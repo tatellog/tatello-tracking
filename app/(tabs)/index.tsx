@@ -16,7 +16,6 @@ import {
 import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
-import type { MoodValue } from '@/features/moods/api'
 import { useAddMoodCheckin } from '@/features/moods/hooks'
 import { useToggleWorkoutToday } from '@/features/streak/hooks'
 import { colors, spacing } from '@/theme'
@@ -114,7 +113,7 @@ function HomeContent({ ctx, cadence }: ContentProps) {
 
         <Animated.View entering={enter(2300)}>
           <MoodPicker
-            value={(ctx.latest_mood?.value ?? null) as MoodValue | null}
+            value={ctx.latest_mood?.value ?? null}
             onChange={(value) => addMood.mutate(value)}
           />
         </Animated.View>

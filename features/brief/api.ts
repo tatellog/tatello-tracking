@@ -1,53 +1,95 @@
+import { z } from 'zod'
+
 import { supabase } from '@/lib/supabase'
-import type { Database } from '@/types/database.types'
-
-type BodyMeasurement = Database['public']['Tables']['body_measurements']['Row']
-type MoodCheckin = Database['public']['Tables']['mood_checkins']['Row']
 
 /*
- * One cell in the 28-day heatmap. `date` is YYYY-MM-DD in
- * America/Mexico_City; `completed` is whether a workout row exists
- * for that day.
- */
-export type StreakCell = {
-  date: string
-  completed: boolean
-}
-
-/*
- * Shape returned by the `get_brief_context` RPC. The Postgres side builds
- * this with jsonb_build_object, so supabase-js typing is Json (opaque);
- * we cast into this shape at the boundary instead of sprinkling casts
- * through the UI. Keys are snake_case on purpose — they match the DB so
- * adapting once, later, is cheaper than adapting on every access.
+ * BriefContext is validated at the supabase-js boundary because the
+ * RPC returns jsonb (opaque Json on the client). A zod schema
+ * replaces the old `as unknown as BriefContext` cast with a real
+ * runtime parse: schema drift on the server surfaces as a thrown
+ * ZodError in the failing query instead of quietly producing
+ * undefined fields that crash inside a component.
  *
- * grid_28_days is oldest first (index 0 = 27 days ago) and today last
- * (index 27 = today). That order matches the row-major fill of the
- * 7×4 visual grid read left-to-right, top-to-bottom.
+ * The schema is the source of truth for the type — `BriefContext`
+ * is inferred from it, so editing the schema and the type stay in
+ * lock-step.
  */
-export type BriefContext = {
-  date: string
-  day_of_week: string // Spanish weekday: 'Domingo' … 'Sábado'
-  streak_days: number
-  today_workout_completed: boolean
-  latest_measurement: BodyMeasurement | null
-  measurement_30d_ago: BodyMeasurement | null
-  grid_28_days: StreakCell[]
-  latest_mood: MoodCheckin | null
-}
+
+const IsoDateSchema = z.string()
+
+const MoodValueSchema = z.enum(['good', 'neutral', 'struggle'])
+
+const BodyMeasurementSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  measured_at: z.string(),
+  weight_kg: z.number().nullable(),
+  waist_cm: z.number().nullable(),
+  chest_cm: z.number().nullable(),
+  hip_cm: z.number().nullable(),
+  thigh_cm: z.number().nullable(),
+  arm_cm: z.number().nullable(),
+  created_at: z.string(),
+})
+
+const MoodCheckinSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  value: MoodValueSchema,
+  checked_at: z.string(),
+  checkin_date: IsoDateSchema,
+  created_at: z.string(),
+})
+
+const StreakCellSchema = z.object({
+  date: IsoDateSchema,
+  completed: z.boolean(),
+})
+
+const MacroTargetsSchema = z.object({
+  user_id: z.string(),
+  protein_g: z.number().int(),
+  calories: z.number().int(),
+  updated_at: z.string(),
+})
+
+const TodayMacrosSchema = z.object({
+  protein_g: z.coerce.number(),
+  calories: z.coerce.number(),
+})
+
+export const BriefContextSchema = z.object({
+  date: IsoDateSchema,
+  day_of_week: z.string(),
+  streak_days: z.number().int(),
+  today_workout_completed: z.boolean(),
+  latest_measurement: BodyMeasurementSchema.nullable(),
+  measurement_30d_ago: BodyMeasurementSchema.nullable(),
+  grid_28_days: z.array(StreakCellSchema).length(28),
+  latest_mood: MoodCheckinSchema.nullable(),
+  targets: MacroTargetsSchema.nullable(),
+  today_macros: TodayMacrosSchema,
+  meal_count_today: z.number().int(),
+})
+
+export type BriefContext = z.infer<typeof BriefContextSchema>
+export type StreakCell = z.infer<typeof StreakCellSchema>
+export type MacroTargetsRow = z.infer<typeof MacroTargetsSchema>
+export type TodayMacros = z.infer<typeof TodayMacrosSchema>
+export type MoodValue = z.infer<typeof MoodValueSchema>
 
 /*
  * Fetch the authenticated user's brief context.
  *
  * p_date is optional — omit for "today in user tz" (server default).
  * p_user_id is omitted on purpose: the RPC defaults it to auth.uid()
- * and rejects any caller-supplied value that doesn't match, so passing
- * it client-side buys nothing and risks silent mismatches.
+ * and rejects any caller-supplied value that doesn't match, so
+ * passing it client-side buys nothing and risks silent mismatches.
  */
 export async function fetchBriefContext(date?: string): Promise<BriefContext> {
   const { data, error } = await supabase.rpc('get_brief_context', {
     p_date: date,
   })
   if (error) throw error
-  return data as unknown as BriefContext
+  return BriefContextSchema.parse(data)
 }

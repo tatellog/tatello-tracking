@@ -68,4 +68,16 @@ export const MOCK_BRIEF_CONTEXT: BriefContext = {
   },
   grid_28_days: buildGrid(),
   latest_mood: null,
+  // Sprint 2.5 — macros (populated so rings render at ~65% / ~82%).
+  targets: {
+    user_id: 'mock-user',
+    protein_g: 130,
+    calories: 1800,
+    updated_at: `${MOCK_TODAY}T09:00:00Z`,
+  },
+  today_macros: {
+    protein_g: 85,
+    calories: 1470,
+  },
+  meal_count_today: 3,
 }
