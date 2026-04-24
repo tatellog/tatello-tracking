@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
+import { useRouter } from 'expo-router'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
@@ -8,15 +9,19 @@ import { colors, radius, spacing, typography } from '@/theme'
 const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
 
 /*
- * Placeholder settings screen — Sprint 2 spec T13 calls for a
- * single sign-out entry; richer settings arrive in Sprint 3/4
- * alongside profile, goals, HealthKit and so on. The theme toggle
- * that used to live here is gone: dark mode is post-MVP, and the
- * header moon icon is decorative only.
+ * Placeholder settings screen — richer settings (profile, HealthKit,
+ * notifications) arrive in Sprint 3/4. For now: a macros goal link
+ * and a sign-out entry. Theme toggle stays post-MVP.
  */
 export default function SettingsScreen() {
+  const router = useRouter()
+
   const handleSignOut = () => {
     supabase.auth.signOut().catch(() => {})
+  }
+
+  const editTargets = () => {
+    router.push('/onboarding/macro-targets?source=settings')
   }
 
   return (
@@ -27,13 +32,21 @@ export default function SettingsScreen() {
           <Text style={styles.meta}>tracking-app · v1.0.0</Text>
         </Animated.View>
 
-        <Animated.View entering={enter(150)}>
+        <Animated.View entering={enter(150)} style={styles.group}>
+          <Text style={styles.sectionLabel}>NUTRICIÓN</Text>
+          <Pressable onPress={editTargets} style={styles.row} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Editar metas diarias</Text>
+            <Text style={styles.rowHint}>›</Text>
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View entering={enter(220)}>
           <Pressable onPress={handleSignOut} style={styles.signOut}>
             <Text style={styles.signOutLabel}>Cerrar sesión</Text>
           </Pressable>
         </Animated.View>
 
-        <Animated.View entering={enter(280)}>
+        <Animated.View entering={enter(320)}>
           <Text style={styles.footer}>Un acto silencioso cada mañana</Text>
         </Animated.View>
       </ScrollView>
@@ -50,7 +63,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
-    gap: spacing.xxl,
+    gap: spacing.xl,
   },
   headline: {
     fontFamily: typography.displayMedium,
@@ -63,6 +76,35 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.label,
     color: colors.goldSoft,
     marginTop: spacing.xs,
+  },
+  group: {
+    gap: spacing.sm,
+  },
+  sectionLabel: {
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: typography.letterSpacing.label,
+    color: colors.goldBurnt,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.input,
+    backgroundColor: colors.creamSoft,
+    borderWidth: 0.5,
+    borderColor: colors.goldAlpha20,
+  },
+  rowLabel: {
+    fontFamily: typography.prose,
+    fontSize: typography.sizes.body,
+    fontStyle: 'italic',
+    color: colors.forestDeep,
+  },
+  rowHint: {
+    color: colors.goldBurnt,
+    fontSize: 18,
   },
   signOut: {
     alignSelf: 'flex-start',
