@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useBriefContext } from '@/features/brief/hooks'
+import { patchBriefCache, restoreBriefCache } from '@/lib/briefCache'
 import { queryKeys } from '@/lib/queryKeys'
 
 import {
@@ -15,36 +16,7 @@ import {
   type MealInput,
 } from './api'
 
-import type { BriefContext, MacroTargetsRow } from '@/features/brief/api'
-
-type OptimisticContext = { previous: [readonly unknown[], unknown][] }
-
-/*
- * Helper: apply a pure transform to every cached BriefContext under
- * queryKeys.brief.*. Returns a snapshot so the onError can restore.
- * Shared by create/update/delete optimistic paths.
- */
-function patchBriefCache(
-  qc: ReturnType<typeof useQueryClient>,
-  transform: (ctx: BriefContext) => BriefContext,
-): OptimisticContext {
-  const previous = qc.getQueriesData<BriefContext>({ queryKey: queryKeys.brief.all })
-  qc.setQueriesData<BriefContext>({ queryKey: queryKeys.brief.all }, (ctx) => {
-    if (!ctx) return ctx
-    return transform(ctx)
-  })
-  return { previous: previous as [readonly unknown[], unknown][] }
-}
-
-function restoreBriefCache(
-  qc: ReturnType<typeof useQueryClient>,
-  context: OptimisticContext | undefined,
-) {
-  if (!context) return
-  for (const [key, data] of context.previous) {
-    qc.setQueryData(key, data)
-  }
-}
+import type { MacroTargetsRow } from '@/features/brief/api'
 
 /* ─── targets ────────────────────────────────────────────────────── */
 
