@@ -12,5 +12,10 @@
     --text-tertiary: 156 163 175;
     --border-default: 229 231 235;
     --border-muted: 243 244 246;
+
+    --bg-amber-soft: 254 243 199;
+    --text-amber-strong: 146 64 14;
+    --bg-success: 209 250 229;
+    --text-success: 6 95 70;
   }
 }

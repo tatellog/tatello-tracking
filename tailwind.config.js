@@ -19,11 +19,15 @@ module.exports = {
         primary: 'rgb(var(--bg-primary) / <alpha-value>)',
         secondary: 'rgb(var(--bg-secondary) / <alpha-value>)',
         tertiary: 'rgb(var(--bg-tertiary) / <alpha-value>)',
+        'amber-soft': 'rgb(var(--bg-amber-soft) / <alpha-value>)',
+        success: 'rgb(var(--bg-success) / <alpha-value>)',
       },
       textColor: {
         primary: 'rgb(var(--text-primary) / <alpha-value>)',
         secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
         tertiary: 'rgb(var(--text-tertiary) / <alpha-value>)',
+        'amber-strong': 'rgb(var(--text-amber-strong) / <alpha-value>)',
+        success: 'rgb(var(--text-success) / <alpha-value>)',
       },
       borderColor: {
         DEFAULT: 'rgb(var(--border-default) / <alpha-value>)',
