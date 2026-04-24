@@ -96,6 +96,33 @@ export type Database = {
         }
         Relationships: []
       }
+      mood_checkins: {
+        Row: {
+          checked_at: string
+          checkin_date: string | null
+          created_at: string
+          id: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          checked_at?: string
+          checkin_date?: string | null
+          created_at?: string
+          id?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          checked_at?: string
+          checkin_date?: string | null
+          created_at?: string
+          id?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: []
+      }
       photos: {
         Row: {
           angle: string | null
