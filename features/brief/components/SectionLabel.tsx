@@ -6,7 +6,5 @@ type Props = {
 }
 
 export function SectionLabel({ children }: Props) {
-  return (
-    <Text className="text-xs uppercase tracking-widest text-tertiary">{children}</Text>
-  )
+  return <Text className="text-xs uppercase tracking-widest text-tertiary">{children}</Text>
 }

@@ -17,9 +17,7 @@ export function WorkoutCheckIn({ completed, onPress }: Props) {
     >
       <Text
         className={
-          completed
-            ? 'text-base font-medium text-success'
-            : 'text-base font-medium text-primary'
+          completed ? 'text-base font-medium text-success' : 'text-base font-medium text-primary'
         }
       >
         {completed ? '✓ Entrenado hoy' : '¿Entrenaste hoy?'}

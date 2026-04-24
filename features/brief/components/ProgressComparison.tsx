@@ -41,11 +41,7 @@ export function ProgressComparison({
 function Photo({ source, label }: { source: ImageSourcePropType; label: string }) {
   return (
     <View className="relative flex-1">
-      <Image
-        source={source}
-        resizeMode="cover"
-        className="aspect-[3/4] w-full rounded-md"
-      />
+      <Image source={source} resizeMode="cover" className="aspect-[3/4] w-full rounded-md" />
       <View className="absolute bottom-2 left-2 rounded-sm bg-white/85 px-2 py-1">
         <Text className="text-xs text-primary">{label}</Text>
       </View>
