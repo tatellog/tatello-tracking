@@ -137,6 +137,7 @@ export type BriefData = typeof mockBriefData
 Ubicación: `/features/brief/components/`
 
 **StreakHero.tsx**
+
 - Layout vertical centrado
 - Label superior: "RACHA" (11px, uppercase, letter-spacing amplio, text-tertiary)
 - Número grande: 56-64px, font-weight 500, text-primary
@@ -144,6 +145,7 @@ Ubicación: `/features/brief/components/`
 - Props: `{ days: number }`
 
 **ProgressComparison.tsx**
+
 - Label superior: "TU PROGRESO" (mismo estilo que el label de StreakHero)
 - Grid 2 columnas con gap pequeño, cada foto aspect-ratio 3:4, rounded-md
 - Cada foto con un label flotante en bottom-left (fondo semi-transparente blanco, texto oscuro, padding pequeño): "hace 30 días", "hoy"
@@ -151,12 +153,14 @@ Ubicación: `/features/brief/components/`
 - Props: `{ before: ImageSource, after: ImageSource, beforeLabel: string, afterLabel: string, weightDeltaKg: number, waistDeltaCm: number, periodWeeks: number }`
 
 **MetricPair.tsx**
+
 - Grid 2 columnas con gap
 - Cada item: fondo bg-secondary, rounded-md, padding interno
 - Dentro: label pequeño (11px, text-secondary), número grande (18px, font-weight 500), unidad inline más pequeña y muted
 - Props: `{ items: Array<{ label: string, value: number | string, unit?: string }> }`
 
 **PatternAlert.tsx**
+
 - Fondo ámbar muy suave (ej custom `bg-amber-soft`), texto ámbar oscuro
 - Label "PATRÓN" uppercase arriba (11px, letter-spacing)
 - Mensaje debajo en 13px, line-height relaxed
@@ -164,6 +168,7 @@ Ubicación: `/features/brief/components/`
 - Props: `{ detected: boolean, message: string }`
 
 **WorkoutCheckIn.tsx**
+
 - Botón full-width, padding vertical generoso (~14px), rounded-md
 - Label: "¿Entrenaste hoy?" cuando `completed === false`
 - Label: "✓ Entrenado hoy" cuando `completed === true` (con estilo success visual distinto)
@@ -189,6 +194,7 @@ En `/app/(tabs)/index.tsx`:
 ### Tarea 8 — README
 
 Crear `README.md` en la raíz con:
+
 - Descripción breve (1-2 líneas)
 - Stack
 - Prerequisitos (Node 20+, pnpm, Xcode con simulator)
