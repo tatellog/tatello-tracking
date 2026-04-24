@@ -68,10 +68,13 @@ export function MacroRing({
   const radius = (size - STROKE_WIDTH) / 2
   const circumference = 2 * Math.PI * radius
 
+  const hasTarget = target > 0
+
   const dashOffset = useSharedValue(circumference)
 
   useEffect(() => {
-    const pct = target > 0 ? current / target : 0
+    if (!hasTarget) return
+    const pct = current / target
     const clamped = Math.max(0, Math.min(1, pct))
     const nextOffset = circumference * (1 - clamped)
     cancelAnimation(dashOffset)
@@ -79,11 +82,41 @@ export function MacroRing({
       delayMs,
       withTiming(nextOffset, { duration: duration.slow * 3, easing: easing.out }),
     )
-  }, [current, target, circumference, delayMs, dashOffset])
+  }, [current, target, hasTarget, circumference, delayMs, dashOffset])
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: dashOffset.value,
   }))
+
+  // Defensive: a target of 0 or less shouldn't happen (the DB CHECK
+  // enforces > 0), but if bad data slips through we render a muted
+  // placeholder instead of misleading math (div-by-zero → empty
+  // ring + "+N over" indicator pretending the user blew past an
+  // undefined goal).
+  if (!hasTarget) {
+    return (
+      <View
+        style={{ width: size, height: size }}
+        accessibilityLabel={accessibilityLabel ?? `${label} sin meta`}
+      >
+        <Svg width={size} height={size} style={styles.svg}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={colors.goldDivider}
+            strokeWidth={STROKE_WIDTH}
+            fill="none"
+            opacity={0.35}
+          />
+        </Svg>
+        <View style={styles.centerWrap} pointerEvents="none">
+          <Text style={styles.number}>—</Text>
+          <Text style={styles.label}>{label.toUpperCase()}</Text>
+        </View>
+      </View>
+    )
+  }
 
   const over = Math.max(0, Math.round(current - target))
   const ringColor = over > 0 ? OVER_COLORS[color] : RING_COLORS[color]
