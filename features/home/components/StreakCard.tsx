@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
+  useAnimatedProps,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -168,12 +170,56 @@ function TodayCell({ index }: { index: number }) {
   )
 }
 
-/* ─── streak number ──────────────────────────────────────────────── */
+/* ─── streak number (with count-up animation) ────────────────────── */
 
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
+const COUNT_UP_DURATION = 800
+
+/*
+ * Animates count → target with a decelerating curve on the UI
+ * thread. Reanimated's `text` animated prop on a TextInput bypasses
+ * React re-renders entirely — the number visibly climbs without
+ * ticking through state updates.
+ *
+ * On first mount the displayed value is set directly to `count`
+ * (no anim, avoids 'counting from 0 on every cold start'). On
+ * subsequent prop changes, it withTimings from the previous value
+ * to the new one, so the tap-to-seal + undo flows make the number
+ * crawl up or back naturally.
+ */
 function StreakNumber({ count }: { count: number }) {
+  const displayed = useSharedValue(count)
+  const previous = useRef(count)
+
+  useEffect(() => {
+    if (previous.current === count) return
+    displayed.value = withTiming(count, {
+      duration: COUNT_UP_DURATION,
+      easing: Easing.out(Easing.cubic),
+    })
+    previous.current = count
+  }, [count, displayed])
+
+  const rounded = useDerivedValue(() => Math.round(displayed.value))
+
+  const animatedProps = useAnimatedProps(() => {
+    const text = String(rounded.value)
+    // 'text' isn't in TextInputProps' public surface — reanimated
+    // supports it via native-side update. Cast through unknown to
+    // satisfy the type system without forcing an `any` in callers.
+    return { text, defaultValue: text } as unknown as Partial<TextInputProps>
+  })
+
   return (
     <View style={styles.numberWrap}>
-      <Text style={styles.bigNumber}>{count}</Text>
+      <AnimatedTextInput
+        editable={false}
+        underlineColorAndroid="transparent"
+        animatedProps={animatedProps}
+        defaultValue={String(count)}
+        accessibilityLabel={`${count} días`}
+        style={styles.bigNumber}
+      />
       <Text style={styles.seguidos}>SEGUIDOS</Text>
     </View>
   )
