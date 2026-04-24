@@ -1,18 +1,5 @@
 import { requireUserId, supabase } from '@/lib/supabase'
-
-/*
- * All workout dates are expressed in the user's local timezone on the
- * server (workouts.workout_date is `(completed_at at time zone TZ)::date`
- * generated). We mirror the same timezone here so delete targets match.
- * Hardcoded for Sprint 1; when the app goes multi-region this becomes
- * a profile setting and is threaded through both sides.
- */
-const USER_TIMEZONE = 'America/Mexico_City'
-
-/* YYYY-MM-DD in the given timezone — `en-CA` locale formats that way natively. */
-function todayInTimezone(tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
-}
+import { todayInTimezone } from '@/lib/time'
 
 /*
  * Log today's workout. Idempotent: the table has a unique (user_id,
@@ -37,6 +24,6 @@ export async function unmarkWorkoutToday(): Promise<void> {
     .from('workouts')
     .delete()
     .eq('user_id', userId)
-    .eq('workout_date', todayInTimezone(USER_TIMEZONE))
+    .eq('workout_date', todayInTimezone())
   if (error) throw error
 }
