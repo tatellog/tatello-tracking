@@ -46,19 +46,24 @@ export default function RootLayout() {
     if (ready) SplashScreen.hideAsync().catch(() => {})
   }, [ready])
 
+  // Dev escape hatch: with EXPO_PUBLIC_SKIP_AUTH=true in .env.local
+  // the app boots straight into (tabs) for UI iteration against mock
+  // data. The variable must be unset in any real build.
+  const skipAuth = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
+
   // Route guard: send unauthenticated users to /auth, and bounce
   // already-authenticated users off /auth back into the tabs. Gated
   // behind `ready` so we don't redirect during the initial hydration
   // flash (which would race against the splash screen).
   useEffect(() => {
-    if (!ready) return
+    if (!ready || skipAuth) return
     const onAuthScreen = segments[0] === 'auth'
     if (!session && !onAuthScreen) {
       router.replace('/auth')
     } else if (session && onAuthScreen) {
       router.replace('/(tabs)')
     }
-  }, [ready, session, segments, router])
+  }, [ready, session, segments, router, skipAuth])
 
   if (!ready) return null
 
