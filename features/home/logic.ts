@@ -63,3 +63,61 @@ export function deriveContextMessage(ctx: BriefContext, state: DayState): string
   if (ctx.today_workout_completed) return 'Hoy ya está sellado. Mantén el ritmo.'
   return `Vas ${ctx.streak_days} días seguidos. Uno más.`
 }
+
+/* ─── checkin bar ─────────────────────────────────────────────────── */
+
+export type WorkoutCheckinState = 'early' | 'urgent' | 'completed'
+
+/*
+ * Decide which of the three states the WorkoutCheckinBar should
+ * render. Pure: all inputs explicit, no new Date() reads inside.
+ *
+ * Urgency triggers:
+ *   - hour >= 17 on any day
+ *   - weekend (Sun=0 / Sat=6) after 14:00
+ *   - risky pattern: the last three occurrences of today's weekday
+ *     include at least two non-completed entries. Catches the
+ *     'three saturdays in a row with no training' warning before
+ *     it becomes a broken streak.
+ */
+export function deriveCheckinState(
+  workoutCompleted: boolean,
+  hour: number,
+  dayOfWeek: number,
+  gridDays: StreakCell[],
+): WorkoutCheckinState {
+  if (workoutCompleted) return 'completed'
+
+  const sameDayOfWeekHistory = gridDays
+    .filter((d) => dayOfWeekOf(d.date) === dayOfWeek)
+    // Drop today (last match) and take the previous three.
+    .slice(-4, -1)
+
+  const hasRiskyPattern =
+    sameDayOfWeekHistory.length >= 3 && sameDayOfWeekHistory.filter((d) => !d.completed).length >= 2
+
+  const isLate = hour >= 17
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+  const isRiskyWeekend = isWeekend && hour >= 14
+
+  if (isLate || isRiskyWeekend || hasRiskyPattern) return 'urgent'
+  return 'early'
+}
+
+export function deriveCheckinCopy(
+  state: WorkoutCheckinState,
+  dayOfWeek: string,
+): { label: string; prompt: string } {
+  const label = `Hoy · ${dayOfWeek}`
+  switch (state) {
+    case 'early':
+      return { label, prompt: 'Todavía no la has cerrado.' }
+    case 'urgent':
+      return { label, prompt: 'No pierdas la racha.' }
+    case 'completed':
+      // Not consumed in the completed bar — that layout renders its
+      // own copy. Return an empty shape so callers don't have to
+      // special-case the return type.
+      return { label: '', prompt: '' }
+  }
+}
