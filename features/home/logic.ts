@@ -9,11 +9,12 @@ export type DayState = 'on-level' | 'caution' | 'risk'
  * where the same ctx feeds a prompt and the model returns richer,
  * more specific copy.
  *
- * Every function here is pure and takes BriefContext as the single
- * source of truth. The only ambient reads are `new Date().getHours()`
- * for the local wall-clock; day-of-week comes from ctx.day_of_week
- * (server-computed in America/Mexico_City) so timezone drift on the
- * device clock can't flip Saturday to Friday.
+ * Every function here is pure: `hour` is injected by the caller
+ * instead of being read from `new Date()` inside, so tests become
+ * deterministic regardless of the machine timezone. Day-of-week
+ * comes from ctx.day_of_week (server-computed in
+ * America/Mexico_City) so local drift can't flip Saturday to
+ * Friday either.
  */
 
 const WEEKEND_DAYS = new Set(['Sábado', 'Domingo'])
@@ -30,17 +31,15 @@ function dayOfWeekOf(isoDate: string): number {
   return new Date(y, m - 1, d).getDay()
 }
 
-export function deriveDayState(ctx: BriefContext): DayState {
+export function deriveDayState(ctx: BriefContext, hour: number): DayState {
   if (ctx.today_workout_completed) return 'on-level'
-  const hour = new Date().getHours()
   if (hour >= 19) return 'risk'
   if (WEEKEND_DAYS.has(ctx.day_of_week) && hour >= 14) return 'caution'
   return 'on-level'
 }
 
-export function deriveAnchorAction(ctx: BriefContext, state: DayState): string {
+export function deriveAnchorAction(ctx: BriefContext, state: DayState, hour: number): string {
   if (ctx.today_workout_completed) return '✓ Entreno de hoy hecho.'
-  const hour = new Date().getHours()
   if (state === 'risk') return 'Entrena antes de dormir.'
   if (state === 'caution' && WEEKEND_DAYS.has(ctx.day_of_week)) {
     return 'Entrena antes de las 6.'

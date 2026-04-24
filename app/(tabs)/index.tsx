@@ -65,8 +65,9 @@ export default function HomeScreen() {
 type ContentProps = { ctx: BriefContext; cadence: Cadence }
 
 function HomeContent({ ctx, cadence }: ContentProps) {
-  const state = deriveDayState(ctx)
-  const anchor = deriveAnchorAction(ctx, state)
+  const hour = new Date().getHours()
+  const state = deriveDayState(ctx, hour)
+  const anchor = deriveAnchorAction(ctx, state, hour)
   const contextMessage = deriveContextMessage(ctx, state)
 
   const weightDeltaKg = calcDelta(
