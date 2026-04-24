@@ -12,7 +12,7 @@ export function WorkoutCheckIn({ completed, onPress }: Props) {
       className={
         completed
           ? 'w-full items-center rounded-md bg-success px-4 py-4'
-          : 'w-full items-center rounded-md border border-default bg-secondary px-4 py-4'
+          : 'w-full items-center rounded-md border border-muted bg-secondary px-4 py-4'
       }
     >
       <Text
