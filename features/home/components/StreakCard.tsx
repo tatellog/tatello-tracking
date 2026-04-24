@@ -37,8 +37,15 @@ const CELL_DELAY_MS = 40
  * told to.
  */
 export function StreakCard({ days, streakCount, contextMessage }: Props) {
+  const summaryLabel = `Tu racha: ${streakCount} días seguidos. ${contextMessage}`
+
   return (
-    <View style={styles.card}>
+    <View
+      style={styles.card}
+      accessible
+      accessibilityRole="summary"
+      accessibilityLabel={summaryLabel}
+    >
       <View style={styles.header}>
         <Text style={styles.label}>TU RACHA</Text>
         <Text style={styles.subLabel}>ÚLTIMOS 28 DÍAS</Text>

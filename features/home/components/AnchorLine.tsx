@@ -14,7 +14,12 @@ type Props = {
  */
 export function AnchorLine({ text }: Props) {
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={`Ancla de hoy: ${text}`}
+    >
       <Text style={styles.label}>ANCLA DE HOY</Text>
       <Text style={styles.text}>{text}</Text>
     </View>

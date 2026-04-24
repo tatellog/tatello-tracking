@@ -61,14 +61,32 @@ export function DeltaPair({ weightDeltaKg, waistDeltaCm, periodWeeks = 4 }: Prop
 
   if (weightDeltaKg === undefined && waistDeltaCm === undefined) {
     return (
-      <View style={styles.empty}>
+      <View
+        style={styles.empty}
+        accessible
+        accessibilityLabel="Todavía no hay medidas registradas. Agregá tu primera medida."
+      >
         <Text style={styles.emptyText}>Agrega tu primera medida</Text>
       </View>
     )
   }
 
+  const summaryLabel = [
+    weightDeltaKg !== undefined &&
+      `Peso: ${formatSigned(weightDeltaKg)} kilos en ${periodWeeks} semanas`,
+    waistDeltaCm !== undefined &&
+      `cintura: ${formatSigned(waistDeltaCm)} centímetros en ${periodWeeks} semanas`,
+  ]
+    .filter(Boolean)
+    .join('. ')
+
   return (
-    <Animated.View style={[styles.row, animStyle]}>
+    <Animated.View
+      style={[styles.row, animStyle]}
+      accessible
+      accessibilityRole="summary"
+      accessibilityLabel={summaryLabel}
+    >
       <DeltaColumn value={weightDeltaKg} unit="kg" label="peso" periodWeeks={periodWeeks} />
       <LinearGradient
         colors={['transparent', colors.goldDivider, 'transparent']}
