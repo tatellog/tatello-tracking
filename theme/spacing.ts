@@ -19,6 +19,7 @@ export const spacing = {
 
 export const radius = {
   cell: 6,
+  input: 12,
   card: 22,
   screen: 38,
   pill: 100,

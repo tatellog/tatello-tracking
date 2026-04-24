@@ -1,7 +1,16 @@
 import { Feather } from '@expo/vector-icons'
 import { useEffect, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import Animated, {
+  Easing,
   FadeInDown,
   ZoomIn,
   interpolateColor,
@@ -11,26 +20,28 @@ import Animated, {
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { duration, easing } from '@/design/motion'
-import { shadow, useColors } from '@/design/tokens'
-import { Body, Editorial, Headline, Meta } from '@/design/typography'
 import { supabase } from '@/lib/supabase'
+import { colors, radius, shadows, spacing, typography } from '@/theme'
 
 type Status = 'idle' | 'sending' | 'sent' | 'error'
 
+const QUICK_MS = 150
+const STANDARD_MS = 250
+const SLOW_MS = 400
+const LANGUID_MS = 600
+
 const enter = (delayMs: number) =>
-  FadeInDown.duration(duration.slow).delay(delayMs).springify().damping(18)
+  FadeInDown.duration(SLOW_MS).delay(delayMs).springify().damping(18)
 
 /*
- * Magic-link entry point. The user types an email, we call signInWithOtp,
- * and Supabase emails a deep link back into the app. The root layout's
- * useMagicLinkHandler exchanges the tokens when they tap it.
+ * Magic-link entry point. Typing an email + submitting fires
+ * signInWithOtp; Supabase sends a link that deep-links back into the
+ * app, where useMagicLinkHandler at the root exchanges the tokens.
  *
- * Motion language: every state transition carries a rose-gold signal —
- * the input border warms into accent-warm on focus, the submit capsule
- * interpolates from raised (disabled) to accent-warm (ready), and the
- * sent confirmation blooms with a spring. Tap feedback is a 0.97 scale
- * pulse on the UI thread so it never fights the JS bridge.
+ * Motion language: the input border warms into copper on focus, the
+ * submit capsule interpolates from raised (disabled) to copper (ready),
+ * and the sent confirmation blooms with a spring. Tap feedback is a
+ * 0.97 scale pulse on the UI thread so it never fights the JS bridge.
  */
 export default function AuthScreen() {
   const [email, setEmail] = useState('')
@@ -65,24 +76,24 @@ export default function AuthScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="flex-1 justify-between px-6 pb-6 pt-12">
+        <View style={styles.container}>
           <BrandMark />
 
-          <View className="gap-8">
-            <Animated.View entering={enter(100)} className="gap-3">
-              <Headline>Entrá con tu email</Headline>
-              <Editorial className="text-secondary">
+          <View style={styles.stack}>
+            <Animated.View entering={enter(100)} style={{ gap: spacing.sm }}>
+              <Text style={styles.headline}>Entrá con tu email</Text>
+              <Text style={styles.editorial}>
                 Un link mágico. Sin passwords, sin cuentas nuevas.
-              </Editorial>
+              </Text>
             </Animated.View>
 
-            <Animated.View entering={enter(180)} className="gap-3">
-              <Meta>EMAIL</Meta>
+            <Animated.View entering={enter(180)} style={{ gap: spacing.sm }}>
+              <Text style={styles.meta}>EMAIL</Text>
               <EmailInput
                 value={email}
                 onChangeText={setEmail}
@@ -97,13 +108,13 @@ export default function AuthScreen() {
 
             {errorMessage && (
               <Animated.View entering={enter(0)}>
-                <Body className="text-accent-warm-strong">{errorMessage}</Body>
+                <Text style={styles.error}>{errorMessage}</Text>
               </Animated.View>
             )}
           </View>
 
           <Animated.View entering={enter(340)}>
-            <Editorial className="text-center text-tertiary">Nunca compartimos tu email</Editorial>
+            <Text style={[styles.editorial, styles.footerNote]}>Nunca compartimos tu email</Text>
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
@@ -113,9 +124,9 @@ export default function AuthScreen() {
 
 function BrandMark() {
   return (
-    <Animated.View entering={enter(0)} className="gap-3">
-      <Meta>TRACKING-APP</Meta>
-      <View className="h-px w-12 bg-accent-warm/50" />
+    <Animated.View entering={enter(0)} style={{ gap: spacing.sm }}>
+      <Text style={styles.meta}>TRACKING-APP</Text>
+      <View style={styles.brandBar} />
     </Animated.View>
   )
 }
@@ -127,20 +138,14 @@ type EmailInputProps = {
   disabled: boolean
 }
 
-/*
- * Email input with an animated focus state. Border interpolates from
- * border-subtle (idle) to accent-warm (focused) over 250ms. The mail
- * glyph and caret both warm to rose-gold to reinforce the signal.
- */
 function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInputProps) {
-  const colors = useColors()
   const [focused, setFocused] = useState(false)
   const focusProgress = useSharedValue(0)
 
   useEffect(() => {
     focusProgress.value = withTiming(focused ? 1 : 0, {
-      duration: duration.standard,
-      easing: easing.standard,
+      duration: STANDARD_MS,
+      easing: Easing.inOut(Easing.ease),
     })
   }, [focusProgress, focused])
 
@@ -148,20 +153,13 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
     borderColor: interpolateColor(
       focusProgress.value,
       [0, 1],
-      [colors.border.subtle, colors.accent.warm],
+      [colors.goldAlpha20, colors.copperVivid],
     ),
   }))
 
   return (
-    <Animated.View
-      style={animatedContainer}
-      className="flex-row items-center rounded-lg border bg-paper pl-4"
-    >
-      <Feather
-        name="mail"
-        size={18}
-        color={focused ? colors.accent.warm : colors.content.tertiary}
-      />
+    <Animated.View style={[styles.inputContainer, animatedContainer]}>
+      <Feather name="mail" size={18} color={focused ? colors.copperVivid : colors.goldSoft} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -169,9 +167,9 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder="tu@email.com"
-        placeholderTextColor={colors.content.disabled}
-        selectionColor={colors.accent.warm}
-        cursorColor={colors.accent.warm}
+        placeholderTextColor={colors.goldSoft}
+        selectionColor={colors.copperVivid}
+        cursorColor={colors.copperVivid}
         autoCapitalize="none"
         autoComplete="email"
         autoCorrect={false}
@@ -179,7 +177,7 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
         textContentType="emailAddress"
         editable={!disabled}
         returnKeyType="send"
-        className="ml-3 flex-1 py-4 pr-4 text-base text-primary"
+        style={styles.input}
       />
     </Animated.View>
   )
@@ -191,65 +189,43 @@ type SubmitButtonProps = {
   onPress: () => void
 }
 
-/*
- * Submit capsule — the one place we let the rose-gold breathe. Only the
- * background is animated (raised → accent-warm, 250ms) so the color
- * shift reads as the button "waking up" when the email is valid. Text
- * and icon swap via className for crisp state; they're always the cream
- * `on-accent` tone when the button is ready, disabled-gray otherwise.
- * Tap feedback is a 0.97 scale pulse on the UI thread.
- */
 function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
-  const colors = useColors()
   const scale = useSharedValue(1)
   const ready = useSharedValue(canSubmit ? 1 : 0)
 
   useEffect(() => {
     ready.value = withTiming(canSubmit ? 1 : 0, {
-      duration: duration.standard,
-      easing: easing.standard,
+      duration: STANDARD_MS,
+      easing: Easing.inOut(Easing.ease),
     })
   }, [ready, canSubmit])
 
   const animatedContainer = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    backgroundColor: interpolateColor(
-      ready.value,
-      [0, 1],
-      [colors.surface.raised, colors.accent.warm],
-    ),
+    backgroundColor: interpolateColor(ready.value, [0, 1], [colors.creamShade, colors.copperVivid]),
   }))
 
   const onPressIn = () => {
     if (!canSubmit) return
-    scale.value = withTiming(0.97, { duration: duration.quick, easing: easing.out })
+    scale.value = withTiming(0.97, { duration: QUICK_MS, easing: Easing.out(Easing.cubic) })
   }
   const onPressOut = () => {
-    scale.value = withTiming(1, { duration: duration.standard, easing: easing.out })
+    scale.value = withTiming(1, { duration: STANDARD_MS, easing: Easing.out(Easing.cubic) })
   }
 
   const showIcon = canSubmit && !isSending
 
   return (
-    <Animated.View
-      style={[animatedContainer, canSubmit ? shadow.md : null]}
-      className="rounded-full"
-    >
+    <Animated.View style={[styles.submitWrap, canSubmit && shadows.card, animatedContainer]}>
       <Pressable
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         disabled={!canSubmit}
-        className="flex-row items-center justify-center gap-2 px-5 py-4"
+        style={styles.submitPressable}
       >
-        {showIcon && <Feather name="arrow-right" size={16} color={colors.content.onAccent} />}
-        <Text
-          className={
-            canSubmit
-              ? 'font-serif-italic text-base text-on-accent'
-              : 'font-serif-italic text-base text-disabled'
-          }
-        >
+        {showIcon && <Feather name="arrow-right" size={16} color={colors.creamWarm} />}
+        <Text style={[styles.submitLabel, !canSubmit && styles.submitLabelDisabled]}>
           {isSending ? 'Enviando…' : 'Enviarme el link'}
         </Text>
       </Pressable>
@@ -257,34 +233,24 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
   )
 }
 
-/*
- * Sent confirmation — the circle blooms in with a spring (ZoomIn) to make
- * the success moment feel earned. Then the headline and editorial settle
- * in a beat later for a gentle cascade.
- */
 function SentState({ email }: { email: string }) {
-  const colors = useColors()
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
-      <View className="flex-1 justify-between px-6 pb-6 pt-12">
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.container}>
         <BrandMark />
 
-        <View className="items-center gap-5">
+        <View style={styles.sentBlock}>
           <Animated.View
-            entering={ZoomIn.duration(duration.languid)
-              .delay(120)
-              .springify()
-              .damping(12)
-              .stiffness(180)}
-            className="h-16 w-16 items-center justify-center rounded-full bg-accent-cool-soft"
+            entering={ZoomIn.duration(LANGUID_MS).delay(120).springify().damping(12).stiffness(180)}
+            style={styles.sentIcon}
           >
-            <Feather name="mail" size={26} color={colors.accent.coolStrong} />
+            <Feather name="mail" size={26} color={colors.copperShade} />
           </Animated.View>
-          <Animated.View entering={enter(220)} className="items-center gap-3">
-            <Headline className="text-center">Revisá tu email</Headline>
-            <Editorial className="text-center text-secondary">
+          <Animated.View entering={enter(220)} style={styles.sentText}>
+            <Text style={[styles.headline, styles.centered]}>Revisá tu email</Text>
+            <Text style={[styles.editorial, styles.centered]}>
               Te mandamos un link a {email}. Abrilo desde el teléfono y te traemos de vuelta.
-            </Editorial>
+            </Text>
           </Animated.View>
         </View>
 
@@ -293,3 +259,111 @@ function SentState({ email }: { email: string }) {
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.creamWarm,
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    paddingTop: 48,
+    paddingBottom: spacing.xl,
+  },
+  stack: {
+    gap: spacing.xxl,
+  },
+  brandBar: {
+    height: 1,
+    width: 48,
+    backgroundColor: colors.copperVivid,
+    opacity: 0.5,
+  },
+  headline: {
+    fontFamily: typography.displayMedium,
+    fontSize: typography.sizes.anchor,
+    color: colors.forestDeep,
+    letterSpacing: typography.letterSpacing.display,
+  },
+  editorial: {
+    fontFamily: typography.prose,
+    fontSize: typography.sizes.prose,
+    color: colors.forestSoft,
+    fontStyle: 'italic',
+    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
+  },
+  footerNote: {
+    textAlign: 'center',
+    color: colors.goldSoft,
+  },
+  meta: {
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: typography.letterSpacing.label,
+    color: colors.goldBurnt,
+  },
+  error: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.copperShade,
+  },
+
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.input,
+    borderWidth: 1,
+    backgroundColor: colors.creamSoft,
+    paddingLeft: spacing.md,
+  },
+  input: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    paddingVertical: 14,
+    paddingRight: spacing.md,
+    fontSize: typography.sizes.body,
+    color: colors.forestDeep,
+  },
+
+  submitWrap: {
+    borderRadius: radius.pill,
+  },
+  submitPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  submitLabel: {
+    fontFamily: typography.prose,
+    fontSize: typography.sizes.body,
+    fontStyle: 'italic',
+    color: colors.creamWarm,
+  },
+  submitLabelDisabled: {
+    color: colors.goldSoft,
+  },
+
+  sentBlock: {
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  sentIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.creamSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sentText: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  centered: {
+    textAlign: 'center',
+  },
+})
