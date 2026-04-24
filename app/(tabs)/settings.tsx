@@ -1,40 +1,90 @@
-import { ScrollView, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { duration } from '@/design/motion'
-import { Editorial, Headline, Meta } from '@/design/typography'
-import { ThemePicker } from '@/features/settings/components/ThemePicker'
+import { supabase } from '@/lib/supabase'
+import { colors, radius, spacing, typography } from '@/theme'
 
-const enter = (delayMs: number) =>
-  FadeInDown.duration(duration.slow).delay(delayMs).springify().damping(18)
+const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
 
+/*
+ * Placeholder settings screen — Sprint 2 spec T13 calls for a
+ * single sign-out entry; richer settings arrive in Sprint 3/4
+ * alongside profile, goals, HealthKit and so on. The theme toggle
+ * that used to live here is gone: dark mode is post-MVP, and the
+ * header moon icon is decorative only.
+ */
 export default function SettingsScreen() {
+  const handleSignOut = () => {
+    supabase.auth.signOut().catch(() => {})
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-6 pt-4 pb-8"
-        showsVerticalScrollIndicator={false}
-      >
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View entering={enter(0)}>
-          <Headline>Ajustes</Headline>
-          <Meta className="mt-1">tracking-app · v1.0.0</Meta>
+          <Text style={styles.headline}>Ajustes</Text>
+          <Text style={styles.meta}>tracking-app · v1.0.0</Text>
         </Animated.View>
 
-        <View className="mt-10 gap-3">
-          <Animated.View entering={enter(100)}>
-            <Editorial>Apariencia</Editorial>
-          </Animated.View>
-          <Animated.View entering={enter(180)}>
-            <ThemePicker />
-          </Animated.View>
-        </View>
+        <Animated.View entering={enter(150)}>
+          <Pressable onPress={handleSignOut} style={styles.signOut}>
+            <Text style={styles.signOutLabel}>Cerrar sesión</Text>
+          </Pressable>
+        </Animated.View>
 
-        <Animated.View entering={enter(280)} className="mt-16 items-center">
-          <Editorial className="text-center">Un acto silencioso cada mañana</Editorial>
+        <Animated.View entering={enter(280)}>
+          <Text style={styles.footer}>Un acto silencioso cada mañana</Text>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.creamWarm,
+  },
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.xxl,
+  },
+  headline: {
+    fontFamily: typography.displayMedium,
+    fontSize: typography.sizes.anchor,
+    color: colors.forestDeep,
+    letterSpacing: typography.letterSpacing.display,
+  },
+  meta: {
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: typography.letterSpacing.label,
+    color: colors.goldSoft,
+    marginTop: spacing.xs,
+  },
+  signOut: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 0.5,
+    borderColor: colors.goldAlpha25,
+    backgroundColor: colors.overlayWhite40,
+  },
+  signOutLabel: {
+    fontFamily: typography.prose,
+    fontSize: typography.sizes.body,
+    fontStyle: 'italic',
+    color: colors.forestDeep,
+  },
+  footer: {
+    fontFamily: typography.prose,
+    fontSize: typography.sizes.smallLabel + 1,
+    fontStyle: 'italic',
+    color: colors.goldSoft,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
+})
