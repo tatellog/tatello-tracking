@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useRef } from 'react'
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 import Animated, {
@@ -82,7 +83,7 @@ function StreakGrid({ days }: GridProps) {
           {row.map((cell, cIdx) => {
             const index = rIdx * GRID_COLS + cIdx
             return index === TODAY_INDEX ? (
-              <TodayCell key={cell.date} index={index} />
+              <TodayCell key={cell.date} index={index} completed={cell.completed} />
             ) : (
               <HistoryCell key={cell.date} cell={cell} index={index} />
             )
@@ -120,9 +121,11 @@ function HistoryCell({ cell, index }: HistoryProps) {
   )
 }
 
-/* ─── today cell (copper + breathing + halo) ─────────────────────── */
+/* ─── today cell (mauve; outlined until completed) ───────────────── */
 
-function TodayCell({ index }: { index: number }) {
+type TodayCellProps = { index: number; completed: boolean }
+
+function TodayCell({ index, completed }: TodayCellProps) {
   const breath = useSharedValue(1)
   const haloScale = useSharedValue(1)
   const haloOpacity = useSharedValue(0)
@@ -165,7 +168,18 @@ function TodayCell({ index }: { index: number }) {
       style={styles.todayWrap}
     >
       <Animated.View pointerEvents="none" style={[styles.halo, haloStyle]} />
-      <Animated.View style={[styles.cell, styles.cellToday, cellStyle]} />
+      {completed ? (
+        <Animated.View style={[styles.cell, cellStyle]}>
+          <LinearGradient
+            colors={[colors.mauveLight, colors.mauveDeep]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.cellTodayFilled}
+          />
+        </Animated.View>
+      ) : (
+        <Animated.View style={[styles.cell, styles.cellTodayOutlined, cellStyle]} />
+      )}
     </Animated.View>
   )
 }
@@ -292,16 +306,23 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: radius.cell,
     borderWidth: 1,
-    borderColor: colors.copperVivid,
+    borderColor: colors.mauveDeep,
   },
-  cellToday: {
+  cellTodayOutlined: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    backgroundColor: colors.copperVivid,
-    ...shadows.copperToday,
+    borderRadius: radius.cell,
+    borderWidth: 1.5,
+    borderColor: colors.mauveDeep,
+    backgroundColor: 'transparent',
   },
-
+  cellTodayFilled: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: radius.cell,
+  },
   vDivider: {
     width: 0.5,
     alignSelf: 'stretch',
