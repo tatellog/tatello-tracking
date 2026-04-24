@@ -49,6 +49,12 @@ export function HomeSkeleton() {
       {/* streak card */}
       <Animated.View style={[styles.card, animStyle]} />
 
+      {/* macros card */}
+      <Animated.View style={[styles.macrosCard, animStyle]} />
+
+      {/* log meal CTA */}
+      <Animated.View style={[styles.logCta, animStyle]} />
+
       {/* deltas */}
       <View style={styles.deltasRow}>
         <Animated.View style={[styles.deltaBlock, animStyle]} />
@@ -115,6 +121,16 @@ const styles = StyleSheet.create({
   card: {
     height: 230,
     borderRadius: radius.card,
+    backgroundColor: BLOCK,
+  },
+  macrosCard: {
+    height: 220,
+    borderRadius: radius.card,
+    backgroundColor: BLOCK,
+  },
+  logCta: {
+    height: 52,
+    borderRadius: radius.pill,
     backgroundColor: BLOCK,
   },
   deltasRow: {

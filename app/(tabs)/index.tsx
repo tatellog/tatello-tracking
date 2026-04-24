@@ -17,6 +17,7 @@ import {
 import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
+import { DefineTargetsBanner, LogMealButton, MacrosTodayCard } from '@/features/macros/components'
 import { useAddMoodCheckin } from '@/features/moods/hooks'
 import { useToggleWorkoutToday } from '@/features/streak/hooks'
 import { colors, spacing } from '@/theme'
@@ -97,26 +98,44 @@ function HomeContent({ ctx, cadence }: ContentProps) {
           />
         </Animated.View>
 
-        <Animated.View entering={enter(1700)}>
+        <Animated.View entering={enter(1500)}>
+          {ctx.targets ? (
+            <MacrosTodayCard
+              current={ctx.today_macros}
+              target={ctx.targets}
+              mealCount={ctx.meal_count_today}
+            />
+          ) : (
+            <DefineTargetsBanner />
+          )}
+        </Animated.View>
+
+        {ctx.targets && (
+          <Animated.View entering={enter(1700)}>
+            <LogMealButton />
+          </Animated.View>
+        )}
+
+        <Animated.View entering={enter(1900)}>
           <DeltaPair weightDeltaKg={weightDeltaKg} waistDeltaCm={waistDeltaCm} periodWeeks={4} />
         </Animated.View>
 
-        <Animated.View entering={enter(1850)}>
+        <Animated.View entering={enter(2050)}>
           <AnchorLine text={anchor} />
         </Animated.View>
 
-        <Animated.View entering={enter(2000)}>
+        <Animated.View entering={enter(2200)}>
           <SwipeToSeal
             sealed={ctx.today_workout_completed}
             onSeal={() => toggleWorkout.mutate(!ctx.today_workout_completed)}
           />
         </Animated.View>
 
-        <Animated.View entering={enter(2150)}>
+        <Animated.View entering={enter(2350)}>
           <QuickActions />
         </Animated.View>
 
-        <Animated.View entering={enter(2300)}>
+        <Animated.View entering={enter(2500)}>
           <MoodPicker
             value={ctx.latest_mood?.value ?? null}
             onChange={(value) => addMood.mutate(value)}
