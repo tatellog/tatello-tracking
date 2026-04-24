@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Toast from 'react-native-toast-message'
 
 import type { BriefContext } from '@/features/brief/api'
 import {
@@ -11,8 +12,8 @@ import {
   HomeSkeleton,
   MoodPicker,
   QuickActions,
+  SealDayButton,
   StreakCard,
-  SwipeToSeal,
 } from '@/features/home/components'
 import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
@@ -126,9 +127,25 @@ function HomeContent({ ctx, cadence }: ContentProps) {
         </Animated.View>
 
         <Animated.View entering={enter(2200)}>
-          <SwipeToSeal
+          <SealDayButton
             sealed={ctx.today_workout_completed}
-            onSeal={() => toggleWorkout.mutate(!ctx.today_workout_completed)}
+            streakCount={ctx.streak_days}
+            onSeal={() => {
+              toggleWorkout.mutate(true)
+              Toast.show({
+                type: 'sealed',
+                position: 'bottom',
+                bottomOffset: 96,
+                visibilityTime: 5000,
+                props: {
+                  onUndo: () => {
+                    Toast.hide()
+                    toggleWorkout.mutate(false)
+                  },
+                },
+              })
+            }}
+            onUnseal={() => toggleWorkout.mutate(false)}
           />
         </Animated.View>
 
