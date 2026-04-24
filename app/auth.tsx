@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native'
 import Animated, {
-  Easing,
   FadeInDown,
   ZoomIn,
   interpolateColor,
@@ -21,17 +20,12 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { supabase } from '@/lib/supabase'
-import { colors, radius, shadows, spacing, typography } from '@/theme'
+import { colors, duration, easing, radius, shadows, spacing, typography } from '@/theme'
 
 type Status = 'idle' | 'sending' | 'sent' | 'error'
 
-const QUICK_MS = 150
-const STANDARD_MS = 250
-const SLOW_MS = 400
-const LANGUID_MS = 600
-
 const enter = (delayMs: number) =>
-  FadeInDown.duration(SLOW_MS).delay(delayMs).springify().damping(18)
+  FadeInDown.duration(duration.slow).delay(delayMs).springify().damping(18)
 
 /*
  * Magic-link entry point. Typing an email + submitting fires
@@ -144,8 +138,8 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
 
   useEffect(() => {
     focusProgress.value = withTiming(focused ? 1 : 0, {
-      duration: STANDARD_MS,
-      easing: Easing.inOut(Easing.ease),
+      duration: duration.standard,
+      easing: easing.standard,
     })
   }, [focusProgress, focused])
 
@@ -195,8 +189,8 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
 
   useEffect(() => {
     ready.value = withTiming(canSubmit ? 1 : 0, {
-      duration: STANDARD_MS,
-      easing: Easing.inOut(Easing.ease),
+      duration: duration.standard,
+      easing: easing.standard,
     })
   }, [ready, canSubmit])
 
@@ -207,10 +201,10 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
 
   const onPressIn = () => {
     if (!canSubmit) return
-    scale.value = withTiming(0.97, { duration: QUICK_MS, easing: Easing.out(Easing.cubic) })
+    scale.value = withTiming(0.97, { duration: duration.quick, easing: easing.out })
   }
   const onPressOut = () => {
-    scale.value = withTiming(1, { duration: STANDARD_MS, easing: Easing.out(Easing.cubic) })
+    scale.value = withTiming(1, { duration: duration.standard, easing: easing.out })
   }
 
   const showIcon = canSubmit && !isSending
@@ -241,7 +235,11 @@ function SentState({ email }: { email: string }) {
 
         <View style={styles.sentBlock}>
           <Animated.View
-            entering={ZoomIn.duration(LANGUID_MS).delay(120).springify().damping(12).stiffness(180)}
+            entering={ZoomIn.duration(duration.languid)
+              .delay(120)
+              .springify()
+              .damping(12)
+              .stiffness(180)}
             style={styles.sentIcon}
           >
             <Feather name="mail" size={26} color={colors.copperShade} />
