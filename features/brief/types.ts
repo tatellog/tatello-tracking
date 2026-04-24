@@ -5,8 +5,8 @@ export type Streak = {
 }
 
 export type ProgressComparison = {
-  beforePhoto: ImageSourcePropType
-  afterPhoto: ImageSourcePropType
+  beforePhoto?: ImageSourcePropType
+  afterPhoto?: ImageSourcePropType
   beforeLabel: string
   afterLabel: string
   weightDeltaKg: number

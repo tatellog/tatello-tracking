@@ -9,6 +9,10 @@
  * the user's explicit preference stored in Zustand (see `design/theme.ts`).
  * The `.dark:root` block in global.css swaps the primitive→semantic mapping;
  * no `dark:` variant classes needed in the JSX.
+ *
+ * Typography pairs Fraunces (serif, editorial voice) with Geist (sans, UI
+ * breath). React Native loads each weight/style as its own family, so
+ * `font-serif-italic` maps to Fraunces Italic (not the CSS `italic` property).
  */
 
 const rgbVar = (name) => `rgb(var(${name}) / <alpha-value>)`
@@ -31,7 +35,8 @@ module.exports = {
       '6xl': '72px',
     },
     fontFamily: {
-      sans: ['System'],
+      sans: ['Geist_400Regular'],
+      'sans-medium': ['Geist_500Medium'],
       serif: ['Fraunces_400Regular'],
       'serif-italic': ['Fraunces_400Regular_Italic'],
       'serif-medium': ['Fraunces_500Medium'],

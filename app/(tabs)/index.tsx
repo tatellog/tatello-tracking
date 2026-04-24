@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ScrollView, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeInDown } from 'react-native-reanimated'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { duration } from '@/design/motion'
 import { Masthead } from '@/features/brief/components/Masthead'
@@ -34,7 +34,12 @@ export default function BriefScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={enter(0)}>
-          <Masthead dayOfWeek={data.dayOfWeek} time={data.time} />
+          <Masthead
+            dayOfWeek={data.dayOfWeek}
+            date={data.date}
+            time={data.time}
+            streakDays={data.streak.days}
+          />
         </Animated.View>
 
         <View className="mt-8 gap-8">

@@ -15,7 +15,7 @@ type Props = {
 export function MetricPair({ items }: Props) {
   return (
     <View>
-      <Editorial>esta mañana</Editorial>
+      <Editorial>Esta mañana</Editorial>
       <View className="mt-3 flex-row">
         {items.map((item, idx) => (
           <View
@@ -25,10 +25,10 @@ export function MetricPair({ items }: Props) {
             <View className="flex-row items-baseline">
               <Title>{item.value}</Title>
               {item.unit !== undefined && (
-                <Text className="ml-1 text-sm text-tertiary">{item.unit}</Text>
+                <Text className="ml-1 font-sans text-sm text-tertiary">{item.unit}</Text>
               )}
             </View>
-            <Meta className="mt-1">{item.label.toLowerCase()}</Meta>
+            <Meta className="mt-1">{item.label}</Meta>
           </View>
         ))}
       </View>

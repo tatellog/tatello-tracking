@@ -18,13 +18,13 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={enter(0)}>
-          <Headline>ajustes</Headline>
+          <Headline>Ajustes</Headline>
           <Meta className="mt-1">tracking-app · v1.0.0</Meta>
         </Animated.View>
 
         <View className="mt-10 gap-3">
           <Animated.View entering={enter(100)}>
-            <Editorial>apariencia</Editorial>
+            <Editorial>Apariencia</Editorial>
           </Animated.View>
           <Animated.View entering={enter(180)}>
             <ThemePicker />
@@ -32,7 +32,7 @@ export default function SettingsScreen() {
         </View>
 
         <Animated.View entering={enter(280)} className="mt-16 items-center">
-          <Editorial className="text-center">un acto silencioso cada mañana</Editorial>
+          <Editorial className="text-center">Un acto silencioso cada mañana</Editorial>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>

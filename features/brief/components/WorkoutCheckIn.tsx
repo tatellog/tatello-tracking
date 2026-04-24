@@ -1,8 +1,9 @@
-import { Pressable, Text, View } from 'react-native'
+import { Feather } from '@expo/vector-icons'
+import { Pressable } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
 import { duration, easing } from '@/design/motion'
-import { shadow } from '@/design/tokens'
+import { shadow, useColors } from '@/design/tokens'
 import { Prose } from '@/design/typography'
 
 type Props = {
@@ -11,11 +12,16 @@ type Props = {
 }
 
 /*
- * Tap feedback: subtle scale-down on pressIn (0.97) and decompression
- * on pressOut. Uses reanimated shared values so the work stays on the UI
- * thread and the animation never jank-fights the JS bridge.
+ * Primary CTA — capsule pill that shifts mood with state:
+ *   Idle     — rose-gold filled, cream text. Warm invitation.
+ *   Completed — sage-soft filled, checkmark + sage text. Cool confirmation.
+ *
+ * The temperature shift mirrors the workout arc: warm activation before,
+ * cool rest after. Tap feedback runs on the UI thread (reanimated shared
+ * value) so the press never fights the JS bridge.
  */
 export function WorkoutCheckIn({ completed, onPress }: Props) {
+  const colors = useColors()
   const scale = useSharedValue(1)
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -29,25 +35,25 @@ export function WorkoutCheckIn({ completed, onPress }: Props) {
   }
 
   return (
-    <Animated.View style={[shadow.sm, animatedStyle]}>
+    <Animated.View style={[shadow.md, animatedStyle]}>
       <Pressable
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         className={
           completed
-            ? 'w-full flex-row items-center justify-center rounded-lg border border-accent-cool/40 bg-accent-cool-soft px-4 py-4'
-            : 'w-full flex-row items-center justify-center rounded-lg border bg-paper px-4 py-4'
+            ? 'w-full flex-row items-center justify-center gap-2 rounded-full border border-accent-cool/40 bg-accent-cool-soft px-5 py-4'
+            : 'w-full flex-row items-center justify-center gap-2 rounded-full bg-accent-warm px-5 py-4'
         }
       >
-        {completed ? (
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base text-accent-cool-strong">✓</Text>
-            <Prose className="text-accent-cool-strong">entrenado hoy</Prose>
-          </View>
-        ) : (
-          <Prose>¿entrenaste hoy?</Prose>
-        )}
+        <Feather
+          name={completed ? 'check' : 'sunrise'}
+          size={16}
+          color={completed ? colors.accent.coolStrong : colors.content.onAccent}
+        />
+        <Prose className={completed ? 'text-accent-cool-strong' : 'text-on-accent'}>
+          {completed ? 'Entrenado hoy' : '¿Entrenaste hoy?'}
+        </Prose>
       </Pressable>
     </Animated.View>
   )

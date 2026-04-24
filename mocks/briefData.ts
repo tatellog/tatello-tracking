@@ -8,10 +8,11 @@ export const mockBriefData: BriefData = {
     days: 14,
   },
   progress: {
-    beforePhoto: require('./photos/before.jpg'),
-    afterPhoto: require('./photos/after.jpg'),
-    beforeLabel: 'hace 30 días',
-    afterLabel: 'hoy',
+    // Photos omitted to preview the empty state. When the user uploads real
+    // photos (Sprint 3, camera integration), set beforePhoto + afterPhoto to
+    // the returned ImageSource and the polaroid frames render them directly.
+    beforeLabel: 'Hace 30 días',
+    afterLabel: 'Hoy',
     weightDeltaKg: -1.8,
     waistDeltaCm: -2,
     periodWeeks: 4,

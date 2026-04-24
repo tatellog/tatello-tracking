@@ -14,9 +14,9 @@ type Option = {
 }
 
 const options: readonly Option[] = [
-  { value: 'light', icon: 'sun', label: 'claro' },
-  { value: 'dark', icon: 'moon', label: 'oscuro' },
-  { value: 'system', icon: 'smartphone', label: 'sistema' },
+  { value: 'light', icon: 'sun', label: 'Claro' },
+  { value: 'dark', icon: 'moon', label: 'Oscuro' },
+  { value: 'system', icon: 'smartphone', label: 'Sistema' },
 ] as const
 
 export function ThemePicker() {

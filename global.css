@@ -13,102 +13,115 @@
  * flips. This means every component works on both themes without any `dark:`
  * variants in the JSX.
  *
+ * Palette — "Midnight jade & rose gold":
+ *   pearl = cool warm-white light surfaces
+ *   cream = warm pearl used for dark-mode text
+ *   jade  = deep blue-green inks (near-black in dark canvas)
+ *   rose  = rose-gold warm accent (dusty, dried-petal, never neon)
+ *   sage  = cool botanical accent (dusty mint/jade-sage)
+ *
+ * Inspirations: La Mer, SK-II, Aman Tokyo, Chanel Beauty bottle glass.
+ *
  * Values are space-separated RGB triples so Tailwind composes alpha via
  * `rgb(var(--token) / <alpha-value>)`.
  */
 
 @layer base {
   :root {
-    /* ─── Primitives — warm neutrals (ivory → charcoal) ─── */
-    --primitive-ivory-50: 250 248 245;
-    --primitive-ivory-100: 245 241 234;
-    --primitive-ivory-200: 238 233 223;
-    --primitive-ivory-300: 232 226 216;
-    --primitive-ivory-400: 215 206 192;
+    /* ─── Primitives — pearl (cool warm-white surfaces) ─── */
+    --primitive-pearl-50: 250 248 243;
+    --primitive-pearl-100: 243 240 235;
+    --primitive-pearl-200: 232 226 215;
+    --primitive-pearl-300: 218 210 195;
+    --primitive-pearl-400: 196 188 172;
 
-    --primitive-charcoal-200: 227 223 217;
-    --primitive-charcoal-300: 207 203 196;
-    --primitive-charcoal-400: 183 178 170;
-    --primitive-charcoal-500: 146 140 132;
-    --primitive-charcoal-600: 92 88 85;
-    --primitive-charcoal-700: 69 66 63;
-    --primitive-charcoal-800: 42 40 38;
-    --primitive-charcoal-900: 28 27 26;
-    --primitive-charcoal-950: 20 19 18;
+    /* ─── Primitives — cream (warm pearl, for dark-mode text) ─── */
+    --primitive-cream-100: 244 237 220;
 
-    /* ─── Primitives — amber (warmth, momentum, patrón) ─── */
-    --primitive-amber-50: 252 245 232;
-    --primitive-amber-100: 244 232 216;
-    --primitive-amber-400: 220 172 120;
-    --primitive-amber-500: 210 151 90;
-    --primitive-amber-600: 184 128 74;
-    --primitive-amber-700: 140 94 52;
-    --primitive-amber-900: 92 60 32;
+    /* ─── Primitives — jade (deep blue-green ink) ─── */
+    --primitive-jade-300: 140 165 155;
+    --primitive-jade-400: 100 130 120;
+    --primitive-jade-500: 78 108 98;
+    --primitive-jade-700: 40 70 60;
+    --primitive-jade-800: 21 44 39;
+    --primitive-jade-900: 20 48 40;
+    --primitive-jade-950: 11 30 26;
+    --primitive-jade-975: 7 22 19;
 
-    /* ─── Primitives — sage (calm, éxito) ─── */
-    --primitive-sage-50: 238 243 231;
-    --primitive-sage-100: 225 234 218;
-    --primitive-sage-400: 140 172 145;
-    --primitive-sage-500: 107 142 111;
-    --primitive-sage-700: 74 104 80;
-    --primitive-sage-900: 46 66 50;
+    /* ─── Primitives — rose (rose-gold warmth) ─── */
+    --primitive-rose-100: 244 220 210;
+    --primitive-rose-300: 225 180 165;
+    --primitive-rose-500: 212 162 144;
+    --primitive-rose-600: 184 131 117;
+    --primitive-rose-700: 138 90 76;
+    --primitive-rose-900: 78 45 35;
 
-    /* ─── Semantic — light theme ─── */
-    --surface-canvas: var(--primitive-ivory-50);
-    --surface-paper: var(--primitive-ivory-100);
-    --surface-raised: var(--primitive-ivory-200);
-    --surface-sunken: var(--primitive-ivory-300);
+    /* ─── Primitives — sage (cool botanical accent) ─── */
+    --primitive-sage-100: 210 225 215;
+    --primitive-sage-300: 159 184 168;
+    --primitive-sage-500: 120 150 135;
+    --primitive-sage-600: 107 128 121;
+    --primitive-sage-700: 78 100 92;
+    --primitive-sage-900: 38 55 48;
 
-    --content-primary: var(--primitive-charcoal-900);
-    --content-secondary: var(--primitive-charcoal-600);
-    --content-tertiary: var(--primitive-charcoal-500);
-    --content-disabled: var(--primitive-charcoal-400);
-    --content-on-accent: var(--primitive-ivory-50);
+    /* ─── Semantic — light theme (morning, cool pearl surfaces) ─── */
+    --surface-canvas: var(--primitive-pearl-100);
+    --surface-paper: var(--primitive-pearl-200);
+    --surface-raised: var(--primitive-pearl-300);
+    --surface-sunken: var(--primitive-pearl-400);
 
-    --border-subtle: var(--primitive-ivory-300);
-    --border-muted: var(--primitive-ivory-200);
-    --border-strong: var(--primitive-charcoal-500);
+    --content-primary: var(--primitive-jade-900);
+    --content-secondary: var(--primitive-jade-700);
+    --content-tertiary: var(--primitive-jade-500);
+    --content-disabled: var(--primitive-jade-400);
+    --content-on-accent: var(--primitive-pearl-50);
 
-    --accent-warm: var(--primitive-amber-600);
-    --accent-warm-soft: var(--primitive-amber-100);
-    --accent-warm-strong: var(--primitive-amber-700);
-    --accent-warm-contrast: var(--primitive-amber-900);
+    --border-subtle: var(--primitive-pearl-300);
+    --border-muted: var(--primitive-pearl-200);
+    --border-strong: var(--primitive-jade-500);
 
-    --accent-cool: var(--primitive-sage-500);
+    --accent-warm: var(--primitive-rose-600);
+    --accent-warm-soft: var(--primitive-rose-100);
+    --accent-warm-strong: var(--primitive-rose-700);
+    --accent-warm-contrast: var(--primitive-rose-900);
+
+    --accent-cool: var(--primitive-sage-600);
     --accent-cool-soft: var(--primitive-sage-100);
     --accent-cool-strong: var(--primitive-sage-700);
     --accent-cool-contrast: var(--primitive-sage-900);
   }
 
   /*
-   * Dark theme — flip the primitive references. No color value is redefined
-   * here; we only re-alias. This keeps the palette honest and auditable.
+   * Dark theme — midnight jade. Canvas leans into a deep blue-green rather
+   * than neutral black; text is warm cream (not cool white) so the contrast
+   * feels like candlelight, not fluorescent. Rose gold brightens a step so
+   * it glows against the dark ground.
    */
   .dark:root,
   :root.dark {
-    --surface-canvas: var(--primitive-charcoal-900);
-    --surface-paper: var(--primitive-charcoal-800);
-    --surface-raised: var(--primitive-charcoal-700);
-    --surface-sunken: var(--primitive-charcoal-950);
+    --surface-canvas: var(--primitive-jade-950);
+    --surface-paper: var(--primitive-jade-800);
+    --surface-raised: var(--primitive-jade-700);
+    --surface-sunken: var(--primitive-jade-975);
 
-    --content-primary: var(--primitive-ivory-50);
-    --content-secondary: var(--primitive-ivory-300);
-    --content-tertiary: var(--primitive-charcoal-400);
-    --content-disabled: var(--primitive-charcoal-600);
-    --content-on-accent: var(--primitive-charcoal-900);
+    --content-primary: var(--primitive-cream-100);
+    --content-secondary: var(--primitive-pearl-300);
+    --content-tertiary: var(--primitive-jade-300);
+    --content-disabled: var(--primitive-jade-500);
+    --content-on-accent: var(--primitive-jade-950);
 
-    --border-subtle: var(--primitive-charcoal-800);
-    --border-muted: var(--primitive-charcoal-900);
-    --border-strong: var(--primitive-charcoal-400);
+    --border-subtle: var(--primitive-jade-800);
+    --border-muted: var(--primitive-jade-900);
+    --border-strong: var(--primitive-sage-300);
 
-    --accent-warm: var(--primitive-amber-500);
-    --accent-warm-soft: var(--primitive-amber-900);
-    --accent-warm-strong: var(--primitive-amber-400);
-    --accent-warm-contrast: var(--primitive-amber-100);
+    --accent-warm: var(--primitive-rose-500);
+    --accent-warm-soft: var(--primitive-rose-900);
+    --accent-warm-strong: var(--primitive-rose-300);
+    --accent-warm-contrast: var(--primitive-rose-100);
 
     --accent-cool: var(--primitive-sage-500);
     --accent-cool-soft: var(--primitive-sage-900);
-    --accent-cool-strong: var(--primitive-sage-400);
+    --accent-cool-strong: var(--primitive-sage-300);
     --accent-cool-contrast: var(--primitive-sage-100);
   }
 }

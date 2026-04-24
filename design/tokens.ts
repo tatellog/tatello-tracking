@@ -11,6 +11,13 @@ import { useColorScheme } from 'nativewind'
  * reactive theme switching via CSS. Reach for these tokens only when the
  * surface isn't styleable via className.
  *
+ * Palette — "Midnight jade & rose gold":
+ *   pearl = cool warm-white light surfaces
+ *   cream = warm pearl used for dark-mode text
+ *   jade  = deep blue-green inks (near-black in dark canvas)
+ *   rose  = rose-gold warm accent
+ *   sage  = cool botanical accent (dusty jade-sage)
+ *
  * Dark values mirror the `.dark:root` block in global.css. When you change a
  * value there, change the matching scheme map here.
  */
@@ -48,63 +55,63 @@ type ColorScale = {
 
 const light: ColorScale = {
   surface: {
-    canvas: 'rgb(250, 248, 245)',
-    paper: 'rgb(245, 241, 234)',
-    raised: 'rgb(238, 233, 223)',
-    sunken: 'rgb(232, 226, 216)',
+    canvas: 'rgb(243, 240, 235)',
+    paper: 'rgb(232, 226, 215)',
+    raised: 'rgb(218, 210, 195)',
+    sunken: 'rgb(196, 188, 172)',
   },
   content: {
-    primary: 'rgb(28, 27, 26)',
-    secondary: 'rgb(92, 88, 85)',
-    tertiary: 'rgb(146, 140, 132)',
-    disabled: 'rgb(183, 178, 170)',
-    onAccent: 'rgb(250, 248, 245)',
+    primary: 'rgb(20, 48, 40)',
+    secondary: 'rgb(40, 70, 60)',
+    tertiary: 'rgb(78, 108, 98)',
+    disabled: 'rgb(100, 130, 120)',
+    onAccent: 'rgb(250, 248, 243)',
   },
   border: {
-    subtle: 'rgb(232, 226, 216)',
-    muted: 'rgb(238, 233, 223)',
-    strong: 'rgb(146, 140, 132)',
+    subtle: 'rgb(218, 210, 195)',
+    muted: 'rgb(232, 226, 215)',
+    strong: 'rgb(78, 108, 98)',
   },
   accent: {
-    warm: 'rgb(184, 128, 74)',
-    warmSoft: 'rgb(244, 232, 216)',
-    warmStrong: 'rgb(140, 94, 52)',
-    warmContrast: 'rgb(92, 60, 32)',
-    cool: 'rgb(107, 142, 111)',
-    coolSoft: 'rgb(225, 234, 218)',
-    coolStrong: 'rgb(74, 104, 80)',
-    coolContrast: 'rgb(46, 66, 50)',
+    warm: 'rgb(184, 131, 117)',
+    warmSoft: 'rgb(244, 220, 210)',
+    warmStrong: 'rgb(138, 90, 76)',
+    warmContrast: 'rgb(78, 45, 35)',
+    cool: 'rgb(107, 128, 121)',
+    coolSoft: 'rgb(210, 225, 215)',
+    coolStrong: 'rgb(78, 100, 92)',
+    coolContrast: 'rgb(38, 55, 48)',
   },
 }
 
 const dark: ColorScale = {
   surface: {
-    canvas: 'rgb(28, 27, 26)',
-    paper: 'rgb(42, 40, 38)',
-    raised: 'rgb(69, 66, 63)',
-    sunken: 'rgb(20, 19, 18)',
+    canvas: 'rgb(11, 30, 26)',
+    paper: 'rgb(21, 44, 39)',
+    raised: 'rgb(40, 70, 60)',
+    sunken: 'rgb(7, 22, 19)',
   },
   content: {
-    primary: 'rgb(250, 248, 245)',
-    secondary: 'rgb(232, 226, 216)',
-    tertiary: 'rgb(183, 178, 170)',
-    disabled: 'rgb(92, 88, 85)',
-    onAccent: 'rgb(28, 27, 26)',
+    primary: 'rgb(244, 237, 220)',
+    secondary: 'rgb(218, 210, 195)',
+    tertiary: 'rgb(140, 165, 155)',
+    disabled: 'rgb(78, 108, 98)',
+    onAccent: 'rgb(11, 30, 26)',
   },
   border: {
-    subtle: 'rgb(42, 40, 38)',
-    muted: 'rgb(28, 27, 26)',
-    strong: 'rgb(183, 178, 170)',
+    subtle: 'rgb(21, 44, 39)',
+    muted: 'rgb(20, 48, 40)',
+    strong: 'rgb(159, 184, 168)',
   },
   accent: {
-    warm: 'rgb(210, 151, 90)',
-    warmSoft: 'rgb(92, 60, 32)',
-    warmStrong: 'rgb(220, 172, 120)',
-    warmContrast: 'rgb(244, 232, 216)',
-    cool: 'rgb(107, 142, 111)',
-    coolSoft: 'rgb(46, 66, 50)',
-    coolStrong: 'rgb(140, 172, 145)',
-    coolContrast: 'rgb(225, 234, 218)',
+    warm: 'rgb(212, 162, 144)',
+    warmSoft: 'rgb(78, 45, 35)',
+    warmStrong: 'rgb(225, 180, 165)',
+    warmContrast: 'rgb(244, 220, 210)',
+    cool: 'rgb(120, 150, 135)',
+    coolSoft: 'rgb(38, 55, 48)',
+    coolStrong: 'rgb(159, 184, 168)',
+    coolContrast: 'rgb(210, 225, 215)',
   },
 }
 
@@ -138,36 +145,37 @@ export const spacing = {
 } as const
 
 /*
- * Shadows are kept static (anchored to light-theme charcoal). On dark
- * backgrounds they're nearly invisible, which is intentional — dark UIs
- * typically lean on elevation through surface lightness, not shadow.
+ * Shadows anchor to the light-theme jade ink so they carry a subtle blue-
+ * green undertone — on-brand and almost imperceptible at the chosen opacities.
+ * On dark surfaces they're nearly invisible, which is intentional.
  */
 export const shadow = {
   sm: {
     shadowColor: light.content.primary,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 1,
   },
   md: {
     shadowColor: light.content.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
   },
   lg: {
     shadowColor: light.content.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 16,
     elevation: 4,
   },
 } as const
 
 export const fontFamily = {
-  sans: 'System',
+  sans: 'Geist_400Regular',
+  sansMedium: 'Geist_500Medium',
   serif: 'Fraunces_400Regular',
   serifItalic: 'Fraunces_400Regular_Italic',
   serifMedium: 'Fraunces_500Medium',
