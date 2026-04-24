@@ -49,3 +49,17 @@ export const supabase = createClient<Database>(url, key, {
     detectSessionInUrl: false,
   },
 })
+
+/*
+ * Resolve the authenticated user's id for INSERT/UPDATE/DELETE paths
+ * that need to set user_id explicitly (RLS policies enforce
+ * auth.uid() = user_id). Throws a clear error when called without a
+ * session so the caller surfaces "please log in" instead of a
+ * supabase-js null-dereference further down.
+ */
+export async function requireUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw error
+  if (!data.user) throw new Error('not authenticated')
+  return data.user.id
+}
