@@ -5,3 +5,4 @@ web-build
 ios
 android
 pnpm-lock.yaml
+.husky/_

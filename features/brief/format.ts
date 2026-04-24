@@ -1,9 +1,13 @@
 const MINUS = '−'
 
-function formatSigned(n: number): string {
+export function formatSigned(n: number): string {
   if (n > 0) return `+${n}`
   if (n < 0) return `${MINUS}${Math.abs(n)}`
   return `${n}`
+}
+
+export function formatDelta(value: number, unit: string): string {
+  return `${formatSigned(value)} ${unit}`
 }
 
 export function formatProgressDeltas(input: {
@@ -11,8 +15,8 @@ export function formatProgressDeltas(input: {
   waistDeltaCm: number
   periodWeeks: number
 }): string {
-  const weight = `${formatSigned(input.weightDeltaKg)} kg`
-  const waist = `cintura ${formatSigned(input.waistDeltaCm)} cm`
+  const weight = formatDelta(input.weightDeltaKg, 'kg')
+  const waist = `cintura ${formatDelta(input.waistDeltaCm, 'cm')}`
   const period = `${input.periodWeeks} semanas`
   return `${weight} · ${waist} · ${period}`
 }

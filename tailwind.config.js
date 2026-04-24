@@ -1,43 +1,87 @@
 /** @type {import('tailwindcss').Config} */
+
+/*
+ * Tailwind exposes only SEMANTIC tokens as utilities. Primitive tokens live in
+ * global.css and must be accessed through a semantic alias. This keeps usage
+ * intent-driven (`bg-canvas`, `text-primary`) rather than literal (`bg-ivory-50`).
+ *
+ * Dark mode is class-based (toggled via NativeWind's colorScheme), driven by
+ * the user's explicit preference stored in Zustand (see `design/theme.ts`).
+ * The `.dark:root` block in global.css swaps the primitive→semantic mapping;
+ * no `dark:` variant classes needed in the JSX.
+ */
+
+const rgbVar = (name) => `rgb(var(${name}) / <alpha-value>)`
+
 module.exports = {
-  content: ['./app/**/*.{ts,tsx}', './features/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
+  content: ['./app/**/*.{ts,tsx}', './features/**/*.{ts,tsx}', './design/**/*.{ts,tsx}'],
   presets: [require('nativewind/preset')],
-  darkMode: 'media',
+  darkMode: 'class',
   theme: {
     fontSize: {
       xs: '11px',
       sm: '13px',
       base: '15px',
       lg: '18px',
-      xl: '20px',
-      '2xl': '24px',
-      '4xl': '36px',
-      '6xl': '56px',
+      xl: '22px',
+      '2xl': '28px',
+      '3xl': '34px',
+      '4xl': '44px',
+      '5xl': '56px',
+      '6xl': '72px',
+    },
+    fontFamily: {
+      sans: ['System'],
+      serif: ['Fraunces_400Regular'],
+      'serif-italic': ['Fraunces_400Regular_Italic'],
+      'serif-medium': ['Fraunces_500Medium'],
+    },
+    letterSpacing: {
+      tight: '-0.01em',
+      normal: '0',
+      wide: '0.05em',
+      editorial: '0.12em',
     },
     extend: {
       backgroundColor: {
-        primary: 'rgb(var(--bg-primary) / <alpha-value>)',
-        secondary: 'rgb(var(--bg-secondary) / <alpha-value>)',
-        tertiary: 'rgb(var(--bg-tertiary) / <alpha-value>)',
-        'amber-soft': 'rgb(var(--bg-amber-soft) / <alpha-value>)',
-        success: 'rgb(var(--bg-success) / <alpha-value>)',
+        canvas: rgbVar('--surface-canvas'),
+        paper: rgbVar('--surface-paper'),
+        raised: rgbVar('--surface-raised'),
+        sunken: rgbVar('--surface-sunken'),
+
+        'accent-warm': rgbVar('--accent-warm'),
+        'accent-warm-soft': rgbVar('--accent-warm-soft'),
+        'accent-cool': rgbVar('--accent-cool'),
+        'accent-cool-soft': rgbVar('--accent-cool-soft'),
       },
       textColor: {
-        primary: 'rgb(var(--text-primary) / <alpha-value>)',
-        secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
-        tertiary: 'rgb(var(--text-tertiary) / <alpha-value>)',
-        'amber-strong': 'rgb(var(--text-amber-strong) / <alpha-value>)',
-        success: 'rgb(var(--text-success) / <alpha-value>)',
+        primary: rgbVar('--content-primary'),
+        secondary: rgbVar('--content-secondary'),
+        tertiary: rgbVar('--content-tertiary'),
+        disabled: rgbVar('--content-disabled'),
+        'on-accent': rgbVar('--content-on-accent'),
+
+        'accent-warm': rgbVar('--accent-warm'),
+        'accent-warm-strong': rgbVar('--accent-warm-strong'),
+        'accent-warm-contrast': rgbVar('--accent-warm-contrast'),
+        'accent-cool': rgbVar('--accent-cool'),
+        'accent-cool-strong': rgbVar('--accent-cool-strong'),
+        'accent-cool-contrast': rgbVar('--accent-cool-contrast'),
       },
       borderColor: {
-        DEFAULT: 'rgb(var(--border-default) / <alpha-value>)',
-        muted: 'rgb(var(--border-muted) / <alpha-value>)',
+        DEFAULT: rgbVar('--border-subtle'),
+        subtle: rgbVar('--border-subtle'),
+        muted: rgbVar('--border-muted'),
+        strong: rgbVar('--border-strong'),
+        'accent-warm': rgbVar('--accent-warm'),
+        'accent-cool': rgbVar('--accent-cool'),
       },
       borderRadius: {
         sm: '4px',
         md: '8px',
         lg: '12px',
         xl: '16px',
+        '2xl': '24px',
       },
     },
   },

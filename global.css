@@ -2,20 +2,113 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens — two-layer architecture with light/dark themes.
+ *
+ *   1. Primitives — raw scales. Never reference these directly from components.
+ *   2. Semantic   — role-based aliases of primitives. Components always use these.
+ *
+ * Light is the base (:root). Dark overrides are scoped to `.dark:root` so the
+ * semantic layer stays identical across themes — only the primitive mapping
+ * flips. This means every component works on both themes without any `dark:`
+ * variants in the JSX.
+ *
+ * Values are space-separated RGB triples so Tailwind composes alpha via
+ * `rgb(var(--token) / <alpha-value>)`.
+ */
+
 @layer base {
   :root {
-    --bg-primary: 255 255 255;
-    --bg-secondary: 249 250 251;
-    --bg-tertiary: 243 244 246;
-    --text-primary: 17 24 39;
-    --text-secondary: 75 85 99;
-    --text-tertiary: 156 163 175;
-    --border-default: 229 231 235;
-    --border-muted: 243 244 246;
+    /* ─── Primitives — warm neutrals (ivory → charcoal) ─── */
+    --primitive-ivory-50: 250 248 245;
+    --primitive-ivory-100: 245 241 234;
+    --primitive-ivory-200: 238 233 223;
+    --primitive-ivory-300: 232 226 216;
+    --primitive-ivory-400: 215 206 192;
 
-    --bg-amber-soft: 254 243 199;
-    --text-amber-strong: 146 64 14;
-    --bg-success: 209 250 229;
-    --text-success: 6 95 70;
+    --primitive-charcoal-200: 227 223 217;
+    --primitive-charcoal-300: 207 203 196;
+    --primitive-charcoal-400: 183 178 170;
+    --primitive-charcoal-500: 146 140 132;
+    --primitive-charcoal-600: 92 88 85;
+    --primitive-charcoal-700: 69 66 63;
+    --primitive-charcoal-800: 42 40 38;
+    --primitive-charcoal-900: 28 27 26;
+    --primitive-charcoal-950: 20 19 18;
+
+    /* ─── Primitives — amber (warmth, momentum, patrón) ─── */
+    --primitive-amber-50: 252 245 232;
+    --primitive-amber-100: 244 232 216;
+    --primitive-amber-400: 220 172 120;
+    --primitive-amber-500: 210 151 90;
+    --primitive-amber-600: 184 128 74;
+    --primitive-amber-700: 140 94 52;
+    --primitive-amber-900: 92 60 32;
+
+    /* ─── Primitives — sage (calm, éxito) ─── */
+    --primitive-sage-50: 238 243 231;
+    --primitive-sage-100: 225 234 218;
+    --primitive-sage-400: 140 172 145;
+    --primitive-sage-500: 107 142 111;
+    --primitive-sage-700: 74 104 80;
+    --primitive-sage-900: 46 66 50;
+
+    /* ─── Semantic — light theme ─── */
+    --surface-canvas: var(--primitive-ivory-50);
+    --surface-paper: var(--primitive-ivory-100);
+    --surface-raised: var(--primitive-ivory-200);
+    --surface-sunken: var(--primitive-ivory-300);
+
+    --content-primary: var(--primitive-charcoal-900);
+    --content-secondary: var(--primitive-charcoal-600);
+    --content-tertiary: var(--primitive-charcoal-500);
+    --content-disabled: var(--primitive-charcoal-400);
+    --content-on-accent: var(--primitive-ivory-50);
+
+    --border-subtle: var(--primitive-ivory-300);
+    --border-muted: var(--primitive-ivory-200);
+    --border-strong: var(--primitive-charcoal-500);
+
+    --accent-warm: var(--primitive-amber-600);
+    --accent-warm-soft: var(--primitive-amber-100);
+    --accent-warm-strong: var(--primitive-amber-700);
+    --accent-warm-contrast: var(--primitive-amber-900);
+
+    --accent-cool: var(--primitive-sage-500);
+    --accent-cool-soft: var(--primitive-sage-100);
+    --accent-cool-strong: var(--primitive-sage-700);
+    --accent-cool-contrast: var(--primitive-sage-900);
+  }
+
+  /*
+   * Dark theme — flip the primitive references. No color value is redefined
+   * here; we only re-alias. This keeps the palette honest and auditable.
+   */
+  .dark:root,
+  :root.dark {
+    --surface-canvas: var(--primitive-charcoal-900);
+    --surface-paper: var(--primitive-charcoal-800);
+    --surface-raised: var(--primitive-charcoal-700);
+    --surface-sunken: var(--primitive-charcoal-950);
+
+    --content-primary: var(--primitive-ivory-50);
+    --content-secondary: var(--primitive-ivory-300);
+    --content-tertiary: var(--primitive-charcoal-400);
+    --content-disabled: var(--primitive-charcoal-600);
+    --content-on-accent: var(--primitive-charcoal-900);
+
+    --border-subtle: var(--primitive-charcoal-800);
+    --border-muted: var(--primitive-charcoal-900);
+    --border-strong: var(--primitive-charcoal-400);
+
+    --accent-warm: var(--primitive-amber-500);
+    --accent-warm-soft: var(--primitive-amber-900);
+    --accent-warm-strong: var(--primitive-amber-400);
+    --accent-warm-contrast: var(--primitive-amber-100);
+
+    --accent-cool: var(--primitive-sage-500);
+    --accent-cool-soft: var(--primitive-sage-900);
+    --accent-cool-strong: var(--primitive-sage-400);
+    --accent-cool-contrast: var(--primitive-sage-100);
   }
 }

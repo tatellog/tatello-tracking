@@ -1,4 +1,6 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+
+import { Body, Editorial } from '@/design/typography'
 
 type Props = {
   detected: boolean
@@ -9,9 +11,9 @@ export function PatternAlert({ detected, message }: Props) {
   if (!detected) return null
 
   return (
-    <View className="rounded-md bg-amber-soft p-4">
-      <Text className="text-xs uppercase tracking-widest text-amber-strong">PATRÓN</Text>
-      <Text className="mt-2 text-sm leading-relaxed text-amber-strong">{message}</Text>
+    <View className="rounded-lg border border-accent-warm/30 bg-accent-warm-soft p-5">
+      <Editorial className="text-accent-warm-strong">una nota para ti</Editorial>
+      <Body className="mt-3">{message}</Body>
     </View>
   )
 }

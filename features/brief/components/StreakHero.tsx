@@ -1,6 +1,6 @@
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
 
-import { SectionLabel } from './SectionLabel'
+import { Display, Editorial, Meta } from '@/design/typography'
 
 type Props = {
   days: number
@@ -8,10 +8,10 @@ type Props = {
 
 export function StreakHero({ days }: Props) {
   return (
-    <View className="items-center">
-      <SectionLabel>RACHA</SectionLabel>
-      <Text className="mt-3 text-6xl font-medium text-primary">{days}</Text>
-      <Text className="mt-2 text-sm text-secondary">días entrenando seguido</Text>
+    <View className="items-center border-t border-muted pt-6">
+      <Meta>día</Meta>
+      <Display className="mt-2">{days}</Display>
+      <Editorial className="mt-3 text-secondary">sin romper la racha</Editorial>
     </View>
   )
 }

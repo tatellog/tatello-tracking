@@ -1,5 +1,7 @@
 import { Text, View } from 'react-native'
 
+import { Editorial, Meta, Title } from '@/design/typography'
+
 type Item = {
   label: string
   value: number | string
@@ -12,18 +14,24 @@ type Props = {
 
 export function MetricPair({ items }: Props) {
   return (
-    <View className="flex-row gap-2">
-      {items.map((item) => (
-        <View key={item.label} className="flex-1 rounded-md bg-secondary p-4">
-          <Text className="text-xs text-secondary">{item.label}</Text>
-          <View className="mt-1 flex-row items-baseline">
-            <Text className="text-lg font-medium text-primary">{item.value}</Text>
-            {item.unit !== undefined && (
-              <Text className="ml-1 text-sm text-tertiary">{item.unit}</Text>
-            )}
+    <View>
+      <Editorial>esta mañana</Editorial>
+      <View className="mt-3 flex-row">
+        {items.map((item, idx) => (
+          <View
+            key={item.label}
+            className={idx === 0 ? 'flex-1 border-r border-muted pr-4' : 'flex-1 pl-4'}
+          >
+            <View className="flex-row items-baseline">
+              <Title>{item.value}</Title>
+              {item.unit !== undefined && (
+                <Text className="ml-1 text-sm text-tertiary">{item.unit}</Text>
+              )}
+            </View>
+            <Meta className="mt-1">{item.label.toLowerCase()}</Meta>
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   )
 }
