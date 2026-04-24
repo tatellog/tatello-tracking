@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
-import { useCallback, useEffect, useState } from 'react'
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   runOnJS,
@@ -21,49 +21,51 @@ type Props = {
 }
 
 /*
- * Swipe-to-seal replaces the old 'did you train today?' button.
+ * Swipe-to-seal — fully controlled.
  *
- * Flow:
- *   1. User drags the thumb right.
- *   2. translateX clamps at [0, trackWidth - THUMB_SIZE - padding×2].
- *   3. On release: past 80% → medium haptic + onSeal() + spring to end,
- *      enter sealed state (no more gestures). Below 80% → spring back
- *      to 0 and stay idle.
+ * The `sealed` prop is the single source of truth for whether the
+ * button is in its 'after' state. The component does not maintain
+ * its own completed flag: the thumb's translateX animates from 0
+ * to maxTranslate (or back) whenever `sealed` changes, and the
+ * gesture fires `onSeal()` without flipping any local state.
  *
- * If the parent passes `sealed: true` on mount (e.g. the user already
- * logged today's workout earlier), the thumb snaps to the end state
- * without a gesture.
+ * Why controlled: a previous revision kept an internal `completed`
+ * state synced from `sealed` via useEffect. That pattern drifts
+ * during edge cases (prop flips mid-gesture, optimistic parent
+ * updates that race with the gesture end) and violated the
+ * controlled/uncontrolled React rule. With truth in the prop the
+ * parent decides everything and the component just animates.
  *
  * Requires GestureHandlerRootView mounted at the app root.
  */
 export function SwipeToSeal({ sealed, onSeal }: Props) {
   const [trackWidth, setTrackWidth] = useState(0)
-  const [completed, setCompleted] = useState(sealed)
   const translateX = useSharedValue(0)
 
   const maxTranslate = Math.max(0, trackWidth - THUMB_SIZE - TRACK_PADDING * 2)
 
+  // Whenever the parent flips sealed (or the track width lands),
+  // snap the thumb to the matching position. If the gesture was
+  // already in-flight, withSpring cancels the previous animation.
   useEffect(() => {
     if (trackWidth === 0) return
-    setCompleted(sealed)
     translateX.value = withSpring(sealed ? maxTranslate : 0, { damping: 20 })
   }, [sealed, trackWidth, maxTranslate, translateX])
 
-  const triggerSeal = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    setCompleted(true)
+  const fireSeal = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
     onSeal()
-  }, [onSeal])
+  }
 
   const panGesture = Gesture.Pan()
-    .enabled(!completed && trackWidth > 0)
+    .enabled(!sealed && trackWidth > 0)
     .onUpdate((event) => {
       translateX.value = Math.min(maxTranslate, Math.max(0, event.translationX))
     })
     .onEnd(() => {
       if (translateX.value > maxTranslate * COMPLETE_RATIO) {
         translateX.value = withSpring(maxTranslate, { damping: 18 })
-        runOnJS(triggerSeal)()
+        runOnJS(fireSeal)()
       } else {
         translateX.value = withSpring(0, { damping: 20 })
       }
@@ -79,25 +81,39 @@ export function SwipeToSeal({ sealed, onSeal }: Props) {
 
   return (
     <GestureDetector gesture={panGesture}>
-      <View style={[styles.track, completed && styles.trackSealed]} onLayout={handleLayout}>
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={sealed ? 'Día sellado' : 'Desliza para sellar el día de entreno'}
+        accessibilityHint={sealed ? undefined : 'Arrastrá el botón hacia la derecha para completar'}
+        accessibilityState={{ selected: sealed, disabled: sealed }}
+        onPress={() => {
+          // Screen-reader fallback: users who can't perform the pan
+          // gesture still need a way to seal the day. Activation via
+          // AT fires onSeal directly.
+          if (!sealed) fireSeal()
+        }}
+        style={[styles.track, sealed && styles.trackSealed]}
+        onLayout={handleLayout}
+      >
         <View style={styles.labelWrap} pointerEvents="none">
-          <Text style={[styles.label, completed && styles.labelSealed]}>
-            {completed ? '✓ Día sellado' : 'Desliza para sellar el día'}
+          <Text style={[styles.label, sealed && styles.labelSealed]}>
+            {sealed ? '✓ Día sellado' : 'Desliza para sellar el día'}
           </Text>
         </View>
-        {!completed && (
+        {!sealed && (
           <View style={styles.hintWrap} pointerEvents="none">
             <Text style={styles.hint}>›››</Text>
           </View>
         )}
-        <Animated.View style={[styles.thumbWrap, thumbStyle]}>
-          <View style={[styles.thumb, completed && styles.thumbSealed]}>
-            <Text style={[styles.thumbArrow, completed && styles.thumbArrowSealed]}>
-              {completed ? '✓' : '›'}
+        <Animated.View style={[styles.thumbWrap, thumbStyle]} pointerEvents="none">
+          <View style={[styles.thumb, sealed && styles.thumbSealed]}>
+            <Text style={[styles.thumbArrow, sealed && styles.thumbArrowSealed]}>
+              {sealed ? '✓' : '›'}
             </Text>
           </View>
         </Animated.View>
-      </View>
+      </Pressable>
     </GestureDetector>
   )
 }
