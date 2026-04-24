@@ -6,6 +6,7 @@ import {
   Fraunces_500Medium,
   useFonts,
 } from '@expo-google-fonts/fraunces'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
@@ -14,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useThemeStore } from '@/design/theme'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
+import { QUERY_CACHE_MAX_AGE, queryClient, queryPersister } from '@/lib/queryClient'
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Ignore — on fast refresh the splash is already hidden.
@@ -68,8 +70,13 @@ export default function RootLayout() {
   if (!ready) return null
 
   return (
-    <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </SafeAreaProvider>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
+    >
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </SafeAreaProvider>
+    </PersistQueryClientProvider>
   )
 }
