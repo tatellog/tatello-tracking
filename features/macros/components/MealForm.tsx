@@ -49,12 +49,20 @@ export function MealForm({
 }: Props) {
   const { control, handleSubmit, formState } = useForm<MealInput>({
     resolver: zodResolver(MealInputSchema),
+    // onTouched fires validation after the first blur on a field,
+    // so inline errors appear as the user tabs through — not only
+    // after they first tap Submit on an invalid form.
+    mode: 'onTouched',
+    // Numbers start undefined (not 0) so the placeholder shows
+    // until the user types — no more deleting "0" before entry.
+    // Zod rejects undefined on submit, which triggers the error
+    // copy under the field.
     defaultValues: {
       name: defaultValues?.name ?? '',
-      protein_g: defaultValues?.protein_g ?? 0,
-      calories: defaultValues?.calories ?? 0,
+      protein_g: defaultValues?.protein_g,
+      calories: defaultValues?.calories,
       consumed_at: defaultValues?.consumed_at ?? new Date(),
-    },
+    } as Partial<MealInput>,
   })
 
   return (
@@ -182,6 +190,8 @@ function TextField({ label, placeholder, value, onChangeText, onBlur, error }: T
         onBlur={onBlur}
         placeholder={placeholder}
         placeholderTextColor={colors.goldSoft}
+        accessibilityLabel={label}
+        accessibilityHint={error}
         style={[styles.textInput, error && styles.inputError]}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -193,8 +203,8 @@ type NumberFieldProps = {
   label: string
   suffix: string
   placeholder: string
-  value: number
-  onChangeText: (v: number) => void
+  value: number | undefined
+  onChangeText: (v: number | undefined) => void
   onBlur: () => void
   error: string | undefined
 }
@@ -208,20 +218,30 @@ function NumberField({
   onBlur,
   error,
 }: NumberFieldProps) {
+  // value is undefined on mount (user hasn't typed yet) → placeholder
+  // shows and zod flags the field as invalid until they enter a value.
+  const displayValue = value === undefined || value === 0 ? '' : String(value)
+
   return (
     <View style={{ gap: spacing.sm }}>
       <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
       <View style={[styles.numberInputRow, error && styles.inputError]}>
         <TextInput
-          value={value ? String(value) : ''}
+          value={displayValue}
           onChangeText={(text) => {
             const digits = text.replace(/[^0-9.]/g, '')
-            const n = digits === '' ? 0 : Number(digits)
-            onChangeText(Number.isFinite(n) ? n : 0)
+            if (digits === '') {
+              onChangeText(undefined)
+              return
+            }
+            const n = Number(digits)
+            onChangeText(Number.isFinite(n) ? n : undefined)
           }}
           onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={colors.goldSoft}
+          accessibilityLabel={`${label}, en ${suffix === 'g' ? 'gramos' : suffix}`}
+          accessibilityHint={error}
           keyboardType="decimal-pad"
           inputMode="decimal"
           style={styles.numberInput}
@@ -377,6 +397,12 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: typography.sizes.smallLabel,
     color: colors.copperShade,
+  },
+  submitHint: {
+    fontSize: typography.sizes.smallLabel,
+    color: colors.copperShade,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
 
   iosDateWrap: {

@@ -31,8 +31,15 @@ export function MacrosTodayCard({ current, target, mealCount }: Props) {
     [current, target, hour, mealCount],
   )
 
+  const summaryLabel = `Hoy llevas ${Math.round(current.protein_g)} de ${target.protein_g} gramos de proteína y ${Math.round(current.calories)} de ${target.calories} calorías, con ${formatMealCount(mealCount)}.`
+
   return (
-    <View style={styles.card}>
+    <View
+      style={styles.card}
+      accessible
+      accessibilityRole="summary"
+      accessibilityLabel={summaryLabel}
+    >
       <View style={styles.header}>
         <Text style={styles.label}>HOY COMISTE</Text>
         <Text style={styles.subLabel}>{formatMealCount(mealCount)}</Text>
