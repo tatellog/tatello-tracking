@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import Toast from 'react-native-toast-message'
 
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
@@ -72,6 +73,7 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <Stack screenOptions={{ headerShown: false }} />
         </SafeAreaProvider>
+        <Toast />
       </PersistQueryClientProvider>
     </GestureHandlerRootView>
   )
