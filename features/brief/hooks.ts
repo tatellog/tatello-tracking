@@ -1,24 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
 
+import { queryKeys } from '@/lib/queryKeys'
+
 import { fetchBriefContext, type BriefContext } from './api'
 
 /*
- * Query key convention for the brief:
- *   ['brief']           → today
- *   ['brief', '2026-04-23'] → specific day (for history views later)
- *
- * Streak and measurement mutations that affect the brief's content
- * invalidate ['brief'] — a single prefix invalidation catches every
- * cached day in one shot.
+ * Query keys live in lib/queryKeys. This file just wires the
+ * brief's fetch function into TanStack Query under the standard
+ * key. Mutations that touch the brief invalidate queryKeys.brief.all
+ * directly — there's no need to route through this file.
  */
-export const briefKeys = {
-  all: ['brief'] as const,
-  byDate: (date: string) => ['brief', date] as const,
-}
-
 export function useBriefContext(date?: string) {
   return useQuery<BriefContext>({
-    queryKey: date ? briefKeys.byDate(date) : briefKeys.all,
+    queryKey: date ? queryKeys.brief.byDate(date) : queryKeys.brief.all,
     queryFn: () => fetchBriefContext(date),
   })
 }

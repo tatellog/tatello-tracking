@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { briefKeys } from '@/features/brief/hooks'
+import { queryKeys } from '@/lib/queryKeys'
 
 import { markWorkoutToday, unmarkWorkoutToday } from './api'
 
@@ -11,15 +11,14 @@ import { markWorkoutToday, unmarkWorkoutToday } from './api'
  *
  * On success we invalidate the brief tree so the streak count and
  * today_workout_completed flag re-fetch. No dedicated streak query
- * exists — the streak lives inside BriefContext — so briefKeys.all
- * is the right (and only) invalidation target.
+ * exists — the streak lives inside BriefContext.
  */
 export function useToggleWorkoutToday() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (complete: boolean) => (complete ? markWorkoutToday() : unmarkWorkoutToday()),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: briefKeys.all })
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
     },
   })
 }

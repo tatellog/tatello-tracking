@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { briefKeys } from '@/features/brief/hooks'
+import { queryKeys } from '@/lib/queryKeys'
 
 import { addMoodCheckin, type MoodValue } from './api'
 
@@ -17,7 +17,7 @@ export function useAddMoodCheckin() {
   return useMutation({
     mutationFn: (value: MoodValue) => addMoodCheckin(value),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: briefKeys.all })
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
     },
   })
 }
