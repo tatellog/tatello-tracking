@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "test": "jest",
     "test:watch": "jest --watch",
+    "types:db": "supabase gen types typescript --linked > types/database.types.ts",
     "prepare": "husky"
   },
   "lint-staged": {

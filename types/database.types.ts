@@ -96,6 +96,72 @@ export type Database = {
         }
         Relationships: []
       }
+      macro_targets: {
+        Row: {
+          calories: number
+          protein_g: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calories: number
+          protein_g: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calories?: number
+          protein_g?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      meals: {
+        Row: {
+          ai_raw_response: Json | null
+          calories: number
+          consumed_at: string
+          created_at: string
+          id: string
+          meal_date: string | null
+          name: string
+          notes: string | null
+          photo_storage_path: string | null
+          protein_g: number
+          source: string
+          user_id: string
+        }
+        Insert: {
+          ai_raw_response?: Json | null
+          calories: number
+          consumed_at?: string
+          created_at?: string
+          id?: string
+          meal_date?: string | null
+          name: string
+          notes?: string | null
+          photo_storage_path?: string | null
+          protein_g: number
+          source?: string
+          user_id: string
+        }
+        Update: {
+          ai_raw_response?: Json | null
+          calories?: number
+          consumed_at?: string
+          created_at?: string
+          id?: string
+          meal_date?: string | null
+          name?: string
+          notes?: string | null
+          photo_storage_path?: string | null
+          protein_g?: number
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mood_checkins: {
         Row: {
           checked_at: string
@@ -217,6 +283,7 @@ export type Database = {
         Args: { p_timezone?: string; p_user_id?: string }
         Returns: number
       }
+      user_timezone: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
