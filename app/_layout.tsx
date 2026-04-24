@@ -1,6 +1,11 @@
 import '@/global.css'
 
 import {
+  CormorantGaramond_400Regular,
+  CormorantGaramond_500Medium,
+} from '@expo-google-fonts/cormorant-garamond'
+import { EBGaramond_400Regular_Italic } from '@expo-google-fonts/eb-garamond'
+import {
   Fraunces_400Regular,
   Fraunces_400Regular_Italic,
   Fraunces_500Medium,
@@ -23,6 +28,11 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
+    // Sprint 2 display + prose — consumed by /theme/typography.ts
+    CormorantGaramond_400Regular,
+    CormorantGaramond_500Medium,
+    EBGaramond_400Regular_Italic,
+    // Legacy /design/ family — kept until that folder is fully retired.
     Fraunces_400Regular,
     Fraunces_400Regular_Italic,
     Fraunces_500Medium,
