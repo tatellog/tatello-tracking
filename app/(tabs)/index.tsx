@@ -6,6 +6,7 @@ import type { BriefContext } from '@/features/brief/api'
 import {
   AnchorLine,
   DeltaPair,
+  HomeError,
   HomeHeader,
   HomeSkeleton,
   MoodPicker,
@@ -42,6 +43,10 @@ function calcDelta(current?: number | null, previous?: number | null): number | 
 export default function HomeScreen() {
   const brief = useHomeBrief()
   const cadence = useHomeCadence()
+
+  if (brief.isError && !brief.data) {
+    return <HomeError onRetry={brief.refetch} />
+  }
 
   if (brief.isLoading || !brief.data || cadence == null) {
     return (

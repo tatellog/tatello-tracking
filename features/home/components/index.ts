@@ -1,5 +1,6 @@
 export { AnchorLine } from './AnchorLine'
 export { DeltaPair } from './DeltaPair'
+export { HomeError } from './HomeError'
 export { HomeHeader } from './HomeHeader'
 export { HomeSkeleton } from './HomeSkeleton'
 export { MoodPicker } from './MoodPicker'
