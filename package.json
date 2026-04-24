@@ -12,6 +12,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
     "expo-linking": "~8.0.11",
@@ -19,11 +20,13 @@
     "expo-status-bar": "~3.0.9",
     "nativewind": "^4.2.3",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.7",
     "react-native-safe-area-context": "~5.6.2",
-    "react-native-screens": "~4.16.0"
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
@@ -36,5 +39,6 @@
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
 }
