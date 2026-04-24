@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet } from 'react-native'
-import Animated, { FadeInDown } from 'react-native-reanimated'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import type { BriefContext } from '@/features/brief/api'
@@ -15,19 +15,24 @@ import {
 } from '@/features/home/components'
 import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
+import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { MoodValue } from '@/features/moods/api'
 import { useAddMoodCheckin } from '@/features/moods/hooks'
 import { useToggleWorkoutToday } from '@/features/streak/hooks'
 import { colors, spacing } from '@/theme'
 
 /*
- * Entrance choreography — the eye reads top-to-bottom, so the
- * delays cascade: header first, streak card immediately after (its
- * own grid cascade runs ~1.1 s and is what we wait on), then the
- * rest of the blocks chain in 150 ms intervals so the rhythm feels
- * composed, not random.
+ * Entrance factory — switches between the composed cascade (first
+ * open of the hour) and a reduced uniform fade (re-opens within the
+ * hour). The cadence decision comes from useHomeCadence, which
+ * reads/writes the last-open timestamp in AsyncStorage.
  */
-const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
+function makeEnter(cadence: Cadence) {
+  if (cadence === 'reduced') {
+    return (_delayMs: number) => FadeIn.duration(250)
+  }
+  return (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
+}
 
 /* `latest - previous` for each metric, only when both are present. */
 function calcDelta(current?: number | null, previous?: number | null): number | undefined {
@@ -37,8 +42,9 @@ function calcDelta(current?: number | null, previous?: number | null): number | 
 
 export default function HomeScreen() {
   const brief = useHomeBrief()
+  const cadence = useHomeCadence()
 
-  if (brief.isLoading || !brief.data) {
+  if (brief.isLoading || !brief.data || cadence == null) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -48,12 +54,12 @@ export default function HomeScreen() {
     )
   }
 
-  return <HomeContent ctx={brief.data} />
+  return <HomeContent ctx={brief.data} cadence={cadence} />
 }
 
-type ContentProps = { ctx: BriefContext }
+type ContentProps = { ctx: BriefContext; cadence: Cadence }
 
-function HomeContent({ ctx }: ContentProps) {
+function HomeContent({ ctx, cadence }: ContentProps) {
   const state = deriveDayState(ctx)
   const anchor = deriveAnchorAction(ctx, state)
   const contextMessage = deriveContextMessage(ctx, state)
@@ -70,6 +76,8 @@ function HomeContent({ ctx }: ContentProps) {
   const toggleWorkout = useToggleWorkoutToday()
   const addMood = useAddMoodCheckin()
 
+  const enter = makeEnter(cadence)
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -77,7 +85,7 @@ function HomeContent({ ctx }: ContentProps) {
           <HomeHeader dayOfWeek={ctx.day_of_week} date={ctx.date} />
         </Animated.View>
 
-        <Animated.View entering={enter(150)} style={styles.block}>
+        <Animated.View entering={enter(150)}>
           <StreakCard
             days={ctx.grid_28_days}
             streakCount={ctx.streak_days}
@@ -85,26 +93,26 @@ function HomeContent({ ctx }: ContentProps) {
           />
         </Animated.View>
 
-        <Animated.View entering={enter(1700)} style={styles.block}>
+        <Animated.View entering={enter(1700)}>
           <DeltaPair weightDeltaKg={weightDeltaKg} waistDeltaCm={waistDeltaCm} periodWeeks={4} />
         </Animated.View>
 
-        <Animated.View entering={enter(1850)} style={styles.block}>
+        <Animated.View entering={enter(1850)}>
           <AnchorLine text={anchor} />
         </Animated.View>
 
-        <Animated.View entering={enter(2000)} style={styles.block}>
+        <Animated.View entering={enter(2000)}>
           <SwipeToSeal
             sealed={ctx.today_workout_completed}
             onSeal={() => toggleWorkout.mutate(!ctx.today_workout_completed)}
           />
         </Animated.View>
 
-        <Animated.View entering={enter(2150)} style={styles.block}>
+        <Animated.View entering={enter(2150)}>
           <QuickActions />
         </Animated.View>
 
-        <Animated.View entering={enter(2300)} style={styles.block}>
+        <Animated.View entering={enter(2300)}>
           <MoodPicker
             value={(ctx.latest_mood?.value ?? null) as MoodValue | null}
             onChange={(value) => addMood.mutate(value)}
@@ -125,9 +133,5 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
     gap: spacing.lg,
-  },
-  block: {
-    // Each Animated.View becomes a layout block; the `gap` on the
-    // ScrollView's contentContainer handles the vertical rhythm.
   },
 })
