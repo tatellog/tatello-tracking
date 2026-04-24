@@ -15,6 +15,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { useThemeStore } from '@/design/theme'
@@ -80,13 +81,15 @@ export default function RootLayout() {
   if (!ready) return null
 
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
-    >
-      <SafeAreaProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </SafeAreaProvider>
-    </PersistQueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
+      >
+        <SafeAreaProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </SafeAreaProvider>
+      </PersistQueryClientProvider>
+    </GestureHandlerRootView>
   )
 }
