@@ -42,6 +42,7 @@ export const MOCK_BRIEF_CONTEXT: BriefContext = {
   day_of_week: MOCK_WEEKDAY,
   streak_days: 14,
   today_workout_completed: false,
+  today_workout_at: null,
   latest_measurement: {
     id: 'mock-latest',
     user_id: 'mock-user',

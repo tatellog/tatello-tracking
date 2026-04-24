@@ -63,6 +63,9 @@ export const BriefContextSchema = z.object({
   day_of_week: z.string(),
   streak_days: z.number().int(),
   today_workout_completed: z.boolean(),
+  // ISO timestamp of today's workout insert — null when unmarked.
+  // Powers the 'Día sellado · HH:mm' timestamp on the completed bar.
+  today_workout_at: z.string().nullable(),
   latest_measurement: BodyMeasurementSchema.nullable(),
   measurement_30d_ago: BodyMeasurementSchema.nullable(),
   grid_28_days: z.array(StreakCellSchema).length(28),

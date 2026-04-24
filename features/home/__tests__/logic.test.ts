@@ -23,6 +23,7 @@ function buildCtx(overrides: Partial<BriefContext> = {}): BriefContext {
     day_of_week: 'Viernes',
     streak_days: 0,
     today_workout_completed: false,
+    today_workout_at: null,
     latest_measurement: null,
     measurement_30d_ago: null,
     grid_28_days: grid,
