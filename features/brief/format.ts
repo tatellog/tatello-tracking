@@ -91,3 +91,33 @@ export function formatStreakCount(days: number): { headline: string; tail: strin
   const spelled = spellCardinalEs(days)
   return { headline: spelled ?? String(days), tail: 'días escuchándote' }
 }
+
+const daysOfWeekEs = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+] as const
+
+export function dayOfWeekEs(date: Date): string {
+  const index = date.getDay()
+  return daysOfWeekEs[index] ?? ''
+}
+
+/* ISO YYYY-MM-DD — the format `formatEditorialDate` consumes. */
+export function formatIsoDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = (date.getMonth() + 1).toString().padStart(2, '0')
+  const d = date.getDate().toString().padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/* 24-hour H:MM clock — no leading zero on the hour, padded minutes. */
+export function formatBriefTime(date: Date): string {
+  const h = date.getHours()
+  const m = date.getMinutes().toString().padStart(2, '0')
+  return `${h}:${m}`
+}

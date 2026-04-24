@@ -1,9 +1,11 @@
 import type { BriefData } from '@/features/brief/types'
 
-export const mockBriefData: BriefData = {
-  date: '2026-04-23',
-  dayOfWeek: 'Sábado',
-  time: '8:12',
+/*
+ * Static portion of the brief — everything not derived from `new Date()`.
+ * `date`, `dayOfWeek`, and `time` are computed in `useBriefData` so the
+ * header always reflects the moment the user opened the app.
+ */
+export const mockBriefData: Omit<BriefData, 'date' | 'dayOfWeek' | 'time'> = {
   streak: {
     days: 14,
   },
