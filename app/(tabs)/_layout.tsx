@@ -46,6 +46,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="meals"
+        options={{
+          title: 'Comidas',
+          tabBarIcon: ({ color }) => <TabIcon color={color} glyph="🍽" />,
+        }}
+      />
+      <Tabs.Screen
         name="progress"
         options={{
           title: 'Progreso',
