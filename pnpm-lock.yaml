@@ -14,9 +14,6 @@ importers:
       '@expo-google-fonts/eb-garamond':
         specifier: ^0.4.2
         version: 0.4.2
-      '@expo-google-fonts/fraunces':
-        specifier: ^0.4.1
-        version: 0.4.1
       '@expo-google-fonts/geist':
         specifier: ^0.4.1
         version: 0.4.1
@@ -799,9 +796,6 @@ packages:
 
   '@expo-google-fonts/eb-garamond@0.4.2':
     resolution: {integrity: sha512-tkw/RNj3sLpOfasAYF1wrh8XnKspHXmoNf6StJ4LDvFlRpDCXXtG8sxkyjab1ncnlgK8iRUC8FugmYMr55YCHw==}
-
-  '@expo-google-fonts/fraunces@0.4.1':
-    resolution: {integrity: sha512-gYc9P92ObyWvz1rWPOeWSvVKyBFIuA8hgOdhvo4DSiPBaWLbFA6v8uLIEIBwW+0oWTlXbBzjeBReHQI2H7UNjQ==}
 
   '@expo-google-fonts/geist@0.4.1':
     resolution: {integrity: sha512-UOBwoTJkKC0ViMOS8gjlQyUcT/5PX0phCroz/8z0DP1+7FcoD1RGGeG//nVQYWbT3y/ze4XoE63gSunml9Wdbw==}
@@ -6065,8 +6059,6 @@ snapshots:
   '@expo-google-fonts/cormorant-garamond@0.4.1': {}
 
   '@expo-google-fonts/eb-garamond@0.4.2': {}
-
-  '@expo-google-fonts/fraunces@0.4.1': {}
 
   '@expo-google-fonts/geist@0.4.1': {}
 
