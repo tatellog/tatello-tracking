@@ -9,8 +9,6 @@ import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { todayInTimezone } from '@/lib/time'
 import { colors, radius, shadows, spacing, typography } from '@/theme'
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
-
 function addDays(iso: string, delta: number): string {
   const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
   const date = new Date(y, m - 1, d)
@@ -39,7 +37,7 @@ export default function MealsScreen() {
   const mealsQuery = useMealsForDate(selected)
   const deleteMeal = useDeleteMeal()
 
-  const meals = mealsQuery.data ?? []
+  const meals = useMemo(() => mealsQuery.data ?? [], [mealsQuery.data])
 
   const summary = useMemo(
     () =>
