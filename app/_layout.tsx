@@ -12,21 +12,10 @@ import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import Toast from 'react-native-toast-message'
 
-import { SealedToast } from '@/features/home/components/SealedToast'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
 import { QUERY_CACHE_MAX_AGE, queryClient, queryPersister } from '@/lib/queryClient'
-
-/*
- * Custom toast registry. Only 'sealed' ships today — it's the
- * undo-within-5s confirmation for the seal-day button. Future
- * flavours (error, info) can be added here as the product grows.
- */
-const toastConfig = {
-  sealed: ({ props }: { props: { onUndo: () => void } }) => <SealedToast onUndo={props.onUndo} />,
-}
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Ignore — on fast refresh the splash is already hidden.
@@ -83,7 +72,6 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <Stack screenOptions={{ headerShown: false }} />
         </SafeAreaProvider>
-        <Toast config={toastConfig} />
       </PersistQueryClientProvider>
     </GestureHandlerRootView>
   )

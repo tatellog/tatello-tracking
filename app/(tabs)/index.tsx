@@ -1,7 +1,6 @@
 import { ScrollView, StyleSheet } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Toast from 'react-native-toast-message'
 
 import type { BriefContext } from '@/features/brief/api'
 import {
@@ -12,10 +11,15 @@ import {
   HomeSkeleton,
   MoodPicker,
   QuickActions,
-  SealDayButton,
   StreakCard,
+  WorkoutCheckinBar,
 } from '@/features/home/components'
-import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
+import {
+  deriveAnchorAction,
+  deriveCheckinState,
+  deriveContextMessage,
+  deriveDayState,
+} from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import { DefineTargetsBanner, LogMealButton, MacrosTodayCard } from '@/features/macros/components'
@@ -40,6 +44,13 @@ function makeEnter(cadence: Cadence) {
 function calcDelta(current?: number | null, previous?: number | null): number | undefined {
   if (current == null || previous == null) return undefined
   return Number((current - previous).toFixed(2))
+}
+
+/* Local-zoned day-of-week (0–6) from 'YYYY-MM-DD' — sidesteps the
+ * `new Date('YYYY-MM-DD')` UTC-midnight drift west of UTC. */
+function dayOfWeekOf(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number]
+  return new Date(y, m - 1, d).getDay()
 }
 
 export default function HomeScreen() {
@@ -127,24 +138,16 @@ function HomeContent({ ctx, cadence }: ContentProps) {
         </Animated.View>
 
         <Animated.View entering={enter(2200)}>
-          <SealDayButton
-            sealed={ctx.today_workout_completed}
-            streakCount={ctx.streak_days}
-            onSeal={() => {
-              toggleWorkout.mutate(true)
-              Toast.show({
-                type: 'sealed',
-                position: 'bottom',
-                bottomOffset: 96,
-                visibilityTime: 5000,
-                props: {
-                  onUndo: () => {
-                    Toast.hide()
-                    toggleWorkout.mutate(false)
-                  },
-                },
-              })
-            }}
+          <WorkoutCheckinBar
+            state={deriveCheckinState(
+              ctx.today_workout_completed,
+              hour,
+              dayOfWeekOf(ctx.date),
+              ctx.grid_28_days,
+            )}
+            dayOfWeek={ctx.day_of_week}
+            completedAt={ctx.today_workout_at ? new Date(ctx.today_workout_at) : undefined}
+            onTap={() => toggleWorkout.mutate(true)}
             onUnseal={() => toggleWorkout.mutate(false)}
           />
         </Animated.View>

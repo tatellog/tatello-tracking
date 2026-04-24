@@ -10,15 +10,14 @@ import { markWorkoutToday, unmarkWorkoutToday } from './api'
  * (`true` to mark, `false` to unmark).
  *
  * Optimistic: flips today_workout_completed immediately and nudges
- * streak_days by ±1 so the button/card/rings respond the instant
- * the tap lands. The streak bump is an estimate — the server's
+ * streak_days by ±1 so the bar/card/rings respond the instant the
+ * tap lands. The streak bump is an estimate — the server's
  * get_current_streak RPC may disagree in weird tz edge cases; the
  * refetch on settle reconciles either way. Rollback snapshots the
  * previous state so any error restores the pre-tap picture.
  *
- * Enables the 'tap + undo toast' pattern in SealDayButton: users
- * see the commit land before the network round-trip; if they
- * undo within 5 s we flip back just as fast.
+ * Powers WorkoutCheckinBar's tap-to-seal and the long-press undo
+ * on the completed surface — both flows share this single mutation.
  */
 export function useToggleWorkoutToday() {
   const qc = useQueryClient()
@@ -29,6 +28,7 @@ export function useToggleWorkoutToday() {
       return patchBriefCache(qc, (ctx) => ({
         ...ctx,
         today_workout_completed: complete,
+        today_workout_at: complete ? new Date().toISOString() : null,
         streak_days: complete ? ctx.streak_days + 1 : Math.max(0, ctx.streak_days - 1),
       }))
     },
