@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { briefKeys } from '@/features/brief/hooks'
+import { useBriefContext } from '@/features/brief/hooks'
+import { queryKeys } from '@/lib/queryKeys'
 
 import {
   createMeal,
   deleteMeal,
-  getMacroTargets,
   getMealById,
   getMealsForDate,
   updateMeal,
@@ -15,25 +15,63 @@ import {
   type MealInput,
 } from './api'
 
+import type { BriefContext, MacroTargetsRow } from '@/features/brief/api'
+
+type OptimisticContext = { previous: [readonly unknown[], unknown][] }
+
 /*
- * Query key tree for macros. Mirrors the briefKeys pattern — a
- * single root tuple lets us invalidate the whole feature with one
- * call, while the sub-tuples keep date-specific caches independent.
+ * Helper: apply a pure transform to every cached BriefContext under
+ * queryKeys.brief.*. Returns a snapshot so the onError can restore.
+ * Shared by create/update/delete optimistic paths.
  */
-export const macroKeys = {
-  all: ['macros'] as const,
-  targets: () => ['macros', 'targets'] as const,
-  meals: (date: string) => ['macros', 'meals', date] as const,
-  meal: (id: string) => ['macros', 'meal', id] as const,
+function patchBriefCache(
+  qc: ReturnType<typeof useQueryClient>,
+  transform: (ctx: BriefContext) => BriefContext,
+): OptimisticContext {
+  const previous = qc.getQueriesData<BriefContext>({ queryKey: queryKeys.brief.all })
+  qc.setQueriesData<BriefContext>({ queryKey: queryKeys.brief.all }, (ctx) => {
+    if (!ctx) return ctx
+    return transform(ctx)
+  })
+  return { previous: previous as [readonly unknown[], unknown][] }
+}
+
+function restoreBriefCache(
+  qc: ReturnType<typeof useQueryClient>,
+  context: OptimisticContext | undefined,
+) {
+  if (!context) return
+  for (const [key, data] of context.previous) {
+    qc.setQueryData(key, data)
+  }
 }
 
 /* ─── targets ────────────────────────────────────────────────────── */
 
-export function useMacroTargets() {
-  return useQuery({
-    queryKey: macroKeys.targets(),
-    queryFn: getMacroTargets,
-  })
+type MacroTargetsQuery = {
+  data: MacroTargetsRow | null | undefined
+  isLoading: boolean
+  isError: boolean
+  refetch: () => void
+}
+
+/*
+ * Targets live inside BriefContext, so we derive them from the
+ * single brief query instead of maintaining a parallel cache.
+ * Two benefits:
+ *   1. No chance of drift between two copies of the same data.
+ *   2. One network round-trip at app start, not two.
+ */
+export function useMacroTargets(): MacroTargetsQuery {
+  const brief = useBriefContext()
+  return {
+    data: brief.data?.targets ?? null,
+    isLoading: brief.isLoading,
+    isError: brief.isError,
+    refetch: () => {
+      brief.refetch()
+    },
+  }
 }
 
 export function useUpsertMacroTargets() {
@@ -41,11 +79,9 @@ export function useUpsertMacroTargets() {
   return useMutation({
     mutationFn: (input: MacroTargetsInput) => upsertMacroTargets(input),
     onSuccess: () => {
-      // Setting targets flips the Home from banner to rings + unlocks
-      // the log-meal CTA. Both read through the brief, so invalidating
-      // that tree + the targets query covers every surface.
-      qc.invalidateQueries({ queryKey: briefKeys.all })
-      qc.invalidateQueries({ queryKey: macroKeys.targets() })
+      // Only the brief cache needs invalidation now — targets live
+      // inside the brief payload.
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
     },
   })
 }
@@ -54,14 +90,14 @@ export function useUpsertMacroTargets() {
 
 export function useMealsForDate(date: string) {
   return useQuery({
-    queryKey: macroKeys.meals(date),
+    queryKey: queryKeys.macros.meals(date),
     queryFn: () => getMealsForDate(date),
   })
 }
 
 export function useMealById(id: string | undefined) {
   return useQuery({
-    queryKey: id ? macroKeys.meal(id) : ['macros', 'meal', 'noop'],
+    queryKey: id ? queryKeys.macros.meal(id) : ['macros', 'meal', 'noop'],
     queryFn: () => getMealById(id!),
     enabled: Boolean(id),
   })
@@ -70,76 +106,109 @@ export function useMealById(id: string | undefined) {
 /* ─── meal mutations ─────────────────────────────────────────────── */
 
 /*
- * Create a meal. Optimistically bumps BriefContext.today_macros and
- * meal_count_today so the Home's rings grow the instant the user
- * taps 'Guardar' — the round-trip happens in the background.
- *
- * On failure, the previous snapshot is restored. On settled, we
- * refetch everything so server truth replaces optimistic estimates.
+ * Create a meal — optimistic. Bumps today_macros + meal_count_today
+ * so the Home's rings grow instantly; the server round-trip happens
+ * in the background. Rollback on error; invalidate on settle so
+ * server truth replaces the estimate.
  */
 export function useCreateMeal() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: MealInput) => createMeal(input),
     onMutate: async (input) => {
-      await qc.cancelQueries({ queryKey: briefKeys.all })
-      const previous = qc.getQueriesData({ queryKey: briefKeys.all })
-      qc.setQueriesData({ queryKey: briefKeys.all }, (ctx) => {
-        if (!ctx || typeof ctx !== 'object') return ctx
-        const typed = ctx as {
-          today_macros: { protein_g: number; calories: number }
-          meal_count_today: number
-        }
-        return {
-          ...typed,
-          today_macros: {
-            protein_g: typed.today_macros.protein_g + input.protein_g,
-            calories: typed.today_macros.calories + input.calories,
-          },
-          meal_count_today: typed.meal_count_today + 1,
-        }
-      })
-      return { previous }
+      await qc.cancelQueries({ queryKey: queryKeys.brief.all })
+      return patchBriefCache(qc, (ctx) => ({
+        ...ctx,
+        today_macros: {
+          protein_g: ctx.today_macros.protein_g + input.protein_g,
+          calories: ctx.today_macros.calories + input.calories,
+        },
+        meal_count_today: ctx.meal_count_today + 1,
+      }))
     },
-    onError: (_err, _vars, context) => {
-      if (!context?.previous) return
-      for (const [key, data] of context.previous) {
-        qc.setQueryData(key, data)
-      }
-    },
+    onError: (_err, _vars, context) => restoreBriefCache(qc, context),
     onSettled: (_data, _err, variables) => {
-      qc.invalidateQueries({ queryKey: briefKeys.all })
-      // Invalidate the meal list for the consumed date so the Comidas
-      // tab picks up the new row when the user switches tabs.
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       const mealDate = variables.consumed_at.toISOString().slice(0, 10)
-      qc.invalidateQueries({ queryKey: macroKeys.meals(mealDate) })
+      qc.invalidateQueries({ queryKey: queryKeys.macros.meals(mealDate) })
     },
   })
 }
 
+/*
+ * Update a meal — optimistic. Needs the previous meal to compute
+ * the macro delta (new - old), so we snapshot it from the cache
+ * inside onMutate. Falls back to a plain invalidate if the meal
+ * isn't cached (edge case: deep-link edit without previous visit).
+ */
 export function useUpdateMeal() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: MealInput }) => updateMeal(id, input),
+    onMutate: async ({ id, input }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.brief.all })
+      const existing = qc.getQueryData<Meal>(queryKeys.macros.meal(id))
+      if (!existing) {
+        // No cached baseline — skip the optimistic delta.
+        return patchBriefCache(qc, (ctx) => ctx)
+      }
+      const proteinDelta = input.protein_g - Number(existing.protein_g)
+      const calorieDelta = input.calories - existing.calories
+      return patchBriefCache(qc, (ctx) => ({
+        ...ctx,
+        today_macros: {
+          protein_g: ctx.today_macros.protein_g + proteinDelta,
+          calories: ctx.today_macros.calories + calorieDelta,
+        },
+      }))
+    },
+    onError: (_err, _vars, context) => restoreBriefCache(qc, context),
     onSuccess: (meal: Meal) => {
-      qc.invalidateQueries({ queryKey: briefKeys.all })
       // meal_date is a generated column — the Supabase type generator
       // marks it nullable, guard it even though Postgres fills it.
       if (meal.meal_date) {
-        qc.invalidateQueries({ queryKey: macroKeys.meals(meal.meal_date) })
+        qc.invalidateQueries({ queryKey: queryKeys.macros.meals(meal.meal_date) })
       }
-      qc.invalidateQueries({ queryKey: macroKeys.meal(meal.id) })
+      qc.invalidateQueries({ queryKey: queryKeys.macros.meal(meal.id) })
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
     },
   })
 }
 
+/*
+ * Delete a meal — optimistic. Subtracts the meal's macros from
+ * today_macros and drops meal_count_today by one, then invalidates
+ * on settle. If the meal isn't in the cache we skip the optimistic
+ * step; the UI corrects itself on the refetch.
+ */
 export function useDeleteMeal() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => deleteMeal(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: briefKeys.all })
-      qc.invalidateQueries({ queryKey: macroKeys.all })
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: queryKeys.brief.all })
+      const existing = qc.getQueryData<Meal>(queryKeys.macros.meal(id))
+      if (!existing) {
+        return patchBriefCache(qc, (ctx) => ({
+          ...ctx,
+          meal_count_today: Math.max(0, ctx.meal_count_today - 1),
+        }))
+      }
+      return patchBriefCache(qc, (ctx) => ({
+        ...ctx,
+        today_macros: {
+          protein_g: Math.max(0, ctx.today_macros.protein_g - Number(existing.protein_g)),
+          calories: Math.max(0, ctx.today_macros.calories - existing.calories),
+        },
+        meal_count_today: Math.max(0, ctx.meal_count_today - 1),
+      }))
+    },
+    onError: (_err, _vars, context) => restoreBriefCache(qc, context),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      qc.invalidateQueries({ queryKey: queryKeys.macros.all })
     },
   })
 }
