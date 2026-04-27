@@ -64,28 +64,31 @@ export function deriveContextMessage(ctx: BriefContext, state: DayState): string
   return `Vas ${ctx.streak_days} días seguidos. Uno más.`
 }
 
-/* ─── checkin bar ─────────────────────────────────────────────────── */
+/* ─── today tile ──────────────────────────────────────────────────── */
 
-export type WorkoutCheckinState = 'early' | 'urgent' | 'completed'
+export type TodayTileState = 'morning' | 'day' | 'urgent' | 'completed'
 
 /*
- * Decide which of the three states the WorkoutCheckinBar should
- * render. Pure: all inputs explicit, no new Date() reads inside.
+ * Decide which variant the in-grid TodayTile should render. Pure:
+ * all inputs explicit, no new Date() reads inside.
  *
- * Urgency triggers:
- *   - hour >= 17 on any day
- *   - weekend (Sun=0 / Sat=6) after 14:00
- *   - risky pattern: the last three occurrences of today's weekday
- *     include at least two non-completed entries. Catches the
- *     'three saturdays in a row with no training' warning before
- *     it becomes a broken streak.
+ *   morning   → hour < 11, no urgency triggers. Soft 'tu día está
+ *               abierto' prompt.
+ *   day       → 11 ≤ hour < 17, no urgency triggers. Direct 'marcar
+ *               entreno' nudge.
+ *   urgent    → hour ≥ 17, weekend (Sun/Sat) ≥ 14h, OR the risky
+ *               pattern: of the last three same-weekday entries, at
+ *               least two were not completed. Faster halo, bolder
+ *               copy.
+ *   completed → workout already marked for today. Caller hides the
+ *               tile and renders the full 28-cell grid instead.
  */
-export function deriveCheckinState(
+export function deriveTodayTileState(
   workoutCompleted: boolean,
   hour: number,
   dayOfWeek: number,
   gridDays: StreakCell[],
-): WorkoutCheckinState {
+): TodayTileState {
   if (workoutCompleted) return 'completed'
 
   const sameDayOfWeekHistory = gridDays
@@ -101,23 +104,26 @@ export function deriveCheckinState(
   const isRiskyWeekend = isWeekend && hour >= 14
 
   if (isLate || isRiskyWeekend || hasRiskyPattern) return 'urgent'
-  return 'early'
+  if (hour < 11) return 'morning'
+  return 'day'
 }
 
-export function deriveCheckinCopy(
-  state: WorkoutCheckinState,
+export function deriveTodayTileCopy(
+  state: TodayTileState,
   dayOfWeek: string,
-): { label: string; prompt: string } {
-  const label = `Hoy · ${dayOfWeek}`
+): { topLabel: string; bottomText: string } {
+  const topLabel = `Hoy · ${dayOfWeek}`
   switch (state) {
-    case 'early':
-      return { label, prompt: 'Todavía no la has cerrado.' }
+    case 'morning':
+      return { topLabel, bottomText: 'Tu día está abierto' }
+    case 'day':
+      return { topLabel, bottomText: 'Marcar entreno' }
     case 'urgent':
-      return { label, prompt: 'No pierdas la racha.' }
+      return { topLabel, bottomText: 'No pierdas la racha' }
     case 'completed':
-      // Not consumed in the completed bar — that layout renders its
-      // own copy. Return an empty shape so callers don't have to
-      // special-case the return type.
-      return { label: '', prompt: '' }
+      // Not consumed when completed — the grid renders 28 normal
+      // cells in this state. Return an empty shape so callers don't
+      // have to special-case the return type.
+      return { topLabel: '', bottomText: '' }
   }
 }

@@ -1,10 +1,10 @@
 import type { BriefContext, StreakCell } from '@/features/brief/api'
 import {
   deriveAnchorAction,
-  deriveCheckinCopy,
-  deriveCheckinState,
   deriveContextMessage,
   deriveDayState,
+  deriveTodayTileCopy,
+  deriveTodayTileState,
 } from '@/features/home/logic'
 
 /*
@@ -128,7 +128,7 @@ describe('deriveContextMessage', () => {
 /*
  * Helper: build a 28-day grid with precise control over which
  * weekday-matching entries are completed. Useful for the risky-
- * pattern branch of deriveCheckinState.
+ * pattern branch of deriveTodayTileState.
  */
 function buildGridWithSelectiveCompletions(todayDow: number, completedSameDay: boolean[]) {
   const grid: StreakCell[] = []
@@ -152,63 +152,76 @@ function buildGridWithSelectiveCompletions(todayDow: number, completedSameDay: b
   return grid
 }
 
-describe('deriveCheckinState', () => {
+describe('deriveTodayTileState', () => {
   it('returns completed whenever today workout is completed', () => {
-    expect(deriveCheckinState(true, 9, 5, [])).toBe('completed')
-    expect(deriveCheckinState(true, 22, 6, [])).toBe('completed')
+    expect(deriveTodayTileState(true, 9, 5, [])).toBe('completed')
+    expect(deriveTodayTileState(true, 22, 6, [])).toBe('completed')
   })
 
-  it('returns early on a weekday morning with no history risk', () => {
+  it('returns morning on a weekday before 11h with no history risk', () => {
     const grid = buildGridWithSelectiveCompletions(5, [true, true, true])
-    expect(deriveCheckinState(false, 9, 5, grid)).toBe('early')
-    expect(deriveCheckinState(false, 13, 5, grid)).toBe('early')
+    expect(deriveTodayTileState(false, 7, 5, grid)).toBe('morning')
+    expect(deriveTodayTileState(false, 10, 5, grid)).toBe('morning')
+  })
+
+  it('returns day on a weekday between 11h and 17h with no history risk', () => {
+    const grid = buildGridWithSelectiveCompletions(5, [true, true, true])
+    expect(deriveTodayTileState(false, 11, 5, grid)).toBe('day')
+    expect(deriveTodayTileState(false, 16, 5, grid)).toBe('day')
   })
 
   it('returns urgent after 17:00 on any day', () => {
     const grid = buildGridWithSelectiveCompletions(3, [true, true, true])
-    expect(deriveCheckinState(false, 17, 3, grid)).toBe('urgent')
-    expect(deriveCheckinState(false, 20, 3, grid)).toBe('urgent')
+    expect(deriveTodayTileState(false, 17, 3, grid)).toBe('urgent')
+    expect(deriveTodayTileState(false, 20, 3, grid)).toBe('urgent')
   })
 
   it('returns urgent on weekend afternoons (>= 14:00)', () => {
     const gridSat = buildGridWithSelectiveCompletions(6, [true, true, true])
-    expect(deriveCheckinState(false, 14, 6, gridSat)).toBe('urgent')
+    expect(deriveTodayTileState(false, 14, 6, gridSat)).toBe('urgent')
     const gridSun = buildGridWithSelectiveCompletions(0, [true, true, true])
-    expect(deriveCheckinState(false, 15, 0, gridSun)).toBe('urgent')
+    expect(deriveTodayTileState(false, 15, 0, gridSun)).toBe('urgent')
   })
 
-  it('stays early on weekend mornings before 14:00', () => {
+  it('stays morning on weekend mornings before 11h', () => {
     const grid = buildGridWithSelectiveCompletions(6, [true, true, true])
-    expect(deriveCheckinState(false, 10, 6, grid)).toBe('early')
+    expect(deriveTodayTileState(false, 8, 6, grid)).toBe('morning')
+  })
+
+  it('returns day on a weekend between 11h and 14h', () => {
+    const grid = buildGridWithSelectiveCompletions(6, [true, true, true])
+    expect(deriveTodayTileState(false, 12, 6, grid)).toBe('day')
   })
 
   it('returns urgent when the risky weekday pattern fires (2 of last 3 empty)', () => {
     // Friday (dow=5) with last 3 fridays: true, false, false → 2 empties → risky.
     const grid = buildGridWithSelectiveCompletions(5, [true, false, false])
-    expect(deriveCheckinState(false, 10, 5, grid)).toBe('urgent')
+    expect(deriveTodayTileState(false, 10, 5, grid)).toBe('urgent')
   })
 
-  it('stays early when the last 3 same-weekday entries are mostly completed', () => {
+  it('stays morning when the last 3 same-weekday entries are mostly completed', () => {
     // Friday with last 3 fridays: true, true, false → only 1 empty → not risky.
     const grid = buildGridWithSelectiveCompletions(5, [true, true, false])
-    expect(deriveCheckinState(false, 10, 5, grid)).toBe('early')
+    expect(deriveTodayTileState(false, 9, 5, grid)).toBe('morning')
   })
 })
 
-describe('deriveCheckinCopy', () => {
-  it('uses the weekday in the label for both active states', () => {
-    expect(deriveCheckinCopy('early', 'Lunes').label).toBe('Hoy · Lunes')
-    expect(deriveCheckinCopy('urgent', 'Sábado').label).toBe('Hoy · Sábado')
+describe('deriveTodayTileCopy', () => {
+  it('uses the weekday in the top label for all pending states', () => {
+    expect(deriveTodayTileCopy('morning', 'Lunes').topLabel).toBe('Hoy · Lunes')
+    expect(deriveTodayTileCopy('day', 'Martes').topLabel).toBe('Hoy · Martes')
+    expect(deriveTodayTileCopy('urgent', 'Sábado').topLabel).toBe('Hoy · Sábado')
   })
 
-  it('swaps prompt text by state', () => {
-    expect(deriveCheckinCopy('early', 'Lunes').prompt).toMatch(/todavía no la has cerrado/i)
-    expect(deriveCheckinCopy('urgent', 'Sábado').prompt).toMatch(/no pierdas la racha/i)
+  it('swaps bottom text by state', () => {
+    expect(deriveTodayTileCopy('morning', 'Lunes').bottomText).toMatch(/tu día está abierto/i)
+    expect(deriveTodayTileCopy('day', 'Lunes').bottomText).toMatch(/marcar entreno/i)
+    expect(deriveTodayTileCopy('urgent', 'Sábado').bottomText).toMatch(/no pierdas la racha/i)
   })
 
   it('returns empty strings for the completed state', () => {
-    const { label, prompt } = deriveCheckinCopy('completed', 'Lunes')
-    expect(label).toBe('')
-    expect(prompt).toBe('')
+    const { topLabel, bottomText } = deriveTodayTileCopy('completed', 'Lunes')
+    expect(topLabel).toBe('')
+    expect(bottomText).toBe('')
   })
 })

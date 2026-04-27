@@ -12,19 +12,12 @@ import {
   MoodPicker,
   QuickActions,
   StreakCard,
-  WorkoutCheckinBar,
 } from '@/features/home/components'
-import {
-  deriveAnchorAction,
-  deriveCheckinState,
-  deriveContextMessage,
-  deriveDayState,
-} from '@/features/home/logic'
+import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import { DefineTargetsBanner, LogMealButton, MacrosTodayCard } from '@/features/macros/components'
 import { useAddMoodCheckin } from '@/features/moods/hooks'
-import { useToggleWorkoutToday } from '@/features/streak/hooks'
 import { colors, spacing } from '@/theme'
 
 /*
@@ -44,13 +37,6 @@ function makeEnter(cadence: Cadence) {
 function calcDelta(current?: number | null, previous?: number | null): number | undefined {
   if (current == null || previous == null) return undefined
   return Number((current - previous).toFixed(2))
-}
-
-/* Local-zoned day-of-week (0–6) from 'YYYY-MM-DD' — sidesteps the
- * `new Date('YYYY-MM-DD')` UTC-midnight drift west of UTC. */
-function dayOfWeekOf(isoDate: string): number {
-  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number]
-  return new Date(y, m - 1, d).getDay()
 }
 
 export default function HomeScreen() {
@@ -91,7 +77,6 @@ function HomeContent({ ctx, cadence }: ContentProps) {
     ctx.measurement_30d_ago?.waist_cm,
   )
 
-  const toggleWorkout = useToggleWorkoutToday()
   const addMood = useAddMoodCheckin()
 
   const enter = makeEnter(cadence)
@@ -138,25 +123,10 @@ function HomeContent({ ctx, cadence }: ContentProps) {
         </Animated.View>
 
         <Animated.View entering={enter(2200)}>
-          <WorkoutCheckinBar
-            state={deriveCheckinState(
-              ctx.today_workout_completed,
-              hour,
-              dayOfWeekOf(ctx.date),
-              ctx.grid_28_days,
-            )}
-            dayOfWeek={ctx.day_of_week}
-            completedAt={ctx.today_workout_at ? new Date(ctx.today_workout_at) : undefined}
-            onTap={() => toggleWorkout.mutate(true)}
-            onUnseal={() => toggleWorkout.mutate(false)}
-          />
-        </Animated.View>
-
-        <Animated.View entering={enter(2350)}>
           <QuickActions />
         </Animated.View>
 
-        <Animated.View entering={enter(2500)}>
+        <Animated.View entering={enter(2350)}>
           <MoodPicker
             value={ctx.latest_mood?.value ?? null}
             onChange={(value) => addMood.mutate(value)}
