@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -87,6 +87,16 @@ const PRESS_HOLD_MS = 600 // 250ms cross-fade + 350ms hold with check
 export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) {
   const intensity = INTENSITY[state]
   const [pressed, setPressed] = useState(false)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Bail out cleanly if the component unmounts mid-press (user navs
+  // away in the 600ms hold window) — otherwise the setTimeout would
+  // fire onMark on a stale handler.
+  useEffect(() => {
+    return () => {
+      if (pressTimer.current) clearTimeout(pressTimer.current)
+    }
+  }, [])
 
   const haloOpacity = useSharedValue(0.4)
   const haloScale = useSharedValue(1)
@@ -184,7 +194,7 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
     if (pressed) return
     setPressed(true)
     checkOpacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.ease) })
-    setTimeout(onMark, PRESS_HOLD_MS)
+    pressTimer.current = setTimeout(onMark, PRESS_HOLD_MS)
   }
 
   // Glyph + label sizing scales lightly with the tile so a tighter
