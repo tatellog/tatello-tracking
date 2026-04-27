@@ -13,11 +13,18 @@ import {
   QuickActions,
   StreakCard,
 } from '@/features/home/components'
-import { deriveAnchorAction, deriveContextMessage, deriveDayState } from '@/features/home/logic'
+import {
+  deriveAnchorAction,
+  deriveContextMessage,
+  deriveDayState,
+  deriveTodayTileCopy,
+  deriveTodayTileState,
+} from '@/features/home/logic'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import { DefineTargetsBanner, LogMealButton, MacrosTodayCard } from '@/features/macros/components'
 import { useAddMoodCheckin } from '@/features/moods/hooks'
+import { useToggleWorkoutToday } from '@/features/streak/hooks'
 import { colors, spacing } from '@/theme'
 
 /*
@@ -37,6 +44,13 @@ function makeEnter(cadence: Cadence) {
 function calcDelta(current?: number | null, previous?: number | null): number | undefined {
   if (current == null || previous == null) return undefined
   return Number((current - previous).toFixed(2))
+}
+
+/* Local-zoned day-of-week (0–6) from 'YYYY-MM-DD' — sidesteps the
+ * `new Date('YYYY-MM-DD')` UTC-midnight drift west of UTC. */
+function dayOfWeekOf(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number]
+  return new Date(y, m - 1, d).getDay()
 }
 
 export default function HomeScreen() {
@@ -77,7 +91,16 @@ function HomeContent({ ctx, cadence }: ContentProps) {
     ctx.measurement_30d_ago?.waist_cm,
   )
 
+  const toggleWorkout = useToggleWorkoutToday()
   const addMood = useAddMoodCheckin()
+
+  const todayTileState = deriveTodayTileState(
+    ctx.today_workout_completed,
+    hour,
+    dayOfWeekOf(ctx.date),
+    ctx.grid_28_days,
+  )
+  const todayCopy = deriveTodayTileCopy(todayTileState, ctx.day_of_week)
 
   const enter = makeEnter(cadence)
 
@@ -93,6 +116,9 @@ function HomeContent({ ctx, cadence }: ContentProps) {
             days={ctx.grid_28_days}
             streakCount={ctx.streak_days}
             contextMessage={contextMessage}
+            todayTileState={todayTileState}
+            todayCopy={todayCopy}
+            onMarkWorkout={() => toggleWorkout.mutate(true)}
           />
         </Animated.View>
 

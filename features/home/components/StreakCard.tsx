@@ -1,45 +1,72 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { useEffect, useRef } from 'react'
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+  type TextInputProps,
+} from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   useAnimatedProps,
-  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated'
 
 import type { StreakCell } from '@/features/brief/api'
+import type { TodayTileState } from '@/features/home/logic'
 import { colors, radius, shadows, spacing, typography } from '@/theme'
+
+import { TodayTile } from './TodayTile'
 
 type Props = {
   days: StreakCell[]
   streakCount: number
   contextMessage: string
+  todayTileState: TodayTileState
+  todayCopy: { topLabel: string; bottomText: string }
+  onMarkWorkout: () => void
 }
 
 const GRID_ROWS = 4
 const GRID_COLS = 7
-const TODAY_INDEX = GRID_ROWS * GRID_COLS - 1
 const CELL_GAP = 4
 const CELL_DELAY_MS = 40
+const HOLE_DELAY_MS = 60 // stagger for the 4 cells that fill the tile's slot
+
+// Cells in the bottom-right 2×2 (rows 3-4, cols 6-7) — these are
+// hidden behind the tile in pending state and reappear with a fast
+// stagger when the workout is marked.
+const HOLE_INDICES = [19, 20, 26, 27]
+const TODAY_INDEX = GRID_ROWS * GRID_COLS - 1
+const TILE_ENTRY_DELAY = 24 * CELL_DELAY_MS
 
 /*
- * The hero card: 'TU RACHA' header, 7×4 heatmap of the last 28
- * days, a vertical gradient divider, the big streak number, and a
- * serif-italic context line underneath.
+ * Hero card. Header (`TU RACHA · 14 DÍAS · 7 SEGUIDOS`), then a
+ * full-width 7×4 grid that either shows 28 small cells (workout
+ * marked) or 24 small cells + a 2×2 TodayTile in the bottom-right
+ * (workout pending). Below: dashed divider, big streak counter,
+ * and the prose context line.
  *
- * Cells fade in one-by-one on a 40 ms cadence so the grid 'paints'
- * left-to-right, top-to-bottom. Today (the last cell) is rendered
- * copper instead of forest, pulses gently on breath, and pushes a
- * halo out in a 1.8 s loop — the eye lands there without being
- * told to.
+ * Cell positions are absolute and computed from a measured grid
+ * width — this lets the four "hole" cells (indices 19/20/26/27)
+ * disappear and reappear without disturbing the surrounding layout
+ * when the user taps Entrené.
  */
-export function StreakCard({ days, streakCount, contextMessage }: Props) {
+export function StreakCard({
+  days,
+  streakCount,
+  contextMessage,
+  todayTileState,
+  todayCopy,
+  onMarkWorkout,
+}: Props) {
+  const completedCount = days.filter((d) => d.completed).length
   const summaryLabel = `Tu racha: ${streakCount} días seguidos. ${contextMessage}`
 
   return (
@@ -51,52 +78,123 @@ export function StreakCard({ days, streakCount, contextMessage }: Props) {
     >
       <View style={styles.header}>
         <Text style={styles.label}>TU RACHA</Text>
-        <Text style={styles.subLabel}>ÚLTIMOS 28 DÍAS</Text>
+        <Text style={styles.subLabel}>{`${completedCount} DÍAS · ${streakCount} SEGUIDOS`}</Text>
       </View>
 
-      <View style={styles.body}>
-        <StreakGrid days={days} />
-        <View style={styles.vDivider} />
-        <StreakNumber count={streakCount} />
-      </View>
+      <StreakGrid
+        days={days}
+        todayTileState={todayTileState}
+        todayCopy={todayCopy}
+        onMarkWorkout={onMarkWorkout}
+      />
 
-      <View style={styles.hDivider} />
+      <View style={styles.dashedDivider} />
+
+      <StreakNumber count={streakCount} />
 
       <Text style={styles.contextMessage}>{contextMessage}</Text>
     </View>
   )
 }
 
-/* ─── 7×4 grid ───────────────────────────────────────────────────── */
+/* ─── grid (absolute-positioned cells + 2×2 tile) ─────────────────── */
 
-type GridProps = { days: StreakCell[] }
+type GridProps = {
+  days: StreakCell[]
+  todayTileState: TodayTileState
+  todayCopy: { topLabel: string; bottomText: string }
+  onMarkWorkout: () => void
+}
 
-function StreakGrid({ days }: GridProps) {
-  const rows = Array.from({ length: GRID_ROWS }, (_, r) =>
-    days.slice(r * GRID_COLS, (r + 1) * GRID_COLS),
-  )
+function StreakGrid({ days, todayTileState, todayCopy, onMarkWorkout }: GridProps) {
+  const [gridWidth, setGridWidth] = useState(0)
+  // After the first commit, isInitialMount.current = false. We use
+  // this to distinguish 'cells fading in for the first time' (use
+  // the chronological cascade) from 'cells filling the hole left by
+  // the dismissed tile' (use a tighter 60ms stagger so the grid
+  // reseals quickly after a tap).
+  const isInitialMount = useRef(true)
+  useEffect(() => {
+    isInitialMount.current = false
+  }, [])
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const next = e.nativeEvent.layout.width
+    if (next !== gridWidth) setGridWidth(next)
+  }
+
+  const showTile = todayTileState !== 'completed'
+  const cellSize = gridWidth ? (gridWidth - (GRID_COLS - 1) * CELL_GAP) / GRID_COLS : 0
+  const tileSize = 2 * cellSize + CELL_GAP
+  const containerHeight = gridWidth ? GRID_ROWS * cellSize + (GRID_ROWS - 1) * CELL_GAP : 0
 
   return (
-    <View style={styles.gridWrap}>
-      {rows.map((row, rIdx) => (
-        <View key={`row-${rIdx}`} style={styles.gridRow}>
-          {row.map((cell, cIdx) => {
-            const index = rIdx * GRID_COLS + cIdx
-            return index === TODAY_INDEX ? (
-              <TodayCell key={cell.date} index={index} completed={cell.completed} />
-            ) : (
-              <HistoryCell key={cell.date} cell={cell} index={index} />
-            )
-          })}
-        </View>
-      ))}
+    <View
+      style={[styles.gridWrap, gridWidth ? { height: containerHeight } : null]}
+      onLayout={onLayout}
+    >
+      {gridWidth > 0 &&
+        days.map((day, i) => {
+          if (showTile && HOLE_INDICES.includes(i)) return null
+
+          const isFillingHole = HOLE_INDICES.includes(i) && !isInitialMount.current
+          const enterDelay = isFillingHole
+            ? HOLE_INDICES.indexOf(i) * HOLE_DELAY_MS
+            : i * CELL_DELAY_MS
+
+          const row = Math.floor(i / GRID_COLS)
+          const col = i % GRID_COLS
+
+          return (
+            <Cell
+              key={day.date}
+              cell={day}
+              index={i}
+              top={row * (cellSize + CELL_GAP)}
+              left={col * (cellSize + CELL_GAP)}
+              size={cellSize}
+              enterDelay={enterDelay}
+              isToday={i === TODAY_INDEX}
+            />
+          )
+        })}
+
+      {gridWidth > 0 && showTile && (
+        <Animated.View
+          entering={FadeIn.delay(TILE_ENTRY_DELAY).springify().damping(12)}
+          exiting={FadeOut.duration(300)}
+          style={{
+            position: 'absolute',
+            top: 2 * (cellSize + CELL_GAP),
+            left: 5 * (cellSize + CELL_GAP),
+            width: tileSize,
+            height: tileSize,
+          }}
+        >
+          <TodayTile
+            state={todayTileState}
+            topLabel={todayCopy.topLabel}
+            bottomText={todayCopy.bottomText}
+            size={tileSize}
+            onMark={onMarkWorkout}
+          />
+        </Animated.View>
+      )}
     </View>
   )
 }
 
-/* ─── history cells ──────────────────────────────────────────────── */
+/* ─── cell (history + today completed) ────────────────────────────── */
 
-type HistoryProps = { cell: StreakCell; index: number }
+type CellProps = {
+  cell: StreakCell
+  index: number
+  top: number
+  left: number
+  size: number
+  enterDelay: number
+  isToday: boolean
+}
 
 function ageOpacity(index: number): number {
   if (index <= 6) return 0.55
@@ -104,87 +202,43 @@ function ageOpacity(index: number): number {
   return 1
 }
 
-function HistoryCell({ cell, index }: HistoryProps) {
-  const enter = FadeIn.delay(index * CELL_DELAY_MS)
-    .springify()
-    .damping(12)
+function Cell({ cell, index, top, left, size, enterDelay, isToday }: CellProps) {
+  const enter = FadeIn.delay(enterDelay).springify().damping(12)
+  const baseStyle = {
+    position: 'absolute' as const,
+    top,
+    left,
+    width: size,
+    height: size,
+    borderRadius: radius.cell,
+  }
 
   if (!cell.completed) {
-    return <Animated.View entering={enter} style={[styles.cell, styles.cellEmpty]} />
+    return <Animated.View entering={enter} style={[baseStyle, styles.cellEmpty]} />
+  }
+
+  if (isToday) {
+    return (
+      <Animated.View entering={enter} style={baseStyle}>
+        <LinearGradient
+          colors={[colors.mauveLight, colors.mauveDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.todayGradient}
+        />
+      </Animated.View>
+    )
   }
 
   return (
     <Animated.View
       entering={enter}
-      style={[styles.cell, styles.cellCompleted, { opacity: ageOpacity(index) }]}
+      style={[baseStyle, styles.cellCompleted, { opacity: ageOpacity(index) }]}
     />
   )
 }
 
-/* ─── today cell (mauve; outlined until completed) ───────────────── */
-
-type TodayCellProps = { index: number; completed: boolean }
-
-function TodayCell({ index, completed }: TodayCellProps) {
-  const breath = useSharedValue(1)
-  const haloScale = useSharedValue(1)
-  const haloOpacity = useSharedValue(0)
-
-  useEffect(() => {
-    breath.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    )
-    haloScale.value = withRepeat(
-      withTiming(2.3, { duration: 1800, easing: Easing.out(Easing.cubic) }),
-      -1,
-      false,
-    )
-    haloOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.8, { duration: 200, easing: Easing.linear }),
-        withTiming(0, { duration: 1600, easing: Easing.out(Easing.cubic) }),
-      ),
-      -1,
-      false,
-    )
-  }, [breath, haloScale, haloOpacity])
-
-  const cellStyle = useAnimatedStyle(() => ({ transform: [{ scale: breath.value }] }))
-  const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: haloScale.value }],
-    opacity: haloOpacity.value,
-  }))
-
-  return (
-    <Animated.View
-      entering={FadeIn.delay(index * CELL_DELAY_MS)
-        .springify()
-        .damping(12)}
-      style={styles.todayWrap}
-    >
-      <Animated.View pointerEvents="none" style={[styles.halo, haloStyle]} />
-      {completed ? (
-        <Animated.View style={[styles.cell, cellStyle]}>
-          <LinearGradient
-            colors={[colors.mauveLight, colors.mauveDeep]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.cellTodayFilled}
-          />
-        </Animated.View>
-      ) : (
-        <Animated.View style={[styles.cell, styles.cellTodayOutlined, cellStyle]} />
-      )}
-    </Animated.View>
-  )
-}
-
-/* ─── streak number (with count-up animation) ────────────────────── */
+/* ─── streak number (count-up animation) ─────────────────────────── */
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 const COUNT_UP_DURATION = 800
@@ -198,8 +252,7 @@ const COUNT_UP_DURATION = 800
  * On first mount the displayed value is set directly to `count`
  * (no anim, avoids 'counting from 0 on every cold start'). On
  * subsequent prop changes, it withTimings from the previous value
- * to the new one, so the tap-to-seal + undo flows make the number
- * crawl up or back naturally.
+ * to the new one, so tap-to-mark makes the number crawl up.
  */
 function StreakNumber({ count }: { count: number }) {
   const displayed = useSharedValue(count)
@@ -218,9 +271,6 @@ function StreakNumber({ count }: { count: number }) {
 
   const animatedProps = useAnimatedProps(() => {
     const text = String(rounded.value)
-    // 'text' isn't in TextInputProps' public surface — reanimated
-    // supports it via native-side update. Cast through unknown to
-    // satisfy the type system without forcing an `any` in callers.
     return { text, defaultValue: text } as unknown as Partial<TextInputProps>
   })
 
@@ -231,10 +281,10 @@ function StreakNumber({ count }: { count: number }) {
         underlineColorAndroid="transparent"
         animatedProps={animatedProps}
         defaultValue={String(count)}
-        accessibilityLabel={`${count} días`}
+        accessibilityLabel={`${count} días seguidos`}
         style={styles.bigNumber}
       />
-      <Text style={styles.seguidos}>SEGUIDOS</Text>
+      <Text style={styles.seguidos}>DÍAS SEGUIDOS</Text>
     </View>
   )
 }
@@ -266,25 +316,11 @@ const styles = StyleSheet.create({
     color: colors.goldSoft,
   },
 
-  body: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  gridWrap: {
+    width: '100%',
+    position: 'relative',
   },
 
-  gridWrap: {
-    flex: 1,
-    gap: CELL_GAP,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: CELL_GAP,
-  },
-  cell: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: radius.cell,
-  },
   cellEmpty: {
     borderWidth: 0.5,
     borderStyle: 'dashed',
@@ -293,46 +329,23 @@ const styles = StyleSheet.create({
   cellCompleted: {
     backgroundColor: colors.forestDeep,
   },
+  todayGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: radius.cell,
+  },
 
-  todayWrap: {
-    flex: 1,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  halo: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: radius.cell,
-    borderWidth: 1,
-    borderColor: colors.mauveDeep,
-  },
-  cellTodayOutlined: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: radius.cell,
-    borderWidth: 1.5,
-    borderColor: colors.mauveDeep,
-    backgroundColor: 'transparent',
-  },
-  cellTodayFilled: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: radius.cell,
-  },
-  vDivider: {
-    width: 0.5,
-    alignSelf: 'stretch',
-    backgroundColor: colors.goldAlpha18,
-    marginVertical: spacing.sm,
+  dashedDivider: {
+    height: 0,
+    borderTopWidth: 0.6,
+    borderStyle: 'dashed',
+    borderColor: colors.goldAlpha18,
+    marginVertical: spacing.md,
   },
 
   numberWrap: {
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   bigNumber: {
     fontFamily: typography.display,
@@ -340,6 +353,7 @@ const styles = StyleSheet.create({
     color: colors.forestDeep,
     letterSpacing: typography.letterSpacing.display,
     lineHeight: typography.sizes.streakNumber * typography.lineHeight.tight,
+    textAlign: 'center',
   },
   seguidos: {
     fontSize: typography.sizes.tinyLabel,
@@ -348,17 +362,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 
-  hDivider: {
-    height: 0.5,
-    backgroundColor: colors.goldAlpha12,
-    marginVertical: spacing.md,
-  },
   contextMessage: {
     fontFamily: typography.prose,
     fontSize: typography.sizes.prose,
     color: colors.forestDeep,
     lineHeight: typography.sizes.prose * typography.lineHeight.prose,
     fontStyle: 'italic',
-    textAlign: 'left',
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
 })
