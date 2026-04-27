@@ -66,7 +66,6 @@ export function StreakCard({
   todayCopy,
   onMarkWorkout,
 }: Props) {
-  const completedCount = days.filter((d) => d.completed).length
   const summaryLabel = `Tu racha: ${streakCount} días seguidos. ${contextMessage}`
 
   return (
@@ -78,7 +77,7 @@ export function StreakCard({
     >
       <View style={styles.header}>
         <Text style={styles.label}>TU RACHA</Text>
-        <Text style={styles.subLabel}>{`${completedCount} DÍAS · ${streakCount} SEGUIDOS`}</Text>
+        <Text style={styles.subLabel}>{`28 DÍAS · ${streakCount} SEGUIDOS`}</Text>
       </View>
 
       <StreakGrid
@@ -294,7 +293,7 @@ function StreakNumber({ count }: { count: number }) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
-    backgroundColor: colors.creamShelf,
+    backgroundColor: colors.pearlElevated,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     ...shadows.card,
@@ -307,13 +306,13 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   subLabel: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelDim,
   },
 
   gridWrap: {
@@ -324,10 +323,10 @@ const styles = StyleSheet.create({
   cellEmpty: {
     borderWidth: 0.5,
     borderStyle: 'dashed',
-    borderColor: colors.goldMute,
+    borderColor: colors.borderDashed,
   },
   cellCompleted: {
-    backgroundColor: colors.forestDeep,
+    backgroundColor: colors.inkPrimary,
   },
   todayGradient: {
     width: '100%',
@@ -339,7 +338,7 @@ const styles = StyleSheet.create({
     height: 0,
     borderTopWidth: 0.6,
     borderStyle: 'dashed',
-    borderColor: colors.goldAlpha18,
+    borderColor: colors.borderDashed,
     marginVertical: spacing.md,
   },
 
@@ -349,25 +348,24 @@ const styles = StyleSheet.create({
   },
   bigNumber: {
     fontFamily: typography.display,
-    fontSize: typography.sizes.streakNumber,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
-    lineHeight: typography.sizes.streakNumber * typography.lineHeight.tight,
+    fontSize: typography.sizes.streakNum,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
+    lineHeight: typography.sizes.streakNum * typography.lineHeight.displayTight,
     textAlign: 'center',
   },
   seguidos: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
     marginTop: spacing.xs,
   },
 
   contextMessage: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    color: colors.forestDeep,
-    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.inkPrimary,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
     textAlign: 'center',
     marginTop: spacing.md,
   },

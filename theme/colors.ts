@@ -1,87 +1,43 @@
 /*
- * Palette — additive across sprints.
+ * Pearl Mauve — sistema de diseño bicromático (ink + mauve sobre pearl).
  *
- * Sprint 2 families (core):
- *   cream   — warm backgrounds, paper surfaces
- *   forest  — primary text, deep card surfaces
- *   copper  — accent (macros rings, log-meal CTA)
- *   gold    — tertiary labels, dividers, subtle UI chrome
- *
- * Sprint 2 tarea-9-replacement (checkin bar) additions:
- *   ink     — dark surface for the workout checkin bar
- *   pearl   — light text over ink, elevated surface for the
- *             completed bar
- *   mauve   — today's cell + the 'entrené' button (replaces the
- *             previous copper treatment on the today cell; copper
- *             stays as the macros accent)
- *   feedback — moss green for success/completed states
- *
- * Plus alpha utilities for overlays, dashed borders, and shadows.
- * No hex literals live in components — if you need a color, add
- * it here first.
+ * Reglas duras:
+ *   - Cero hex sueltos en componentes. Cualquier color va via tokens.
+ *   - Si necesitás un color que no está, agregalo aquí primero.
+ *   - El verde feedbackSuccess solo para confirmaciones, no decoración.
  */
 export const colors = {
-  // Cream / background family
-  creamWarm: '#F7F1E6',
-  creamSoft: '#F5EFE4',
-  creamDeep: '#F2EBDC',
-  creamShade: '#EFE6D3',
-  creamPaper: '#FAF4E8',
-  creamShelf: '#F5EED9',
+  // Backgrounds (pearl family)
+  pearlBase: '#FAFAFB',
+  pearlElevated: '#FFFFFF',
+  pearlMuted: '#F0EEF2',
 
-  // Forest / primary text
-  forestDeep: '#15302A',
-  forestMid: '#1A3C34',
-  forestShade: '#0F241F',
-  forestSoft: '#3E4841',
+  // Text (ink family)
+  inkPrimary: '#1C1A1F',
+  inkSoft: '#3E3A42',
+  labelMuted: '#7A737E',
+  labelDim: '#B0A8B4',
 
-  // Copper / macros accent
-  copperBright: '#D97847',
-  copperVivid: '#B8633D',
-  copperShade: '#9A4E2D',
+  // Accent (mauve family)
+  mauveLight: '#C9879E',
+  mauveDeep: '#A85E7C',
+  mauveShadow: 'rgba(168, 94, 124, 0.25)',
 
-  // Gold / tertiary
-  goldBurnt: '#8B6F3E',
-  goldSoft: '#A89B84',
-  goldMute: '#C1B7A3',
-  goldDivider: '#C9BFA8',
+  // Borders / dividers
+  borderSubtle: '#E8E3EB',
+  borderDashed: '#D8D2DC',
 
-  // Ink / checkin bar dark surface
-  inkDark: '#1E1E1E',
-  inkDarkHighlight: '#2B2B2B',
-  inkPrimary: '#1E1E1E',
+  // Dark surfaces
+  inkDark: '#1C1A1F',
+  inkDarkHighlight: '#2A252E',
 
-  // Pearl / text over ink + elevated completed surface
-  pearlBase: '#F6F2EA',
-  pearlElevated: '#FBF8F2',
+  // Shadows / overlays
+  shadowCard: 'rgba(28, 26, 31, 0.08)',
+  shadowLift: 'rgba(28, 26, 31, 0.15)',
 
-  // Mauve / today accent + entrené button
-  mauveLight: '#D8A7B8',
-  mauveDeep: '#A97082',
-
-  // Feedback (moss green success)
-  feedbackSuccess: '#6E8D72',
-
-  // Alpha utilities
-  overlayWhite35: 'rgba(255, 255, 255, 0.35)',
-  overlayWhite40: 'rgba(255, 255, 255, 0.40)',
-  overlayWhite60: 'rgba(255, 255, 255, 0.60)',
-  goldAlpha08: 'rgba(139, 111, 62, 0.08)',
-  goldAlpha10: 'rgba(139, 111, 62, 0.10)',
-  goldAlpha12: 'rgba(139, 111, 62, 0.12)',
-  goldAlpha18: 'rgba(139, 111, 62, 0.18)',
-  goldAlpha20: 'rgba(139, 111, 62, 0.20)',
-  goldAlpha25: 'rgba(139, 111, 62, 0.25)',
-  forestAlpha08: 'rgba(21, 48, 42, 0.08)',
-  forestAlpha15: 'rgba(21, 48, 42, 0.15)',
-  copperShadow: 'rgba(184, 99, 61, 0.35)',
-
-  // Ink/mauve/feedback alpha utilities (checkin bar chrome)
-  labelDim: 'rgba(246, 242, 234, 0.55)',
-  borderSubtle: 'rgba(30, 30, 30, 0.08)',
-  mauveShadow: 'rgba(169, 112, 130, 0.38)',
-  mauveAlpha20: 'rgba(169, 112, 130, 0.20)',
-  feedbackSuccessSoft: 'rgba(110, 141, 114, 0.12)',
+  // Feedback colors
+  feedbackSuccess: '#5A6F4C',
+  feedbackError: '#B85045',
 } as const
 
 export type ColorToken = keyof typeof colors

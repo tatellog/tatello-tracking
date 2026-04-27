@@ -59,7 +59,7 @@ export function HomeHeader({ dayOfWeek, date }: Props) {
         <Text style={styles.time}>{time}</Text>
       </View>
       <Pressable accessibilityLabel="Cambiar tema" style={styles.toggle}>
-        <Feather name="moon" size={14} color={colors.forestDeep} />
+        <Feather name="moon" size={14} color={colors.inkPrimary} />
       </Pressable>
     </View>
   )
@@ -73,24 +73,24 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
     fontWeight: '600',
   },
   time: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelDim,
     marginTop: spacing.xs,
   },
   toggle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.overlayWhite40,
+    backgroundColor: colors.pearlMuted,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
   },
 })

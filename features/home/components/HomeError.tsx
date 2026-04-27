@@ -35,7 +35,7 @@ export function HomeError({ onRetry }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.creamWarm,
+    backgroundColor: colors.pearlBase,
     paddingHorizontal: spacing.xl,
   },
   stack: {
@@ -45,21 +45,20 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   editorial: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    fontStyle: 'italic',
-    color: colors.forestSoft,
-    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   retry: {
     alignSelf: 'flex-start',
@@ -67,12 +66,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.copperVivid,
+    backgroundColor: colors.mauveDeep,
   },
   retryLabel: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
 })

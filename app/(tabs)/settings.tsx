@@ -57,7 +57,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.creamWarm,
+    backgroundColor: colors.pearlBase,
   },
   content: {
     paddingHorizontal: spacing.xl,
@@ -68,13 +68,13 @@ const styles = StyleSheet.create({
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   meta: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelDim,
     marginTop: spacing.xs,
   },
   group: {
@@ -82,8 +82,8 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   row: {
     flexDirection: 'row',
@@ -91,19 +91,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: radius.input,
-    backgroundColor: colors.creamSoft,
+    borderRadius: radius.tile,
+    backgroundColor: colors.pearlBase,
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
   },
   rowLabel: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
   },
   rowHint: {
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
     fontSize: 18,
   },
   signOut: {
@@ -112,20 +111,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha25,
-    backgroundColor: colors.overlayWhite40,
+    borderColor: colors.borderDashed,
+    backgroundColor: colors.pearlMuted,
   },
   signOutLabel: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
   },
   footer: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.smallLabel + 1,
-    fontStyle: 'italic',
-    color: colors.goldSoft,
+    color: colors.labelDim,
     textAlign: 'center',
     marginTop: spacing.xl,
   },

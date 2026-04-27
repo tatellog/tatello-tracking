@@ -147,13 +147,13 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
     borderColor: interpolateColor(
       focusProgress.value,
       [0, 1],
-      [colors.goldAlpha20, colors.copperVivid],
+      [colors.borderDashed, colors.mauveDeep],
     ),
   }))
 
   return (
     <Animated.View style={[styles.inputContainer, animatedContainer]}>
-      <Feather name="mail" size={18} color={focused ? colors.copperVivid : colors.goldSoft} />
+      <Feather name="mail" size={18} color={focused ? colors.mauveDeep : colors.labelDim} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -161,9 +161,9 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder="tu@email.com"
-        placeholderTextColor={colors.goldSoft}
-        selectionColor={colors.copperVivid}
-        cursorColor={colors.copperVivid}
+        placeholderTextColor={colors.labelDim}
+        selectionColor={colors.mauveDeep}
+        cursorColor={colors.mauveDeep}
         autoCapitalize="none"
         autoComplete="email"
         autoCorrect={false}
@@ -196,7 +196,7 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
 
   const animatedContainer = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    backgroundColor: interpolateColor(ready.value, [0, 1], [colors.creamShade, colors.copperVivid]),
+    backgroundColor: interpolateColor(ready.value, [0, 1], [colors.pearlBase, colors.mauveDeep]),
   }))
 
   const onPressIn = () => {
@@ -218,7 +218,7 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
         disabled={!canSubmit}
         style={styles.submitPressable}
       >
-        {showIcon && <Feather name="arrow-right" size={16} color={colors.creamWarm} />}
+        {showIcon && <Feather name="arrow-right" size={16} color={colors.pearlBase} />}
         <Text style={[styles.submitLabel, !canSubmit && styles.submitLabelDisabled]}>
           {isSending ? 'Enviando…' : 'Enviarme el link'}
         </Text>
@@ -242,7 +242,7 @@ function SentState({ email }: { email: string }) {
               .stiffness(180)}
             style={styles.sentIcon}
           >
-            <Feather name="mail" size={26} color={colors.copperShade} />
+            <Feather name="mail" size={26} color={colors.mauveDeep} />
           </Animated.View>
           <Animated.View entering={enter(220)} style={styles.sentText}>
             <Text style={[styles.headline, styles.centered]}>Revisá tu email</Text>
@@ -261,7 +261,7 @@ function SentState({ email }: { email: string }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.creamWarm,
+    backgroundColor: colors.pearlBase,
   },
   container: {
     flex: 1,
@@ -276,43 +276,42 @@ const styles = StyleSheet.create({
   brandBar: {
     height: 1,
     width: 48,
-    backgroundColor: colors.copperVivid,
+    backgroundColor: colors.mauveDeep,
     opacity: 0.5,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   editorial: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    color: colors.forestSoft,
-    fontStyle: 'italic',
-    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   footerNote: {
     textAlign: 'center',
-    color: colors.goldSoft,
+    color: colors.labelDim,
   },
   meta: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   error: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
-    color: colors.copperShade,
+    color: colors.mauveDeep,
   },
 
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.input,
+    borderRadius: radius.tile,
     borderWidth: 1,
-    backgroundColor: colors.creamSoft,
+    backgroundColor: colors.pearlBase,
     paddingLeft: spacing.md,
   },
   input: {
@@ -321,7 +320,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingRight: spacing.md,
     fontSize: typography.sizes.body,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
   },
 
   submitWrap: {
@@ -336,13 +335,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   submitLabel: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
   submitLabelDisabled: {
-    color: colors.goldSoft,
+    color: colors.labelDim,
   },
 
   sentBlock: {
@@ -353,7 +351,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.creamSoft,
+    backgroundColor: colors.pearlBase,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -49,15 +49,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: colors.overlayWhite40,
+    backgroundColor: colors.pearlMuted,
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
   },
   icon: {
     fontSize: 14,
   },
   label: {
     fontSize: typography.sizes.body,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
   },
 })

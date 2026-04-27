@@ -127,7 +127,7 @@ export default function MealsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.creamWarm,
+    backgroundColor: colors.pearlBase,
   },
   content: {
     paddingHorizontal: spacing.xl,
@@ -146,19 +146,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.overlayWhite40,
+    backgroundColor: colors.pearlMuted,
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
   },
   navBtnDisabled: {
     opacity: 0.4,
   },
   navGlyph: {
     fontSize: 20,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
   },
   navGlyphDisabled: {
-    color: colors.goldSoft,
+    color: colors.labelDim,
   },
   headerLabel: {
     flex: 1,
@@ -166,20 +166,19 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
     textTransform: 'capitalize',
   },
   summary: {
-    fontFamily: typography.prose,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.prose,
-    color: colors.forestSoft,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
     textAlign: 'center',
   },
   list: {
@@ -191,22 +190,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
   emptyText: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    fontStyle: 'italic',
-    color: colors.goldBurnt,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
   },
   emptyCta: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.copperVivid,
+    backgroundColor: colors.mauveDeep,
   },
   emptyCtaLabel: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
   fab: {
     position: 'absolute',
@@ -215,14 +212,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.copperVivid,
+    backgroundColor: colors.mauveDeep,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.copperToday,
+    ...shadows.ctaMauve,
   },
   fabGlyph: {
     fontSize: 28,
-    color: colors.creamWarm,
+    color: colors.pearlBase,
     lineHeight: 28,
   },
 })

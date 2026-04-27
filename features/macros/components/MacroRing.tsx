@@ -29,15 +29,15 @@ type Props = {
 const STROKE_WIDTH = 10
 
 const RING_COLORS: Record<RingColor, string> = {
-  protein: colors.forestDeep,
-  calories: colors.copperVivid,
+  protein: colors.inkPrimary,
+  calories: colors.mauveDeep,
 }
 
 const OVER_COLORS: Record<RingColor, string> = {
   // Over-protein reads as 'good surplus' → lean on accent-warm for warmth.
   // Over-calories reads as a warning → copperShade (more intense copper).
-  protein: colors.copperBright,
-  calories: colors.copperShade,
+  protein: colors.mauveDeep,
+  calories: colors.mauveDeep,
 }
 
 /*
@@ -104,7 +104,7 @@ export function MacroRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={colors.goldDivider}
+            stroke={colors.borderSubtle}
             strokeWidth={STROKE_WIDTH}
             fill="none"
             opacity={0.35}
@@ -134,7 +134,7 @@ export function MacroRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={colors.goldDivider}
+          stroke={colors.borderSubtle}
           strokeWidth={STROKE_WIDTH}
           fill="none"
           opacity={0.35}
@@ -187,9 +187,9 @@ const styles = StyleSheet.create({
   },
   number: {
     fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.delta,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    fontSize: typography.sizes.deltaNum,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   over: {
     fontFamily: typography.displayMedium,
@@ -197,13 +197,13 @@ const styles = StyleSheet.create({
   },
   target: {
     fontSize: typography.sizes.tinyLabel,
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
     marginTop: 2,
   },
   label: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelDim,
     marginTop: 6,
   },
 })

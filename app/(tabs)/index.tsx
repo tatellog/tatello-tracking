@@ -168,7 +168,7 @@ function HomeContent({ ctx, cadence }: ContentProps) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.creamWarm,
+    backgroundColor: colors.pearlBase,
   },
   content: {
     paddingHorizontal: spacing.xl,

@@ -19,21 +19,20 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.copperVivid,
-        tabBarInactiveTintColor: colors.goldSoft,
+        tabBarActiveTintColor: colors.mauveDeep,
+        tabBarInactiveTintColor: colors.labelDim,
         tabBarStyle: {
-          backgroundColor: colors.creamSoft,
-          borderTopColor: colors.goldAlpha10,
+          backgroundColor: colors.pearlBase,
+          borderTopColor: colors.borderSubtle,
           borderTopWidth: 0.5,
           height: 72,
           paddingTop: 6,
           paddingBottom: 10,
         },
         tabBarLabelStyle: {
-          fontFamily: typography.prose,
+          fontFamily: typography.uiMedium,
           fontSize: typography.sizes.smallLabel + 1,
-          fontStyle: 'italic',
-          letterSpacing: typography.letterSpacing.softLabel,
+          letterSpacing: typography.letterSpacing.bodyLoose,
           marginTop: 2,
         },
       }}

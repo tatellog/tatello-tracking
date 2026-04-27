@@ -89,7 +89,7 @@ export function HomeSkeleton() {
   )
 }
 
-const BLOCK = colors.goldAlpha12
+const BLOCK = colors.borderSubtle
 
 const styles = StyleSheet.create({
   root: {

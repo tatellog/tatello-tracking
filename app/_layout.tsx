@@ -1,11 +1,16 @@
 import '@/global.css'
 
 import {
-  CormorantGaramond_400Regular,
-  CormorantGaramond_500Medium,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
   useFonts,
-} from '@expo-google-fonts/cormorant-garamond'
-import { EBGaramond_400Regular_Italic } from '@expo-google-fonts/eb-garamond'
+} from '@expo-google-fonts/inter'
+import {
+  InterTight_300Light,
+  InterTight_400Regular,
+  InterTight_500Medium,
+} from '@expo-google-fonts/inter-tight'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
@@ -22,12 +27,15 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 })
 
 export default function RootLayout() {
-  // Cormorant powers display/medium; EB Garamond italic powers prose.
-  // System font handles body + UI chrome and doesn't need loading.
+  // Pearl Mauve sólo carga Inter + Inter Tight. Sin serif, sin italic.
+  // Inter Tight para números display, Inter para todo el chrome UI.
   const [fontsLoaded, fontError] = useFonts({
-    CormorantGaramond_400Regular,
-    CormorantGaramond_500Medium,
-    EBGaramond_400Regular_Italic,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    InterTight_300Light,
+    InterTight_400Regular,
+    InterTight_500Medium,
   })
 
   const { session, loading: sessionLoading } = useSession()

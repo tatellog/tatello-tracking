@@ -88,8 +88,8 @@ const styles = StyleSheet.create({
   },
   question: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
     marginBottom: spacing.md,
   },
   orbs: {
@@ -100,14 +100,14 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: colors.overlayWhite40,
+    backgroundColor: colors.pearlMuted,
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
     alignItems: 'center',
     justifyContent: 'center',
   },
   orbSelected: {
-    borderColor: colors.copperVivid,
+    borderColor: colors.mauveDeep,
     borderWidth: 1.2,
   },
   emoji: {

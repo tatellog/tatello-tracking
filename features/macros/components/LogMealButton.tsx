@@ -29,7 +29,7 @@ export function LogMealButton() {
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
 
   return (
-    <Animated.View style={[animatedStyle, shadows.copperToday]}>
+    <Animated.View style={[animatedStyle, shadows.ctaMauve]}>
       <Pressable
         onPress={() => router.push('/log-meal')}
         onPressIn={onPressIn}
@@ -38,7 +38,7 @@ export function LogMealButton() {
         accessibilityLabel="Loggear comida"
       >
         <LinearGradient
-          colors={[colors.copperBright, colors.copperVivid]}
+          colors={[colors.mauveDeep, colors.mauveDeep]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.pill}
@@ -70,9 +70,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   label: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: 16,
-    fontStyle: 'italic',
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
 })

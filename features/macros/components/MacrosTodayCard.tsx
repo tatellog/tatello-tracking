@@ -65,7 +65,7 @@ export function MacrosTodayCard({ current, target, mealCount }: Props) {
       </View>
 
       <LinearGradient
-        colors={['transparent', colors.goldDivider, 'transparent']}
+        colors={['transparent', colors.borderSubtle, 'transparent']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.divider}
@@ -85,7 +85,7 @@ function formatMealCount(count: number): string {
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
-    backgroundColor: colors.creamShelf,
+    backgroundColor: colors.pearlElevated,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     ...shadows.card,
@@ -97,13 +97,13 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   subLabel: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelDim,
   },
   rings: {
     flexDirection: 'row',
@@ -116,11 +116,10 @@ const styles = StyleSheet.create({
     marginVertical: spacing.md,
   },
   message: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    fontStyle: 'italic',
-    color: colors.forestDeep,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.inkPrimary,
     textAlign: 'center',
-    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
 })

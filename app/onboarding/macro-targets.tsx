@@ -165,7 +165,7 @@ function NumberField({
           }}
           onBlur={onBlur}
           placeholder={placeholder}
-          placeholderTextColor={colors.goldSoft}
+          placeholderTextColor={colors.labelDim}
           keyboardType="numeric"
           inputMode="numeric"
           style={styles.input}
@@ -178,7 +178,7 @@ function NumberField({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.creamWarm },
+  screen: { flex: 1, backgroundColor: colors.pearlBase },
   flex: { flex: 1 },
   container: {
     flex: 1,
@@ -190,49 +190,48 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.lg },
   meta: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   editorial: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    color: colors.forestSoft,
-    fontStyle: 'italic',
-    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.goldAlpha20,
-    borderRadius: radius.input,
-    backgroundColor: colors.creamSoft,
+    borderColor: colors.borderDashed,
+    borderRadius: radius.tile,
+    backgroundColor: colors.pearlBase,
     paddingHorizontal: spacing.md,
   },
   inputError: {
-    borderColor: colors.copperVivid,
+    borderColor: colors.mauveDeep,
   },
   input: {
     flex: 1,
-    fontSize: typography.sizes.delta,
+    fontSize: typography.sizes.deltaNum,
     fontFamily: typography.displayMedium,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
     paddingVertical: spacing.md,
   },
   suffix: {
     fontSize: typography.sizes.body,
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
     marginLeft: spacing.sm,
   },
   errorText: {
     fontSize: typography.sizes.smallLabel,
-    color: colors.copperShade,
+    color: colors.mauveDeep,
   },
   actions: { gap: spacing.md },
   primary: {
@@ -240,16 +239,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.copperVivid,
+    backgroundColor: colors.mauveDeep,
   },
   primaryDisabled: {
-    backgroundColor: colors.creamShade,
+    backgroundColor: colors.pearlBase,
   },
   primaryLabel: {
-    fontFamily: typography.prose,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
   secondary: {
     alignItems: 'center',
@@ -257,9 +255,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   secondaryLabel: {
-    fontFamily: typography.prose,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
   },
 })

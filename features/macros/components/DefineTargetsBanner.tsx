@@ -37,7 +37,7 @@ export function DefineTargetsBanner() {
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
-    backgroundColor: colors.creamPaper,
+    backgroundColor: colors.pearlElevated,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     ...shadows.card,
@@ -45,28 +45,27 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
     marginTop: spacing.xs,
   },
   editorial: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    color: colors.forestSoft,
-    fontStyle: 'italic',
-    lineHeight: typography.sizes.prose * typography.lineHeight.prose,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   divider: {
     height: 0.5,
     borderTopWidth: 0.5,
     borderStyle: 'dashed',
-    borderColor: colors.goldMute,
+    borderColor: colors.borderDashed,
     marginVertical: spacing.md,
   },
   cta: {
@@ -74,12 +73,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.forestDeep,
+    backgroundColor: colors.inkPrimary,
   },
   ctaLabel: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
 })

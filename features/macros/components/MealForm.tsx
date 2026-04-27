@@ -189,7 +189,7 @@ function TextField({ label, placeholder, value, onChangeText, onBlur, error }: T
         onChangeText={onChangeText}
         onBlur={onBlur}
         placeholder={placeholder}
-        placeholderTextColor={colors.goldSoft}
+        placeholderTextColor={colors.labelDim}
         accessibilityLabel={label}
         accessibilityHint={error}
         style={[styles.textInput, error && styles.inputError]}
@@ -239,7 +239,7 @@ function NumberField({
           }}
           onBlur={onBlur}
           placeholder={placeholder}
-          placeholderTextColor={colors.goldSoft}
+          placeholderTextColor={colors.labelDim}
           accessibilityLabel={`${label}, en ${suffix === 'g' ? 'gramos' : suffix}`}
           accessibilityHint={error}
           keyboardType="decimal-pad"
@@ -333,7 +333,7 @@ function DateField({ label, value, onChange, error }: DateFieldProps) {
 /* ─── styles ─────────────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.creamWarm },
+  screen: { flex: 1, backgroundColor: colors.pearlBase },
   flex: { flex: 1 },
   scroll: {
     paddingHorizontal: spacing.xl,
@@ -343,14 +343,14 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   stack: { gap: spacing.lg },
   row: { flexDirection: 'row', gap: spacing.md },
@@ -358,73 +358,72 @@ const styles = StyleSheet.create({
 
   fieldLabel: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: colors.goldAlpha20,
-    borderRadius: radius.input,
-    backgroundColor: colors.creamSoft,
+    borderColor: colors.borderDashed,
+    borderRadius: radius.tile,
+    backgroundColor: colors.pearlBase,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontSize: typography.sizes.body,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
     fontFamily: typography.ui,
   },
   numberInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.goldAlpha20,
-    borderRadius: radius.input,
-    backgroundColor: colors.creamSoft,
+    borderColor: colors.borderDashed,
+    borderRadius: radius.tile,
+    backgroundColor: colors.pearlBase,
     paddingHorizontal: spacing.md,
   },
   numberInput: {
     flex: 1,
     fontSize: typography.sizes.anchor,
     fontFamily: typography.displayMedium,
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
     paddingVertical: spacing.md,
   },
   suffix: {
     fontSize: typography.sizes.body,
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
     marginLeft: spacing.sm,
   },
-  inputError: { borderColor: colors.copperVivid },
+  inputError: { borderColor: colors.mauveDeep },
   errorText: {
     fontSize: typography.sizes.smallLabel,
-    color: colors.copperShade,
+    color: colors.mauveDeep,
   },
   submitHint: {
     fontSize: typography.sizes.smallLabel,
-    color: colors.copperShade,
+    color: colors.mauveDeep,
     textAlign: 'center',
     marginTop: spacing.xs,
   },
 
   iosDateWrap: {
-    borderRadius: radius.input,
-    backgroundColor: colors.creamSoft,
+    borderRadius: radius.tile,
+    backgroundColor: colors.pearlBase,
     borderWidth: 1,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
   androidDateBtn: {
-    borderRadius: radius.input,
-    backgroundColor: colors.creamSoft,
+    borderRadius: radius.tile,
+    backgroundColor: colors.pearlBase,
     borderWidth: 1,
-    borderColor: colors.goldAlpha20,
+    borderColor: colors.borderDashed,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
   androidDateLabel: {
-    fontFamily: typography.prose,
-    fontStyle: 'italic',
-    color: colors.forestDeep,
+    fontFamily: typography.uiMedium,
+    color: colors.inkPrimary,
     fontSize: typography.sizes.body,
   },
 
@@ -434,16 +433,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.copperVivid,
+    backgroundColor: colors.mauveDeep,
   },
   primaryDisabled: {
-    backgroundColor: colors.creamShade,
+    backgroundColor: colors.pearlBase,
   },
   primaryLabel: {
-    fontFamily: typography.prose,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.creamWarm,
+    color: colors.pearlBase,
   },
   secondary: {
     alignItems: 'center',
@@ -451,9 +449,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   secondaryLabel: {
-    fontFamily: typography.prose,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
   },
 })

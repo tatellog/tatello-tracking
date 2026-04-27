@@ -32,15 +32,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
     marginBottom: spacing.sm,
   },
   text: {
     fontFamily: typography.display,
     fontSize: typography.sizes.anchor,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
     textAlign: 'center',
   },
 })

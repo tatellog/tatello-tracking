@@ -89,7 +89,7 @@ export function DeltaPair({ weightDeltaKg, waistDeltaCm, periodWeeks = 4 }: Prop
     >
       <DeltaColumn value={weightDeltaKg} unit="kg" label="peso" periodWeeks={periodWeeks} />
       <LinearGradient
-        colors={['transparent', colors.goldDivider, 'transparent']}
+        colors={['transparent', colors.borderSubtle, 'transparent']}
         style={styles.divider}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -144,19 +144,19 @@ const styles = StyleSheet.create({
   },
   valueNumber: {
     fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.delta,
-    color: colors.forestDeep,
-    letterSpacing: typography.letterSpacing.display,
+    fontSize: typography.sizes.deltaNum,
+    color: colors.inkPrimary,
+    letterSpacing: typography.letterSpacing.displayMed,
   },
   valueUnit: {
     fontSize: typography.sizes.body,
-    color: colors.goldBurnt,
+    color: colors.labelMuted,
     marginLeft: spacing.xs,
   },
   label: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelDim,
     marginTop: spacing.xs,
     textTransform: 'uppercase',
   },
@@ -165,9 +165,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   emptyText: {
-    fontFamily: typography.prose,
-    fontSize: typography.sizes.prose,
-    color: colors.goldBurnt,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.labelMuted,
   },
 })

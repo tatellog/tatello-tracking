@@ -199,7 +199,7 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
 
   // Glyph + label sizing scales lightly with the tile so a tighter
   // 320-wide screen and a roomy iPad both look balanced.
-  const glyphSize = Math.round(size * 0.42)
+  const glyphSize = Math.round(size * 0.48)
 
   return (
     <Pressable
@@ -218,7 +218,12 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
           end={{ x: 1, y: 1 }}
           style={styles.gradient}
         >
-          <Text style={styles.topLabel} numberOfLines={1}>
+          <Text
+            style={styles.topLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
             {topLabel.toUpperCase()}
           </Text>
           <View style={[styles.glyphSlot, { height: glyphSize + 4 }]}>
@@ -239,7 +244,7 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
                 letterSpacing: intensity.bottomLetterSpacing,
               },
             ]}
-            numberOfLines={1}
+            numberOfLines={2}
           >
             {bottomText}
           </Text>
@@ -276,7 +281,7 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
     paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
@@ -284,9 +289,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.ui,
     fontSize: 8.5,
     fontWeight: '600',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     color: colors.pearlBase,
     opacity: 0.85,
+    textAlign: 'center',
   },
   glyphSlot: {
     alignItems: 'center',
@@ -305,7 +311,8 @@ const styles = StyleSheet.create({
   },
   bottomText: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: 11.5,
+    lineHeight: 14,
     color: colors.pearlBase,
     textAlign: 'center',
   },

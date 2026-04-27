@@ -1,44 +1,65 @@
 /*
- * Sprint 2 typography — three families + numeric scale + tracking + leading.
+ * Pearl Mauve typography — solo Inter + Inter Tight.
  *
- *   display        — Cormorant Garamond, for streak number, deltas, anchor
- *   displayMedium  — 500 weight, for headline numbers that need more presence
- *   prose          — EB Garamond Italic, for narrative/conversational messages
- *   ui             — system default (SF Pro on iOS, Roboto on Android)
+ * Inter Tight para números display y elementos prominentes.
+ * Inter para labels, body, botones, todo lo que es UI funcional.
  *
- * Keep values inline per Sprint 2 convention:
- *   <Text style={{ fontFamily: typography.display, fontSize: typography.sizes.delta }} />
- *
- * No wrapped primitives — the spec favours inline composition so the
- * style intent lives next to the markup.
+ * NO usar serif. NO usar Cormorant, EB Garamond, Playfair, Georgia.
+ * NO usar italic en ningún caso — la estética italic prose era boda.
+ * Lo que antes era italic prose es ahora UPPERCASE Inter Medium con
+ * letter-spacing wide.
  */
 export const typography = {
-  display: 'CormorantGaramond_400Regular',
-  displayMedium: 'CormorantGaramond_500Medium',
-  prose: 'EBGaramond_400Regular_Italic',
-  ui: undefined as string | undefined,
+  // Display sans (números prominentes)
+  display: 'InterTight_300Light',
+  displayMedium: 'InterTight_400Regular',
+  displaySemi: 'InterTight_500Medium',
+
+  // UI sans (labels, body, botones)
+  ui: 'Inter_400Regular',
+  uiMedium: 'Inter_500Medium',
+  uiSemi: 'Inter_600SemiBold',
 
   sizes: {
-    tinyLabel: 9.5,
+    tinyLabel: 9,
     smallLabel: 10,
-    body: 14,
-    prose: 14.5,
-    anchor: 22,
-    delta: 34,
-    streakNumber: 50,
+    caption: 11.5,
+    body: 13,
+    bodyLarge: 14,
+    anchor: 17,
+    deltaNum: 28,
+    streakNum: 48,
+    macroNum: 30,
+    tilePlus: 28,
   },
 
   letterSpacing: {
-    label: 2,
-    softLabel: 0.3,
-    display: -0.8,
+    uppercaseWide: 2.4,
+    uppercaseMed: 1.8,
+    displayTight: -2,
+    displayMed: -1,
+    default: 0,
+    bodyLoose: 0.3,
+  },
+
+  fontWeight: {
+    light: '300' as const,
+    regular: '400' as const,
+    medium: '500' as const,
+    semi: '600' as const,
   },
 
   lineHeight: {
-    tight: 0.95,
-    display: 1.25,
-    prose: 1.5,
+    displayTight: 0.95,
+    body: 1.55,
+    statement: 1.3,
   },
 } as const
 
-export type TypographyFamily = 'display' | 'displayMedium' | 'prose' | 'ui'
+export type TypographyFamily =
+  | 'display'
+  | 'displayMedium'
+  | 'displaySemi'
+  | 'ui'
+  | 'uiMedium'
+  | 'uiSemi'

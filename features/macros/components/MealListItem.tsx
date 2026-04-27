@@ -90,10 +90,10 @@ export function MealListItem({ meal, onEdit, onDelete }: Props) {
 
 const styles = StyleSheet.create({
   row: {
-    backgroundColor: colors.creamShelf,
-    borderRadius: radius.input,
+    backgroundColor: colors.pearlElevated,
+    borderRadius: radius.tile,
     borderWidth: 0.5,
-    borderColor: colors.goldAlpha18,
+    borderColor: colors.borderDashed,
   },
   pressable: {
     flexDirection: 'row',
@@ -107,22 +107,21 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.label,
-    color: colors.goldBurnt,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.labelMuted,
   },
   content: {
     flex: 1,
   },
   name: {
-    fontFamily: typography.prose,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    fontStyle: 'italic',
-    color: colors.forestDeep,
+    color: colors.inkPrimary,
   },
   macros: {
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.softLabel,
-    color: colors.goldSoft,
+    letterSpacing: typography.letterSpacing.bodyLoose,
+    color: colors.labelDim,
     marginTop: 2,
   },
 })
