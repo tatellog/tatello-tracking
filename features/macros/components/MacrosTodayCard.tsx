@@ -16,9 +16,9 @@ type Props = {
 
 /*
  * Home card for today's macros. Mirrors the streak card's layout
- * language (creamShelf surface, card shadow, header row, two-column
- * visual, horizontal hairline, editorial closing line) so both
- * cards read as one system.
+ * language (pearl elevated surface, card shadow, header row,
+ * two-column visual, soft hairline, narrative closing line) so
+ * both cards read as one system.
  *
  * The narrative line comes from deriveMacroMessage — pure, memoised
  * against (current, target, hour, mealCount) so mood scrolls and

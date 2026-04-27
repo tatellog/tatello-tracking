@@ -34,8 +34,9 @@ const RING_COLORS: Record<RingColor, string> = {
 }
 
 const OVER_COLORS: Record<RingColor, string> = {
-  // Over-protein reads as 'good surplus' → lean on accent-warm for warmth.
-  // Over-calories reads as a warning → copperShade (more intense copper).
+  // Pearl Mauve is bichromatic — both 'over' states resolve to mauve
+  // so the ring keeps reading inside the system instead of reaching
+  // for a contrasting alarm hue.
   protein: colors.mauveDeep,
   calories: colors.mauveDeep,
 }
