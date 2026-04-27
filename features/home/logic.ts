@@ -19,8 +19,6 @@ export type DayState = 'on-level' | 'caution' | 'risk'
 
 const WEEKEND_DAYS = new Set(['Sábado', 'Domingo'])
 
-const SATURDAY_INDEX = 6
-
 /*
  * Parse 'YYYY-MM-DD' to the local-zoned JS day-of-week (0–6) without
  * the `new Date('YYYY-MM-DD')` UTC-midnight gotcha that drifts by one
@@ -46,22 +44,6 @@ export function deriveAnchorAction(ctx: BriefContext, state: DayState, hour: num
   }
   if (hour < 10) return 'Marca tu entreno cuando termines.'
   return 'Entrena antes de las 6.'
-}
-
-export function deriveContextMessage(ctx: BriefContext, state: DayState): string {
-  if (ctx.day_of_week === 'Sábado') {
-    // The 3 Saturdays before today in the 28-day grid.
-    const saturdaysBefore: StreakCell[] = ctx.grid_28_days
-      .slice(0, -1) // today is always the last cell
-      .filter((c) => dayOfWeekOf(c.date) === SATURDAY_INDEX)
-    const last3 = saturdaysBefore.slice(-3)
-    if (last3.length === 3 && last3.every((c) => !c.completed)) {
-      return 'Hoy es sábado. Tus últimos 3 fueron los huecos.'
-    }
-  }
-  if (state === 'risk') return 'Ya es tarde. No dejes que hoy sea un hueco.'
-  if (ctx.today_workout_completed) return 'Hoy ya está sellado. Mantén el ritmo.'
-  return `Vas ${ctx.streak_days} días seguidos. Uno más.`
 }
 
 /* ─── today tile ──────────────────────────────────────────────────── */

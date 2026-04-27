@@ -49,15 +49,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: colors.pearlMuted,
-    borderWidth: 0.5,
-    borderColor: colors.borderDashed,
+    backgroundColor: colors.pearlElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
   },
   icon: {
     fontSize: 14,
   },
   label: {
-    fontSize: typography.sizes.body,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    fontWeight: typography.fontWeight.medium,
     color: colors.inkPrimary,
   },
 })

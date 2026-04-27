@@ -1,7 +1,6 @@
 import type { BriefContext, StreakCell } from '@/features/brief/api'
 import {
   deriveAnchorAction,
-  deriveContextMessage,
   deriveDayState,
   deriveTodayTileCopy,
   deriveTodayTileState,
@@ -91,37 +90,6 @@ describe('deriveAnchorAction', () => {
   it('defaults to "antes de las 6" on a weekday mid-day', () => {
     const msg = deriveAnchorAction(buildCtx(), 'on-level', 13)
     expect(msg).toMatch(/antes de las 6/i)
-  })
-})
-
-describe('deriveContextMessage', () => {
-  it('fires the 3-saturday pattern when the last 3 saturdays are empty', () => {
-    // Construct a grid whose saturdays (dayOfWeek === 6) are all
-    // completed: false. The default builder already has every cell
-    // false, so the assertion holds when day_of_week is Sábado.
-    const msg = deriveContextMessage(
-      buildCtx({ day_of_week: 'Sábado', streak_days: 0 }),
-      'on-level',
-    )
-    expect(msg).toMatch(/últimos 3 fueron los huecos/i)
-  })
-
-  it('warns on risk state', () => {
-    const msg = deriveContextMessage(buildCtx({ streak_days: 5 }), 'risk')
-    expect(msg).toMatch(/ya es tarde/i)
-  })
-
-  it('validates the sealed day', () => {
-    const msg = deriveContextMessage(
-      buildCtx({ today_workout_completed: true, streak_days: 8 }),
-      'on-level',
-    )
-    expect(msg).toMatch(/ya está sellado/i)
-  })
-
-  it('falls back to a streak-count nudge', () => {
-    const msg = deriveContextMessage(buildCtx({ streak_days: 14 }), 'on-level')
-    expect(msg).toMatch(/vas 14 días seguidos/i)
   })
 })
 

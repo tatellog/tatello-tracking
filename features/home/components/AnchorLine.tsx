@@ -7,10 +7,10 @@ type Props = {
 }
 
 /*
- * The 'anchor of the day' — a single imperative serif line that
- * tells the user the next concrete action. Label 'ANCLA DE HOY'
- * sits above, tracking-wide, followed by the action in a display
- * serif at 22px centered.
+ * The 'anchor of the day' — a single imperative line that names
+ * the next concrete action. Label `ANCLA DE HOY` sits above in the
+ * uppercase chrome treatment; the action below is Inter Medium 17px
+ * (no serif, no italic — Pearl Mauve).
  */
 export function AnchorLine({ text }: Props) {
   return (
@@ -31,16 +31,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    fontSize: typography.sizes.smallLabel,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.semi,
     letterSpacing: typography.letterSpacing.uppercaseWide,
     color: colors.labelMuted,
     marginBottom: spacing.sm,
   },
   text: {
-    fontFamily: typography.display,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.anchor,
+    fontWeight: typography.fontWeight.medium,
     color: colors.inkPrimary,
-    letterSpacing: typography.letterSpacing.displayMed,
     textAlign: 'center',
+    lineHeight: typography.sizes.anchor * typography.lineHeight.statement,
   },
 })

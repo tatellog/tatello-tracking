@@ -27,7 +27,6 @@ import { TodayTile } from './TodayTile'
 type Props = {
   days: StreakCell[]
   streakCount: number
-  contextMessage: string
   todayTileState: TodayTileState
   todayCopy: { topLabel: string; bottomText: string }
   onMarkWorkout: () => void
@@ -47,26 +46,19 @@ const TODAY_INDEX = GRID_ROWS * GRID_COLS - 1
 const TILE_ENTRY_DELAY = 24 * CELL_DELAY_MS
 
 /*
- * Hero card. Header (`TU RACHA · 14 DÍAS · 7 SEGUIDOS`), then a
+ * Hero card. Header (`TU RACHA · 28 DÍAS · X SEGUIDOS`), then a
  * full-width 7×4 grid that either shows 28 small cells (workout
  * marked) or 24 small cells + a 2×2 TodayTile in the bottom-right
- * (workout pending). Below: dashed divider, big streak counter,
- * and the prose context line.
+ * (workout pending). Below: dashed divider + inline streak counter
+ * (`14 DÍAS SEGUIDOS`).
  *
  * Cell positions are absolute and computed from a measured grid
  * width — this lets the four "hole" cells (indices 19/20/26/27)
  * disappear and reappear without disturbing the surrounding layout
  * when the user taps Entrené.
  */
-export function StreakCard({
-  days,
-  streakCount,
-  contextMessage,
-  todayTileState,
-  todayCopy,
-  onMarkWorkout,
-}: Props) {
-  const summaryLabel = `Tu racha: ${streakCount} días seguidos. ${contextMessage}`
+export function StreakCard({ days, streakCount, todayTileState, todayCopy, onMarkWorkout }: Props) {
+  const summaryLabel = `Tu racha: ${streakCount} días seguidos.`
 
   return (
     <View
@@ -90,8 +82,6 @@ export function StreakCard({
       <View style={styles.dashedDivider} />
 
       <StreakNumber count={streakCount} />
-
-      <Text style={styles.contextMessage}>{contextMessage}</Text>
     </View>
   )
 }
@@ -196,8 +186,11 @@ type CellProps = {
 }
 
 function ageOpacity(index: number): number {
-  if (index <= 6) return 0.55
-  if (index <= 20) return 0.76
+  // Pearl Mauve cell aging: oldest week dimmest (0.3), middle (0.6),
+  // most recent (1.0). The contrast spread is wider than the prior
+  // forest treatment so the 'recency' read lands without color help.
+  if (index <= 6) return 0.3
+  if (index <= 20) return 0.6
   return 1
 }
 
@@ -283,7 +276,7 @@ function StreakNumber({ count }: { count: number }) {
         accessibilityLabel={`${count} días seguidos`}
         style={styles.bigNumber}
       />
-      <Text style={styles.seguidos}>DÍAS SEGUIDOS</Text>
+      <Text style={styles.seguidos}>DÍAS{'\n'}SEGUIDOS</Text>
     </View>
   )
 }
@@ -294,6 +287,8 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
     backgroundColor: colors.pearlElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     ...shadows.card,
@@ -302,16 +297,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: typography.sizes.smallLabel,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.semi,
     letterSpacing: typography.letterSpacing.uppercaseWide,
     color: colors.labelMuted,
   },
   subLabel: {
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
+    fontWeight: typography.fontWeight.medium,
+    letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelDim,
   },
 
@@ -343,30 +343,27 @@ const styles = StyleSheet.create({
   },
 
   numberWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.xs,
   },
   bigNumber: {
     fontFamily: typography.display,
     fontSize: typography.sizes.streakNum,
+    fontWeight: typography.fontWeight.light,
     color: colors.inkPrimary,
-    letterSpacing: typography.letterSpacing.displayMed,
+    letterSpacing: typography.letterSpacing.displayTight,
     lineHeight: typography.sizes.streakNum * typography.lineHeight.displayTight,
     textAlign: 'center',
   },
   seguidos: {
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
-    marginTop: spacing.xs,
-  },
-
-  contextMessage: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.inkPrimary,
-    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
-    textAlign: 'center',
-    marginTop: spacing.md,
+    fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.medium,
+    letterSpacing: typography.letterSpacing.uppercaseMed,
+    color: colors.labelMuted,
+    lineHeight: typography.sizes.tinyLabel * typography.lineHeight.statement,
   },
 })

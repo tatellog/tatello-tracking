@@ -38,7 +38,7 @@ export function LogMealButton() {
         accessibilityLabel="Loggear comida"
       >
         <LinearGradient
-          colors={[colors.mauveDeep, colors.mauveDeep]}
+          colors={[colors.mauveLight, colors.mauveDeep]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.pill}
@@ -71,7 +71,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiMedium,
-    fontSize: 16,
-    color: colors.pearlBase,
+    fontSize: typography.sizes.bodyLarge,
+    fontWeight: typography.fontWeight.medium,
+    letterSpacing: typography.letterSpacing.bodyLoose,
+    color: colors.pearlElevated,
   },
 })

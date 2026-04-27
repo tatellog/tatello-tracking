@@ -86,6 +86,8 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
     backgroundColor: colors.pearlElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     ...shadows.card,
@@ -93,16 +95,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: typography.sizes.smallLabel,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.semi,
     letterSpacing: typography.letterSpacing.uppercaseWide,
     color: colors.labelMuted,
   },
   subLabel: {
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
+    fontWeight: typography.fontWeight.medium,
+    letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelDim,
   },
   rings: {

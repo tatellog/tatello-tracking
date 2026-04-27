@@ -15,7 +15,6 @@ import {
 } from '@/features/home/components'
 import {
   deriveAnchorAction,
-  deriveContextMessage,
   deriveDayState,
   deriveTodayTileCopy,
   deriveTodayTileState,
@@ -82,7 +81,6 @@ function HomeContent({ ctx, cadence }: ContentProps) {
   const hour = new Date().getHours()
   const state = deriveDayState(ctx, hour)
   const anchor = deriveAnchorAction(ctx, state, hour)
-  const contextMessage = deriveContextMessage(ctx, state)
 
   const weightDeltaKg = calcDelta(
     ctx.latest_measurement?.weight_kg,
@@ -117,7 +115,6 @@ function HomeContent({ ctx, cadence }: ContentProps) {
           <StreakCard
             days={ctx.grid_28_days}
             streakCount={ctx.streak_days}
-            contextMessage={contextMessage}
             todayTileState={todayTileState}
             todayCopy={todayCopy}
             onMarkWorkout={() => toggleWorkout.mutate(true)}

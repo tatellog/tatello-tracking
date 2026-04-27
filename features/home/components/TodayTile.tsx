@@ -13,7 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import { colors, radius, typography } from '@/theme'
+import { colors, radius, shadows, spacing, typography } from '@/theme'
 
 type State = 'morning' | 'day' | 'urgent'
 
@@ -197,10 +197,6 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
     pressTimer.current = setTimeout(onMark, PRESS_HOLD_MS)
   }
 
-  // Glyph + label sizing scales lightly with the tile so a tighter
-  // 320-wide screen and a roomy iPad both look balanced.
-  const glyphSize = Math.round(size * 0.48)
-
   return (
     <Pressable
       onPress={handlePress}
@@ -222,19 +218,13 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
             style={styles.topLabel}
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            minimumFontScale={0.78}
           >
             {topLabel.toUpperCase()}
           </Text>
-          <View style={[styles.glyphSlot, { height: glyphSize + 4 }]}>
-            <Animated.Text style={[styles.glyph, { fontSize: glyphSize }, plusStyle]}>
-              {PLUS_GLYPH}
-            </Animated.Text>
-            <Animated.Text
-              style={[styles.glyph, styles.check, { fontSize: glyphSize * 0.85 }, checkStyle]}
-            >
-              ✓
-            </Animated.Text>
+          <View style={styles.glyphSlot}>
+            <Animated.Text style={[styles.glyph, plusStyle]}>{PLUS_GLYPH}</Animated.Text>
+            <Animated.Text style={[styles.glyph, styles.check, checkStyle]}>✓</Animated.Text>
           </View>
           <Text
             style={[
@@ -263,57 +253,58 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    borderRadius: radius.card * 0.65,
+    borderRadius: radius.tile + 2,
     borderWidth: 1.5,
     borderColor: colors.mauveDeep,
   },
   body: {
     width: '100%',
     height: '100%',
-    borderRadius: 14,
+    borderRadius: radius.tile,
+    borderWidth: 2,
+    borderColor: colors.pearlElevated,
     overflow: 'hidden',
-    shadowColor: colors.mauveDeep,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.32,
-    shadowRadius: 10,
-    elevation: 6,
+    ...shadows.tileBig,
   },
   gradient: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   topLabel: {
-    fontFamily: typography.ui,
-    fontSize: 8.5,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    color: colors.pearlBase,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.semi,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.pearlElevated,
     opacity: 0.85,
     textAlign: 'center',
   },
   glyphSlot: {
+    height: typography.sizes.tilePlus + 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   glyph: {
     position: 'absolute',
-    fontFamily: typography.ui,
-    fontWeight: '200',
-    color: colors.pearlBase,
+    fontFamily: typography.display,
+    fontWeight: typography.fontWeight.light,
+    fontSize: typography.sizes.tilePlus,
+    color: colors.pearlElevated,
     textAlign: 'center',
     includeFontPadding: false,
   },
   check: {
-    fontWeight: '500',
+    fontWeight: typography.fontWeight.medium,
+    fontSize: typography.sizes.tilePlus * 0.82,
   },
   bottomText: {
-    fontFamily: typography.ui,
-    fontSize: 11.5,
-    lineHeight: 14,
-    color: colors.pearlBase,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.smallLabel + 0.5,
+    lineHeight: (typography.sizes.smallLabel + 0.5) * typography.lineHeight.statement,
+    color: colors.pearlElevated,
     textAlign: 'center',
   },
 })

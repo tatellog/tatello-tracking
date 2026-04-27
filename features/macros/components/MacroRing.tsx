@@ -104,10 +104,9 @@ export function MacroRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={colors.borderSubtle}
+            stroke={colors.pearlMuted}
             strokeWidth={STROKE_WIDTH}
             fill="none"
-            opacity={0.35}
           />
         </Svg>
         <View style={styles.centerWrap} pointerEvents="none">
@@ -134,10 +133,9 @@ export function MacroRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={colors.borderSubtle}
+          stroke={colors.pearlMuted}
           strokeWidth={STROKE_WIDTH}
           fill="none"
-          opacity={0.35}
         />
         {/* Progress */}
         <AnimatedCircle
@@ -187,22 +185,29 @@ const styles = StyleSheet.create({
   },
   number: {
     fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.deltaNum,
+    fontSize: typography.sizes.macroNum,
+    fontWeight: typography.fontWeight.regular,
     color: colors.inkPrimary,
     letterSpacing: typography.letterSpacing.displayMed,
   },
   over: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.body,
+    fontWeight: typography.fontWeight.regular,
   },
   target: {
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.medium,
+    letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelMuted,
     marginTop: 2,
   },
   label: {
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
+    fontWeight: typography.fontWeight.medium,
+    letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelDim,
     marginTop: 6,
   },

@@ -31,7 +31,8 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: {
           fontFamily: typography.uiMedium,
-          fontSize: typography.sizes.smallLabel + 1,
+          fontSize: typography.sizes.smallLabel,
+          fontWeight: typography.fontWeight.medium,
           letterSpacing: typography.letterSpacing.bodyLoose,
           marginTop: 2,
         },
