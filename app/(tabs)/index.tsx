@@ -20,6 +20,7 @@ import {
   deriveTodayTileCopy,
   deriveTodayTileState,
 } from '@/features/home/logic'
+import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import { DefineTargetsBanner, LogMealButton, MacrosTodayCard } from '@/features/macros/components'
@@ -56,6 +57,7 @@ function dayOfWeekOf(isoDate: string): number {
 export default function HomeScreen() {
   const brief = useHomeBrief()
   const cadence = useHomeCadence()
+  useDayRollover(brief.data?.date)
 
   if (brief.isError && !brief.data) {
     return <HomeError onRetry={brief.refetch} />
