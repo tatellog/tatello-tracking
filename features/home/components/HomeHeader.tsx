@@ -1,63 +1,24 @@
 import { Feather } from '@expo/vector-icons'
-import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { colors, spacing, typography } from '@/theme'
-
-type Props = {
-  dayOfWeek: string
-  date: string // 'YYYY-MM-DD' in America/Mexico_City
-}
-
-const MONTHS_ES = [
-  'ENERO',
-  'FEBRERO',
-  'MARZO',
-  'ABRIL',
-  'MAYO',
-  'JUNIO',
-  'JULIO',
-  'AGOSTO',
-  'SEPTIEMBRE',
-  'OCTUBRE',
-  'NOVIEMBRE',
-  'DICIEMBRE',
-] as const
+import { colors, typography } from '@/theme'
 
 /*
- * 'YYYY-MM-DD' → '23 ABRIL'. Parses components manually so the render
- * doesn't depend on `new Date('YYYY-MM-DD')` (which is UTC midnight
- * and can drift a day for users west of UTC).
+ * Single-line uppercase 'WEEKDAY · DAY MONTH' (e.g. 'SÁBADO · 23
+ * ABRIL') derived from the device's local clock, plus the day/night
+ * toggle placeholder on the right (non-functional until a real dark
+ * mode lands).
+ *
+ * Date is read from `new Date()` at render time so the masthead
+ * stays current as the day rolls over — `useDayRollover` upstream
+ * invalidates the brief, which re-renders this component.
  */
-function formatDateEs(isoDate: string): string {
-  const [, m, d] = isoDate.split('-').map(Number) as [number, number, number]
-  return `${d} ${MONTHS_ES[m - 1]}`
-}
-
-/* 24-hour HH:MM in the device's local tz — matches the masthead convention. */
-function formatTime(date: Date): string {
-  const h = date.getHours().toString().padStart(2, '0')
-  const m = date.getMinutes().toString().padStart(2, '0')
-  return `${h}:${m}`
-}
-
-/*
- * Top-left: WEEKDAY · DATE + HH:MM under it.
- * Top-right: a day/night toggle placeholder — non-functional in
- * Sprint 2 (dark mode is post-MVP); rendered so the composition
- * matches the mockup and the future toggle has a slot.
- */
-export function HomeHeader({ dayOfWeek, date }: Props) {
-  const now = useMemo(() => new Date(), [])
-  const time = formatTime(now)
-  const heading = `${dayOfWeek.toUpperCase()} · ${formatDateEs(date)}`
+export function HomeHeader() {
+  const heading = formatHeadingEs(new Date())
 
   return (
     <View style={styles.root}>
-      <View>
-        <Text style={styles.heading}>{heading}</Text>
-        <Text style={styles.time}>{time}</Text>
-      </View>
+      <Text style={styles.heading}>{heading}</Text>
       <Pressable accessibilityLabel="Cambiar tema" style={styles.toggle}>
         <Feather name="moon" size={14} color={colors.inkPrimary} />
       </Pressable>
@@ -65,10 +26,22 @@ export function HomeHeader({ dayOfWeek, date }: Props) {
   )
 }
 
+/*
+ * 'SÁBADO · 23 ABRIL' in es-MX. We pull weekday and month names
+ * separately and uppercase them rather than calling toLocaleDateString
+ * once because the ICU `long` format inserts comma + 'de' joiners
+ * ('sábado, 23 de abril') that we don't want in the masthead.
+ */
+function formatHeadingEs(now: Date): string {
+  const weekday = now.toLocaleDateString('es-MX', { weekday: 'long' }).toUpperCase()
+  const month = now.toLocaleDateString('es-MX', { month: 'long' }).toUpperCase()
+  return `${weekday} · ${now.getDate()} ${month}`
+}
+
 const styles = StyleSheet.create({
   root: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   heading: {
@@ -77,14 +50,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semi,
     letterSpacing: typography.letterSpacing.uppercaseWide,
     color: colors.labelMuted,
-  },
-  time: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.tinyLabel,
-    fontWeight: typography.fontWeight.medium,
-    letterSpacing: typography.letterSpacing.uppercaseMed,
-    color: colors.labelDim,
-    marginTop: spacing.xs,
   },
   toggle: {
     width: 36,

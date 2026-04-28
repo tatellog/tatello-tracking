@@ -108,7 +108,7 @@ function HomeContent({ ctx, cadence }: ContentProps) {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View entering={enter(50)}>
-          <HomeHeader dayOfWeek={ctx.day_of_week} date={ctx.date} />
+          <HomeHeader />
         </Animated.View>
 
         <Animated.View entering={enter(150)}>
