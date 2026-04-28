@@ -4,6 +4,9 @@ import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
 import { getMeasurements } from './api'
+import { buildMockMeasurements } from './mock'
+
+const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
 
 /*
  * Lectura: useMeasurements(rangeDays) — null = todo el historial.
@@ -11,11 +14,15 @@ import { getMeasurements } from './api'
  * Pasamos `rangeDays` como parte del queryKey, así cada rango cachea
  * por separado y switchear de '7d' a '30d' es instantáneo si ya se
  * fetcheó antes.
+ *
+ * En modo SKIP_AUTH (dev iteration sin sesión), devolvemos un set
+ * mockeado para que la gráfica tenga datos visibles. En producción
+ * ese branch es tree-shakeado.
  */
 export function useMeasurements(rangeDays: number | null) {
   return useQuery({
     queryKey: queryKeys.progress.measurements(rangeDays),
-    queryFn: () => getMeasurements(rangeDays),
+    queryFn: () => (SKIP_AUTH ? buildMockMeasurements(rangeDays) : getMeasurements(rangeDays)),
   })
 }
 
