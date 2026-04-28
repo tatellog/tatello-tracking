@@ -196,37 +196,48 @@ function ageOpacity(index: number): number {
 
 function Cell({ cell, index, top, left, size, enterDelay, isToday }: CellProps) {
   const enter = FadeIn.delay(enterDelay).springify().damping(12)
-  const baseStyle = {
+  const wrapperStyle = {
     position: 'absolute' as const,
     top,
     left,
     width: size,
     height: size,
+  }
+  const fillStyle = {
+    width: '100%' as const,
+    height: '100%' as const,
     borderRadius: radius.cell,
   }
 
+  // Reanimated warns when an entering layout animation runs on the
+  // same node that sets opacity/transform statically, so we keep the
+  // outer Animated.View bare (only layout) and apply visual styles
+  // on a plain inner View.
   if (!cell.completed) {
-    return <Animated.View entering={enter} style={[baseStyle, styles.cellEmpty]} />
+    return (
+      <Animated.View entering={enter} style={wrapperStyle}>
+        <View style={[fillStyle, styles.cellEmpty]} />
+      </Animated.View>
+    )
   }
 
   if (isToday) {
     return (
-      <Animated.View entering={enter} style={baseStyle}>
+      <Animated.View entering={enter} style={wrapperStyle}>
         <LinearGradient
           colors={[colors.mauveLight, colors.mauveDeep]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.todayGradient}
+          style={fillStyle}
         />
       </Animated.View>
     )
   }
 
   return (
-    <Animated.View
-      entering={enter}
-      style={[baseStyle, styles.cellCompleted, { opacity: ageOpacity(index) }]}
-    />
+    <Animated.View entering={enter} style={wrapperStyle}>
+      <View style={[fillStyle, styles.cellCompleted, { opacity: ageOpacity(index) }]} />
+    </Animated.View>
   )
 }
 
@@ -327,11 +338,6 @@ const styles = StyleSheet.create({
   },
   cellCompleted: {
     backgroundColor: colors.inkPrimary,
-  },
-  todayGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: radius.cell,
   },
 
   dashedDivider: {
