@@ -40,29 +40,30 @@ export const PROTEIN_EQUIVALENTS: readonly ProteinEquivalent[] = [
 
 /*
  * Pick a food suggestion for the remaining protein the user needs,
- * shaped by the hour of day. Three bands:
+ * shaped by the hour of day. Three bands, colloquial copy:
  *
- *   ≤ 20 g  — snack territory; suggests what's realistic as a
- *             between-meals bite (eggs in the morning, yogurt or
- *             whey in the afternoon, whey or tuna in the evening).
- *   ≤ 50 g  — a proper meal; the gram figure is computed against
- *             a 25 g-per-100 g protein anchor (lean meat / fish).
- *   > 50 g  — too much to rescue in one sitting; honest copy that
- *             points at distributing across two meals.
+ *   ≤ 20 g  — snack territory. Eggs in the morning, yogurt or whey
+ *             mid-afternoon, tuna or whey otherwise.
+ *   ≤ 50 g  — a proper meal. Dinner-explicit after 18:00, otherwise
+ *             a generic 'mete algo proteico fuerte' nudge.
+ *   > 50 g  — too much to rescue in one sitting; points at spreading
+ *             across multiple meals.
+ *
+ * The strings drop into deriveMacroMessage's evening / daytime
+ * branches as the trailing clause, so they read as natural advice
+ * rather than as standalone sentences.
  */
 export function suggestProteinSource(gramsNeeded: number, hour: number): string {
   if (gramsNeeded <= 20) {
-    if (hour < 11) return `2 huevos cubren ${Math.round(gramsNeeded)}g`
-    if (hour >= 15 && hour < 19) return 'un yogurt griego o un scoop de whey'
-    return '1 scoop de whey o atún en lata'
+    if (hour < 11) return '2 huevos te lo cubren'
+    if (hour >= 15 && hour < 19) return 'un yogurt griego o whey'
+    return 'una lata de atún o whey'
   }
 
   if (gramsNeeded <= 50) {
-    // 25 g protein per 100 g is the rough anchor across tuna / lean beef.
-    const grams = Math.round((gramsNeeded / 25) * 100)
-    if (hour >= 18) return `unos ${grams}g de pollo o pescado para la cena`
-    return `unos ${grams}g de proteína magra`
+    if (hour >= 18) return 'pollo o pescado a la cena'
+    return 'mete algo proteico fuerte'
   }
 
-  return 'te faltan más de 50g — 2 comidas con proteína sólida (pollo, pescado, res)'
+  return 'son varias comidas — pollo, atún o pescado'
 }
