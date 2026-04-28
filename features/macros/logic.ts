@@ -13,7 +13,7 @@ export type MacroTargets = {
 /*
  * Turn the current day's macro picture into a single narrative line
  * for the Home card. Fully deterministic — same inputs, same output —
- * so the 6 acceptance scenarios can be proved by unit tests instead
+ * so the acceptance scenarios can be proved by unit tests instead
  * of eyeballing the simulator at different times of day.
  *
  * Sprint 4 replaces this function's body with Anthropic structured
@@ -27,61 +27,52 @@ export function deriveMacroMessage(
   mealCount: number,
 ): string {
   const proteinPct = target.protein_g > 0 ? current.protein_g / target.protein_g : 0
-  const caloriePct = target.calories > 0 ? current.calories / target.calories : 0
+  const calPct = target.calories > 0 ? current.calories / target.calories : 0
   const proteinRemaining = Math.max(0, Math.round(target.protein_g - current.protein_g))
-  const calorieRemaining = Math.max(0, Math.round(target.calories - current.calories))
+  const calRemaining = Math.max(0, Math.round(target.calories - current.calories))
 
   // 1 — nothing logged yet.
   if (mealCount === 0) {
-    if (hour < 11) return 'Empieza fuerte con proteína al desayuno. Huevos o yogurt griego.'
-    if (hour < 16) return 'Ya es media tarde sin loggear. Empieza con algo proteico.'
-    return 'No has loggeado nada hoy. ¿Olvido o ayuno?'
+    if (hour < 11) return 'Día abierto. Arranca con huevos o yogurt griego al desayuno.'
+    if (hour < 16) return 'Aún no loggeas. Mete algo proteico ahora.'
+    return 'Día sin loggear. ¿Olvido o ayuno?'
   }
 
-  // 2a — protein significantly over, calories in range → recognize
-  // the over-delivery explicitly. Checked before the 'Proteína lista'
-  // rule so a user at 120% protein doesn't read a neutral nudge.
-  if (proteinPct > 1.1 && caloriePct <= 1) {
-    return 'Proteína superada. Buen día nutricional.'
+  // 2 — protein significantly over target, calories still in range.
+  // Checked before the 'protein closed' branch so a user at 120%
+  // protein gets the celebratory copy, not a neutral nudge.
+  if (proteinPct > 1.1 && calPct <= 1) {
+    return 'Proteína superada. Buen día.'
   }
 
-  // 2b — protein goal met, calories still have room.
-  if (proteinPct >= 1 && caloriePct < 1) {
-    return `Proteína lista. Te quedan ${calorieRemaining} cal — espacio para algo de carbo.`
+  // 3 — protein goal met, calories still have room.
+  if (proteinPct >= 1 && calPct < 1) {
+    return `Proteína cerrada. Te quedan ${calRemaining} cal — espacio para una buena cena.`
   }
 
-  // 3 — large protein gap, evening hours: suggest a dinner source.
+  // 4 — large protein gap, evening hours: reassure + suggest dinner.
   if (proteinRemaining > 30 && hour >= 17) {
-    return `Te faltan ${proteinRemaining}g de proteína. ${capitalize(
-      suggestProteinSource(proteinRemaining, hour),
-    )}.`
+    const suggestion = suggestProteinSource(proteinRemaining, hour)
+    return `Vas atrasada. ${proteinRemaining}g por delante — ${suggestion} y la pegas.`
   }
 
-  // 4 — large protein gap, still daytime: suggest distribution.
+  // 5 — large protein gap, still daytime: distribute across the day.
   if (proteinRemaining > 30 && hour < 17) {
-    return `Faltan ${proteinRemaining}g — distribúyelos en lo que queda del día. ${capitalize(
-      suggestProteinSource(proteinRemaining, hour),
-    )}.`
+    const suggestion = suggestProteinSource(proteinRemaining, hour)
+    return `Andas baja en proteína. ${proteinRemaining}g pendientes — ${suggestion}.`
   }
 
-  // 5 — comfortably on track, just nudge the remaining.
+  // 6 — comfortably on track, just nudge the remainder.
   if (proteinPct >= 0.7 && proteinPct < 1) {
-    return `Vas bien. Te quedan ${proteinRemaining}g — ${suggestProteinSource(
-      proteinRemaining,
-      hour,
-    )}.`
+    return `Vas bien. Te faltan ${proteinRemaining}g por cerrar.`
   }
 
-  // 6 — significantly over calories.
-  if (caloriePct > 1.05) {
+  // 7 — significantly over calories.
+  if (calPct > 1.05) {
     const over = Math.round(current.calories - target.calories)
-    return `Pasaste tu meta de calorías por ${over}. Si entrenas hoy, no pasa nada.`
+    return `Te pasaste por ${over} cal. Si entrenaste hoy, no pasa nada.`
   }
 
-  // 7 — default summary line.
-  return `Te quedan ${proteinRemaining}g de proteína y ${calorieRemaining} cal.`
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
+  // 8 — default summary line.
+  return `Te quedan ${proteinRemaining}g de proteína y ${calRemaining} cal.`
 }
