@@ -32,4 +32,8 @@ export const queryKeys = {
     meals: (date: string) => ['macros', 'meals', date] as const,
     meal: (id: string) => ['macros', 'meal', id] as const,
   },
+  progress: {
+    all: ['progress'] as const,
+    measurements: (rangeDays: number | null) => ['progress', 'measurements', rangeDays] as const,
+  },
 } as const

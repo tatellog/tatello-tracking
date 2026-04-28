@@ -19,7 +19,7 @@ const IsoDateSchema = z.string()
 
 const MoodValueSchema = z.enum(['good', 'neutral', 'struggle'])
 
-const BodyMeasurementSchema = z.object({
+export const BodyMeasurementSchema = z.object({
   id: z.string(),
   user_id: z.string(),
   measured_at: z.string(),
@@ -80,6 +80,7 @@ export type StreakCell = z.infer<typeof StreakCellSchema>
 export type MacroTargetsRow = z.infer<typeof MacroTargetsSchema>
 export type TodayMacros = z.infer<typeof TodayMacrosSchema>
 export type MoodValue = z.infer<typeof MoodValueSchema>
+export type BodyMeasurement = z.infer<typeof BodyMeasurementSchema>
 
 /*
  * Fetch the authenticated user's brief context.
