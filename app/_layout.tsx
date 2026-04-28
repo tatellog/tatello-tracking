@@ -20,6 +20,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
+import { ensureDevUserSession } from '@/lib/devAuth'
 import { QUERY_CACHE_MAX_AGE, queryClient, queryPersister } from '@/lib/queryClient'
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -43,6 +44,12 @@ export default function RootLayout() {
   const router = useRouter()
 
   useMagicLinkHandler()
+
+  // Dev-only: si no hay sesión, loggear al user de prueba al arranque.
+  // Corre una sola vez por mount; si ya hay sesión, es no-op.
+  useEffect(() => {
+    ensureDevUserSession().catch(() => {})
+  }, [])
 
   const ready = (fontsLoaded || fontError) && !sessionLoading
 
