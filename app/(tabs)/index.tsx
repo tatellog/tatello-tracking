@@ -118,6 +118,7 @@ function HomeContent({ ctx, cadence }: ContentProps) {
             todayTileState={todayTileState}
             todayCopy={todayCopy}
             onMarkWorkout={() => toggleWorkout.mutate(true)}
+            todayWorkoutAt={ctx.today_workout_at}
           />
         </Animated.View>
 

@@ -33,19 +33,43 @@ export async function ensureDevUserSession(): Promise<void> {
   }
 
   console.log('[devAuth] Signing in dev user...')
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: DEV_EMAIL,
-    password: DEV_PASSWORD,
+
+  // signInWithPassword can hang silently (no resolve / no reject) when
+  // the user doesn't exist or there's a credential mismatch in some
+  // supabase-js + browser setups. We wrap it with a timeout so the
+  // log surfaces a clear failure instead of a frozen "Signing in..."
+  // hint forever.
+  const SIGNIN_TIMEOUT_MS = 8000
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`signInWithPassword timed out after ${SIGNIN_TIMEOUT_MS}ms`)),
+      SIGNIN_TIMEOUT_MS,
+    )
   })
 
-  if (error) {
-    console.warn(
-      '[devAuth] Failed to sign in:',
-      error.message,
-      '\n→ ¿Existe el user dev@local.test en Supabase con email confirmado?',
-    )
-    return
-  }
+  try {
+    const result = await Promise.race([
+      supabase.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD }),
+      timeoutPromise,
+    ])
+    if (timer) clearTimeout(timer)
 
-  console.log('[devAuth] Signed in as', data.user?.email)
+    if (result.error) {
+      console.warn(
+        '[devAuth] Failed to sign in:',
+        result.error.message,
+        '\n→ ¿Existe el user dev@local.test en Supabase con email confirmado?',
+      )
+      return
+    }
+    console.log('[devAuth] Signed in as', result.data.user?.email)
+  } catch (err) {
+    if (timer) clearTimeout(timer)
+    console.warn(
+      '[devAuth]',
+      err instanceof Error ? err.message : String(err),
+      '\n→ Verificá que dev@local.test exista con email auto-confirmed en el dashboard.',
+    )
+  }
 }

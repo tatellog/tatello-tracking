@@ -30,6 +30,8 @@ type Props = {
   todayTileState: TodayTileState
   todayCopy: { topLabel: string; bottomText: string }
   onMarkWorkout: () => void
+  /** ISO timestamp del workout de hoy si ya está marcado, sino null. */
+  todayWorkoutAt: string | null
 }
 
 const GRID_ROWS = 4
@@ -57,8 +59,17 @@ const TILE_ENTRY_DELAY = 24 * CELL_DELAY_MS
  * disappear and reappear without disturbing the surrounding layout
  * when the user taps Entrené.
  */
-export function StreakCard({ days, streakCount, todayTileState, todayCopy, onMarkWorkout }: Props) {
+export function StreakCard({
+  days,
+  streakCount,
+  todayTileState,
+  todayCopy,
+  onMarkWorkout,
+  todayWorkoutAt,
+}: Props) {
   const summaryLabel = `Tu racha: ${streakCount} días seguidos.`
+  const completedTime =
+    todayTileState === 'completed' && todayWorkoutAt ? formatTimeEs(todayWorkoutAt) : null
 
   return (
     <View
@@ -82,8 +93,22 @@ export function StreakCard({ days, streakCount, todayTileState, todayCopy, onMar
       <View style={styles.dashedDivider} />
 
       <StreakNumber count={streakCount} />
+
+      {completedTime && (
+        <Text style={styles.sealedNote} accessibilityLabel={`Día sellado a las ${completedTime}`}>
+          ✓ HOY SELLADO · {completedTime}
+        </Text>
+      )}
     </View>
   )
+}
+
+/* '14:23' en hora local — usamos la hora del cliente porque el ISO
+ * timestamp ya está en UTC y `toLocaleTimeString` lo convierte a la zona
+ * del dispositivo. */
+function formatTimeEs(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 /* ─── grid (absolute-positioned cells + 2×2 tile) ─────────────────── */
@@ -371,5 +396,15 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelMuted,
     lineHeight: typography.sizes.tinyLabel * typography.lineHeight.statement,
+  },
+
+  sealedNote: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    fontWeight: typography.fontWeight.semi,
+    letterSpacing: typography.letterSpacing.uppercaseMed,
+    color: colors.feedbackSuccess,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 })
