@@ -12,6 +12,10 @@ import { supabase } from './supabase'
  * Reglas:
  *   - Solo corre cuando `__DEV__` (Metro bundler) está activo, así el
  *     builder de prod nunca lo trae embebido.
+ *   - Si `EXPO_PUBLIC_SKIP_AUTH=true`, salimos antes de tocar el auth
+ *     server. El _layout ya skipea el route guard con la misma flag,
+ *     así que la combinación produce: sin sesión, sin redirect, y la
+ *     home cae al mock data via useHomeBrief.
  *   - Si ya hay sesión, no hace nada. Esto convive con el flujo
  *     real de auth — si en algún momento iniciás sesión con tu user
  *     real, este helper se queda quieto.
@@ -24,6 +28,10 @@ const DEV_PASSWORD = 'devpassword123'
 
 export async function ensureDevUserSession(): Promise<void> {
   if (!__DEV__) return
+  if (process.env.EXPO_PUBLIC_SKIP_AUTH === 'true') {
+    console.log('[devAuth] EXPO_PUBLIC_SKIP_AUTH=true — skipping dev sign-in.')
+    return
+  }
 
   const {
     data: { session },
