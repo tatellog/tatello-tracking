@@ -7,6 +7,13 @@ import { colors, typography } from '@/theme'
 type Props = {
   suggestions: MealSuggestion[]
   onSelect: (suggestion: MealSuggestion) => void
+  /**
+   * State 4 — the user is mid-typing in ManualInputs without picking
+   * a suggestion. Dim the list to opacity 0.5 so the suggestions
+   * read as "still here if you change your mind" rather than
+   * competing with the active inputs below.
+   */
+  dimmed?: boolean
 }
 
 /*
@@ -18,11 +25,11 @@ type Props = {
  * Returns null when the list is empty so the parent's "o escribe"
  * divider isn't orphaned with nothing to divide from.
  */
-export function SuggestionsList({ suggestions, onSelect }: Props) {
+export function SuggestionsList({ suggestions, onSelect, dimmed = false }: Props) {
   if (suggestions.length === 0) return null
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, dimmed && styles.wrapDimmed]}>
       <View style={styles.labelRow}>
         <Text style={styles.label}>PROBABLE</Text>
         <Text style={styles.labelSoft}>
@@ -79,6 +86,9 @@ const styles = StyleSheet.create({
   wrap: {
     gap: 10,
     marginBottom: 22,
+  },
+  wrapDimmed: {
+    opacity: 0.5,
   },
   labelRow: {
     flexDirection: 'row',

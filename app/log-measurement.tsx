@@ -104,35 +104,41 @@ export default function LogMeasurementScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable
-            onPress={handleSave}
-            disabled={!isValid || addMeasurement.isPending}
-            style={({ pressed }) => [
-              styles.cta,
-              !isValid && styles.ctaDisabled,
-              pressed && isValid && !addMeasurement.isPending && styles.ctaPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Guardar peso"
-            accessibilityState={{ disabled: !isValid, busy: addMeasurement.isPending }}
-          >
-            {isValid ? (
-              <LinearGradient
-                colors={[colors.mauveLight, colors.mauveDeep]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            ) : null}
-            {addMeasurement.isPending ? (
-              <View style={styles.ctaRow}>
-                <ActivityIndicator color={colors.pearlBase} size="small" />
-                <Text style={styles.ctaLabel}>Guardando…</Text>
-              </View>
-            ) : (
-              <Text style={[styles.ctaLabel, !isValid && styles.ctaLabelDisabled]}>Guardar</Text>
-            )}
-          </Pressable>
+          {/* Shadow on the outer wrapper, overflow:hidden + gradient
+              on the inner Pressable. Same pattern as log-meal — iOS
+              collapses layout when shadow + overflow + absoluteFill
+              gradient share a single node. */}
+          <View style={[styles.ctaShadow, !isValid && styles.ctaShadowDisabled]}>
+            <Pressable
+              onPress={handleSave}
+              disabled={!isValid || addMeasurement.isPending}
+              style={({ pressed }) => [
+                styles.cta,
+                !isValid && styles.ctaDisabled,
+                pressed && isValid && !addMeasurement.isPending && styles.ctaPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Guardar peso"
+              accessibilityState={{ disabled: !isValid, busy: addMeasurement.isPending }}
+            >
+              {isValid ? (
+                <LinearGradient
+                  colors={[colors.mauveLight, colors.mauveDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : null}
+              {addMeasurement.isPending ? (
+                <View style={styles.ctaRow}>
+                  <ActivityIndicator color={colors.pearlBase} size="small" />
+                  <Text style={styles.ctaLabel}>Guardando…</Text>
+                </View>
+              ) : (
+                <Text style={[styles.ctaLabel, !isValid && styles.ctaLabelDisabled]}>Guardar</Text>
+              )}
+            </Pressable>
+          </View>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.cancel}>Cancelar</Text>
           </Pressable>
@@ -223,18 +229,24 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     gap: spacing.sm,
   },
+  ctaShadow: {
+    borderRadius: radius.pill,
+    ...shadows.ctaMauve,
+  },
+  ctaShadowDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   cta: {
     overflow: 'hidden',
     borderRadius: radius.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.ctaMauve,
+    width: '100%',
   },
   ctaDisabled: {
     backgroundColor: colors.pearlMuted,
-    shadowOpacity: 0,
-    elevation: 0,
   },
   ctaPressed: {
     opacity: 0.9,

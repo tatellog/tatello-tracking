@@ -18,6 +18,7 @@ import Toast from 'react-native-toast-message'
 import { useBriefContext } from '@/features/brief/hooks'
 import {
   DividerWithText,
+  EmptyMealsWelcome,
   FeedbackCard,
   FilledMealCard,
   ManualInputs,
@@ -77,6 +78,13 @@ export default function LogMealScreen() {
       caloriesNum > 0
     )
   }, [manualName, manualProtein, manualCalories])
+
+  // Anything in the manual fields counts as "user is writing" — even
+  // a single character. This drives the visual transition between
+  // state 2 (suggestions full opacity, inputs idle) and state 4
+  // (suggestions dimmed, inputs active).
+  const hasManualContent =
+    manualName.length > 0 || manualProtein.length > 0 || manualCalories.length > 0
 
   const currentMeal = useMemo(() => {
     if (selected) {
@@ -174,6 +182,7 @@ export default function LogMealScreen() {
           </View>
 
           {selected ? (
+            // ── State 3 — plato lleno ────────────────────────────────
             <>
               <FilledMealCard
                 name={currentMeal.name}
@@ -192,8 +201,27 @@ export default function LogMealScreen() {
             </>
           ) : (
             <>
-              <SuggestionsList suggestions={suggestions} onSelect={handleSelectSuggestion} />
+              {/*
+                State 1 — empty (user nuevo, sin sugerencias y sin
+                contenido manual). Welcome card explica qué viene; los
+                inputs manuales abajo son el único path por ahora.
+              */}
+              {suggestions.length === 0 && !hasManualContent ? <EmptyMealsWelcome /> : null}
+
+              {/*
+                States 2 + 4 — hay sugerencias. En state 2 (idle), full
+                opacity. En state 4 (typing manual), dimmed a 0.5 para
+                comunicar "siguen disponibles si cambias de opinión".
+              */}
+              <SuggestionsList
+                suggestions={suggestions}
+                onSelect={handleSelectSuggestion}
+                dimmed={hasManualContent}
+              />
+
+              {/* Divider solo cuando hay sugerencias arriba que separar. */}
               {suggestions.length > 0 ? <DividerWithText text="o escribe" /> : null}
+
               <ManualInputs
                 name={manualName}
                 onNameChange={setManualName}
@@ -202,43 +230,65 @@ export default function LogMealScreen() {
                 calories={manualCalories}
                 onCaloriesChange={setManualCalories}
                 mealVerb={meal.verb}
+                active={hasManualContent}
               />
+
+              {/*
+                State 4 — feedback inline aparece cuando los 3 campos
+                manuales son válidos, sin esperar a que selecciones
+                una sugerencia. Mismo treatment que state 3.
+              */}
+              {!selected && manualValid && targets ? (
+                <View style={styles.manualFeedback}>
+                  <FeedbackCard
+                    projected={projected}
+                    targets={{ protein_g: targets.protein_g, calories: targets.calories }}
+                    mealLabel={meal.label.toLowerCase()}
+                  />
+                </View>
+              ) : null}
             </>
           )}
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable
-            onPress={handleSave}
-            disabled={!hasFilledMeal || isPending}
-            style={({ pressed }) => [
-              styles.cta,
-              !hasFilledMeal && styles.ctaDisabled,
-              pressed && hasFilledMeal && !isPending && styles.ctaPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={meal.saveLabel}
-            accessibilityState={{ disabled: !hasFilledMeal, busy: isPending }}
-          >
-            {hasFilledMeal && !isPending ? (
-              <LinearGradient
-                colors={[colors.mauveLight, colors.mauveDeep]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            ) : null}
-            {isPending ? (
-              <View style={styles.ctaRow}>
-                <ActivityIndicator color={colors.pearlBase} size="small" />
-                <Text style={styles.ctaLabel}>Guardando…</Text>
-              </View>
-            ) : (
-              <Text style={[styles.ctaLabel, !hasFilledMeal && styles.ctaLabelDisabled]}>
-                {meal.saveLabel}
-              </Text>
-            )}
-          </Pressable>
+          {/* Shadow lives on the outer wrapper so it isn't clipped by
+              the inner overflow:hidden that the rounded gradient
+              surface needs. Splitting the two also fixes a layout
+              collapse iOS produced when both lived on the Pressable. */}
+          <View style={[styles.ctaShadow, !hasFilledMeal && styles.ctaShadowDisabled]}>
+            <Pressable
+              onPress={handleSave}
+              disabled={!hasFilledMeal || isPending}
+              style={({ pressed }) => [
+                styles.cta,
+                !hasFilledMeal && styles.ctaDisabled,
+                pressed && hasFilledMeal && !isPending && styles.ctaPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={meal.saveLabel}
+              accessibilityState={{ disabled: !hasFilledMeal, busy: isPending }}
+            >
+              {hasFilledMeal && !isPending ? (
+                <LinearGradient
+                  colors={[colors.mauveLight, colors.mauveDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : null}
+              {isPending ? (
+                <View style={styles.ctaRow}>
+                  <ActivityIndicator color={colors.pearlBase} size="small" />
+                  <Text style={styles.ctaLabel}>Guardando…</Text>
+                </View>
+              ) : (
+                <Text style={[styles.ctaLabel, !hasFilledMeal && styles.ctaLabelDisabled]}>
+                  {meal.saveLabel}
+                </Text>
+              )}
+            </Pressable>
+          </View>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.cancel}>Cancelar</Text>
           </Pressable>
@@ -294,18 +344,24 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderSubtle,
   },
+  ctaShadow: {
+    borderRadius: radius.pill,
+    ...shadows.ctaMauve,
+  },
+  ctaShadowDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   cta: {
     overflow: 'hidden',
     borderRadius: radius.pill,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.ctaMauve,
+    width: '100%',
   },
   ctaDisabled: {
     backgroundColor: colors.borderSubtle,
-    shadowOpacity: 0,
-    elevation: 0,
   },
   ctaPressed: {
     opacity: 0.9,
@@ -330,5 +386,8 @@ const styles = StyleSheet.create({
     color: colors.labelDim,
     textAlign: 'center',
     paddingVertical: spacing.sm,
+  },
+  manualFeedback: {
+    marginTop: 16,
   },
 })

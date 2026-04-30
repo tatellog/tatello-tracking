@@ -1,5 +1,6 @@
 export { DefineTargetsBanner } from './DefineTargetsBanner'
 export { DividerWithText } from './DividerWithText'
+export { EmptyMealsWelcome } from './EmptyMealsWelcome'
 export { FeedbackCard } from './FeedbackCard'
 export { FilledMealCard } from './FilledMealCard'
 export { LogMealButton } from './LogMealButton'
