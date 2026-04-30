@@ -36,4 +36,13 @@ export const queryKeys = {
     all: ['progress'] as const,
     measurements: (rangeDays: number | null) => ['progress', 'measurements', rangeDays] as const,
   },
+  profile: {
+    all: ['profile'] as const,
+    me: () => ['profile', 'me'] as const,
+  },
+  photos: {
+    all: ['photos'] as const,
+    today: () => ['photos', 'today'] as const,
+    latestSet: () => ['photos', 'latest-set'] as const,
+  },
 } as const

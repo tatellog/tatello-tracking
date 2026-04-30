@@ -15,7 +15,7 @@ import Animated, {
 
 import { colors, radius, shadows, spacing, typography } from '@/theme'
 
-type State = 'morning' | 'day' | 'urgent'
+type State = 'morning' | 'day' | 'urgent' | 'first-day'
 
 type Props = {
   state: State
@@ -75,6 +75,17 @@ const INTENSITY: Record<
     bottomWeight: '600',
     bottomLetterSpacing: 0.5,
   },
+  // first-day shares morning's gentleness — the user is brand new,
+  // the tile shouldn't be shouting. The germinate entrance below
+  // does the work of drawing attention without intensity boosts.
+  'first-day': {
+    haloMs: 2600,
+    haloMaxOpacity: 0.8,
+    breathMs: 2800,
+    breathMaxScale: 1.04,
+    bottomWeight: '500',
+    bottomLetterSpacing: 0,
+  },
 }
 
 // U+FF0B FULLWIDTH PLUS SIGN — visually balanced inside an Inter-style
@@ -104,6 +115,21 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
   const plusBob = useSharedValue(0)
   const pressScale = useSharedValue(1)
   const checkOpacity = useSharedValue(0)
+  // Germinate: 0 → 1.2 (overshoot bezier) → 1 (spring rest). Only
+  // armed for first-day; every other state starts at full size so a
+  // re-render doesn't trigger a phantom entrance animation.
+  const entryScale = useSharedValue(state === 'first-day' ? 0 : 1)
+
+  useEffect(() => {
+    if (state !== 'first-day') {
+      entryScale.value = 1
+      return
+    }
+    entryScale.value = withSequence(
+      withTiming(1.2, { duration: 400, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }),
+      withSpring(1, { stiffness: 100, damping: 12 }),
+    )
+  }, [state, entryScale])
 
   useEffect(() => {
     haloOpacity.value = withRepeat(
@@ -169,7 +195,7 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
     transform: [{ scale: haloScale.value }],
   }))
   const bodyStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: breath.value * pressScale.value }],
+    transform: [{ scale: breath.value * pressScale.value * entryScale.value }],
   }))
   const plusStyle = useAnimatedStyle(() => ({
     opacity: 1 - checkOpacity.value,

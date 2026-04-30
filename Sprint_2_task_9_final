@@ -1,0 +1,319 @@
+# Sprint 2 — Reemplazo de Tarea 9 (final)
+
+Este documento reemplaza **solo la Tarea 9** del Sprint 2 original (que era `SwipeToSeal`).
+Todas las demás tareas del Sprint 2 siguen iguales.
+
+Decisiones tomadas:
+- Tile gigante en posición fija 2x2 esquina inferior derecha (no reorganización compleja del grid)
+- Aparece SIEMPRE que el workout no esté marcado (cualquier hora)
+- Copy del tile cambia con hora del día / patrón de riesgo (3 estados: morning / day / urgent)
+
+---
+
+## Tarea 9 (nueva) — TodayTile dentro del StreakGrid
+
+**Ya no hay un componente separado tipo `WorkoutCheckinBar` o `SwipeToSeal`. La acción vive dentro del `StreakGrid` mismo, en una celda especial que ocupa 2x2.**
+
+Esto significa que la Tarea 7 del Sprint 2 (StreakGrid) cambia. Lo defino completo aquí — sustituye la Tarea 7 original con esto.
+
+### Estructura del StreakGrid actualizada
+
+Layout interno del card:
+- Header (label "Tu racha" + counter "28 días · 14 seguidos")
+- Grid 7 columnas × 4 filas, gap 4px
+- 24 celdas pequeñas (días -27 a -4, que llenan las primeras 3.5 filas) + 1 tile gigante 2x2 (esquina inferior derecha)
+- Divider dashed inferior
+- Total racha "14 días seguidos" centrado abajo
+
+Cuando hay workout completado HOY → grid normal 7×4 con 28 celdas, todas tamaño igual, HOY en esquina inferior derecha lleno.
+
+Cuando NO hay workout completado HOY → grid de 24 celdas pequeñas + 1 tile 2x2 en esquina inferior derecha.
+
+### Math importante
+
+Grid normal 7×4 con gap 4px y celda con `aspect-ratio: 1`:
+- Celda chica: `(width - 6 * 4px) / 7` ≈ ~30-35px en pantalla 380px
+- Tile gigante 2x2: ocupa `grid-column: 6 / span 2` y `grid-row: 3 / span 2`
+- Tamaño efectivo: 2 × celda + 1 × gap (= ~64-74px)
+- Las 4 celdas que normalmente irían en posiciones (col 6-7, row 3-4) se omiten del render cuando el tile gigante existe
+
+CSS Grid permite esto naturalmente con `grid-template-rows: repeat(4, auto)` y posicionamiento explícito del tile. Las celdas del array de datos se mapean dinámicamente según índice — las últimas 4 (índices 24-27) se reemplazan por el tile en estado pendiente.
+
+### Lógica de qué celdas renderizar
+
+```ts
+// /features/home/logic.ts (agregar)
+
+export type TodayTileState = 'morning' | 'day' | 'urgent' | 'completed'
+
+export function deriveTodayTileState(
+  workoutCompleted: boolean,
+  hour: number,
+  dayOfWeek: number,
+  gridDays: Array<{ date: string; completed: boolean }>
+): TodayTileState {
+  if (workoutCompleted) return 'completed'
+
+  // Patrón de riesgo: las últimas 3 ocurrencias de este día de la semana
+  const sameDayHistory = gridDays
+    .filter((d) => new Date(d.date).getDay() === dayOfWeek)
+    .slice(-4, -1)
+  const riskyPattern =
+    sameDayHistory.length >= 3 &&
+    sameDayHistory.filter((d) => !d.completed).length >= 2
+
+  const isLate = hour >= 17
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+  const riskyWeekend = isWeekend && hour >= 14
+
+  if (isLate || riskyWeekend || riskyPattern) return 'urgent'
+  if (hour < 11) return 'morning'
+  return 'day'
+}
+
+export function deriveTodayTileCopy(
+  state: TodayTileState,
+  dayOfWeek: string
+): { topLabel: string; bottomText: string } {
+  const dayLabel = `Hoy · ${dayOfWeek}`
+
+  switch (state) {
+    case 'morning':
+      return { topLabel: dayLabel, bottomText: 'Tu día está abierto' }
+    case 'day':
+      return { topLabel: dayLabel, bottomText: 'Marcar entreno' }
+    case 'urgent':
+      return { topLabel: dayLabel, bottomText: 'No pierdas la racha' }
+    case 'completed':
+      return { topLabel: '', bottomText: '' } // no se renderiza el tile en este estado
+  }
+}
+```
+
+### Componente TodayTile
+
+`/features/home/components/TodayTile.tsx`:
+
+```tsx
+type TodayTileProps = {
+  state: 'morning' | 'day' | 'urgent'
+  topLabel: string
+  bottomText: string
+  onPress: () => Promise<void>
+}
+```
+
+Estructura visual:
+- Container con `aspect-ratio: 1`, posicionado con grid-column/grid-row del padre
+- Background: gradient `mauveLight` (#C9879E) → `mauveDeep` (#A85E7C)
+- Border radius: 14px (más generoso que celdas chicas 4-5px)
+- Box shadow: ring blanco 2px + ring malva 3px + drop shadow malva
+- Halo absolute view encima con `border: 1.5px mauveDeep`, animación `haloRing` infinita
+
+Contenido vertical centrado, gap pequeño:
+1. Label superior (`topLabel`): Inter UI, size 8.5px, letter-spacing 2px, uppercase, opacity 0.85, color blanco
+2. Plus icon: Inter Tight light, size 32px, weight 200, color blanco, con animación `plusBob` sutil (sube/baja 2px cada 2.4s)
+3. Texto inferior (`bottomText`): Inter, size 12px, weight 500-600 según estado, color blanco
+
+### Diferencias visuales por estado
+
+| Estado | Halo speed | Breathing scale | Plus animation | Bottom text weight |
+|--------|------------|-----------------|----------------|--------------------|
+| morning | 2.6s, opacity 0.8 | 1 ↔ 1.04 (2.8s) | bob 2px (2.4s) | 500 (regular medium) |
+| day | 2.6s, opacity 0.8 | 1 ↔ 1.04 (2.8s) | bob 2px (2.4s) | 500 |
+| urgent | 1.8s, opacity 1 | 1 ↔ 1.06 (1.8s) | bob 2px (2.4s) | 600 + letter-spacing 0.5 |
+
+Morning y day son idénticos visualmente, solo el copy cambia. Urgent sube intensidad: halo más rápido y opaco, breathing más pronunciado, copy más enfático.
+
+### Interacción
+
+```tsx
+import * as Haptics from 'expo-haptics'
+
+const handlePress = async () => {
+  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+  await onPress() // dispara mutation de markWorkoutComplete
+  // El componente se desmonta cuando el state cambia a 'completed' (porque el padre re-renderiza grid sin el tile)
+}
+```
+
+Pressable con `onPressIn` para haptic + scale-down inmediato (1 → 0.96 con `withSpring`), y `onPress` para el toggle real.
+
+### Animación de transición pendiente → completed
+
+Cuando el user tapea y la mutation termina:
+
+1. Haptic Medium ya disparó al tapear
+2. Plus icon hace cross-fade con check mark "✓" (250ms)
+3. Tile permanece visible 350ms con el check
+4. Tile hace fade-out + scale 1 → 0.85 simultáneo (300ms)
+5. Las 4 celdas chicas (24-27) hacen fade-in con stagger 60ms entre cada una (240ms total)
+6. La celda 27 (HOY) entra ya filled con el gradient malva normal
+7. Total: ~900ms desde tap hasta grid completo
+
+Implementación: el padre `StreakGrid` usa `LayoutAnimation` o entrada/salida explícita con Reanimated. Cuando `state === 'completed'`, renderiza las 28 celdas. Cuando es otro estado, renderiza 24 celdas + el tile.
+
+Para el cross-fade de tile → 4 celdas, ambos están en el mismo viewport (grid-column 6-7, grid-row 3-4). El tile sale, las celdas entran en su lugar.
+
+### StreakGrid completo (reemplaza Tarea 7)
+
+```tsx
+type StreakGridProps = {
+  days: Array<{ date: string; completed: boolean }>
+  streakCount: number
+  todayTileState: TodayTileState
+  todayCopy: { topLabel: string; bottomText: string }
+  onMarkWorkout: () => Promise<void>
+}
+
+export function StreakGrid({
+  days,
+  streakCount,
+  todayTileState,
+  todayCopy,
+  onMarkWorkout,
+}: StreakGridProps) {
+  const showTile = todayTileState !== 'completed'
+
+  // Si tile gigante existe, solo renderizamos days[0..23] (las primeras 24)
+  // Si no, renderizamos todas las 28 incluyendo days[27] como HOY
+  const cellsToRender = showTile ? days.slice(0, 24) : days
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Text style={styles.label}>Tu racha</Text>
+        <Text style={styles.softLabel}>
+          {days.filter(d => d.completed).length} días · {streakCount} seguidos
+        </Text>
+      </View>
+
+      <View style={styles.gridContainer}>
+        {cellsToRender.map((day, i) => (
+          <Cell
+            key={day.date}
+            day={day}
+            ageBucket={getAgeBucket(i, cellsToRender.length)}
+            entering={FadeIn.delay(i * 40).springify()}
+          />
+        ))}
+
+        {showTile && (
+          <TodayTile
+            state={todayTileState}
+            topLabel={todayCopy.topLabel}
+            bottomText={todayCopy.bottomText}
+            onPress={onMarkWorkout}
+            entering={FadeIn.delay(24 * 40).springify()}
+          />
+        )}
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.streakNumber}>
+        <Text style={styles.bigNumber}>{streakCount}</Text>
+        <Text style={styles.softLabel}> días seguidos</Text>
+      </View>
+    </View>
+  )
+}
+```
+
+El truco del posicionamiento: el contenedor `gridContainer` usa CSS-in-JS o style flat con `display: 'grid'` (en RN no aplica directamente — usa flexbox con wrap, o react-native-svg, o un grid manual con math). En Reanimated 3 + RN, lo más limpio es:
+
+- Wrap container con `flexDirection: 'row'`, `flexWrap: 'wrap'`, gap 4
+- Cada celda chica tiene `width: (100% - gaps) / 7`
+- El TodayTile tiene `width: ((100% - 6*gap) / 7) * 2 + gap` (es decir, 2 celdas + 1 gap), y `position: 'absolute'` con bottom: 0, right: 0
+- Las primeras 24 celdas fluyen naturalmente, dejando hueco visual donde irá el tile absolute
+
+Alternativa más simple si peleas con el layout: dos rows de 7 + una row mixta de 5 chicas + 1 tile 2x2 + nada. Esto solo funciona si los días siempre caben así, lo cual depende de qué día de la semana sea HOY.
+
+**Recomendación práctica:** position absolute para el tile. El layout es predecible (siempre va abajo-derecha del card), y las celdas chicas que faltan (índices 24-27) no se renderizan en pendiente, así que no hay overlapping.
+
+### Done when
+
+1. En estado pendiente: grid muestra 24 celdas pequeñas + tile gigante 2x2 esquina inferior derecha
+2. En estado completed: grid muestra 28 celdas pequeñas iguales, HOY filled en esquina inferior derecha
+3. Los 3 estados pendientes (morning/day/urgent) muestran copy correcto
+4. Estado urgent tiene halo más rápido + breathing más pronunciado + bottom text bold
+5. Tap en tile dispara haptic Medium + mutation + transición fluida hacia grid completed (~900ms)
+6. Las 4 celdas pequeñas que reemplazan al tile entran en cascada stagger 60ms
+7. La cell HOY (la que llega después del tile) ya entra con gradient filled, no outline
+8. La cuadrícula entera entra animada al abrir el screen (ya estaba en Tarea 7 original — sigue válido para las celdas chicas)
+9. Si el día cambia (medianoche con app abierta), el state se reevalúa y el grid se redibuja correctamente
+
+---
+
+## Cambios en otros lugares
+
+### Lo que se elimina
+
+- ~~Componente `SwipeToSeal`~~
+- ~~Componente `WorkoutCheckinBar`~~ (si lo habías considerado)
+- ~~La sección "Swipe-to-seal" del coreography del Sprint 2 original~~
+
+### Lo que ya no necesita su propio Animated.View en el Home
+
+En `/app/(tabs)/index.tsx`, el bloque que antes era:
+
+```tsx
+<Animated.View entering={FadeInDown.delay(2000)}>
+  <SwipeToSeal ... />
+</Animated.View>
+```
+
+**Se elimina completamente.** El check-in ahora vive dentro de StreakGrid, no es un bloque separado. Esto simplifica el orden de cascada: ya no hay 7 bloques en el Home, son 6.
+
+Cascada actualizada:
+- 50ms: Header
+- 150ms: StreakCard (que ahora incluye el tile gigante internamente, su propia cascada interna sigue funcionando)
+- 1500ms: MacrosCard (Sprint 2.5)
+- 1700ms: LogMealButton (Sprint 2.5)
+- 1900ms: DeltaPair
+- 2050ms: AnchorLine
+- 2200ms: QuickActions
+- 2350ms: MoodPicker
+
+### Cambio en RPC get_brief_context
+
+Agregar al jsonb_build_object: `'today_workout_at'` con el timestamp del workout más reciente de hoy si existe.
+
+```sql
+-- Dentro de get_brief_context:
+declare v_today_workout_at timestamptz;
+
+select completed_at
+into v_today_workout_at
+from public.workouts
+where user_id = p_user_id and workout_date = v_today
+order by completed_at desc limit 1;
+
+-- En el return:
+'today_workout_at', v_today_workout_at,
+```
+
+Esto se usa para potencialmente mostrar el timestamp en el card de racha cuando ya está completed (ej: pequeña línea bajo el "14 días seguidos" que diga "✓ entrenado a las 14:23"). Es nice-to-have, no obligatorio en Sprint 2.
+
+### Cambio en Acceptance criteria del Sprint 2
+
+Reemplazar los criterios 4 (que era "Swipe-to-seal funciona con gesto") con:
+
+- "Tile gigante 2x2 aparece cuando el workout no está marcado, en cualquier hora"
+- "Copy del tile cambia entre morning/day/urgent según hora del día y patrón de riesgo"
+- "Tap en tile gigante: haptic Medium → mutation → transición a grid 7×4 completo en ~900ms"
+- "En estado urgent, el tile tiene halo más rápido, breathing más pronunciado, copy 'No pierdas la racha' bold"
+
+---
+
+## Notas para Claude Code
+
+- **El tile gigante NO es un overlay del grid; es parte del grid.** Esto importa para que la animación de transición se sienta natural — el tile cae al lugar de las 4 celdas que lo reemplazan, no aparece "encima" o "afuera".
+- **Position absolute es la solución pragmática.** Pelear con CSS Grid en React Native (que no soporta grid nativamente) no vale la pena. Position absolute con cálculo manual de width = `(cellWidth * 2 + gap)` y posicionado bottom-right del contenedor flex funciona bien.
+- **Las 4 celdas que se omiten en estado pendiente DEBEN tener su data preservada en estado.** Cuando el user tapea, esas 4 celdas tienen que aparecer con la data correcta (días -3 a HOY, todas con `completed: true` para los 3 días previos + HOY recién marcado). Esto significa que el array `days` siempre debe tener 28 elementos; lo único que cambia es cuántos se renderizan.
+- **El plus icon (＋) es un caracter Unicode FULLWIDTH PLUS SIGN U+FF0B**, no el plus normal. Visualmente más balanceado en la tipografía Inter Tight light. Verifica que se renderiza correctamente — si no, fallback a "+" normal con weight ajustado.
+- **Halo del tile = view absolute con border + scale animation + opacity animation, no box-shadow.** Box-shadow no se puede animar bien en React Native.
+- **NO usar `Pressable` con efectos por defecto de iOS.** El feedback visual al tap debe ser custom (scale 0.96 con spring + cambio sutil de gradient). El highlight gris/azul del Pressable nativo arruinará la estética.
+- **Cross-fade plus → check al tapear:** dos Text superpuestos con opacity inversa animada. Más simple que cualquier otra approach.
+- **Si el day-of-week cambia (medianoche), el grid debe reaccionar.** Implementar con un `useInterval` que verifica cada 60s si la fecha de hoy cambió, y si sí, invalida la query del brief context.
+- **Test edge cases:** primer día del usuario (días = 28 todos vacíos), racha rota recién (último día empty antes del tile), racha gigante (sin huecos en 28 días), workout completed antes de las 7am (el tile no aparece, ya está completed desde el primer abrir del día).

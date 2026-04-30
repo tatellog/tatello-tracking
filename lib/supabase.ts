@@ -42,11 +42,13 @@ export const supabase = createClient<Database>(url, key, {
     storage,
     autoRefreshToken: true,
     persistSession: true,
-    // Magic-link deep links come in via expo-linking; we parse them
-    // manually in the auth screen and call setSession. Turning this
-    // off stops supabase-js from trying to read window.location on
-    // native (no-op today, forward-compat).
-    detectSessionInUrl: false,
+    // On native we parse the deep link manually in
+    // useMagicLinkHandler (expo-linking gives us the URL on cold
+    // start and on resume). On web we let supabase-js read
+    // window.location.hash itself — it strips the fragment after
+    // exchanging the tokens, so the route guard re-runs against a
+    // clean URL.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 })
 

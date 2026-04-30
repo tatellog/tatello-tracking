@@ -1,0 +1,182 @@
+# Sprint 2 — Reemplazo de Tarea 9
+
+Este documento reemplaza **solo la Tarea 9** del Sprint 2 original (que era `SwipeToSeal`).
+Todas las demás tareas del Sprint 2 siguen iguales.
+
+---
+
+## Tarea 9 (nueva) — WorkoutCheckinBar con tres estados
+
+`/features/home/components/WorkoutCheckinBar.tsx`:
+
+Barra de check-in contextual con microcopia que cambia según la hora del día y el riesgo. Reemplaza completamente al SwipeToSeal original.
+
+### Tres estados
+
+**Early (antes de 3pm, día normal):**
+- Fondo: gradient `inkDark` → `inkDarkHighlight`
+- Layout: 1fr auto — texto izquierda, botón derecha
+- Label superior: "HOY · {dayOfWeek}" en `labelDim` uppercase
+- Prompt: "Todavía no la has cerrado." en `pearlBase`
+- Botón: gradient `mauveLight` → `mauveDeep`, "＋ Entrené", sin glow
+- Sin indicadores de urgencia
+
+**Urgent (después de 5pm, fin de semana con riesgo, o patrón roto):**
+- Mismo fondo oscuro pero con barra vertical malva a la izquierda absolute-positioned
+- La barra vertical pulsa con `opacity 0.4 ↔ 0.9` cada 2 segundos (`withRepeat`)
+- Prompt cambia a: "No pierdas la racha."
+- Botón con glow pulsante infinito (`box-shadow` animado)
+- Haptic Light al abrir la app en este estado (una vez por sesión)
+
+**Completed (después de marcar):**
+- Fondo: `pearlElevated` con border `borderSubtle`
+- Layout: auto 1fr auto — icono, texto, timestamp
+- Icono: círculo 28x28 con fondo `feedbackSuccess` tinte 12%, check verde musgo (`feedbackSuccess`)
+- Texto: "Día sellado" en `inkPrimary`, medium weight
+- Timestamp: hora de marcado en formato "14:23" en `labelDim` uppercase letter-spacing 1px
+- Sin animaciones, estado estático acumulativo (persiste hasta 00:00 del día siguiente)
+
+### Props
+
+```ts
+type WorkoutCheckinBarProps = {
+  state: 'early' | 'urgent' | 'completed'
+  dayOfWeek: string          // "Sábado", "Lunes", etc.
+  completedAt?: Date          // solo si state === 'completed'
+  onTap: () => Promise<void>  // dispara mutation de workout insert
+}
+```
+
+### Implementación de transiciones
+
+**Early → Urgent** (la app está abierta cuando pasa la hora threshold):
+- Entering animation nueva: el indicador vertical hace fade-in con scale 0.5 → 1
+- Copy hace crossfade con duración 200ms
+- Botón gana glow progresivamente en 300ms
+
+**Urgent → Completed** (al tapear el botón):
+1. Haptic feedback `Haptics.ImpactFeedbackStyle.Medium` inmediato
+2. La barra oscura completa hace `FadeOut.duration(250)` con slide-up 8px
+3. La barra completed hace `FadeIn.delay(150).duration(300)` con slide-up 8px
+4. Total: ~450ms, se siente como una transformación, no reemplazo
+5. En paralelo, dispara el callback prop `onTap()` que hace el mutation al Supabase
+
+**Early → Completed** (desde estado no-urgente):
+- Misma animación pero sin glow que apagar
+
+### Lógica en `/features/home/logic.ts`
+
+Agregar las dos funciones que te indiqué:
+
+```ts
+export type WorkoutCheckinState = 'early' | 'urgent' | 'completed'
+
+export function deriveCheckinState(
+  workoutCompleted: boolean,
+  hour: number,
+  dayOfWeek: number,
+  gridDays: Array<{ date: string; completed: boolean }>
+): WorkoutCheckinState {
+  if (workoutCompleted) return 'completed'
+
+  // Patrón de riesgo: las últimas 3 veces que fue este día de la semana
+  const sameDayOfWeekHistory = gridDays
+    .filter((d) => new Date(d.date).getDay() === dayOfWeek)
+    .slice(-4, -1) // últimas 3 anteriores a hoy
+
+  const hasRiskyPattern =
+    sameDayOfWeekHistory.length >= 3 &&
+    sameDayOfWeekHistory.filter((d) => !d.completed).length >= 2
+
+  const isLate = hour >= 17
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+  const isRiskyWeekend = isWeekend && hour >= 14
+
+  if (isLate || isRiskyWeekend || hasRiskyPattern) return 'urgent'
+
+  return 'early'
+}
+
+export function deriveCheckinCopy(
+  state: WorkoutCheckinState,
+  dayOfWeek: string
+): { label: string; prompt: string } {
+  const dayLabel = `Hoy · ${dayOfWeek}`
+
+  switch (state) {
+    case 'early':
+      return { label: dayLabel, prompt: 'Todavía no la has cerrado.' }
+    case 'urgent':
+      return { label: dayLabel, prompt: 'No pierdas la racha.' }
+    case 'completed':
+      return { label: '', prompt: '' } // no se usa en state completed
+  }
+}
+```
+
+### Integración en Home
+
+En `/app/(tabs)/index.tsx`, reemplazar donde antes iba SwipeToSeal:
+
+```tsx
+<Animated.View entering={FadeInDown.delay(2000)}>
+  <WorkoutCheckinBar
+    state={deriveCheckinState(
+      ctx.today_workout_completed,
+      new Date().getHours(),
+      new Date(ctx.date).getDay(),
+      ctx.grid_28_days
+    )}
+    dayOfWeek={ctx.day_of_week}
+    completedAt={
+      ctx.today_workout_completed
+        ? new Date(/* el created_at del workout, debe venir del contexto */)
+        : undefined
+    }
+    onTap={async () => {
+      await markWorkoutComplete() // mutation existente
+    }}
+  />
+</Animated.View>
+```
+
+Nota: para que el estado "completed" muestre el timestamp correcto, el RPC `get_brief_context` debe devolver no solo `today_workout_completed: boolean` sino también `today_workout_at: timestamp | null`. Agregar a la migración si no estaba:
+
+```sql
+-- Dentro de get_brief_context, reemplazar el cálculo de today_workout
+select
+  exists(select 1 from public.workouts where user_id = p_user_id and workout_date = v_today),
+  (select completed_at from public.workouts where user_id = p_user_id and workout_date = v_today order by completed_at desc limit 1)
+into v_today_workout, v_today_workout_at;
+```
+
+Y agregarlo al jsonb_build_object como `'today_workout_at', v_today_workout_at`.
+
+### Done when
+
+1. Los tres estados renderizan correctamente según hora y workoutCompleted
+2. Transition Urgent → Completed al tap es fluida (~450ms, sin jumps)
+3. Haptic Medium al tapear el botón
+4. El timestamp del estado Completed coincide con el timestamp guardado en DB
+5. El cuadro HOY en la cuadrícula también cambia visualmente (outline-only → lleno) al marcar — esto es responsabilidad del componente StreakGrid, no del checkin bar, pero ambos deben invalidar la misma query para sincronizar
+6. Al deshacer (si implementas hold-to-undo más adelante), el estado vuelve correctamente a early/urgent según corresponda
+
+---
+
+## Cambios en otros lugares
+
+### Tarea 7 del Sprint 2 (StreakGrid)
+
+El cuadro HOY cuando NO está completado debe renderizarse como **outline malva** (border 1.5px `mauveDeep`, fondo transparente, con halo pulsante). Solo cuando se marca el workout cambia a **gradient filled** (mauveLight → mauveDeep).
+
+Esto es un cambio visual respecto al Sprint 2 original, donde el HOY siempre era filled. La razón: visualmente comunica "esta celda todavía no te pertenece". Al tapear el botón del checkin bar, se llena.
+
+### Tarea 14 del Sprint 2 (animación reducida en aperturas frecuentes)
+
+Sin cambios. La barra de checkin se incluye en el fade reducido.
+
+---
+
+## Lo que queda obsoleto del Sprint 2 original
+
+El componente `SwipeToSeal` y toda su lógica de gesture handler con `Gesture.Pan()` no se construye. Puedes saltarte la instalación de `react-native-gesture-handler` SI no la necesitas para otras cosas — revisa si alguna otra parte del sprint la usa (probablemente sí, por Reanimated mismo o por swipe-to-delete en la tab Comidas del Sprint 2.5). En caso de duda, déjala instalada: no agrega peso significativo.

@@ -37,7 +37,13 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite a tracking-app usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
+        }
+      ]
     ]
   }
 }

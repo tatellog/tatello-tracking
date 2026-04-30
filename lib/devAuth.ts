@@ -1,37 +1,35 @@
 import { supabase } from './supabase'
 
 /*
- * Dev-only auto-login.
+ * Opt-in dev shortcut.
  *
- * Mientras el flujo real de magic-link / OAuth no esté validado de
- * principio a fin, en builds de desarrollo nos saltamos la pantalla
- * de auth: si no hay sesión activa, intentamos signInWithPassword
- * con un usuario de prueba pre-creado en Supabase
- * (`dev@local.test` / `devpassword123`, email ya confirmado).
+ * When `EXPO_PUBLIC_USE_DEV_SIGNIN=true` AND we're in __DEV__, this
+ * helper signs the app in as `dev@local.test` (pre-created in
+ * Supabase, email confirmed) so we can bypass the magic-link
+ * round-trip while iterating on the wizard/home/photos.
+ *
+ * Default behaviour (flag unset / false): NO-OP. The user lands on
+ * /auth and goes through the real magic-link flow — that's the path
+ * production users take, so it's the path we test by default.
  *
  * Reglas:
- *   - Solo corre cuando `__DEV__` (Metro bundler) está activo, así el
- *     builder de prod nunca lo trae embebido.
- *   - Si `EXPO_PUBLIC_SKIP_AUTH=true`, salimos antes de tocar el auth
- *     server. El _layout ya skipea el route guard con la misma flag,
- *     así que la combinación produce: sin sesión, sin redirect, y la
- *     home cae al mock data via useHomeBrief.
- *   - Si ya hay sesión, no hace nada. Esto convive con el flujo
- *     real de auth — si en algún momento iniciás sesión con tu user
- *     real, este helper se queda quieto.
- *   - Errores se loguean y se devuelven; el caller no los relanza
- *     porque el splash-screen del `_layout` no debe bloquearse por
- *     un dev-helper.
+ *   - `__DEV__` gate: production builds never touch this helper.
+ *   - `USE_DEV_SIGNIN` is independent of `SKIP_AUTH`. Combine them as
+ *     needed:
+ *       USE_DEV_SIGNIN=true  + SKIP_AUTH=true   → fastest dev loop.
+ *       USE_DEV_SIGNIN=false + SKIP_AUTH=false  → full real flow.
+ *       USE_DEV_SIGNIN=true  + SKIP_AUTH=false  → real auth screen
+ *           never shown but session exists (uncommon).
+ *   - Si ya hay sesión, no hace nada — convive con el flujo real.
+ *   - Errores se loguean y se devuelven; el splash-screen no se
+ *     bloquea por un dev-helper.
  */
 const DEV_EMAIL = 'dev@local.test'
 const DEV_PASSWORD = 'devpassword123'
 
 export async function ensureDevUserSession(): Promise<void> {
   if (!__DEV__) return
-  if (process.env.EXPO_PUBLIC_SKIP_AUTH === 'true') {
-    console.log('[devAuth] EXPO_PUBLIC_SKIP_AUTH=true — skipping dev sign-in.')
-    return
-  }
+  if (process.env.EXPO_PUBLIC_USE_DEV_SIGNIN !== 'true') return
 
   const {
     data: { session },

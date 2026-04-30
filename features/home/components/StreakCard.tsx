@@ -13,8 +13,10 @@ import Animated, {
   FadeIn,
   FadeOut,
   useAnimatedProps,
+  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
 
@@ -32,6 +34,12 @@ type Props = {
   onMarkWorkout: () => void
   /** ISO timestamp del workout de hoy si ya está marcado, sino null. */
   todayWorkoutAt: string | null
+  /**
+   * The user has never marked a workout. Switches the card to its
+   * Día 1 dressing: warm pearl→tinted gradient, mauve labels, "0
+   * EMPEZANDO" counter, and a slow horizontal shimmer overlay.
+   */
+  isFirstDay?: boolean
 }
 
 const GRID_ROWS = 4
@@ -66,8 +74,11 @@ export function StreakCard({
   todayCopy,
   onMarkWorkout,
   todayWorkoutAt,
+  isFirstDay = false,
 }: Props) {
-  const summaryLabel = `Tu racha: ${streakCount} días seguidos.`
+  const summaryLabel = isFirstDay
+    ? 'Día 1. Tu racha empieza hoy.'
+    : `Tu racha: ${streakCount} días seguidos.`
   const completedTime =
     todayTileState === 'completed' && todayWorkoutAt ? formatTimeEs(todayWorkoutAt) : null
 
@@ -78,9 +89,23 @@ export function StreakCard({
       accessibilityRole="summary"
       accessibilityLabel={summaryLabel}
     >
+      {isFirstDay ? (
+        <LinearGradient
+          colors={[colors.pearlElevated, '#FCF7F9']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: radius.card }]}
+          pointerEvents="none"
+        />
+      ) : null}
+
+      {isFirstDay ? <FirstDayShimmer /> : null}
+
       <View style={styles.header}>
-        <Text style={styles.label}>TU RACHA</Text>
-        <Text style={styles.subLabel}>{`28 DÍAS · ${streakCount} SEGUIDOS`}</Text>
+        <Text style={[styles.label, isFirstDay && styles.labelMauve]}>TU RACHA</Text>
+        <Text style={[styles.subLabel, isFirstDay && styles.subLabelMauve]}>
+          {isFirstDay ? 'DÍA 1' : `28 DÍAS · ${streakCount} SEGUIDOS`}
+        </Text>
       </View>
 
       <StreakGrid
@@ -92,7 +117,7 @@ export function StreakCard({
 
       <View style={styles.dashedDivider} />
 
-      <StreakNumber count={streakCount} />
+      <StreakNumber count={isFirstDay ? 0 : streakCount} isFirstDay={isFirstDay} />
 
       {completedTime && (
         <Text style={styles.sealedNote} accessibilityLabel={`Día sellado a las ${completedTime}`}>
@@ -100,6 +125,38 @@ export function StreakCard({
         </Text>
       )}
     </View>
+  )
+}
+
+/*
+ * Slow horizontal shimmer band that crosses the card while the user
+ * is on Día 1. translateX -100% → 100% over 3 s, looping forever.
+ * pointerEvents none so it never intercepts taps on the tile.
+ */
+function FirstDayShimmer() {
+  const translate = useSharedValue(-1)
+
+  useEffect(() => {
+    translate.value = withRepeat(
+      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.cubic) }),
+      -1,
+      false,
+    )
+  }, [translate])
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: `${translate.value * 100}%` }],
+  }))
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.shimmer, animStyle]}>
+      <LinearGradient
+        colors={['transparent', 'rgba(168, 94, 124, 0.08)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+    </Animated.View>
   )
 }
 
@@ -282,7 +339,7 @@ const COUNT_UP_DURATION = 800
  * subsequent prop changes, it withTimings from the previous value
  * to the new one, so tap-to-mark makes the number crawl up.
  */
-function StreakNumber({ count }: { count: number }) {
+function StreakNumber({ count, isFirstDay = false }: { count: number; isFirstDay?: boolean }) {
   const displayed = useSharedValue(count)
   const previous = useRef(count)
 
@@ -309,10 +366,12 @@ function StreakNumber({ count }: { count: number }) {
         underlineColorAndroid="transparent"
         animatedProps={animatedProps}
         defaultValue={String(count)}
-        accessibilityLabel={`${count} días seguidos`}
-        style={styles.bigNumber}
+        accessibilityLabel={isFirstDay ? 'Día 1, empezando' : `${count} días seguidos`}
+        style={[styles.bigNumber, isFirstDay && styles.bigNumberMauve]}
       />
-      <Text style={styles.seguidos}>DÍAS{'\n'}SEGUIDOS</Text>
+      <Text style={[styles.seguidos, isFirstDay && styles.seguidosMauve]}>
+        {isFirstDay ? 'EMPEZANDO' : `DÍAS\nSEGUIDOS`}
+      </Text>
     </View>
   )
 }
@@ -327,7 +386,15 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
+    overflow: 'hidden',
     ...shadows.card,
+  },
+  shimmer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: '60%',
   },
 
   header: {
@@ -349,6 +416,12 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelDim,
+  },
+  labelMauve: {
+    color: colors.mauveDeep,
+  },
+  subLabelMauve: {
+    color: colors.mauveDeep,
   },
 
   gridWrap: {
@@ -396,6 +469,12 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.labelMuted,
     lineHeight: typography.sizes.tinyLabel * typography.lineHeight.statement,
+  },
+  bigNumberMauve: {
+    color: colors.mauveDeep,
+  },
+  seguidosMauve: {
+    color: colors.mauveDeep,
   },
 
   sealedNote: {

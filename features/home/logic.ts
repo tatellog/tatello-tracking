@@ -48,29 +48,34 @@ export function deriveAnchorAction(ctx: BriefContext, state: DayState, hour: num
 
 /* ─── today tile ──────────────────────────────────────────────────── */
 
-export type TodayTileState = 'morning' | 'day' | 'urgent' | 'completed'
+export type TodayTileState = 'morning' | 'day' | 'urgent' | 'completed' | 'first-day'
 
 /*
  * Decide which variant the in-grid TodayTile should render. Pure:
  * all inputs explicit, no new Date() reads inside.
  *
- *   morning   → hour < 11, no urgency triggers. Soft 'tu día está
- *               abierto' prompt.
- *   day       → 11 ≤ hour < 17, no urgency triggers. Direct 'marcar
- *               entreno' nudge.
+ *   first-day → user has never marked a workout (profile.first_workout_at
+ *               is null). Trumps everything else. The tile renders with
+ *               the germinate entrance and a 'Empieza tu racha' prompt.
+ *   completed → workout already marked for today. Caller hides the
+ *               tile and renders the full 28-cell grid instead.
  *   urgent    → hour ≥ 17, weekend (Sun/Sat) ≥ 14h, OR the risky
  *               pattern: of the last three same-weekday entries, at
  *               least two were not completed. Faster halo, bolder
  *               copy.
- *   completed → workout already marked for today. Caller hides the
- *               tile and renders the full 28-cell grid instead.
+ *   morning   → hour < 11, no urgency triggers. Soft 'tu día está
+ *               abierto' prompt.
+ *   day       → 11 ≤ hour < 17, no urgency triggers. Direct 'marcar
+ *               entreno' nudge.
  */
 export function deriveTodayTileState(
   workoutCompleted: boolean,
   hour: number,
   dayOfWeek: number,
   gridDays: StreakCell[],
+  isFirstDay: boolean = false,
 ): TodayTileState {
+  if (isFirstDay) return 'first-day'
   if (workoutCompleted) return 'completed'
 
   const sameDayOfWeekHistory = gridDays
@@ -102,6 +107,8 @@ export function deriveTodayTileCopy(
       return { topLabel, bottomText: 'Marcar entreno' }
     case 'urgent':
       return { topLabel, bottomText: 'No pierdas la racha' }
+    case 'first-day':
+      return { topLabel: `Día 1 · ${dayOfWeek}`, bottomText: 'Empieza tu racha' }
     case 'completed':
       // Not consumed when completed — the grid renders 28 normal
       // cells in this state. Return an empty shape so callers don't

@@ -191,51 +191,75 @@ export type Database = {
       }
       photos: {
         Row: {
-          angle: string | null
+          angle: string
+          byte_size: number | null
           created_at: string
+          height: number | null
           id: string
           storage_path: string
           taken_at: string
           user_id: string
+          width: number | null
         }
         Insert: {
-          angle?: string | null
+          angle: string
+          byte_size?: number | null
           created_at?: string
+          height?: number | null
           id?: string
           storage_path: string
           taken_at?: string
           user_id: string
+          width?: number | null
         }
         Update: {
-          angle?: string | null
+          angle?: string
+          byte_size?: number | null
           created_at?: string
+          height?: number | null
           id?: string
           storage_path?: string
           taken_at?: string
           user_id?: string
+          width?: number | null
         }
         Relationships: []
       }
       profiles: {
         Row: {
+          biological_sex: string | null
           created_at: string
+          date_of_birth: string | null
           display_name: string | null
+          first_workout_at: string | null
           goal: string | null
+          height_cm: number | null
           id: string
+          onboarding_completed_at: string | null
           updated_at: string
         }
         Insert: {
+          biological_sex?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
+          first_workout_at?: string | null
           goal?: string | null
+          height_cm?: number | null
           id: string
+          onboarding_completed_at?: string | null
           updated_at?: string
         }
         Update: {
+          biological_sex?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
+          first_workout_at?: string | null
           goal?: string | null
+          height_cm?: number | null
           id?: string
+          onboarding_completed_at?: string | null
           updated_at?: string
         }
         Relationships: []

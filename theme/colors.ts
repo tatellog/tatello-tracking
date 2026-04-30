@@ -38,6 +38,21 @@ export const colors = {
   // Feedback colors
   feedbackSuccess: '#5A6F4C',
   feedbackError: '#B85045',
+
+  // Sprint 2.6 — onboarding wizard surfaces.
+  // pearlGradientEnd is the bottom of the subtle pearl→tinted gradient
+  // that sits behind every wizard step. mauveTinted is the fill of a
+  // SelectableCard once the user picks it — strong enough to read,
+  // light enough not to wreck the card column rhythm. mauveBorderSoft
+  // is the dashed border for empty photo slots (less assertive than
+  // mauveDeep so the slot reads "to do" instead of "active"). The two
+  // cameraDark tokens are top/bottom of the camera viewport gradient,
+  // designed to recede behind the silhouette overlay.
+  pearlGradientEnd: '#F5EFF2',
+  mauveTinted: '#F8F0F4',
+  mauveBorderSoft: '#D8B5C4',
+  cameraDark: '#2A2530',
+  cameraDarkBottom: '#1F1A24',
 } as const
 
 export type ColorToken = keyof typeof colors

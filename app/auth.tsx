@@ -11,7 +11,6 @@ import {
 } from 'react-native'
 import Animated, {
   FadeInDown,
-  ZoomIn,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
@@ -22,51 +21,95 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { colors, duration, easing, radius, shadows, spacing, typography } from '@/theme'
 
-type Status = 'idle' | 'sending' | 'sent' | 'error'
-
 const enter = (delayMs: number) =>
   FadeInDown.duration(duration.slow).delay(delayMs).springify().damping(18)
 
+const MIN_PASSWORD_LENGTH = 6
+
 /*
- * Magic-link entry point. Typing an email + submitting fires
- * signInWithOtp; Supabase sends a link that deep-links back into the
- * app, where useMagicLinkHandler at the root exchanges the tokens.
+ * Email + password sign-in with auto-signup as fallback.
  *
- * Motion language: the input border warms into copper on focus, the
- * submit capsule interpolates from raised (disabled) to copper (ready),
- * and the sent confirmation blooms with a spring. Tap feedback is a
- * 0.97 scale pulse on the UI thread so it never fights the JS bridge.
+ * Flow:
+ *   1. signInWithPassword(email, password)
+ *   2. If Supabase reports "Invalid login credentials", treat it as
+ *      "user not found" and try signUp(email, password). When the
+ *      project has "Confirm email" disabled (recommended for dev),
+ *      signUp returns a session immediately — RouteGuard takes over.
+ *   3. If signUp says the user already exists, the original signIn
+ *      failure was actually a wrong password — surface that.
+ *
+ * For this to work end-to-end the Supabase project needs:
+ *   - Authentication → Providers → Email → enabled
+ *   - Authentication → Providers → Email → "Confirm email" OFF
+ *     (or signUp will return session=null and the user gets stuck on
+ *     this screen waiting for an email they didn't ask for).
+ *
+ * Magic-link / OAuth providers are not part of this screen yet —
+ * they'll come back as separate sign-in paths once the project's
+ * auth providers are configured. The code from earlier is preserved
+ * in git history.
  */
+
 export default function AuthScreen() {
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState<Status>('idle')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const trimmed = email.trim()
-  const canSubmit = trimmed.length > 0 && status !== 'sending'
-  const isSending = status === 'sending'
+  const trimmedEmail = email.trim()
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)
+  const isPasswordValid = password.length >= MIN_PASSWORD_LENGTH
+  const canSubmit = isEmailValid && isPasswordValid && !submitting
 
   const onSubmit = async () => {
     if (!canSubmit) return
-    setStatus('sending')
+    setSubmitting(true)
     setErrorMessage(null)
-    const { error } = await supabase.auth.signInWithOtp({
-      email: trimmed,
-      options: {
-        emailRedirectTo: 'tracking-app://auth/callback',
-        shouldCreateUser: true,
-      },
-    })
-    if (error) {
-      setStatus('error')
-      setErrorMessage(error.message)
-      return
-    }
-    setStatus('sent')
-  }
 
-  if (status === 'sent') {
-    return <SentState email={trimmed} />
+    try {
+      const signIn = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      })
+
+      if (!signIn.error) {
+        // RouteGuard will read the session change and redirect.
+        return
+      }
+
+      // Supabase returns the same error for "user not found" and
+      // "wrong password" so it can't enumerate accounts. We use
+      // signUp as the disambiguator.
+      const isInvalidCredentials = /invalid login credentials/i.test(signIn.error.message)
+      if (!isInvalidCredentials) throw signIn.error
+
+      const signUp = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+      })
+
+      if (signUp.error) {
+        if (/already registered/i.test(signUp.error.message)) {
+          throw new Error('Contraseña incorrecta para esa cuenta.')
+        }
+        throw signUp.error
+      }
+
+      // signUp returned. With "Confirm email" off, session is set
+      // and RouteGuard takes over. With confirm on, session is null
+      // and we surface a hint instead of silently doing nothing.
+      if (!signUp.data.session) {
+        throw new Error(
+          'Tu cuenta fue creada pero falta confirmar el email. Pedile al admin desactivar "Confirm email" en Supabase.',
+        )
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No pudimos iniciar sesión.'
+      setErrorMessage(message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -76,39 +119,82 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
-          <BrandMark />
+          <Animated.View entering={enter(0)} style={{ gap: spacing.sm }}>
+            <Text style={styles.meta}>TRACKING-APP</Text>
+            <View style={styles.brandBar} />
+          </Animated.View>
 
           <View style={styles.stack}>
             <Animated.View entering={enter(100)} style={{ gap: spacing.sm }}>
-              <Text style={styles.headline}>Entrá con tu email</Text>
+              <Text style={styles.headline}>Entrá a tracking-app</Text>
               <Text style={styles.editorial}>
-                Un link mágico. Sin passwords, sin cuentas nuevas.
+                Si ya tenés cuenta, ponemos tu email y contraseña. Si es la primera vez, te creamos
+                la cuenta automáticamente.
               </Text>
             </Animated.View>
 
             <Animated.View entering={enter(180)} style={{ gap: spacing.sm }}>
               <Text style={styles.meta}>EMAIL</Text>
-              <EmailInput
+              <Field
                 value={email}
                 onChangeText={setEmail}
-                onSubmitEditing={onSubmit}
-                disabled={isSending}
+                placeholder="tu@email.com"
+                icon="mail"
+                disabled={submitting}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
               />
             </Animated.View>
 
-            <Animated.View entering={enter(260)}>
-              <SubmitButton canSubmit={canSubmit} isSending={isSending} onPress={onSubmit} />
+            <Animated.View entering={enter(240)} style={{ gap: spacing.sm }}>
+              <Text style={styles.meta}>CONTRASEÑA</Text>
+              <Field
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Mínimo 6 caracteres"
+                icon="lock"
+                disabled={submitting}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                returnKeyType="go"
+                onSubmitEditing={onSubmit}
+                trailing={
+                  <Pressable
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    <Feather
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={18}
+                      color={colors.labelMuted}
+                    />
+                  </Pressable>
+                }
+              />
             </Animated.View>
 
-            {errorMessage && (
+            <Animated.View entering={enter(300)}>
+              <SubmitButton canSubmit={canSubmit} isSubmitting={submitting} onPress={onSubmit} />
+            </Animated.View>
+
+            {errorMessage ? (
               <Animated.View entering={enter(0)}>
                 <Text style={styles.error}>{errorMessage}</Text>
               </Animated.View>
-            )}
+            ) : null}
           </View>
 
-          <Animated.View entering={enter(340)}>
-            <Text style={[styles.editorial, styles.footerNote]}>Nunca compartimos tu email</Text>
+          <Animated.View entering={enter(360)}>
+            <Text style={[styles.editorial, styles.footerNote]}>
+              Sin verificación de email. Volvemos a entrar con esta misma combinación.
+            </Text>
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
@@ -116,23 +202,39 @@ export default function AuthScreen() {
   )
 }
 
-function BrandMark() {
-  return (
-    <Animated.View entering={enter(0)} style={{ gap: spacing.sm }}>
-      <Text style={styles.meta}>TRACKING-APP</Text>
-      <View style={styles.brandBar} />
-    </Animated.View>
-  )
-}
+type FieldIcon = 'mail' | 'lock'
 
-type EmailInputProps = {
+type FieldProps = {
   value: string
-  onChangeText: (text: string) => void
-  onSubmitEditing: () => void
+  onChangeText: (v: string) => void
+  placeholder: string
+  icon: FieldIcon
   disabled: boolean
+  secureTextEntry?: boolean
+  keyboardType?: 'default' | 'email-address'
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters'
+  autoComplete?: 'email' | 'password' | 'off'
+  textContentType?: 'emailAddress' | 'password'
+  returnKeyType?: 'next' | 'go' | 'done' | 'send'
+  onSubmitEditing?: () => void
+  trailing?: React.ReactNode
 }
 
-function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInputProps) {
+function Field({
+  value,
+  onChangeText,
+  placeholder,
+  icon,
+  disabled,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+  autoComplete,
+  textContentType,
+  returnKeyType,
+  onSubmitEditing,
+  trailing,
+}: FieldProps) {
   const [focused, setFocused] = useState(false)
   const focusProgress = useSharedValue(0)
 
@@ -153,37 +255,39 @@ function EmailInput({ value, onChangeText, onSubmitEditing, disabled }: EmailInp
 
   return (
     <Animated.View style={[styles.inputContainer, animatedContainer]}>
-      <Feather name="mail" size={18} color={focused ? colors.mauveDeep : colors.labelDim} />
+      <Feather name={icon} size={18} color={focused ? colors.mauveDeep : colors.labelDim} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        onSubmitEditing={onSubmitEditing}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="tu@email.com"
+        onSubmitEditing={onSubmitEditing}
+        placeholder={placeholder}
         placeholderTextColor={colors.labelDim}
         selectionColor={colors.mauveDeep}
         cursorColor={colors.mauveDeep}
-        autoCapitalize="none"
-        autoComplete="email"
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
         autoCorrect={false}
-        keyboardType="email-address"
-        textContentType="emailAddress"
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+        textContentType={textContentType}
         editable={!disabled}
-        returnKeyType="send"
+        returnKeyType={returnKeyType}
         style={styles.input}
       />
+      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
     </Animated.View>
   )
 }
 
 type SubmitButtonProps = {
   canSubmit: boolean
-  isSending: boolean
+  isSubmitting: boolean
   onPress: () => void
 }
 
-function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
+function SubmitButton({ canSubmit, isSubmitting, onPress }: SubmitButtonProps) {
   const scale = useSharedValue(1)
   const ready = useSharedValue(canSubmit ? 1 : 0)
 
@@ -207,7 +311,7 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
     scale.value = withTiming(1, { duration: duration.standard, easing: easing.out })
   }
 
-  const showIcon = canSubmit && !isSending
+  const showIcon = canSubmit && !isSubmitting
 
   return (
     <Animated.View style={[styles.submitWrap, canSubmit && shadows.card, animatedContainer]}>
@@ -217,44 +321,15 @@ function SubmitButton({ canSubmit, isSending, onPress }: SubmitButtonProps) {
         onPressOut={onPressOut}
         disabled={!canSubmit}
         style={styles.submitPressable}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
       >
         {showIcon && <Feather name="arrow-right" size={16} color={colors.pearlBase} />}
         <Text style={[styles.submitLabel, !canSubmit && styles.submitLabelDisabled]}>
-          {isSending ? 'Enviando…' : 'Enviarme el link'}
+          {isSubmitting ? 'Entrando…' : 'Entrar'}
         </Text>
       </Pressable>
     </Animated.View>
-  )
-}
-
-function SentState({ email }: { email: string }) {
-  return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <View style={styles.container}>
-        <BrandMark />
-
-        <View style={styles.sentBlock}>
-          <Animated.View
-            entering={ZoomIn.duration(duration.languid)
-              .delay(120)
-              .springify()
-              .damping(12)
-              .stiffness(180)}
-            style={styles.sentIcon}
-          >
-            <Feather name="mail" size={26} color={colors.mauveDeep} />
-          </Animated.View>
-          <Animated.View entering={enter(220)} style={styles.sentText}>
-            <Text style={[styles.headline, styles.centered]}>Revisá tu email</Text>
-            <Text style={[styles.editorial, styles.centered]}>
-              Te mandamos un link a {email}. Abrilo desde el teléfono y te traemos de vuelta.
-            </Text>
-          </Animated.View>
-        </View>
-
-        <View />
-      </View>
-    </SafeAreaView>
   )
 }
 
@@ -271,7 +346,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   stack: {
-    gap: spacing.xxl,
+    gap: spacing.lg,
   },
   brandBar: {
     height: 1,
@@ -303,7 +378,7 @@ const styles = StyleSheet.create({
   error: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
-    color: colors.mauveDeep,
+    color: colors.feedbackError,
   },
 
   inputContainer: {
@@ -313,14 +388,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: colors.pearlBase,
     paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
   },
   input: {
     flex: 1,
     marginLeft: spacing.sm,
     paddingVertical: 14,
-    paddingRight: spacing.md,
+    paddingRight: spacing.sm,
     fontSize: typography.sizes.body,
     color: colors.inkPrimary,
+  },
+  trailing: {
+    paddingHorizontal: spacing.sm,
   },
 
   submitWrap: {
@@ -341,25 +420,5 @@ const styles = StyleSheet.create({
   },
   submitLabelDisabled: {
     color: colors.labelDim,
-  },
-
-  sentBlock: {
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
-  sentIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.pearlBase,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sentText: {
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  centered: {
-    textAlign: 'center',
   },
 })
