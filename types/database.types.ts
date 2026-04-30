@@ -125,6 +125,7 @@ export type Database = {
           created_at: string
           id: string
           meal_date: string | null
+          meal_type: string
           name: string
           notes: string | null
           photo_storage_path: string | null
@@ -139,6 +140,7 @@ export type Database = {
           created_at?: string
           id?: string
           meal_date?: string | null
+          meal_type: string
           name: string
           notes?: string | null
           photo_storage_path?: string | null
@@ -153,6 +155,7 @@ export type Database = {
           created_at?: string
           id?: string
           meal_date?: string | null
+          meal_type?: string
           name?: string
           notes?: string | null
           photo_storage_path?: string | null
@@ -306,6 +309,16 @@ export type Database = {
       get_current_streak: {
         Args: { p_timezone?: string; p_user_id?: string }
         Returns: number
+      }
+      get_meal_suggestions: {
+        Args: { p_limit?: number; p_meal_type: string }
+        Returns: {
+          calories: number
+          id: string
+          name: string
+          protein_g: number
+          source: string
+        }[]
       }
       user_timezone: { Args: never; Returns: string }
     }

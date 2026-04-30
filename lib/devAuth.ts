@@ -1,26 +1,17 @@
 import { supabase } from './supabase'
 
 /*
- * Opt-in dev shortcut.
- *
- * When `EXPO_PUBLIC_USE_DEV_SIGNIN=true` AND we're in __DEV__, this
- * helper signs the app in as `dev@local.test` (pre-created in
- * Supabase, email confirmed) so we can bypass the magic-link
- * round-trip while iterating on the wizard/home/photos.
- *
- * Default behaviour (flag unset / false): NO-OP. The user lands on
- * /auth and goes through the real magic-link flow — that's the path
- * production users take, so it's the path we test by default.
+ * Dev auto-login. Runs on every cold start in __DEV__ and signs the
+ * app in as `dev@local.test` (pre-created in Supabase, email
+ * confirmed, password `devpassword123`). Sprint Foundation makes
+ * auto-login the default for fast iteration — auth real lands later.
  *
  * Reglas:
  *   - `__DEV__` gate: production builds never touch this helper.
- *   - `USE_DEV_SIGNIN` is independent of `SKIP_AUTH`. Combine them as
- *     needed:
- *       USE_DEV_SIGNIN=true  + SKIP_AUTH=true   → fastest dev loop.
- *       USE_DEV_SIGNIN=false + SKIP_AUTH=false  → full real flow.
- *       USE_DEV_SIGNIN=true  + SKIP_AUTH=false  → real auth screen
- *           never shown but session exists (uncommon).
- *   - Si ya hay sesión, no hace nada — convive con el flujo real.
+ *   - `EXPO_PUBLIC_DISABLE_DEV_SIGNIN=true` opts out (set this when
+ *     you want to QA the actual /auth screen). Default is on.
+ *   - Si ya hay sesión, no hace nada — convive con el flujo real
+ *     cuando entre.
  *   - Errores se loguean y se devuelven; el splash-screen no se
  *     bloquea por un dev-helper.
  */
@@ -29,7 +20,7 @@ const DEV_PASSWORD = 'devpassword123'
 
 export async function ensureDevUserSession(): Promise<void> {
   if (!__DEV__) return
-  if (process.env.EXPO_PUBLIC_USE_DEV_SIGNIN !== 'true') return
+  if (process.env.EXPO_PUBLIC_DISABLE_DEV_SIGNIN === 'true') return
 
   const {
     data: { session },

@@ -90,18 +90,29 @@ export default function AuthScreen() {
       })
 
       if (signUp.error) {
-        if (/already registered/i.test(signUp.error.message)) {
-          throw new Error('Contraseña incorrecta para esa cuenta.')
+        if (/already registered|already exists/i.test(signUp.error.message)) {
+          throw new Error('Email registrado pero la contraseña no coincide.')
         }
         throw signUp.error
       }
 
-      // signUp returned. With "Confirm email" off, session is set
-      // and RouteGuard takes over. With confirm on, session is null
-      // and we surface a hint instead of silently doing nothing.
+      // Supabase v2 quirk: signUp on an existing email returns the
+      // user with an empty `identities` array and session=null
+      // (deliberate, to prevent account enumeration). That looks
+      // identical to "needs confirmation" without inspecting the
+      // user payload — distinguish them here so the error message
+      // tells the truth.
+      const userAlreadyExisted = (signUp.data.user?.identities?.length ?? 0) === 0
+      if (userAlreadyExisted) {
+        throw new Error('Email registrado pero la contraseña no coincide.')
+      }
+
+      // Fresh signup. Session present → confirm-email is off, route
+      // guard takes over. Session null → confirm-email is on; tell
+      // the user to disable it in Supabase.
       if (!signUp.data.session) {
         throw new Error(
-          'Tu cuenta fue creada pero falta confirmar el email. Pedile al admin desactivar "Confirm email" en Supabase.',
+          'Tu cuenta fue creada pero falta confirmar el email. Desactivá "Confirm email" en Supabase Authentication settings.',
         )
       }
     } catch (err) {

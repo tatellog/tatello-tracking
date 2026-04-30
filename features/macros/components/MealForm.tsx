@@ -15,7 +15,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { MealInputSchema, type MealInput } from '@/features/macros/api'
+import type { MealType } from '@/features/macros/utils/mealType'
 import { colors, radius, spacing, typography } from '@/theme'
+
+function inferMealTypeFromHour(hour: number): MealType {
+  if (hour >= 5 && hour <= 10) return 'breakfast'
+  if (hour >= 11 && hour <= 15) return 'lunch'
+  if (hour >= 16 && hour <= 20) return 'dinner'
+  return 'snack'
+}
 
 type Props = {
   defaultValues?: Partial<MealInput>
@@ -62,6 +70,14 @@ export function MealForm({
       protein_g: defaultValues?.protein_g,
       calories: defaultValues?.calories,
       consumed_at: defaultValues?.consumed_at ?? new Date(),
+      // Edit screens pass meal_type explicitly. New-meal callers
+      // (only the legacy /log-meal.tsx route, replaced by the
+      // suggestor-driven screen) fall back to inferring from the
+      // consumed_at hour so the form submission isn't rejected by
+      // the zod enum.
+      meal_type:
+        defaultValues?.meal_type ??
+        inferMealTypeFromHour((defaultValues?.consumed_at ?? new Date()).getHours()),
     } as Partial<MealInput>,
   })
 

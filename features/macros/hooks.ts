@@ -103,6 +103,9 @@ export function useCreateMeal() {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       const mealDate = variables.consumed_at.toISOString().slice(0, 10)
       qc.invalidateQueries({ queryKey: queryKeys.macros.meals(mealDate) })
+      // The suggestion RPC is meal-type-scoped, so re-fetching the
+      // current slot keeps "Lo de ayer" honest after a fresh insert.
+      qc.invalidateQueries({ queryKey: queryKeys.macros.suggestions(variables.meal_type) })
     },
   })
 }

@@ -67,7 +67,11 @@ export default function RootLayout() {
       >
         <SafeAreaProvider>
           <RouteGuard />
-          <Stack screenOptions={{ headerShown: false }} />
+          <Stack screenOptions={{ headerShown: false }}>
+            {/* Slide-up sheet for logging a measurement. Other routes
+                inherit the default fullscreen push. */}
+            <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
+          </Stack>
         </SafeAreaProvider>
       </PersistQueryClientProvider>
     </GestureHandlerRootView>

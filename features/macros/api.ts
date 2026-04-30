@@ -15,17 +15,22 @@ export type Meal = Database['public']['Tables']['meals']['Row']
  */
 
 export const MacroTargetsInputSchema = z.object({
-  protein_g: z.number().int('Usa números enteros').min(1, 'Mínimo 1 g').max(999, 'Máximo 999 g'),
+  // Realistic adult range (50-300 g protein, 1000-5000 kcal). Stops
+  // typo'd values (e.g. extra zero) from landing in the targets row
+  // before the Home rings render with broken denominators.
+  protein_g: z.number().int('Usa números enteros').min(50, 'Mínimo 50 g').max(300, 'Máximo 300 g'),
   calories: z
     .number()
     .int('Usa números enteros')
-    .min(1, 'Mínimo 1 cal')
-    .max(9999, 'Máximo 9999 cal'),
+    .min(1000, 'Mínimo 1000 cal')
+    .max(5000, 'Máximo 5000 cal'),
 })
 
 export type MacroTargetsInput = z.infer<typeof MacroTargetsInputSchema>
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+
+export const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack'])
 
 export const MealInputSchema = z.object({
   name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(100, 'Máximo 100 caracteres'),
@@ -39,6 +44,7 @@ export const MealInputSchema = z.object({
     .date()
     .refine((d) => d.getTime() <= Date.now() + 60_000, 'No puede ser en el futuro')
     .refine((d) => d.getTime() >= Date.now() - SEVEN_DAYS_MS, 'Máximo 7 días atrás'),
+  meal_type: MealTypeSchema,
 })
 
 export type MealInput = z.infer<typeof MealInputSchema>
@@ -97,6 +103,7 @@ export async function createMeal(input: MealInput): Promise<Meal> {
       protein_g: parsed.protein_g,
       calories: parsed.calories,
       consumed_at: parsed.consumed_at.toISOString(),
+      meal_type: parsed.meal_type,
       source: 'manual',
     })
     .select()
@@ -114,6 +121,7 @@ export async function updateMeal(id: string, input: MealInput): Promise<Meal> {
       protein_g: parsed.protein_g,
       calories: parsed.calories,
       consumed_at: parsed.consumed_at.toISOString(),
+      meal_type: parsed.meal_type,
     })
     .eq('id', id)
     .select()

@@ -112,32 +112,36 @@ async function seed(): Promise<void> {
   })
   if (targetsErr) throw targetsErr
 
-  // 14 workouts: ayer hacia atrás (índice 1..14 días desde hoy). Hoy
-  // queda intencionalmente libre para que el TodayTile aparezca.
-  const workouts = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (i + 1))
-    return {
-      user_id: devUserId,
-      completed_at: d.toISOString(),
-      type: 'gym',
+  // 14 days of workouts with ~80% probability per day. Yesterday is
+  // forced to true so today's TodayTile lands "in streak" and the
+  // user has continuity with their last session. Today is left blank
+  // intentionally so the tile appears for tap-to-mark testing.
+  const today = new Date()
+  const workouts: { user_id: string; completed_at: string; type: string }[] = []
+  for (let i = 1; i <= 14; i++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    d.setHours(18, 0, 0, 0)
+    const isInStreak = i === 1 || Math.random() > 0.2
+    if (isInStreak) {
+      workouts.push({
+        user_id: devUserId,
+        completed_at: d.toISOString(),
+        type: 'gym',
+      })
     }
-  })
+  }
   const { error: workoutsErr } = await supabase.from('workouts').insert(workouts)
   if (workoutsErr) throw workoutsErr
 
-  // The first_workout_at trigger only fires on inserts — but it does
-  // fire on these. Unconditionally backfill it to the oldest workout
-  // so the home doesn't sit in first-day mode for a dev user that
-  // already has 14 days of history.
-  const oldest = workouts[workouts.length - 1]?.completed_at
-  if (oldest) {
+  // Backfill first_workout_at + complete onboarding so the route
+  // guard sends the seeded user straight to /(tabs).
+  const oldestWorkout = workouts[workouts.length - 1]?.completed_at
+  if (oldestWorkout) {
     const { error: backfillErr } = await supabase
       .from('profiles')
       .update({
-        first_workout_at: oldest,
-        // The standard seed user has finished onboarding so the route
-        // guard sends them straight to /(tabs).
+        first_workout_at: oldestWorkout,
         onboarding_completed_at: new Date().toISOString(),
         display_name: 'Dev',
         date_of_birth: '1995-01-01',
@@ -149,72 +153,113 @@ async function seed(): Promise<void> {
     if (backfillErr) throw backfillErr
   }
 
-  // 2 medidas: una hace 30 días, otra hoy.
-  const today = new Date()
-  const thirtyAgo = new Date()
-  thirtyAgo.setDate(thirtyAgo.getDate() - 30)
+  // 14 days of meals. RECETARIO seeds the "Lo de ayer" pattern: the
+  // most recent dinner is "Pollo con arroz y verduras", which the
+  // suggestion RPC (Bloque 4) latches onto. Variety in lunches and
+  // breakfasts keeps the meals tab visually realistic.
+  const RECETARIO = {
+    breakfast: [
+      { name: 'Avena con plátano', protein_g: 18, calories: 380 },
+      { name: 'Yogurt griego con almendras', protein_g: 22, calories: 320 },
+      { name: 'Huevos con aguacate', protein_g: 24, calories: 420 },
+    ],
+    lunch: [
+      { name: 'Pollo con arroz y verduras', protein_g: 40, calories: 520 },
+      { name: 'Salmón con quinoa', protein_g: 38, calories: 480 },
+      { name: 'Tacos de pescado', protein_g: 32, calories: 620 },
+    ],
+    dinner: [
+      // Yesterday's dinner is always the first entry — drives the
+      // "Lo de ayer" suggestion in the redesigned log screen.
+      { name: 'Pollo con arroz y verduras', protein_g: 40, calories: 520 },
+      { name: 'Ensalada con atún', protein_g: 35, calories: 380 },
+    ],
+  } as const
 
-  const { error: measErr } = await supabase.from('body_measurements').insert([
-    {
-      user_id: devUserId,
-      measured_at: thirtyAgo.toISOString(),
-      weight_kg: 78.0,
-      waist_cm: 76,
-    },
-    {
-      user_id: devUserId,
-      measured_at: today.toISOString(),
-      weight_kg: 76.2,
-      waist_cm: 74,
-    },
-  ])
-  if (measErr) throw measErr
+  const meals: {
+    user_id: string
+    consumed_at: string
+    name: string
+    protein_g: number
+    calories: number
+    meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+    source: string
+  }[] = []
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
 
-  // 3 comidas de hoy a horas razonables. Total: 85g proteína, 1470 cal.
-  const morning = atHour(8, 30)
-  const lunch = atHour(14, 0)
-  const snack = atHour(17, 0)
+    // Skip today's breakfast/lunch/dinner so the user can log fresh
+    // entries for "today". Yesterday and earlier get full days.
+    if (i === 0) continue
 
-  const { error: mealsErr } = await supabase.from('meals').insert([
-    {
+    const breakfast = RECETARIO.breakfast[i % RECETARIO.breakfast.length]!
+    const bDate = new Date(d)
+    bDate.setHours(8, 30, 0, 0)
+    meals.push({
       user_id: devUserId,
-      consumed_at: morning.toISOString(),
-      name: 'Avena con plátano y proteína',
-      protein_g: 35,
-      calories: 450,
+      consumed_at: bDate.toISOString(),
+      ...breakfast,
+      meal_type: 'breakfast',
       source: 'manual',
-    },
-    {
+    })
+
+    const lunch = RECETARIO.lunch[i % RECETARIO.lunch.length]!
+    const lDate = new Date(d)
+    lDate.setHours(14, 0, 0, 0)
+    meals.push({
       user_id: devUserId,
-      consumed_at: lunch.toISOString(),
-      name: 'Pollo con arroz y verduras',
-      protein_g: 40,
-      calories: 700,
+      consumed_at: lDate.toISOString(),
+      ...lunch,
+      meal_type: 'lunch',
       source: 'manual',
-    },
-    {
+    })
+
+    // Yesterday (i === 1) is locked to "Pollo con arroz" to seed the
+    // suggestion. Other days alternate freely.
+    const dinner = i === 1 ? RECETARIO.dinner[0]! : RECETARIO.dinner[i % RECETARIO.dinner.length]!
+    const dDate = new Date(d)
+    dDate.setHours(19, 30, 0, 0)
+    meals.push({
       user_id: devUserId,
-      consumed_at: snack.toISOString(),
-      name: 'Yogurt griego con nueces',
-      protein_g: 10,
-      calories: 320,
+      consumed_at: dDate.toISOString(),
+      ...dinner,
+      meal_type: 'dinner',
       source: 'manual',
-    },
-  ])
+    })
+  }
+  const { error: mealsErr } = await supabase.from('meals').insert(meals)
   if (mealsErr) throw mealsErr
+
+  // 8 weekly body_measurements descending toward today, slow drift
+  // -2 kg over 8 weeks plus a little jitter so the chart looks
+  // realistic, not a straight line.
+  const measurements: {
+    user_id: string
+    measured_at: string
+    weight_kg: number
+    waist_cm: number
+  }[] = []
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i * 7)
+    measurements.push({
+      user_id: devUserId,
+      measured_at: d.toISOString(),
+      weight_kg: Number((76.2 + i * 0.3 + (Math.random() - 0.5) * 0.4).toFixed(2)),
+      waist_cm: Number((74 + i * 0.25).toFixed(1)),
+    })
+  }
+  const { error: measErr } = await supabase.from('body_measurements').insert(measurements)
+  if (measErr) throw measErr
 
   console.log('[seed] Done:')
   console.log('  • profile onboarded (Dev, female, 165 cm, 1995-01-01, recomposition)')
-  console.log('  • 14 workouts (yesterday and 13 prior days)')
-  console.log('  • 2 measurements (today 76.2 kg, 30d ago 78.0 kg)')
-  console.log('  • 3 meals today (85g protein, 1470 cal)')
+  console.log(`  • ${workouts.length} workouts in last 14 days (yesterday locked in)`)
+  console.log(`  • ${meals.length} meals across last 13 days (today empty)`)
+  console.log(`  • ${measurements.length} weekly body_measurements over 8 weeks`)
   console.log('  • macro_targets: 130g protein / 1800 cal')
-}
-
-function atHour(h: number, m: number): Date {
-  const d = new Date()
-  d.setHours(h, m, 0, 0)
-  return d
+  console.log('  • yesterday\'s dinner = "Pollo con arroz y verduras" → suggestion RPC primed')
 }
 
 seed().catch((err) => {

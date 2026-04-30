@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { OrnamentShape } from '@/features/onboarding/components'
 import { colors, typography } from '@/theme'
@@ -21,6 +21,7 @@ import { colors, typography } from '@/theme'
  */
 export default function WelcomeScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
 
   const handleStart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
@@ -28,14 +29,13 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <LinearGradient
         colors={[colors.pearlBase, colors.pearlGradientEnd]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
       <OrnamentShape variant="tr" />
-      <OrnamentShape variant="bl" />
 
       <View style={styles.content}>
         <View style={styles.heroBlock}>
@@ -79,7 +79,7 @@ export default function WelcomeScreen() {
           <Text style={styles.ctaLabel}>Empecemos</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -159,13 +159,16 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 22,
+    paddingTop: 8,
     paddingBottom: 16,
   },
   cta: {
+    alignSelf: 'stretch',
     backgroundColor: colors.mauveDeep,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaPressed: {
     opacity: 0.85,
