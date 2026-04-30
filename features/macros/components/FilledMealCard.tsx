@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { useConfirm } from '@/lib/confirm'
 import { colors, typography } from '@/theme'
 
 type Props = {
@@ -19,31 +20,28 @@ type Props = {
  * the eye to the chosen plate; numbers in Inter Tight 32 Light read
  * as "decided" without crossing into shouting.
  *
- * "Cambiar o editar →" opens a small action sheet so the user can
- * either swap the entire plate or tweak the macros without leaving
- * the screen. Web falls back to window.confirm — it's good enough
- * for dev / web testing without dragging in a third-party sheet.
+ * "Cambiar o editar →" opens the custom ConfirmDialog with two
+ * actions: swap the entire plate, or transfer the macros to the
+ * manual fields for tweaking. Same UX on web and native — no more
+ * window.confirm fallback.
  */
 export function FilledMealCard({ name, protein_g, calories, onChangePlate, onEditNumbers }: Props) {
-  const handleChangeOrEdit = () => {
-    if (Platform.OS === 'web') {
-      const ok =
-        typeof window !== 'undefined' &&
-        typeof window.confirm === 'function' &&
-        window.confirm('¿Elegir otra sugerencia? (Cancelar deja este plato como está.)')
-      if (ok) onChangePlate()
-      return
-    }
-    Alert.alert(
-      'Cambiar o editar',
-      undefined,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Elegir otra sugerencia', onPress: onChangePlate },
-        ...(onEditNumbers ? [{ text: 'Editar números', onPress: onEditNumbers }] : []),
+  const choose = useConfirm()
+
+  const handleChangeOrEdit = async () => {
+    const choice = await choose({
+      title: 'Cambiar o editar',
+      description: 'Podés elegir otra sugerencia o ajustar los números a mano.',
+      actions: [
+        { id: 'change', label: 'Elegir otra sugerencia', style: 'default' },
+        ...(onEditNumbers
+          ? [{ id: 'edit', label: 'Editar números', style: 'default' as const }]
+          : []),
+        { id: 'cancel', label: 'Cancelar', style: 'cancel' as const },
       ],
-      { cancelable: true },
-    )
+    })
+    if (choice === 'change') onChangePlate()
+    if (choice === 'edit' && onEditNumbers) onEditNumbers()
   }
 
   return (

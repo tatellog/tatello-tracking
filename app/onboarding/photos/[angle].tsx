@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import { createElement, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ProgressBar } from '@/features/onboarding/components'
@@ -11,6 +11,7 @@ import { SilhouetteRenderer } from '@/features/onboarding/photos/components/Silh
 import { ThumbnailRow } from '@/features/onboarding/photos/components/ThumbnailRow'
 import type { PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
+import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { colors, typography } from '@/theme'
 
 const PHOTO_ORDER: PhotoAngle[] = ['front', 'side_right', 'side_left', 'back']
@@ -81,6 +82,7 @@ function PhotoCaptureScreen({
   single?: boolean
 }) {
   const router = useRouter()
+  const choose = useConfirm()
   const [permission, requestPermission] = useCameraPermissions()
   const cameraRef = useRef<CameraView>(null)
   const takePhoto = useTakePhoto()
@@ -138,22 +140,16 @@ function PhotoCaptureScreen({
     }
   }, [handleCapturedUri])
 
-  const handleSkip = useCallback(() => {
-    const skipMsg =
-      'Podrás capturarlas después desde Día 1 o Settings, pero hoy es el "antes" perfecto.'
-    if (isWeb) {
-      const ok =
-        typeof window !== 'undefined' &&
-        typeof window.confirm === 'function' &&
-        window.confirm(`¿Saltar las fotos? ${skipMsg}`)
-      if (ok) router.replace(finalDestination)
-      return
-    }
-    Alert.alert('¿Saltar las fotos?', skipMsg, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Saltar', style: 'destructive', onPress: () => router.replace(finalDestination) },
-    ])
-  }, [finalDestination, isWeb, router])
+  const handleSkip = useCallback(async () => {
+    const ok = await confirmBinary(choose, {
+      title: '¿Saltar las fotos?',
+      description:
+        'Podrás capturarlas después desde Día 1 o Settings, pero hoy es el "antes" perfecto.',
+      confirmLabel: 'Saltar',
+      destructive: true,
+    })
+    if (ok) router.replace(finalDestination)
+  }, [choose, finalDestination, router])
 
   // Native permission gating. Web skips this entirely (file input
   // doesn't need camera permission).

@@ -160,13 +160,16 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 22,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   cta: {
+    alignSelf: 'stretch',
     backgroundColor: colors.mauveDeep,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaPressed: {
     opacity: 0.85,

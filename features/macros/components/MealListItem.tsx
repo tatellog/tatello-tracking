@@ -1,4 +1,4 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   runOnJS,
@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import type { Meal } from '@/features/macros/api'
+import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { colors, radius, spacing, typography } from '@/theme'
 
 type Props = {
@@ -20,24 +21,24 @@ const DELETE_THRESHOLD = -120
 
 /*
  * Single row in the Comidas list. Pan left past 120 px triggers a
- * delete confirmation (Alert.alert — a system dialog so there's no
- * ambiguity about what's about to happen). Short swipes spring back.
+ * delete confirmation (custom Pearl Mauve dialog). Short swipes
+ * spring back.
  *
  * Tap the row to edit — the name / macros / time all lead to the
  * same form reuse path.
  */
 export function MealListItem({ meal, onEdit, onDelete }: Props) {
+  const choose = useConfirm()
   const translateX = useSharedValue(0)
 
-  const confirmDelete = () => {
-    Alert.alert('Borrar esta comida', `"${meal.name}"`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Borrar',
-        style: 'destructive',
-        onPress: () => onDelete(meal.id),
-      },
-    ])
+  const confirmDelete = async () => {
+    const ok = await confirmBinary(choose, {
+      title: 'Borrar esta comida',
+      description: `"${meal.name}"`,
+      confirmLabel: 'Borrar',
+      destructive: true,
+    })
+    if (ok) onDelete(meal.id)
   }
 
   const gesture = Gesture.Pan()

@@ -111,31 +111,56 @@ export function PhotoCaptureCard({ photos, onStartCapture, onSlotPress }: Props)
         4 fotos hoy para comparar en 30 días. La diferencia visual es donde el cambio se ve real.
       </Text>
 
+      {/* iOS native collapses children with width:'48.5%' inside a
+          flex-wrap row when aspectRatio is set — every slot ends up
+          on one row with zero height. Two explicit row Views with
+          flex:1 children render the 2×2 grid reliably. */}
       <View style={styles.slotsGrid}>
-        {ANGLE_ORDER.map((angle) => (
+        <View style={styles.slotsRow}>
           <PhotoSlot
-            key={angle}
-            angle={angle}
-            photo={captured[angle]}
-            onPress={onSlotPress ? () => onSlotPress(angle) : undefined}
+            angle={ANGLE_ORDER[0]!}
+            photo={captured[ANGLE_ORDER[0]!]}
+            onPress={onSlotPress ? () => onSlotPress(ANGLE_ORDER[0]!) : undefined}
           />
-        ))}
+          <PhotoSlot
+            angle={ANGLE_ORDER[1]!}
+            photo={captured[ANGLE_ORDER[1]!]}
+            onPress={onSlotPress ? () => onSlotPress(ANGLE_ORDER[1]!) : undefined}
+          />
+        </View>
+        <View style={styles.slotsRow}>
+          <PhotoSlot
+            angle={ANGLE_ORDER[2]!}
+            photo={captured[ANGLE_ORDER[2]!]}
+            onPress={onSlotPress ? () => onSlotPress(ANGLE_ORDER[2]!) : undefined}
+          />
+          <PhotoSlot
+            angle={ANGLE_ORDER[3]!}
+            photo={captured[ANGLE_ORDER[3]!]}
+            onPress={onSlotPress ? () => onSlotPress(ANGLE_ORDER[3]!) : undefined}
+          />
+        </View>
       </View>
 
-      <Pressable
-        onPress={onStartCapture}
-        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-        accessibilityRole="button"
-        accessibilityLabel={ctaCopy}
-      >
-        <LinearGradient
-          colors={[colors.mauveLight, colors.mauveDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <Text style={styles.ctaLabel}>{ctaCopy}</Text>
-      </Pressable>
+      {/* Outer wrapper carries the shadow (no overflow); inner
+          Pressable carries overflow:hidden + gradient. Splitting
+          the two avoids the iOS layout collapse we hit elsewhere. */}
+      <View style={styles.ctaShadow}>
+        <Pressable
+          onPress={onStartCapture}
+          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+          accessibilityRole="button"
+          accessibilityLabel={ctaCopy}
+        >
+          <LinearGradient
+            colors={[colors.mauveLight, colors.mauveDeep]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={styles.ctaLabel}>{ctaCopy}</Text>
+        </Pressable>
+      </View>
     </View>
   )
 }
@@ -249,15 +274,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   slotsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: 6,
-    rowGap: 6,
+    gap: 6,
     marginBottom: 12,
   },
+  slotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   slotEmpty: {
-    width: '48.5%',
+    flex: 1,
     aspectRatio: 3 / 4,
+    minHeight: 110,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: 'dashed',
@@ -279,8 +306,9 @@ const styles = StyleSheet.create({
     color: colors.labelMuted,
   },
   slotFilled: {
-    width: '48.5%',
+    flex: 1,
     aspectRatio: 3 / 4,
+    minHeight: 110,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: colors.pearlMuted,
@@ -304,18 +332,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.pearlBase,
   },
-  cta: {
-    position: 'relative',
-    overflow: 'hidden',
+  ctaShadow: {
     borderRadius: 100,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: colors.mauveDeep,
     shadowOpacity: 0.25,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
+  },
+  cta: {
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+    borderRadius: 100,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
   },
   ctaPressed: {
     opacity: 0.9,

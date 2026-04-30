@@ -21,6 +21,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useProfile } from '@/features/profile/hooks'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
+import { ConfirmProvider } from '@/lib/confirm'
 import { ensureDevUserSession } from '@/lib/devAuth'
 import { useVisitedDayOne } from '@/lib/onboardingFlags'
 import { QUERY_CACHE_MAX_AGE, queryClient, queryPersister } from '@/lib/queryClient'
@@ -66,12 +67,14 @@ export default function RootLayout() {
         persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
       >
         <SafeAreaProvider>
-          <RouteGuard />
-          <Stack screenOptions={{ headerShown: false }}>
-            {/* Slide-up sheet for logging a measurement. Other routes
-                inherit the default fullscreen push. */}
-            <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
-          </Stack>
+          <ConfirmProvider>
+            <RouteGuard />
+            <Stack screenOptions={{ headerShown: false }}>
+              {/* Slide-up sheet for logging a measurement. Other routes
+                  inherit the default fullscreen push. */}
+              <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
+            </Stack>
+          </ConfirmProvider>
         </SafeAreaProvider>
       </PersistQueryClientProvider>
     </GestureHandlerRootView>

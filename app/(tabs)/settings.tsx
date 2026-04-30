@@ -2,21 +2,13 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useProfile } from '@/features/profile/hooks'
+import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
@@ -54,6 +46,7 @@ const GOAL_LABEL: Record<string, string> = {
 export default function SettingsScreen() {
   const router = useRouter()
   const qc = useQueryClient()
+  const choose = useConfirm()
   const { data: profile } = useProfile()
   const { data: targets } = useMacroTargets()
 
@@ -77,26 +70,18 @@ export default function SettingsScreen() {
     }
   }
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     if (signingOut) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
 
-    if (Platform.OS === 'web') {
-      const ok =
-        typeof window !== 'undefined' &&
-        typeof window.confirm === 'function' &&
-        window.confirm('¿Cerrar sesión? Tus datos en este dispositivo se limpian.')
-      if (ok) void performSignOut()
-      return
-    }
-    Alert.alert(
-      '¿Cerrar sesión?',
-      'Tus datos en este dispositivo se limpian. Podés volver a entrar con el mismo email cuando quieras.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar sesión', style: 'destructive', onPress: () => void performSignOut() },
-      ],
-    )
+    const ok = await confirmBinary(choose, {
+      title: '¿Cerrar sesión?',
+      description:
+        'Tus datos en este dispositivo se limpian. Podés volver a entrar con el mismo email cuando quieras.',
+      confirmLabel: 'Cerrar sesión',
+      destructive: true,
+    })
+    if (ok) void performSignOut()
   }
 
   const editTargets = () => {
