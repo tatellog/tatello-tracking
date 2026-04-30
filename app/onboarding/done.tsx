@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -89,11 +89,6 @@ export default function DoneScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <LinearGradient
-        colors={[colors.pearlBase, colors.pearlGradientEnd]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
       <OrnamentShape variant="tr" />
 
       <View style={styles.content}>
@@ -120,19 +115,16 @@ export default function DoneScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Pressable
+        <TouchableOpacity
           onPress={handleContinue}
           disabled={updateProfile.isPending}
-          style={({ pressed }) => [
-            styles.cta,
-            updateProfile.isPending && styles.ctaDisabled,
-            pressed && styles.ctaPressed,
-          ]}
+          activeOpacity={0.85}
+          style={[styles.cta, updateProfile.isPending && styles.ctaDisabled]}
           accessibilityRole="button"
           accessibilityLabel="Continuar"
         >
           <Text style={styles.ctaLabel}>Continuar</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
@@ -210,12 +202,10 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaDisabled: {
     opacity: 0.4,
-  },
-  ctaPressed: {
-    opacity: 0.85,
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,

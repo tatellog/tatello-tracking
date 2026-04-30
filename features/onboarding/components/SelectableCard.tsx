@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { colors, typography } from '@/theme'
 
@@ -28,9 +28,14 @@ type Props =
  * choices laid side-by-side (sex, future on/off cards). The row
  * variant is for stacked lists with a description (goal selection).
  *
- * Selection haptic fires on press, not on the upstream state change,
- * so the user feels the tap exactly when their finger lands rather
- * than after the parent re-renders.
+ * Built on TouchableOpacity, not Pressable — the function-style prop
+ * on Pressable was failing to render backgroundColor in some iOS
+ * native + RN combos, leaving cards invisible. activeOpacity gives
+ * the same press-fade feedback without the function path.
+ *
+ * Square variant uses an explicit minHeight instead of aspectRatio
+ * for the same reason — flex:1 + aspectRatio collapses to zero
+ * height on iOS native when the parent's width hasn't measured yet.
  */
 export function SelectableCard(props: Props) {
   const { variant, label, selected, onPress } = props
@@ -40,14 +45,16 @@ export function SelectableCard(props: Props) {
     onPress()
   }
 
+  const surfaceStyle = [
+    variant === 'square' ? styles.square : styles.row,
+    selected ? styles.selected : styles.idle,
+  ]
+
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={handlePress}
-      style={({ pressed }) => [
-        variant === 'square' ? styles.square : styles.row,
-        selected ? styles.selected : styles.idle,
-        pressed && styles.pressed,
-      ]}
+      activeOpacity={0.85}
+      style={surfaceStyle}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
     >
@@ -64,16 +71,16 @@ export function SelectableCard(props: Props) {
           ) : null}
         </View>
       )}
-    </Pressable>
+    </TouchableOpacity>
   )
 }
 
 const styles = StyleSheet.create({
   square: {
     flex: 1,
-    aspectRatio: 1,
+    minHeight: 140,
     borderRadius: 14,
-    paddingVertical: 18,
+    paddingVertical: 22,
     paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
@@ -125,8 +132,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.mauveTinted,
     borderWidth: 1.5,
     borderColor: colors.mauveDeep,
-  },
-  pressed: {
-    opacity: 0.85,
   },
 })

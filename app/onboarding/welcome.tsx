@@ -2,26 +2,32 @@ import MaskedView from '@react-native-masked-view/masked-view'
 import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { OrnamentShape } from '@/features/onboarding/components'
 import { colors, typography } from '@/theme'
 
 /*
- * Opening shot of the onboarding ceremony. Centred composition with a
- * 365 stat as the protagonist, an editorial line, and a single CTA.
+ * Opening shot of the onboarding ceremony. Centred composition with
+ * the 365 stat as the protagonist and a single CTA at the bottom.
  *
- * The "365" wears an ink→mauve diagonal gradient via MaskedView. If
- * MaskedView ever fails on a given platform the underlying <Text>
- * still renders in inkPrimary, so the screen degrades gracefully.
- *
- * No progress bar — the wizard "starts" on the next screen so this
- * one reads as a foreword, not step 0 of 6.
+ * Implementation notes (post-iOS debugging):
+ *   - TouchableOpacity (not Pressable) for the CTA. Pressable's
+ *     `style` prop accepts a function that takes the press state, but
+ *     in some iOS native + RN combos the function path skips
+ *     backgroundColor entirely, painting the surface transparent.
+ *     TouchableOpacity uses a plain object style and renders
+ *     reliably.
+ *   - The screen background is a flat `colors.pearlBase` on the
+ *     SafeAreaView. We dropped the absoluteFill LinearGradient
+ *     because in iOS native it occasionally promoted itself above
+ *     static-positioned children regardless of JSX order or zIndex.
+ *     The pearl→pearlGradientEnd transition is barely visible to
+ *     begin with — flat pearl reads identical at this contrast.
  */
 export default function WelcomeScreen() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
 
   const handleStart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
@@ -29,12 +35,7 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <LinearGradient
-        colors={[colors.pearlBase, colors.pearlGradientEnd]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <OrnamentShape variant="tr" />
 
       <View style={styles.content}>
@@ -53,7 +54,8 @@ export default function WelcomeScreen() {
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            {/* Spacer so MaskedView has bounds matching the masked text. */}
+            {/* Spacer reserves the same intrinsic width so the masked
+                gradient fills the right region. */}
             <Text style={[styles.bigNumber, styles.bigNumberSpacer]}>365</Text>
           </MaskedView>
           <Text style={styles.bigNumberSub}>DÍAS POR DELANTE</Text>
@@ -70,16 +72,17 @@ export default function WelcomeScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Pressable
+        <TouchableOpacity
           onPress={handleStart}
-          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+          style={styles.cta}
+          activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Empecemos"
         >
           <Text style={styles.ctaLabel}>Empecemos</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -118,8 +121,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 92,
   },
-  // The spacer is invisible but reserves the same intrinsic width so
-  // the LinearGradient inside MaskedView fills the right region.
   bigNumberSpacer: {
     opacity: 0,
     position: 'absolute',
@@ -163,15 +164,12 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   cta: {
-    alignSelf: 'stretch',
+    width: '100%',
     backgroundColor: colors.mauveDeep,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  ctaPressed: {
-    opacity: 0.85,
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,

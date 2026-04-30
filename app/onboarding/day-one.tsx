@@ -1,6 +1,5 @@
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useBriefContext } from '@/features/brief/hooks'
@@ -51,70 +50,61 @@ export default function DayOneScreen() {
   }
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={[colors.pearlBase, colors.pearlGradientEnd]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <OrnamentShape variant="tl-small" />
 
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.eyebrow}>Tu primer día</Text>
-          <Text style={styles.title}>
-            Hoy <Text style={styles.titleEmphasis}>empieza</Text>.
-          </Text>
-          <Text style={styles.sub}>Aquí está lo que te hará despegar.</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.eyebrow}>Tu primer día</Text>
+        <Text style={styles.title}>
+          Hoy <Text style={styles.titleEmphasis}>empieza</Text>.
+        </Text>
+        <Text style={styles.sub}>Aquí está lo que te hará despegar.</Text>
 
-          {profile ? (
-            <View style={styles.cards}>
-              <ProfileSummaryCard
-                profile={profile}
-                weightKg={brief?.latest_measurement?.weight_kg ?? null}
-              />
+        {profile ? (
+          <View style={styles.cards}>
+            <ProfileSummaryCard
+              profile={profile}
+              weightKg={brief?.latest_measurement?.weight_kg ?? null}
+            />
 
-              <PhotoCaptureCard
-                photos={photos}
-                onStartCapture={handleStartPhotos}
-                onSlotPress={handleSlotPress}
-              />
+            <PhotoCaptureCard
+              photos={photos}
+              onStartCapture={handleStartPhotos}
+              onSlotPress={handleSlotPress}
+            />
 
-              <View style={styles.tasksList}>
-                {TASKS.map((task) => (
-                  <DayOneTask key={task.num} num={task.num} text={task.text} />
-                ))}
-              </View>
+            <View style={styles.tasksList}>
+              {TASKS.map((task) => (
+                <DayOneTask key={task.num} num={task.num} text={task.text} />
+              ))}
             </View>
-          ) : null}
-        </ScrollView>
+          </View>
+        ) : null}
+      </ScrollView>
 
-        <View style={styles.footer}>
-          <Pressable
-            onPress={handleEnter}
-            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Entrar a la app"
-          >
-            <Text style={styles.ctaLabel}>Entrar a la app →</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    </View>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          onPress={handleEnter}
+          style={styles.cta}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Entrar a la app"
+        >
+          <Text style={styles.ctaLabel}>Entrar a la app →</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.pearlBase,
-  },
   safe: {
     flex: 1,
+    backgroundColor: colors.pearlBase,
   },
   scroll: {
     flex: 1,
@@ -164,15 +154,11 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   cta: {
-    alignSelf: 'stretch',
     backgroundColor: colors.mauveDeep,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  ctaPressed: {
-    opacity: 0.85,
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,

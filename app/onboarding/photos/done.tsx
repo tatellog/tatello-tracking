@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -65,11 +65,6 @@ export default function PhotosDoneScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <LinearGradient
-        colors={[colors.pearlBase, colors.pearlGradientEnd]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
       <OrnamentShape variant="br" />
 
       <View style={styles.content}>
@@ -108,14 +103,15 @@ export default function PhotosDoneScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Pressable
+        <TouchableOpacity
           onPress={handleContinue}
-          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+          style={styles.cta}
+          activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={ctaLabel}
         >
           <Text style={styles.ctaLabel}>{ctaLabel}</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
@@ -215,9 +211,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
-  },
-  ctaPressed: {
-    opacity: 0.85,
+    justifyContent: 'center',
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,

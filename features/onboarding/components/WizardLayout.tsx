@@ -1,8 +1,14 @@
 import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { colors, typography } from '@/theme'
@@ -72,13 +78,10 @@ export function WizardLayout({
     onContinue()
   }
 
+  const isContinueDisabled = !canContinue || loading
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <LinearGradient
-        colors={[colors.pearlBase, colors.pearlGradientEnd]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
       {showOrnaments ? <OrnamentShape variant={ornamentVariant} /> : null}
 
       <View style={styles.progressWrap}>
@@ -103,17 +106,17 @@ export function WizardLayout({
             </Pressable>
           ) : null}
         </View>
-        <Pressable
+        {/* TouchableOpacity, not Pressable: the function-style prop
+            on Pressable was failing to render backgroundColor on
+            some iOS native + RN combos, leaving the CTA invisible. */}
+        <TouchableOpacity
           onPress={handleContinue}
-          disabled={!canContinue || loading}
-          style={({ pressed }) => [
-            styles.continue,
-            !canContinue && !loading && styles.continueDisabled,
-            pressed && canContinue && !loading && styles.continuePressed,
-          ]}
+          disabled={isContinueDisabled}
+          activeOpacity={0.85}
+          style={[styles.continue, isContinueDisabled && styles.continueDisabled]}
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
-          accessibilityState={{ disabled: !canContinue || loading, busy: loading }}
+          accessibilityState={{ disabled: isContinueDisabled, busy: loading }}
         >
           {loading ? (
             <View style={styles.continueLoadingRow}>
@@ -123,7 +126,7 @@ export function WizardLayout({
           ) : (
             <Text style={styles.continueLabel}>{continueLabel}</Text>
           )}
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
@@ -168,12 +171,11 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingHorizontal: 22,
     paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   continueDisabled: {
     opacity: 0.4,
-  },
-  continuePressed: {
-    opacity: 0.85,
   },
   continueLabel: {
     fontFamily: typography.uiMedium,
