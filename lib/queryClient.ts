@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { QueryClient } from '@tanstack/react-query'
 
+import { supabase } from './supabase'
+
 /*
  * TanStack Query configuration for the app.
  *
@@ -54,3 +56,30 @@ export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000
  * onboarding_completed_at and skips the wizard entirely.
  */
 export const LAST_AUTH_USER_KEY = 'tracking-app.last-auth-user-id'
+
+/*
+ * Module-level auth subscriber that flushes the query cache the
+ * moment supabase reports a different auth user than the previous
+ * event. Critical that this runs OUTSIDE the React component tree:
+ *   - React effect order is bottom-up (children before parents),
+ *     so a cache-clear effect placed in RootLayout fires AFTER
+ *     RouteGuard has already read stale cached data and routed the
+ *     user to the wrong screen.
+ *   - supabase fires INITIAL_SESSION / SIGNED_IN / SIGNED_OUT /
+ *     TOKEN_REFRESHED at well-defined points; subscribing here means
+ *     the cache is empty by the time any query hook mounts.
+ *
+ * Tri-state lastAuthUserId: `undefined` until the first event,
+ * `null` when no user is signed in, otherwise the user's id. The
+ * first event never triggers a clear (initial state is the source
+ * of truth, not a transition).
+ */
+let lastAuthUserId: string | null | undefined = undefined
+supabase.auth.onAuthStateChange((_event, session) => {
+  const newUserId = session?.user?.id ?? null
+  if (lastAuthUserId !== undefined && lastAuthUserId !== newUserId) {
+    queryClient.clear()
+    Promise.resolve(queryPersister.removeClient()).catch(() => {})
+  }
+  lastAuthUserId = newUserId
+})
