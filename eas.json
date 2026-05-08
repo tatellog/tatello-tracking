@@ -12,6 +12,12 @@
       }
     },
     "simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "dev-sim": {
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
