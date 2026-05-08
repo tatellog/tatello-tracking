@@ -39,3 +39,18 @@ export const queryPersister = createAsyncStoragePersister({
 })
 
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000
+
+/*
+ * AsyncStorage key that stores the auth user id seen on the most
+ * recent app boot. RouteGuard compares it against the current
+ * session — when a different user signs in (or signs in fresh on
+ * a device that has another user's persisted cache), the cache is
+ * keyed against THIS user, not the previous one.
+ *
+ * Without this, query keys like ['profile', 'me'] are identical
+ * across users, so the persister hands back the previous user's
+ * profile to a freshly signed-in user. The user briefly sees stale
+ * data and — worse — RouteGuard reads a non-null
+ * onboarding_completed_at and skips the wizard entirely.
+ */
+export const LAST_AUTH_USER_KEY = 'tracking-app.last-auth-user-id'

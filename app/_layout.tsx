@@ -1,5 +1,6 @@
 import '@/global.css'
 
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -14,7 +15,7 @@ import {
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
@@ -23,8 +24,13 @@ import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
 import { ConfirmProvider } from '@/lib/confirm'
 import { ensureDevUserSession } from '@/lib/devAuth'
-import { useVisitedDayOne } from '@/lib/onboardingFlags'
-import { QUERY_CACHE_MAX_AGE, queryClient, queryPersister } from '@/lib/queryClient'
+import { clearVisitedDayOne, useVisitedDayOne } from '@/lib/onboardingFlags'
+import {
+  LAST_AUTH_USER_KEY,
+  QUERY_CACHE_MAX_AGE,
+  queryClient,
+  queryPersister,
+} from '@/lib/queryClient'
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Ignore — on fast refresh the splash is already hidden.
@@ -108,6 +114,48 @@ function RouteGuard() {
   // the auth check is bypassed but onboarding/day-one gates still
   // apply (so dev users without a finished profile see the wizard).
   const skipAuth = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
+
+  // ── User-switch detection ─────────────────────────────────────────
+  // Query keys like ['profile', 'me'] are user-agnostic and the cache
+  // is persisted to AsyncStorage. When user A signs out and user B
+  // signs in (or signs in fresh on a device where A was last), we
+  // need to flush the cache so user B doesn't briefly see A's
+  // profile / brief / meals — the worst case is RouteGuard reading
+  // A's onboarding_completed_at and skipping the wizard for B.
+  //
+  // Strategy: stash the current auth user id in AsyncStorage every
+  // time a session is observed, and clear the cache when the stored
+  // id and the live id disagree. The ref guards against running the
+  // clear during the very first read (empty stored id is normal).
+  const lastClearedRef = useRef<string | null>(null)
+  useEffect(() => {
+    const currentId = session?.user?.id ?? null
+    let cancelled = false
+    AsyncStorage.getItem(LAST_AUTH_USER_KEY)
+      .then(async (stored) => {
+        if (cancelled) return
+        if (stored && stored !== currentId && lastClearedRef.current !== stored) {
+          lastClearedRef.current = stored
+          queryClient.clear()
+          await Promise.all([
+            Promise.resolve(queryPersister.removeClient()).catch(() => {}),
+            clearVisitedDayOne(),
+          ])
+        }
+        if (currentId) {
+          await AsyncStorage.setItem(LAST_AUTH_USER_KEY, currentId)
+        } else if (stored) {
+          await AsyncStorage.removeItem(LAST_AUTH_USER_KEY)
+        }
+      })
+      .catch(() => {
+        // AsyncStorage is best-effort here — RouteGuard still works
+        // off the live session below.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.id])
 
   useEffect(() => {
     const top = segments[0] ?? ''
