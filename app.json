@@ -29,7 +29,8 @@
         "backgroundColor": "#F3F0EB"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"]
     },
     "web": {
       "bundler": "metro",
@@ -46,6 +47,13 @@
           "cameraPermission": "Permite a tracking-app usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a44e4351-b3df-4462-8168-b28e1ac4d6a2"
+      }
+    },
+    "owner": "tatello"
   }
 }
