@@ -19,9 +19,11 @@
       }
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tatello.tracking"
     },
     "android": {
+      "package": "com.tatello.tracking",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F3F0EB"
