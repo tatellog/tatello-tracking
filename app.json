@@ -49,7 +49,8 @@
         {
           "cameraPermission": "Permite a tracking-app usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},
