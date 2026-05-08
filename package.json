@@ -14,6 +14,7 @@
     "test:watch": "jest --watch",
     "types:db": "supabase gen types typescript --linked > types/database.types.ts",
     "seed:dev": "tsx scripts/seed-dev-user.ts",
+    "seed:real": "tsx scripts/seed-real-data.ts",
     "prepare": "husky"
   },
   "lint-staged": {

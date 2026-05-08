@@ -36,38 +36,62 @@ export type Database = {
       body_measurements: {
         Row: {
           arm_cm: number | null
+          bmi: number | null
+          bmr: number | null
+          body_fat_pct: number | null
+          bone_mass_kg: number | null
           chest_cm: number | null
           created_at: string
           hip_cm: number | null
           id: string
           measured_at: string
+          metabolic_age: number | null
+          muscle_mass_kg: number | null
           thigh_cm: number | null
           user_id: string
+          visceral_fat: number | null
           waist_cm: number | null
+          water_pct: number | null
           weight_kg: number | null
         }
         Insert: {
           arm_cm?: number | null
+          bmi?: number | null
+          bmr?: number | null
+          body_fat_pct?: number | null
+          bone_mass_kg?: number | null
           chest_cm?: number | null
           created_at?: string
           hip_cm?: number | null
           id?: string
           measured_at?: string
+          metabolic_age?: number | null
+          muscle_mass_kg?: number | null
           thigh_cm?: number | null
           user_id: string
+          visceral_fat?: number | null
           waist_cm?: number | null
+          water_pct?: number | null
           weight_kg?: number | null
         }
         Update: {
           arm_cm?: number | null
+          bmi?: number | null
+          bmr?: number | null
+          body_fat_pct?: number | null
+          bone_mass_kg?: number | null
           chest_cm?: number | null
           created_at?: string
           hip_cm?: number | null
           id?: string
           measured_at?: string
+          metabolic_age?: number | null
+          muscle_mass_kg?: number | null
           thigh_cm?: number | null
           user_id?: string
+          visceral_fat?: number | null
           waist_cm?: number | null
+          water_pct?: number | null
           weight_kg?: number | null
         }
         Relationships: []
