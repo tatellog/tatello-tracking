@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
@@ -10,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -252,31 +252,25 @@ export default function LogMealScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          {/* Shadow lives on the outer wrapper so it isn't clipped by
-              the inner overflow:hidden that the rounded gradient
-              surface needs. Splitting the two also fixes a layout
-              collapse iOS produced when both lived on the Pressable. */}
+          {/* TouchableOpacity + solid mauveDeep instead of Pressable +
+              LinearGradient absoluteFill — Android (and iOS native)
+              swallow the rounded corners + background when the
+              function-style style prop combines with the absolute-
+              fill child. Visual is slightly less rich, layout is
+              reliable. Same fix we applied to PhotoCaptureCard. */}
           <View style={[styles.ctaShadow, !hasFilledMeal && styles.ctaShadowDisabled]}>
-            <Pressable
+            <TouchableOpacity
               onPress={handleSave}
               disabled={!hasFilledMeal || isPending}
-              style={({ pressed }) => [
+              activeOpacity={0.85}
+              style={[
                 styles.cta,
-                !hasFilledMeal && styles.ctaDisabled,
-                pressed && hasFilledMeal && !isPending && styles.ctaPressed,
+                hasFilledMeal && !isPending ? styles.ctaActive : styles.ctaDisabled,
               ]}
               accessibilityRole="button"
               accessibilityLabel={meal.saveLabel}
               accessibilityState={{ disabled: !hasFilledMeal, busy: isPending }}
             >
-              {hasFilledMeal && !isPending ? (
-                <LinearGradient
-                  colors={[colors.mauveLight, colors.mauveDeep]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : null}
               {isPending ? (
                 <View style={styles.ctaRow}>
                   <ActivityIndicator color={colors.pearlBase} size="small" />
@@ -287,7 +281,7 @@ export default function LogMealScreen() {
                   {meal.saveLabel}
                 </Text>
               )}
-            </Pressable>
+            </TouchableOpacity>
           </View>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.cancel}>Cancelar</Text>
@@ -360,11 +354,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
+  ctaActive: {
+    backgroundColor: colors.mauveDeep,
+  },
   ctaDisabled: {
     backgroundColor: colors.borderSubtle,
-  },
-  ctaPressed: {
-    opacity: 0.9,
   },
   ctaRow: {
     flexDirection: 'row',

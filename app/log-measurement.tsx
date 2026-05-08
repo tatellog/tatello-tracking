@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
@@ -10,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -104,31 +104,22 @@ export default function LogMeasurementScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          {/* Shadow on the outer wrapper, overflow:hidden + gradient
-              on the inner Pressable. Same pattern as log-meal — iOS
-              collapses layout when shadow + overflow + absoluteFill
-              gradient share a single node. */}
+          {/* TouchableOpacity + solid mauveDeep instead of Pressable +
+              LinearGradient absoluteFill — same Android/iOS layout
+              swallow we hit in log-meal and PhotoCaptureCard. */}
           <View style={[styles.ctaShadow, !isValid && styles.ctaShadowDisabled]}>
-            <Pressable
+            <TouchableOpacity
               onPress={handleSave}
               disabled={!isValid || addMeasurement.isPending}
-              style={({ pressed }) => [
+              activeOpacity={0.85}
+              style={[
                 styles.cta,
-                !isValid && styles.ctaDisabled,
-                pressed && isValid && !addMeasurement.isPending && styles.ctaPressed,
+                isValid && !addMeasurement.isPending ? styles.ctaActive : styles.ctaDisabled,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Guardar peso"
               accessibilityState={{ disabled: !isValid, busy: addMeasurement.isPending }}
             >
-              {isValid ? (
-                <LinearGradient
-                  colors={[colors.mauveLight, colors.mauveDeep]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : null}
               {addMeasurement.isPending ? (
                 <View style={styles.ctaRow}>
                   <ActivityIndicator color={colors.pearlBase} size="small" />
@@ -137,7 +128,7 @@ export default function LogMeasurementScreen() {
               ) : (
                 <Text style={[styles.ctaLabel, !isValid && styles.ctaLabelDisabled]}>Guardar</Text>
               )}
-            </Pressable>
+            </TouchableOpacity>
           </View>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.cancel}>Cancelar</Text>
@@ -245,11 +236,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
+  ctaActive: {
+    backgroundColor: colors.mauveDeep,
+  },
   ctaDisabled: {
     backgroundColor: colors.pearlMuted,
-  },
-  ctaPressed: {
-    opacity: 0.9,
   },
   ctaRow: {
     flexDirection: 'row',
