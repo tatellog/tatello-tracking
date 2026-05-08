@@ -15,7 +15,7 @@ import {
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
@@ -48,7 +48,7 @@ export default function RootLayout() {
     InterTight_500Medium,
   })
 
-  const { loading: sessionLoading } = useSession()
+  const { session, loading: sessionLoading } = useSession()
 
   useMagicLinkHandler()
 
@@ -58,7 +58,52 @@ export default function RootLayout() {
     ensureDevUserSession().catch(() => {})
   }, [])
 
-  const ready = (fontsLoaded || fontError) && !sessionLoading
+  // ── User-match gate ────────────────────────────────────────────────
+  // Query keys like ['profile', 'me'] don't include the auth user id,
+  // and the cache is persisted to AsyncStorage. When a different user
+  // signs in (or signs in fresh on a device where another user was
+  // last seen), the persister hands back the previous user's profile
+  // before any refetch fires. RouteGuard reads the stale
+  // onboarding_completed_at and the new user is dropped on Home
+  // instead of /onboarding/welcome.
+  //
+  // Fix: stash the live auth user id every time a session is observed
+  // and, on mismatch with the stored id, clear in-memory + persisted
+  // caches BEFORE the rest of the tree mounts. Render is gated on
+  // `userMatchChecked` so RouteGuard never reads from a cache that
+  // belongs to someone else.
+  const [userMatchChecked, setUserMatchChecked] = useState(false)
+  const currentUserId = session?.user?.id ?? null
+  useEffect(() => {
+    if (sessionLoading) return
+    setUserMatchChecked(false)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const stored = await AsyncStorage.getItem(LAST_AUTH_USER_KEY)
+        if (cancelled) return
+        if (stored && stored !== currentUserId) {
+          queryClient.clear()
+          await Promise.resolve(queryPersister.removeClient()).catch(() => {})
+          await clearVisitedDayOne()
+        }
+        if (currentUserId) {
+          await AsyncStorage.setItem(LAST_AUTH_USER_KEY, currentUserId)
+        } else if (stored) {
+          await AsyncStorage.removeItem(LAST_AUTH_USER_KEY)
+        }
+      } catch {
+        // AsyncStorage is best-effort — fall through to mark checked
+        // so a transient storage hiccup can't soft-lock the splash.
+      }
+      if (!cancelled) setUserMatchChecked(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [sessionLoading, currentUserId])
+
+  const ready = (fontsLoaded || fontError) && !sessionLoading && userMatchChecked
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {})
@@ -114,48 +159,6 @@ function RouteGuard() {
   // the auth check is bypassed but onboarding/day-one gates still
   // apply (so dev users without a finished profile see the wizard).
   const skipAuth = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
-
-  // ── User-switch detection ─────────────────────────────────────────
-  // Query keys like ['profile', 'me'] are user-agnostic and the cache
-  // is persisted to AsyncStorage. When user A signs out and user B
-  // signs in (or signs in fresh on a device where A was last), we
-  // need to flush the cache so user B doesn't briefly see A's
-  // profile / brief / meals — the worst case is RouteGuard reading
-  // A's onboarding_completed_at and skipping the wizard for B.
-  //
-  // Strategy: stash the current auth user id in AsyncStorage every
-  // time a session is observed, and clear the cache when the stored
-  // id and the live id disagree. The ref guards against running the
-  // clear during the very first read (empty stored id is normal).
-  const lastClearedRef = useRef<string | null>(null)
-  useEffect(() => {
-    const currentId = session?.user?.id ?? null
-    let cancelled = false
-    AsyncStorage.getItem(LAST_AUTH_USER_KEY)
-      .then(async (stored) => {
-        if (cancelled) return
-        if (stored && stored !== currentId && lastClearedRef.current !== stored) {
-          lastClearedRef.current = stored
-          queryClient.clear()
-          await Promise.all([
-            Promise.resolve(queryPersister.removeClient()).catch(() => {}),
-            clearVisitedDayOne(),
-          ])
-        }
-        if (currentId) {
-          await AsyncStorage.setItem(LAST_AUTH_USER_KEY, currentId)
-        } else if (stored) {
-          await AsyncStorage.removeItem(LAST_AUTH_USER_KEY)
-        }
-      })
-      .catch(() => {
-        // AsyncStorage is best-effort here — RouteGuard still works
-        // off the live session below.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [session?.user?.id])
 
   useEffect(() => {
     const top = segments[0] ?? ''
