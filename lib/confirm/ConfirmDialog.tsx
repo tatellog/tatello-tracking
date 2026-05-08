@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from 'react-native-reanimated'
 
 import { colors, radius, shadows, spacing, typography } from '@/theme'
@@ -89,15 +89,19 @@ export function ConfirmDialog({ request, onPick, onDismiss }: Props) {
 
 function ActionButton({ action, onPress }: { action: ConfirmAction; onPress: () => void }) {
   const variant = action.style ?? 'default'
+  // TouchableOpacity instead of Pressable — function-style style on
+  // Pressable swallows backgroundColor on iOS native, so the
+  // destructive variant rendered as white-on-white (invisible).
+  // Same fix as the meal-form / photo-capture CTAs.
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
-      style={({ pressed }) => [
+      activeOpacity={0.85}
+      style={[
         styles.actionBase,
         variant === 'cancel' && styles.actionCancel,
         variant === 'default' && styles.actionDefault,
         variant === 'destructive' && styles.actionDestructive,
-        pressed && styles.actionPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel={action.label}
@@ -111,7 +115,7 @@ function ActionButton({ action, onPress }: { action: ConfirmAction; onPress: () 
       >
         {action.label}
       </Text>
-    </Pressable>
+    </TouchableOpacity>
   )
 }
 
@@ -169,9 +173,6 @@ const styles = StyleSheet.create({
   },
   actionDestructive: {
     backgroundColor: colors.feedbackError,
-  },
-  actionPressed: {
-    opacity: 0.9,
   },
   actionLabel: {
     fontFamily: typography.uiMedium,
