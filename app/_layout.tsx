@@ -58,52 +58,64 @@ export default function RootLayout() {
     ensureDevUserSession().catch(() => {})
   }, [])
 
-  // ── User-match gate ────────────────────────────────────────────────
+  // ── Cold-start cache flush ─────────────────────────────────────────
   // Query keys like ['profile', 'me'] don't include the auth user id,
-  // and the cache is persisted to AsyncStorage. When a different user
-  // signs in (or signs in fresh on a device where another user was
-  // last seen), the persister hands back the previous user's profile
-  // before any refetch fires. RouteGuard reads the stale
-  // onboarding_completed_at and the new user is dropped on Home
-  // instead of /onboarding/welcome.
+  // and the cache is persisted to AsyncStorage. If a different user
+  // signed in last time and their cache survived to this boot, the
+  // persister hands their profile back to whoever signs in now —
+  // RouteGuard reads the stale onboarding_completed_at and the new
+  // user is dropped on Home instead of /onboarding/welcome.
   //
-  // Fix: stash the live auth user id every time a session is observed
-  // and, on mismatch with the stored id, clear in-memory + persisted
-  // caches BEFORE the rest of the tree mounts. Render is gated on
-  // `userMatchChecked` so RouteGuard never reads from a cache that
-  // belongs to someone else.
-  const [userMatchChecked, setUserMatchChecked] = useState(false)
-  const currentUserId = session?.user?.id ?? null
+  // Fix: ONCE on cold start, compare the live session's user id to
+  // the id we stored last boot. On mismatch, clear in-memory +
+  // persisted caches before any query hook mounts. Render is gated
+  // on `coldStartChecked` so RouteGuard never reads from a cache
+  // that belongs to someone else.
+  //
+  // We deliberately do NOT re-gate render on subsequent sign-in /
+  // sign-out transitions — Settings already clears caches on sign-
+  // out, and tearing the navigator down mid-session was queuing
+  // navigations against routes that didn't exist anymore.
+  const [coldStartChecked, setColdStartChecked] = useState(false)
   useEffect(() => {
     if (sessionLoading) return
-    setUserMatchChecked(false)
+    if (coldStartChecked) return
     let cancelled = false
     ;(async () => {
       try {
         const stored = await AsyncStorage.getItem(LAST_AUTH_USER_KEY)
         if (cancelled) return
-        if (stored && stored !== currentUserId) {
+        const currentId = session?.user?.id ?? null
+        if (stored && stored !== currentId) {
           queryClient.clear()
           await Promise.resolve(queryPersister.removeClient()).catch(() => {})
           await clearVisitedDayOne()
-        }
-        if (currentUserId) {
-          await AsyncStorage.setItem(LAST_AUTH_USER_KEY, currentUserId)
-        } else if (stored) {
-          await AsyncStorage.removeItem(LAST_AUTH_USER_KEY)
         }
       } catch {
         // AsyncStorage is best-effort — fall through to mark checked
         // so a transient storage hiccup can't soft-lock the splash.
       }
-      if (!cancelled) setUserMatchChecked(true)
+      if (!cancelled) setColdStartChecked(true)
     })()
     return () => {
       cancelled = true
     }
-  }, [sessionLoading, currentUserId])
+  }, [sessionLoading, session, coldStartChecked])
 
-  const ready = (fontsLoaded || fontError) && !sessionLoading && userMatchChecked
+  // Keep the stored last-user-id in sync on every session change so
+  // the next cold-start check has accurate info. This runs without
+  // gating render — never blocks the UI.
+  useEffect(() => {
+    if (sessionLoading) return
+    const id = session?.user?.id
+    if (id) {
+      AsyncStorage.setItem(LAST_AUTH_USER_KEY, id).catch(() => {})
+    } else {
+      AsyncStorage.removeItem(LAST_AUTH_USER_KEY).catch(() => {})
+    }
+  }, [sessionLoading, session?.user?.id])
+
+  const ready = (fontsLoaded || fontError) && !sessionLoading && coldStartChecked
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {})
