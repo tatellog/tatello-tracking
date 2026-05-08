@@ -76,11 +76,21 @@ export function StreakCard({
   todayWorkoutAt,
   isFirstDay = false,
 }: Props) {
+  // The hero always shows "days active in the last 28" — the metric
+  // the user feels every day they log. Consecutive-day streaks
+  // matter, but a single missed day shouldn't be allowed to drop
+  // the headline number from 7 to 1; otherwise marking a workout
+  // after a gap *feels* like a regression. Streak goes to the
+  // subtitle as a smaller secondary stat that grows independently.
+  const activeDays = days.filter((d) => d.completed).length
   const summaryLabel = isFirstDay
     ? 'Día 1. Tu racha empieza hoy.'
-    : `Tu racha: ${streakCount} días seguidos.`
+    : `${activeDays} días activos en los últimos 28. Racha actual: ${streakCount} días seguidos.`
   const completedTime =
     todayTileState === 'completed' && todayWorkoutAt ? formatTimeEs(todayWorkoutAt) : null
+
+  const heroNumber = isFirstDay ? 0 : activeDays
+  const heroLabel = isFirstDay ? 'EMPEZANDO' : `DÍAS ACTIVOS\nDE 28`
 
   return (
     <View
@@ -104,7 +114,11 @@ export function StreakCard({
       <View style={styles.header}>
         <Text style={[styles.label, isFirstDay && styles.labelMauve]}>TU RACHA</Text>
         <Text style={[styles.subLabel, isFirstDay && styles.subLabelMauve]}>
-          {isFirstDay ? 'DÍA 1' : `28 DÍAS · ${streakCount} SEGUIDOS`}
+          {isFirstDay
+            ? 'DÍA 1'
+            : streakCount > 0
+              ? `🔥 ${streakCount} ${streakCount === 1 ? 'DÍA SEGUIDO' : 'DÍAS SEGUIDOS'}`
+              : 'SIN RACHA · MARCA HOY'}
         </Text>
       </View>
 
@@ -117,7 +131,7 @@ export function StreakCard({
 
       <View style={styles.dashedDivider} />
 
-      <StreakNumber count={isFirstDay ? 0 : streakCount} isFirstDay={isFirstDay} />
+      <StreakNumber count={heroNumber} label={heroLabel} isFirstDay={isFirstDay} />
 
       {completedTime && (
         <Text style={styles.sealedNote} accessibilityLabel={`Día sellado a las ${completedTime}`}>
@@ -339,7 +353,16 @@ const COUNT_UP_DURATION = 800
  * subsequent prop changes, it withTimings from the previous value
  * to the new one, so tap-to-mark makes the number crawl up.
  */
-function StreakNumber({ count, isFirstDay = false }: { count: number; isFirstDay?: boolean }) {
+function StreakNumber({
+  count,
+  label,
+  isFirstDay = false,
+}: {
+  count: number
+  /** Multi-line label rendered next to the count. */
+  label: string
+  isFirstDay?: boolean
+}) {
   const displayed = useSharedValue(count)
   const previous = useRef(count)
 
@@ -359,6 +382,10 @@ function StreakNumber({ count, isFirstDay = false }: { count: number; isFirstDay
     return { text, defaultValue: text } as unknown as Partial<TextInputProps>
   })
 
+  const accessibilityLabel = isFirstDay
+    ? 'Día 1, empezando'
+    : `${count} ${label.replace(/\n/g, ' ').toLowerCase()}`
+
   return (
     <View style={styles.numberWrap}>
       <AnimatedTextInput
@@ -366,12 +393,10 @@ function StreakNumber({ count, isFirstDay = false }: { count: number; isFirstDay
         underlineColorAndroid="transparent"
         animatedProps={animatedProps}
         defaultValue={String(count)}
-        accessibilityLabel={isFirstDay ? 'Día 1, empezando' : `${count} días seguidos`}
+        accessibilityLabel={accessibilityLabel}
         style={[styles.bigNumber, isFirstDay && styles.bigNumberMauve]}
       />
-      <Text style={[styles.seguidos, isFirstDay && styles.seguidosMauve]}>
-        {isFirstDay ? 'EMPEZANDO' : `DÍAS\nSEGUIDOS`}
-      </Text>
+      <Text style={[styles.seguidos, isFirstDay && styles.seguidosMauve]}>{label}</Text>
     </View>
   )
 }

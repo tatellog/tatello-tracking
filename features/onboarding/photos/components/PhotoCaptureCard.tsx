@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useMemo } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -142,25 +142,21 @@ export function PhotoCaptureCard({ photos, onStartCapture, onSlotPress }: Props)
         </View>
       </View>
 
-      {/* Outer wrapper carries the shadow (no overflow); inner
-          Pressable carries overflow:hidden + gradient. Splitting
-          the two avoids the iOS layout collapse we hit elsewhere. */}
-      <View style={styles.ctaShadow}>
-        <Pressable
-          onPress={onStartCapture}
-          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-          accessibilityRole="button"
-          accessibilityLabel={ctaCopy}
-        >
-          <LinearGradient
-            colors={[colors.mauveLight, colors.mauveDeep]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Text style={styles.ctaLabel}>{ctaCopy}</Text>
-        </Pressable>
-      </View>
+      {/* TouchableOpacity (not Pressable) — function-style props on
+          Pressable were swallowing backgroundColor on iOS native.
+          Solid mauveDeep instead of LinearGradient because the
+          gradient's absoluteFill child added another stacking
+          quirk on top of the function-style one. The visual is
+          slightly less rich but renders reliably. */}
+      <TouchableOpacity
+        onPress={onStartCapture}
+        style={styles.cta}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={ctaCopy}
+      >
+        <Text style={styles.ctaLabel}>{ctaCopy}</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -174,9 +170,11 @@ function PhotoSlot({
   photo?: TodayPhoto
   onPress?: () => void
 }) {
-  // The slot becomes interactive when a parent supplies onPress —
-  // wraps the surface in a Pressable so taps fall through any
-  // positioned children and the press style can dim the slot.
+  // TouchableOpacity wins over Pressable here — Pressable's
+  // function-style was eating the flex:1 + backgroundColor styles
+  // on iOS, which collapsed the slots to content-natural width and
+  // skipped the dashed border. activeOpacity matches the previous
+  // press-fade feedback.
   const accessibilityLabel = photo
     ? `Volver a tomar ${ANGLE_LABELS[angle]}`
     : `Tomar foto ${ANGLE_LABELS[angle]}`
@@ -184,9 +182,10 @@ function PhotoSlot({
   if (photo?.signed_url) {
     if (onPress) {
       return (
-        <Pressable
+        <TouchableOpacity
           onPress={onPress}
-          style={({ pressed }) => [styles.slotFilled, pressed && styles.slotPressed]}
+          style={styles.slotFilled}
+          activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
         >
@@ -194,7 +193,7 @@ function PhotoSlot({
           <View style={styles.checkBadge}>
             <Text style={styles.checkBadgeText}>✓</Text>
           </View>
-        </Pressable>
+        </TouchableOpacity>
       )
     }
     return (
@@ -209,15 +208,16 @@ function PhotoSlot({
 
   if (onPress) {
     return (
-      <Pressable
+      <TouchableOpacity
         onPress={onPress}
-        style={({ pressed }) => [styles.slotEmpty, pressed && styles.slotPressed]}
+        style={styles.slotEmpty}
+        activeOpacity={0.85}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
       >
         <Text style={styles.slotPlus}>＋</Text>
         <Text style={styles.slotLabel}>{ANGLE_LABELS[angle]}</Text>
-      </Pressable>
+      </TouchableOpacity>
     )
   }
 
@@ -313,9 +313,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.pearlMuted,
   },
-  slotPressed: {
-    opacity: 0.75,
-  },
   checkBadge: {
     position: 'absolute',
     top: 6,
@@ -332,25 +329,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.pearlBase,
   },
-  ctaShadow: {
+  cta: {
+    backgroundColor: colors.mauveDeep,
     borderRadius: 100,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: colors.mauveDeep,
     shadowOpacity: 0.25,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
-  },
-  cta: {
-    alignSelf: 'stretch',
-    overflow: 'hidden',
-    borderRadius: 100,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 36,
-  },
-  ctaPressed: {
-    opacity: 0.9,
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,
