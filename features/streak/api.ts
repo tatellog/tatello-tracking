@@ -27,3 +27,29 @@ export async function unmarkWorkoutToday(): Promise<void> {
     .eq('workout_date', todayInTimezone())
   if (error) throw error
 }
+
+/*
+ * Log a workout for a past date. workout_date is a generated column
+ * derived from `(completed_at at time zone 'America/Mexico_City')::date`,
+ * so we set completed_at to noon-Mexico_City for the target day —
+ * 18:00 UTC, far enough from both ends that DST shifts (now defunct
+ * for Mexico_City but still belt-and-braces) can't bump the date.
+ */
+export async function markWorkoutForDate(date: string): Promise<void> {
+  const userId = await requireUserId()
+  const completedAt = `${date}T18:00:00Z`
+  const { error } = await supabase
+    .from('workouts')
+    .insert({ user_id: userId, completed_at: completedAt })
+  if (error && error.code !== '23505') throw error
+}
+
+export async function unmarkWorkoutForDate(date: string): Promise<void> {
+  const userId = await requireUserId()
+  const { error } = await supabase
+    .from('workouts')
+    .delete()
+    .eq('user_id', userId)
+    .eq('workout_date', date)
+  if (error) throw error
+}

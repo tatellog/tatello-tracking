@@ -1,6 +1,8 @@
+import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useRef, useState } from 'react'
 import {
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -32,6 +34,12 @@ type Props = {
   todayTileState: TodayTileState
   todayCopy: { topLabel: string; bottomText: string }
   onMarkWorkout: () => void
+  /**
+   * Toggle the workout state of any cell in the grid (past day or
+   * today). Powers "I forgot to log Tuesday" edits. When omitted (e.g.
+   * during the Día 1 onboarding card) the cells stay non-interactive.
+   */
+  onToggleDay?: (date: string, complete: boolean) => void
   /** ISO timestamp del workout de hoy si ya está marcado, sino null. */
   todayWorkoutAt: string | null
   /**
@@ -73,6 +81,7 @@ export function StreakCard({
   todayTileState,
   todayCopy,
   onMarkWorkout,
+  onToggleDay,
   todayWorkoutAt,
   isFirstDay = false,
 }: Props) {
@@ -127,6 +136,7 @@ export function StreakCard({
         todayTileState={todayTileState}
         todayCopy={todayCopy}
         onMarkWorkout={onMarkWorkout}
+        onToggleDay={onToggleDay}
       />
 
       <View style={styles.dashedDivider} />
@@ -189,9 +199,10 @@ type GridProps = {
   todayTileState: TodayTileState
   todayCopy: { topLabel: string; bottomText: string }
   onMarkWorkout: () => void
+  onToggleDay?: (date: string, complete: boolean) => void
 }
 
-function StreakGrid({ days, todayTileState, todayCopy, onMarkWorkout }: GridProps) {
+function StreakGrid({ days, todayTileState, todayCopy, onMarkWorkout, onToggleDay }: GridProps) {
   const [gridWidth, setGridWidth] = useState(0)
   // After the first commit, isInitialMount.current = false. We use
   // this to distinguish 'cells fading in for the first time' (use
@@ -240,6 +251,7 @@ function StreakGrid({ days, todayTileState, todayCopy, onMarkWorkout }: GridProp
               size={cellSize}
               enterDelay={enterDelay}
               isToday={i === TODAY_INDEX}
+              onToggle={onToggleDay}
             />
           )
         })}
@@ -279,6 +291,7 @@ type CellProps = {
   size: number
   enterDelay: number
   isToday: boolean
+  onToggle?: (date: string, complete: boolean) => void
 }
 
 function ageOpacity(index: number): number {
@@ -290,7 +303,7 @@ function ageOpacity(index: number): number {
   return 1
 }
 
-function Cell({ cell, index, top, left, size, enterDelay, isToday }: CellProps) {
+function Cell({ cell, index, top, left, size, enterDelay, isToday, onToggle }: CellProps) {
   const enter = FadeIn.delay(enterDelay).springify().damping(12)
   const wrapperStyle = {
     position: 'absolute' as const,
@@ -308,31 +321,49 @@ function Cell({ cell, index, top, left, size, enterDelay, isToday }: CellProps) 
   // Reanimated warns when an entering layout animation runs on the
   // same node that sets opacity/transform statically, so we keep the
   // outer Animated.View bare (only layout) and apply visual styles
-  // on a plain inner View.
-  if (!cell.completed) {
-    return (
-      <Animated.View entering={enter} style={wrapperStyle}>
-        <View style={[fillStyle, styles.cellEmpty]} />
-      </Animated.View>
-    )
-  }
+  // on a plain inner View. The inner Pressable handles the tap-to-
+  // toggle for "I forgot to log Tuesday" — light haptic + invert
+  // cell.completed, parent mutation reconciles the rest.
+  const fill = !cell.completed ? (
+    <View style={[fillStyle, styles.cellEmpty]} />
+  ) : isToday ? (
+    <LinearGradient
+      colors={[colors.mauveLight, colors.mauveDeep]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={fillStyle}
+    />
+  ) : (
+    <View style={[fillStyle, styles.cellCompleted, { opacity: ageOpacity(index) }]} />
+  )
 
-  if (isToday) {
-    return (
-      <Animated.View entering={enter} style={wrapperStyle}>
-        <LinearGradient
-          colors={[colors.mauveLight, colors.mauveDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={fillStyle}
-        />
-      </Animated.View>
-    )
+  const handlePress = () => {
+    if (!onToggle) return
+    Haptics.selectionAsync().catch(() => {})
+    onToggle(cell.date, !cell.completed)
   }
 
   return (
     <Animated.View entering={enter} style={wrapperStyle}>
-      <View style={[fillStyle, styles.cellCompleted, { opacity: ageOpacity(index) }]} />
+      {onToggle ? (
+        <Pressable
+          onPress={handlePress}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={`${cell.date}, ${cell.completed ? 'entrenado' : 'sin entrenar'}`}
+          accessibilityHint={
+            cell.completed ? 'Toca para desmarcar este día' : 'Toca para marcar como entrenado'
+          }
+          style={({ pressed }) => [
+            { width: '100%', height: '100%' },
+            pressed && styles.cellPressed,
+          ]}
+        >
+          {fill}
+        </Pressable>
+      ) : (
+        fill
+      )}
     </Animated.View>
   )
 }
@@ -461,6 +492,9 @@ const styles = StyleSheet.create({
   },
   cellCompleted: {
     backgroundColor: colors.inkPrimary,
+  },
+  cellPressed: {
+    opacity: 0.6,
   },
 
   dashedDivider: {

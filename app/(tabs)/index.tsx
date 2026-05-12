@@ -32,7 +32,7 @@ import { DefineTargetsBanner, LogMealButton, MacrosTodayCard } from '@/features/
 import { useAddMoodCheckin } from '@/features/moods/hooks'
 import { useLatestPhotoSet } from '@/features/onboarding/photos/hooks/useLatestPhotoSet'
 import { useProfile } from '@/features/profile/hooks'
-import { useToggleWorkoutToday } from '@/features/streak/hooks'
+import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, spacing } from '@/theme'
 
@@ -115,6 +115,7 @@ function HomeContent({ ctx, cadence }: ContentProps) {
   )
 
   const toggleWorkout = useToggleWorkoutToday()
+  const toggleWorkoutForDate = useToggleWorkoutForDate()
   const addMood = useAddMoodCheckin()
 
   const todayTileState = deriveTodayTileState(
@@ -244,6 +245,7 @@ function HomeContent({ ctx, cadence }: ContentProps) {
               todayTileState={todayTileState}
               todayCopy={todayCopy}
               onMarkWorkout={handleMarkWorkout}
+              onToggleDay={(date, complete) => toggleWorkoutForDate.mutate({ date, complete })}
               todayWorkoutAt={ctx.today_workout_at}
             />
           </Animated.View>
