@@ -8,11 +8,15 @@ type Props = {
 }
 
 /*
- * Segmented progress for the wizard. N stripes, equal width, gap 4.
- * Filled stripes are mauve; remaining ones share the wizard's hairline
- * tone so the inactive bar reads as a faint suggestion of "more to
- * go" instead of an empty rail. No animation in v1 — the screen
- * transition itself is the cue that progress moved.
+ * Norte progress bar — N segmentos de 3px de alto separados por 4px.
+ *
+ *   done    → cream sólido (`leche`)
+ *   active  → magenta con glow (box-shadow simulado vía sombra RN)
+ *   pending → bruma sólido
+ *
+ * El `current` es 1-indexed; `idx < current` queda "done", `idx ===
+ * current` queda "active". No animamos el llenado — la transición
+ * de pantalla ya es la señal de progreso.
  */
 export function ProgressBar({ current, total }: Props) {
   return (
@@ -21,12 +25,21 @@ export function ProgressBar({ current, total }: Props) {
       accessibilityRole="progressbar"
       accessibilityValue={{ now: current, min: 0, max: total }}
     >
-      {Array.from({ length: total }, (_, i) => (
-        <View
-          key={i}
-          style={[styles.segment, i < current ? styles.segmentFilled : styles.segmentEmpty]}
-        />
-      ))}
+      {Array.from({ length: total }, (_, i) => {
+        const idx = i + 1
+        const state = idx < current ? 'done' : idx === current ? 'active' : 'pending'
+        return (
+          <View
+            key={i}
+            style={[
+              styles.segment,
+              state === 'done' && styles.segmentDone,
+              state === 'active' && styles.segmentActive,
+              state === 'pending' && styles.segmentPending,
+            ]}
+          />
+        )
+      })}
     </View>
   )
 }
@@ -41,12 +54,20 @@ const styles = StyleSheet.create({
   segment: {
     flex: 1,
     height: 3,
-    borderRadius: 1.5,
+    borderRadius: 1,
   },
-  segmentFilled: {
-    backgroundColor: colors.mauveDeep,
+  segmentDone: {
+    backgroundColor: colors.leche,
   },
-  segmentEmpty: {
-    backgroundColor: colors.borderSubtle,
+  segmentActive: {
+    backgroundColor: colors.magenta,
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  segmentPending: {
+    backgroundColor: colors.bruma,
   },
 })

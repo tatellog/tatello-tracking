@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useEffect, useState } from 'react'
 
 const VISITED_DAY_ONE_KEY = '@app:visited_day_one'
+const FRICTIONS_KEY = '@app:onboarding_frictions'
+const SKIP_WEIGHT_KEY = '@app:onboarding_skip_weight'
 
 /*
  * Tiny AsyncStorage flag that records whether the user has cleared
@@ -56,6 +58,41 @@ export async function clearVisitedDayOne() {
 
 export async function readVisitedDayOne(): Promise<boolean> {
   return ensureLoaded()
+}
+
+/*
+ * Norte onboarding — datos que el wizard captura pero que aún no
+ * tienen columna propia en `profiles`:
+ *
+ *   • frictions: array de strings (lo que se le ha atravesado al
+ *     usuario en otras apps). Entrena al coach. Hoy lo persistimos
+ *     local; cuando el backend acepte el campo, este helper se
+ *     reemplaza por una mutación de profile.
+ *   • skipWeight: bandera indicando que el usuario no tenía báscula
+ *     al onboarding. El brief la lee para mostrar "registra tu peso"
+ *     como prompt en vez de tratar el null como dato faltante.
+ */
+export async function saveFrictions(frictions: readonly string[]): Promise<void> {
+  await AsyncStorage.setItem(FRICTIONS_KEY, JSON.stringify(frictions))
+}
+
+export async function readFrictions(): Promise<readonly string[]> {
+  const raw = await AsyncStorage.getItem(FRICTIONS_KEY)
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export async function saveSkipWeight(skip: boolean): Promise<void> {
+  await AsyncStorage.setItem(SKIP_WEIGHT_KEY, skip ? 'true' : 'false')
+}
+
+export async function readSkipWeight(): Promise<boolean> {
+  return (await AsyncStorage.getItem(SKIP_WEIGHT_KEY)) === 'true'
 }
 
 export function useVisitedDayOne(): boolean | null {

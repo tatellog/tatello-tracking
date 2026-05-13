@@ -1,72 +1,59 @@
-import MaskedView from '@react-native-masked-view/masked-view'
 import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { OrnamentShape } from '@/features/onboarding/components'
-import { colors, typography } from '@/theme'
+import { ManifOrb, ProgressBar } from '@/features/onboarding/components'
+import { colors, shadows, typography } from '@/theme'
 
 /*
- * Opening shot of the onboarding ceremony. Centred composition with
- * the 365 stat as the protagonist and a single CTA at the bottom.
+ * Screen 1 · Manifiesto. La pantalla de bienvenida — no pide nada,
+ * sólo comunica filosofía. Layout:
  *
- * Implementation notes (post-iOS debugging):
- *   - TouchableOpacity (not Pressable) for the CTA. Pressable's
- *     `style` prop accepts a function that takes the press state, but
- *     in some iOS native + RN combos the function path skips
- *     backgroundColor entirely, painting the surface transparent.
- *     TouchableOpacity uses a plain object style and renders
- *     reliably.
- *   - The screen background is a flat `colors.pearlBase` on the
- *     SafeAreaView. We dropped the absoluteFill LinearGradient
- *     because in iOS native it occasionally promoted itself above
- *     static-positioned children regardless of JSX order or zIndex.
- *     The pearl→pearlGradientEnd transition is barely visible to
- *     begin with — flat pearl reads identical at this contrast.
+ *   • Progress bar (1/5)
+ *   • Eyebrow magenta uppercase "NORTE · EL MANIFIESTO"
+ *   • Quote 44px Hanken 900:
+ *       "La perfección
+ *        no es necesaria."
+ *       (block) "La dirección sí." — Cormorant italic magenta
+ *   • Hairline magenta 36×1
+ *   • Meta paragraph bone con "**En 28 días**" en italic magenta
+ *   • CTA "Empezar →"
+ *   • Orb decorativo absoluto al fondo-derecha
+ *
+ * El layout heredado del prototype HTML pone la quota centrada
+ * vertical-ish con `justify-content: center`; aquí el `flex: 1` del
+ * stage la centra entre el progress bar y el CTA.
+ *
+ * Nota: usamos directamente SafeAreaView en vez de WizardLayout
+ * porque el padding del manifiesto difiere (no hay back link, hay
+ * orb decorativo absoluto). Conserva el mismo padding lateral 24.
  */
-export default function WelcomeScreen() {
+export default function ManifiestoScreen() {
   const router = useRouter()
 
   const handleStart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    router.push('/onboarding/name')
+    router.push('/onboarding/frictions')
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <OrnamentShape variant="tr" />
+      <View style={styles.progressWrap}>
+        <ProgressBar current={1} total={5} />
+      </View>
 
-      <View style={styles.content}>
-        <View style={styles.heroBlock}>
-          <MaskedView
-            style={styles.bigNumberMask}
-            maskElement={
-              <View style={styles.bigNumberMaskInner}>
-                <Text style={styles.bigNumber}>365</Text>
-              </View>
-            }
-          >
-            <LinearGradient
-              colors={[colors.inkPrimary, colors.mauveDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            {/* Spacer reserves the same intrinsic width so the masked
-                gradient fills the right region. */}
-            <Text style={[styles.bigNumber, styles.bigNumberSpacer]}>365</Text>
-          </MaskedView>
-          <Text style={styles.bigNumberSub}>DÍAS POR DELANTE</Text>
-        </View>
+      <View style={styles.stage}>
+        <ManifOrb />
 
-        <View style={styles.copyBlock}>
-          <Text style={styles.title}>
-            Tu cuerpo se transforma <Text style={styles.titleEmphasis}>cada día</Text>.
-          </Text>
-          <Text style={styles.subtitle}>
-            Vamos a empezar a notarlo. Toma menos de un minuto conocernos.
+        <View style={styles.content}>
+          <Text style={styles.eyebrow}>Norte · el manifiesto</Text>
+          <Text style={styles.quote}>La perfección{'\n'}no es necesaria.</Text>
+          <Text style={styles.quoteEmphasis}>La dirección sí.</Text>
+          <View style={styles.rule} />
+          <Text style={styles.meta}>
+            Esta app te lee patrones, no perfección.{'\n'}
+            <Text style={styles.metaStrong}>En 28 días</Text> verás tu primera comparativa.
           </Text>
         </View>
       </View>
@@ -74,12 +61,12 @@ export default function WelcomeScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           onPress={handleStart}
-          style={styles.cta}
           activeOpacity={0.85}
+          style={styles.cta}
           accessibilityRole="button"
-          accessibilityLabel="Empecemos"
+          accessibilityLabel="Empezar"
         >
-          <Text style={styles.ctaLabel}>Empecemos</Text>
+          <Text style={styles.ctaLabel}>Empezar →</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -89,92 +76,83 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
+  },
+  progressWrap: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  stage: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
   content: {
-    flex: 1,
-    paddingHorizontal: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 36,
+    zIndex: 1,
   },
-  heroBlock: {
-    alignItems: 'center',
-  },
-  bigNumberMask: {
-    height: 92,
-    width: 220,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  bigNumberMaskInner: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bigNumber: {
-    fontFamily: typography.display,
-    fontSize: 80,
-    letterSpacing: -3,
-    color: colors.inkPrimary,
-    textAlign: 'center',
-    lineHeight: 92,
-  },
-  bigNumberSpacer: {
-    opacity: 0,
-    position: 'absolute',
-  },
-  bigNumberSub: {
-    marginTop: 8,
-    fontFamily: typography.uiSemi,
-    fontSize: 11,
-    letterSpacing: 2,
+  eyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 10.5,
+    color: colors.magenta,
+    letterSpacing: 2.5,
     textTransform: 'uppercase',
-    color: colors.labelMuted,
+    marginBottom: 14,
   },
-  copyBlock: {
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 4,
+  quote: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 44,
+    lineHeight: 44,
+    color: colors.leche,
+    letterSpacing: -2,
   },
-  title: {
-    fontFamily: typography.display,
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -0.8,
-    color: colors.inkPrimary,
-    textAlign: 'center',
+  quoteEmphasis: {
+    marginTop: 8,
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 40,
+    color: colors.magenta,
+    lineHeight: 44,
+    letterSpacing: -0.5,
   },
-  titleEmphasis: {
-    fontFamily: typography.displaySemi,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.mauveDeep,
+  rule: {
+    marginTop: 22,
+    marginBottom: 16,
+    width: 36,
+    height: 1,
+    backgroundColor: colors.magenta,
   },
-  subtitle: {
-    fontFamily: typography.ui,
+  meta: {
+    maxWidth: 240,
+    fontFamily: typography.uiMedium,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: colors.bone,
+  },
+  metaStrong: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
     fontSize: 14,
-    lineHeight: 22,
-    color: colors.labelMuted,
-    textAlign: 'center',
+    color: colors.magenta,
   },
   footer: {
-    paddingHorizontal: 22,
-    paddingTop: 8,
+    paddingHorizontal: 24,
     paddingBottom: 16,
+    paddingTop: 12,
   },
   cta: {
-    width: '100%',
-    backgroundColor: colors.mauveDeep,
-    borderRadius: 100,
-    paddingVertical: 16,
+    height: 54,
+    borderRadius: 4,
+    backgroundColor: colors.magenta,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.ctaMagenta,
   },
   ctaLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: 15,
-    color: colors.pearlBase,
-    letterSpacing: 0.3,
+    fontFamily: typography.uiBold,
+    fontSize: 12,
+    color: '#FFFFFF',
+    letterSpacing: 2.16,
+    textTransform: 'uppercase',
   },
 })

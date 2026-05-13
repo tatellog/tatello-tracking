@@ -1,58 +1,82 @@
 /*
- * Pearl Mauve — sistema de diseño bicromático (ink + mauve sobre pearl).
+ * Norte — warm dark sweat + magenta accent.
+ *
+ * Filosofía: anti-fitness-bro, anti-gamification, anti-aspirational.
+ * El producto es básicamente bicromático: cream (`leche`) + magenta
+ * sobre un casi-negro cálido (`bg`). El magenta aparece a lo sumo dos
+ * veces por pantalla — si se esparce, pierde voz.
  *
  * Reglas duras:
- *   - Cero hex sueltos en componentes. Cualquier color va via tokens.
- *   - Si necesitás un color que no está, agregalo aquí primero.
- *   - El verde feedbackSuccess solo para confirmaciones, no decoración.
+ *   - Cero hex sueltos en componentes; todo color va via tokens.
+ *   - Magenta sólo para CTA primario + palabra italic destacada.
+ *   - Hairlines (líneas decorativas) van con alpha sobre `leche`,
+ *     no sólido `bruma` — eso lo reservamos para placeholders.
+ *
+ * Nota de compatibilidad: durante la transición de Pearl Mauve a
+ * Norte, los nombres viejos siguen exportados pero apuntan a sus
+ * equivalentes Norte. Código nuevo debe usar los nombres canónicos
+ * (`bg`, `leche`, `magenta`, etc.). El alias permite que features
+ * pre-existentes (home/brief/macros/...) sigan renderizando sin
+ * tener que re-tocar cada `colors.pearlBase` simultáneamente.
  */
 export const colors = {
-  // Backgrounds (pearl family)
-  pearlBase: '#FAFAFB',
-  pearlElevated: '#FFFFFF',
-  pearlMuted: '#F0EEF2',
+  // ── Norte canonical surfaces ────────────────────────────────────
+  bg: '#0A0608',
+  bgCard: '#14080B',
+  bgCard2: '#1F0E13',
 
-  // Text (ink family)
-  inkPrimary: '#1C1A1F',
-  inkSoft: '#3E3A42',
-  labelMuted: '#7A737E',
-  labelDim: '#B0A8B4',
+  // ── Norte foreground (cream tones on dark) ──────────────────────
+  leche: '#F4ECDE',
+  bone: '#C9B8A5',
+  niebla: '#8A7570',
+  bruma: '#4F3A3D',
 
-  // Accent (mauve family)
-  mauveLight: '#C9879E',
-  mauveDeep: '#A85E7C',
-  mauveShadow: 'rgba(168, 94, 124, 0.25)',
+  // ── Magenta accent (use sparingly) ──────────────────────────────
+  magenta: '#E91E63',
+  magentaHot: '#FF4886',
+  magentaDeep: '#A6164A',
+  magentaGlow: 'rgba(233, 30, 99, 0.45)',
+  magentaTint: 'rgba(233, 30, 99, 0.10)',
+  magentaTint2: 'rgba(233, 30, 99, 0.18)',
 
-  // Borders / dividers
-  borderSubtle: '#E8E3EB',
-  borderDashed: '#D8D2DC',
+  // ── Hairlines (alpha over leche) ────────────────────────────────
+  hairline: 'rgba(244, 236, 222, 0.10)',
+  hairlineStrong: 'rgba(244, 236, 222, 0.22)',
 
-  // Dark surfaces
-  inkDark: '#1C1A1F',
-  inkDarkHighlight: '#2A252E',
+  // ── Legacy aliases (Pearl Mauve → Norte) ────────────────────────
+  // Mapped so existing screens render cohesively in the new palette
+  // without per-file refactor. New code should prefer the canonical
+  // names above.
+  pearlBase: '#0A0608',
+  pearlElevated: '#14080B',
+  pearlMuted: '#1F0E13',
+  pearlGradientEnd: '#14080B',
 
-  // Shadows / overlays
-  shadowCard: 'rgba(28, 26, 31, 0.08)',
-  shadowLift: 'rgba(28, 26, 31, 0.15)',
+  inkPrimary: '#F4ECDE',
+  inkSoft: '#C9B8A5',
+  labelMuted: '#8A7570',
+  labelDim: '#4F3A3D',
 
-  // Feedback colors
+  mauveLight: '#FF4886',
+  mauveDeep: '#E91E63',
+  mauveShadow: 'rgba(233, 30, 99, 0.45)',
+  mauveTinted: 'rgba(233, 30, 99, 0.10)',
+  mauveBorderSoft: '#4F3A3D',
+
+  borderSubtle: 'rgba(244, 236, 222, 0.10)',
+  borderDashed: '#4F3A3D',
+
+  inkDark: '#0A0608',
+  inkDarkHighlight: '#14080B',
+
+  shadowCard: 'rgba(0, 0, 0, 0.4)',
+  shadowLift: 'rgba(0, 0, 0, 0.55)',
+
   feedbackSuccess: '#5A6F4C',
   feedbackError: '#B85045',
 
-  // Sprint 2.6 — onboarding wizard surfaces.
-  // pearlGradientEnd is the bottom of the subtle pearl→tinted gradient
-  // that sits behind every wizard step. mauveTinted is the fill of a
-  // SelectableCard once the user picks it — strong enough to read,
-  // light enough not to wreck the card column rhythm. mauveBorderSoft
-  // is the dashed border for empty photo slots (less assertive than
-  // mauveDeep so the slot reads "to do" instead of "active"). The two
-  // cameraDark tokens are top/bottom of the camera viewport gradient,
-  // designed to recede behind the silhouette overlay.
-  pearlGradientEnd: '#F5EFF2',
-  mauveTinted: '#F8F0F4',
-  mauveBorderSoft: '#D8B5C4',
-  cameraDark: '#2A2530',
-  cameraDarkBottom: '#1F1A24',
+  cameraDark: '#14080B',
+  cameraDarkBottom: '#0A0608',
 } as const
 
 export type ColorToken = keyof typeof colors

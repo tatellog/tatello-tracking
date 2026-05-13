@@ -1,0 +1,969 @@
+/* ─────────────────────────────────────────────────────────────
+   NORTE · final · Magenta + Hanken Black + Dark Sweat
+   Locked: #E91E63 magenta · Hanken Grotesk 900 + Cormorant italic
+   ───────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600;1,700&family=Hanken+Grotesk:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Surfaces — warm dark sweat */
+  --bg: #0a0608;
+  --bg-card: #14080b;
+  --bg-card-2: #1f0e13;
+
+  /* Foreground */
+  --leche: #f4ecde;
+  --bone: #c9b8a5;
+  --niebla: #8a7570;
+  --bruma: #4f3a3d;
+
+  /* Magenta accent */
+  --magenta: #e91e63;
+  --magenta-hot: #ff4886;
+  --magenta-deep: #a6164a;
+  --magenta-glow: rgba(233, 30, 99, 0.45);
+  --magenta-tint: rgba(233, 30, 99, 0.1);
+  --magenta-tint-2: rgba(233, 30, 99, 0.18);
+
+  /* Hairlines */
+  --hairline: rgba(244, 236, 222, 0.1);
+  --hairline-strong: rgba(244, 236, 222, 0.22);
+
+  /* Type */
+  --display: 'Hanken Grotesk', -apple-system, system-ui, sans-serif;
+  --serif: 'Cormorant Garamond', 'Cardo', Georgia, serif;
+  --sans: 'Hanken Grotesk', 'Manrope', -apple-system, system-ui, sans-serif;
+}
+
+/* ───────────── Canvas board ───────────── */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--leche);
+  font-family: var(--sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ───────────── Animations ───────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.95;
+  }
+}
+@keyframes orbitalDrift {
+  from {
+    transform: rotate(0deg) translateX(28px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(28px) rotate(-360deg);
+  }
+}
+@keyframes scanline {
+  0% {
+    transform: translateX(-10%);
+    opacity: 0;
+  }
+  10%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+@keyframes pulseGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(233, 30, 99, 0);
+  }
+}
+@keyframes ringSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dotPop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes cursorBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Universal stagger: each *[data-anim] gets a delayed fadeUp */
+[data-anim] {
+  opacity: 0;
+  animation: fadeUp 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+[data-anim='0'] {
+  animation-delay: 0.05s;
+}
+[data-anim='1'] {
+  animation-delay: 0.2s;
+}
+[data-anim='2'] {
+  animation-delay: 0.35s;
+}
+[data-anim='3'] {
+  animation-delay: 0.5s;
+}
+[data-anim='4'] {
+  animation-delay: 0.65s;
+}
+[data-anim='5'] {
+  animation-delay: 0.8s;
+}
+[data-anim='6'] {
+  animation-delay: 0.95s;
+}
+[data-anim='7'] {
+  animation-delay: 1.1s;
+}
+
+/* ───────────── Manifiesto orb (decorative) ───────────── */
+.manif-orb {
+  position: absolute;
+  right: -40px;
+  bottom: 60px;
+  width: 180px;
+  height: 180px;
+  pointer-events: none;
+  z-index: 0;
+}
+.manif-orb .core {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 72, 134, 0.45) 0%,
+    rgba(233, 30, 99, 0.25) 30%,
+    rgba(233, 30, 99, 0) 70%
+  );
+  animation: breathe 5.5s ease-in-out infinite;
+}
+.manif-orb .ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  margin: -70px 0 0 -70px;
+  border-radius: 50%;
+  border: 1px solid rgba(233, 30, 99, 0.18);
+  animation: breathe 5.5s ease-in-out infinite reverse;
+}
+.manif-orb .satellite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--magenta);
+  box-shadow: 0 0 12px var(--magenta);
+  animation: orbitalDrift 14s linear infinite;
+}
+.manif-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* ───────────── Image placeholder ───────────── */
+.img-slot {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(244, 236, 222, 0.03) 0%, rgba(233, 30, 99, 0.04) 100%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(244, 236, 222, 0.025) 0px,
+      rgba(244, 236, 222, 0.025) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  border: 1px dashed var(--bruma);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--niebla);
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 8px;
+}
+.img-slot::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 4px;
+  height: 4px;
+  background: var(--magenta);
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+/* ───────────── Día 28 — Timeline visualization ───────────── */
+.timeline28 {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+}
+.timeline28 .track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--bruma);
+  transform: translateY(-50%);
+}
+.timeline28 .dots {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 4px;
+}
+.timeline28 .d {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(244, 236, 222, 0.18);
+  position: relative;
+  z-index: 2;
+  animation: dotPop 0.4s ease-out backwards;
+}
+.timeline28 .d.day1 {
+  width: 12px;
+  height: 12px;
+  background: var(--magenta);
+  box-shadow: 0 0 14px var(--magenta-glow);
+  animation:
+    dotPop 0.4s ease-out backwards,
+    pulseGlow 2.6s ease-out infinite 1.2s;
+}
+.timeline28 .d.day28 {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+  border: 1px solid var(--magenta);
+}
+.timeline28 .d.day28::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 1px dashed var(--magenta);
+  animation: ringSpin 18s linear infinite;
+}
+.timeline28 .scan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60px;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(233, 30, 99, 0) 30%,
+    rgba(233, 30, 99, 0.25) 50%,
+    rgba(233, 30, 99, 0) 70%,
+    transparent 100%
+  );
+  animation: scanline 6s ease-in-out infinite 2s;
+  pointer-events: none;
+  z-index: 1;
+}
+.timeline28 .labels {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--sans);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--niebla);
+}
+.timeline28 .labels .now {
+  color: var(--magenta);
+}
+
+/* Day 1 / Day 28 image slots row */
+.preview-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+  width: 100%;
+}
+.preview-row .img-slot {
+  height: 72px;
+  font-size: 8px;
+  line-height: 1.4;
+  padding: 4px;
+}
+.preview-row .img-slot strong {
+  display: block;
+  color: var(--magenta);
+  font-family: var(--sans);
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+/* ───────────── Weight ruler decoration ───────────── */
+.wt-ruler {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 130px;
+  height: 24px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0.35;
+}
+.wt-ruler .tick {
+  width: 1px;
+  height: 6px;
+  background: var(--bone);
+}
+.wt-ruler .tick.maj {
+  height: 14px;
+  background: var(--magenta);
+}
+
+/* ───────────── Animated cursor on inputs ───────────── */
+.fld input:focus,
+.wt-num:focus {
+  caret-color: var(--magenta);
+}
+
+/* ───────────── HERO (design canvas header) ───────────── */
+.norte-hero {
+  padding: 56px 64px 24px;
+  max-width: 1100px;
+}
+.norte-hero .eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--magenta);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.norte-hero .eyebrow::before {
+  content: '';
+  width: 24px;
+  height: 2px;
+  background: var(--magenta);
+}
+.norte-hero h1 {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 56px;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  margin: 0 0 16px;
+  color: var(--leche);
+}
+.norte-hero h1 em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--magenta);
+  letter-spacing: -0.01em;
+  font-size: 0.92em;
+}
+.norte-hero p {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--bone);
+  max-width: 620px;
+  margin: 0;
+}
+.norte-hero p strong {
+  color: var(--magenta);
+  font-weight: 700;
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SCREEN container — used inside each iOS frame
+   ───────────────────────────────────────────────────────────── */
+.scr {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  color: var(--leche);
+  font-family: var(--sans);
+  display: flex;
+  flex-direction: column;
+  padding: 60px 24px 32px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Progress bar at top */
+.scr-progress {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+.scr-progress span {
+  flex: 1;
+  height: 3px;
+  background: var(--bruma);
+  border-radius: 1px;
+  transition: background 0.3s;
+}
+.scr-progress span.done {
+  background: var(--leche);
+}
+.scr-progress span.active {
+  background: var(--magenta);
+  box-shadow: 0 0 8px var(--magenta-glow);
+}
+
+.scr-back {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--niebla);
+  margin-bottom: 18px;
+  cursor: pointer;
+  user-select: none;
+}
+.scr-back:hover {
+  color: var(--leche);
+}
+
+.scr-eyebrow {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: 0.24em;
+  color: var(--magenta);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.scr-title {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 36px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--leche);
+  margin: 0 0 10px;
+}
+.scr-title em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--magenta);
+  letter-spacing: -0.01em;
+  font-size: 0.95em;
+}
+
+.scr-sub {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bone);
+  margin: 0 0 20px;
+  font-weight: 500;
+}
+
+.scr-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Primary CTA */
+.scr-cta {
+  position: relative;
+  height: 54px;
+  border-radius: 4px;
+  background: var(--magenta);
+  color: #fff;
+  border: none;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow:
+    0 6px 24px -8px var(--magenta-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.scr-cta:hover {
+  background: var(--magenta-hot);
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 28px -8px var(--magenta-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.scr-cta:active {
+  transform: translateY(0);
+  background: var(--magenta-deep);
+}
+.scr-cta[disabled] {
+  background: var(--bg-card-2);
+  color: var(--niebla);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.scr-cta[disabled]:hover {
+  transform: none;
+}
+.scr-cta.ghost {
+  background: transparent;
+  border: 1.5px solid var(--bruma);
+  color: var(--leche);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  height: 46px;
+  box-shadow: none;
+}
+
+/* ───────────── Inputs ───────────── */
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.fld label {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--niebla);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.fld input,
+.fld .pseudo-input {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--bruma);
+  padding: 10px 0;
+  color: var(--leche);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.fld input::placeholder {
+  color: var(--bruma);
+  font-weight: 700;
+}
+.fld input:focus {
+  border-color: var(--magenta);
+}
+.fld-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Segmented toggle (femenino / masculino) */
+.seg {
+  display: flex;
+  background: var(--bg-card);
+  border: 1.5px solid var(--bruma);
+  border-radius: 4px;
+  padding: 3px;
+  gap: 3px;
+}
+.seg button {
+  flex: 1;
+  height: 40px;
+  background: transparent;
+  border: none;
+  color: var(--niebla);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.seg button.on {
+  background: var(--magenta-tint-2);
+  color: var(--leche);
+  box-shadow: inset 0 0 0 1px var(--magenta);
+}
+
+/* Option rows — checklist */
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1.5px solid var(--bruma);
+  background: var(--bg-card);
+  border-radius: 4px;
+  margin-bottom: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.opt:hover {
+  border-color: var(--niebla);
+  transform: translateX(3px);
+}
+.opt.on {
+  background: var(--magenta-tint);
+  border-color: var(--magenta);
+  box-shadow:
+    0 0 0 1px var(--magenta),
+    0 4px 16px -8px var(--magenta-glow);
+}
+.opt .opt-label {
+  flex: 1;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--bone);
+  letter-spacing: -0.005em;
+}
+.opt.on .opt-label {
+  color: var(--leche);
+}
+.opt .opt-tick {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1.5px solid var(--bruma);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.18s;
+  color: var(--leche);
+}
+.opt.on .opt-tick {
+  background: var(--magenta);
+  border-color: var(--magenta);
+}
+.opt.neutral .opt-label {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--niebla);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.opt.neutral.on .opt-label {
+  color: var(--leche);
+}
+
+/* ───────────── Weight number input ───────────── */
+.wt {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin: 32px 0 16px;
+}
+.wt-num {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 120px;
+  line-height: 0.9;
+  color: var(--leche);
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 180px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+}
+.wt-num:disabled {
+  color: var(--niebla);
+}
+.wt-unit {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 26px;
+  color: var(--magenta);
+}
+.wt-caveat {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  text-align: center;
+  color: var(--bone);
+  max-width: 240px;
+  margin: 0 auto 18px;
+  line-height: 1.45;
+}
+.wt-skip {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--magenta);
+  cursor: pointer;
+}
+.wt-skip:hover {
+  color: var(--magenta-hot);
+}
+
+/* ───────────── Manifiesto screen ───────────── */
+.manif {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  padding: 0 0 12px;
+}
+.manif::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: var(--magenta);
+}
+.manif-quote {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 44px;
+  line-height: 1;
+  color: var(--leche);
+  margin: 0 0 8px;
+  letter-spacing: -0.045em;
+}
+.manif-quote em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--magenta);
+  letter-spacing: -0.01em;
+  font-size: 0.92em;
+  display: block;
+  margin-top: 8px;
+}
+.manif-rule {
+  width: 36px;
+  height: 1px;
+  background: var(--magenta);
+  margin: 22px 0 16px;
+}
+.manif-meta {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--bone);
+  letter-spacing: 0;
+  max-width: 240px;
+  line-height: 1.55;
+}
+.manif-meta strong {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--magenta);
+  font-size: 14px;
+}
+
+/* ───────────── Constellation / Día 28 screen ───────────── */
+.const-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+}
+.const-num {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 80px;
+  line-height: 0.82;
+  color: var(--magenta);
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+.const-line {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--bone);
+  line-height: 1.3;
+  margin: -4px 0 0;
+}
+
+.const-date-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid var(--bruma);
+  border-bottom: 1px solid var(--bruma);
+  width: 100%;
+  margin: 4px 0 0;
+}
+.const-date-lbl {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--niebla);
+}
+.const-date-val {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--leche);
+}
+.const-date-val em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 26px;
+  color: var(--magenta);
+  letter-spacing: -0.01em;
+}
+
+.const-poet {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--bone);
+  margin: 2px 0 0;
+}
+.const-poet em {
+  color: var(--magenta);
+  font-style: italic;
+}
+
+.foot-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 12px;
+}
+.foot-note .pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--bruma);
+  color: var(--bone);
+  font-family: var(--sans);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.foot-note .pill:first-child {
+  background: var(--magenta);
+  border-color: var(--magenta);
+  color: #fff;
+}

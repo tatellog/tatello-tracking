@@ -1,40 +1,46 @@
 import { Fragment } from 'react'
-import { StyleSheet, Text, View, type TextStyle } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 
 import { colors, typography } from '@/theme'
 
-type EyebrowColor = 'mauve' | 'muted'
+type EyebrowColor = 'magenta' | 'niebla'
 
 type Props = {
   eyebrow?: string
   eyebrowColor?: EyebrowColor
   /**
-   * Some steps render the user's name as the eyebrow ("Sofía,") and
-   * want it in title case rather than uppercase, but still in mauve.
-   * Pass `eyebrowCase="none"` for those; the default uppercases.
+   * Algunos steps usan el nombre del usuario como eyebrow ("Sofía,")
+   * en title case. Para esos casos `eyebrowCase="none"` apaga el
+   * uppercase + tracking.
    */
   eyebrowCase?: 'upper' | 'none'
+  /** Título — Hanken 900 black 36px con letter-spacing -4%. */
   question: string
+  /**
+   * Palabra destacada — se renderiza en Cormorant italic magenta
+   * dentro del título. Si no aparece dentro del texto se ignora.
+   */
   questionEmphasis?: string
+  /** Subtítulo body en bone. */
   hint?: string
+  /** Legacy alias for eyebrowColor — `mauve` redirige a magenta. */
+  legacyMauveAlias?: never
 }
 
 /*
- * The recurring opening of a wizard step:
+ * El header recurrente del wizard:
  *
  *     EYEBROW
- *     ¿Pregunta con palabra destacada?
- *     hint con tono más suave
+ *     Título 36px con palabra destacada en italic magenta
+ *     subtítulo bone
  *
- * The destacada word reuses the original casing/punctuation supplied
- * by the caller so the highlight reads naturally in Spanish (acentos,
- * mayúsculas iniciales, etc.). renderWithEmphasis splits on the first
- * match only — repeating the same word twice in one question would
- * highlight just the first occurrence, which has been fine so far.
+ * `renderWithEmphasis` divide el texto en la primera coincidencia
+ * (case-insensitive) — repetir la palabra dos veces destaca sólo la
+ * primera, comportamiento heredado del wizard anterior.
  */
 export function StepHeader({
   eyebrow,
-  eyebrowColor = 'muted',
+  eyebrowColor = 'magenta',
   eyebrowCase = 'upper',
   question,
   questionEmphasis,
@@ -45,8 +51,8 @@ export function StepHeader({
       {eyebrow ? (
         <Text
           style={[
-            styles.eyebrow,
-            eyebrowColor === 'mauve' ? styles.eyebrowMauve : styles.eyebrowMuted,
+            styles.eyebrowBase,
+            eyebrowColor === 'magenta' ? styles.eyebrowMagenta : styles.eyebrowNiebla,
             eyebrowCase === 'none' && styles.eyebrowNoTransform,
           ]}
         >
@@ -80,48 +86,48 @@ function renderWithEmphasis(text: string, emphasis?: string) {
   )
 }
 
-const eyebrowBase: TextStyle = {
-  fontFamily: typography.uiSemi,
-  fontSize: 10,
-  letterSpacing: typography.letterSpacing.uppercaseWide,
-  textTransform: 'uppercase',
-  marginBottom: 14,
-}
-
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
   },
-  eyebrow: eyebrowBase,
-  eyebrowMauve: {
-    ...eyebrowBase,
-    color: colors.mauveDeep,
+  eyebrowBase: {
+    fontFamily: typography.uiBold,
+    fontSize: 10.5,
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    marginBottom: 10,
   },
-  eyebrowMuted: {
-    ...eyebrowBase,
-    color: colors.labelMuted,
+  eyebrowMagenta: {
+    color: colors.magenta,
+  },
+  eyebrowNiebla: {
+    color: colors.niebla,
   },
   eyebrowNoTransform: {
     textTransform: 'none',
     letterSpacing: 0,
   },
   question: {
-    fontFamily: typography.display,
-    fontSize: 28,
-    letterSpacing: -1.2,
-    lineHeight: 32,
-    color: colors.inkPrimary,
+    fontFamily: typography.displayHeavy,
+    fontSize: 36,
+    letterSpacing: -1.4,
+    lineHeight: 36,
+    color: colors.leche,
   },
   questionEmphasis: {
-    fontFamily: typography.displaySemi,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.mauveDeep,
+    // Cormorant italic 0.95em ≈ 34px. RN no soporta em, así que
+    // usamos un fontSize próximo y dejamos el fontFamily italic.
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 34,
+    color: colors.magenta,
+    letterSpacing: -0.3,
   },
   hint: {
-    marginTop: 12,
-    fontFamily: typography.ui,
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
     fontSize: 13,
     lineHeight: 20,
-    color: colors.labelMuted,
+    color: colors.bone,
   },
 })

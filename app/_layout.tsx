@@ -2,16 +2,19 @@ import '@/global.css'
 
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  useFonts,
-} from '@expo-google-fonts/inter'
+  CormorantGaramond_500Medium_Italic,
+  CormorantGaramond_600SemiBold_Italic,
+  CormorantGaramond_700Bold_Italic,
+} from '@expo-google-fonts/cormorant-garamond'
 import {
-  InterTight_300Light,
-  InterTight_400Regular,
-  InterTight_500Medium,
-} from '@expo-google-fonts/inter-tight'
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+  HankenGrotesk_800ExtraBold,
+  HankenGrotesk_900Black,
+  useFonts,
+} from '@expo-google-fonts/hanken-grotesk'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
@@ -37,15 +40,21 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 })
 
 export default function RootLayout() {
-  // Pearl Mauve sólo carga Inter + Inter Tight. Sin serif, sin italic.
-  // Inter Tight para números display, Inter para todo el chrome UI.
+  // Norte carga Hanken Grotesk para todo el UI (display + body) y
+  // Cormorant Garamond *exclusivamente* en italic para la palabra
+  // destacada y frases poéticas cortas. Sin Inter, sin Inter Tight —
+  // la paleta cambió de Pearl Mauve a Norte y los tokens del theme
+  // ya apuntan a las nuevas familias.
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    InterTight_300Light,
-    InterTight_400Regular,
-    InterTight_500Medium,
+    HankenGrotesk_400Regular,
+    HankenGrotesk_500Medium,
+    HankenGrotesk_600SemiBold,
+    HankenGrotesk_700Bold,
+    HankenGrotesk_800ExtraBold,
+    HankenGrotesk_900Black,
+    CormorantGaramond_500Medium_Italic,
+    CormorantGaramond_600SemiBold_Italic,
+    CormorantGaramond_700Bold_Italic,
   })
 
   const { session, loading: sessionLoading } = useSession()

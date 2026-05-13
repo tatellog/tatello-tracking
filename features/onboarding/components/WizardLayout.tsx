@@ -11,22 +11,19 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { colors, typography } from '@/theme'
+import { colors, shadows, typography } from '@/theme'
 
-import { OrnamentShape, type OrnamentVariant } from './OrnamentShape'
 import { ProgressBar } from './ProgressBar'
 
 type Props = {
   step: number
-  totalSteps: number
+  totalSteps?: number
   showBack?: boolean
   canContinue: boolean
   onContinue: () => void
   onBack?: () => void
   children: ReactNode
   continueLabel?: string
-  showOrnaments?: boolean
-  ornamentVariant?: OrnamentVariant
   /** Disables the Continue button briefly while a mutation runs. */
   loading?: boolean
   /**
@@ -37,28 +34,29 @@ type Props = {
 }
 
 /*
- * Wraps every wizard step (welcome and done don't use this — they're
- * full-bleed celebration screens). Provides:
- *   - Pearl background + a barely-there pearl→tinted vertical gradient
- *   - Optional malva ornament blob
- *   - Progress bar pinned to the top
- *   - Centred content area for the step's StepHeader + input
- *   - Footer with "‹ Atrás" + "Continuar →" buttons
+ * Norte wizard scaffold — la estructura compartida de los 5 steps
+ * (screen 1 manifiesto usa ManifiestoScreen directamente porque su
+ * decoración orb se ancla absolute al fondo). Provee:
  *
- * The "Atrás" button defaults to router.back(); pass onBack to override
- * (some steps need to invalidate state before walking back).
+ *   • Background bg dark
+ *   • Progress bar arriba (5 segmentos)
+ *   • Back link uppercase (excepto en step 1)
+ *   • Centred content area
+ *   • Primary CTA magenta full-width (54px alto, radius 4)
+ *
+ * Padding del README: 60px arriba / 24px laterales / 32px abajo.
+ * El SafeAreaView se encarga del top, así que padding-top adicional
+ * se baja a 24px.
  */
 export function WizardLayout({
   step,
-  totalSteps,
+  totalSteps = 5,
   showBack = true,
   canContinue,
   onContinue,
   onBack,
   children,
   continueLabel = 'Continuar →',
-  showOrnaments = true,
-  ornamentVariant = 'tr',
   loading = false,
   errorMessage = null,
 }: Props) {
@@ -82,49 +80,47 @@ export function WizardLayout({
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {showOrnaments ? <OrnamentShape variant={ornamentVariant} /> : null}
-
       <View style={styles.progressWrap}>
         <ProgressBar current={step} total={totalSteps} />
       </View>
 
+      {showBack ? (
+        <Pressable onPress={handleBack} hitSlop={12} style={styles.backWrap}>
+          <Text style={styles.backLabel}>‹ Atrás</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.backSpacer} />
+      )}
+
       <View style={styles.content}>{children}</View>
 
       {errorMessage ? (
-        <View style={styles.errorWrap}>
-          <Text style={styles.errorText} accessibilityLiveRegion="polite">
-            {errorMessage}
-          </Text>
-        </View>
+        <Text style={styles.errorText} accessibilityLiveRegion="polite">
+          {errorMessage}
+        </Text>
       ) : null}
 
       <View style={styles.footer}>
-        <View style={styles.footerLeft}>
-          {showBack ? (
-            <Pressable onPress={handleBack} hitSlop={12}>
-              <Text style={styles.backLabel}>‹ Atrás</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        {/* TouchableOpacity, not Pressable: the function-style prop
-            on Pressable was failing to render backgroundColor on
-            some iOS native + RN combos, leaving the CTA invisible. */}
         <TouchableOpacity
           onPress={handleContinue}
           disabled={isContinueDisabled}
           activeOpacity={0.85}
-          style={[styles.continue, isContinueDisabled && styles.continueDisabled]}
+          style={[styles.cta, isContinueDisabled && styles.ctaDisabled]}
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
           accessibilityState={{ disabled: isContinueDisabled, busy: loading }}
         >
           {loading ? (
-            <View style={styles.continueLoadingRow}>
-              <ActivityIndicator color={colors.pearlBase} size="small" />
-              <Text style={styles.continueLabel}>Guardando…</Text>
+            <View style={styles.ctaLoadingRow}>
+              <ActivityIndicator color={colors.leche} size="small" />
+              <Text style={[styles.ctaLabel, isContinueDisabled && styles.ctaLabelDisabled]}>
+                Guardando…
+              </Text>
             </View>
           ) : (
-            <Text style={styles.continueLabel}>{continueLabel}</Text>
+            <Text style={[styles.ctaLabel, isContinueDisabled && styles.ctaLabelDisabled]}>
+              {continueLabel}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -135,65 +131,67 @@ export function WizardLayout({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
   },
   progressWrap: {
-    paddingHorizontal: 22,
-    paddingTop: 22,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  backWrap: {
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 4,
+  },
+  backSpacer: {
+    height: 22,
+  },
+  backLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    color: colors.niebla,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    textTransform: 'uppercase',
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingTop: 8,
   },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    paddingBottom: 12,
-    paddingTop: 8,
-    gap: 12,
-  },
-  footerLeft: {
-    minWidth: 56,
-    height: 24,
-    justifyContent: 'center',
-  },
-  backLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: 13,
-    color: colors.labelMuted,
-    letterSpacing: 0.2,
-  },
-  continue: {
-    backgroundColor: colors.mauveDeep,
-    borderRadius: 100,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueDisabled: {
-    opacity: 0.4,
-  },
-  continueLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: 14,
-    color: colors.pearlBase,
-    letterSpacing: 0.3,
-  },
-  continueLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  errorWrap: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingBottom: 16,
+    paddingTop: 12,
+  },
+  cta: {
+    height: 54,
+    borderRadius: 4,
+    backgroundColor: colors.magenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.ctaMagenta,
+  },
+  ctaDisabled: {
+    backgroundColor: colors.bgCard2,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  ctaLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 12,
+    color: '#FFFFFF',
+    letterSpacing: 2.16,
+    textTransform: 'uppercase',
+  },
+  ctaLabelDisabled: {
+    color: colors.niebla,
+  },
+  ctaLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   errorText: {
+    paddingHorizontal: 24,
     fontFamily: typography.uiMedium,
     fontSize: 12,
     lineHeight: 17,
