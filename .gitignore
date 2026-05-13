@@ -39,6 +39,12 @@ yarn-error.*
 # claude code (user-local)
 .claude/
 
+# JetBrains IDEs (user-local)
+.idea/
+
+# one-off local scripts (not for the repo)
+scripts/reset-onboarding.ts
+
 # generated native folders
 /ios
 /android
