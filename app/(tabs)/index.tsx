@@ -23,6 +23,7 @@ import {
   WeekStrip,
   type WeekDayCell,
 } from '@/features/tabs/components'
+import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
 
@@ -116,6 +117,9 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const trainedThisMonth = ctx.grid_28_days.filter((c) => c.completed).length
 
+  const sign = useMemo(() => zodiacFromDate(profile?.date_of_birth), [profile?.date_of_birth])
+  const signLabel = ZODIAC[sign].label
+
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
 
   const todayPill = useMemo(() => {
@@ -182,13 +186,17 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
           <Animated.View entering={enter(220)}>
             <SectionHeader
-              label="Tu Acuario · 28 días"
+              label={`Tu ${capitalize(signLabel)} · 28 días`}
               meta={{ value: String(trainedThisMonth), label: 'de 28' }}
             />
           </Animated.View>
 
           <Animated.View entering={enter(320)}>
-            <LunarConstellation trained={ctx.grid_28_days.map((c) => c.completed)} todayIdx={27} />
+            <LunarConstellation
+              trained={ctx.grid_28_days.map((c) => c.completed)}
+              todayIdx={27}
+              sign={sign}
+            />
           </Animated.View>
 
           <Animated.View entering={enter(420)}>
@@ -272,6 +280,10 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       {showCelebration ? <Day1Celebration /> : null}
     </View>
   )
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
 /** 1500 → "1.5", 980 → "980". */

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import {
+  DateOfBirthInput,
   SegmentedToggle,
   StepHeader,
   UnderlinedInput,
@@ -17,45 +18,40 @@ const SEX_OPTIONS = [
   { value: 'male' as const, label: 'Masculino' },
 ]
 
-// `profiles.date_of_birth` is YYYY-MM-DD but the design captures
-// only age. Synthesise a Jan-1 DOB so BMR math stays valid; the user
-// can edit the exact date in Settings later.
+const MIN_AGE_YEARS = 13
+const MAX_AGE_YEARS = 100
+const DEFAULT_AGE_YEARS = 30
+
 export default function AboutYouScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
 
-  const initialAge = useMemo(() => {
-    if (!profile?.date_of_birth) return ''
-    const parts = profile.date_of_birth.split('-').map(Number)
-    const y = parts[0]
-    if (!y) return ''
-    return String(new Date().getFullYear() - y)
-  }, [profile?.date_of_birth])
+  const { defaultDate, minDate, maxDate } = useMemo(() => boundsForAdult(), [])
+
+  const initialDob = useMemo(() => parseISODate(profile?.date_of_birth), [profile?.date_of_birth])
 
   const [name, setName] = useState(profile?.display_name ?? '')
-  const [age, setAge] = useState(initialAge)
+  const [dob, setDob] = useState<Date | null>(initialDob)
   const [height, setHeight] = useState(profile?.height_cm ? String(profile.height_cm) : '')
   const [sex, setSex] = useState<BiologicalSex | null>(
     (profile?.biological_sex as BiologicalSex | null) ?? null,
   )
 
   const trimmedName = name.trim()
-  const ageNum = Number(age)
   const heightNum = Number(height)
-  const ageValid = ageNum >= 13 && ageNum <= 99
+  const dobValid = dob !== null && isAdultAge(dob)
   const heightValid = heightNum >= 100 && heightNum <= 230
 
   const canContinue =
-    trimmedName.length >= 1 && trimmedName.length <= 40 && ageValid && heightValid && sex !== null
+    trimmedName.length >= 1 && trimmedName.length <= 40 && dobValid && heightValid && sex !== null
 
   const handleContinue = () => {
-    if (!canContinue || !sex) return
-    const dob = ageToISODate(ageNum)
+    if (!canContinue || !sex || !dob) return
     updateProfile.mutate(
       {
         display_name: trimmedName,
-        date_of_birth: dob,
+        date_of_birth: toISODate(dob),
         biological_sex: sex,
         height_cm: Math.round(heightNum),
       },
@@ -100,29 +96,25 @@ export default function AboutYouScreen() {
             />
           </View>
 
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <UnderlinedInput
-                label="Edad"
-                value={age}
-                onChangeText={(v) => setAge(v.replace(/\D/g, '').slice(0, 3))}
-                placeholder="36"
-                keyboardType="number-pad"
-                maxLength={3}
-                compact
-              />
-            </View>
-            <View style={styles.col}>
-              <UnderlinedInput
-                label="Altura · cm"
-                value={height}
-                onChangeText={(v) => setHeight(v.replace(/\D/g, '').slice(0, 3))}
-                placeholder="170"
-                keyboardType="number-pad"
-                maxLength={3}
-                compact
-              />
-            </View>
+          <View style={styles.field}>
+            <DateOfBirthInput
+              value={dob}
+              onChange={setDob}
+              defaultDate={defaultDate}
+              minDate={minDate}
+              maxDate={maxDate}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <UnderlinedInput
+              label="Altura · cm"
+              value={height}
+              onChangeText={(v) => setHeight(v.replace(/\D/g, '').slice(0, 3))}
+              placeholder="170"
+              keyboardType="number-pad"
+              maxLength={3}
+            />
           </View>
 
           <View style={styles.field}>
@@ -136,9 +128,40 @@ export default function AboutYouScreen() {
   )
 }
 
-function ageToISODate(age: number): string {
-  const year = new Date().getFullYear() - age
-  return `${year}-01-01`
+function yearsAgo(years: number): Date {
+  const now = new Date()
+  return new Date(now.getFullYear() - years, now.getMonth(), now.getDate())
+}
+
+function boundsForAdult() {
+  return {
+    defaultDate: yearsAgo(DEFAULT_AGE_YEARS),
+    minDate: yearsAgo(MAX_AGE_YEARS),
+    maxDate: yearsAgo(MIN_AGE_YEARS),
+  }
+}
+
+function isAdultAge(d: Date): boolean {
+  const min = yearsAgo(MAX_AGE_YEARS).getTime()
+  const max = yearsAgo(MIN_AGE_YEARS).getTime()
+  const t = d.getTime()
+  return t >= min && t <= max
+}
+
+function toISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function parseISODate(v: string | null | undefined): Date | null {
+  if (!v) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+  if (!m) return null
+  const [, y, mo, d] = m
+  const date = new Date(Number(y), Number(mo) - 1, Number(d))
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 const styles = StyleSheet.create({
@@ -151,14 +174,6 @@ const styles = StyleSheet.create({
   },
   field: {
     marginTop: 22,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 22,
-  },
-  col: {
-    flex: 1,
   },
   fieldLabel: {
     fontFamily: typography.uiBold,

@@ -1,63 +1,37 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated'
 import Svg, { Circle, Defs, G, Line, RadialGradient, Stop, Text as SvgText } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
-type ZodiacSign = 'acuario'
+import { magnitudeToRadius } from '../zodiac/astronomy/project'
+import { ZODIAC } from '../zodiac/data'
+import type { ZodiacDef, ZodiacSign } from '../zodiac/types'
 
-type ZodiacStar = {
-  /** Relative coords 0..1 inside the SVG box. */
-  x: number
-  y: number
-  /** 1 = brightest (largest dot), 5 = faintest. */
-  mag: number
-}
+// Bright stars (mag ≤ 2) earn the cross sparkle. With real Hipparcos
+// data that means Aldebaran, Regulus, Antares, Spica, Pollux, Castor,
+// Shaula, Elnath, Kaus Australis, Sargas, Alhena, Hamal — about a
+// dozen per zodiac coverage, never more than 1-3 per sign.
+const SPARKLE_MAG_THRESHOLD = 2
 
-type ZodiacDef = {
-  label: string
-  glyph: string
-  stars: readonly ZodiacStar[]
-  lines: readonly (readonly [number, number])[]
-}
-
-// Hand-shaped to be recognisable while leaving the centre clear for
-// the day-counter text. Roadmap: pick by `profile.date_of_birth`.
-const ZODIAC: Record<ZodiacSign, ZodiacDef> = {
-  acuario: {
-    label: 'ACUARIO',
-    glyph: '♒',
-    stars: [
-      { x: 0.18, y: 0.14, mag: 2 },
-      { x: 0.44, y: 0.18, mag: 2 },
-      { x: 0.66, y: 0.3, mag: 3 },
-      { x: 0.84, y: 0.26, mag: 4 },
-      { x: 0.94, y: 0.46, mag: 4 },
-      { x: 0.55, y: 0.42, mag: 3 },
-      { x: 0.6, y: 0.64, mag: 4 },
-      { x: 0.42, y: 0.74, mag: 3 },
-      { x: 0.24, y: 0.88, mag: 3 },
-      { x: 0.74, y: 0.84, mag: 4 },
-    ],
-    lines: [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 4],
-      [1, 5],
-      [2, 5],
-      [5, 6],
-      [6, 7],
-      [7, 8],
-      [6, 9],
-    ],
-  },
-}
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+const AnimatedG = Animated.createAnimatedComponent(G)
 
 const W = 290
 const H = 290
 const PAD = 30
 const TARGET_DAYS = 28
+const AMBIENT_STAR_COUNT = 64
+const AMBIENT_BUCKET_COUNT = 8
 
 type Resolved = {
   x: number
@@ -104,16 +78,37 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
   }, [elementsLit, sequence])
   const nextEl: SequenceEl | null = sequence[elementsLit] ?? null
 
+  // Shared time pulse driving every animation. Single 8s loop on UI
+  // thread; per-element worklets read from it with a phase offset so
+  // animations look independent without spawning N timers.
+  const t = useSharedValue(0)
+  // Slow rotation for the sparkle decoration on brightest stars.
+  const sparkleT = useSharedValue(0)
+
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
+    sparkleT.value = withRepeat(
+      withTiming(1, { duration: 24000, easing: Easing.linear }),
+      -1,
+      false,
+    )
+    return () => {
+      cancelAnimation(t)
+      cancelAnimation(sparkleT)
+    }
+  }, [t, sparkleT])
+
   return (
     <View style={styles.wrap}>
       <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
         <SvgGradients />
-        <Circle cx={cx} cy={cy} r={78} fill="url(#centerBloom)" />
+        <AmbientField t={t} />
+        <CenterBloom cx={cx} cy={cy} t={t} />
         <BaseLayer zodiac={zodiac} stars={stars} />
         <LitLines zodiac={zodiac} stars={stars} litKeys={litKeys} nextEl={nextEl} />
         <CenterText cx={cx} cy={cy} trainedCount={trainedCount} label={label} />
-        <StarsLayer stars={stars} litKeys={litKeys} nextEl={nextEl} />
-        {isComplete ? <CompletionRings cx={cx} cy={cy} /> : null}
+        <StarsLayer stars={stars} litKeys={litKeys} nextEl={nextEl} t={t} sparkleT={sparkleT} />
+        {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
       </Svg>
 
       <View style={styles.zodiacCap}>
@@ -144,8 +139,8 @@ function deriveProgress(
   const complete = count >= TARGET_DAYS
   const pctRound = Math.round(pct * 100)
 
-  // Sequence: interleave stars + lines so each line is preceded by both
-  // its endpoint stars. Leftover stars (none in current data) trail.
+  // Interleave stars + lines so each line is preceded by both its
+  // endpoint stars. Leftover stars trail at the end.
   const seq: SequenceEl[] = []
   const seen = new Set<number>()
   if (nStars > 0) {
@@ -168,10 +163,12 @@ function deriveProgress(
     if (!seen.has(i)) seq.push({ type: 'star', idx: i })
   }
 
+  const lowerLabel = zodiac.label.toLowerCase()
+  const titleLabel = zodiac.label.charAt(0) + zodiac.label.slice(1).toLowerCase()
   const label = complete
-    ? `${zodiac.label.charAt(0)}${zodiac.label.slice(1).toLowerCase()} completo`
+    ? `${titleLabel} completo`
     : count === 0
-      ? `tu ${zodiac.label.toLowerCase()} te espera`
+      ? `tu ${lowerLabel} te espera`
       : pct < 0.5
         ? `${pctRound}% iluminado`
         : pct < 1
@@ -209,6 +206,83 @@ function SvgGradients() {
   )
 }
 
+/* ─ Ambient star field ──────────────────────────────────────────── */
+
+type AmbientStar = { x: number; y: number; r: number; baseOp: number }
+
+// Deterministic field that avoids the centre block where the day
+// counter lives. The seed math is intentionally noisy — `Math.sin` of
+// large integers gives us a stable pseudo-random sequence without
+// pulling in a PRNG. Stars are bucketed by index so the twinkle stays
+// cheap (one worklet per bucket, not per star).
+function buildAmbientField(): AmbientStar[][] {
+  const buckets: AmbientStar[][] = Array.from({ length: AMBIENT_BUCKET_COUNT }, () => [])
+  for (let i = 0; i < AMBIENT_STAR_COUNT; i++) {
+    const a = Math.sin(i * 47.1 + 3.7)
+    const b = Math.sin(i * 91.3 + 1.1)
+    const x = ((((a * 9301 + 49297) % 1) + 1) % 1) * W
+    const y = ((((b * 8101 + 26183) % 1) + 1) % 1) * H
+    const dx = x - W / 2
+    const dy = y - H / 2
+    if (dx * dx + dy * dy < 3200) continue
+    const baseOp = 0.04 + Math.abs(a * b) * 0.1
+    const r = 0.4 + Math.abs(a) * 0.7
+    const bucket = i % AMBIENT_BUCKET_COUNT
+    buckets[bucket]!.push({ x, y, r, baseOp })
+  }
+  return buckets
+}
+
+function AmbientField({ t }: { t: SharedValue<number> }) {
+  const buckets = useMemo(() => buildAmbientField(), [])
+  return (
+    <G>
+      {buckets.map((stars, bucketIdx) => (
+        <AmbientBucket key={bucketIdx} stars={stars} bucketIdx={bucketIdx} t={t} />
+      ))}
+    </G>
+  )
+}
+
+function AmbientBucket({
+  stars,
+  bucketIdx,
+  t,
+}: {
+  stars: AmbientStar[]
+  bucketIdx: number
+  t: SharedValue<number>
+}) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const phase = bucketIdx / AMBIENT_BUCKET_COUNT
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    return { opacity: 0.35 + 0.65 * wave }
+  })
+  return (
+    <AnimatedG animatedProps={animatedProps}>
+      {stars.map((s, i) => (
+        <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.baseOp * 4} />
+      ))}
+    </AnimatedG>
+  )
+}
+
+/* ─ Centre bloom (faint magenta vignette) ───────────────────────── */
+
+function CenterBloom({ cx, cy, t }: { cx: number; cy: number; t: SharedValue<number> }) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { opacity: 0.7 + 0.3 * wave }
+  })
+  return (
+    <AnimatedCircle cx={cx} cy={cy} r={78} fill="url(#centerBloom)" animatedProps={animatedProps} />
+  )
+}
+
+/* ─ Base placeholder layer (always visible silhouette) ──────────── */
+
 function BaseLayer({ zodiac, stars }: { zodiac: ZodiacDef; stars: Resolved[] }) {
   return (
     <G>
@@ -234,13 +308,15 @@ function BaseLayer({ zodiac, stars }: { zodiac: ZodiacDef; stars: Resolved[] }) 
           key={`bs-${i}`}
           cx={s.x}
           cy={s.y}
-          r={(6 - s.mag) * 0.85}
+          r={magnitudeToRadius(s.mag) * 0.65}
           fill="rgba(244,236,222,0.55)"
         />
       ))}
     </G>
   )
 }
+
+/* ─ Lit & next lines ────────────────────────────────────────────── */
 
 function LitLines({
   zodiac,
@@ -279,6 +355,8 @@ function LitLines({
     </>
   )
 }
+
+/* ─ Centre counter texts ────────────────────────────────────────── */
 
 function CenterText({
   cx,
@@ -330,35 +408,70 @@ function CenterText({
   )
 }
 
+/* ─ Stars layer (dispatches lit / next variants) ────────────────── */
+
 function StarsLayer({
   stars,
   litKeys,
   nextEl,
+  t,
+  sparkleT,
 }: {
   stars: Resolved[]
   litKeys: Set<string>
   nextEl: SequenceEl | null
+  t: SharedValue<number>
+  sparkleT: SharedValue<number>
 }) {
   return (
     <>
       {stars.map((s, i) => {
         const isLit = litKeys.has(`star-${i}`)
         const isNext = nextEl?.type === 'star' && nextEl.idx === i
-        if (isNext) return <NextStar key={`s-${i}`} s={s} />
-        if (isLit) return <LitStar key={`s-${i}`} s={s} />
+        if (isNext) return <NextStar key={`s-${i}`} s={s} t={t} />
+        if (isLit) return <LitStar key={`s-${i}`} s={s} i={i} t={t} sparkleT={sparkleT} />
         return null
       })}
     </>
   )
 }
 
-function NextStar({ s }: { s: Resolved }) {
-  const magR = 6 - s.mag
-  const r = magR + 2
+function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
+  const r = magnitudeToRadius(s.mag) + 1.5
+
+  // Outer halo pulse — 2.4s yoyo, fades from 0 to ~22 px radius.
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    // 2.4 s ÷ 8 s base loop ≈ 0.3 — derive a faster sub-pulse off t.
+    const pulse = (t.value * (8 / 2.4)) % 1
+    return {
+      r: r + 6 + pulse * 14,
+      opacity: 0.55 * (1 - pulse),
+    }
+  })
+
+  const midProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { opacity: 0.18 + 0.18 * wave }
+  })
+
   return (
     <G>
-      <Circle cx={s.x} cy={s.y} r={r + 14} fill="rgba(233,30,99,0.10)" />
-      <Circle cx={s.x} cy={s.y} r={r + 6} fill="rgba(233,30,99,0.22)" />
+      <AnimatedCircle
+        cx={s.x}
+        cy={s.y}
+        r={r + 14}
+        fill="rgba(233,30,99,0.10)"
+        animatedProps={haloProps}
+      />
+      <AnimatedCircle
+        cx={s.x}
+        cy={s.y}
+        r={r + 6}
+        fill="rgba(233,30,99,0.22)"
+        animatedProps={midProps}
+      />
       <Circle cx={s.x} cy={s.y} r={r} fill="url(#starNext)" />
       <Line
         x1={s.x - r * 2.6}
@@ -380,15 +493,52 @@ function NextStar({ s }: { s: Resolved }) {
   )
 }
 
-function LitStar({ s }: { s: Resolved }) {
-  const magR = 6 - s.mag
-  const r = magR + 1
+function LitStar({
+  s,
+  i,
+  t,
+  sparkleT,
+}: {
+  s: Resolved
+  i: number
+  t: SharedValue<number>
+  sparkleT: SharedValue<number>
+}) {
+  const r = magnitudeToRadius(s.mag) + 0.5
+
+  // Per-star phase offset so adjacent stars breathe out of sync.
+  const phase = (i * 0.137) % 1
+
+  const coreProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    return { r: r * (1 + wave * 0.12), opacity: 0.85 + 0.15 * wave }
+  })
+
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    return { opacity: 0.05 + 0.2 * wave }
+  })
+
+  const sparkleProps = useAnimatedProps(() => {
+    'worklet'
+    const deg = sparkleT.value * 360
+    return { transform: [{ rotate: `${deg}deg` }] }
+  })
+
   return (
     <G>
-      <Circle cx={s.x} cy={s.y} r={r + 5} fill="rgba(244,236,222,0.05)" />
-      <Circle cx={s.x} cy={s.y} r={r} fill="url(#starLit)" />
-      {s.mag <= 2 ? (
-        <G>
+      <AnimatedCircle
+        cx={s.x}
+        cy={s.y}
+        r={r + 5}
+        fill="rgba(244,236,222,0.05)"
+        animatedProps={haloProps}
+      />
+      <AnimatedCircle cx={s.x} cy={s.y} r={r} fill="url(#starLit)" animatedProps={coreProps} />
+      {s.mag <= SPARKLE_MAG_THRESHOLD ? (
+        <AnimatedG animatedProps={sparkleProps} origin={`${s.x}, ${s.y}`}>
           <Line
             x1={s.x - r * 3}
             y1={s.y}
@@ -405,17 +555,46 @@ function LitStar({ s }: { s: Resolved }) {
             stroke="rgba(244,236,222,0.50)"
             strokeWidth={0.5}
           />
-        </G>
+        </AnimatedG>
       ) : null}
     </G>
   )
 }
 
-function CompletionRings({ cx, cy }: { cx: number; cy: number }) {
+/* ─ Completion rings ────────────────────────────────────────────── */
+
+function CompletionRings({ cx, cy, t }: { cx: number; cy: number; t: SharedValue<number> }) {
+  const innerProps = useAnimatedProps(() => {
+    'worklet'
+    // 5s loop derived from the 8s base.
+    const p = (t.value * (8 / 5)) % 1
+    return { r: 110 + p * 20, opacity: 0.35 * (1 - p) }
+  })
+  const outerProps = useAnimatedProps(() => {
+    'worklet'
+    const p = (t.value * (8 / 5) + 0.32) % 1
+    return { r: 130 + p * 20, opacity: 0.2 * (1 - p) }
+  })
   return (
     <G>
-      <Circle cx={cx} cy={cy} r={110} fill="none" stroke="rgba(233,30,99,0.35)" strokeWidth={0.5} />
-      <Circle cx={cx} cy={cy} r={130} fill="none" stroke="rgba(233,30,99,0.20)" strokeWidth={0.5} />
+      <AnimatedCircle
+        cx={cx}
+        cy={cy}
+        r={110}
+        fill="none"
+        stroke="rgba(233,30,99,0.35)"
+        strokeWidth={0.5}
+        animatedProps={innerProps}
+      />
+      <AnimatedCircle
+        cx={cx}
+        cy={cy}
+        r={130}
+        fill="none"
+        stroke="rgba(233,30,99,0.20)"
+        strokeWidth={0.5}
+        animatedProps={outerProps}
+      />
     </G>
   )
 }
@@ -439,8 +618,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   zodiacGlyph: {
-    // ♒ renders as plain text in RN (no emoji color fallback); paint
-    // it magenta so the cap still reads as accented.
     fontFamily: typography.uiBold,
     fontSize: 16,
     color: colors.magenta,

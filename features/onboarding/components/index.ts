@@ -1,3 +1,4 @@
+export { DateOfBirthInput } from './DateOfBirthInput'
 export { DayOneTask } from './DayOneTask'
 export { ManifiestoOrb } from './ManifiestoOrb'
 export { NumberInput } from './NumberInput'
