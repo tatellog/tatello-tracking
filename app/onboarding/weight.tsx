@@ -12,21 +12,6 @@ const MAX_KG = 300
 
 const TARGET_PLACEHOLDER = '75'
 
-/*
- * Screen 4 · Hoy pesas. El número se enmarca como punto de partida,
- * no veredicto. Layout:
- *
- *   • Header con titulo y caveat
- *   • Número 120px Hanken 900 cream + "kg" Cormorant italic magenta
- *   • Ruler decorativa abajo del input (21 ticks, cada 5to mayor y
- *     magenta)
- *   • Caveat italic "Es solo el punto de partida. / No es tu valor."
- *   • Skip link "No tengo báscula · registrar después"
- *
- * Count-up animation: al montar (y mientras el usuario no toque el
- * input), el número anima 0 → placeholder (75). En cuanto el usuario
- * escribe, pasamos `paused = true` al hook y el counter cede control.
- */
 export default function WeightScreen() {
   const router = useRouter()
   const insertWeight = useInsertInitialWeight()
@@ -36,8 +21,6 @@ export default function WeightScreen() {
   const [saving, setSaving] = useState(false)
   const [savingError, setSavingError] = useState<string | null>(null)
 
-  // Mientras el usuario no haya tocado y skip esté apagado, mostramos
-  // la animación count-up sobre el placeholder.
   const animated = useCountUp(TARGET_PLACEHOLDER, {
     duration: 1400,
     startDelay: 350,
@@ -174,7 +157,6 @@ const styles = StyleSheet.create({
     letterSpacing: -6,
     backgroundColor: 'transparent',
     padding: 0,
-    // line-height 0.9 en CSS → en RN se traduce a fontSize * 0.9 = 108
     lineHeight: 108,
   },
   numberDisabled: {

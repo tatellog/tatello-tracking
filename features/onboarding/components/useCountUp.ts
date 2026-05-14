@@ -1,25 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 
 type Options = {
-  /** Total duration in ms. Default 1400. */
   duration?: number
-  /** Delay before the count starts, in ms. Default 200. */
   startDelay?: number
-  /** Decimals to show (matches the target's intrinsic precision by default). */
   decimals?: number | 'auto'
-  /** When true, the counter ignores `target` and shows nothing. */
+  /** When true the hook releases control and shows `target` literal. */
   paused?: boolean
 }
 
-/*
- * Norte count-up — ease-out cubic, requestAnimationFrame-based.
+/**
+ * requestAnimationFrame-based count-up with ease-out cubic.
  *
  *   const value = useCountUp('75', { duration: 1400 })
  *
- * Equivalente al `useCounter` del prototype HTML. El valor regresado
- * es un string para preservar precisión decimal (.toFixed(decimals)).
- * Pasar `paused = true` (p.e. cuando el usuario empieza a escribir)
- * detiene la animación y deja el `target` literal en pantalla.
+ * Returned as a string to preserve decimal precision (`toFixed`).
  */
 export function useCountUp(target: string | number | null, opts: Options = {}): string {
   const { duration = 1400, startDelay = 200, decimals = 'auto', paused = false } = opts
@@ -28,8 +22,6 @@ export function useCountUp(target: string | number | null, opts: Options = {}): 
 
   useEffect(() => {
     if (paused || target === null || target === '') {
-      // El consumer toma control — devolvemos el target literal y
-      // cancelamos cualquier rAF pendiente.
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       setValue(target === null ? '0' : String(target))
       return
@@ -57,7 +49,6 @@ export function useCountUp(target: string | number | null, opts: Options = {}): 
         return
       }
       const p = Math.min(1, (t - start) / duration)
-      // ease-out cubic: 1 − (1 − p)³
       const eased = 1 - Math.pow(1 - p, 3)
       setValue((num * eased).toFixed(dec))
       if (p < 1) rafRef.current = requestAnimationFrame(tick)

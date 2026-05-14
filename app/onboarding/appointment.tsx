@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import {
-  ImgSlot,
+  PhotoPlaceholder,
   StepHeader,
   Timeline28,
   useCountUp,
@@ -28,26 +28,6 @@ const MONTH_ES = [
   'DIC',
 ] as const
 
-/*
- * Screen 5 · Tu cita en 28 días. Reemplaza la pantalla "Listo ✓" del
- * wizard anterior con una cita concreta — el north star metric del
- * producto es "no abandones", y un calendario claro es el ancla.
- *
- * Layout:
- *   • Eyebrow magenta "Tu cita"
- *   • "28" en Hanken 80px 900 magenta (count-up animation)
- *   • Caption italic Cormorant "días para tu primera comparativa."
- *   • Timeline28 (28 dots, scanline, day1 pulse, day28 ring)
- *   • Date block "NOS VEMOS / [WEEKDAY] [day italic magenta] [MONTH]"
- *   • Preview row con 2 ImgSlots (placeholders Día 1 / Día 28)
- *   • Línea poética "{name}, vuelves a esta pantalla. / Verás *lo
- *     que cambió*."
- *   • CTA "Empezar mi día 1 →"
- *
- * Al tap del CTA, persiste `onboarding_completed_at` y replaza la
- * ruta hacia /onboarding/day-one (replace, no push, para que back no
- * pueda regresar al wizard).
- */
 export default function AppointmentScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
@@ -75,9 +55,8 @@ export default function AppointmentScreen() {
         onboarding_completed_at: new Date().toISOString(),
       })
     } catch {
-      // Si el patch falla aún dejamos pasar — el día-one re-leerá el
-      // perfil al montar; mejor que bloquear al usuario en una
-      // pantalla "ya casi" por un blip de red.
+      // Día 1 re-fetches the profile on mount, so a transient patch
+      // failure doesn't strand the user on the appointment screen.
     }
     router.replace('/onboarding/day-one')
   }
@@ -108,8 +87,8 @@ export default function AppointmentScreen() {
         </View>
 
         <View style={styles.previewRow}>
-          <ImgSlot prefix="Día 1" caption={'tu foto\nde hoy'} />
-          <ImgSlot prefix="Día 28" caption={'tu foto\nen 4 semanas'} />
+          <PhotoPlaceholder prefix="Día 1" caption={'tu foto\nde hoy'} />
+          <PhotoPlaceholder prefix="Día 28" caption={'tu foto\nen 4 semanas'} />
         </View>
 
         <Text style={styles.poet}>

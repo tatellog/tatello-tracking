@@ -3,21 +3,11 @@ import { StyleSheet, View } from 'react-native'
 import { colors } from '@/theme'
 
 type Props = {
+  /** 1-indexed: idx < current is done, idx === current is active. */
   current: number
   total: number
 }
 
-/*
- * Norte progress bar — N segmentos de 3px de alto separados por 4px.
- *
- *   done    → cream sólido (`leche`)
- *   active  → magenta con glow (box-shadow simulado vía sombra RN)
- *   pending → bruma sólido
- *
- * El `current` es 1-indexed; `idx < current` queda "done", `idx ===
- * current` queda "active". No animamos el llenado — la transición
- * de pantalla ya es la señal de progreso.
- */
 export function ProgressBar({ current, total }: Props) {
   return (
     <View

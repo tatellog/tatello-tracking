@@ -12,19 +12,14 @@ import Animated, {
 
 import { colors, typography } from '@/theme'
 
-/*
- * Timeline visual — 28 puntos sobre una línea horizontal, con:
- *
- *   • Día 1 (idx 0) — punto 12×12 magenta con `pulseGlow` infinito
- *   • Día 28 (idx 27) — circle 10×10 outline magenta + ring dashed
- *     animado que rota (`ringSpin` 18s lineal)
- *   • Resto — puntos 4×4 alpha-leche, con dot-pop stagger al montar
- *   • Scanline magenta deslizando left→right cada 6s
- *   • Labels "Día 1" / "Día 28" abajo, "Día 1" en magenta
- *
- * Las animaciones son Reanimated SharedValues; en RN no podemos
- * stagger animations sólo con CSS delays, así que cada dot recibe
- * su delay propio basado en su índice.
+const DOT_COUNT = 28
+const TODAY_IDX = 0
+const TARGET_IDX = DOT_COUNT - 1
+
+/**
+ * 28-dot horizontal timeline. Day 1 pulses, Day 28 rotates a dashed
+ * ring, a magenta scan line sweeps left→right every 6 s. Static dots
+ * in between are alpha-leche; the animations only run on day 1 / 28.
  */
 export function Timeline28() {
   const scan = useSharedValue(0)
@@ -54,15 +49,10 @@ export function Timeline28() {
     opacity: scan.value > 0.1 && scan.value < 0.9 ? 1 : 0,
   }))
 
-  const pulseStyle = useAnimatedStyle(() => {
-    // box-shadow no es animable per-frame en RN sin overhead; en su
-    // lugar simulamos el pulse con un ring que expande y se desvanece.
-    const p = pulse.value
-    return {
-      transform: [{ scale: 1 + p * 4 }],
-      opacity: (1 - p) * 0.55,
-    }
-  })
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulse.value * 4 }],
+    opacity: (1 - pulse.value) * 0.55,
+  }))
 
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${ring.value * 360}deg` }],
@@ -73,8 +63,8 @@ export function Timeline28() {
       <View style={styles.track} />
       <Animated.View style={[styles.scan, scanStyle]} />
       <View style={styles.dotsRow}>
-        {Array.from({ length: 28 }).map((_, i) => {
-          if (i === 0) {
+        {Array.from({ length: DOT_COUNT }).map((_, i) => {
+          if (i === TODAY_IDX) {
             return (
               <View key={i} style={styles.dotWrap}>
                 <Animated.View style={[styles.day1Pulse, pulseStyle]} />
@@ -82,7 +72,7 @@ export function Timeline28() {
               </View>
             )
           }
-          if (i === 27) {
+          if (i === TARGET_IDX) {
             return (
               <View key={i} style={styles.dotWrap}>
                 <Animated.View style={[styles.day28Ring, ringStyle]} />

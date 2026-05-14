@@ -1,32 +1,23 @@
 import { StyleSheet, Text, View } from 'react-native'
-import Svg, { Defs, Line, Pattern, Rect, G } from 'react-native-svg'
+import Svg, { Defs, G, Line, Pattern, Rect } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 type Props = {
-  /** "DÍA 1" — el strong prefix renderizado en magenta uppercase. */
+  /** Magenta uppercase prefix, e.g. "DÍA 1". */
   prefix: string
-  /** Body de la caption — mono uppercase niebla. */
+  /** Mono-uppercase niebla body, e.g. "tu foto\nde hoy". */
   caption: string
-  /** Override del alto del slot (default 72px). */
   height?: number
 }
 
-/*
- * Placeholder visual del prototype HTML — futura ubicación de las
- * fotos de Día 1 / Día 28. Replica:
- *
- *   • Hatching diagonal a 45° (líneas leche alpha 0.025)
- *   • Border dashed bruma 1px (RN no soporta `dashed` borderStyle
- *     uniformemente, así que dibujamos un rectángulo SVG con
- *     strokeDasharray)
- *   • Dot magenta 4×4 en top-left como "registration mark"
- *   • Caption: prefix magenta uppercase + cuerpo niebla mono
- *
- * Producción: este slot se reemplaza por la cámara real una vez que
- * el flujo de captura esté listo. Sirve aquí como teaser visual.
+/**
+ * Photo-placeholder slot — diagonal hatching + dashed bruma border +
+ * 4 px magenta registration dot. RN's `borderStyle: 'dashed'` doesn't
+ * render reliably on every platform, so we draw the dashed rectangle
+ * via SVG with `strokeDasharray`.
  */
-export function ImgSlot({ prefix, caption, height = 72 }: Props) {
+export function PhotoPlaceholder({ prefix, caption, height = 72 }: Props) {
   return (
     <View style={[styles.slot, { height }]}>
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">

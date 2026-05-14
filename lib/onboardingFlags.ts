@@ -5,20 +5,10 @@ const VISITED_DAY_ONE_KEY = '@app:visited_day_one'
 const FRICTIONS_KEY = '@app:onboarding_frictions'
 const SKIP_WEIGHT_KEY = '@app:onboarding_skip_weight'
 
-/*
- * Tiny AsyncStorage flag that records whether the user has cleared
- * the Día 1 ceremony. The Bloque F route guard reads this to decide
- * whether to bounce a freshly-onboarded user back to /onboarding/day-one
- * the next time they open the app — so the celebration can't be
- * accidentally skipped by closing the app between Done and Home.
- *
- * AsyncStorage doesn't notify of writes, so we layer a small pub/sub
- * on top: mark / clear update the in-memory cache and broadcast to
- * every active useVisitedDayOne subscriber. Without this, the route
- * guard would read a stale `false` after markVisitedDayOne and bounce
- * the user right back to /onboarding/day-one — the exact loop we ran
- * into when Día 1's "Entrar a la app" CTA didn't actually exit.
- */
+// The Día 1 flag persists in AsyncStorage but AsyncStorage doesn't
+// notify on writes. The pub/sub layer below keeps useVisitedDayOne
+// in sync after markVisitedDayOne — without it the route guard reads
+// a stale `false` and bounces the user back into /onboarding/day-one.
 
 let cachedValue: boolean | null = null
 let inFlight: Promise<boolean> | null = null
@@ -47,10 +37,6 @@ export async function markVisitedDayOne() {
   notify(true)
 }
 
-/*
- * Wipe the flag — called from sign-out so the next user's first
- * /(tabs) entry triggers Día 1 again.
- */
 export async function clearVisitedDayOne() {
   await AsyncStorage.removeItem(VISITED_DAY_ONE_KEY)
   notify(false)
@@ -60,18 +46,8 @@ export async function readVisitedDayOne(): Promise<boolean> {
   return ensureLoaded()
 }
 
-/*
- * Norte onboarding — datos que el wizard captura pero que aún no
- * tienen columna propia en `profiles`:
- *
- *   • frictions: array de strings (lo que se le ha atravesado al
- *     usuario en otras apps). Entrena al coach. Hoy lo persistimos
- *     local; cuando el backend acepte el campo, este helper se
- *     reemplaza por una mutación de profile.
- *   • skipWeight: bandera indicando que el usuario no tenía báscula
- *     al onboarding. El brief la lee para mostrar "registra tu peso"
- *     como prompt en vez de tratar el null como dato faltante.
- */
+// Captured during onboarding but no column for them on `profiles` yet —
+// stored locally until the schema grows the fields.
 export async function saveFrictions(frictions: readonly string[]): Promise<void> {
   await AsyncStorage.setItem(FRICTIONS_KEY, JSON.stringify(frictions))
 }

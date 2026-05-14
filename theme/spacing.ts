@@ -1,16 +1,14 @@
-/*
+/**
  * Norte spatial tokens.
  *
- * Spacing es la escala s-1…s-9 documentada en el design handoff
- * (4/8/12/16/24/32/48/64/96). Mantengo además los aliases xs/sm/md…
- * para que features pre-existentes sigan compilando.
- *
- * Radius: Norte usa 4px casi universalmente (botones, cards, option
- * rows, segmented toggle), 2px en piezas pequeñas (tick boxes, pills),
- * y 50% para circles decorativos. Los aliases viejos quedan mapeados.
- *
- * Shadows: el glow magenta es el único que cuenta. `tileBig` se queda
- * por compatibilidad pero apunta al mismo glow.
+ *   - `spacing`: the s1…s9 scale documented in the design handoff
+ *     (4/8/12/16/24/32/48/64/96 px). The t-shirt aliases (xs, sm, …)
+ *     are kept so untouched features keep compiling.
+ *   - `radius`: Norte uses 4 px for almost every surface
+ *     (cards/buttons/cells), 2 px for tick boxes/pills, 100 (pill)
+ *     for the legacy round CTAs.
+ *   - `shadows`: the magenta glow is the only one that matters for
+ *     CTAs. `card` and `screenOuter` stay for pre-existing surfaces.
  */
 export const spacing = {
   // Norte canonical scale
@@ -35,12 +33,9 @@ export const spacing = {
 } as const
 
 export const radius = {
-  // Norte canonical
   tick: 2,
   cell: 4,
   card: 4,
-
-  // Aliases (legacy — Pearl Mauve used wider radii)
   tile: 4,
   screen: 4,
   pill: 100,
@@ -54,9 +49,8 @@ export const shadows = {
     shadowRadius: 12,
     elevation: 2,
   },
+  /** @deprecated Use `ctaMagenta` */
   ctaMauve: {
-    // Magenta glow del Primary CTA — replicates the CSS
-    // `0 6px 24px -8px var(--magenta-glow)`.
     shadowColor: '#E91E63',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,

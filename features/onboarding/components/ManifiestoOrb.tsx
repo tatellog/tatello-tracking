@@ -12,24 +12,17 @@ import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
-/*
- * Orb decorativo del Manifiesto. Tres capas concéntricas, todas
- * absolute, ancladas bottom-right del screen:
+/**
+ * Manifiesto decorative orb. Three concentric layers anchored
+ * bottom-right of the screen:
  *
- *   • `.core` — radial gradient magenta → transparent, anima
- *     `breathe` (5.5s ease-in-out infinite, scale 1↔1.06, opacity
- *     0.55↔0.95)
- *   • `.ring` — círculo de borde alpha-magenta 1px, anima `breathe`
- *     en reverso para contra-pulsar
- *   • `.satellite` — punto de 6px sólido magenta con glow,
- *     `orbitalDrift` a 14s linear infinite (rotación + translateX 28px)
- *
- * En RN, los keyframes CSS se traducen a Reanimated sharedValues +
- * withRepeat reverse=true. El satellite usa la mismas dos transforms
- * que el CSS — rotación, translate, rotación contraria — para que
- * orbite manteniendo orientación.
+ *   - core: radial gradient magenta → transparent, scale + opacity
+ *     yoyo (Reanimated translation of the CSS `breathe` keyframe).
+ *   - ring: 1 px alpha-magenta circle, runs the yoyo in reverse so
+ *     it contra-pulses.
+ *   - satellite: 6 px solid magenta dot orbiting at 28 px radius.
  */
-export function ManifOrb() {
+export function ManifiestoOrb() {
   const breath = useSharedValue(0)
   const counterBreath = useSharedValue(1)
   const drift = useSharedValue(0)

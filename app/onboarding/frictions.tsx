@@ -14,25 +14,11 @@ const FRICTIONS = [
   'Recaigo en atracones',
 ] as const
 
+// "Prefiero no decir" is mutually exclusive with the option list.
+// Modelled as a sentinel inside the same array so persistence stays
+// one shape (until `profiles` grows a column for it).
 const SKIP_SENTINEL = '__skip__'
 
-/*
- * Screen 2 · Lo que te ha costado. Entrena al coach: lo que el
- * usuario marca aquí informa cómo el coach habla después. Está
- * deliberadamente *antes* de pedir datos demográficos.
- *
- * Estado:
- *   - `selected` es un array de strings (las fricciones marcadas)
- *   - "Prefiero no decir" se modela vía el sentinel `__skip__`. Al
- *     prenderlo se vacía todo lo demás; al prender cualquier otro,
- *     se quita el skip.
- *   - El CTA habilita con al menos una opción O el skip prendido.
- *
- * Persistimos a AsyncStorage al "Continuar" porque la tabla
- * `profiles` todavía no tiene columna para esto; el helper
- * `saveFrictions` está en `lib/onboardingFlags` y se reemplazará
- * por una mutación de profile cuando la columna exista.
- */
 export default function FrictionsScreen() {
   const router = useRouter()
   const [selected, setSelected] = useState<readonly string[]>([])

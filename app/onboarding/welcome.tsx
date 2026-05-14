@@ -1,41 +1,15 @@
-import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { ManifOrb, ProgressBar } from '@/features/onboarding/components'
-import { colors, shadows, typography } from '@/theme'
+import { PrimaryCta } from '@/components/PrimaryCta'
+import { ManifiestoOrb, ProgressBar } from '@/features/onboarding/components'
+import { colors, typography } from '@/theme'
 
-/*
- * Screen 1 · Manifiesto. La pantalla de bienvenida — no pide nada,
- * sólo comunica filosofía. Layout:
- *
- *   • Progress bar (1/5)
- *   • Eyebrow magenta uppercase "NORTE · EL MANIFIESTO"
- *   • Quote 44px Hanken 900:
- *       "La perfección
- *        no es necesaria."
- *       (block) "La dirección sí." — Cormorant italic magenta
- *   • Hairline magenta 36×1
- *   • Meta paragraph bone con "**En 28 días**" en italic magenta
- *   • CTA "Empezar →"
- *   • Orb decorativo absoluto al fondo-derecha
- *
- * El layout heredado del prototype HTML pone la quota centrada
- * vertical-ish con `justify-content: center`; aquí el `flex: 1` del
- * stage la centra entre el progress bar y el CTA.
- *
- * Nota: usamos directamente SafeAreaView en vez de WizardLayout
- * porque el padding del manifiesto difiere (no hay back link, hay
- * orb decorativo absoluto). Conserva el mismo padding lateral 24.
- */
+// Step 1 — Manifiesto. Standalone scaffold (not WizardLayout) because
+// it has no back link and the decorative orb is absolute-positioned.
 export default function ManifiestoScreen() {
   const router = useRouter()
-
-  const handleStart = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    router.push('/onboarding/frictions')
-  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -44,7 +18,7 @@ export default function ManifiestoScreen() {
       </View>
 
       <View style={styles.stage}>
-        <ManifOrb />
+        <ManifiestoOrb />
 
         <View style={styles.content}>
           <Text style={styles.eyebrow}>Norte · el manifiesto</Text>
@@ -59,15 +33,7 @@ export default function ManifiestoScreen() {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          onPress={handleStart}
-          activeOpacity={0.85}
-          style={styles.cta}
-          accessibilityRole="button"
-          accessibilityLabel="Empezar"
-        >
-          <Text style={styles.ctaLabel}>Empezar →</Text>
-        </TouchableOpacity>
+        <PrimaryCta label="Empezar →" onPress={() => router.push('/onboarding/frictions')} />
       </View>
     </SafeAreaView>
   )
@@ -139,20 +105,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 16,
     paddingTop: 12,
-  },
-  cta: {
-    height: 54,
-    borderRadius: 4,
-    backgroundColor: colors.magenta,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.ctaMagenta,
-  },
-  ctaLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 12,
-    color: '#FFFFFF',
-    letterSpacing: 2.16,
-    textTransform: 'uppercase',
   },
 })

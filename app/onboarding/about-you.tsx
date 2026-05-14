@@ -17,23 +17,9 @@ const SEX_OPTIONS = [
   { value: 'male' as const, label: 'Masculino' },
 ]
 
-/*
- * Screen 3 · Cuéntame de ti. Combina lo que antes eran cuatro
- * pantallas (nombre, fecha de nacimiento, sexo biológico, altura)
- * en una sola — el design Norte sostiene que el form fatigue de
- * cuatro pasos no agrega contexto al usuario.
- *
- *   • Nombre (texto)
- *   • Edad (1–3 dígitos) + Altura cm (1–3 dígitos) en grid de 2
- *   • Sexo biológico (segmented Femenino/Masculino) + sub
- *     "metabolismo, no identidad" en Cormorant niebla
- *
- * Edad → fecha de nacimiento. Nuestro schema requiere `date_of_birth`
- * (YYYY-MM-DD); convertimos asumiendo "cumpleaños el 1 de enero" del
- * año correspondiente. Es lo suficientemente bueno para calcular
- * BMR; cuando el usuario quiera la fecha exacta puede editarla en
- * Settings.
- */
+// `profiles.date_of_birth` is YYYY-MM-DD but the design captures
+// only age. Synthesise a Jan-1 DOB so BMR math stays valid; the user
+// can edit the exact date in Settings later.
 export default function AboutYouScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
@@ -152,8 +138,6 @@ export default function AboutYouScreen() {
 
 function ageToISODate(age: number): string {
   const year = new Date().getFullYear() - age
-  // Fecha sintética: 1 de enero del año correspondiente. El BMR no
-  // depende del día exacto, sólo del año aproximado.
   return `${year}-01-01`
 }
 

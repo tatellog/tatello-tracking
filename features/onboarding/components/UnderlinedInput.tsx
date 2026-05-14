@@ -15,19 +15,10 @@ type Props = {
   autoCorrect?: boolean
   returnKeyType?: TextInputProps['returnKeyType']
   onSubmitEditing?: () => void
-  /** Reduce font size for narrow grid cells (edad / altura). */
+  /** Narrows the value font for grid cells (edad / altura). */
   compact?: boolean
 }
 
-/*
- * El input "fld" del prototype HTML:
- *
- *     LABEL UPPERCASE (10px 700 niebla, 22% tracking)
- *     value en Hanken 24px 700 cream con border-bottom 2px
- *
- * Focus cambia border-bottom + caret a magenta. Placeholder en bruma.
- * `compact` baja el value a 20px para las columnas de edad/altura.
- */
 export function UnderlinedInput({
   label,
   value,
@@ -101,7 +92,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.magenta,
   },
   inputWeb: {
-    // @ts-expect-error — outline* es estilo web-only que RNW acepta.
+    // @ts-expect-error — outline* is web-only; RNW accepts it.
     outlineStyle: 'none',
   },
 })

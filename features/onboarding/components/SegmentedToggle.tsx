@@ -14,12 +14,6 @@ type Props<T extends string> = {
   onChange: (next: T) => void
 }
 
-/*
- * Segmented toggle Norte (femenino/masculino). Container con border
- * bruma + fondo bg-card; los botones internos son transparentes hasta
- * seleccionarse, donde toman bg magenta-tint2 + inset border magenta
- * y texto cream.
- */
 export function SegmentedToggle<T extends string>({ value, options, onChange }: Props<T>) {
   return (
     <View style={styles.container} accessibilityRole="radiogroup">

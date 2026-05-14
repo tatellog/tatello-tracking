@@ -1,32 +1,28 @@
-/*
+/**
  * Norte typography — Hanken Grotesk + Cormorant Garamond italic.
  *
- * Hanken Grotesk para todo el UI: display (números/titles 900 black),
- * pesos 400/500/600/700/800/900 disponibles. Cormorant Garamond
- * EXCLUSIVAMENTE en italic 500/600 para la palabra destacada y frases
- * poéticas cortas (la "soul" del Manifiesto).
- *
- * El italic no se usa con Hanken — italic = Cormorant, siempre.
- *
- * Compatibilidad: los nombres `display/displaySemi/ui/...` siguen
- * vigentes pero apuntan a Hanken. Código nuevo puede usar `serif`
- * para el énfasis Cormorant italic.
+ *   - Hanken is the only sans (display + UI). Use the weighted
+ *     aliases (`displayHeavy`, `uiBold`, etc.) so swapping weights
+ *     stays a one-line change.
+ *   - Cormorant Garamond is used EXCLUSIVELY in italic for the
+ *     emphasised word + short poetic lines. Reach for `serif` /
+ *     `serifSemi` only there.
+ *   - Italic is reserved for the serif. Hanken stays upright.
  */
 export const typography = {
-  // Display (Hanken 900 / 800) — números grandes, titulares
+  // Display sans (Hanken)
   display: 'HankenGrotesk_900Black',
   displayHeavy: 'HankenGrotesk_900Black',
-  displayBold: 'HankenGrotesk_700Bold',
   displayMedium: 'HankenGrotesk_500Medium',
   displaySemi: 'HankenGrotesk_600SemiBold',
 
-  // UI (Hanken 400/500/600/700) — labels, body, botones
+  // UI sans (Hanken)
   ui: 'HankenGrotesk_400Regular',
   uiMedium: 'HankenGrotesk_500Medium',
   uiSemi: 'HankenGrotesk_600SemiBold',
   uiBold: 'HankenGrotesk_700Bold',
 
-  // Serif italic (Cormorant) — sólo para énfasis y frases cortas
+  // Serif italic (Cormorant)
   serif: 'CormorantGaramond_500Medium_Italic',
   serifSemi: 'CormorantGaramond_600SemiBold_Italic',
 
@@ -72,7 +68,6 @@ export const typography = {
 export type TypographyFamily =
   | 'display'
   | 'displayHeavy'
-  | 'displayBold'
   | 'displayMedium'
   | 'displaySemi'
   | 'ui'

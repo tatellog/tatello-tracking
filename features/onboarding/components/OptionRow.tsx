@@ -9,22 +9,12 @@ type Props = {
   selected: boolean
   onPress: () => void
   /**
-   * "Prefiero no decir" se diferencia visualmente — uppercase niebla
-   * 12px en vez de body bone 13.5px — para que se lea como "opt out"
-   * y no como "otra opción".
+   * Visually distinct opt-out variant ("Prefiero no decir") — uppercase
+   * niebla instead of body bone so it doesn't read as "another option".
    */
   neutral?: boolean
 }
 
-/*
- * Fila de checklist Norte. Card bg-card con border bruma; al
- * seleccionar se llena con magenta-tint, border magenta + glow, y el
- * tick box (18×18) se rellena de magenta con ✓ blanco.
- *
- * Touchable porque el press feedback se controla vía activeOpacity —
- * la opt:hover translateX(3px) del prototype HTML no se replica en
- * RN (no hay hover en mobile), pero el haptic + opacity bastan.
- */
 export function OptionRow({ label, selected, onPress, neutral = false }: Props) {
   const handlePress = () => {
     Haptics.selectionAsync().catch(() => {})
