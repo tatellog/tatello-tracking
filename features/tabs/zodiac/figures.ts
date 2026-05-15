@@ -225,26 +225,33 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     ],
   },
 
-  // Libra — light Y/triangle with one bright star at the top apex.
+  // Libra — a triangle of three bright stars (top-left, top-right,
+  // bottom-right) with two trailing chains: a three-star tail hanging
+  // down-left off the top-left star, and a two-star tail dropping off
+  // the bottom-right star. The top-left star anchors as the hero; the
+  // other two triangle stars stay bright but un-glowed.
   libra: {
     label: 'LIBRA',
     glyph: '♎',
     stars: [
-      { x: 0.5, y: 0.12, mag: 1.8 }, // 0 top apex (anchor)
-      { x: 0.2, y: 0.46, mag: 2.8 }, // 1 left tip
-      { x: 0.8, y: 0.46, mag: 2.8 }, // 2 right tip
-      { x: 0.36, y: 0.78, mag: 3.5 }, // 3 lower-left
-      { x: 0.64, y: 0.78, mag: 3.5 }, // 4 lower-right
-      { x: 0.5, y: 0.6, mag: 3.5 }, // 5 inner pivot
+      { x: 0.26, y: 0.2, mag: 1.5 }, // 0 A — top-left (anchor)
+      { x: 0.66, y: 0.24, mag: 1.9 }, // 1 B — top-right
+      { x: 0.74, y: 0.6, mag: 1.9 }, // 2 C — bottom-right
+      { x: 0.28, y: 0.4, mag: 3.2 }, // 3 D — left tail
+      { x: 0.22, y: 0.54, mag: 3.2 }, // 4 E — left tail
+      { x: 0.15, y: 0.7, mag: 3.0 }, // 5 F — left tail end
+      { x: 0.6, y: 0.78, mag: 3.2 }, // 6 G — lower tail
+      { x: 0.68, y: 0.92, mag: 3.0 }, // 7 H — lower tail end
     ],
     lines: [
-      [0, 1],
-      [0, 2],
-      [1, 3],
-      [2, 4],
-      [3, 5],
+      [0, 1], // triangle — top edge
+      [0, 2], // triangle — diagonal
+      [1, 2], // triangle — right edge
+      [0, 3], // left tail
+      [3, 4],
       [4, 5],
-      [1, 2],
+      [2, 6], // lower tail
+      [6, 7],
     ],
   },
 
