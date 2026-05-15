@@ -16,13 +16,17 @@ type Props = {
  * The committed state lives elsewhere now: the constellation burst,
  * the coach line and the filled "HOY" star in the WeekStrip all
  * confirm the workout, and undoing happens by tapping that same star.
- * Keeping a committed pill here just repeated those signals in the
- * screen's most valuable slot.
  *
- * Magenta-tinted bg, full magenta border + glow, "HOY · Marcar
- * entreno · ○". The empty circle evokes an unchecked checkbox — tap
- * to fill. Verb+noun "marcar entreno" makes the action explicit
- * (it's a check-in, not "go train").
+ * It reads as a tappable card, not a label: a magenta-tinted surface
+ * with a full magenta border and glow, a large unchecked-checkbox
+ * circle, and an imperative title with a state-reminder subtitle. The
+ * circle is the only affordance — a check-in toggles state, so an
+ * unchecked checkbox is the honest signal; a chevron would imply
+ * navigation that does not happen.
+ *
+ * The whole card lives on the inner `card` View, not on the Pressable
+ * — a function `style` on the Pressable did not apply here, so the
+ * surface, border and row layout are all on a plain inner View.
  */
 export function TodayWorkoutButton({ onConfirm }: Props) {
   const handlePress = () => {
@@ -35,65 +39,70 @@ export function TodayWorkoutButton({ onConfirm }: Props) {
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel="Marcar entreno de hoy"
-      style={({ pressed }) => [styles.shell, pressed && styles.pressed]}
+      accessibilityHint="Aún no registras tu entreno de hoy"
     >
-      <View style={styles.row}>
-        <Text style={styles.eyebrow}>HOY</Text>
-        <Text style={styles.title}>Marcar entreno</Text>
+      <View style={styles.card}>
         <View style={styles.checkWrap}>
-          <Svg width={20} height={20} viewBox="0 0 24 24">
-            <Circle cx={12} cy={12} r={9} stroke={colors.magenta} strokeWidth={1.6} fill="none" />
+          <Svg width={30} height={30} viewBox="0 0 30 30">
+            <Circle cx={15} cy={15} r={13} fill={colors.magentaTint2} />
+            <Circle cx={15} cy={15} r={13} stroke={colors.magenta} strokeWidth={2} fill="none" />
           </Svg>
+        </View>
+
+        <View style={styles.textCol}>
+          <Text style={styles.eyebrow}>HOY</Text>
+          <Text style={styles.title}>Marca tu entreno</Text>
+          <Text style={styles.subtitle}>Aún no lo registras</Text>
         </View>
       </View>
     </Pressable>
   )
 }
 
-const SHELL_HEIGHT = 52
-
 const styles = StyleSheet.create({
-  shell: {
-    height: SHELL_HEIGHT,
-    borderRadius: SHELL_HEIGHT / 2,
-    backgroundColor: 'rgba(233,30,99,0.12)',
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(233,30,99,0.15)',
     borderWidth: 1.5,
     borderColor: colors.magenta,
     marginBottom: 18,
-    paddingHorizontal: 22,
-    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     shadowColor: colors.magenta,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 14,
     elevation: 4,
   },
-  pressed: {
-    transform: [{ scale: 0.985 }],
-    opacity: 0.92,
-  },
-  row: {
-    flexDirection: 'row',
+  checkWrap: {
+    width: 30,
+    height: 30,
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+  },
+  textCol: {
+    flex: 1,
   },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: 9.5,
     color: colors.magenta,
     letterSpacing: 2.4,
+    marginBottom: 2,
   },
   title: {
-    flex: 1,
     fontFamily: typography.displayHeavy,
-    fontSize: 18,
+    fontSize: 19,
     color: colors.leche,
     letterSpacing: -0.4,
   },
-  checkWrap: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  subtitle: {
+    fontFamily: typography.ui,
+    fontSize: 12.5,
+    color: colors.niebla,
+    marginTop: 2,
   },
 })

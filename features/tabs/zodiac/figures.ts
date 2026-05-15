@@ -182,32 +182,46 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
 
   // Virgo — radiating multi-armed figure with Spica anchoring the
   // bottom.
+  // Virgo — the canonical figure. The body is a FIVE-sided pentagon
+  // C-D-F-G-E: top edge C-D, a right side that bends at the knee F
+  // (D-F runs near-vertical, F-G kicks out to the wider bottom-right
+  // corner G), bottom edge G-E, left edge E-C. The pentagon frames
+  // the counter in its interior — no star or line touches the number.
+  // Four branches: antenna off C, arm off D up to a corner, left leg
+  // off the central node E, and the forked lower-right leg off G.
+  // C (the biggest star) anchors as the fuchsia hero.
   virgo: {
     label: 'VIRGO',
     glyph: '♍',
     stars: [
-      { x: 0.5, y: 0.08, mag: 3.0 }, // 0 head top
-      { x: 0.32, y: 0.22, mag: 3.0 }, // 1 left arm out
-      { x: 0.16, y: 0.36, mag: 3.5 }, // 2 left hand
-      { x: 0.68, y: 0.22, mag: 3.0 }, // 3 right arm out
-      { x: 0.86, y: 0.36, mag: 3.0 }, // 4 right hand
-      { x: 0.5, y: 0.42, mag: 3.0 }, // 5 chest
-      { x: 0.5, y: 0.62, mag: 3.0 }, // 6 waist
-      { x: 0.32, y: 0.74, mag: 3.5 }, // 7 left hip
-      { x: 0.68, y: 0.74, mag: 3.5 }, // 8 right hip
-      { x: 0.5, y: 0.92, mag: 1.5 }, // 9 Spica (anchor)
+      { x: 0.22, y: 0.1, mag: 3.4 }, // 0 H — antenna tip
+      { x: 0.4, y: 0.2, mag: 1.5 }, // 1 C — pentagon top-left (anchor)
+      { x: 0.63, y: 0.28, mag: 3.0 }, // 2 D — pentagon top-right
+      { x: 0.78, y: 0.15, mag: 3.2 }, // 3 B — arm
+      { x: 0.92, y: 0.05, mag: 3.4 }, // 4 A — arm tip
+      { x: 0.66, y: 0.47, mag: 3.4 }, // 5 F — pentagon right knee
+      { x: 0.71, y: 0.69, mag: 1.9 }, // 6 G — pentagon bottom-right
+      { x: 0.33, y: 0.66, mag: 2.6 }, // 7 E — pentagon bottom-left (node)
+      { x: 0.2, y: 0.79, mag: 3.2 }, // 8 I — left leg
+      { x: 0.07, y: 0.93, mag: 3.2 }, // 9 J — left foot
+      { x: 0.58, y: 0.83, mag: 3.2 }, // 10 L — right leg fork
+      { x: 0.74, y: 0.91, mag: 3.2 }, // 11 K — right foot
+      { x: 0.46, y: 0.95, mag: 3.4 }, // 12 M — lower dangle
     ],
     lines: [
-      [0, 5],
-      [5, 1],
-      [1, 2],
-      [5, 3],
+      [1, 0], // antenna — C to H
+      [1, 2], // pentagon — top edge C-D
+      [2, 5], // pentagon — right side upper D-F
+      [5, 6], // pentagon — right side lower F-G (the knee)
+      [6, 7], // pentagon — bottom edge G-E
+      [7, 1], // pentagon — left edge E-C
+      [2, 3], // arm — D up to the corner
       [3, 4],
-      [5, 6],
-      [6, 7],
-      [6, 8],
-      [7, 9],
+      [7, 8], // left leg off the node E
       [8, 9],
+      [6, 10], // lower-right leg off G
+      [10, 11],
+      [10, 12], // lower dangle
     ],
   },
 
