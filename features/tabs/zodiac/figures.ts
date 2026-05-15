@@ -114,21 +114,32 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
 
   // Cáncer — sparse Y with 5 faint stars. No bright anchor in
   // reality, but we keep one at the apex so the sparkle still fires.
+  // Cáncer — the crab as an inverted Y: two arms bowing gently up and
+  // out from a bright fuchsia junction, and a stem dropping to a
+  // forked pair of claws below the counter. The forked base mirrors
+  // the two raised arms so the figure reads balanced top-to-bottom
+  // rather than as a lonely stem dangling off the apex.
   cancer: {
     label: 'CÁNCER',
     glyph: '♋',
     stars: [
-      { x: 0.3, y: 0.22, mag: 3.0 }, // 0 top-left arm
-      { x: 0.5, y: 0.36, mag: 1.9 }, // 1 apex (anchor)
-      { x: 0.72, y: 0.22, mag: 3.0 }, // 2 top-right arm
-      { x: 0.5, y: 0.58, mag: 3.0 }, // 3 stem mid
-      { x: 0.5, y: 0.82, mag: 3.5 }, // 4 stem bottom
+      { x: 0.2, y: 0.18, mag: 2.8 }, // 0 left arm tip
+      { x: 0.34, y: 0.25, mag: 3.2 }, // 1 left arm mid (bows up)
+      { x: 0.5, y: 0.37, mag: 1.5 }, // 2 junction (anchor)
+      { x: 0.66, y: 0.25, mag: 3.2 }, // 3 right arm mid (bows up)
+      { x: 0.8, y: 0.17, mag: 2.8 }, // 4 right arm tip
+      { x: 0.5, y: 0.62, mag: 3.2 }, // 5 stem mid
+      { x: 0.36, y: 0.82, mag: 3.0 }, // 6 left claw
+      { x: 0.63, y: 0.84, mag: 3.0 }, // 7 right claw
     ],
     lines: [
-      [0, 1],
+      [0, 1], // left arm
       [1, 2],
-      [1, 3],
+      [2, 3], // right arm
       [3, 4],
+      [2, 5], // stem
+      [5, 6], // claws
+      [5, 7],
     ],
   },
 
