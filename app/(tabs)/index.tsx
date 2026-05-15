@@ -18,8 +18,8 @@ import {
   PrimaryCta,
   RingCard,
   SectionHeader,
-  SlideToConfirm,
   TabHeader,
+  TodayWorkoutButton,
   WeekStrip,
   type WeekDayCell,
 } from '@/features/tabs/components'
@@ -133,7 +133,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
-  const handleSlideConfirm = () => {
+  const handleConfirmWorkout = () => {
     const wasFirstDay = isFirstDay
     toggleToday.mutate(true)
     if (wasFirstDay) {
@@ -146,7 +146,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
     }
   }
 
-  const handleSlideUndo = () => {
+  const handleUndoWorkout = () => {
     toggleToday.mutate(false)
   }
 
@@ -177,10 +177,10 @@ function TodayContent({ ctx, cadence }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(120)}>
-            <SlideToConfirm
+            <TodayWorkoutButton
               committed={ctx.today_workout_completed}
-              onConfirm={handleSlideConfirm}
-              onUndo={handleSlideUndo}
+              onConfirm={handleConfirmWorkout}
+              onUndo={handleUndoWorkout}
             />
           </Animated.View>
 
