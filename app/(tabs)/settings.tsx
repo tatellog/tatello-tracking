@@ -97,7 +97,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View entering={enter(0)}>
           <Text style={styles.headline}>Ajustes</Text>
-          <Text style={styles.meta}>tracking-app · v1.0.0</Text>
+          <Text style={styles.meta}>STELAR · v1.0.0</Text>
         </Animated.View>
 
         <Animated.View entering={enter(120)} style={styles.group}>

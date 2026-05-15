@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
  * Handles the tail end of the Supabase magic-link flow:
  *
  *   1. User requests a link from app/auth.tsx → Supabase sends an email.
- *   2. User taps the link → iOS / Android open tracking-app://auth/callback
+ *   2. User taps the link → iOS / Android open stelar://auth/callback
  *      with access_token + refresh_token in the URL fragment.
  *   3. This hook intercepts that URL (both on cold start and while the app
  *      is already running), pulls the tokens out, and hands them to

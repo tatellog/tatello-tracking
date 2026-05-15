@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "tracking-app",
-    "slug": "tracking-app",
-    "scheme": "tracking-app",
+    "name": "STELAR",
+    "slug": "stelar",
+    "scheme": "stelar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,13 +20,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tatello.tracking",
+      "bundleIdentifier": "com.tatello.stelar",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.tatello.tracking",
+      "package": "com.tatello.stelar",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F3F0EB"
@@ -47,7 +47,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permite a tracking-app usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
+          "cameraPermission": "Permite a STELAR usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
         }
       ],
       "expo-web-browser"

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useEffect, useState } from 'react'
 
 const ONE_HOUR_MS = 60 * 60 * 1000
-const STORAGE_KEY = 'tracking-app.home.last_open'
+const STORAGE_KEY = 'stelar.home.last_open'
 
 export type Cadence = 'cascade' | 'reduced'
 

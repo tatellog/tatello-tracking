@@ -17,7 +17,7 @@ import { supabase } from './supabase'
  *     surfaces an error state instead of thrashing the network.
  *
  * The cache persists to AsyncStorage under a dedicated key, separate
- * from the theme store (`tracking-app.theme`) and the Supabase auth
+ * from the theme store (`stelar.theme`) and the Supabase auth
  * session (expo-secure-store). maxAge matches gcTime so rehydration
  * never restores stuff older than the in-memory policy would keep.
  */
@@ -37,7 +37,7 @@ export const queryClient = new QueryClient({
 
 export const queryPersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: 'tracking-app.query-cache',
+  key: 'stelar.query-cache',
 })
 
 export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000
@@ -55,7 +55,7 @@ export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000
  * data and — worse — RouteGuard reads a non-null
  * onboarding_completed_at and skips the wizard entirely.
  */
-export const LAST_AUTH_USER_KEY = 'tracking-app.last-auth-user-id'
+export const LAST_AUTH_USER_KEY = 'stelar.last-auth-user-id'
 
 /*
  * Module-level auth subscriber that flushes the query cache the
