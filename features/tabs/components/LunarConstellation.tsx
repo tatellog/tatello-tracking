@@ -100,7 +100,10 @@ type Resolved = {
   mag: number
 }
 
-type SequenceEl = { type: 'star' | 'line'; idx: number }
+// 'star'/'line' are figure elements; 'field' is a padding star — an
+// unconnected point of sky added so a small figure still fills the
+// whole 28-day cycle. See deriveProgress.
+type SequenceEl = { type: 'star' | 'line' | 'field'; idx: number }
 
 type Props = {
   /** 28-day boolean array; index i is the i-th cell. */
@@ -126,7 +129,7 @@ export function LunarConstellation({
   const cx = W / 2
   const cy = H / 2
 
-  const { trainedCount, elementsLit, sequence, isComplete, intensity } = useMemo(
+  const { trainedCount, elementsLit, sequence, fieldStars, isComplete, intensity } = useMemo(
     () => deriveProgress(trained, todayIdx, zodiac),
     [trained, todayIdx, zodiac],
   )
@@ -265,7 +268,9 @@ export function LunarConstellation({
     radialPulse.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
 
     if (elementsLit > prevLit) {
-      const newEls = sequence.slice(prevLit, elementsLit)
+      // Field stars don't run through the ignition flash — they just
+      // fade in. Only figure stars/lines get the dramatic ignition.
+      const newEls = sequence.slice(prevLit, elementsLit).filter((el) => el.type !== 'field')
       const hasLine = newEls.some((el) => el.type === 'line')
       Haptics.impactAsync(
         hasLine ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
@@ -306,6 +311,7 @@ export function LunarConstellation({
           <AmbientField t={t} />
           <ShootingStar t={t} />
           <AmbientGlow cx={cx} cy={cy} />
+          <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
           <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
           <LitLines
             zodiac={zodiac}
@@ -331,6 +337,7 @@ export function LunarConstellation({
             ignitingKey={ignitingKey}
             igniteT={igniteT}
           />
+          <CenterScrim cx={cx} cy={cy} />
           <StarBurst cx={cx} cy={cy} pulse={radialPulse} />
           <CenterText cx={cx} cy={cy} />
           {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
@@ -352,6 +359,41 @@ export function LunarConstellation({
   )
 }
 
+/* Deterministic scatter of `count` unconnected "field" stars across
+ * the canvas, kept clear of the centre counter and of the figure's
+ * own stars. Same positions every render (seeded by index). */
+function buildFieldStars(
+  figureStars: readonly { x: number; y: number }[],
+  count: number,
+): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = []
+  let i = 0
+  while (out.length < count && i < count * 60 + 60) {
+    const a = Math.sin(i * 73.13 + 2.1)
+    const b = Math.sin(i * 31.77 + 5.9)
+    i++
+    const x = 0.06 + ((Math.abs(a) * 1000) % 1) * 0.88
+    const y = 0.06 + ((Math.abs(b) * 1000) % 1) * 0.88
+    // Skip the centre — that's where the day counter sits.
+    const dcx = x - 0.5
+    const dcy = y - 0.5
+    if (dcx * dcx + dcy * dcy < 0.21 * 0.21) continue
+    // Skip anything sitting on top of a figure star.
+    let collides = false
+    for (const fs of figureStars) {
+      const ex = x - fs.x
+      const ey = y - fs.y
+      if (ex * ex + ey * ey < 0.065 * 0.065) {
+        collides = true
+        break
+      }
+    }
+    if (collides) continue
+    out.push({ x, y })
+  }
+  return out
+}
+
 function deriveProgress(
   trained: readonly boolean[],
   todayIdx: number,
@@ -360,56 +402,71 @@ function deriveProgress(
   trainedCount: number
   elementsLit: number
   sequence: SequenceEl[]
+  fieldStars: { x: number; y: number }[]
   isComplete: boolean
-  /** 0..1 — populated only when totalElements < TARGET_DAYS. Each
-   *  overflow day past full constellation adds intensity, which lit
-   *  stars and the centre bloom read to grow subtly. */
+  /** Overflow intensifier — now always 0: the figure is padded with
+   *  field stars to exactly TARGET_DAYS elements, so there is never
+   *  an overflow phase. Kept in the shape for LitStar's signature. */
   intensity: number
 } {
   const count = trained.slice(0, todayIdx + 1).filter(Boolean).length
   const nStars = zodiac.stars.length
-  const nLines = zodiac.lines.length
-  const totalElements = nStars + nLines
-  // 1:1 mapping — every tap moves an element until the constellation
-  // is fully lit. Previously `round(pct * totalElements)` produced
-  // invisible taps on the days where rounding didn't bump (e.g. day 5
-  // for a 25-element constellation), which broke the reward loop.
-  const lit = Math.min(count, totalElements)
-  const complete = count >= TARGET_DAYS
-  const overflowMax = Math.max(0, TARGET_DAYS - totalElements)
-  const overflowDays = Math.max(0, count - totalElements)
-  const intensity = overflowMax === 0 ? 0 : Math.min(1, overflowDays / overflowMax)
 
-  // Interleave stars + lines so each line is preceded by both its
-  // endpoint stars. Leftover stars trail at the end.
-  const seq: SequenceEl[] = []
+  // ── Figure sequence — stars + lines, each line preceded by both
+  //    its endpoint stars; leftover stars trail at the end. ──
+  const figureSeq: SequenceEl[] = []
   const seen = new Set<number>()
   if (nStars > 0) {
-    seq.push({ type: 'star', idx: 0 })
+    figureSeq.push({ type: 'star', idx: 0 })
     seen.add(0)
   }
   zodiac.lines.forEach((ln, lineIdx) => {
     const [a, b] = ln
     if (!seen.has(a)) {
-      seq.push({ type: 'star', idx: a })
+      figureSeq.push({ type: 'star', idx: a })
       seen.add(a)
     }
     if (!seen.has(b)) {
-      seq.push({ type: 'star', idx: b })
+      figureSeq.push({ type: 'star', idx: b })
       seen.add(b)
     }
-    seq.push({ type: 'line', idx: lineIdx })
+    figureSeq.push({ type: 'line', idx: lineIdx })
   })
   for (let i = 0; i < nStars; i++) {
-    if (!seen.has(i)) seq.push({ type: 'star', idx: i })
+    if (!seen.has(i)) figureSeq.push({ type: 'star', idx: i })
+  }
+
+  // ── Pad to TARGET_DAYS with field stars so a small figure (e.g.
+  //    the 11-element Aries) still fills across the whole 28-day
+  //    cycle instead of completing on day 11. ──
+  const figureCount = figureSeq.length
+  const fieldStars = buildFieldStars(zodiac.stars, Math.max(0, TARGET_DAYS - figureCount))
+
+  // ── Interleave figure elements and field stars evenly, so the
+  //    figure itself keeps growing across the whole cycle rather
+  //    than finishing first and the field trailing after. ──
+  const total = figureCount + fieldStars.length
+  const seq: SequenceEl[] = []
+  let fi = 0
+  let pi = 0
+  for (let k = 0; k < total; k++) {
+    const figureTarget = Math.round(((k + 1) * figureCount) / total)
+    if (fi < figureTarget && fi < figureCount) {
+      seq.push(figureSeq[fi]!)
+      fi++
+    } else {
+      seq.push({ type: 'field', idx: pi })
+      pi++
+    }
   }
 
   return {
     trainedCount: count,
-    elementsLit: lit,
+    elementsLit: Math.min(count, seq.length),
     sequence: seq,
-    isComplete: complete,
-    intensity,
+    fieldStars,
+    isComplete: count >= TARGET_DAYS,
+    intensity: 0,
   }
 }
 
@@ -707,6 +764,57 @@ function AmbientBucket({
   )
 }
 
+/* ─ Field stars ───────────────────────────────────────────────────
+ *
+ * The unconnected padding stars (see deriveProgress). They light up
+ * interleaved with the figure so the canvas keeps filling across the
+ * whole 28-day cycle. A lit field star is a small magenta 4-point
+ * star — magenta is the "earned progress" colour, so it reads as
+ * yours against the dim cream ambient field without needing a glow
+ * disc (a filled halo circle reads as a hard-edged coin in isolation).
+ * Unlit ones don't render: the ambient field covers "empty sky". */
+function FieldStars({
+  fieldStars,
+  litKeys,
+  t,
+}: {
+  fieldStars: readonly { x: number; y: number }[]
+  litKeys: Set<string>
+  t: SharedValue<number>
+}) {
+  return (
+    <>
+      {fieldStars.map((fs, n) =>
+        litKeys.has(`field-${n}`) ? <FieldStar key={n} fs={fs} n={n} t={t} /> : null,
+      )}
+    </>
+  )
+}
+
+function FieldStar({
+  fs,
+  n,
+  t,
+}: {
+  fs: { x: number; y: number }
+  n: number
+  t: SharedValue<number>
+}) {
+  const cx = PAD + fs.x * (W - 2 * PAD)
+  const cy = PAD + fs.y * (H - 2 * PAD)
+  const phase = (n * 0.21) % 1
+  const starProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    return { opacity: 0.62 + 0.32 * wave }
+  })
+  return (
+    <AnimatedG animatedProps={starProps}>
+      <Path d={fourPointStarPath(cx, cy, 4.5)} fill={colors.magenta} />
+    </AnimatedG>
+  )
+}
+
 /* ─ Base placeholder layer (always visible silhouette) ──────────── */
 
 function BaseLayer({
@@ -773,8 +881,28 @@ function BaseLayer({
  * cream fill) so the unlit field reads as "waiting" rather than "lit".
  * Each star has its own phase offset so the field is asynchronous —
  * adjacent stars never breathe or twinkle in sync. */
+// Stars at/below this magnitude are the "hero" of their figure — the
+// single brightest star (the anchor, mag 1.5). A figure has exactly
+// one. Hero stars get HeroGlow so they read as genuinely *brighter*,
+// not just bigger — matching how one star dominates in a real sky.
+const HERO_MAG = 1.7
+
+/* Soft magenta bloom for hero stars — two stacked low-alpha discs.
+ * The hero is each figure's alpha star; the magenta glow makes it
+ * "the fuchsia one" — unmistakably the brightest — in both the
+ * placeholder and lit states. Drawn behind the star body. */
+function HeroGlow({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+  return (
+    <>
+      <Circle cx={cx} cy={cy} r={r * 3.0} fill={colors.magenta} opacity={0.07} />
+      <Circle cx={cx} cy={cy} r={r * 1.9} fill={colors.magenta} opacity={0.13} />
+    </>
+  )
+}
+
 function PlaceholderStar({ s, i, t }: { s: Resolved; i: number; t: SharedValue<number> }) {
   const baseR = starRadius(s.mag) * 0.95
+  const isHero = s.mag <= HERO_MAG
   const phase = (i * 0.137) % 1
 
   const animatedProps = useAnimatedProps(() => {
@@ -805,6 +933,7 @@ function PlaceholderStar({ s, i, t }: { s: Resolved; i: number; t: SharedValue<n
 
   return (
     <AnimatedG animatedProps={animatedProps}>
+      {isHero ? <HeroGlow cx={s.x} cy={s.y} r={baseR} /> : null}
       <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="#F4ECDE" />
     </AnimatedG>
   )
@@ -861,6 +990,29 @@ function LitLines({
         )
       })}
     </AnimatedG>
+  )
+}
+
+/* ─ Centre scrim ──────────────────────────────────────────────────
+ *
+ * A soft dark vignette behind the centre counter. Every zodiac figure
+ * routes some stars/lines through the middle of the canvas, where the
+ * big day-count number sits — without this they collide and the
+ * number reads as cluttered. The scrim punches a calm "clearing":
+ * stacked low-alpha bg ellipses darken the constellation just under
+ * the counter, fading out smoothly so there's no hard edge. */
+const SCRIM_LAYERS = 7
+
+function CenterScrim({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <G>
+      {Array.from({ length: SCRIM_LAYERS }).map((_, i) => {
+        const tt = i / (SCRIM_LAYERS - 1)
+        const rx = 72 - 52 * tt
+        const ry = 54 - 39 * tt
+        return <Ellipse key={i} cx={cx} cy={cy} rx={rx} ry={ry} fill={colors.bg} opacity={0.1} />
+      })}
+    </G>
   )
 }
 
@@ -1194,6 +1346,7 @@ function LitStar({
 }) {
   const baseR = starRadius(s.mag) + 0.5
   const r = baseR * (1 + intensity * 0.18)
+  const isHero = s.mag <= HERO_MAG
 
   // Per-star phase offset so adjacent stars breathe out of sync.
   const phase = (i * 0.137) % 1
@@ -1204,13 +1357,18 @@ function LitStar({
   // Computed on JS thread and captured as a worklet closure scalar.
   const haloMult = recencyHaloMultiplier(recency)
 
+  // Magenta glow — this is what separates a LIT star from a
+  // placeholder one. Both star bodies are cream (starlight), so
+  // without this halo a freshly-marked day is invisible against the
+  // placeholder silhouette. The magenta is the achievement colour:
+  // a lit star glows with it. Recency still fades older glows.
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    const ambient = (0.05 + 0.2 * wave) * (1 + intensity * 0.8) * haloMult
+    const ambient = (0.22 + 0.16 * wave) * (1 + intensity * 0.5) * haloMult
     return {
-      opacity: ambient + litPulse.value * 0.45,
-      r: r + 5 * haloMult + litPulse.value * 4,
+      opacity: ambient + litPulse.value * 0.4,
+      r: r + 7 * haloMult + litPulse.value * 4,
     }
   })
 
@@ -1248,13 +1406,8 @@ function LitStar({
 
   return (
     <G>
-      <AnimatedCircle
-        cx={s.x}
-        cy={s.y}
-        r={r + 5}
-        fill="rgba(244,236,222,0.05)"
-        animatedProps={haloProps}
-      />
+      {isHero ? <HeroGlow cx={s.x} cy={s.y} r={r} /> : null}
+      <AnimatedCircle cx={s.x} cy={s.y} r={r + 7} fill={colors.magenta} animatedProps={haloProps} />
       <AnimatedG animatedProps={starProps}>
         <Path d={fourPointStarPath(s.x, s.y, r)} fill="url(#starLit)" />
       </AnimatedG>

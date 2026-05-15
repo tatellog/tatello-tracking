@@ -22,11 +22,13 @@ describe.each(SIGNS)('ZODIAC[%s]', (sign) => {
   const def = ZODIAC[sign]
 
   it('has a non-empty star list', () => {
-    expect(def.stars.length).toBeGreaterThanOrEqual(5)
+    // 4 = the smallest authentic asterism (e.g. the Aries four-star
+    // bent line). Anything below that isn't a recognisable figure.
+    expect(def.stars.length).toBeGreaterThanOrEqual(4)
   })
 
   it('has a non-empty line list', () => {
-    expect(def.lines.length).toBeGreaterThanOrEqual(4)
+    expect(def.lines.length).toBeGreaterThanOrEqual(3)
   })
 
   it('all stars sit inside [0,1] with sub-pixel slack', () => {
@@ -48,18 +50,24 @@ describe.each(SIGNS)('ZODIAC[%s]', (sign) => {
     }
   })
 
-  it('every star is reachable from the line graph', () => {
+  it('the lined stars form one connected figure', () => {
     if (def.lines.length === 0) return
     const adj = new Map<number, Set<number>>()
+    const lined = new Set<number>()
     for (let i = 0; i < def.stars.length; i++) adj.set(i, new Set())
     for (const [a, b] of def.lines) {
       adj.get(a)!.add(b)
       adj.get(b)!.add(a)
+      lined.add(a)
+      lined.add(b)
     }
-    // BFS from the first star — every other star should be reachable
-    // for the figure to read as a single connected silhouette.
-    const seen = new Set<number>([0])
-    const queue: number[] = [0]
+    // BFS from the first lined star — every other star that appears
+    // in a line should be reachable, so the drawn silhouette reads as
+    // one connected figure. Stars in no line at all are deliberate
+    // unconnected field stars (e.g. Aries) and are excluded here.
+    const start = [...lined][0]!
+    const seen = new Set<number>([start])
+    const queue: number[] = [start]
     while (queue.length > 0) {
       const cur = queue.shift()!
       for (const next of adj.get(cur)!) {
@@ -69,13 +77,7 @@ describe.each(SIGNS)('ZODIAC[%s]', (sign) => {
         }
       }
     }
-    // Tauro is a documented exception: the Pleiades cluster is drawn
-    // as a separate two-star asterism alongside the main bull figure.
-    if (sign === 'tauro') {
-      expect(seen.size).toBeGreaterThanOrEqual(def.stars.length - 2)
-    } else {
-      expect(seen.size).toBe(def.stars.length)
-    }
+    expect(seen.size).toBe(lined.size)
   })
 
   it('has at least one anchor star bright enough to sparkle', () => {

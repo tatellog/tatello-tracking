@@ -7,6 +7,7 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInDown,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -161,10 +162,6 @@ function TodayContent({ ctx, cadence }: ContentProps) {
     }
   }
 
-  const handleUndoWorkout = () => {
-    toggleToday.mutate(false)
-  }
-
   const handleToggleDay = (date: string) => {
     const cell = ctx.grid_28_days.find((c) => c.date === date)
     if (!cell) return
@@ -196,13 +193,15 @@ function TodayContent({ ctx, cadence }: ContentProps) {
             <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
           </Animated.View>
 
-          <Animated.View entering={enter(120)}>
-            <TodayWorkoutButton
-              committed={ctx.today_workout_completed}
-              onConfirm={handleConfirmWorkout}
-              onUndo={handleUndoWorkout}
-            />
-          </Animated.View>
+          {/* CTA only — once the day is marked the button has no job
+              left, so it unmounts. The workout is then confirmed by
+              the constellation burst, the coach line and the filled
+              HOY star in the WeekStrip; undo lives on that star. */}
+          {!ctx.today_workout_completed ? (
+            <Animated.View entering={enter(120)} exiting={FadeOut.duration(260)}>
+              <TodayWorkoutButton onConfirm={handleConfirmWorkout} />
+            </Animated.View>
+          ) : null}
 
           <Animated.View entering={enter(220)}>
             <SectionHeader label={`Tu ${capitalize(signLabel)}`} />

@@ -18,49 +18,60 @@ import type { ZodiacDef, ZodiacSign } from './types'
  * detail view, see `features/tabs/zodiac/astronomy/`.
  */
 export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
-  // Aries — gentle zigzag arcing from upper-left down across to the
-  // right, with one prominent star (Hamal) at the peak.
+  // Aries — a six-star wave: a gentle dip on the left, a rise to
+  // bright Hamal at the peak, then a long curving descent to the
+  // lower-right tail. The peak sits above the centre counter and the
+  // line drapes around it — nothing crosses the number.
   aries: {
     label: 'ARIES',
     glyph: '♈',
     stars: [
-      { x: 0.16, y: 0.4, mag: 3.5 }, // 0 leftmost small
-      { x: 0.34, y: 0.22, mag: 1.5 }, // 1 anchor / Hamal
-      { x: 0.5, y: 0.38, mag: 3.0 }, // 2 dip
-      { x: 0.7, y: 0.55, mag: 3.0 }, // 3 mid-right
-      { x: 0.88, y: 0.68, mag: 3.5 }, // 4 far right
+      { x: 0.09, y: 0.46, mag: 2.6 }, // 0 far-left — second brightest
+      { x: 0.25, y: 0.55, mag: 3.4 }, // 1 dip
+      { x: 0.42, y: 0.25, mag: 1.5 }, // 2 Hamal — the peak (anchor)
+      { x: 0.66, y: 0.36, mag: 2.9 }, // 3 shoulder
+      { x: 0.8, y: 0.58, mag: 3.0 }, // 4 descent
+      { x: 0.91, y: 0.8, mag: 3.3 }, // 5 tail tip
     ],
     lines: [
       [0, 1],
-      [1, 2],
-      [2, 3],
+      [1, 2], // rise to Hamal
+      [2, 3], // curving descent
       [3, 4],
+      [4, 5],
     ],
   },
 
-  // Taurus — Hyades V tilted, Aldebaran at the centre, horns
-  // trailing to the upper-right.
+  // Taurus — the bull: two horns reaching up-left, the Hyades V of
+  // the face cascading down the centre, Aldebaran blazing as the eye,
+  // and the body trailing to the lower-right.
   tauro: {
     label: 'TAURO',
     glyph: '♉',
     stars: [
-      { x: 0.08, y: 0.45, mag: 3.5 }, // 0 left horn tip
-      { x: 0.25, y: 0.52, mag: 3.0 }, // 1 V left
-      { x: 0.42, y: 0.58, mag: 1.5 }, // 2 Aldebaran (anchor)
-      { x: 0.32, y: 0.32, mag: 3.0 }, // 3 V upper
-      { x: 0.55, y: 0.42, mag: 3.5 }, // 4 V apex / hinge
-      { x: 0.7, y: 0.36, mag: 3.0 }, // 5 right branch
-      { x: 0.86, y: 0.26, mag: 2.5 }, // 6 right horn tip
-      { x: 0.78, y: 0.5, mag: 3.5 }, // 7 lower-right tail
+      { x: 0.2, y: 0.08, mag: 2.0 }, // 0 top horn tip
+      { x: 0.46, y: 0.35, mag: 3.0 }, // 1 top horn base
+      { x: 0.06, y: 0.31, mag: 3.0 }, // 2 left horn tip
+      { x: 0.38, y: 0.62, mag: 3.0 }, // 3 left horn base
+      { x: 0.49, y: 0.46, mag: 4.0 }, // 4 Hyades V — upper
+      { x: 0.44, y: 0.54, mag: 4.0 }, // 5 Hyades V — mid
+      { x: 0.52, y: 0.61, mag: 4.0 }, // 6 Hyades V — lower
+      { x: 0.57, y: 0.69, mag: 3.0 }, // 7 face hinge
+      { x: 0.69, y: 0.81, mag: 1.5 }, // 8 Aldebaran (anchor / the eye)
+      { x: 0.89, y: 0.73, mag: 3.2 }, // 9 body
+      { x: 0.92, y: 0.93, mag: 3.5 }, // 10 body tip
     ],
     lines: [
-      [0, 1],
-      [1, 2],
-      [2, 4],
-      [3, 4],
+      [0, 1], // top horn
+      [2, 3], // left horn
+      [1, 4], // top horn base into the Hyades V
       [4, 5],
       [5, 6],
-      [5, 7],
+      [6, 7], // V down to the face hinge
+      [3, 7], // left horn base to the hinge
+      [7, 8], // hinge to Aldebaran
+      [8, 9], // Aldebaran into the body
+      [9, 10], // body tip
     ],
   },
 
