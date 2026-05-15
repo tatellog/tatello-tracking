@@ -261,16 +261,16 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     label: 'ESCORPIO',
     glyph: '♏',
     stars: [
-      { x: 0.1, y: 0.2, mag: 3.0 }, // 0 left claw
-      { x: 0.22, y: 0.3, mag: 3.0 }, // 1 head
-      { x: 0.4, y: 0.18, mag: 3.0 }, // 2 right claw
-      { x: 0.36, y: 0.42, mag: 3.0 }, // 3 body high
+      { x: 0.1, y: 0.2, mag: 2.7 }, // 0 left claw
+      { x: 0.22, y: 0.3, mag: 2.3 }, // 1 head
+      { x: 0.4, y: 0.18, mag: 2.7 }, // 2 right claw
+      { x: 0.36, y: 0.42, mag: 2.9 }, // 3 body high
       { x: 0.5, y: 0.55, mag: 1.5 }, // 4 Antares (anchor)
       { x: 0.55, y: 0.72, mag: 3.0 }, // 5 body mid
-      { x: 0.7, y: 0.82, mag: 3.0 }, // 6 body bend
-      { x: 0.84, y: 0.78, mag: 3.0 }, // 7 tail curl
-      { x: 0.9, y: 0.62, mag: 3.0 }, // 8 tail
-      { x: 0.8, y: 0.45, mag: 2.0 }, // 9 stinger tip (anchor)
+      { x: 0.7, y: 0.82, mag: 2.8 }, // 6 body bend
+      { x: 0.84, y: 0.78, mag: 2.4 }, // 7 tail curl
+      { x: 0.9, y: 0.62, mag: 2.6 }, // 8 tail
+      { x: 0.8, y: 0.45, mag: 1.9 }, // 9 stinger tip
     ],
     lines: [
       [0, 1],
