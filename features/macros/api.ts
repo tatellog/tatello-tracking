@@ -92,6 +92,68 @@ export async function getMealById(id: string): Promise<Meal | null> {
   return data
 }
 
+/* A frequent meal is a de-duplicated entry from the user's own log,
+ * surfaced for one-tap re-adding in the Hoy-tab quick log. The macros
+ * come from the user's most recent entry of that name (foods drift;
+ * the latest log is the best estimate). */
+export type FrequentMeal = {
+  name: string
+  meal_type: string
+  protein_g: number
+  calories: number
+  /** How many times this name appears in the lookback window. */
+  freq: number
+}
+
+const FREQUENT_LOOKBACK_DAYS = 90
+
+/*
+ * Frequent meals — the quick log's "Lo de siempre". Derived purely
+ * from the user's own meal history (no food database, no seeding):
+ * pull the last 90 days, group by lowercased name, rank by frequency
+ * then recency. Aggregation is client-side — at this volume (a few
+ * hundred rows at most) it's cheaper than maintaining a Postgres RPC.
+ * If the dataset ever outgrows that, this is the seam to move to a
+ * server-side `group by`.
+ */
+export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
+  const userId = await requireUserId()
+  const since = new Date(Date.now() - FREQUENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabase
+    .from('meals')
+    .select('name, meal_type, protein_g, calories, consumed_at')
+    .eq('user_id', userId)
+    .gte('consumed_at', since)
+    .order('consumed_at', { ascending: false })
+  if (error) throw error
+
+  type Agg = FrequentMeal & { lastAt: string }
+  const groups = new Map<string, Agg>()
+  for (const m of data) {
+    const key = m.name.trim().toLowerCase()
+    const existing = groups.get(key)
+    if (existing) {
+      existing.freq += 1
+    } else {
+      // First time seen — and because rows are consumed_at DESC, this
+      // first occurrence is the most recent, so its macros win.
+      groups.set(key, {
+        name: m.name.trim(),
+        meal_type: m.meal_type,
+        protein_g: Number(m.protein_g),
+        calories: m.calories,
+        freq: 1,
+        lastAt: m.consumed_at,
+      })
+    }
+  }
+
+  return [...groups.values()]
+    .sort((a, b) => b.freq - a.freq || b.lastAt.localeCompare(a.lastAt))
+    .slice(0, limit)
+    .map(({ lastAt: _lastAt, ...meal }) => meal)
+}
+
 export async function createMeal(input: MealInput): Promise<Meal> {
   const userId = await requireUserId()
   const parsed = MealInputSchema.parse(input)

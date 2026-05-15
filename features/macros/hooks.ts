@@ -7,6 +7,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import {
   createMeal,
   deleteMeal,
+  getFrequentMeals,
   getMealById,
   getMealsForDate,
   updateMeal,
@@ -75,6 +76,15 @@ export function useMealById(id: string | undefined) {
   })
 }
 
+/* Frequent meals power the Hoy-tab quick log. Invalidated whenever a
+ * meal is created/updated/deleted so "Lo de siempre" stays honest. */
+export function useFrequentMeals(limit = 8) {
+  return useQuery({
+    queryKey: queryKeys.macros.frequentMeals(),
+    queryFn: () => getFrequentMeals(limit),
+  })
+}
+
 /* ─── meal mutations ─────────────────────────────────────────────── */
 
 /*
@@ -106,6 +116,7 @@ export function useCreateMeal() {
       // The suggestion RPC is meal-type-scoped, so re-fetching the
       // current slot keeps "Lo de ayer" honest after a fresh insert.
       qc.invalidateQueries({ queryKey: queryKeys.macros.suggestions(variables.meal_type) })
+      qc.invalidateQueries({ queryKey: queryKeys.macros.frequentMeals() })
     },
   })
 }
@@ -148,6 +159,7 @@ export function useUpdateMeal() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      qc.invalidateQueries({ queryKey: queryKeys.macros.frequentMeals() })
     },
   })
 }

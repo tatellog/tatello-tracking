@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 
 import { colors, shadows, typography } from '@/theme'
 
-export type CtaVariant = 'primary' | 'ghost'
+export type CtaVariant = 'primary' | 'ghost' | 'soft'
 
 type Props = {
   label: string
@@ -30,6 +30,7 @@ export function PrimaryCta({
 }: Props) {
   const inactive = disabled || loading
   const isGhost = variant === 'ghost'
+  const isSoft = variant === 'soft'
 
   const handlePress = () => {
     if (inactive) return
@@ -45,7 +46,8 @@ export function PrimaryCta({
       style={[
         styles.btn,
         isGhost && styles.btnGhost,
-        inactive && !isGhost && styles.btnDisabled,
+        isSoft && styles.btnSoft,
+        inactive && !isGhost && !isSoft && styles.btnDisabled,
         { marginTop, marginBottom },
       ]}
       accessibilityRole="button"
@@ -54,15 +56,21 @@ export function PrimaryCta({
     >
       {loading ? (
         <View style={styles.loadingRow}>
-          <ActivityIndicator color={isGhost ? colors.leche : '#FFFFFF'} size="small" />
-          <Text style={[styles.label, isGhost && styles.labelGhost]}>{loadingLabel}</Text>
+          <ActivityIndicator
+            color={isGhost ? colors.leche : isSoft ? colors.magenta : '#FFFFFF'}
+            size="small"
+          />
+          <Text style={[styles.label, isGhost && styles.labelGhost, isSoft && styles.labelSoft]}>
+            {loadingLabel}
+          </Text>
         </View>
       ) : (
         <Text
           style={[
             styles.label,
             isGhost && styles.labelGhost,
-            inactive && !isGhost && styles.labelDisabled,
+            isSoft && styles.labelSoft,
+            inactive && !isGhost && !isSoft && styles.labelDisabled,
           ]}
         >
           {label}
@@ -88,6 +96,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
+  // Soft — keeps the magenta identity but calms it: tinted fill +
+  // magenta border + a gentle (not saturated) glow. Reads as an
+  // invitation, not a demand; matches the active-state language of
+  // the TodayWorkoutButton pill.
+  btnSoft: {
+    backgroundColor: 'rgba(233,30,99,0.12)',
+    borderWidth: 1.5,
+    borderColor: colors.magenta,
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 3,
+  },
   btnDisabled: {
     backgroundColor: colors.bgCard2,
     shadowOpacity: 0,
@@ -106,6 +128,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     fontFamily: typography.uiMedium,
     fontSize: 13.5,
+  },
+  labelSoft: {
+    color: colors.magenta,
   },
   labelDisabled: {
     color: colors.niebla,

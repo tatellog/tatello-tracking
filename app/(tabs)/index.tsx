@@ -23,9 +23,11 @@ import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/strea
 import {
   LunarConstellation,
   PrimaryCta,
+  QuickLogSheet,
   RingCard,
   SectionHeader,
   TabHeader,
+  TodayMealLog,
   TodayWorkoutButton,
   WeekStrip,
   type WeekDayCell,
@@ -84,6 +86,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const [showCelebration, setShowCelebration] = useState(false)
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
+  const [quickLogVisible, setQuickLogVisible] = useState(false)
   // Drives the full-viewport magenta wash that accompanies the
   // constellation burst on each day-mark. Fires 0→1 over the same
   // duration as LunarConstellation's internal radialPulse so the
@@ -165,12 +168,22 @@ function TodayContent({ ctx, cadence }: ContentProps) {
   const handleToggleDay = (date: string) => {
     const cell = ctx.grid_28_days.find((c) => c.date === date)
     if (!cell) return
+    const willComplete = !cell.completed
     const idx = visibleWeek.findIndex((c) => c.date === date)
     if (idx >= 0) {
       setJustMarkedIdx(idx)
       setTimeout(() => setJustMarkedIdx(null), 800)
     }
-    toggleForDate.mutate({ date, complete: !cell.completed })
+    // Marking a past day fires the same celebration as today's
+    // workout: the screen wash here + the constellation burst (which
+    // re-animates on its own once the trained count rises). Undo
+    // toggles stay silent — matching the constellation, which never
+    // animates downward.
+    if (willComplete) {
+      screenFlash.value = 0
+      screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
+    }
+    toggleForDate.mutate({ date, complete: willComplete })
   }
 
   const enter = makeEnter(cadence)
@@ -208,12 +221,41 @@ function TodayContent({ ctx, cadence }: ContentProps) {
             <CoachLine count={trainedThisMonth} signLabel={signLabel} />
           </Animated.View>
 
+          <Animated.View entering={enter(520)}>
+            <View style={styles.weekHeader}>
+              <Text style={styles.weekLabel}>{weekLabel}</Text>
+              <View style={styles.weekNav}>
+                <Pressable
+                  onPress={() => canGoPrev && setWeekOffset(weekOffset - 1)}
+                  disabled={!canGoPrev}
+                  style={[styles.navBtn, !canGoPrev && styles.navBtnDisabled]}
+                  accessibilityLabel="Semana anterior"
+                >
+                  <Text style={styles.navGlyph}>‹</Text>
+                </Pressable>
+                <Text style={styles.weekRange}>
+                  {visibleWeek[0]?.date ? dayNumOf(visibleWeek[0].date) : ''}–
+                  {visibleWeek[6]?.date ? dayNumOf(visibleWeek[6].date) : ''}
+                </Text>
+                <Pressable
+                  onPress={() => canGoNext && setWeekOffset(weekOffset + 1)}
+                  disabled={!canGoNext}
+                  style={[styles.navBtn, !canGoNext && styles.navBtnDisabled]}
+                  accessibilityLabel="Semana siguiente"
+                >
+                  <Text style={styles.navGlyph}>›</Text>
+                </Pressable>
+              </View>
+            </View>
+            <WeekStrip days={weekDays} onToggle={handleToggleDay} justMarkedIdx={justMarkedIdx} />
+          </Animated.View>
+
           {ctx.targets ? (
             <>
-              <Animated.View entering={enter(520)}>
+              <Animated.View entering={enter(600)}>
                 <SectionHeader label="Macros de hoy" />
               </Animated.View>
-              <Animated.View entering={enter(580)} style={styles.macroRow}>
+              <Animated.View entering={enter(660)} style={styles.macroRow}>
                 <RingCard
                   label="Proteína"
                   value={ctx.today_macros.protein_g}
@@ -253,40 +295,19 @@ function TodayContent({ ctx, cadence }: ContentProps) {
             </>
           ) : null}
 
-          <Animated.View entering={enter(680)}>
-            <View style={styles.weekHeader}>
-              <Text style={styles.weekLabel}>{weekLabel}</Text>
-              <View style={styles.weekNav}>
-                <Pressable
-                  onPress={() => canGoPrev && setWeekOffset(weekOffset - 1)}
-                  disabled={!canGoPrev}
-                  style={[styles.navBtn, !canGoPrev && styles.navBtnDisabled]}
-                  accessibilityLabel="Semana anterior"
-                >
-                  <Text style={styles.navGlyph}>‹</Text>
-                </Pressable>
-                <Text style={styles.weekRange}>
-                  {visibleWeek[0]?.date ? dayNumOf(visibleWeek[0].date) : ''}–
-                  {visibleWeek[6]?.date ? dayNumOf(visibleWeek[6].date) : ''}
-                </Text>
-                <Pressable
-                  onPress={() => canGoNext && setWeekOffset(weekOffset + 1)}
-                  disabled={!canGoNext}
-                  style={[styles.navBtn, !canGoNext && styles.navBtnDisabled]}
-                  accessibilityLabel="Semana siguiente"
-                >
-                  <Text style={styles.navGlyph}>›</Text>
-                </Pressable>
-              </View>
-            </View>
-            <WeekStrip days={weekDays} onToggle={handleToggleDay} justMarkedIdx={justMarkedIdx} />
+          <Animated.View entering={enter(740)}>
+            <SectionHeader label="Estela de hoy" />
+          </Animated.View>
+          <Animated.View entering={enter(800)}>
+            <TodayMealLog date={ctx.date} onOpenMeal={(id) => router.push(`/meal/${id}`)} />
           </Animated.View>
 
-          <Animated.View entering={enter(820)}>
+          <Animated.View entering={enter(880)}>
             <PrimaryCta
               label="Sumar comida →"
-              onPress={() => router.push('/log-meal')}
-              marginTop={28}
+              variant="soft"
+              onPress={() => setQuickLogVisible(true)}
+              marginTop={36}
               marginBottom={20}
             />
           </Animated.View>
@@ -296,6 +317,15 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       </SafeAreaView>
 
       <Animated.View pointerEvents="none" style={[styles.screenFlash, screenFlashStyle]} />
+
+      <QuickLogSheet
+        visible={quickLogVisible}
+        onClose={() => setQuickLogVisible(false)}
+        onGoToComidas={() => {
+          setQuickLogVisible(false)
+          router.push('/log-meal')
+        }}
+      />
 
       {showCelebration ? <Day1Celebration /> : null}
     </View>

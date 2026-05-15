@@ -1,10 +1,25 @@
 import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
+import { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
+import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 const SPANISH_DAY_INITIAL = ['D', 'L', 'M', 'M', 'J', 'V', 'S'] as const
+
+// 4-point star, viewBox 24×24, centred (12,12). Outer r≈10, inner
+// r≈3.2 — same iconography as the Hoy-tab constellation so a marked
+// day reads as "another lit star in your figure".
+const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
 export type WeekDayCell = {
   /** ISO 'YYYY-MM-DD'. */
@@ -23,22 +38,63 @@ type Props = {
   justMarkedIdx?: number | null
 }
 
-const BAR_GRADIENT = {
-  today: ['rgba(233,30,99,0.30)', colors.magenta] as readonly [string, string],
-  trained: ['rgba(244,236,222,0.18)', 'rgba(244,236,222,0.55)'] as readonly [string, string],
-  empty: ['rgba(79,58,61,0)', 'rgba(79,58,61,0.4)'] as readonly [string, string],
-}
+/* Per-day star. Three states:
+ *   trained        → filled star (cream for past days, magenta today)
+ *   today, untrained → magenta outline — "this is the spot to light"
+ *   past, untrained  → dim niebla outline — quiet, waiting
+ * Tapping the cell toggles the day, so backfilling a week of past
+ * workouts is just tapping each star on.
+ *
+ * Trained stars breathe (opacity + slight scale) on a slow loop so a
+ * marked day reads as alive, matching the lit stars in the Hoy-tab
+ * constellation. Per-index delay desynchronises the row. Untrained
+ * outlines stay static — they are still "waiting". */
+function DayStar({
+  trained,
+  isToday,
+  index,
+}: {
+  trained: boolean
+  isToday: boolean
+  index: number
+}) {
+  const fill = trained ? (isToday ? colors.magenta : colors.leche) : 'none'
+  const stroke = trained ? 'none' : isToday ? colors.magenta : colors.niebla
 
-function barHeight(d: WeekDayCell): '100%' | '60%' | '8%' {
-  if (d.isToday) return '100%'
-  if (d.trained) return '60%'
-  return '8%'
-}
+  const breath = useSharedValue(0)
+  useEffect(() => {
+    if (!trained) {
+      breath.value = 0
+      return
+    }
+    breath.value = withDelay(
+      index * 220,
+      withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true),
+    )
+    return () => cancelAnimation(breath)
+  }, [trained, index, breath])
 
-function barGradient(d: WeekDayCell) {
-  if (d.isToday) return BAR_GRADIENT.today
-  if (d.trained) return BAR_GRADIENT.trained
-  return BAR_GRADIENT.empty
+  const animStyle = useAnimatedStyle(() => {
+    if (!trained) return { opacity: 1, transform: [{ scale: 1 }] }
+    return {
+      opacity: 0.78 + breath.value * 0.22,
+      transform: [{ scale: 1 + breath.value * 0.08 }],
+    }
+  })
+
+  return (
+    <Animated.View style={animStyle}>
+      <Svg width={20} height={20} viewBox="0 0 24 24">
+        <Path
+          d={STAR_PATH}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={trained ? 0 : 1.6}
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </Animated.View>
+  )
 }
 
 export function WeekStrip({ days, onToggle, justMarkedIdx = null }: Props) {
@@ -76,13 +132,8 @@ export function WeekStrip({ days, onToggle, justMarkedIdx = null }: Props) {
             >
               {d.dayNum}
             </Text>
-            <View pointerEvents="none" style={[styles.bar, { height: barHeight(d) }]}>
-              <LinearGradient
-                colors={barGradient(d)}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
+            <View style={styles.starWrap}>
+              <DayStar trained={d.trained} isToday={d.isToday} index={i} />
             </View>
             {d.isToday ? <Text style={styles.todayLabel}>HOY</Text> : null}
           </Pressable>
@@ -157,12 +208,12 @@ const styles = StyleSheet.create({
     color: colors.leche,
     zIndex: 1,
   },
-  bar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    overflow: 'hidden',
+  // marginTop:auto pushes the star toward the bottom of the cell so
+  // the letter/number sit at the top and the star anchors the base —
+  // a small constellation node in each day.
+  starWrap: {
+    marginTop: 'auto',
+    paddingTop: 8,
   },
   todayLabel: {
     position: 'absolute',
