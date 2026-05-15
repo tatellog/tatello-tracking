@@ -16,6 +16,7 @@ import Animated, {
 import Svg, {
   Circle,
   Defs,
+  Ellipse,
   G,
   Line,
   Path,
@@ -47,6 +48,18 @@ function starRadius(mag: number): number {
   if (r < 2.5) return 2.5
   if (r > 9) return 9
   return r
+}
+
+// Days-since-marked → halo intensity multiplier for lit stars. Stars
+// marked in the last week shine the brightest halo; halos fade across
+// days 7..21 toward a floor that keeps old-lit stars visible without
+// competing with recent ones. Two-segment piecewise linear keeps the
+// shape readable and easy to tune.
+function recencyHaloMultiplier(days: number): number {
+  if (days <= 0) return 1
+  if (days <= 7) return 1 - (days / 7) * 0.45 // 1.0 → 0.55 over 7 days
+  if (days <= 21) return 0.55 - ((days - 7) / 14) * 0.37 // 0.55 → 0.18 over next 14
+  return 0.18 // floor — old stars still glow, just quietly
 }
 
 // 4-point star polygon path centred at (cx, cy). 8 alternating outer
@@ -94,14 +107,26 @@ type Props = {
   trained: readonly boolean[]
   todayIdx: number
   sign?: ZodiacSign
+  /** When true (today is already marked as complete), the "next"
+   *  affordance — the dashed magenta ring around the upcoming star,
+   *  and the dashed magenta segment for the next line — is hidden.
+   *  Mirrors the app's philosophy that progress is a ritual, not a
+   *  debt: once you've checked in today, the figure shouldn't be
+   *  whispering "one more". The ring reappears the next day. */
+  committed?: boolean
 }
 
-export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Props) {
+export function LunarConstellation({
+  trained,
+  todayIdx,
+  sign = 'acuario',
+  committed = false,
+}: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
   const cy = H / 2
 
-  const { trainedCount, elementsLit, sequence, isComplete, label, intensity } = useMemo(
+  const { trainedCount, elementsLit, sequence, isComplete, intensity } = useMemo(
     () => deriveProgress(trained, todayIdx, zodiac),
     [trained, todayIdx, zodiac],
   )
@@ -124,7 +149,34 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
     }
     return set
   }, [elementsLit, sequence])
-  const nextEl: SequenceEl | null = sequence[elementsLit] ?? null
+
+  // Map of lit-star idx → days since the user marked it. Reads:
+  // recency 0 = today, 7 = a week ago, 27 = nearly four weeks ago.
+  // Used by LitStar to scale its halo intensity — recent stars shine
+  // bright, older ones taper to a quiet glow. Reinforces the app's
+  // "body remembers recent rhythm more vividly than old" metaphor.
+  const starRecency = useMemo(() => {
+    const trainingDayIndices: number[] = []
+    for (let i = 0; i <= todayIdx; i++) {
+      if (trained[i]) trainingDayIndices.push(i)
+    }
+    const map = new Map<number, number>()
+    for (let k = 0; k < Math.min(elementsLit, sequence.length); k++) {
+      const el = sequence[k]
+      if (el?.type !== 'star') continue
+      const dayIdx = trainingDayIndices[k]
+      if (dayIdx !== undefined) {
+        map.set(el.idx, todayIdx - dayIdx)
+      }
+    }
+    return map
+  }, [trained, todayIdx, elementsLit, sequence])
+
+  // When the user has marked today, suppress the "next" affordance so
+  // neither the dashed ring around the upcoming star nor the dashed
+  // line preview render. Tomorrow's render will set committed=false
+  // again and the next affordance reappears.
+  const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
   // Two clocks share-drive every animation:
   //   t       — 8 s loop. Star breathing, ambient bucket twinkle,
@@ -210,7 +262,7 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
       withTiming(0, { duration: 480, easing: Easing.inOut(Easing.cubic) }),
     )
     radialPulse.value = 0
-    radialPulse.value = withTiming(1, { duration: 950, easing: Easing.out(Easing.cubic) })
+    radialPulse.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
 
     if (elementsLit > prevLit) {
       const newEls = sequence.slice(prevLit, elementsLit)
@@ -253,7 +305,8 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
           <SvgGradients />
           <AmbientField t={t} />
           <ShootingStar t={t} />
-          <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} />
+          <AmbientGlow cx={cx} cy={cy} />
+          <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
           <LitLines
             zodiac={zodiac}
             stars={stars}
@@ -262,7 +315,6 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
             ignitingKey={ignitingKey}
             litPulse={litPulse}
           />
-          <LineCurrents zodiac={zodiac} stars={stars} litKeys={litKeys} t={t} />
           <StarsLayer
             stars={stars}
             litKeys={litKeys}
@@ -271,6 +323,7 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
             ignitingKey={ignitingKey}
             intensity={intensity}
             litPulse={litPulse}
+            starRecency={starRecency}
           />
           <IgnitingOverlay
             zodiac={zodiac}
@@ -278,7 +331,7 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
             ignitingKey={ignitingKey}
             igniteT={igniteT}
           />
-          <RadialPulse cx={cx} cy={cy} pulse={radialPulse} />
+          <StarBurst cx={cx} cy={cy} pulse={radialPulse} />
           <CenterText cx={cx} cy={cy} />
           {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
         </Svg>
@@ -290,13 +343,11 @@ export function LunarConstellation({ trained, todayIdx, sign = 'acuario' }: Prop
         />
       </View>
 
-      <Text style={styles.progressLabel}>{label}</Text>
-
-      <View style={styles.zodiacCap}>
-        <Text style={styles.zodiacGlyph}>{zodiac.glyph}</Text>
-        <Text style={styles.zodiacLabel}>{zodiac.label}</Text>
-        {isComplete ? <Text style={styles.zodiacOverflow}> · COMPLETO</Text> : null}
-      </View>
+      {isComplete ? (
+        <View style={styles.completionCap}>
+          <Text style={styles.completionLabel}>COMPLETO</Text>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -310,7 +361,6 @@ function deriveProgress(
   elementsLit: number
   sequence: SequenceEl[]
   isComplete: boolean
-  label: string
   /** 0..1 — populated only when totalElements < TARGET_DAYS. Each
    *  overflow day past full constellation adds intensity, which lit
    *  stars and the centre bloom read to grow subtly. */
@@ -326,8 +376,6 @@ function deriveProgress(
   // for a 25-element constellation), which broke the reward loop.
   const lit = Math.min(count, totalElements)
   const complete = count >= TARGET_DAYS
-  const pct = Math.min(1, count / TARGET_DAYS)
-  const pctRound = Math.round(pct * 100)
   const overflowMax = Math.max(0, TARGET_DAYS - totalElements)
   const overflowDays = Math.max(0, count - totalElements)
   const intensity = overflowMax === 0 ? 0 : Math.min(1, overflowDays / overflowMax)
@@ -356,24 +404,11 @@ function deriveProgress(
     if (!seen.has(i)) seq.push({ type: 'star', idx: i })
   }
 
-  const lowerLabel = zodiac.label.toLowerCase()
-  const titleLabel = zodiac.label.charAt(0) + zodiac.label.slice(1).toLowerCase()
-  const label = complete
-    ? `${titleLabel} completo`
-    : count === 0
-      ? `tu ${lowerLabel} te espera`
-      : pct < 0.5
-        ? `${pctRound}% iluminado`
-        : pct < 1
-          ? `${pctRound}% · casi`
-          : 'completo'
-
   return {
     trainedCount: count,
     elementsLit: lit,
     sequence: seq,
     isComplete: complete,
-    label,
     intensity,
   }
 }
@@ -392,6 +427,49 @@ function SvgGradients() {
         <Stop offset="100%" stopColor="#7A1737" />
       </RadialGradient>
     </Defs>
+  )
+}
+
+/* Persistent magenta ambient wash that sits behind the constellation
+ * at rest — the "this is where your figure lives" mood light.
+ *
+ * 12 concentric ellipses with uniform low alpha and uniform radial
+ * spacing fake a radial gradient without using <RadialGradient> (which
+ * has known iOS issues with alpha stops in react-native-svg). With
+ * this many layers, no individual edge is perceptible — the eye reads
+ * a smooth falloff. Each layer adds the same alpha increment, so the
+ * accumulated opacity falls linearly from ~0.26 at the centre to ~0
+ * at the outer rim. Horizontal aspect ~1.45 : 1 matches the
+ * constellation's typical spread.
+ *
+ * Static — no animation — so the eye reads it as the scene's lighting,
+ * not as an effect. */
+const AMBIENT_LAYERS = 12
+const AMBIENT_PER_LAYER_ALPHA = 0.022
+const AMBIENT_RX_MAX = W * 0.6
+const AMBIENT_RX_MIN = W * 0.08
+const AMBIENT_ASPECT = 1.45
+
+function AmbientGlow({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <G>
+      {Array.from({ length: AMBIENT_LAYERS }).map((_, i) => {
+        const tt = i / (AMBIENT_LAYERS - 1)
+        const rx = AMBIENT_RX_MAX - (AMBIENT_RX_MAX - AMBIENT_RX_MIN) * tt
+        const ry = rx / AMBIENT_ASPECT
+        return (
+          <Ellipse
+            key={i}
+            cx={cx}
+            cy={cy}
+            rx={rx}
+            ry={ry}
+            fill={colors.magenta}
+            opacity={AMBIENT_PER_LAYER_ALPHA}
+          />
+        )
+      })}
+    </G>
   )
 }
 
@@ -491,110 +569,107 @@ function ShootingStar({ t }: { t: SharedValue<number> }) {
   )
 }
 
-/* ─ Radial pulse — magenta wave on each commit ────────────────────
+/* ─ Burst effect — magenta particle ring on each commit ────────────
  *
- * Two concentric expanding rings + a soft inner glow. Fired once per
- * day-mark (driven by the parent's `radialPulse` SharedValue 0→1 over
- * ~950 ms). Reads as "energy travelling outward from the centre"
- * which complements the silhouette flash in BaseLayer.
+ * On every day-mark, a bright magenta core flashes at centre and
+ * `PARTICLE_COUNT` small magenta dots burst radially outward from it,
+ * each with a slightly different speed so they spread instead of
+ * marching in lock-step. Earlier iterations used three concentric
+ * 4-point-star outlines — they read as a geometric stamp instead of
+ * an organic celebration. The particle approach feels more like a
+ * spark / fireworks moment, which is the metaphor we want for "you
+ * just lit another star in your figure".
+ *
+ * Driven by parent's `radialPulse` SharedValue 0→1 over 1500 ms.
  */
-function RadialPulse({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
-  const innerProps = useAnimatedProps(() => {
-    'worklet'
-    const r = 4 + pulse.value * (W * 0.42)
-    return { r, opacity: (1 - pulse.value) * 0.95 }
-  })
-  const outerProps = useAnimatedProps(() => {
-    'worklet'
-    const r = 4 + pulse.value * (W * 0.68)
-    return { r, opacity: (1 - pulse.value) * 0.6 }
-  })
-  const glowProps = useAnimatedProps(() => {
-    'worklet'
-    const r = 8 + pulse.value * 60
-    return { r, opacity: (1 - pulse.value) * 0.4 }
-  })
+function StarBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
   return (
     <G>
-      <AnimatedCircle cx={cx} cy={cy} r={0} fill={colors.magenta} animatedProps={glowProps} />
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        r={0}
-        fill="none"
-        stroke={colors.magenta}
-        strokeWidth={3}
-        animatedProps={innerProps}
-      />
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        r={0}
-        fill="none"
-        stroke="rgba(233,30,99,0.7)"
-        strokeWidth={1.8}
-        animatedProps={outerProps}
-      />
+      <BurstCore cx={cx} cy={cy} pulse={pulse} />
+      <ParticleBurst cx={cx} cy={cy} pulse={pulse} />
     </G>
   )
 }
 
-/* ─ Line currents — bright dots flowing along each lit line ────────
- *
- * One small cream-coloured dot per lit line, travelling A→B over a
- * 3 s cycle derived from the shared 8 s clock. Indexed phase keeps
- * adjacent lines out of sync. Reads as energy / life flowing through
- * the silhouette — "tu cuerpo lo está registrando" made visible.
- */
-function LineCurrents({
-  zodiac,
-  stars,
-  litKeys,
-  t,
-}: {
-  zodiac: ZodiacDef
-  stars: Resolved[]
-  litKeys: Set<string>
-  t: SharedValue<number>
-}) {
+const PARTICLE_COUNT = 28
+const PARTICLE_RADIUS_MAX = 140
+
+function ParticleBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
   return (
-    <>
-      {zodiac.lines.map(([a, b], idx) => {
-        if (!litKeys.has(`line-${idx}`)) return null
-        const A = stars[a]
-        const B = stars[b]
-        if (!A || !B) return null
-        return <LineCurrent key={`lc-${idx}`} A={A} B={B} t={t} index={idx} />
-      })}
-    </>
+    <G>
+      {Array.from({ length: PARTICLE_COUNT }).map((_, i) => (
+        <ParticleDot key={i} cx={cx} cy={cy} index={i} pulse={pulse} />
+      ))}
+    </G>
   )
 }
 
-function LineCurrent({
-  A,
-  B,
-  t,
+/* One particle in the burst ring. All particles share the same speed
+ * and same maxR so the ring stays a perfect circle as it expands —
+ * the earlier per-index speed jitter produced a "cloud" look that
+ * read as messy rather than ceremonial. Only the dot size has a tiny
+ * deterministic jitter so the ring still has visible mass variation.
+ * Travels strictly radially from centre outward. */
+function ParticleDot({
+  cx,
+  cy,
   index,
+  pulse,
 }: {
-  A: Resolved
-  B: Resolved
-  t: SharedValue<number>
+  cx: number
+  cy: number
   index: number
+  pulse: SharedValue<number>
 }) {
+  const angle = (index / PARTICLE_COUNT) * Math.PI * 2
+  // Subtle size variation only — adjacent dots feel slightly distinct
+  // without breaking the uniform-ring expansion.
+  const dotSize = 2.6 + Math.abs(Math.sin(index * 17.3)) * 0.8
+  const dirX = Math.cos(angle)
+  const dirY = Math.sin(angle)
+
   const animatedProps = useAnimatedProps(() => {
     'worklet'
-    // 3 s cycle (8 / (8/3)) with a per-line phase offset.
-    const cycle = (t.value * (8 / 3) + index * 0.21) % 1
-    const cx = A.x + (B.x - A.x) * cycle
-    const cy = A.y + (B.y - A.y) * cycle
-    // Fade in 0..0.12, fade out 0.88..1 — the dot appears near A,
-    // bright through the middle, fades out near B.
-    let op = 0.85
-    if (cycle < 0.12) op = (cycle / 0.12) * 0.85
-    else if (cycle > 0.88) op = (1 - (cycle - 0.88) / 0.12) * 0.85
-    return { cx, cy, opacity: op }
+    const u = pulse.value
+    if (u <= 0 || u >= 1) return { cx: -10, cy: -10, opacity: 0 }
+    const r = 6 + (PARTICLE_RADIUS_MAX - 6) * u
+    const px = cx + dirX * r
+    const py = cy + dirY * r
+    let op
+    if (u < 0.08) op = (u / 0.08) * 0.95
+    else if (u < 0.65) op = 0.95
+    else op = 0.95 * (1 - (u - 0.65) / 0.35)
+    return { cx: px, cy: py, opacity: op }
   })
-  return <AnimatedCircle cx={A.x} cy={A.y} r={1.8} fill="#F4ECDE" animatedProps={animatedProps} />
+
+  return (
+    <AnimatedCircle
+      cx={cx}
+      cy={cy}
+      r={dotSize}
+      fill={colors.magenta}
+      animatedProps={animatedProps}
+    />
+  )
+}
+
+/* Bright magenta filled core. Pops in the first 25% of the pulse and
+ * is gone by ~50%, so it reads as the ignition point that the three
+ * stars expand outward from. Fill + scale, no stroke — this is the
+ * "spark", not the "wave". */
+function BurstCore({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const u = pulse.value
+    let op = 0
+    if (u < 0.2) op = 0.95 * (u / 0.2)
+    else if (u < 0.45) op = 0.95 * (1 - (u - 0.2) / 0.25)
+    const r = 4 + u * 14
+    return { r, opacity: op }
+  })
+  return (
+    <AnimatedCircle cx={cx} cy={cy} r={4} fill={colors.magenta} animatedProps={animatedProps} />
+  )
 }
 
 function AmbientField({ t }: { t: SharedValue<number> }) {
@@ -639,6 +714,7 @@ function BaseLayer({
   stars,
   slowT,
   radialPulse,
+  t,
 }: {
   zodiac: ZodiacDef
   stars: Resolved[]
@@ -651,8 +727,11 @@ function BaseLayer({
    *  silhouette gets a brightness boost so the WHOLE figure flashes
    *  alongside the magenta radial ring — "the constellation fills up". */
   radialPulse: SharedValue<number>
+  /** 8 s clock shared with the lit-star layer so the placeholder
+   *  stars breathe + twinkle on the same heartbeat (just dimmer). */
+  t: SharedValue<number>
 }) {
-  const groupProps = useAnimatedProps(() => {
+  const linesProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin(slowT.value * 2 * Math.PI)
     // Parabolic flash: peaks at radialPulse=0.5, zero at 0 and 1, so
@@ -662,31 +741,71 @@ function BaseLayer({
     return { opacity: op > 1 ? 1 : op }
   })
   return (
-    <AnimatedG animatedProps={groupProps}>
-      {zodiac.lines.map(([a, b], idx) => {
-        const A = stars[a]
-        const B = stars[b]
-        if (!A || !B) return null
-        return (
-          <Line
-            key={`bl-${idx}`}
-            x1={A.x}
-            y1={A.y}
-            x2={B.x}
-            y2={B.y}
-            stroke="rgba(244,236,222,0.3)"
-            strokeWidth={1.4}
-            strokeLinecap="round"
-          />
-        )
-      })}
+    <>
+      <AnimatedG animatedProps={linesProps}>
+        {zodiac.lines.map(([a, b], idx) => {
+          const A = stars[a]
+          const B = stars[b]
+          if (!A || !B) return null
+          return (
+            <Line
+              key={`bl-${idx}`}
+              x1={A.x}
+              y1={A.y}
+              x2={B.x}
+              y2={B.y}
+              stroke="rgba(244,236,222,0.3)"
+              strokeWidth={1.4}
+              strokeLinecap="round"
+            />
+          )
+        })}
+      </AnimatedG>
       {stars.map((s, i) => (
-        <Path
-          key={`bs-${i}`}
-          d={fourPointStarPath(s.x, s.y, starRadius(s.mag) * 0.7)}
-          fill="rgba(244,236,222,0.6)"
-        />
+        <PlaceholderStar key={`bs-${i}`} s={s} i={i} t={t} />
       ))}
+    </>
+  )
+}
+
+/* Animated placeholder star — same breathing + twinkle pattern as
+ * `LitStar` but tuned softer (smaller scale swing, slightly dimmer
+ * cream fill) so the unlit field reads as "waiting" rather than "lit".
+ * Each star has its own phase offset so the field is asynchronous —
+ * adjacent stars never breathe or twinkle in sync. */
+function PlaceholderStar({ s, i, t }: { s: Resolved; i: number; t: SharedValue<number> }) {
+  const baseR = starRadius(s.mag) * 0.95
+  const phase = (i * 0.137) % 1
+
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    // Softer breath than lit stars (7 % vs 10 %) — still visible
+    // motion, but the lit layer should always read as the brighter
+    // half of the hierarchy when both coexist.
+    const scale = 1 + wave * 0.07
+
+    // Same scintillation period as lit stars but with a deeper dim
+    // (down to 0.42 of base) so the eye registers the twinkle on the
+    // dimmer cream fill.
+    const twinkleCycle = (t.value * 2.4 + i * 0.31) % 1
+    let twinkleOp = 1
+    if (twinkleCycle < 0.04) {
+      twinkleOp = 1 - (twinkleCycle / 0.04) * 0.58
+    } else if (twinkleCycle < 0.08) {
+      twinkleOp = 0.42 + ((twinkleCycle - 0.04) / 0.04) * 0.58
+    }
+
+    const ambient = (0.68 + 0.1 * wave) * twinkleOp
+    return {
+      opacity: ambient,
+      transform: `translate(${s.x} ${s.y}) scale(${scale.toFixed(3)}) translate(${-s.x} ${-s.y})`,
+    }
+  })
+
+  return (
+    <AnimatedG animatedProps={animatedProps}>
+      <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="#F4ECDE" />
     </AnimatedG>
   )
 }
@@ -789,8 +908,13 @@ function CenterNumberOverlay({
     const text = String(rounded.value)
     return { text, defaultValue: text } as unknown as Partial<TextInputProps>
   })
+  // Opacity ramps from 0.42 at count=0 to 1.0 once the user has marked
+  // at least one day — the dim "0" reads as "waiting for you to begin"
+  // rather than a bright assertion. Beyond count=1 the number stays at
+  // full brightness; scale pulse on commit is layered on top.
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + numberPulse.value * 0.08 }],
+    opacity: 0.42 + Math.min(1, displayedCount.value) * 0.58,
   }))
   return (
     <View style={styles.numberOverlay} pointerEvents="none">
@@ -817,6 +941,7 @@ function StarsLayer({
   ignitingKey,
   intensity,
   litPulse,
+  starRecency,
 }: {
   stars: Resolved[]
   litKeys: Set<string>
@@ -827,6 +952,9 @@ function StarsLayer({
   ignitingKey: string | null
   intensity: number
   litPulse: SharedValue<number>
+  /** Star idx → days since marked. Drives the halo decay so recent
+   *  stars feel alive and older ones quiet down. */
+  starRecency: Map<number, number>
 }) {
   return (
     <>
@@ -835,10 +963,20 @@ function StarsLayer({
         const isNext = nextEl?.type === 'star' && nextEl.idx === i
         if (ignitingKey === `star-${i}`) return null
         if (isNext) return <NextStar key={`s-${i}`} s={s} t={t} />
-        if (isLit)
+        if (isLit) {
+          const recency = starRecency.get(i) ?? 0
           return (
-            <LitStar key={`s-${i}`} s={s} i={i} t={t} intensity={intensity} litPulse={litPulse} />
+            <LitStar
+              key={`s-${i}`}
+              s={s}
+              i={i}
+              t={t}
+              intensity={intensity}
+              litPulse={litPulse}
+              recency={recency}
+            />
           )
+        }
         return null
       })}
     </>
@@ -982,13 +1120,23 @@ function IgnitingLine({
 function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
   const baseR = starRadius(s.mag) + 0.5
 
-  // Ring pulse 0.45 → 0.85 opacity. Faster than the 8 s ambient (so
-  // it draws the eye) but well slower than haptic-grade pulses.
-  // Period ≈ 2.6 s.
+  // Ring pulse 0.65 → 1.0 opacity. Brighter range than before so the
+  // affordance reads on first glance — this is the spot to fill next.
+  // Period ≈ 2.6 s. Faster than the 8 s ambient (it should draw the
+  // eye) but well slower than haptic-grade pulses.
   const ringProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * (8 / 2.6))
-    return { opacity: 0.45 + 0.4 * wave }
+    return { opacity: 0.65 + 0.35 * wave }
+  })
+
+  // Outer halo ring (larger, faded) gives the next affordance a soft
+  // glow that radiates out, so the eye locks on it even at small
+  // sizes. Pulses with the same wave but at a lower opacity range.
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * (8 / 2.6))
+    return { opacity: 0.18 + 0.22 * wave }
   })
 
   return (
@@ -996,15 +1144,24 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
       <AnimatedCircle
         cx={s.x}
         cy={s.y}
-        r={baseR + 5.5}
+        r={baseR + 11}
         fill="none"
         stroke={colors.magenta}
-        strokeWidth={1.2}
+        strokeWidth={1}
+        animatedProps={haloProps}
+      />
+      <AnimatedCircle
+        cx={s.x}
+        cy={s.y}
+        r={baseR + 7}
+        fill="none"
+        stroke={colors.magenta}
+        strokeWidth={2}
         strokeDasharray="3 4"
         strokeLinecap="round"
         animatedProps={ringProps}
       />
-      <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="url(#starNext)" opacity={0.65} />
+      <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="url(#starNext)" opacity={0.85} />
     </G>
   )
 }
@@ -1015,6 +1172,7 @@ function LitStar({
   t,
   intensity,
   litPulse,
+  recency,
 }: {
   s: Resolved
   i: number
@@ -1029,6 +1187,10 @@ function LitStar({
    *  opacity and amplifies the halo so each "Hoy" tap visibly lifts
    *  the whole constellation, not only the newly-igniting element. */
   litPulse: SharedValue<number>
+  /** Days since this star was marked. 0 = today. Drives halo decay
+   *  so recent stars feel alive while older ones quiet down — the
+   *  body remembers recent rhythm more vividly than old. */
+  recency: number
 }) {
   const baseR = starRadius(s.mag) + 0.5
   const r = baseR * (1 + intensity * 0.18)
@@ -1036,20 +1198,52 @@ function LitStar({
   // Per-star phase offset so adjacent stars breathe out of sync.
   const phase = (i * 0.137) % 1
 
+  // Halo intensity multiplier from recency. Days 0..7 stay bright
+  // (1.0 → 0.55), days 7..21 fade further (0.55 → 0.18), days 21+
+  // floor at a quiet baseline so old-lit stars still glow faintly.
+  // Computed on JS thread and captured as a worklet closure scalar.
+  const haloMult = recencyHaloMultiplier(recency)
+
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    const ambient = (0.05 + 0.2 * wave) * (1 + intensity * 0.8)
-    return { opacity: ambient + litPulse.value * 0.45, r: r + 5 + litPulse.value * 4 }
+    const ambient = (0.05 + 0.2 * wave) * (1 + intensity * 0.8) * haloMult
+    return {
+      opacity: ambient + litPulse.value * 0.45,
+      r: r + 5 * haloMult + litPulse.value * 4,
+    }
   })
 
+  // Body animation: slow breathing scale 1.00 → 1.10 driven by the 8 s
+  // clock + an asynchronous twinkle flicker (~3.3 s period per star,
+  // each with its own phase) that briefly dips opacity to ~0.65 and
+  // snaps back. The breathing carries the continuous "alive" feel; the
+  // twinkle gives the eye the universal scintillation cue of real
+  // stars in a night sky. The transform string lives on AnimatedG
+  // (not the Path) so the gradient fill `url(#starLit)` stays stable.
   const starProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    const ambient = 0.85 + 0.15 * wave
-    // Cap at 1; SVG opacity doesn't accept >1.
+    const scale = 1 + wave * 0.1
+
+    // Twinkle: t cycles 0..1 every 8 s; ×2.4 ⇒ ~3.3 s per twinkle.
+    // Per-star phase keeps the field asynchronous.
+    const twinkleCycle = (t.value * 2.4 + i * 0.31) % 1
+    let twinkleOp = 1
+    if (twinkleCycle < 0.04) {
+      // Fast dim down (0 → 165 ms-ish at 4 % of 3.3 s).
+      twinkleOp = 1 - (twinkleCycle / 0.04) * 0.35
+    } else if (twinkleCycle < 0.08) {
+      // Fast recover back to full brightness.
+      twinkleOp = 0.65 + ((twinkleCycle - 0.04) / 0.04) * 0.35
+    }
+
+    const ambient = (0.85 + 0.15 * wave) * twinkleOp
     const boosted = ambient + litPulse.value * 0.15
-    return { opacity: boosted > 1 ? 1 : boosted }
+    return {
+      opacity: boosted > 1 ? 1 : boosted,
+      transform: `translate(${s.x} ${s.y}) scale(${scale.toFixed(3)}) translate(${-s.x} ${-s.y})`,
+    }
   })
 
   return (
@@ -1127,56 +1321,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   numberOverlayText: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 64,
+    // displaySemi (600) instead of displayHeavy (900) — at 64 px the
+    // heavy weight competed with the constellation as visual focus;
+    // the constellation is the hero, the count is metadata-on-top.
+    // Semibold + smaller size lets the figure breathe while still
+    // reading as a hero number.
+    fontFamily: typography.displaySemi,
+    fontSize: 52,
     color: colors.magenta,
-    letterSpacing: -3.5,
+    letterSpacing: -2.6,
     textAlign: 'center',
     // Native magenta glow — replaces the SVG RadialGradient bloom that
     // was rendering as a solid disk on iOS. RN's textShadow works
     // cleanly on both platforms.
-    textShadowColor: 'rgba(233,30,99,0.65)',
+    textShadowColor: 'rgba(233,30,99,0.55)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadowRadius: 16,
     // The SVG drew the number at y = cy - 4 (above geometric centre).
     // RN centres via flex so we bias upward to match the original
     // composition. includeFontPadding off kills Android's extra space.
-    marginTop: -22,
+    marginTop: -18,
     padding: 0,
     includeFontPadding: false,
-    minWidth: 90,
+    minWidth: 80,
   },
-  progressLabel: {
-    marginTop: 6,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 14,
-    color: colors.bone,
-    textAlign: 'center',
-  },
-  zodiacCap: {
-    flexDirection: 'row',
+  // Visible only once the user completes the 28-day cycle — a single
+  // small magenta caps stamp announcing the achievement. Replaces the
+  // permanent "ACUARIO" label which duplicated the "TU ACUARIO"
+  // section header above.
+  completionCap: {
     alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    marginBottom: 14,
+    marginTop: 6,
+    marginBottom: 10,
   },
-  zodiacGlyph: {
-    fontFamily: typography.uiBold,
-    fontSize: 16,
-    color: colors.magenta,
-  },
-  zodiacLabel: {
+  completionLabel: {
     fontFamily: typography.uiBold,
     fontSize: 10.5,
-    color: colors.leche,
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-  },
-  zodiacOverflow: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 13,
     color: colors.magenta,
-    letterSpacing: -0.5,
+    letterSpacing: 2.8,
+    textTransform: 'uppercase',
   },
 })

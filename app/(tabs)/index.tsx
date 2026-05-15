@@ -3,7 +3,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import type { BriefContext, StreakCell } from '@/features/brief/api'
@@ -28,7 +35,6 @@ import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
 
 const CELEBRATION_MS = 2000
-const SPANISH_WEEKDAY_SHORT = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'] as const
 
 function makeEnter(cadence: Cadence) {
   if (cadence === 'reduced') return (_d: number) => FadeIn.duration(220)
@@ -78,6 +84,16 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const [showCelebration, setShowCelebration] = useState(false)
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
+  // Drives the full-viewport magenta wash that accompanies the
+  // constellation burst on each day-mark. Fires 0→1 over the same
+  // duration as LunarConstellation's internal radialPulse so the
+  // two animations read as one moment. Bell-curve opacity in the
+  // animated style peaks mid-pulse and fades back to zero at the end.
+  const screenFlash = useSharedValue(0)
+  const screenFlashStyle = useAnimatedStyle(() => {
+    const u = screenFlash.value
+    return { opacity: u * (1 - u) * 4 * 0.18 }
+  })
   /** Offset relative to the current 4-week window: 0 = current, -1 = previous, etc. */
   const [weekOffset, setWeekOffset] = useState(0)
 
@@ -122,20 +138,16 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
 
-  const todayPill = useMemo(() => {
-    const now = new Date()
-    const weekday = SPANISH_WEEKDAY_SHORT[now.getDay()] ?? 'HOY'
-    const day = now.getDate()
-    const hh = String(now.getHours()).padStart(2, '0')
-    const mm = String(now.getMinutes()).padStart(2, '0')
-    return { full: `${weekday} ${day} · ${hh}:${mm}`, emphasis: weekday }
-  }, [])
-
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
   const handleConfirmWorkout = () => {
     const wasFirstDay = isFirstDay
     toggleToday.mutate(true)
+    // Mirror duration & easing of LunarConstellation's internal
+    // radialPulse so the screen wash + the constellation burst peak
+    // and fade together.
+    screenFlash.value = 0
+    screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
     if (wasFirstDay) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
       setShowCelebration(true)
@@ -168,12 +180,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       <SafeAreaView style={styles.screen} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Animated.View entering={enter(40)}>
-            <TabHeader
-              greeting={`Hola, ${greetingName}.`}
-              greetingEmphasis={greetingName}
-              pillLabel={todayPill.full}
-              pillEmphasis={todayPill.emphasis}
-            />
+            <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
           </Animated.View>
 
           <Animated.View entering={enter(120)}>
@@ -185,10 +192,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(220)}>
-            <SectionHeader
-              label={`Tu ${capitalize(signLabel)} · 28 días`}
-              meta={{ value: String(trainedThisMonth), label: 'de 28' }}
-            />
+            <SectionHeader label={`Tu ${capitalize(signLabel)}`} />
           </Animated.View>
 
           <Animated.View entering={enter(320)}>
@@ -196,20 +200,18 @@ function TodayContent({ ctx, cadence }: ContentProps) {
               trained={ctx.grid_28_days.map((c) => c.completed)}
               todayIdx={27}
               sign={sign}
+              committed={ctx.today_workout_completed}
             />
           </Animated.View>
 
           <Animated.View entering={enter(420)}>
-            <Text style={styles.coachLine}>
-              Tu cuerpo lo está <Text style={styles.coachLineEm}>registrando</Text>. Aunque no lo
-              veas todavía.
-            </Text>
+            <CoachLine count={trainedThisMonth} signLabel={signLabel} />
           </Animated.View>
 
           {ctx.targets ? (
             <>
               <Animated.View entering={enter(520)}>
-                <SectionHeader label="Macros de hoy" meta="recomp" />
+                <SectionHeader label="Macros de hoy" />
               </Animated.View>
               <Animated.View entering={enter(580)} style={styles.macroRow}>
                 <RingCard
@@ -217,20 +219,36 @@ function TodayContent({ ctx, cadence }: ContentProps) {
                   value={ctx.today_macros.protein_g}
                   target={ctx.targets.protein_g}
                   formatted={Math.round(ctx.today_macros.protein_g).toString()}
-                  unitSuffix={`de ${ctx.targets.protein_g} g`}
+                  unitSuffix={`/ ${ctx.targets.protein_g} g`}
                   ringColor={colors.magenta}
                   ringDelay={400}
                 />
-                <RingCard
-                  label="Calorías"
-                  value={ctx.today_macros.calories}
-                  target={ctx.targets.calories}
-                  formatted={formatKcal(ctx.today_macros.calories)}
-                  unitSuffix={`de ${formatKcal(ctx.targets.calories)} k`}
-                  ringColor={colors.bone}
-                  ringDelay={600}
-                  small
-                />
+                {(() => {
+                  // Calories use a "budget remaining" mental model:
+                  // start at full target, count down as the user logs
+                  // meals. The protein card stays in "accumulate to
+                  // target" — different metric, different framing.
+                  // The big number is the integer kcal count (e.g. 400,
+                  // 1300, 1800) — the compact "1.3" form was reading as
+                  // "1.3 kcal restantes" which was nonsensical.
+                  const caloriesRemaining = Math.max(
+                    0,
+                    ctx.targets.calories - ctx.today_macros.calories,
+                  )
+                  return (
+                    <RingCard
+                      budget
+                      label="Calorías"
+                      value={caloriesRemaining}
+                      target={ctx.targets.calories}
+                      formatted={Math.round(caloriesRemaining).toString()}
+                      unitSuffix="kcal restantes"
+                      ringColor={colors.bone}
+                      ringDelay={600}
+                      small
+                    />
+                  )
+                })()}
               </Animated.View>
             </>
           ) : null}
@@ -277,6 +295,8 @@ function TodayContent({ ctx, cadence }: ContentProps) {
         </ScrollView>
       </SafeAreaView>
 
+      <Animated.View pointerEvents="none" style={[styles.screenFlash, screenFlashStyle]} />
+
       {showCelebration ? <Day1Celebration /> : null}
     </View>
   )
@@ -286,18 +306,96 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
-/** 1500 → "1.5", 980 → "980". */
-function formatKcal(kcal: number): string {
-  if (kcal >= 1000) {
-    return (Math.round(kcal / 100) / 10).toFixed(1)
+/* Editorial copy that follows the user through the 28-day cycle.
+ * Specific milestone days (1, 7, 14, 21, 28) get unique sentences;
+ * in-between days fall back to phase-level copy so the message
+ * evolves with the user's progress without writing 29 distinct
+ * lines. The constellation centre already shows the numeric count —
+ * the copy here doesn't repeat it. Sentences are capitalised so the
+ * voice reads mature/editorial rather than chat-style. */
+type CoachCopy = { before: string; emphasis: string; after: string }
+
+function getCoachCopy(count: number, signLabel: string): CoachCopy {
+  const lower = signLabel.toLowerCase()
+
+  // Specific milestone days — checked first so they override the
+  // phase fallbacks below.
+  if (count === 28) {
+    return { before: `Completaste tu ${lower}. `, emphasis: 'Brillas', after: '.' }
   }
-  return Math.round(kcal).toString()
+  if (count === 21) {
+    return { before: 'Tres semanas. Estás ', emphasis: 'cerca', after: '.' }
+  }
+  if (count === 14) {
+    return { before: 'La ', emphasis: 'mitad atrás', after: '. Sigue.' }
+  }
+  if (count === 7) {
+    return { before: 'Una semana. Tu cuerpo lo ', emphasis: 'recuerda', after: '.' }
+  }
+  if (count === 1) {
+    return {
+      before: 'Hoy ',
+      emphasis: 'empieza',
+      after: ' algo. Tu cuerpo lo está registrando.',
+    }
+  }
+
+  // Phase fallbacks for in-between days. Each block covers the days
+  // *after* its milestone (e.g. 22..27 sit in the "closing stretch"
+  // bucket because 21 was the last milestone).
+  if (count >= 22) {
+    return {
+      before: '',
+      emphasis: 'Recta final',
+      after: '. El cielo casi se cierra.',
+    }
+  }
+  if (count >= 15) {
+    return {
+      before: 'Pasaste la mitad. Esto ya es ',
+      emphasis: 'tuyo',
+      after: '.',
+    }
+  }
+  if (count >= 8) {
+    return {
+      before: 'El cuerpo aprende cuando ',
+      emphasis: 'insistes',
+      after: '.',
+    }
+  }
+  if (count >= 2) {
+    return {
+      before: 'Tu cuerpo lo está ',
+      emphasis: 'registrando',
+      after: '. Aunque no lo veas todavía.',
+    }
+  }
+  return { before: `Tu ${lower} `, emphasis: 'te espera', after: '.' }
+}
+
+function CoachLine({ count, signLabel }: { count: number; signLabel: string }) {
+  const copy = getCoachCopy(count, signLabel)
+  return (
+    <Text style={styles.coachLine}>
+      {copy.before}
+      <Text style={styles.coachLineEm}>{copy.emphasis}</Text>
+      {copy.after}
+    </Text>
+  )
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  // Magenta wash fired on each workout commit. Covers the full
+  // viewport (above the ScrollView so it includes the header bar and
+  // tab bar) and lets taps pass through via pointerEvents="none".
+  screenFlash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.magenta,
   },
   content: {
     paddingHorizontal: 20,
@@ -307,12 +405,12 @@ const styles = StyleSheet.create({
   coachLine: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 26,
     color: colors.bone,
     textAlign: 'center',
     marginHorizontal: 16,
-    marginTop: -8,
+    marginTop: 4,
   },
   coachLineEm: {
     color: colors.magenta,

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "STELAR",
-    "slug": "stelar",
+    "slug": "tracking-app",
     "scheme": "stelar",
     "version": "1.0.0",
     "orientation": "portrait",

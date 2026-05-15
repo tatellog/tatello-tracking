@@ -10,8 +10,11 @@ type Props = {
   /** "Tu comida" — uses Hanken 36 px; emphasis word renders Cormorant italic 34 px magenta. */
   title?: string
   titleEmphasis?: string
-  /** "SÁB 27 · 14:25" / "HOY · JUE 30" / "30 días" — emphasis word renders magenta. */
-  pillLabel: string
+  /** Optional metadata pill on the right ("SÁB 27", "30 días", etc.).
+   *  Tabs that want a clean header (e.g. the daily-ritual Hoy tab,
+   *  where minute-level time pulls the user out of contemplation)
+   *  omit this prop and only the greeting/title renders. */
+  pillLabel?: string
   pillEmphasis?: string
 }
 
@@ -43,14 +46,16 @@ export function TabHeader({
           />
         ) : null}
       </View>
-      <View style={styles.pill}>
-        <EmText
-          text={pillLabel}
-          emphasis={pillEmphasis}
-          emStyle={styles.pillEm}
-          style={styles.pillText}
-        />
-      </View>
+      {pillLabel ? (
+        <View style={styles.pill}>
+          <EmText
+            text={pillLabel}
+            emphasis={pillEmphasis}
+            emStyle={styles.pillEm}
+            style={styles.pillText}
+          />
+        </View>
+      ) : null}
     </View>
   )
 }

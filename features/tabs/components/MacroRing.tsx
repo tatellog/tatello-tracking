@@ -52,6 +52,12 @@ export function MacroRing({
         viewBox={`0 0 ${size} ${size}`}
         style={{ transform: [{ rotate: '-90deg' }] }}
       >
+        {/* Inner halo — three stacked low-alpha discs approximate a
+            soft radial glow inside the ring. Reads as "this ring has
+            life inside it" rather than just an arc on a void. */}
+        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 2)} fill={color} opacity={0.04} />
+        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 8)} fill={color} opacity={0.07} />
+        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 16)} fill={color} opacity={0.12} />
         <Circle
           cx={size / 2}
           cy={size / 2}

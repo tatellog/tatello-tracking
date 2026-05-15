@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
@@ -11,15 +11,21 @@ type Props = {
 }
 
 /**
- * Daily workout check-in. Two contained visual states — neither
- * dominates the hero. The constellation below is the hero; this
- * button is the verb that lights it up.
+ * Daily workout check-in. Single pill silhouette that toggles between
+ * two states — same height/radius/padding so the transition reads as
+ * one control flipping rather than two unrelated UI objects.
  *
- *   committed=false → bordered ghost pill, magenta-tinted bg, magenta
- *                     glow. Reads as "an invitation, not a demand".
- *   committed=true  → quiet stamp chip, dark surface, cream text.
- *                     Visually steps back so the constellation can
- *                     hold attention.
+ *   committed=false → magenta-tinted bg, full magenta border + glow,
+ *                     "HOY · Marcar entreno · ○". The empty circle
+ *                     icon evokes an unchecked checkbox — tap to fill.
+ *                     Verb+noun "marcar entreno" makes the action
+ *                     explicit (it's a check-in, not "go train").
+ *   committed=true  → softer magenta tint + dimmer magenta border +
+ *                     half-intensity glow, "✓ · Entrenaste hoy · ×".
+ *                     The × icon carries the "tap to undo" affordance
+ *                     so the shape still feels alive without a verbose
+ *                     hint string. Empty circle → filled check tells
+ *                     the toggle's micro-narrative without copy.
  */
 export function TodayWorkoutButton({ committed, onConfirm, onUndo }: Props) {
   const handlePress = () => {
@@ -52,16 +58,10 @@ function ActiveContent() {
   return (
     <View style={styles.row}>
       <Text style={styles.activeEyebrow}>HOY</Text>
-      <Text style={styles.activeTitle}>Entrenar</Text>
-      <View style={styles.activeStarWrap}>
+      <Text style={styles.activeTitle}>Marcar entreno</Text>
+      <View style={styles.activeCheckWrap}>
         <Svg width={20} height={20} viewBox="0 0 24 24">
-          <Path
-            d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3 8.2 13.9 2 9.4h7.6z"
-            fill="none"
-            stroke={colors.magenta}
-            strokeWidth={2}
-            strokeLinejoin="round"
-          />
+          <Circle cx={12} cy={12} r={9} stroke={colors.magenta} strokeWidth={1.6} fill="none" />
         </Svg>
       </View>
     </View>
@@ -71,27 +71,40 @@ function ActiveContent() {
 function CommittedContent() {
   return (
     <View style={styles.row}>
-      <View style={styles.committedStarWrap}>
-        <Svg width={16} height={16} viewBox="0 0 24 24">
+      <View style={styles.committedCheckWrap}>
+        <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path
-            d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3 8.2 13.9 2 9.4h7.6z"
-            fill={colors.magenta}
+            d="M5 12.5l4.5 4.5L19 7"
+            stroke={colors.magenta}
+            strokeWidth={2.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
           />
         </Svg>
       </View>
       <Text style={styles.committedTitle}>Entrenaste hoy</Text>
-      <Text style={styles.committedHint}>tocar para deshacer</Text>
+      <View style={styles.committedCloseWrap}>
+        <Svg width={16} height={16} viewBox="0 0 24 24">
+          <Path
+            d="M6 6l12 12M18 6L6 18"
+            stroke={colors.magenta}
+            strokeOpacity={0.7}
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        </Svg>
+      </View>
     </View>
   )
 }
 
-const ACTIVE_HEIGHT = 52
-const COMMITTED_HEIGHT = 44
+const SHELL_HEIGHT = 52
 
 const styles = StyleSheet.create({
   activeShell: {
-    height: ACTIVE_HEIGHT,
-    borderRadius: ACTIVE_HEIGHT / 2,
+    height: SHELL_HEIGHT,
+    borderRadius: SHELL_HEIGHT / 2,
     backgroundColor: 'rgba(233,30,99,0.12)',
     borderWidth: 1.5,
     borderColor: colors.magenta,
@@ -104,15 +117,24 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 4,
   },
+  // Same silhouette as activeShell so the toggle reads as one
+  // control flipping state. Magenta tint stays present but dims —
+  // the × icon on the right side now carries the "tap to undo"
+  // affordance instead of a literal hint string.
   committedShell: {
-    height: COMMITTED_HEIGHT,
-    borderRadius: COMMITTED_HEIGHT / 2,
-    backgroundColor: colors.bgCard,
+    height: SHELL_HEIGHT,
+    borderRadius: SHELL_HEIGHT / 2,
+    backgroundColor: 'rgba(233,30,99,0.06)',
     borderWidth: 1,
-    borderColor: colors.bruma,
+    borderColor: 'rgba(233,30,99,0.45)',
     marginBottom: 18,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
     justifyContent: 'center',
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 2,
   },
   pressed: {
     transform: [{ scale: 0.985 }],
@@ -136,29 +158,29 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.4,
   },
-  activeStarWrap: {
+  activeCheckWrap: {
     width: 24,
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  committedStarWrap: {
-    width: 18,
-    height: 18,
+  committedCheckWrap: {
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   committedTitle: {
     flex: 1,
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: 15,
+    fontFamily: typography.displayHeavy,
+    fontSize: 18,
     color: colors.leche,
+    letterSpacing: -0.4,
   },
-  committedHint: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 11,
-    color: colors.niebla,
+  committedCloseWrap: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 })
