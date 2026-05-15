@@ -145,32 +145,38 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
 
   // Leo — sickle (backwards question-mark mane) anchored on Regulus,
   // body triangle extending to Denebola at the tail.
+  // Leo — the sickle (an open backwards-question-mark hook for the
+  // head and mane, anchored on bright Regulus) plus the hindquarters
+  // triangle trailing right to Denebola at the tail. The lion's back
+  // (Algieba → Zosma) arcs above the centre counter; only the belly
+  // line (Regulus → Chort) passes behind it.
   leo: {
     label: 'LEO',
     glyph: '♌',
     stars: [
-      { x: 0.1, y: 0.5, mag: 1.5 }, // 0 Regulus (anchor)
-      { x: 0.14, y: 0.32, mag: 3.0 }, // 1 neck
-      { x: 0.22, y: 0.18, mag: 3.0 }, // 2 sickle top-left
-      { x: 0.34, y: 0.14, mag: 2.5 }, // 3 sickle top
-      { x: 0.42, y: 0.26, mag: 3.0 }, // 4 sickle top-right
-      { x: 0.34, y: 0.38, mag: 3.0 }, // 5 sickle inner / Algieba
-      { x: 0.46, y: 0.56, mag: 3.0 }, // 6 back high
-      { x: 0.68, y: 0.6, mag: 3.5 }, // 7 back
-      { x: 0.88, y: 0.5, mag: 2.0 }, // 8 Denebola (anchor)
-      { x: 0.72, y: 0.78, mag: 3.5 }, // 9 hind leg
+      // The sickle — open hook, Regulus at its base
+      { x: 0.16, y: 0.52, mag: 1.5 }, // 0 Regulus (anchor)
+      { x: 0.2, y: 0.4, mag: 3.2 }, // 1 Eta
+      { x: 0.24, y: 0.28, mag: 2.4 }, // 2 Algieba — the bend
+      { x: 0.2, y: 0.18, mag: 3.2 }, // 3 Adhafera
+      { x: 0.3, y: 0.12, mag: 3.2 }, // 4 Rasalas
+      { x: 0.42, y: 0.16, mag: 2.8 }, // 5 Epsilon — open end
+      // The hindquarters triangle
+      { x: 0.56, y: 0.6, mag: 3.2 }, // 6 Chort
+      { x: 0.6, y: 0.4, mag: 2.8 }, // 7 Zosma
+      { x: 0.86, y: 0.52, mag: 2.0 }, // 8 Denebola — the tail
     ],
     lines: [
-      [0, 1],
+      [0, 1], // sickle hook
       [1, 2],
       [2, 3],
       [3, 4],
       [4, 5],
-      [5, 0],
-      [0, 6],
-      [6, 7],
+      [6, 7], // hindquarters triangle
       [7, 8],
-      [7, 9],
+      [6, 8],
+      [0, 6], // belly
+      [2, 7], // back
     ],
   },
 
