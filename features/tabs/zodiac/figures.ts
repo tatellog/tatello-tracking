@@ -75,30 +75,40 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     ],
   },
 
-  // Géminis — two stars at the top (Castor & Pollux), parallel bodies
-  // trailing down-right and ending in feet.
+  // Géminis — the twins Castor & Pollux: two parallel horizontal
+  // bodies, bright heads at the left, bodies extending right. Joined
+  // by one vertical line (the twins' clasped hands). Unique among the
+  // signs: NO fuchsia alpha — both heads are equal sibling stars, so
+  // they stay cream. Heads are mag 1.9 (above HERO_MAG 1.7) precisely
+  // so the hero glow never fires for this figure.
+  // Coords normalised from the reference spec (viewBox 300×260).
   geminis: {
     label: 'GÉMINIS',
     glyph: '♊',
     stars: [
-      { x: 0.18, y: 0.16, mag: 1.5 }, // 0 Castor (anchor)
-      { x: 0.34, y: 0.22, mag: 1.5 }, // 1 Pollux (anchor)
-      { x: 0.45, y: 0.38, mag: 3.0 }, // 2 mid-right joint
-      { x: 0.6, y: 0.42, mag: 3.0 }, // 3
-      { x: 0.78, y: 0.5, mag: 3.0 }, // 4
-      { x: 0.92, y: 0.55, mag: 3.5 }, // 5 right tip
-      { x: 0.5, y: 0.6, mag: 3.5 }, // 6 lower parallel
-      { x: 0.72, y: 0.72, mag: 3.5 }, // 7 lower foot
+      // Castor — the upper twin, left to right
+      { x: 0.167, y: 0.26, mag: 1.9 }, // 0 castor_head
+      { x: 0.383, y: 0.32, mag: 3.2 }, // 1 castor_body_1
+      { x: 0.583, y: 0.36, mag: 3.2 }, // 2 castor_body_2
+      { x: 0.767, y: 0.34, mag: 3.2 }, // 3 castor_foot
+      // Pollux — the lower twin, left to right
+      { x: 0.2, y: 0.56, mag: 1.9 }, // 4 pollux_head
+      { x: 0.417, y: 0.62, mag: 3.2 }, // 5 pollux_body_1
+      { x: 0.617, y: 0.66, mag: 3.2 }, // 6 pollux_body_2
+      { x: 0.817, y: 0.66, mag: 3.2 }, // 7 pollux_foot
+      { x: 0.9, y: 0.73, mag: 3.2 }, // 8 pollux_extra
     ],
     lines: [
-      [0, 1],
-      [0, 2],
+      [0, 1], // Castor's body
+      [1, 2],
       [2, 3],
-      [3, 4],
-      [4, 5],
-      [1, 6],
+      [4, 5], // Pollux's body
+      [5, 6],
       [6, 7],
-      [3, 7],
+      [7, 8],
+      [1, 5], // the clasped hands — vertical join between the twins
+      [0, 4], // closing edge — heads
+      [3, 7], // closing edge — feet
     ],
   },
 

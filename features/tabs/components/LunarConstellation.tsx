@@ -626,18 +626,18 @@ function ShootingStar({ t }: { t: SharedValue<number> }) {
   )
 }
 
-/* ─ Burst effect — magenta particle ring on each commit ────────────
+/* ─ Burst effect — fireworks on each commit ────────────────────────
  *
  * On every day-mark, a bright magenta core flashes at centre and
- * `PARTICLE_COUNT` small magenta dots burst radially outward from it,
- * each with a slightly different speed so they spread instead of
- * marching in lock-step. Earlier iterations used three concentric
- * 4-point-star outlines — they read as a geometric stamp instead of
- * an organic celebration. The particle approach feels more like a
- * spark / fireworks moment, which is the metaphor we want for "you
- * just lit another star in your figure".
+ * PARTICLE_COUNT sparks burst out like a firework: each shoots at its
+ * own angle and reach, decelerates (air drag), arcs downward under
+ * gravity, flickers and fades. Each spark is a streak — the segment
+ * between its position now and a beat earlier — so it's a long trail
+ * while fast and shrinks to a point as it slows. The asymmetry +
+ * gravity arc is what reads as a firework rather than an expanding
+ * ring.
  *
- * Driven by parent's `radialPulse` SharedValue 0→1 over 1500 ms.
+ * Driven by the parent's `radialPulse` SharedValue 0→1.
  */
 function StarBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
   return (
@@ -649,25 +649,25 @@ function StarBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedVal
 }
 
 const PARTICLE_COUNT = 28
-const PARTICLE_RADIUS_MAX = 140
+const PARTICLE_REACH = 118 // base radial reach (px), jittered per spark
+const PARTICLE_GRAVITY = 95 // downward pull accumulated by the burst's end
 
 function ParticleBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
   return (
     <G>
       {Array.from({ length: PARTICLE_COUNT }).map((_, i) => (
-        <ParticleDot key={i} cx={cx} cy={cy} index={i} pulse={pulse} />
+        <ParticleSpark key={i} cx={cx} cy={cy} index={i} pulse={pulse} />
       ))}
     </G>
   )
 }
 
-/* One particle in the burst ring. All particles share the same speed
- * and same maxR so the ring stays a perfect circle as it expands —
- * the earlier per-index speed jitter produced a "cloud" look that
- * read as messy rather than ceremonial. Only the dot size has a tiny
- * deterministic jitter so the ring still has visible mass variation.
- * Travels strictly radially from centre outward. */
-function ParticleDot({
+/* One firework spark. Shoots out (ease-out — explosive launch, then
+ * air drag), arcs downward under gravity, flickers, fades. Rendered
+ * as the streak between the head (position now) and the tail
+ * (position a beat earlier): long while the spark is fast, collapsing
+ * to a point as it slows. */
+function ParticleSpark({
   cx,
   cy,
   index,
@@ -678,33 +678,47 @@ function ParticleDot({
   index: number
   pulse: SharedValue<number>
 }) {
-  const angle = (index / PARTICLE_COUNT) * Math.PI * 2
-  // Subtle size variation only — adjacent dots feel slightly distinct
-  // without breaking the uniform-ring expansion.
-  const dotSize = 2.6 + Math.abs(Math.sin(index * 17.3)) * 0.8
+  // Even angular spread + deterministic jitter so the burst is
+  // organic, not a perfect ring.
+  const angle = (index / PARTICLE_COUNT) * Math.PI * 2 + Math.sin(index * 12.9898) * 0.2
+  // Per-spark reach + thickness — sparks fly different distances.
+  const reach = PARTICLE_REACH * (0.55 + Math.abs(Math.sin(index * 31.7)) * 0.78)
+  const width = 1.4 + Math.abs(Math.sin(index * 17.3)) * 1.6
   const dirX = Math.cos(angle)
   const dirY = Math.sin(angle)
+  const flickPhase = (index * 0.37) % 1
 
   const animatedProps = useAnimatedProps(() => {
     'worklet'
     const u = pulse.value
-    if (u <= 0 || u >= 1) return { cx: -10, cy: -10, opacity: 0 }
-    const r = 6 + (PARTICLE_RADIUS_MAX - 6) * u
-    const px = cx + dirX * r
-    const py = cy + dirY * r
-    let op
-    if (u < 0.08) op = (u / 0.08) * 0.95
-    else if (u < 0.65) op = 0.95
-    else op = 0.95 * (1 - (u - 0.65) / 0.35)
-    return { cx: px, cy: py, opacity: op }
+    if (u <= 0 || u >= 1) {
+      return { x1: -20, y1: -20, x2: -20, y2: -20, opacity: 0 }
+    }
+    // ease-out radial travel for the head; the tail trails a beat
+    // behind. Gravity (u²) curves both downward — the streak arcs.
+    const lag = 0.07
+    const uTail = u < lag ? 0 : u - lag
+    const tHead = 1 - (1 - u) * (1 - u)
+    const tTail = 1 - (1 - uTail) * (1 - uTail)
+    const xHead = cx + dirX * reach * tHead
+    const yHead = cy + dirY * reach * tHead + PARTICLE_GRAVITY * u * u
+    const xTail = cx + dirX * reach * tTail
+    const yTail = cy + dirY * reach * tTail + PARTICLE_GRAVITY * uTail * uTail
+    // fast fade-in, long fade-out, plus a fast flicker.
+    const fade = u < 0.06 ? u / 0.06 : 1 - (u - 0.06) / 0.94
+    const flicker = 0.65 + 0.35 * Math.sin(u * 70 + flickPhase * 6.283)
+    return { x1: xTail, y1: yTail, x2: xHead, y2: yHead, opacity: fade * flicker }
   })
 
   return (
-    <AnimatedCircle
-      cx={cx}
-      cy={cy}
-      r={dotSize}
-      fill={colors.magenta}
+    <AnimatedLine
+      x1={cx}
+      y1={cy}
+      x2={cx}
+      y2={cy}
+      stroke={colors.magenta}
+      strokeWidth={width}
+      strokeLinecap="round"
       animatedProps={animatedProps}
     />
   )

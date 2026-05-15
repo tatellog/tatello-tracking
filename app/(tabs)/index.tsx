@@ -118,11 +118,14 @@ function TodayContent({ ctx, cadence }: ContentProps) {
   const isCurrentWeek = weekOffset === 0
   const canGoPrev = currentWeekIdx > 0
   const canGoNext = weekOffset < 0
+  // Buckets are rolling 7-day windows ending today — not calendar
+  // weeks — so the copy says "días" rather than implying a Mon–Sun
+  // week the strip never actually shows.
   const weekLabel = isCurrentWeek
-    ? 'Esta semana'
+    ? 'Últimos 7 días'
     : weekOffset === -1
-      ? 'Semana pasada'
-      : `Hace ${-weekOffset} sem`
+      ? 'Hace 1 semana'
+      : `Hace ${-weekOffset} semanas`
 
   const todayCell = ctx.grid_28_days[27] // brief guarantees length 28
   const todayIsoLocal = ctx.date
