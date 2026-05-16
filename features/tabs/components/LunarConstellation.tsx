@@ -626,16 +626,15 @@ function ShootingStar({ t }: { t: SharedValue<number> }) {
   )
 }
 
-/* ─ Burst effect — fireworks on each commit ────────────────────────
+/* ─ Burst effect — round firework on each commit ───────────────────
  *
  * On every day-mark, a bright magenta core flashes at centre and
- * PARTICLE_COUNT sparks burst out like a firework: each shoots at its
- * own angle and reach, decelerates (air drag), arcs downward under
- * gravity, flickers and fades. Each spark is a streak — the segment
- * between its position now and a beat earlier — so it's a long trail
- * while fast and shrinks to a point as it slows. The asymmetry +
- * gravity arc is what reads as a firework rather than an expanding
- * ring.
+ * PARTICLE_COUNT sparks burst out as a round firework: the sparks are
+ * spaced at even angles and all travel the same reach, so their heads
+ * stay on one expanding circle. Each spark is a streak — the segment
+ * between its position now and a beat earlier — radiating cleanly
+ * outward, then flickering and fading. No gravity, no per-spark
+ * jitter: the ring stays perfectly circular.
  *
  * Driven by the parent's `radialPulse` SharedValue 0→1.
  */
@@ -648,9 +647,8 @@ function StarBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedVal
   )
 }
 
-const PARTICLE_COUNT = 28
-const PARTICLE_REACH = 118 // base radial reach (px), jittered per spark
-const PARTICLE_GRAVITY = 95 // downward pull accumulated by the burst's end
+const PARTICLE_COUNT = 30
+const PARTICLE_REACH = 120 // radial reach (px) — identical for every spark
 
 function ParticleBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: SharedValue<number> }) {
   return (
@@ -662,11 +660,12 @@ function ParticleBurst({ cx, cy, pulse }: { cx: number; cy: number; pulse: Share
   )
 }
 
-/* One firework spark. Shoots out (ease-out — explosive launch, then
- * air drag), arcs downward under gravity, flickers, fades. Rendered
- * as the streak between the head (position now) and the tail
+/* One firework spark. Shoots straight out along its radial angle
+ * (ease-out — explosive launch, then air drag), flickers, fades.
+ * Rendered as the streak between the head (position now) and the tail
  * (position a beat earlier): long while the spark is fast, collapsing
- * to a point as it slows. */
+ * to a point as it slows. Every spark shares the same reach so the
+ * burst expands as a clean round ring. */
 function ParticleSpark({
   cx,
   cy,
@@ -678,12 +677,10 @@ function ParticleSpark({
   index: number
   pulse: SharedValue<number>
 }) {
-  // Even angular spread + deterministic jitter so the burst is
-  // organic, not a perfect ring.
-  const angle = (index / PARTICLE_COUNT) * Math.PI * 2 + Math.sin(index * 12.9898) * 0.2
-  // Per-spark reach + thickness — sparks fly different distances.
-  const reach = PARTICLE_REACH * (0.55 + Math.abs(Math.sin(index * 31.7)) * 0.78)
-  const width = 1.4 + Math.abs(Math.sin(index * 17.3)) * 1.6
+  // Perfectly even angular spacing — no jitter — so the heads stay on
+  // one circle and the burst reads as a round firework.
+  const angle = (index / PARTICLE_COUNT) * Math.PI * 2
+  const width = 2 + Math.abs(Math.sin(index * 17.3)) * 0.8
   const dirX = Math.cos(angle)
   const dirY = Math.sin(angle)
   const flickPhase = (index * 0.37) % 1
@@ -695,18 +692,19 @@ function ParticleSpark({
       return { x1: -20, y1: -20, x2: -20, y2: -20, opacity: 0 }
     }
     // ease-out radial travel for the head; the tail trails a beat
-    // behind. Gravity (u²) curves both downward — the streak arcs.
-    const lag = 0.07
+    // behind. No gravity term — the streak stays straight and the
+    // ring stays round.
+    const lag = 0.08
     const uTail = u < lag ? 0 : u - lag
     const tHead = 1 - (1 - u) * (1 - u)
     const tTail = 1 - (1 - uTail) * (1 - uTail)
-    const xHead = cx + dirX * reach * tHead
-    const yHead = cy + dirY * reach * tHead + PARTICLE_GRAVITY * u * u
-    const xTail = cx + dirX * reach * tTail
-    const yTail = cy + dirY * reach * tTail + PARTICLE_GRAVITY * uTail * uTail
+    const xHead = cx + dirX * PARTICLE_REACH * tHead
+    const yHead = cy + dirY * PARTICLE_REACH * tHead
+    const xTail = cx + dirX * PARTICLE_REACH * tTail
+    const yTail = cy + dirY * PARTICLE_REACH * tTail
     // fast fade-in, long fade-out, plus a fast flicker.
     const fade = u < 0.06 ? u / 0.06 : 1 - (u - 0.06) / 0.94
-    const flicker = 0.65 + 0.35 * Math.sin(u * 70 + flickPhase * 6.283)
+    const flicker = 0.7 + 0.3 * Math.sin(u * 70 + flickPhase * 6.283)
     return { x1: xTail, y1: yTail, x2: xHead, y2: yHead, opacity: fade * flicker }
   })
 

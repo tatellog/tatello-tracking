@@ -1,55 +1,50 @@
 import * as Haptics from 'expo-haptics'
-import { useEffect, useState } from 'react'
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native'
+import { type ElementRef, useEffect, useRef } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  Extrapolation,
   FadeIn,
   FadeOut,
+  interpolate,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
-// weekdayIdx is 0..6 (0=Sun). Spanish convention disambiguates the
-// martes/miércoles "M/M" collision by writing Wednesday as "X".
+// weekdayIdx is 0..6 (0=Sun). Wednesday is written "X" — the Spanish
+// convention that disambiguates the martes/miércoles "M/M" collision.
 const SPANISH_DAY_INITIAL = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
-const SPANISH_DAY_FULL = [
-  'domingo',
-  'lunes',
-  'martes',
-  'miércoles',
-  'jueves',
-  'viernes',
-  'sábado',
-] as const
-const SPANISH_MONTH = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-] as const
 
 // 4-point star, viewBox 24×24, centred (12,12). Outer r≈10, inner
 // r≈3.2 — same iconography as the Hoy-tab constellation so a marked
 // day reads as "another lit star in your figure".
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
+const CELL_W = 46
+const GAP = 4
+const ROW_PAD = 20
+// Column pitch: width + gap. A column's content-space centre x is
+// `ROW_PAD + index*PITCH + CELL_W/2`.
+const PITCH = CELL_W + GAP
 const STAR_SIZE = 22
-const CONNECTOR_THICKNESS = 2
+const GLOW_SIZE = 40
+
+// Scroll-driven falloff: a column whose centre sits at or left of
+// FADE_IN (relative to the viewport's left edge) is fully dimmed; at
+// or right of FADE_OUT it is fully crisp. Only the left edge fades —
+// today and the recent days on the right stay sharp, so "the past
+// dims as it scrolls away" while the present never loses focus.
+const FADE_IN = -16
+const FADE_OUT = 92
 
 export type WeekDayCell = {
   /** ISO 'YYYY-MM-DD'. */
@@ -68,59 +63,24 @@ type Props = {
   justMarkedIdx?: number | null
 }
 
-/** Human, screen-reader-friendly date — "jueves 15 de mayo" beats the
- *  raw ISO string, which a screen reader spells out digit by digit. */
-function humanDate(d: WeekDayCell): string {
-  const monthIdx = (Number(d.date.split('-')[1]) || 1) - 1
-  const weekday = SPANISH_DAY_FULL[d.weekdayIdx] ?? ''
-  const month = SPANISH_MONTH[monthIdx] ?? ''
-  return `${weekday} ${d.dayNum} de ${month}`
-}
-
-/* A faint segment linking a trained day to the next trained day — a
- * gap in the run renders no segment, so a streak reads as one short
- * constellation.
- *
- * It lives *inside* the star's box and is centred with `top: '50%'`.
- * Because the star is flex-centred in that same box, 50% of the box
- * IS the star's vertical centre — by construction, not by a measured
- * or guessed offset. So the line can never drift off the star row.
- * Horizontally it runs centre-to-centre — a full column wide — and
- * passes *behind* both stars (they carry a higher zIndex), so the
- * line reads as one continuous thread the stars sit on. */
-function Connector({ width }: { width: number }) {
-  return (
-    <Animated.View
-      pointerEvents="none"
-      entering={FadeIn.duration(420)}
-      style={[styles.connector, { width }]}
-    />
-  )
-}
-
-/* Soft magenta halo behind a star — two concentric translucent discs
- * plus an iOS shadow bloom fake a radial glow without a gradient.
- * Rendered for today (always) and for any day in its 800 ms
- * just-marked window, so marking a past day blooms it alive. */
+/* Soft magenta halo behind a star — rendered for today (always) and
+ * for any day inside its just-marked window, so toggling a past day
+ * blooms it alive. */
 function StarGlow() {
   return (
     <Animated.View
       pointerEvents="none"
-      entering={FadeIn.duration(360)}
+      entering={FadeIn.duration(300)}
       exiting={FadeOut.duration(420)}
-      style={styles.glowOuter}
-    >
-      <View style={styles.glowInner} />
-    </Animated.View>
+      style={styles.glow}
+    />
   )
 }
 
-/* Per-day star. States:
- *   trained          → filled star (cream past days, magenta today)
+/* Per-day star. Three states:
+ *   trained          → filled star (cream for past days, magenta today)
  *   today, untrained → magenta outline — "this is the spot to light"
  *   past, untrained  → dim niebla outline — quiet, waiting
- * Tapping the column toggles the day, so backfilling past workouts is
- * just tapping each star on.
  *
  * Trained stars breathe (opacity + slight scale) on a slow loop so a
  * marked day reads as alive, matching the lit stars in the Hoy-tab
@@ -144,7 +104,7 @@ function DayStar({
       return
     }
     breath.value = withDelay(
-      index * 220,
+      (index % 7) * 220,
       withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true),
     )
     return () => cancelAnimation(breath)
@@ -173,78 +133,142 @@ function DayStar({
   )
 }
 
-export function WeekStrip({ days, onToggle, justMarkedIdx = null }: Props) {
-  // The only measurement: row width → column width. The connector
-  // spans exactly one column (centre-to-centre); its vertical
-  // placement needs no measuring (see Connector).
-  const [rowWidth, setRowWidth] = useState<number | null>(null)
-  const connectorWidth = rowWidth != null ? rowWidth / Math.max(1, days.length) : 0
+/* One day column. Its scale + opacity track the live scroll offset:
+ * as the column approaches the left edge it eases down to a dimmed,
+ * slightly smaller state, then back to full as it scrolls into view. */
+function DayColumn({
+  day,
+  index,
+  scrollX,
+  justMarked,
+  onToggle,
+}: {
+  day: WeekDayCell
+  index: number
+  scrollX: SharedValue<number>
+  justMarked: boolean
+  onToggle: (date: string) => void
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const centreX = ROW_PAD + index * PITCH + CELL_W / 2
+    const posInViewport = centreX - scrollX.value
+    const t = interpolate(posInViewport, [FADE_IN, FADE_OUT], [0, 1], Extrapolation.CLAMP)
+    return {
+      opacity: 0.32 + t * 0.68,
+      transform: [{ scale: 0.85 + t * 0.15 }],
+    }
+  })
 
-  const handleRowLayout = (e: LayoutChangeEvent) => {
-    setRowWidth(e.nativeEvent.layout.width)
-  }
+  const glow = day.isToday || justMarked
 
   return (
-    <View style={styles.row} onLayout={handleRowLayout}>
-      {days.map((d, i) => {
-        const glow = d.isToday || justMarkedIdx === i
-        const connectsNext = d.trained && (days[i + 1]?.trained ?? false)
-        return (
-          <Pressable
-            key={d.date}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {})
-              onToggle(d.date)
-            }}
-            style={({ pressed }) => [styles.col, pressed && styles.colPressed]}
-            accessibilityRole="button"
-            accessibilityHint={d.trained ? 'Tocar para desmarcar' : 'Tocar para marcar entreno'}
-            accessibilityLabel={`${humanDate(d)}, ${d.trained ? 'entrenado' : 'sin entrenar'}`}
-            accessibilityState={{ selected: d.trained }}
-          >
-            <Text
-              style={[
-                styles.dayLetter,
-                d.trained && styles.dayLetterTrained,
-                d.isToday && styles.dayLetterToday,
-              ]}
-            >
-              {SPANISH_DAY_INITIAL[d.weekdayIdx] ?? '?'}
-            </Text>
-            <Text
-              style={[
-                styles.dayNum,
-                d.trained && styles.dayNumTrained,
-                d.isToday && styles.dayNumToday,
-              ]}
-            >
-              {d.dayNum}
-            </Text>
-            <View style={styles.starWrap}>
-              {connectsNext && connectorWidth > 0 ? <Connector width={connectorWidth} /> : null}
-              {glow ? <StarGlow /> : null}
-              <DayStar trained={d.trained} isToday={d.isToday} index={i} />
-            </View>
-          </Pressable>
-        )
-      })}
-    </View>
+    <Animated.View style={[styles.colBox, animStyle]}>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {})
+          onToggle(day.date)
+        }}
+        style={({ pressed }) => [styles.col, pressed && styles.colPressed]}
+        accessibilityRole="button"
+        accessibilityLabel={`${day.date}, ${day.trained ? 'entrenado' : 'no entrenado'}`}
+        accessibilityHint={day.trained ? 'Toca para desmarcar' : 'Toca para registrar'}
+        accessibilityState={{ selected: day.trained }}
+      >
+        <Text
+          style={[
+            styles.dayLetter,
+            day.trained && styles.dayLetterTrained,
+            day.isToday && styles.dayLetterToday,
+          ]}
+        >
+          {day.isToday ? 'HOY' : (SPANISH_DAY_INITIAL[day.weekdayIdx] ?? '?')}
+        </Text>
+        <Text
+          style={[
+            styles.dayNum,
+            day.trained && styles.dayNumTrained,
+            day.isToday && styles.dayNumToday,
+          ]}
+        >
+          {day.dayNum}
+        </Text>
+        <View style={styles.starWrap}>
+          {glow ? <StarGlow /> : null}
+          <DayStar trained={day.trained} isToday={day.isToday} index={index} />
+        </View>
+      </Pressable>
+    </Animated.View>
+  )
+}
+
+/**
+ * A horizontally scrollable strip of the last 28 days — the editable
+ * history surface. Each day is a bare column (weekday letter, number,
+ * star) with no card chrome, so the strip reads in the same airy,
+ * editorial language as the constellation above it. Today is the
+ * rightmost column — labelled "HOY", drawn in magenta, haloed — and
+ * the strip opens scrolled to it; the user swipes left for older
+ * days. Columns dim and shrink as they scroll off the left edge.
+ * Tapping a column toggles that day to backfill a past workout.
+ */
+export function WeekStrip({ days, onToggle, justMarkedIdx = null }: Props) {
+  const scrollRef = useRef<ElementRef<typeof Animated.ScrollView>>(null)
+  const scrollX = useSharedValue(0)
+
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollX.value = e.contentOffset.x
+  })
+
+  return (
+    <Animated.ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
+      contentContainerStyle={styles.row}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      // Content lays out oldest-first; opening at the end puts today
+      // under the user's thumb. Fires once on mount (size 0 → full).
+      onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+    >
+      {days.map((d, i) => (
+        <DayColumn
+          key={d.date}
+          day={d}
+          index={i}
+          scrollX={scrollX}
+          justMarked={justMarkedIdx === i}
+          onToggle={onToggle}
+        />
+      ))}
+    </Animated.ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
+  // Negative margin cancels the screen's 20px padding so the strip
+  // scrolls edge-to-edge; the contentContainer puts that 20px back as
+  // padding, so the first/last columns align to the screen gutter.
+  scroll: {
+    marginHorizontal: -ROW_PAD,
+    marginTop: 2,
+  },
   row: {
     flexDirection: 'row',
-    marginTop: 6,
+    gap: GAP,
+    paddingHorizontal: ROW_PAD,
+    paddingVertical: 10,
+  },
+  colBox: {
+    width: CELL_W,
   },
   // No card, no border — each day is just letter / number / star in
-  // an airy column. State legibility comes from brightness (dim =
-  // pending, cream = done) and the star fill, not from box chrome.
+  // an airy column, the same visual language as the constellation.
   col: {
-    flex: 1,
+    alignSelf: 'stretch',
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingVertical: 6,
   },
   colPressed: {
     opacity: 0.55,
@@ -278,7 +302,7 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   // Square box sized to the star; `position: relative` makes it the
-  // containing block for the absolutely-placed connector and glow.
+  // containing block for the absolutely-placed glow.
   starWrap: {
     marginTop: 10,
     width: STAR_SIZE,
@@ -290,42 +314,19 @@ const styles = StyleSheet.create({
   starGlyph: {
     zIndex: 1,
   },
-  // top:'50%' = the star's vertical centre (star is flex-centred in
-  // starWrap); the negative marginTop re-centres the line's own
-  // thickness. left:'50%' = this star's centre x; the width (one
-  // column) carries it to the next star's centre. zIndex 0 keeps it
-  // behind the stars (starGlyph is zIndex 1).
-  connector: {
+  glow: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -CONNECTOR_THICKNESS / 2,
-    height: CONNECTOR_THICKNESS,
-    backgroundColor: colors.hairlineStrong,
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
+    top: (STAR_SIZE - GLOW_SIZE) / 2,
+    left: (STAR_SIZE - GLOW_SIZE) / 2,
+    borderRadius: GLOW_SIZE / 2,
+    backgroundColor: colors.magentaTint2,
     zIndex: 0,
-  },
-  // Outer + inner translucent discs, centred on the STAR_SIZE box,
-  // overflowing it freely (no clipping). The shadow adds an iOS bloom.
-  glowOuter: {
-    position: 'absolute',
-    width: 48,
-    height: 48,
-    top: (STAR_SIZE - 48) / 2,
-    left: (STAR_SIZE - 48) / 2,
-    borderRadius: 24,
-    backgroundColor: colors.magentaTint,
-    alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: colors.magenta,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  glowInner: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.magentaTint2,
+    shadowRadius: 9,
+    elevation: 3,
   },
 })

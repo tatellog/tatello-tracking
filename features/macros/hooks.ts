@@ -77,10 +77,13 @@ export function useMealById(id: string | undefined) {
 }
 
 /* Frequent meals power the Hoy-tab quick log. Invalidated whenever a
- * meal is created/updated/deleted so "Lo de siempre" stays honest. */
+ * meal is created/updated/deleted so "Lo de siempre" stays honest.
+ * The limit is part of the key: the quick log wants the top few, the
+ * meal search wants the whole vocabulary — distinct cache entries.
+ * Invalidations use the base key, which prefix-matches both. */
 export function useFrequentMeals(limit = 8) {
   return useQuery({
-    queryKey: queryKeys.macros.frequentMeals(),
+    queryKey: [...queryKeys.macros.frequentMeals(), limit],
     queryFn: () => getFrequentMeals(limit),
   })
 }
@@ -149,13 +152,13 @@ export function useUpdateMeal() {
       }))
     },
     onError: (_err, _vars, context) => restoreBriefCache(qc, context),
-    onSuccess: (meal: Meal) => {
-      // meal_date is a generated column — the Supabase type generator
-      // marks it nullable, guard it even though Postgres fills it.
-      if (meal.meal_date) {
-        qc.invalidateQueries({ queryKey: queryKeys.macros.meals(meal.meal_date) })
-      }
-      qc.invalidateQueries({ queryKey: queryKeys.macros.meal(meal.id) })
+    onSuccess: () => {
+      // A meal's consumed_at can be edited to a different day, which
+      // moves it between day lists. Invalidating only the new date
+      // would leave the old day's cached estela showing the stale
+      // meal — so invalidate the whole macros namespace, covering
+      // both day lists and the meal detail.
+      qc.invalidateQueries({ queryKey: queryKeys.macros.all })
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })

@@ -1,0 +1,241 @@
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
+import * as Haptics from 'expo-haptics'
+import { useEffect, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Path } from 'react-native-svg'
+
+import { colors, typography } from '@/theme'
+
+import { QuickLogSheet } from './QuickLogSheet'
+
+// 4-point star — the shared "enciende una estrella" glyph, matching
+// MealComposer and TodayMealLog. The FAB is that action made global.
+const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
+const PILL_HEIGHT = 62
+const FAB_SIZE = 56
+
+function StarGlyph({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d={STAR_PATH} fill="#FFFFFF" />
+    </Svg>
+  )
+}
+
+/*
+ * The create button — a magenta disc with the star glyph. Its job is
+ * to read as *tappable* without a label:
+ *   - a lighter rim + drop shadow give it a raised, button-like body;
+ *   - a halo behind it breathes slowly, so it's a live element, not
+ *     a flat sticker (matches the breathing glyphs elsewhere);
+ *   - press drives a spring-y scale-down for a tactile click.
+ * Reduced-motion users get the static disc — only the loop is gated.
+ */
+function QuickLogFab({ onPress }: { onPress: () => void }) {
+  const reduceMotion = useReducedMotion()
+  const breath = useSharedValue(0)
+  const press = useSharedValue(0)
+
+  useEffect(() => {
+    if (reduceMotion) return
+    breath.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(breath)
+  }, [breath, reduceMotion])
+
+  // Halo — a soft magenta disc behind the FAB, breathing in scale and
+  // opacity. This is the "slight animation" and also pulls the eye.
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.18 + breath.value * 0.24,
+    transform: [{ scale: 1 + breath.value * 0.16 }],
+  }))
+
+  // The disc itself: a faint breath, then press scales it down.
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: (1 + breath.value * 0.04) * (1 - press.value * 0.12) }],
+  }))
+
+  return (
+    <Pressable
+      onPressIn={() => {
+        press.value = withTiming(1, { duration: 110 })
+      }}
+      onPressOut={() => {
+        press.value = withTiming(0, { duration: 240, easing: Easing.out(Easing.quad) })
+      }}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+        onPress()
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Sumar comida"
+      accessibilityHint="Abre el registro rápido de comida"
+    >
+      <View style={styles.fabWrap}>
+        <Animated.View style={[styles.fabHalo, haloStyle]} pointerEvents="none" />
+        <Animated.View style={[styles.fab, fabStyle]}>
+          <StarGlyph size={23} />
+        </Animated.View>
+      </View>
+    </Pressable>
+  )
+}
+
+/*
+ * The app's bottom chrome — a navigation pill plus a detached create
+ * button, two distinct jobs kept visually apart:
+ *
+ *   pill → navegar  (Hoy · Comidas · Progreso · Ajustes)
+ *   ✦    → crear    (quick-log de comida, desde cualquier tab)
+ *
+ * The ✦ is NOT a tab: it doesn't change the route, it opens the
+ * QuickLogSheet over whatever screen is showing. Keeping it outside
+ * the pill is the whole point — creation isn't navigation, so it
+ * doesn't share the navigation surface.
+ */
+export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets()
+  const [quickLogVisible, setQuickLogVisible] = useState(false)
+
+  return (
+    <>
+      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={styles.pill}>
+          {state.routes.map((route, index) => {
+            const descriptor = descriptors[route.key]
+            if (!descriptor) return null
+            const { options } = descriptor
+            const label = options.title ?? route.name
+            const focused = state.index === index
+            const color = focused ? colors.magenta : colors.niebla
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              })
+              if (!focused && !event.defaultPrevented) {
+                navigation.navigate(route.name)
+              }
+            }
+
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                style={[styles.tab, focused && styles.tabActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={label}
+              >
+                {options.tabBarIcon?.({ focused, color, size: 20 })}
+                <Text style={[styles.label, { color }]} numberOfLines={1}>
+                  {label}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+
+        <QuickLogFab onPress={() => setQuickLogVisible(true)} />
+      </View>
+
+      <QuickLogSheet
+        visible={quickLogVisible}
+        onClose={() => setQuickLogVisible(false)}
+        onGoToComidas={() => {
+          setQuickLogVisible(false)
+          navigation.navigate('meals')
+        }}
+      />
+    </>
+  )
+}
+
+const styles = StyleSheet.create({
+  // Solid canvas-coloured bar; the pill + FAB float as elements
+  // within it. Screens render above this, exactly as with the
+  // default tab bar — no per-screen scroll-inset retuning needed.
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  // The navigation pill — a stadium holding the four tabs.
+  pill: {
+    flex: 1,
+    flexDirection: 'row',
+    height: PILL_HEIGHT,
+    borderRadius: PILL_HEIGHT / 2,
+    backgroundColor: colors.bgCard2,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: 5,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    borderRadius: (PILL_HEIGHT - 10) / 2,
+  },
+  // Active tab — an inset magenta-tint capsule inside the pill.
+  tabActive: {
+    backgroundColor: colors.magentaTint,
+  },
+  label: {
+    fontFamily: typography.uiBold,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  // Layout box for the FAB — sized to the disc; the halo overflows it.
+  fabWrap: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Breathing glow behind the disc — pulls the eye to the action.
+  fabHalo: {
+    position: 'absolute',
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: colors.magenta,
+  },
+  // The create action — solid magenta disc with a lighter rim and a
+  // drop shadow so it reads as a raised, pressable button.
+  fab: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: colors.magenta,
+    borderWidth: 1.5,
+    borderColor: colors.magentaHot,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.38,
+    shadowRadius: 9,
+    elevation: 5,
+  },
+})

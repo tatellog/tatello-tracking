@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
@@ -15,6 +16,44 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
   { value: 'dinner', label: 'Cena' },
   { value: 'snack', label: 'Snack' },
 ]
+
+/* The celestial glyph for each meal slot — sunrise / sun / crescent /
+ * star. Same vocabulary as the meal rows on Hoy, so the slot reads the
+ * same wherever it appears. */
+function MealGlyph({ type, color }: { type: MealType; color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      {type === 'lunch' ? (
+        <>
+          <Circle cx={12} cy={12} r={4.3} fill={color} />
+          <Path
+            d="M12 5.6 V2.8 M12 18.4 V21.2 M18.4 12 H21.2 M5.6 12 H2.8 M16.5 7.5 L18.5 5.5 M7.5 7.5 L5.5 5.5 M16.5 16.5 L18.5 18.5 M7.5 16.5 L5.5 18.5"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </>
+      ) : type === 'dinner' ? (
+        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
+      ) : type === 'breakfast' ? (
+        <>
+          <Path d="M7 17.5 A 5 5 0 0 1 17 17.5 Z" fill={color} />
+          <Path
+            d="M2.6 17.5 H21.4 M12 9 V6.4 M6.6 12 L4.8 10.3 M17.4 12 L19.2 10.3"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </>
+      ) : (
+        <Path
+          d="M12 3.4 L13.7 10.3 L20.6 12 L13.7 13.7 L12 20.6 L10.3 13.7 L3.4 12 L10.3 10.3 Z"
+          fill={color}
+        />
+      )}
+    </Svg>
+  )
+}
 
 // Meal type pre-selected by time of day so the common case needs no
 // tap. The user can still override.
@@ -100,7 +139,7 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
           <View style={styles.grabber} />
 
           <View style={styles.header}>
-            <Text style={styles.title}>Quick log</Text>
+            <Text style={styles.title}>Sumar comida</Text>
             <Pressable
               onPress={onClose}
               hitSlop={12}
@@ -111,20 +150,23 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
             </Pressable>
           </View>
 
-          <View style={styles.typeRow}>
+          {/* Meal-slot selector — one pill, four segments, the active
+              one a soft capsule. Same vocabulary as the AppTabBar. */}
+          <View style={styles.typePill}>
             {MEAL_TYPES.map((mt) => {
               const active = mt.value === mealType
+              const tint = active ? colors.magenta : colors.niebla
               return (
                 <Pressable
                   key={mt.value}
                   onPress={() => setMealType(mt.value)}
-                  style={[styles.typeChip, active && styles.typeChipActive]}
+                  style={[styles.typeSeg, active && styles.typeSegActive]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
+                  accessibilityLabel={mt.label}
                 >
-                  <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                    {mt.label}
-                  </Text>
+                  <MealGlyph type={mt.value} color={tint} />
+                  <Text style={[styles.typeSegText, { color: tint }]}>{mt.label}</Text>
                 </Pressable>
               )
             })}
@@ -238,31 +280,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.niebla,
   },
-  typeRow: {
+  // One stadium pill holding the four slot segments — mirrors the
+  // navigation pill in AppTabBar (bgCard2, hairline, inner padding).
+  typePill: {
     flexDirection: 'row',
-    gap: 8,
+    backgroundColor: colors.bgCard2,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: 4,
     marginBottom: 20,
   },
-  typeChip: {
+  typeSeg: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: colors.bruma,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    paddingVertical: 9,
+    borderRadius: 22,
   },
-  typeChipActive: {
-    borderColor: colors.magenta,
-    backgroundColor: 'rgba(233,30,99,0.14)',
+  // Active slot — the same soft magenta-tint capsule as the active tab.
+  typeSegActive: {
+    backgroundColor: colors.magentaTint,
   },
-  typeChipText: {
+  typeSegText: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
-    color: colors.niebla,
-    letterSpacing: 0.5,
-  },
-  typeChipTextActive: {
-    color: colors.magenta,
+    fontSize: 10,
+    letterSpacing: 0.4,
   },
   sectionLabel: {
     fontFamily: typography.uiBold,

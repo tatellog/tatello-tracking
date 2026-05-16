@@ -47,4 +47,8 @@ export const queryKeys = {
     today: () => ['photos', 'today'] as const,
     latestSet: () => ['photos', 'latest-set'] as const,
   },
+  water: {
+    all: ['water'] as const,
+    day: (date: string) => ['water', date] as const,
+  },
 } as const

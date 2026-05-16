@@ -17,9 +17,11 @@ type Props = {
  * the coach line and the filled "HOY" star in the WeekStrip all
  * confirm the workout, and undoing happens by tapping that same star.
  *
- * It reads as a tappable card, not a label: a magenta-tinted surface
- * with a full magenta border and glow, a large unchecked-checkbox
- * circle, and an imperative title with a state-reminder subtitle. The
+ * It reads as a tappable card, not a label: a soft magenta-tinted
+ * surface with a large unchecked-checkbox circle and an imperative
+ * title with a state-reminder subtitle. The fill and circle alone
+ * carry the "tappable" signal — no loud border or glow, so the
+ * constellation below stays the visual hero of the screen. The
  * circle is the only affordance — a check-in toggles state, so an
  * unchecked checkbox is the honest signal; a chevron would imply
  * navigation that does not happen.
@@ -65,17 +67,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     borderRadius: 18,
-    backgroundColor: 'rgba(233,30,99,0.15)',
-    borderWidth: 1.5,
-    borderColor: colors.magenta,
+    backgroundColor: 'rgba(233,30,99,0.13)',
     marginBottom: 18,
     paddingVertical: 14,
     paddingHorizontal: 18,
-    shadowColor: colors.magenta,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 4,
   },
   checkWrap: {
     width: 30,

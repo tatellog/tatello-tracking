@@ -97,6 +97,9 @@ export async function getMealById(id: string): Promise<Meal | null> {
  * come from the user's most recent entry of that name (foods drift;
  * the latest log is the best estimate). */
 export type FrequentMeal = {
+  /** Id of the most recent meal with this name — the row to open
+   *  when the user taps the history entry to edit it. */
+  id: string
   name: string
   meal_type: string
   protein_g: number
@@ -121,7 +124,7 @@ export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
   const since = new Date(Date.now() - FREQUENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('meals')
-    .select('name, meal_type, protein_g, calories, consumed_at')
+    .select('id, name, meal_type, protein_g, calories, consumed_at')
     .eq('user_id', userId)
     .gte('consumed_at', since)
     .order('consumed_at', { ascending: false })
@@ -136,8 +139,9 @@ export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
       existing.freq += 1
     } else {
       // First time seen — and because rows are consumed_at DESC, this
-      // first occurrence is the most recent, so its macros win.
+      // first occurrence is the most recent, so its id + macros win.
       groups.set(key, {
+        id: m.id,
         name: m.name.trim(),
         meal_type: m.meal_type,
         protein_g: Number(m.protein_g),

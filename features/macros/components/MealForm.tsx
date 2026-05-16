@@ -1,6 +1,5 @@
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import {
   KeyboardAvoidingView,
@@ -13,10 +12,19 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { Path } from 'react-native-svg'
 
 import { MealInputSchema, type MealInput } from '@/features/macros/api'
-import type { MealType } from '@/features/macros/utils/mealType'
-import { colors, radius, spacing, typography } from '@/theme'
+import { colors, typography } from '@/theme'
+
+type MealType = MealInput['meal_type']
+
+const MEAL_TYPES: readonly { value: MealType; label: string }[] = [
+  { value: 'breakfast', label: 'Desayuno' },
+  { value: 'lunch', label: 'Comida' },
+  { value: 'dinner', label: 'Cena' },
+  { value: 'snack', label: 'Snack' },
+]
 
 function inferMealTypeFromHour(hour: number): MealType {
   if (hour >= 5 && hour <= 10) return 'breakfast'
@@ -27,59 +35,53 @@ function inferMealTypeFromHour(hour: number): MealType {
 
 type Props = {
   defaultValues?: Partial<MealInput>
-  submitLabel: string
+  /** Centred header title — "Editar comida". */
   headerTitle: string
-  headerMeta: string
   onSubmit: (values: MealInput) => Promise<void> | void
+  /** Back arrow — discards and leaves. */
   onCancel: () => void
+  /** When set, a "Borrar comida" action shows at the foot. */
+  onDelete?: () => void
   isSubmitting?: boolean
 }
 
 /*
- * The single meal form used by both create (log-meal) and edit
- * (meal/[id]) screens. Sprint 3 will reuse this identically behind
- * the photo + IA path: the IA response pre-fills `defaultValues`
- * and the user edits/confirms in this same UI.
+ * The meal detail / edit screen. A polished detail layout — header
+ * with an inline "Guardar", the meal name as the page title, the two
+ * macros as prominent stat cards, then time and meal-slot — rather
+ * than a plain stacked form.
  *
- * Validation: zod schema (MealInputSchema) mirrors the server's
- * CHECK constraints. Numeric inputs accept digits only; the
- * stripped string is coerced to a real Number on change so zod
- * reads the right primitive type.
+ * Only the fields the data model actually holds (name, protein,
+ * calories, consumed_at, meal_type) are shown — no serving-size or
+ * carb/fat scaffolding the schema can't back.
+ *
+ * Validation: zod (MealInputSchema) mirrors the server CHECK
+ * constraints; the header "Guardar" stays disabled until the form
+ * is valid.
  */
 export function MealForm({
   defaultValues,
-  submitLabel,
   headerTitle,
-  headerMeta,
   onSubmit,
   onCancel,
+  onDelete,
   isSubmitting = false,
 }: Props) {
   const { control, handleSubmit, formState } = useForm<MealInput>({
     resolver: zodResolver(MealInputSchema),
-    // onTouched fires validation after the first blur on a field,
-    // so inline errors appear as the user tabs through — not only
-    // after they first tap Submit on an invalid form.
     mode: 'onTouched',
-    // Numbers start undefined (not 0) so the placeholder shows
-    // until the user types — no more deleting "0" before entry.
-    // Zod rejects undefined on submit, which triggers the error
-    // copy under the field.
     defaultValues: {
       name: defaultValues?.name ?? '',
       protein_g: defaultValues?.protein_g,
       calories: defaultValues?.calories,
       consumed_at: defaultValues?.consumed_at ?? new Date(),
-      // Edit screens pass meal_type explicitly. New-meal callers
-      // (only the legacy /log-meal.tsx route, replaced by the
-      // suggestor-driven screen) fall back to inferring from the
-      // consumed_at hour so the form submission isn't rejected by
-      // the zod enum.
       meal_type:
         defaultValues?.meal_type ??
         inferMealTypeFromHour((defaultValues?.consumed_at ?? new Date()).getHours()),
     } as Partial<MealInput>,
   })
+
+  const canSave = formState.isValid && !isSubmitting
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -87,98 +89,153 @@ export function MealForm({
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        <View style={styles.header}>
+          <Pressable
+            onPress={onCancel}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
+          >
+            <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M15 5 L8 12 L15 19"
+                stroke={colors.leche}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </Pressable>
+          <Text style={styles.headerTitle}>{headerTitle}</Text>
+          <Pressable
+            onPress={handleSubmit(onSubmit)}
+            disabled={!canSave}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Guardar"
+            accessibilityState={{ disabled: !canSave }}
+          >
+            <Text style={[styles.headerSave, !canSave && styles.headerSaveOff]}>
+              {isSubmitting ? 'Guardando…' : 'Guardar'}
+            </Text>
+          </Pressable>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={{ gap: spacing.sm }}>
-            <Text style={styles.meta}>{headerMeta}</Text>
-            <Text style={styles.headline}>{headerTitle}</Text>
-          </View>
-
-          <View style={styles.stack}>
-            <Controller
-              control={control}
-              name="name"
-              render={({ field, fieldState }) => (
-                <TextField
-                  label="¿Qué comiste?"
-                  placeholder="Pollo a la plancha con arroz"
+          {/* Name — the page's title, editable in place. */}
+          <Controller
+            control={control}
+            name="name"
+            render={({ field, fieldState }) => (
+              <View style={styles.nameBlock}>
+                <TextInput
                   value={field.value}
                   onChangeText={field.onChange}
+                  onBlur={field.onBlur}
+                  placeholder="¿Qué comiste?"
+                  placeholderTextColor={colors.bruma}
+                  style={styles.nameInput}
+                  accessibilityLabel="Nombre de la comida"
+                  multiline
+                />
+                <View style={styles.nameRule} />
+                {fieldState.error ? (
+                  <Text style={styles.errorText}>{fieldState.error.message}</Text>
+                ) : null}
+              </View>
+            )}
+          />
+
+          {/* The two macros — prominent stat cards. */}
+          <View style={styles.macroRow}>
+            <Controller
+              control={control}
+              name="protein_g"
+              render={({ field, fieldState }) => (
+                <StatField
+                  label="Proteína"
+                  unit="g"
+                  placeholder="35"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={fieldState.error?.message}
+                  accent
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="calories"
+              render={({ field, fieldState }) => (
+                <StatField
+                  label="Calorías"
+                  unit="kcal"
+                  placeholder="520"
+                  value={field.value}
+                  onChange={field.onChange}
                   onBlur={field.onBlur}
                   error={fieldState.error?.message}
                 />
               )}
             />
-
-            <View style={styles.row}>
-              <View style={styles.half}>
-                <Controller
-                  control={control}
-                  name="protein_g"
-                  render={({ field, fieldState }) => (
-                    <NumberField
-                      label="Proteína"
-                      suffix="g"
-                      placeholder="35"
-                      value={field.value}
-                      onChangeText={field.onChange}
-                      onBlur={field.onBlur}
-                      error={fieldState.error?.message}
-                    />
-                  )}
-                />
-              </View>
-              <View style={styles.half}>
-                <Controller
-                  control={control}
-                  name="calories"
-                  render={({ field, fieldState }) => (
-                    <NumberField
-                      label="Calorías"
-                      suffix="cal"
-                      placeholder="520"
-                      value={field.value}
-                      onChangeText={field.onChange}
-                      onBlur={field.onBlur}
-                      error={fieldState.error?.message}
-                    />
-                  )}
-                />
-              </View>
-            </View>
-
-            <Controller
-              control={control}
-              name="consumed_at"
-              render={({ field, fieldState }) => (
-                <DateField
-                  label="Hora"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
           </View>
 
-          <View style={styles.actions}>
+          {/* Time. */}
+          <Controller
+            control={control}
+            name="consumed_at"
+            render={({ field }) => (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Hora</Text>
+                <DateRow value={field.value} onChange={field.onChange} />
+              </View>
+            )}
+          />
+
+          {/* Meal slot. */}
+          <Controller
+            control={control}
+            name="meal_type"
+            render={({ field }) => (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Momento</Text>
+                <View style={styles.chips}>
+                  {MEAL_TYPES.map((mt) => {
+                    const active = field.value === mt.value
+                    return (
+                      <Pressable
+                        key={mt.value}
+                        onPress={() => field.onChange(mt.value)}
+                        style={[styles.chip, active && styles.chipActive]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {mt.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              </View>
+            )}
+          />
+
+          {onDelete ? (
             <Pressable
-              onPress={handleSubmit(onSubmit)}
-              disabled={isSubmitting || !formState.isValid}
-              style={[
-                styles.primary,
-                (isSubmitting || !formState.isValid) && styles.primaryDisabled,
-              ]}
+              onPress={onDelete}
+              style={styles.deleteBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Borrar comida"
             >
-              <Text style={styles.primaryLabel}>{isSubmitting ? 'Guardando…' : submitLabel}</Text>
+              <Text style={styles.deleteLabel}>Borrar comida</Text>
             </Pressable>
-            <Pressable onPress={onCancel} style={styles.secondary}>
-              <Text style={styles.secondaryLabel}>Cancelar</Text>
-            </Pressable>
-          </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -187,161 +244,73 @@ export function MealForm({
 
 /* ─── fields ─────────────────────────────────────────────────────── */
 
-type TextFieldProps = {
+type StatFieldProps = {
   label: string
-  placeholder: string
-  value: string
-  onChangeText: (v: string) => void
-  onBlur: () => void
-  error: string | undefined
-}
-
-function TextField({ label, placeholder, value, onChangeText, onBlur, error }: TextFieldProps) {
-  return (
-    <View style={{ gap: spacing.sm }}>
-      <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        placeholderTextColor={colors.labelDim}
-        accessibilityLabel={label}
-        accessibilityHint={error}
-        style={[styles.textInput, error && styles.inputError]}
-      />
-      {error && <Text style={styles.errorText}>{error}</Text>}
-    </View>
-  )
-}
-
-type NumberFieldProps = {
-  label: string
-  suffix: string
+  unit: string
   placeholder: string
   value: number | undefined
-  onChangeText: (v: number | undefined) => void
+  onChange: (v: number | undefined) => void
   onBlur: () => void
   error: string | undefined
+  /** Magenta number — used for the hero metric (protein). */
+  accent?: boolean
 }
 
-function NumberField({
+function StatField({
   label,
-  suffix,
+  unit,
   placeholder,
   value,
-  onChangeText,
+  onChange,
   onBlur,
   error,
-}: NumberFieldProps) {
-  // value is undefined on mount (user hasn't typed yet) → placeholder
-  // shows and zod flags the field as invalid until they enter a value.
-  const displayValue = value === undefined || value === 0 ? '' : String(value)
-
+  accent = false,
+}: StatFieldProps) {
+  const display = value === undefined || value === 0 ? '' : String(value)
   return (
-    <View style={{ gap: spacing.sm }}>
-      <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
-      <View style={[styles.numberInputRow, error && styles.inputError]}>
+    <View style={[styles.statCard, error && styles.cardError]}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <View style={styles.statValueRow}>
         <TextInput
-          value={displayValue}
+          value={display}
           onChangeText={(text) => {
             const digits = text.replace(/[^0-9.]/g, '')
             if (digits === '') {
-              onChangeText(undefined)
+              onChange(undefined)
               return
             }
             const n = Number(digits)
-            onChangeText(Number.isFinite(n) ? n : undefined)
+            onChange(Number.isFinite(n) ? n : undefined)
           }}
           onBlur={onBlur}
           placeholder={placeholder}
-          placeholderTextColor={colors.labelDim}
-          accessibilityLabel={`${label}, en ${suffix === 'g' ? 'gramos' : suffix}`}
-          accessibilityHint={error}
+          placeholderTextColor={colors.bruma}
           keyboardType="decimal-pad"
           inputMode="decimal"
-          style={styles.numberInput}
+          style={[styles.statInput, accent && styles.statInputAccent]}
+          accessibilityLabel={label}
         />
-        <Text style={styles.suffix}>{suffix}</Text>
+        <Text style={styles.statUnit}>{unit}</Text>
       </View>
-      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   )
 }
 
-type DateFieldProps = {
-  label: string
-  value: Date
-  onChange: (d: Date) => void
-  error: string | undefined
-}
-
-function DateField({ label, value, onChange, error }: DateFieldProps) {
-  const [open, setOpen] = useState(Platform.OS === 'ios') // iOS picker is inline by default
-  const [mode, setMode] = useState<'date' | 'time'>('date')
-
-  const handleChange = (_event: DateTimePickerEvent, next?: Date) => {
-    if (Platform.OS === 'android') setOpen(false)
+function DateRow({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
+  const handleChange = (_e: DateTimePickerEvent, next?: Date) => {
     if (next) onChange(next)
   }
-
-  const formatted = value.toLocaleString('es-MX', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: 'short',
-  })
-
-  if (Platform.OS === 'ios') {
-    return (
-      <View style={{ gap: spacing.sm }}>
-        <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
-        <View style={[styles.iosDateWrap, error && styles.inputError]}>
-          <DateTimePicker
-            mode="datetime"
-            value={value}
-            onChange={handleChange}
-            maximumDate={new Date()}
-            locale="es-MX"
-          />
-        </View>
-        {error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
-    )
-  }
-
   return (
-    <View style={{ gap: spacing.sm }}>
-      <Text style={styles.fieldLabel}>{label.toUpperCase()}</Text>
-      <View style={styles.row}>
-        <Pressable
-          onPress={() => {
-            setMode('date')
-            setOpen(true)
-          }}
-          style={[styles.androidDateBtn, styles.half]}
-        >
-          <Text style={styles.androidDateLabel}>{formatted}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            setMode('time')
-            setOpen(true)
-          }}
-          style={[styles.androidDateBtn, styles.half]}
-        >
-          <Text style={styles.androidDateLabel}>Hora</Text>
-        </Pressable>
-      </View>
-      {open && (
-        <DateTimePicker
-          mode={mode}
-          value={value}
-          onChange={handleChange}
-          maximumDate={new Date()}
-        />
-      )}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+    <View style={styles.dateWrap}>
+      <DateTimePicker
+        mode="datetime"
+        value={value}
+        onChange={handleChange}
+        maximumDate={new Date()}
+        locale="es-MX"
+        themeVariant="dark"
+        accentColor={colors.magenta}
+      />
     </View>
   )
 }
@@ -349,124 +318,161 @@ function DateField({ label, value, onChange, error }: DateFieldProps) {
 /* ─── styles ─────────────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.pearlBase },
-  flex: { flex: 1 },
-  scroll: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.xl,
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
-  meta: {
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
+  flex: {
+    flex: 1,
   },
-  headline: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.anchor,
-    color: colors.inkPrimary,
-    letterSpacing: typography.letterSpacing.displayMed,
-  },
-  stack: { gap: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.md },
-  half: { flex: 1 },
-
-  fieldLabel: {
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: colors.borderDashed,
-    borderRadius: radius.tile,
-    backgroundColor: colors.pearlBase,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    fontSize: typography.sizes.body,
-    color: colors.inkPrimary,
-    fontFamily: typography.ui,
-  },
-  numberInputRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderDashed,
-    borderRadius: radius.tile,
-    backgroundColor: colors.pearlBase,
-    paddingHorizontal: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
   },
-  numberInput: {
+  headerTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: 13,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.bone,
+  },
+  headerSave: {
+    fontFamily: typography.uiBold,
+    fontSize: 14,
+    color: colors.magenta,
+    letterSpacing: 0.3,
+  },
+  headerSaveOff: {
+    color: colors.bruma,
+  },
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 40,
+  },
+  nameBlock: {
+    marginBottom: 24,
+  },
+  nameInput: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 28,
+    lineHeight: 34,
+    color: colors.leche,
+    letterSpacing: -0.8,
+    padding: 0,
+  },
+  nameRule: {
+    height: 1,
+    backgroundColor: colors.hairlineStrong,
+    marginTop: 10,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 22,
+  },
+  statCard: {
     flex: 1,
-    fontSize: typography.sizes.anchor,
-    fontFamily: typography.displayMedium,
-    color: colors.inkPrimary,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
-  suffix: {
-    fontSize: typography.sizes.body,
-    color: colors.labelMuted,
-    marginLeft: spacing.sm,
+  cardError: {
+    borderColor: colors.feedbackError,
   },
-  inputError: { borderColor: colors.mauveDeep },
+  statLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 6,
+  },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 5,
+  },
+  statInput: {
+    flex: 1,
+    fontFamily: typography.displayHeavy,
+    fontSize: 30,
+    letterSpacing: -1,
+    color: colors.leche,
+    padding: 0,
+  },
+  statInputAccent: {
+    color: colors.magenta,
+  },
+  statUnit: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: colors.niebla,
+  },
+  field: {
+    marginBottom: 22,
+  },
+  fieldLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.magenta,
+    marginBottom: 10,
+  },
+  dateWrap: {
+    alignSelf: 'flex-start',
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    backgroundColor: colors.bgCard,
+  },
+  chipActive: {
+    borderColor: colors.magenta,
+    backgroundColor: colors.magentaTint2,
+  },
+  chipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: 13,
+    color: colors.bone,
+  },
+  chipTextActive: {
+    fontFamily: typography.uiBold,
+    color: colors.leche,
+  },
   errorText: {
-    fontSize: typography.sizes.smallLabel,
-    color: colors.mauveDeep,
-  },
-  submitHint: {
-    fontSize: typography.sizes.smallLabel,
-    color: colors.mauveDeep,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-
-  iosDateWrap: {
-    borderRadius: radius.tile,
-    backgroundColor: colors.pearlBase,
-    borderWidth: 1,
-    borderColor: colors.borderDashed,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  androidDateBtn: {
-    borderRadius: radius.tile,
-    backgroundColor: colors.pearlBase,
-    borderWidth: 1,
-    borderColor: colors.borderDashed,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  androidDateLabel: {
+    marginTop: 8,
     fontFamily: typography.uiMedium,
-    color: colors.inkPrimary,
-    fontSize: typography.sizes.body,
+    fontSize: 12,
+    color: colors.feedbackError,
   },
-
-  actions: { gap: spacing.md, marginTop: spacing.xl },
-  primary: {
+  deleteBtn: {
+    marginTop: 10,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
-    backgroundColor: colors.mauveDeep,
+    paddingVertical: 14,
   },
-  primaryDisabled: {
-    backgroundColor: colors.pearlBase,
-  },
-  primaryLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.pearlBase,
-  },
-  secondary: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-  },
-  secondaryLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.labelMuted,
+  deleteLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 13,
+    letterSpacing: 0.4,
+    color: colors.feedbackError,
   },
 })

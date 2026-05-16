@@ -1,27 +1,29 @@
+import * as Haptics from 'expo-haptics'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import Toast from 'react-native-toast-message'
 
 import { MealForm } from '@/features/macros/components'
-import { useMealById, useUpdateMeal } from '@/features/macros/hooks'
+import { useDeleteMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
+import { confirmBinary, useConfirm } from '@/lib/confirm'
 
 import type { MealInput } from '@/features/macros/api'
 
 /*
- * Edit-meal screen. Loads the meal via useMealById, hands its
- * fields to MealForm as defaultValues (which becomes the initial
- * state of react-hook-form), and dispatches useUpdateMeal on
- * submit.
+ * Edit-meal screen. Loads the meal via useMealById, hands its fields
+ * to MealForm as defaultValues, dispatches useUpdateMeal on submit
+ * and useDeleteMeal (behind a confirm) on delete.
  *
  * meal_date is a generated column in Postgres, so if the user
  * changes consumed_at to a different day the server recomputes
- * meal_date automatically and the row moves to that day's bucket
- * in the Comidas tab.
+ * meal_date and the row moves to that day's bucket in the estela.
  */
 export default function EditMealScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const mealQuery = useMealById(id)
   const updateMeal = useUpdateMeal()
+  const deleteMeal = useDeleteMeal()
+  const choose = useConfirm()
 
   const meal = mealQuery.data
 
@@ -31,6 +33,7 @@ export default function EditMealScreen() {
         protein_g: Number(meal.protein_g),
         calories: meal.calories,
         consumed_at: new Date(meal.consumed_at),
+        meal_type: meal.meal_type as MealInput['meal_type'],
       }
     : undefined
 
@@ -49,22 +52,31 @@ export default function EditMealScreen() {
     }
   }
 
-  // Until the meal query resolves we render the form with whatever
-  // defaults MealForm picks up (empty string + zeros); once it
-  // lands, defaultValues-prop re-renders and react-hook-form re-
-  // initialises via `values` reset. For simplicity the form always
-  // renders — if the user interacts before load, their edits get
-  // overwritten by the fetched meal. Acceptable edge case for MVP.
+  const handleDelete = async () => {
+    if (!id || !meal) return
+    const ok = await confirmBinary(choose, {
+      title: 'Borrar esta comida',
+      description: `"${meal.name}"`,
+      confirmLabel: 'Borrar',
+      destructive: true,
+    })
+    if (!ok) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+    deleteMeal.mutate(id)
+    router.back()
+  }
 
+  // Key flips 'loading' → id once the meal lands, remounting MealForm
+  // so react-hook-form re-initialises with the real values (its
+  // defaultValues are read once, at mount).
   return (
     <MealForm
-      key={id ?? 'loading'}
-      headerMeta="COMIDA"
+      key={meal ? id : 'loading'}
       headerTitle="Editar comida"
-      submitLabel="Guardar cambios"
       defaultValues={defaultValues}
       onSubmit={onSubmit}
       onCancel={() => router.back()}
+      onDelete={handleDelete}
       isSubmitting={updateMeal.isPending}
     />
   )

@@ -7,7 +7,7 @@ type Props = {
   /** "Hola, Anahí." — uses Hanken 28 px; emphasis word renders Cormorant italic 26 px magenta. */
   greeting?: string
   greetingEmphasis?: string
-  /** "Tu comida" — uses Hanken 36 px; emphasis word renders Cormorant italic 34 px magenta. */
+  /** "Tu comida" — uses Hanken 36 px; emphasis word renders Hanken heavy 36 px magenta. */
   title?: string
   titleEmphasis?: string
   /** Optional metadata pill on the right ("SÁB 27", "30 días", etc.).
@@ -41,7 +41,7 @@ export function TabHeader({
           <EmText
             text={title}
             emphasis={titleEmphasis}
-            emStyle={styles.italicEmTitle}
+            emStyle={styles.emTitle}
             style={styles.title}
           />
         ) : null}
@@ -94,9 +94,15 @@ const styles = StyleSheet.create({
     letterSpacing: -1.6,
     lineHeight: 38,
   },
-  // CSS spec: .tab-hello em → 0.92em of 28 ≈ 26; .tab-title em → 0.95em of 36 ≈ 34.
+  // Greeting keeps the serif-italic accent; the title emphasis is plain
+  // Hanken heavy — the accent is carried by colour, not by face.
   italicEmGreeting: { ...italicEmBase, fontSize: 26 },
-  italicEmTitle: { ...italicEmBase, fontSize: 34 },
+  emTitle: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 36,
+    color: colors.magenta,
+    letterSpacing: -1.6,
+  },
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
