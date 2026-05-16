@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native'
 
@@ -24,6 +24,10 @@ const DEFAULT_AGE_YEARS = 30
 
 export default function AboutYouScreen() {
   const router = useRouter()
+  // Opened from Ajustes (?source=settings) → save and return there;
+  // otherwise this is the onboarding wizard → advance to the next step.
+  const { source } = useLocalSearchParams<{ source?: string }>()
+  const fromSettings = source === 'settings'
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
 
@@ -55,7 +59,9 @@ export default function AboutYouScreen() {
         biological_sex: sex,
         height_cm: Math.round(heightNum),
       },
-      { onSuccess: () => router.push('/onboarding/weight') },
+      {
+        onSuccess: () => (fromSettings ? router.back() : router.push('/onboarding/weight')),
+      },
     )
   }
 

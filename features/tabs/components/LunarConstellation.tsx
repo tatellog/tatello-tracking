@@ -939,7 +939,13 @@ function PlaceholderStar({ s, i, t }: { s: Resolved; i: number; t: SharedValue<n
     const ambient = (0.68 + 0.1 * wave) * twinkleOp
     return {
       opacity: ambient,
-      transform: `translate(${s.x} ${s.y}) scale(${scale.toFixed(3)}) translate(${-s.x} ${-s.y})`,
+      transform: [
+        { translateX: s.x },
+        { translateY: s.y },
+        { scale },
+        { translateX: -s.x },
+        { translateY: -s.y },
+      ],
     }
   })
 
@@ -1206,7 +1212,13 @@ function IgnitingStar({ s, igniteT }: { s: Resolved; igniteT: SharedValue<number
       scale = 1 + 1.5 * (1 - (u - 0.5) / 0.5)
     }
     return {
-      transform: `translate(${s.x} ${s.y}) scale(${scale.toFixed(3)}) translate(${-s.x} ${-s.y})`,
+      transform: [
+        { translateX: s.x },
+        { translateY: s.y },
+        { scale },
+        { translateX: -s.x },
+        { translateY: -s.y },
+      ],
     }
   })
 
@@ -1412,7 +1424,13 @@ function LitStar({
     const boosted = ambient + litPulse.value * 0.15
     return {
       opacity: boosted > 1 ? 1 : boosted,
-      transform: `translate(${s.x} ${s.y}) scale(${scale.toFixed(3)}) translate(${-s.x} ${-s.y})`,
+      transform: [
+        { translateX: s.x },
+        { translateY: s.y },
+        { scale },
+        { translateX: -s.x },
+        { translateY: -s.y },
+      ],
     }
   })
 

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { MealInputSchema, type MealInput } from '@/features/macros/api'
 import { colors, typography } from '@/theme'
@@ -25,6 +25,54 @@ const MEAL_TYPES: readonly { value: MealType; label: string }[] = [
   { value: 'dinner', label: 'Cena' },
   { value: 'snack', label: 'Snack' },
 ]
+
+/* The celestial glyph for each meal slot — sunrise / sun / crescent /
+ * sparkle. The same set the meal rows and the quick-log sheet use, so
+ * a slot reads identically everywhere. */
+function MealGlyph({ type, color }: { type: MealType; color: string }) {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      {type === 'lunch' ? (
+        <>
+          <Circle cx={12} cy={12} r={4.3} fill={color} />
+          <Path
+            d="M12 5.6 V2.8 M12 18.4 V21.2 M18.4 12 H21.2 M5.6 12 H2.8 M16.5 7.5 L18.5 5.5 M7.5 7.5 L5.5 5.5 M16.5 16.5 L18.5 18.5 M7.5 16.5 L5.5 18.5"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </>
+      ) : type === 'dinner' ? (
+        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
+      ) : type === 'breakfast' ? (
+        <>
+          <Path d="M7 17.5 A 5 5 0 0 1 17 17.5 Z" fill={color} />
+          <Path
+            d="M2.6 17.5 H21.4 M12 9 V6.4 M6.6 12 L4.8 10.3 M17.4 12 L19.2 10.3"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </>
+      ) : (
+        <>
+          <Path
+            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
+            fill={color}
+          />
+          <Path
+            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
+            fill={color}
+          />
+          <Path
+            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
+            fill={color}
+          />
+        </>
+      )}
+    </Svg>
+  )
+}
 
 function inferMealTypeFromHour(hour: number): MealType {
   if (hour >= 5 && hour <= 10) return 'breakfast'
@@ -204,20 +252,21 @@ export function MealForm({
             render={({ field }) => (
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>Momento</Text>
-                <View style={styles.chips}>
+                <View style={styles.momentoPill}>
                   {MEAL_TYPES.map((mt) => {
                     const active = field.value === mt.value
+                    const tint = active ? colors.magenta : colors.niebla
                     return (
                       <Pressable
                         key={mt.value}
                         onPress={() => field.onChange(mt.value)}
-                        style={[styles.chip, active && styles.chipActive]}
+                        style={[styles.momentoSeg, active && styles.momentoSegActive]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
+                        accessibilityLabel={mt.label}
                       >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {mt.label}
-                        </Text>
+                        <MealGlyph type={mt.value} color={tint} />
+                        <Text style={[styles.momentoSegText, { color: tint }]}>{mt.label}</Text>
                       </Pressable>
                     )
                   })}
@@ -268,7 +317,7 @@ function StatField({
 }: StatFieldProps) {
   const display = value === undefined || value === 0 ? '' : String(value)
   return (
-    <View style={[styles.statCard, error && styles.cardError]}>
+    <View style={[styles.statCard, accent && styles.cardAccent, error && styles.cardError]}>
       <Text style={styles.statLabel}>{label}</Text>
       <View style={styles.statValueRow}>
         <TextInput
@@ -376,14 +425,26 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 22,
   },
+  // Lifted stat card — a soft shadow gives the macros physical depth.
   statCard: {
     flex: 1,
     backgroundColor: colors.bgCard,
     borderWidth: 1,
     borderColor: colors.hairline,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderRadius: 16,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 9,
+    elevation: 4,
+  },
+  // The protein card — the fitness hero metric. A magenta-tinted
+  // surface + edge so it reads as the screen's primary number.
+  cardAccent: {
+    backgroundColor: colors.magentaTint2,
+    borderColor: colors.magenta,
   },
   cardError: {
     borderColor: colors.feedbackError,
@@ -432,31 +493,32 @@ const styles = StyleSheet.create({
   dateWrap: {
     alignSelf: 'flex-start',
   },
-  chips: {
+  // Meal-slot selector — one stadium pill, four glyph+label segments,
+  // the active one a magenta capsule. The same control as the quick-
+  // log sheet's, so "sumar" and "editar" speak one language.
+  momentoPill: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: 999,
+    backgroundColor: colors.bgCard2,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: colors.bruma,
-    backgroundColor: colors.bgCard,
+    borderColor: colors.hairline,
+    padding: 4,
   },
-  chipActive: {
-    borderColor: colors.magenta,
+  momentoSeg: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 11,
+    borderRadius: 22,
+  },
+  momentoSegActive: {
     backgroundColor: colors.magentaTint2,
   },
-  chipText: {
-    fontFamily: typography.uiSemi,
-    fontSize: 13,
-    color: colors.bone,
-  },
-  chipTextActive: {
+  momentoSegText: {
     fontFamily: typography.uiBold,
-    color: colors.leche,
+    fontSize: 10,
+    letterSpacing: 0.4,
   },
   errorText: {
     marginTop: 8,

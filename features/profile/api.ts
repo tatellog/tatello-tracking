@@ -1,3 +1,4 @@
+import * as ImageManipulator from 'expo-image-manipulator'
 import { z } from 'zod'
 
 import { requireUserId, supabase } from '@/lib/supabase'
@@ -26,6 +27,7 @@ export const ProfileUpdateSchema = z
     height_cm: z.number().int().min(51, 'Mínimo 51 cm').max(249, 'Máximo 249 cm'),
     goal: z.enum(GOAL_VALUES),
     onboarding_completed_at: z.string(),
+    avatar_path: z.string(),
   })
   .partial()
 
@@ -53,6 +55,40 @@ export async function updateProfile(input: ProfileUpdate): Promise<Profile> {
     .single()
   if (error) throw error
   return data
+}
+
+const AVATAR_PX = 512
+
+/* The public URL for an avatar storage path. The `avatars` bucket is
+ * public, so this is a stable link with no signing. */
+export function avatarUrl(path: string): string {
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
+}
+
+/*
+ * Resize → JPEG-compress → upload to the `avatars` bucket → point the
+ * profile row at the new file. The picker hands us an already-square
+ * crop, so a flat 512×512 resize won't distort. The path is
+ * timestamped ({userId}/{epochMillis}.jpg) so each new avatar gets a
+ * fresh URL — no CDN cache to bust. The leading {userId} folder is the
+ * RLS gate (see 20260516120003_profile_avatar.sql).
+ */
+export async function uploadAvatar(uri: string): Promise<Profile> {
+  const userId = await requireUserId()
+  const processed = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: AVATAR_PX, height: AVATAR_PX } }],
+    { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG },
+  )
+  const blob = await fetch(processed.uri).then((r) => r.blob())
+  const path = `${userId}/${Date.now()}.jpg`
+
+  const { error: uploadErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' })
+  if (uploadErr) throw uploadErr
+
+  return updateProfile({ avatar_path: path })
 }
 
 /*

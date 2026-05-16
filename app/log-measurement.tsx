@@ -2,7 +2,6 @@ import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,6 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+
+import { StarLoader } from '@/components/StarLoader'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 
@@ -122,7 +123,7 @@ export default function LogMeasurementScreen() {
             >
               {addMeasurement.isPending ? (
                 <View style={styles.ctaRow}>
-                  <ActivityIndicator color={colors.pearlBase} size="small" />
+                  <StarLoader size={18} color={colors.pearlBase} />
                   <Text style={styles.ctaLabel}>Guardando…</Text>
                 </View>
               ) : (

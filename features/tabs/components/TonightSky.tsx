@@ -43,7 +43,10 @@ type Props = {
  * translating + scaling the shared 24×24 glyph. */
 function starTransform(cx: number, cy: number, r: number) {
   const s = (r * 2) / 24
-  return `translate(${cx - 12 * s} ${cy - 12 * s}) scale(${s})`
+  // RN-style transform array — react-native-svg accepts a string here
+  // too, but a string crashes on Android's New Architecture (the
+  // native side expects a ReadableArray).
+  return [{ translateX: cx - 12 * s }, { translateY: cy - 12 * s }, { scale: s }]
 }
 
 /*

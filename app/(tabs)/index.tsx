@@ -7,27 +7,30 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInDown,
-  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { LoadingView } from '@/components/LoadingView'
 import type { BriefContext } from '@/features/brief/api'
-import { Day1Celebration, HomeError, HomeSkeleton } from '@/features/home/components'
+import { Day1Celebration, HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import { useProfile } from '@/features/profile/hooks'
+import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import {
+  DayCheckIn,
+  type DayState,
   LunarConstellation,
   SectionHeader,
+  SkyBackground,
   StatSlider,
   TabHeader,
   TodayMealLog,
-  TodayWorkoutButton,
   WeekStrip,
   type WeekDayCell,
 } from '@/features/tabs/components'
@@ -62,11 +65,12 @@ export default function TodayScreen() {
 
   if (brief.isLoading || !brief.data || cadence == null) {
     return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <HomeSkeleton />
-        </ScrollView>
-      </SafeAreaView>
+      <View style={styles.screen}>
+        <SkyBackground />
+        <SafeAreaView style={styles.safe} edges={['top']}>
+          <LoadingView />
+        </SafeAreaView>
+      </View>
     )
   }
 
@@ -82,6 +86,13 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()
+
+  // Rest day — logged separately from workouts; it never touches the
+  // constellation or the count, it only swaps the guilt-CTA for a
+  // supportive message on a day the user didn't train.
+  const restQuery = useRestToday(ctx.date)
+  const setRest = useSetRestToday(ctx.date)
+  const restedToday = restQuery.data ?? false
 
   const [showCelebration, setShowCelebration] = useState(false)
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
@@ -116,21 +127,42 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
-  const handleConfirmWorkout = () => {
-    const wasFirstDay = isFirstDay
-    toggleToday.mutate(true)
-    // Mirror duration & easing of LunarConstellation's internal
-    // radialPulse so the screen wash + the constellation burst peak
-    // and fade together.
-    screenFlash.value = 0
-    screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
-    if (wasFirstDay) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-      setShowCelebration(true)
-      setTimeout(() => {
-        setShowCelebration(false)
-        qc.invalidateQueries({ queryKey: queryKeys.profile.all })
-      }, CELEBRATION_MS)
+  // Today's state, derived for the persistent check-in toggle. Trained
+  // wins over rested if both somehow exist (a stale rest row).
+  const dayState: DayState = ctx.today_workout_completed
+    ? 'trained'
+    : restedToday
+      ? 'rested'
+      : 'undecided'
+
+  // One handler for the whole toggle. Each branch only runs on a real
+  // transition (the toggle never re-fires the state it's already in),
+  // so e.g. the 'trained' branch always means "newly trained".
+  const handleDayChange = (next: DayState) => {
+    if (next === 'trained') {
+      const wasFirstDay = isFirstDay
+      if (restedToday) setRest.mutate(false)
+      toggleToday.mutate(true)
+      // Mirror duration & easing of LunarConstellation's internal
+      // radialPulse so the screen wash + the constellation burst peak
+      // and fade together.
+      screenFlash.value = 0
+      screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
+      if (wasFirstDay) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+        setShowCelebration(true)
+        setTimeout(() => {
+          setShowCelebration(false)
+          qc.invalidateQueries({ queryKey: queryKeys.profile.all })
+        }, CELEBRATION_MS)
+      }
+    } else if (next === 'rested') {
+      if (ctx.today_workout_completed) toggleToday.mutate(false)
+      setRest.mutate(true)
+    } else {
+      // Cleared back to undecided — undo whichever was set.
+      if (ctx.today_workout_completed) toggleToday.mutate(false)
+      if (restedToday) setRest.mutate(false)
     }
   }
 
@@ -159,21 +191,20 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   return (
     <View style={styles.screen}>
-      <SafeAreaView style={styles.screen} edges={['top']}>
+      <SkyBackground />
+      <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Animated.View entering={enter(40)}>
             <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
           </Animated.View>
 
-          {/* CTA only — once the day is marked the button has no job
-              left, so it unmounts. The workout is then confirmed by
-              the constellation burst, the coach line and the filled
-              HOY star in the WeekStrip; undo lives on that star. */}
-          {!ctx.today_workout_completed ? (
-            <Animated.View entering={enter(120)} exiting={FadeOut.duration(260)}>
-              <TodayWorkoutButton onConfirm={handleConfirmWorkout} />
-            </Animated.View>
-          ) : null}
+          {/* The daily check-in — a persistent toggle. It always
+              shows today's state (entrené / descansé / sin decidir)
+              and stays editable; the constellation burst + filled HOY
+              star still confirm a trained day alongside it. */}
+          <Animated.View entering={enter(120)}>
+            <DayCheckIn state={dayState} onChange={handleDayChange} />
+          </Animated.View>
 
           <Animated.View entering={enter(220)}>
             <SectionHeader label={`Tu ${capitalize(signLabel)}`} />
@@ -305,6 +336,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  safe: {
+    flex: 1,
   },
   // Magenta wash fired on each workout commit. Covers the full
   // viewport (above the ScrollView so it includes the header bar and

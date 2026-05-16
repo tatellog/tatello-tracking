@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
-import { getMeasurements } from './api'
+import { getBeforeAfterPhotos, getMeasurements } from './api'
 import { buildMockMeasurements } from './mock'
 
 const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
@@ -23,6 +23,18 @@ export function useMeasurements(rangeDays: number | null) {
   return useQuery({
     queryKey: queryKeys.progress.measurements(rangeDays),
     queryFn: () => (SKIP_AUTH ? buildMockMeasurements(rangeDays) : getMeasurements(rangeDays)),
+  })
+}
+
+/*
+ * Lectura: useBeforeAfterPhotos — el par antes/ahora (frontal) para la
+ * página de Progreso. staleTime moderado; las signed URLs viven 1h.
+ */
+export function useBeforeAfterPhotos() {
+  return useQuery({
+    queryKey: queryKeys.photos.beforeAfter(),
+    queryFn: getBeforeAfterPhotos,
+    staleTime: 5 * 60_000,
   })
 }
 

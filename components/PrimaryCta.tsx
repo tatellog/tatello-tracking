@@ -1,7 +1,9 @@
 import * as Haptics from 'expo-haptics'
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 import { colors, shadows, typography } from '@/theme'
+
+import { StarLoader } from './StarLoader'
 
 export type CtaVariant = 'primary' | 'ghost' | 'soft' | 'destructive'
 
@@ -58,9 +60,9 @@ export function PrimaryCta({
     >
       {loading ? (
         <View style={styles.loadingRow}>
-          <ActivityIndicator
+          <StarLoader
+            size={18}
             color={isGhost ? colors.leche : isSoft ? colors.magenta : '#FFFFFF'}
-            size="small"
           />
           <Text style={[styles.label, isGhost && styles.labelGhost, isSoft && styles.labelSoft]}>
             {loadingLabel}

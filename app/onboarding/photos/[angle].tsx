@@ -2,9 +2,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import { createElement, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { StarLoader } from '@/components/StarLoader'
 import { ProgressBar } from '@/features/onboarding/components'
 import { CaptureButton } from '@/features/onboarding/photos/components/CaptureButton'
 import { SilhouetteRenderer } from '@/features/onboarding/photos/components/SilhouetteRenderer'
@@ -157,7 +158,7 @@ function PhotoCaptureScreen({
     if (!permission) {
       return (
         <View style={styles.fullCenter}>
-          <ActivityIndicator color={colors.mauveDeep} />
+          <StarLoader size={32} color={colors.mauveDeep} />
         </View>
       )
     }
@@ -210,7 +211,7 @@ function PhotoCaptureScreen({
 
         {takePhoto.isPending ? (
           <View pointerEvents="none" style={styles.uploadOverlay}>
-            <ActivityIndicator color={colors.pearlBase} />
+            <StarLoader size={30} color={colors.pearlBase} />
             <Text style={styles.uploadOverlayText}>Subiendo…</Text>
           </View>
         ) : null}

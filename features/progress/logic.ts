@@ -103,23 +103,21 @@ export function computeTrend(points: WeightPoint[]): Trend | null {
 }
 
 /*
- * Convierte un Trend en una línea editorial corta. Calmo y
- * descriptivo — sin verbos imperativos ni juicios morales sobre el
- * progreso. Acompaña la gráfica como "lo que un coach te diría
- * mirando estos puntos".
+ * Una línea corta, como te la diría un coach mirando tus puntos.
+ * Calma, sin cifras (el número ya está en la gráfica) y sin juzgar el
+ * progreso. La pauta exacta del ritmo vive en el chart; esto es la voz.
  */
 export function formatTrendCopy(trend: Trend): string {
-  const abs = Math.abs(trend.weeklyChange)
-  if (trend.direction === 'flat') return 'Estable. Sin cambios significativos esta vuelta.'
+  if (trend.direction === 'flat') return 'Tu peso está parejo estos días.'
 
-  const verb = trend.direction === 'down' ? 'Bajando' : 'Subiendo'
-  const tail =
-    abs > 0.5
-      ? trend.direction === 'down'
-        ? 'Ritmo agresivo — cuidado con la masa muscular.'
-        : 'Ritmo agresivo.'
-      : abs >= 0.2
-        ? 'Ritmo sostenible.'
-        : 'Movimiento lento, pero movimiento.'
-  return `${verb} ~${abs.toFixed(1)} kg/semana. ${tail}`
+  const abs = Math.abs(trend.weeklyChange)
+  if (trend.direction === 'down') {
+    if (abs > 0.5) return 'Estás bajando rápido. Come suficiente proteína para cuidar tu músculo.'
+    if (abs >= 0.2) return 'Vas bajando con buen ritmo, sin prisa.'
+    return 'Bajas poco a poco. Vas bien.'
+  }
+
+  if (abs > 0.5) return 'Estás subiendo rápido estas semanas.'
+  if (abs >= 0.2) return 'Vas subiendo poco a poco.'
+  return 'Tu peso sube apenas un poco.'
 }

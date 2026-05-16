@@ -1,18 +1,23 @@
 import * as Haptics from 'expo-haptics'
+import * as ImagePicker from 'expo-image-picker'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { StarLoader } from '@/components/StarLoader'
 import { useMacroTargets } from '@/features/macros/hooks'
-import { useProfile } from '@/features/profile/hooks'
+import { avatarUrl } from '@/features/profile/api'
+import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
+import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
+import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
-import { colors, radius, spacing, typography } from '@/theme'
+import { colors, typography } from '@/theme'
 
 const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
 
@@ -29,19 +34,19 @@ const GOAL_LABEL: Record<string, string> = {
 }
 
 /*
- * Settings hub. Three blocks:
- *   1. Mi perfil — read-only summary of the wizard answers (name,
- *      age, height, sex, goal). Editing happens from the onboarding
- *      flow today; an inline edit lands in a future sprint.
- *   2. Mis metas — current macro targets with a tap-to-edit row that
- *      reuses /onboarding/macro-targets (?source=settings). Building
- *      a separate modal would duplicate functionality with no upside.
- *   3. Cuenta — sign out + version.
+ * Settings hub, in the app's celestial-editorial language. Three
+ * blocks under a TabHeader:
+ *   1. Mi perfil — an identity card. The name leads as a title; below
+ *      it the zodiac sign + age tie back to the Hoy-tab constellation
+ *      ("Tu Acuario"). The remaining wizard answers sit as quiet rows.
+ *   2. Mis metas — the macro targets as a tappable card; tapping it
+ *      reuses /onboarding/macro-targets (?source=settings).
+ *   3. Cuenta — sign out.
  *
  * Sign-out is destructive: confirmation, then a coordinated cleanup
  * (in-memory query cache + persisted store + visited-day-one flag)
- * before signOut. Skipping any of those leaks the previous user's
- * brief / photos / profile into the next sign-in.
+ * before signOut — skipping any leaks the previous user's data into
+ * the next sign-in.
  */
 export default function SettingsScreen() {
   const router = useRouter()
@@ -88,93 +93,162 @@ export default function SettingsScreen() {
     router.push('/onboarding/macro-targets?source=settings')
   }
 
+  const editProfile = () => {
+    router.push('/onboarding/about-you?source=settings')
+  }
+
+  const uploadAvatar = useUploadAvatar()
+
+  const pickAvatar = async () => {
+    if (uploadAvatar.isPending) return
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    })
+    const asset = result.canceled ? null : result.assets[0]
+    if (asset) uploadAvatar.mutate(asset.uri)
+  }
+
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const sexLabel = profile?.biological_sex ? (SEX_LABEL[profile.biological_sex] ?? '—') : '—'
   const goalLabel = profile?.goal ? (GOAL_LABEL[profile.goal] ?? '—') : '—'
 
+  // Celestial identity line — sign comes from the same source as the
+  // Hoy-tab constellation, so the two screens agree.
+  const signLabel = profile?.date_of_birth
+    ? ZODIAC[zodiacFromDate(profile.date_of_birth)].label
+    : null
+  const identityLine = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join('  ·  ')
+
+  const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
+  const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
+
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={enter(0)}>
-          <Text style={styles.headline}>Ajustes</Text>
-          <Text style={styles.meta}>STELAR · v1.0.0</Text>
-        </Animated.View>
+    <View style={styles.screen}>
+      <SkyBackground />
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Animated.View entering={enter(0)}>
+            <TabHeader title="Ajustes" pillLabel="STELAR · v1.0.0" />
+          </Animated.View>
 
-        <Animated.View entering={enter(120)} style={styles.group}>
-          <Text style={styles.sectionLabel}>MI PERFIL</Text>
-          <View style={styles.profileCard}>
-            <ProfileItem label="Nombre" value={profile?.display_name ?? '—'} />
-            <Divider />
-            <ProfileItem label="Edad" value={age != null ? `${age} años` : '—'} />
-            <Divider />
-            <ProfileItem
-              label="Altura"
-              value={profile?.height_cm ? `${profile.height_cm} cm` : '—'}
-            />
-            <Divider />
-            <ProfileItem label="Sexo biológico" value={sexLabel} />
-            <Divider />
-            <ProfileItem label="Objetivo" value={goalLabel} />
-          </View>
-        </Animated.View>
+          {/* ── Mi perfil — the identity card, tap to edit. ── */}
+          <Animated.View entering={enter(100)}>
+            <SectionHeader label="Mi perfil" />
+            <Pressable
+              onPress={editProfile}
+              accessibilityRole="button"
+              accessibilityLabel="Editar mi perfil"
+            >
+              <View style={styles.profileCard}>
+                <View style={styles.identity}>
+                  {/* Avatar — its own tap target: tap it to change the
+                      photo, tap the rest of the card to edit profile. */}
+                  <Pressable
+                    onPress={pickAvatar}
+                    disabled={uploadAvatar.isPending}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cambiar foto de perfil"
+                  >
+                    <View style={styles.avatar}>
+                      {uploadAvatar.isPending ? (
+                        <StarLoader size={16} color={colors.magenta} />
+                      ) : avatarUri ? (
+                        <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                      ) : (
+                        <Text style={styles.avatarInitial}>{initial}</Text>
+                      )}
+                    </View>
+                  </Pressable>
+                  <View style={styles.identityText}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {profile?.display_name ?? '—'}
+                    </Text>
+                    {identityLine ? <Text style={styles.signAge}>{identityLine}</Text> : null}
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </View>
+                <View style={styles.cardDivider} />
+                <ProfileRow
+                  label="Altura"
+                  value={profile?.height_cm ? `${profile.height_cm} cm` : '—'}
+                />
+                <ProfileRow label="Sexo biológico" value={sexLabel} />
+                <ProfileRow label="Objetivo" value={goalLabel} />
+              </View>
+            </Pressable>
+          </Animated.View>
 
-        <Animated.View entering={enter(200)} style={styles.group}>
-          <Text style={styles.sectionLabel}>MIS METAS</Text>
-          <Pressable onPress={editTargets} style={styles.row} accessibilityRole="button">
-            <View style={styles.rowMain}>
-              <Text style={styles.rowLabel}>Macros diarios</Text>
-              <Text style={styles.rowSub}>
-                {targets
-                  ? `${targets.protein_g}g proteína · ${targets.calories} cal`
-                  : 'Definir metas'}
-              </Text>
-            </View>
-            <Text style={styles.rowHint}>›</Text>
-          </Pressable>
-        </Animated.View>
+          {/* ── Mis metas — macros, tap to edit. ── */}
+          <Animated.View entering={enter(190)}>
+            <SectionHeader label="Mis metas" />
+            <Pressable
+              onPress={editTargets}
+              accessibilityRole="button"
+              accessibilityLabel="Editar macros diarios"
+            >
+              <View style={styles.metaCard}>
+                <View style={styles.metaMain}>
+                  <Text style={styles.metaLabel}>Macros diarios</Text>
+                  {targets ? (
+                    <Text style={styles.metaValue}>
+                      <Text style={styles.metaNum}>{targets.protein_g}</Text> g proteína
+                      {'   ·   '}
+                      <Text style={styles.metaNum}>{targets.calories}</Text> kcal
+                    </Text>
+                  ) : (
+                    <Text style={styles.metaValue}>Aún sin definir</Text>
+                  )}
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </View>
+            </Pressable>
+          </Animated.View>
 
-        <Animated.View entering={enter(280)} style={styles.group}>
-          <Text style={styles.sectionLabel}>CUENTA</Text>
-          <Pressable
-            onPress={handleSignOut}
-            disabled={signingOut}
-            style={({ pressed }) => [
-              styles.signOut,
-              pressed && !signingOut && styles.signOutPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ busy: signingOut }}
-          >
-            {signingOut ? (
-              <ActivityIndicator color={colors.inkPrimary} size="small" />
-            ) : (
-              <Text style={styles.signOutLabel}>Cerrar sesión</Text>
-            )}
-          </Pressable>
-          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-        </Animated.View>
+          {/* ── Cuenta. ── */}
+          <Animated.View entering={enter(280)}>
+            <SectionHeader label="Cuenta" />
+            <Pressable
+              onPress={handleSignOut}
+              disabled={signingOut}
+              accessibilityRole="button"
+              accessibilityState={{ busy: signingOut }}
+            >
+              <View style={styles.signOut}>
+                {signingOut ? (
+                  <StarLoader size={18} color={colors.leche} />
+                ) : (
+                  <Text style={styles.signOutLabel}>Cerrar sesión</Text>
+                )}
+              </View>
+            </Pressable>
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          </Animated.View>
 
-        <Animated.View entering={enter(360)}>
-          <Text style={styles.footer}>Un acto silencioso cada mañana</Text>
-        </Animated.View>
-      </ScrollView>
-    </SafeAreaView>
-  )
-}
-
-function ProfileItem({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.profileItem}>
-      <Text style={styles.profileItemLabel}>{label}</Text>
-      <Text style={styles.profileItemValue} numberOfLines={1}>
-        {value}
-      </Text>
+          <Animated.View entering={enter(370)}>
+            <Text style={styles.footer}>
+              Un acto <Text style={styles.footerEm}>silencioso</Text> cada mañana.
+            </Text>
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
     </View>
   )
 }
 
-function Divider() {
-  return <View style={styles.divider} />
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  )
 }
 
 function calculateAge(iso: string): number {
@@ -193,126 +267,169 @@ function calculateAge(iso: string): number {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
+  },
+  safe: {
+    flex: 1,
   },
   content: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.xl,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 48,
   },
-  headline: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.anchor,
-    color: colors.inkPrimary,
-    letterSpacing: typography.letterSpacing.displayMed,
-  },
-  meta: {
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelDim,
-    marginTop: spacing.xs,
-  },
-  group: {
-    gap: spacing.sm,
-  },
-  sectionLabel: {
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
-  },
+  // ── Mi perfil ──────────────────────────────────────────────────
   profileCard: {
-    borderRadius: radius.tile,
-    backgroundColor: colors.pearlElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    overflow: 'hidden',
   },
-  profileItem: {
+  // The identity block — name as title, sign + age beneath.
+  identity: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 15,
+    paddingBottom: 14,
   },
-  profileItemLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.labelMuted,
+  identityText: {
+    flex: 1,
+    minWidth: 0,
   },
-  profileItemValue: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.body,
-    color: colors.inkPrimary,
-    letterSpacing: -0.2,
-    flexShrink: 1,
-    textAlign: 'right',
+  // Avatar — magenta-rimmed circle; holds the photo, the initial, or
+  // an upload spinner. Tapping it opens the image picker.
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.magentaTint2,
+    borderWidth: 1,
+    borderColor: colors.magentaGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
+  avatarImg: {
+    width: 52,
+    height: 52,
+  },
+  avatarInitial: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 22,
+    color: colors.magenta,
+  },
+  name: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 22,
+    color: colors.leche,
+    letterSpacing: -0.6,
+  },
+  signAge: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: colors.niebla,
+    marginTop: 4,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.hairline,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radius.tile,
-    backgroundColor: colors.pearlElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-  },
-  rowMain: {
-    flex: 1,
-    gap: 2,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   rowLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.inkPrimary,
+    fontSize: 13.5,
+    color: colors.niebla,
   },
-  rowSub: {
+  rowValue: {
+    fontFamily: typography.displaySemi,
+    fontSize: 14.5,
+    color: colors.bone,
+    letterSpacing: -0.2,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  // ── Mis metas ──────────────────────────────────────────────────
+  metaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+  },
+  metaMain: {
+    flex: 1,
+  },
+  metaLabel: {
+    fontFamily: typography.displaySemi,
+    fontSize: 15.5,
+    color: colors.leche,
+    letterSpacing: -0.3,
+  },
+  metaValue: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13.5,
+    color: colors.niebla,
+    marginTop: 4,
+  },
+  metaNum: {
+    fontFamily: typography.displaySemi,
+    fontStyle: 'normal',
+    color: colors.bone,
+  },
+  chevron: {
     fontFamily: typography.ui,
-    fontSize: typography.sizes.caption,
-    color: colors.labelMuted,
+    fontSize: 22,
+    color: colors.niebla,
   },
-  rowHint: {
-    color: colors.labelMuted,
-    fontSize: 18,
-    marginLeft: spacing.md,
-  },
+  // ── Cuenta ─────────────────────────────────────────────────────
   signOut: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderDashed,
-    backgroundColor: colors.pearlMuted,
-    minWidth: 140,
+    backgroundColor: colors.bgCard,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  signOutPressed: {
-    opacity: 0.85,
-  },
   signOutLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.inkPrimary,
+    fontFamily: typography.uiBold,
+    fontSize: 13.5,
+    color: colors.bone,
+    letterSpacing: 0.3,
   },
   errorText: {
-    marginTop: spacing.sm,
+    marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.caption,
+    fontSize: 12,
     color: colors.feedbackError,
   },
+  // Editorial sign-off — serif italic with one magenta word.
   footer: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.smallLabel + 1,
-    color: colors.labelDim,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 15,
+    color: colors.bone,
     textAlign: 'center',
-    marginTop: spacing.xl,
+    marginTop: 32,
+  },
+  footerEm: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    color: colors.magenta,
   },
 })

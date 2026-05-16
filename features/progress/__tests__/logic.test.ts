@@ -131,27 +131,24 @@ describe('computeTrend', () => {
 })
 
 describe('formatTrendCopy', () => {
-  it('describes a sustainable down trend', () => {
+  it('describes a steady down trend', () => {
     const copy = formatTrendCopy({ direction: 'down', weeklyChange: -0.3 })
     expect(copy).toMatch(/bajando/i)
-    expect(copy).toMatch(/0\.3 kg\/semana/)
-    expect(copy).toMatch(/sostenible/i)
   })
 
-  it('warns when descent is aggressive', () => {
+  it('flags muscle care when descent is fast', () => {
     const copy = formatTrendCopy({ direction: 'down', weeklyChange: -0.7 })
-    expect(copy).toMatch(/agresivo/i)
-    expect(copy).toMatch(/masa muscular/i)
+    expect(copy).toMatch(/r[áa]pido/i)
+    expect(copy).toMatch(/m[úu]sculo/i)
   })
 
-  it('describes a slow up trend without alarming language', () => {
+  it('describes an up trend without alarming language', () => {
     const copy = formatTrendCopy({ direction: 'up', weeklyChange: 0.1 })
-    expect(copy).toMatch(/subiendo/i)
-    expect(copy).toMatch(/lento/i)
+    expect(copy).toMatch(/sube|subiendo/i)
   })
 
-  it('describes flat trend as estable', () => {
+  it('describes flat trend as parejo', () => {
     const copy = formatTrendCopy({ direction: 'flat', weeklyChange: 0.02 })
-    expect(copy).toMatch(/estable/i)
+    expect(copy).toMatch(/parejo/i)
   })
 })

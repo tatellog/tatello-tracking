@@ -1,18 +1,32 @@
 import { useRouter } from 'expo-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  Extrapolation,
+  FadeIn,
+  FadeInDown,
+  interpolate,
+  useAnimatedProps,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg'
 
+import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
   computeTrend,
+  formatTrendCopy,
   toWeightPoints,
+  type Trend,
   type WeightPoint,
 } from '@/features/progress/logic'
-import { PrimaryCta, TabHeader } from '@/features/tabs/components'
+import { PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
 type Period = '7D' | '30D' | '90D' | 'TODO'
@@ -24,19 +38,11 @@ const PERIOD_DAYS: Record<Period, number | null> = {
   TODO: null,
 }
 
-const PERIOD_LABEL: Record<Period, string> = {
-  '7D': '7',
-  '30D': '30',
-  '90D': '90',
-  TODO: '∞',
-}
+// 4-point star — the shared glyph; here it marks the trajectory origin.
+const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
-const PERIOD_UNIT: Record<Period, string> = {
-  '7D': 'días',
-  '30D': 'días',
-  '90D': 'días',
-  TODO: 'todo',
-}
+const AnimatedPath = Animated.createAnimatedComponent(Path)
+const AnimatedG = Animated.createAnimatedComponent(G)
 
 export default function ProgressScreen() {
   const router = useRouter()
@@ -52,91 +58,99 @@ export default function ProgressScreen() {
 
   const first = points[0]
   const last = points[points.length - 1]
-  const measurementCount = points.length
+  const count = points.length
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeIn.duration(280)}>
-          <TabHeader
-            title="Tu cambio"
-            titleEmphasis="Tu"
-            pillLabel={`${PERIOD_LABEL[period]} ${PERIOD_UNIT[period]}`}
-            pillEmphasis={PERIOD_LABEL[period]}
-          />
-        </Animated.View>
+    <View style={styles.screen}>
+      <SkyBackground />
 
-        <Animated.View entering={FadeIn.duration(320).delay(80)} style={styles.deltaBlock}>
-          <Text style={styles.deltaLabel}>Tu cambio · {PERIOD_UNIT[period]}</Text>
-          <View style={styles.deltaNumRow}>
-            <Text style={styles.deltaNum}>{formatDelta(delta?.abs)}</Text>
-            <Text style={styles.deltaUnit}>kg</Text>
-          </View>
-          {first && last && first !== last ? (
-            <Text style={styles.deltaRange}>
-              de <Text style={styles.deltaRangeStrong}>{first.weight.toFixed(1)}</Text> a{' '}
-              <Text style={styles.deltaRangeStrong}>{last.weight.toFixed(1)} kg</Text>
-            </Text>
-          ) : (
-            <Text style={styles.deltaRange}>
-              {points.length === 0
-                ? 'Sin mediciones en este rango.'
-                : 'Una sola medición — añade otra para ver el cambio.'}
-            </Text>
-          )}
-        </Animated.View>
+      <SafeAreaView style={styles.flex} edges={['top']}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Animated.View entering={FadeIn.duration(280)}>
+            <TabHeader title="Tu cambio" titleEmphasis="Tu" />
+          </Animated.View>
 
-        <Animated.View entering={FadeIn.duration(320).delay(160)} style={styles.periods}>
-          {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => (
-            <Pressable
-              key={p}
-              onPress={() => setPeriod(p)}
-              style={[styles.periodBtn, p === period && styles.periodBtnOn]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: p === period }}
-            >
-              <Text style={[styles.periodLabel, p === period && styles.periodLabelOn]}>{p}</Text>
-            </Pressable>
-          ))}
-        </Animated.View>
-
-        <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartCard}>
-          <Text style={styles.chartLabel}>Trayectoria · banda de tolerancia ±0.3 kg</Text>
-          {points.length >= 2 ? (
-            <TrajectoryChart points={points} />
-          ) : (
-            <View style={styles.chartEmpty}>
-              <Text style={styles.chartEmptyText}>
-                Necesitas al menos 2 mediciones para trazar la curva.
-              </Text>
+          {/* Hero — the change, the brightest star in the page's sky. */}
+          <Animated.View entering={FadeInDown.duration(420).delay(60)} style={styles.hero}>
+            <EyebrowLabel tone="niebla" size={10} style={styles.heroEyebrow}>
+              Rumbo a tu Andrómeda
+            </EyebrowLabel>
+            <View style={styles.deltaRow}>
+              <Text style={styles.deltaNum}>{formatDelta(delta?.abs)}</Text>
+              {delta ? <Text style={styles.deltaUnit}>kg</Text> : null}
             </View>
-          )}
-        </Animated.View>
+            <Text style={styles.deltaRange}>
+              {count === 0 ? (
+                'Aún no marcas tu trayectoria.'
+              ) : count === 1 && first ? (
+                <>
+                  Tu primera marca —{' '}
+                  <Text style={styles.deltaStrong}>{first.weight.toFixed(1)} kg</Text>
+                </>
+              ) : first && last ? (
+                <>
+                  <Text style={styles.deltaStrong}>{first.weight.toFixed(1)}</Text> →{' '}
+                  <Text style={styles.deltaStrong}>{last.weight.toFixed(1)} kg</Text>
+                </>
+              ) : null}
+            </Text>
+          </Animated.View>
 
-        <Animated.View entering={FadeIn.duration(360).delay(320)} style={styles.statsRow}>
-          <StatCard label="Mediciones" value={`${measurementCount}`} />
-          <StatCard
-            label="Promedio"
-            value={
-              trend ? `${trend.weeklyChange > 0 ? '+' : ''}${trend.weeklyChange.toFixed(2)}` : '—'
-            }
-            valueColor={trend && trend.direction === 'down' ? colors.magenta : colors.leche}
-          />
-          <StatCard
-            label="Próximo"
-            value={
-              trend
-                ? `${trend.weeklyChange > 0 ? '+' : ''}${(trend.weeklyChange * 4).toFixed(1)}`
-                : '—'
-            }
-          />
-        </Animated.View>
+          {/* Period — a stadium pill, matching the quick-log selector. */}
+          <Animated.View entering={FadeIn.duration(320).delay(160)} style={styles.periodPill}>
+            {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
+              const on = p === period
+              return (
+                <Pressable
+                  key={p}
+                  onPress={() => setPeriod(p)}
+                  style={[styles.periodSeg, on && styles.periodSegOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                >
+                  <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>{p}</Text>
+                </Pressable>
+              )
+            })}
+          </Animated.View>
 
-        <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
-          <PrimaryCta label="+ Nueva medición →" onPress={() => router.push('/log-measurement')} />
-        </Animated.View>
-      </ScrollView>
-    </SafeAreaView>
+          {/* Trajectory — no box; the line floats in the page's sky,
+            crossing the same starfield as everything else. */}
+          <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartSection}>
+            {count >= 1 ? (
+              <Text style={styles.chartCaption}>
+                {count} {count === 1 ? 'medición' : 'mediciones'}
+              </Text>
+            ) : null}
+            {points.length >= 2 ? (
+              <TrajectoryChart points={points} trend={trend} />
+            ) : (
+              <View style={styles.chartEmpty}>
+                <Text style={styles.chartEmptyText}>
+                  {count === 1
+                    ? 'Una segunda marca traza tu trayectoria.'
+                    : 'Marca tu peso para empezar a trazar tu trayectoria.'}
+                </Text>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* The pace — in the coach's voice. */}
+          {trend ? (
+            <Animated.View entering={FadeIn.duration(360).delay(320)}>
+              <Text style={styles.coachLine}>{formatTrendCopy(trend)}</Text>
+            </Animated.View>
+          ) : null}
+
+          {/* Antes y ahora — the trajectory, made visible. */}
+          <BeforeAfterPhotos />
+
+          <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
+            <PrimaryCta label="Nueva medición" onPress={() => router.push('/log-measurement')} />
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   )
 }
 
@@ -151,96 +165,136 @@ function formatDelta(kg: number | undefined): string {
 
 type ChartProps = {
   points: readonly WeightPoint[]
+  trend: Trend | null
 }
 
-// X-axis is the ordinal index of measurements, not real time —
-// otherwise two same-day measurements would collapse to one tick.
-function TrajectoryChart({ points }: ChartProps) {
-  const W = 280
-  const H = 130
-  const padX = 12
-  const padY = 14
+/*
+ * The trajectory. X-axis is the ordinal index of measurements, not
+ * real time — two same-day measurements must not collapse to one tick.
+ *
+ * Read as a constellation forming: the measurement stars sit in the
+ * sky, the comet line draws itself between them on mount, the current
+ * weight blazes as the comet head, and — with enough points for a
+ * trend — a dashed line projects the pace forward.
+ */
+function TrajectoryChart({ points, trend }: ChartProps) {
+  const W = 300
+  const H = 188
+  const padX = 18
+  const padY = 26
+
+  const lastIdx = points.length - 1
+  const last = points[lastIdx]
+  const first = points[0]
+  const hasProjection = trend != null && last != null
+
+  // Reserve the right slice of the chart for the forward projection.
+  const histEndX = hasProjection ? padX + (W - 2 * padX) * 0.64 : W - padX
+  const projectedWeight = hasProjection ? last.weight + trend.weeklyChange * 4 : null
 
   const ys = points.map((p) => p.weight)
-  const minY = Math.min(...ys) - 0.6
-  const maxY = Math.max(...ys) + 0.6
-  const lastX = points.length - 1
+  const domainYs = projectedWeight != null ? [...ys, projectedWeight] : ys
+  const minY = Math.min(...domainYs) - 0.7
+  const maxY = Math.max(...domainYs) + 0.7
 
-  const sx = (i: number) => padX + (i / Math.max(1, lastX)) * (W - 2 * padX)
+  const sx = (i: number) => padX + (i / Math.max(1, lastIdx)) * (histEndX - padX)
   const sy = (y: number) => padY + ((maxY - y) / (maxY - minY)) * (H - 2 * padY)
 
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(i)} ${sy(p.weight)}`).join(' ')
-  const upperPath = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(i)} ${sy(p.weight + 0.3)}`)
-    .join(' ')
-  const lowerPath = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(i)} ${sy(p.weight - 0.3)}`)
-    .join(' ')
 
-  const bandPath = `${upperPath} L ${sx(lastX)} ${sy((points[lastX]?.weight ?? 0) - 0.3)} ${points
-    .slice()
-    .reverse()
-    .map((p, i) => `L ${sx(lastX - i)} ${sy(p.weight - 0.3)}`)
-    .join(' ')} Z`
+  // Total polyline length — drives the stroke draw-in.
+  let lineLen = 0
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1]
+    const b = points[i]
+    if (!a || !b) continue
+    lineLen += Math.hypot(sx(i) - sx(i - 1), sy(b.weight) - sy(a.weight))
+  }
+  lineLen = lineLen || 1
 
-  const endX = sx(lastX)
-  const endY = sy(points[lastX]?.weight ?? 0)
+  const draw = useSharedValue(0)
+  useEffect(() => {
+    draw.value = 0
+    draw.value = withDelay(150, withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) }))
+  }, [points, draw])
+
+  const lineProps = useAnimatedProps(() => ({
+    strokeDashoffset: lineLen * (1 - draw.value),
+  }))
+  const revealProps = useAnimatedProps(() => ({
+    opacity: interpolate(draw.value, [0.62, 1], [0, 1], Extrapolation.CLAMP),
+  }))
+
+  const originK = 12 / 24
+  const ox = sx(0)
+  const oy = sy(first?.weight ?? 0)
+  const hx = sx(lastIdx)
+  const hy = sy(last?.weight ?? 0)
 
   return (
     <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
       <Defs>
-        <LinearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="rgba(233,30,99,0.18)" />
-          <Stop offset="100%" stopColor="rgba(233,30,99,0.04)" />
-        </LinearGradient>
+        {/* Comet gradient — deep magenta tail receding into the bright
+            head, so the line itself carries depth. */}
+        <SvgGradient id="comet" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={colors.magentaDeep} />
+          <Stop offset="1" stopColor={colors.magentaHot} />
+        </SvgGradient>
       </Defs>
 
-      <Path d={bandPath} fill="url(#bandGrad)" stroke="none" />
+      {/* Measurement stars — each logged weight, a point of light. */}
+      {points.slice(1, lastIdx).map((p, i) => (
+        <Circle key={`m${i}`} cx={sx(i + 1)} cy={sy(p.weight)} r={2.6} fill={colors.magenta} />
+      ))}
+
+      {/* Origin — a faint star marking where the trajectory began. */}
       <Path
-        d={upperPath}
-        fill="none"
-        stroke="rgba(244,236,222,0.15)"
-        strokeWidth={0.7}
-        strokeDasharray="3 3"
-      />
-      <Path
-        d={lowerPath}
-        fill="none"
-        stroke="rgba(244,236,222,0.15)"
-        strokeWidth={0.7}
-        strokeDasharray="3 3"
+        d={STAR_PATH}
+        transform={[
+          { translateX: ox - 12 * originK },
+          { translateY: oy - 12 * originK },
+          { scale: originK },
+        ]}
+        fill={colors.magentaDeep}
       />
 
-      <Path
+      {/* The trajectory — a comet, drawing itself in on mount. */}
+      <AnimatedPath
         d={linePath}
         fill="none"
-        stroke={colors.magenta}
-        strokeWidth={2.4}
+        stroke="url(#comet)"
+        strokeWidth={2.8}
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeDasharray={lineLen}
+        animatedProps={lineProps}
       />
-      <Circle cx={endX} cy={endY} r={5} fill={colors.magenta} />
-      <Circle cx={endX} cy={endY} r={10} fill="none" stroke="rgba(233,30,99,0.5)" strokeWidth={1} />
+
+      {/* Comet head + forward projection — revealed once the line lands. */}
+      <AnimatedG animatedProps={revealProps}>
+        {hasProjection && projectedWeight != null ? (
+          <>
+            <Path
+              d={`M ${hx} ${hy} L ${W - padX} ${sy(projectedWeight)}`}
+              stroke={colors.magentaDeep}
+              strokeWidth={1.8}
+              strokeDasharray="3 5"
+              strokeLinecap="round"
+            />
+            <Circle
+              cx={W - padX}
+              cy={sy(projectedWeight)}
+              r={4.5}
+              fill="none"
+              stroke={colors.magentaDeep}
+              strokeWidth={1.6}
+            />
+          </>
+        ) : null}
+        <Circle cx={hx} cy={hy} r={13} fill={colors.magentaTint2} />
+        <Circle cx={hx} cy={hy} r={5.5} fill={colors.magentaHot} />
+      </AnimatedG>
     </Svg>
-  )
-}
-
-/* ────────────────────────────────────────────────────────────────── */
-
-function StatCard({
-  label,
-  value,
-  valueColor,
-}: {
-  label: string
-  value: string
-  valueColor?: string
-}) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
-    </View>
   )
 }
 
@@ -249,24 +303,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
+  flex: {
+    flex: 1,
+  },
   content: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 100,
   },
-  deltaBlock: {
-    paddingTop: 8,
-    paddingBottom: 12,
+  hero: {
+    paddingTop: 6,
+    paddingBottom: 6,
   },
-  deltaLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    color: colors.magenta,
-    letterSpacing: 2.2,
-    textTransform: 'uppercase',
-    marginBottom: 8,
+  heroEyebrow: {
+    marginBottom: 10,
   },
-  deltaNumRow: {
+  deltaRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
@@ -274,119 +326,92 @@ const styles = StyleSheet.create({
   deltaNum: {
     fontFamily: typography.displayHeavy,
     fontSize: 80,
-    lineHeight: 74,
+    // Hanken Black at 80 px draws ink beyond the font's own metrics;
+    // iOS clips that overshoot to the Text frame. lineHeight can't fix
+    // it — padding can: it enlarges the frame so the ink has room.
+    paddingTop: 14,
+    paddingBottom: 12,
     color: colors.magenta,
-    letterSpacing: -5,
+    letterSpacing: -3,
   },
   deltaUnit: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 22,
+    fontFamily: typography.displayMedium,
+    fontSize: 21,
     color: colors.bone,
   },
   deltaRange: {
-    marginTop: 6,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 15,
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: 14,
     color: colors.bone,
   },
-  deltaRangeStrong: {
-    fontFamily: typography.displayHeavy,
-    fontStyle: 'normal',
+  deltaStrong: {
+    fontFamily: typography.displaySemi,
+    fontSize: 15,
     color: colors.leche,
-    fontSize: 16,
   },
-  periods: {
+  // Stadium pill — mirrors the quick-log meal-slot selector.
+  periodPill: {
     flexDirection: 'row',
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.bgCard2,
     borderWidth: 1,
     borderColor: colors.bruma,
-    borderRadius: 4,
-    padding: 3,
-    gap: 3,
-    marginTop: 18,
+    borderRadius: 22,
+    padding: 4,
+    marginTop: 22,
     marginBottom: 16,
   },
-  periodBtn: {
+  periodSeg: {
     flex: 1,
-    height: 38,
-    borderRadius: 2,
+    height: 34,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
-  periodBtnOn: {
-    backgroundColor: colors.magenta,
+  periodSegOn: {
+    backgroundColor: colors.magentaTint2,
   },
   periodLabel: {
     fontFamily: typography.uiBold,
     fontSize: 11,
     color: colors.niebla,
-    letterSpacing: 1.8,
-    textTransform: 'uppercase',
+    letterSpacing: 1.4,
   },
   periodLabelOn: {
-    color: '#FFFFFF',
+    color: colors.magentaHot,
   },
-  chartCard: {
-    backgroundColor: colors.bgCard,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    borderRadius: 6,
-    padding: 14,
+  // No box — the trajectory floats directly in the page's sky.
+  chartSection: {
+    marginTop: 4,
   },
-  chartLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    color: colors.magenta,
-    letterSpacing: 2.2,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginBottom: 12,
+  chartCaption: {
+    fontFamily: typography.uiMedium,
+    fontSize: 11,
+    color: colors.niebla,
+    letterSpacing: 0.3,
+    marginBottom: 6,
   },
   chartEmpty: {
-    paddingVertical: 30,
+    paddingVertical: 26,
     alignItems: 'center',
   },
   chartEmptyText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: 13,
+    lineHeight: 19,
     color: colors.bone,
     textAlign: 'center',
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
+  // The pace, read aloud — the only serif-italic line: the coach voice.
+  coachLine: {
     marginTop: 16,
-    marginBottom: 8,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.bgCard,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    borderRadius: 4,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-  },
-  statLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 9,
-    color: colors.niebla,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  statValue: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 22,
-    color: colors.leche,
-    letterSpacing: -0.9,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 15,
     lineHeight: 22,
+    color: colors.bone,
   },
   ctaWrap: {
-    marginTop: 14,
+    marginTop: 18,
   },
 })

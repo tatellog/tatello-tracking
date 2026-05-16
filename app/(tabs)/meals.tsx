@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
-import { MealComposer, TabHeader, TonightSky } from '@/features/tabs/components'
+import { MealComposer, SkyBackground, TabHeader, TonightSky } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -66,7 +66,8 @@ export default function MealsScreen() {
 
   return (
     <View style={styles.screen}>
-      <SafeAreaView style={styles.screen} edges={['top']}>
+      <SkyBackground />
+      <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -110,6 +111,9 @@ export default function MealsScreen() {
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

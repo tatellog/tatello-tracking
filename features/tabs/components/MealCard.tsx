@@ -24,10 +24,11 @@ type Props = {
 
 const CIRCLE = 34
 
-/* A frequent-meal card — name, macros and a "+" circle. Shared by the
- * Comidas estela and the quick-log sheet so the two never drift: the
- * estela wraps it with the constellation rail, the quick-log uses it
- * bare. On confirm the card stamps magenta. */
+/* A frequent-meal card — a rounded surface holding the name + macros
+ * and a "+" circle, all inside one card. Shared by the Comidas estela
+ * and the quick-log sheet so the two never drift. On the estela the
+ * body and the circle are separate tap targets (edit vs log); in the
+ * quick-log the whole card logs. On confirm the card stamps magenta. */
 export function MealCard({
   name,
   protein,
@@ -40,10 +41,12 @@ export function MealCard({
   style,
 }: Props) {
   const confirmed = state === 'confirmed'
-  const cardStyle = [
+  const cardSurface = [
     styles.card,
     elevated && styles.cardElevated,
     confirmed && styles.cardConfirmed,
+    state === 'dimmed' && styles.dimmed,
+    style,
   ]
 
   const content = (
@@ -61,12 +64,13 @@ export function MealCard({
     <Text style={[styles.icon, confirmed && styles.iconConfirmed]}>{confirmed ? '✓' : '+'}</Text>
   )
 
-  // Estela — card body and circle are independent tap targets.
+  // Estela — one card surface, two tap targets inside it: the body
+  // opens the editor, the "+" circle logs the meal.
   if (onCardPress) {
     return (
-      <View style={[styles.row, state === 'dimmed' && styles.dimmed, style]}>
+      <View style={cardSurface}>
         <TouchableOpacity
-          style={cardStyle}
+          style={styles.body}
           activeOpacity={0.6}
           onPress={onCardPress}
           disabled={disabled}
@@ -90,47 +94,49 @@ export function MealCard({
     )
   }
 
-  // Quick-log — the whole card is one add tap target.
+  // Quick-log — the whole card is one add tap target; the "+" circle
+  // inside it is the visual cue.
   return (
     <TouchableOpacity
-      style={[styles.row, state === 'dimmed' && styles.dimmed, style]}
+      style={cardSurface}
       activeOpacity={0.7}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={`Sumar ${name}`}
     >
-      <View style={cardStyle}>{content}</View>
+      <View style={styles.body}>{content}</View>
       <View style={[styles.circle, confirmed && styles.circleConfirmed]}>{icon}</View>
     </TouchableOpacity>
   )
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
   dimmed: {
     opacity: 0.32,
   },
-  // The tappable surface — rounded card; a hairline edge + soft shadow
-  // lift it off the screen. Stamps magenta on confirm.
+  // The card surface — a rounded row holding the body + the "+"
+  // circle. A hairline edge + soft shadow lift it off the screen;
+  // it stamps magenta on confirm.
   card: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.bgCard,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.hairline,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 13,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
     shadowRadius: 8,
     elevation: 4,
+  },
+  // The body — name + macros; on the estela it's the editor's target.
+  body: {
+    flex: 1,
+    minWidth: 0,
   },
   // One surface step up — for cards sitting on a bgCard surface.
   cardElevated: {
@@ -157,7 +163,6 @@ const styles = StyleSheet.create({
   // Quiet ghost circle — neutral ring, magenta glyph; goes solid white
   // only on confirm, against the stamped magenta card.
   circle: {
-    alignSelf: 'center',
     marginLeft: 10,
     width: CIRCLE,
     height: CIRCLE,

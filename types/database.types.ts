@@ -254,6 +254,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           biological_sex: string | null
           created_at: string
           date_of_birth: string | null
@@ -266,6 +267,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_path?: string | null
           biological_sex?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_path?: string | null
           biological_sex?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -288,6 +291,24 @@ export type Database = {
           id?: string
           onboarding_completed_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      rest_days: {
+        Row: {
+          created_at: string
+          rest_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          rest_date: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          rest_date?: string
+          user_id?: string
         }
         Relationships: []
       }
