@@ -1,19 +1,22 @@
 import { curveMonotoneX, line as d3Line } from 'd3-shape'
 import * as Haptics from 'expo-haptics'
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
 import Animated, {
+  Extrapolation,
   FadeIn,
+  interpolate,
+  type SharedValue,
   useAnimatedProps,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -45,6 +48,12 @@ export function StatSlider({ ctx }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
 
+  // Live scroll offset — drives the per-slide enter/leave animation.
+  const scrollX = useSharedValue(0)
+  const scrollHandler = useAnimatedScrollHandler((e) => {
+    scrollX.value = e.contentOffset.x
+  })
+
   const onLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width
     if (w !== width) setWidth(w)
@@ -66,22 +75,24 @@ export function StatSlider({ ctx }: Props) {
       </View>
 
       {width > 0 ? (
-        <ScrollView
+        <Animated.ScrollView
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={onScrollEnd}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
         >
-          <View style={{ width }}>
+          <Slide index={0} width={width} scrollX={scrollX}>
             <MacroSlide ctx={ctx} />
-          </View>
-          <View style={{ width }}>
+          </Slide>
+          <Slide index={1} width={width} scrollX={scrollX}>
             <WeightSlide ctx={ctx} />
-          </View>
-          <View style={{ width }}>
+          </Slide>
+          <Slide index={2} width={width} scrollX={scrollX}>
             <WaterSlide date={ctx.date} />
-          </View>
-        </ScrollView>
+          </Slide>
+        </Animated.ScrollView>
       ) : (
         <View style={styles.measurePlaceholder} />
       )}
@@ -89,6 +100,31 @@ export function StatSlider({ ctx }: Props) {
       <Dots count={SLIDE_TITLES.length} active={active} />
     </View>
   )
+}
+
+/* Each slide breathes as the carousel pages: a slide off-centre
+ * fades and scales down a touch, the centred one sits full. The
+ * effect is tied straight to the scroll offset, so it tracks the
+ * finger left and right rather than only snapping at the end. */
+function Slide({
+  index,
+  width,
+  scrollX,
+  children,
+}: {
+  index: number
+  width: number
+  scrollX: SharedValue<number>
+  children: ReactNode
+}) {
+  const style = useAnimatedStyle(() => {
+    const d = width > 0 ? scrollX.value / width - index : 0
+    return {
+      opacity: interpolate(d, [-1, 0, 1], [0.5, 1, 0.5], Extrapolation.CLAMP),
+      transform: [{ scale: interpolate(d, [-1, 0, 1], [0.94, 1, 0.94], Extrapolation.CLAMP) }],
+    }
+  })
+  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>
 }
 
 /* ─── Slide 1 — today's macros ─────────────────────────────────────── */

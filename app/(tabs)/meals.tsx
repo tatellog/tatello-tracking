@@ -4,18 +4,41 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
-import { MacroLine, MealComposer, TabHeader } from '@/features/tabs/components'
+import { MealComposer, TabHeader, TonightSky } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-/* Editorial line under the macro summary — it follows the protein arc
- * of the day so the screen has a voice, not just figures. */
-function skyCopy(pct: number, mealCount: number): string {
-  if (mealCount === 0) return 'Tu cielo está por trazarse.'
-  if (pct >= 1) return 'Cerraste tu cielo. Cada estrella cuenta.'
-  if (pct >= 0.75) return 'Una estrella más y lo completas.'
-  if (pct >= 0.4) return 'Tu cielo va tomando forma.'
-  return 'Cada comida suma una estrella.'
+/* Editorial coach line under the protein sky — it follows the day's
+ * protein arc so the screen has a voice, not just figures. Same shape
+ * as the Hoy tab's CoachLine: a sentence with one magenta-emphasised
+ * word, set in serif italic. */
+type SkyCopy = { before: string; emphasis: string; after: string }
+
+function skyCopy(pct: number, mealCount: number): SkyCopy {
+  if (mealCount === 0) {
+    return { before: 'Tu cielo está por ', emphasis: 'trazarse', after: '.' }
+  }
+  if (pct >= 1) {
+    return { before: 'Lo cerraste. Cada estrella ', emphasis: 'cuenta', after: '.' }
+  }
+  if (pct >= 0.75) {
+    return { before: 'Estás ', emphasis: 'cerca', after: ' de cerrar tu cielo.' }
+  }
+  if (pct >= 0.4) {
+    return { before: 'Tu cielo va ', emphasis: 'tomando forma', after: '.' }
+  }
+  return { before: 'Cada comida ', emphasis: 'suma una estrella', after: '.' }
+}
+
+function CoachLine({ pct, mealCount }: { pct: number; mealCount: number }) {
+  const copy = skyCopy(pct, mealCount)
+  return (
+    <Text style={styles.coachLine}>
+      {copy.before}
+      <Text style={styles.coachLineEm}>{copy.emphasis}</Text>
+      {copy.after}
+    </Text>
+  )
 }
 
 export default function MealsScreen() {
@@ -40,9 +63,6 @@ export default function MealsScreen() {
   )
 
   const proteinPct = targets ? summary.protein / targets.protein_g : 0
-  const caloriesPct = targets ? summary.calories / targets.calories : 0
-  const proteinLeft = targets ? Math.max(0, Math.round(targets.protein_g - summary.protein)) : 0
-  const caloriesLeft = targets ? Math.max(0, Math.round(targets.calories - summary.calories)) : 0
 
   return (
     <View style={styles.screen}>
@@ -57,32 +77,14 @@ export default function MealsScreen() {
 
           {targets ? (
             <>
-              {/* Compact macro summary — context while you log, not a
-                  panel that competes with the meal list below. */}
-              <View style={styles.macros}>
-                <MacroLine
-                  label="Proteína"
-                  value={String(Math.round(summary.protein))}
-                  unit={` / ${targets.protein_g} g`}
-                  pct={proteinPct}
-                  footerLeft={`${Math.round(proteinPct * 100)} %`}
-                  footerRight={proteinLeft > 0 ? `faltan ${proteinLeft} g` : 'meta cumplida'}
-                  footerRightEmphasis={proteinLeft > 0 ? `${proteinLeft} g` : undefined}
-                />
-                <MacroLine
-                  label="Calorías"
-                  value={String(Math.round(summary.calories))}
-                  unit={` / ${targets.calories} kcal`}
-                  pct={caloriesPct}
-                  footerLeft={`${Math.round(caloriesPct * 100)} %`}
-                  footerRight={
-                    caloriesLeft > 0 ? `restan ${caloriesLeft} kcal` : 'presupuesto lleno'
-                  }
-                  footerRightEmphasis={caloriesLeft > 0 ? `${caloriesLeft} kcal` : undefined}
-                  delay={350}
-                />
-              </View>
-              <Text style={styles.coachLine}>{skyCopy(proteinPct, meals.length)}</Text>
+              <TonightSky
+                meals={meals}
+                proteinValue={summary.protein}
+                proteinTarget={targets.protein_g}
+                caloriesValue={summary.calories}
+                caloriesTarget={targets.calories}
+              />
+              <CoachLine pct={proteinPct} mealCount={meals.length} />
             </>
           ) : (
             <Pressable
@@ -117,15 +119,21 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 48,
   },
-  macros: {
-    marginTop: 8,
-  },
+  // Editorial voice — serif italic with a magenta-emphasised word,
+  // matching the Hoy tab's coach line.
   coachLine: {
-    fontFamily: typography.ui,
-    fontSize: 14,
-    lineHeight: 20,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 16.5,
+    lineHeight: 24,
     color: colors.bone,
+    marginTop: 12,
     marginBottom: 4,
+  },
+  coachLineEm: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    color: colors.magenta,
   },
   defineTargets: {
     backgroundColor: colors.bgCard,

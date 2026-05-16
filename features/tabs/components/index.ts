@@ -1,6 +1,7 @@
 export { AppTabBar } from './AppTabBar'
 export { LunarConstellation } from './LunarConstellation'
 export { MacroLine } from './MacroLine'
+export { MealCard } from './MealCard'
 export { MealComposer } from './MealComposer'
 export { MacroRing } from './MacroRing'
 export { PrimaryCta } from './PrimaryCta'

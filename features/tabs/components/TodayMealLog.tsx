@@ -6,6 +6,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeInDown,
+  interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -20,7 +21,7 @@ import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { colors, typography } from '@/theme'
 
-const BADGE_SIZE = 30
+const NODE_SIZE = 30
 
 // ── Swipe-to-delete ────────────────────────────────────────────────
 const DELETE_THRESHOLD = -88
@@ -50,7 +51,7 @@ function formatTime(iso: string): string {
 }
 
 /* The celestial glyph for a meal slot — sunrise / sun / crescent /
- * star. It is the meal's node on the estela. */
+ * sparkle. It is the meal's node on the estela. */
 function PeriodGlyph({ period, size, color }: { period: MealType; size: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -77,10 +78,20 @@ function PeriodGlyph({ period, size, color }: { period: MealType; size: number; 
           />
         </>
       ) : (
-        <Path
-          d="M12 3.4 L13.7 10.3 L20.6 12 L13.7 13.7 L12 20.6 L10.3 13.7 L3.4 12 L10.3 10.3 Z"
-          fill={color}
-        />
+        <>
+          <Path
+            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
+            fill={color}
+          />
+          <Path
+            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
+            fill={color}
+          />
+          <Path
+            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
+            fill={color}
+          />
+        </>
       )}
     </Svg>
   )
@@ -108,9 +119,10 @@ function TrashIcon() {
   )
 }
 
-/* The meal's glyph node. Older meals' badges dim toward the tail of
- * the estela; the most recent — the comet head — sits full magenta,
- * glowing and breathing. */
+/* The meal's glyph node — the bare slot glyph, no badge ring (a ringed
+ * disc reads as a radio button). Older glyphs dim toward the tail of
+ * the estela; the most recent — the comet head — sits full magenta
+ * over a soft glow, breathing. */
 function GlyphNode({
   type,
   factor,
@@ -135,18 +147,15 @@ function GlyphNode({
   }, [isRecent, breath])
 
   const breathStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + breath.value * 0.07 }],
+    transform: [{ scale: 1 + breath.value * 0.08 }],
   }))
 
   return (
     <Animated.View
-      style={[
-        styles.badge,
-        isRecent ? styles.badgeNow : { opacity: lerp(0.5, 0.9, factor) },
-        breathStyle,
-      ]}
+      style={[styles.glyphNode, !isRecent && { opacity: lerp(0.4, 0.82, factor) }, breathStyle]}
     >
-      <PeriodGlyph period={type} size={15} color={colors.leche} />
+      {isRecent ? <View style={styles.glyphGlow} /> : null}
+      <PeriodGlyph period={type} size={22} color={colors.magenta} />
     </Animated.View>
   )
 }
@@ -162,14 +171,14 @@ type Props = {
 
 /* "Comidas de hoy" — la estela del día.
  *
- * A tight chronological list: each meal is a row tagged with its
- * slot's celestial glyph (sunrise / sun / moon / star). The glyph
- * badges dim up toward the tail and the most recent meal — the comet
- * head — glows and breathes; that brightness gradient is the estela,
- * no connecting line needed.
+ * A tight chronological list: each meal is a card tagged with its
+ * slot's celestial glyph (sunrise / sun / moon / sparkle). The glyphs
+ * dim up toward the tail and the most recent meal — the comet head —
+ * glows and breathes; that brightness gradient is the estela, no
+ * connecting line needed.
  *
- * Tap a row → edit. Swipe a row left past the threshold → delete. The
- * glyph column never slides — only the meal content does. */
+ * Tap a card → edit. Swipe a card left past the threshold → delete.
+ * The slot glyph is the card's leading mark. */
 export function TodayMealLog({ date, onOpenMeal, showFooter = true }: Props) {
   const { data: meals } = useMealsForDate(date)
   const deleteMeal = useDeleteMeal()
@@ -198,8 +207,6 @@ export function TodayMealLog({ date, onOpenMeal, showFooter = true }: Props) {
   }
 
   const n = meals.length
-  const totalProtein = Math.round(meals.reduce((s, m) => s + Number(m.protein_g), 0))
-  const totalCalories = Math.round(meals.reduce((s, m) => s + Number(m.calories), 0))
 
   return (
     <View>
@@ -227,9 +234,6 @@ export function TodayMealLog({ date, onOpenMeal, showFooter = true }: Props) {
           <Text style={styles.footerText}>
             <Text style={styles.footerStrong}>{n}</Text> {n === 1 ? 'comida' : 'comidas'} en tu
             cielo
-            {'   ·   '}
-            <Text style={styles.footerStrong}>{totalProtein}</Text> g{'   ·   '}
-            <Text style={styles.footerStrong}>{totalCalories}</Text> kcal
           </Text>
         </View>
       ) : null}
@@ -248,13 +252,14 @@ type RowProps = {
 
 function MealRow({ meal, factor, isRecent, onOpen, onRequestDelete }: RowProps) {
   const translateX = useSharedValue(0)
+  const press = useSharedValue(0)
   const requestDelete = () => onRequestDelete(meal)
 
   const pan = Gesture.Pan()
     .activeOffsetX([-12, 12])
     .failOffsetY([-14, 14])
     .onUpdate((e) => {
-      // Left-only drag, clamped so the row can't slide off.
+      // Left-only drag, clamped so the card can't slide off.
       const next = e.translationX
       translateX.value = next > 0 ? 0 : next < -DRAG_MAX ? -DRAG_MAX : next
     })
@@ -265,47 +270,57 @@ function MealRow({ meal, factor, isRecent, onOpen, onRequestDelete }: RowProps) 
       translateX.value = withSpring(0, SPRING)
     })
 
-  const frontStyle = useAnimatedStyle(() => ({
+  // The card slides on swipe; on press its surface lifts a shade. The
+  // press feedback is an opaque colour shift — never opacity or scale,
+  // which would bare the magenta delete zone sitting behind the card.
+  const cardStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
+    backgroundColor: interpolateColor(press.value, [0, 1], [colors.bgCard, colors.bgCard2]),
   }))
 
-  return (
-    <View style={styles.row}>
-      {/* Glyph node — fixed, never slides; keeps the estela intact. */}
-      <GlyphNode type={mealTypeOf(meal)} factor={factor} isRecent={isRecent} />
+  const handlePress = () => {
+    Haptics.selectionAsync().catch(() => {})
+    onOpen(meal.id)
+  }
 
-      {/* Swipe zone — the delete affordance hides behind the content. */}
-      <View style={styles.swipeZone}>
-        <View style={styles.deleteZone}>
-          <TrashIcon />
-        </View>
-        <GestureDetector gesture={pan}>
-          <Animated.View style={[styles.front, frontStyle]}>
-            <Pressable
-              onPress={() => onOpen(meal.id)}
-              accessibilityRole="button"
-              accessibilityLabel={meal.name}
-              accessibilityHint="Toca para editar; desliza a la izquierda para borrar"
-            >
-              {/* Layout on a plain inner View — a function `style` on
-                  the Pressable does not apply here. */}
-              <View style={styles.mealContent}>
-                <View style={styles.mealText}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {meal.name}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {formatTime(meal.consumed_at)} · {Math.round(Number(meal.protein_g))} g proteína
-                  </Text>
-                </View>
-                <Text style={styles.kcal}>
-                  <Text style={styles.kcalNum}>{meal.calories}</Text> kcal
+  return (
+    <View style={styles.swipeZone}>
+      {/* Delete affordance — hidden behind the card until swiped. */}
+      <View style={styles.deleteZone}>
+        <TrashIcon />
+      </View>
+      <GestureDetector gesture={pan}>
+        <Animated.View style={[styles.card, cardStyle]}>
+          <Pressable
+            onPress={handlePress}
+            onPressIn={() => {
+              press.value = withTiming(1, { duration: 90 })
+            }}
+            onPressOut={() => {
+              press.value = withTiming(0, { duration: 170 })
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={meal.name}
+            accessibilityHint="Toca para editar; desliza a la izquierda para borrar"
+          >
+            <View style={styles.mealContent}>
+              {/* Slot glyph — a leading mark integrated into the card. */}
+              <GlyphNode type={mealTypeOf(meal)} factor={factor} isRecent={isRecent} />
+              <View style={styles.mealText}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {meal.name}
+                </Text>
+                <Text style={styles.meta}>
+                  {formatTime(meal.consumed_at)} · {Math.round(Number(meal.protein_g))} g proteína
                 </Text>
               </View>
-            </Pressable>
-          </Animated.View>
-        </GestureDetector>
-      </View>
+              <Text style={styles.kcal}>
+                <Text style={styles.kcalNum}>{meal.calories}</Text> kcal
+              </Text>
+            </View>
+          </Pressable>
+        </Animated.View>
+      </GestureDetector>
     </View>
   )
 }
@@ -339,37 +354,33 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   list: {
-    gap: 14,
+    gap: 10,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  // Glyph node — magenta-rimmed badge holding the slot glyph.
-  badge: {
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-    borderRadius: BADGE_SIZE / 2,
-    backgroundColor: colors.magentaTint2,
-    borderWidth: 1.5,
-    borderColor: colors.magenta,
+  // Glyph node — a transparent slot holding the bare slot glyph; no
+  // ring, so it reads as a celestial mark, not a selectable control.
+  glyphNode: {
+    width: NODE_SIZE,
+    height: NODE_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // The comet head — the most recent meal, glowing.
-  badgeNow: {
+  // The comet head's glow — soft and edgeless behind the recent glyph.
+  glyphGlow: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.magentaTint,
     shadowColor: colors.magenta,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
   swipeZone: {
-    flex: 1,
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: 8,
+    borderRadius: 14,
   },
   deleteZone: {
     ...StyleSheet.absoluteFillObject,
@@ -378,15 +389,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingRight: 20,
   },
-  // Opaque (page bg) so it fully covers the delete zone when closed.
-  front: {
-    backgroundColor: colors.bg,
+  // Each meal is a card — an opaque surface lifted off the page with a
+  // hairline edge. The surface itself is the tap affordance, and when
+  // it slides open it covers the delete zone behind it. Every card is
+  // uniform: a single highlighted card would read as "selected". The
+  // most-recent meal is marked instead by its glyph, which glows.
+  card: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
   },
   mealContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 2,
   },
   mealText: {
     flex: 1,

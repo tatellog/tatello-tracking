@@ -8,6 +8,8 @@ import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { colors, typography } from '@/theme'
 
+import { MealCard } from './MealCard'
+
 type MealType = MealInput['meal_type']
 
 const MEAL_TYPES: { value: MealType; label: string }[] = [
@@ -18,8 +20,8 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
 ]
 
 /* The celestial glyph for each meal slot — sunrise / sun / crescent /
- * star. Same vocabulary as the meal rows on Hoy, so the slot reads the
- * same wherever it appears. */
+ * ringed planet. Same vocabulary as the meal rows on Hoy, so the slot
+ * reads the same wherever it appears. */
 function MealGlyph({ type, color }: { type: MealType; color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -46,10 +48,20 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
           />
         </>
       ) : (
-        <Path
-          d="M12 3.4 L13.7 10.3 L20.6 12 L13.7 13.7 L12 20.6 L10.3 13.7 L3.4 12 L10.3 10.3 Z"
-          fill={color}
-        />
+        <>
+          <Path
+            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
+            fill={color}
+          />
+          <Path
+            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
+            fill={color}
+          />
+          <Path
+            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
+            fill={color}
+          />
+        </>
       )}
     </Svg>
   )
@@ -184,36 +196,17 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
                   const confirming = confirmingName === item.name
                   const dimmed = confirmingName != null && !confirming
                   return (
-                    <Pressable
+                    <MealCard
                       key={item.name}
+                      style={styles.cardGap}
+                      elevated
+                      name={item.name}
+                      protein={item.protein_g}
+                      calories={item.calories}
+                      state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
                       onPress={() => handleLog(item)}
                       disabled={confirmingName != null}
-                      style={({ pressed }) => [
-                        styles.item,
-                        confirming && styles.itemConfirming,
-                        dimmed && styles.itemDimmed,
-                        pressed && !confirmingName && styles.itemPressed,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Sumar ${item.name}`}
-                    >
-                      <View style={styles.itemMain}>
-                        <Text
-                          style={[styles.itemName, confirming && styles.itemTextConfirming]}
-                          numberOfLines={1}
-                        >
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.itemMacros, confirming && styles.itemTextConfirming]}>
-                          {Math.round(item.protein_g)} g · {item.calories} kcal
-                        </Text>
-                      </View>
-                      <View style={[styles.addBtn, confirming && styles.addBtnConfirming]}>
-                        <Text style={[styles.addIcon, confirming && styles.addIconConfirming]}>
-                          {confirming ? '✓' : '+'}
-                        </Text>
-                      </View>
-                    </Pressable>
+                    />
                   )
                 })}
               </ScrollView>
@@ -226,7 +219,7 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
             style={styles.comidasLink}
             accessibilityRole="button"
           >
-            <Text style={styles.comidasLinkText}>¿Algo distinto? Ir a Comidas →</Text>
+            <Text style={styles.comidasLinkText}>Sumar una comida nueva →</Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -318,78 +311,13 @@ const styles = StyleSheet.create({
   list: {
     maxHeight: ITEMS_MAX_HEIGHT,
   },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.bruma,
-    backgroundColor: 'rgba(244,236,222,0.04)',
-  },
-  itemPressed: {
-    opacity: 0.7,
-  },
-  itemDimmed: {
-    opacity: 0.32,
-  },
-  itemConfirming: {
-    backgroundColor: colors.magenta,
-    borderColor: colors.magenta,
-    transform: [{ scale: 1.02 }],
-  },
-  itemMain: {
-    flex: 1,
-    minWidth: 0,
-    gap: 3,
-  },
-  itemName: {
-    fontFamily: typography.displaySemi,
-    fontSize: 16,
-    color: colors.leche,
-    letterSpacing: -0.3,
-  },
-  itemMacros: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 13.5,
-    color: colors.bone,
-  },
-  itemTextConfirming: {
-    color: '#FFFFFF',
-  },
-  addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: colors.magenta,
-    backgroundColor: 'rgba(233,30,99,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnConfirming: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  addIcon: {
-    fontFamily: typography.uiBold,
-    fontSize: 20,
-    lineHeight: 23,
-    color: colors.magenta,
-  },
-  addIconConfirming: {
-    fontSize: 16,
-    lineHeight: 19,
+  cardGap: {
+    marginBottom: 8,
   },
   empty: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: typography.ui,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.niebla,
     textAlign: 'center',
     paddingVertical: 20,
@@ -400,9 +328,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   comidasLinkText: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: 14,
+    fontFamily: typography.uiSemi,
+    fontSize: 13,
     color: colors.magenta,
   },
 })

@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 
 import { colors, shadows, typography } from '@/theme'
 
-export type CtaVariant = 'primary' | 'ghost' | 'soft'
+export type CtaVariant = 'primary' | 'ghost' | 'soft' | 'destructive'
 
 type Props = {
   label: string
@@ -31,6 +31,7 @@ export function PrimaryCta({
   const inactive = disabled || loading
   const isGhost = variant === 'ghost'
   const isSoft = variant === 'soft'
+  const isDestructive = variant === 'destructive'
 
   const handlePress = () => {
     if (inactive) return
@@ -47,6 +48,7 @@ export function PrimaryCta({
         styles.btn,
         isGhost && styles.btnGhost,
         isSoft && styles.btnSoft,
+        isDestructive && styles.btnDestructive,
         inactive && !isGhost && !isSoft && styles.btnDisabled,
         { marginTop, marginBottom },
       ]}
@@ -109,6 +111,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 12,
     elevation: 3,
+  },
+  // Destructive — same filled-CTA geometry, swapped to the warning
+  // red with a matching red glow. For delete / sign-out confirms.
+  btnDestructive: {
+    backgroundColor: colors.feedbackError,
+    shadowColor: colors.feedbackError,
   },
   btnDisabled: {
     backgroundColor: colors.bgCard2,

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -17,6 +17,7 @@ import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { colors, typography } from '@/theme'
 
+import { MealCard } from './MealCard'
 import { SectionHeader } from './SectionHeader'
 
 const HISTORY_LIMIT = 24
@@ -31,10 +32,9 @@ const RAIL_WIDTH = 34
 const LINE_WIDTH = 1.5
 const MIN_STAR = 9
 const MAX_STAR = 20
-// The "+" — a quiet ghost circle at the row's end; it lights up
-// solid only on confirm, so the star trail stays the protagonist.
-const ADD_BTN = 34
-const ADD_GAP = 10
+// Gap between meal cards. The trail line extends into it so the
+// constellation stays continuous across the cards.
+const ROW_GAP = 8
 // New-meal preview star.
 const PREVIEW_STAR = 19
 
@@ -243,10 +243,13 @@ export function MealComposer({ onOpenMeal }: Props) {
             </EyebrowLabel>
             <StarPreview progress={previewProgress} valid={manualValid} />
           </View>
-          <Text style={styles.newHint}>
-            <Text style={styles.newHintName}>«{name.trim()}»</Text> aún no está en tu cielo. Dale su
-            proteína y calorías.
+          {/* The typed name is its own title line — never embedded in
+              the hint sentence, so a long name truncates cleanly
+              instead of wrapping mid-prose. */}
+          <Text style={styles.newName} numberOfLines={1}>
+            {name.trim()}
           </Text>
+          <Text style={styles.newHint}>Aún no está en tu cielo. Dale su proteína y calorías.</Text>
 
           <View style={styles.numberRow}>
             <View style={styles.fieldCol}>
@@ -329,7 +332,7 @@ export function MealComposer({ onOpenMeal }: Props) {
                       {
                         opacity: lineOpacity,
                         top: i === 0 ? '50%' : 0,
-                        bottom: i === n - 1 ? '50%' : 0,
+                        bottom: i === n - 1 ? '50%' : -ROW_GAP,
                       },
                     ]}
                   />
@@ -337,33 +340,15 @@ export function MealComposer({ onOpenMeal }: Props) {
                 <TrailStar size={starSize} glow={starGlow} isHead={i === 0} />
               </View>
 
-              <TouchableOpacity
-                style={styles.body}
-                activeOpacity={0.6}
-                onPress={() => onOpenMeal(item.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`Editar ${item.name}`}
-                accessibilityHint="Abre la comida en el editor"
-              >
-                <Text style={styles.rowName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.rowMacros}>
-                  {Math.round(item.protein_g)} g · {item.calories} kcal
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.addBtn, isConfirmed && styles.addBtnConfirmed]}
-                activeOpacity={0.7}
+              <MealCard
+                style={styles.cardFlex}
+                name={item.name}
+                protein={item.protein_g}
+                calories={item.calories}
+                state={isConfirmed ? 'confirmed' : 'idle'}
                 onPress={() => handleLogRow(item)}
-                accessibilityRole="button"
-                accessibilityLabel={`Registrar ${item.name}`}
-              >
-                <Text style={[styles.addIcon, isConfirmed && styles.addIconConfirmed]}>
-                  {isConfirmed ? '✓' : '+'}
-                </Text>
-              </TouchableOpacity>
+                onCardPress={() => onOpenMeal(item.id)}
+              />
             </View>
           )
         })}
@@ -413,6 +398,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',
+    marginBottom: ROW_GAP,
   },
   rail: {
     width: RAIL_WIDTH,
@@ -445,52 +431,9 @@ const styles = StyleSheet.create({
     shadowRadius: 7,
     elevation: 3,
   },
-  body: {
+  // Lets the shared MealCard fill the row beside the trail rail.
+  cardFlex: {
     flex: 1,
-    minWidth: 0,
-    justifyContent: 'center',
-    paddingVertical: 15,
-    paddingLeft: 2,
-  },
-  rowName: {
-    fontFamily: typography.displaySemi,
-    fontSize: 17,
-    color: colors.leche,
-    letterSpacing: -0.3,
-  },
-  rowMacros: {
-    marginTop: 3,
-    fontFamily: typography.uiMedium,
-    fontSize: 12.5,
-    color: colors.niebla,
-  },
-  // A quiet ghost circle — neutral ring, magenta glyph. It recedes so
-  // the star trail keeps the spotlight; no fill, no glow.
-  addBtn: {
-    alignSelf: 'center',
-    marginLeft: ADD_GAP,
-    width: ADD_BTN,
-    height: ADD_BTN,
-    borderRadius: ADD_BTN / 2,
-    backgroundColor: colors.bgCard2,
-    borderWidth: 1,
-    borderColor: colors.hairlineStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // The confirm flash — the one moment the button goes solid.
-  addBtnConfirmed: {
-    backgroundColor: colors.magenta,
-    borderColor: colors.magenta,
-  },
-  addIcon: {
-    fontFamily: typography.uiBold,
-    fontSize: 18,
-    lineHeight: 20,
-    color: colors.magenta,
-  },
-  addIconConfirmed: {
-    color: '#FFFFFF',
   },
   emptyHint: {
     fontFamily: typography.ui,
@@ -514,16 +457,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
+  // The new meal's name — its own line, a clean title. Truncates if
+  // long; the full text still lives in the field above.
+  newName: {
+    fontFamily: typography.displaySemi,
+    fontSize: 19,
+    color: colors.leche,
+    letterSpacing: -0.3,
+    marginTop: 2,
+  },
+  // Instruction copy — fixed text, now quieter since the name above
+  // carries the emphasis.
   newHint: {
     fontFamily: typography.ui,
     fontSize: 13,
     lineHeight: 19,
-    color: colors.bone,
+    color: colors.niebla,
+    marginTop: 3,
     marginBottom: 14,
-  },
-  newHintName: {
-    fontFamily: typography.uiSemi,
-    color: colors.leche,
   },
   numberRow: {
     flexDirection: 'row',

@@ -1,7 +1,9 @@
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from 'react-native-reanimated'
+import { BlurView } from 'expo-blur'
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 
-import { colors, radius, shadows, spacing, typography } from '@/theme'
+import { PrimaryCta, type CtaVariant } from '@/components/PrimaryCta'
+import { colors, shadows, typography } from '@/theme'
 
 import type { ConfirmAction, ConfirmRequest } from './ConfirmProvider'
 
@@ -11,15 +13,23 @@ type Props = {
   onDismiss: () => void
 }
 
+/* Maps an action's intent onto the app's CTA variants, so the dialog
+ * buttons read identically to every other button in the app. */
+function variantFor(style: ConfirmAction['style']): CtaVariant {
+  if (style === 'destructive') return 'destructive'
+  if (style === 'cancel') return 'ghost'
+  return 'primary'
+}
+
 /*
- * Visual presentation of the confirm flow. Backdrop fades in over
- * the screen; the card zooms in with a soft spring. Tap the backdrop
- * (or the cancel action) to dismiss; tap any other action to resolve
- * the pending promise with that action's id.
+ * Visual presentation of the confirm flow. The screen behind frosts
+ * into a dark blur; the card sits over it with no motion of its own.
+ * Tap the blur (or the cancel action) to dismiss; tap any other
+ * action to resolve the pending promise with that action's id.
  *
- * The action stack is sorted so cancel sits at the bottom — matches
- * the iOS Action Sheet convention so muscle memory carries over from
- * the system dialog this replaces.
+ * Actions render through the shared PrimaryCta so they match the
+ * app's button language. The stack is sorted so cancel sits at the
+ * bottom — the iOS Action Sheet convention.
  */
 export function ConfirmDialog({ request, onPick, onDismiss }: Props) {
   const visible = request !== null
@@ -48,6 +58,10 @@ export function ConfirmDialog({ request, onPick, onDismiss }: Props) {
           entering={FadeIn.duration(180)}
           exiting={FadeOut.duration(160)}
         >
+          {/* Frosted blur + a warm dark scrim for card contrast. */}
+          <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.scrim} />
+
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={onDismiss}
@@ -55,11 +69,7 @@ export function ConfirmDialog({ request, onPick, onDismiss }: Props) {
             accessibilityLabel="Cerrar"
           />
 
-          <Animated.View
-            style={styles.card}
-            entering={ZoomIn.duration(220).springify().damping(16)}
-            exiting={ZoomOut.duration(160)}
-          >
+          <View style={styles.card}>
             {request ? <Text style={styles.title}>{request.title}</Text> : null}
             {request?.description ? (
               <Text style={styles.description}>{request.description}</Text>
@@ -67,9 +77,10 @@ export function ConfirmDialog({ request, onPick, onDismiss }: Props) {
 
             <View style={styles.actions}>
               {orderedActions.map((action) => (
-                <ActionButton
+                <PrimaryCta
                   key={action.id}
-                  action={action}
+                  label={action.label}
+                  variant={variantFor(action.style)}
                   onPress={() => {
                     if (action.style === 'cancel') {
                       onDismiss()
@@ -80,109 +91,54 @@ export function ConfirmDialog({ request, onPick, onDismiss }: Props) {
                 />
               ))}
             </View>
-          </Animated.View>
+          </View>
         </Animated.View>
       ) : null}
     </Modal>
   )
 }
 
-function ActionButton({ action, onPress }: { action: ConfirmAction; onPress: () => void }) {
-  const variant = action.style ?? 'default'
-  // TouchableOpacity instead of Pressable — function-style style on
-  // Pressable swallows backgroundColor on iOS native, so the
-  // destructive variant rendered as white-on-white (invisible).
-  // Same fix as the meal-form / photo-capture CTAs.
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.85}
-      style={[
-        styles.actionBase,
-        variant === 'cancel' && styles.actionCancel,
-        variant === 'default' && styles.actionDefault,
-        variant === 'destructive' && styles.actionDestructive,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={action.label}
-    >
-      <Text
-        style={[
-          styles.actionLabel,
-          variant === 'cancel' && styles.actionLabelCancel,
-          (variant === 'default' || variant === 'destructive') && styles.actionLabelLight,
-        ]}
-      >
-        {action.label}
-      </Text>
-    </TouchableOpacity>
-  )
-}
-
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(28, 26, 31, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 32,
+  },
+  // Sits over the blur — deepens it and lifts the card off the frost.
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 6, 8, 0.42)',
   },
   card: {
     width: '100%',
-    maxWidth: 360,
-    backgroundColor: colors.pearlElevated,
-    borderRadius: radius.card,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    gap: spacing.md,
+    maxWidth: 330,
+    backgroundColor: colors.bgCard2,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingTop: 24,
+    paddingBottom: 18,
+    paddingHorizontal: 20,
     ...shadows.card,
   },
   title: {
-    fontFamily: typography.displayMedium,
-    fontSize: 20,
-    letterSpacing: -0.5,
-    color: colors.inkPrimary,
+    fontFamily: typography.displaySemi,
+    fontSize: 19,
+    letterSpacing: -0.4,
+    color: colors.leche,
     textAlign: 'center',
   },
   description: {
+    marginTop: 7,
     fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    lineHeight: typography.sizes.body * typography.lineHeight.body,
-    color: colors.labelMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.bone,
     textAlign: 'center',
   },
   actions: {
-    marginTop: spacing.sm,
-    gap: spacing.sm,
-  },
-  actionBase: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  actionCancel: {
-    backgroundColor: colors.pearlBase,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-  },
-  actionDefault: {
-    backgroundColor: colors.mauveDeep,
-  },
-  actionDestructive: {
-    backgroundColor: colors.feedbackError,
-  },
-  actionLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.2,
-  },
-  actionLabelCancel: {
-    color: colors.inkPrimary,
-  },
-  actionLabelLight: {
-    color: colors.pearlBase,
+    marginTop: 22,
+    gap: 10,
   },
 })
