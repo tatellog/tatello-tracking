@@ -348,28 +348,38 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
 
   // Capricornio — wide curved wedge (sea-goat profile) from upper-
   // left around to lower-right.
+  // Capricornio — a broad triangle: a two-star apex up top, a left
+  // edge and a right edge descending from it, and a chain of stars
+  // closing the base. The counter sits inside the triangle interior,
+  // clear of every star. The apex star anchors as the fuchsia hero.
   capricornio: {
     label: 'CAPRICORNIO',
     glyph: '♑',
     stars: [
-      { x: 0.08, y: 0.32, mag: 3.0 }, // 0 left horn tip
-      { x: 0.24, y: 0.22, mag: 2.5 }, // 1 top
-      { x: 0.46, y: 0.18, mag: 3.0 }, // 2 top-mid
-      { x: 0.7, y: 0.32, mag: 1.8 }, // 3 Deneb Algedi (anchor)
-      { x: 0.84, y: 0.48, mag: 3.0 }, // 4 right
-      { x: 0.66, y: 0.7, mag: 3.0 }, // 5 lower-right
-      { x: 0.4, y: 0.78, mag: 3.0 }, // 6 lower-mid
-      { x: 0.2, y: 0.6, mag: 3.0 }, // 7 lower-left
+      { x: 0.56, y: 0.08, mag: 2.4 }, // 0 apex top
+      { x: 0.54, y: 0.17, mag: 1.5 }, // 1 apex (anchor)
+      { x: 0.33, y: 0.5, mag: 3.0 }, // 2 left edge
+      { x: 0.21, y: 0.63, mag: 2.8 }, // 3 lower-left
+      { x: 0.11, y: 0.74, mag: 2.6 }, // 4 bottom-left
+      { x: 0.2, y: 0.79, mag: 3.0 }, // 5 base
+      { x: 0.35, y: 0.76, mag: 3.0 }, // 6 base
+      { x: 0.5, y: 0.75, mag: 2.8 }, // 7 base
+      { x: 0.63, y: 0.72, mag: 2.8 }, // 8 base
+      { x: 0.75, y: 0.67, mag: 2.4 }, // 9 lower-right
+      { x: 0.81, y: 0.58, mag: 2.0 }, // 10 right edge
     ],
     lines: [
-      [0, 1],
-      [1, 2],
+      [0, 1], // apex pair
+      [1, 2], // left edge
       [2, 3],
       [3, 4],
-      [4, 5],
+      [4, 5], // base chain
       [5, 6],
       [6, 7],
-      [7, 0],
+      [7, 8],
+      [8, 9],
+      [9, 10], // right edge
+      [10, 1],
     ],
   },
 
