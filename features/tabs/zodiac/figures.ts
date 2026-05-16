@@ -285,32 +285,64 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     ],
   },
 
-  // Sagitario — the teapot asterism (spout, body, handle, lid).
+  // Sagitario — the full constellation. The left side is an OPEN
+  // bracket (top edge, long left edge, bottom edge) with a small fork
+  // — not a closed box. A bridge crosses to the teapot: an upper
+  // chain to the topmost star, the body quadrilateral, a spout off
+  // its left, a handle off its right, and legs forking down. Stars
+  // sit at natural spacing; the centre scrim dims the few lines that
+  // pass behind the counter. The bright right-hand star is the hero.
   sagitario: {
     label: 'SAGITARIO',
     glyph: '♐',
     stars: [
-      { x: 0.08, y: 0.5, mag: 3.0 }, // 0 spout tip
-      { x: 0.24, y: 0.46, mag: 2.8 }, // 1 spout base
-      { x: 0.2, y: 0.7, mag: 3.0 }, // 2 bottom-left
-      { x: 0.5, y: 0.78, mag: 3.0 }, // 3 bottom-right
-      { x: 0.6, y: 0.55, mag: 2.8 }, // 4 handle base
-      { x: 0.84, y: 0.6, mag: 3.0 }, // 5 handle outer
-      { x: 0.6, y: 0.3, mag: 2.8 }, // 6 top-right / lid base
-      { x: 0.42, y: 0.18, mag: 1.9 }, // 7 lid top (anchor)
-      { x: 0.28, y: 0.3, mag: 3.0 }, // 8 lid top-left
+      // Left bracket + fork
+      { x: 0.05, y: 0.28, mag: 2.4 }, // 0 bracket top-left
+      { x: 0.24, y: 0.22, mag: 2.6 }, // 1 bracket top-right
+      { x: 0.05, y: 0.72, mag: 2.4 }, // 2 bracket bottom-left
+      { x: 0.23, y: 0.72, mag: 2.8 }, // 3 bracket bottom-mid
+      { x: 0.3, y: 0.9, mag: 3.0 }, // 4 fork
+      // Upper chain
+      { x: 0.46, y: 0.07, mag: 2.8 }, // 5 topmost
+      { x: 0.5, y: 0.22, mag: 2.8 }, // 6 upper-mid
+      { x: 0.59, y: 0.26, mag: 3.0 }, // 7 hook
+      // Teapot body
+      { x: 0.46, y: 0.37, mag: 2.0 }, // 8 body top-left (junction)
+      { x: 0.62, y: 0.41, mag: 2.4 }, // 9 body top-right
+      { x: 0.44, y: 0.51, mag: 2.4 }, // 10 body bottom-left
+      { x: 0.58, y: 0.53, mag: 2.2 }, // 11 body bottom-right
+      { x: 0.35, y: 0.45, mag: 2.8 }, // 12 spout tip
+      // Handle + bright star
+      { x: 0.72, y: 0.43, mag: 2.6 }, // 13 handle junction
+      { x: 0.85, y: 0.31, mag: 1.5 }, // 14 right bright star (anchor)
+      { x: 0.81, y: 0.55, mag: 2.8 }, // 15 handle lower
+      // Legs
+      { x: 0.65, y: 0.65, mag: 2.4 }, // 16 leg junction
+      { x: 0.61, y: 0.86, mag: 3.0 }, // 17 leg foot
+      { x: 0.81, y: 0.74, mag: 3.0 }, // 18 leg right
     ],
     lines: [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 4],
-      [4, 5],
-      [5, 6],
-      [4, 6],
-      [1, 8],
-      [8, 7],
-      [7, 6],
+      [1, 0], // bracket — top edge
+      [0, 2], // bracket — left edge
+      [2, 3], // bracket — bottom edge
+      [3, 4], // fork
+      [1, 8], // bridge to the teapot
+      [5, 6], // upper chain
+      [6, 7],
+      [6, 8],
+      [8, 9], // body
+      [8, 10],
+      [10, 11],
+      [9, 11],
+      [12, 8], // spout
+      [12, 10],
+      [9, 13], // handle
+      [13, 14],
+      [13, 15],
+      [15, 11],
+      [11, 16], // legs
+      [16, 17],
+      [16, 18],
     ],
   },
 
