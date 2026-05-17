@@ -288,17 +288,18 @@ function WeightSparkline({ points }: { points: WeightPoint[] }) {
 /* ─── Slide 3 — water intake ───────────────────────────────────────── */
 
 const WATER_TARGET = 8
-const DROP_SIZE = 34
-const DROPLET =
-  'M12 2.4 C 12 2.4 4.6 10.8 4.6 15.4 A 7.4 7.4 0 1 0 19.4 15.4 C 19.4 10.8 12 2.4 12 2.4 Z'
+const GLASS_SIZE = 34
+// A tumbler — water is shown as a glass, matching the "vasos" copy,
+// so it never reads as a magenta blood drop / cycle tracker.
+const GLASS = 'M6 3.6 H18 L16.2 20.8 H7.8 Z'
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect)
 
-/* One droplet — a magenta outline that fills with rising water on a
- * spring when tapped. The water is a rect clipped to the droplet
- * shape; its top edge eases up from the base (empty) to the tip
+/* One glass — a magenta outline that fills with rising water on a
+ * spring when tapped. The water is a rect clipped to the glass
+ * shape; its top edge eases up from the base (empty) to the rim
  * (full). A soft magenta halo fades in as it fills. */
-function Droplet({
+function Glass({
   index,
   filled,
   onPress,
@@ -312,22 +313,22 @@ function Droplet({
     fill.value = withSpring(filled ? 1 : 0, { damping: 15, stiffness: 130 })
   }, [filled, fill])
 
-  // Water level — a rect clipped to the droplet. y eases from the
-  // base (24, empty) up to the tip (0, full).
+  // Water level — a rect clipped to the glass. y eases from the
+  // base (24, empty) up to the rim (0, full).
   const waterProps = useAnimatedProps(() => {
     const h = 24 * fill.value
     return { y: 24 - h, height: h }
   })
   const glowStyle = useAnimatedStyle(() => ({ shadowOpacity: fill.value * 0.55 }))
 
-  const clipId = `drop-${index}`
+  const clipId = `glass-${index}`
   return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button">
-      <Animated.View style={[styles.dropGlow, glowStyle]}>
-        <Svg width={DROP_SIZE} height={DROP_SIZE} viewBox="0 0 24 24">
+    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button">
+      <Animated.View style={[styles.glassGlow, glowStyle]}>
+        <Svg width={GLASS_SIZE} height={GLASS_SIZE} viewBox="0 0 24 24">
           <Defs>
             <ClipPath id={clipId}>
-              <Path d={DROPLET} />
+              <Path d={GLASS} />
             </ClipPath>
           </Defs>
           <AnimatedRect
@@ -338,7 +339,7 @@ function Droplet({
             animatedProps={waterProps}
           />
           <Path
-            d={DROPLET}
+            d={GLASS}
             fill="none"
             stroke={colors.magenta}
             strokeWidth={1.7}
@@ -364,7 +365,7 @@ function WaterSlide({ date }: { date: string }) {
       <View style={styles.card}>
         <View style={styles.waterDroplets}>
           {Array.from({ length: WATER_TARGET }).map((_, i) => (
-            <Droplet key={i} index={i} filled={i < glasses} onPress={() => tap(i)} />
+            <Glass key={i} index={i} filled={i < glasses} onPress={() => tap(i)} />
           ))}
         </View>
         <Text style={styles.waterCount}>
@@ -498,8 +499,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   // Soft magenta aura — shadowOpacity is animated, so it only glows
-  // once a droplet has water in it.
-  dropGlow: {
+  // once a glass has water in it.
+  glassGlow: {
     shadowColor: colors.magenta,
     shadowOffset: { width: 0, height: 0 },
     shadowRadius: 7,

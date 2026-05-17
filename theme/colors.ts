@@ -38,6 +38,13 @@ export const colors = {
   feedbackSuccess: '#5A6F4C',
   feedbackError: '#B85045',
 
+  // ── Scan beam — the AI scan-line light sweep ───────────────────
+  beamTint: 'rgba(255, 72, 134, 0.32)',
+  beamLine: 'rgba(255, 140, 180, 0.55)',
+
+  // ── Scrim — a dark wash for chips sitting over a photo ─────────
+  scrim: 'rgba(0, 0, 0, 0.55)',
+
   // ── Legacy Pearl Mauve aliases (deprecated — see file header) ──
   /** @deprecated Use `bg` */
   pearlBase: '#0A0608',

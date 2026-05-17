@@ -1,14 +1,31 @@
 import * as Haptics from 'expo-haptics'
-import { useEffect, useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
+import { useRouter } from 'expo-router'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ActionSheetIOS,
+  Alert,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { useAddMeasurement, useMeasurements } from '@/features/progress/hooks'
+import { toWeightPoints } from '@/features/progress/logic'
+import { useSetWater, useWaterToday } from '@/features/water/hooks'
+import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 import { MealCard } from './MealCard'
+import { WeightWheel } from './WeightWheel'
 
 type MealType = MealInput['meal_type']
 
@@ -19,9 +36,18 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
   { value: 'snack', label: 'Snack' },
 ]
 
+const CONFIRM_HOLD_MS = 520
+const WATER_TARGET = 8
+const DEFAULT_WEIGHT = 70
+// A tumbler — water is shown as a glass, matching the "vasos" copy,
+// so it never reads as a magenta blood drop / cycle tracker.
+const GLASS = 'M6 3.6 H18 L16.2 20.8 H7.8 Z'
+// Body height caps the scrolling area so the sheet never exceeds the
+// screen on a short phone.
+const BODY_MAX_H = Math.round(Dimensions.get('window').height * 0.56)
+
 /* The celestial glyph for each meal slot — sunrise / sun / crescent /
- * ringed planet. Same vocabulary as the meal rows on Hoy, so the slot
- * reads the same wherever it appears. */
+ * sparkle. Same vocabulary as the meal rows on Hoy. */
 function MealGlyph({ type, color }: { type: MealType; color: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -67,8 +93,64 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
   )
 }
 
-// Meal type pre-selected by time of day so the common case needs no
-// tap. The user can still override.
+/* One water glass — a magenta-filled tumbler when logged, a faint
+ * outline when not. The glass shape (not a drop) keeps it from
+ * reading as the cycle tracker. */
+function WaterGlass({
+  filled,
+  size = 26,
+  onPress,
+}: {
+  filled: boolean
+  size?: number
+  onPress: () => void
+}) {
+  return (
+    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button">
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Path
+          d={GLASS}
+          fill={filled ? colors.magenta : 'none'}
+          stroke={filled ? colors.magenta : colors.bruma}
+          strokeWidth={1.7}
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </Pressable>
+  )
+}
+
+function PencilIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 20.2 L4.8 16 L16 4.8 L19.2 8 L8 19.2 Z M14.4 6.4 L17.6 9.6"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
+function CameraIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={7} width={18} height={13} rx={3} stroke={color} strokeWidth={1.8} />
+      <Path
+        d="M9 7 L10.4 4.6 H13.6 L15 7"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={13.4} r={3.4} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  )
+}
+
+// Meal type pre-selected by time of day so the common case needs no tap.
 function defaultMealType(): MealType {
   const h = new Date().getHours()
   if (h < 11) return 'breakfast'
@@ -77,10 +159,7 @@ function defaultMealType(): MealType {
   return 'snack'
 }
 
-// How long the magenta "stamped" confirmation holds before the sheet
-// slides away — long enough to register the moment, short enough not
-// to feel like a wait.
-const CONFIRM_HOLD_MS = 520
+type Mode = 'home' | 'weight'
 
 type Props = {
   visible: boolean
@@ -90,35 +169,47 @@ type Props = {
 }
 
 /*
- * Quick log — a shortcut layer over the Comidas core, NOT a copy of
- * it. It only re-adds the user's frequent foods in one tap. Anything
- * new (search, barcode, first-time foods) routes to Comidas via the
- * escape link. "Lo de siempre" is derived from the user's own meal
- * history (see getFrequentMeals) so it costs zero schema and grows
- * on its own — empty for a brand-new user, which is honest.
- *
- * One tap logs the meal and closes the sheet: the tapped card stamps
- * magenta with a check, the others dim, and the sheet slides away.
+ * Registro rápido — one sheet to log the three things that change
+ * daily: peso, agua, comida.
+ *   - Peso  → opens a two-wheel weight picker (mode 'weight').
+ *   - Agua  → tap a droplet, logged instantly (water_intake).
+ *   - Comida → the slot pill + "Lo de siempre" frequent foods; the
+ *     bottom offers two methods — Log manual (the editor) and Con
+ *     foto (pick/shoot a photo → the scan-meal flow).
  */
 export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
+  const router = useRouter()
+  const today = useMemo(() => todayInTimezone(), [])
+
   const { data: frequent } = useFrequentMeals()
   const createMeal = useCreateMeal()
+  const { data: measurements } = useMeasurements(90)
+  const addMeasurement = useAddMeasurement()
+  const { data: glasses = 0 } = useWaterToday(today)
+  const setWater = useSetWater(today)
 
+  const [mode, setMode] = useState<Mode>('home')
   const [mealType, setMealType] = useState<MealType>(defaultMealType)
-  // Name of the meal currently being confirmed — drives the stamp
-  // animation and locks out further taps until the sheet closes.
   const [confirmingName, setConfirmingName] = useState<string | null>(null)
+  const [weightDraft, setWeightDraft] = useState<number | null>(null)
 
   const items = frequent ?? []
 
+  const latestWeight = useMemo(() => {
+    const pts = toWeightPoints(measurements ?? [])
+    return pts.length > 0 ? (pts[pts.length - 1]?.weight ?? null) : null
+  }, [measurements])
+
   useEffect(() => {
     if (!visible) {
+      setMode('home')
       setConfirmingName(null)
       setMealType(defaultMealType())
+      setWeightDraft(null)
     }
   }, [visible])
 
-  const handleLog = (item: FrequentMeal) => {
+  const handleLogMeal = (item: FrequentMeal) => {
     if (confirmingName) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     createMeal.mutate({
@@ -130,6 +221,57 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
     })
     setConfirmingName(item.name)
     setTimeout(onClose, CONFIRM_HOLD_MS)
+  }
+
+  const tapDroplet = (index: number) => {
+    Haptics.selectionAsync().catch(() => {})
+    // Tap a droplet to fill up to it; tap the current top one to step back.
+    setWater.mutate(glasses === index + 1 ? index : index + 1)
+  }
+
+  const openWeight = () => {
+    setWeightDraft(latestWeight ?? DEFAULT_WEIGHT)
+    setMode('weight')
+  }
+
+  const handleLogWeight = () => {
+    if (weightDraft == null) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    addMeasurement.mutate({ weight_kg: Math.round(weightDraft * 10) / 10 }, { onSuccess: onClose })
+  }
+
+  // Con foto — shoot or pick a photo, then hand off to the scan-meal
+  // flow which reads the plate and logs the meal.
+  const openPhoto = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
+        return
+      }
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
+    if (result.canceled || !result.assets[0]) return
+    onClose()
+    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri } })
+  }
+
+  const handlePhotoLog = () => {
+    if (confirmingName != null) return
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: 'Registrar comida con foto',
+        options: ['Tomar foto', 'Elegir de la galería', 'Cancelar'],
+        cancelButtonIndex: 2,
+      },
+      (index) => {
+        if (index === 0) void openPhoto('camera')
+        else if (index === 1) void openPhoto('library')
+      },
+    )
   }
 
   return (
@@ -151,7 +293,21 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
           <View style={styles.grabber} />
 
           <View style={styles.header}>
-            <Text style={styles.title}>Sumar comida</Text>
+            {mode === 'weight' ? (
+              <Pressable
+                onPress={() => setMode('home')}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Atrás"
+              >
+                <Text style={styles.back}>‹</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.backSpacer} />
+            )}
+            <Text style={styles.title}>
+              {mode === 'weight' ? 'Tu peso actual' : 'Registro rápido'}
+            </Text>
             <Pressable
               onPress={onClose}
               hitSlop={12}
@@ -162,72 +318,143 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
             </Pressable>
           </View>
 
-          {/* Meal-slot selector — one pill, four segments, the active
-              one a soft capsule. Same vocabulary as the AppTabBar. */}
-          <View style={styles.typePill}>
-            {MEAL_TYPES.map((mt) => {
-              const active = mt.value === mealType
-              const tint = active ? colors.magenta : colors.niebla
-              return (
-                <Pressable
-                  key={mt.value}
-                  onPress={() => setMealType(mt.value)}
-                  style={[styles.typeSeg, active && styles.typeSegActive]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={mt.label}
-                >
-                  <MealGlyph type={mt.value} color={tint} />
-                  <Text style={[styles.typeSegText, { color: tint }]}>{mt.label}</Text>
-                </Pressable>
-              )
-            })}
-          </View>
-
-          {items.length === 0 ? (
-            <Text style={styles.empty}>
-              Aún no tienes comidas frecuentes. Suma tu primera en Comidas.
-            </Text>
+          {mode === 'weight' ? (
+            <View style={styles.weightPane}>
+              <WeightWheel value={weightDraft ?? DEFAULT_WEIGHT} onChange={setWeightDraft} />
+              <Pressable
+                onPress={handleLogWeight}
+                style={styles.primaryBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar peso"
+              >
+                <Text style={styles.primaryBtnText}>Registrar peso</Text>
+              </Pressable>
+            </View>
           ) : (
-            <>
-              <Text style={styles.sectionLabel}>LO DE SIEMPRE</Text>
-              <ScrollView style={styles.list} bounces={false} showsVerticalScrollIndicator={false}>
-                {items.map((item) => {
-                  const confirming = confirmingName === item.name
-                  const dimmed = confirmingName != null && !confirming
+            <ScrollView
+              style={styles.body}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* ── Hoy: peso + agua, one compact strip ── */}
+              <View style={styles.strip}>
+                <Pressable
+                  onPress={openWeight}
+                  style={styles.stripZone}
+                  accessibilityRole="button"
+                  accessibilityLabel="Registrar peso"
+                >
+                  <Text style={styles.stripCaption}>Peso</Text>
+                  <View style={styles.stripWeightRow}>
+                    <Text style={styles.stripWeight} numberOfLines={1}>
+                      {latestWeight != null ? `${latestWeight.toFixed(1)} kg` : 'Registrar'}
+                    </Text>
+                    <Text style={styles.chevron}>›</Text>
+                  </View>
+                </Pressable>
+                <View style={styles.stripDivider} />
+                <View style={[styles.stripZone, styles.stripZoneWater]}>
+                  <Text style={styles.stripCaption}>
+                    Agua · {glasses}/{WATER_TARGET}
+                  </Text>
+                  <View style={styles.dropletsCompact}>
+                    {Array.from({ length: WATER_TARGET }).map((_, i) => (
+                      <WaterGlass
+                        key={i}
+                        size={20}
+                        filled={i < glasses}
+                        onPress={() => tapDroplet(i)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              {/* ── The two ways to log a meal, side by side near the
+               * top so neither is buried. Foto leads, carried by the
+               * magenta-tinted fill. ── */}
+              <View style={styles.methods}>
+                <Pressable
+                  onPress={handlePhotoLog}
+                  disabled={confirmingName != null}
+                  style={[styles.method, styles.methodPhoto]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Registrar una comida con foto"
+                >
+                  <View style={[styles.methodIcon, styles.methodIconPhoto]}>
+                    <CameraIcon color={colors.magenta} />
+                  </View>
+                  <Text style={styles.methodLabel}>Con foto</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onGoToComidas}
+                  disabled={confirmingName != null}
+                  style={[styles.method, styles.methodManual]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Registrar una comida manualmente"
+                >
+                  <View style={[styles.methodIcon, styles.methodIconManual]}>
+                    <PencilIcon color={colors.magenta} />
+                  </View>
+                  <Text style={styles.methodLabel}>Log manual</Text>
+                </Pressable>
+              </View>
+
+              {/* ── Comida ── */}
+              <View style={styles.typePill}>
+                {MEAL_TYPES.map((mt) => {
+                  const active = mt.value === mealType
+                  const tint = active ? colors.magenta : colors.niebla
                   return (
-                    <MealCard
-                      key={item.name}
-                      style={styles.cardGap}
-                      elevated
-                      name={item.name}
-                      protein={item.protein_g}
-                      calories={item.calories}
-                      state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
-                      onPress={() => handleLog(item)}
-                      disabled={confirmingName != null}
-                    />
+                    <Pressable
+                      key={mt.value}
+                      onPress={() => setMealType(mt.value)}
+                      style={[styles.typeSeg, active && styles.typeSegActive]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={mt.label}
+                    >
+                      <MealGlyph type={mt.value} color={tint} />
+                      <Text style={[styles.typeSegText, { color: tint }]}>{mt.label}</Text>
+                    </Pressable>
                   )
                 })}
-              </ScrollView>
-            </>
-          )}
+              </View>
 
-          <Pressable
-            onPress={onGoToComidas}
-            disabled={confirmingName != null}
-            style={styles.comidasLink}
-            accessibilityRole="button"
-          >
-            <Text style={styles.comidasLinkText}>Sumar una comida nueva →</Text>
-          </Pressable>
+              {items.length === 0 ? (
+                <Text style={styles.empty}>
+                  Aún no tienes comidas frecuentes. Suma tu primera con Log manual.
+                </Text>
+              ) : (
+                <>
+                  <Text style={styles.frequentLabel}>Lo de siempre</Text>
+                  {items.map((item) => {
+                    const confirming = confirmingName === item.name
+                    const dimmed = confirmingName != null && !confirming
+                    return (
+                      <MealCard
+                        key={item.name}
+                        style={styles.cardGap}
+                        elevated
+                        compact
+                        name={item.name}
+                        protein={item.protein_g}
+                        calories={item.calories}
+                        state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
+                        onPress={() => handleLogMeal(item)}
+                        disabled={confirmingName != null}
+                      />
+                    )
+                  })}
+                </>
+              )}
+            </ScrollView>
+          )}
         </Animated.View>
       </View>
     </Modal>
   )
 }
-
-const ITEMS_MAX_HEIGHT = 300
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -254,7 +481,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.bruma,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   header: {
     flexDirection: 'row',
@@ -262,27 +489,92 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
+  back: {
+    fontFamily: typography.uiBold,
+    fontSize: 26,
+    lineHeight: 26,
+    color: colors.niebla,
+    width: 24,
+  },
+  backSpacer: {
+    width: 24,
+  },
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 21,
+    fontSize: 20,
     color: colors.leche,
-    letterSpacing: -0.6,
+    letterSpacing: -0.5,
   },
   close: {
     fontFamily: typography.uiBold,
     fontSize: 16,
     color: colors.niebla,
+    width: 24,
+    textAlign: 'right',
   },
-  // One stadium pill holding the four slot segments — mirrors the
-  // navigation pill in AppTabBar (bgCard2, hairline, inner padding).
+  body: {
+    maxHeight: BODY_MAX_H,
+  },
+  // Compact "Hoy" strip — peso (tappable) on the left, agua on the
+  // right, split by a hairline. Lifts the meal list above the fold.
+  strip: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgCard2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    marginTop: 4,
+  },
+  stripZone: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    gap: 6,
+  },
+  stripZoneWater: {
+    flex: 1,
+  },
+  stripDivider: {
+    width: 1,
+    marginVertical: 10,
+    backgroundColor: colors.hairline,
+  },
+  stripCaption: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    color: colors.magenta,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  stripWeightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stripWeight: {
+    fontFamily: typography.displaySemi,
+    fontSize: 16,
+    color: colors.leche,
+    letterSpacing: -0.3,
+  },
+  chevron: {
+    fontFamily: typography.ui,
+    fontSize: 22,
+    color: colors.niebla,
+  },
+  dropletsCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  // One stadium pill holding the four slot segments.
   typePill: {
     flexDirection: 'row',
+    marginTop: 18,
     backgroundColor: colors.bgCard2,
     borderRadius: 26,
     borderWidth: 1,
     borderColor: colors.hairline,
     padding: 4,
-    marginBottom: 20,
   },
   typeSeg: {
     flex: 1,
@@ -292,7 +584,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 22,
   },
-  // Active slot — the same soft magenta-tint capsule as the active tab.
   typeSegActive: {
     backgroundColor: colors.magentaTint,
   },
@@ -301,35 +592,84 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.4,
   },
-  sectionLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    color: colors.magenta,
-    letterSpacing: 2.2,
+  frequentLabel: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: colors.bone,
+    marginTop: 14,
     marginBottom: 10,
   },
-  list: {
-    maxHeight: ITEMS_MAX_HEIGHT,
-  },
   cardGap: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   empty: {
     fontFamily: typography.ui,
-    fontSize: 14,
+    fontSize: 13.5,
     lineHeight: 20,
     color: colors.niebla,
-    textAlign: 'center',
-    paddingVertical: 20,
+    paddingVertical: 14,
   },
-  comidasLink: {
+  // The two log methods — a side-by-side pair near the top. Foto
+  // carries a magenta-tinted fill; manual is a quieter bordered tile.
+  methods: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 16,
-    alignItems: 'center',
-    paddingVertical: 8,
   },
-  comidasLinkText: {
-    fontFamily: typography.uiSemi,
+  method: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 15,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  methodPhoto: {
+    borderColor: colors.magentaTint2,
+    backgroundColor: colors.magentaTint,
+  },
+  methodManual: {
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.bgCard2,
+  },
+  methodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  methodIconPhoto: {
+    backgroundColor: colors.magentaTint2,
+  },
+  methodIconManual: {
+    backgroundColor: colors.bgCard,
+  },
+  methodLabel: {
+    fontFamily: typography.uiBold,
     fontSize: 13,
-    color: colors.magenta,
+    color: colors.leche,
+    letterSpacing: 0.3,
+  },
+  // ── Weight pane ──────────────────────────────────────────────────
+  weightPane: {
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  primaryBtn: {
+    marginTop: 20,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.magenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    fontFamily: typography.uiBold,
+    fontSize: 14,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 })

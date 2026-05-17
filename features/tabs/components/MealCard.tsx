@@ -18,11 +18,15 @@ type Props = {
   /** Lifts the card surface a step (bgCard2) — use when the card sits
    *  on a bgCard surface itself, e.g. inside the quick-log sheet. */
   elevated?: boolean
+  /** Tighter row — smaller type, padding and circle. Use for long
+   *  lists, e.g. "Lo de siempre" in the quick-log sheet. */
+  compact?: boolean
   disabled?: boolean
   style?: StyleProp<ViewStyle>
 }
 
 const CIRCLE = 34
+const CIRCLE_COMPACT = 28
 
 /* A frequent-meal card — a rounded surface holding the name + macros
  * and a "+" circle, all inside one card. Shared by the Comidas estela
@@ -37,12 +41,14 @@ export function MealCard({
   onPress,
   onCardPress,
   elevated = false,
+  compact = false,
   disabled = false,
   style,
 }: Props) {
   const confirmed = state === 'confirmed'
   const cardSurface = [
     styles.card,
+    compact && styles.cardCompact,
     elevated && styles.cardElevated,
     confirmed && styles.cardConfirmed,
     state === 'dimmed' && styles.dimmed,
@@ -51,17 +57,24 @@ export function MealCard({
 
   const content = (
     <>
-      <Text style={[styles.name, confirmed && styles.textOnStamp]} numberOfLines={1}>
+      <Text
+        style={[styles.name, compact && styles.nameCompact, confirmed && styles.textOnStamp]}
+        numberOfLines={1}
+      >
         {name}
       </Text>
-      <Text style={[styles.macros, confirmed && styles.textOnStamp]}>
+      <Text
+        style={[styles.macros, compact && styles.macrosCompact, confirmed && styles.textOnStamp]}
+      >
         {Math.round(protein)} g · {calories} kcal
       </Text>
     </>
   )
 
   const icon = (
-    <Text style={[styles.icon, confirmed && styles.iconConfirmed]}>{confirmed ? '✓' : '+'}</Text>
+    <Text style={[styles.icon, compact && styles.iconCompact, confirmed && styles.iconConfirmed]}>
+      {confirmed ? '✓' : '+'}
+    </Text>
   )
 
   // Estela — one card surface, two tap targets inside it: the body
@@ -81,7 +94,11 @@ export function MealCard({
           {content}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.circle, confirmed && styles.circleConfirmed]}
+          style={[
+            styles.circle,
+            compact && styles.circleCompact,
+            confirmed && styles.circleConfirmed,
+          ]}
           activeOpacity={0.7}
           onPress={onPress}
           disabled={disabled}
@@ -106,7 +123,15 @@ export function MealCard({
       accessibilityLabel={`Sumar ${name}`}
     >
       <View style={styles.body}>{content}</View>
-      <View style={[styles.circle, confirmed && styles.circleConfirmed]}>{icon}</View>
+      <View
+        style={[
+          styles.circle,
+          compact && styles.circleCompact,
+          confirmed && styles.circleConfirmed,
+        ]}
+      >
+        {icon}
+      </View>
     </TouchableOpacity>
   )
 }
@@ -133,6 +158,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  // Compact — a tighter row for long frequent-meal lists.
+  cardCompact: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
   // The body — name + macros; on the estela it's the editor's target.
   body: {
     flex: 1,
@@ -151,11 +181,18 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.3,
   },
+  nameCompact: {
+    fontSize: 15,
+  },
   macros: {
     marginTop: 3,
     fontFamily: typography.uiMedium,
     fontSize: 12.5,
     color: colors.niebla,
+  },
+  macrosCompact: {
+    marginTop: 1,
+    fontSize: 11.5,
   },
   textOnStamp: {
     color: '#FFFFFF',
@@ -173,6 +210,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  circleCompact: {
+    width: CIRCLE_COMPACT,
+    height: CIRCLE_COMPACT,
+    borderRadius: CIRCLE_COMPACT / 2,
+  },
   circleConfirmed: {
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
@@ -182,6 +224,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 20,
     color: colors.magenta,
+  },
+  iconCompact: {
+    fontSize: 16,
+    lineHeight: 18,
   },
   iconConfirmed: {
     fontSize: 15,
