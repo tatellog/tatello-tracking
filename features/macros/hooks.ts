@@ -115,8 +115,12 @@ export function useCreateMeal() {
     onError: (_err, _vars, context) => restoreBriefCache(qc, context),
     onSettled: (_data, _err, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
-      const mealDate = variables.consumed_at.toISOString().slice(0, 10)
-      qc.invalidateQueries({ queryKey: queryKeys.macros.meals(mealDate) })
+      // Refetch every day's meal list by prefix. The meal_date bucket
+      // is computed server-side in the app timezone, so a UTC date
+      // derived here (consumed_at.toISOString) would point at the wrong
+      // day after ~6pm local — leaving the Hoy estela stale right after
+      // a late-evening log.
+      qc.invalidateQueries({ queryKey: ['macros', 'meals'] })
       // The suggestion RPC is meal-type-scoped, so re-fetching the
       // current slot keeps "Lo de ayer" honest after a fresh insert.
       qc.invalidateQueries({ queryKey: queryKeys.macros.suggestions(variables.meal_type) })
