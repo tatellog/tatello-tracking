@@ -237,7 +237,10 @@ function TodayContent({ ctx, cadence }: ContentProps) {
             <SectionHeader label="Comidas de hoy" />
           </Animated.View>
           <Animated.View entering={enter(800)}>
-            <TodayMealLog date={ctx.date} onOpenMeal={(id) => router.push(`/meal/${id}`)} />
+            <TodayMealLog
+              date={ctx.date}
+              onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+            />
           </Animated.View>
         </ScrollView>
       </SafeAreaView>

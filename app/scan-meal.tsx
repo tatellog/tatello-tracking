@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActionSheetIOS,
   Alert,
@@ -31,8 +31,14 @@ import Svg, { Path } from 'react-native-svg'
 import { OrbitLoader } from '@/components/OrbitLoader'
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { StarLoader } from '@/components/StarLoader'
-import type { MealInput } from '@/features/macros/api'
-import { useCreateMeal } from '@/features/macros/hooks'
+import {
+  mealIngredients,
+  mealPhotoUrl,
+  uploadMealPhoto,
+  type MealInput,
+  type StoredIngredient,
+} from '@/features/macros/api'
+import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
 import {
   ingredientKcal,
   ingredientProtein,
@@ -182,20 +188,24 @@ function currentMealType(): MealInput['meal_type'] {
  */
 export default function ScanMealScreen() {
   const router = useRouter()
-  const { uri } = useLocalSearchParams<{ uri?: string }>()
+  const { uri, editId } = useLocalSearchParams<{ uri?: string; editId?: string }>()
+  const isEdit = !!editId
   const createMeal = useCreateMeal()
+  const updateMeal = useUpdateMeal()
+  const editMeal = useMealById(editId)
 
-  const [phase, setPhase] = useState<'scanning' | 'confirm'>('scanning')
+  const [phase, setPhase] = useState<'scanning' | 'confirm'>(isEdit ? 'confirm' : 'scanning')
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
   const [name, setName] = useState('')
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([])
   const [saving, setSaving] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
+  const populatedRef = useRef(false)
 
-  // Scan whenever we (re-)enter the scanning phase.
+  // Scan whenever we (re-)enter the scanning phase — skipped in edit.
   useEffect(() => {
-    if (phase !== 'scanning') return
+    if (isEdit || phase !== 'scanning') return
     let alive = true
     scanMeal(photoUri ?? '').then((meal) => {
       if (!alive) return
@@ -206,17 +216,42 @@ export default function ScanMealScreen() {
     return () => {
       alive = false
     }
-  }, [phase, photoUri])
+  }, [isEdit, phase, photoUri])
+
+  // Edit mode — fill the form from the meal once it loads. The ref
+  // gates it to a single run so a refetch can't clobber edits; a meal
+  // with no stored ingredients becomes one synthetic ingredient.
+  useEffect(() => {
+    if (!isEdit || populatedRef.current || !editMeal.data) return
+    populatedRef.current = true
+    const m = editMeal.data
+    setName(m.name)
+    const stored = mealIngredients(m)
+    setIngredients(
+      stored
+        ? stored.map((ing, i) => ({ ...ing, id: `ing-${i}` }))
+        : [
+            {
+              id: 'ing-0',
+              name: m.name,
+              grams: 100,
+              proteinPer100: Number(m.protein_g),
+              kcalPer100: m.calories,
+            },
+          ],
+    )
+    if (m.photo_storage_path) setPhotoUri(mealPhotoUrl(m.photo_storage_path))
+  }, [isEdit, editMeal.data])
 
   // Advance the status line while scanning, holding on the last step.
   useEffect(() => {
-    if (phase !== 'scanning') return
+    if (isEdit || phase !== 'scanning') return
     setStepIndex(0)
     const id = setInterval(() => {
       setStepIndex((i) => Math.min(i + 1, SCAN_STEPS.length - 1))
     }, 1600)
     return () => clearInterval(id)
-  }, [phase])
+  }, [isEdit, phase])
 
   // Read the photo's real proportions so it can be shown uncropped.
   useEffect(() => {
@@ -298,17 +333,60 @@ export default function ScanMealScreen() {
     )
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (saving || ingredients.length === 0) return
     setSaving(true)
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+
+    const storedIngredients: StoredIngredient[] = ingredients.map(
+      ({ name: ingName, grams, proteinPer100, kcalPer100 }) => ({
+        name: ingName,
+        grams,
+        proteinPer100,
+        kcalPer100,
+      }),
+    )
+    const macros = {
+      name: name.trim() || 'Comida',
+      protein_g: Math.round(totals.protein * 10) / 10,
+      calories: Math.round(totals.calories),
+    }
+
+    // Edit — update the meal in place, keeping its slot and time.
+    if (isEdit && editMeal.data) {
+      updateMeal.mutate(
+        {
+          id: editMeal.data.id,
+          input: {
+            ...macros,
+            consumed_at: new Date(editMeal.data.consumed_at),
+            meal_type: editMeal.data.meal_type as MealInput['meal_type'],
+            ingredients: storedIngredients,
+          },
+        },
+        { onSuccess: () => router.back(), onError: () => setSaving(false) },
+      )
+      return
+    }
+
+    // Create — upload the photo first (best effort; the meal saves
+    // either way, but a failed upload is surfaced, not lost silently).
+    let photoPath: string | undefined
+    if (photoUri) {
+      try {
+        photoPath = await uploadMealPhoto(photoUri)
+      } catch (e) {
+        console.warn('[scan-meal] photo upload failed', e)
+        Alert.alert('Foto', 'No pudimos guardar la foto, pero sí registramos la comida.')
+      }
+    }
     createMeal.mutate(
       {
-        name: name.trim() || 'Comida',
-        protein_g: Math.round(totals.protein * 10) / 10,
-        calories: Math.round(totals.calories),
+        ...macros,
         consumed_at: new Date(),
         meal_type: currentMealType(),
+        photo_storage_path: photoPath,
+        ingredients: storedIngredients,
       },
       {
         onSuccess: () => router.back(),
@@ -321,7 +399,13 @@ export default function ScanMealScreen() {
     <View style={styles.screen}>
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        {phase === 'scanning' ? (
+        {isEdit && !editMeal.data ? (
+          <View style={styles.scanning}>
+            <View style={styles.scanCenter}>
+              <StarLoader size={40} />
+            </View>
+          </View>
+        ) : phase === 'scanning' ? (
           <View style={styles.scanning}>
             <View style={styles.scanCenter}>
               {photoUri ? (
@@ -374,18 +458,24 @@ export default function ScanMealScreen() {
               keyboardDismissMode="interactive"
             >
               {photoUri ? (
-                <Pressable
-                  onPress={photoOptions}
-                  style={[styles.photoWrap, { width: photoW, height: photoH }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Reescanear o cambiar la foto"
-                >
-                  <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
-                  <View style={styles.photoChip}>
-                    <RescanIcon color={colors.leche} />
-                    <Text style={styles.photoChipText}>Reescanear</Text>
+                isEdit ? (
+                  <View style={[styles.photoWrap, { width: photoW, height: photoH }]}>
+                    <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
                   </View>
-                </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={photoOptions}
+                    style={[styles.photoWrap, { width: photoW, height: photoH }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reescanear o cambiar la foto"
+                  >
+                    <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
+                    <View style={styles.photoChip}>
+                      <RescanIcon color={colors.leche} />
+                      <Text style={styles.photoChipText}>Reescanear</Text>
+                    </View>
+                  </Pressable>
+                )
               ) : null}
 
               <Text style={styles.eyebrow}>Tu platillo</Text>
@@ -400,7 +490,9 @@ export default function ScanMealScreen() {
                 <PencilIcon color={colors.niebla} />
               </View>
 
-              <Text style={[styles.eyebrow, styles.eyebrowGap]}>Ingredientes detectados</Text>
+              <Text style={[styles.eyebrow, styles.eyebrowGap]}>
+                {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
+              </Text>
               {ingredients.map((ing) => (
                 <View key={ing.id} style={styles.row}>
                   <View style={styles.ingMain}>
@@ -466,7 +558,7 @@ export default function ScanMealScreen() {
                 </Text>
               </View>
               <PrimaryCta
-                label="Confirmar"
+                label={isEdit ? 'Guardar' : 'Confirmar'}
                 onPress={handleConfirm}
                 disabled={ingredients.length === 0}
                 loading={saving}

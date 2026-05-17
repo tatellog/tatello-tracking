@@ -12,9 +12,10 @@ import {
   getMealsForDate,
   updateMeal,
   upsertMacroTargets,
+  type CreateMealInput,
   type MacroTargetsInput,
   type Meal,
-  type MealInput,
+  type UpdateMealInput,
 } from './api'
 
 import type { MacroTargetsRow } from '@/features/brief/api'
@@ -99,7 +100,7 @@ export function useFrequentMeals(limit = 8) {
 export function useCreateMeal() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: MealInput) => createMeal(input),
+    mutationFn: (input: CreateMealInput) => createMeal(input),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.brief.all })
       return patchBriefCache(qc, (ctx) => ({
@@ -133,7 +134,7 @@ export function useCreateMeal() {
 export function useUpdateMeal() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: MealInput }) => updateMeal(id, input),
+    mutationFn: ({ id, input }: { id: string; input: UpdateMealInput }) => updateMeal(id, input),
     onMutate: async ({ id, input }) => {
       await qc.cancelQueries({ queryKey: queryKeys.brief.all })
       const existing = qc.getQueryData<Meal>(queryKeys.macros.meal(id))

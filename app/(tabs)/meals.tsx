@@ -103,7 +103,9 @@ export default function MealsScreen() {
 
           {/* Sumar comida (search / create) + Tu estela (the food
               history) — two sections, both owned by MealComposer. */}
-          <MealComposer onOpenMeal={(id) => router.push(`/meal/${id}`)} />
+          <MealComposer
+            onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+          />
         </ScrollView>
       </SafeAreaView>
     </View>

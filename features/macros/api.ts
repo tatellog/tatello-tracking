@@ -1,7 +1,8 @@
+import * as ImageManipulator from 'expo-image-manipulator'
 import { z } from 'zod'
 
 import { requireUserId, supabase } from '@/lib/supabase'
-import type { Database } from '@/types/database.types'
+import type { Database, Json } from '@/types/database.types'
 
 type MacroTargetsRow = Database['public']['Tables']['macro_targets']['Row']
 export type Meal = Database['public']['Tables']['meals']['Row']
@@ -48,6 +49,66 @@ export const MealInputSchema = z.object({
 })
 
 export type MealInput = z.infer<typeof MealInputSchema>
+
+/** A meal's ingredient breakdown — persisted in `ai_raw_response`. */
+export type StoredIngredient = {
+  name: string
+  grams: number
+  proteinPer100: number
+  kcalPer100: number
+}
+
+/** createMeal carries the optional photo + ingredients from the scan. */
+export type CreateMealInput = MealInput & {
+  photo_storage_path?: string | null
+  ingredients?: StoredIngredient[]
+}
+
+/** updateMeal carries the optional edited ingredient breakdown. */
+export type UpdateMealInput = MealInput & {
+  ingredients?: StoredIngredient[]
+}
+
+/* The ai_raw_response payload that stores a meal's ingredients. */
+function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
+  if (!ingredients || ingredients.length === 0) return null
+  return {
+    ingredients: ingredients.map(({ name, grams, proteinPer100, kcalPer100 }) => ({
+      name,
+      grams,
+      proteinPer100,
+      kcalPer100,
+    })),
+  }
+}
+
+/** A meal's stored ingredient breakdown, or null when it has none. */
+export function mealIngredients(meal: Meal): StoredIngredient[] | null {
+  const raw = meal.ai_raw_response
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const list = (raw as { ingredients?: unknown }).ingredients
+  if (!Array.isArray(list)) return null
+  const parsed: StoredIngredient[] = []
+  for (const item of list) {
+    if (item && typeof item === 'object') {
+      const o = item as Record<string, unknown>
+      if (
+        typeof o.name === 'string' &&
+        typeof o.grams === 'number' &&
+        typeof o.proteinPer100 === 'number' &&
+        typeof o.kcalPer100 === 'number'
+      ) {
+        parsed.push({
+          name: o.name,
+          grams: o.grams,
+          proteinPer100: o.proteinPer100,
+          kcalPer100: o.kcalPer100,
+        })
+      }
+    }
+  }
+  return parsed.length > 0 ? parsed : null
+}
 
 /* ─── macro_targets ──────────────────────────────────────────────── */
 
@@ -158,7 +219,7 @@ export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
     .map(({ lastAt: _lastAt, ...meal }) => meal)
 }
 
-export async function createMeal(input: MealInput): Promise<Meal> {
+export async function createMeal(input: CreateMealInput): Promise<Meal> {
   const userId = await requireUserId()
   const parsed = MealInputSchema.parse(input)
   const { data, error } = await supabase
@@ -171,6 +232,8 @@ export async function createMeal(input: MealInput): Promise<Meal> {
       consumed_at: parsed.consumed_at.toISOString(),
       meal_type: parsed.meal_type,
       source: 'manual',
+      photo_storage_path: input.photo_storage_path ?? null,
+      ai_raw_response: ingredientsPayload(input.ingredients),
     })
     .select()
     .single()
@@ -178,20 +241,52 @@ export async function createMeal(input: MealInput): Promise<Meal> {
   return data
 }
 
-export async function updateMeal(id: string, input: MealInput): Promise<Meal> {
+const MEAL_PHOTO_PX = 720
+
+/** Public URL for a meal photo storage path — the bucket is public. */
+export function mealPhotoUrl(path: string): string {
+  return supabase.storage.from('meal-photos').getPublicUrl(path).data.publicUrl
+}
+
+/*
+ * Resize → JPEG-compress → upload the scan photo to the public
+ * `meal-photos` bucket; returns the storage path to save on the meal
+ * row. The leading {userId} folder is the RLS gate (see the
+ * 20260516120004_meal_photos_storage.sql migration).
+ */
+export async function uploadMealPhoto(uri: string): Promise<string> {
+  const userId = await requireUserId()
+  const processed = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: MEAL_PHOTO_PX } }],
+    { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+  )
+  // React Native's fetch().blob() uploads 0 bytes to Supabase Storage —
+  // supabase-js can't read the lazy RN Blob. An ArrayBuffer carries the
+  // real bytes; this is the documented React Native upload pattern.
+  const bytes = await fetch(processed.uri).then((r) => r.arrayBuffer())
+  if (bytes.byteLength === 0) throw new Error('La imagen quedó vacía al procesarla.')
+  const path = `${userId}/${Date.now()}.jpg`
+  const { error } = await supabase.storage
+    .from('meal-photos')
+    .upload(path, bytes, { contentType: 'image/jpeg', cacheControl: '3600' })
+  if (error) throw error
+  return path
+}
+
+export async function updateMeal(id: string, input: UpdateMealInput): Promise<Meal> {
   const parsed = MealInputSchema.parse(input)
-  const { data, error } = await supabase
-    .from('meals')
-    .update({
-      name: parsed.name,
-      protein_g: parsed.protein_g,
-      calories: parsed.calories,
-      consumed_at: parsed.consumed_at.toISOString(),
-      meal_type: parsed.meal_type,
-    })
-    .eq('id', id)
-    .select()
-    .single()
+  const patch: Database['public']['Tables']['meals']['Update'] = {
+    name: parsed.name,
+    protein_g: parsed.protein_g,
+    calories: parsed.calories,
+    consumed_at: parsed.consumed_at.toISOString(),
+    meal_type: parsed.meal_type,
+  }
+  // Only touch the ingredient breakdown when the caller supplies one,
+  // so a plain field edit never wipes a scanned meal's ingredients.
+  if (input.ingredients) patch.ai_raw_response = ingredientsPayload(input.ingredients)
+  const { data, error } = await supabase.from('meals').update(patch).eq('id', id).select().single()
   if (error) throw error
   return data
 }
