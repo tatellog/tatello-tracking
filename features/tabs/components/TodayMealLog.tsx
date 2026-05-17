@@ -132,6 +132,18 @@ function PeriodGlyph({ period, size, color }: { period: MealType; size: number; 
   )
 }
 
+/* A generic plate — the pile's placeholder when a meal has no photo.
+ * Neutral on purpose: the celestial slot glyph stays for the list
+ * rows, where the time of day gives it meaning. */
+function DishGlyph({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={8.4} stroke={color} strokeWidth={1.6} />
+      <Circle cx={12} cy={12} r={3.6} stroke={color} strokeWidth={1.6} />
+    </Svg>
+  )
+}
+
 function TrashIcon({ color }: { color: string }) {
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
@@ -261,7 +273,7 @@ function PileCircle({
               onError={() => setFailed(true)}
             />
           ) : (
-            <PeriodGlyph period={mealTypeOf(meal)} size={26} color={colors.magenta} />
+            <DishGlyph size={26} color={colors.niebla} />
           )}
         </View>
       </Pressable>
@@ -573,7 +585,8 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
-  // Each disc — ringed in the page colour so it cuts out cleanly.
+  // Each disc — ringed in the page colour so it cuts out cleanly. The
+  // neutral fill shows only behind the no-photo plate placeholder.
   pileCircle: {
     width: PILE_SIZE,
     height: PILE_SIZE,
@@ -581,7 +594,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: colors.magentaTint,
+    backgroundColor: colors.bgCard2,
     borderWidth: 3,
     borderColor: colors.bg,
   },
