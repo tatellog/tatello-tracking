@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Dimensions,
   Image,
   Modal,
@@ -22,28 +23,29 @@ import Animated, {
   withRepeat,
   withSpring,
   withTiming,
+  ZoomIn,
 } from 'react-native-reanimated'
 import Svg, { Circle, Path } from 'react-native-svg'
 
 import { mealPhotoUrl, type Meal } from '@/features/macros/api'
 import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { SAMPLE_MEAL_PHOTOS } from '@/features/macros/sampleMealPhotos'
-import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { colors, typography } from '@/theme'
 
 const THUMB = 48
 
 // ── Photo-circle pile — the section's hero summary ─────────────────
-const PILE_SIZE = 56
-const PILE_OVERLAP = 18
+const PILE_SIZE = 64
+const PILE_OVERLAP = 20
 const PILE_MAX = 6
 
 // The detail sheet's scroll area caps below the screen height.
 const SHEET_BODY_MAX_H = Math.round(Dimensions.get('window').height * 0.62)
 
 // ── Swipe-to-delete ────────────────────────────────────────────────
-const DELETE_THRESHOLD = -88
-const DRAG_MAX = 120
+const SWIPE_OPEN = -84 // rest position — the delete button is revealed
+const SWIPE_COMMIT = -240 // dragged past this → delete fires on release
+const SWIPE_MAX = -300 // hard clamp on the drag
 const SPRING = { damping: 22, stiffness: 220 } as const
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
@@ -132,14 +134,26 @@ function PeriodGlyph({ period, size, color }: { period: MealType; size: number; 
   )
 }
 
-/* A generic plate — the pile's placeholder when a meal has no photo.
- * Neutral on purpose: the celestial slot glyph stays for the list
- * rows, where the time of day gives it meaning. */
+/* A bowl with steam — the placeholder for any meal with no photo,
+ * in the pile and the list alike. Warm and unmistakably "a meal". */
 function DishGlyph({ size, color }: { size: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={8.4} stroke={color} strokeWidth={1.6} />
-      <Circle cx={12} cy={12} r={3.6} stroke={color} strokeWidth={1.6} />
+      {/* Two steam wisps rising off the bowl. */}
+      <Path
+        d="M9.3 3.4 C 8.3 4.7 10.3 5.7 9.3 7.1 M14.7 3.4 C 13.7 4.7 15.7 5.7 14.7 7.1"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+      {/* Rim line + the bowl body curving down from it. */}
+      <Path
+        d="M3.4 10.6 H20.6 M5 10.9 C 5 16.5 8.6 19.4 12 19.4 C 15.4 19.4 19 16.5 19 10.9"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   )
 }
@@ -166,19 +180,10 @@ function TrashIcon({ color }: { color: string }) {
   )
 }
 
-/* The meal's thumbnail — a circular photo of the dish, or, when there
- * is no photo, a placeholder carrying the slot's celestial glyph
- * (sunrise / sun / crescent / sparkle). The most recent meal — the
- * comet head — wears a glowing magenta ring and breathes. */
-function MealThumb({
-  type,
-  photo,
-  isRecent,
-}: {
-  type: MealType
-  photo: ImageSourcePropType | null
-  isRecent: boolean
-}) {
+/* The meal's thumbnail — a circular photo of the dish, or the bowl
+ * placeholder when it has none. The most recent meal — the comet
+ * head — wears a glowing magenta ring and breathes. */
+function MealThumb({ photo, isRecent }: { photo: ImageSourcePropType | null; isRecent: boolean }) {
   const breath = useSharedValue(0)
   useEffect(() => {
     if (!isRecent) {
@@ -212,26 +217,28 @@ function MealThumb({
             onError={() => setFailed(true)}
           />
         ) : (
-          <PeriodGlyph period={type} size={24} color={colors.magenta} />
+          <DishGlyph size={22} color={colors.niebla} />
         )}
       </View>
     </Animated.View>
   )
 }
 
-/* One disc in the photo pile — the dish photo (or its slot glyph),
+/* One disc in the photo pile — the dish photo (or the bowl glyph),
  * ringed in the page colour so it reads cut out from the disc behind.
- * The most recent meal glows and breathes, the comet head. */
+ * It pops in on a staggered cascade (so the pile reads as a live,
+ * interactive object); the most recent meal also glows and breathes,
+ * the comet head. The whole pile is one tap target. */
 function PileCircle({
   meal,
+  index,
   first,
   isRecent,
-  onPress,
 }: {
   meal: Meal
+  index: number
   first: boolean
   isRecent: boolean
-  onPress: () => void
 }) {
   const breath = useSharedValue(0)
   useEffect(() => {
@@ -256,13 +263,14 @@ function PileCircle({
   const [failed, setFailed] = useState(false)
 
   return (
-    <Animated.View style={[!first && styles.pileOverlap, breathStyle]}>
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={meal.name}
-        accessibilityHint="Abre la lista de comidas de hoy"
-      >
+    // Outer view carries the cascade entrance + the overlap margin;
+    // the inner one carries the comet-head breathing, kept separate so
+    // the two transforms don't fight.
+    <Animated.View
+      entering={ZoomIn.delay(index * 55).duration(280)}
+      style={!first && styles.pileOverlap}
+    >
+      <Animated.View style={breathStyle}>
         {isRecent ? <View style={styles.pileGlow} /> : null}
         <View style={styles.pileCircle}>
           {photo && !failed ? (
@@ -273,18 +281,17 @@ function PileCircle({
               onError={() => setFailed(true)}
             />
           ) : (
-            <DishGlyph size={26} color={colors.niebla} />
+            <DishGlyph size={30} color={colors.niebla} />
           )}
         </View>
-      </Pressable>
+      </Animated.View>
     </Animated.View>
   )
 }
 
 /* The photo pile — the day's meals as overlapping circles, the
- * section's glanceable hero. Shows the most recent few; tapping any
- * circle opens the full detail list below. */
-function MealPhotoCluster({ meals, onPressPile }: { meals: Meal[]; onPressPile: () => void }) {
+ * section's glanceable hero. Shows the most recent few. */
+function MealPhotoCluster({ meals }: { meals: Meal[] }) {
   const shown = meals.slice(-PILE_MAX)
   return (
     <View style={styles.pile}>
@@ -292,9 +299,9 @@ function MealPhotoCluster({ meals, onPressPile }: { meals: Meal[]; onPressPile: 
         <PileCircle
           key={meal.id}
           meal={meal}
+          index={i}
           first={i === 0}
           isRecent={i === shown.length - 1}
-          onPress={onPressPile}
         />
       ))}
     </View>
@@ -319,20 +326,23 @@ type Props = {
 export function TodayMealLog({ date, onOpenMeal }: Props) {
   const { data: meals } = useMealsForDate(date)
   const deleteMeal = useDeleteMeal()
-  const choose = useConfirm()
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  const handleRequestDelete = async (meal: Meal) => {
-    const ok = await confirmBinary(choose, {
-      title: 'Borrar esta comida',
-      description: `"${meal.name}"`,
-      confirmLabel: 'Borrar',
-      destructive: true,
-    })
-    if (ok) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
-      deleteMeal.mutate(meal.id)
-    }
+  // A native Alert, not the app's Modal-based confirm — the meal list
+  // lives inside a Modal sheet, and a Modal-over-Modal confirm doesn't
+  // present reliably on iOS. The native alert always sits on top.
+  const handleRequestDelete = (meal: Meal) => {
+    Alert.alert('Borrar esta comida', `"${meal.name}"`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Borrar',
+        style: 'destructive',
+        onPress: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+          deleteMeal.mutate(meal.id)
+        },
+      },
+    ])
   }
 
   if (!meals || meals.length === 0) {
@@ -349,18 +359,23 @@ export function TodayMealLog({ date, onOpenMeal }: Props) {
 
   return (
     <View>
-      <MealPhotoCluster
-        meals={meals}
-        onPressPile={() => {
+      {/* The whole pile + summary is one tap target. It cascades in and
+       * dips on press, so the overlapping circles read as a button. */}
+      <Pressable
+        onPress={() => {
           Haptics.selectionAsync().catch(() => {})
           setSheetOpen(true)
         }}
-      />
-
-      <Text style={styles.summary}>
-        <Text style={styles.summaryStrong}>{totalKcal.toLocaleString('es-MX')}</Text> kcal ·{' '}
-        <Text style={styles.summaryStrong}>{n}</Text> {n === 1 ? 'comida' : 'comidas'} en tu cielo
-      </Text>
+        style={({ pressed }) => [styles.summaryBlock, pressed && styles.summaryBlockPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Ver todas las comidas de hoy"
+      >
+        <MealPhotoCluster meals={meals} />
+        <Text style={styles.summary}>
+          <Text style={styles.summaryStrong}>{totalKcal.toLocaleString('es-MX')}</Text> kcal ·{' '}
+          <Text style={styles.summaryStrong}>{n}</Text> {n === 1 ? 'comida' : 'comidas'} en tu cielo
+        </Text>
+      </Pressable>
 
       <TodayMealsSheet
         visible={sheetOpen}
@@ -453,26 +468,46 @@ type RowProps = {
   onRequestDelete: (meal: Meal) => void
 }
 
-/* One meal — a card tagged with its thumbnail. Tap to edit; swipe it
- * left past the threshold to delete (a magenta zone shows behind). */
+/* One meal — a card tagged with its thumbnail. Tap to edit. Swipe it
+ * left a little to rest open with a tappable delete button; swipe it
+ * far (past the commit point) and releasing deletes straight away. */
 function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
   const translateX = useSharedValue(0)
+  const offsetX = useSharedValue(0) // settled position: 0 (closed) or SWIPE_OPEN
   const press = useSharedValue(0)
+  const [open, setOpen] = useState(false)
   const requestDelete = () => onRequestDelete(meal)
+  const closeRow = () => {
+    offsetX.value = 0
+    translateX.value = withSpring(0, SPRING)
+    setOpen(false)
+  }
 
   const pan = Gesture.Pan()
     .activeOffsetX([-12, 12])
     .failOffsetY([-14, 14])
     .onUpdate((e) => {
-      // Left-only drag, clamped so the card can't slide off.
-      const next = e.translationX
-      translateX.value = next > 0 ? 0 : next < -DRAG_MAX ? -DRAG_MAX : next
+      // Drag left from wherever the row was settled; clamp the range.
+      const next = offsetX.value + e.translationX
+      translateX.value = next > 0 ? 0 : next < SWIPE_MAX ? SWIPE_MAX : next
     })
     .onEnd(() => {
-      if (translateX.value < DELETE_THRESHOLD) {
+      if (translateX.value <= SWIPE_COMMIT) {
+        // Swiped far — delete straight away.
+        offsetX.value = 0
+        translateX.value = withSpring(0, SPRING)
+        runOnJS(setOpen)(false)
         runOnJS(requestDelete)()
+      } else if (translateX.value <= SWIPE_OPEN / 2) {
+        // Swiped a little — rest open so the delete button is tappable.
+        offsetX.value = SWIPE_OPEN
+        translateX.value = withSpring(SWIPE_OPEN, SPRING)
+        runOnJS(setOpen)(true)
+      } else {
+        offsetX.value = 0
+        translateX.value = withSpring(0, SPRING)
+        runOnJS(setOpen)(false)
       }
-      translateX.value = withSpring(0, SPRING)
     })
 
   // The card slides on swipe; on press its surface lifts a shade — an
@@ -483,16 +518,28 @@ function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
     backgroundColor: interpolateColor(press.value, [0, 1], [colors.bgCard, colors.bgCard2]),
   }))
 
+  // The trash pops bigger once the drag passes the commit point — a
+  // "release to delete" cue.
+  const trashStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: translateX.value <= SWIPE_COMMIT ? 1.3 : 1 }],
+  }))
+
   return (
     <View style={styles.swipeZone}>
-      {/* Delete affordance — hidden behind the card until swiped. */}
+      {/* Delete zone — the magenta + trash revealed behind the card. */}
       <View style={styles.deleteZone}>
-        <TrashIcon color="#FFFFFF" />
+        <Animated.View style={trashStyle}>
+          <TrashIcon color="#FFFFFF" />
+        </Animated.View>
       </View>
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.card, cardStyle]}>
           <Pressable
             onPress={() => {
+              if (open) {
+                closeRow()
+                return
+              }
               Haptics.selectionAsync().catch(() => {})
               onOpen(meal.id)
             }}
@@ -507,15 +554,20 @@ function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
             accessibilityHint="Toca para editar; desliza a la izquierda para borrar"
           >
             <View style={styles.mealContent}>
-              {/* Thumbnail — the dish photo, or the slot glyph placeholder. */}
-              <MealThumb type={mealTypeOf(meal)} photo={mealPhoto(meal)} isRecent={isRecent} />
+              {/* Thumbnail — the dish photo, or the bowl placeholder. */}
+              <MealThumb photo={mealPhoto(meal)} isRecent={isRecent} />
               <View style={styles.mealText}>
                 <Text style={styles.name} numberOfLines={1}>
                   {meal.name}
                 </Text>
-                <Text style={styles.meta}>
-                  {formatTime(meal.consumed_at)} · {Math.round(Number(meal.protein_g))} g proteína
-                </Text>
+                <View style={styles.metaRow}>
+                  {/* The slot glyph rides the detail line — sunrise /
+                   * sun / crescent / sparkle for the meal's time. */}
+                  <PeriodGlyph period={mealTypeOf(meal)} size={13} color={colors.niebla} />
+                  <Text style={styles.meta}>
+                    {formatTime(meal.consumed_at)} · {Math.round(Number(meal.protein_g))} g proteína
+                  </Text>
+                </View>
               </View>
               <Text style={styles.kcal}>
                 <Text style={styles.kcalNum}>{meal.calories}</Text> kcal
@@ -524,6 +576,17 @@ function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
           </Pressable>
         </Animated.View>
       </GestureDetector>
+      {/* The tap target for the revealed delete button — mounted only
+       * when the row rests open, and on top so the touch can't be
+       * intercepted by the card's gesture detector underneath. */}
+      {open ? (
+        <Pressable
+          style={styles.deleteHit}
+          onPress={requestDelete}
+          accessibilityRole="button"
+          accessibilityLabel={`Borrar ${meal.name}`}
+        />
+      ) : null}
     </View>
   )
 }
@@ -601,6 +664,15 @@ const styles = StyleSheet.create({
   pilePhoto: {
     width: '100%',
     height: '100%',
+  },
+  // The pile + summary, as one tappable button. It dips slightly on
+  // press so the overlapping circles respond like a control.
+  summaryBlock: {
+    alignSelf: 'flex-start',
+  },
+  summaryBlockPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.97 }],
   },
   // Summary line under the pile.
   summary: {
@@ -690,7 +762,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: colors.magentaTint,
+    backgroundColor: colors.bgCard2,
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
   },
@@ -714,6 +786,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
     paddingRight: 20,
+  },
+  // Invisible tap target over the revealed delete strip — on top of
+  // the card so the touch lands cleanly.
+  deleteHit: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: -SWIPE_OPEN,
   },
   // Each meal is a card — an opaque surface with a hairline edge; it
   // slides on swipe to bare the delete zone behind it.
@@ -740,8 +821,14 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.3,
   },
-  meta: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     marginTop: 3,
+  },
+  meta: {
+    flex: 1,
     fontFamily: typography.uiMedium,
     fontSize: 12,
     color: colors.niebla,

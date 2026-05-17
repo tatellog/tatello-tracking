@@ -26,7 +26,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { OrbitLoader } from '@/components/OrbitLoader'
 import { PrimaryCta } from '@/components/PrimaryCta'
@@ -144,6 +144,23 @@ function PlusIcon({ color }: { color: string }) {
   )
 }
 
+// A camera — add or change the meal photo.
+function CameraIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={7} width={18} height={13} rx={3} stroke={color} strokeWidth={1.8} />
+      <Path
+        d="M9 7 L10.4 4.6 H13.6 L15 7"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={13.4} r={3.4} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  )
+}
+
 // A circular arrow — rescan the photo.
 function RescanIcon({ color }: { color: string }) {
   return (
@@ -171,14 +188,70 @@ const SCREEN_W = Dimensions.get('window').width
 const PHOTO_W = SCREEN_W - 40
 const PHOTO_MAX_H = 340
 
-// Slot pre-selected by time of day — the user can re-slot the meal
-// later from the editor.
+// Slot pre-selected by time of day — the user can change it in the
+// picker before confirming.
 function currentMealType(): MealInput['meal_type'] {
   const h = new Date().getHours()
   if (h < 11) return 'breakfast'
   if (h < 16) return 'lunch'
   if (h < 21) return 'dinner'
   return 'snack'
+}
+
+type MealType = MealInput['meal_type']
+
+const MEAL_TYPES: { value: MealType; label: string }[] = [
+  { value: 'breakfast', label: 'Desayuno' },
+  { value: 'lunch', label: 'Comida' },
+  { value: 'dinner', label: 'Cena' },
+  { value: 'snack', label: 'Snack' },
+]
+
+/* The celestial glyph for each meal slot — sunrise / sun / crescent /
+ * sparkle. Same vocabulary as the quick-log slot pill. */
+function MealGlyph({ type, color }: { type: MealType; color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      {type === 'lunch' ? (
+        <>
+          <Circle cx={12} cy={12} r={4.3} fill={color} />
+          <Path
+            d="M12 5.6 V2.8 M12 18.4 V21.2 M18.4 12 H21.2 M5.6 12 H2.8 M16.5 7.5 L18.5 5.5 M7.5 7.5 L5.5 5.5 M16.5 16.5 L18.5 18.5 M7.5 16.5 L5.5 18.5"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </>
+      ) : type === 'dinner' ? (
+        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
+      ) : type === 'breakfast' ? (
+        <>
+          <Path d="M7 17.5 A 5 5 0 0 1 17 17.5 Z" fill={color} />
+          <Path
+            d="M2.6 17.5 H21.4 M12 9 V6.4 M6.6 12 L4.8 10.3 M17.4 12 L19.2 10.3"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </>
+      ) : (
+        <>
+          <Path
+            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
+            fill={color}
+          />
+          <Path
+            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
+            fill={color}
+          />
+          <Path
+            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
+            fill={color}
+          />
+        </>
+      )}
+    </Svg>
+  )
 }
 
 /*
@@ -198,9 +271,13 @@ export default function ScanMealScreen() {
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
   const [name, setName] = useState('')
+  const [mealType, setMealType] = useState<MealType>(currentMealType)
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([])
   const [saving, setSaving] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
+  // In edit mode, true once the user attaches a new photo — so save
+  // knows to upload it rather than keep the meal's existing one.
+  const [photoChanged, setPhotoChanged] = useState(false)
   const populatedRef = useRef(false)
 
   // Scan whenever we (re-)enter the scanning phase — skipped in edit.
@@ -226,6 +303,7 @@ export default function ScanMealScreen() {
     populatedRef.current = true
     const m = editMeal.data
     setName(m.name)
+    setMealType(m.meal_type as MealType)
     const stored = mealIngredients(m)
     setIngredients(
       stored
@@ -299,7 +377,8 @@ export default function ScanMealScreen() {
     ])
   }
 
-  // Re-pick the photo (or shoot a new one), then scan it again.
+  // Pick a photo. On a fresh scan it re-runs the scan; in edit mode it
+  // just attaches the photo, to be uploaded on save.
   const pickPhoto = async (source: 'camera' | 'library') => {
     if (source === 'camera') {
       const perm = await ImagePicker.requestCameraPermissionsAsync()
@@ -314,21 +393,29 @@ export default function ScanMealScreen() {
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
     if (result.canceled || !result.assets[0]) return
     setPhotoUri(result.assets[0].uri)
-    setPhase('scanning')
+    if (isEdit) setPhotoChanged(true)
+    else setPhase('scanning')
   }
 
-  // Tap the photo — rescan it, or swap it for another.
+  // Tap the photo (or the placeholder) — change it. A fresh scan also
+  // offers to re-run the scan on the same photo.
   const photoOptions = () => {
+    const options = isEdit
+      ? ['Tomar foto', 'Elegir de galería', 'Cancelar']
+      : ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar']
     ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: 'Foto del platillo',
-        options: ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar'],
-        cancelButtonIndex: 3,
-      },
+      { title: 'Foto del platillo', options, cancelButtonIndex: options.length - 1 },
       (i) => {
-        if (i === 0) setPhase('scanning')
-        else if (i === 1) void pickPhoto('camera')
-        else if (i === 2) void pickPhoto('library')
+        if (isEdit) {
+          if (i === 0) void pickPhoto('camera')
+          else if (i === 1) void pickPhoto('library')
+        } else if (i === 0) {
+          setPhase('scanning')
+        } else if (i === 1) {
+          void pickPhoto('camera')
+        } else if (i === 2) {
+          void pickPhoto('library')
+        }
       },
     )
   }
@@ -352,16 +439,28 @@ export default function ScanMealScreen() {
       calories: Math.round(totals.calories),
     }
 
-    // Edit — update the meal in place, keeping its slot and time.
+    // Edit — update the meal in place, keeping its time.
     if (isEdit && editMeal.data) {
+      // Upload only a freshly-attached photo; otherwise the meal keeps
+      // whatever photo it already had.
+      let photoPath: string | undefined
+      if (photoChanged && photoUri) {
+        try {
+          photoPath = await uploadMealPhoto(photoUri)
+        } catch (e) {
+          console.warn('[scan-meal] photo upload failed', e)
+          Alert.alert('Foto', 'No pudimos guardar la foto, pero sí actualizamos la comida.')
+        }
+      }
       updateMeal.mutate(
         {
           id: editMeal.data.id,
           input: {
             ...macros,
             consumed_at: new Date(editMeal.data.consumed_at),
-            meal_type: editMeal.data.meal_type as MealInput['meal_type'],
+            meal_type: mealType,
             ingredients: storedIngredients,
+            ...(photoPath ? { photo_storage_path: photoPath } : {}),
           },
         },
         { onSuccess: () => router.back(), onError: () => setSaving(false) },
@@ -384,7 +483,7 @@ export default function ScanMealScreen() {
       {
         ...macros,
         consumed_at: new Date(),
-        meal_type: currentMealType(),
+        meal_type: mealType,
         photo_storage_path: photoPath,
         ingredients: storedIngredients,
       },
@@ -458,24 +557,34 @@ export default function ScanMealScreen() {
               keyboardDismissMode="interactive"
             >
               {photoUri ? (
-                isEdit ? (
-                  <View style={[styles.photoWrap, { width: photoW, height: photoH }]}>
-                    <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
-                  </View>
-                ) : (
-                  <Pressable
-                    onPress={photoOptions}
-                    style={[styles.photoWrap, { width: photoW, height: photoH }]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Reescanear o cambiar la foto"
-                  >
-                    <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
-                    <View style={styles.photoChip}>
+                <Pressable
+                  onPress={photoOptions}
+                  style={[styles.photoWrap, { width: photoW, height: photoH }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={isEdit ? 'Cambiar la foto' : 'Reescanear o cambiar la foto'}
+                >
+                  <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
+                  <View style={styles.photoChip}>
+                    {isEdit ? (
+                      <CameraIcon color={colors.leche} size={14} />
+                    ) : (
                       <RescanIcon color={colors.leche} />
-                      <Text style={styles.photoChipText}>Reescanear</Text>
-                    </View>
-                  </Pressable>
-                )
+                    )}
+                    <Text style={styles.photoChipText}>
+                      {isEdit ? 'Cambiar foto' : 'Reescanear'}
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : isEdit ? (
+                <Pressable
+                  onPress={photoOptions}
+                  style={styles.photoPlaceholder}
+                  accessibilityRole="button"
+                  accessibilityLabel="Agregar una foto del platillo"
+                >
+                  <CameraIcon color={colors.magenta} size={28} />
+                  <Text style={styles.photoPlaceholderText}>Agregar foto</Text>
+                </Pressable>
               ) : null}
 
               <Text style={styles.eyebrow}>Tu platillo</Text>
@@ -488,6 +597,27 @@ export default function ScanMealScreen() {
                   placeholderTextColor={colors.niebla}
                 />
                 <PencilIcon color={colors.niebla} />
+              </View>
+
+              <Text style={[styles.eyebrow, styles.eyebrowGap]}>Momento</Text>
+              <View style={styles.slotPill}>
+                {MEAL_TYPES.map((mt) => {
+                  const active = mt.value === mealType
+                  const tint = active ? colors.magenta : colors.niebla
+                  return (
+                    <Pressable
+                      key={mt.value}
+                      onPress={() => setMealType(mt.value)}
+                      style={[styles.slotSeg, active && styles.slotSegActive]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={mt.label}
+                    >
+                      <MealGlyph type={mt.value} color={tint} />
+                      <Text style={[styles.slotSegText, { color: tint }]}>{mt.label}</Text>
+                    </Pressable>
+                  )
+                })}
               </View>
 
               <Text style={[styles.eyebrow, styles.eyebrowGap]}>
@@ -689,6 +819,25 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: 0.3,
   },
+  // No-photo placeholder — a dashed slot inviting a meal photo.
+  photoPlaceholder: {
+    width: '100%',
+    height: 150,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  photoPlaceholderText: {
+    fontFamily: typography.uiBold,
+    fontSize: 13,
+    color: colors.magenta,
+    letterSpacing: 0.3,
+  },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: 10,
@@ -720,6 +869,31 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.3,
     padding: 0,
+  },
+  // Slot picker — one stadium pill with the four meal-moment segments.
+  slotPill: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgCard,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: 4,
+  },
+  slotSeg: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    paddingVertical: 9,
+    borderRadius: 22,
+  },
+  slotSegActive: {
+    backgroundColor: colors.magentaTint,
+  },
+  slotSegText: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 0.4,
   },
   row: {
     flexDirection: 'row',

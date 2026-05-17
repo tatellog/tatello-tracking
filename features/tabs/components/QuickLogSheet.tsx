@@ -218,6 +218,8 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
       calories: item.calories,
       consumed_at: new Date(),
       meal_type: mealType,
+      photo_storage_path: item.photo_storage_path,
+      ingredients: item.ingredients ?? undefined,
     })
     setConfirmingName(item.name)
     setTimeout(onClose, CONFIRM_HOLD_MS)

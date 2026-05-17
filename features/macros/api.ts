@@ -64,9 +64,11 @@ export type CreateMealInput = MealInput & {
   ingredients?: StoredIngredient[]
 }
 
-/** updateMeal carries the optional edited ingredient breakdown. */
+/** updateMeal carries the optional edited ingredient breakdown and a
+ *  newly-attached photo. */
 export type UpdateMealInput = MealInput & {
   ingredients?: StoredIngredient[]
+  photo_storage_path?: string | null
 }
 
 /* The ai_raw_response payload that stores a meal's ingredients. */
@@ -82,9 +84,8 @@ function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
   }
 }
 
-/** A meal's stored ingredient breakdown, or null when it has none. */
-export function mealIngredients(meal: Meal): StoredIngredient[] | null {
-  const raw = meal.ai_raw_response
+/* Parse a stored ai_raw_response payload into ingredients. */
+function parseIngredients(raw: Json | null): StoredIngredient[] | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const list = (raw as { ingredients?: unknown }).ingredients
   if (!Array.isArray(list)) return null
@@ -108,6 +109,11 @@ export function mealIngredients(meal: Meal): StoredIngredient[] | null {
     }
   }
   return parsed.length > 0 ? parsed : null
+}
+
+/** A meal's stored ingredient breakdown, or null when it has none. */
+export function mealIngredients(meal: Meal): StoredIngredient[] | null {
+  return parseIngredients(meal.ai_raw_response)
 }
 
 /* ─── macro_targets ──────────────────────────────────────────────── */
@@ -165,6 +171,12 @@ export type FrequentMeal = {
   meal_type: string
   protein_g: number
   calories: number
+  /** Storage path of the most recent photo across this name's
+   *  occurrences — carried so a re-log keeps the dish photo. */
+  photo_storage_path: string | null
+  /** Most recent ingredient breakdown for this name — carried so a
+   *  re-log keeps the detected ingredients. */
+  ingredients: StoredIngredient[] | null
   /** How many times this name appears in the lookback window. */
   freq: number
 }
@@ -185,7 +197,9 @@ export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
   const since = new Date(Date.now() - FREQUENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('meals')
-    .select('id, name, meal_type, protein_g, calories, consumed_at')
+    .select(
+      'id, name, meal_type, protein_g, calories, consumed_at, photo_storage_path, ai_raw_response',
+    )
     .eq('user_id', userId)
     .gte('consumed_at', since)
     .order('consumed_at', { ascending: false })
@@ -198,6 +212,14 @@ export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
     const existing = groups.get(key)
     if (existing) {
       existing.freq += 1
+      // Keep the most recent photo + ingredients this name ever had.
+      // Rows are consumed_at DESC, so only fill still-empty slots.
+      if (!existing.photo_storage_path && m.photo_storage_path) {
+        existing.photo_storage_path = m.photo_storage_path
+      }
+      if (!existing.ingredients) {
+        existing.ingredients = parseIngredients(m.ai_raw_response)
+      }
     } else {
       // First time seen — and because rows are consumed_at DESC, this
       // first occurrence is the most recent, so its id + macros win.
@@ -207,6 +229,8 @@ export async function getFrequentMeals(limit = 8): Promise<FrequentMeal[]> {
         meal_type: m.meal_type,
         protein_g: Number(m.protein_g),
         calories: m.calories,
+        photo_storage_path: m.photo_storage_path,
+        ingredients: parseIngredients(m.ai_raw_response),
         freq: 1,
         lastAt: m.consumed_at,
       })
@@ -286,6 +310,8 @@ export async function updateMeal(id: string, input: UpdateMealInput): Promise<Me
   // Only touch the ingredient breakdown when the caller supplies one,
   // so a plain field edit never wipes a scanned meal's ingredients.
   if (input.ingredients) patch.ai_raw_response = ingredientsPayload(input.ingredients)
+  // Likewise the photo — only when a new one was attached.
+  if (input.photo_storage_path !== undefined) patch.photo_storage_path = input.photo_storage_path
   const { data, error } = await supabase.from('meals').update(patch).eq('id', id).select().single()
   if (error) throw error
   return data
