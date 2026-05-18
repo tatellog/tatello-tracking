@@ -98,8 +98,12 @@ function QuickLogFab({ onPress }: { onPress: () => void }) {
  * The app's bottom chrome — a navigation pill plus a detached create
  * button, two distinct jobs kept visually apart:
  *
- *   pill → navegar  (Hoy · Comidas · Progreso · Ajustes)
+ *   pill → navegar  (Hoy · Comidas · Órbita · Progreso)
  *   ✦    → crear    (quick-log de comida, desde cualquier tab)
+ *
+ * Ajustes is intentionally NOT in the pill — it's a gear button in
+ * each tab's TabHeader. Settings is configuration, not a destination
+ * you orbit between, so it doesn't share the navigation surface.
  *
  * The ✦ is NOT a tab: it doesn't change the route, it opens the
  * QuickLogSheet over whatever screen is showing. Keeping it outside
@@ -117,6 +121,9 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
           {state.routes.map((route, index) => {
             const descriptor = descriptors[route.key]
             if (!descriptor) return null
+            // Ajustes is reached from the header gear, not the pill —
+            // skip it here while keeping the route navigable.
+            if (route.name === 'settings') return null
             const { options } = descriptor
             const label = options.title ?? route.name
             const focused = state.index === index
@@ -154,14 +161,7 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
         <QuickLogFab onPress={() => setQuickLogVisible(true)} />
       </View>
 
-      <QuickLogSheet
-        visible={quickLogVisible}
-        onClose={() => setQuickLogVisible(false)}
-        onGoToComidas={() => {
-          setQuickLogVisible(false)
-          navigation.navigate('meals')
-        }}
-      />
+      <QuickLogSheet visible={quickLogVisible} onClose={() => setQuickLogVisible(false)} />
     </>
   )
 }

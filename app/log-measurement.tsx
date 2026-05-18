@@ -1,267 +1,157 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
-
-import { StarLoader } from '@/components/StarLoader'
+import { useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { Path } from 'react-native-svg'
 import Toast from 'react-native-toast-message'
 
-import { NumberInput } from '@/features/onboarding/components'
-import { useAddMeasurement } from '@/features/progress/hooks'
-import { colors, radius, shadows, spacing, typography } from '@/theme'
+import { PrimaryCta } from '@/components/PrimaryCta'
+import { StarLoader } from '@/components/StarLoader'
+import { useAddMeasurement, useMeasurements } from '@/features/progress/hooks'
+import { toWeightPoints } from '@/features/progress/logic'
+import { SkyBackground } from '@/features/tabs/components'
+import { WeightWheel } from '@/features/tabs/components/WeightWheel'
+import { colors, typography } from '@/theme'
 
-const MIN_KG = 30
-const MAX_KG = 300
+const DEFAULT_WEIGHT = 70
 
 /*
- * Slide-up sheet for logging a new weight reading. Defaults the
- * timestamp to "now" — the user almost always weighs themselves the
- * moment they open this screen, so we don't make them pick a time.
- * If they need to backdate, that lands in a future sprint (Pareto).
- *
- * Validates 30 ≤ kg ≤ 300 (criterion 23). Optimistic-ish: the
- * mutation invalidates progress + brief on settle, so the chart
- * picks up the new point without manual refresh.
+ * Log a new weight reading — the same two-wheel picker the quick-log
+ * uses, not a typed form. The wheels start at the latest weight so a
+ * new reading is a small scroll, not one from scratch. The timestamp
+ * defaults to "now"; the user weighs in the moment they open this.
  */
 export default function LogMeasurementScreen() {
   const router = useRouter()
   const addMeasurement = useAddMeasurement()
-  const [value, setValue] = useState('')
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const measurementsQuery = useMeasurements(90)
 
-  const num = value === '' ? Number.NaN : Number(value)
-  const isValid = Number.isFinite(num) && num >= MIN_KG && num <= MAX_KG
-  const showInlineError = value.length > 0 && !isValid
+  const latestWeight = useMemo(() => {
+    const pts = toWeightPoints(measurementsQuery.data ?? [])
+    return pts.length > 0 ? (pts[pts.length - 1]?.weight ?? null) : null
+  }, [measurementsQuery.data])
 
-  const handleSave = () => {
-    if (!isValid) return
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    setErrorMessage(null)
+  const save = (kg: number) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     addMeasurement.mutate(
-      {
-        weight_kg: Number(num.toFixed(2)),
-        measured_at: new Date().toISOString(),
-      },
+      { weight_kg: Math.round(kg * 10) / 10, measured_at: new Date().toISOString() },
       {
         onSuccess: () => {
-          Toast.show({ type: 'success', text1: 'Medida guardada' })
+          Toast.show({ type: 'success', text1: 'Peso registrado' })
           router.back()
         },
         onError: (err) => {
-          const message = err instanceof Error ? err.message : 'No pudimos guardar.'
-          setErrorMessage(message)
+          Toast.show({
+            type: 'error',
+            text1: 'No pudimos guardar',
+            text2: err instanceof Error ? err.message : 'Intenta de nuevo.',
+          })
         },
       },
     )
   }
 
-  const nowLabel = formatNowLong(new Date())
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.header}>
-            <Text style={styles.eyebrow}>NUEVA MEDIDA</Text>
-            <Text style={styles.title}>
-              Hoy <Text style={styles.titleEmphasis}>pesas</Text>...
-            </Text>
-            <Text style={styles.timestamp}>{nowLabel}</Text>
-          </View>
-
-          <NumberInput
-            value={value}
-            onChangeText={setValue}
-            unit="kg"
-            placeholder="76"
-            decimal
-            autoFocus
-          />
-
-          {showInlineError ? (
-            <Text style={styles.error}>
-              Entre {MIN_KG} y {MAX_KG} kg.
-            </Text>
-          ) : null}
-
-          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          {/* TouchableOpacity + solid mauveDeep instead of Pressable +
-              LinearGradient absoluteFill — same Android/iOS layout
-              swallow we hit in log-meal and PhotoCaptureCard. */}
-          <View style={[styles.ctaShadow, !isValid && styles.ctaShadowDisabled]}>
-            <TouchableOpacity
-              onPress={handleSave}
-              disabled={!isValid || addMeasurement.isPending}
-              activeOpacity={0.85}
-              style={[
-                styles.cta,
-                isValid && !addMeasurement.isPending ? styles.ctaActive : styles.ctaDisabled,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Guardar peso"
-              accessibilityState={{ disabled: !isValid, busy: addMeasurement.isPending }}
-            >
-              {addMeasurement.isPending ? (
-                <View style={styles.ctaRow}>
-                  <StarLoader size={18} color={colors.pearlBase} />
-                  <Text style={styles.ctaLabel}>Guardando…</Text>
-                </View>
-              ) : (
-                <Text style={[styles.ctaLabel, !isValid && styles.ctaLabelDisabled]}>Guardar</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.cancel}>Cancelar</Text>
+    <View style={styles.screen}>
+      <SkyBackground />
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Tu peso actual</Text>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar"
+          >
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M6 6 L18 18 M18 6 L6 18"
+                stroke={colors.bone}
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              />
+            </Svg>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+        {measurementsQuery.isLoading ? (
+          <View style={styles.center}>
+            <StarLoader size={40} />
+          </View>
+        ) : (
+          <WeightEntry
+            initialKg={latestWeight ?? DEFAULT_WEIGHT}
+            saving={addMeasurement.isPending}
+            onSave={save}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   )
 }
 
-function formatNowLong(d: Date): string {
-  const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
-  const months = [
-    'ene',
-    'feb',
-    'mar',
-    'abr',
-    'may',
-    'jun',
-    'jul',
-    'ago',
-    'sep',
-    'oct',
-    'nov',
-    'dic',
-  ]
-  const dayName = days[d.getDay()] ?? ''
-  const monthName = months[d.getMonth()] ?? ''
-  const time = d.toLocaleTimeString('es-MX', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-  return `${dayName} ${d.getDate()} ${monthName} · ${time}`
+/* The wheel + CTA — split out so it mounts only once the latest weight
+ * is known, since WeightWheel reads its start position once at mount. */
+function WeightEntry({
+  initialKg,
+  saving,
+  onSave,
+}: {
+  initialKg: number
+  saving: boolean
+  onSave: (kg: number) => void
+}) {
+  const [kg, setKg] = useState(initialKg)
+  return (
+    <View style={styles.entry}>
+      <View style={styles.wheelWrap}>
+        <WeightWheel value={kg} onChange={setKg} />
+      </View>
+      <PrimaryCta
+        label="Registrar peso"
+        onPress={() => onSave(kg)}
+        loading={saving}
+        loadingLabel="Guardando…"
+      />
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   safe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
-  },
-  flex: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
   },
   header: {
-    marginBottom: spacing.xl,
-  },
-  eyebrow: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    textTransform: 'uppercase',
-    color: colors.mauveDeep,
-    marginBottom: 8,
-  },
-  title: {
-    fontFamily: typography.display,
-    fontSize: 28,
-    letterSpacing: -1.2,
-    color: colors.inkPrimary,
-    lineHeight: 32,
-  },
-  titleEmphasis: {
-    fontFamily: typography.displaySemi,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.mauveDeep,
-  },
-  timestamp: {
-    marginTop: 6,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.caption,
-    color: colors.labelMuted,
-  },
-  error: {
-    marginTop: spacing.sm,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.caption,
-    color: colors.feedbackError,
-  },
-  footer: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.sm,
-    gap: spacing.sm,
-  },
-  ctaShadow: {
-    borderRadius: radius.pill,
-    ...shadows.ctaMauve,
-  },
-  ctaShadowDisabled: {
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  cta: {
-    overflow: 'hidden',
-    borderRadius: radius.pill,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  ctaActive: {
-    backgroundColor: colors.mauveDeep,
-  },
-  ctaDisabled: {
-    backgroundColor: colors.pearlMuted,
-  },
-  ctaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
-  ctaLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.pearlBase,
-    letterSpacing: 0.3,
+  title: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 20,
+    color: colors.leche,
+    letterSpacing: -0.5,
   },
-  ctaLabelDisabled: {
-    color: colors.labelDim,
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.caption,
-    color: colors.labelMuted,
-    textAlign: 'center',
-    paddingVertical: spacing.sm,
+  entry: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  wheelWrap: {
+    marginBottom: 28,
   },
 })

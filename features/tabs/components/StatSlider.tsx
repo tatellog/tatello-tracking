@@ -1,6 +1,6 @@
 import { curveMonotoneX, line as d3Line } from 'd3-shape'
 import * as Haptics from 'expo-haptics'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native'
 import Animated, {
+  Easing,
   Extrapolation,
   FadeIn,
   interpolate,
@@ -19,29 +20,36 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, ClipPath, Defs, Path, Rect } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
-import { useSetWater, useWaterToday } from '@/features/water/hooks'
+import type { SleepDraft } from '@/features/sleep/api'
+import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
+import type { WellbeingDraft } from '@/features/wellbeing/api'
+import { useSaveWellbeing, useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { colors, typography } from '@/theme'
 
 import { RingCard } from './RingCard'
 
-const SLIDE_TITLES = ['Macros de hoy', 'Tu peso', 'Agua de hoy'] as const
+// Macros lead — the day's most-checked number — then the morning
+// rituals (sleep, check-in) and the slow weight trend. Water lives in
+// the QuickLog (✦); registering it here too would duplicate that.
+const SLIDE_TITLES = ['Macros de hoy', 'Sueño de anoche', 'Cómo amaneciste', 'Tu peso'] as const
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 type Props = { ctx: BriefContext }
 
 /**
  * The Hoy-tab stat slider — a paged carousel whose section title
- * changes per slide. Slide 1 is today's macros (protein + calories),
- * slide 2 is the weight trend. Pagination dots track the position;
+ * changes per slide: today's macros, last night's sleep, the morning
+ * check-in, the weight trend. Sleep and the check-in register inline
+ * (once-a-day morning rituals, not QuickLog actions); macros and
+ * weight are read-only views. Pagination dots track the position;
  * the title cross-fades as the slider pages.
  */
 export function StatSlider({ ctx }: Props) {
@@ -87,10 +95,13 @@ export function StatSlider({ ctx }: Props) {
             <MacroSlide ctx={ctx} />
           </Slide>
           <Slide index={1} width={width} scrollX={scrollX}>
-            <WeightSlide ctx={ctx} />
+            <SleepSlide date={ctx.date} />
           </Slide>
           <Slide index={2} width={width} scrollX={scrollX}>
-            <WaterSlide date={ctx.date} />
+            <WellbeingSlide date={ctx.date} />
+          </Slide>
+          <Slide index={3} width={width} scrollX={scrollX}>
+            <WeightSlide ctx={ctx} />
           </Slide>
         </Animated.ScrollView>
       ) : (
@@ -285,92 +296,346 @@ function WeightSparkline({ points }: { points: WeightPoint[] }) {
   )
 }
 
-/* ─── Slide 3 — water intake ───────────────────────────────────────── */
+/* ─── Slide — last night's sleep ───────────────────────────────────── */
 
-const WATER_TARGET = 8
-const GLASS_SIZE = 34
-// A tumbler — water is shown as a glass, matching the "vasos" copy,
-// so it never reads as a magenta blood drop / cycle tracker.
-const GLASS = 'M6 3.6 H18 L16.2 20.8 H7.8 Z'
+// 7 h 30 m — a neutral default shown (muted) before the night is
+// logged, so the first tap is a small adjustment, not a guess.
+const SLEEP_DEFAULT_MIN = 450
+const SLEEP_MIN = 180 // 3 h
+const SLEEP_MAX = 720 // 12 h
+const SLEEP_STEP = 15
+// A crescent — same moon glyph as the dinner meal slot.
+const MOON = 'M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z'
+const QUALITY_WORDS = ['inquieto', 'ligero', 'reparador', 'profundo', 'pleno'] as const
 
-const AnimatedRect = Animated.createAnimatedComponent(Rect)
+// The hours arc — a shallow bow the night fills left-to-right, giving
+// the slide a "shape" like the weight sparkline. Geometry is fixed: a
+// 150-wide chord rising 34 px to the apex → radius ≈ 99.7, swept
+// length ≈ 170. Fill is 0 at 0 h, full at SLEEP_MAX (12 h).
+const ARC_W = 160
+const ARC_H = 46
+const ARC_PATH = 'M 5 40 A 99.7 99.7 0 0 1 155 40'
+const ARC_LEN = 170
+const ARC_STROKE = 7
 
-/* One glass — a magenta outline that fills with rising water on a
- * spring when tapped. The water is a rect clipped to the glass
- * shape; its top edge eases up from the base (empty) to the rim
- * (full). A soft magenta halo fades in as it fills. */
-function Glass({
-  index,
-  filled,
+function clampDuration(n: number): number {
+  return n < SLEEP_MIN ? SLEEP_MIN : n > SLEEP_MAX ? SLEEP_MAX : n
+}
+
+const AnimatedPath = Animated.createAnimatedComponent(Path)
+
+/* The hours arc — a faint full track with a coloured progress arc on
+ * top. The progress eases to its new length whenever duration steps;
+ * before the night is logged it draws muted, matching the muted
+ * duration number. */
+function SleepArc({ fraction, muted }: { fraction: number; muted: boolean }) {
+  const progress = useSharedValue(fraction)
+  useEffect(() => {
+    progress.value = withTiming(fraction, { duration: 420, easing: Easing.out(Easing.cubic) })
+  }, [fraction, progress])
+
+  // strokeDasharray is one full-length dash; the offset hides the
+  // unfilled tail (offset = LEN → empty, 0 → full).
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: ARC_LEN * (1 - progress.value),
+  }))
+
+  return (
+    <Svg width={ARC_W} height={ARC_H}>
+      <Path
+        d={ARC_PATH}
+        stroke={colors.bruma}
+        strokeWidth={ARC_STROKE}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <AnimatedPath
+        d={ARC_PATH}
+        stroke={muted ? colors.niebla : colors.magenta}
+        strokeWidth={ARC_STROKE}
+        strokeLinecap="round"
+        fill="none"
+        strokeDasharray={ARC_LEN}
+        animatedProps={animatedProps}
+      />
+    </Svg>
+  )
+}
+
+/* A − / + chip for stepping the sleep duration. */
+function StepButton({
+  label,
+  hint,
   onPress,
 }: {
-  index: number
-  filled: boolean
+  label: string
+  hint: string
   onPress: () => void
 }) {
-  const fill = useSharedValue(filled ? 1 : 0)
-  useEffect(() => {
-    fill.value = withSpring(filled ? 1 : 0, { damping: 15, stiffness: 130 })
-  }, [filled, fill])
-
-  // Water level — a rect clipped to the glass. y eases from the
-  // base (24, empty) up to the rim (0, full).
-  const waterProps = useAnimatedProps(() => {
-    const h = 24 * fill.value
-    return { y: 24 - h, height: h }
-  })
-  const glowStyle = useAnimatedStyle(() => ({ shadowOpacity: fill.value * 0.55 }))
-
-  const clipId = `glass-${index}`
   return (
-    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button">
-      <Animated.View style={[styles.glassGlow, glowStyle]}>
-        <Svg width={GLASS_SIZE} height={GLASS_SIZE} viewBox="0 0 24 24">
-          <Defs>
-            <ClipPath id={clipId}>
-              <Path d={GLASS} />
-            </ClipPath>
-          </Defs>
-          <AnimatedRect
-            x={0}
-            width={24}
-            fill={colors.magenta}
-            clipPath={`url(#${clipId})`}
-            animatedProps={waterProps}
-          />
-          <Path
-            d={GLASS}
-            fill="none"
-            stroke={colors.magenta}
-            strokeWidth={1.7}
-            strokeLinejoin="round"
-          />
-        </Svg>
-      </Animated.View>
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      style={styles.stepButton}
+      accessibilityRole="button"
+      accessibilityLabel={hint}
+    >
+      <Text style={styles.stepButtonLabel}>{label}</Text>
     </Pressable>
   )
 }
 
-function WaterSlide({ date }: { date: string }) {
-  const { data: glasses = 0 } = useWaterToday(date)
-  const setWater = useSetWater(date)
-  const tap = (idx: number) => {
-    Haptics.selectionAsync().catch(() => {})
-    // Tap a droplet to fill up to it; tap the current top droplet
-    // again to step one back down.
-    setWater.mutate(glasses === idx + 1 ? idx : idx + 1)
+/*
+ * Last night's sleep — the only slide that registers, not just
+ * displays. Sleep is a once-a-day morning ritual, so its home is
+ * here on Hoy rather than the meal-centric QuickLog. Duration steps
+ * in 15-min increments; quality is five tappable moons. The slide
+ * owns the edited values in local state — the query only seeds them
+ * — so the UI is instant and each change upserts in the background.
+ */
+function SleepSlide({ date }: { date: string }) {
+  const { data: log, isLoading } = useSleepLog(date)
+  const upsert = useUpsertSleep(date)
+
+  const [draft, setDraft] = useState<SleepDraft | null>(null)
+  const [touched, setTouched] = useState(false)
+
+  // Seed the editable draft once the night's row (or its absence) loads.
+  useEffect(() => {
+    if (isLoading || draft != null) return
+    setDraft({
+      durationMinutes: log?.duration_minutes ?? SLEEP_DEFAULT_MIN,
+      quality: log?.quality ?? null,
+    })
+  }, [isLoading, log, draft])
+
+  if (draft == null) {
+    return <View style={[styles.slide, styles.card]} />
   }
+
+  // A row exists once the night is logged or the user has touched it.
+  const hasEntry = log != null || touched
+  const h = Math.floor(draft.durationMinutes / 60)
+  const m = draft.durationMinutes % 60
+
+  const commit = (next: SleepDraft) => {
+    setDraft(next)
+    setTouched(true)
+    upsert.mutate(next)
+  }
+  const step = (delta: number) => {
+    const minutes = clampDuration(draft.durationMinutes + delta)
+    if (minutes === draft.durationMinutes) return
+    Haptics.selectionAsync().catch(() => {})
+    commit({ ...draft, durationMinutes: minutes })
+  }
+  const rate = (i: number) => {
+    Haptics.selectionAsync().catch(() => {})
+    // Tap a moon to set the quality; tap the current top moon to
+    // step one back down — mirrors the water glasses' behaviour.
+    const next = draft.quality === i + 1 ? (i === 0 ? null : i) : i + 1
+    commit({ ...draft, quality: next })
+  }
+
   return (
     <View style={styles.slide}>
-      <View style={styles.card}>
-        <View style={styles.waterDroplets}>
-          {Array.from({ length: WATER_TARGET }).map((_, i) => (
-            <Glass key={i} index={i} filled={i < glasses} onPress={() => tap(i)} />
+      <View style={[styles.card, styles.sleepCard]}>
+        {/* The hours-arc gauge with the duration nested in its bow,
+            flanked by the − / + chips that grow and shrink it. */}
+        <View style={styles.sleepGaugeRow}>
+          <StepButton label="−" hint="Restar 15 minutos" onPress={() => step(-SLEEP_STEP)} />
+          <View style={styles.sleepGauge}>
+            <SleepArc fraction={draft.durationMinutes / SLEEP_MAX} muted={!hasEntry} />
+            <View style={styles.sleepValueWrap}>
+              <Text style={[styles.weightValue, !hasEntry && styles.sleepValueMuted]}>{h}</Text>
+              <Text style={styles.sleepUnit}>h</Text>
+              {m > 0 ? (
+                <>
+                  <Text
+                    style={[
+                      styles.weightValue,
+                      styles.sleepMinutes,
+                      !hasEntry && styles.sleepValueMuted,
+                    ]}
+                  >
+                    {m}
+                  </Text>
+                  <Text style={styles.sleepUnit}>m</Text>
+                </>
+              ) : null}
+            </View>
+          </View>
+          <StepButton label="+" hint="Sumar 15 minutos" onPress={() => step(SLEEP_STEP)} />
+        </View>
+
+        <View style={styles.sleepQualityRow}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Pressable
+              key={i}
+              onPress={() => rate(i)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Calidad ${i + 1} de 5`}
+            >
+              <Svg width={26} height={26} viewBox="0 0 24 24">
+                <Path d={MOON} fill={(draft.quality ?? 0) > i ? colors.magenta : colors.bruma} />
+              </Svg>
+            </Pressable>
           ))}
         </View>
-        <Text style={styles.waterCount}>
-          <Text style={styles.waterCountStrong}>{glasses}</Text> de {WATER_TARGET} vasos hoy
-        </Text>
+
+        {!hasEntry ? (
+          <Text style={styles.captionLine}>¿Cuánto dormiste anoche?</Text>
+        ) : draft.quality == null ? (
+          <Text style={styles.captionLine}>Toca las lunas para la calidad</Text>
+        ) : (
+          <Text style={styles.captionLine}>
+            Sueño <Text style={styles.captionEm}>{QUALITY_WORDS[draft.quality - 1]}</Text>
+          </Text>
+        )}
+      </View>
+    </View>
+  )
+}
+
+/* ─── Slide — this morning's check-in ──────────────────────────────── */
+
+const WELLBEING_AXES = [
+  { key: 'energy', label: 'Energía', invert: false },
+  { key: 'motivation', label: 'Motivación', invert: false },
+  // The DB column is `stress`, but the slide asks for its opposite,
+  // Calma — so all three axes read "more = better" and a fully lit
+  // row is unambiguously a good morning. Stored value = 6 − calma.
+  { key: 'stress', label: 'Calma', invert: true },
+] as const
+
+type WellbeingAxis = (typeof WELLBEING_AXES)[number]
+
+const ENERGY_WORDS = ['en reserva', 'baja', 'estable', 'en alza', 'radiante'] as const
+
+// A 4-point star — the app's celestial glyph. Here it's a rating
+// that lights up: rated levels glow, the rest stay as dim embers.
+const STAR = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
+
+// Taps coalesce: adjusting an axis fires one write 350 ms after the
+// last touch, so a multi-axis check-in doesn't spray rows.
+const WELLBEING_DEBOUNCE_MS = 350
+
+/** The 1–5 value shown for an axis — inverted axes show 6 − stored. */
+function shownValue(axis: WellbeingAxis, draft: WellbeingDraft): number | null {
+  const stored = draft[axis.key]
+  if (stored == null) return null
+  return axis.invert ? 6 - stored : stored
+}
+
+/* One 1–5 axis — five levels that light from embers into glowing
+ * stars as it's rated. */
+function AxisStars({ value, onRate }: { value: number | null; onRate: (i: number) => void }) {
+  const lit = value ?? 0
+  return (
+    <View style={styles.starsRow}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Pressable
+          key={i}
+          onPress={() => onRate(i)}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`${i + 1} de 5`}
+          style={styles.starSlot}
+        >
+          {lit > i ? (
+            <View style={styles.starGlow}>
+              <Svg width={18} height={18} viewBox="0 0 24 24">
+                <Path d={STAR} fill={colors.magenta} />
+              </Svg>
+            </View>
+          ) : (
+            <View style={styles.ember} />
+          )}
+        </Pressable>
+      ))}
+    </View>
+  )
+}
+
+/*
+ * This morning's check-in — energy, motivation and calm on a 1–5
+ * scale. Like the sleep slide it registers inline (a once-a-day
+ * ritual, not a QuickLog action) and feeds two órbita dimensions:
+ * energía and mente. The slide owns the draft; taps are debounced
+ * into one write, and later edits update that same row in place.
+ */
+function WellbeingSlide({ date }: { date: string }) {
+  const { data: row, isLoading } = useTodayWellbeing(date)
+  const save = useSaveWellbeing(date)
+
+  const [draft, setDraft] = useState<WellbeingDraft | null>(null)
+  const [touched, setTouched] = useState(false)
+  // Row id and debounce timer live in refs so a tap reads their
+  // latest value without the draft effect re-running.
+  const rowId = useRef<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Seed the editable draft once today's check-in (or its absence) loads.
+  useEffect(() => {
+    if (isLoading || draft != null) return
+    setDraft({
+      energy: row?.energy ?? null,
+      motivation: row?.motivation ?? null,
+      stress: row?.stress ?? null,
+    })
+    rowId.current = row?.id ?? null
+  }, [isLoading, row, draft])
+
+  // Drop a still-pending write when the slide unmounts.
+  useEffect(() => () => clearTimeout(timer.current ?? undefined), [])
+
+  if (draft == null) {
+    return <View style={[styles.slide, styles.card]} />
+  }
+
+  // A row exists once the check-in is logged or the user has touched it.
+  const hasEntry = row != null || touched
+
+  const rate = (axis: WellbeingAxis, i: number) => {
+    Haptics.selectionAsync().catch(() => {})
+    // Tap a star to set the level; tap the current top star to step
+    // back. The step works on the shown value, then converts to the
+    // stored one (inverted for Calma).
+    const shown = shownValue(axis, draft)
+    const nextShown = shown === i + 1 ? (i === 0 ? null : i) : i + 1
+    const stored = nextShown == null ? null : axis.invert ? 6 - nextShown : nextShown
+    const nextDraft = { ...draft, [axis.key]: stored }
+    setDraft(nextDraft)
+    setTouched(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      save.mutate(
+        { id: rowId.current, draft: nextDraft },
+        { onSuccess: (saved) => (rowId.current = saved?.id ?? null) },
+      )
+    }, WELLBEING_DEBOUNCE_MS)
+  }
+
+  return (
+    <View style={styles.slide}>
+      <View style={[styles.card, styles.wellbeingCard]}>
+        {WELLBEING_AXES.map((axis) => (
+          <View key={axis.key} style={styles.axisRow}>
+            <Text style={styles.axisLabel}>{axis.label}</Text>
+            <AxisStars value={shownValue(axis, draft)} onRate={(i) => rate(axis, i)} />
+          </View>
+        ))}
+
+        {!hasEntry ? (
+          <Text style={styles.captionLine}>¿Cómo te sientes hoy?</Text>
+        ) : draft.energy != null ? (
+          <Text style={styles.captionLine}>
+            Energía <Text style={styles.captionEm}>{ENERGY_WORDS[draft.energy - 1]}</Text>
+          </Text>
+        ) : (
+          <Text style={styles.captionLine}>Check-in guardado</Text>
+        )}
       </View>
     </View>
   )
@@ -493,31 +758,122 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     textAlign: 'center',
   },
-  waterDroplets: {
+  // ── Sleep slide ────────────────────────────────────────────────
+  // The card's children stacked with even breathing room.
+  sleepCard: {
+    gap: 14,
+  },
+  // The − chip · arc gauge · + chip, kept as one centred cluster.
+  sleepGaugeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  // The arc and the duration, stacked — the number tucks up into the
+  // arc's bow via the value row's negative margin.
+  sleepGauge: {
     alignItems: 'center',
   },
-  // Soft magenta aura — shadowOpacity is animated, so it only glows
-  // once a glass has water in it.
-  glassGlow: {
+  sleepValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: -22,
+  },
+  // The h / m units — small, serif, tucked tight against their number.
+  sleepUnit: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: colors.niebla,
+    marginLeft: 2,
+  },
+  // Space before the minutes number, separating the two h·m groups.
+  sleepMinutes: {
+    marginLeft: 8,
+  },
+  // Before the night is logged the duration is a muted suggestion.
+  sleepValueMuted: {
+    color: colors.niebla,
+  },
+  // − / + chip — same bordered surface as the header gear button.
+  stepButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepButtonLabel: {
+    fontFamily: typography.ui,
+    fontSize: 22,
+    lineHeight: 24,
+    color: colors.bone,
+  },
+  sleepQualityRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  // ── Wellbeing slide ────────────────────────────────────────────
+  wellbeingCard: {
+    gap: 13,
+  },
+  // Label + stars as one centred cluster; the fixed label width
+  // keeps the three star columns aligned.
+  axisRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  axisLabel: {
+    width: 104,
+    fontFamily: typography.uiBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  starsRow: {
+    flexDirection: 'row',
+  },
+  // Fixed slot so a lit star and a dim ember occupy the same box.
+  starSlot: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // A rated level — the star sits on a soft magenta glow.
+  starGlow: {
     shadowColor: colors.magenta,
     shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 7,
+    shadowRadius: 5,
+    shadowOpacity: 0.75,
+    elevation: 4,
   },
-  waterCount: {
-    marginTop: 16,
+  // An unrated level — a dim ember.
+  ember: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: colors.bruma,
+  },
+  // ── Shared caption — the serif italic line under a slide. ──────
+  captionLine: {
     textAlign: 'center',
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: 15,
     color: colors.niebla,
   },
-  waterCountStrong: {
-    fontFamily: typography.displaySemi,
-    fontStyle: 'normal',
-    fontSize: 17,
-    color: colors.leche,
+  captionEm: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    color: colors.magenta,
   },
   dots: {
     flexDirection: 'row',

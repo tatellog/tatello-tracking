@@ -84,12 +84,15 @@ export async function uploadAvatar(uri: string): Promise<Profile> {
     [{ resize: { width: AVATAR_PX, height: AVATAR_PX } }],
     { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG },
   )
-  const blob = await fetch(processed.uri).then((r) => r.blob())
+  // React Native's fetch().blob() uploads 0 bytes to Supabase Storage —
+  // an ArrayBuffer carries the real bytes (the documented RN pattern).
+  const bytes = await fetch(processed.uri).then((r) => r.arrayBuffer())
+  if (bytes.byteLength === 0) throw new Error('La imagen quedó vacía al procesarla.')
   const path = `${userId}/${Date.now()}.jpg`
 
   const { error: uploadErr } = await supabase.storage
     .from('avatars')
-    .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '3600' })
+    .upload(path, bytes, { contentType: 'image/jpeg', cacheControl: '3600' })
   if (uploadErr) throw uploadErr
 
   return updateProfile({ avatar_path: path })

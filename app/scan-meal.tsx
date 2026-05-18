@@ -261,18 +261,29 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  */
 export default function ScanMealScreen() {
   const router = useRouter()
-  const { uri, editId } = useLocalSearchParams<{ uri?: string; editId?: string }>()
+  const { uri, editId, manual } = useLocalSearchParams<{
+    uri?: string
+    editId?: string
+    manual?: string
+  }>()
   const isEdit = !!editId
+  // Manual log — no scan, no ingredient breakdown; the user types the
+  // protein + calories. The photo and name stay optional.
+  const isManual = !!manual
   const createMeal = useCreateMeal()
   const updateMeal = useUpdateMeal()
   const editMeal = useMealById(editId)
 
-  const [phase, setPhase] = useState<'scanning' | 'confirm'>(isEdit ? 'confirm' : 'scanning')
+  const [phase, setPhase] = useState<'scanning' | 'confirm'>(
+    isEdit || isManual ? 'confirm' : 'scanning',
+  )
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
   const [name, setName] = useState('')
   const [mealType, setMealType] = useState<MealType>(currentMealType)
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([])
+  const [proteinInput, setProteinInput] = useState('')
+  const [caloriesInput, setCaloriesInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   // In edit mode, true once the user attaches a new photo — so save
@@ -280,9 +291,10 @@ export default function ScanMealScreen() {
   const [photoChanged, setPhotoChanged] = useState(false)
   const populatedRef = useRef(false)
 
-  // Scan whenever we (re-)enter the scanning phase — skipped in edit.
+  // Scan whenever we (re-)enter the scanning phase — skipped in edit
+  // and manual modes, which open straight on the confirm form.
   useEffect(() => {
-    if (isEdit || phase !== 'scanning') return
+    if (isEdit || isManual || phase !== 'scanning') return
     let alive = true
     scanMeal(photoUri ?? '').then((meal) => {
       if (!alive) return
@@ -293,7 +305,7 @@ export default function ScanMealScreen() {
     return () => {
       alive = false
     }
-  }, [isEdit, phase, photoUri])
+  }, [isEdit, isManual, phase, photoUri])
 
   // Edit mode — fill the form from the meal once it loads. The ref
   // gates it to a single run so a refetch can't clobber edits; a meal
@@ -323,13 +335,13 @@ export default function ScanMealScreen() {
 
   // Advance the status line while scanning, holding on the last step.
   useEffect(() => {
-    if (isEdit || phase !== 'scanning') return
+    if (isEdit || isManual || phase !== 'scanning') return
     setStepIndex(0)
     const id = setInterval(() => {
       setStepIndex((i) => Math.min(i + 1, SCAN_STEPS.length - 1))
     }, 1600)
     return () => clearInterval(id)
-  }, [isEdit, phase])
+  }, [isEdit, isManual, phase])
 
   // Read the photo's real proportions so it can be shown uncropped.
   useEffect(() => {
@@ -394,19 +406,20 @@ export default function ScanMealScreen() {
     if (result.canceled || !result.assets[0]) return
     setPhotoUri(result.assets[0].uri)
     if (isEdit) setPhotoChanged(true)
-    else setPhase('scanning')
+    else if (!isManual) setPhase('scanning')
   }
 
   // Tap the photo (or the placeholder) — change it. A fresh scan also
   // offers to re-run the scan on the same photo.
   const photoOptions = () => {
-    const options = isEdit
-      ? ['Tomar foto', 'Elegir de galería', 'Cancelar']
-      : ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar']
+    const options =
+      isEdit || isManual
+        ? ['Tomar foto', 'Elegir de galería', 'Cancelar']
+        : ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar']
     ActionSheetIOS.showActionSheetWithOptions(
       { title: 'Foto del platillo', options, cancelButtonIndex: options.length - 1 },
       (i) => {
-        if (isEdit) {
+        if (isEdit || isManual) {
           if (i === 0) void pickPhoto('camera')
           else if (i === 1) void pickPhoto('library')
         } else if (i === 0) {
@@ -421,9 +434,41 @@ export default function ScanMealScreen() {
   }
 
   const handleConfirm = async () => {
-    if (saving || ingredients.length === 0) return
+    if (saving) return
+    if (isManual) {
+      if (!proteinInput.trim() || !caloriesInput.trim()) return
+    } else if (ingredients.length === 0) {
+      return
+    }
     setSaving(true)
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+
+    // Manual log — macros typed by hand, no ingredient breakdown.
+    if (isManual) {
+      let manualPhoto: string | undefined
+      if (photoUri) {
+        try {
+          manualPhoto = await uploadMealPhoto(photoUri)
+        } catch (e) {
+          console.warn('[scan-meal] photo upload failed', e)
+          Alert.alert('Foto', 'No pudimos guardar la foto, pero sí registramos la comida.')
+        }
+      }
+      createMeal.mutate(
+        {
+          name: name.trim() || 'Comida',
+          // Clamp to the schema's accepted range so a typo can't make
+          // the insert reject silently.
+          protein_g: Math.min(500, Math.max(0, Number(proteinInput) || 0)),
+          calories: Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0))),
+          consumed_at: new Date(),
+          meal_type: mealType,
+          photo_storage_path: manualPhoto,
+        },
+        { onSuccess: () => router.back(), onError: () => setSaving(false) },
+      )
+      return
+    }
 
     const storedIngredients: StoredIngredient[] = ingredients.map(
       ({ name: ingName, grams, proteinPer100, kcalPer100 }) => ({
@@ -561,21 +606,23 @@ export default function ScanMealScreen() {
                   onPress={photoOptions}
                   style={[styles.photoWrap, { width: photoW, height: photoH }]}
                   accessibilityRole="button"
-                  accessibilityLabel={isEdit ? 'Cambiar la foto' : 'Reescanear o cambiar la foto'}
+                  accessibilityLabel={
+                    isEdit || isManual ? 'Cambiar la foto' : 'Reescanear o cambiar la foto'
+                  }
                 >
                   <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
                   <View style={styles.photoChip}>
-                    {isEdit ? (
+                    {isEdit || isManual ? (
                       <CameraIcon color={colors.leche} size={14} />
                     ) : (
                       <RescanIcon color={colors.leche} />
                     )}
                     <Text style={styles.photoChipText}>
-                      {isEdit ? 'Cambiar foto' : 'Reescanear'}
+                      {isEdit || isManual ? 'Cambiar foto' : 'Reescanear'}
                     </Text>
                   </View>
                 </Pressable>
-              ) : isEdit ? (
+              ) : isEdit || isManual ? (
                 <Pressable
                   onPress={photoOptions}
                   style={styles.photoPlaceholder}
@@ -620,77 +667,121 @@ export default function ScanMealScreen() {
                 })}
               </View>
 
-              <Text style={[styles.eyebrow, styles.eyebrowGap]}>
-                {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
-              </Text>
-              {ingredients.map((ing) => (
-                <View key={ing.id} style={styles.row}>
-                  <View style={styles.ingMain}>
-                    <TextInput
-                      style={styles.ingName}
-                      value={ing.name}
-                      onChangeText={(t) => setIngredientName(ing.id, t)}
-                      placeholder="Ingrediente"
-                      placeholderTextColor={colors.niebla}
-                    />
-                    <Text style={styles.ingMacros}>
-                      {Math.round(ingredientProtein(ing))} g proteína ·{' '}
-                      {Math.round(ingredientKcal(ing))} kcal
-                    </Text>
-                  </View>
-                  <View style={styles.gramsBox}>
-                    <TextInput
-                      style={styles.gramsInput}
-                      value={String(ing.grams)}
-                      onChangeText={(t) => setGrams(ing.id, t)}
-                      keyboardType="numeric"
-                      returnKeyType="done"
-                    />
-                    <Text style={styles.gramsUnit}>g</Text>
-                  </View>
-                  <Pressable
-                    onPress={() => removeIngredient(ing.id)}
-                    hitSlop={8}
-                    style={styles.removeBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Quitar ${ing.name || 'ingrediente'}`}
-                  >
-                    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-                      <Path
-                        d="M6 6 L18 18 M18 6 L6 18"
-                        stroke={colors.niebla}
-                        strokeWidth={2.4}
-                        strokeLinecap="round"
+              {isManual ? (
+                <>
+                  <Text style={[styles.eyebrow, styles.eyebrowGap]}>Macros</Text>
+                  <View style={styles.row}>
+                    <Text style={styles.macroLabel}>Proteína</Text>
+                    <View style={[styles.gramsBox, styles.macroBox]}>
+                      <TextInput
+                        style={styles.gramsInput}
+                        value={proteinInput}
+                        onChangeText={(t) => setProteinInput(t.replace(/[^0-9]/g, ''))}
+                        placeholder="0"
+                        placeholderTextColor={colors.niebla}
+                        keyboardType="numeric"
+                        returnKeyType="done"
                       />
-                    </Svg>
-                  </Pressable>
-                </View>
-              ))}
+                      <Text style={styles.gramsUnit}>g</Text>
+                    </View>
+                  </View>
+                  <View style={styles.row}>
+                    <Text style={styles.macroLabel}>Calorías</Text>
+                    <View style={[styles.gramsBox, styles.macroBox]}>
+                      <TextInput
+                        style={styles.gramsInput}
+                        value={caloriesInput}
+                        onChangeText={(t) => setCaloriesInput(t.replace(/[^0-9]/g, ''))}
+                        placeholder="0"
+                        placeholderTextColor={colors.niebla}
+                        keyboardType="numeric"
+                        returnKeyType="done"
+                      />
+                      <Text style={styles.gramsUnit}>kcal</Text>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.eyebrow, styles.eyebrowGap]}>
+                    {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
+                  </Text>
+                  {ingredients.map((ing) => (
+                    <View key={ing.id} style={styles.row}>
+                      <View style={styles.ingMain}>
+                        <TextInput
+                          style={styles.ingName}
+                          value={ing.name}
+                          onChangeText={(t) => setIngredientName(ing.id, t)}
+                          placeholder="Ingrediente"
+                          placeholderTextColor={colors.niebla}
+                        />
+                        <Text style={styles.ingMacros}>
+                          {Math.round(ingredientProtein(ing))} g proteína ·{' '}
+                          {Math.round(ingredientKcal(ing))} kcal
+                        </Text>
+                      </View>
+                      <View style={styles.gramsBox}>
+                        <TextInput
+                          style={styles.gramsInput}
+                          value={String(ing.grams)}
+                          onChangeText={(t) => setGrams(ing.id, t)}
+                          keyboardType="numeric"
+                          returnKeyType="done"
+                        />
+                        <Text style={styles.gramsUnit}>g</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => removeIngredient(ing.id)}
+                        hitSlop={8}
+                        style={styles.removeBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Quitar ${ing.name || 'ingrediente'}`}
+                      >
+                        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                          <Path
+                            d="M6 6 L18 18 M18 6 L6 18"
+                            stroke={colors.niebla}
+                            strokeWidth={2.4}
+                            strokeLinecap="round"
+                          />
+                        </Svg>
+                      </Pressable>
+                    </View>
+                  ))}
 
-              <Pressable
-                onPress={addIngredient}
-                style={styles.addBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Agregar un ingrediente"
-              >
-                <PlusIcon color={colors.magenta} />
-                <Text style={styles.addBtnText}>Agregar ingrediente</Text>
-              </Pressable>
+                  <Pressable
+                    onPress={addIngredient}
+                    style={styles.addBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Agregar un ingrediente"
+                  >
+                    <PlusIcon color={colors.magenta} />
+                    <Text style={styles.addBtnText}>Agregar ingrediente</Text>
+                  </Pressable>
+                </>
+              )}
             </ScrollView>
 
             <View style={styles.footer}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>En total</Text>
-                <Text style={styles.totalValue}>
-                  <Text style={styles.totalNum}>{Math.round(totals.protein)}</Text> g proteína
-                  {'   ·   '}
-                  <Text style={styles.totalNum}>{Math.round(totals.calories)}</Text> kcal
-                </Text>
-              </View>
+              {isManual ? null : (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>En total</Text>
+                  <Text style={styles.totalValue}>
+                    <Text style={styles.totalNum}>{Math.round(totals.protein)}</Text> g proteína
+                    {'   ·   '}
+                    <Text style={styles.totalNum}>{Math.round(totals.calories)}</Text> kcal
+                  </Text>
+                </View>
+              )}
               <PrimaryCta
                 label={isEdit ? 'Guardar' : 'Confirmar'}
                 onPress={handleConfirm}
-                disabled={ingredients.length === 0}
+                disabled={
+                  isManual
+                    ? !proteinInput.trim() || !caloriesInput.trim()
+                    : ingredients.length === 0
+                }
                 loading={saving}
                 loadingLabel="Guardando…"
               />
@@ -952,6 +1043,17 @@ const styles = StyleSheet.create({
   removeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Manual macros — a label + a number box per row (protein / kcal).
+  macroLabel: {
+    flex: 1,
+    fontFamily: typography.displaySemi,
+    fontSize: 15,
+    color: colors.leche,
+    letterSpacing: -0.2,
+  },
+  macroBox: {
+    minWidth: 104,
   },
   // "Agregar ingrediente" — a dashed slot signalling an open row.
   addBtn: {

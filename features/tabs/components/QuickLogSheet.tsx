@@ -164,8 +164,6 @@ type Mode = 'home' | 'weight'
 type Props = {
   visible: boolean
   onClose: () => void
-  /** Escape hatch to the Comidas core for foods not in "Lo de siempre". */
-  onGoToComidas: () => void
 }
 
 /*
@@ -174,10 +172,10 @@ type Props = {
  *   - Peso  → opens a two-wheel weight picker (mode 'weight').
  *   - Agua  → tap a droplet, logged instantly (water_intake).
  *   - Comida → the slot pill + "Lo de siempre" frequent foods; the
- *     bottom offers two methods — Log manual (the editor) and Con
- *     foto (pick/shoot a photo → the scan-meal flow).
+ *     bottom offers two methods — Log manual (scan-meal in manual
+ *     mode) and Con foto (pick/shoot a photo → the scan-meal flow).
  */
-export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
+export function QuickLogSheet({ visible, onClose }: Props) {
   const router = useRouter()
   const today = useMemo(() => todayInTimezone(), [])
 
@@ -274,6 +272,14 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
         else if (index === 1) void openPhoto('library')
       },
     )
+  }
+
+  // Log manual — the scan-meal screen in manual mode: type the macros
+  // by hand, photo and ingredients optional.
+  const handleManualLog = () => {
+    if (confirmingName != null) return
+    onClose()
+    router.push({ pathname: '/scan-meal', params: { manual: '1' } })
   }
 
   return (
@@ -389,7 +395,7 @@ export function QuickLogSheet({ visible, onClose, onGoToComidas }: Props) {
                   <Text style={styles.methodLabel}>Con foto</Text>
                 </Pressable>
                 <Pressable
-                  onPress={onGoToComidas}
+                  onPress={handleManualLog}
                   disabled={confirmingName != null}
                   style={[styles.method, styles.methodManual]}
                   accessibilityRole="button"

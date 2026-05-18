@@ -12,7 +12,7 @@ import { useMacroTargets } from '@/features/macros/hooks'
 import { avatarUrl } from '@/features/profile/api'
 import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
-import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
+import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
@@ -119,9 +119,8 @@ export default function SettingsScreen() {
 
   // Celestial identity line — sign comes from the same source as the
   // Hoy-tab constellation, so the two screens agree.
-  const signLabel = profile?.date_of_birth
-    ? ZODIAC[zodiacFromDate(profile.date_of_birth)].label
-    : null
+  const zodiacSign = profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null
+  const signLabel = zodiacSign ? ZODIAC[zodiacSign].label : null
   const identityLine = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join('  ·  ')
 
   const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
@@ -159,6 +158,8 @@ export default function SettingsScreen() {
                         <StarLoader size={16} color={colors.magenta} />
                       ) : avatarUri ? (
                         <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                      ) : zodiacSign ? (
+                        <ZodiacFigure sign={zodiacSign} size={30} color={colors.magenta} />
                       ) : (
                         <Text style={styles.avatarInitial}>{initial}</Text>
                       )}
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
   signAge: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: 14.5,
     color: colors.niebla,
     marginTop: 4,
   },
@@ -347,12 +348,12 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 13.5,
+    fontSize: 15.5,
     color: colors.niebla,
   },
   rowValue: {
     fontFamily: typography.displaySemi,
-    fontSize: 14.5,
+    fontSize: 15.5,
     color: colors.bone,
     letterSpacing: -0.2,
     flexShrink: 1,
@@ -375,14 +376,14 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontFamily: typography.displaySemi,
-    fontSize: 15.5,
+    fontSize: 16.5,
     color: colors.leche,
     letterSpacing: -0.3,
   },
   metaValue: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
+    fontSize: 14,
     color: colors.niebla,
     marginTop: 4,
   },
@@ -408,14 +409,14 @@ const styles = StyleSheet.create({
   },
   signOutLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 13.5,
+    fontSize: 15,
     color: colors.bone,
     letterSpacing: 0.3,
   },
   errorText: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: 12.5,
     color: colors.feedbackError,
   },
   // Editorial sign-off — serif italic with one magenta word.
