@@ -16,3 +16,15 @@ export function todayInTimezone(tz: string = USER_TIMEZONE): string {
   // a manual zero-pad + concat.
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
 }
+
+/*
+ * The device's current IANA timezone (e.g. 'America/Mexico_City',
+ * 'Europe/Madrid'). Captured into profiles.timezone at the end of
+ * onboarding so every per-user server query (the órbitas engine,
+ * future daily_signals view) buckets the local day correctly instead
+ * of assuming everyone lives in Mexico City. Falls back to the
+ * USER_TIMEZONE literal on the rare runtime that returns no zone.
+ */
+export function deviceTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || USER_TIMEZONE
+}

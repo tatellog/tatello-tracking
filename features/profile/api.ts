@@ -28,6 +28,10 @@ export const ProfileUpdateSchema = z
     goal: z.enum(GOAL_VALUES),
     onboarding_completed_at: z.string(),
     avatar_path: z.string(),
+    // IANA zone name. The DB trg_validate_profile_timezone trigger is
+    // the real validator (it rejects bad names); the client just guards
+    // against an empty/oversized string before the round-trip.
+    timezone: z.string().min(1, 'Requerido').max(64, 'Máximo 64 caracteres'),
   })
   .partial()
 

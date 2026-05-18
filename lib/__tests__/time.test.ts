@@ -1,4 +1,4 @@
-import { USER_TIMEZONE, todayInTimezone } from '@/lib/time'
+import { deviceTimezone, USER_TIMEZONE, todayInTimezone } from '@/lib/time'
 
 describe('todayInTimezone', () => {
   beforeEach(() => {
@@ -38,5 +38,21 @@ describe('todayInTimezone', () => {
 describe('USER_TIMEZONE constant', () => {
   it('is the IANA name matching the server-side user_timezone() function', () => {
     expect(USER_TIMEZONE).toBe('America/Mexico_City')
+  })
+})
+
+describe('deviceTimezone', () => {
+  it('returns a non-empty IANA zone name', () => {
+    const tz = deviceTimezone()
+    expect(typeof tz).toBe('string')
+    expect(tz.length).toBeGreaterThan(0)
+  })
+
+  it('falls back to USER_TIMEZONE when the runtime reports no zone', () => {
+    const spy = jest
+      .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+      .mockReturnValue({ timeZone: '' } as Intl.ResolvedDateTimeFormatOptions)
+    expect(deviceTimezone()).toBe(USER_TIMEZONE)
+    spy.mockRestore()
   })
 })

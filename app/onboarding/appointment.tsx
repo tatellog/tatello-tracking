@@ -10,6 +10,7 @@ import {
   WizardLayout,
 } from '@/features/onboarding/components'
 import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
+import { deviceTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 const WEEKDAY_ES = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'] as const
@@ -53,6 +54,9 @@ export default function AppointmentScreen() {
     try {
       await updateProfile.mutateAsync({
         onboarding_completed_at: new Date().toISOString(),
+        // Capture the device's IANA zone so every per-user day-bucketed
+        // query lands on the right local day — see profiles.timezone.
+        timezone: deviceTimezone(),
       })
     } catch {
       // Día 1 re-fetches the profile on mount, so a transient patch

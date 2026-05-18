@@ -120,6 +120,36 @@ export type Database = {
         }
         Relationships: []
       }
+      cycle_events: {
+        Row: {
+          created_at: string
+          event_date: string
+          event_type: string
+          flow: string | null
+          id: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_date: string
+          event_type: string
+          flow?: string | null
+          id?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string
+          event_type?: string
+          flow?: string | null
+          id?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       macro_targets: {
         Row: {
           calories: number
@@ -264,6 +294,7 @@ export type Database = {
           height_cm: number | null
           id: string
           onboarding_completed_at: string | null
+          timezone: string
           updated_at: string
         }
         Insert: {
@@ -277,6 +308,7 @@ export type Database = {
           height_cm?: number | null
           id: string
           onboarding_completed_at?: string | null
+          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -290,6 +322,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           onboarding_completed_at?: string | null
+          timezone?: string
           updated_at?: string
         }
         Relationships: []
@@ -312,6 +345,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sleep_logs: {
+        Row: {
+          bedtime: string
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          quality: number | null
+          sleep_date: string
+          user_id: string
+          wake_time: string
+        }
+        Insert: {
+          bedtime: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          quality?: number | null
+          sleep_date: string
+          user_id: string
+          wake_time: string
+        }
+        Update: {
+          bedtime?: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          quality?: number | null
+          sleep_date?: string
+          user_id?: string
+          wake_time?: string
+        }
+        Relationships: []
+      }
       water_intake: {
         Row: {
           glasses: number
@@ -329,6 +398,42 @@ export type Database = {
           glasses?: number
           intake_date?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wellbeing_checkins: {
+        Row: {
+          checked_at: string
+          checkin_date: string
+          created_at: string
+          energy: number | null
+          id: string
+          motivation: number | null
+          notes: string | null
+          stress: number | null
+          user_id: string
+        }
+        Insert: {
+          checked_at?: string
+          checkin_date: string
+          created_at?: string
+          energy?: number | null
+          id?: string
+          motivation?: number | null
+          notes?: string | null
+          stress?: number | null
+          user_id: string
+        }
+        Update: {
+          checked_at?: string
+          checkin_date?: string
+          created_at?: string
+          energy?: number | null
+          id?: string
+          motivation?: number | null
+          notes?: string | null
+          stress?: number | null
           user_id?: string
         }
         Relationships: []
@@ -365,7 +470,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      daily_signals: {
+        Row: {
+          calories: number | null
+          day: string | null
+          energy: number | null
+          meal_count: number | null
+          mood: string | null
+          motivation: number | null
+          on_period: boolean | null
+          protein_g: number | null
+          rested: boolean | null
+          sleep_minutes: number | null
+          sleep_quality: number | null
+          stress: number | null
+          trained: boolean | null
+          user_id: string | null
+          water_glasses: number | null
+          weight_kg: number | null
+          wellbeing_checkins: number | null
+          workout_type: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_brief_context: {
@@ -387,6 +514,7 @@ export type Database = {
         }[]
       }
       user_timezone: { Args: never; Returns: string }
+      user_tz: { Args: { p_user_id?: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
