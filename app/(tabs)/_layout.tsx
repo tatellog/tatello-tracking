@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, Ellipse, Path } from 'react-native-svg'
 
 import { AppTabBar } from '@/features/tabs/components'
 
@@ -46,6 +46,26 @@ function MealBowlIcon({ color, size = 20 }: IconProps) {
   )
 }
 
+// Órbita — a core with a body orbiting it on a tilted ellipse. The
+// app's central metaphor, distilled into a glyph.
+function OrbitIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
+      <Ellipse
+        cx={12}
+        cy={12}
+        rx={10}
+        ry={4.4}
+        stroke={color}
+        strokeWidth={2}
+        transform="rotate(-30 12 12)"
+      />
+      <Circle cx={12} cy={12} r={3.2} fill={color} />
+      <Circle cx={20.7} cy={7} r={2.5} fill={color} />
+    </Svg>
+  )
+}
+
 // Progreso — a rising trend line with a bright node at its peak.
 function TrendIcon({ color, size = 20 }: IconProps) {
   return (
@@ -62,22 +82,12 @@ function TrendIcon({ color, size = 20 }: IconProps) {
   )
 }
 
-// Ajustes — sliders: two tracks, each with a knob; tracks break
-// around the knob so the control reads cleanly.
-function SlidersIcon({ color, size = 20 }: IconProps) {
-  return (
-    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
-      <Path d="M3 8h3M12 8h9M3 16h9M18 16h3" stroke={color} strokeWidth={2} strokeLinecap="round" />
-      <Circle cx={9} cy={8} r={3} fill={color} />
-      <Circle cx={15} cy={16} r={3} fill={color} />
-    </Svg>
-  )
-}
-
 // The bottom chrome is a custom component (AppTabBar): a navigation
 // pill plus a detached magenta ✦ that opens the quick-log. Screen
 // options here only carry each tab's title + icon — AppTabBar reads
-// them off the route descriptors.
+// them off the route descriptors. Ajustes is the exception: it has no
+// icon here because it's not in the pill — it's the header gear, and
+// AppTabBar skips its route.
 export default function TabsLayout() {
   return (
     <Tabs
@@ -101,6 +111,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="orbita"
+        options={{
+          title: 'Órbita',
+          tabBarIcon: ({ color, size }) => <OrbitIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="progress"
         options={{
           title: 'Progreso',
@@ -111,7 +128,6 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: 'Ajustes',
-          tabBarIcon: ({ color, size }) => <SlidersIcon color={color} size={size} />,
         }}
       />
     </Tabs>

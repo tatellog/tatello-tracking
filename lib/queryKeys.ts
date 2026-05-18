@@ -56,4 +56,16 @@ export const queryKeys = {
     all: ['rest'] as const,
     day: (date: string) => ['rest', date] as const,
   },
+  sleep: {
+    all: ['sleep'] as const,
+    day: (date: string) => ['sleep', date] as const,
+  },
+  wellbeing: {
+    all: ['wellbeing'] as const,
+    day: (date: string) => ['wellbeing', date] as const,
+  },
+  orbita: {
+    all: ['orbita'] as const,
+    today: () => ['orbita', 'today'] as const,
+  },
 } as const
