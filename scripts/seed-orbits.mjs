@@ -36,7 +36,7 @@ const admin = createClient(URL_, SERVICE_KEY, {
 })
 
 const TEST_EMAIL = 'seed@stelar.test'
-const TEST_PASSWORD = 'stelar-seed-2026'
+const TEST_PASSWORD = 'test123'
 const DAYS = 45
 // Mexico City has been a permanent UTC-6 (no DST) since 2022, so a
 // fixed offset is exact for this seed user's timezone.
