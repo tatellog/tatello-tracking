@@ -1,9 +1,20 @@
 import { useState } from 'react'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
+import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
 import type { ProgressPhoto } from '@/features/progress/api'
 import { useBeforeAfterPhotos } from '@/features/progress/hooks'
 import { colors, typography } from '@/theme'
@@ -40,30 +51,57 @@ function formatDate(iso: string): string {
   return `${d.getDate()} ${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
 }
 
-/* One side of the diptych — an eyebrow, a portrait photo frame (or a
- * dashed placeholder when the photo doesn't exist yet) and its date. */
+/* One side of the diptych — an eyebrow, a portrait photo frame and its
+ * date. When `onPress` is given the frame is a button: a filled photo
+ * re-opens the picker, an empty one shows a "Subir foto" affordance.
+ * `uploading` swaps the frame for a spinner while the upload runs. */
 function PhotoColumn({
   label,
   tone,
   photo,
+  onPress,
+  uploading,
 }: {
   label: string
   tone: EyebrowTone
   photo: ProgressPhoto | null
+  onPress?: () => void
+  uploading?: boolean
 }) {
+  const frame =
+    photo?.signed_url && !uploading ? (
+      <View style={styles.frame}>
+        <Image source={{ uri: photo.signed_url }} style={styles.img} resizeMode="cover" />
+      </View>
+    ) : (
+      <View style={[styles.frame, styles.framePlaceholder]}>
+        {uploading ? (
+          <ActivityIndicator color={colors.magenta} />
+        ) : (
+          <>
+            <Text style={styles.placeholderStar}>✦</Text>
+            {onPress ? <Text style={styles.placeholderHint}>Subir foto</Text> : null}
+          </>
+        )}
+      </View>
+    )
+
   return (
     <View style={styles.col}>
       <EyebrowLabel tone={tone} size={10} style={styles.colLabel}>
         {label}
       </EyebrowLabel>
-      {photo?.signed_url ? (
-        <View style={styles.frame}>
-          <Image source={{ uri: photo.signed_url }} style={styles.img} resizeMode="cover" />
-        </View>
+      {onPress ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`Subir foto de ${label.toLowerCase()}`}
+        >
+          {frame}
+        </TouchableOpacity>
       ) : (
-        <View style={[styles.frame, styles.framePlaceholder]}>
-          <Text style={styles.placeholderStar}>✦</Text>
-        </View>
+        frame
       )}
       <Text style={styles.date}>{photo ? formatDate(photo.taken_at) : 'Pendiente'}</Text>
     </View>
@@ -74,12 +112,48 @@ function PhotoColumn({
  * "Antes y ahora" — the visual twin of the trajectory: the earliest
  * front photo against the latest. Always the full span (not the page
  * range). Empty / single states render the same diptych with dashed
- * placeholders so the shape of the journey is always legible.
+ * placeholders, each tappable to upload a front photo.
  */
 export function BeforeAfterPhotos() {
   const { data } = useBeforeAfterPhotos()
+  const takePhoto = useTakePhoto()
   const [shareOpen, setShareOpen] = useState(false)
   if (!data) return null
+
+  // Pick from camera/library, then push it through the shared upload
+  // pipeline as a `front` photo — getBeforeAfterPhotos derives the
+  // before/after pair from the earliest/latest front photos, so a new
+  // upload always lands as the "ahora".
+  const pickAndUpload = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
+        return
+      }
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
+    if (result.canceled || !result.assets[0]) return
+    try {
+      await takePhoto.mutateAsync({ uri: result.assets[0].uri, angle: 'front' })
+    } catch {
+      Alert.alert('Foto', 'No se pudo subir la foto. Inténtalo de nuevo.')
+    }
+  }
+
+  const choosePhoto = () => {
+    const options = ['Tomar foto', 'Elegir de galería', 'Cancelar']
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: 'Foto de progreso', options, cancelButtonIndex: 2 },
+      (i) => {
+        if (i === 0) void pickAndUpload('camera')
+        else if (i === 1) void pickAndUpload('library')
+      },
+    )
+  }
 
   const caption =
     data.count === 0
@@ -88,13 +162,30 @@ export function BeforeAfterPhotos() {
         ? 'Tu próxima foto frontal completará el después.'
         : null
   const canShare = data.count >= 2
+  const busy = takePhoto.isPending
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(360)} style={styles.wrap}>
       <View style={styles.row}>
-        <PhotoColumn label="Antes" tone="niebla" photo={data.before} />
+        <PhotoColumn
+          label="Antes"
+          tone="niebla"
+          photo={data.before}
+          // The "antes" is your origin point — only tappable while it's
+          // still empty (the very first upload).
+          onPress={!busy && !data.before ? choosePhoto : undefined}
+          uploading={busy && data.count === 0}
+        />
         <Text style={styles.arrow}>→</Text>
-        <PhotoColumn label="Ahora" tone="magenta" photo={data.after} />
+        <PhotoColumn
+          label="Ahora"
+          tone="magenta"
+          photo={data.after}
+          // The "ahora" is always updatable — each new front photo
+          // becomes the latest comparison point.
+          onPress={!busy ? choosePhoto : undefined}
+          uploading={busy && data.count >= 1}
+        />
       </View>
       {caption ? <Text style={styles.caption}>{caption}</Text> : null}
 
@@ -153,9 +244,21 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: colors.bruma,
   },
+  // The tap affordance — quiet magenta so the empty frame reads as an
+  // invitation, not just a void.
+  placeholderHint: {
+    marginTop: 6,
+    fontFamily: typography.uiSemi,
+    fontSize: 11,
+    color: colors.magenta,
+    letterSpacing: 0.3,
+  },
+  // Absolute-fill, not 100%/100%: the frame's height comes from
+  // `aspectRatio`, and a percentage-height child of an aspectRatio-sized
+  // parent resolves to 0 in Yoga — the image would render invisibly.
+  // (The onboarding PhotoCaptureCard fills its frame the same way.)
   img: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   date: {
     marginTop: 8,
