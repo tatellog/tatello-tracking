@@ -154,17 +154,18 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     label: 'LEO',
     glyph: '♌',
     stars: [
-      // The sickle — open hook, Regulus at its base
-      { x: 0.16, y: 0.52, mag: 1.5 }, // 0 Regulus (anchor)
-      { x: 0.2, y: 0.4, mag: 3.2 }, // 1 Eta
-      { x: 0.24, y: 0.28, mag: 2.4 }, // 2 Algieba — the bend
-      { x: 0.2, y: 0.18, mag: 3.2 }, // 3 Adhafera
-      { x: 0.3, y: 0.12, mag: 3.2 }, // 4 Rasalas
-      { x: 0.42, y: 0.16, mag: 2.8 }, // 5 Epsilon — open end
-      // The hindquarters triangle
-      { x: 0.56, y: 0.6, mag: 3.2 }, // 6 Chort
-      { x: 0.6, y: 0.4, mag: 2.8 }, // 7 Zosma
-      { x: 0.86, y: 0.52, mag: 2.0 }, // 8 Denebola — the tail
+      // The Sickle — the lion's head & mane: a backwards-question-mark
+      // hook that rises from Regulus and curls over the top.
+      { x: 0.14, y: 0.74, mag: 1.5 }, // 0 Regulus — the heart, anchor & brightest
+      { x: 0.21, y: 0.56, mag: 3.5 }, // 1 Eta — up the neck
+      { x: 0.28, y: 0.38, mag: 2.3 }, // 2 Algieba — the bright bend of the hook
+      { x: 0.28, y: 0.2, mag: 3.5 }, // 3 Adhafera — straight up
+      { x: 0.39, y: 0.12, mag: 3.9 }, // 4 Rasalas — over the crown
+      { x: 0.5, y: 0.19, mag: 3.0 }, // 5 Epsilon — the hook's open end, curling down
+      // The hindquarters — a triangle trailing back to the tail.
+      { x: 0.58, y: 0.62, mag: 3.3 }, // 6 Chort — the haunch
+      { x: 0.63, y: 0.41, mag: 2.6 }, // 7 Zosma — the hip
+      { x: 0.9, y: 0.52, mag: 2.0 }, // 8 Denebola — the tail tip
     ],
     lines: [
       [0, 1], // sickle hook

@@ -75,6 +75,22 @@ function fourPointStarPath(cx: number, cy: number, outer: number): string {
   return `M${pts.join('L')}Z`
 }
 
+// One bead roughly every BEAD_SPACING px along a connecting line: a
+// long line becomes a strung row of small sparkles rather than a bare
+// stroke — the "beaded" look of the reference constellation art.
+const BEAD_SPACING = 27
+
+function lineBeads(ax: number, ay: number, bx: number, by: number): { x: number; y: number }[] {
+  const len = Math.hypot(bx - ax, by - ay)
+  const n = Math.max(1, Math.round(len / BEAD_SPACING) - 1)
+  const out: { x: number; y: number }[] = []
+  for (let i = 1; i <= n; i++) {
+    const f = i / (n + 1)
+    out.push({ x: ax + (bx - ax) * f, y: ay + (by - ay) * f })
+  }
+  return out
+}
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
@@ -532,7 +548,7 @@ function AmbientGlow({ cx, cy }: { cx: number; cy: number }) {
 
 /* ─ Ambient star field ──────────────────────────────────────────── */
 
-type AmbientStar = { x: number; y: number; r: number; baseOp: number }
+type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }
 
 // Deterministic field that avoids the centre block where the day
 // counter lives. The seed math is intentionally noisy — `Math.sin` of
@@ -552,7 +568,9 @@ function buildAmbientField(): AmbientStar[][] {
     const baseOp = 0.04 + Math.abs(a * b) * 0.1
     const r = 0.4 + Math.abs(a) * 0.7
     const bucket = i % AMBIENT_BUCKET_COUNT
-    buckets[bucket]!.push({ x, y, r, baseOp })
+    // Every third ambient point is a tiny 4-point spark instead of a
+    // plain dot — the scattered glints that decorate the reference art.
+    buckets[bucket]!.push({ x, y, r, baseOp, sparkle: i % 3 === 0 })
   }
   return buckets
 }
@@ -769,9 +787,18 @@ function AmbientBucket({
   })
   return (
     <AnimatedG animatedProps={animatedProps}>
-      {stars.map((s, i) => (
-        <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.baseOp * 4} />
-      ))}
+      {stars.map((s, i) =>
+        s.sparkle ? (
+          <Path
+            key={i}
+            d={fourPointStarPath(s.x, s.y, s.r * 2.4)}
+            fill="#F4ECDE"
+            opacity={s.baseOp * 4}
+          />
+        ) : (
+          <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.baseOp * 4} />
+        ),
+      )}
     </AnimatedG>
   )
 }
@@ -868,16 +895,20 @@ function BaseLayer({
           const B = stars[b]
           if (!A || !B) return null
           return (
-            <Line
-              key={`bl-${idx}`}
-              x1={A.x}
-              y1={A.y}
-              x2={B.x}
-              y2={B.y}
-              stroke="rgba(244,236,222,0.3)"
-              strokeWidth={1.4}
-              strokeLinecap="round"
-            />
+            <G key={`bl-${idx}`}>
+              <Line
+                x1={A.x}
+                y1={A.y}
+                x2={B.x}
+                y2={B.y}
+                stroke="rgba(244,236,222,0.3)"
+                strokeWidth={1.4}
+                strokeLinecap="round"
+              />
+              {lineBeads(A.x, A.y, B.x, B.y).map((p, n) => (
+                <Path key={n} d={fourPointStarPath(p.x, p.y, 2)} fill="rgba(244,236,222,0.5)" />
+              ))}
+            </G>
           )
         })}
       </AnimatedG>
@@ -899,6 +930,11 @@ function BaseLayer({
 // not just bigger — matching how one star dominates in a real sky.
 const HERO_MAG = 1.7
 
+// Stars at/below this magnitude get the crossed 8-ray "glint" — the
+// brighter half of a figure, drawn as a jewel rather than a flat
+// asterisk. Fainter stars keep a simple 4-point spark.
+const SPARKLE_MAG = 2.8
+
 /* Soft magenta bloom for hero stars — two stacked low-alpha discs.
  * The hero is each figure's alpha star; the magenta glow makes it
  * "the fuchsia one" — unmistakably the brightest — in both the
@@ -908,6 +944,36 @@ function HeroGlow({ cx, cy, r }: { cx: number; cy: number; r: number }) {
     <>
       <Circle cx={cx} cy={cy} r={r * 3.0} fill={colors.magenta} opacity={0.07} />
       <Circle cx={cx} cy={cy} r={r * 1.9} fill={colors.magenta} opacity={0.13} />
+    </>
+  )
+}
+
+/* The star body. A 4-point spark, plus — for bright stars — a second
+ * smaller spark crossed at 45°, so a figure's brightest jewels show
+ * the 8-ray glint of the reference art instead of a flat asterisk. */
+function StarSparkle({
+  cx,
+  cy,
+  r,
+  mag,
+  fill,
+}: {
+  cx: number
+  cy: number
+  r: number
+  mag: number
+  fill: string
+}) {
+  return (
+    <>
+      <Path d={fourPointStarPath(cx, cy, r)} fill={fill} />
+      {mag <= SPARKLE_MAG ? (
+        <Path
+          d={fourPointStarPath(cx, cy, r * 0.6)}
+          fill={fill}
+          transform={`rotate(45 ${cx} ${cy})`}
+        />
+      ) : null}
     </>
   )
 }
@@ -952,7 +1018,7 @@ function PlaceholderStar({ s, i, t }: { s: Resolved; i: number; t: SharedValue<n
   return (
     <AnimatedG animatedProps={animatedProps}>
       {isHero ? <HeroGlow cx={s.x} cy={s.y} r={baseR} /> : null}
-      <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="#F4ECDE" />
+      <StarSparkle cx={s.x} cy={s.y} r={baseR} mag={s.mag} fill="#F4ECDE" />
     </AnimatedG>
   )
 }
@@ -994,17 +1060,23 @@ function LitLines({
         if (!isLit && !isNext) return null
         if (ignitingKey === `line-${idx}`) return null
         return (
-          <Line
-            key={`l-${idx}`}
-            x1={A.x}
-            y1={A.y}
-            x2={B.x}
-            y2={B.y}
-            stroke={isLit ? colors.magenta : 'rgba(233,30,99,0.4)'}
-            strokeWidth={isLit ? 2.5 : 1.4}
-            strokeLinecap="round"
-            strokeDasharray={isLit ? undefined : '3 4'}
-          />
+          <G key={`l-${idx}`}>
+            <Line
+              x1={A.x}
+              y1={A.y}
+              x2={B.x}
+              y2={B.y}
+              stroke={isLit ? colors.magenta : 'rgba(233,30,99,0.4)'}
+              strokeWidth={isLit ? 2.5 : 1.4}
+              strokeLinecap="round"
+              strokeDasharray={isLit ? undefined : '3 4'}
+            />
+            {isLit
+              ? lineBeads(A.x, A.y, B.x, B.y).map((p, n) => (
+                  <Path key={n} d={fourPointStarPath(p.x, p.y, 2.6)} fill="url(#starLit)" />
+                ))
+              : null}
+          </G>
         )
       })}
     </AnimatedG>
@@ -1337,7 +1409,9 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
         strokeLinecap="round"
         animatedProps={ringProps}
       />
-      <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="url(#starNext)" opacity={0.85} />
+      <G opacity={0.85}>
+        <StarSparkle cx={s.x} cy={s.y} r={baseR} mag={s.mag} fill="url(#starNext)" />
+      </G>
     </G>
   )
 }
@@ -1439,7 +1513,7 @@ function LitStar({
       {isHero ? <HeroGlow cx={s.x} cy={s.y} r={r} /> : null}
       <AnimatedCircle cx={s.x} cy={s.y} r={r + 7} fill={colors.magenta} animatedProps={haloProps} />
       <AnimatedG animatedProps={starProps}>
-        <Path d={fourPointStarPath(s.x, s.y, r)} fill="url(#starLit)" />
+        <StarSparkle cx={s.x} cy={s.y} r={r} mag={s.mag} fill="url(#starLit)" />
       </AnimatedG>
     </G>
   )
