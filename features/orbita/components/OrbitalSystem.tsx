@@ -12,10 +12,12 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, G, Line, RadialGradient, Stop, Text as SvgText } from 'react-native-svg'
 
-import { ZODIAC, type ZodiacSign } from '@/features/tabs/zodiac'
+import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, typography } from '@/theme'
 
 import type { Dimension, DimensionKey } from '../logic'
+import { Cosmos } from './Cosmos'
+import { zodiacGlyphPaths } from './ZodiacGlyph'
 
 /*
  * The orbital diagram — the hero of the Día segment. A solar system:
@@ -27,11 +29,11 @@ import type { Dimension, DimensionKey } from '../logic'
  * See docs/tu-orbita-design.md.
  */
 
-const W = 320
+const W = 372
 const CX = W / 2
 const CY = W / 2
-const MAX_R = 106
-const HIT = 58 // tap-target box, in px
+const MAX_R = 132
+const HIT = 66 // tap-target box, in px
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 
@@ -43,11 +45,39 @@ function lerpHex(a: string, b: string, t: number): string {
   return `rgb(${m(0)},${m(1)},${m(2)})`
 }
 
-// A planet's three shading stops, interpolated lejos → en luz: a dark
-// distant sphere brightens into a vivid lit one.
-const orbHighlight = (b: number) => lerpHex('#6E5862', '#FFE7EF', b)
-const orbMid = (b: number) => lerpHex('#3A2530', '#E9528A', b)
-const orbShadow = (b: number) => lerpHex('#190E15', '#4C1129', b)
+// A planet's three shading stops, interpolated lejos → en luz. The
+// lejos end is a cool deep plum (not a muddy brown), so a dark planet
+// reads as distant, not dead.
+const orbHighlight = (b: number) => lerpHex('#574C63', '#FFE7EF', b)
+const orbMid = (b: number) => lerpHex('#2A2238', '#EC5A90', b)
+const orbShadow = (b: number) => lerpHex('#120E1C', '#4C1129', b)
+
+/** Deterministic soft surface patches for a planet — breaks the
+ *  flawless gradient into a textured body, less CG billiard ball. Two
+ *  light patches, one dark, hashed by the planet's index so each
+ *  planet's "surface" differs but never reshuffles between renders.
+ *  Kept inside ~0.8r so they never poke past the crisp limb. */
+function mottlePatches(
+  x: number,
+  y: number,
+  r: number,
+  index: number,
+): { cx: number; cy: number; r: number; light: boolean }[] {
+  const out: { cx: number; cy: number; r: number; light: boolean }[] = []
+  for (let i = 0; i < 3; i++) {
+    const seed = index * 2.7 + i * 1.93
+    const f1 = 0.5 + 0.5 * Math.sin(seed * 3.7)
+    const f2 = 0.5 + 0.5 * Math.sin(seed * 6.1)
+    const dist = (0.1 + f1 * 0.26) * r
+    out.push({
+      cx: x + Math.cos(seed * 1.3) * dist,
+      cy: y + Math.sin(seed * 1.3) * dist,
+      r: (0.26 + f2 * 0.18) * r,
+      light: i !== 1,
+    })
+  }
+  return out
+}
 
 /** Canvas position of a dimension — fixed by its angle + orbit radius. */
 function place(d: Dimension): { x: number; y: number } {
@@ -71,12 +101,18 @@ export function OrbitalSystem({
   selectedKey: DimensionKey | null
   onSelect: (key: DimensionKey) => void
 }) {
-  // One 8 s clock drives every breath, like LunarConstellation.
+  // Two clocks: t (8 s) drives breathing + twinkle; drift (44 s) the
+  // slow nebula movement.
   const t = useSharedValue(0)
+  const drift = useSharedValue(0)
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
-    return () => cancelAnimation(t)
-  }, [t])
+    drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
+    return () => {
+      cancelAnimation(t)
+      cancelAnimation(drift)
+    }
+  }, [t, drift])
 
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedPos = selected ? place(selected) : null
@@ -102,6 +138,10 @@ export function OrbitalSystem({
           </RadialGradient>
         </Defs>
 
+        {/* The deep field — nebula + starfield — so the system reads
+            as bodies IN space, not stickers on a void. */}
+        <Cosmos t={t} drift={drift} />
+
         {/* Orbit rings — quiet hairlines; the selected one lights. */}
         {dimensions.map((d) => {
           const on = d.key === selectedKey
@@ -113,9 +153,8 @@ export function OrbitalSystem({
               r={d.radiusFrac * MAX_R}
               fill="none"
               stroke={on ? colors.magenta : '#F4ECDE'}
-              strokeOpacity={on ? 0.42 : 0.07}
+              strokeOpacity={on ? 0.3 : 0.05}
               strokeWidth={1}
-              strokeDasharray={on ? '5 6' : undefined}
             />
           )
         })}
@@ -173,11 +212,9 @@ export function OrbitalSystem({
 /* The core everything orbits — "tú": a deep, glowing sun-orb carrying
  * your name (in the serif coach voice) and your zodiac glyph. The
  * system literally turns around you. */
-const SUN_R = 27
+const SUN_R = 35
 
 function CenterSelf({ sign, name, t }: { sign: ZodiacSign; name: string; t: SharedValue<number> }) {
-  const z = ZODIAC[sign]
-
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
@@ -197,8 +234,8 @@ function CenterSelf({ sign, name, t }: { sign: ZodiacSign; name: string; t: Shar
     <G>
       <AnimatedG animatedProps={breath}>
         {/* Corona — a contained glow, not a smear. */}
-        <Circle cx={CX} cy={CY} r={46} fill={colors.magenta} opacity={0.07} />
-        <Circle cx={CX} cy={CY} r={33} fill={colors.magenta} opacity={0.13} />
+        <Circle cx={CX} cy={CY} r={62} fill={colors.magenta} opacity={0.07} />
+        <Circle cx={CX} cy={CY} r={46} fill={colors.magenta} opacity={0.13} />
         {/* The sun-orb, shaded, with a soft specular gloss. */}
         <Circle cx={CX} cy={CY} r={SUN_R} fill="url(#orb-self)" />
         <Circle
@@ -212,26 +249,27 @@ function CenterSelf({ sign, name, t }: { sign: ZodiacSign; name: string; t: Shar
       {/* Your name — the serif coach voice — and your sign, on the orb. */}
       <SvgText
         x={CX}
-        y={CY - 1}
+        y={CY - 6}
         textAnchor="middle"
         fontFamily={typography.serifSemi}
         fontStyle="italic"
-        fontSize={19}
+        fontSize={22}
         fill="#FBF2E6"
       >
         {name}
       </SvgText>
-      <SvgText
-        x={CX}
-        y={CY + 16}
-        textAnchor="middle"
-        fontFamily={typography.uiBold}
-        fontSize={9}
-        letterSpacing={1.8}
-        fill="#E7BFCE"
+      {/* The zodiac glyph, hand-drawn — a 24-unit glyph scaled,
+          sitting just under the name. */}
+      <G
+        transform={`translate(${CX - 9.8} ${CY + 2}) scale(0.82)`}
+        stroke="#E7BFCE"
+        strokeWidth={2.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
       >
-        {`${z.glyph}  ${z.label}`}
-      </SvgText>
+        {zodiacGlyphPaths(sign)}
+      </G>
     </G>
   )
 }
@@ -255,7 +293,7 @@ function OrbitPlanet({
 }) {
   const { x, y } = place(dim)
   const b = dim.brightness
-  const R = 9 + b * 9
+  const R = 15 + b * 10
   const phase = (index * 0.17) % 1
 
   const dx = x - CX
@@ -298,15 +336,36 @@ function OrbitPlanet({
             opacity={0.9}
           />
         ) : null}
-        {/* The planet — a sphere via radial-gradient shading — and a
-            small specular gloss on the lit side. */}
+        {/* The planet: a shaded body, strong soft mottling so the
+            surface has character, and a diffuse inner luminosity — it
+            glows, it is not a glossy CG ball. No specular dot, no rim
+            "smile". */}
         <Circle cx={x} cy={y} r={R} fill={`url(#orb-${dim.key})`} />
+        {mottlePatches(x, y, R, index).map((p, i) => {
+          const col = p.light ? '#FFDDEA' : '#1B0A16'
+          const op = (p.light ? 0.2 : 0.26) * (0.5 + b * 0.5)
+          return (
+            <G key={`mottle-${i}`}>
+              <Circle cx={p.cx} cy={p.cy} r={p.r} fill={col} opacity={op * 0.5} />
+              <Circle cx={p.cx} cy={p.cy} r={p.r * 0.58} fill={col} opacity={op * 0.78} />
+            </G>
+          )
+        })}
+        {/* Diffuse inner luminosity, biased to the lit side — the
+            body glows from within rather than reflecting like glass. */}
         <Circle
-          cx={x - R * 0.34}
-          cy={y - R * 0.36}
-          r={R * 0.24}
-          fill="#FFFFFF"
-          opacity={0.18 + b * 0.42}
+          cx={x - R * 0.2}
+          cy={y - R * 0.24}
+          r={R * 0.66}
+          fill="#FFE2EE"
+          opacity={0.04 + b * 0.1}
+        />
+        <Circle
+          cx={x - R * 0.24}
+          cy={y - R * 0.28}
+          r={R * 0.34}
+          fill="#FFF0F5"
+          opacity={0.05 + b * 0.16}
         />
       </AnimatedG>
       <SvgText

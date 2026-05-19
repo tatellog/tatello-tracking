@@ -52,13 +52,17 @@ export function DiaSegment() {
         </Text>
       </View>
 
-      <OrbitalSystem
-        dimensions={dimensions}
-        sign={sign}
-        name={name}
-        selectedKey={selectedKey}
-        onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
-      />
+      {/* Full-bleed — the diagram is the hero, it breaks out of the
+          screen's 20px gutter so the planets read large. */}
+      <View style={styles.diagram}>
+        <OrbitalSystem
+          dimensions={dimensions}
+          sign={sign}
+          name={name}
+          selectedKey={selectedKey}
+          onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
+        />
+      </View>
 
       {selected ? (
         <Animated.View key={selected.key} entering={FadeIn.duration(220)} style={styles.readout}>
@@ -87,6 +91,10 @@ export function DiaSegment() {
 const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
+  },
+  // Breaks out of the screen's horizontal gutter (orbita.tsx pads 20).
+  diagram: {
+    marginHorizontal: -20,
   },
   header: {
     flexDirection: 'row',
