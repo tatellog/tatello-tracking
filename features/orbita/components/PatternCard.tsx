@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Polyline, Rect } from 'react-native-svg'
 
@@ -63,8 +64,14 @@ function PatternGlyph({ kind }: { kind: Patron['kind'] }) {
  * accent word) and the sub-data. Tappable — a detail view comes later.
  */
 export function PatternCard({ patron }: { patron: Patron }) {
+  const router = useRouter()
   return (
-    <Pressable style={styles.card} accessibilityRole="button" accessibilityLabel={patron.title}>
+    <Pressable
+      style={styles.card}
+      onPress={() => router.push(`/orbita/patron/${patron.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={patron.title}
+    >
       <View style={styles.glyphBox}>
         <PatternGlyph kind={patron.kind} />
       </View>
