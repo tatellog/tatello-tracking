@@ -5,8 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import {
   DiaSegment,
+  MesSegment,
   OrbitSegments,
-  SegmentPlaceholder,
+  SemanaSegment,
   type OrbitSegment,
 } from '@/features/orbita/components'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
@@ -17,26 +18,10 @@ import { colors } from '@/theme'
  * altitudes of one sky: Día (El Sistema) · Semana (Las Órbitas) ·
  * Mes (El Cielo). See docs/tu-orbita-design.md.
  *
- * Día renders the live orbital diagram (DiaSegment). Semana and Mes
- * still show a "still forming" placeholder — their engine-fed pieces
- * (Voz de Stelar, Patrones) arrive once the Anthropic key is in.
+ * Día renders the live orbital diagram. The engine-fed pieces (Voz de
+ * Stelar, patrones) currently run on MOCK data — see features/orbita/
+ * mock.ts — until the Anthropic key is in.
  */
-const PLACEHOLDERS: Record<
-  Exclude<OrbitSegment, 'dia'>,
-  { eyebrow: string; title: string; body: string }
-> = {
-  semana: {
-    eyebrow: 'Las Órbitas',
-    title: 'Aún no hay órbitas que leer',
-    body: 'Tus patrones se revelan cuando el cielo acumula suficientes noches.',
-  },
-  mes: {
-    eyebrow: 'El Cielo',
-    title: 'Tu primer ciclo se dibuja',
-    body: 'Aquí se sellará tu constelación cuando cierres el mes.',
-  },
-}
-
 export default function OrbitaScreen() {
   const [segment, setSegment] = useState<OrbitSegment>('dia')
 
@@ -57,13 +42,10 @@ export default function OrbitaScreen() {
           {/* key re-mounts on switch so the fade-in replays per segment. */}
           {segment === 'dia' ? (
             <DiaSegment key="dia" />
+          ) : segment === 'semana' ? (
+            <SemanaSegment key="semana" />
           ) : (
-            <SegmentPlaceholder
-              key={segment}
-              eyebrow={PLACEHOLDERS[segment].eyebrow}
-              title={PLACEHOLDERS[segment].title}
-              body={PLACEHOLDERS[segment].body}
-            />
+            <MesSegment key="mes" />
           )}
         </ScrollView>
       </SafeAreaView>

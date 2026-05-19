@@ -15,7 +15,9 @@ import {
   dimensionState,
   type DimensionKey,
 } from '../logic'
+import { MOCK_VOZ } from '../mock'
 import { OrbitalSystem } from './OrbitalSystem'
+import { VozDeStelar } from './VozDeStelar'
 
 /*
  * The Día segment — "El Sistema". Reads today's signals, resolves the
@@ -84,6 +86,8 @@ export function DiaSegment() {
       ) : (
         <Text style={styles.hint}>Toca una dimensión para leerla.</Text>
       )}
+
+      <VozDeStelar scope="hoy" text={MOCK_VOZ.dia} />
     </Animated.View>
   )
 }
