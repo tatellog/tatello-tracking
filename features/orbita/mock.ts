@@ -55,6 +55,46 @@ export const MOCK_PATRONES: readonly Patron[] = [
   },
 ]
 
+/** A day on the Semana hero's week-ring. `brightness` (0..1) is that
+ *  day's overall system state — the engine will derive it; here it is
+ *  mock. `note` is the readout shown when the day is tapped. */
+export type DiaSemana = {
+  label: string
+  brightness: number
+  today: boolean
+  note: string
+}
+
+export const MOCK_SEMANA: readonly DiaSemana[] = [
+  {
+    label: 'L',
+    brightness: 0.86,
+    today: false,
+    note: 'Lunes — tu día más en luz: dormiste bien y entrenaste.',
+  },
+  {
+    label: 'M',
+    brightness: 0.73,
+    today: false,
+    note: 'Martes — sólido, energía estable todo el día.',
+  },
+  {
+    label: 'M',
+    brightness: 0.66,
+    today: false,
+    note: 'Miércoles — el ritmo empezó a pesar un poco.',
+  },
+  {
+    label: 'J',
+    brightness: 0.31,
+    today: false,
+    note: 'Jueves — te apagaste: poco sueño y ánimo bajo.',
+  },
+  { label: 'V', brightness: 0.56, today: false, note: 'Viernes — recuperando de a poco.' },
+  { label: 'S', brightness: 0.71, today: false, note: 'Sábado — descanso, energía al alza.' },
+  { label: 'D', brightness: 0.64, today: true, note: 'Hoy — tu sistema está sereno.' },
+]
+
 /** The current cycle, for the Mes segment. */
 export const MOCK_CICLO = {
   day: 22,
