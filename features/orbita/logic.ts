@@ -13,23 +13,28 @@ export type DimensionLayout = {
 }
 
 /*
- * Fixed orbits — the layout NEVER changes day to day, so the user
- * learns "sueño lives lower-right". Brightness is the only variable
- * (see docs/tu-orbita-design.md §4). Each dimension gets its own
- * radius so the diagram reads as nested orbits, like real planets.
+ * Fixed layout — the angle of each dimension NEVER changes day to
+ * day, so the user learns "sueño lives upper-right" (see
+ * docs/tu-orbita-design.md §4). The radius is tuned per dimension so
+ * that, once the tilted plane foreshortens it, every node clears the
+ * core by a similar margin — the ones near the top/bottom of the
+ * plane sit further out to make up for the squash.
  */
 export const DIMENSIONS: readonly DimensionLayout[] = [
-  { key: 'cuerpo', label: 'CUERPO', angleDeg: 312, radiusFrac: 0.58 },
-  { key: 'ciclo', label: 'CICLO', angleDeg: 196, radiusFrac: 0.66 },
-  { key: 'mente', label: 'MENTE', angleDeg: 8, radiusFrac: 0.74 },
-  { key: 'energia', label: 'ENERGÍA', angleDeg: 250, radiusFrac: 0.82 },
-  { key: 'sueno', label: 'SUEÑO', angleDeg: 64, radiusFrac: 0.91 },
-  { key: 'alimento', label: 'ALIMENTO', angleDeg: 128, radiusFrac: 1.0 },
+  { key: 'cuerpo', label: 'CUERPO', angleDeg: 312, radiusFrac: 0.82 },
+  { key: 'ciclo', label: 'CICLO', angleDeg: 196, radiusFrac: 0.95 },
+  { key: 'mente', label: 'MENTE', angleDeg: 8, radiusFrac: 1.0 },
+  { key: 'energia', label: 'ENERGÍA', angleDeg: 250, radiusFrac: 0.72 },
+  { key: 'sueno', label: 'SUEÑO', angleDeg: 64, radiusFrac: 0.78 },
+  { key: 'alimento', label: 'ALIMENTO', angleDeg: 128, radiusFrac: 0.88 },
 ]
 
 export type Dimension = DimensionLayout & {
   /** 0 (lejos — a dark ember) … 1 (en luz — full glow). */
   brightness: number
+  /** A one-word state caption — "clara", "corto" — shown under the
+   *  label in the diagram. `null` when there's nothing to say. */
+  word: string | null
 }
 
 /** A dimension with no signal still glows faintly — "forming", never
@@ -89,12 +94,36 @@ function brightnessFor(key: DimensionKey, s: DailySignals): number {
   }
 }
 
+/* A one-word state caption for a dimension — the engine will write
+ * these; for now a light heuristic. `null` means stay quiet. */
+function dimensionWord(key: DimensionKey, s: DailySignals): string | null {
+  switch (key) {
+    case 'mente':
+      if (s.mood == null && s.stress == null && s.motivation == null) return null
+      return brightnessFor('mente', s) >= 0.6 ? 'clara' : 'nublada'
+    case 'sueno': {
+      if (s.sleep_minutes == null) return null
+      const h = s.sleep_minutes / 60
+      return h < 7 ? 'corto' : h > 8.5 ? 'largo' : 'pleno'
+    }
+    case 'cuerpo':
+      return s.trained ? 'activo' : null
+    case 'energia':
+      return s.energy == null ? null : s.energy >= 4 ? 'alta' : s.energy <= 2 ? 'baja' : null
+    case 'ciclo':
+      return s.on_period ? 'sangrado' : null
+    default:
+      return null
+  }
+}
+
 /** Resolve the six dimensions with today's brightness. `null` signals
  *  (nothing logged) → every dimension at the floor. */
 export function deriveDimensions(signals: DailySignals | null): Dimension[] {
   return DIMENSIONS.map((d) => ({
     ...d,
     brightness: signals == null ? DIM_FLOOR : brightnessFor(d.key, signals),
+    word: signals == null ? null : dimensionWord(d.key, signals),
   }))
 }
 

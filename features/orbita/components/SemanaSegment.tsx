@@ -23,10 +23,15 @@ const EN_LUZ = 0.55
 export function SemanaSegment() {
   const { data: profile } = useProfile()
   const sign = zodiacFromDate(profile?.date_of_birth)
-  const name = (profile?.display_name ?? '').trim().split(' ')[0] || 'Tú'
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
 
-  const enLuz = MOCK_SEMANA.filter((d) => d.brightness >= EN_LUZ).length
+  // Today starts selected — you open Semana already reading your day.
+  const todayIdx = MOCK_SEMANA.findIndex((d) => d.today)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(todayIdx >= 0 ? todayIdx : null)
+
+  // Counts run over the days lived so far — today and before.
+  const livedCount = todayIdx < 0 ? MOCK_SEMANA.length : todayIdx + 1
+  const enLuz = MOCK_SEMANA.slice(0, livedCount).filter((d) => d.brightness >= EN_LUZ).length
+  const porVenir = MOCK_SEMANA.length - livedCount
   const selected = selectedIdx != null ? MOCK_SEMANA[selectedIdx] : null
 
   return (
@@ -37,7 +42,7 @@ export function SemanaSegment() {
         </EyebrowLabel>
         <Text style={styles.count}>
           <Text style={styles.countLuz}>{enLuz} en luz</Text>
-          <Text>{`  ·  ${MOCK_SEMANA.length - enLuz} lejos`}</Text>
+          <Text>{`  ·  ${porVenir} por venir`}</Text>
         </Text>
       </View>
 
@@ -45,7 +50,6 @@ export function SemanaSegment() {
       <View style={styles.diagram}>
         <WeekRing
           days={MOCK_SEMANA}
-          name={name}
           sign={sign}
           selectedIdx={selectedIdx}
           onSelect={(i) => setSelectedIdx((cur) => (cur === i ? null : i))}

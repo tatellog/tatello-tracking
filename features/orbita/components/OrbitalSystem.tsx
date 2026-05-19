@@ -11,31 +11,22 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, {
-  Circle,
-  Defs,
-  Ellipse,
-  G,
-  Line,
-  RadialGradient,
-  Stop,
-  Text as SvgText,
-} from 'react-native-svg'
+import Svg, { Circle, Defs, G, Line, RadialGradient, Stop, Text as SvgText } from 'react-native-svg'
 
 import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, typography } from '@/theme'
 
-import type { Dimension, DimensionKey } from '../logic'
+import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 import { Cosmos } from './Cosmos'
 import { zodiacGlyphPaths } from './ZodiacGlyph'
 
 /*
- * The orbital diagram — the hero of the Día segment. A solar system:
- * the user (their name + sign) is the luminous core, and six
- * dimensions orbit it as PLANETS. Each planet is a shaded sphere — a
- * radial gradient gives it a lit side and a shadowed side. Brightness
- * is how lit the planet is: en luz glows warm and vivid, lejos sits
- * small and dark. Tapping a planet selects it.
+ * The orbital diagram — the hero of the Día segment. A constellation:
+ * you are the luminous star at the centre, and six dimensions hang on
+ * faint dotted threads around you. A dimension en luz is a luminous
+ * cream orb; one lejos is a hollow station, an unlit ring. Each wears
+ * its label and a one-word state. Tapping a node selects it.
+ * The plane is tilted (ry = rx · TILT) so the system reads as 3D.
  * See docs/tu-orbita-design.md.
  */
 
@@ -44,55 +35,10 @@ const CX = W / 2
 const CY = W / 2
 const MAX_R = 140
 const HIT = 66 // tap-target box, in px
-
-// The orbital plane is tilted — orbits are foreshortened ellipses
-// (ry = rx · TILT), so the system reads as 3D, not a flat radar.
 const TILT = 0.62
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-
-/** Linear blend between two #rrggbb colours. */
-function lerpHex(a: string, b: string, t: number): string {
-  const ca = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)]
-  const cb = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)]
-  const m = (i: number) => Math.round(ca[i]! + (cb[i]! - ca[i]!) * t)
-  return `rgb(${m(0)},${m(1)},${m(2)})`
-}
-
-// A planet's three shading stops, interpolated lejos → en luz. The
-// lejos end is a cool deep plum (not a muddy brown), so a dark planet
-// reads as distant, not dead.
-const orbHighlight = (b: number) => lerpHex('#574C63', '#FFE7EF', b)
-const orbMid = (b: number) => lerpHex('#2A2238', '#EC5A90', b)
-const orbShadow = (b: number) => lerpHex('#120E1C', '#4C1129', b)
-
-/** Deterministic soft surface patches for a planet — breaks the
- *  flawless gradient into a textured body, less CG billiard ball. Two
- *  light patches, one dark, hashed by the planet's index so each
- *  planet's "surface" differs but never reshuffles between renders.
- *  Kept inside ~0.8r so they never poke past the crisp limb. */
-function mottlePatches(
-  x: number,
-  y: number,
-  r: number,
-  index: number,
-): { cx: number; cy: number; r: number; light: boolean }[] {
-  const out: { cx: number; cy: number; r: number; light: boolean }[] = []
-  for (let i = 0; i < 3; i++) {
-    const seed = index * 2.7 + i * 1.93
-    const f1 = 0.5 + 0.5 * Math.sin(seed * 3.7)
-    const f2 = 0.5 + 0.5 * Math.sin(seed * 6.1)
-    const dist = (0.1 + f1 * 0.26) * r
-    out.push({
-      cx: x + Math.cos(seed * 1.3) * dist,
-      cy: y + Math.sin(seed * 1.3) * dist,
-      r: (0.26 + f2 * 0.18) * r,
-      light: i !== 1,
-    })
-  }
-  return out
-}
 
 /** Canvas position of a dimension on the tilted orbital plane.
  *  `depth` is -1 (far / behind the core) … +1 (near / in front). */
@@ -106,15 +52,12 @@ function place(d: Dimension): { x: number; y: number; depth: number } {
 export function OrbitalSystem({
   dimensions,
   sign,
-  name,
   selectedKey,
   onSelect,
 }: {
   dimensions: Dimension[]
-  /** The user's zodiac sign — the glyph at the core. */
+  /** The user's zodiac sign — the sigil at the core. */
   sign: ZodiacSign
-  /** The user's first name — the luminous core is them. */
-  name: string
   selectedKey: DimensionKey | null
   onSelect: (key: DimensionKey) => void
 }) {
@@ -131,7 +74,7 @@ export function OrbitalSystem({
     }
   }, [t, drift])
 
-  // Tap feedback: popT (0→1→0) amplifies the selected planet with a
+  // Tap feedback: popT (0→1→0) amplifies the selected node with a
   // punchy overshoot; rippleT (0→1) drives a shockwave ring out of it.
   const popT = useSharedValue(0)
   const rippleT = useSharedValue(0)
@@ -146,81 +89,57 @@ export function OrbitalSystem({
     rippleT.value = withTiming(1, { duration: 640, easing: Easing.out(Easing.cubic) })
   }, [selectedKey, popT, rippleT])
 
-  const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
-  const selectedPos = selected ? place(selected) : null
-
-  // Split planets by depth so the back half sits behind the core —
-  // real 3D occlusion. Within each half, sort by screen-y so a nearer
-  // planet draws over a farther one.
+  // Split nodes by depth so the back half tucks behind the core — real
+  // 3D occlusion. Within each half, sort by screen-y.
   const placed = dimensions.map((d, i) => ({ d, i, pos: place(d) }))
-  const backPlanets = placed.filter((p) => p.pos.depth < 0).sort((a, b) => a.pos.y - b.pos.y)
-  const frontPlanets = placed.filter((p) => p.pos.depth >= 0).sort((a, b) => a.pos.y - b.pos.y)
+  const backNodes = placed.filter((p) => p.pos.depth < 0).sort((a, b) => a.pos.y - b.pos.y)
+  const frontNodes = placed.filter((p) => p.pos.depth >= 0).sort((a, b) => a.pos.y - b.pos.y)
 
   return (
     <View style={styles.wrap}>
       <Svg viewBox={`0 0 ${W} ${W}`} style={styles.svg}>
         <Defs>
-          {/* One sphere-shading gradient per planet — light from the
-              upper-left, shadow falling to the lower-right. */}
-          {dimensions.map((d) => (
-            <RadialGradient key={d.key} id={`orb-${d.key}`} cx="36%" cy="32%" r="75%">
-              <Stop offset="0%" stopColor={orbHighlight(d.brightness)} />
-              <Stop offset="46%" stopColor={orbMid(d.brightness)} />
-              <Stop offset="100%" stopColor={orbShadow(d.brightness)} />
-            </RadialGradient>
-          ))}
           {/* The core "sun" — a deep, glowing magenta orb. */}
           <RadialGradient id="orb-self" cx="38%" cy="33%" r="78%">
             <Stop offset="0%" stopColor="#E07BA0" />
             <Stop offset="48%" stopColor="#8A2150" />
             <Stop offset="100%" stopColor="#330A1E" />
           </RadialGradient>
+          {/* A dimension en luz — a luminous cream orb. */}
+          <RadialGradient id="orb-lit" cx="36%" cy="32%" r="76%">
+            <Stop offset="0%" stopColor="#FFFFFF" />
+            <Stop offset="44%" stopColor="#FBD7E3" />
+            <Stop offset="100%" stopColor="#9A3358" />
+          </RadialGradient>
         </Defs>
 
-        {/* The deep field — nebula + starfield — so the system reads
-            as bodies IN space, not stickers on a void. */}
+        {/* The deep field — nebula + starfield. */}
         <Cosmos t={t} drift={drift} />
 
-        {/* Orbit rings — tilted ellipses: the foreshortened plane of a
-            3D system, not flat circles. Each ring carries a faint echo
-            of its dimension's brightness; the selected one lifts. */}
+        {/* Constellation threads — faint dotted lines from the core to
+            each node; the selected one lifts and tightens. Drawn first
+            so they emerge from behind the star. */}
         {dimensions.map((d) => {
+          const { x, y } = place(d)
           const on = d.key === selectedKey
-          const r = d.radiusFrac * MAX_R
           return (
-            <Ellipse
-              key={`ring-${d.key}`}
-              cx={CX}
-              cy={CY}
-              rx={r}
-              ry={r * TILT}
-              fill="none"
+            <Line
+              key={`spoke-${d.key}`}
+              x1={CX}
+              y1={CY}
+              x2={x}
+              y2={y}
               stroke={colors.magenta}
-              strokeOpacity={on ? 0.42 : 0.08 + d.brightness * 0.12}
+              strokeOpacity={on ? 0.42 : 0.07 + d.brightness * 0.1}
               strokeWidth={1}
+              strokeDasharray={on ? '3 4' : '1 6'}
             />
           )
         })}
 
-        {/* The thread to the selected planet — drawn before the core
-            so it emerges from behind it. */}
-        {selectedPos ? (
-          <Line
-            x1={CX}
-            y1={CY}
-            x2={selectedPos.x}
-            y2={selectedPos.y}
-            stroke={colors.magenta}
-            strokeWidth={1}
-            strokeOpacity={0.36}
-            strokeDasharray="2 4"
-          />
-        ) : null}
-
-        {/* Back planets → core → front planets, so the back of the
-            plane tucks behind the sun. */}
-        {backPlanets.map(({ d, i }) => (
-          <OrbitPlanet
+        {/* Back nodes → core → front nodes. */}
+        {backNodes.map(({ d, i }) => (
+          <OrbitNode
             key={d.key}
             dim={d}
             index={i}
@@ -232,10 +151,10 @@ export function OrbitalSystem({
           />
         ))}
 
-        <CenterSelf sign={sign} name={name} t={t} />
+        <CenterSelf sign={sign} t={t} />
 
-        {frontPlanets.map(({ d, i }) => (
-          <OrbitPlanet
+        {frontNodes.map(({ d, i }) => (
+          <OrbitNode
             key={d.key}
             dim={d}
             index={i}
@@ -248,8 +167,7 @@ export function OrbitalSystem({
         ))}
       </Svg>
 
-      {/* Tap targets — RN Pressables over each planet. Reliable hit
-          testing regardless of how the SVG breathes underneath. */}
+      {/* Tap targets — RN Pressables over each node. */}
       {dimensions.map((d) => {
         const { x, y } = place(d)
         return (
@@ -270,12 +188,12 @@ export function OrbitalSystem({
   )
 }
 
-/* The core everything orbits — "tú": a deep, glowing sun-orb carrying
- * your name (in the serif coach voice) and your zodiac glyph. The
- * system literally turns around you. */
+/* The core everything orbits — "tú": a white-hot star with a deep
+ * magenta bloom, marked with your zodiac sigil. No name — the centre
+ * is felt by composition; the glyph is a symbol of you, not a label. */
 const SUN_R = 35
 
-function CenterSelf({ sign, name, t }: { sign: ZodiacSign; name: string; t: SharedValue<number> }) {
+function CenterSelf({ sign, t }: { sign: ZodiacSign; t: SharedValue<number> }) {
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
@@ -292,54 +210,36 @@ function CenterSelf({ sign, name, t }: { sign: ZodiacSign; name: string; t: Shar
   })
 
   return (
-    <G>
-      <AnimatedG animatedProps={breath}>
-        {/* Corona — a contained glow, not a smear. */}
-        <Circle cx={CX} cy={CY} r={62} fill={colors.magenta} opacity={0.07} />
-        <Circle cx={CX} cy={CY} r={46} fill={colors.magenta} opacity={0.13} />
-        {/* The sun-orb, shaded, with a soft specular gloss. */}
-        <Circle cx={CX} cy={CY} r={SUN_R} fill="url(#orb-self)" />
-        <Circle
-          cx={CX - SUN_R * 0.32}
-          cy={CY - SUN_R * 0.36}
-          r={SUN_R * 0.26}
-          fill="#FFFFFF"
-          opacity={0.4}
-        />
-      </AnimatedG>
-      {/* Your name — the serif coach voice — and your sign, on the orb. */}
-      <SvgText
-        x={CX}
-        y={CY - 6}
-        textAnchor="middle"
-        fontFamily={typography.serifSemi}
-        fontStyle="italic"
-        fontSize={22}
-        fill="#FBF2E6"
-      >
-        {name}
-      </SvgText>
-      {/* The zodiac glyph, hand-drawn — a 24-unit glyph scaled,
-          sitting just under the name. */}
+    <AnimatedG animatedProps={breath}>
+      {/* Bloom — the star's outer light. */}
+      <Circle cx={CX} cy={CY} r={74} fill={colors.magenta} opacity={0.05} />
+      <Circle cx={CX} cy={CY} r={54} fill={colors.magenta} opacity={0.1} />
+      <Circle cx={CX} cy={CY} r={40} fill={colors.magenta} opacity={0.17} />
+      {/* The orb. */}
+      <Circle cx={CX} cy={CY} r={SUN_R} fill="url(#orb-self)" />
+      {/* White-hot heart. */}
+      <Circle cx={CX} cy={CY} r={SUN_R * 0.56} fill="#FFFFFF" opacity={0.28} />
+      <Circle cx={CX} cy={CY} r={SUN_R * 0.32} fill="#FFFFFF" opacity={0.62} />
+      {/* The zodiac sigil, hand-drawn, centred — deep enough to read
+          against the hot core. */}
       <G
-        transform={`translate(${CX - 9.8} ${CY + 2}) scale(0.82)`}
-        stroke="#E7BFCE"
-        strokeWidth={2.6}
+        transform={`translate(${CX - 12} ${CY - 12}) scale(1)`}
+        stroke="#5E1734"
+        strokeWidth={2.4}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       >
         {zodiacGlyphPaths(sign)}
       </G>
-    </G>
+    </AnimatedG>
   )
 }
 
-/* One dimension — a planet. A radial gradient shades it into a sphere;
- * brightness drives its size, how lit it is, its atmosphere glow and
- * its specular gloss. The planet breathes; the label stays put,
- * radially outward so inner planets never collide with the core. */
-function OrbitPlanet({
+/* One dimension. En luz → a luminous cream orb that breathes and
+ * glows; lejos → a hollow station, an unlit ring with a faint ember.
+ * The label sits radially outward with its one-word state below it. */
+function OrbitNode({
   dim,
   index,
   t,
@@ -351,18 +251,19 @@ function OrbitPlanet({
   dim: Dimension
   index: number
   t: SharedValue<number>
-  /** 0 → 1 → 0 tap ripple; the selected planet amplifies on it. */
+  /** 0 → 1 → 0 tap ripple; the selected node amplifies on it. */
   popT: SharedValue<number>
-  /** 0 → 1 tap ripple; drives the shockwave ring out of the planet. */
+  /** 0 → 1 tap ripple; drives the shockwave ring out of the node. */
   rippleT: SharedValue<number>
   selected: boolean
   faded: boolean
 }) {
   const { x, y, depth } = place(dim)
   const b = dim.brightness
-  // Perspective: a near planet (front of the plane) is a touch bigger,
-  // a far one a touch smaller — depth on top of the brightness size.
-  const R = (13 + b * 9) * (1 + depth * 0.16)
+  const enLuz = b >= EN_LUZ_THRESHOLD
+  // A near node (front of the plane) is a touch bigger, a far one
+  // smaller — depth on top of the brightness size.
+  const R = enLuz ? (10 + b * 5) * (1 + depth * 0.12) : 8.5
   const phase = (index * 0.17) % 1
 
   const dx = x - CX
@@ -370,13 +271,12 @@ function OrbitPlanet({
   const dist = Math.hypot(dx, dy) || 1
   const labelOff = R + 16
   const lx = x + (dx / dist) * labelOff
-  const ly = y + (dy / dist) * labelOff + 3.5
+  const ly = y + (dy / dist) * labelOff + 3
 
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    let scale = 1 + wave * 0.06
-    // The selected planet amplifies on the tap-pop, then settles back.
+    let scale = 1 + wave * (enLuz ? 0.06 : 0.025)
     if (selected) scale *= 1 + popT.value * 0.5
     return {
       transform: [
@@ -389,8 +289,7 @@ function OrbitPlanet({
     }
   })
 
-  // Shockwave ring — radiates out of the planet on tap, fading as it
-  // expands.
+  // Shockwave ring — radiates out of the node on tap.
   const ripple = useAnimatedProps(() => {
     'worklet'
     const u = rippleT.value
@@ -398,8 +297,7 @@ function OrbitPlanet({
   })
 
   return (
-    <G opacity={faded ? 0.4 : 1}>
-      {/* Shockwave — a ring radiating out of the tapped planet. */}
+    <G opacity={faded ? 0.42 : 1}>
       {selected ? (
         <AnimatedCircle
           cx={x}
@@ -412,52 +310,45 @@ function OrbitPlanet({
         />
       ) : null}
       <AnimatedG animatedProps={breath}>
-        {/* Atmosphere — a tight glow that only en-luz planets carry. */}
-        <Circle cx={x} cy={y} r={R * 1.7} fill={colors.magenta} opacity={b * 0.1} />
-        <Circle cx={x} cy={y} r={R * 1.32} fill={colors.magenta} opacity={b * 0.2} />
-        {/* Selection crown. */}
-        {selected ? (
-          <Circle
-            cx={x}
-            cy={y}
-            r={R + 6}
-            fill="none"
-            stroke="#F4ECDE"
-            strokeWidth={1.4}
-            opacity={0.9}
-          />
-        ) : null}
-        {/* The planet: a shaded body, strong soft mottling so the
-            surface has character, and a diffuse inner luminosity — it
-            glows, it is not a glossy CG ball. No specular dot, no rim
-            "smile". */}
-        <Circle cx={x} cy={y} r={R} fill={`url(#orb-${dim.key})`} />
-        {mottlePatches(x, y, R, index).map((p, i) => {
-          const col = p.light ? '#FFDDEA' : '#1B0A16'
-          const op = (p.light ? 0.2 : 0.26) * (0.5 + b * 0.5)
-          return (
-            <G key={`mottle-${i}`}>
-              <Circle cx={p.cx} cy={p.cy} r={p.r} fill={col} opacity={op * 0.5} />
-              <Circle cx={p.cx} cy={p.cy} r={p.r * 0.58} fill={col} opacity={op * 0.78} />
-            </G>
-          )
-        })}
-        {/* Diffuse inner luminosity, biased to the lit side — the
-            body glows from within rather than reflecting like glass. */}
-        <Circle
-          cx={x - R * 0.2}
-          cy={y - R * 0.24}
-          r={R * 0.66}
-          fill="#FFE2EE"
-          opacity={0.04 + b * 0.1}
-        />
-        <Circle
-          cx={x - R * 0.24}
-          cy={y - R * 0.28}
-          r={R * 0.34}
-          fill="#FFF0F5"
-          opacity={0.05 + b * 0.16}
-        />
+        {enLuz ? (
+          <>
+            {/* Atmosphere — the glow of a lit dimension. */}
+            <Circle cx={x} cy={y} r={R * 1.9} fill={colors.magenta} opacity={0.05 + b * 0.12} />
+            <Circle cx={x} cy={y} r={R * 1.34} fill="#FBD7E3" opacity={0.06 + b * 0.14} />
+            {selected ? (
+              <Circle
+                cx={x}
+                cy={y}
+                r={R + 6}
+                fill="none"
+                stroke="#F4ECDE"
+                strokeWidth={1.4}
+                opacity={0.9}
+              />
+            ) : null}
+            {/* The luminous body. */}
+            <Circle cx={x} cy={y} r={R} fill="url(#orb-lit)" />
+            <Circle cx={x - R * 0.26} cy={y - R * 0.3} r={R * 0.32} fill="#FFFFFF" opacity={0.72} />
+          </>
+        ) : (
+          <>
+            {selected ? (
+              <Circle
+                cx={x}
+                cy={y}
+                r={R + 6}
+                fill="none"
+                stroke="#F4ECDE"
+                strokeWidth={1.4}
+                opacity={0.9}
+              />
+            ) : null}
+            {/* A hollow station — unlit, not yet in light. */}
+            <Circle cx={x} cy={y} r={R} fill={colors.bg} opacity={0.55} />
+            <Circle cx={x} cy={y} r={R} fill="none" stroke={colors.bruma} strokeWidth={1.5} />
+            <Circle cx={x} cy={y} r={R * 0.26} fill={colors.niebla} opacity={0.4} />
+          </>
+        )}
       </AnimatedG>
       <SvgText
         x={lx}
@@ -465,12 +356,26 @@ function OrbitPlanet({
         textAnchor="middle"
         fontFamily={typography.uiBold}
         fontSize={9}
-        fill={colors.leche}
-        opacity={selected ? 1 : 0.36 + b * 0.6}
+        fill={enLuz ? colors.leche : colors.niebla}
+        opacity={selected ? 1 : enLuz ? 0.6 + b * 0.4 : 0.7}
         letterSpacing={1.3}
       >
         {dim.label}
       </SvgText>
+      {dim.word ? (
+        <SvgText
+          x={lx}
+          y={ly + 11}
+          textAnchor="middle"
+          fontFamily={typography.serif}
+          fontStyle="italic"
+          fontSize={10}
+          fill={colors.magenta}
+          opacity={selected ? 1 : 0.78}
+        >
+          {dim.word}
+        </SvgText>
+      ) : null}
     </G>
   )
 }

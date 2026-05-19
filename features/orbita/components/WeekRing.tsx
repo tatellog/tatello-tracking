@@ -33,10 +33,15 @@ import { zodiacGlyphPaths } from './ZodiacGlyph'
  * The Semana hero — your week as a SPIRAL unwinding from you. Día is a
  * snapshot (a closed system); Semana is time (a path with a start and
  * an end). Monday begins close to the core; the spiral opens outward
- * day by day; today sits at the outer head. The seven days are beads
- * threaded on a trail of light. Same core "tú", same cosmos, same
- * tilt as the Día diagram — but a spiral, not closed orbits, so the
- * two read as siblings yet never the same screen.
+ * day by day. Same core "tú", same cosmos, same tilt as the Día
+ * diagram — but a spiral, not closed orbits, so the two read as
+ * siblings yet never the same screen.
+ *
+ * The spiral expresses the present. The full week is always mapped as
+ * a faint path; the stretch you have lived (Monday → today) burns
+ * over it as a bright trail; today is the comet head — the brightest,
+ * ringed node where the live trail ends; the days still to come are
+ * hollow stations, unlit, waiting further out.
  */
 
 const W = 372
@@ -46,13 +51,14 @@ const TILT = 0.62 // same plane tilt as the Día diagram
 const HIT = 56
 const SUN_R = 30
 
-// Spiral: Monday at THETA0 / R0, opening SWEEP° out to R1 by today.
+// Spiral: Monday at THETA0 / R0, opening SWEEP° out to R1 by Sunday.
 // Just under a full turn, so the path opens cleanly and never crosses
-// itself — a week unwinding, not a coil.
+// itself — a week unwinding, not a coil. R0 clears the core so the
+// early days never crowd it.
 const THETA0 = 115
 const SWEEP = 335
-const R0 = 74
-const R1 = 156
+const R0 = 92
+const R1 = 160
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 
@@ -76,17 +82,16 @@ function spiral(s: number): Pos {
 }
 
 const TRAIL_SAMPLES = 46
-const TRAIL_SEGMENTS = 30
+const LIVED_SEGMENTS = 24
 
 export function WeekRing({
   days,
-  name,
   sign,
   selectedIdx,
   onSelect,
 }: {
   days: readonly DiaSemana[]
-  name: string
+  /** The user's zodiac sign — the sigil at the core. */
   sign: ZodiacSign
   selectedIdx: number | null
   onSelect: (i: number) => void
@@ -113,6 +118,9 @@ export function WeekRing({
   }, [selectedIdx, popT])
 
   const last = days.length - 1
+  const todayIdx = days.findIndex((d) => d.today)
+  const todayAt = todayIdx < 0 ? last : todayIdx
+  const sToday = last > 0 ? todayAt / last : 0
   const placed = days.map((d, i) => ({ d, i, pos: spiral(i / last) }))
   const back = placed.filter((p) => p.pos.depth < 0).sort((a, b) => a.pos.y - b.pos.y)
   const front = placed.filter((p) => p.pos.depth >= 0).sort((a, b) => a.pos.y - b.pos.y)
@@ -137,13 +145,14 @@ export function WeekRing({
 
         <Cosmos t={t} drift={drift} />
 
-        {/* The trail — a soft glow underlay, then crisp segments that
-            fade from the inner past toward the bright outer "today". */}
-        <Path d={glowPath} fill="none" stroke={colors.magenta} strokeWidth={5} opacity={0.1} />
-        {Array.from({ length: TRAIL_SEGMENTS }).map((_, j) => {
-          const a = spiral(j / TRAIL_SEGMENTS)
-          const b = spiral((j + 1) / TRAIL_SEGMENTS)
-          const mid = (j + 0.5) / TRAIL_SEGMENTS
+        {/* The whole week stays mapped as a faint path; the lived
+            stretch — Monday to today — burns over it, brightening
+            toward today, the comet head. */}
+        <Path d={glowPath} fill="none" stroke={colors.magenta} strokeWidth={5} opacity={0.09} />
+        {Array.from({ length: LIVED_SEGMENTS }).map((_, j) => {
+          const a = spiral((j / LIVED_SEGMENTS) * sToday)
+          const b = spiral(((j + 1) / LIVED_SEGMENTS) * sToday)
+          const mid = (j + 0.5) / LIVED_SEGMENTS
           return (
             <Line
               key={`tr-${j}`}
@@ -152,40 +161,18 @@ export function WeekRing({
               x2={b.x}
               y2={b.y}
               stroke={colors.magenta}
-              strokeOpacity={0.08 + mid * 0.34}
-              strokeWidth={1.4}
+              strokeOpacity={0.14 + mid * 0.5}
+              strokeWidth={1.7}
               strokeLinecap="round"
             />
           )
         })}
 
-        {back.map(({ d, i, pos }) => (
-          <DayNode
-            key={i}
-            day={d}
-            pos={pos}
-            index={i}
-            t={t}
-            popT={popT}
-            selected={i === selectedIdx}
-            faded={selectedIdx != null && i !== selectedIdx}
-          />
-        ))}
+        {back.map((p) => renderNode(p, todayAt, selectedIdx, t, popT))}
 
-        <Core sign={sign} name={name} t={t} />
+        <Core sign={sign} t={t} />
 
-        {front.map(({ d, i, pos }) => (
-          <DayNode
-            key={i}
-            day={d}
-            pos={pos}
-            index={i}
-            t={t}
-            popT={popT}
-            selected={i === selectedIdx}
-            faded={selectedIdx != null && i !== selectedIdx}
-          />
-        ))}
+        {front.map((p) => renderNode(p, todayAt, selectedIdx, t, popT))}
       </Svg>
 
       {placed.map(({ d, i, pos }) => (
@@ -205,9 +192,10 @@ export function WeekRing({
   )
 }
 
-/* The core — "tú", the same glowing sun-orb with name + sign glyph as
- * the Día diagram: the family link between the two segments. */
-function Core({ sign, name, t }: { sign: ZodiacSign; name: string; t: SharedValue<number> }) {
+/* The core — "tú": the same glowing sun-orb as the Día diagram, the
+ * family link between the two segments. Marked with your zodiac sigil;
+ * no name — the centre is felt by composition, not labelled. */
+function Core({ sign, t }: { sign: ZodiacSign; t: SharedValue<number> }) {
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
@@ -223,32 +211,20 @@ function Core({ sign, name, t }: { sign: ZodiacSign; name: string; t: SharedValu
     }
   })
   return (
-    <G>
-      <AnimatedG animatedProps={breath}>
-        <Circle cx={CX} cy={CY} r={52} fill={colors.magenta} opacity={0.07} />
-        <Circle cx={CX} cy={CY} r={38} fill={colors.magenta} opacity={0.12} />
-        <Circle cx={CX} cy={CY} r={SUN_R} fill="url(#week-self)" />
-        <Circle
-          cx={CX - SUN_R * 0.32}
-          cy={CY - SUN_R * 0.36}
-          r={SUN_R * 0.26}
-          fill="#FFFFFF"
-          opacity={0.38}
-        />
-      </AnimatedG>
-      <SvgText
-        x={CX}
-        y={CY - 4}
-        textAnchor="middle"
-        fontFamily={typography.serifSemi}
-        fontStyle="italic"
-        fontSize={19}
-        fill="#FBF2E6"
-      >
-        {name}
-      </SvgText>
+    <AnimatedG animatedProps={breath}>
+      <Circle cx={CX} cy={CY} r={52} fill={colors.magenta} opacity={0.07} />
+      <Circle cx={CX} cy={CY} r={38} fill={colors.magenta} opacity={0.12} />
+      <Circle cx={CX} cy={CY} r={SUN_R} fill="url(#week-self)" />
+      <Circle
+        cx={CX - SUN_R * 0.32}
+        cy={CY - SUN_R * 0.36}
+        r={SUN_R * 0.26}
+        fill="#FFFFFF"
+        opacity={0.38}
+      />
+      {/* The zodiac sigil, hand-drawn, centred in the orb. */}
       <G
-        transform={`translate(${CX - 8.4} ${CY + 2}) scale(0.7)`}
+        transform={`translate(${CX - 10.3} ${CY - 10.3}) scale(0.86)`}
         stroke="#E7BFCE"
         strokeWidth={2.6}
         strokeLinecap="round"
@@ -257,7 +233,7 @@ function Core({ sign, name, t }: { sign: ZodiacSign; name: string; t: SharedValu
       >
         {zodiacGlyphPaths(sign)}
       </G>
-    </G>
+    </AnimatedG>
   )
 }
 
@@ -307,8 +283,20 @@ function DayNode({
   return (
     <G opacity={faded ? 0.4 : 1}>
       <AnimatedG animatedProps={breath}>
-        <Circle cx={x} cy={y} r={R * 1.85} fill={colors.magenta} opacity={b * 0.13} />
-        <Circle cx={x} cy={y} r={R * 1.32} fill={colors.magenta} opacity={b * 0.22} />
+        <Circle
+          cx={x}
+          cy={y}
+          r={R * 1.95}
+          fill={colors.magenta}
+          opacity={day.today ? 0.3 : b * 0.13}
+        />
+        <Circle
+          cx={x}
+          cy={y}
+          r={R * 1.34}
+          fill={colors.magenta}
+          opacity={day.today ? 0.46 : b * 0.22}
+        />
         {ring ? (
           <Circle
             cx={x}
@@ -342,6 +330,59 @@ function DayNode({
         </SvgText>
       </AnimatedG>
     </G>
+  )
+}
+
+/* A day still to come — a hollow station on the path, unlit. The week
+ * is mapped, but you have not reached this point yet. */
+function FutureNode({ day, pos, faded }: { day: DiaSemana; pos: Pos; faded: boolean }) {
+  const { x, y } = pos
+  const R = 9
+  return (
+    <G opacity={faded ? 0.55 : 1}>
+      <Circle cx={x} cy={y} r={R} fill={colors.bg} opacity={0.7} />
+      <Circle cx={x} cy={y} r={R} fill="none" stroke={colors.bruma} strokeWidth={1.4} />
+      <SvgText
+        x={x}
+        y={y + 3.4}
+        textAnchor="middle"
+        fontFamily={typography.uiBold}
+        fontSize={9.5}
+        fill={colors.niebla}
+        opacity={0.55}
+      >
+        {day.label}
+      </SvgText>
+    </G>
+  )
+}
+
+type Placed = { d: DiaSemana; i: number; pos: Pos }
+
+/* Picks the node for a day: lived days (Monday → today) are lit beads;
+ * the days past today are hollow future stations. */
+function renderNode(
+  p: Placed,
+  todayAt: number,
+  selectedIdx: number | null,
+  t: SharedValue<number>,
+  popT: SharedValue<number>,
+) {
+  const faded = selectedIdx != null && p.i !== selectedIdx
+  if (p.i > todayAt) {
+    return <FutureNode key={p.i} day={p.d} pos={p.pos} faded={faded} />
+  }
+  return (
+    <DayNode
+      key={p.i}
+      day={p.d}
+      pos={p.pos}
+      index={p.i}
+      t={t}
+      popT={popT}
+      selected={p.i === selectedIdx}
+      faded={faded}
+    />
   )
 }
 
