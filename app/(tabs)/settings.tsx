@@ -210,6 +210,26 @@ export default function SettingsScreen() {
             </Pressable>
           </Animated.View>
 
+          {/* ── Cómo te lee Stelar — the intelligence, named and
+              explained: what it reads, and that the data is yours. ── */}
+          <Animated.View entering={enter(235)}>
+            <SectionHeader label="Cómo te lee Stelar" />
+            <View style={styles.stelarCard}>
+              <Text style={styles.stelarBody}>
+                Stelar lee{' '}
+                <Text style={styles.stelarAccent}>
+                  tu sueño, tus comidas, tu movimiento, tu ánimo
+                </Text>
+                . Encuentra tus patrones y escribe cada lectura de Tu Órbita.
+              </Text>
+              <View style={styles.cardDivider} />
+              <Text style={styles.stelarBody}>
+                <Text style={styles.stelarStrong}>Tus datos son tuyos.</Text> Viven en tu cuenta y
+                nadie más los lee.
+              </Text>
+            </View>
+          </Animated.View>
+
           {/* ── Cuenta. ── */}
           <Animated.View entering={enter(280)}>
             <SectionHeader label="Cuenta" />
@@ -337,6 +357,31 @@ const styles = StyleSheet.create({
   cardDivider: {
     height: 1,
     backgroundColor: colors.hairline,
+  },
+  // ── Cómo te lee Stelar ─────────────────────────────────────────
+  stelarCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    overflow: 'hidden',
+  },
+  stelarBody: {
+    fontFamily: typography.uiMedium,
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.bone,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  stelarAccent: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    color: colors.magenta,
+  },
+  stelarStrong: {
+    fontFamily: typography.displaySemi,
+    color: colors.leche,
   },
   row: {
     flexDirection: 'row',

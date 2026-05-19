@@ -13,6 +13,7 @@ import Animated, {
 import { EmText } from '@/components/EmText'
 import { useProfile } from '@/features/profile/hooks'
 import { zodiacFromDate } from '@/features/tabs/zodiac'
+import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
 import { useTodaySignals } from '../hooks'
@@ -50,6 +51,7 @@ export function DiaSegment() {
   const enLuz = countEnLuz(dimensions)
   const lejos = dimensions.length - enLuz
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
+  const reveal = useFirstReadReveal()
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -70,10 +72,10 @@ export function DiaSegment() {
           <Text> lejos</Text>
         </Text>
 
-        <View style={styles.divider} />
-
         {/* Credit + scope — the read is Stelar's, and it shows what
-            it read, so the intelligence is named, not hidden. */}
+            it read, so the intelligence is named, not hidden. The
+            block sits in its own breathing space below the stats —
+            no rule line, the live dot is the only visual change. */}
         <View style={styles.metaRow}>
           <LiveDot />
           <Text style={styles.meta}>
@@ -116,9 +118,46 @@ export function DiaSegment() {
         <Text style={styles.hint}>Toca una dimensión para leerla.</Text>
       )}
 
-      <VozDeStelar scope="hoy" parts={MOCK_VOZ_DIA.parts} time={MOCK_VOZ_DIA.time} />
+      {reveal ? (
+        <Animated.View entering={FadeIn.duration(700)}>
+          {/* One-time framing — names the first reading as Stelar's. */}
+          <View style={styles.revealIntro}>
+            <Text style={styles.revealEyebrow}>Tu primera lectura</Text>
+            <Text style={styles.revealLine}>
+              Stelar leyó tus últimos {MOCK_ARQUETIPO.daysRead} días para escribir lo que sigue.
+              Cuanto más registres, más te conoce.
+            </Text>
+          </View>
+          <Animated.View entering={FadeIn.duration(1100).delay(420)}>
+            <VozDeStelar parts={MOCK_VOZ_DIA.parts} />
+          </Animated.View>
+        </Animated.View>
+      ) : (
+        <VozDeStelar parts={MOCK_VOZ_DIA.parts} />
+      )}
     </Animated.View>
   )
+}
+
+/* The first time the user reaches a Stelar reading, surface a one-time
+ * reveal that frames it as Stelar's work — then mark it seen so it
+ * never shows again. */
+function useFirstReadReveal(): boolean {
+  const [reveal, setReveal] = useState(false)
+  useEffect(() => {
+    let alive = true
+    readSeenStelarReveal()
+      .then((seen) => {
+        if (!alive || seen) return
+        setReveal(true)
+        void markSeenStelarReveal()
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+  return reveal
 }
 
 /* A softly breathing dot — Stelar's presence: it is reading you now,
@@ -194,14 +233,8 @@ const styles = StyleSheet.create({
   statDot: {
     color: colors.bruma,
   },
-  divider: {
-    width: '100%',
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.hairlineStrong,
-    marginTop: 14,
-    marginBottom: 12,
-  },
   metaRow: {
+    marginTop: 22,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -247,6 +280,28 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: 12,
     color: colors.niebla,
+  },
+  // The one-time first-reading reveal, above the Voz de Stelar card.
+  revealIntro: {
+    marginTop: 22,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  revealEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: colors.magenta,
+  },
+  revealLine: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: colors.bone,
+    textAlign: 'center',
   },
   // The tapped dimension's readout — a quiet card under the diagram.
   readout: {

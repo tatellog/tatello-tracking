@@ -10,29 +10,20 @@
  *  narration. Día has its own richer reading (MOCK_VOZ_DIA). */
 export const MOCK_VOZ: Record<'semana' | 'mes', string> = {
   semana:
-    'Brillaste de lunes a miércoles y te apagaste el jueves — igual que las últimas tres semanas. Tu jueves no es flojera; es lo que se acumula pidiendo descanso.',
-  mes: 'Vas en el día 22 de tu ciclo. La fase lútea explica los antojos y el sueño ligero de estos días. No es un retroceso — es tu cuerpo en su ritmo.',
+    'Brillaste de lunes a miércoles y te apagaste el jueves, igual que las últimas tres semanas. Tu jueves no es flojera. Es lo que se acumula pidiendo descanso.',
+  mes: 'Vas en el día 22 de tu ciclo. La fase lútea explica los antojos y el sueño ligero de estos días. No es un retroceso, es tu cuerpo en su ritmo.',
 }
 
 /** A run of the coach's reading, split so a word can carry an accent
  *  (magenta) or strong (a bold figure) weight inline. */
 export type VozParte = { text: string; tone?: 'accent' | 'strong' }
 
-/** The Día reading — a timestamp plus inline-emphasised words. */
-export const MOCK_VOZ_DIA: { time: string; parts: readonly VozParte[] } = {
-  time: '14:25',
+/** The Día reading — a quiet line in Stelar's voice, with an
+ *  accented opener that paints the body of the day. */
+export const MOCK_VOZ_DIA: { parts: readonly VozParte[] } = {
   parts: [
-    { text: 'Tu ' },
-    { text: 'cuerpo', tone: 'accent' },
-    { text: ' y ' },
-    { text: 'mente', tone: 'accent' },
-    { text: ' están en luz — pero dormiste ' },
-    { text: '5 h', tone: 'strong' },
-    { text: ' y tu ' },
-    { text: 'alimento', tone: 'accent' },
-    { text: ' sigue sin registrarse. No es disciplina faltante: tu sistema te pide ' },
-    { text: 'una noche entera', tone: 'accent' },
-    { text: '.' },
+    { text: 'Cuerpo entero, mente a media luz.', tone: 'accent' },
+    { text: ' Cinco horas explican más de lo que crees. Nada de eso es tu falla.' },
   ],
 }
 
@@ -88,7 +79,7 @@ export const MOCK_PATRONES: readonly Patron[] = [
     since: 'Detectado hace 3 semanas',
     confidence: 'alta',
     evidence: {
-      caption: 'Una semana típica — el jueves cae solo.',
+      caption: 'Una semana típica. El jueves cae solo.',
       bars: [
         { v: 0.86, label: 'L' },
         { v: 0.73, label: 'M' },
@@ -100,11 +91,11 @@ export const MOCK_PATRONES: readonly Patron[] = [
       ],
       legend: 'Tu jueves vive un 64 % por debajo de tu lunes.',
     },
-    voz: 'Tu jueves no es flojera. Es el cansancio de lunes a miércoles que se acumula sin que lo notes — y para el jueves tu sistema ya no tiene de dónde.',
+    voz: 'Tu jueves no es flojera. Es el cansancio de lunes a miércoles que se acumula sin que lo notes. Para el jueves tu cuerpo ya no tiene de dónde.',
     correlacion:
       'Tu jueves cae más cuando tu sueño del miércoles baja de 7 h. Las tres semanas del patrón dormiste 6 h o menos esa noche.',
     experimento: {
-      hint: 'Date +30 min de sueño este miércoles — antes de que el jueves lo cobre.',
+      hint: 'Date 30 minutos más de sueño este miércoles, antes de que el jueves lo cobre.',
       action: 'STELAR vigila mi jueves',
     },
   },
@@ -127,11 +118,11 @@ export const MOCK_PATRONES: readonly Patron[] = [
       ],
       legend: '4 de 5 fueron tu día más en luz de la semana.',
     },
-    voz: 'El lunes llegas con el fin de semana entero descansado en el cuerpo. No es disciplina nueva — es tu sistema recargado.',
+    voz: 'El lunes llegas con el fin de semana descansado en el cuerpo. No es disciplina nueva, es tu cuerpo recargado.',
     correlacion:
       'Tus lunes altos siguen a fines de semana donde dormiste 7 h o más las dos noches.',
     experimento: {
-      hint: 'Agenda para los lunes lo que más te cuesta — es cuando más tienes con qué.',
+      hint: 'Agenda para los lunes lo que más te cuesta. Es cuando más tienes con qué.',
       action: 'Proteger mis lunes',
     },
   },
@@ -146,12 +137,13 @@ export const MOCK_PATRONES: readonly Patron[] = [
     evidence: {
       caption: 'Tus antojos a lo largo del ciclo.',
       bars: luteaBars,
-      legend: 'El pico cae del día 20 al 26 — tu fase lútea.',
+      legend: 'El pico cae del día 20 al 26. Tu fase lútea.',
     },
-    voz: 'Tus antojos de la fase lútea no son falta de control. Son tu cuerpo pidiendo más energía mientras la progesterona sube — biología, no debilidad.',
-    correlacion: 'Coinciden con tu sueño más ligero: esos mismos días duermes unos 40 min menos.',
+    voz: 'Tus antojos de la fase lútea no son falta de control. Son tu cuerpo pidiendo más energía mientras la progesterona sube. Es biología, no debilidad.',
+    correlacion:
+      'Coinciden con tu sueño más ligero. Esos mismos días duermes unos 40 minutos menos.',
     experimento: {
-      hint: 'Del día 20 al 26, suma una colación con proteína — adelántate al antojo.',
+      hint: 'Del día 20 al 26, suma una colación con proteína. Adelántate al antojo.',
       action: 'Anticipar mi fase lútea',
     },
   },
@@ -164,7 +156,7 @@ export const MOCK_PATRONES: readonly Patron[] = [
     since: 'Detectado hace 4 semanas',
     confidence: 'alta',
     evidence: {
-      caption: 'Tus últimos 10 días — marcados, los que entrenaste.',
+      caption: 'Tus últimos 10 días. Los marcados son los que entrenaste.',
       bars: [
         { v: 0.62, mark: true },
         { v: 0.48 },
@@ -179,10 +171,10 @@ export const MOCK_PATRONES: readonly Patron[] = [
       ],
       legend: 'Entrenar te suma 45 min de sueño en promedio.',
     },
-    voz: 'Los días que entrenas, tu cuerpo llega a la noche pidiendo descanso de verdad — y se lo das. El movimiento le ordena el sueño.',
+    voz: 'Los días que entrenas, tu cuerpo llega a la noche pidiendo descanso de verdad. Se lo das, y el movimiento le ordena el sueño.',
     correlacion: 'Las noches después de entrenar duermes 45 min más que las noches sin movimiento.',
     experimento: {
-      hint: 'Sostén al menos 3 entrenos por semana — tu sueño depende de ellos más de lo que crees.',
+      hint: 'Sostén al menos 3 entrenos por semana. Tu sueño depende de ellos más de lo que crees.',
       action: 'Cuidar mi ritmo',
     },
   },
@@ -206,19 +198,19 @@ export const MOCK_SEMANA: readonly DiaSemana[] = [
     label: 'L',
     brightness: 0.86,
     today: false,
-    note: 'Lunes — arrancaste en luz: dormiste bien y entrenaste.',
+    note: 'Arrancaste la semana en luz. Dormiste bien y entrenaste.',
   },
   {
     label: 'M',
     brightness: 0.7,
     today: true,
-    note: 'Hoy, martes — vas sólida: tu energía se sostiene.',
+    note: 'Hoy vas sólida, tu energía se sostiene.',
   },
-  { label: 'M', brightness: 0, today: false, note: 'Miércoles — aún no llega.' },
-  { label: 'J', brightness: 0, today: false, note: 'Jueves — aún no llega.' },
-  { label: 'V', brightness: 0, today: false, note: 'Viernes — aún no llega.' },
-  { label: 'S', brightness: 0, today: false, note: 'Sábado — aún no llega.' },
-  { label: 'D', brightness: 0, today: false, note: 'Domingo — aún no llega.' },
+  { label: 'M', brightness: 0, today: false, note: 'Aún no llega.' },
+  { label: 'J', brightness: 0, today: false, note: 'Aún no llega.' },
+  { label: 'V', brightness: 0, today: false, note: 'Aún no llega.' },
+  { label: 'S', brightness: 0, today: false, note: 'Aún no llega.' },
+  { label: 'D', brightness: 0, today: false, note: 'Aún no llega.' },
 ]
 
 /** The current cycle, for the Mes segment. */

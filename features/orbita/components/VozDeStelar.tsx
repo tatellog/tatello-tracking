@@ -9,29 +9,27 @@ import type { VozParte } from '../mock'
  * narration (the app's poetic register) in a quiet card. Two modes:
  * a plain `text` string (Semana / Mes), or `parts` — a run where
  * single words carry an accent (magenta) or strong (a bold figure)
- * weight, plus a `time` stamp. Content is MOCK; the órbita engine
- * will write it from daily_signals.
+ * weight. The eyebrow is the only chrome — no timestamp, no clock:
+ * the voice transcends the moment, it doesn't get datestamped.
+ * Content is MOCK; the órbita engine will write it from daily_signals.
  */
 export function VozDeStelar({
   scope,
   text,
   parts,
-  time,
 }: {
-  scope: string
+  /** Optional context — "esta semana", "este ciclo". Día omits it: the
+   *  voice stands alone. */
+  scope?: string
   text?: string
   parts?: readonly VozParte[]
-  time?: string
 }) {
   return (
     <View style={styles.card}>
       <View style={styles.eyebrowRow}>
-        <View style={styles.eyebrowLeft}>
-          <View style={styles.dot} />
-          <Text style={styles.eyebrow}>Voz de Stelar</Text>
-          {time ? null : <Text style={styles.scope}> · {scope}</Text>}
-        </View>
-        {time ? <Text style={styles.scope}>{time} · hoy</Text> : null}
+        <View style={styles.dot} />
+        <Text style={styles.eyebrow}>Voz de Stelar</Text>
+        {scope ? <Text style={styles.scope}> · {scope}</Text> : null}
       </View>
       <Text style={styles.body}>
         {parts
@@ -67,13 +65,8 @@ const styles = StyleSheet.create({
   },
   eyebrowRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 9,
-  },
-  eyebrowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   dot: {
     width: 5,

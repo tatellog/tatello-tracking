@@ -71,6 +71,18 @@ export async function readSkipWeight(): Promise<boolean> {
   return (await AsyncStorage.getItem(SKIP_WEIGHT_KEY)) === 'true'
 }
 
+// Whether the user has seen the one-time "this is your first reading,
+// Stelar wrote it" reveal above the first Voz de Stelar.
+const STELAR_REVEAL_KEY = '@app:seen_stelar_reveal'
+
+export async function markSeenStelarReveal(): Promise<void> {
+  await AsyncStorage.setItem(STELAR_REVEAL_KEY, 'true')
+}
+
+export async function readSeenStelarReveal(): Promise<boolean> {
+  return (await AsyncStorage.getItem(STELAR_REVEAL_KEY)) === 'true'
+}
+
 export function useVisitedDayOne(): boolean | null {
   const [visited, setVisited] = useState<boolean | null>(cachedValue)
 
