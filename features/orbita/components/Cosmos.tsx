@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import Animated, { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
-import { Circle, G } from 'react-native-svg'
+import { Circle, G, Line } from 'react-native-svg'
 
 /*
  * Cosmos — the deep field behind the orbital system. Drifting nebula
@@ -11,6 +11,64 @@ import { Circle, G } from 'react-native-svg'
  */
 
 const AnimatedG = Animated.createAnimatedComponent(G)
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+const AnimatedLine = Animated.createAnimatedComponent(Line)
+
+/* A shooting star — a rare streak diagonally across the field. Active
+ * only ~6% of a 24 s cycle, so it reads as an event, not a loop. */
+function ShootingStar({ t }: { t: SharedValue<number> }) {
+  const sx = -40
+  const sy = 46
+  const dx = W + 80
+  const dy = W * 0.56
+  const len = Math.hypot(dx, dy)
+  const TAIL = 46
+
+  const head = useAnimatedProps(() => {
+    'worklet'
+    const cycle = (t.value / 3) % 1
+    if (cycle >= 0.06) return { opacity: 0, cx: -60, cy: -60 }
+    const u = cycle / 0.06
+    let op = 1
+    if (u < 0.16) op = u / 0.16
+    else if (u > 0.7) op = 1 - (u - 0.7) / 0.3
+    return { opacity: op, cx: sx + dx * u, cy: sy + dy * u }
+  })
+  const tail = useAnimatedProps(() => {
+    'worklet'
+    const cycle = (t.value / 3) % 1
+    if (cycle >= 0.06) return { opacity: 0, x1: -60, y1: -60, x2: -60, y2: -60 }
+    const u = cycle / 0.06
+    const hx = sx + dx * u
+    const hy = sy + dy * u
+    let op = 0.55
+    if (u < 0.16) op = (u / 0.16) * 0.55
+    else if (u > 0.7) op = (1 - (u - 0.7) / 0.3) * 0.55
+    return {
+      opacity: op,
+      x1: hx - (dx / len) * TAIL,
+      y1: hy - (dy / len) * TAIL,
+      x2: hx,
+      y2: hy,
+    }
+  })
+
+  return (
+    <G>
+      <AnimatedLine
+        x1={0}
+        y1={0}
+        x2={0}
+        y2={0}
+        stroke="#FFFFFF"
+        strokeWidth={1.4}
+        strokeLinecap="round"
+        animatedProps={tail}
+      />
+      <AnimatedCircle cx={0} cy={0} r={1.9} fill="#FFFFFF" animatedProps={head} />
+    </G>
+  )
+}
 
 // Must match OrbitalSystem's viewBox.
 const W = 372
@@ -130,6 +188,7 @@ export function Cosmos({ t, drift }: { t: SharedValue<number>; drift: SharedValu
       {buckets.map((group, b) => (
         <StarBucket key={`bkt-${b}`} stars={group} index={b} t={t} />
       ))}
+      <ShootingStar t={t} />
     </G>
   )
 }

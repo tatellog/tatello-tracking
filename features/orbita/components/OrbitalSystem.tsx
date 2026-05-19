@@ -7,10 +7,20 @@ import Animated, {
   useAnimatedProps,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, G, Line, RadialGradient, Stop, Text as SvgText } from 'react-native-svg'
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  G,
+  Line,
+  RadialGradient,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg'
 
 import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, typography } from '@/theme'
@@ -32,10 +42,15 @@ import { zodiacGlyphPaths } from './ZodiacGlyph'
 const W = 372
 const CX = W / 2
 const CY = W / 2
-const MAX_R = 132
+const MAX_R = 140
 const HIT = 66 // tap-target box, in px
 
+// The orbital plane is tilted — orbits are foreshortened ellipses
+// (ry = rx · TILT), so the system reads as 3D, not a flat radar.
+const TILT = 0.62
+
 const AnimatedG = Animated.createAnimatedComponent(G)
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 /** Linear blend between two #rrggbb colours. */
 function lerpHex(a: string, b: string, t: number): string {
@@ -79,11 +94,13 @@ function mottlePatches(
   return out
 }
 
-/** Canvas position of a dimension — fixed by its angle + orbit radius. */
-function place(d: Dimension): { x: number; y: number } {
+/** Canvas position of a dimension on the tilted orbital plane.
+ *  `depth` is -1 (far / behind the core) … +1 (near / in front). */
+function place(d: Dimension): { x: number; y: number; depth: number } {
   const rad = ((d.angleDeg - 90) * Math.PI) / 180
   const r = d.radiusFrac * MAX_R
-  return { x: CX + Math.cos(rad) * r, y: CY + Math.sin(rad) * r }
+  const depth = Math.sin(rad)
+  return { x: CX + Math.cos(rad) * r, y: CY + depth * r * TILT, depth }
 }
 
 export function OrbitalSystem({
@@ -114,8 +131,30 @@ export function OrbitalSystem({
     }
   }, [t, drift])
 
+  // Tap feedback: popT (0→1→0) amplifies the selected planet with a
+  // punchy overshoot; rippleT (0→1) drives a shockwave ring out of it.
+  const popT = useSharedValue(0)
+  const rippleT = useSharedValue(0)
+  useEffect(() => {
+    if (selectedKey == null) return
+    popT.value = 0
+    popT.value = withSequence(
+      withTiming(1, { duration: 240, easing: Easing.out(Easing.back(2.6)) }),
+      withTiming(0, { duration: 520, easing: Easing.inOut(Easing.cubic) }),
+    )
+    rippleT.value = 0
+    rippleT.value = withTiming(1, { duration: 640, easing: Easing.out(Easing.cubic) })
+  }, [selectedKey, popT, rippleT])
+
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedPos = selected ? place(selected) : null
+
+  // Split planets by depth so the back half sits behind the core —
+  // real 3D occlusion. Within each half, sort by screen-y so a nearer
+  // planet draws over a farther one.
+  const placed = dimensions.map((d, i) => ({ d, i, pos: place(d) }))
+  const backPlanets = placed.filter((p) => p.pos.depth < 0).sort((a, b) => a.pos.y - b.pos.y)
+  const frontPlanets = placed.filter((p) => p.pos.depth >= 0).sort((a, b) => a.pos.y - b.pos.y)
 
   return (
     <View style={styles.wrap}>
@@ -142,24 +181,29 @@ export function OrbitalSystem({
             as bodies IN space, not stickers on a void. */}
         <Cosmos t={t} drift={drift} />
 
-        {/* Orbit rings — quiet hairlines; the selected one lights. */}
+        {/* Orbit rings — tilted ellipses: the foreshortened plane of a
+            3D system, not flat circles. Each ring carries a faint echo
+            of its dimension's brightness; the selected one lifts. */}
         {dimensions.map((d) => {
           const on = d.key === selectedKey
+          const r = d.radiusFrac * MAX_R
           return (
-            <Circle
+            <Ellipse
               key={`ring-${d.key}`}
               cx={CX}
               cy={CY}
-              r={d.radiusFrac * MAX_R}
+              rx={r}
+              ry={r * TILT}
               fill="none"
-              stroke={on ? colors.magenta : '#F4ECDE'}
-              strokeOpacity={on ? 0.3 : 0.05}
+              stroke={colors.magenta}
+              strokeOpacity={on ? 0.42 : 0.08 + d.brightness * 0.12}
               strokeWidth={1}
             />
           )
         })}
 
-        {/* The thread from the core to the selected planet. */}
+        {/* The thread to the selected planet — drawn before the core
+            so it emerges from behind it. */}
         {selectedPos ? (
           <Line
             x1={CX}
@@ -173,14 +217,31 @@ export function OrbitalSystem({
           />
         ) : null}
 
-        <CenterSelf sign={sign} name={name} t={t} />
-
-        {dimensions.map((d, i) => (
+        {/* Back planets → core → front planets, so the back of the
+            plane tucks behind the sun. */}
+        {backPlanets.map(({ d, i }) => (
           <OrbitPlanet
             key={d.key}
             dim={d}
             index={i}
             t={t}
+            popT={popT}
+            rippleT={rippleT}
+            selected={d.key === selectedKey}
+            faded={selectedKey != null && d.key !== selectedKey}
+          />
+        ))}
+
+        <CenterSelf sign={sign} name={name} t={t} />
+
+        {frontPlanets.map(({ d, i }) => (
+          <OrbitPlanet
+            key={d.key}
+            dim={d}
+            index={i}
+            t={t}
+            popT={popT}
+            rippleT={rippleT}
             selected={d.key === selectedKey}
             faded={selectedKey != null && d.key !== selectedKey}
           />
@@ -282,18 +343,26 @@ function OrbitPlanet({
   dim,
   index,
   t,
+  popT,
+  rippleT,
   selected,
   faded,
 }: {
   dim: Dimension
   index: number
   t: SharedValue<number>
+  /** 0 → 1 → 0 tap ripple; the selected planet amplifies on it. */
+  popT: SharedValue<number>
+  /** 0 → 1 tap ripple; drives the shockwave ring out of the planet. */
+  rippleT: SharedValue<number>
   selected: boolean
   faded: boolean
 }) {
-  const { x, y } = place(dim)
+  const { x, y, depth } = place(dim)
   const b = dim.brightness
-  const R = 15 + b * 10
+  // Perspective: a near planet (front of the plane) is a touch bigger,
+  // a far one a touch smaller — depth on top of the brightness size.
+  const R = (13 + b * 9) * (1 + depth * 0.16)
   const phase = (index * 0.17) % 1
 
   const dx = x - CX
@@ -306,7 +375,9 @@ function OrbitPlanet({
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    const scale = 1 + wave * 0.06
+    let scale = 1 + wave * 0.06
+    // The selected planet amplifies on the tap-pop, then settles back.
+    if (selected) scale *= 1 + popT.value * 0.5
     return {
       transform: [
         { translateX: x },
@@ -318,8 +389,28 @@ function OrbitPlanet({
     }
   })
 
+  // Shockwave ring — radiates out of the planet on tap, fading as it
+  // expands.
+  const ripple = useAnimatedProps(() => {
+    'worklet'
+    const u = rippleT.value
+    return { r: R + u * R * 2.6, opacity: (1 - u) * 0.5 }
+  })
+
   return (
     <G opacity={faded ? 0.4 : 1}>
+      {/* Shockwave — a ring radiating out of the tapped planet. */}
+      {selected ? (
+        <AnimatedCircle
+          cx={x}
+          cy={y}
+          r={R}
+          fill="none"
+          stroke="#F4ECDE"
+          strokeWidth={1.6}
+          animatedProps={ripple}
+        />
+      ) : null}
       <AnimatedG animatedProps={breath}>
         {/* Atmosphere — a tight glow that only en-luz planets carry. */}
         <Circle cx={x} cy={y} r={R * 1.7} fill={colors.magenta} opacity={b * 0.1} />
