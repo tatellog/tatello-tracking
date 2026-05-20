@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -16,10 +16,43 @@ import Svg, { Path } from 'react-native-svg'
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
 import type { ProgressPhoto } from '@/features/progress/api'
-import { useBeforeAfterPhotos } from '@/features/progress/hooks'
+import { useBeforeAfterPhotos, useMeasurements } from '@/features/progress/hooks'
+import {
+  computeDelta,
+  computeTrend,
+  formatTrendCopy,
+  toWeightPoints,
+} from '@/features/progress/logic'
 import { colors, typography } from '@/theme'
 
-import { ProgressShareSheet } from './ProgressShareSheet'
+import { ProgressShareCard, SHARE_VARIANTS } from './ProgressShareCard'
+import { ProgressShareSheet, type ShareVariant } from './ProgressShareSheet'
+
+const MESES_FMT = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]
+
+function formatDateForCard(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getDate()} ${MESES_FMT[d.getMonth()] ?? ''} ${d.getFullYear()}`
+}
+
+function formatDeltaForCard(kg: number | undefined): string {
+  if (kg == null) return '—'
+  if (kg === 0) return '0.0'
+  return `${kg < 0 ? '−' : '+'}${Math.abs(kg).toFixed(1)}`
+}
 
 /* iOS-style share glyph — a box with an arrow rising out of it. */
 function ShareIcon() {
@@ -116,8 +149,44 @@ function PhotoColumn({
  */
 export function BeforeAfterPhotos() {
   const { data } = useBeforeAfterPhotos()
+  const measurements = useMeasurements(null)
   const takePhoto = useTakePhoto()
   const [shareOpen, setShareOpen] = useState(false)
+
+  // Build the card-config used to feed the generic share sheet. Lives
+  // here (not in the sheet) because the data — photo URLs, dates,
+  // delta, coach line — is specific to the antes/después flow.
+  const shareVariants: ShareVariant[] = useMemo(() => {
+    const before = data?.before
+    const after = data?.after
+    const beforeUrl = before?.signed_url
+    const afterUrl = after?.signed_url
+    if (!before || !after || !beforeUrl || !afterUrl) return []
+    const points = toWeightPoints(measurements.data ?? [])
+    const delta = computeDelta(points)
+    const trend = computeTrend(points)
+    const deltaText = formatDeltaForCard(delta?.abs)
+    const coachCopy = trend ? formatTrendCopy(trend) : null
+    const beforeDate = formatDateForCard(before.taken_at)
+    const afterDate = formatDateForCard(after.taken_at)
+    return SHARE_VARIANTS.map((v) => ({
+      id: v.id,
+      label: v.label,
+      render: (onReady: () => void) => (
+        <ProgressShareCard
+          variant={v.id}
+          beforeUrl={beforeUrl}
+          afterUrl={afterUrl}
+          beforeDate={beforeDate}
+          afterDate={afterDate}
+          deltaText={deltaText}
+          coachCopy={coachCopy}
+          onReady={onReady}
+        />
+      ),
+    }))
+  }, [data?.before, data?.after, measurements.data])
+
   if (!data) return null
 
   // Pick from camera/library, then push it through the shared upload
@@ -203,7 +272,11 @@ export function BeforeAfterPhotos() {
       ) : null}
 
       {canShare ? (
-        <ProgressShareSheet visible={shareOpen} onClose={() => setShareOpen(false)} />
+        <ProgressShareSheet
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          variants={shareVariants}
+        />
       ) : null}
     </Animated.View>
   )

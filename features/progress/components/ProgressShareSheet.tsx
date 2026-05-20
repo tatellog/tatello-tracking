@@ -1,8 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import * as MediaLibrary from 'expo-media-library'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import {
-  Alert,
   Dimensions,
   Linking,
   Modal,
@@ -17,30 +16,11 @@ import { captureRef } from 'react-native-view-shot'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { StarLoader } from '@/components/StarLoader'
-import { useBeforeAfterPhotos, useMeasurements } from '@/features/progress/hooks'
-import {
-  computeDelta,
-  computeTrend,
-  formatTrendCopy,
-  toWeightPoints,
-} from '@/features/progress/logic'
 import { colors, shadows, typography } from '@/theme'
 
-import { CARD_H, ProgressShareCard, SHARE_VARIANTS } from './ProgressShareCard'
+import { CARD_H } from './ProgressShareCard'
 
 const SCREEN_W = Dimensions.get('window').width
-const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getDate()} ${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
-}
-
-function formatDelta(kg: number | undefined): string {
-  if (kg == null) return '—'
-  if (kg === 0) return '0.0'
-  return `${kg < 0 ? '−' : '+'}${Math.abs(kg).toFixed(1)}`
-}
 
 /* Write-only Photos permission — enough to save; less invasive than
  * full library access. */
@@ -129,43 +109,60 @@ function ActionButton({
   )
 }
 
+/** One swipeable card inside the share sheet. The render function
+ *  receives `onReady` — call it once the card's photos (or whatever
+ *  blocks the capture) have settled, so the action buttons enable. */
+export type ShareVariant = {
+  id: string
+  label: string
+  render: (onReady: () => void) => ReactNode
+}
+
 type Props = {
   visible: boolean
   onClose: () => void
+  /** The cards to display in the carousel. The sheet's chrome (modal,
+   *  carousel, dots, save/IG actions) is the same for every flow that
+   *  uses it — antes/después, entreno, anything future. Only the
+   *  cards change. */
+  variants: readonly ShareVariant[]
+  /** Optional override for the "loading…" copy shown while the cards'
+   *  photos haven't settled yet. */
+  loadingLabel?: string
 }
 
 type Busy = 'ig' | 'save' | null
 
 /*
- * The share flow — a carousel of card styles. Swipe to pick a style,
- * then tap an icon: Instagram (the card is saved to Photos first so
- * it's one tap away in the IG gallery) or just save it.
+ * Generic share flow — a carousel of card variants. Swipe to pick a
+ * style, then tap an icon: Instagram (the card is saved to Photos
+ * first so it's one tap away in the IG gallery) or just save it.
+ *
+ * The sheet doesn't know what's INSIDE the cards — it just owns the
+ * chrome: modal, close button, horizontal pager, variant dots,
+ * Save/Instagram buttons, and the captureRef → MediaLibrary flow.
+ * Consumers (BeforeAfterPhotos, TrainingShareCTA, …) supply the
+ * cards via `variants`.
  */
-export function ProgressShareSheet({ visible, onClose }: Props) {
-  const photos = useBeforeAfterPhotos()
-  const measurements = useMeasurements(null)
-
+export function ProgressShareSheet({ visible, onClose, variants, loadingLabel }: Props) {
   const cardRefs = useRef<(View | null)[]>([])
   const [active, setActive] = useState(0)
-  const [ready, setReady] = useState(false)
+  // settled counts the cards whose `onReady` has fired so far. The
+  // sheet enables actions only after every variant in the carousel
+  // has settled — captureRef of an un-loaded photo yields a blank
+  // frame on iOS, so blocking the whole sheet is the safest gate.
+  const settledRef = useRef(new Set<string>())
+  const [readyCount, setReadyCount] = useState(0)
   const [busy, setBusy] = useState<Busy>(null)
   const [saved, setSaved] = useState(false)
 
-  const { deltaText, coachCopy } = useMemo(() => {
-    const points = toWeightPoints(measurements.data ?? [])
-    const delta = computeDelta(points)
-    const trend = computeTrend(points)
-    return {
-      deltaText: formatDelta(delta?.abs),
-      coachCopy: trend ? formatTrendCopy(trend) : null,
-    }
-  }, [measurements.data])
+  const onCardReady = (id: string) => {
+    if (settledRef.current.has(id)) return
+    settledRef.current.add(id)
+    setReadyCount(settledRef.current.size)
+  }
 
-  const before = photos.data?.before
-  const after = photos.data?.after
-  const beforeUrl = before?.signed_url ?? null
-  const afterUrl = after?.signed_url ?? null
-  const cardReady = beforeUrl != null && afterUrl != null && before != null && after != null
+  const ready = readyCount >= variants.length && variants.length > 0
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     setActive(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))
@@ -182,7 +179,6 @@ export function ProgressShareSheet({ visible, onClose }: Props) {
     setBusy('save')
     try {
       if (!(await ensurePhotoPermission())) {
-        Alert.alert('Permiso necesario', 'Activa el acceso a Fotos para guardar tu tarjeta.')
         return
       }
       const uri = await captureActive()
@@ -246,7 +242,7 @@ export function ProgressShareSheet({ visible, onClose }: Props) {
           </TouchableOpacity>
         </View>
 
-        {cardReady && beforeUrl && afterUrl && before && after ? (
+        {variants.length > 0 ? (
           <>
             <View style={styles.carouselWrap}>
               <ScrollView
@@ -255,7 +251,7 @@ export function ProgressShareSheet({ visible, onClose }: Props) {
                 showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={onScrollEnd}
               >
-                {SHARE_VARIANTS.map((v, i) => (
+                {variants.map((v, i) => (
                   <View key={v.id} style={styles.page}>
                     <View
                       ref={(el) => {
@@ -263,16 +259,7 @@ export function ProgressShareSheet({ visible, onClose }: Props) {
                       }}
                       collapsable={false}
                     >
-                      <ProgressShareCard
-                        variant={v.id}
-                        beforeUrl={beforeUrl}
-                        afterUrl={afterUrl}
-                        beforeDate={formatDate(before.taken_at)}
-                        afterDate={formatDate(after.taken_at)}
-                        deltaText={deltaText}
-                        coachCopy={coachCopy}
-                        onReady={() => setReady(true)}
-                      />
+                      {v.render(() => onCardReady(v.id))}
                     </View>
                   </View>
                 ))}
@@ -280,9 +267,9 @@ export function ProgressShareSheet({ visible, onClose }: Props) {
             </View>
 
             <View style={styles.meta}>
-              <Text style={styles.variantName}>{SHARE_VARIANTS[active]?.label}</Text>
+              <Text style={styles.variantName}>{variants[active]?.label}</Text>
               <View style={styles.dots}>
-                {SHARE_VARIANTS.map((v, i) => (
+                {variants.map((v, i) => (
                   <View key={v.id} style={[styles.dot, i === active && styles.dotOn]} />
                 ))}
               </View>
@@ -291,7 +278,7 @@ export function ProgressShareSheet({ visible, onClose }: Props) {
         ) : (
           <View style={styles.loading}>
             <StarLoader size={34} />
-            <Text style={styles.loadingText}>Preparando tu tarjeta…</Text>
+            <Text style={styles.loadingText}>{loadingLabel ?? 'Preparando tu tarjeta…'}</Text>
           </View>
         )}
 

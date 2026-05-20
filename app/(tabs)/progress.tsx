@@ -17,6 +17,7 @@ import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
+import { TrainingShareCTA } from '@/features/progress/components/TrainingShareCTA'
 import { useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
@@ -141,6 +142,11 @@ export default function ProgressScreen() {
               <Text style={styles.coachLine}>{formatTrendCopy(trend)}</Text>
             </Animated.View>
           ) : null}
+
+          {/* Entreno de hoy — ephemeral capture-and-share, only when
+              the user has marked today as trained. Lives above the
+              antes/después since "recent" reads before "longitudinal". */}
+          <TrainingShareCTA />
 
           {/* Antes y ahora — the trajectory, made visible. */}
           <BeforeAfterPhotos />

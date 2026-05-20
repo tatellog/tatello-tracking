@@ -19,6 +19,7 @@ import Svg, {
   Ellipse,
   G,
   Line,
+  LinearGradient,
   Path,
   RadialGradient,
   Stop,
@@ -75,22 +76,6 @@ function fourPointStarPath(cx: number, cy: number, outer: number): string {
   return `M${pts.join('L')}Z`
 }
 
-// One bead roughly every BEAD_SPACING px along a connecting line: a
-// long line becomes a strung row of small sparkles rather than a bare
-// stroke — the "beaded" look of the reference constellation art.
-const BEAD_SPACING = 27
-
-function lineBeads(ax: number, ay: number, bx: number, by: number): { x: number; y: number }[] {
-  const len = Math.hypot(bx - ax, by - ay)
-  const n = Math.max(1, Math.round(len / BEAD_SPACING) - 1)
-  const out: { x: number; y: number }[] = []
-  for (let i = 1; i <= n; i++) {
-    const f = i / (n + 1)
-    out.push({ x: ax + (bx - ax) * f, y: ay + (by - ay) * f })
-  }
-  return out
-}
-
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
@@ -98,10 +83,16 @@ const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 
 const W = 290
 const H = 290
-const PAD = 30
+// Inner padding around the figure. Lower values let the constellation
+// spread closer to the canvas edges so the figure feels less cramped
+// against the centre counter. The alpha's diffraction spikes extend
+// ~r×7 (≈ 65 px) from its centre, so spikes near a PAD-edge can clip
+// slightly — accepted as a "looking out through a porthole" framing
+// rather than a layout bug.
+const PAD = 18
 const TARGET_DAYS = 28
-const AMBIENT_STAR_COUNT = 64
-const AMBIENT_BUCKET_COUNT = 8
+const AMBIENT_STAR_COUNT = 22
+const AMBIENT_BUCKET_COUNT = 5
 
 // Per-element ignition duration. Stars take longer (flash+settle vs.
 // a single stroke trace), and the queue waits this long before
@@ -160,6 +151,69 @@ export function LunarConstellation({
     [zodiac],
   )
 
+  // The figure's "alpha" — the star with the lowest magnitude. Used
+  // to bias the nebula toward the alpha's quadrant so the sky has
+  // directionality: the warm patch sits where the brightest star
+  // radiates, the cool patch sits in the opposite quadrant. Without
+  // this the canvas reads as a flat magenta wash; with it the
+  // constellation feels placed somewhere specific in space.
+  const alphaIdx = useMemo(() => {
+    let minMag = Infinity
+    let idx = 0
+    for (let i = 0; i < stars.length; i++) {
+      if (stars[i]!.mag < minMag) {
+        minMag = stars[i]!.mag
+        idx = i
+      }
+    }
+    return idx
+  }, [stars])
+
+  const alphaPos = useMemo(() => {
+    const a = stars[alphaIdx]
+    return a ? { x: a.x, y: a.y } : { x: W / 2, y: H / 2 }
+  }, [stars, alphaIdx])
+
+  // BFS distance map from the alpha through the figure's line graph.
+  // Drives the cascading "ripple" breath: the alpha pulses first, then
+  // each shell of connected stars ~320 ms later. The constellation
+  // feels like a neural network firing outward from a source instead
+  // of a chorus chanting in unison — narrative weight on the alpha as
+  // origin, with the rest of the figure responding to it.
+  const starDepth = useMemo(() => {
+    const adj: number[][] = stars.map(() => [])
+    for (const [a, b] of zodiac.lines) {
+      adj[a]?.push(b)
+      adj[b]?.push(a)
+    }
+    const depth = new Map<number, number>()
+    depth.set(alphaIdx, 0)
+    const queue: number[] = [alphaIdx]
+    while (queue.length > 0) {
+      const u = queue.shift()!
+      const d = depth.get(u) ?? 0
+      for (const v of adj[u] ?? []) {
+        if (depth.has(v)) continue
+        depth.set(v, d + 1)
+        queue.push(v)
+      }
+    }
+    return depth
+  }, [stars, zodiac.lines, alphaIdx])
+
+  // Line depth = whichever of its endpoints is closer to the alpha.
+  // A line lights up in sync with its nearest-to-alpha endpoint so
+  // the wave radiates through stars and lines together.
+  const lineDepth = useMemo(
+    () =>
+      zodiac.lines.map(([a, b]) => {
+        const da = starDepth.get(a) ?? 0
+        const db = starDepth.get(b) ?? 0
+        return Math.min(da, db)
+      }),
+    [zodiac.lines, starDepth],
+  )
+
   const litKeys = useMemo(() => {
     const set = new Set<string>()
     for (let i = 0; i < Math.min(elementsLit, sequence.length); i++) {
@@ -198,23 +252,40 @@ export function LunarConstellation({
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
   // Two clocks share-drive every animation:
-  //   t       — 8 s loop. Star breathing, ambient bucket twinkle,
-  //             centre bloom ambient pulse, completion rings.
-  //   slowT   — 5 s loop. The base silhouette breath so the
-  //             placeholder lines+stars feel like a constellation
-  //             waiting (not a static stamp), especially at count=0.
+  //   t        — 8 s loop. Star breathing, ambient bucket twinkle,
+  //              centre bloom ambient pulse, completion rings.
+  //   slowT    — 5 s loop. The base silhouette breath so the
+  //              placeholder lines+stars feel like a constellation
+  //              waiting (not a static stamp), especially at count=0.
+  //   breathT  — 16 s loop. Drives the cascading "ripple" breath —
+  //              every cycle the alpha brightens first, then each
+  //              shell of connected stars ~320 ms later, until the
+  //              wave has rippled through the whole figure. The rest
+  //              of the time each element twinkles independently.
+  //              Reinforces "the alpha is the source; everything else
+  //              is its light reaching outward".
+  //   driftT   — 60 s loop. Slowly translates the two nebula patches
+  //              along independent vector fields so the sky feels
+  //              alive without distracting. Like clouds in a long
+  //              exposure — perceptible only when you stare.
   // Single-thread clocks avoid spawning a timer per element.
   const t = useSharedValue(0)
   const slowT = useSharedValue(0)
+  const breathT = useSharedValue(0)
+  const driftT = useSharedValue(0)
 
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     slowT.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
+    breathT.value = withRepeat(withTiming(1, { duration: 16000, easing: Easing.linear }), -1, false)
+    driftT.value = withRepeat(withTiming(1, { duration: 42000, easing: Easing.linear }), -1, false)
     return () => {
       cancelAnimation(t)
       cancelAnimation(slowT)
+      cancelAnimation(breathT)
+      cancelAnimation(driftT)
     }
-  }, [t, slowT])
+  }, [t, slowT, breathT, driftT])
 
   // ── Ignition engine ────────────────────────────────────────────────
   //
@@ -327,6 +398,7 @@ export function LunarConstellation({
           <AmbientField t={t} />
           <ShootingStar t={t} />
           <AmbientGlow cx={cx} cy={cy} />
+          <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
           <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
           <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
           <LitLines
@@ -336,6 +408,8 @@ export function LunarConstellation({
             nextEl={nextEl}
             ignitingKey={ignitingKey}
             litPulse={litPulse}
+            breathT={breathT}
+            lineDepth={lineDepth}
           />
           <StarsLayer
             stars={stars}
@@ -346,6 +420,8 @@ export function LunarConstellation({
             intensity={intensity}
             litPulse={litPulse}
             starRecency={starRecency}
+            breathT={breathT}
+            starDepth={starDepth}
           />
           <IgnitingOverlay
             zodiac={zodiac}
@@ -353,6 +429,7 @@ export function LunarConstellation({
             ignitingKey={ignitingKey}
             igniteT={igniteT}
           />
+          <CenterOrb cx={cx} cy={cy} clock={t} />
           <CenterScrim cx={cx} cy={cy} />
           <StarBurst cx={cx} cy={cy} pulse={radialPulse} />
           <CenterText cx={cx} cy={cy} />
@@ -546,6 +623,146 @@ function AmbientGlow({ cx, cy }: { cx: number; cy: number }) {
   )
 }
 
+/* ─ Nebula patches — directional sky ─────────────────────────────
+ *
+ * Two off-centre ellipse stacks that give the canvas a sense of
+ * "this constellation is in a specific part of the sky", not floating
+ * in symmetric nowhere:
+ *
+ *  • Warm patch — magenta-granate, biased toward the alpha star's
+ *    quadrant. Reads as the gas the brightest star illuminates.
+ *  • Cool patch — dark ciruela/violet, in the opposite quadrant.
+ *    Reads as the cold side of the sky, away from the light source.
+ *
+ * Both stacks use the AmbientGlow ellipse-layering trick so we
+ * dodge the iOS RadialGradient alpha-stop bug. Aspect ratios are
+ * deliberately different (warm rx > ry, cool rx < ry) so the patches
+ * don't read as twins. */
+const NEBULA_LAYERS = 11
+
+function NebulaPatches({
+  ax,
+  ay,
+  drift,
+}: {
+  ax: number
+  ay: number
+  /** 60 s loop. Drives the slow translate of both patches so the
+   *  sky drifts like clouds in a long exposure — perceptible only
+   *  when the user stays on this screen. */
+  drift: SharedValue<number>
+}) {
+  const cx = W / 2
+  const cy = H / 2
+  // Bias the warm patch ~60% of the way from the canvas centre to
+  // the alpha — closer to the alpha than centre, but still anchored
+  // enough that small figures don't push it off-canvas.
+  const wx = cx + (ax - cx) * 0.6
+  const wy = cy + (ay - cy) * 0.6
+  // Mirror the warm patch through the centre for the cool patch.
+  const ccx = cx - (wx - cx)
+  const ccy = cy - (wy - cy)
+
+  // Warm patch drifts on an ellipse — amplitudes tuned so the motion
+  // is clearly perceptible if you stay on the screen for ~15 s. Cool
+  // patch drifts on a phase-shifted vector with different amplitudes
+  // so the two never travel in lockstep — the asymmetry sells "this
+  // is weather, not a loop".
+  const warmDrift = useAnimatedProps(() => {
+    'worklet'
+    const a = drift.value * 2 * Math.PI
+    return { transform: [{ translateX: Math.sin(a) * 18 }, { translateY: Math.cos(a) * 12 }] }
+  })
+  const coolDrift = useAnimatedProps(() => {
+    'worklet'
+    const a = drift.value * 2 * Math.PI + Math.PI * 0.7
+    return { transform: [{ translateX: Math.sin(a) * 15 }, { translateY: Math.cos(a) * 20 }] }
+  })
+
+  return (
+    <G>
+      <AnimatedG animatedProps={warmDrift}>
+        {Array.from({ length: NEBULA_LAYERS }).map((_, i) => {
+          const tt = i / (NEBULA_LAYERS - 1)
+          // Layers go from large+faint (outer) to small+slightly
+          // brighter (inner) so the stack reads as a soft radial.
+          const rx = 145 - 100 * tt
+          const ry = rx * 0.78
+          const op = 0.011 + tt * 0.018
+          return (
+            <Ellipse key={`nw-${i}`} cx={wx} cy={wy} rx={rx} ry={ry} fill="#5A1438" opacity={op} />
+          )
+        })}
+      </AnimatedG>
+      <AnimatedG animatedProps={coolDrift}>
+        {Array.from({ length: NEBULA_LAYERS }).map((_, i) => {
+          const tt = i / (NEBULA_LAYERS - 1)
+          const rx = 120 - 82 * tt
+          const ry = rx * 1.18 // taller than wide, opposite aspect of warm patch
+          const op = 0.008 + tt * 0.013
+          return (
+            <Ellipse
+              key={`nc-${i}`}
+              cx={ccx}
+              cy={ccy}
+              rx={rx}
+              ry={ry}
+              fill="#2A1838"
+              opacity={op}
+            />
+          )
+        })}
+      </AnimatedG>
+    </G>
+  )
+}
+
+/* ─ Centre orb — luminous gravitational well behind the day count ──
+ *
+ * A stack of concentric magenta circles sitting under the centre
+ * counter. Replaces the prior "number floats on dark scrim" read
+ * with "number lives inside a glowing core" — the heart of the
+ * cycle. The CenterScrim still renders on top of this orb (smaller
+ * radius) so the digits stay legible against a darker pocket inside
+ * a wider magenta glow.
+ *
+ * Slow 8 s breath (4 % scale swing) keeps the orb subtly alive
+ * without competing with the star twinkle. */
+const ORB_LAYERS = 10
+
+function CenterOrb({ cx, cy, clock }: { cx: number; cy: number; clock: SharedValue<number> }) {
+  const breath = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
+    const scale = 1 + wave * 0.04
+    return {
+      transform: [
+        { translateX: cx },
+        { translateY: cy },
+        { scale },
+        { translateX: -cx },
+        { translateY: -cy },
+      ],
+    }
+  })
+  return (
+    <AnimatedG animatedProps={breath}>
+      {Array.from({ length: ORB_LAYERS }).map((_, i) => {
+        const tt = i / (ORB_LAYERS - 1)
+        // 92 → 28 px. Outer layers are wide and faint; inner layers
+        // tight and slightly brighter so the stack reads as a glow
+        // with a luminous heart.
+        const r = 92 - 64 * tt
+        const op = 0.018 + tt * 0.05
+        return <Circle key={i} cx={cx} cy={cy} r={r} fill={colors.magenta} opacity={op} />
+      })}
+      {/* Hot cream-pink core right under the number — adds the
+          "white-hot heart" feel without competing with type colour. */}
+      <Circle cx={cx} cy={cy} r={20} fill="#FBD7E3" opacity={0.08} />
+    </AnimatedG>
+  )
+}
+
 /* ─ Ambient star field ──────────────────────────────────────────── */
 
 type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }
@@ -568,9 +785,11 @@ function buildAmbientField(): AmbientStar[][] {
     const baseOp = 0.04 + Math.abs(a * b) * 0.1
     const r = 0.4 + Math.abs(a) * 0.7
     const bucket = i % AMBIENT_BUCKET_COUNT
-    // Every third ambient point is a tiny 4-point spark instead of a
-    // plain dot — the scattered glints that decorate the reference art.
-    buckets[bucket]!.push({ x, y, r, baseOp, sparkle: i % 3 === 0 })
+    // All ambient points are plain dots — no 4-point sparks. The
+    // figure stars (and their diffraction-spike alphas) are the only
+    // 4-point shapes on the canvas, so the figure stays the
+    // unambiguous bright pattern; background = atmosphere only.
+    buckets[bucket]!.push({ x, y, r, baseOp, sparkle: false })
   }
   return buckets
 }
@@ -830,6 +1049,12 @@ function FieldStars({
   )
 }
 
+/* A lit padding star — tiny magenta dot with a soft halo. Was a big
+ * 4-point sparkle, but at that size and brightness the padding field
+ * competed with the actual figure stars and made the canvas feel
+ * crowded. Now reads as a quiet "your progress also filled this
+ * patch of sky" mark — present, magenta, but unambiguously secondary
+ * to the architectural figure. */
 function FieldStar({
   fs,
   n,
@@ -845,11 +1070,13 @@ function FieldStar({
   const starProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    return { opacity: 0.62 + 0.32 * wave }
+    return { opacity: 0.4 + 0.2 * wave }
   })
   return (
     <AnimatedG animatedProps={starProps}>
-      <Path d={fourPointStarPath(cx, cy, 4.5)} fill={colors.magenta} />
+      <Circle cx={cx} cy={cy} r={4} fill={colors.magenta} opacity={0.18} />
+      <Circle cx={cx} cy={cy} r={1.6} fill={colors.magenta} />
+      <Circle cx={cx} cy={cy} r={0.7} fill="#FBD7E3" opacity={0.9} />
     </AnimatedG>
   )
 }
@@ -905,9 +1132,6 @@ function BaseLayer({
                 strokeWidth={1.4}
                 strokeLinecap="round"
               />
-              {lineBeads(A.x, A.y, B.x, B.y).map((p, n) => (
-                <Path key={n} d={fourPointStarPath(p.x, p.y, 2)} fill="rgba(244,236,222,0.5)" />
-              ))}
             </G>
           )
         })}
@@ -939,11 +1163,20 @@ const SPARKLE_MAG = 2.8
  * The hero is each figure's alpha star; the magenta glow makes it
  * "the fuchsia one" — unmistakably the brightest — in both the
  * placeholder and lit states. Drawn behind the star body. */
+/* Multi-layer halo stack for alpha stars — matches the visual weight
+ * of the orbital hero suns in Día/Semana. Five concentric layers fake
+ * a smooth radial falloff without using <RadialGradient> (which has
+ * the same iOS alpha-stop bug noted in AmbientGlow). Inner cream-pink
+ * ring suggests heat at the core; outer magenta layers bloom into the
+ * sky. */
 function HeroGlow({ cx, cy, r }: { cx: number; cy: number; r: number }) {
   return (
     <>
-      <Circle cx={cx} cy={cy} r={r * 3.0} fill={colors.magenta} opacity={0.07} />
-      <Circle cx={cx} cy={cy} r={r * 1.9} fill={colors.magenta} opacity={0.13} />
+      <Circle cx={cx} cy={cy} r={r * 5.2} fill={colors.magenta} opacity={0.04} />
+      <Circle cx={cx} cy={cy} r={r * 3.8} fill={colors.magenta} opacity={0.07} />
+      <Circle cx={cx} cy={cy} r={r * 2.6} fill={colors.magenta} opacity={0.12} />
+      <Circle cx={cx} cy={cy} r={r * 1.7} fill={colors.magenta} opacity={0.2} />
+      <Circle cx={cx} cy={cy} r={r * 1.1} fill="#FBD7E3" opacity={0.22} />
     </>
   )
 }
@@ -957,15 +1190,68 @@ function StarSparkle({
   r,
   mag,
   fill,
+  lit = false,
 }: {
   cx: number
   cy: number
   r: number
   mag: number
   fill: string
+  /** When true, render the long diffraction spikes and the white-hot
+   *  pinpoint that signal "this star is alight". Placeholders and the
+   *  next-affordance get only the body so the lit field stays the
+   *  unambiguous bright layer. */
+  lit?: boolean
 }) {
+  const isHero = mag <= HERO_MAG
+  // Hierarchy strategy:
+  //   • lit hero (alpha)    → full astrophotography treatment:
+  //       horizontal+vertical diffraction spikes + 4-point body +
+  //       rotated 45° cross sparkle + white-hot pinpoint.
+  //   • lit secondary       → simple bright circle + cream-rosa
+  //       pinpoint. NO 4-point, NO rotated cross, NO white pinpoint.
+  //       Secondaries should read as "figure nodes" guiding the eye
+  //       along the silhouette, not as competing hero stars.
+  //   • unlit placeholder   → keep the 4-point silhouette so the
+  //       resting figure still reads as a constellation-in-waiting
+  //       against the ambient field.
+  if (lit && !isHero) {
+    // A small 4-point spark — the inherent shape of the path reads as
+    // "point of light" rather than "sphere". Circles felt like pearls
+    // on a string; the spark feels like a glint. No rotated cross or
+    // white pinpoint here — those belong to the hero alone.
+    return <Path d={fourPointStarPath(cx, cy, r * 0.7)} fill={fill} />
+  }
+  const spikeLen = r * 7
   return (
     <>
+      {/* Diffraction spikes — lit ALPHAS only. Horizontal + vertical
+          rays, no diagonals. Drawn before the body so the bright
+          core sits on top and crisps the centre. */}
+      {lit && isHero ? (
+        <>
+          <Line
+            x1={cx - spikeLen}
+            y1={cy}
+            x2={cx + spikeLen}
+            y2={cy}
+            stroke="#FBD7E3"
+            strokeOpacity={0.55}
+            strokeWidth={0.9}
+            strokeLinecap="round"
+          />
+          <Line
+            x1={cx}
+            y1={cy - spikeLen}
+            x2={cx}
+            y2={cy + spikeLen}
+            stroke="#FBD7E3"
+            strokeOpacity={0.55}
+            strokeWidth={0.9}
+            strokeLinecap="round"
+          />
+        </>
+      ) : null}
       <Path d={fourPointStarPath(cx, cy, r)} fill={fill} />
       {mag <= SPARKLE_MAG ? (
         <Path
@@ -974,6 +1260,8 @@ function StarSparkle({
           transform={`rotate(45 ${cx} ${cy})`}
         />
       ) : null}
+      {/* White-hot pinpoint — lit heroes only. */}
+      {lit && isHero ? <Circle cx={cx} cy={cy} r={r * 0.35} fill="#FFFFFF" opacity={0.85} /> : null}
     </>
   )
 }
@@ -1032,6 +1320,8 @@ function LitLines({
   nextEl,
   ignitingKey,
   litPulse,
+  breathT,
+  lineDepth,
 }: {
   zodiac: ZodiacDef
   stars: Resolved[]
@@ -1044,9 +1334,21 @@ function LitLines({
    *  the lit lines' group opacity from 0.92 → 1 so the whole figure
    *  reads as "just got brighter". */
   litPulse: SharedValue<number>
+  /** The 16s clock that drives the cascading-ripple breath. Combined
+   *  with per-line depth, each line pulses in sync with the closer
+   *  of its two endpoint stars. */
+  breathT: SharedValue<number>
+  /** Per-line depth (BFS distance from the alpha through the nearer
+   *  endpoint). Used to offset each line's breath window so the wave
+   *  radiates outward in time. */
+  lineDepth: readonly number[]
 }) {
   const groupProps = useAnimatedProps(() => {
     'worklet'
+    // The base group opacity is no longer where the breath lives —
+    // each line carries its own depth-shifted brighten now. We keep
+    // the litPulse commit-ripple here so the entire figure still
+    // surges as one on each Hoy tap.
     return { opacity: 0.92 + litPulse.value * 0.08 }
   })
   return (
@@ -1059,26 +1361,129 @@ function LitLines({
         const isNext = nextEl?.type === 'line' && nextEl.idx === idx
         if (!isLit && !isNext) return null
         if (ignitingKey === `line-${idx}`) return null
-        return (
-          <G key={`l-${idx}`}>
-            <Line
-              x1={A.x}
-              y1={A.y}
-              x2={B.x}
-              y2={B.y}
-              stroke={isLit ? colors.magenta : 'rgba(233,30,99,0.4)'}
-              strokeWidth={isLit ? 2.5 : 1.4}
-              strokeLinecap="round"
-              strokeDasharray={isLit ? undefined : '3 4'}
+        if (isLit) {
+          return (
+            <LitLineFilament
+              key={`l-${idx}`}
+              idx={idx}
+              ax={A.x}
+              ay={A.y}
+              bx={B.x}
+              by={B.y}
+              breathT={breathT}
+              depth={lineDepth[idx] ?? 0}
             />
-            {isLit
-              ? lineBeads(A.x, A.y, B.x, B.y).map((p, n) => (
-                  <Path key={n} d={fourPointStarPath(p.x, p.y, 2.6)} fill="url(#starLit)" />
-                ))
-              : null}
-          </G>
+          )
+        }
+        return (
+          <Line
+            key={`l-${idx}`}
+            x1={A.x}
+            y1={A.y}
+            x2={B.x}
+            y2={B.y}
+            stroke="rgba(233,30,99,0.4)"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+            strokeDasharray="3 4"
+          />
         )
       })}
+    </AnimatedG>
+  )
+}
+
+/* One lit line, rendered as a 3-layer filament with its own depth-
+ * shifted breath. Per-line component (rather than a .map() body) so
+ * each instance owns a hook call to useAnimatedProps — keeping
+ * Reanimated's worklet scheduling clean. */
+function LitLineFilament({
+  idx,
+  ax,
+  ay,
+  bx,
+  by,
+  breathT,
+  depth,
+}: {
+  idx: number
+  ax: number
+  ay: number
+  bx: number
+  by: number
+  breathT: SharedValue<number>
+  depth: number
+}) {
+  const gradId = `litLine-${idx}`
+  // Same cascade timing as LitStar: each shell brightens 0.02 of the
+  // 16 s cycle (~320 ms) after the previous, modulo-wrapped so deep
+  // lines in long figures still fire cleanly on the next pass.
+  const breathStart = 0.85 + depth * 0.02
+  const filamentProps = useAnimatedProps(() => {
+    'worklet'
+    const bc = (breathT.value - breathStart + 1) % 1
+    let breath = 0
+    if (bc < 0.1) {
+      const local = bc / 0.1
+      breath = Math.sin(local * Math.PI) * 0.18
+    }
+    return { opacity: 0.88 + breath }
+  })
+  return (
+    <AnimatedG animatedProps={filamentProps}>
+      <Defs>
+        {/* Gradient runs along the line in user space so it orients
+            to A→B, not to the SVG viewBox. Stops are bright at each
+            node and dim at the midpoint — each line reads as "two
+            stars connected by their own light" rather than a uniform
+            stroke. */}
+        <LinearGradient id={gradId} gradientUnits="userSpaceOnUse" x1={ax} y1={ay} x2={bx} y2={by}>
+          <Stop offset="0%" stopColor="#FBD7E3" stopOpacity={0.95} />
+          <Stop offset="15%" stopColor={colors.magenta} stopOpacity={0.85} />
+          <Stop offset="50%" stopColor={colors.magenta} stopOpacity={0.32} />
+          <Stop offset="85%" stopColor={colors.magenta} stopOpacity={0.85} />
+          <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0.95} />
+        </LinearGradient>
+      </Defs>
+      {/* Three-layer light filament:
+          1. Wide diffuse outer bloom — magenta haze that makes the
+             line feel like radiation in fog, not a CAD edge.
+          2. Bright magenta gradient body — bright at the nodes,
+             faded at the midpoint, so each line reads as "two stars
+             connected by their own light" rather than a uniform
+             stroke.
+          3. Hair-thin cream-white spine — the filament's crisp inner
+             thread. This is what makes the line stop reading as "ink"
+             and start reading as "a strand of light". */}
+      <Line
+        x1={ax}
+        y1={ay}
+        x2={bx}
+        y2={by}
+        stroke={colors.magenta}
+        strokeOpacity={0.18}
+        strokeWidth={6}
+        strokeLinecap="round"
+      />
+      <Line
+        x1={ax}
+        y1={ay}
+        x2={bx}
+        y2={by}
+        stroke={`url(#${gradId})`}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+      />
+      <Line
+        x1={ax}
+        y1={ay}
+        x2={bx}
+        y2={by}
+        stroke="#FBD7E3"
+        strokeOpacity={0.6}
+        strokeWidth={0.7}
+        strokeLinecap="round"
+      />
     </AnimatedG>
   )
 }
@@ -1184,6 +1589,8 @@ function StarsLayer({
   intensity,
   litPulse,
   starRecency,
+  breathT,
+  starDepth,
 }: {
   stars: Resolved[]
   litKeys: Set<string>
@@ -1197,6 +1604,14 @@ function StarsLayer({
   /** Star idx → days since marked. Drives the halo decay so recent
    *  stars feel alive and older ones quiet down. */
   starRecency: Map<number, number>
+  /** 16s coordinated-breath clock. Threaded through to LitStar so
+   *  every lit star can share the same brighten window. */
+  breathT: SharedValue<number>
+  /** Star idx → BFS distance from the alpha through the figure
+   *  graph. Each shell pulses 320 ms after the previous, so the
+   *  breath ripples outward from the alpha instead of firing in
+   *  unison. */
+  starDepth: Map<number, number>
 }) {
   return (
     <>
@@ -1207,6 +1622,7 @@ function StarsLayer({
         if (isNext) return <NextStar key={`s-${i}`} s={s} t={t} />
         if (isLit) {
           const recency = starRecency.get(i) ?? 0
+          const depth = starDepth.get(i) ?? 0
           return (
             <LitStar
               key={`s-${i}`}
@@ -1216,6 +1632,8 @@ function StarsLayer({
               intensity={intensity}
               litPulse={litPulse}
               recency={recency}
+              breathT={breathT}
+              depth={depth}
             />
           )
         }
@@ -1423,6 +1841,8 @@ function LitStar({
   intensity,
   litPulse,
   recency,
+  breathT,
+  depth,
 }: {
   s: Resolved
   i: number
@@ -1441,6 +1861,13 @@ function LitStar({
    *  so recent stars feel alive while older ones quiet down — the
    *  body remembers recent rhythm more vividly than old. */
   recency: number
+  /** 16s clock that drives the cascading-ripple breath. Combined
+   *  with `depth`, each star pulses 320 ms after the previous shell
+   *  so the brighten wave radiates outward from the alpha. */
+  breathT: SharedValue<number>
+  /** BFS distance from the alpha through the figure graph. 0 means
+   *  this star is the alpha. Used to offset its breath window. */
+  depth: number
 }) {
   const baseR = starRadius(s.mag) + 0.5
   const r = baseR * (1 + intensity * 0.18)
@@ -1460,13 +1887,29 @@ function LitStar({
   // without this halo a freshly-marked day is invisible against the
   // placeholder silhouette. The magenta is the achievement colour:
   // a lit star glows with it. Recency still fades older glows.
+  // Cascade: alpha (depth 0) starts its breath at bc=0.85; every
+  // shell after that fires 0.02 of the 16 s cycle (~320 ms) later.
+  // The wave radiates outward from the alpha instead of all stars
+  // pulsing in unison. Modular so the cascade wraps cleanly when
+  // very deep figures push the last shell past bc=1.0.
+  const breathStart = 0.85 + depth * 0.02
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
     const ambient = (0.22 + 0.16 * wave) * (1 + intensity * 0.5) * haloMult
+    // Depth-shifted breath window. Pulse lasts 0.10 of the cycle
+    // (≈1.6 s). Bell envelope for organic on/off. The modulo wraps
+    // the window so figures whose deepest shell lands past 1.0
+    // still fire cleanly at the start of the next cycle.
+    const bc = (breathT.value - breathStart + 1) % 1
+    let breath = 0
+    if (bc < 0.1) {
+      const local = bc / 0.1
+      breath = Math.sin(local * Math.PI) * 0.25 * haloMult
+    }
     return {
-      opacity: ambient + litPulse.value * 0.4,
-      r: r + 7 * haloMult + litPulse.value * 4,
+      opacity: ambient + litPulse.value * 0.4 + breath,
+      r: r + 7 * haloMult + litPulse.value * 4 + breath * 12,
     }
   })
 
@@ -1495,7 +1938,14 @@ function LitStar({
     }
 
     const ambient = (0.85 + 0.15 * wave) * twinkleOp
-    const boosted = ambient + litPulse.value * 0.15
+    // Cascade breath, depth-shifted (matches haloProps).
+    const bc = (breathT.value - breathStart + 1) % 1
+    let breath = 0
+    if (bc < 0.1) {
+      const local = bc / 0.1
+      breath = Math.sin(local * Math.PI) * 0.12
+    }
+    const boosted = ambient + litPulse.value * 0.15 + breath
     return {
       opacity: boosted > 1 ? 1 : boosted,
       transform: [
@@ -1508,12 +1958,45 @@ function LitStar({
     }
   })
 
+  // Outer diffuse halo — fades the star into the sky so it doesn't
+  // sit as a hard punch-out on the magenta wash. Slow, low-amplitude
+  // breath; recency-aware like the main halo.
+  const outerHaloProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    const ambient = (0.08 + 0.05 * wave) * haloMult
+    return {
+      opacity: ambient + litPulse.value * 0.12,
+      r: r + 16 * haloMult + litPulse.value * 6,
+    }
+  })
+
+  // Hot core — a small cream-pink disc that sits between the star
+  // body and the magenta halo. Adds the white-hot centre look that
+  // makes stars read as light, not stickers.
+  const coreProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    return {
+      opacity: (0.35 + 0.2 * wave) * haloMult + litPulse.value * 0.2,
+      r: r + 2 + wave * 1.2,
+    }
+  })
+
   return (
     <G>
       {isHero ? <HeroGlow cx={s.x} cy={s.y} r={r} /> : null}
+      <AnimatedCircle
+        cx={s.x}
+        cy={s.y}
+        r={r + 16}
+        fill={colors.magenta}
+        animatedProps={outerHaloProps}
+      />
       <AnimatedCircle cx={s.x} cy={s.y} r={r + 7} fill={colors.magenta} animatedProps={haloProps} />
+      <AnimatedCircle cx={s.x} cy={s.y} r={r + 2} fill="#FBD7E3" animatedProps={coreProps} />
       <AnimatedG animatedProps={starProps}>
-        <StarSparkle cx={s.x} cy={s.y} r={r} mag={s.mag} fill="url(#starLit)" />
+        <StarSparkle cx={s.x} cy={s.y} r={r} mag={s.mag} fill="url(#starLit)" lit />
       </AnimatedG>
     </G>
   )
