@@ -6,30 +6,41 @@ import type { VozParte } from '../mock'
 
 /*
  * Voz de Stelar — the coach's reading for a segment. Serif-italic
- * narration (the app's poetic register) in a quiet card. Two modes:
- * a plain `text` string (Semana / Mes), or `parts` — a run where
- * single words carry an accent (magenta) or strong (a bold figure)
- * weight. The eyebrow is the only chrome — no timestamp, no clock:
- * the voice transcends the moment, it doesn't get datestamped.
- * Content is MOCK; the órbita engine will write it from daily_signals.
+ * narration (the app's poetic register) in a quiet card. Two body
+ * modes: a plain `text` string (Mes), or `parts` — a run where words
+ * carry an accent (magenta) or strong (a bold figure) weight. The
+ * eyebrow can carry a right-side `tag` ("Cierre de semana"); when a
+ * `signature` is given, a credit line closes the card with Stelar's
+ * dots, confidence and comparison scope. Content is MOCK; the engine
+ * writes it from daily_signals.
  */
 export function VozDeStelar({
   scope,
   text,
   parts,
+  tag,
+  signature,
 }: {
-  /** Optional context — "esta semana", "este ciclo". Día omits it: the
-   *  voice stands alone. */
+  /** Optional context shown inline in the eyebrow — "esta semana",
+   *  "este ciclo". Día omits it: the voice stands alone. */
   scope?: string
   text?: string
   parts?: readonly VozParte[]
+  /** A right-aligned label in the eyebrow — e.g. "Cierre de semana". */
+  tag?: string
+  /** A bottom signature line: ●●● Stelar · Confianza alta · 4 sem
+   *  comparadas. Tells the user how Stelar reached this reading. */
+  signature?: { confidence: 'alta' | 'media' | 'baja'; scope: string }
 }) {
   return (
     <View style={styles.card}>
-      <View style={styles.eyebrowRow}>
-        <View style={styles.dot} />
-        <Text style={styles.eyebrow}>Voz de Stelar</Text>
-        {scope ? <Text style={styles.scope}> · {scope}</Text> : null}
+      <View style={[styles.eyebrowRow, tag ? styles.eyebrowRowSpread : null]}>
+        <View style={styles.eyebrowLeft}>
+          <View style={styles.dot} />
+          <Text style={styles.eyebrow}>Voz de Stelar</Text>
+          {scope ? <Text style={styles.scope}> · {scope}</Text> : null}
+        </View>
+        {tag ? <Text style={styles.tag}>{tag}</Text> : null}
       </View>
       <Text style={styles.body}>
         {parts
@@ -49,6 +60,18 @@ export function VozDeStelar({
             ))
           : text}
       </Text>
+      {signature ? (
+        <View style={styles.signatureBlock}>
+          <View style={styles.signatureRule} />
+          <View style={styles.signatureRow}>
+            <Text style={styles.sigDots}>●●●</Text>
+            <Text style={styles.sigStelar}> Stelar </Text>
+            <Text style={styles.sigMeta}>
+              · Confianza {signature.confidence} · {signature.scope}
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -67,6 +90,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 9,
+  },
+  eyebrowRowSpread: {
+    justifyContent: 'space-between',
+  },
+  eyebrowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   dot: {
     width: 5,
@@ -89,12 +119,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.niebla,
   },
-  // Serif italic — the coach / poetic voice of the app.
+  // The right-side tag — a quiet context like "Cierre de semana".
+  tag: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  // Serif italic — the coach / poetic voice of the app. The voice
+  // sits a hair larger than the rest of the body copy so it reads
+  // first when the eye lands on the card.
   body: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 25,
     color: colors.bone,
   },
   // An emphasised word — the same serif italic, lifted to magenta.
@@ -105,7 +145,38 @@ const styles = StyleSheet.create({
   strong: {
     fontFamily: typography.uiBold,
     fontStyle: 'normal',
-    fontSize: 13,
+    fontSize: 15,
     color: colors.leche,
+  },
+  signatureBlock: {
+    marginTop: 14,
+  },
+  signatureRule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.hairline,
+    marginBottom: 10,
+  },
+  signatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  sigDots: {
+    fontSize: 7,
+    letterSpacing: 2,
+    color: colors.magenta,
+  },
+  sigStelar: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 12,
+    color: colors.magenta,
+  },
+  sigMeta: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
   },
 })

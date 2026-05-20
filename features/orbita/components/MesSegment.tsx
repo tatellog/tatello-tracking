@@ -10,13 +10,16 @@ import { VozDeStelar } from './VozDeStelar'
 
 /*
  * The Mes segment — "El Cielo": the coach's reading of the cycle, the
- * current cycle phase, and the cycle-bound patterns. The constellation
- * sealing + "Tu Cielo" multi-cycle view belong here too — that's the
- * deferred cycle-lifecycle sprint. Content is MOCK (see ../mock.ts).
+ * current cycle phase, and the full library of detected patterns.
+ * Patterns are cross-week by nature (they need multiple weeks/cycles
+ * of data) so this is where they live. Semana only links to here via
+ * a single forward-looking PatternHint.
+ *
+ * The constellation sealing + "Tu Cielo" multi-cycle view belong
+ * here too — deferred cycle-lifecycle sprint. Content is MOCK.
  */
 export function MesSegment() {
   const ciclo = MOCK_CICLO
-  const cyclePatterns = MOCK_PATRONES.filter((p) => p.id === 'lutea')
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -36,12 +39,16 @@ export function MesSegment() {
         <Text style={styles.note}>{ciclo.note}</Text>
       </View>
 
-      <View style={styles.header}>
-        <EyebrowLabel tone="niebla" size={10}>
-          Ligado a tu ciclo
+      <View style={styles.patHeader}>
+        <EyebrowLabel tone="magenta" size={10}>
+          Patrones que Stelar detectó
         </EyebrowLabel>
+        <Text style={styles.patCount}>
+          <Text style={styles.patCountNum}>{MOCK_PATRONES.length}</Text>
+          <Text> lecturas</Text>
+        </Text>
       </View>
-      {cyclePatterns.map((p) => (
+      {MOCK_PATRONES.map((p) => (
         <PatternCard key={p.id} patron={p} />
       ))}
     </Animated.View>
@@ -98,8 +105,21 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.bone,
   },
-  header: {
-    marginTop: 24,
+  patHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 26,
     marginBottom: 2,
+  },
+  patCount: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  patCountNum: {
+    color: colors.magenta,
   },
 })

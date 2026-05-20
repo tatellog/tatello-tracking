@@ -37,9 +37,16 @@ import { colors, typography } from '@/theme'
 import { RingCard } from './RingCard'
 
 // Macros lead — the day's most-checked number — then the morning
-// rituals (sleep, check-in) and the slow weight trend. Water lives in
-// the QuickLog (✦); registering it here too would duplicate that.
-const SLIDE_TITLES = ['Macros de hoy', 'Sueño de anoche', 'Cómo amaneciste', 'Tu peso'] as const
+// rituals (sleep, check-in), the cycle phase (read-only, reframes
+// the rest), and the slow weight trend. Water lives in the QuickLog
+// (✦); registering it here too would duplicate that.
+const SLIDE_TITLES = [
+  'Macros de hoy',
+  'Sueño de anoche',
+  'Cómo amaneciste',
+  'Tu ciclo',
+  'Tu peso',
+] as const
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 type Props = { ctx: BriefContext }
@@ -101,6 +108,9 @@ export function StatSlider({ ctx }: Props) {
             <WellbeingSlide date={ctx.date} />
           </Slide>
           <Slide index={3} width={width} scrollX={scrollX}>
+            <CycleSlide />
+          </Slide>
+          <Slide index={4} width={width} scrollX={scrollX}>
             <WeightSlide ctx={ctx} />
           </Slide>
         </Animated.ScrollView>
@@ -641,6 +651,104 @@ function WellbeingSlide({ date }: { date: string }) {
   )
 }
 
+/* ─── Slide — cycle phase ──────────────────────────────────────────── */
+
+// Mock — derivation from cycle_events is deferred to the cycle
+// lifecycle sprint. Day 22 / fase lútea matches the Voz de Stelar
+// copy in features/orbita/mock.ts so the two surfaces tell the same
+// story while this slide is still on placeholder data.
+const MOCK_CYCLE = {
+  day: 22,
+  cycleLength: 28,
+  daysToNextPeriod: 6,
+}
+
+type CyclePhase = 'menstrual' | 'folicular' | 'ovulación' | 'lútea'
+
+function phaseForDay(day: number): CyclePhase {
+  if (day <= 5) return 'menstrual'
+  if (day <= 13) return 'folicular'
+  if (day <= 16) return 'ovulación'
+  return 'lútea'
+}
+
+// Dial — a full ring of the cycle's days, the lit arc growing from
+// the top clockwise to today and tipped with a small marker. Visual
+// rhyme with the weight sparkline (a curve + a tip dot).
+const DIAL_W = 130
+const DIAL_H = 130
+const DIAL_R = 52
+const DIAL_CX = DIAL_W / 2
+const DIAL_CY = DIAL_H / 2
+const DIAL_CIRC = 2 * Math.PI * DIAL_R
+
+function CycleDial({ day, cycleLength }: { day: number; cycleLength: number }) {
+  const fraction = Math.min(1, day / cycleLength)
+  const filled = DIAL_CIRC * fraction
+  // Start at top (−90°), sweep clockwise.
+  const angle = fraction * 2 * Math.PI - Math.PI / 2
+  const markerX = DIAL_CX + DIAL_R * Math.cos(angle)
+  const markerY = DIAL_CY + DIAL_R * Math.sin(angle)
+
+  return (
+    <Svg width={DIAL_W} height={DIAL_H}>
+      <Circle
+        cx={DIAL_CX}
+        cy={DIAL_CY}
+        r={DIAL_R}
+        stroke={colors.bruma}
+        strokeWidth={2}
+        fill="none"
+      />
+      <Circle
+        cx={DIAL_CX}
+        cy={DIAL_CY}
+        r={DIAL_R}
+        stroke={colors.magenta}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={`${filled} ${DIAL_CIRC}`}
+        transform={`rotate(-90 ${DIAL_CX} ${DIAL_CY})`}
+      />
+      <Circle cx={markerX} cy={markerY} r={3.6} fill={colors.magenta} />
+    </Svg>
+  )
+}
+
+/*
+ * Cycle phase — a read-only snapshot of where the user is in her
+ * menstrual cycle today. Phase reframes the rest of the dashboard
+ * (calories, sleep, mood), which is why it lives next to them on Hoy.
+ * Inputs (period start / end) belong in QuickLog ✦, not this slide.
+ */
+function CycleSlide() {
+  const { day, cycleLength, daysToNextPeriod } = MOCK_CYCLE
+  const phase = phaseForDay(day)
+
+  return (
+    <View style={styles.slide}>
+      <View style={styles.card}>
+        <View style={styles.weightRow}>
+          <View style={styles.cycleDialWrap}>
+            <CycleDial day={day} cycleLength={cycleLength} />
+            <View style={styles.cycleDialCenter} pointerEvents="none">
+              <Text style={styles.cycleDialDay}>{day}</Text>
+              <Text style={styles.cycleDialOf}>/ {cycleLength}</Text>
+            </View>
+          </View>
+          <View style={styles.numberStack}>
+            <Text style={styles.cyclePhaseLine}>
+              Fase <Text style={styles.cyclePhaseEm}>{phase}</Text>
+            </Text>
+            <Text style={styles.weeklyLine}>regla en {daysToNextPeriod} días</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  )
+}
+
 /* ─── Pagination dots ──────────────────────────────────────────────── */
 
 function Dots({ count, active }: { count: number; active: number }) {
@@ -861,6 +969,48 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: colors.bruma,
+  },
+  // ── Cycle slide ────────────────────────────────────────────────
+  // The dial holds the day number stacked at its centre.
+  cycleDialWrap: {
+    width: DIAL_W,
+    height: DIAL_H,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cycleDialCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Day N — the headline number, sized like the weight value.
+  cycleDialDay: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 38,
+    color: colors.leche,
+    letterSpacing: -1.6,
+    lineHeight: 40,
+  },
+  // "/ 28" — small, serif, sitting just under the day number.
+  cycleDialOf: {
+    marginTop: 2,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 12,
+    color: colors.niebla,
+  },
+  // Phase headline — serif italic like the weight's total delta line.
+  cyclePhaseLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 15,
+    color: colors.bone,
+  },
+  // Phase name — the emphasised word, magenta serif.
+  cyclePhaseEm: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    color: colors.magenta,
   },
   // ── Shared caption — the serif italic line under a slide. ──────
   captionLine: {

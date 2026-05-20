@@ -1,122 +1,157 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, {
-  cancelAnimation,
-  Easing,
-  FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated'
+import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
-import { useProfile } from '@/features/profile/hooks'
-import { zodiacFromDate } from '@/features/tabs/zodiac'
 import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
 import { useTodaySignals } from '../hooks'
 import {
-  countEnLuz,
+  countTones,
   deriveDimensions,
   dimensionDetail,
-  dimensionState,
+  dimensionEvidence,
+  dimensionTone,
   type DimensionKey,
 } from '../logic'
-import { MOCK_ARQUETIPO, MOCK_VOZ_DIA } from '../mock'
+import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
+import { AccionDelDia } from './AccionDelDia'
+import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
+import { StelarHeadline } from './StelarHeadline'
 import { VozDeStelar } from './VozDeStelar'
 
 /*
  * The Día segment — "El Sistema". Reads today's signals, resolves the
- * six dimensions' brightness, and renders the orbital diagram under
- * the archetype the engine names you with. The header credits the
- * read to Stelar and shows its scope — days and dimensions read — so
- * the intelligence behind the archetype is named, not hidden. Tapping
- * a body selects it and surfaces a short readout below.
+ * six dimensions' brightness, and renders the orbital diagram. The
+ * surrounding flow is structured so the AI never feels hidden:
  *
- * While the query loads (or nothing is logged yet) every dimension
- * sits at the floor, so the diagram is always present — forming,
- * never empty. The archetype + Voz de Stelar are MOCK (../mock.ts).
+ *   header (compressed: archetype + one meta line)
+ *   StelarHeadline   ← lifted lede of the reading, above the orbital
+ *   orbital diagram  ← the visual system
+ *   readout          ← tap a dimension; shows verdict + evidence
+ *   AccionDelDia     ← the one move the IA recommends today
+ *   Voz de Stelar    ← the full prose reading
+ *
+ * Archetype + Voz de Stelar + headline + action are MOCK
+ * (../mock.ts); the engine will write them from daily_signals.
  */
 export function DiaSegment() {
   const { data } = useTodaySignals()
-  const { data: profile } = useProfile()
   const signals = data ?? null
   const dimensions = deriveDimensions(signals)
-  const sign = zodiacFromDate(profile?.date_of_birth)
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
 
-  const enLuz = countEnLuz(dimensions)
-  const lejos = dimensions.length - enLuz
+  const tones = countTones(dimensions)
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
+  const selectedTone = selected ? dimensionTone(selected.brightness) : null
+  const evidence = selected ? dimensionEvidence(selected.key, signals) : []
   const reveal = useFirstReadReveal()
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* The archetype — the identity pattern Stelar reads in you. */}
+      {/* Compressed header — archetype as the only hero, with a single
+          dense meta line that names tones, the read window, and how
+          deep STELAR has read so far. */}
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Tu sistema · Hoy</Text>
         <EmText
           text={MOCK_ARQUETIPO.name}
           emphasis={MOCK_ARQUETIPO.emphasis}
           style={styles.archetype}
           emStyle={styles.archetypeEm}
         />
-        <Text style={styles.stats}>
-          <Text style={styles.statNum}>{enLuz}</Text>
-          <Text> en luz </Text>
-          <Text style={styles.statDot}>·</Text>
-          <Text style={styles.statNum}> {lejos}</Text>
-          <Text> lejos</Text>
-        </Text>
-
-        {/* Credit + scope — the read is Stelar's, and it shows what
-            it read, so the intelligence is named, not hidden. The
-            block sits in its own breathing space below the stats —
-            no rule line, the live dot is the only visual change. */}
         <View style={styles.metaRow}>
           <LiveDot />
-          <Text style={styles.meta}>
-            <Text>Leído por </Text>
-            <Text style={styles.metaStelar}>Stelar</Text>
-            <Text>{`   ·   ${MOCK_ARQUETIPO.daysRead} días   ·   ${dimensions.length} dimensiones`}</Text>
-          </Text>
+          <View style={styles.metaStack}>
+            {/* Each tone is its own coloured run — the meta row reads
+                as a tiny visual map of the system, not a numeric list.
+                Magenta is reserved for what truly shines. */}
+            <Text
+              style={styles.meta}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              <Text style={styles.toneBrillante}>{tones.brillantes} brillantes</Text>
+              <Text style={styles.metaSep}> · </Text>
+              <Text style={styles.toneFormacion}>{tones.formacion} en formación</Text>
+              <Text style={styles.metaSep}> · </Text>
+              <Text style={styles.toneSilencio}>{tones.silencio} en silencio</Text>
+            </Text>
+            <Text style={styles.metaB} numberOfLines={1}>
+              <Text>leído por </Text>
+              <Text style={styles.metaStelar}>Stelar</Text>
+              <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
+            </Text>
+          </View>
         </View>
       </View>
+
+      {/* Lifted lede — STELAR's read in two lines, before the visual. */}
+      <StelarHeadline parts={MOCK_HEADLINE.parts} />
 
       {/* Full-bleed — the diagram is the hero, it breaks out of the
           screen's 20px gutter so the bodies read large. */}
       <View style={styles.diagram}>
         <OrbitalSystem
           dimensions={dimensions}
-          sign={sign}
           selectedKey={selectedKey}
           onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
         />
       </View>
 
-      {selected ? (
+      {selected && selectedTone ? (
         <Animated.View key={selected.key} entering={FadeIn.duration(220)} style={styles.readout}>
           <View style={styles.readoutTop}>
-            <Text style={styles.readoutLabel}>{selected.label}</Text>
+            <View style={styles.readoutLabelRow}>
+              <Text style={styles.readoutLabel}>{selected.label}</Text>
+              {/* The one-word poetic state — lifted from the orbital
+                  so it lands here when the user is reading, not as
+                  ambient noise on the diagram. */}
+              {selected.word ? <Text style={styles.readoutWord}>{selected.word}</Text> : null}
+            </View>
             <Text
               style={[
                 styles.readoutState,
-                dimensionState(selected.brightness) === 'en luz'
-                  ? styles.stateLuz
-                  : styles.stateLejos,
+                selectedTone === 'brillante'
+                  ? styles.toneBrillante
+                  : selectedTone === 'en formación'
+                    ? styles.toneFormacion
+                    : styles.toneSilencio,
               ]}
             >
-              {dimensionState(selected.brightness)}
+              {selectedTone}
             </Text>
           </View>
           <Text style={styles.readoutDetail}>{dimensionDetail(selected.key, signals)}</Text>
+          {evidence.length > 0 ? (
+            <View style={styles.evidenceBlock}>
+              <Text style={styles.evidenceEyebrow}>Señales leídas</Text>
+              <View style={styles.evidenceList}>
+                {evidence.map((e, i) => (
+                  <View key={e.label} style={styles.evidenceRow}>
+                    <Text style={styles.evidenceLabel}>{e.label}</Text>
+                    <Text style={styles.evidenceDot}>·</Text>
+                    <Text style={styles.evidenceValue}>{e.value}</Text>
+                    {i < evidence.length - 1 ? <View style={styles.evidenceGap} /> : null}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.evidenceQuiet}>
+              Cuando hay silencio, Stelar no inventa — espera a que registres.
+            </Text>
+          )}
         </Animated.View>
       ) : (
         <Text style={styles.hint}>Toca una dimensión para leerla.</Text>
       )}
+
+      {/* The one move STELAR weights highest today. Heavier card than
+          Voz so it reads as call-to-action, not narration. */}
+      <AccionDelDia title={MOCK_ACCION_DEL_DIA.title} reason={MOCK_ACCION_DEL_DIA.reason} />
 
       {reveal ? (
         <Animated.View entering={FadeIn.duration(700)}>
@@ -160,32 +195,6 @@ function useFirstReadReveal(): boolean {
   return reveal
 }
 
-/* A softly breathing dot — Stelar's presence: it is reading you now,
- * not showing a frozen stat. */
-function LiveDot() {
-  const p = useSharedValue(0)
-  useEffect(() => {
-    p.value = withRepeat(
-      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.quad) }),
-      -1,
-      true,
-    )
-    return () => cancelAnimation(p)
-  }, [p])
-
-  const halo = useAnimatedStyle(() => ({
-    opacity: 0.16 + p.value * 0.4,
-    transform: [{ scale: 0.7 + p.value * 0.7 }],
-  }))
-
-  return (
-    <View style={styles.dotWrap}>
-      <Animated.View style={[styles.dotHalo, halo]} />
-      <View style={styles.dotCore} />
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
@@ -198,16 +207,8 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
   },
-  eyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    letterSpacing: 2.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
   // The archetype name — the app's poetic register.
   archetype: {
-    marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: 27,
@@ -218,27 +219,18 @@ const styles = StyleSheet.create({
   archetypeEm: {
     color: colors.magenta,
   },
-  stats: {
-    marginTop: 9,
-    fontFamily: typography.uiBold,
-    fontSize: 10.5,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    textAlign: 'center',
-  },
-  statNum: {
-    color: colors.magenta,
-  },
-  statDot: {
-    color: colors.bruma,
-  },
+  // Single dense meta row — tones + read window + depth %. The live
+  // dot keeps the "Stelar is reading you" presence; the wrap is two
+  // lines on narrow screens so depth never gets clipped.
   metaRow: {
-    marginTop: 22,
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 4,
   },
-  // The Stelar credit + read scope.
+  metaStack: {
+    flex: 1,
+  },
   meta: {
     fontFamily: typography.uiBold,
     fontSize: 10,
@@ -246,33 +238,27 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.niebla,
   },
-  // The intelligence, named — serif italic, the coach register.
+  // Second meta line — same chrome as the first, slight breathing room.
+  metaB: {
+    marginTop: 4,
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  // The middle dot between the three tones — barely there, just
+  // enough to space them.
+  metaSep: {
+    color: colors.bruma,
+  },
   metaStelar: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 12.5,
+    fontSize: 12,
     color: colors.magenta,
-  },
-  // The live-presence dot.
-  dotWrap: {
-    width: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  dotHalo: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.magenta,
-  },
-  dotCore: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.magentaHot,
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   hint: {
     marginTop: 4,
@@ -318,11 +304,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  readoutLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
   readoutLabel: {
     fontFamily: typography.uiBold,
     fontSize: 11,
     color: colors.leche,
     letterSpacing: 1.6,
+  },
+  // The poetic word — serif italic magenta, like the archetype.
+  readoutWord: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: colors.magenta,
   },
   readoutState: {
     fontFamily: typography.uiBold,
@@ -330,10 +328,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
-  stateLuz: {
+  toneBrillante: {
     color: colors.magenta,
   },
-  stateLejos: {
+  toneFormacion: {
+    color: colors.bone,
+  },
+  toneSilencio: {
     color: colors.niebla,
   },
   readoutDetail: {
@@ -342,5 +343,63 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 19,
     color: colors.bone,
+  },
+  // Evidence — the chain of signals STELAR read to land on the
+  // verdict. A hairline rule separates it from the verdict prose so
+  // the reasoning reads as its own beat.
+  evidenceBlock: {
+    marginTop: 11,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  evidenceEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 9,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 6,
+  },
+  evidenceList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  evidenceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  evidenceLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: 12,
+    color: colors.niebla,
+  },
+  evidenceDot: {
+    marginHorizontal: 6,
+    fontFamily: typography.ui,
+    fontSize: 12,
+    color: colors.bruma,
+  },
+  evidenceValue: {
+    fontFamily: typography.uiBold,
+    fontSize: 12,
+    color: colors.leche,
+  },
+  evidenceGap: {
+    width: 14,
+  },
+  // Honest line when there is nothing to cite — STELAR records,
+  // doesn't invent.
+  evidenceQuiet: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.niebla,
   },
 })

@@ -1,107 +1,112 @@
-import Svg, { Circle, G, Path } from 'react-native-svg'
+import Svg, { Circle, G, Line, Path } from 'react-native-svg'
 
 import type { ZodiacSign } from '@/features/tabs/zodiac'
 
 /*
- * Hand-drawn astrological symbols — a clean stroked line glyph per
- * sign, in the app's 24×24 icon idiom. Replaces the Unicode zodiac
- * characters, which render as tofu boxes in the custom UI font.
+ * Astrological sigil per sign — transcribed from assets/zodiaco/*.svg
+ * into react-native-svg primitives so they render natively inside any
+ * larger SVG (the orbital core, the avatar tile, …). All glyphs share
+ * the same 24×24 viewBox and stroke style as the source files. Cancer
+ * has two filled dots; the rest are pure strokes, so the `color`
+ * argument fills the cancer dots and stays inert elsewhere.
  */
-export function zodiacGlyphPaths(sign: ZodiacSign) {
+export function zodiacGlyphPaths(sign: ZodiacSign, color: string) {
   switch (sign) {
     case 'aries':
       return (
         <>
-          <Path d="M12 21 V12" />
-          <Path d="M12 12 C 12 6 6 6 6 11.6" />
-          <Path d="M12 12 C 12 6 18 6 18 11.6" />
+          <Path d="M 12 19 L 12 9 Q 12 4 8 4 Q 4 4 4 8" />
+          <Path d="M 12 9 Q 12 4 16 4 Q 20 4 20 8" />
         </>
       )
     case 'tauro':
       return (
         <>
-          <Circle cx={12} cy={15} r={5.2} />
-          <Path d="M6.5 9.6 C 7.3 3.6 16.7 3.6 17.5 9.6" />
+          <Circle cx={12} cy={15.5} r={4.5} />
+          <Path d="M 3 5 Q 3 11 12 11 Q 21 11 21 5" />
         </>
       )
     case 'geminis':
       return (
         <>
-          <Path d="M8 5 V19" />
-          <Path d="M16 5 V19" />
-          <Path d="M6 5.7 Q12 8.3 18 5.7" />
-          <Path d="M6 18.3 Q12 15.7 18 18.3" />
+          <Line x1={8} y1={6} x2={8} y2={18} />
+          <Line x1={16} y1={6} x2={16} y2={18} />
+          <Path d="M 5 6 Q 8 4 11 6" />
+          <Path d="M 13 6 Q 16 4 19 6" />
+          <Path d="M 5 18 Q 8 20 11 18" />
+          <Path d="M 13 18 Q 16 20 19 18" />
         </>
       )
     case 'cancer':
       return (
         <>
-          <Circle cx={7} cy={9.6} r={1.9} />
-          <Path d="M8.7 8.7 C 12 6 16.4 8 17 11" />
-          <Circle cx={17} cy={14.4} r={1.9} />
-          <Path d="M15.3 15.3 C 12 18 7.6 16 7 13" />
+          <Path d="M 4 9 Q 4 4 10 4 L 15 4" />
+          <Circle cx={15} cy={4} r={1.6} fill={color} stroke="none" />
+          <Path d="M 20 15 Q 20 20 14 20 L 9 20" />
+          <Circle cx={9} cy={20} r={1.6} fill={color} stroke="none" />
         </>
       )
     case 'leo':
       return (
         <>
-          <Circle cx={8.2} cy={15.6} r={3.4} />
-          <Path d="M10.7 13.4 C 13.5 6 19.5 8.6 18 13 C 17.2 15.5 14.4 15.2 15.4 12.7" />
+          <Circle cx={8.5} cy={8.5} r={3.5} />
+          <Path d="M 12 9 Q 17 9 17 14 Q 17 19 11.5 19.5 Q 6 20 6 15.5" />
         </>
       )
     case 'virgo':
       return (
         <>
-          <Path d="M5 18 V8.6" />
-          <Path d="M5 8.6 Q7 5.7 9 8.6 V18" />
-          <Path d="M9 8.6 Q11 5.7 13 8.6 V14.6" />
-          <Path d="M13 12.4 C 13 17.8 18.6 16.8 17.7 11.5 C 17.1 8.6 13.8 9.3 13.4 12.4" />
+          <Path d="M 4 18 L 4 8 Q 4 5 7 5 Q 9 5 9 8 L 9 18" />
+          <Path d="M 9 18 L 9 8 Q 9 5 12 5 Q 14 5 14 8 L 14 18" />
+          <Path d="M 14 18 L 14 8 Q 14 5 17 5 Q 19 5 19 8 L 19 14 Q 19 16 17 16" />
+          <Path d="M 19 14 Q 21 16 19 18" />
         </>
       )
     case 'libra':
       return (
         <>
-          <Path d="M4.5 18 H19.5" />
-          <Path d="M4.5 13 H8.3 A3.7 3.7 0 0 1 15.7 13 H19.5" />
+          <Path d="M 5 12 Q 5 6 12 6 Q 19 6 19 12" />
+          <Line x1={4} y1={18} x2={20} y2={18} />
+          <Line x1={9} y1={13} x2={15} y2={13} />
         </>
       )
     case 'escorpio':
       return (
         <>
-          <Path d="M5 18 V8.6" />
-          <Path d="M5 8.6 Q7 5.7 9 8.6 V18" />
-          <Path d="M9 8.6 Q11 5.7 13 8.6 V18" />
-          <Path d="M13 8.6 Q15 5.7 17 8.6 V15.4" />
-          <Path d="M17 15.4 L20.6 19 M20.6 19 H16.9 M20.6 19 V15.4" />
+          <Path d="M 4 18 L 4 8 Q 4 5 7 5 Q 9 5 9 8 L 9 18" />
+          <Path d="M 9 18 L 9 8 Q 9 5 12 5 Q 14 5 14 8 L 14 18" />
+          <Path d="M 14 18 L 14 8 Q 14 5 17 5 Q 19 5 19 8 L 19 17" />
+          <Path d="M 19 17 L 22 14 M 19 17 L 22 19" />
         </>
       )
     case 'sagitario':
       return (
         <>
-          <Path d="M5 19 L16.6 7.4" />
-          <Path d="M11 7.4 H16.6 V13" />
-          <Path d="M8.4 11 L12.6 15.2" />
+          <Line x1={5} y1={19} x2={19} y2={5} />
+          <Path d="M 19 5 L 12 5 M 19 5 L 19 12" />
+          <Line x1={8} y1={13} x2={13} y2={18} />
         </>
       )
     case 'capricornio':
       return (
         <>
-          <Path d="M5 9 L8.7 16.8 L11 9.5 C 12 6.4 16.6 6.4 16.6 11 C 16.6 14.9 12.3 14.6 12 11.6" />
+          <Path d="M 4 5 L 9 19 L 13 9" />
+          <Path d="M 13 9 Q 17 7 17 12 Q 17 17 14 17 Q 11 17 11 14 Q 11 11 14 11.5" />
         </>
       )
     case 'acuario':
       return (
         <>
-          <Path d="M4 10 Q6 7.7 8 10 T12 10 T16 10 T20 10" />
-          <Path d="M4 15 Q6 12.7 8 15 T12 15 T16 15 T20 15" />
+          <Path d="M 3 9 Q 6 6 9 9 T 15 9 T 21 9" />
+          <Path d="M 3 15 Q 6 12 9 15 T 15 15 T 21 15" />
         </>
       )
     case 'piscis':
       return (
         <>
-          <Path d="M7.8 4.6 Q3.8 12 7.8 19.4" />
-          <Path d="M16.2 4.6 Q20.2 12 16.2 19.4" />
-          <Path d="M5.2 12 H18.8" />
+          <Path d="M 4 5 Q 8 12 4 19" />
+          <Path d="M 20 5 Q 16 12 20 19" />
+          <Line x1={5} y1={12} x2={19} y2={12} />
         </>
       )
   }
@@ -119,8 +124,8 @@ export function ZodiacGlyph({
 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <G stroke={color} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" fill="none">
-        {zodiacGlyphPaths(sign)}
+      <G stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="none">
+        {zodiacGlyphPaths(sign, color)}
       </G>
     </Svg>
   )

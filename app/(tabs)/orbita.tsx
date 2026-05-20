@@ -39,11 +39,13 @@ export default function OrbitaScreen() {
             <OrbitSegments value={segment} onChange={setSegment} />
           </Animated.View>
 
-          {/* key re-mounts on switch so the fade-in replays per segment. */}
+          {/* key re-mounts on switch so the fade-in replays per segment.
+              Semana hands the segment switch back so its "Abrir Día"
+              CTA can swap us into Día. */}
           {segment === 'dia' ? (
             <DiaSegment key="dia" />
           ) : segment === 'semana' ? (
-            <SemanaSegment key="semana" />
+            <SemanaSegment key="semana" onOpenDia={() => setSegment('dia')} />
           ) : (
             <MesSegment key="mes" />
           )}

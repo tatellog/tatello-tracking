@@ -2,24 +2,30 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path, Rect, Text as SvgText } from 'react-native-svg'
 import Toast from 'react-native-toast-message'
 
 import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { VozDeStelar } from '@/features/orbita/components/VozDeStelar'
-import { MOCK_PATRONES, type EvidenceBar } from '@/features/orbita/mock'
+import {
+  MOCK_PATRONES,
+  type CycleData,
+  type PairedData,
+  type Patron,
+  type WeekdayData,
+} from '@/features/orbita/mock'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
 /*
  * Pattern detail — what a "Patrones detectados" card opens. A pattern
  * is a detected órbita, so this screen does four things: proves it
- * (the evidence chart), explains it (Voz de Stelar — systemic, never
- * moral), connects it (the correlation that drives it) and turns it
- * into a system (an experiment STELAR will track). Content is MOCK
- * — see features/orbita/mock.ts — until the engine lands.
+ * (the evidence, shaped by the pattern's kind — multi-week, cycle,
+ * paired), explains it (Voz de Stelar — systemic, never moral),
+ * connects it (the correlation), and turns it into a system (an
+ * experiment STELAR will track). Content is MOCK.
  */
 export default function PatronDetailScreen() {
   const router = useRouter()
@@ -56,11 +62,10 @@ export default function PatronDetailScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <BackButton onPress={() => router.back()} />
 
-          {/* The reading, restated as the hero. */}
+          {/* The reading, restated as the hero. The "detected since"
+              + confidence dots are Stelar's signature, no clinical
+              "PATRÓN DETECTADO" eyebrow (the title already says it). */}
           <Animated.View entering={FadeInDown.duration(360)}>
-            <EyebrowLabel tone="magenta" size={10}>
-              Patrón detectado
-            </EyebrowLabel>
             <EmText
               text={patron.title}
               emphasis={patron.emphasis}
@@ -70,15 +75,16 @@ export default function PatronDetailScreen() {
             <Text style={styles.meta}>
               {patron.since}
               {'   ·   '}
-              <Text style={styles.metaStrong}>Confianza {patron.confidence}</Text>
+              <Text style={styles.metaLabel}>confianza </Text>
+              <Text style={styles.confidenceDots}>{CONFIDENCE_DOTS[patron.confidence]}</Text>
             </Text>
           </Animated.View>
 
-          {/* 1 · The evidence — the chart that makes it a pattern. */}
+          {/* 1 · The evidence — shape depends on the pattern's data. */}
           <Section title="La evidencia">
-            <EvidenceChart bars={patron.evidence.bars} />
-            <Text style={styles.caption}>{patron.evidence.caption}</Text>
-            <Text style={styles.legend}>{patron.evidence.legend}</Text>
+            <Evidence patron={patron} />
+            <Text style={styles.caption}>{patron.caption}</Text>
+            <Text style={styles.legend}>{patron.legend}</Text>
           </Section>
 
           {/* 2 · The why — coach voice, systemic not moral. */}
@@ -104,6 +110,14 @@ export default function PatronDetailScreen() {
     </View>
   )
 }
+
+const CONFIDENCE_DOTS: Record<Patron['confidence'], string> = {
+  alta: '● ● ●',
+  media: '● ● ○',
+  baja: '● ○ ○',
+}
+
+const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 function BackButton({ onPress }: { onPress: () => void }) {
   return (
@@ -139,33 +153,212 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-/* The evidence chart — one bar per data point. Marked bars (the days
- * the pattern is about) burn magenta; the rest stay dim. Works for a
- * 7-day week, a run of weeks or a 28-day cycle alike. */
-function EvidenceChart({ bars }: { bars: readonly EvidenceBar[] }) {
-  const hasLabels = bars.some((b) => b.label)
+/* The evidence — picks the visual the pattern's shape calls for. */
+function Evidence({ patron }: { patron: Patron }) {
+  switch (patron.data.kind) {
+    case 'weekday':
+      return <WeekdayEvidence data={patron.data} />
+    case 'cycle':
+      return <CycleEvidence data={patron.data} />
+    case 'paired':
+      return <PairedEvidence data={patron.data} />
+  }
+}
+
+/* Multi-week evidence — stacks the recent weeks so the focus day
+ * is seen falling (or peaking) week after week. The recurrence is
+ * literally drawn, not described. */
+function WeekdayEvidence({ data }: { data: WeekdayData }) {
+  const ROW_H = 30
   return (
-    <View>
-      <View style={styles.chart}>
-        {bars.map((b, i) => (
-          <View key={i} style={styles.barCol}>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.barFill,
-                  {
-                    height: `${Math.max(3, b.v * 100)}%`,
-                    backgroundColor: b.mark ? colors.magenta : colors.bruma,
-                  },
-                ]}
-              />
-            </View>
-            {hasLabels ? (
-              <Text style={[styles.barLabel, b.mark && styles.barLabelMark]}>{b.label ?? ''}</Text>
-            ) : null}
+    <View style={styles.chartCard}>
+      {data.weeks.map((w, i) => (
+        <View key={i} style={[styles.weekRow, { height: ROW_H }]}>
+          <Text style={styles.weekRowLabel}>{w.label}</Text>
+          <View style={styles.weekBars}>
+            {w.bars.map((v, j) => (
+              <View key={j} style={styles.weekBarCol}>
+                <View
+                  style={[
+                    styles.weekBarFill,
+                    {
+                      height: `${Math.max(8, v * 100)}%`,
+                      backgroundColor: j === data.focus ? colors.magenta : colors.bruma,
+                      opacity: j === data.focus ? 1 : 0.65,
+                    },
+                  ]}
+                />
+              </View>
+            ))}
           </View>
-        ))}
+        </View>
+      ))}
+      {/* Day letters — shown once, beneath the last week. */}
+      <View style={styles.weekLabelsRow}>
+        <View style={styles.weekRowLabelSpacer} />
+        <View style={styles.weekBars}>
+          {WEEK_LABELS.map((lbl, j) => (
+            <Text key={j} style={[styles.dayLabel, j === data.focus ? styles.dayLabelFocus : null]}>
+              {lbl}
+            </Text>
+          ))}
+        </View>
       </View>
+    </View>
+  )
+}
+
+/* Cycle evidence — 28 dots across the cycle, the band lit and the
+ * marked day called out. The eye scans it like a clock arc. */
+function CycleEvidence({ data }: { data: CycleData }) {
+  const W = 320
+  const H = 90
+  const pad = 12
+  const span = W - 2 * pad
+  const step = span / (data.length - 1)
+  const cy = 40
+  const [bandStart, bandEnd] = data.band
+
+  return (
+    <View style={styles.chartCard}>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+        {data.bars.map((_, i) => {
+          const day = i + 1
+          const inBand = day >= bandStart && day <= bandEnd
+          const isMark = day === data.markDay
+          const cx = pad + i * step
+          return (
+            <Circle
+              key={`d-${i}`}
+              cx={cx}
+              cy={cy}
+              r={isMark ? 4 : 3}
+              fill={inBand ? colors.magenta : colors.bruma}
+              opacity={inBand ? (isMark ? 1 : 0.85) : 0.55}
+            />
+          )
+        })}
+        {/* The marked day — a small ring + day number above. */}
+        {(() => {
+          const cx = pad + (data.markDay - 1) * step
+          return (
+            <>
+              <Circle
+                cx={cx}
+                cy={cy}
+                r={9}
+                fill="none"
+                stroke={colors.magenta}
+                strokeWidth={1.2}
+                opacity={0.8}
+              />
+              <SvgText
+                x={cx}
+                y={cy - 14}
+                textAnchor="middle"
+                fontFamily={typography.uiBold}
+                fontSize={10}
+                fill={colors.magenta}
+              >
+                día {data.markDay}
+              </SvgText>
+            </>
+          )
+        })()}
+        {/* Axis ticks every 7 days. */}
+        {[1, 7, 14, 21, 28].map((d) => {
+          const cx = pad + (d - 1) * step
+          return (
+            <SvgText
+              key={`ax-${d}`}
+              x={cx}
+              y={H - 8}
+              textAnchor="middle"
+              fontFamily={typography.uiBold}
+              fontSize={9}
+              fill={colors.niebla}
+              opacity={0.7}
+            >
+              {d}
+            </SvgText>
+          )
+        })}
+      </Svg>
+    </View>
+  )
+}
+
+/* Paired evidence — two bars side by side, each labelled with its
+ * average. The visual contrast IS the pattern. */
+function PairedEvidence({ data }: { data: PairedData }) {
+  const W = 320
+  const H = 130
+  const BAR_W = 70
+  const GAP = 36
+  const TOTAL = BAR_W * data.groups.length + GAP * (data.groups.length - 1)
+  const startX = (W - TOTAL) / 2
+  const MAX_BAR = 70
+  const maxAvg = Math.max(...data.groups.map((g) => g.avg))
+  return (
+    <View style={styles.chartCard}>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+        {data.groups.map((g, i) => {
+          const x = startX + i * (BAR_W + GAP)
+          const h = (g.avg / maxAvg) * MAX_BAR
+          const highlight = i === 0
+          const top = H - 30 - h
+          return (
+            <Rect
+              key={`bar-${i}`}
+              x={x}
+              y={top}
+              width={BAR_W}
+              height={h}
+              rx={6}
+              fill={highlight ? colors.magenta : colors.bruma}
+              opacity={highlight ? 1 : 0.85}
+            />
+          )
+        })}
+        {data.groups.map((g, i) => {
+          const x = startX + i * (BAR_W + GAP) + BAR_W / 2
+          const h = (g.avg / maxAvg) * MAX_BAR
+          const top = H - 30 - h - 8
+          const highlight = i === 0
+          return (
+            <SvgText
+              key={`v-${i}`}
+              x={x}
+              y={top}
+              textAnchor="middle"
+              fontFamily={typography.uiBold}
+              fontSize={15}
+              fill={highlight ? colors.magenta : colors.bone}
+            >
+              {g.avg}
+              {g.unit}
+            </SvgText>
+          )
+        })}
+        {data.groups.map((g, i) => {
+          const x = startX + i * (BAR_W + GAP) + BAR_W / 2
+          const highlight = i === 0
+          return (
+            <SvgText
+              key={`l-${i}`}
+              x={x}
+              y={H - 8}
+              textAnchor="middle"
+              fontFamily={typography.uiBold}
+              fontSize={10}
+              letterSpacing={1}
+              fill={highlight ? colors.magenta : colors.niebla}
+            >
+              {g.label}
+            </SvgText>
+          )
+        })}
+      </Svg>
     </View>
   )
 }
@@ -200,12 +393,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.niebla,
   },
-  // Hero — the reading restated.
+  // Hero — the reading restated, big.
   heroTitle: {
-    marginTop: 10,
+    marginTop: 4,
     fontFamily: typography.displaySemi,
-    fontSize: 27,
-    lineHeight: 33,
+    fontSize: 28,
+    lineHeight: 34,
     color: colors.leche,
     letterSpacing: -0.4,
   },
@@ -216,14 +409,19 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
   meta: {
-    marginTop: 10,
+    marginTop: 12,
     fontFamily: typography.uiMedium,
     fontSize: 11.5,
     color: colors.niebla,
   },
-  metaStrong: {
-    fontFamily: typography.uiBold,
-    color: colors.bone,
+  metaLabel: {
+    color: colors.niebla,
+  },
+  // The confidence dots — magenta, slightly larger than the meta text.
+  confidenceDots: {
+    color: colors.magenta,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   section: {
     marginTop: 26,
@@ -231,44 +429,67 @@ const styles = StyleSheet.create({
   sectionBody: {
     marginTop: 12,
   },
-  // Evidence chart.
-  chart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 116,
-    gap: 3,
+  // ── Evidence chart card ──────────────────────────────────────
+  chartCard: {
     backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.bruma,
     paddingHorizontal: 14,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingVertical: 14,
   },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
+  // ── Multi-week (weekday) layout ─────────────────────────────
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
   },
-  barTrack: {
-    width: '100%',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: 4,
-    minHeight: 3,
-  },
-  barLabel: {
-    marginTop: 7,
+  weekRowLabel: {
+    width: 40,
     fontFamily: typography.uiBold,
     fontSize: 9.5,
-    letterSpacing: 0.6,
+    letterSpacing: 1,
+    color: colors.niebla,
+    textTransform: 'uppercase',
+  },
+  weekRowLabelSpacer: {
+    width: 40,
+  },
+  weekBars: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: '100%',
+    gap: 4,
+  },
+  weekBarCol: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  weekBarFill: {
+    width: '100%',
+    borderRadius: 3,
+    minHeight: 3,
+  },
+  weekLabelsRow: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dayLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 0.8,
     color: colors.niebla,
   },
-  barLabelMark: {
+  dayLabelFocus: {
     color: colors.magenta,
   },
+  // ── Caption + legend under the evidence chart ───────────────
   caption: {
     marginTop: 12,
     fontFamily: typography.uiSemi,

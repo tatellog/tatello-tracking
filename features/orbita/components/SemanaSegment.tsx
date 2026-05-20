@@ -2,136 +2,171 @@ import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { useProfile } from '@/features/profile/hooks'
-import { zodiacFromDate } from '@/features/tabs/zodiac'
+import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
-import { MOCK_PATRONES, MOCK_SEMANA, MOCK_VOZ } from '../mock'
-import { PatternCard } from './PatternCard'
+import {
+  MOCK_ARQUETIPO_SEMANA,
+  MOCK_PATRONES,
+  MOCK_SEMANA,
+  MOCK_VOZ_SEMANA,
+  MOCK_VOZ_SEMANA_SIGNATURE,
+} from '../mock'
+import { DayCard } from './DayCard'
+import { LiveDot } from './LiveDot'
+import { PatternHint } from './PatternHint'
 import { VozDeStelar } from './VozDeStelar'
-import { WeekRing } from './WeekRing'
+import { WeekConstellation } from './WeekConstellation'
 
 /*
- * The Semana segment — "Las Órbitas". Its hero is the week-ring: your
- * seven days orbiting you, each glowing with how it went. Below it,
- * the coach's weekly reading and the patterns the engine detected.
- * Content is MOCK (see ../mock.ts) until the engine lands.
+ * The Semana segment — "Las Órbitas". Mirrors Día's anatomy: the
+ * week's archetype names the seven days at once, the constellation
+ * hero places them around a luminous star with today as its own
+ * little orbital system inside, the DayCard adapts to whichever day
+ * is selected (today by default), and the Voz de Stelar closes the
+ * week with confidence + scope. MOCK content (../mock.ts).
  */
-const EN_LUZ = 0.55
+export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
+  // Today is selected by default — never null. Tapping any node
+  // switches to that day; the card and constellation react together.
+  const todayIdx = Math.max(
+    0,
+    MOCK_SEMANA.findIndex((d) => d.today),
+  )
+  const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
+  const selectedDay = MOCK_SEMANA[selectedIdx] ?? MOCK_SEMANA[todayIdx]!
 
-export function SemanaSegment() {
-  const { data: profile } = useProfile()
-  const sign = zodiacFromDate(profile?.date_of_birth)
-
-  // Today starts selected — you open Semana already reading your day.
-  const todayIdx = MOCK_SEMANA.findIndex((d) => d.today)
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(todayIdx >= 0 ? todayIdx : null)
-
-  // Counts run over the days lived so far — today and before.
-  const livedCount = todayIdx < 0 ? MOCK_SEMANA.length : todayIdx + 1
-  const enLuz = MOCK_SEMANA.slice(0, livedCount).filter((d) => d.brightness >= EN_LUZ).length
+  // Derive the state counts from the mock so the header tells the
+  // truth: in-luz today and before; lejos today and before; the rest
+  // are still ahead. Computed once per render.
+  const livedCount = MOCK_ARQUETIPO_SEMANA.daysRead
+  const daysEnLuz = MOCK_ARQUETIPO_SEMANA.daysEnLuz
+  const lejos = Math.max(0, livedCount - daysEnLuz)
   const porVenir = MOCK_SEMANA.length - livedCount
-  const selected = selectedIdx != null ? MOCK_SEMANA[selectedIdx] : null
+
+  const activePattern = pickActivePattern(todayIdx)
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+      {/* Compressed header — archetype as the only hero, then a single
+          dense meta block that names the week's state, who read it
+          and the insight. No eyebrow on top: the tab pill already
+          says "Semana". */}
       <View style={styles.header}>
-        <EyebrowLabel tone="niebla" size={10}>
-          Tu semana
-        </EyebrowLabel>
-        <Text style={styles.count}>
-          <Text style={styles.countLuz}>{enLuz} en luz</Text>
-          <Text>{`  ·  ${porVenir} por venir`}</Text>
-        </Text>
-      </View>
-
-      {/* Hero — the week-ring, full-bleed like the Día diagram. */}
-      <View style={styles.diagram}>
-        <WeekRing
-          days={MOCK_SEMANA}
-          sign={sign}
-          selectedIdx={selectedIdx}
-          onSelect={(i) => setSelectedIdx((cur) => (cur === i ? null : i))}
+        <EmText
+          text={MOCK_ARQUETIPO_SEMANA.name}
+          emphasis={MOCK_ARQUETIPO_SEMANA.emphasis}
+          style={styles.archetype}
+          emStyle={styles.archetypeEm}
         />
+        <View style={styles.metaRow}>
+          <LiveDot />
+          <Text style={styles.meta} numberOfLines={2}>
+            <Text style={styles.metaNum}>{daysEnLuz}</Text>
+            <Text> en luz · </Text>
+            <Text style={styles.metaNum}>{lejos}</Text>
+            <Text> lejos · </Text>
+            <Text style={styles.metaNum}>{porVenir}</Text>
+            <Text> por venir</Text>
+            <Text style={styles.metaSep}>{'\n'}</Text>
+            <Text>leído por </Text>
+            <Text style={styles.metaStelar}>Stelar</Text>
+            <Text>{` · ${MOCK_ARQUETIPO_SEMANA.daysRead} días · pico `}</Text>
+            <Text style={styles.metaNum}>{MOCK_ARQUETIPO_SEMANA.peakDay}</Text>
+          </Text>
+        </View>
       </View>
 
-      {selected ? (
-        <Animated.View key={selectedIdx} entering={FadeIn.duration(220)} style={styles.readout}>
-          <Text style={styles.readoutText}>{selected.note}</Text>
-        </Animated.View>
-      ) : (
-        <Text style={styles.hint}>Toca un día para leerlo.</Text>
-      )}
-
-      <VozDeStelar scope="esta semana" text={MOCK_VOZ.semana} />
-
-      <View style={styles.patHeader}>
-        <EyebrowLabel tone="niebla" size={10}>
-          Patrones detectados
-        </EyebrowLabel>
-        <Text style={styles.count}>{MOCK_PATRONES.length} lecturas</Text>
+      {/* Full-bleed hero — the constellation of the seven days. */}
+      <View style={styles.diagram}>
+        <WeekConstellation days={MOCK_SEMANA} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
       </View>
 
-      {MOCK_PATRONES.map((p) => (
-        <PatternCard key={p.id} patron={p} />
-      ))}
+      {/* The day card — bound to the selected day. Today gets the
+          "Abrir Día" CTA; past days are informational. The key on
+          the wrapper makes the card fade in on each selection. */}
+      <Animated.View key={selectedIdx} entering={FadeIn.duration(220)}>
+        <DayCard day={selectedDay} onOpenDia={onOpenDia} />
+      </Animated.View>
+
+      {/* Stelar's reading of the week so far. The tag flips to
+          "Cierre de semana" only at the end of the week; mid-week
+          it stays "Hasta ahora". */}
+      <VozDeStelar
+        parts={MOCK_VOZ_SEMANA.parts}
+        tag="Hasta ahora"
+        signature={MOCK_VOZ_SEMANA_SIGNATURE}
+      />
+
+      {/* One pattern surfaced here as a doorway — the full list lives
+          in Mes, where the cross-week scope belongs. We pick the
+          forward-looking pattern (its focus day still ahead this
+          week) so the chip is actionable, not retrospective. */}
+      {activePattern ? <PatternHint patron={activePattern} /> : null}
     </Animated.View>
   )
+}
+
+/* Pick the pattern most worth surfacing in Semana right now. We
+ * prefer a weekday pattern whose focus is still ahead (so the hint
+ * is actionable), falling back to the first available. */
+function pickActivePattern(todayIdx: number) {
+  // MOCK_SEMANA is Sunday-first; PatternCard's weekday glyph is
+  // Monday-first (L=0..D=6). Convert today's idx accordingly.
+  const monFirst = (todayIdx + 6) % 7
+  const upcoming = MOCK_PATRONES.find((p) => p.data.kind === 'weekday' && p.data.focus > monFirst)
+  return upcoming ?? MOCK_PATRONES[0] ?? null
 }
 
 const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
   },
+  // ── Header — compressed, archetype as the only hero ──────────
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
   },
-  count: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    color: colors.niebla,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
+  archetype: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 27,
+    lineHeight: 32,
+    color: colors.leche,
+    textAlign: 'center',
   },
-  countLuz: {
+  archetypeEm: {
     color: colors.magenta,
   },
-  // Full-bleed — the hero breaks out of the screen's 20px gutter.
+  metaRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  meta: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    textAlign: 'center',
+  },
+  metaNum: {
+    color: colors.magenta,
+  },
+  metaStelar: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 12.5,
+    color: colors.magenta,
+  },
+  metaSep: {
+    fontSize: 4,
+  },
+  // ── Diagram, full-bleed ───────────────────────────────────────
   diagram: {
     marginHorizontal: -20,
-  },
-  hint: {
     marginTop: 4,
-    textAlign: 'center',
-    fontFamily: typography.uiMedium,
-    fontSize: 12,
-    color: colors.niebla,
-  },
-  // The tapped day's readout.
-  readout: {
-    marginTop: 6,
-    backgroundColor: colors.bgCard,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  readoutText: {
-    fontFamily: typography.uiMedium,
-    fontSize: 13.5,
-    lineHeight: 19,
-    color: colors.bone,
-  },
-  patHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 2,
   },
 })

@@ -41,8 +41,17 @@ export type Dimension = DimensionLayout & {
  *  a dead void (docs/tu-orbita-design.md §8). */
 const DIM_FLOOR = 0.14
 
-/** At/above this brightness a dimension counts as "en luz". */
-export const EN_LUZ_THRESHOLD = 0.55
+/** Brightness cutoffs for the three-tone state language. STELAR
+ *  registers, doesn't judge — so the language is *brillante* (alight),
+ *  *en formación* (gathering), *en silencio* (no signal yet). The
+ *  visual orb lights from "en formación" up; only "en silencio" is a
+ *  hollow station. */
+export const TONE_BRILLANTE = 0.7
+export const TONE_FORMACION = 0.3
+
+/** Legacy threshold kept for the existing orb-lit-or-not visual.
+ *  Set to the *en formación* floor so anything with real signal lights. */
+export const EN_LUZ_THRESHOLD = TONE_FORMACION
 
 function clamp01(n: number): number {
   return n < 0 ? 0 : n > 1 ? 1 : n
@@ -127,14 +136,89 @@ export function deriveDimensions(signals: DailySignals | null): Dimension[] {
   }))
 }
 
-/** How many dimensions are currently "en luz". */
+/** How many dimensions are currently "en luz" (brillante + en formación). */
 export function countEnLuz(dims: Dimension[]): number {
   return dims.filter((d) => d.brightness >= EN_LUZ_THRESHOLD).length
 }
 
-/** The two-word state of a dimension, from its brightness. */
+export type DimensionTone = 'brillante' | 'en formación' | 'en silencio'
+
+/** Three-tone state — STELAR registers, never judges. "En silencio"
+ *  is no signal yet, not failure (philosophy: stelar-philosophy). */
+export function dimensionTone(brightness: number): DimensionTone {
+  if (brightness >= TONE_BRILLANTE) return 'brillante'
+  if (brightness >= TONE_FORMACION) return 'en formación'
+  return 'en silencio'
+}
+
+/** Count of each tone across the system — drives the meta line. */
+export function countTones(dims: Dimension[]): {
+  brillantes: number
+  formacion: number
+  silencio: number
+} {
+  let brillantes = 0
+  let formacion = 0
+  let silencio = 0
+  for (const d of dims) {
+    const tone = dimensionTone(d.brightness)
+    if (tone === 'brillante') brillantes++
+    else if (tone === 'en formación') formacion++
+    else silencio++
+  }
+  return { brillantes, formacion, silencio }
+}
+
+/** @deprecated Use `dimensionTone` for the three-level language. */
 export function dimensionState(brightness: number): 'en luz' | 'lejos' {
   return brightness >= EN_LUZ_THRESHOLD ? 'en luz' : 'lejos'
+}
+
+/** One unit of evidence STELAR cites under a dimension — what it read
+ *  and the value it saw. Empty list when nothing has been logged for
+ *  that dimension yet. */
+export type Evidence = { label: string; value: string }
+
+/** The signals STELAR cited to land on this dimension's brightness —
+ *  paired with `dimensionDetail` to turn a verdict into a reasoning
+ *  chain. Returns an empty array when nothing was read for the day. */
+export function dimensionEvidence(key: DimensionKey, s: DailySignals | null): Evidence[] {
+  if (s == null) return []
+  switch (key) {
+    case 'cuerpo': {
+      const list: Evidence[] = []
+      list.push({ label: 'entrenamiento', value: s.trained ? 'sí' : 'no' })
+      if (s.rested) list.push({ label: 'descanso', value: 'sí' })
+      return list
+    }
+    case 'energia':
+      return s.energy == null ? [] : [{ label: 'check-in', value: `${s.energy}/5` }]
+    case 'mente': {
+      const list: Evidence[] = []
+      if (s.mood != null) list.push({ label: 'ánimo', value: moodWord(s.mood) })
+      if (s.motivation != null) list.push({ label: 'motivación', value: `${s.motivation}/5` })
+      if (s.stress != null) list.push({ label: 'calma', value: `${6 - s.stress}/5` })
+      return list
+    }
+    case 'sueno': {
+      if (s.sleep_minutes == null) return []
+      const list: Evidence[] = [{ label: 'duración', value: formatSleep(s.sleep_minutes) }]
+      if (s.sleep_quality != null) list.push({ label: 'calidad', value: `${s.sleep_quality}/5` })
+      return list
+    }
+    case 'alimento':
+      return s.meal_count ? [{ label: 'comidas', value: `${s.meal_count} hoy` }] : []
+    case 'ciclo':
+      return s.on_period ? [{ label: 'sangrado', value: 'sí' }] : []
+  }
+}
+
+/** A read-depth score (0..1) STELAR shows in the meta line — the
+ *  fraction of dimensions that have ANY signal today + how recent
+ *  the read window is. Mock for now (engine will own it). */
+export function readDepth(dims: Dimension[]): number {
+  const withSignal = dims.filter((d) => d.brightness > DIM_FLOOR + 0.01).length
+  return clamp01(withSignal / dims.length)
 }
 
 function moodWord(m: string): string {
