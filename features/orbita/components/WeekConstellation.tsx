@@ -88,8 +88,8 @@ const DUST: readonly Dust[] = (() => {
       const ny = Math.cos(ang)
       const x = p.x + nx * j
       const y = p.y + ny * j
-      const sz = 0.4 + rand(arm * 10 + 5, i) * 0.9
-      const op = (0.7 - Math.min(0.5, radius / 90)) * (0.4 + rand(arm * 10 + 7, i) * 0.6)
+      const sz = 0.5 + rand(arm * 10 + 5, i) * 1.0
+      const op = (0.85 - Math.min(0.5, radius / 130)) * (0.45 + rand(arm * 10 + 7, i) * 0.55)
       // Mostly cream; rare warm/cool flecks (≈ 1 in 12) so the field
       // reads as starlight rather than monochrome dots.
       const tint = rand(arm, i)
@@ -123,7 +123,7 @@ export function WeekConstellation({
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
-    spin.value = withRepeat(withTiming(1, { duration: 90000, easing: Easing.linear }), -1, false)
+    spin.value = withRepeat(withTiming(1, { duration: 55000, easing: Easing.linear }), -1, false)
     return () => {
       cancelAnimation(t)
       cancelAnimation(drift)
@@ -188,7 +188,7 @@ export function WeekConstellation({
             cy={CY}
             r={140 - i * 11}
             fill="#5A1438"
-            opacity={0.012 + i * 0.003}
+            opacity={0.018 + i * 0.004}
           />
         ))}
 
@@ -209,7 +209,20 @@ export function WeekConstellation({
           const faded = exploring && !selected
           const future = todayIdx >= 0 && i > todayIdx
           if (future) {
-            return <DayGhost key={i} pos={pos} selected={selected} faded={faded} />
+            // proximity 1 = tomorrow (the next one approaching),
+            // larger = farther into the week. Used by DayGhost to
+            // brighten the closer-up days and whisper the far ones.
+            const proximity = i - todayIdx
+            return (
+              <DayGhost
+                key={i}
+                day={d}
+                pos={pos}
+                proximity={proximity}
+                selected={selected}
+                faded={faded}
+              />
+            )
           }
           return (
             <DayBody
@@ -380,35 +393,59 @@ function DayBody({
   )
 }
 
-/* A day that hasn't arrived — a tiny cream ghost on the spiral. No
- * label, no animation: a stop the galaxy will eventually grow into. */
+/* A day that hasn't arrived — a cream ghost on the spiral, still
+ * present but quieter than a lived body. `proximity` brightens the
+ * next day up and fades the far end of the week, so the week reads
+ * as a sequence of approaching presences rather than a list of
+ * absences. */
 function DayGhost({
+  day,
   pos,
+  proximity,
   selected,
   faded,
 }: {
+  day: DiaSemana
   pos: { x: number; y: number }
+  /** 1 = tomorrow, larger = farther into the week. */
+  proximity: number
   selected: boolean
   faded: boolean
 }) {
   const { x, y } = pos
-  const R = 2.2
+  // proxFactor 1.0 (tomorrow) → 0.5 (far end). Each step back loses
+  // ~18 % of presence, so by Sábado the ghost is barely a whisper.
+  const proxFactor = Math.max(0.45, 1 - (proximity - 1) * 0.18)
+  const R = 2 + proxFactor * 1.6
   return (
     <G opacity={faded ? 0.55 : 1}>
-      <Circle cx={x} cy={y} r={R * 2.6} fill="#FBD7E3" opacity={0.07} />
-      <Circle cx={x} cy={y} r={R} fill="#F4ECDE" opacity={0.32} />
-      <Circle cx={x} cy={y} r={R * 0.5} fill="#FFFFFF" opacity={0.6} />
+      <Circle cx={x} cy={y} r={R * 3.2} fill="#FBD7E3" opacity={0.04 + proxFactor * 0.08} />
+      <Circle cx={x} cy={y} r={R * 1.7} fill="#FBD7E3" opacity={0.06 + proxFactor * 0.12} />
+      <Circle cx={x} cy={y} r={R} fill="#F4ECDE" opacity={0.32 + proxFactor * 0.32} />
+      <Circle cx={x} cy={y} r={R * 0.45} fill="#FFFFFF" opacity={0.5 + proxFactor * 0.35} />
       {selected ? (
         <Circle
           cx={x}
           cy={y}
-          r={R + 4}
+          r={R + 5}
           fill="none"
           stroke="#F4ECDE"
           strokeWidth={1}
           opacity={0.85}
         />
       ) : null}
+      <SvgText
+        x={x}
+        y={y + R + 11}
+        textAnchor="middle"
+        fontFamily={typography.uiBold}
+        fontSize={9.5}
+        letterSpacing={1.3}
+        fill="#A89887"
+        opacity={0.45 + proxFactor * 0.35}
+      >
+        {day.label}
+      </SvgText>
     </G>
   )
 }

@@ -24,7 +24,7 @@ export function PatternHint({ patron }: { patron: Patron }) {
       style={styles.card}
       onPress={() => router.push(`/orbita/patron/${patron.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${patron.title} — ${patron.since}`}
+      accessibilityLabel={`${patron.title}. ${patron.since}`}
     >
       <View style={styles.head}>
         <EyebrowLabel tone="magenta" size={9.5}>

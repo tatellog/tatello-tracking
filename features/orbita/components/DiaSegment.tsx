@@ -141,7 +141,7 @@ export function DiaSegment() {
             </View>
           ) : (
             <Text style={styles.evidenceQuiet}>
-              Cuando hay silencio, Stelar no inventa — espera a que registres.
+              Cuando hay silencio, Stelar no inventa. Espera a que registres.
             </Text>
           )}
         </Animated.View>

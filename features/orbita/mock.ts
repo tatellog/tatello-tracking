@@ -9,7 +9,7 @@
 /** The coach's reading for the Mes segment — plain serif narration.
  *  Día and Semana have their own richer readings below. */
 export const MOCK_VOZ: Record<'mes', string> = {
-  mes: 'Vas en el día 22 de tu ciclo. La fase lútea explica los antojos y el sueño ligero de estos días. No es un retroceso, es tu cuerpo en su ritmo.',
+  mes: 'Vas en el día 22. Los antojos más altos y el sueño más cortito son la fase lútea. Pasa todos los meses.',
 }
 
 /** A run of the coach's reading, split so a word can carry an accent
@@ -20,8 +20,8 @@ export type VozParte = { text: string; tone?: 'accent' | 'strong' }
  *  accented opener that paints the body of the day. */
 export const MOCK_VOZ_DIA: { parts: readonly VozParte[] } = {
   parts: [
-    { text: 'Cuerpo entero, mente a media luz.', tone: 'accent' },
-    { text: ' Cinco horas explican más de lo que crees. Nada de eso es tu falla.' },
+    { text: 'Cuerpo entero, mente lenta.', tone: 'accent' },
+    { text: ' Las cinco horas de anoche se notan acá. Va a aflojar entrada la tarde.' },
   ],
 }
 
@@ -40,8 +40,8 @@ export const MOCK_ARQUETIPO = {
  *  can give. The accent carries the actionable insight. */
 export const MOCK_HEADLINE: { parts: readonly VozParte[] } = {
   parts: [
-    { text: 'Cuerpo en luz, mente en quietud. ' },
-    { text: 'Hoy se mueve. Las decisiones grandes pesarán menos el jueves', tone: 'accent' },
+    { text: 'Cuerpo encendido, mente lenta. ' },
+    { text: 'Lo difícil del día se mueve mejor si lo dejas para el jueves', tone: 'accent' },
     { text: '.' },
   ],
 }
@@ -52,43 +52,278 @@ export const MOCK_HEADLINE: { parts: readonly VozParte[] } = {
 export const MOCK_ACCION_DEL_DIA = {
   title: 'Dormir antes de las 23:00.',
   reason:
-    'Tu ciclo lúteo y tu fase de baja energía coinciden. Una hora más de sueño hoy te ahorra el jueves.',
+    'Estás en fase lútea y arrancando una semana baja en energía. Una hora más de sueño hoy te ahorra el jueves.',
 }
 
-/** The Semana archetype — the engine names this week. For a week in
- *  progress the archetype is tentative (refined as days arrive); the
- *  stats only count days lived so far. */
-export const MOCK_ARQUETIPO_SEMANA = {
-  name: 'la semana arrancando en luz',
-  emphasis: 'la semana',
-  dateRange: 'Dom 22 al Sáb 28',
-  daysEnLuz: 2,
-  nochesRotas: 0,
-  peakDay: 'Lunes',
-  daysRead: 3,
-  signals: 18,
-  arcNumber: 3,
-  arcTotal: 8,
+/*
+ * The Semana mock is built procedurally from per-weekday templates,
+ * not stored as a static snapshot. That way the prose, archetype,
+ * counts and ghosts all stay coherent regardless of what day the
+ * user opens the app — the same shape the real engine will produce
+ * from daily_signals. Sunday-first throughout, matching the calendar
+ * and JS Date.getDay().
+ */
+
+/** A weekday's intrinsic character — what STELAR would say if this
+ *  day were lived. Used by both the days array and the prose builder
+ *  so today's voice and the day card never disagree. */
+type WeekdayTemplate = {
+  archetype: string
+  brightness: number
+  dimEnLuz: number
+  drift: number
+  /** Used when this day is today — present-voice, full sentence. */
+  noteToday: string
+  /** Used when this day is in the past — past-voice. */
+  notePast: string
+  /** A short phrase that drops in after "Hoy …". */
+  vozTodayPhrase: string
+  /** A short phrase that drops in after "El {weekday} …" in prose. */
+  vozPastPhrase: string
 }
 
-/** The Semana reading — written across the days lived so far, plus
- *  a signature that names confidence and the comparison scope. For a
- *  week in progress the tone is "vamos así", not "cierre". */
-export const MOCK_VOZ_SEMANA: { parts: readonly VozParte[] } = {
-  parts: [
-    { text: 'Arrancaste el domingo a media luz. El ' },
-    { text: 'lunes', tone: 'accent' },
-    { text: ' brillaste, cuerpo, mente y energía cerca del sol. ' },
-    { text: 'Hoy', tone: 'accent' },
-    { text: ' vas sólida y el ritmo está claro. El resto de la semana ' },
-    { text: 'aún se escribe', tone: 'accent' },
-    { text: '.' },
-  ],
+const WEEKDAY_TEMPLATES: readonly WeekdayTemplate[] = [
+  // 0. Domingo: entrada tibia, transición desde el fin de semana.
+  {
+    archetype: 'tibia',
+    brightness: 0.58,
+    dimEnLuz: 2,
+    drift: 2,
+    noteToday: 'Domingo arranca tibio. Lo justo para empezar.',
+    notePast: 'Llegaste medio descansada del finde.',
+    vozTodayPhrase: 'arrancas la semana tibia',
+    vozPastPhrase: 'tibia',
+  },
+  // 1. Lunes: el pico clásico, descansada del finde.
+  {
+    archetype: 'brillante',
+    brightness: 0.92,
+    dimEnLuz: 5,
+    drift: 1,
+    noteToday: 'Hoy llegas firme. Cuerpo, mente y energía juntos.',
+    notePast: 'Tu mejor día de la semana. Cuerpo, mente y energía juntos.',
+    vozTodayPhrase: 'estás en uno de tus mejores días',
+    vozPastPhrase: 'brillaste, fue tu día más alto',
+  },
+  // 2. Martes: sostén del impulso de lunes.
+  {
+    archetype: 'sostenida',
+    brightness: 0.74,
+    dimEnLuz: 4,
+    drift: 1,
+    noteToday: 'Hoy sigues el ritmo del lunes, un poco más bajo pero ahí.',
+    notePast: 'Seguiste el ritmo del lunes, un poco más bajo pero ahí.',
+    vozTodayPhrase: 'sigues el ritmo del lunes',
+    vozPastPhrase: 'seguiste el ritmo del lunes',
+  },
+  // 3. Miércoles: el centro de gravedad, presente.
+  {
+    archetype: 'presente',
+    brightness: 0.7,
+    dimEnLuz: 4,
+    drift: 1,
+    noteToday: 'Hoy sigues firme. El impulso del lunes todavía dura.',
+    notePast: 'Te mantuviste firme. El impulso del lunes todavía duraba.',
+    vozTodayPhrase: 'el impulso del lunes todavía dura',
+    vozPastPhrase: 'te mantuviste firme',
+  },
+  // 4. Jueves: la caída clásica del patrón "el jueves te apaga".
+  {
+    archetype: 'callada',
+    brightness: 0.45,
+    dimEnLuz: 2,
+    drift: 3,
+    noteToday: 'Hoy el cuerpo pide bajar. Los jueves suelen ser así.',
+    notePast: 'El jueves bajó. Cuatro dimensiones quedaron tranquilas.',
+    vozTodayPhrase: 'el cuerpo pide bajar',
+    vozPastPhrase: 'bajaste, cuatro dimensiones tranquilas',
+  },
+  // 5. Viernes: liberación, otro respiro.
+  {
+    archetype: 'libre',
+    brightness: 0.65,
+    dimEnLuz: 3,
+    drift: 2,
+    noteToday: 'Hoy la semana afloja. El cuerpo lo siente.',
+    notePast: 'La semana aflojó. El cuerpo cambió de marcha.',
+    vozTodayPhrase: 'la semana afloja',
+    vozPastPhrase: 'la semana aflojó',
+  },
+  // 6. Sábado: espacio amplio, mente y energía sueltas.
+  {
+    archetype: 'amplia',
+    brightness: 0.72,
+    dimEnLuz: 4,
+    drift: 1,
+    noteToday: 'Sábado largo. Hay tiempo y aire, mente y energía sueltas.',
+    notePast: 'Sábado largo. Tiempo, aire, mente y energía sueltas.',
+    vozTodayPhrase: 'hay margen, mente y energía sueltas',
+    vozPastPhrase: 'hubo margen',
+  },
+]
+
+const WEEKDAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
+const WEEKDAY_NAMES = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+] as const
+
+/** Brightness threshold above which a day counts as "en luz" — the
+ *  same TONE_BRILLANTE used by Día. Days under this are "lejos". */
+const EN_LUZ_THRESHOLD_WEEK = 0.7
+
+/** Build the 7-day array for the current week given today's index
+ *  (0 = Sunday, JS Date.getDay()). Past days carry their template's
+ *  past-voice note; today carries its today-voice note; future days
+ *  are blank stations waiting to arrive. */
+export function buildWeekDays(todayIdx: number): readonly DiaSemana[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const isFuture = i > todayIdx
+    if (isFuture) {
+      return {
+        label: WEEKDAY_LABELS[i]!,
+        weekday: WEEKDAY_NAMES[i]!,
+        brightness: 0,
+        today: false,
+        archetype: '',
+        dimEnLuz: 0,
+        drift: 0,
+        note: 'Aún no llega.',
+      }
+    }
+    const tpl = WEEKDAY_TEMPLATES[i]!
+    const isToday = i === todayIdx
+    return {
+      label: WEEKDAY_LABELS[i]!,
+      weekday: WEEKDAY_NAMES[i]!,
+      brightness: tpl.brightness,
+      today: isToday,
+      archetype: tpl.archetype,
+      dimEnLuz: tpl.dimEnLuz,
+      drift: tpl.drift,
+      note: isToday ? tpl.noteToday : tpl.notePast,
+    }
+  })
 }
 
-export const MOCK_VOZ_SEMANA_SIGNATURE = {
-  confidence: 'alta' as const,
-  scope: '3 días leídos',
+/** Derive the week's archetype + meta counts from the lived days. */
+export function buildArquetipoSemana(
+  days: readonly DiaSemana[],
+  todayIdx: number,
+): {
+  name: string
+  emphasis: string
+  daysEnLuz: number
+  nochesRotas: number
+  peakDay: string
+  daysRead: number
+  signals: number
+  arcNumber: number
+  arcTotal: number
+} {
+  const lived = days.slice(0, todayIdx + 1)
+  const daysRead = lived.length
+  const daysEnLuz = lived.filter((d) => d.brightness >= EN_LUZ_THRESHOLD_WEEK).length
+  const signals = lived.reduce((s, d) => s + d.dimEnLuz + d.drift, 0) * 2
+  const peak = lived.reduce((max, d) => (d.brightness > max.brightness ? d : max), lived[0]!)
+  const proportion = daysEnLuz / daysRead
+  const closing = todayIdx === 6
+  let name = 'la semana arrancando'
+  if (closing) {
+    name =
+      daysEnLuz >= 4
+        ? 'la semana cerrándose en luz'
+        : daysEnLuz >= 2
+          ? 'la semana cerrándose tibia'
+          : 'la semana cerrándose en silencio'
+  } else if (daysRead >= 2) {
+    name =
+      proportion >= 0.6
+        ? 'la semana en luz'
+        : proportion >= 0.3
+          ? 'la semana en formación'
+          : 'la semana en silencio'
+  }
+  return {
+    name,
+    emphasis: 'la semana',
+    daysEnLuz,
+    nochesRotas: 0,
+    peakDay: peak.weekday,
+    daysRead,
+    signals,
+    arcNumber: 3,
+    arcTotal: 8,
+  }
+}
+
+/** Assemble the Voz de Semana prose from the lived days. The
+ *  structure mirrors the original hand-written copy: a Sunday
+ *  opener, a peak callout (the brightest past day excluding
+ *  Sunday), the today phrase, and a future-closer when the week
+ *  isn't done. Each piece is keyed to a template so the prose
+ *  shifts day by day without losing voice. */
+export function buildVozSemana(
+  days: readonly DiaSemana[],
+  todayIdx: number,
+): {
+  parts: readonly VozParte[]
+  signature: { confidence: 'alta' | 'media' | 'baja'; scope: string }
+} {
+  const parts: VozParte[] = []
+  const past = days.slice(0, todayIdx)
+  const todayTpl = WEEKDAY_TEMPLATES[todayIdx]!
+  const hasFuture = todayIdx < 6
+
+  if (todayIdx > 0) {
+    // Sunday opener — always when Sunday is past.
+    const sunTpl = WEEKDAY_TEMPLATES[0]!
+    parts.push({ text: 'Arrancaste el domingo ' })
+    parts.push({ text: sunTpl.vozPastPhrase, tone: 'accent' })
+    parts.push({ text: '. ' })
+
+    // Peak callout — brightest past day (skipping Sunday, already
+    // mentioned). Only if it's bright enough to be worth naming.
+    const candidates = past.slice(1)
+    if (candidates.length > 0) {
+      const peak = candidates.reduce(
+        (max, d) => (d.brightness > max.brightness ? d : max),
+        candidates[0]!,
+      )
+      if (peak.brightness >= EN_LUZ_THRESHOLD_WEEK) {
+        const peakIdx = WEEKDAY_LABELS.indexOf(peak.label as (typeof WEEKDAY_LABELS)[number])
+        const peakTpl = WEEKDAY_TEMPLATES[peakIdx]!
+        parts.push({ text: 'El ' })
+        parts.push({ text: peak.weekday.toLowerCase(), tone: 'accent' })
+        parts.push({ text: ` ${peakTpl.vozPastPhrase}. ` })
+      }
+    }
+  }
+
+  // Today's voice — always present.
+  parts.push({ text: 'Hoy', tone: 'accent' })
+  parts.push({ text: ` ${todayTpl.vozTodayPhrase}. ` })
+
+  // Future-closer — only while the week isn't done.
+  if (hasFuture) {
+    parts.push({ text: 'El resto de la semana ' })
+    parts.push({ text: 'aún se escribe', tone: 'accent' })
+    parts.push({ text: '.' })
+  }
+
+  const daysRead = todayIdx + 1
+  const confidence: 'alta' | 'media' | 'baja' =
+    daysRead >= 5 ? 'alta' : daysRead >= 3 ? 'media' : 'baja'
+
+  return {
+    parts,
+    signature: { confidence, scope: `${daysRead} ${daysRead === 1 ? 'día leído' : 'días leídos'}` },
+  }
 }
 
 /** Lowercase, sensorial verbs the engine uses to type a pattern —
@@ -180,7 +415,7 @@ export const MOCK_PATRONES: readonly Patron[] = [
     confidence: 'alta',
     caption: 'Tres semanas seguidas. Cada jueves cae.',
     legend: 'Tu jueves vive un 64 % por debajo de tu lunes.',
-    voz: 'Tu jueves no es flojera. Es el cansancio de lunes a miércoles que se acumula sin que lo notes. Para el jueves tu cuerpo ya no tiene de dónde.',
+    voz: 'El jueves no aparece de la nada. Lo que estás viendo es el cansancio que se acumula de lunes a miércoles. Para el cuarto día tu cuerpo ya gastó casi todo.',
     correlacion:
       'Tu jueves cae más cuando tu sueño del miércoles baja de 7 h. Las tres semanas del patrón dormiste 6 h o menos esa noche.',
     experimento: {
@@ -210,7 +445,7 @@ export const MOCK_PATRONES: readonly Patron[] = [
     confidence: 'alta',
     caption: 'Tus últimos 5 lunes.',
     legend: '4 de 5 lunes fueron tu día más en luz de la semana.',
-    voz: 'El lunes llegas con el fin de semana descansado en el cuerpo. No es disciplina nueva, es tu cuerpo recargado.',
+    voz: 'El lunes te encuentra con el fin de semana en el cuerpo. Lo que sientes ahí es descanso recargado.',
     correlacion:
       'Tus lunes altos siguen a fines de semana donde dormiste 7 h o más las dos noches.',
     experimento: {
@@ -235,7 +470,7 @@ export const MOCK_PATRONES: readonly Patron[] = [
     confidence: 'media',
     caption: 'Tus antojos a lo largo del ciclo.',
     legend: 'El pico cae del día 20 al 26. Tu fase lútea.',
-    voz: 'Tus antojos de la fase lútea no son falta de control. Son tu cuerpo pidiendo más energía mientras la progesterona sube. Es biología, no debilidad.',
+    voz: 'Los antojos en lútea son la progesterona pidiendo más energía. Es la química del ciclo trabajando.',
     correlacion:
       'Coinciden con tu sueño más ligero. Esos mismos días duermes unos 40 minutos menos.',
     experimento: {
@@ -260,10 +495,10 @@ export const MOCK_PATRONES: readonly Patron[] = [
     confidence: 'alta',
     caption: 'Tu sueño, en promedio, los días con y sin movimiento.',
     legend: 'Entrenar te suma 45 min de sueño.',
-    voz: 'Los días que entrenas, tu cuerpo llega a la noche pidiendo descanso de verdad. Se lo das, y el movimiento le ordena el sueño.',
+    voz: 'Cuando entrenas, tu cuerpo llega a la noche con cansancio real. Eso ordena el sueño y duermes más profundo.',
     correlacion: 'Las noches después de entrenar duermes 45 min más que las noches sin movimiento.',
     experimento: {
-      hint: 'Sostén al menos 3 entrenos por semana. Tu sueño depende de ellos más de lo que crees.',
+      hint: 'Sostén al menos 3 entrenos por semana. Tu sueño los está pidiendo.',
       action: 'Cuidar mi ritmo',
     },
   },
@@ -291,89 +526,223 @@ export type DiaSemana = {
   note: string
 }
 
-// Dom 22 → Sáb 28. Week in progress — today is Tuesday (M). Sunday
-// and Monday are lived; Tuesday is the current day; Wed–Sat are
-// "aún no llega" (the constellation renders them as hollow stations
-// and brightness/archetype/stats are zero/empty until they arrive).
-// "callada" stays in the dataset for when Thursday becomes past — a
-// gentler word than "rota": the body went quiet, it didn't break.
-export const MOCK_SEMANA: readonly DiaSemana[] = [
-  {
-    label: 'D',
-    weekday: 'Domingo',
-    brightness: 0.58,
-    today: false,
-    archetype: 'tibia',
-    dimEnLuz: 2,
-    drift: 2,
-    note: 'Llegaste a esta semana con la del descanso a medias.',
-  },
-  {
-    label: 'L',
-    weekday: 'Lunes',
-    brightness: 0.92,
-    today: false,
-    archetype: 'brillante',
-    dimEnLuz: 5,
-    drift: 1,
-    note: 'El pico de tu semana. Cuerpo, mente y energía cerca del sol.',
-  },
-  {
-    label: 'M',
-    weekday: 'Martes',
-    brightness: 0.78,
-    today: true,
-    archetype: 'sólida',
-    dimEnLuz: 4,
-    drift: 1,
-    note: 'Vas sólida hoy y el ritmo está claro.',
-  },
-  {
-    label: 'X',
-    weekday: 'Miércoles',
-    brightness: 0,
-    today: false,
-    archetype: '',
-    dimEnLuz: 0,
-    drift: 0,
-    note: 'Aún no llega.',
-  },
-  {
-    label: 'J',
-    weekday: 'Jueves',
-    brightness: 0,
-    today: false,
-    archetype: '',
-    dimEnLuz: 0,
-    drift: 0,
-    note: 'Aún no llega.',
-  },
-  {
-    label: 'V',
-    weekday: 'Viernes',
-    brightness: 0,
-    today: false,
-    archetype: '',
-    dimEnLuz: 0,
-    drift: 0,
-    note: 'Aún no llega.',
-  },
-  {
-    label: 'S',
-    weekday: 'Sábado',
-    brightness: 0,
-    today: false,
-    archetype: '',
-    dimEnLuz: 0,
-    drift: 0,
-    note: 'Aún no llega.',
-  },
-]
+// MOCK_SEMANA used to be a static snapshot tied to a specific day —
+// any user opening the app on a different weekday saw a mismatch
+// between the selected day and the prose. The week is now built at
+// render time from buildWeekDays(todayIdx) above, so the visual and
+// the voice stay coherent every day of the week.
 
-/** The current cycle, for the Mes segment. */
+/** The current cycle, for the Mes segment. The `band` marks the
+ *  days of the current phase — it lights up the accretion disk of
+ *  the TuCielo hero.
+ *
+ *  `cycleNumber` and `patternsConfirmed` drive the first-cycle vs
+ *  mature view branch: in cycle 1 the engine has no statistical
+ *  basis to confirm patterns, so TuCielo's satellites render as
+ *  observations and the experimento card is suppressed. From cycle
+ *  3 onward, surfaced patterns are the ones that survived FDR
+ *  correction + replication across ≥2 cycles. */
 export const MOCK_CICLO = {
   day: 22,
   length: 28,
   phase: 'Fase lútea',
+  band: [20, 26] as const,
   note: 'Tu constelación de este ciclo se sella en 6 días.',
+  cycleNumber: 1,
+  patternsConfirmed: 0,
+}
+
+/** The mini-chart that ships with each first-cycle observation —
+ *  the dynamic evidence behind the label. Three shapes:
+ *   · `daily`           — 22-day brightness sparkline with one
+ *                         focus day (used by peak + valley)
+ *   · `dimensionStack`  — 6 stacked sparklines, one per dimension,
+ *                         ordered by stability. The focus dimension
+ *                         is drawn magenta and clearly flatter than
+ *                         the others — so "tu ancla" reads at a
+ *                         glance without needing explanation.
+ *   · `weekday`         — 7 bars (L M M J V S D) with one focus
+ *                         weekday (the tentative jueves hypothesis) */
+export type ObservationChart =
+  | { kind: 'daily'; days: readonly number[]; focusDay: number; focusKind: 'peak' | 'valley' }
+  | {
+      kind: 'dimensionStack'
+      dimensions: readonly {
+        key: string
+        label: string
+        days: readonly number[]
+        variance: number
+      }[]
+      focusKey: string
+    }
+  | { kind: 'weekday'; bars: readonly number[]; focus: number }
+
+/** A first-cycle observation — what Stelar can honestly say with
+ *  one cycle of data. Pure reflection of what the user logged, no
+ *  cross-cycle inference. The `tentative` flag is for the slot
+ *  that hints at a forming hypothesis, marked clearly as such. */
+export type Observation = {
+  id: string
+  /** Short label rendered under the satellite. */
+  label: string
+  /** A 2-4 word value that the prose can quote (e.g. "Lunes 7"). */
+  shortValue: string
+  /** Full sentence shown when the user wants more context. */
+  detail: string
+  /** Visual evidence — the mini-chart shown beside the detail. */
+  chart: ObservationChart
+  /** When true, the satellite is dimmer + the prose treats it as
+   *  hypothesis-in-formation, not as established observation. */
+  tentative?: boolean
+}
+
+/** Cycle-1 daily brightness (overall system score per day). Day 7
+ *  is the peak, day 11 the valley — those drive peak/valley charts. */
+const FIRST_CYCLE_DAILY: readonly number[] = [
+  0.55, 0.62, 0.58, 0.71, 0.66, 0.78, 0.92, 0.74, 0.69, 0.55, 0.31, 0.48, 0.62, 0.67, 0.71, 0.65,
+  0.58, 0.62, 0.66, 0.71, 0.68, 0.7,
+]
+
+/** Per-dimension daily traces for the first cycle — used by the
+ *  `dimensionStack` chart to show all six side by side. The flatter
+ *  the line, the more stable. Mente is the visibly flattest, which
+ *  is what earns it the "ancla" label. */
+const FIRST_CYCLE_DIMENSIONS: readonly {
+  key: string
+  label: string
+  days: readonly number[]
+  variance: number
+}[] = [
+  {
+    key: 'mente',
+    label: 'mente',
+    days: [
+      0.66, 0.67, 0.65, 0.66, 0.68, 0.66, 0.67, 0.66, 0.65, 0.66, 0.64, 0.65, 0.66, 0.67, 0.66,
+      0.67, 0.66, 0.65, 0.66, 0.67, 0.66, 0.65,
+    ],
+    variance: 0.012,
+  },
+  {
+    key: 'cuerpo',
+    label: 'cuerpo',
+    days: [
+      0.68, 0.72, 0.65, 0.72, 0.66, 0.71, 0.78, 0.74, 0.66, 0.62, 0.55, 0.62, 0.68, 0.72, 0.74,
+      0.68, 0.66, 0.62, 0.66, 0.72, 0.68, 0.7,
+    ],
+    variance: 0.024,
+  },
+  {
+    key: 'sueno',
+    label: 'sueño',
+    days: [
+      0.65, 0.55, 0.78, 0.6, 0.72, 0.58, 0.7, 0.62, 0.55, 0.66, 0.3, 0.5, 0.62, 0.75, 0.68, 0.6,
+      0.7, 0.55, 0.65, 0.7, 0.62, 0.68,
+    ],
+    variance: 0.038,
+  },
+  {
+    key: 'alimento',
+    label: 'alimento',
+    days: [
+      0.55, 0.62, 0.5, 0.68, 0.55, 0.72, 0.82, 0.62, 0.5, 0.45, 0.3, 0.45, 0.55, 0.62, 0.65, 0.55,
+      0.5, 0.55, 0.6, 0.65, 0.62, 0.68,
+    ],
+    variance: 0.052,
+  },
+  {
+    key: 'energia',
+    label: 'energía',
+    days: [
+      0.45, 0.62, 0.55, 0.68, 0.5, 0.72, 0.92, 0.65, 0.55, 0.42, 0.2, 0.4, 0.5, 0.62, 0.7, 0.55,
+      0.48, 0.45, 0.55, 0.65, 0.6, 0.65,
+    ],
+    variance: 0.068,
+  },
+  {
+    key: 'ciclo',
+    label: 'ciclo',
+    days: [
+      0.4, 0.55, 0.62, 0.78, 0.85, 0.78, 0.92, 0.68, 0.55, 0.45, 0.35, 0.4, 0.55, 0.68, 0.72, 0.65,
+      0.58, 0.62, 0.68, 0.75, 0.7, 0.72,
+    ],
+    variance: 0.085,
+  },
+]
+
+/** Hand-crafted observations for the first cycle. The real engine
+ *  will derive these from daily_signals once it ships; for now,
+ *  these are illustrative and demonstrate the cycle-1 contract. */
+export const MOCK_OBSERVATIONS: readonly Observation[] = [
+  {
+    id: 'peak',
+    label: 'tu pico',
+    shortValue: 'lunes 7',
+    detail: 'Lunes 7. 5 de 6 dimensiones en luz. Tu día más alto de este ciclo.',
+    chart: { kind: 'daily', days: FIRST_CYCLE_DAILY, focusDay: 7, focusKind: 'peak' },
+  },
+  {
+    id: 'valley',
+    label: 'tu valle',
+    shortValue: 'jueves 11',
+    detail:
+      'Jueves 11. Mente, energía y sueño quedaron bajas ese día. Por ahora es un día, todavía no algo que se repita.',
+    chart: { kind: 'daily', days: FIRST_CYCLE_DAILY, focusDay: 11, focusKind: 'valley' },
+  },
+  {
+    id: 'stable',
+    label: 'tu ancla',
+    shortValue: 'mente',
+    detail:
+      'Mente. Apenas se movió mientras las otras 5 subían y bajaban. Fue tu zona estable este ciclo.',
+    chart: {
+      kind: 'dimensionStack',
+      dimensions: FIRST_CYCLE_DIMENSIONS,
+      focusKey: 'mente',
+    },
+  },
+  {
+    id: 'hypothesis',
+    label: 'stelar observa',
+    shortValue: 'algo en los jueves',
+    detail: 'Algo se mueve en tus jueves. Necesitamos 2 ciclos más para confirmarlo.',
+    tentative: true,
+    chart: {
+      kind: 'weekday',
+      // L M M J V S D — jueves is the lowest by a noticeable margin
+      bars: [0.84, 0.72, 0.68, 0.38, 0.58, 0.71, 0.62],
+      focus: 3,
+    },
+  },
+]
+
+/** First-cycle Voz de Stelar — honest about the learning state.
+ *  Quotes the observed peak day, names the current phase using
+ *  population-level cycle knowledge (not personal inference), and
+ *  ends with the promise of confirmed patterns next cycle. */
+export function buildFirstCycleVoz(
+  ciclo: typeof MOCK_CICLO,
+  observations: readonly Observation[],
+): { parts: readonly VozParte[] } {
+  const peak = observations.find((o) => o.id === 'peak')
+  const remaining = Math.max(0, ciclo.length - ciclo.day)
+  const phaseLower = ciclo.phase.toLowerCase().replace('fase ', '')
+  return {
+    parts: [
+      { text: 'Este es tu ' },
+      { text: 'primer ciclo', tone: 'accent' },
+      {
+        text: ` leído. En ${ciclo.day} días tuviste algunos brillantes y otros más callados. Tu pico fue el `,
+      },
+      { text: peak?.shortValue ?? '', tone: 'accent' },
+      { text: '. Estás en ' },
+      { text: phaseLower, tone: 'accent' },
+      {
+        text: '. Esta fase explica los antojos y el sueño más cortito de estos días. Por ahora Stelar está ',
+      },
+      { text: 'aprendiendo a leerte', tone: 'accent' },
+      {
+        text: `. En ${remaining} días arranca tu segundo ciclo y empezamos a confirmar lo que se repite.`,
+      },
+    ],
+  }
 }

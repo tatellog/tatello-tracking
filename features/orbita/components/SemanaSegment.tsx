@@ -1,17 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
-import {
-  MOCK_ARQUETIPO_SEMANA,
-  MOCK_PATRONES,
-  MOCK_SEMANA,
-  MOCK_VOZ_SEMANA,
-  MOCK_VOZ_SEMANA_SIGNATURE,
-} from '../mock'
+import { buildArquetipoSemana, buildVozSemana, buildWeekDays, MOCK_PATRONES } from '../mock'
 import { DayCard } from './DayCard'
 import { LiveDot } from './LiveDot'
 import { PatternHint } from './PatternHint'
@@ -27,22 +21,25 @@ import { WeekConstellation } from './WeekConstellation'
  * week with confidence + scope. MOCK content (../mock.ts).
  */
 export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
-  // Today is selected by default — never null. Tapping any node
-  // switches to that day; the card and constellation react together.
-  const todayIdx = Math.max(
-    0,
-    MOCK_SEMANA.findIndex((d) => d.today),
-  )
-  const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
-  const selectedDay = MOCK_SEMANA[selectedIdx] ?? MOCK_SEMANA[todayIdx]!
+  // The whole week is built procedurally from the real day-of-week —
+  // days, archetype, counts and prose all stay in sync regardless
+  // of which day the user opens the app. JS Date.getDay() returns
+  // 0 for Sunday, matching the Sunday-first template layout.
+  const todayIdx = useMemo(() => new Date().getDay(), [])
+  const days = useMemo(() => buildWeekDays(todayIdx), [todayIdx])
+  const arquetipo = useMemo(() => buildArquetipoSemana(days, todayIdx), [days, todayIdx])
+  const voz = useMemo(() => buildVozSemana(days, todayIdx), [days, todayIdx])
 
-  // Derive the state counts from the mock so the header tells the
-  // truth: in-luz today and before; lejos today and before; the rest
-  // are still ahead. Computed once per render.
-  const livedCount = MOCK_ARQUETIPO_SEMANA.daysRead
-  const daysEnLuz = MOCK_ARQUETIPO_SEMANA.daysEnLuz
+  const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
+  const selectedDay = days[selectedIdx] ?? days[todayIdx]!
+
+  // Derive the state counts from the lived days so the header tells
+  // the truth: in-luz today and before; lejos today and before; the
+  // rest are still ahead.
+  const livedCount = arquetipo.daysRead
+  const daysEnLuz = arquetipo.daysEnLuz
   const lejos = Math.max(0, livedCount - daysEnLuz)
-  const porVenir = MOCK_SEMANA.length - livedCount
+  const porVenir = days.length - livedCount
 
   const activePattern = pickActivePattern(todayIdx)
 
@@ -54,8 +51,8 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
           says "Semana". */}
       <View style={styles.header}>
         <EmText
-          text={MOCK_ARQUETIPO_SEMANA.name}
-          emphasis={MOCK_ARQUETIPO_SEMANA.emphasis}
+          text={arquetipo.name}
+          emphasis={arquetipo.emphasis}
           style={styles.archetype}
           emStyle={styles.archetypeEm}
         />
@@ -71,15 +68,15 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
             <Text style={styles.metaSep}>{'\n'}</Text>
             <Text>leído por </Text>
             <Text style={styles.metaStelar}>Stelar</Text>
-            <Text>{` · ${MOCK_ARQUETIPO_SEMANA.daysRead} días · pico `}</Text>
-            <Text style={styles.metaNum}>{MOCK_ARQUETIPO_SEMANA.peakDay}</Text>
+            <Text>{` · ${arquetipo.daysRead} días · pico `}</Text>
+            <Text style={styles.metaNum}>{arquetipo.peakDay}</Text>
           </Text>
         </View>
       </View>
 
       {/* Full-bleed hero — the constellation of the seven days. */}
       <View style={styles.diagram}>
-        <WeekConstellation days={MOCK_SEMANA} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
+        <WeekConstellation days={days} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
       </View>
 
       {/* The day card — bound to the selected day. Today gets the
@@ -90,12 +87,12 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
       </Animated.View>
 
       {/* Stelar's reading of the week so far. The tag flips to
-          "Cierre de semana" only at the end of the week; mid-week
-          it stays "Hasta ahora". */}
+          "Cierre de semana" once the week is done; mid-week it
+          stays "Hasta ahora". */}
       <VozDeStelar
-        parts={MOCK_VOZ_SEMANA.parts}
-        tag="Hasta ahora"
-        signature={MOCK_VOZ_SEMANA_SIGNATURE}
+        parts={voz.parts}
+        tag={todayIdx === 6 ? 'Cierre de semana' : 'Hasta ahora'}
+        signature={voz.signature}
       />
 
       {/* One pattern surfaced here as a doorway — the full list lives
@@ -111,7 +108,7 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
  * prefer a weekday pattern whose focus is still ahead (so the hint
  * is actionable), falling back to the first available. */
 function pickActivePattern(todayIdx: number) {
-  // MOCK_SEMANA is Sunday-first; PatternCard's weekday glyph is
+  // buildWeekDays is Sunday-first; PatternCard's weekday glyph is
   // Monday-first (L=0..D=6). Convert today's idx accordingly.
   const monFirst = (todayIdx + 6) % 7
   const upcoming = MOCK_PATRONES.find((p) => p.data.kind === 'weekday' && p.data.focus > monFirst)
