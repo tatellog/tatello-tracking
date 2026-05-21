@@ -9,8 +9,14 @@ export function useTakePhoto() {
   return useMutation({
     mutationFn: ({ uri, angle }: { uri: string; angle: PhotoAngle }) =>
       processAndUploadFromUri(uri, angle),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.photos.all })
+    onSuccess: async () => {
+      // `refetchType: 'all'` forces inactive queries to refetch too —
+      // covers the case where the antes/después preview was mounted
+      // earlier but is paused while the picker is up.
+      await qc.invalidateQueries({
+        queryKey: queryKeys.photos.all,
+        refetchType: 'all',
+      })
     },
   })
 }

@@ -5,6 +5,8 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { colors, typography } from '@/theme'
 
 type Props = {
+  /** Uppercase label drawn above the field. */
+  label: string
   /** Selected date, or null when the user hasn't picked yet. */
   value: Date | null
   onChange: (next: Date) => void
@@ -12,9 +14,8 @@ type Props = {
   defaultDate?: Date
   minDate?: Date
   maxDate?: Date
-  /** Suppress the default "FECHA DE NACIMIENTO" label when the caller
-   *  provides its own (e.g. a conversational question above). */
-  hideLabel?: boolean
+  /** Optional placeholder shown when value is null. */
+  placeholder?: string
 }
 
 const SPANISH_MONTHS = [
@@ -44,16 +45,24 @@ function toISODate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-export function DateOfBirthInput({
+/*
+ * A generic single-date field used by onboarding steps beyond DOB.
+ * Same visual + interaction shape as DateOfBirthInput (so the wizard
+ * stays coherent), but accepts an arbitrary uppercase label. iOS uses
+ * the inline spinner; Android the native dialog; web a `type=date`
+ * input.
+ */
+export function DateField({
+  label,
   value,
   onChange,
   defaultDate,
   minDate,
   maxDate,
-  hideLabel = false,
+  placeholder = 'Tocar para elegir',
 }: Props) {
   const [showPicker, setShowPicker] = useState(false)
-  const seed = value ?? defaultDate ?? new Date(2000, 0, 1)
+  const seed = value ?? defaultDate ?? new Date()
 
   const handleNativeChange = (_event: DateTimePickerEvent, next?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false)
@@ -63,7 +72,7 @@ export function DateOfBirthInput({
   if (Platform.OS === 'web') {
     return (
       <View style={styles.wrap}>
-        {!hideLabel ? <Text style={styles.label}>FECHA DE NACIMIENTO</Text> : null}
+        <Text style={styles.label}>{label}</Text>
         <WebDateInput
           value={value ? toISODate(value) : ''}
           min={minDate ? toISODate(minDate) : undefined}
@@ -79,15 +88,15 @@ export function DateOfBirthInput({
 
   return (
     <View style={styles.wrap}>
-      {!hideLabel ? <Text style={styles.label}>FECHA DE NACIMIENTO</Text> : null}
+      <Text style={styles.label}>{label}</Text>
       <Pressable
         onPress={() => setShowPicker((prev) => !prev)}
         style={[styles.tapTarget, showPicker && styles.tapTargetActive]}
         accessibilityRole="button"
-        accessibilityLabel="Elegir fecha de nacimiento"
+        accessibilityLabel={`Elegir ${label.toLowerCase()}`}
       >
         <Text style={[styles.value, !value && styles.valuePlaceholder]}>
-          {value ? formatDateLong(value) : 'Tocar para elegir'}
+          {value ? formatDateLong(value) : placeholder}
         </Text>
       </Pressable>
       {showPicker ? (
@@ -115,10 +124,6 @@ function parseISODate(v: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-// RNW renders TextInput as <input>, but for `type="date"` we bypass
-// JSX (its DOM typings aren't in the RN types). createElement keeps
-// the iOS/Android builds happy and the web build wired to the native
-// date picker.
 function WebDateInput({
   value,
   min,

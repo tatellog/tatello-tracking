@@ -111,17 +111,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="orbita"
-        options={{
-          title: 'Órbita',
-          tabBarIcon: ({ color, size }) => <OrbitIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="progress"
         options={{
           title: 'Progreso',
           tabBarIcon: ({ color, size }) => <TrendIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="orbita"
+        options={{
+          title: 'Órbita',
+          tabBarIcon: ({ color, size }) => <OrbitIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen

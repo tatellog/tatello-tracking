@@ -95,14 +95,20 @@ function PhotoCaptureScreen({
 
   const isWeb = Platform.OS === 'web'
 
-  const finalDestination = source === 'reminder' ? '/(tabs)' : '/onboarding/day-one'
+  // Skip / abort destination — mirrors photos/done.tsx so leaving the
+  // wizard early returns to the same surface that opened it.
+  const finalDestination =
+    source === 'reminder'
+      ? '/(tabs)'
+      : source === 'settings'
+        ? '/(tabs)/settings'
+        : '/onboarding/day-one'
 
   const onCaptureSuccess = useCallback(() => {
-    // Single-slot mode (tap on one slot from Día 1) returns to Día 1
-    // straight after the upload — the user wanted just this angle,
-    // not the whole walk-through.
+    // Single-slot mode (tap on one slot) returns to whichever surface
+    // opened it — Día 1, Settings, or the home reminder.
     if (single) {
-      router.replace('/onboarding/day-one')
+      router.replace(finalDestination)
       return
     }
     const next = nextAngle(angle)
@@ -111,7 +117,7 @@ function PhotoCaptureScreen({
     } else {
       router.replace(`/onboarding/photos/done${source ? `?source=${source}` : ''}`)
     }
-  }, [angle, router, single, source])
+  }, [angle, finalDestination, router, single, source])
 
   const handleCapturedUri = useCallback(
     async (uri: string) => {

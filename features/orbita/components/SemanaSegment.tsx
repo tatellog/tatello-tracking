@@ -5,8 +5,10 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
+import { useHasAnySignals } from '../hooks'
 import { buildArquetipoSemana, buildVozSemana, buildWeekDays, MOCK_PATRONES } from '../mock'
 import { DayCard } from './DayCard'
+import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PatternHint } from './PatternHint'
 import { VozDeStelar } from './VozDeStelar'
@@ -32,6 +34,7 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
 
   const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
   const selectedDay = days[selectedIdx] ?? days[todayIdx]!
+  const { data: hasAny } = useHasAnySignals()
 
   // Derive the state counts from the lived days so the header tells
   // the truth: in-luz today and before; lejos today and before; the
@@ -42,6 +45,40 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
   const porVenir = days.length - livedCount
 
   const activePattern = pickActivePattern(todayIdx)
+
+  // Empty-state branch: hide the templated archetype + meta + voz +
+  // pattern hint; render the galaxy hero with all 7 days as ghosts
+  // (the WeekConstellation handles brightness=0 gracefully).
+  if (hasAny === false) {
+    const ghostDays = days.map((d) => ({
+      ...d,
+      brightness: 0,
+      archetype: '',
+      dimEnLuz: 0,
+      drift: 0,
+      note: 'Aún no hay registros.',
+    }))
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+        <View style={styles.header}>
+          <EmText
+            text="tu primera semana"
+            emphasis="primera semana"
+            style={styles.archetype}
+            emStyle={styles.archetypeEm}
+          />
+        </View>
+        <View style={styles.diagram}>
+          <WeekConstellation days={ghostDays} selectedIdx={todayIdx} onSelect={() => {}} />
+        </View>
+        <EmptySegmentCard
+          eyebrow="La galaxia se enciende con la data"
+          body="Por ahora todos los días están en silencio. Registra desde Hoy y los días brillan según lo que pasó."
+          hint="Stelar arma la prosa de la semana cuando tenga al menos un día con señales."
+        />
+      </Animated.View>
+    )
+  }
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>

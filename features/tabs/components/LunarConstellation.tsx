@@ -1168,16 +1168,50 @@ const SPARKLE_MAG = 2.8
  * a smooth radial falloff without using <RadialGradient> (which has
  * the same iOS alpha-stop bug noted in AmbientGlow). Inner cream-pink
  * ring suggests heat at the core; outer magenta layers bloom into the
- * sky. */
-function HeroGlow({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+ * sky.
+ *
+ * The wrap AnimatedG breathes the entire halo on a 4 s cycle (per-star
+ * phase offset so the three anchors of a figure never pulse in
+ * unison). Both the overall opacity AND the scale ride the wave, so
+ * the bloom visibly inflates and softens — anchors read as alive,
+ * not just bigger circles. */
+function HeroGlow({
+  cx,
+  cy,
+  r,
+  t,
+  phase,
+}: {
+  cx: number
+  cy: number
+  r: number
+  t: SharedValue<number>
+  phase: number
+}) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value * 2 + phase) * 2 * Math.PI)
+    const scale = 1 + wave * 0.18
+    const op = 0.75 + wave * 0.45
+    return {
+      opacity: op > 1 ? 1 : op,
+      transform: [
+        { translateX: cx },
+        { translateY: cy },
+        { scale },
+        { translateX: -cx },
+        { translateY: -cy },
+      ],
+    }
+  })
   return (
-    <>
-      <Circle cx={cx} cy={cy} r={r * 5.2} fill={colors.magenta} opacity={0.04} />
-      <Circle cx={cx} cy={cy} r={r * 3.8} fill={colors.magenta} opacity={0.07} />
-      <Circle cx={cx} cy={cy} r={r * 2.6} fill={colors.magenta} opacity={0.12} />
-      <Circle cx={cx} cy={cy} r={r * 1.7} fill={colors.magenta} opacity={0.2} />
-      <Circle cx={cx} cy={cy} r={r * 1.1} fill="#FBD7E3" opacity={0.22} />
-    </>
+    <AnimatedG animatedProps={animatedProps}>
+      <Circle cx={cx} cy={cy} r={r * 6.4} fill={colors.magenta} opacity={0.05} />
+      <Circle cx={cx} cy={cy} r={r * 4.6} fill={colors.magenta} opacity={0.09} />
+      <Circle cx={cx} cy={cy} r={r * 3.1} fill={colors.magenta} opacity={0.16} />
+      <Circle cx={cx} cy={cy} r={r * 2.0} fill={colors.magenta} opacity={0.26} />
+      <Circle cx={cx} cy={cy} r={r * 1.2} fill="#FBD7E3" opacity={0.32} />
+    </AnimatedG>
   )
 }
 
@@ -1305,7 +1339,7 @@ function PlaceholderStar({ s, i, t }: { s: Resolved; i: number; t: SharedValue<n
 
   return (
     <AnimatedG animatedProps={animatedProps}>
-      {isHero ? <HeroGlow cx={s.x} cy={s.y} r={baseR} /> : null}
+      {isHero ? <HeroGlow cx={s.x} cy={s.y} r={baseR} t={t} phase={phase} /> : null}
       <StarSparkle cx={s.x} cy={s.y} r={baseR} mag={s.mag} fill="#F4ECDE" />
     </AnimatedG>
   )
@@ -1985,7 +2019,7 @@ function LitStar({
 
   return (
     <G>
-      {isHero ? <HeroGlow cx={s.x} cy={s.y} r={r} /> : null}
+      {isHero ? <HeroGlow cx={s.x} cy={s.y} r={r} t={t} phase={phase} /> : null}
       <AnimatedCircle
         cx={s.x}
         cy={s.y}

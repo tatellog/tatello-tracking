@@ -3,7 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
-import { getBeforeAfterPhotos, getMeasurements } from './api'
+import {
+  getBeforeAfterPhotos,
+  getLastPeriodStart,
+  getMeasurements,
+  getRecentSleepLogs,
+  getRecentWorkoutDates,
+} from './api'
 import { buildMockMeasurements } from './mock'
 
 const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
@@ -28,13 +34,17 @@ export function useMeasurements(rangeDays: number | null) {
 
 /*
  * Lectura: useBeforeAfterPhotos — el par antes/ahora (frontal) para la
- * página de Progreso. staleTime moderado; las signed URLs viven 1h.
+ * página de Progreso. Refresca al volver al tab + al recuperar foco
+ * para que una foto recién subida desde otra surface (onboarding /
+ * settings) aparezca sin esperar el invalidate.
  */
 export function useBeforeAfterPhotos() {
   return useQuery({
     queryKey: queryKeys.photos.beforeAfter(),
     queryFn: getBeforeAfterPhotos,
-    staleTime: 5 * 60_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
   })
 }
 
@@ -51,6 +61,36 @@ type NewMeasurement = {
   weight_kg?: number | null
   waist_cm?: number | null
   measured_at?: string
+}
+
+/*
+ * Reads for the Progress overview cards. Each query is keyed by the
+ * window length so flips between 7d/30d/60d cache independently. The
+ * Progress tab usually wants 60 days (covers the 30-day comparativa
+ * + the 28-day movement constellation in one fetch).
+ */
+export function useRecentWorkoutDates(rangeDays: number) {
+  return useQuery({
+    queryKey: ['progress', 'workouts', rangeDays] as const,
+    queryFn: () => getRecentWorkoutDates(rangeDays),
+    staleTime: 60_000,
+  })
+}
+
+export function useRecentSleepLogs(rangeDays: number) {
+  return useQuery({
+    queryKey: ['progress', 'sleep', rangeDays] as const,
+    queryFn: () => getRecentSleepLogs(rangeDays),
+    staleTime: 60_000,
+  })
+}
+
+export function useLastPeriodStart() {
+  return useQuery({
+    queryKey: ['progress', 'cycle', 'last-period'] as const,
+    queryFn: getLastPeriodStart,
+    staleTime: 5 * 60_000,
+  })
 }
 
 export function useAddMeasurement() {

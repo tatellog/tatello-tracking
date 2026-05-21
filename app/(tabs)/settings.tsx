@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { StarLoader } from '@/components/StarLoader'
 import { useMacroTargets } from '@/features/macros/hooks'
+import { useLatestPhotoSet } from '@/features/onboarding/photos/hooks/useLatestPhotoSet'
 import { avatarUrl } from '@/features/profile/api'
 import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
@@ -26,22 +27,32 @@ const SEX_LABEL: Record<string, string> = {
   male: 'Masculino',
 }
 
-const GOAL_LABEL: Record<string, string> = {
-  recomposition: 'Recomposición',
-  lose_fat: 'Bajar grasa',
-  gain_muscle: 'Ganar músculo',
-  maintain: 'Mantener',
+/** monthly_focus → settings display, mirrors the wizard's tu-intencion
+ *  step. Each option carries the same poetic tagline the user saw
+ *  there, so Settings reads as a continuation of the wizard's voice. */
+const FOCUS_LABEL: Record<string, { label: string; tagline: string }> = {
+  weight: { label: 'Bajar de peso', tagline: 'El cuerpo va a moverse' },
+  energy: { label: 'Tener más energía', tagline: 'Saber de dónde sale tu fuerza' },
+  sleep: { label: 'Dormir profundo', tagline: 'La noche se vuelve descanso' },
+  food: { label: 'Comer con menos lucha', tagline: 'Que comer deje de pesar' },
+  cycle: { label: 'Conocer mi ciclo', tagline: 'Tu cuerpo va a hablarte' },
+  patterns: { label: 'Entender mis patrones', tagline: 'Stelar mapea lo que se repite' },
+  mind: { label: 'Calmar la mente', tagline: 'Menos ruido por dentro' },
+  other: { label: 'Otra cosa', tagline: 'La nombras tú' },
 }
 
 /*
- * Settings hub, in the app's celestial-editorial language. Three
- * blocks under a TabHeader:
- *   1. Mi perfil — an identity card. The name leads as a title; below
- *      it the zodiac sign + age tie back to the Hoy-tab constellation
- *      ("Tu Acuario"). The remaining wizard answers sit as quiet rows.
- *   2. Mis metas — the macro targets as a tappable card; tapping it
- *      reuses /onboarding/macro-targets (?source=settings).
- *   3. Cuenta — sign out.
+ * Settings hub, in the app's celestial-editorial language. Cards:
+ *   1. Mi perfil — identity (name + zodiac + age + altura + sexo).
+ *      Tappable: opens /onboarding/about-you?source=settings.
+ *   2. Tu intención — the monthly_focus the user declared in the
+ *      wizard, surfaced as a separate tappable card (label + tagline)
+ *      so it doesn't get buried with demographics. Tappable: opens
+ *      /onboarding/tu-intencion?source=settings.
+ *   3. Mis metas — macro targets (tappable, opens macro-targets).
+ *   4. Track corporal — optional body-photo comparativa.
+ *   5. Cómo te lee Stelar — what Stelar reads + data privacy promise.
+ *   6. Cuenta — sign out.
  *
  * Sign-out is destructive: confirmation, then a coordinated cleanup
  * (in-memory query cache + persisted store + visited-day-one flag)
@@ -54,6 +65,7 @@ export default function SettingsScreen() {
   const choose = useConfirm()
   const { data: profile } = useProfile()
   const { data: targets } = useMacroTargets()
+  const { data: lastPhotoSetAt } = useLatestPhotoSet()
 
   const [signingOut, setSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -97,6 +109,25 @@ export default function SettingsScreen() {
     router.push('/onboarding/about-you?source=settings')
   }
 
+  const editIntention = () => {
+    router.push('/onboarding/tu-intencion?source=settings')
+  }
+
+  const openBodyTrack = () => {
+    router.push('/onboarding/photos/front?source=settings')
+  }
+
+  // Status line for the Track corporal card. We compute it from the
+  // latest complete (4-angle) set so the card honestly says "X days
+  // since your last comparativa" instead of pretending fresh state.
+  const bodyTrackStatus = (() => {
+    if (lastPhotoSetAt == null) return 'Aún sin foto · activar'
+    const days = Math.max(0, Math.floor((Date.now() - lastPhotoSetAt) / (1000 * 60 * 60 * 24)))
+    if (days === 0) return 'Capturado hoy'
+    if (days === 1) return 'Hace 1 día'
+    return `Hace ${days} días`
+  })()
+
   const uploadAvatar = useUploadAvatar()
 
   const pickAvatar = async () => {
@@ -115,7 +146,7 @@ export default function SettingsScreen() {
 
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const sexLabel = profile?.biological_sex ? (SEX_LABEL[profile.biological_sex] ?? '—') : '—'
-  const goalLabel = profile?.goal ? (GOAL_LABEL[profile.goal] ?? '—') : '—'
+  const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
 
   // Celestial identity line — sign comes from the same source as the
   // Hoy-tab constellation, so the two screens agree.
@@ -179,7 +210,32 @@ export default function SettingsScreen() {
                   value={profile?.height_cm ? `${profile.height_cm} cm` : '—'}
                 />
                 <ProfileRow label="Sexo biológico" value={sexLabel} />
-                <ProfileRow label="Objetivo" value={goalLabel} />
+              </View>
+            </Pressable>
+          </Animated.View>
+
+          {/* ── Tu intención — the monthly_focus the user picked in
+              tu-intencion, surfaced as its own tappable card with the
+              same label + tagline pair the wizard used. Tapping
+              re-opens /onboarding/tu-intencion?source=settings so the
+              user can change it from here. ── */}
+          <Animated.View entering={enter(150)}>
+            <SectionHeader label="Tu intención" />
+            <Pressable
+              onPress={editIntention}
+              accessibilityRole="button"
+              accessibilityLabel="Editar tu intención"
+            >
+              <View style={styles.metaCard}>
+                <View style={styles.metaMain}>
+                  <Text style={styles.metaLabel}>{intention?.label ?? 'Aún sin definir'}</Text>
+                  {intention ? (
+                    <Text style={styles.metaValue}>{intention.tagline}</Text>
+                  ) : (
+                    <Text style={styles.metaValue}>Tocá para elegir un foco</Text>
+                  )}
+                </View>
+                <Text style={styles.chevron}>›</Text>
               </View>
             </Pressable>
           </Animated.View>
@@ -210,9 +266,31 @@ export default function SettingsScreen() {
             </Pressable>
           </Animated.View>
 
+          {/* ── Track corporal — the optional 4-angle body-photo
+              comparativa. Out of the main onboarding flow on
+              purpose; this is where users who want a physical-change
+              record opt in. The status line uses the latest complete
+              set so the card never lies about state. ── */}
+          <Animated.View entering={enter(215)}>
+            <SectionHeader label="Track corporal" />
+            <Pressable
+              onPress={openBodyTrack}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir track corporal"
+            >
+              <View style={styles.metaCard}>
+                <View style={styles.metaMain}>
+                  <Text style={styles.metaLabel}>4 fotos cada 28 días</Text>
+                  <Text style={styles.metaValue}>{bodyTrackStatus}</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </View>
+            </Pressable>
+          </Animated.View>
+
           {/* ── Cómo te lee Stelar — the intelligence, named and
               explained: what it reads, and that the data is yours. ── */}
-          <Animated.View entering={enter(235)}>
+          <Animated.View entering={enter(255)}>
             <SectionHeader label="Cómo te lee Stelar" />
             <View style={styles.stelarCard}>
               <Text style={styles.stelarBody}>

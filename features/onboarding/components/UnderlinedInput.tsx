@@ -37,7 +37,7 @@ export function UnderlinedInput({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label.toUpperCase()}</Text>
+      {label ? <Text style={styles.label}>{label.toUpperCase()}</Text> : null}
       <TextInput
         value={value}
         onChangeText={onChangeText}

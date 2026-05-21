@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { queryKeys } from '@/lib/queryKeys'
 
-import { getTodaySignals } from './api'
+import { getTodaySignals, hasAnySignals } from './api'
 
 /*
  * Today's órbita signals — the data behind the Día segment's orbital
@@ -14,5 +14,20 @@ export function useTodaySignals() {
     queryKey: queryKeys.orbita.today(),
     queryFn: getTodaySignals,
     staleTime: 60_000,
+  })
+}
+
+/*
+ * Has the user ever logged anything? Drives the empty-state path in
+ * Día / Semana / Mes — false → render placeholder, true → render the
+ * full segment. Longer staleTime than the today query: this only
+ * flips from false→true once per user, ever, so we don't need to
+ * re-check on every focus.
+ */
+export function useHasAnySignals() {
+  return useQuery({
+    queryKey: queryKeys.orbita.hasAny(),
+    queryFn: hasAnySignals,
+    staleTime: 1000 * 60 * 5,
   })
 }

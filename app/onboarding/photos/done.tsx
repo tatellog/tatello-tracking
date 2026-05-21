@@ -55,8 +55,23 @@ export default function PhotosDoneScreen() {
     transform: [{ scale: checkScale.value }],
   }))
 
-  const destination = source === 'reminder' ? '/(tabs)' : '/onboarding/day-one'
-  const ctaLabel = source === 'reminder' ? 'Volver al inicio' : 'Volver a Día 1'
+  // Three entry points map to three return paths:
+  //  · reminder  → back to home (the 30-day reminder banner deep-link)
+  //  · settings  → back to settings (the "Track corporal" optional card)
+  //  · undefined → the wizard's Día 1 (the legacy default; still used
+  //                when the photo walk is somehow opened standalone)
+  const destination =
+    source === 'reminder'
+      ? '/(tabs)'
+      : source === 'settings'
+        ? '/(tabs)/settings'
+        : '/onboarding/day-one'
+  const ctaLabel =
+    source === 'reminder'
+      ? 'Volver al inicio'
+      : source === 'settings'
+        ? 'Volver a Ajustes'
+        : 'Volver a Día 1'
 
   const handleContinue = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})

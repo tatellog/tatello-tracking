@@ -5,6 +5,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import {
   getProfile,
   insertInitialWeight,
+  recordLastPeriodStart,
   updateProfile,
   uploadAvatar,
   type ProfileUpdate,
@@ -65,5 +66,17 @@ export function useInsertInitialWeight() {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       qc.invalidateQueries({ queryKey: queryKeys.progress.all })
     },
+  })
+}
+
+/*
+ * Records the user's last period start during the onboarding's
+ * tu-ciclo step. The raw event lands in cycle_events; downstream
+ * features that read cycles will pick it up via their own query
+ * keys, so we don't pre-invalidate anything here.
+ */
+export function useRecordLastPeriodStart() {
+  return useMutation({
+    mutationFn: (eventDateIso: string) => recordLastPeriodStart(eventDateIso),
   })
 }

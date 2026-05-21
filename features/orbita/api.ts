@@ -21,3 +21,21 @@ export async function getTodaySignals(): Promise<DailySignals | null> {
   if (error) throw error
   return data
 }
+
+/*
+ * Has the user ever logged anything that lands in daily_signals? The
+ * 3 órbita segments (Día / Semana / Mes) flip to an empty placeholder
+ * when this returns false — Stelar shouldn't render archetypes,
+ * patterns or readings from MOCK data for a brand-new account who
+ * hasn't given it anything to read. `count: 'exact', head: true`
+ * fetches only the row count (no body), so this stays cheap even on
+ * a thousand-day history.
+ */
+export async function hasAnySignals(): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('daily_signals')
+    .select('day', { count: 'exact', head: true })
+    .limit(1)
+  if (error) throw error
+  return (count ?? 0) > 0
+}

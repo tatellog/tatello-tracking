@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -31,14 +31,18 @@ type Props = {
  * same shell — only halo speed, breathing depth and bottom-text
  * weight differ. `urgent` intensifies all three.
  *
- * Press choreography:
+ * Press choreography — matches the calendar Cell behaviour (no
+ * checkmark beat, immediate toggle):
  *   onPressIn  → haptic Medium + scale 1 → 0.96 (spring).
- *   onPress    → cross-fade '＋ → ✓' (250ms) + 350ms hold, then
- *                fire onMark(). The optimistic mutation flips
- *                today_workout_completed = true upstream, the parent
- *                stops rendering the tile, and the missing four
- *                cells reappear with a stagger entrance. Total ≈ 900ms
- *                from tap to grid-completed.
+ *   onPress    → fire onMark() immediately. The optimistic mutation
+ *                flips today_workout_completed = true upstream; the
+ *                parent stops rendering the tile (FadeOut.300ms), and
+ *                the missing four cells stagger in.
+ *
+ * Earlier this used a ＋ → ✓ cross-fade with a 600 ms hold; in a 2×2
+ * tile the check rendered visually huge relative to a single-cell
+ * mark, so we removed the intermediate state and let the dismiss
+ * animation be the confirmation.
  */
 const INTENSITY: Record<
   State,
@@ -93,28 +97,15 @@ const INTENSITY: Record<
 // stays the same width as a regular '+' so layout doesn't shift.
 const PLUS_GLYPH = '＋'
 
-const PRESS_HOLD_MS = 600 // 250ms cross-fade + 350ms hold with check
-
 export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) {
   const intensity = INTENSITY[state]
   const [pressed, setPressed] = useState(false)
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Bail out cleanly if the component unmounts mid-press (user navs
-  // away in the 600ms hold window) — otherwise the setTimeout would
-  // fire onMark on a stale handler.
-  useEffect(() => {
-    return () => {
-      if (pressTimer.current) clearTimeout(pressTimer.current)
-    }
-  }, [])
 
   const haloOpacity = useSharedValue(0.4)
   const haloScale = useSharedValue(1)
   const breath = useSharedValue(1)
   const plusBob = useSharedValue(0)
   const pressScale = useSharedValue(1)
-  const checkOpacity = useSharedValue(0)
   // Germinate: 0 → 1.2 (overshoot bezier) → 1 (spring rest). Only
   // armed for first-day; every other state starts at full size so a
   // re-render doesn't trigger a phantom entrance animation.
@@ -198,11 +189,7 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
     transform: [{ scale: breath.value * pressScale.value * entryScale.value }],
   }))
   const plusStyle = useAnimatedStyle(() => ({
-    opacity: 1 - checkOpacity.value,
     transform: [{ translateY: plusBob.value }],
-  }))
-  const checkStyle = useAnimatedStyle(() => ({
-    opacity: checkOpacity.value,
   }))
 
   const handlePressIn = () => {
@@ -219,8 +206,10 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
   const handlePress = () => {
     if (pressed) return
     setPressed(true)
-    checkOpacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.ease) })
-    pressTimer.current = setTimeout(onMark, PRESS_HOLD_MS)
+    // Fire immediately — same instant-toggle as the calendar Cells.
+    // The 300 ms FadeOut on the parent's Animated.View covers the
+    // dismiss; no intermediate checkmark needed.
+    onMark()
   }
 
   return (
@@ -250,7 +239,6 @@ export function TodayTile({ state, topLabel, bottomText, size, onMark }: Props) 
           </Text>
           <View style={styles.glyphSlot}>
             <Animated.Text style={[styles.glyph, plusStyle]}>{PLUS_GLYPH}</Animated.Text>
-            <Animated.Text style={[styles.glyph, styles.check, checkStyle]}>✓</Animated.Text>
           </View>
           <Text
             style={[
@@ -321,10 +309,6 @@ const styles = StyleSheet.create({
     color: colors.pearlElevated,
     textAlign: 'center',
     includeFontPadding: false,
-  },
-  check: {
-    fontWeight: typography.fontWeight.medium,
-    fontSize: typography.sizes.tilePlus * 0.82,
   },
   bottomText: {
     fontFamily: typography.uiMedium,

@@ -38,6 +38,29 @@ function PinpointGlyph() {
   )
 }
 
+/* iOS-style share glyph — same as the one in BeforeAfterPhotos. */
+function ShareIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 3.2 V14.2" stroke={colors.magenta} strokeWidth={1.9} strokeLinecap="round" />
+      <Path
+        d="M8.2 6.8 L12 3 L15.8 6.8"
+        stroke={colors.magenta}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M7.6 10 H6 V20.5 H18 V10 H16.4"
+        stroke={colors.magenta}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
 /* A coach line tuned to where the user is in the 28-day cycle. The
  * intent: the share card celebrates today specifically, not the
  * abstract idea of "training". A line that reflects the user's place
@@ -128,8 +151,10 @@ export function TrainingShareCTA() {
           ? await ImagePicker.launchCameraAsync({ quality: 0.85 })
           : await ImagePicker.launchImageLibraryAsync({ quality: 0.85, mediaTypes: ['images'] })
       if (result.canceled || !result.assets[0]) return
+      // Only store the URI — the user opens the share sheet themselves
+      // by tapping the preview. Previously this auto-opened the sheet,
+      // which meant cancelling the share also discarded the photo.
       setPhotoUri(result.assets[0].uri)
-      setSheetOpen(true)
     } finally {
       setBusy(false)
     }
@@ -146,11 +171,22 @@ export function TrainingShareCTA() {
     )
   }
 
+  // Empty-state chip tap → pick a source. Photo state has its own
+  // explicit "Compartir entreno" button + Cambiar/Quitar links, so
+  // the bare tile in that state only opens the share sheet (no
+  // hidden long-press behavior to memorise).
+  const handleTilePress = () => {
+    if (photoUri) {
+      setSheetOpen(true)
+    } else {
+      choosePhoto()
+    }
+  }
+
+  // Closing the share sheet keeps the photo as a preview so the user
+  // can re-share, change it via the header link, or quitar.
   const handleClose = () => {
     setSheetOpen(false)
-    // Discard the local URI on close — the photo lives in Camera Roll
-    // only if the user explicitly saved or shared it from the sheet.
-    setTimeout(() => setPhotoUri(null), 220)
   }
 
   return (
@@ -159,25 +195,60 @@ export function TrainingShareCTA() {
         Entreno de hoy
       </EyebrowLabel>
 
-      <TouchableOpacity
-        style={styles.tile}
-        activeOpacity={0.7}
-        onPress={choosePhoto}
-        accessibilityRole="button"
-        accessibilityLabel="Captura tu entreno"
-      >
-        {photoUri && sheetOpen ? (
-          // While the sheet is open, keep the thumbnail of the latest
-          // capture so the tile doesn't feel "empty" behind the modal.
-          <Image source={{ uri: photoUri }} style={styles.thumb} resizeMode="cover" />
-        ) : (
-          <View style={styles.placeholder}>
-            <PinpointGlyph />
-            <Text style={styles.placeholderText}>Captura tu entreno</Text>
-            <Text style={styles.placeholderHint}>Para compartirlo</Text>
+      {photoUri ? (
+        // Photo state has 3 visible affordances now (the previous
+        // long-press-only menu was undiscoverable):
+        //   • Tile = preview (tap also opens share for power users)
+        //   • "Cambiar" + "Quitar" → tertiary header links
+        //   • "Compartir entreno" → primary button below the tile
+        <>
+          <View style={styles.photoHeader}>
+            <Text style={styles.headerLink} onPress={choosePhoto} suppressHighlighting>
+              Cambiar
+            </Text>
+            <Text style={styles.headerSep}>·</Text>
+            <Text style={styles.headerLink} onPress={() => setPhotoUri(null)} suppressHighlighting>
+              Quitar
+            </Text>
           </View>
-        )}
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.tilePhoto}
+            activeOpacity={0.8}
+            onPress={() => setSheetOpen(true)}
+            accessibilityRole="image"
+            accessibilityLabel="Tu entreno de hoy"
+          >
+            <Image source={{ uri: photoUri }} style={styles.thumb} resizeMode="contain" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.shareBtn}
+            activeOpacity={0.7}
+            onPress={() => setSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Compartir tu entreno"
+          >
+            <ShareIcon />
+            <Text style={styles.shareLabel}>Compartir entreno</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        // Empty state — compact chip, not a 4:5 tile. Without a photo
+        // the section is just an invitation; a dashed monolith eats
+        // vertical space without delivering anything.
+        <TouchableOpacity
+          style={styles.chip}
+          activeOpacity={0.7}
+          onPress={handleTilePress}
+          accessibilityRole="button"
+          accessibilityLabel="Captura tu entreno"
+        >
+          <PinpointGlyph />
+          <View style={styles.chipText}>
+            <Text style={styles.chipTitle}>Captura tu entreno</Text>
+            <Text style={styles.chipHint}>Para compartirlo</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {photoUri ? (
         <ProgressShareSheet visible={sheetOpen} onClose={handleClose} variants={shareVariants} />
@@ -187,46 +258,94 @@ export function TrainingShareCTA() {
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    marginTop: 28,
-  },
+  // The page-level divider in progress.tsx separates sections — no
+  // top margin here.
+  wrap: {},
   eyebrow: {
     marginBottom: 10,
   },
-  // Wider-than-tall tile — the entreno is a single moment, not a
-  // portrait. 16:9-ish so the empty placeholder reads as "frame for a
-  // story", not as a profile pic slot.
-  tile: {
+  // Tertiary actions over the photo tile — discoverable without
+  // the hidden long-press menu (which most users never trigger).
+  photoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginBottom: 8,
+  },
+  headerLink: {
+    fontFamily: typography.uiSemi,
+    fontSize: 12.5,
+    color: colors.magenta,
+    letterSpacing: 0.2,
+    paddingVertical: 4,
+  },
+  headerSep: {
+    fontFamily: typography.uiMedium,
+    fontSize: 12,
+    color: colors.niebla,
+  },
+  // Captured photo — 4:5 portrait-leaning tile to fit gym selfies.
+  // resizeMode "contain" keeps the full body in frame; letterbox
+  // bars (if any) match the dark tile background.
+  tilePhoto: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    aspectRatio: 4 / 5,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.bruma,
-    borderStyle: 'dashed',
     backgroundColor: colors.bgCard,
     overflow: 'hidden',
+  },
+  // Primary share action — same vocabulary as the "Compartir mi
+  // cambio" link in BeforeAfterPhotos. Sits below the tile so it
+  // doesn't crowd the photo.
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 7,
+    marginTop: 12,
+    paddingVertical: 4,
+  },
+  shareLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: 13.5,
+    color: colors.magenta,
   },
   thumb: {
     width: '100%',
     height: '100%',
   },
-  placeholder: {
-    flex: 1,
+  // Empty-state chip — single row, compact. Replaces the prior 4:5
+  // tile-with-placeholder which dominated the screen for a feature
+  // that only matters after the user has captured something.
+  chip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
+    gap: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    borderStyle: 'dashed',
+    backgroundColor: colors.bgCard,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
-  placeholderText: {
+  chipText: {
+    flex: 1,
+  },
+  chipTitle: {
     fontFamily: typography.uiSemi,
-    fontSize: 14,
+    fontSize: 14.5,
     color: colors.leche,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
-  placeholderHint: {
+  chipHint: {
+    marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: 11.5,
     color: colors.niebla,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
 })

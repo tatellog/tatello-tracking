@@ -284,45 +284,69 @@ export type Database = {
       }
       profiles: {
         Row: {
+          acquisition_source: string | null
           avatar_path: string | null
           biological_sex: string | null
           created_at: string
+          cycle_length_days: number | null
+          cycle_situation: string | null
           date_of_birth: string | null
           display_name: string | null
           first_workout_at: string | null
+          frictions: Json
           goal: string | null
           height_cm: number | null
           id: string
+          monthly_focus: string | null
+          notification_window: string | null
           onboarding_completed_at: string | null
           timezone: string
+          training_frequency: string | null
+          typical_sleep_hours: number | null
           updated_at: string
         }
         Insert: {
+          acquisition_source?: string | null
           avatar_path?: string | null
           biological_sex?: string | null
           created_at?: string
+          cycle_length_days?: number | null
+          cycle_situation?: string | null
           date_of_birth?: string | null
           display_name?: string | null
           first_workout_at?: string | null
+          frictions?: Json
           goal?: string | null
           height_cm?: number | null
           id: string
+          monthly_focus?: string | null
+          notification_window?: string | null
           onboarding_completed_at?: string | null
           timezone?: string
+          training_frequency?: string | null
+          typical_sleep_hours?: number | null
           updated_at?: string
         }
         Update: {
+          acquisition_source?: string | null
           avatar_path?: string | null
           biological_sex?: string | null
           created_at?: string
+          cycle_length_days?: number | null
+          cycle_situation?: string | null
           date_of_birth?: string | null
           display_name?: string | null
           first_workout_at?: string | null
+          frictions?: Json
           goal?: string | null
           height_cm?: number | null
           id?: string
+          monthly_focus?: string | null
+          notification_window?: string | null
           onboarding_completed_at?: string | null
           timezone?: string
+          training_frequency?: string | null
+          typical_sleep_hours?: number | null
           updated_at?: string
         }
         Relationships: []

@@ -75,40 +75,59 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     ],
   },
 
-  // Géminis — the twins Castor & Pollux: two parallel horizontal
-  // bodies, bright heads at the left, bodies extending right. Joined
-  // by one vertical line (the twins' clasped hands). Unique among the
-  // signs: NO fuchsia alpha — both heads are equal sibling stars, so
-  // they stay cream. Heads are mag 1.9 (above HERO_MAG 1.7) precisely
-  // so the hero glow never fires for this figure.
-  // Coords normalised from the reference spec (viewBox 300×260).
+  // Géminis — Castor (α Gem) and Pollux (β Gem) as the twin heads
+  // at the upper-left, with both bodies cascading down and the feet
+  // extending to the right toward Orion. Pollux is the brightest
+  // (mag 1.14, the constellation's alpha despite the historical
+  // beta designation); Castor is second (mag 1.58). Names + relative
+  // positions match a standard star chart so the reveal renders an
+  // astronomically faithful Géminis rather than an iconographic
+  // stick figure.
   geminis: {
     label: 'GÉMINIS',
     glyph: '♊',
     stars: [
-      // Castor — the upper twin, left to right
-      { x: 0.167, y: 0.26, mag: 1.9 }, // 0 castor_head
-      { x: 0.383, y: 0.32, mag: 3.2 }, // 1 castor_body_1
-      { x: 0.583, y: 0.36, mag: 3.2 }, // 2 castor_body_2
-      { x: 0.767, y: 0.34, mag: 3.2 }, // 3 castor_foot
-      // Pollux — the lower twin, left to right
-      { x: 0.2, y: 0.56, mag: 1.9 }, // 4 pollux_head
-      { x: 0.417, y: 0.62, mag: 3.2 }, // 5 pollux_body_1
-      { x: 0.617, y: 0.66, mag: 3.2 }, // 6 pollux_body_2
-      { x: 0.817, y: 0.66, mag: 3.2 }, // 7 pollux_foot
-      { x: 0.9, y: 0.73, mag: 3.2 }, // 8 pollux_extra
+      // The constellation reads as two visual tiers, per the chart:
+      //   L (size = "large") — Castor, Pollux, Alhena: bright anchor
+      //     stars rendered with the hero glow (mag ≤ 1.7).
+      //   M (size = "medium") — every other point: uniform mid-mag
+      //     so they're visible connectors without competing with the
+      //     anchors. We use mag 1.5 / 3.0 as the two tiers so the
+      //     LunarConstellation HERO_MAG=1.7 cleanly splits them.
+      // L
+      { x: 0.28, y: 0.15, mag: 1.5 }, // 0 Castor (α Gem)
+      { x: 0.2, y: 0.26, mag: 1.5 }, // 1 Pollux (β Gem)
+      // M — Pollux's hand to Al Kirkab and then into Wasat
+      { x: 0.1, y: 0.42, mag: 3.0 }, // 2 Al Kirkab (κ Gem)
+      // M — Castor's body descending right to Mebsuta
+      { x: 0.52, y: 0.32, mag: 3.0 }, // 3 Mebsuta (ε Gem)
+      // M — the meeting point of the two twin bodies
+      { x: 0.42, y: 0.55, mag: 3.0 }, // 4 Wasat (δ Gem)
+      // L — the bright foot off to the right
+      { x: 0.66, y: 0.68, mag: 1.5 }, // 5 Alhena (γ Gem)
+      // M — Pollux's leg down toward Alzirr (the left foot)
+      { x: 0.48, y: 0.72, mag: 3.0 }, // 6 Mekbuda (ζ Gem)
+      { x: 0.42, y: 0.92, mag: 3.0 }, // 7 Alzirr (ξ Gem)
+      // M — Castor's right arm out to Propus (the rightmost star)
+      { x: 0.82, y: 0.48, mag: 3.0 }, // 8 Tejat Posterior (μ Gem)
+      { x: 0.92, y: 0.42, mag: 3.0 }, // 9 Propus (η Gem)
     ],
     lines: [
-      [0, 1], // Castor's body
-      [1, 2],
-      [2, 3],
-      [4, 5], // Pollux's body
-      [5, 6],
-      [6, 7],
-      [7, 8],
-      [1, 5], // the clasped hands — vertical join between the twins
-      [0, 4], // closing edge — heads
-      [3, 7], // closing edge — feet
+      // Heads
+      [0, 1], // Castor → Pollux
+      // Twin 1 — Castor down to its foot at Alzirr
+      [0, 3], // Castor → Mebsuta
+      [3, 4], // Mebsuta → Wasat
+      [4, 6], // Wasat → Mekbuda
+      [6, 7], // Mekbuda → Alzirr
+      // Twin 2 — Pollux's hand merges into the shared body at Wasat
+      [1, 2], // Pollux → Al Kirkab
+      [2, 4], // Al Kirkab → Wasat
+      // Right arm — from Mebsuta out to Propus, plus the brace down
+      // to Alhena
+      [3, 8], // Mebsuta → Tejat Posterior
+      [8, 9], // Tejat Posterior → Propus
+      [4, 5], // Wasat → Alhena
     ],
   },
 

@@ -8,6 +8,7 @@ import { PrimaryCta } from '@/components/PrimaryCta'
 import { colors, typography } from '@/theme'
 
 import { ProgressBar } from './ProgressBar'
+import { WizardBackdrop } from './WizardBackdrop'
 
 type Props = {
   step: number
@@ -20,6 +21,9 @@ type Props = {
   continueLabel?: string
   loading?: boolean
   errorMessage?: string | null
+  /** Render the bottom CTA as a pill (border-radius 100) — used by
+   *  the new identidad / cuerpo onboarding screens. */
+  ctaPill?: boolean
 }
 
 export function WizardLayout({
@@ -33,6 +37,7 @@ export function WizardLayout({
   continueLabel = 'Continuar →',
   loading = false,
   errorMessage = null,
+  ctaPill = false,
 }: Props) {
   const router = useRouter()
 
@@ -43,6 +48,13 @@ export function WizardLayout({
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {/* Per-screen cosmic backdrop. Used to be in the layout root
+          shared across all screens, but the Stack's slide_from_right
+          + transparent contentStyle let the previous screen show
+          through during the 240 ms slide. Wrapping each screen with
+          its own backdrop + an opaque contentStyle means each screen
+          covers its neighbour cleanly during transitions. */}
+      <WizardBackdrop />
       <View style={styles.progressWrap}>
         <ProgressBar current={step} total={totalSteps} />
       </View>
@@ -71,6 +83,7 @@ export function WizardLayout({
           onPress={onContinue}
           disabled={!canContinue}
           loading={loading}
+          pill={ctaPill}
         />
       </View>
     </SafeAreaView>
@@ -78,6 +91,10 @@ export function WizardLayout({
 }
 
 const styles = StyleSheet.create({
+  // Opaque page bg so the screen covers its neighbour during the
+  // Stack's slide transition. The backdrop renders on top of this
+  // (absolutely positioned) and the screen content renders on top of
+  // the backdrop.
   safe: { flex: 1, backgroundColor: colors.bg },
   progressWrap: { paddingHorizontal: 24, paddingTop: 12 },
   backWrap: { paddingHorizontal: 24, paddingTop: 18, paddingBottom: 4 },

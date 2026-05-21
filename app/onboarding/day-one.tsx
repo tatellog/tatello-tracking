@@ -1,58 +1,101 @@
 import { useRouter } from 'expo-router'
+import { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useBriefContext } from '@/features/brief/hooks'
-import { DayOneTask, OrnamentShape, ProfileSummaryCard } from '@/features/onboarding/components'
-import { PhotoCaptureCard } from '@/features/onboarding/photos/components/PhotoCaptureCard'
-import { usePhotosToday, type PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
+import { DayOneTask, WizardBackdrop } from '@/features/onboarding/components'
+import { type MonthlyFocus } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { ZODIAC, ZodiacFigure, zodiacFromDate, type ZodiacSign } from '@/features/tabs/zodiac'
 import { markVisitedDayOne } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
 const TASKS: { num: number; text: string }[] = [
-  { num: 1, text: 'Marca tu primer entreno cuando lo termines.' },
-  { num: 2, text: 'Registra tu primera comida del día.' },
-  { num: 3, text: 'Vuelve mañana para sellar tu segundo cuadrito.' },
+  {
+    num: 1,
+    text: 'Registra tu primera comida del día. La señal más rápida que Stelar lee.',
+  },
+  {
+    num: 2,
+    text: 'Marca tu primer entreno cuando lo termines, aunque sea caminar.',
+  },
+  {
+    num: 3,
+    text: 'Vuelve mañana. El segundo día de lectura es donde Stelar empieza a verte.',
+  },
 ]
 
+/** Phrases the recap card uses when listing what Stelar already
+ *  knows from the wizard. Same vocabulary as the reveal so the
+ *  Día 1 lands as continuation, not as a new screen. */
+const FOCUS_RECAP: Record<MonthlyFocus, string> = {
+  weight: 'quieres bajar de peso',
+  energy: 'quieres más energía',
+  sleep: 'quieres dormir mejor',
+  food: 'quieres cambiar tu relación con la comida',
+  cycle: 'quieres conocer tu ciclo',
+  patterns: 'quieres entender tus patrones',
+  mind: 'quieres calmar la mente',
+  other: 'tienes una intención propia',
+}
+
 /*
- * Día 1 — the bridge between the wizard's celebration and the real
- * Home. Layered as a scroll because the photo card + tasks together
- * push past most viewport heights, and the user shouldn't feel they
- * have to read everything before the CTA is reachable.
+ * Día 1 — the bridge between the wizard and the real Home. After
+ * the reveal's cosmic moment, this page used to break the spell
+ * with a light pearl theme. Now it stays in the same dark+magenta
+ * register as the rest of onboarding, opens with a recap card that
+ * names back what Stelar captured (sunk-cost validation), then the
+ * 3 small tasks for tomorrow.
  *
- * The photo CTA opens the wizard at the first angle. usePhotosToday
- * keeps the slots in sync if the user comes back here after a partial
- * capture session.
+ * The body composition track (4 photos + initial weight) lives in
+ * Settings → Track corporal; not surfaced here so Día 1 stays
+ * focused on signals, not measurements.
  */
 export default function DayOneScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const { data: brief } = useBriefContext()
-  const { data: photos = [] } = usePhotosToday()
+
+  const firstName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
   const handleEnter = async () => {
     await markVisitedDayOne()
     router.replace('/(tabs)')
   }
 
-  const handleStartPhotos = () => {
-    router.push('/onboarding/photos/front')
-  }
-
-  // Single-angle capture: tapping a specific slot opens the wizard
-  // for just that angle and bounces back to Día 1 instead of walking
-  // through the remaining three. Use case: user already captured
-  // front, wants to retake side_left without re-doing the others.
-  const handleSlotPress = (angle: PhotoAngle) => {
-    router.push(`/onboarding/photos/${angle}?single=true`)
-  }
+  // Build the recap list of what Stelar already knows. Each line is
+  // a fact the user just confirmed in the wizard; the card
+  // validates the 11 steps of input by surfacing them back. The
+  // sign line includes the actual zodiac glyph so the recap reads
+  // visually, not just textually.
+  type Row = { label: string; value: string } | { label: string; value: string; zodiac: ZodiacSign }
+  const recapLines = useMemo<Row[]>(() => {
+    const out: Row[] = []
+    if (profile?.date_of_birth) {
+      const sign = zodiacFromDate(profile.date_of_birth)
+      out.push({ label: 'TU SIGNO', value: ZODIAC[sign].label, zodiac: sign })
+    }
+    if (
+      profile?.cycle_situation === 'menstruates' ||
+      profile?.cycle_situation === 'contraception'
+    ) {
+      out.push({ label: 'TU CICLO', value: 'leyéndose mes a mes' })
+    }
+    const w = brief?.latest_measurement?.weight_kg
+    if (w != null) {
+      out.push({ label: 'TU BASE', value: `${w.toFixed(1)} kg` })
+    }
+    const f = (profile?.monthly_focus as MonthlyFocus | null) ?? null
+    if (f) {
+      out.push({ label: 'TU FOCO', value: FOCUS_RECAP[f] })
+    }
+    return out
+  }, [profile, brief])
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <OrnamentShape variant="tl-small" />
-
+      <WizardBackdrop />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -60,30 +103,36 @@ export default function DayOneScreen() {
       >
         <Text style={styles.eyebrow}>Tu primer día</Text>
         <Text style={styles.title}>
-          Hoy <Text style={styles.titleEmphasis}>empieza</Text>.
+          {firstName}, <Text style={styles.titleEm}>hoy empieza</Text>.
         </Text>
-        <Text style={styles.sub}>Aquí está lo que te hará despegar.</Text>
+        <Text style={styles.sub}>Tres pasos para que Stelar arme su primera lectura.</Text>
 
-        {profile ? (
-          <View style={styles.cards}>
-            <ProfileSummaryCard
-              profile={profile}
-              weightKg={brief?.latest_measurement?.weight_kg ?? null}
-            />
-
-            <PhotoCaptureCard
-              photos={photos}
-              onStartCapture={handleStartPhotos}
-              onSlotPress={handleSlotPress}
-            />
-
-            <View style={styles.tasksList}>
-              {TASKS.map((task) => (
-                <DayOneTask key={task.num} num={task.num} text={task.text} />
+        {/* Recap — "Stelar ya sabe esto de vos". Validates the 11
+            wizard inputs by naming them back as facts Stelar holds. */}
+        {recapLines.length > 0 ? (
+          <View style={styles.recapCard}>
+            <Text style={styles.recapEyebrow}>Stelar ya sabe esto de ti</Text>
+            <View style={styles.recapList}>
+              {recapLines.map((row) => (
+                <View key={row.label} style={styles.recapRow}>
+                  <Text style={styles.recapLabel}>{row.label}</Text>
+                  <View style={styles.recapValueWrap}>
+                    {'zodiac' in row ? (
+                      <ZodiacFigure sign={row.zodiac} size={20} color={colors.magenta} />
+                    ) : null}
+                    <Text style={styles.recapValue}>{row.value}</Text>
+                  </View>
+                </View>
               ))}
             </View>
           </View>
         ) : null}
+
+        <View style={styles.tasksList}>
+          {TASKS.map((task) => (
+            <DayOneTask key={task.num} num={task.num} text={task.text} />
+          ))}
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -92,9 +141,9 @@ export default function DayOneScreen() {
           style={styles.cta}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Entrar a la app"
+          accessibilityLabel="Entrar a tu órbita"
         >
-          <Text style={styles.ctaLabel}>Entrar a la app →</Text>
+          <Text style={styles.ctaLabel}>Entrar a tu órbita →</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -104,66 +153,113 @@ export default function DayOneScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 22,
-    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingTop: 18,
     paddingBottom: 24,
   },
   eyebrow: {
-    fontFamily: typography.uiSemi,
-    fontSize: 10,
-    letterSpacing: 2.4,
+    fontFamily: typography.uiBold,
+    fontSize: 10.5,
+    letterSpacing: 2.5,
     textTransform: 'uppercase',
-    color: colors.mauveDeep,
-    marginBottom: 8,
+    color: colors.magenta,
+    marginBottom: 12,
   },
   title: {
-    fontFamily: typography.display,
-    fontSize: 36,
+    fontFamily: typography.displayHeavy,
+    fontSize: 34,
     letterSpacing: -1.4,
     lineHeight: 38,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
-  titleEmphasis: {
-    fontFamily: typography.displaySemi,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.inkPrimary,
+  titleEm: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 34,
+    color: colors.magenta,
+    letterSpacing: -1,
   },
   sub: {
-    marginTop: 8,
-    fontFamily: typography.ui,
-    fontSize: 13,
-    lineHeight: 20,
-    color: colors.labelMuted,
-    marginBottom: 24,
+    marginTop: 12,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.bone,
   },
-  cards: {
-    gap: 0,
+  recapCard: {
+    marginTop: 26,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
-  tasksList: {
+  recapEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: colors.magenta,
+  },
+  recapList: {
+    marginTop: 12,
+    gap: 12,
+  },
+  recapRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  recapLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.8,
+    color: colors.niebla,
+    flexShrink: 0,
+  },
+  recapValueWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 8,
   },
+  recapValue: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 14.5,
+    color: colors.leche,
+    textAlign: 'right',
+  },
+  tasksList: {
+    marginTop: 24,
+    gap: 10,
+  },
   footer: {
-    paddingHorizontal: 22,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   cta: {
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctaLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: 15,
-    letterSpacing: 0.3,
-    color: colors.pearlBase,
+    fontFamily: typography.uiBold,
+    fontSize: 14,
+    letterSpacing: 0.5,
+    color: '#FFFFFF',
   },
 })

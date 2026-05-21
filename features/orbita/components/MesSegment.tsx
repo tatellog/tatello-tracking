@@ -7,6 +7,7 @@ import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
+import { useHasAnySignals } from '../hooks'
 import {
   buildFirstCycleVoz,
   MOCK_CICLO,
@@ -16,6 +17,7 @@ import {
   type Observation,
   type Patron,
 } from '../mock'
+import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { ObservationChart } from './ObservationChart'
 import { TuCielo, type Satellite } from './TuCielo'
@@ -53,6 +55,7 @@ export function MesSegment() {
   const ciclo = MOCK_CICLO
   const isFirstCycle = ciclo.cycleNumber === 1
   const remaining = Math.max(0, ciclo.length - ciclo.day)
+  const { data: hasAny } = useHasAnySignals()
 
   // Cycle-1 only: which observation the user has tapped open. Default
   // to the peak so the chart shows on first paint — the gesture
@@ -104,6 +107,32 @@ export function MesSegment() {
     ? `tu primer ciclo en ${ciclo.phase.toLowerCase()}`
     : `tu ciclo en ${ciclo.phase.toLowerCase()}`
   const archetypeEmphasis = ciclo.phase.toLowerCase()
+
+  // Empty-state branch: hide the satellites + readout + voz. The BH
+  // hero still renders (visual identity of Mes) but with empty
+  // satellites so the eye doesn't see fake patterns yet.
+  if (hasAny === false) {
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+        <View style={styles.header}>
+          <EmText
+            text="tu primer ciclo"
+            emphasis="primer ciclo"
+            style={styles.archetype}
+            emStyle={styles.archetypeEm}
+          />
+        </View>
+        <View style={styles.diagram}>
+          <TuCielo ciclo={ciclo} satellites={[]} onSatellitePress={undefined} />
+        </View>
+        <EmptySegmentCard
+          eyebrow="El cielo se forma día a día"
+          body="Stelar no inventa patrones. Necesita verte primero — al menos un día con algo registrado."
+          hint="A partir del segundo ciclo, Stelar empieza a confirmar lo que se repite."
+        />
+      </Animated.View>
+    )
+  }
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>

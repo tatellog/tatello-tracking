@@ -17,6 +17,10 @@ type Props = {
   marginTop?: number
   marginBottom?: number
   accessibilityLabel?: string
+  /** Pill shape (border-radius 100) instead of the default soft rect.
+   *  Used by the new identidad / cuerpo onboarding screens whose
+   *  language is rounder than the rest of the wizard. */
+  pill?: boolean
 }
 
 export function PrimaryCta({
@@ -29,6 +33,7 @@ export function PrimaryCta({
   marginTop = 0,
   marginBottom = 0,
   accessibilityLabel,
+  pill = false,
 }: Props) {
   const inactive = disabled || loading
   const isGhost = variant === 'ghost'
@@ -52,6 +57,7 @@ export function PrimaryCta({
         isSoft && styles.btnSoft,
         isDestructive && styles.btnDestructive,
         inactive && !isGhost && !isSoft && styles.btnDisabled,
+        pill && styles.btnPill,
         { marginTop, marginBottom },
       ]}
       accessibilityRole="button"
@@ -124,6 +130,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard2,
     shadowOpacity: 0,
     elevation: 0,
+  },
+  // Pill — full rounded shape.
+  btnPill: {
+    borderRadius: 100,
   },
   label: {
     fontFamily: typography.uiBold,

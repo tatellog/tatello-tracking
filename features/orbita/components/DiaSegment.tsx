@@ -6,7 +6,7 @@ import { EmText } from '@/components/EmText'
 import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
-import { useTodaySignals } from '../hooks'
+import { useHasAnySignals, useTodaySignals } from '../hooks'
 import {
   countTones,
   deriveDimensions,
@@ -17,6 +17,7 @@ import {
 } from '../logic'
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
 import { AccionDelDia } from './AccionDelDia'
+import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
 import { StelarHeadline } from './StelarHeadline'
@@ -39,6 +40,7 @@ import { VozDeStelar } from './VozDeStelar'
  */
 export function DiaSegment() {
   const { data } = useTodaySignals()
+  const { data: hasAny } = useHasAnySignals()
   const signals = data ?? null
   const dimensions = deriveDimensions(signals)
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
@@ -48,6 +50,37 @@ export function DiaSegment() {
   const selectedTone = selected ? dimensionTone(selected.brightness) : null
   const evidence = selected ? dimensionEvidence(selected.key, signals) : []
   const reveal = useFirstReadReveal()
+
+  // Empty-state branch: hide every MOCK-driven prose (archetype,
+  // headline, voz, acción) and show a single coach-voice card that
+  // tells the user what to register. The orbital still renders so
+  // the visual identity of Día stays consistent.
+  if (hasAny === false) {
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+        <View style={styles.header}>
+          <EmText
+            text="tu primer día"
+            emphasis="primer día"
+            style={styles.archetype}
+            emStyle={styles.archetypeEm}
+          />
+        </View>
+        <View style={styles.diagram}>
+          <OrbitalSystem
+            dimensions={dimensions}
+            selectedKey={selectedKey}
+            onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
+          />
+        </View>
+        <EmptySegmentCard
+          eyebrow="Stelar te empieza a leer"
+          body="Registra algo — una comida, tu sueño de anoche, un entreno, un vaso de agua. Cualquier señal vale."
+          hint="Cuando haya algo registrado, esta pantalla se transforma en tu lectura."
+        />
+      </Animated.View>
+    )
+  }
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>

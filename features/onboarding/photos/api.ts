@@ -40,11 +40,21 @@ export async function processAndUploadFromUri(
   const userId = await requireUserId()
 
   const compressed = Platform.OS === 'web' ? await compressOnWeb(uri) : await compressOnNative(uri)
+  // Guard against the silent-0-byte upload: if the compressed buffer
+  // is empty something went wrong in the pipeline. Better to surface
+  // an error here than ship a phantom record + 0-byte storage object.
+  if (compressed.byteSize === 0) {
+    throw new Error('La imagen quedó vacía al procesarla.')
+  }
   const path = `${userId}/${Date.now()}_${angle}.jpg`
 
+  // React Native's fetch().blob() uploads 0 bytes to Supabase Storage
+  // — the SDK reads zero from the Blob. An ArrayBuffer carries the
+  // real bytes, which is the documented RN pattern (same fix lives in
+  // profile/api.ts uploadAvatar).
   const { error: uploadErr } = await supabase.storage
     .from('progress-photos')
-    .upload(path, compressed.blob, {
+    .upload(path, compressed.bytes, {
       contentType: 'image/jpeg',
       cacheControl: '3600',
     })
@@ -56,7 +66,7 @@ export async function processAndUploadFromUri(
     storage_path: path,
     width: compressed.width,
     height: compressed.height,
-    byte_size: compressed.blob.size,
+    byte_size: compressed.byteSize,
   })
   if (insertErr) {
     // Best-effort cleanup: if the metadata row fails, the storage
@@ -69,11 +79,11 @@ export async function processAndUploadFromUri(
     storage_path: path,
     width: compressed.width,
     height: compressed.height,
-    byte_size: compressed.blob.size,
+    byte_size: compressed.byteSize,
   }
 }
 
-type Compressed = { blob: Blob; width: number; height: number }
+type Compressed = { bytes: ArrayBuffer; byteSize: number; width: number; height: number }
 
 async function compressOnNative(uri: string): Promise<Compressed> {
   const processed = await ImageManipulator.manipulateAsync(
@@ -81,8 +91,14 @@ async function compressOnNative(uri: string): Promise<Compressed> {
     [{ resize: { width: MAX_WIDTH } }],
     { compress: JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG },
   )
-  const blob = await fetch(processed.uri).then((r) => r.blob())
-  return { blob, width: processed.width, height: processed.height }
+  // ArrayBuffer, not Blob — see comment in processAndUploadFromUri.
+  const bytes = await fetch(processed.uri).then((r) => r.arrayBuffer())
+  return {
+    bytes,
+    byteSize: bytes.byteLength,
+    width: processed.width,
+    height: processed.height,
+  }
 }
 
 /*
@@ -137,6 +153,8 @@ async function compressOnWeb(uri: string): Promise<Compressed> {
       JPEG_QUALITY,
     )
   })
-
-  return { blob, width: outW, height: outH }
+  // Browsers handle Blob → ArrayBuffer cleanly; unifying the upload
+  // path on bytes keeps the Native/Web call sites identical.
+  const bytes = await blob.arrayBuffer()
+  return { bytes, byteSize: bytes.byteLength, width: outW, height: outH }
 }
