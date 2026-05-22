@@ -22,6 +22,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg'
 
+import { phaseForDay, type CyclePhase } from '@/features/cycle/phase'
 import { colors, typography } from '@/theme'
 
 import { Cosmos } from './Cosmos'
@@ -77,6 +78,16 @@ const RY_BACK = [88, 65, 44] as const
 const EH = 26 // event horizon radius
 const PHOTON_BASE = EH * 1.08
 const EINSTEIN_R = EH * 1.55 // outer Einstein ring — second halo of light
+
+// The accretion disk's light rises and falls with the cycle phase —
+// quietest in the menstrual rest, fullest at ovulation. A gentle
+// opacity modulation across the whole disk.
+const PHASE_DISK_GLOW: Record<CyclePhase, number> = {
+  menstrual: 0.82,
+  folicular: 0.93,
+  ovulatoria: 1,
+  lutea: 0.9,
+}
 const DISK_TILT_DEG = -8 // breaks the perfect horizontal symmetry
 const HIT = 56 // satellite tap-target box
 
@@ -245,6 +256,10 @@ export function TuCielo({
    *  informational, not navigable. */
   onSatellitePress?: (id: string) => void
 }) {
+  // The disk's glow follows the cycle phase (derived from the day in
+  // cycle), so the hero brightens and quiets as the cycle turns.
+  const diskGlow = PHASE_DISK_GLOW[phaseForDay(ciclo.day, ciclo.length)]
+
   const t = useSharedValue(0) // 5 s — photon ring, today's pulse, jet
   const drift = useSharedValue(0) // 44 s — nebula starfield drift
   const streakClock = useSharedValue(0) // 8 s — Doppler streak pulse
@@ -494,8 +509,9 @@ export function TuCielo({
             into a perfect horizontal symmetry. Contains the lensed
             arc, its day-specks and the Doppler streaks emerging
             from the disk's edge-on tips. Drawn BEFORE the void so
-            the back content can be partially occluded by it. */}
-        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`}>
+            the back content can be partially occluded by it.
+            `diskGlow` rises and falls with the cycle phase. */}
+        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`} opacity={diskGlow}>
           {/* Lensed back arc — three layers, outer-soft to inner-sharp.
               ry tops out at 88, so the arc towers ~62 px above the
               void's edge. That gap is the Gargantua signature. */}
@@ -612,8 +628,9 @@ export function TuCielo({
         />
 
         {/* FRONT-HALF group — same tilt so it lines up with the back
-            arc edge-on points. Drawn AFTER the void, on top. */}
-        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`}>
+            arc edge-on points. Drawn AFTER the void, on top.
+            `diskGlow` rises and falls with the cycle phase. */}
+        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`} opacity={diskGlow}>
           {/* Front arc — much flatter than the back. Three layers. */}
           {RY_FRONT.map((ry, i) => (
             <Path
