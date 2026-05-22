@@ -4,35 +4,24 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Circle, Line } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { useProfile } from '@/features/profile/hooks'
+import {
+  ACTIVE_CYCLE_SITUATIONS,
+  cyclePhaseFromPeriod,
+  type CyclePhase,
+  DEFAULT_CYCLE_LENGTH,
+} from '@/features/cycle/phase'
 import { type CycleSituation } from '@/features/profile/api'
+import { useProfile } from '@/features/profile/hooks'
 import { colors, typography } from '@/theme'
 
 import { useLastPeriodStart } from '../hooks'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const DEFAULT_CYCLE_LENGTH = 28
-
-// Cycle situations that have an active monthly cycle. Pregnant /
-// postmenopause / skip all hide this card.
-const ACTIVE: readonly CycleSituation[] = ['menstruates', 'contraception', 'irregular']
-
-type Phase = {
-  key: 'menstrual' | 'folicular' | 'ovulatoria' | 'lutea'
-  label: string
-}
-
-/** Rough phase split — same conventional bands a paper chart uses.
- *  We're not predicting ovulation precisely, just naming where the
- *  user is in the arc. */
-function phaseForDay(day: number, length: number): Phase {
-  if (day <= 5) return { key: 'menstrual', label: 'Menstrual' }
-  // Ovulatory window: roughly 4 days centred on the day-before-mid.
-  const ovStart = Math.floor(length / 2) - 2
-  const ovEnd = ovStart + 4
-  if (day < ovStart) return { key: 'folicular', label: 'Folicular' }
-  if (day <= ovEnd) return { key: 'ovulatoria', label: 'Ovulatoria' }
-  return { key: 'lutea', label: 'Lútea' }
+// Spanish display label for each phase key.
+const PHASE_LABEL: Record<CyclePhase, string> = {
+  menstrual: 'Menstrual',
+  folicular: 'Folicular',
+  ovulatoria: 'Ovulatoria',
+  lutea: 'Lútea',
 }
 
 /* ─────────────────────── Component ─────────────────────── */
@@ -56,23 +45,18 @@ export function CycleCard() {
   const { data: lastPeriod } = useLastPeriodStart()
 
   const cycleSituation = profile?.cycle_situation as CycleSituation | null | undefined
-  const isActive = !!cycleSituation && ACTIVE.includes(cycleSituation)
+  const isActive = !!cycleSituation && ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
   const cycleLength = profile?.cycle_length_days ?? DEFAULT_CYCLE_LENGTH
 
   const state = useMemo(() => {
-    if (!isActive || !lastPeriod) return null
-    const startMs = new Date(lastPeriod).getTime()
-    if (Number.isNaN(startMs)) return null
-    const elapsedDays = Math.floor((Date.now() - startMs) / DAY_MS)
-    // Wrap into the current cycle (in case multiple cycles passed
-    // without the user logging a fresh start).
-    const day = (((elapsedDays % cycleLength) + cycleLength) % cycleLength) + 1
-    const daysToNext = cycleLength - day + 1
+    if (!isActive) return null
+    const cp = cyclePhaseFromPeriod(lastPeriod, cycleLength)
+    if (!cp) return null
     return {
-      day,
+      day: cp.day,
       length: cycleLength,
-      phase: phaseForDay(day, cycleLength),
-      daysToNext,
+      phaseKey: cp.phase,
+      daysToNext: cycleLength - cp.day + 1,
     }
   }, [isActive, lastPeriod, cycleLength])
 
@@ -105,7 +89,7 @@ export function CycleCard() {
         <View style={styles.headRow}>
           <View>
             <Text style={styles.dayNum}>Día {state.day}</Text>
-            <Text style={styles.phaseLabel}>{state.phase.label}</Text>
+            <Text style={styles.phaseLabel}>{PHASE_LABEL[state.phaseKey]}</Text>
           </View>
           <View style={styles.headRight}>
             <Text style={styles.headRightLabel}>Próximo período</Text>
@@ -115,7 +99,7 @@ export function CycleCard() {
           </View>
         </View>
 
-        <Timeline day={state.day} length={state.length} phaseKey={state.phase.key} />
+        <Timeline day={state.day} length={state.length} phaseKey={state.phaseKey} />
       </View>
     </Animated.View>
   )
@@ -132,7 +116,7 @@ function Timeline({
 }: {
   day: number
   length: number
-  phaseKey: Phase['key']
+  phaseKey: CyclePhase
 }) {
   const W = 340
   const H = 28
