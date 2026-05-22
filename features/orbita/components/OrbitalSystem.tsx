@@ -44,8 +44,14 @@ import { Cosmos } from './Cosmos'
 const W = 372
 const CX = W / 2
 const CY = W / 2
-const MAX_R = 140
 const HIT = 66 // tap-target box, in px
+
+// The visible window. It starts above y=0 so the topmost dimension
+// (MENTE sits near the canvas top) keeps its full bloom — plus its
+// breath and tap-pop headroom — inside the frame instead of clipping
+// against the edge. The height extends to match so nothing squishes.
+const VB_TOP = -28
+const VB_H = 382
 
 // Three orbits — modelled after the triple-star reference photo. The
 // shapes are hand-tuned for each orbit's character (tall vertical,
@@ -167,7 +173,7 @@ export function OrbitalSystem({
 
   return (
     <View style={styles.wrap}>
-      <Svg viewBox={`0 0 ${W} ${W}`} style={styles.svg}>
+      <Svg viewBox={`0 ${VB_TOP} ${W} ${VB_H}`} style={styles.svg}>
         <Defs>
           {/* The central star — white-hot fading to magenta. */}
           <RadialGradient id="orb-self" cx="50%" cy="50%" r="60%">
@@ -243,7 +249,13 @@ export function OrbitalSystem({
             Haptics.selectionAsync().catch(() => {})
             onSelect(d.key)
           }}
-          style={[styles.hit, { left: `${(pos.x / W) * 100}%`, top: `${(pos.y / W) * 100}%` }]}
+          style={[
+            styles.hit,
+            {
+              left: `${(pos.x / W) * 100}%`,
+              top: `${((pos.y - VB_TOP) / VB_H) * 100}%`,
+            },
+          ]}
           accessibilityRole="button"
           accessibilityState={{ selected: d.key === selectedKey }}
           accessibilityLabel={d.label}
@@ -610,7 +622,9 @@ function StarNode({
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
-    aspectRatio: 1,
+    // Matches the viewBox aspect exactly so the SVG fills the box
+    // with no letterbox and no squish.
+    aspectRatio: W / VB_H,
   },
   svg: {
     width: '100%',

@@ -70,8 +70,12 @@ function ShootingStar({ t }: { t: SharedValue<number> }) {
   )
 }
 
-// Must match OrbitalSystem's viewBox.
+// Must match OrbitalSystem's viewBox width.
 const W = 372
+// The starfield is generated taller than W so it fills OrbitalSystem's
+// viewBox even with its vertical headroom (VB_TOP −28 → VB bottom 354).
+// Stars span [−FIELD_PAD, W + FIELD_PAD] vertically.
+const FIELD_PAD = 48
 
 /* Nebula clouds — soft colour drifting behind everything. Each is a
  * stack of fading circles: a hand-built radial falloff, since an
@@ -140,7 +144,7 @@ function buildStarfield(): Star[] {
       const f = Math.abs(Math.sin(i * 51.17 + 9.1))
       out.push({
         x: (h1 - Math.floor(h1)) * W,
-        y: (h2 - Math.floor(h2)) * W,
+        y: -FIELD_PAD + (h2 - Math.floor(h2)) * (W + FIELD_PAD * 2),
         r: tier.rMin + f * (tier.rMax - tier.rMin),
         op: tier.oMin + f * (tier.oMax - tier.oMin),
         halo: tIdx === 2 && f > 0.55,
