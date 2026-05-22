@@ -158,8 +158,20 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
       </View>
     )
   }
-  // Calories use a "budget remaining" model — start full, count down.
-  const caloriesRemaining = Math.max(0, ctx.targets.calories - ctx.today_macros.calories)
+  // Calories — a speedometer gauge that exceeds when consumed > target.
+  // The big number is what you've eaten today; the subtitle adapts to
+  // under / at / over the target. Going over is informational (warm
+  // amber, not red), so it's visible without being a verdict.
+  const caloriesConsumed = ctx.today_macros.calories
+  const caloriesTarget = ctx.targets.calories
+  const calOver = Math.max(0, Math.round(caloriesConsumed - caloriesTarget))
+  const calRemaining = Math.max(0, Math.round(caloriesTarget - caloriesConsumed))
+  const calSubtitle =
+    calOver > 0
+      ? `+${calOver} kcal sobre tu meta`
+      : calRemaining > 0
+        ? `de ${caloriesTarget} kcal · faltan ${calRemaining}`
+        : `de ${caloriesTarget} kcal · llegaste`
   return (
     <View style={[styles.slide, styles.macroRow]}>
       <RingCard
@@ -172,13 +184,13 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
         ringDelay={400}
       />
       <RingCard
-        budget
+        speedometer
         label="Calorías"
-        value={caloriesRemaining}
-        target={ctx.targets.calories}
-        formatted={Math.round(caloriesRemaining).toString()}
-        unitSuffix="kcal restantes"
-        ringColor={colors.bone}
+        value={caloriesConsumed}
+        target={caloriesTarget}
+        formatted={Math.round(caloriesConsumed).toString()}
+        unitSuffix={calSubtitle}
+        ringColor={colors.magenta}
         ringDelay={600}
         small
       />

@@ -4,6 +4,7 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
 import { MacroRing } from './MacroRing'
+import { SpeedometerRing } from './SpeedometerRing'
 
 type Props = {
   label: string
@@ -22,6 +23,13 @@ type Props = {
    *  number counts down. Disables the "empty translucent" treatment
    *  because value=0 here means "fully consumed", not "not started". */
   budget?: boolean
+  /** Speedometer mode: a 270° gauge whose fill exceeds into the
+   *  bottom 90° gap when `value > target`. `value` is the consumed
+   *  amount (not remaining). Used by calories so going over is
+   *  visible, not silently clamped. */
+  speedometer?: boolean
+  /** Overflow tint for speedometer mode — warm amber by default. */
+  overColor?: string
 }
 
 export function RingCard({
@@ -34,6 +42,8 @@ export function RingCard({
   small = false,
   ringDelay = 200,
   budget = false,
+  speedometer = false,
+  overColor,
 }: Props) {
   const ringSize = small ? 76 : 88
   // Empty state: when nothing's been logged in an *accumulating* card,
@@ -49,13 +59,24 @@ export function RingCard({
         {label}
       </EyebrowLabel>
       <View style={styles.row}>
-        <MacroRing
-          value={value}
-          target={target}
-          size={ringSize}
-          color={ringColor}
-          delay={ringDelay}
-        />
+        {speedometer ? (
+          <SpeedometerRing
+            value={value}
+            target={target}
+            size={ringSize}
+            color={ringColor}
+            overColor={overColor}
+            delay={ringDelay}
+          />
+        ) : (
+          <MacroRing
+            value={value}
+            target={target}
+            size={ringSize}
+            color={ringColor}
+            delay={ringDelay}
+          />
+        )}
         <View style={styles.numberStack}>
           <Text
             style={[styles.value, small && styles.valueSmall, isEmpty && styles.valueEmpty]}
