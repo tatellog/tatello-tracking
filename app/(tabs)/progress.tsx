@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
 import { CycleCard } from '@/features/progress/components/CycleCard'
@@ -25,11 +27,18 @@ import {
   computeDelta,
   computeTrend,
   formatTrendCopy,
+  smoothWeightPoints,
   toWeightPoints,
   type Trend,
   type WeightPoint,
 } from '@/features/progress/logic'
-import { CoachLine, PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
+import {
+  CoachLine,
+  PrimaryCta,
+  SectionHeader,
+  SkyBackground,
+  TabHeader,
+} from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
 type Period = '7D' | '30D' | '90D' | 'TODO'
@@ -60,18 +69,36 @@ const AnimatedG = Animated.createAnimatedComponent(G)
 export default function ProgressScreen() {
   const router = useRouter()
   const [period, setPeriod] = useState<Period>('30D')
+  // The before/after diptych is collapsed by default — viewing it is
+  // a deliberate choice, not a passive daily exposure.
+  const [photosOpen, setPhotosOpen] = useState(false)
   const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
+  const { data: profile } = useProfile()
 
   const points = useMemo(
     () => toWeightPoints(measurementsQuery.data ?? []),
     [measurementsQuery.data],
   )
-  const delta = useMemo(() => computeDelta(points), [points])
-  const trend = useMemo(() => computeTrend(points), [points])
+  // Weight is shown smoothed — a trailing 7-day moving average — so a
+  // single noisy weigh-in never becomes the trend, the delta or the
+  // headline number. The raw `points` are kept only for the count.
+  const smoothed = useMemo(() => smoothWeightPoints(points), [points])
+  const delta = useMemo(() => computeDelta(smoothed), [smoothed])
+  const trend = useMemo(() => computeTrend(smoothed), [smoothed])
 
-  const first = points[0]
-  const last = points[points.length - 1]
+  const first = smoothed[0]
+  const last = smoothed[smoothed.length - 1]
   const count = points.length
+
+  // Cycle phase — used to caption the weight chart so a luteal
+  // water-weight bump reads as biology, not regression.
+  const cycle = useCyclePhase()
+
+  // The user's declared focus for the month. When it isn't weight,
+  // the "Tu cuerpo" section says so — the number is reference, not a
+  // goal they should be chasing.
+  const focusIsWeight = profile?.monthly_focus === 'weight'
+  const hasFocus = profile?.monthly_focus != null
 
   const goLogMeasurement = () => router.push('/log-measurement')
   const hasTrajectory = count >= 2
@@ -100,6 +127,11 @@ export default function ProgressScreen() {
           <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
             Tu cuerpo
           </EyebrowLabel>
+          {hasFocus && !focusIsWeight ? (
+            <Text style={styles.focusNote}>
+              Tu enfoque este mes no es el peso — esto es solo una referencia, sin metas.
+            </Text>
+          ) : null}
           {hasTrajectory ? (
             <>
               <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.hero}>
@@ -136,9 +168,22 @@ export default function ProgressScreen() {
               </Animated.View>
 
               <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartSection}>
-                <Text style={styles.chartCaption}>{count} mediciones</Text>
-                <TrajectoryChart points={points} trend={trend} />
+                <Text style={styles.chartCaption}>{count} mediciones · media de 7 días</Text>
+                <TrajectoryChart points={smoothed} trend={trend} />
               </Animated.View>
+
+              {/* Cycle context — weight genuinely shifts with the
+                  cycle's water balance; the chart says so, so a
+                  luteal bump isn't read as a setback. */}
+              {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
+                <Animated.View entering={FadeIn.duration(360).delay(290)}>
+                  <Text style={styles.cycleNote}>
+                    {cycle.phase === 'lutea'
+                      ? 'Fase lútea — el peso sube por agua estos días. Es normal.'
+                      : 'Estás menstruando — el peso se mueve por agua, no por grasa.'}
+                  </Text>
+                </Animated.View>
+              ) : null}
 
               {trend ? (
                 <Animated.View entering={FadeIn.duration(360).delay(320)}>
@@ -183,9 +228,26 @@ export default function ProgressScreen() {
           <View style={styles.divider} />
           <CycleCard />
 
-          {/* ── Registro visual — antes/después ── */}
+          {/* ── Registro visual — antes/después. Collapsed by
+              default: a before/after diptych invites body-comparison,
+              so opening it is a deliberate choice. ── */}
           <View style={styles.divider} />
-          <BeforeAfterPhotos />
+          <Pressable
+            onPress={() => setPhotosOpen((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: photosOpen }}
+          >
+            <SectionHeader
+              label="Tu cambio visual"
+              meta={photosOpen ? 'Ocultar' : 'Ver'}
+              metaEmphasis={photosOpen ? 'Ocultar' : 'Ver'}
+            />
+          </Pressable>
+          {photosOpen ? (
+            <Animated.View entering={FadeIn.duration(220)}>
+              <BeforeAfterPhotos hideEyebrow />
+            </Animated.View>
+          ) : null}
 
           {/* ── Entreno de hoy (sólo si trainedToday) ── */}
           <View style={styles.divider} />
@@ -533,6 +595,26 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 0.3,
     marginBottom: 6,
+  },
+  // Cycle context under the chart — quiet, reassuring, serif italic.
+  cycleNote: {
+    marginTop: 10,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.niebla,
+  },
+  // Shown in "Tu cuerpo" when the month's focus isn't weight — the
+  // section is reference, not a target to chase.
+  focusNote: {
+    marginTop: -2,
+    marginBottom: 6,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.niebla,
   },
   chartEmpty: {
     paddingVertical: 26,

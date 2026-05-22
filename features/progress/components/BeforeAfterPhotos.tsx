@@ -199,7 +199,7 @@ function PhotoColumn({
  * range). Empty / single states render the same diptych with dashed
  * placeholders, each tappable to upload a front photo.
  */
-export function BeforeAfterPhotos() {
+export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   const { data } = useBeforeAfterPhotos()
   const measurements = useMeasurements(null)
   const takePhoto = useTakePhoto()
@@ -284,9 +284,13 @@ export function BeforeAfterPhotos() {
   // declares itself); the body changes by data state.
   return (
     <Animated.View entering={FadeIn.duration(360).delay(360)} style={styles.wrap}>
-      <EyebrowLabel tone="magenta" size={10} style={styles.sectionEyebrow}>
-        Tu cambio visual
-      </EyebrowLabel>
+      {/* The eyebrow is suppressed when a parent already provides the
+          section header (e.g. the Progreso collapsible toggle). */}
+      {hideEyebrow ? null : (
+        <EyebrowLabel tone="magenta" size={10} style={styles.sectionEyebrow}>
+          Tu cambio visual
+        </EyebrowLabel>
+      )}
 
       {/* Empty state — a single invitation card, not two dashed
           placeholders. With zero photos there's no "antes" nor an
@@ -335,21 +339,20 @@ export function BeforeAfterPhotos() {
         </>
       )}
 
-      {/* Promoted share button — full-width pill with the magenta tint
-          background when canShare. Previously a quiet right-aligned
-          link that read as a label, not a button; the share action is
-          the *whole point* of having both photos, so it now claims a
-          row of its own. */}
+      {/* Share — a quiet, right-aligned link, not a promoted pill.
+          A before/after diptych is private by default; sharing it
+          outward is an option the user can find, never the section's
+          headline call to action. */}
       {canShare ? (
         <TouchableOpacity
-          style={styles.shareBtnPromoted}
-          activeOpacity={0.7}
+          style={styles.shareBtn}
+          activeOpacity={0.6}
           onPress={() => setShareOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="Compartir mi cambio"
         >
           <ShareIcon />
-          <Text style={styles.shareLabelPromoted}>Compartir mi cambio</Text>
+          <Text style={styles.shareLabel}>Compartir mi cambio</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -488,9 +491,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.bone,
   },
-  // Quiet, label-led — discoverable without competing with the photos.
-  // Kept as a fallback style for any flow that wants the quiet variant
-  // (currently unused; the promoted pill below is the default).
+  // Quiet, label-led, right-aligned — a discoverable option that
+  // never competes with the photos. Sharing a before/after outward
+  // is the most diet-culture-coded gesture in the app; it stays a
+  // calm link, not a promoted call to action.
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -503,27 +507,5 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: 13,
     color: colors.magenta,
-  },
-  // Promoted variant — full-width magenta-tinted pill so the share
-  // action reads as a proper button. The diptych's whole point is to
-  // be shareable, so the CTA gets the same weight as a primary action.
-  shareBtnPromoted: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-    marginTop: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 22,
-    backgroundColor: colors.magentaTint2,
-    borderWidth: 1,
-    borderColor: 'rgba(214, 60, 130, 0.32)',
-  },
-  shareLabelPromoted: {
-    fontFamily: typography.uiBold,
-    fontSize: 13.5,
-    color: colors.magentaHot,
-    letterSpacing: 0.4,
   },
 })

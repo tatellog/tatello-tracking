@@ -20,6 +20,36 @@ export function toWeightPoints(measurements: BodyMeasurement[]): WeightPoint[] {
     .sort((a, b) => a.t - b.t)
 }
 
+const SMOOTH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
+/*
+ * Trailing 7-day moving average. Each point's weight is replaced by
+ * the mean of every measurement within the 7 days up to and
+ * including it.
+ *
+ * Body weight swings ±1–2 kg a day from water, food and cycle phase;
+ * a raw line (or a raw "today's number") turns that noise into
+ * emotional signal. The smoothed series is what the Progreso tab
+ * shows as the trend and the delta — what changed, not what the
+ * scale happened to say this morning.
+ *
+ * Input must be sorted ascending by `t` (toWeightPoints already is).
+ */
+export function smoothWeightPoints(points: WeightPoint[]): WeightPoint[] {
+  return points.map((p, i) => {
+    let sum = 0
+    let n = 0
+    for (let j = i; j >= 0; j -= 1) {
+      const q = points[j]
+      if (!q) continue
+      if (p.t - q.t > SMOOTH_WINDOW_MS) break
+      sum += q.weight
+      n += 1
+    }
+    return { t: p.t, weight: n > 0 ? sum / n : p.weight }
+  })
+}
+
 export type WeightDelta = {
   /** Diferencia en kg entre la última y la primera medida del rango. */
   abs: number
