@@ -4,14 +4,19 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
-import { MealComposer, SkyBackground, TabHeader, TonightSky } from '@/features/tabs/components'
+import {
+  CoachLine,
+  DaySky,
+  MealComposer,
+  SkyBackground,
+  TabHeader,
+} from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-/* Editorial coach line under the protein sky — it follows the day's
- * protein arc so the screen has a voice, not just figures. Same shape
- * as the Hoy tab's CoachLine: a sentence with one magenta-emphasised
- * word, set in serif italic. */
+/* Copy for the coach line under the protein sky — it follows the
+ * day's protein arc so the screen has a voice, not just figures. The
+ * shared <CoachLine> renders it; this just picks the sentence. */
 type SkyCopy = { before: string; emphasis: string; after: string }
 
 function skyCopy(pct: number, mealCount: number): SkyCopy {
@@ -28,17 +33,6 @@ function skyCopy(pct: number, mealCount: number): SkyCopy {
     return { before: 'Tu cielo va ', emphasis: 'tomando forma', after: '.' }
   }
   return { before: 'Cada comida ', emphasis: 'suma una estrella', after: '.' }
-}
-
-function CoachLine({ pct, mealCount }: { pct: number; mealCount: number }) {
-  const copy = skyCopy(pct, mealCount)
-  return (
-    <Text style={styles.coachLine}>
-      {copy.before}
-      <Text style={styles.coachLineEm}>{copy.emphasis}</Text>
-      {copy.after}
-    </Text>
-  )
 }
 
 export default function MealsScreen() {
@@ -63,6 +57,7 @@ export default function MealsScreen() {
   )
 
   const proteinPct = targets ? summary.protein / targets.protein_g : 0
+  const coachCopy = skyCopy(proteinPct, meals.length)
 
   return (
     <View style={styles.screen}>
@@ -78,14 +73,18 @@ export default function MealsScreen() {
 
           {targets ? (
             <>
-              <TonightSky
+              <DaySky
                 meals={meals}
                 proteinValue={summary.protein}
                 proteinTarget={targets.protein_g}
                 caloriesValue={summary.calories}
                 caloriesTarget={targets.calories}
               />
-              <CoachLine pct={proteinPct} mealCount={meals.length} />
+              <CoachLine
+                before={coachCopy.before}
+                emphasis={coachCopy.emphasis}
+                after={coachCopy.after}
+              />
             </>
           ) : (
             <Pressable
@@ -125,28 +124,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 48,
   },
-  // Editorial voice — serif italic with a magenta-emphasised word,
-  // matching the Hoy tab's coach line.
-  coachLine: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 16.5,
-    lineHeight: 24,
-    color: colors.bone,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  coachLineEm: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    color: colors.magenta,
-  },
+  // Empty state — same card vocabulary as the rest of the app
+  // (radius 16, hairline border) instead of the legacy radius-6 box.
   defineTargets: {
     backgroundColor: colors.bgCard,
     borderWidth: 1,
-    borderColor: colors.bruma,
-    borderRadius: 6,
-    padding: 14,
+    borderColor: colors.hairline,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
     marginBottom: 12,
   },
   defineTargetsLabel: {

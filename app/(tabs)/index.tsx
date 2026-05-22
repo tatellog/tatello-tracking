@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
@@ -23,6 +23,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import {
+  CoachLine,
   DayCheckIn,
   type DayState,
   LunarConstellation,
@@ -96,6 +97,9 @@ function TodayContent({ ctx, cadence }: ContentProps) {
 
   const [showCelebration, setShowCelebration] = useState(false)
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
+  // The 28-day strip is the constellation's data twin — collapsed by
+  // default so it doesn't compete with the hero constellation above.
+  const [weekOpen, setWeekOpen] = useState(false)
   // Drives the full-viewport magenta wash that accompanies the
   // constellation burst on each day-mark. Fires 0→1 over the same
   // duration as LunarConstellation's internal radialPulse so the
@@ -220,13 +224,34 @@ function TodayContent({ ctx, cadence }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(420)}>
-            <CoachLine count={trainedThisMonth} signLabel={signLabel} />
+            <CoachLine align="center" {...getCoachCopy(trainedThisMonth, signLabel)} />
           </Animated.View>
 
+          {/* "Tus 28 días" — the editable calendar twin of the
+              constellation, collapsed by default. The header doubles
+              as the toggle; the strip + hint reveal on tap. */}
           <Animated.View entering={enter(520)}>
-            <SectionHeader label="Tu mes" />
-            <Text style={styles.weekHint}>Desliza y toca un día para registrarlo.</Text>
-            <WeekStrip days={allDays} onToggle={handleToggleDay} justMarkedIdx={justMarkedIdx} />
+            <Pressable
+              onPress={() => setWeekOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: weekOpen }}
+            >
+              <SectionHeader
+                label="Tus 28 días"
+                meta={weekOpen ? 'Ocultar' : 'Ver detalle'}
+                metaEmphasis={weekOpen ? 'Ocultar' : 'Ver detalle'}
+              />
+            </Pressable>
+            {weekOpen ? (
+              <Animated.View entering={FadeIn.duration(220)}>
+                <Text style={styles.weekHint}>Desliza y toca un día para registrarlo.</Text>
+                <WeekStrip
+                  days={allDays}
+                  onToggle={handleToggleDay}
+                  justMarkedIdx={justMarkedIdx}
+                />
+              </Animated.View>
+            ) : null}
           </Animated.View>
 
           <Animated.View entering={enter(600)}>
@@ -324,17 +349,6 @@ function getCoachCopy(count: number, signLabel: string): CoachCopy {
   return { before: `Tu ${lower} `, emphasis: 'te espera', after: '.' }
 }
 
-function CoachLine({ count, signLabel }: { count: number; signLabel: string }) {
-  const copy = getCoachCopy(count, signLabel)
-  return (
-    <Text style={styles.coachLine}>
-      {copy.before}
-      <Text style={styles.coachLineEm}>{copy.emphasis}</Text>
-      {copy.after}
-    </Text>
-  )
-}
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -354,21 +368,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 36,
-  },
-  coachLine: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 18,
-    lineHeight: 26,
-    color: colors.bone,
-    textAlign: 'center',
-    marginHorizontal: 16,
-    marginTop: 4,
-  },
-  coachLineEm: {
-    color: colors.magenta,
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
   },
   weekHint: {
     fontFamily: typography.ui,

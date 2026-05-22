@@ -30,7 +30,7 @@ import {
   type Trend,
   type WeightPoint,
 } from '@/features/progress/logic'
-import { PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
+import { CoachLine, PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
 type Period = '7D' | '30D' | '90D' | 'TODO'
@@ -40,6 +40,16 @@ const PERIOD_DAYS: Record<Period, number | null> = {
   '30D': 30,
   '90D': 90,
   TODO: null,
+}
+
+// Display labels — the keys stay terse codes, but the pills read in
+// plain Spanish instead of the "7D / TODO" mix (TODO all-caps even
+// looked like a dev marker).
+const PERIOD_LABEL: Record<Period, string> = {
+  '7D': '7 días',
+  '30D': '30 días',
+  '90D': '90 días',
+  TODO: 'Todo',
 }
 
 // 4-point star — the shared glyph; here it marks the trajectory origin.
@@ -74,7 +84,7 @@ export default function ProgressScreen() {
       <SafeAreaView style={styles.flex} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeIn.duration(280)}>
-            <TabHeader title="Tu cambio" titleEmphasis="Tu" />
+            <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
 
           {/* Hero — three branches matched to the data the user has:
@@ -115,7 +125,9 @@ export default function ProgressScreen() {
                       accessibilityRole="button"
                       accessibilityState={{ selected: on }}
                     >
-                      <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>{p}</Text>
+                      <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
+                        {PERIOD_LABEL[p]}
+                      </Text>
                     </Pressable>
                   )
                 })}
@@ -128,7 +140,7 @@ export default function ProgressScreen() {
 
               {trend ? (
                 <Animated.View entering={FadeIn.duration(360).delay(320)}>
-                  <Text style={styles.coachLine}>{formatTrendCopy(trend)}</Text>
+                  <CoachLine text={formatTrendCopy(trend)} />
                 </Animated.View>
               ) : null}
             </>
@@ -514,7 +526,9 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: 11,
     color: colors.niebla,
-    letterSpacing: 1.4,
+    // Tight tracking now that the labels are words ("30 días"), not
+    // 2–3-char codes — wide tracking would overflow the segment.
+    letterSpacing: 0.2,
   },
   periodLabelOn: {
     color: colors.magentaHot,
@@ -540,15 +554,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.bone,
     textAlign: 'center',
-  },
-  // The pace, read aloud — the only serif-italic line: the coach voice.
-  coachLine: {
-    marginTop: 16,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.bone,
   },
   ctaWrap: {
     marginTop: 18,

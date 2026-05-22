@@ -63,7 +63,7 @@ function starTransform(cx: number, cy: number, r: number) {
  * cream, never competing with the protein goal's magenta, red only
  * when overspent.
  */
-export function TonightSky({
+export function DaySky({
   meals,
   proteinValue,
   proteinTarget,
