@@ -211,6 +211,39 @@ export function OrbitalSystem({
               <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0.2} />
             </LinearGradient>
           ))}
+          {/* Flare streak gradients — transparent at the tips, bright
+              at the centre, so the diffraction spikes taper into the
+              field instead of ending on hard cut-off points. One
+              gradient per axis so each line maps onto its bounding
+              box: horizontal, vertical, and the two diagonals. */}
+          <LinearGradient id="flare-h" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+          </LinearGradient>
+          <LinearGradient id="flare-v" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+          </LinearGradient>
+          <LinearGradient id="flare-d1" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+          </LinearGradient>
+          <LinearGradient id="flare-d2" x1="0" y1="1" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+          </LinearGradient>
         </Defs>
 
         {/* The deep field — nebula + starfield. */}
@@ -321,16 +354,23 @@ function CenterStar({ t }: { t: SharedValue<number> }) {
   )
 }
 
-/* Telescope-style diffraction spikes — a "+" of two long thin lines
- * crossing through (x, y), with an optional diagonal "x" pair. Used
- * on the central star and on lit dimension stars to give them the
- * unmistakable look of real long-exposure astrophotography. */
+/* Lens-flare spikes — the organic starburst a real camera lens
+ * produces around a bright point, not a rigid geometric "+". The
+ * horizontal streak is slightly longer and brighter than the
+ * vertical (the anamorphic signature); each axis layers a wide soft
+ * halo behind a thin bright core; tipless gradients taper the ends
+ * to transparent so the streaks fade into the field; and four faint
+ * diagonal whiskers soften the rigid cross into a starburst.
+ *
+ * Requires the parent SVG's <Defs> to define `flare-h`, `flare-v`,
+ * `flare-d1`, `flare-d2` — one tapered gradient per axis.
+ */
 function DiffractionSpikes({
   x,
   y,
   length,
   opacity,
-  diagOpacity = 0,
+  diagOpacity,
   strokeWidth,
 }: {
   x: number
@@ -340,50 +380,86 @@ function DiffractionSpikes({
   diagOpacity?: number
   strokeWidth: number
 }) {
-  const d = length / Math.SQRT2
+  // Anamorphic asymmetry — what a real lens does, never a perfect
+  // geometric square cross.
+  const hLen = length * 1.18
+  const vLen = length * 0.74
+  // Diagonal whiskers project onto each axis by `dLen` — a short
+  // overall length (≈0.6 × the vertical) so they read as faint
+  // starburst whiskers, not full rays.
+  const dLen = length * 0.3
+  const dOp = diagOpacity ?? opacity * 0.35
+  // Two-layer streak per axis: a wide soft halo behind a thin bright
+  // core. The combination is what reads as "light", not a line.
+  const haloW = Math.max(1, strokeWidth * 3.4)
+  const coreW = Math.max(0.45, strokeWidth * 0.6)
   return (
     <G>
+      {/* Horizontal — the dominant streak (anamorphic). */}
       <Line
-        x1={x - length}
+        x1={x - hLen}
         y1={y}
-        x2={x + length}
+        x2={x + hLen}
         y2={y}
-        stroke="#FFFFFF"
-        strokeOpacity={opacity}
-        strokeWidth={strokeWidth}
+        stroke="url(#flare-h)"
+        strokeWidth={haloW}
         strokeLinecap="round"
+        opacity={opacity * 0.5}
+      />
+      <Line
+        x1={x - hLen}
+        y1={y}
+        x2={x + hLen}
+        y2={y}
+        stroke="url(#flare-h)"
+        strokeWidth={coreW}
+        strokeLinecap="round"
+        opacity={opacity}
+      />
+      {/* Vertical — quieter, shorter than the horizontal. */}
+      <Line
+        x1={x}
+        y1={y - vLen}
+        x2={x}
+        y2={y + vLen}
+        stroke="url(#flare-v)"
+        strokeWidth={haloW * 0.78}
+        strokeLinecap="round"
+        opacity={opacity * 0.42}
       />
       <Line
         x1={x}
-        y1={y - length}
+        y1={y - vLen}
         x2={x}
-        y2={y + length}
-        stroke="#FFFFFF"
-        strokeOpacity={opacity}
-        strokeWidth={strokeWidth}
+        y2={y + vLen}
+        stroke="url(#flare-v)"
+        strokeWidth={coreW}
         strokeLinecap="round"
+        opacity={opacity * 0.78}
       />
-      {diagOpacity > 0 ? (
+      {/* Diagonal whiskers — short and faint, the starburst breaks
+          that keep the cross from reading as a rigid "+". */}
+      {dOp > 0 ? (
         <>
           <Line
-            x1={x - d}
-            y1={y - d}
-            x2={x + d}
-            y2={y + d}
-            stroke="#FFFFFF"
-            strokeOpacity={diagOpacity}
-            strokeWidth={strokeWidth * 0.7}
+            x1={x - dLen}
+            y1={y - dLen}
+            x2={x + dLen}
+            y2={y + dLen}
+            stroke="url(#flare-d1)"
+            strokeWidth={coreW}
             strokeLinecap="round"
+            opacity={dOp}
           />
           <Line
-            x1={x - d}
-            y1={y + d}
-            x2={x + d}
-            y2={y - d}
-            stroke="#FFFFFF"
-            strokeOpacity={diagOpacity}
-            strokeWidth={strokeWidth * 0.7}
+            x1={x - dLen}
+            y1={y + dLen}
+            x2={x + dLen}
+            y2={y - dLen}
+            stroke="url(#flare-d2)"
+            strokeWidth={coreW}
             strokeLinecap="round"
+            opacity={dOp}
           />
         </>
       ) : null}
