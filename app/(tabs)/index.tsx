@@ -30,6 +30,7 @@ import {
   SectionHeader,
   SkyBackground,
   StatSlider,
+  StreakLine,
   TabHeader,
   TodayMealLog,
   WeekStrip,
@@ -234,6 +235,12 @@ function TodayContent({ ctx, cadence }: ContentProps) {
               star still confirm a trained day alongside it. */}
           <Animated.View entering={enter(120)}>
             <DayCheckIn state={dayState} onChange={handleDayChange} />
+          </Animated.View>
+
+          {/* The streak — what the check-in puts at stake. Pops +1 on
+              each commit; hides itself under 2 days. */}
+          <Animated.View entering={enter(160)}>
+            <StreakLine streak={ctx.streak_days} />
           </Animated.View>
 
           <Animated.View entering={enter(220)}>
