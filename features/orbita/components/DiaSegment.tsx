@@ -6,6 +6,7 @@ import { EmText } from '@/components/EmText'
 import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
+import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals, useTodaySignals } from '../hooks'
 import {
   countTones,
@@ -20,6 +21,7 @@ import { AccionDelDia } from './AccionDelDia'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
+import { PreviewBanner } from './PreviewBanner'
 import { StelarHeadline } from './StelarHeadline'
 import { VozDeStelar } from './VozDeStelar'
 
@@ -49,7 +51,9 @@ export function DiaSegment() {
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedTone = selected ? dimensionTone(selected.brightness) : null
   const evidence = selected ? dimensionEvidence(selected.key, signals) : []
-  const reveal = useFirstReadReveal()
+  // The first-reading reveal frames the prose as "Stelar read your
+  // last N days" — only honest once the engine actually has.
+  const reveal = useFirstReadReveal() && ENGINE_ACTIVE
 
   // Empty-state branch: hide every MOCK-driven prose (archetype,
   // headline, voz, acción) and show a single coach-voice card that
@@ -84,6 +88,10 @@ export function DiaSegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+      {/* Honest framing while the engine is mock — the prose below is
+          an example, not a real reading. */}
+      {ENGINE_ACTIVE ? null : <PreviewBanner />}
+
       {/* Compressed header — archetype as the only hero, with a single
           dense meta line that names tones, the read window, and how
           deep STELAR has read so far. */}
@@ -112,11 +120,15 @@ export function DiaSegment() {
               <Text style={styles.metaSep}> · </Text>
               <Text style={styles.toneSilencio}>{tones.silencio} en silencio</Text>
             </Text>
-            <Text style={styles.metaB} numberOfLines={1}>
-              <Text>leído por </Text>
-              <Text style={styles.metaStelar}>Stelar</Text>
-              <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
-            </Text>
+            {/* "leído por Stelar · N días" — a claim only true once
+                the engine has run; hidden while the prose is mock. */}
+            {ENGINE_ACTIVE ? (
+              <Text style={styles.metaB} numberOfLines={1}>
+                <Text>leído por </Text>
+                <Text style={styles.metaStelar}>Stelar</Text>
+                <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
+              </Text>
+            ) : null}
           </View>
         </View>
       </View>

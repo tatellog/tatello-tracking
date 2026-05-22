@@ -7,6 +7,7 @@ import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
+import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals } from '../hooks'
 import {
   buildFirstCycleVoz,
@@ -20,6 +21,7 @@ import {
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { ObservationChart } from './ObservationChart'
+import { PreviewBanner } from './PreviewBanner'
 import { TuCielo, type Satellite } from './TuCielo'
 import { VozDeStelar } from './VozDeStelar'
 
@@ -136,6 +138,9 @@ export function MesSegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+      {/* Honest framing while the engine is mock. */}
+      {ENGINE_ACTIVE ? null : <PreviewBanner />}
+
       {/* Compressed header — mirrors Día / Semana. */}
       <View style={styles.header}>
         <EmText

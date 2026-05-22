@@ -5,12 +5,14 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
+import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals } from '../hooks'
 import { buildArquetipoSemana, buildVozSemana, buildWeekDays, MOCK_PATRONES } from '../mock'
 import { DayCard } from './DayCard'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PatternHint } from './PatternHint'
+import { PreviewBanner } from './PreviewBanner'
 import { VozDeStelar } from './VozDeStelar'
 import { WeekConstellation } from './WeekConstellation'
 
@@ -82,6 +84,9 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+      {/* Honest framing while the engine is mock. */}
+      {ENGINE_ACTIVE ? null : <PreviewBanner />}
+
       {/* Compressed header — archetype as the only hero, then a single
           dense meta block that names the week's state, who read it
           and the insight. No eyebrow on top: the tab pill already
@@ -95,18 +100,24 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
         />
         <View style={styles.metaRow}>
           <LiveDot />
-          <Text style={styles.meta} numberOfLines={2}>
+          <Text style={styles.meta} numberOfLines={ENGINE_ACTIVE ? 2 : 1}>
             <Text style={styles.metaNum}>{daysEnLuz}</Text>
             <Text> en luz · </Text>
             <Text style={styles.metaNum}>{lejos}</Text>
             <Text> lejos · </Text>
             <Text style={styles.metaNum}>{porVenir}</Text>
             <Text> por venir</Text>
-            <Text style={styles.metaSep}>{'\n'}</Text>
-            <Text>leído por </Text>
-            <Text style={styles.metaStelar}>Stelar</Text>
-            <Text>{` · ${arquetipo.daysRead} días · pico `}</Text>
-            <Text style={styles.metaNum}>{arquetipo.peakDay}</Text>
+            {/* "leído por Stelar · N días" — only true once the engine
+                has run; hidden while the week's prose is mock. */}
+            {ENGINE_ACTIVE ? (
+              <>
+                <Text style={styles.metaSep}>{'\n'}</Text>
+                <Text>leído por </Text>
+                <Text style={styles.metaStelar}>Stelar</Text>
+                <Text>{` · ${arquetipo.daysRead} días · pico `}</Text>
+                <Text style={styles.metaNum}>{arquetipo.peakDay}</Text>
+              </>
+            ) : null}
           </Text>
         </View>
       </View>
@@ -129,7 +140,9 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
       <VozDeStelar
         parts={voz.parts}
         tag={todayIdx === 6 ? 'Cierre de semana' : 'Hasta ahora'}
-        signature={voz.signature}
+        // The confidence signature ("Confianza alta · N días") is a
+        // real-engine artifact — never shown over mock prose.
+        signature={ENGINE_ACTIVE ? voz.signature : undefined}
       />
 
       {/* One pattern surfaced here as a doorway — the full list lives
