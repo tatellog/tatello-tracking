@@ -3,6 +3,8 @@ import { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { type CyclePhase } from '@/features/cycle/phase'
+import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
 import {
   CoachLine,
@@ -15,15 +17,35 @@ import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 /* Copy for the coach line under the protein sky. Keyed on meal count
- * alone — never on a percentage-to-target — so the line *witnesses*
- * the day rather than pushing toward a finish line. Food logging is
+ * — never on a percentage-to-target — so the line *witnesses* the
+ * day rather than pushing toward a finish line. Food logging is
  * psychologically fragile: the voice here observes, never races.
+ *
+ * When the cycle phase is known, luteal and menstrual days swap in a
+ * normalising line: appetite genuinely shifts across the cycle, and
+ * the tab names that as biology, not as drift to correct.
  * The shared <CoachLine> renders it; this just picks the sentence. */
 type SkyCopy = { before: string; emphasis: string; after: string }
 
-function skyCopy(mealCount: number): SkyCopy {
+function skyCopy(mealCount: number, phase: CyclePhase | null): SkyCopy {
   if (mealCount === 0) {
     return { before: 'Tu cielo de hoy está por ', emphasis: 'escribirse', after: '.' }
+  }
+  // Cycle-aware reassurance — only once the day has at least one meal
+  // (a "your body asks for more" line makes no sense at zero).
+  if (phase === 'lutea') {
+    return {
+      before: 'Fase lútea — tu cuerpo pide más estos días. Y ',
+      emphasis: 'está bien',
+      after: '.',
+    }
+  }
+  if (phase === 'menstrual') {
+    return {
+      before: 'Estás menstruando. Comer con ',
+      emphasis: 'suavidad',
+      after: ' hoy es cuidarte.',
+    }
   }
   if (mealCount === 1) {
     return { before: 'Una estrella. El día empieza a ', emphasis: 'nutrirse', after: '.' }
@@ -55,7 +77,8 @@ export default function MealsScreen() {
     [meals],
   )
 
-  const coachCopy = skyCopy(meals.length)
+  const cycle = useCyclePhase()
+  const coachCopy = skyCopy(meals.length, cycle?.phase ?? null)
 
   return (
     <View style={styles.screen}>
