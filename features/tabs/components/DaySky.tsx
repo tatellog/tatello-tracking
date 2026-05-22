@@ -3,7 +3,6 @@ import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedProps,
-  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
@@ -34,9 +33,10 @@ type MealLike = { id: string; protein_g: number | string }
 type Props = {
   meals: readonly MealLike[]
   proteinValue: number
-  proteinTarget: number
+  /** Optional — surfaced only as a faint "≈ X g sugerido" reference,
+   *  never as a denominator, bar or percentage to race. */
+  proteinTarget?: number
   caloriesValue: number
-  caloriesTarget: number
 }
 
 /* Renders one 4-point star at (cx, cy) with outer radius r by
@@ -50,42 +50,38 @@ function starTransform(cx: number, cy: number, r: number) {
 }
 
 /*
- * "Tu cielo" — the day's protein, made the hero.
+ * "Tu cielo" — the day's nourishment, made visible.
  *
  * Depth comes from three stacked layers, back to front: a near-black
- * sky; a magenta bloom that fades up with progress, so the sky lights
- * as you near your goal; and the meals themselves — one star each,
+ * sky; a magenta bloom; and the meals themselves — one star each,
  * placed in chronological order along a gentle arc and strung on a
  * faint thread, so the day reads as a deliberate constellation, not
  * a scatter. The big readout sits in the bloom's glow.
  *
- * Calories ride below the panel as a quiet budget line — neutral
- * cream, never competing with the protein goal's magenta, red only
- * when overspent.
+ * Deliberately NOT a progress meter. The readout is purely
+ * accumulative ("95 g"), the bloom lights with meal count — not with
+ * a percentage-to-goal — and there is no bar, no "%", no completion
+ * state. A protein target, if set, appears only as a faint "≈ X g
+ * sugerido" reference. Calories are a plain neutral fact. Food
+ * logging is psychologically fragile: the sky witnesses the day, it
+ * never scores it.
  */
-export function DaySky({
-  meals,
-  proteinValue,
-  proteinTarget,
-  caloriesValue,
-  caloriesTarget,
-}: Props) {
+export function DaySky({ meals, proteinValue, proteinTarget, caloriesValue }: Props) {
   const [w, setW] = useState<number | null>(null)
 
-  const pct = proteinTarget > 0 ? Math.min(1, Math.max(0, proteinValue / proteinTarget)) : 0
-  const complete = pct >= 1
-  const remaining = Math.max(0, Math.round(proteinTarget - proteinValue))
+  // The protein target, if any — kept only as a faint reference
+  // number, never used as a denominator.
+  const pTarget = proteinTarget != null && proteinTarget > 0 ? Math.round(proteinTarget) : null
 
-  const calPct = caloriesTarget > 0 ? Math.min(1, Math.max(0, caloriesValue / caloriesTarget)) : 0
-  const overBudget = caloriesValue > caloriesTarget
+  // The bloom lights with meal count — the sky brightens as the day
+  // fills, never as a percentage of a goal.
+  const skyFill = Math.min(1, meals.length / 4)
 
-  // 0 → pct, eased in once on mount. Protein leads, calories follows.
+  // 0 → fill, eased in once on mount.
   const prog = useSharedValue(0)
-  const progCal = useSharedValue(0)
   useEffect(() => {
-    prog.value = withDelay(160, withTiming(pct, { duration: 1100, easing: FILL_EASING }))
-    progCal.value = withDelay(360, withTiming(calPct, { duration: 1100, easing: FILL_EASING }))
-  }, [prog, progCal, pct, calPct])
+    prog.value = withDelay(160, withTiming(skyFill, { duration: 1100, easing: FILL_EASING }))
+  }, [prog, skyFill])
 
   const handleLayout = (e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)
 
@@ -150,14 +146,12 @@ export function DaySky({
   }, [mealStars])
 
   const bloomProps = useAnimatedProps(() => ({ opacity: 0.35 + prog.value * 0.65 }))
-  const fillStyle = useAnimatedStyle(() => ({ width: `${prog.value * 100}%` }))
-  const calFillStyle = useAnimatedStyle(() => ({ width: `${progCal.value * 100}%` }))
 
   const bloomCx = w != null ? w * 0.32 : 0
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.panel, complete && styles.panelComplete]} onLayout={handleLayout}>
+      <View style={styles.panel} onLayout={handleLayout}>
         {w != null ? (
           <Svg style={StyleSheet.absoluteFill} width={w} height={PANEL_H}>
             <Defs>
@@ -168,7 +162,7 @@ export function DaySky({
               </RadialGradient>
             </Defs>
 
-            {/* Progress bloom — fades up from black sky to lit sky. */}
+            {/* Bloom — lights with meal count, not with a goal. */}
             <AnimatedCircle
               cx={bloomCx}
               cy={150}
@@ -191,20 +185,21 @@ export function DaySky({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                stroke={complete ? colors.magenta : colors.leche}
+                stroke={colors.leche}
                 strokeWidth={1}
                 strokeLinecap="round"
                 opacity={0.34}
               />
             ))}
 
-            {/* One star per meal, in order, sized by its protein. */}
+            {/* One star per meal, in order, sized by its protein —
+                always cream; the sky has no "complete" state. */}
             {mealStars.map((s) => (
               <Path
                 key={s.id}
                 d={STAR_PATH}
                 transform={starTransform(s.x, s.y, s.r)}
-                fill={complete ? colors.magenta : colors.leche}
+                fill={colors.leche}
               />
             ))}
           </Svg>
@@ -214,32 +209,25 @@ export function DaySky({
           <Text style={styles.eyebrow}>Tu cielo</Text>
           <View style={styles.spacer} />
 
+          {/* Accumulative readout — what you've eaten today, full
+              stop. No "/ target", no bar, no %, no completion. */}
           <View style={styles.readout}>
             <Text style={styles.value}>{Math.round(proteinValue)}</Text>
-            <Text style={styles.target}> / {proteinTarget} g</Text>
+            <Text style={styles.target}> g</Text>
           </View>
           <Text style={styles.caption}>proteína</Text>
 
-          <View style={styles.barTrack}>
-            <Animated.View style={[styles.barFill, fillStyle]} />
-          </View>
-          <Text style={styles.footer}>
-            {complete
-              ? 'Tu cielo está completo ✦'
-              : `${Math.round(pct * 100)} % · faltan ${remaining} g`}
-          </Text>
+          {/* The target survives only as a faint, ignorable
+              reference — never a denominator to race. */}
+          {pTarget != null ? <Text style={styles.reference}>≈ {pTarget} g sugerido</Text> : null}
         </View>
       </View>
 
-      {/* Calorie budget — a quiet line below the hero, not a co-star. */}
+      {/* Calories — a plain neutral fact below the hero. No target,
+          no bar, no verdict: just what the day held. */}
       <View style={styles.calRow}>
         <Text style={styles.calLabel}>Calorías</Text>
-        <Text style={[styles.calValue, overBudget && styles.calOver]}>
-          {Math.round(caloriesValue)} / {caloriesTarget} kcal
-        </Text>
-      </View>
-      <View style={styles.calTrack}>
-        <Animated.View style={[styles.calFill, overBudget && styles.calFillOver, calFillStyle]} />
+        <Text style={styles.calValue}>{Math.round(caloriesValue)} kcal</Text>
       </View>
     </View>
   )
@@ -259,9 +247,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.hairline,
     overflow: 'hidden',
-  },
-  panelComplete: {
-    borderColor: colors.magentaGlow,
   },
   content: {
     flex: 1,
@@ -304,29 +289,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 4,
   },
-  // A carved channel; the fill is light moving inside it.
-  barTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(244,236,222,0.08)',
-    overflow: 'hidden',
-    marginTop: 11,
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: colors.magenta,
-    shadowColor: colors.magenta,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  footer: {
+  // The optional protein target — a faint reference the eye can
+  // skip past. Never a bar, never a percentage.
+  reference: {
     marginTop: 8,
-    fontFamily: typography.uiSemi,
-    fontSize: 11,
-    color: colors.bone,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 12.5,
+    color: colors.niebla,
   },
   calRow: {
     flexDirection: 'row',
@@ -345,24 +315,5 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: 12.5,
     color: colors.bone,
-  },
-  calOver: {
-    color: colors.feedbackError,
-  },
-  // Neutral cream fill — a budget consumed, not a goal reached.
-  calTrack: {
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.hairline,
-    overflow: 'hidden',
-    marginTop: 7,
-  },
-  calFill: {
-    height: '100%',
-    borderRadius: 1.5,
-    backgroundColor: colors.bone,
-  },
-  calFillOver: {
-    backgroundColor: colors.feedbackError,
   },
 })

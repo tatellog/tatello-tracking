@@ -14,25 +14,24 @@ import {
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-/* Copy for the coach line under the protein sky — it follows the
- * day's protein arc so the screen has a voice, not just figures. The
- * shared <CoachLine> renders it; this just picks the sentence. */
+/* Copy for the coach line under the protein sky. Keyed on meal count
+ * alone — never on a percentage-to-target — so the line *witnesses*
+ * the day rather than pushing toward a finish line. Food logging is
+ * psychologically fragile: the voice here observes, never races.
+ * The shared <CoachLine> renders it; this just picks the sentence. */
 type SkyCopy = { before: string; emphasis: string; after: string }
 
-function skyCopy(pct: number, mealCount: number): SkyCopy {
+function skyCopy(mealCount: number): SkyCopy {
   if (mealCount === 0) {
-    return { before: 'Tu cielo está por ', emphasis: 'trazarse', after: '.' }
+    return { before: 'Tu cielo de hoy está por ', emphasis: 'escribirse', after: '.' }
   }
-  if (pct >= 1) {
-    return { before: 'Lo cerraste. Cada estrella ', emphasis: 'cuenta', after: '.' }
+  if (mealCount === 1) {
+    return { before: 'Una estrella. El día empieza a ', emphasis: 'nutrirse', after: '.' }
   }
-  if (pct >= 0.75) {
-    return { before: 'Estás ', emphasis: 'cerca', after: ' de cerrar tu cielo.' }
+  if (mealCount <= 3) {
+    return { before: 'Tu cielo se va ', emphasis: 'poblando', after: '.' }
   }
-  if (pct >= 0.4) {
-    return { before: 'Tu cielo va ', emphasis: 'tomando forma', after: '.' }
-  }
-  return { before: 'Cada comida ', emphasis: 'suma una estrella', after: '.' }
+  return { before: 'Un cielo lleno. Hoy te ', emphasis: 'nutriste', after: '.' }
 }
 
 export default function MealsScreen() {
@@ -56,8 +55,7 @@ export default function MealsScreen() {
     [meals],
   )
 
-  const proteinPct = targets ? summary.protein / targets.protein_g : 0
-  const coachCopy = skyCopy(proteinPct, meals.length)
+  const coachCopy = skyCopy(meals.length)
 
   return (
     <View style={styles.screen}>
@@ -71,32 +69,32 @@ export default function MealsScreen() {
         >
           <TabHeader title="Tus comidas" titleEmphasis="Tus" />
 
-          {targets ? (
-            <>
-              <DaySky
-                meals={meals}
-                proteinValue={summary.protein}
-                proteinTarget={targets.protein_g}
-                caloriesValue={summary.calories}
-                caloriesTarget={targets.calories}
-              />
-              <CoachLine
-                before={coachCopy.before}
-                emphasis={coachCopy.emphasis}
-                after={coachCopy.after}
-              />
-            </>
-          ) : (
+          {/* The sky always renders — logging a meal and seeing it
+              never requires setting a number first. Targets are an
+              optional reference, offered (not demanded) below. */}
+          <DaySky
+            meals={meals}
+            proteinValue={summary.protein}
+            proteinTarget={targets?.protein_g}
+            caloriesValue={summary.calories}
+          />
+          <CoachLine
+            before={coachCopy.before}
+            emphasis={coachCopy.emphasis}
+            after={coachCopy.after}
+          />
+
+          {targets ? null : (
             <Pressable
               onPress={() => router.push('/onboarding/macro-targets?source=banner')}
-              style={styles.defineTargets}
+              style={styles.targetInvite}
               accessibilityRole="button"
-              accessibilityLabel="Definir metas"
+              accessibilityLabel="Añadir una referencia de proteína"
             >
-              <Text style={styles.defineTargetsLabel}>Define tus metas</Text>
-              <Text style={styles.defineTargetsHint}>
-                Para ver tu cielo de proteína y tus calorías, primero pon tus números base.
+              <Text style={styles.targetInviteText}>
+                Las metas son opcionales. Añade una referencia de proteína cuando quieras.
               </Text>
+              <Text style={styles.targetInviteChevron}>›</Text>
             </Pressable>
           )}
 
@@ -124,29 +122,26 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 48,
   },
-  // Empty state — same card vocabulary as the rest of the app
-  // (radius 16, hairline border) instead of the legacy radius-6 box.
-  defineTargets: {
-    backgroundColor: colors.bgCard,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 12,
-    marginBottom: 12,
+  // Optional-target invite — a quiet line, not a wall. The tab is
+  // fully usable without ever tapping it.
+  targetInvite: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    paddingVertical: 4,
   },
-  defineTargetsLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 11,
-    color: colors.magenta,
-    letterSpacing: 2.2,
-    textTransform: 'uppercase',
-    marginBottom: 6,
+  targetInviteText: {
+    flex: 1,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.niebla,
   },
-  defineTargetsHint: {
+  targetInviteChevron: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
-    color: colors.bone,
-    lineHeight: 17,
+    fontSize: 20,
+    color: colors.niebla,
   },
 })
