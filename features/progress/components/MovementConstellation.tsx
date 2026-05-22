@@ -43,20 +43,31 @@ function ymdLocal(d: Date): string {
 export function MovementConstellation() {
   const workouts = useRecentWorkoutDates(40)
 
-  const { days, litCount } = useMemo(() => {
+  const { days, litCount, weekdayLabels } = useMemo(() => {
     const trainedSet = new Set(workouts.data ?? [])
     const out: { date: string; lit: boolean }[] = []
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     // Build 28 days oldest → newest so the grid reads
-    // top-left (oldest) to bottom-right (today).
+    // top-left (oldest) to bottom-right (today). Each row is exactly
+    // 7 days, so every column lands on the same weekday — that's why
+    // we only need ONE set of labels (computed from the bottom row)
+    // and they apply to every row above.
     for (let i = TOTAL - 1; i >= 0; i--) {
       const d = new Date(today.getTime() - i * DAY_MS)
       const ymd = ymdLocal(d)
       out.push({ date: ymd, lit: trainedSet.has(ymd) })
     }
     const lit = out.filter((d) => d.lit).length
-    return { days: out, litCount: lit }
+    // Weekday for each column = the weekday of the bottom row's
+    // corresponding day. col 0 = 6 days ago, col 6 = today.
+    const WD = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+    const labels = Array.from({ length: COLS }, (_, col) => {
+      const daysAgo = COLS - 1 - col
+      const d = new Date(today.getTime() - daysAgo * DAY_MS)
+      return WD[d.getDay()] ?? ''
+    })
+    return { days: out, litCount: lit, weekdayLabels: labels }
   }, [workouts.data])
 
   return (
@@ -66,6 +77,17 @@ export function MovementConstellation() {
       </EyebrowLabel>
 
       <View style={styles.card}>
+        {/* Weekday labels above the grid — every column is a fixed
+            weekday (col 0 = 6 days ago's weekday, col 6 = today's).
+            Reveals patterns like "I always train Mondays" at a glance. */}
+        <View style={styles.weekdayRow}>
+          {weekdayLabels.map((w, i) => (
+            <Text key={`wd-${i}`} style={styles.weekdayLabel}>
+              {w}
+            </Text>
+          ))}
+        </View>
+
         <Svg
           width="100%"
           height={CANVAS_H}
@@ -174,6 +196,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 16,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 6,
+    paddingHorizontal: CELL / 2,
+  },
+  weekdayLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 9,
+    color: colors.niebla,
+    letterSpacing: 1.4,
+    width: CELL,
+    textAlign: 'center',
   },
   footer: {
     marginTop: 10,

@@ -84,22 +84,55 @@ function formatDate(iso: string): string {
   return `${d.getDate()} ${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
 }
 
+/** YYYY-MM-DD in local time — used to detect same-day pairs in the
+ *  diptych so the "ahora" column reads "Hoy" / "Hace un momento" when
+ *  before and after share a date (otherwise both columns display the
+ *  same string and the metaphor collapses). */
+function ymdLocal(iso: string): string {
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Date label for the "ahora" column. When the pair is same-day, show
+ *  a relative phrase instead of the same calendar string as the
+ *  "antes" column — same date in both slots reads as a bug. */
+function formatAfterDate(after: ProgressPhoto, before: ProgressPhoto | null): string {
+  const todayYmd = ymdLocal(new Date().toISOString())
+  const afterYmd = ymdLocal(after.taken_at)
+  const sameAsBefore = before && ymdLocal(before.taken_at) === afterYmd
+  if (sameAsBefore) {
+    // If "after" is literally today, "Hoy"; otherwise the user shot
+    // both on the same older day — surface that as "Mismo día" so
+    // both columns aren't a copy of the same string.
+    return afterYmd === todayYmd ? 'Hoy' : 'Mismo día'
+  }
+  return afterYmd === todayYmd ? 'Hoy' : formatDate(after.taken_at)
+}
+
 /* One side of the diptych — an eyebrow, a portrait photo frame and its
  * date. When `onPress` is given the frame is a button: a filled photo
  * re-opens the picker, an empty one shows a "Subir foto" affordance.
- * `uploading` swaps the frame for a spinner while the upload runs. */
+ * `uploading` swaps the frame for a spinner while the upload runs.
+ * `dateOverride` lets the caller substitute the default `taken_at`
+ * stringifier — used to render "Hoy" / "Mismo día" in the after slot
+ * when the pair shares a date. */
 function PhotoColumn({
   label,
   tone,
   photo,
   onPress,
   uploading,
+  dateOverride,
 }: {
   label: string
   tone: EyebrowTone
   photo: ProgressPhoto | null
   onPress?: () => void
   uploading?: boolean
+  dateOverride?: string
 }) {
   // 3-state render: uploading spinner, full image, or placeholder.
   // The placeholder distinguishes between "no photo yet" (✦ + Subir
@@ -114,7 +147,10 @@ function PhotoColumn({
     </View>
   ) : photo?.signed_url ? (
     <View style={styles.frame}>
-      <Image source={{ uri: photo.signed_url }} style={styles.img} resizeMode="cover" />
+      {/* resizeMode "contain" so the full body stays visible in the
+          frame — the diptych's whole point is comparing silhouettes,
+          and "cover" was cropping the head/feet of portrait shots. */}
+      <Image source={{ uri: photo.signed_url }} style={styles.img} resizeMode="contain" />
     </View>
   ) : (
     <View style={[styles.frame, styles.framePlaceholder]}>
@@ -150,7 +186,9 @@ function PhotoColumn({
       ) : (
         frame
       )}
-      <Text style={styles.date}>{photo ? formatDate(photo.taken_at) : 'Pendiente'}</Text>
+      <Text style={styles.date}>
+        {dateOverride ?? (photo ? formatDate(photo.taken_at) : 'Pendiente')}
+      </Text>
     </View>
   )
 }
@@ -288,6 +326,7 @@ export function BeforeAfterPhotos() {
               photo={data.after}
               onPress={!busy ? choosePhoto : undefined}
               uploading={busy && data.count >= 1}
+              dateOverride={data.after ? formatAfterDate(data.after, data.before) : undefined}
             />
           </View>
           {data.count === 1 ? (
@@ -296,16 +335,21 @@ export function BeforeAfterPhotos() {
         </>
       )}
 
+      {/* Promoted share button — full-width pill with the magenta tint
+          background when canShare. Previously a quiet right-aligned
+          link that read as a label, not a button; the share action is
+          the *whole point* of having both photos, so it now claims a
+          row of its own. */}
       {canShare ? (
         <TouchableOpacity
-          style={styles.shareBtn}
-          activeOpacity={0.6}
+          style={styles.shareBtnPromoted}
+          activeOpacity={0.7}
           onPress={() => setShareOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="Compartir mi cambio"
         >
           <ShareIcon />
-          <Text style={styles.shareLabel}>Compartir mi cambio</Text>
+          <Text style={styles.shareLabelPromoted}>Compartir mi cambio</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -445,6 +489,8 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   // Quiet, label-led — discoverable without competing with the photos.
+  // Kept as a fallback style for any flow that wants the quiet variant
+  // (currently unused; the promoted pill below is the default).
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -457,5 +503,27 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: 13,
     color: colors.magenta,
+  },
+  // Promoted variant — full-width magenta-tinted pill so the share
+  // action reads as a proper button. The diptych's whole point is to
+  // be shareable, so the CTA gets the same weight as a primary action.
+  shareBtnPromoted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    backgroundColor: colors.magentaTint2,
+    borderWidth: 1,
+    borderColor: 'rgba(214, 60, 130, 0.32)',
+  },
+  shareLabelPromoted: {
+    fontFamily: typography.uiBold,
+    fontSize: 13.5,
+    color: colors.magentaHot,
+    letterSpacing: 0.4,
   },
 })

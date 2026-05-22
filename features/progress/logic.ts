@@ -103,21 +103,24 @@ export function computeTrend(points: WeightPoint[]): Trend | null {
 }
 
 /*
- * Una línea corta, como te la diría un coach mirando tus puntos.
- * Calma, sin cifras (el número ya está en la gráfica) y sin juzgar el
- * progreso. La pauta exacta del ritmo vive en el chart; esto es la voz.
+ * Una línea corta — la voz que comparte rumbo con el eyebrow "Rumbo a
+ * tu Andrómeda". Sin cifras (el número está arriba) y sin juzgar el
+ * sentido del cambio: Stelar nombra la trayectoria, no la regaña.
+ *
+ * El vocabulario es cósmico — órbita, rumbo, gravedad — para que el
+ * coach line se sienta parte del mismo cielo que el resto de Progreso.
  */
 export function formatTrendCopy(trend: Trend): string {
-  if (trend.direction === 'flat') return 'Tu peso está parejo estos días.'
+  if (trend.direction === 'flat') return 'Tu órbita está en pausa — el cielo sostiene tu ritmo.'
 
   const abs = Math.abs(trend.weeklyChange)
   if (trend.direction === 'down') {
-    if (abs > 0.5) return 'Estás bajando rápido. Come suficiente proteína para cuidar tu músculo.'
-    if (abs >= 0.2) return 'Vas bajando con buen ritmo, sin prisa.'
-    return 'Bajas poco a poco. Vas bien.'
+    if (abs > 0.5) return 'Vas bajando con fuerza — cuida tu combustible para no perder brillo.'
+    if (abs >= 0.2) return 'Tu trayectoria desciende con calma, sin prisa.'
+    return 'Bajas de a poquito — gravedad amable.'
   }
 
-  if (abs > 0.5) return 'Estás subiendo rápido estas semanas.'
-  if (abs >= 0.2) return 'Vas subiendo poco a poco.'
-  return 'Tu peso sube apenas un poco.'
+  if (abs > 0.5) return 'Tu rumbo sube rápido estas semanas.'
+  if (abs >= 0.2) return 'Tu órbita asciende, paso a paso.'
+  return 'Subís apenas un grado — luz tibia.'
 }

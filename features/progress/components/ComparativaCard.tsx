@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import type { BodyMeasurement } from '@/features/brief/api'
@@ -123,44 +124,132 @@ export function ComparativaCard() {
     return { now: nowSnap, past: pastSnap, hasComparison: has }
   }, [measurements.data, workouts.data, sleeps.data])
 
+  const router = useRouter()
+
   if (!hasComparison) return null
 
-  // Build rows in order, skipping any with no data on either side.
-  const rows: { label: string; past: string; now: string; delta: string | null }[] = []
+  // Build rows in the same fixed order every time — we now ALWAYS
+  // render all four metrics so the card reads as a "panel" instead of
+  // shifting layout based on what's logged. Rows with no data on one
+  // or both sides become invitation rows that route the user to the
+  // correct logging surface.
+  type FilledRow = {
+    kind: 'filled'
+    label: string
+    past: string
+    now: string
+    delta: string | null
+    /** Absolute relative change in % — used to pick the row to highlight. */
+    relPct: number
+  }
+  type EmptyRow = {
+    kind: 'empty'
+    label: string
+    cta: string
+    onPress: () => void
+  }
+  const rows: (FilledRow | EmptyRow)[] = []
+
+  // ── Peso ──
   if (past.weightKg != null && now.weightKg != null) {
+    const diff = now.weightKg - past.weightKg
     rows.push({
+      kind: 'filled',
       label: 'Peso',
       past: `${past.weightKg.toFixed(1)} kg`,
       now: `${now.weightKg.toFixed(1)} kg`,
-      delta: formatDelta(now.weightKg - past.weightKg, 'kg'),
+      delta: formatDelta(diff, 'kg'),
+      relPct: relPct(diff, past.weightKg),
     })
-  }
-  if (past.waistCm != null && now.waistCm != null) {
+  } else {
     rows.push({
-      label: 'Cintura',
-      past: `${past.waistCm.toFixed(0)} cm`,
-      now: `${now.waistCm.toFixed(0)} cm`,
-      delta: formatDelta(now.waistCm - past.waistCm, 'cm'),
-    })
-  }
-  if (past.workouts28d > 0 || now.workouts28d > 0) {
-    rows.push({
-      label: 'Entrenos (28 d)',
-      past: `${past.workouts28d}`,
-      now: `${now.workouts28d}`,
-      delta: formatCount(now.workouts28d - past.workouts28d),
-    })
-  }
-  if (past.sleepAvg7d != null && now.sleepAvg7d != null) {
-    rows.push({
-      label: 'Sueño (sem.)',
-      past: `${past.sleepAvg7d.toFixed(1)} h`,
-      now: `${now.sleepAvg7d.toFixed(1)} h`,
-      delta: formatDelta(now.sleepAvg7d - past.sleepAvg7d, 'h'),
+      kind: 'empty',
+      label: 'Peso',
+      cta:
+        now.weightKg == null
+          ? 'Registra tu peso de hoy'
+          : 'Necesitamos otra medición para comparar',
+      onPress: () => router.push('/log-measurement'),
     })
   }
 
-  if (rows.length === 0) return null
+  // ── Cintura ──
+  if (past.waistCm != null && now.waistCm != null) {
+    const diff = now.waistCm - past.waistCm
+    rows.push({
+      kind: 'filled',
+      label: 'Cintura',
+      past: `${past.waistCm.toFixed(0)} cm`,
+      now: `${now.waistCm.toFixed(0)} cm`,
+      delta: formatDelta(diff, 'cm'),
+      relPct: relPct(diff, past.waistCm),
+    })
+  } else {
+    rows.push({
+      kind: 'empty',
+      label: 'Cintura',
+      cta: 'Suma tu cintura cuando midas',
+      onPress: () => router.push('/log-measurement'),
+    })
+  }
+
+  // ── Entrenos (28 d) ──
+  if (past.workouts28d > 0 || now.workouts28d > 0) {
+    const diff = now.workouts28d - past.workouts28d
+    // For counts, "rel %" is meaningless when past=0; use a coarse
+    // magnitude scaled to a reasonable baseline (8 entrenos/mes) so a
+    // jump from 0→6 still reads as significant.
+    const denom = Math.max(past.workouts28d, 8)
+    rows.push({
+      kind: 'filled',
+      label: 'Entrenos (28 d)',
+      past: `${past.workouts28d}`,
+      now: `${now.workouts28d}`,
+      delta: formatCount(diff),
+      relPct: (Math.abs(diff) / denom) * 100,
+    })
+  } else {
+    rows.push({
+      kind: 'empty',
+      label: 'Entrenos (28 d)',
+      cta: 'Loguea tu primer entreno desde ✦',
+      onPress: () => router.push('/(tabs)'),
+    })
+  }
+
+  // ── Sueño (sem.) ──
+  if (past.sleepAvg7d != null && now.sleepAvg7d != null) {
+    const diff = now.sleepAvg7d - past.sleepAvg7d
+    rows.push({
+      kind: 'filled',
+      label: 'Sueño (sem.)',
+      past: `${past.sleepAvg7d.toFixed(1)} h`,
+      now: `${now.sleepAvg7d.toFixed(1)} h`,
+      delta: formatDelta(diff, 'h'),
+      relPct: relPct(diff, past.sleepAvg7d),
+    })
+  } else {
+    rows.push({
+      kind: 'empty',
+      label: 'Sueño (sem.)',
+      cta: 'Suma tu sueño desde Hoy',
+      onPress: () => router.push('/(tabs)'),
+    })
+  }
+
+  // Pick the row with the largest relative change to highlight.
+  // Ignored if no row has a meaningful delta (< 1%) — silence is OK.
+  const highlightIndex = (() => {
+    let best = -1
+    let bestPct = 1 // threshold: at least 1% change to be worth marking
+    rows.forEach((r, i) => {
+      if (r.kind === 'filled' && r.relPct > bestPct) {
+        bestPct = r.relPct
+        best = i
+      }
+    })
+    return best
+  })()
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(280)}>
@@ -172,20 +261,62 @@ export function ComparativaCard() {
           <Text style={styles.headerLeft}>ANTES</Text>
           <Text style={styles.headerRight}>HOY</Text>
         </View>
-        {rows.map((row, i) => (
-          <View key={row.label} style={[styles.row, i > 0 && styles.rowDivider]}>
-            <Text style={styles.rowLabel}>{row.label}</Text>
-            <View style={styles.rowValues}>
-              <Text style={styles.rowPast}>{row.past}</Text>
-              <Text style={styles.rowArrow}>→</Text>
-              <Text style={styles.rowNow}>{row.now}</Text>
-              {row.delta ? <Text style={styles.rowDelta}>{row.delta}</Text> : null}
-            </View>
-          </View>
-        ))}
+        {rows.map((row, i) => {
+          if (row.kind === 'filled') {
+            const isHighlight = i === highlightIndex
+            return (
+              <View
+                key={row.label}
+                style={[styles.row, i > 0 && styles.rowDivider, isHighlight && styles.rowHighlight]}
+              >
+                <Text style={[styles.rowLabel, isHighlight && styles.rowLabelHighlight]}>
+                  {row.label}
+                </Text>
+                <View style={styles.rowValues}>
+                  <Text style={styles.rowPast}>{row.past}</Text>
+                  <Text style={styles.rowArrow}>→</Text>
+                  <Text style={[styles.rowNow, isHighlight && styles.rowNowHighlight]}>
+                    {row.now}
+                  </Text>
+                  {row.delta ? (
+                    <Text style={[styles.rowDelta, isHighlight && styles.rowDeltaHighlight]}>
+                      {row.delta}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            )
+          }
+          // Invitation row — same vertical rhythm as filled rows so
+          // the card layout stays stable; the body is replaced by a
+          // soft CTA the user can tap to start logging.
+          return (
+            <Pressable
+              key={row.label}
+              onPress={row.onPress}
+              style={({ pressed }) => [
+                styles.row,
+                i > 0 && styles.rowDivider,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <Text style={styles.rowLabelEmpty}>{row.label}</Text>
+              <View style={styles.rowValues}>
+                <Text style={styles.emptyHint}>{row.cta}</Text>
+                <Text style={styles.emptyChevron}>›</Text>
+              </View>
+            </Pressable>
+          )
+        })}
       </View>
     </Animated.View>
   )
+}
+
+/** Absolute relative change as a positive percentage. */
+function relPct(delta: number, base: number): number {
+  if (!base) return 0
+  return (Math.abs(delta) / Math.abs(base)) * 100
 }
 
 function formatDelta(delta: number, unit: string): string | null {
@@ -235,9 +366,22 @@ const styles = StyleSheet.create({
   row: {
     paddingVertical: 12,
   },
+  rowPressed: {
+    opacity: 0.6,
+  },
   rowDivider: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  // Highlight band — applied to the row with the largest relative
+  // delta. A faint magenta wash + ribbon on the left edge so the eye
+  // finds it without the whole card screaming.
+  rowHighlight: {
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(214, 60, 130, 0.07)',
+    borderLeftWidth: 2,
+    borderLeftColor: colors.magenta,
   },
   rowLabel: {
     fontFamily: typography.uiMedium,
@@ -246,6 +390,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: 'uppercase',
     marginBottom: 6,
+  },
+  rowLabelHighlight: {
+    color: colors.magenta,
+  },
+  rowLabelEmpty: {
+    fontFamily: typography.uiMedium,
+    fontSize: 12,
+    color: colors.niebla,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    opacity: 0.7,
   },
   rowValues: {
     flexDirection: 'row',
@@ -270,11 +426,37 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.3,
   },
+  rowNowHighlight: {
+    color: colors.magenta,
+  },
   rowDelta: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
     fontSize: 13,
     color: colors.magenta,
+    marginLeft: 'auto',
+  },
+  rowDeltaHighlight: {
+    fontFamily: typography.displayHeavy,
+    fontStyle: 'normal',
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  // Invitation row body — quieter than a filled row so empty rows
+  // don't compete visually with the actual data.
+  emptyHint: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14,
+    color: colors.bone,
+    opacity: 0.7,
+    flex: 1,
+  },
+  emptyChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: 22,
+    color: colors.niebla,
+    lineHeight: 22,
     marginLeft: 'auto',
   },
 })
