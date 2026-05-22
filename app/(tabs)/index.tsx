@@ -41,6 +41,30 @@ import { colors, typography } from '@/theme'
 
 const CELEBRATION_MS = 2000
 
+/*
+ * The commit haptic — a designed two-beat "phrase", not a tick:
+ *   trained  → Medium impact ("it clicked in") + a Success
+ *              notification 90 ms later ("it landed, and it mattered")
+ *   backfill → a single Medium impact (marking a past day is a solid
+ *              confirmation, but not today's live ritual)
+ *   rested   → a soft Light impact — rest is valid, but a Success
+ *              cue would mis-signal it as a "win"
+ * Owned here (the action handlers) rather than in DayCheckIn or the
+ * constellation, so the body's reward fires with the user's choice.
+ */
+function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
+  if (kind === 'rested') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    return
+  }
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+  if (kind === 'trained') {
+    setTimeout(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    }, 90)
+  }
+}
+
 function makeEnter(cadence: Cadence) {
   if (cadence === 'reduced') return (_d: number) => FadeIn.duration(220)
   return (d: number) => FadeInDown.duration(380).delay(d).springify().damping(18)
@@ -147,13 +171,13 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       const wasFirstDay = isFirstDay
       if (restedToday) setRest.mutate(false)
       toggleToday.mutate(true)
+      playCommitHaptic('trained')
       // Mirror duration & easing of LunarConstellation's internal
       // radialPulse so the screen wash + the constellation burst peak
       // and fade together.
       screenFlash.value = 0
       screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
       if (wasFirstDay) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
         setShowCelebration(true)
         setTimeout(() => {
           setShowCelebration(false)
@@ -163,6 +187,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
     } else if (next === 'rested') {
       if (ctx.today_workout_completed) toggleToday.mutate(false)
       setRest.mutate(true)
+      playCommitHaptic('rested')
     } else {
       // Cleared back to undecided — undo whichever was set.
       if (ctx.today_workout_completed) toggleToday.mutate(false)
@@ -185,6 +210,7 @@ function TodayContent({ ctx, cadence }: ContentProps) {
     // toggles stay silent — matching the constellation, which never
     // animates downward.
     if (willComplete) {
+      playCommitHaptic('backfill')
       screenFlash.value = 0
       screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
     }

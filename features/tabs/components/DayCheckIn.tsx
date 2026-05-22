@@ -36,6 +36,10 @@ function Segment({ label, kind, active, onPress }: SegmentProps) {
   return (
     <Pressable
       onPress={onPress}
+      // Press-down tick only — the anticipation beat. The reward
+      // "phrase" (impact + success) fires from the Hoy screen's
+      // handleDayChange once the state actually commits.
+      onPressIn={() => Haptics.selectionAsync().catch(() => {})}
       style={[styles.seg, active && styles.segActive]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -62,7 +66,6 @@ function Segment({ label, kind, active, onPress }: SegmentProps) {
  */
 export function DayCheckIn({ state, onChange }: Props) {
   const pick = (seg: 'trained' | 'rested') => {
-    Haptics.selectionAsync().catch(() => {})
     // Tapping the active side clears it; tapping the other switches.
     onChange(state === seg ? 'undecided' : seg)
   }

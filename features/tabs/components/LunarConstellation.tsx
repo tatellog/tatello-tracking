@@ -1,9 +1,10 @@
-import * as Haptics from 'expo-haptics'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 import Animated, {
   Easing,
   cancelAnimation,
+  interpolate,
+  interpolateColor,
   useAnimatedProps,
   useAnimatedStyle,
   useDerivedValue,
@@ -320,6 +321,11 @@ export function LunarConstellation({
   // so the WHOLE figure (lit + unlit) lights up momentarily, then
   // settles back to the current state.
   const radialPulse = useSharedValue(0)
+  // 0→1 ramp fired once per upward commit — drives the floating "+1"
+  // ghost that rises above the counter and fades. The literal
+  // increment, made visible for ~700 ms then gone (a flourish, not
+  // chrome). Stays at 0 on undo / first paint.
+  const plusOne = useSharedValue(0)
 
   // Detect upward changes → fire haptic, run centre animations, push
   // new SequenceEls onto the queue. Downward changes (undo) just sync
@@ -346,6 +352,10 @@ export function LunarConstellation({
       withTiming(1, { duration: 220, easing: Easing.out(Easing.back(1.4)) }),
       withTiming(0, { duration: 340, easing: Easing.inOut(Easing.cubic) }),
     )
+    // The "+1" ghost — a single 0→1 ramp; the overlay derives both
+    // its rise and its fade from this value.
+    plusOne.value = 0
+    plusOne.value = withTiming(1, { duration: 760, easing: Easing.out(Easing.cubic) })
     litPulse.value = 0
     litPulse.value = withSequence(
       withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }),
@@ -358,18 +368,21 @@ export function LunarConstellation({
       // Field stars don't run through the ignition flash — they just
       // fade in. Only figure stars/lines get the dramatic ignition.
       const newEls = sequence.slice(prevLit, elementsLit).filter((el) => el.type !== 'field')
-      const hasLine = newEls.some((el) => el.type === 'line')
-      Haptics.impactAsync(
-        hasLine ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
-      ).catch(() => {})
       setIgnitionQueue((q) => [...q, ...newEls])
-    } else {
-      // Tap landed but `round(pct * total)` didn't bump any element
-      // this time. Still give a soft tactile confirmation so the user
-      // doesn't think their tap got eaten.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
     }
-  }, [trainedCount, elementsLit, sequence, displayedCount, numberPulse, litPulse, radialPulse])
+    // The commit haptic is owned by the Hoy screen's action handlers
+    // (a designed two-beat phrase) — the constellation no longer
+    // fires its own single tick, which would double up.
+  }, [
+    trainedCount,
+    elementsLit,
+    sequence,
+    displayedCount,
+    numberPulse,
+    litPulse,
+    radialPulse,
+    plusOne,
+  ])
 
   // Drain the queue one element at a time. Each fire sets igniteT 0→1
   // over the element-typed duration, holds for 30ms post-completion,
@@ -439,6 +452,7 @@ export function LunarConstellation({
         <CenterNumberOverlay
           displayedCount={displayedCount}
           numberPulse={numberPulse}
+          plusOne={plusOne}
           initialCount={trainedCount}
         />
       </View>
@@ -1578,10 +1592,12 @@ function CenterText({ cx, cy }: { cx: number; cy: number }) {
 function CenterNumberOverlay({
   displayedCount,
   numberPulse,
+  plusOne,
   initialCount,
 }: {
   displayedCount: SharedValue<number>
   numberPulse: SharedValue<number>
+  plusOne: SharedValue<number>
   initialCount: number
 }) {
   const rounded = useDerivedValue(() => Math.round(displayedCount.value))
@@ -1591,11 +1607,22 @@ function CenterNumberOverlay({
   })
   // Opacity ramps from 0.42 at count=0 to 1.0 once the user has marked
   // at least one day — the dim "0" reads as "waiting for you to begin"
-  // rather than a bright assertion. Beyond count=1 the number stays at
-  // full brightness; scale pulse on commit is layered on top.
+  // rather than a bright assertion. The commit scale-pop is bigger now
+  // (0.18, was 0.08) so the increment lands as a beat, not a twitch.
   const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + numberPulse.value * 0.08 }],
+    transform: [{ scale: 1 + numberPulse.value * 0.18 }],
     opacity: 0.42 + Math.min(1, displayedCount.value) * 0.58,
+  }))
+  // The digit flashes pale at the peak of the pop — magenta → near
+  // white → magenta — so the eye catches the number *changing*.
+  const colorStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(numberPulse.value, [0, 1], [colors.magenta, '#FFF3FA']),
+  }))
+  // The "+1" ghost — rises ~22 px and fades. Appears fast, holds
+  // briefly, gone by the end of the ramp.
+  const ghostStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(plusOne.value, [0, 0.12, 0.6, 1], [0, 1, 1, 0]),
+    transform: [{ translateY: -plusOne.value * 22 }],
   }))
   return (
     <View style={styles.numberOverlay} pointerEvents="none">
@@ -1605,8 +1632,11 @@ function CenterNumberOverlay({
           underlineColorAndroid="transparent"
           animatedProps={textProps}
           defaultValue={String(initialCount)}
-          style={styles.numberOverlayText}
+          style={[styles.numberOverlayText, colorStyle]}
         />
+      </Animated.View>
+      <Animated.View style={[styles.plusOne, ghostStyle]} pointerEvents="none">
+        <Text style={styles.plusOneText}>+1</Text>
       </Animated.View>
     </View>
   )
@@ -2118,6 +2148,24 @@ const styles = StyleSheet.create({
     padding: 0,
     includeFontPadding: false,
     minWidth: 80,
+  },
+  // The "+1" ghost — floats above the counter and rises out on each
+  // commit. Absolute so it never shifts the centred number's layout.
+  plusOne: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: H / 2 - 62,
+    alignItems: 'center',
+  },
+  plusOneText: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 22,
+    color: colors.magenta,
+    textShadowColor: 'rgba(233,30,99,0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
   // Visible only once the user completes the 28-day cycle — a single
   // small magenta caps stamp announcing the achievement. Replaces the
