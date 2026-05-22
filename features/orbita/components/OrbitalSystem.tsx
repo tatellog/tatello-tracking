@@ -1,7 +1,4 @@
 import * as Haptics from 'expo-haptics'
-// Aliased — react-native-svg also exports a `LinearGradient` (the
-// SVG paint server used for the orbit strokes).
-import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -21,7 +18,9 @@ import Svg, {
   G,
   Line,
   LinearGradient,
+  Mask,
   RadialGradient,
+  Rect,
   Stop,
   Text as SvgText,
 } from 'react-native-svg'
@@ -55,6 +54,10 @@ const HIT = 66 // tap-target box, in px
 // against the edge. The height extends to match so nothing squishes.
 const VB_TOP = -28
 const VB_H = 382
+// The diagram fades to transparent over its top FADE_H units — a mask,
+// not a coloured overlay, so the real page background shows through
+// and there is no flat patch.
+const FADE_H = 56
 
 // Three orbits — modelled after the triple-star reference photo. The
 // shapes are hand-tuned for each orbit's character (tall vertical,
@@ -211,36 +214,58 @@ export function OrbitalSystem({
               <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0.2} />
             </LinearGradient>
           ))}
+
+          {/* Top-edge fade mask — black (transparent) at the canvas
+              top easing to white (opaque) below, so the whole diagram
+              dissolves into the page rather than ending on a hard
+              edge. A mask, not an overlay: the real background shows
+              through, no flat-coloured patch. */}
+          <LinearGradient
+            id="top-fade-grad"
+            gradientUnits="userSpaceOnUse"
+            x1="0"
+            y1={VB_TOP}
+            x2="0"
+            y2={VB_TOP + FADE_H}
+          >
+            <Stop offset="0" stopColor="#000000" />
+            <Stop offset="1" stopColor="#FFFFFF" />
+          </LinearGradient>
+          <Mask id="top-fade" maskUnits="userSpaceOnUse" x={0} y={VB_TOP} width={W} height={VB_H}>
+            <Rect x={0} y={VB_TOP} width={W} height={VB_H} fill="url(#top-fade-grad)" />
+          </Mask>
         </Defs>
 
-        {/* The deep field — nebula + starfield. */}
-        <Cosmos t={t} drift={drift} />
+        {/* The whole diagram is drawn through the top-fade mask. */}
+        <G mask="url(#top-fade)">
+          {/* The deep field — nebula + starfield. */}
+          <Cosmos t={t} drift={drift} />
 
-        {/* Cosmic interlace — three asymmetric orbits, each with its
-            own centre, axis tilt and weight. Each ellipse + its
-            destello live inside a slowly-precessing group so the
-            tilt drifts over time; the pink gradient sweeps with it. */}
-        <OrbitGroup orbit={ORBITS[0]!} gradId="orb-grad-0" spin={spin1} particle={orbit1} />
-        <OrbitGroup orbit={ORBITS[1]!} gradId="orb-grad-1" spin={spin2} particle={orbit2} />
-        <OrbitGroup orbit={ORBITS[2]!} gradId="orb-grad-2" spin={spin3} particle={orbit3} />
+          {/* Cosmic interlace — three asymmetric orbits, each with its
+              own centre, axis tilt and weight. Each ellipse + its
+              destello live inside a slowly-precessing group so the
+              tilt drifts over time; the pink gradient sweeps with it. */}
+          <OrbitGroup orbit={ORBITS[0]!} gradId="orb-grad-0" spin={spin1} particle={orbit1} />
+          <OrbitGroup orbit={ORBITS[1]!} gradId="orb-grad-1" spin={spin2} particle={orbit2} />
+          <OrbitGroup orbit={ORBITS[2]!} gradId="orb-grad-2" spin={spin3} particle={orbit3} />
 
-        {/* The central star — the "you" the dimensions orbit. Smaller
-            than before; the orbits are the loud thing now. */}
-        <CenterStar t={t} />
+          {/* The central star — the "you" the dimensions orbit. */}
+          <CenterStar t={t} />
 
-        {/* Dimension stars — small luminous points on each orbit. */}
-        {placed.map(({ d, pos }) => (
-          <StarNode
-            key={d.key}
-            dim={d}
-            pos={pos}
-            t={t}
-            popT={popT}
-            rippleT={rippleT}
-            selected={d.key === selectedKey}
-            faded={selectedKey != null && d.key !== selectedKey}
-          />
-        ))}
+          {/* Dimension stars — small luminous points on each orbit. */}
+          {placed.map(({ d, pos }) => (
+            <StarNode
+              key={d.key}
+              dim={d}
+              pos={pos}
+              t={t}
+              popT={popT}
+              rippleT={rippleT}
+              selected={d.key === selectedKey}
+              faded={selectedKey != null && d.key !== selectedKey}
+            />
+          ))}
+        </G>
       </Svg>
 
       {/* Tap targets — RN Pressables centred on each star. The hit
@@ -264,14 +289,6 @@ export function OrbitalSystem({
           accessibilityLabel={d.label}
         />
       ))}
-
-      {/* Top fade — the diagram dissolves into the page instead of
-          starting on a hard edge under the reading above it. */}
-      <FadeGradient
-        colors={[colors.bg, 'transparent']}
-        style={styles.topFade}
-        pointerEvents="none"
-      />
     </View>
   )
 }
@@ -647,14 +664,5 @@ const styles = StyleSheet.create({
     height: HIT,
     marginLeft: -HIT / 2,
     marginTop: -HIT / 2,
-  },
-  // Softens the diagram's top edge into the page background — the
-  // hero emerges rather than starting on a line.
-  topFade: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
   },
 })
