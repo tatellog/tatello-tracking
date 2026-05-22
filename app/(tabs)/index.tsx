@@ -3,14 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
@@ -125,16 +118,6 @@ function TodayContent({ ctx, cadence }: ContentProps) {
   // The 28-day strip is the constellation's data twin — collapsed by
   // default so it doesn't compete with the hero constellation above.
   const [weekOpen, setWeekOpen] = useState(false)
-  // Drives the full-viewport magenta wash that accompanies the
-  // constellation burst on each day-mark. Fires 0→1 over the same
-  // duration as LunarConstellation's internal radialPulse so the
-  // two animations read as one moment. Bell-curve opacity in the
-  // animated style peaks mid-pulse and fades back to zero at the end.
-  const screenFlash = useSharedValue(0)
-  const screenFlashStyle = useAnimatedStyle(() => {
-    const u = screenFlash.value
-    return { opacity: u * (1 - u) * 4 * 0.18 }
-  })
   const todayIsoLocal = ctx.date
 
   // The week strip shows the full 28-day window as one horizontally
@@ -173,11 +156,9 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       if (restedToday) setRest.mutate(false)
       toggleToday.mutate(true)
       playCommitHaptic('trained')
-      // Mirror duration & easing of LunarConstellation's internal
-      // radialPulse so the screen wash + the constellation burst peak
-      // and fade together.
-      screenFlash.value = 0
-      screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
+      // No flat screen wash — the reward light blooms from the
+      // constellation itself (its internal radialPulse), so it
+      // radiates from the figure rather than tinting the whole app.
       if (wasFirstDay) {
         setShowCelebration(true)
         setTimeout(() => {
@@ -205,15 +186,12 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       setJustMarkedIdx(idx)
       setTimeout(() => setJustMarkedIdx(null), 800)
     }
-    // Marking a past day fires the same celebration as today's
-    // workout: the screen wash here + the constellation burst (which
+    // Marking a past day fires the same constellation burst (which
     // re-animates on its own once the trained count rises). Undo
     // toggles stay silent — matching the constellation, which never
     // animates downward.
     if (willComplete) {
       playCommitHaptic('backfill')
-      screenFlash.value = 0
-      screenFlash.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
     }
     toggleForDate.mutate({ date, complete: willComplete })
   }
@@ -257,7 +235,10 @@ function TodayContent({ ctx, cadence }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(420)}>
-            <CoachLine align="center" {...getCoachCopy(trainedThisMonth, signLabel)} />
+            <CoachLine
+              align="center"
+              {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained')}
+            />
           </Animated.View>
 
           {/* "Tus 28 días" — the editable calendar twin of the
@@ -303,8 +284,6 @@ function TodayContent({ ctx, cadence }: ContentProps) {
         </ScrollView>
       </SafeAreaView>
 
-      <Animated.View pointerEvents="none" style={[styles.screenFlash, screenFlashStyle]} />
-
       {showCelebration ? <Day1Celebration /> : null}
     </View>
   )
@@ -315,19 +294,67 @@ function capitalize(s: string): string {
 }
 
 /* Editorial copy that follows the user through the 28-day cycle.
- * Specific milestone days (1, 7, 14, 21, 28) get unique sentences;
- * in-between days fall back to phase-level copy so the message
- * evolves with the user's progress without writing 29 distinct
- * lines. The constellation centre already shows the numeric count —
- * the copy here doesn't repeat it. Sentences are capitalised so the
+ * Milestone counts (1, 2, 5, 7, 10, 14, 21, 28) get unique
+ * sentences; once today is marked a past-tense "done" line closes
+ * the day; other in-between days draw from a per-phase POOL so two
+ * consecutive logs never get the same line — a sentence that repeats verbatim every
+ * day in a phase reads as a frozen screen, and a flat reward
+ * habituates. The line is picked by `count % pool.length`, so it's
+ * stable for a given day but rotates as the count climbs.
+ *
+ * The constellation centre already shows the numeric count — the
+ * copy here doesn't repeat it. Sentences are capitalised so the
  * voice reads mature/editorial rather than chat-style. */
 type CoachCopy = { before: string; emphasis: string; after: string }
 
-function getCoachCopy(count: number, signLabel: string): CoachCopy {
+// Phase pools — each in-between phase has several lines; consecutive
+// days draw consecutive entries, so the copy keeps moving.
+const COACH_PHASE_POOLS: { min: number; lines: CoachCopy[] }[] = [
+  {
+    min: 22,
+    lines: [
+      { before: '', emphasis: 'Recta final', after: '. El cielo casi se cierra.' },
+      { before: 'Tu ', emphasis: 'constelación', after: ' casi está completa.' },
+      { before: 'Faltan pocas estrellas para ', emphasis: 'cerrarla', after: '.' },
+      { before: 'Tan cerca que ya casi lo ', emphasis: 'ves entero', after: '.' },
+    ],
+  },
+  {
+    min: 15,
+    lines: [
+      { before: 'Pasaste la mitad. Esto ya es ', emphasis: 'tuyo', after: '.' },
+      { before: 'La segunda mitad pesa ', emphasis: 'menos', after: '. Lo notas.' },
+      { before: 'Tu cielo está más ', emphasis: 'lleno que vacío', after: '.' },
+      { before: 'Lo difícil ya ', emphasis: 'quedó atrás', after: '.' },
+    ],
+  },
+  {
+    min: 8,
+    lines: [
+      { before: 'El cuerpo aprende cuando ', emphasis: 'insistes', after: '.' },
+      { before: 'Ya no es esfuerzo. Empieza a ser ', emphasis: 'tuyo', after: '.' },
+      { before: 'La constancia se está volviendo ', emphasis: 'gravedad', after: '.' },
+      { before: 'Tu órbita ya tiene ', emphasis: 'forma', after: '.' },
+    ],
+  },
+  {
+    min: 2,
+    lines: [
+      { before: 'Tu cuerpo lo está ', emphasis: 'registrando', after: '. Aunque no lo veas aún.' },
+      { before: 'Dos, tres, cuatro… ', emphasis: 'un patrón', after: ' empieza a dibujarse.' },
+      { before: 'Cada día suma una estrella a tu ', emphasis: 'cielo', after: '.' },
+      { before: 'Todavía es frágil. Por eso ', emphasis: 'hoy importa', after: '.' },
+    ],
+  },
+]
+
+function getCoachCopy(count: number, signLabel: string, trainedToday: boolean): CoachCopy {
   const lower = signLabel.toLowerCase()
 
-  // Specific milestone days — checked first so they override the
-  // phase fallbacks below.
+  // Milestone counts — landmark lines, shown whenever the count lands
+  // on them. They read as achievement/closure already, so they
+  // override everything below. 2 / 5 / 10 are the early-window
+  // mini-milestones that flatten the post-day-1 cliff (#5).
   if (count === 28) {
     return { before: `Completaste tu ${lower}. `, emphasis: 'Brillas', after: '.' }
   }
@@ -337,47 +364,40 @@ function getCoachCopy(count: number, signLabel: string): CoachCopy {
   if (count === 14) {
     return { before: 'La ', emphasis: 'mitad atrás', after: '. Sigue.' }
   }
+  if (count === 10) {
+    return { before: 'Diez. Ya no es casualidad, es ', emphasis: 'tuyo', after: '.' }
+  }
   if (count === 7) {
     return { before: 'Una semana. Tu cuerpo lo ', emphasis: 'recuerda', after: '.' }
   }
+  if (count === 5) {
+    return { before: 'Cinco días. Esto ya ', emphasis: 'pesa', after: '.' }
+  }
+  if (count === 2) {
+    return { before: 'Dos. Ya empieza a ser un ', emphasis: 'patrón', after: '.' }
+  }
   if (count === 1) {
-    return {
-      before: 'Hoy ',
-      emphasis: 'empieza',
-      after: ' algo. Tu cuerpo lo está registrando.',
-    }
+    return { before: 'Hoy ', emphasis: 'empieza', after: ' algo. Tu cuerpo lo registra.' }
   }
 
-  // Phase fallbacks for in-between days. Each block covers the days
-  // *after* its milestone (e.g. 22..27 sit in the "closing stretch"
-  // bucket because 21 was the last milestone).
-  if (count >= 22) {
-    return {
-      before: '',
-      emphasis: 'Recta final',
-      after: '. El cielo casi se cierra.',
-    }
+  // Today already marked — a past-tense closing line so the screen
+  // rests on "done", not "pending" (peak-end rule, #6). Rotates by
+  // count so consecutive done days don't repeat.
+  if (trainedToday) {
+    const done: CoachCopy[] = [
+      { before: 'Hoy quedó. Una estrella más en tu ', emphasis: lower, after: '.' },
+      { before: 'Listo por hoy. Tu cielo ', emphasis: 'creció', after: '.' },
+      { before: 'Hoy ', emphasis: 'cuenta', after: '. Tu cuerpo lo registró.' },
+      { before: 'Quedó marcado. Una luz ', emphasis: 'más', after: ' en tu figura.' },
+    ]
+    return done[count % done.length]!
   }
-  if (count >= 15) {
-    return {
-      before: 'Pasaste la mitad. Esto ya es ',
-      emphasis: 'tuyo',
-      after: '.',
-    }
-  }
-  if (count >= 8) {
-    return {
-      before: 'El cuerpo aprende cuando ',
-      emphasis: 'insistes',
-      after: '.',
-    }
-  }
-  if (count >= 2) {
-    return {
-      before: 'Tu cuerpo lo está ',
-      emphasis: 'registrando',
-      after: '. Aunque no lo veas todavía.',
-    }
+
+  // Today still open — rotate through the matching in-progress phase
+  // pool (reads as invitation, not closure).
+  const phase = COACH_PHASE_POOLS.find((p) => count >= p.min)
+  if (phase) {
+    return phase.lines[count % phase.lines.length] ?? phase.lines[0]!
   }
   return { before: `Tu ${lower} `, emphasis: 'te espera', after: '.' }
 }
@@ -389,13 +409,6 @@ const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
-  },
-  // Magenta wash fired on each workout commit. Covers the full
-  // viewport (above the ScrollView so it includes the header bar and
-  // tab bar) and lets taps pass through via pointerEvents="none".
-  screenFlash: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.magenta,
   },
   content: {
     paddingHorizontal: 20,
