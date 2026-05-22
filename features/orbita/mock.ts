@@ -67,9 +67,11 @@ export const MOCK_ACCION_DEL_DIA = {
  * and JS Date.getDay().
  */
 
-/** A weekday's intrinsic character — what STELAR would say if this
- *  day were lived. Used by both the days array and the prose builder
- *  so today's voice and the day card never disagree. */
+/** One day of the EXAMPLE week — mock content for the preview only.
+ *  The real engine derives each day from that day's own
+ *  daily_signals, never from the weekday: a Thursday isn't destined
+ *  to be anything. Used by the days array + the prose builder so the
+ *  example stays internally coherent. */
 type WeekdayTemplate = {
   archetype: string
   brightness: number
@@ -97,16 +99,16 @@ const WEEKDAY_TEMPLATES: readonly WeekdayTemplate[] = [
     vozTodayPhrase: 'arrancas la semana tibia',
     vozPastPhrase: 'tibia',
   },
-  // 1. Lunes: el pico clásico, descansada del finde.
+  // 1. Lunes: alto en esta semana de ejemplo, descansada del finde.
   {
     archetype: 'brillante',
     brightness: 0.92,
     dimEnLuz: 5,
     drift: 1,
     noteToday: 'Hoy llegas firme. Cuerpo, mente y energía juntos.',
-    notePast: 'Tu mejor día de la semana. Cuerpo, mente y energía juntos.',
-    vozTodayPhrase: 'estás en uno de tus mejores días',
-    vozPastPhrase: 'brillaste, fue tu día más alto',
+    notePast: 'Cuerpo, mente y energía llegaron juntos.',
+    vozTodayPhrase: 'llegas firme',
+    vozPastPhrase: 'brillaste',
   },
   // 2. Martes: sostén del impulso de lunes.
   {
@@ -130,16 +132,16 @@ const WEEKDAY_TEMPLATES: readonly WeekdayTemplate[] = [
     vozTodayPhrase: 'el impulso del lunes todavía dura',
     vozPastPhrase: 'te mantuviste firme',
   },
-  // 4. Jueves: la caída clásica del patrón "el jueves te apaga".
+  // 4. Jueves: un día más callado en esta semana de ejemplo.
   {
     archetype: 'callada',
     brightness: 0.45,
     dimEnLuz: 2,
     drift: 3,
-    noteToday: 'Hoy el cuerpo pide bajar. Los jueves suelen ser así.',
-    notePast: 'El jueves bajó. Cuatro dimensiones quedaron tranquilas.',
+    noteToday: 'Hoy el cuerpo pide bajar.',
+    notePast: 'Ese día el cuerpo pidió calma.',
     vozTodayPhrase: 'el cuerpo pide bajar',
-    vozPastPhrase: 'bajaste, cuatro dimensiones tranquilas',
+    vozPastPhrase: 'aflojó',
   },
   // 5. Viernes: liberación, otro respiro.
   {
@@ -214,6 +216,11 @@ export function buildWeekDays(todayIdx: number): readonly DiaSemana[] {
   })
 }
 
+/** Mean of a list of numbers (0 for an empty list). */
+function average(xs: readonly number[]): number {
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
+}
+
 /** Derive the week's archetype + meta counts from the lived days. */
 export function buildArquetipoSemana(
   days: readonly DiaSemana[],
@@ -232,27 +239,36 @@ export function buildArquetipoSemana(
   const daysRead = lived.length
   const daysEnLuz = lived.filter((d) => d.brightness >= EN_LUZ_THRESHOLD_WEEK).length
   const signals = lived.reduce((s, d) => s + d.dimEnLuz + d.drift, 0) * 2
-  const proportion = daysEnLuz / daysRead
-  const closing = todayIdx === 6
+
+  // The week archetype names the *shape* of the week — its rhythm —
+  // never a grade of how many days were "good". A rhythm isn't a
+  // pass/fail; it's something to notice and plan around.
   let name = 'la semana arrancando'
-  if (closing) {
-    name =
-      daysEnLuz >= 4
-        ? 'la semana cerrándose en luz'
-        : daysEnLuz >= 2
-          ? 'la semana cerrándose tibia'
-          : 'la semana cerrándose en silencio'
-  } else if (daysRead >= 2) {
-    name =
-      proportion >= 0.6
-        ? 'la semana en luz'
-        : proportion >= 0.3
-          ? 'la semana en formación'
-          : 'la semana en silencio'
+  let emphasis = 'arrancando'
+  if (daysRead >= 2) {
+    const bs = lived.map((d) => d.brightness)
+    const mid = Math.max(1, Math.floor(bs.length / 2))
+    const firstAvg = average(bs.slice(0, mid))
+    const secondAvg = average(bs.slice(mid))
+    const range = Math.max(...bs) - Math.min(...bs)
+    if (range < 0.18) {
+      name = 'la semana pareja'
+      emphasis = 'pareja'
+    } else if (secondAvg - firstAvg > 0.1) {
+      name = 'la semana que sube'
+      emphasis = 'sube'
+    } else if (firstAvg - secondAvg > 0.1) {
+      name = 'la semana que afloja'
+      emphasis = 'afloja'
+    } else {
+      name = 'la semana de vaivén'
+      emphasis = 'vaivén'
+    }
   }
+
   return {
     name,
-    emphasis: 'la semana',
+    emphasis,
     daysEnLuz,
     nochesRotas: 0,
     daysRead,
