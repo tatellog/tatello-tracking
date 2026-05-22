@@ -71,7 +71,7 @@ export function MovementConstellation() {
   }, [workouts.data])
 
   return (
-    <Animated.View entering={FadeIn.duration(360).delay(340)}>
+    <Animated.View entering={FadeIn.duration(360).delay(80)}>
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Movimiento · 28 días
       </EyebrowLabel>

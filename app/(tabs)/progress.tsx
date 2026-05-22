@@ -5,7 +5,6 @@ import Animated, {
   Easing,
   Extrapolation,
   FadeIn,
-  FadeInDown,
   interpolate,
   useAnimatedProps,
   useSharedValue,
@@ -87,20 +86,23 @@ export default function ProgressScreen() {
             <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
 
-          {/* Hero — three branches matched to the data the user has:
-                count = 0  → invitation + primary CTA
-                count = 1  → first weight is the hero + CTA to add a 2nd
-                count ≥ 2  → delta + chart + period filter + coach line
-              The earlier single template rendered an em-dash hero with
-              an empty chart for the 0/1 cases — read as "bug", not as
-              "empty". Adaptive content makes the early states feel
-              intentional, and pushes the action up where it belongs. */}
+          {/* Hero — the user's PROCESS: how much they moved. Weight
+              is an outcome (laggy, noisy, half outside their
+              control); what the tab opens on is what they actually
+              did. The movement constellation owns its own eyebrow. */}
+          <MovementConstellation />
+
+          {/* ── Tu cuerpo — weight + measurements. Demoted out of the
+              hero: one section among several, an outcome shown
+              calmly. The giant opening delta is gone; the number is
+              section-sized now. ── */}
+          <View style={styles.divider} />
+          <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
+            Tu cuerpo
+          </EyebrowLabel>
           {hasTrajectory ? (
             <>
-              <Animated.View entering={FadeInDown.duration(420).delay(60)} style={styles.hero}>
-                <EyebrowLabel tone="niebla" size={10} style={styles.heroEyebrow}>
-                  Rumbo a tu Andrómeda
-                </EyebrowLabel>
+              <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.hero}>
                 <View style={styles.deltaRow}>
                   <Text style={styles.deltaNum}>{formatDelta(delta?.abs)}</Text>
                   {delta ? <Text style={styles.deltaUnit}>kg</Text> : null}
@@ -145,11 +147,7 @@ export default function ProgressScreen() {
               ) : null}
             </>
           ) : (
-            <Animated.View entering={FadeInDown.duration(420).delay(60)} style={styles.heroEmpty}>
-              <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
-                {count === 0 ? 'Empezás acá' : 'Tu punto de partida'}
-              </EyebrowLabel>
-
+            <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.heroEmpty}>
               {count === 1 && first ? (
                 <View style={styles.firstWeightRow}>
                   <Text style={styles.firstWeightNum}>{first.weight.toFixed(1)}</Text>
@@ -176,32 +174,25 @@ export default function ProgressScreen() {
             </Animated.View>
           )}
 
-          {/* ── Sección: comparativa 30 días (silenciosa si aún no
-              hay datos pasados para comparar) ── */}
+          {/* ── Comparativa 30 días (silenciosa si no hay datos
+              pasados para comparar) ── */}
           <View style={styles.divider} />
           <ComparativaCard />
 
-          {/* ── Sección: ciclo (silenciosa si cycle_situation no es
-              activa) ── */}
+          {/* ── Ciclo (silenciosa si cycle_situation no es activa) ── */}
           <View style={styles.divider} />
           <CycleCard />
 
-          {/* ── Sección: movimiento en 28 días — constelación ── */}
-          <View style={styles.divider} />
-          <MovementConstellation />
-
-          {/* ── Sección: tu cambio visual ── */}
+          {/* ── Registro visual — antes/después ── */}
           <View style={styles.divider} />
           <BeforeAfterPhotos />
 
-          {/* ── Sección: entreno de hoy (sólo si trainedToday) ── */}
+          {/* ── Entreno de hoy (sólo si trainedToday) ── */}
           <View style={styles.divider} />
           <TrainingShareCTA />
 
-          {/* Bottom CTA — only shown once the user already has a
-              trajectory; the empty / first-weight states put the CTA
-              in the hero so it's not buried. In-scroll (not sticky):
-              a floating button covered too much content. */}
+          {/* Bottom CTA — only once the user already has a trajectory;
+              the empty / first-weight states carry their own CTA. */}
           {hasTrajectory ? (
             <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
               <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
@@ -437,17 +428,17 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 6,
   },
+  // Section-sized, not page-hero-sized — weight is no longer the
+  // number the tab opens on.
   firstWeightNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 80,
-    paddingTop: 14,
-    paddingBottom: 12,
+    fontSize: 46,
+    paddingTop: 4,
+    paddingBottom: 2,
     color: colors.leche,
-    letterSpacing: -3,
-    // Soft cream halo against the dark page — same vocabulary as the
-    // weight + height heroes in the onboarding baseline screens.
+    letterSpacing: -1,
     textShadowColor: 'rgba(252, 246, 235, 0.22)',
-    textShadowRadius: 18,
+    textShadowRadius: 14,
     textShadowOffset: { width: 0, height: 0 },
   },
   firstWeightUnit: {
@@ -474,16 +465,15 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 6,
   },
+  // Section-sized — weight is one axis among several now, not the
+  // giant delta that used to open the tab.
   deltaNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 80,
-    // Hanken Black at 80 px draws ink beyond the font's own metrics;
-    // iOS clips that overshoot to the Text frame. lineHeight can't fix
-    // it — padding can: it enlarges the frame so the ink has room.
-    paddingTop: 14,
-    paddingBottom: 12,
+    fontSize: 46,
+    paddingTop: 4,
+    paddingBottom: 4,
     color: colors.magenta,
-    letterSpacing: -3,
+    letterSpacing: -1,
   },
   deltaUnit: {
     fontFamily: typography.displayMedium,
