@@ -1,4 +1,7 @@
 import * as Haptics from 'expo-haptics'
+// Aliased — react-native-svg also exports a `LinearGradient` (the
+// SVG paint server used for the orbit strokes).
+import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -261,6 +264,14 @@ export function OrbitalSystem({
           accessibilityLabel={d.label}
         />
       ))}
+
+      {/* Top fade — the diagram dissolves into the page instead of
+          starting on a hard edge under the reading above it. */}
+      <FadeGradient
+        colors={[colors.bg, 'transparent']}
+        style={styles.topFade}
+        pointerEvents="none"
+      />
     </View>
   )
 }
@@ -636,5 +647,14 @@ const styles = StyleSheet.create({
     height: HIT,
     marginLeft: -HIT / 2,
     marginTop: -HIT / 2,
+  },
+  // Softens the diagram's top edge into the page background — the
+  // hero emerges rather than starting on a line.
+  topFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
   },
 })
