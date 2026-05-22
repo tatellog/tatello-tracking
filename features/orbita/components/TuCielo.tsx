@@ -392,8 +392,11 @@ export function TuCielo({
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0.9} />
           </LinearGradient>
           <RadialGradient id="mc-void" cx="50%" cy="50%" r="60%">
-            <Stop offset="0%" stopColor="#000000" />
-            <Stop offset="65%" stopColor="#000000" />
+            {/* Warm-dark, not dead-black: the void's heart still reads
+                as the quiet still centre, but it never reads as a
+                pit that swallows light. */}
+            <Stop offset="0%" stopColor="#240A16" />
+            <Stop offset="65%" stopColor="#0A0308" />
             <Stop offset="92%" stopColor="#1A0410" />
             <Stop offset="100%" stopColor="#5A1430" />
           </RadialGradient>
@@ -579,6 +582,13 @@ export function TuCielo({
           strokeWidth={2}
           opacity={0.8}
         />
+        {/* Ember — a faint warm heartbeat at the void's heart. The
+            centre stays dark and still (the cycle's quiet point) but
+            it is warm-dark, never a dead pit: light lives here, just
+            softly. */}
+        <Circle cx={CX} cy={CY} r={EH * 0.62} fill={colors.magenta} opacity={0.12} />
+        <Circle cx={CX} cy={CY} r={EH * 0.34} fill="#F4ABC8" opacity={0.16} />
+        <Circle cx={CX} cy={CY} r={EH * 0.12} fill="#FBD7E3" opacity={0.46} />
         {/* Photon ring — bright hot edge of the void. Breathes. */}
         <AnimatedCircle
           cx={CX}
