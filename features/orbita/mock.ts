@@ -49,11 +49,11 @@ export const MOCK_HEADLINE: { parts: readonly VozParte[] } = {
   ],
 }
 
-/** Today's "moves the needle" — STELAR picks the one action with the
- *  highest leverage given the read. Title is plain Spanish (an
- *  imperative); reason names the data that justifies it. */
+/** Today's suggested move — one low-effort thing the reading hints
+ *  might help. Title is a plain, period-less phrase (an offer, not a
+ *  command); reason names the data behind it. */
 export const MOCK_ACCION_DEL_DIA = {
-  title: 'Dormir antes de las 23:00.',
+  title: 'Dormir antes de las 23:00',
   reason:
     'Estás en fase lútea y arrancando una semana baja en energía. Una hora más de sueño hoy te ahorra el jueves.',
 }

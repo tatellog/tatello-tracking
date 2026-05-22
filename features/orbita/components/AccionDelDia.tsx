@@ -3,20 +3,17 @@ import { StyleSheet, Text, View } from 'react-native'
 import { colors, typography } from '@/theme'
 
 /*
- * AccionDelDia — STELAR's "what moves the needle today" card. It
- * converts the reading into a single prioritised action, so the
- * orbital + Voz don't end as pure poetry. One action, not a list:
- * STELAR's job is to call the highest-leverage move, not to dump
- * every option.
+ * AccionDelDia — one thing the reading suggests might help today.
+ * An *invitation*, not a prescription: STELAR offers a single
+ * low-effort move and the reason behind it; the user decides.
  *
- * Visually heavier than Voz de Stelar — bordered with a soft magenta
- * tint and a magenta hairline — so it reads as the call-to-action it
- * is, not as more narration.
+ * Same calm card weight as Voz de Stelar (not a heavier CTA tint) —
+ * it's a suggestion sitting beside the reading, not an order above it.
  */
 export function AccionDelDia({ title, reason }: { title: string; reason: string }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>Hoy mueve la aguja</Text>
+      <Text style={styles.eyebrow}>Algo que quizá ayude hoy</Text>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.reason}>{reason}</Text>
     </View>
@@ -26,10 +23,10 @@ export function AccionDelDia({ title, reason }: { title: string; reason: string 
 const styles = StyleSheet.create({
   card: {
     marginTop: 18,
-    backgroundColor: colors.magentaTint,
+    backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.magentaDeep,
+    borderColor: colors.bruma,
     paddingHorizontal: 16,
     paddingVertical: 16,
   },

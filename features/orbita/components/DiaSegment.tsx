@@ -96,6 +96,9 @@ export function DiaSegment() {
           dense meta line that names tones, the read window, and how
           deep STELAR has read so far. */}
       <View style={styles.header}>
+        {/* Frames the archetype as a lens for today — something that
+            shifts — not a fixed identity label. */}
+        <Text style={styles.lensEyebrow}>Tu lente de hoy</Text>
         <EmText
           text={MOCK_ARQUETIPO.name}
           emphasis={MOCK_ARQUETIPO.emphasis}
@@ -105,9 +108,10 @@ export function DiaSegment() {
         <View style={styles.metaRow}>
           <LiveDot />
           <View style={styles.metaStack}>
-            {/* Each tone is its own coloured run — the meta row reads
-                as a tiny visual map of the system, not a numeric list.
-                Magenta is reserved for what truly shines. */}
+            {/* Leads with the light. The header names what shines and
+                what's forming; it never counts the dimensions "en
+                silencio" at the user — those are discoverable by
+                tapping the diagram, not a daily tally of absence. */}
             <Text
               style={styles.meta}
               numberOfLines={1}
@@ -117,8 +121,6 @@ export function DiaSegment() {
               <Text style={styles.toneBrillante}>{tones.brillantes} brillantes</Text>
               <Text style={styles.metaSep}> · </Text>
               <Text style={styles.toneFormacion}>{tones.formacion} en formación</Text>
-              <Text style={styles.metaSep}> · </Text>
-              <Text style={styles.toneSilencio}>{tones.silencio} en silencio</Text>
             </Text>
             {/* "leído por Stelar · N días" — a claim only true once
                 the engine has run; hidden while the prose is mock. */}
@@ -251,6 +253,15 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
+  },
+  // Frames the archetype as a passing lens, not an identity.
+  lensEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 8,
   },
   // The archetype name — the app's poetic register.
   archetype: {

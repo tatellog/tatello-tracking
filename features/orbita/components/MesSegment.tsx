@@ -143,6 +143,8 @@ export function MesSegment() {
 
       {/* Compressed header — mirrors Día / Semana. */}
       <View style={styles.header}>
+        {/* Frames the cycle archetype as a lens, not an identity. */}
+        <Text style={styles.lensEyebrow}>Tu lente del mes</Text>
         <EmText
           text={archetypeName}
           emphasis={archetypeEmphasis}
@@ -244,6 +246,15 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
+  },
+  // Frames the archetype as a passing lens, not an identity.
+  lensEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 8,
   },
   archetype: {
     fontFamily: typography.serif,

@@ -43,7 +43,6 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
   // rest are still ahead.
   const livedCount = arquetipo.daysRead
   const daysEnLuz = arquetipo.daysEnLuz
-  const lejos = Math.max(0, livedCount - daysEnLuz)
   const porVenir = days.length - livedCount
 
   const activePattern = pickActivePattern(todayIdx)
@@ -92,6 +91,8 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
           and the insight. No eyebrow on top: the tab pill already
           says "Semana". */}
       <View style={styles.header}>
+        {/* Frames the week's archetype as a lens, not an identity. */}
+        <Text style={styles.lensEyebrow}>Tu lente de la semana</Text>
         <EmText
           text={arquetipo.name}
           emphasis={arquetipo.emphasis}
@@ -101,10 +102,9 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
         <View style={styles.metaRow}>
           <LiveDot />
           <Text style={styles.meta} numberOfLines={ENGINE_ACTIVE ? 2 : 1}>
+            {/* Leads with the light — days "lejos" aren't tallied. */}
             <Text style={styles.metaNum}>{daysEnLuz}</Text>
             <Text> en luz · </Text>
-            <Text style={styles.metaNum}>{lejos}</Text>
-            <Text> lejos · </Text>
             <Text style={styles.metaNum}>{porVenir}</Text>
             <Text> por venir</Text>
             {/* "leído por Stelar · N días" — only true once the engine
@@ -172,6 +172,15 @@ const styles = StyleSheet.create({
   // ── Header — compressed, archetype as the only hero ──────────
   header: {
     alignItems: 'center',
+  },
+  // Frames the archetype as a passing lens, not an identity.
+  lensEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 8,
   },
   archetype: {
     fontFamily: typography.serif,
