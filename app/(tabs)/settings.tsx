@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -42,17 +42,17 @@ const FOCUS_LABEL: Record<string, { label: string; tagline: string }> = {
 }
 
 /*
- * Settings hub, in the app's celestial-editorial language. Cards:
+ * Settings hub, in the app's celestial-editorial language. Sections:
  *   1. Mi perfil — identity (name + zodiac + age + altura + sexo).
- *      Tappable: opens /onboarding/about-you?source=settings.
- *   2. Tu intención — the monthly_focus the user declared in the
- *      wizard, surfaced as a separate tappable card (label + tagline)
- *      so it doesn't get buried with demographics. Tappable: opens
- *      /onboarding/tu-intencion?source=settings.
- *   3. Mis metas — macro targets (tappable, opens macro-targets).
- *   4. Track corporal — optional body-photo comparativa.
- *   5. Cómo te lee Stelar — what Stelar reads + data privacy promise.
- *   6. Cuenta — sign out.
+ *      Tappable card: opens /onboarding/about-you?source=settings.
+ *   2. Tu plan — the three levers the user controls, grouped into a
+ *      single card with one tappable row each: intención del mes,
+ *      macros diarios, seguimiento corporal. They used to be three
+ *      separate one-row sections — collapsing them kills the
+ *      header-row-header-row rhythm and lifts everything up.
+ *   3. Cómo te lee Stelar — one line naming what the intelligence
+ *      reads (the privacy promise moved to Cuenta, where it belongs).
+ *   4. Cuenta — the data-ownership line + sign out.
  *
  * Sign-out is destructive: confirmation, then a coordinated cleanup
  * (in-memory query cache + persisted store + visited-day-one flag)
@@ -121,7 +121,7 @@ export default function SettingsScreen() {
   // latest complete (4-angle) set so the card honestly says "X days
   // since your last comparativa" instead of pretending fresh state.
   const bodyTrackStatus = (() => {
-    if (lastPhotoSetAt == null) return 'Aún sin foto · activar'
+    if (lastPhotoSetAt == null) return 'Aún sin fotos'
     const days = Math.max(0, Math.floor((Date.now() - lastPhotoSetAt) / (1000 * 60 * 60 * 24)))
     if (days === 0) return 'Capturado hoy'
     if (days === 1) return 'Hace 1 día'
@@ -166,13 +166,17 @@ export default function SettingsScreen() {
             <TabHeader title="Ajustes" pillLabel="STELAR · v1.0.0" />
           </Animated.View>
 
-          {/* ── Mi perfil — the identity card, tap to edit. ── */}
+          {/* ── Mi perfil — the identity card, tap to edit. The
+              pressed style covers the whole card so tapping the
+              Altura / Sexo rows (which have no chevron of their own)
+              still gives feedback — they read as static otherwise. ── */}
           <Animated.View entering={enter(100)}>
             <SectionHeader label="Mi perfil" />
             <Pressable
               onPress={editProfile}
               accessibilityRole="button"
               accessibilityLabel="Editar mi perfil"
+              style={({ pressed }) => pressed && styles.rowPressed}
             >
               <View style={styles.profileCard}>
                 <View style={styles.identity}>
@@ -214,83 +218,49 @@ export default function SettingsScreen() {
             </Pressable>
           </Animated.View>
 
-          {/* ── Tu intención — the monthly_focus the user picked in
-              tu-intencion, surfaced as its own tappable card with the
-              same label + tagline pair the wizard used. Tapping
-              re-opens /onboarding/tu-intencion?source=settings so the
-              user can change it from here. ── */}
+          {/* ── Tu plan — the three levers the user controls. One
+              section header over three distinct cards: solves the
+              eyebrow-soup (3 headers → 1) without melting them into a
+              single slab of full-bleed dividers, which read as an
+              unstyled list. ── */}
           <Animated.View entering={enter(150)}>
-            <SectionHeader label="Tu intención" />
-            <Pressable
+            <SectionHeader label="Tu plan" />
+            <PlanRow
+              label={intention?.label ?? 'Aún sin definir'}
+              value={intention?.tagline ?? 'Tocá para elegir un foco'}
               onPress={editIntention}
-              accessibilityRole="button"
               accessibilityLabel="Editar tu intención"
-            >
-              <View style={styles.metaCard}>
-                <View style={styles.metaMain}>
-                  <Text style={styles.metaLabel}>{intention?.label ?? 'Aún sin definir'}</Text>
-                  {intention ? (
-                    <Text style={styles.metaValue}>{intention.tagline}</Text>
-                  ) : (
-                    <Text style={styles.metaValue}>Tocá para elegir un foco</Text>
-                  )}
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            </Pressable>
-          </Animated.View>
-
-          {/* ── Mis metas — macros, tap to edit. ── */}
-          <Animated.View entering={enter(190)}>
-            <SectionHeader label="Mis metas" />
-            <Pressable
+            />
+            <PlanRow
+              label="Macros diarios"
               onPress={editTargets}
-              accessibilityRole="button"
               accessibilityLabel="Editar macros diarios"
-            >
-              <View style={styles.metaCard}>
-                <View style={styles.metaMain}>
-                  <Text style={styles.metaLabel}>Macros diarios</Text>
-                  {targets ? (
-                    <Text style={styles.metaValue}>
-                      <Text style={styles.metaNum}>{targets.protein_g}</Text> g proteína
-                      {'   ·   '}
-                      <Text style={styles.metaNum}>{targets.calories}</Text> kcal
-                    </Text>
-                  ) : (
-                    <Text style={styles.metaValue}>Aún sin definir</Text>
-                  )}
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            </Pressable>
-          </Animated.View>
-
-          {/* ── Track corporal — the optional 4-angle body-photo
-              comparativa. Out of the main onboarding flow on
-              purpose; this is where users who want a physical-change
-              record opt in. The status line uses the latest complete
-              set so the card never lies about state. ── */}
-          <Animated.View entering={enter(215)}>
-            <SectionHeader label="Track corporal" />
-            <Pressable
+              valueNode={
+                targets ? (
+                  <Text style={styles.metaValue}>
+                    <Text style={styles.metaNum}>{targets.protein_g}</Text> g proteína
+                    {'   ·   '}
+                    <Text style={styles.metaNum}>{targets.calories}</Text> kcal
+                  </Text>
+                ) : (
+                  <Text style={styles.metaValue}>Aún sin definir</Text>
+                )
+              }
+            />
+            <PlanRow
+              label="Seguimiento corporal"
+              value={bodyTrackStatus}
               onPress={openBodyTrack}
-              accessibilityRole="button"
-              accessibilityLabel="Abrir track corporal"
-            >
-              <View style={styles.metaCard}>
-                <View style={styles.metaMain}>
-                  <Text style={styles.metaLabel}>4 fotos cada 28 días</Text>
-                  <Text style={styles.metaValue}>{bodyTrackStatus}</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            </Pressable>
+              accessibilityLabel="Abrir seguimiento corporal"
+              last
+            />
           </Animated.View>
 
-          {/* ── Cómo te lee Stelar — the intelligence, named and
-              explained: what it reads, and that the data is yours. ── */}
-          <Animated.View entering={enter(255)}>
+          {/* ── Cómo te lee Stelar — one line naming what the
+              intelligence reads. The privacy promise moved to Cuenta,
+              so this is no longer a two-paragraph block with a
+              misleading internal divider. ── */}
+          <Animated.View entering={enter(200)}>
             <SectionHeader label="Cómo te lee Stelar" />
             <View style={styles.stelarCard}>
               <Text style={styles.stelarBody}>
@@ -298,19 +268,19 @@ export default function SettingsScreen() {
                 <Text style={styles.stelarAccent}>
                   tu sueño, tus comidas, tu movimiento, tu ánimo
                 </Text>
-                . Encuentra tus patrones y escribe cada lectura de Tu Órbita.
-              </Text>
-              <View style={styles.cardDivider} />
-              <Text style={styles.stelarBody}>
-                <Text style={styles.stelarStrong}>Tus datos son tuyos.</Text> Viven en tu cuenta y
-                nadie más los lee.
+                , encuentra tus patrones y escribe cada lectura de Tu Órbita.
               </Text>
             </View>
           </Animated.View>
 
-          {/* ── Cuenta. ── */}
-          <Animated.View entering={enter(280)}>
+          {/* ── Cuenta — the data-ownership promise sits here, beside
+              the account actions it actually relates to. ── */}
+          <Animated.View entering={enter(240)}>
             <SectionHeader label="Cuenta" />
+            <Text style={styles.privacyLine}>
+              <Text style={styles.privacyStrong}>Tus datos son tuyos.</Text> Viven en tu cuenta y
+              nadie más los lee.
+            </Text>
             <Pressable
               onPress={handleSignOut}
               disabled={signingOut}
@@ -328,7 +298,7 @@ export default function SettingsScreen() {
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
           </Animated.View>
 
-          <Animated.View entering={enter(370)}>
+          <Animated.View entering={enter(320)}>
             <Text style={styles.footer}>
               Un acto <Text style={styles.footerEm}>silencioso</Text> cada mañana.
             </Text>
@@ -347,6 +317,50 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
     </View>
+  )
+}
+
+/* A "Tu plan" item — its own bordered card: a bold label, a
+ * sub-value (a plain string via `value`, or a rich node via
+ * `valueNode` for the macros line) and a chevron. Three of these
+ * stack under a single section header. `last` drops the bottom
+ * margin so the section doesn't over-pad before the next header. */
+function PlanRow({
+  label,
+  value,
+  valueNode,
+  onPress,
+  accessibilityLabel,
+  last,
+}: {
+  label: string
+  value?: string
+  valueNode?: ReactNode
+  onPress: () => void
+  accessibilityLabel: string
+  last?: boolean
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [
+        last ? styles.planWrapLast : styles.planWrap,
+        pressed && styles.rowPressed,
+      ]}
+    >
+      {/* The card's border + fill live on this inner View, not on the
+          Pressable — border/background don't render reliably when
+          applied straight to a Pressable in this RN setup. */}
+      <View style={styles.planCard}>
+        <View style={styles.metaMain}>
+          <Text style={styles.metaLabel}>{label}</Text>
+          {valueNode ?? <Text style={styles.metaValue}>{value}</Text>}
+        </View>
+        <Text style={styles.chevron}>›</Text>
+      </View>
+    </Pressable>
   )
 }
 
@@ -457,9 +471,20 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: colors.magenta,
   },
-  stelarStrong: {
+  // ── Cuenta — privacy line ──────────────────────────────────────
+  // The data-ownership promise, now a quiet line above the sign-out
+  // button instead of a card that looked tappable.
+  privacyLine: {
+    fontFamily: typography.uiMedium,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.niebla,
+    marginBottom: 14,
+    paddingHorizontal: 2,
+  },
+  privacyStrong: {
     fontFamily: typography.displaySemi,
-    color: colors.leche,
+    color: colors.bone,
   },
   row: {
     flexDirection: 'row',
@@ -482,8 +507,18 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'right',
   },
-  // ── Mis metas ──────────────────────────────────────────────────
-  metaCard: {
+  // ── Tu plan ────────────────────────────────────────────────────
+  // The Pressable carries only spacing; the visible card lives on an
+  // inner View (planCard) so its border + fill render reliably.
+  planWrap: {
+    marginBottom: 10,
+  },
+  planWrapLast: {
+    marginBottom: 0,
+  },
+  // Each PlanRow is its own distinct card — same vocabulary as the
+  // Mi perfil card — stacked with a small gap under one header.
+  planCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -493,6 +528,11 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
     paddingHorizontal: 16,
     paddingVertical: 15,
+  },
+  // Whole-card press feedback — used by PlanRow and the Mi perfil
+  // card so every tappable surface dims on touch.
+  rowPressed: {
+    opacity: 0.6,
   },
   metaMain: {
     flex: 1,
