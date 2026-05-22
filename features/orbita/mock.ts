@@ -16,12 +16,15 @@ export const MOCK_VOZ: Record<'mes', string> = {
  *  (magenta) or strong (a bold figure) weight inline. */
 export type VozParte = { text: string; tone?: 'accent' | 'strong' }
 
-/** The Día reading — a quiet line in Stelar's voice, with an
- *  accented opener that paints the body of the day. */
+/** The Día reading — Stelar observes and wonders; it doesn't
+ *  pronounce. It names what the signals suggest, hedges what it
+ *  can't know, and hands the verdict back to the user. */
 export const MOCK_VOZ_DIA: { parts: readonly VozParte[] } = {
   parts: [
-    { text: 'Cuerpo entero, mente lenta.', tone: 'accent' },
-    { text: ' Las cinco horas de anoche se notan acá. Va a aflojar entrada la tarde.' },
+    { text: 'Cuerpo entero, mente más lenta', tone: 'accent' },
+    {
+      text: ' — ¿se siente así tu día? Anoche fueron cinco horas de sueño; quizá la tarde pida un poco más de calma.',
+    },
   ],
 }
 
@@ -398,9 +401,9 @@ export const MOCK_PATRONES: readonly Patron[] = [
   {
     id: 'jueves',
     category: 'recurrencia',
-    title: 'El jueves te apaga.',
+    title: '¿Los jueves te apagan?',
     emphasis: 'jueves',
-    detail: 'Pasa 3 semanas seguidas. Caen 4 a 5 dimensiones.',
+    detail: 'Lo vimos 3 jueves seguidos.',
     data: {
       kind: 'weekday',
       focus: 3,
@@ -426,9 +429,9 @@ export const MOCK_PATRONES: readonly Patron[] = [
   {
     id: 'lunes',
     category: 'comparacion',
-    title: 'Tu mejor lunes del mes.',
+    title: '¿Tus lunes brillan?',
     emphasis: 'lunes',
-    detail: '5 de 6 dimensiones en luz. 18 % sobre tu promedio.',
+    detail: 'Lo vimos en 4 de tus últimos 5 lunes.',
     data: {
       kind: 'weekday',
       focus: 0,
@@ -456,9 +459,9 @@ export const MOCK_PATRONES: readonly Patron[] = [
   {
     id: 'lutea',
     category: 'correlacion',
-    title: 'Día 22 → antojos.',
+    title: '¿Antojos cerca del día 22?',
     emphasis: 'antojos',
-    detail: '4 ciclos seguidos en tu fase lútea.',
+    detail: 'Lo vimos en tus 2 últimos ciclos.',
     data: {
       kind: 'cycle',
       length: 28,
@@ -481,9 +484,9 @@ export const MOCK_PATRONES: readonly Patron[] = [
   {
     id: 'sueno-entreno',
     category: 'correlacion',
-    title: 'Duermes mejor cuando entrenas.',
+    title: '¿Duermes mejor si entrenas?',
     emphasis: 'entrenas',
-    detail: 'Duermes 45 min más cuando entrenas. 4 semanas seguidas.',
+    detail: 'Lo vimos 4 semanas seguidas — unos 45 min más.',
     data: {
       kind: 'paired',
       groups: [
