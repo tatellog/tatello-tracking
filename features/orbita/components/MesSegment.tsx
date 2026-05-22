@@ -56,7 +56,6 @@ export function MesSegment() {
   const router = useRouter()
   const ciclo = MOCK_CICLO
   const isFirstCycle = ciclo.cycleNumber === 1
-  const remaining = Math.max(0, ciclo.length - ciclo.day)
   const { data: hasAny } = useHasAnySignals()
 
   // Cycle-1 only: which observation the user has tapped open. Default
@@ -153,11 +152,12 @@ export function MesSegment() {
         />
         <View style={styles.metaRow}>
           <LiveDot />
+          {/* Where you are in the cycle — a day, a phase — not an
+              "X de 28" progress bar. The cycle turns; it isn't a
+              task you complete. */}
           <Text style={styles.meta} numberOfLines={1}>
+            <Text>Día </Text>
             <Text style={styles.metaNum}>{ciclo.day}</Text>
-            <Text>{` de ${ciclo.length} · `}</Text>
-            <Text style={styles.metaNum}>{remaining}</Text>
-            <Text> por cerrar</Text>
             {isFirstCycle ? (
               <>
                 <Text> · </Text>

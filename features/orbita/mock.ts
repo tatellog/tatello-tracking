@@ -563,7 +563,9 @@ export const MOCK_CICLO = {
   length: 28,
   phase: 'Fase lútea',
   band: [20, 26] as const,
-  note: 'Tu constelación de este ciclo se sella en 6 días.',
+  // Descriptive of the cycle turning — not a task that "seals" with
+  // the user's effort.
+  note: 'Faltan 6 días para tu próximo ciclo.',
   cycleNumber: 1,
   patternsConfirmed: 0,
 }
@@ -698,10 +700,10 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
   },
   {
     id: 'valley',
-    label: 'tu valle',
+    label: 'tu pausa',
     shortValue: 'jueves 11',
     detail:
-      'Jueves 11. Mente, energía y sueño quedaron bajas ese día. Por ahora es un día, todavía no algo que se repita.',
+      'Jueves 11 — el cuerpo pidió más calma. Por ahora es un día, todavía no algo que se repita.',
     chart: { kind: 'daily', days: FIRST_CYCLE_DAILY, focusDay: 11, focusKind: 'valley' },
   },
   {
