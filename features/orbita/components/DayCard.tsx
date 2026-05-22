@@ -8,9 +8,10 @@ import type { DiaSemana } from '../mock'
 /*
  * The day card under the constellation. Mirrors the selection in the
  * diagram: whichever day is selected, this card shows its one-word
- * archetype, the day's voz, and its en-luz / drift counts. Today gets
- * the extra "Abrir Día" CTA — the bridge into the Día view; past
- * days are purely informational, no CTA.
+ * archetype (the day's qualitative state) and the day's voz — no
+ * X/6 score, no drift number; a day isn't a grade. Today gets the
+ * extra "Abrir Día" CTA — the bridge into the Día view; past days
+ * are a quiet read, no action.
  */
 export function DayCard({ day, onOpenDia }: { day: DiaSemana; onOpenDia: () => void }) {
   const isToday = day.today
@@ -46,21 +47,10 @@ export function DayCard({ day, onOpenDia }: { day: DiaSemana; onOpenDia: () => v
         <EmText text={title} emphasis={word} style={styles.title} emStyle={styles.titleAccent} />
         <Text style={styles.voz}>{day.note}</Text>
       </View>
-      <View style={styles.right}>
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statNumRow}>
-              <Text style={styles.statNum}>{day.dimEnLuz}</Text>
-              <Text style={styles.statDen}>/6</Text>
-            </Text>
-            <Text style={styles.statLabel}>En luz</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{day.drift}</Text>
-            <Text style={styles.statLabel}>Drift</Text>
-          </View>
-        </View>
-        {isToday ? (
+      {/* Today bridges into the Día view; past days are a quiet read,
+          no score and no action. */}
+      {isToday ? (
+        <View style={styles.right}>
           <Pressable
             onPress={onOpenDia}
             accessibilityRole="button"
@@ -69,8 +59,8 @@ export function DayCard({ day, onOpenDia }: { day: DiaSemana; onOpenDia: () => v
           >
             <Text style={styles.ctaText}>Abrir Día →</Text>
           </Pressable>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -142,37 +132,9 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.bone,
   },
-  // ── Right: stats + (today only) CTA ───────────────────────────
+  // ── Right: the (today-only) CTA, vertically centred ───────────
   right: {
-    alignItems: 'flex-end',
-    gap: 14,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  stat: {
-    alignItems: 'center',
-  },
-  statNumRow: {},
-  statNum: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 26,
-    color: colors.magenta,
-    letterSpacing: -0.6,
-  },
-  statDen: {
-    fontFamily: typography.uiBold,
-    fontSize: 13,
-    color: colors.niebla,
-  },
-  statLabel: {
-    marginTop: 2,
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
+    justifyContent: 'center',
   },
   // The CTA — a magenta-outlined button that opens Día.
   cta: {

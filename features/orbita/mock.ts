@@ -223,7 +223,6 @@ export function buildArquetipoSemana(
   emphasis: string
   daysEnLuz: number
   nochesRotas: number
-  peakDay: string
   daysRead: number
   signals: number
   arcNumber: number
@@ -233,7 +232,6 @@ export function buildArquetipoSemana(
   const daysRead = lived.length
   const daysEnLuz = lived.filter((d) => d.brightness >= EN_LUZ_THRESHOLD_WEEK).length
   const signals = lived.reduce((s, d) => s + d.dimEnLuz + d.drift, 0) * 2
-  const peak = lived.reduce((max, d) => (d.brightness > max.brightness ? d : max), lived[0]!)
   const proportion = daysEnLuz / daysRead
   const closing = todayIdx === 6
   let name = 'la semana arrancando'
@@ -257,7 +255,6 @@ export function buildArquetipoSemana(
     emphasis: 'la semana',
     daysEnLuz,
     nochesRotas: 0,
-    peakDay: peak.weekday,
     daysRead,
     signals,
     arcNumber: 3,

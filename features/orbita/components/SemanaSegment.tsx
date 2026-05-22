@@ -114,8 +114,7 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
                 <Text style={styles.metaSep}>{'\n'}</Text>
                 <Text>leído por </Text>
                 <Text style={styles.metaStelar}>Stelar</Text>
-                <Text>{` · ${arquetipo.daysRead} días · pico `}</Text>
-                <Text style={styles.metaNum}>{arquetipo.peakDay}</Text>
+                <Text>{` · ${arquetipo.daysRead} días`}</Text>
               </>
             ) : null}
           </Text>
