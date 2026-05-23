@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { Dimensions, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
@@ -8,11 +8,14 @@ import {
   DiaSegment,
   MesSegment,
   OrbitSegments,
+  ScreenCosmos,
   SemanaSegment,
   type OrbitSegment,
 } from '@/features/orbita/components'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors } from '@/theme'
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
 /*
  * Tu Órbita — STELAR's core tab, the meaning layer. Three time
@@ -30,18 +33,22 @@ export default function OrbitaScreen() {
     <View style={styles.screen}>
       <SkyBackground />
 
-      {/* Ambient warm glow — a soft radial wash centred behind the
-          Día hero so the page doesn't read as a black-and-magenta
-          rectangle. The gradient peaks at ~22 % opacity magenta in
-          the centre and fades fully transparent at the edges, so
-          it lifts the dark areas around the diagram (the bottom
-          half + the right strip near the dimension list) without
-          flattening the diagram's own contrast. */}
+      {/* Full-screen cosmic backdrop — nebulae + starfield + shooting
+          star. Sits BEHIND everything (just above the SkyBackground)
+          so the constellation, the dimension list, and the readout
+          below all live in the same cosmic space. No more visible
+          "diagram rectangle". */}
+      <ScreenCosmos width={SCREEN_W} height={SCREEN_H} />
+
+      {/* Wide ambient warm glow — a magenta radial wash on top of
+          the cosmos. Bigger radius than the previous version
+          (75% × 70%) so the warmth reaches the bottom + right
+          regions of the screen, not just behind the diagram. */}
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
-          <RadialGradient id="orbita-ambient" cx="50%" cy="45%" rx="65%" ry="55%">
-            <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.22} />
-            <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.08} />
+          <RadialGradient id="orbita-ambient" cx="50%" cy="48%" rx="75%" ry="70%">
+            <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.18} />
+            <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.06} />
             <Stop offset="100%" stopColor="#E91E63" stopOpacity={0} />
           </RadialGradient>
         </Defs>

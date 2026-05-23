@@ -1,6 +1,4 @@
 import * as Haptics from 'expo-haptics'
-// Aliased — react-native-svg also exports a LinearGradient.
-import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -26,7 +24,6 @@ import {
 } from '../constants/constellationTheme'
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 import { AnimatedConstellation } from './AnimatedConstellation'
-import { Cosmos } from './Cosmos'
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -123,15 +120,14 @@ export function OrbitalSystem({
   const profile = getConstellationProfile(intensity, reducedMotion ?? false)
 
   // Clocks for ambient motion. `t` (8 s) drives the existing star
-  // breath + twinkle. `drift` (44 s) drives the nebula. `slowClock`
-  // drives the slow respirating glow behind active stars; its period
-  // comes from the profile so 'low' breathes ~10 s, 'high' ~5.5 s.
+  // breath + twinkle. `slowClock` drives the slow respirating glow
+  // behind active stars; its period comes from the profile so 'low'
+  // breathes ~10 s, 'high' ~5.5 s. The nebula `drift` clock moved
+  // to ScreenCosmos, which now owns the full-screen cosmic backdrop.
   const t = useSharedValue(0)
-  const drift = useSharedValue(0)
   const slowClock = useSharedValue(0)
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
-    drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
     slowClock.value = withRepeat(
       withTiming(1, { duration: profile.glowDurationMs, easing: Easing.linear }),
       -1,
@@ -139,10 +135,9 @@ export function OrbitalSystem({
     )
     return () => {
       cancelAnimation(t)
-      cancelAnimation(drift)
       cancelAnimation(slowClock)
     }
-  }, [t, drift, slowClock, profile.glowDurationMs])
+  }, [t, slowClock, profile.glowDurationMs])
 
   // Tap feedback: popT amplifies the selected star; rippleT drives
   // a shockwave ring out of it.
@@ -251,8 +246,11 @@ export function OrbitalSystem({
             zoom together; the selected star ends up dominating the
             frame. */}
         <AnimatedG animatedProps={zoomTransform}>
-          {/* The deep field — nebula + starfield. */}
-          <Cosmos t={t} drift={drift} />
+          {/* The deep field (nebula + starfield) was moved to
+              ScreenCosmos at the page level so it spans BEYOND the
+              diagram's bounds — no visible "diagram rectangle" any
+              more. OrbitalSystem only renders the constellation +
+              live stars now. */}
 
           {/* The ornamental constellation — native SVG paths from
               `assets/constellations/constellation_app_day.svg`,
@@ -348,33 +346,12 @@ export function OrbitalSystem({
         />
       )}
 
-      {/* Soft horizontal blend fades — the diagram's content needs
-          to dissolve into the page rather than ending on a hard
-          vertical edge, but the previous attempt (fade to opaque
-          colours.bg) painted a dark band that read as a frame
-          against the surrounding magenta glow. The new approach
-          uses a SEMI-TRANSPARENT, magenta-tinted end colour
-          (rgba(40, 14, 24, 0.6) ≈ bg + low-mag tint at 60 %
-          opacity). At the diagram's right edge the overlay dims
-          the content by 60 % AND tints it toward the same wine
-          shade the surrounding ambient glow lands on, so the
-          transition reads as a soft dissolve into the surrounding
-          rather than a coloured frame. Wide (100 px each side) for
-          a long, soft falloff. */}
-      <FadeGradient
-        colors={['rgba(40, 14, 24, 0.6)', 'transparent']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.leftBlend}
-        pointerEvents="none"
-      />
-      <FadeGradient
-        colors={['transparent', 'rgba(40, 14, 24, 0.6)']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.rightBlend}
-        pointerEvents="none"
-      />
+      {/* No edge fades — the cosmic backdrop (nebulae + starfield)
+          is now painted by ScreenCosmos at the page level and
+          extends BEYOND the diagram, so the diagram blends into
+          the surrounding screen naturally. No dark frame, no soft
+          tint band: the constellation just floats on the same
+          cosmos that fills the rest of the tab. */}
     </View>
   )
 }
@@ -854,23 +831,5 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  // Soft horizontal blend overlays — semi-transparent magenta-
-  // tinted gradients on the left and right edges so the diagram
-  // dissolves into the surrounding ambient glow without a dark
-  // band or a hard edge. 100 px wide each = long, gentle falloff.
-  leftBlend: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 100,
-  },
-  rightBlend: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: 100,
   },
 })

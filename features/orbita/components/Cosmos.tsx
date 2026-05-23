@@ -1,6 +1,15 @@
-import { useMemo } from 'react'
-import Animated, { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
-import { Circle, G, Line } from 'react-native-svg'
+import { useEffect, useMemo } from 'react'
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated'
+import Svg, { Circle, G, Line } from 'react-native-svg'
 
 /*
  * Cosmos — the deep field behind the orbital system. Drifting nebula
@@ -16,11 +25,11 @@ const AnimatedLine = Animated.createAnimatedComponent(Line)
 
 /* A shooting star — a rare streak diagonally across the field. Active
  * only ~6% of a 24 s cycle, so it reads as an event, not a loop. */
-function ShootingStar({ t }: { t: SharedValue<number> }) {
+function ShootingStar({ t, w, h }: { t: SharedValue<number>; w: number; h: number }) {
   const sx = -40
-  const sy = 46
-  const dx = W + 80
-  const dy = W * 0.56
+  const sy = h * 0.08
+  const dx = w + 80
+  const dy = h * 0.5
   const len = Math.hypot(dx, dy)
   const TAIL = 46
 
@@ -70,11 +79,11 @@ function ShootingStar({ t }: { t: SharedValue<number> }) {
   )
 }
 
-// Must match OrbitalSystem's viewBox width.
-const W = 372
-// The starfield is generated taller than W so it fills OrbitalSystem's
-// viewBox even with its vertical headroom (VB_TOP −28 → VB bottom 354).
-// Stars span [−FIELD_PAD, W + FIELD_PAD] vertically.
+// Default viewport for back-compat — original OrbitalSystem usage.
+// Screen-level usage passes its own width + height.
+const DEFAULT_W = 372
+// Extra vertical pad so the starfield extends a touch beyond the
+// viewport bounds.
 const FIELD_PAD = 48
 
 /* Nebula clouds — soft colour drifting behind everything. Each is a
@@ -92,12 +101,16 @@ const CLOUD_STEPS = 8
 function NebulaCloud({
   cloud,
   drift,
+  w,
+  h,
 }: {
   cloud: (typeof NEBULAE)[number]
   drift: SharedValue<number>
+  w: number
+  h: number
 }) {
-  const cx = cloud.fx * W
-  const cy = cloud.fy * W
+  const cx = cloud.fx * w
+  const cy = cloud.fy * h
   const animatedProps = useAnimatedProps(() => {
     'worklet'
     const a = (drift.value + cloud.ph) * 2 * Math.PI
@@ -135,11 +148,34 @@ const BUCKETS = 6
  * dots that read as visual noise/dust against the warm dark BG (cream
  * at low opacity over a dark warm field perceives as neutral grey,
  * not as star). Fewer, more confident stars now: 28/18/11. */
-function buildStarfield(): Star[] {
+function buildStarfield(w: number, h: number, count: number): Star[] {
+  // Star counts scale with the viewport's area so a fullscreen
+  // cosmos has more stars than the diagram-sized one without
+  // requiring the call site to pick a number. `count` is the
+  // upper-bound the caller wants; we honour it directly.
+  const TIER_RATIOS = [0.52, 0.32, 0.16] as const
   const tiers = [
-    { n: 28, rMin: 0.4, rMax: 1.0, oMin: 0.18, oMax: 0.4 },
-    { n: 18, rMin: 0.8, rMax: 1.4, oMin: 0.32, oMax: 0.6 },
-    { n: 11, rMin: 1.5, rMax: 2.7, oMin: 0.5, oMax: 0.92 },
+    {
+      n: Math.max(1, Math.round(count * TIER_RATIOS[0])),
+      rMin: 0.4,
+      rMax: 1.0,
+      oMin: 0.18,
+      oMax: 0.4,
+    },
+    {
+      n: Math.max(1, Math.round(count * TIER_RATIOS[1])),
+      rMin: 0.8,
+      rMax: 1.4,
+      oMin: 0.32,
+      oMax: 0.6,
+    },
+    {
+      n: Math.max(1, Math.round(count * TIER_RATIOS[2])),
+      rMin: 1.5,
+      rMax: 2.7,
+      oMin: 0.5,
+      oMax: 0.92,
+    },
   ]
   const out: Star[] = []
   let i = 0
@@ -149,8 +185,8 @@ function buildStarfield(): Star[] {
       const h2 = Math.sin(i * 78.233 + 2.7) * 24634.6345
       const f = Math.abs(Math.sin(i * 51.17 + 9.1))
       out.push({
-        x: (h1 - Math.floor(h1)) * W,
-        y: -FIELD_PAD + (h2 - Math.floor(h2)) * (W + FIELD_PAD * 2),
+        x: (h1 - Math.floor(h1)) * w,
+        y: -FIELD_PAD + (h2 - Math.floor(h2)) * (h + FIELD_PAD * 2),
         r: tier.rMin + f * (tier.rMax - tier.rMin),
         op: tier.oMin + f * (tier.oMax - tier.oMin),
         halo: tIdx === 2 && f > 0.55,
@@ -184,8 +220,23 @@ function StarBucket({ stars, index, t }: { stars: Star[]; index: number; t: Shar
   )
 }
 
-export function Cosmos({ t, drift }: { t: SharedValue<number>; drift: SharedValue<number> }) {
-  const stars = useMemo(buildStarfield, [])
+export function Cosmos({
+  t,
+  drift,
+  width = DEFAULT_W,
+  height = DEFAULT_W,
+  starCount = 57,
+}: {
+  t: SharedValue<number>
+  drift: SharedValue<number>
+  /** Viewport width in user-space units. Defaults to the legacy 372. */
+  width?: number
+  /** Viewport height in user-space units. Defaults to width (square). */
+  height?: number
+  /** Total star count budget across the three tiers. */
+  starCount?: number
+}) {
+  const stars = useMemo(() => buildStarfield(width, height, starCount), [width, height, starCount])
   const buckets = useMemo(
     () => Array.from({ length: BUCKETS }, (_, b) => stars.filter((s) => s.bucket === b)),
     [stars],
@@ -193,12 +244,50 @@ export function Cosmos({ t, drift }: { t: SharedValue<number>; drift: SharedValu
   return (
     <G>
       {NEBULAE.map((cloud, i) => (
-        <NebulaCloud key={`neb-${i}`} cloud={cloud} drift={drift} />
+        <NebulaCloud key={`neb-${i}`} cloud={cloud} drift={drift} w={width} h={height} />
       ))}
       {buckets.map((group, b) => (
         <StarBucket key={`bkt-${b}`} stars={group} index={b} t={t} />
       ))}
-      <ShootingStar t={t} />
+      <ShootingStar t={t} w={width} h={height} />
     </G>
+  )
+}
+
+/*
+ * Screen-level Cosmos — drops a full-bleed cosmic backdrop behind
+ * everything in the Órbita tab so the diagram and the surrounding
+ * content sit in the SAME cosmic space (no visible boundary between
+ * "inside the diagram" and "outside"). Owns its own t + drift
+ * clocks so the screen layer is independent of OrbitalSystem.
+ */
+export function ScreenCosmos({
+  width,
+  height,
+  style,
+}: {
+  width: number
+  height: number
+  style?: StyleProp<ViewStyle>
+}) {
+  const t = useSharedValue(0)
+  const drift = useSharedValue(0)
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
+    drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
+    return () => {
+      cancelAnimation(t)
+      cancelAnimation(drift)
+    }
+  }, [t, drift])
+  // Scale star count with screen area — full-screen cosmos should
+  // feel denser than the legacy diagram-bounded version.
+  const starCount = Math.round(80 * (Math.min(width, height) / 393))
+  return (
+    <View style={[StyleSheet.absoluteFill, style]} pointerEvents="none">
+      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+        <Cosmos t={t} drift={drift} width={width} height={height} starCount={starCount} />
+      </Svg>
+    </View>
   )
 }
