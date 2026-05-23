@@ -55,6 +55,11 @@ const HIT = 66 // tap-target box, in px
 // against the edge. The height extends to match so nothing squishes.
 const VB_TOP = -28
 const VB_H = 382
+// Zoom factor for the selected-dimension cinematic. 2.4x gives a
+// neighbourhood ~155 units wide around the target — the star + its
+// flare fill the frame, the rest of the constellation drifts off
+// screen.
+const ZOOM_SCALE = 2.4
 
 // Three orbits — modelled after the triple-star reference photo. The
 // shapes are hand-tuned for each orbit's character (tall vertical,
@@ -172,6 +177,43 @@ export function OrbitalSystem({
     rippleT.value = withTiming(1, { duration: 640, easing: Easing.out(Easing.cubic) })
   }, [selectedKey, popT, rippleT])
 
+  // Zoom-to-star: when a dimension is selected, the whole canvas
+  // zooms in on its position; tapping anywhere (or the same dim
+  // again, or the right-side list) zooms back out. The transform is
+  // an interpolation between identity and `translate(CX - Z*sx, CY -
+  // Z*sy) * scale(Z)`, which maps the target (sx, sy) onto the
+  // viewBox centre at full zoom. `zoomT` runs 0→1 over ~520 ms;
+  // `targetX/Y` are themselves animated so SWITCHING between zoomed
+  // stars pans smoothly instead of snapping.
+  const zoomT = useSharedValue(0)
+  const targetXVal = useSharedValue(CX)
+  const targetYVal = useSharedValue(CY)
+  useEffect(() => {
+    if (selectedKey) {
+      const pos = STAR_POS[selectedKey]
+      targetXVal.value = withTiming(pos.x, {
+        duration: 520,
+        easing: Easing.inOut(Easing.cubic),
+      })
+      targetYVal.value = withTiming(pos.y, {
+        duration: 520,
+        easing: Easing.inOut(Easing.cubic),
+      })
+      zoomT.value = withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })
+    } else {
+      zoomT.value = withTiming(0, { duration: 380, easing: Easing.inOut(Easing.cubic) })
+    }
+  }, [selectedKey, zoomT, targetXVal, targetYVal])
+
+  const zoomTransform = useAnimatedProps(() => {
+    'worklet'
+    const tz = zoomT.value
+    const s = 1 + tz * (ZOOM_SCALE - 1)
+    const tx = tz * (CX - ZOOM_SCALE * targetXVal.value)
+    const ty = tz * (CY - ZOOM_SCALE * targetYVal.value)
+    return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
+  })
+
   const placed = dimensions.map((d) => ({ d, pos: place(d) }))
 
   return (
@@ -246,56 +288,80 @@ export function OrbitalSystem({
           </LinearGradient>
         </Defs>
 
-        {/* The deep field — nebula + starfield. */}
-        <Cosmos t={t} drift={drift} />
+        {/* Everything below sits inside the zoom transform — when a
+            dimension is selected, this whole group translates+scales
+            so the target star sits at the viewBox centre. The cosmos,
+            the orbits, the centre star, the other dimension stars all
+            zoom together; the selected star ends up dominating the
+            frame. */}
+        <AnimatedG animatedProps={zoomTransform}>
+          {/* The deep field — nebula + starfield. */}
+          <Cosmos t={t} drift={drift} />
 
-        {/* Cosmic interlace — three asymmetric orbits, each with its
+          {/* Cosmic interlace — three asymmetric orbits, each with its
               own centre, axis tilt and weight. Each ellipse + its
               destello live inside a slowly-precessing group so the
               tilt drifts over time; the pink gradient sweeps with it. */}
-        <OrbitGroup orbit={ORBITS[0]!} gradId="orb-grad-0" spin={spin1} particle={orbit1} />
-        <OrbitGroup orbit={ORBITS[1]!} gradId="orb-grad-1" spin={spin2} particle={orbit2} />
-        <OrbitGroup orbit={ORBITS[2]!} gradId="orb-grad-2" spin={spin3} particle={orbit3} />
+          <OrbitGroup orbit={ORBITS[0]!} gradId="orb-grad-0" spin={spin1} particle={orbit1} />
+          <OrbitGroup orbit={ORBITS[1]!} gradId="orb-grad-1" spin={spin2} particle={orbit2} />
+          <OrbitGroup orbit={ORBITS[2]!} gradId="orb-grad-2" spin={spin3} particle={orbit3} />
 
-        {/* The central star — the "you" the dimensions orbit. */}
-        <CenterStar t={t} />
+          {/* The central star — the "you" the dimensions orbit. */}
+          <CenterStar t={t} />
 
-        {/* Dimension stars — small luminous points on each orbit. */}
-        {placed.map(({ d, pos }) => (
-          <StarNode
-            key={d.key}
-            dim={d}
-            pos={pos}
-            t={t}
-            popT={popT}
-            rippleT={rippleT}
-            selected={d.key === selectedKey}
-            faded={selectedKey != null && d.key !== selectedKey}
-          />
-        ))}
+          {/* Dimension stars — small luminous points on each orbit. */}
+          {placed.map(({ d, pos }) => (
+            <StarNode
+              key={d.key}
+              dim={d}
+              pos={pos}
+              t={t}
+              popT={popT}
+              rippleT={rippleT}
+              selected={d.key === selectedKey}
+              faded={selectedKey != null && d.key !== selectedKey}
+            />
+          ))}
+        </AnimatedG>
       </Svg>
 
-      {/* Tap targets — RN Pressables centred on each star. The hit
-          box is generous so tiny stars stay easy to tap. */}
-      {placed.map(({ d, pos }) => (
+      {selectedKey == null ? (
+        // Not zoomed — the six per-star hit targets. RN Pressables
+        // centred on each star, generous hit box.
+        placed.map(({ d, pos }) => (
+          <Pressable
+            key={`hit-${d.key}`}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {})
+              onSelect(d.key)
+            }}
+            style={[
+              styles.hit,
+              {
+                left: `${(pos.x / W) * 100}%`,
+                top: `${((pos.y - VB_TOP) / VB_H) * 100}%`,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: d.key === selectedKey }}
+            accessibilityLabel={d.label}
+          />
+        ))
+      ) : (
+        // Zoomed in — the per-star hits no longer align (everything
+        // has moved under the zoom transform), so a single full-area
+        // pressable catches a tap-to-exit. The right-side node list
+        // remains live for SWITCHING between zoomed stars.
         <Pressable
-          key={`hit-${d.key}`}
           onPress={() => {
             Haptics.selectionAsync().catch(() => {})
-            onSelect(d.key)
+            onSelect(selectedKey)
           }}
-          style={[
-            styles.hit,
-            {
-              left: `${(pos.x / W) * 100}%`,
-              top: `${((pos.y - VB_TOP) / VB_H) * 100}%`,
-            },
-          ]}
+          style={styles.tapToExit}
           accessibilityRole="button"
-          accessibilityState={{ selected: d.key === selectedKey }}
-          accessibilityLabel={d.label}
+          accessibilityLabel="Cerrar zoom"
         />
-      ))}
+      )}
 
       {/* Top-edge fade — a static native overlay (cheap). An SVG
           mask would composite the diagram correctly, but masking
@@ -677,6 +743,22 @@ function StarNode({
           opacity={enLuz ? 0.07 + b * 0.13 : 0.06}
         />
         <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.1 + b * 0.18 : 0.08} />
+        {/* When this star is the focus of the zoom, lay a full
+            lens-flare starburst behind the point — long horizontal +
+            vertical streaks with diagonal whiskers. The outer zoom
+            transform amplifies the streaks 2.4× so they fan out across
+            the framed view, exactly the "Constellation Lv. 6" beat
+            from the reference image. */}
+        {selected ? (
+          <DiffractionSpikes
+            x={x}
+            y={y}
+            length={R * 12}
+            opacity={0.85}
+            diagOpacity={0.35}
+            strokeWidth={0.9}
+          />
+        ) : null}
         {/* Selection crown — sits between the aura and the bright
             point. */}
         {selected ? (
@@ -727,6 +809,16 @@ const styles = StyleSheet.create({
     height: HIT,
     marginLeft: -HIT / 2,
     marginTop: -HIT / 2,
+  },
+  // Full-area tap-to-exit when zoomed in. Covers the diagram so any
+  // tap on it deselects (smooth zoom-out); the right-side node list
+  // sits outside this overlay and stays interactive.
+  tapToExit: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   // The diagram dissolves into the page across its top. Static
   // native gradient — zero per-frame cost (an SVG mask was the right
