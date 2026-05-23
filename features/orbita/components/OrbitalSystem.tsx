@@ -1,7 +1,4 @@
 import * as Haptics from 'expo-haptics'
-// Aliased — react-native-svg also exports a `LinearGradient` (the
-// SVG paint server used for the orbit strokes).
-import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -318,40 +315,14 @@ export function OrbitalSystem({
         />
       )}
 
-      {/* Four-edge fades — static native gradients (cheap).
-          The constellation now sits centred inside the canvas with
-          breathing room on all four sides; every edge dissolves
-          into colours.bg so the figure floats in the page instead
-          of ending on hard rectangle edges. The right fade is the
-          most important visually: it softens the boundary where
-          the diagram meets the dimension list. (An SVG mask would
-          do this inside the SVG too, but masking the animated
-          content group forced a per-frame re-composite and tanked
-          performance.) */}
-      <FadeGradient
-        colors={[colors.bg, 'transparent']}
-        style={styles.topFade}
-        pointerEvents="none"
-      />
-      <FadeGradient
-        colors={['transparent', colors.bg]}
-        style={styles.bottomFade}
-        pointerEvents="none"
-      />
-      <FadeGradient
-        colors={[colors.bg, 'transparent']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.leftFade}
-        pointerEvents="none"
-      />
-      <FadeGradient
-        colors={['transparent', colors.bg]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.rightFade}
-        pointerEvents="none"
-      />
+      {/* No more edge fades — they were painting bands of colours.bg
+          around the diagram, which against the magenta ambient glow
+          on the page read as a hard rectangular frame ("parece un
+          cuadro"). The diagram's own Cosmos backdrop is transparent
+          so the screen's ambient glow shows through naturally, and
+          its content (sparse field stars, line art, bright stars)
+          blends with the surrounding glow without any opaque
+          softening overlay. */}
     </View>
   )
 }
@@ -718,40 +689,5 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  // The diagram dissolves into the page across all four edges.
-  // Static native gradients — zero per-frame cost (an SVG mask was
-  // the right visual but compositing it over the animated group
-  // every frame was too expensive). The horizontal pair (left,
-  // right) is the one that softens the boundary with the
-  // DimensionNodeList; the vertical pair (top, bottom) lets the
-  // figure float between the headline above and the readout below.
-  topFade: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 70,
-  },
-  bottomFade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 70,
-  },
-  leftFade: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 50,
-  },
-  rightFade: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: 60,
   },
 })
