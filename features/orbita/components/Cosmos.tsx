@@ -128,12 +128,18 @@ const BUCKETS = 6
 
 /* Three depth tiers: many tiny faint stars (far), through fewer big
  * bright ones (near). The variance IS the depth cue. Positions are a
- * stable hash, so the sky never reshuffles between renders. */
+ * stable hash, so the sky never reshuffles between renders.
+ *
+ * Counts trimmed and opacity floors raised after the ornamental PNG
+ * landed — the previous 58/30/13 distribution painted ~50 mid-bright
+ * dots that read as visual noise/dust against the warm dark BG (cream
+ * at low opacity over a dark warm field perceives as neutral grey,
+ * not as star). Fewer, more confident stars now: 28/18/11. */
 function buildStarfield(): Star[] {
   const tiers = [
-    { n: 58, rMin: 0.3, rMax: 0.95, oMin: 0.07, oMax: 0.24 },
-    { n: 30, rMin: 0.7, rMax: 1.35, oMin: 0.18, oMax: 0.42 },
-    { n: 13, rMin: 1.5, rMax: 2.7, oMin: 0.4, oMax: 0.86 },
+    { n: 28, rMin: 0.4, rMax: 1.0, oMin: 0.18, oMax: 0.4 },
+    { n: 18, rMin: 0.8, rMax: 1.4, oMin: 0.32, oMax: 0.6 },
+    { n: 11, rMin: 1.5, rMax: 2.7, oMin: 0.5, oMax: 0.92 },
   ]
   const out: Star[] = []
   let i = 0
@@ -169,9 +175,9 @@ function StarBucket({ stars, index, t }: { stars: Star[]; index: number; t: Shar
       {stars.map((s, i) => (
         <G key={i}>
           {s.halo ? (
-            <Circle cx={s.x} cy={s.y} r={s.r * 3.2} fill="#F4ECDE" opacity={s.op * 0.16} />
+            <Circle cx={s.x} cy={s.y} r={s.r * 3.2} fill="#F4ECDE" opacity={s.op * 0.18} />
           ) : null}
-          <Circle cx={s.x} cy={s.y} r={s.r} fill="#FDF6E8" opacity={s.op} />
+          <Circle cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.op} />
         </G>
       ))}
     </AnimatedG>

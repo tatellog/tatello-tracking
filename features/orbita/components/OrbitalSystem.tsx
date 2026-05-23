@@ -23,10 +23,9 @@ import Svg, {
   LinearGradient,
   RadialGradient,
   Stop,
-  Text as SvgText,
 } from 'react-native-svg'
 
-import { colors, typography } from '@/theme'
+import { colors } from '@/theme'
 
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 import { Cosmos } from './Cosmos'
@@ -357,9 +356,11 @@ export function OrbitalSystem({
   )
 }
 
-/* The central star — small, bright, breathing. No glyph: the centre
- * is felt by composition, the orbits do the talking. */
-const CORE_R = 9
+/* The central star — small, bright, breathing. Shrunk after the
+ * ornamental PNG arrived: the art has its own central diamond, and
+ * the previous CORE_R=9 painted a bright disc that competed with it.
+ * Now the diamond carries the centre; this is just a quiet pulse. */
+const CORE_R = 3.2
 
 function CenterStar({ t }: { t: SharedValue<number> }) {
   const breath = useAnimatedProps(() => {
@@ -621,14 +622,6 @@ function StarNode({
     }
   })
 
-  // Label sits along the radial vector outward from the centre.
-  const dx = x - CX
-  const dy = y - CY
-  const dist = Math.hypot(dx, dy) || 1
-  const labelOff = R + 14
-  const lx = x + (dx / dist) * labelOff
-  const ly = y + (dy / dist) * labelOff + 3
-
   return (
     <G opacity={faded ? 0.45 : 1}>
       {selected ? (
@@ -697,18 +690,10 @@ function StarNode({
         <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
         {enLuz ? <Circle cx={x} cy={y} r={R * 0.45} fill="#FFFFFF" opacity={0.85} /> : null}
       </AnimatedG>
-      <SvgText
-        x={lx}
-        y={ly}
-        textAnchor="middle"
-        fontFamily={typography.uiBold}
-        fontSize={9}
-        fill={enLuz ? colors.leche : colors.niebla}
-        opacity={selected ? 1 : enLuz ? 0.65 + b * 0.35 : 0.6}
-        letterSpacing={1.3}
-      >
-        {dim.label}
-      </SvgText>
+      {/* Labels intentionally removed — the right-side DimensionNodeList
+          is the single source of identification. Two labels for the
+          same dimension was visual noise and they kept colliding with
+          the ornament's flourishes. */}
     </G>
   )
 }

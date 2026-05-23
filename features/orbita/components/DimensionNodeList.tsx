@@ -9,6 +9,12 @@ import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 // itself, so the node-list and the diagram read as one design.
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
+// Clockwise traversal of the constellation from the top burst. The
+// list mirrors how the eye walks around the figure, so the index
+// reads as a *route* through the constellation, not an alphabetical
+// dump.
+const CLOCKWISE_ORDER: DimensionKey[] = ['mente', 'sueno', 'alimento', 'ciclo', 'energia', 'cuerpo']
+
 type Props = {
   dimensions: readonly Dimension[]
   selectedKey: DimensionKey | null
@@ -27,16 +33,24 @@ type Props = {
  * skill-tree branch in the reference image.
  */
 export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) {
+  // Reorder by the constellation's clockwise traversal so walking the
+  // list = walking the figure (top → upper-right → lower-right →
+  // bottom → lower-left → upper-left). `deriveDimensions` returns
+  // them in a fixed engine order; we project here so the engine and
+  // the visual representation each keep their own ordering rules.
+  const ordered = CLOCKWISE_ORDER.map((k) => dimensions.find((d) => d.key === k)).filter(
+    (d): d is Dimension => d != null,
+  )
+
   return (
     <View style={styles.list}>
       {/* Faint connecting branch — a thin vertical hairline passing
           through the node centres. Sits behind the nodes. */}
       <View style={styles.branch} pointerEvents="none" />
 
-      {dimensions.map((dim) => {
+      {ordered.map((dim) => {
         const enLuz = dim.brightness >= EN_LUZ_THRESHOLD
         const isSelected = dim.key === selectedKey
-        const nodeOpacity = enLuz ? 0.6 + dim.brightness * 0.4 : 0.45
         return (
           <Pressable
             key={dim.key}
@@ -56,8 +70,8 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
               <Svg width={14} height={14} viewBox="0 0 24 24">
                 <Path
                   d={STAR_PATH}
-                  fill={enLuz ? colors.magenta : colors.niebla}
-                  opacity={nodeOpacity}
+                  fill={enLuz ? '#FFFFFF' : colors.niebla}
+                  opacity={enLuz ? 0.95 : 0.5}
                 />
               </Svg>
             </View>
@@ -74,13 +88,14 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
   )
 }
 
-const NODE_SIZE = 28
+const NODE_SIZE = 26
 
 const styles = StyleSheet.create({
   // The whole list — a vertical column on the right side of the hero
-  // row. Fixed-ish width so the diagram beside it can flex.
+  // row. Width bumped 92 → 100 so `ALIMENTO` fits without ellipsis at
+  // the new tighter font size.
   list: {
-    width: 92,
+    width: 100,
     justifyContent: 'center',
     paddingRight: 6,
     paddingVertical: 4,
@@ -90,8 +105,8 @@ const styles = StyleSheet.create({
   // node-circle column (NODE_SIZE/2 from the left edge of the list).
   branch: {
     position: 'absolute',
-    top: 18,
-    bottom: 18,
+    top: 16,
+    bottom: 16,
     left: NODE_SIZE / 2 - 0.5,
     width: 1,
     backgroundColor: colors.bruma,
@@ -102,9 +117,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  // The node circle — a faint ring around the star icon. Lit
-  // dimensions warm to magenta-tint; the selected one gains a clear
-  // magenta border so the eye finds it instantly.
+  // The node circle — three clearly different visual states so the
+  // list itself communicates which dimensions are en luz, lejos or
+  // selected without the eye having to dart back to the diagram.
+  //
+  // - Default (lejos): faint outline, transparent fill, dim star.
+  // - Lit:    SOLID magenta fill, white star icon → reads as "on".
+  // - Selected: cream outline ring sits around either state.
   nodeWrap: {
     width: NODE_SIZE,
     height: NODE_SIZE,
@@ -113,27 +132,26 @@ const styles = StyleSheet.create({
     borderRadius: NODE_SIZE / 2,
     borderWidth: 1,
     borderColor: colors.bruma,
-    backgroundColor: colors.bg,
+    backgroundColor: 'transparent',
   },
   nodeWrapLit: {
-    borderColor: 'rgba(233, 30, 99, 0.4)',
-    backgroundColor: colors.magentaTint,
+    borderColor: colors.magenta,
+    backgroundColor: colors.magenta,
   },
   nodeWrapSelected: {
-    borderColor: colors.magenta,
-    borderWidth: 1.4,
-    backgroundColor: colors.magentaTint2,
+    borderColor: colors.leche,
+    borderWidth: 1.6,
   },
   label: {
     flex: 1,
     fontFamily: typography.uiBold,
-    fontSize: 9,
-    letterSpacing: 1.2,
+    fontSize: 8,
+    letterSpacing: 1,
     textTransform: 'uppercase',
     color: colors.niebla,
   },
   labelLit: {
-    color: colors.bone,
+    color: colors.leche,
   },
   labelSelected: {
     color: colors.magenta,
