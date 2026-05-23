@@ -68,27 +68,38 @@ const VB_H = 382
 // screen.
 const ZOOM_SCALE = 2.4
 
-// Three orbits — modelled after the triple-star reference photo. The
-// shapes are hand-tuned for each orbit's character (tall vertical,
-// two opposite diagonals meeting at the centre). They are FIXED,
-// independent of the dimensions: the orbits are the structural
-// drawing of the diagram, not derived from data.
+// The PNG ornament is rendered at (IMG_X, IMG_Y) with size (IMG_W,
+// IMG_H) inside the viewBox. The PNG itself is 782 × 899 pixels;
+// these constants both size the ornament and let us project the
+// art's intrinsic star centres (detected from the PNG, in fractional
+// coords) into the SVG's user space.
+const IMG_X = 46
+const IMG_Y = 20
+const IMG_W = 280
+const IMG_H = 322
 
-// Three dimensions live ON the orbits (at the prominent tip of each).
-// The other three are PERIPHERAL — distant stars in the field around
-// the orbital cluster, still part of the diagram but outside the main
-// dance. Active flows (mente/energía/alimento) anchor the orbits;
-// structural ones (cuerpo/sueño/ciclo) hover at the edges.
+// The art draws decorative bursts at fixed anchor points; the live
+// dimension stars MUST land on those bursts so the constellation
+// reads as one figure, not two layers. Fractional positions were
+// detected programmatically from the PNG (cluster of pixels above
+// the white-core threshold, blob-merged within a 60-px halo radius).
+// `fx, fy` here go through the same mapping the <SvgImage> uses, so
+// any time IMG_X/Y/W/H change the stars move with the art.
+function ornamentPos(fx: number, fy: number): { x: number; y: number } {
+  return { x: IMG_X + fx * IMG_W, y: IMG_Y + fy * IMG_H }
+}
+
 const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
-  // Orbital trio — on the outer tips of each ellipse's major axis.
-  // The vertical orbit's slight tilt nudges MENTE a touch right.
-  mente: { x: 194, y: 26 },
-  energia: { x: 79, y: 284 },
-  alimento: { x: 293, y: 284 },
-  // Peripheral trio — around the cluster, outside the orbits.
-  cuerpo: { x: 45, y: 130 },
-  sueno: { x: 325, y: 130 },
-  ciclo: { x: 185, y: 325 },
+  // Top burst — slightly right of centre.
+  mente: ornamentPos(0.471, 0.072),
+  // Left side: upper burst and lower burst.
+  cuerpo: ornamentPos(0.1, 0.25),
+  energia: ornamentPos(0.08, 0.699),
+  // Right side: upper-right burst and the central-diamond burst.
+  sueno: ornamentPos(0.79, 0.259),
+  alimento: ornamentPos(0.671, 0.638),
+  // Bottom burst.
+  ciclo: ornamentPos(0.432, 0.861),
 }
 
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -241,19 +252,20 @@ export function OrbitalSystem({
           <Cosmos t={t} drift={drift} />
 
           {/* The ornamental constellation drawing — scrollwork and
-              decorative curves around the dimension stars. `slice`
-              fills the whole viewBox by width AND height, clipping
-              the tip/tail flourishes that fall outside (preferable
-              to the empty side margins `meet` was leaving). The
-              opacity holds the line art back so it sits *behind* the
-              live luminous stars, not over them. */}
+              decorative curves around the dimension stars. Sized
+              smaller than the full viewBox so the figure fits within
+              the topFade + bottomFade dissolve, and so the live
+              dimension stars (whose positions are computed from the
+              same IMG_X/Y/W/H constants) land exactly on the art's
+              own burst points. Aspect of the box matches the PNG, so
+              `meet` and `slice` resolve to the same output. */}
           <SvgImage
-            x={0}
-            y={VB_TOP}
-            width={W}
-            height={VB_H}
+            x={IMG_X}
+            y={IMG_Y}
+            width={IMG_W}
+            height={IMG_H}
             href={diaOrnamentPng}
-            preserveAspectRatio="xMidYMid slice"
+            preserveAspectRatio="xMidYMid meet"
             opacity={0.82}
           />
 
@@ -314,16 +326,21 @@ export function OrbitalSystem({
         />
       )}
 
-      {/* Top-edge fade — a static native overlay (cheap). An SVG
-          mask would composite the diagram correctly, but masking
-          this group's eight continuous animation clocks forced a
-          per-frame re-composite and tanked the tab's performance.
-          The overlay paints colours.bg → transparent: it covers the
-          very top of the diagram (mostly sparse headroom stars), so
-          the diagram emerges instead of starting on a hard edge. */}
+      {/* Top + bottom edge fades — static native gradients (cheap).
+          The constellation now sits centred inside the canvas with
+          breathing room above and below; both edges dissolve into
+          colours.bg so the figure floats in the page instead of
+          ending on hard rectangle edges. (An SVG mask would do this
+          inside the SVG too, but masking the animated content group
+          forced a per-frame re-composite and tanked performance.) */}
       <FadeGradient
         colors={[colors.bg, 'transparent']}
         style={styles.topFade}
+        pointerEvents="none"
+      />
+      <FadeGradient
+        colors={['transparent', colors.bg]}
+        style={styles.bottomFade}
         pointerEvents="none"
       />
     </View>
@@ -352,18 +369,18 @@ function CenterStar({ t }: { t: SharedValue<number> }) {
 
   return (
     <AnimatedG animatedProps={breath}>
-      {/* Bloom — soft layered halo. The outermost layer is wide and
-          almost invisible; it gives the eye a sense of light spilling
-          beyond the bright disc without flooding the field. */}
-      <Circle cx={CX} cy={CY} r={CORE_R * 7} fill={colors.magenta} opacity={0.015} />
-      <Circle cx={CX} cy={CY} r={CORE_R * 4.2} fill={colors.magenta} opacity={0.06} />
-      <Circle cx={CX} cy={CY} r={CORE_R * 2.6} fill={colors.magenta} opacity={0.12} />
-      <Circle cx={CX} cy={CY} r={CORE_R * 1.6} fill={colors.magenta} opacity={0.22} />
-      {/* Diffraction spikes — only the centre carries the cross, and
-          only the cardinal pair. The "+" tells the eye this is the
-          brightest body in the field; no diagonals so it stays
-          minimal. */}
-      <DiffractionSpikes x={CX} y={CY} length={CORE_R * 5} opacity={0.4} strokeWidth={0.7} />
+      {/* Bloom — soft layered halo. Tighter than before now that the
+          ornament's central diamond sits behind the core; the very
+          wide outermost layers were creating a magenta wash over the
+          art. The bright disc carries most of the centre's weight. */}
+      <Circle cx={CX} cy={CY} r={CORE_R * 4.2} fill={colors.magenta} opacity={0.03} />
+      <Circle cx={CX} cy={CY} r={CORE_R * 2.6} fill={colors.magenta} opacity={0.07} />
+      <Circle cx={CX} cy={CY} r={CORE_R * 1.6} fill={colors.magenta} opacity={0.14} />
+      {/* Diffraction spikes — shorter and softer than before. The
+          previous CORE_R * 5 with 0.4 opacity painted a high-contrast
+          cross over the magenta ornament that read as a visual glitch
+          rather than a flare. */}
+      <DiffractionSpikes x={CX} y={CY} length={CORE_R * 3} opacity={0.25} strokeWidth={0.5} />
       {/* The point itself. */}
       <Circle cx={CX} cy={CY} r={CORE_R} fill="url(#orb-self)" />
       <Circle cx={CX} cy={CY} r={CORE_R * 0.5} fill="#FFFFFF" opacity={0.85} />
@@ -510,9 +527,12 @@ function StarNode({
   // Small stars — size driven by brightness, with a clear gap
   // between en luz and lejos so the eye reads them as different
   // states. The core is the bright disc; the bloom is the halo.
+  // Bloom/aura sized down from the old orbital diagram now that the
+  // PNG carries its own burst halo behind each star — the previous
+  // R*5 made big magenta blobs that fought the ornament.
   const R = enLuz ? 3.2 + b * 2.6 : 2
-  const bloomR = enLuz ? R * 5 : R * 2.5
-  const auraR = enLuz ? R * 2.6 : R * 1.6
+  const bloomR = enLuz ? R * 2.8 : R * 1.6
+  const auraR = enLuz ? R * 1.7 : R * 1.2
 
   // Each star breathes on its own phase so the constellation feels
   // alive but not synchronised.
@@ -562,30 +582,32 @@ function StarNode({
         />
       ) : null}
       <AnimatedG animatedProps={breath}>
-        {/* Bloom — the star's outer light. Only en luz stars carry a
-            wide halo; lejos ones stay tight. */}
+        {/* Bloom — the star's outer light. Soft, low-opacity now
+            (the PNG ornament already paints its own burst behind
+            each anchor, so the live star is the bright POINT, not
+            another big halo). */}
         <Circle
           cx={x}
           cy={y}
           r={bloomR}
           fill={colors.magenta}
-          opacity={enLuz ? 0.07 + b * 0.13 : 0.06}
+          opacity={enLuz ? 0.04 + b * 0.08 : 0.04}
         />
-        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.1 + b * 0.18 : 0.08} />
-        {/* When this star is the focus of the zoom, lay a full
-            lens-flare starburst behind the point — long horizontal +
-            vertical streaks with diagonal whiskers. The outer zoom
-            transform amplifies the streaks 2.4× so they fan out across
-            the framed view, exactly the "Constellation Lv. 6" beat
-            from the reference image. */}
+        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.06 + b * 0.1 : 0.05} />
+        {/* When this star is the focus of the zoom, a discreet
+            lens-flare starburst — shorter and softer than the centre
+            star's, because the outer zoom transform amplifies it
+            2.4× already. The previous R*12 length + 0.85 opacity
+            turned into a screen-filling cross when scaled; R*6 with
+            opacity 0.55 reads as a flare not a flash. */}
         {selected ? (
           <DiffractionSpikes
             x={x}
             y={y}
-            length={R * 12}
-            opacity={0.85}
-            diagOpacity={0.35}
-            strokeWidth={0.9}
+            length={R * 6}
+            opacity={0.55}
+            diagOpacity={0.22}
+            strokeWidth={0.55}
           />
         ) : null}
         {/* Selection crown — sits between the aura and the bright
@@ -649,15 +671,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  // The diagram dissolves into the page across its top. Static
-  // native gradient — zero per-frame cost (an SVG mask was the right
-  // visual but compositing it over the animated group every frame
-  // was too expensive).
+  // The diagram dissolves into the page across both its top and
+  // bottom edges. Static native gradients — zero per-frame cost (an
+  // SVG mask was the right visual but compositing it over the
+  // animated group every frame was too expensive).
   topFade: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 70,
+  },
+  bottomFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 70,
   },
 })
