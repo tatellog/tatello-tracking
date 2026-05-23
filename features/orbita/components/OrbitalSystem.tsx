@@ -1,4 +1,6 @@
 import * as Haptics from 'expo-haptics'
+// Aliased — react-native-svg also exports a LinearGradient.
+import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -315,14 +317,33 @@ export function OrbitalSystem({
         />
       )}
 
-      {/* No more edge fades — they were painting bands of colours.bg
-          around the diagram, which against the magenta ambient glow
-          on the page read as a hard rectangular frame ("parece un
-          cuadro"). The diagram's own Cosmos backdrop is transparent
-          so the screen's ambient glow shows through naturally, and
-          its content (sparse field stars, line art, bright stars)
-          blends with the surrounding glow without any opaque
-          softening overlay. */}
+      {/* Soft horizontal blend fades — the diagram's content needs
+          to dissolve into the page rather than ending on a hard
+          vertical edge, but the previous attempt (fade to opaque
+          colours.bg) painted a dark band that read as a frame
+          against the surrounding magenta glow. The new approach
+          uses a SEMI-TRANSPARENT, magenta-tinted end colour
+          (rgba(40, 14, 24, 0.6) ≈ bg + low-mag tint at 60 %
+          opacity). At the diagram's right edge the overlay dims
+          the content by 60 % AND tints it toward the same wine
+          shade the surrounding ambient glow lands on, so the
+          transition reads as a soft dissolve into the surrounding
+          rather than a coloured frame. Wide (100 px each side) for
+          a long, soft falloff. */}
+      <FadeGradient
+        colors={['rgba(40, 14, 24, 0.6)', 'transparent']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={styles.leftBlend}
+        pointerEvents="none"
+      />
+      <FadeGradient
+        colors={['transparent', 'rgba(40, 14, 24, 0.6)']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={styles.rightBlend}
+        pointerEvents="none"
+      />
     </View>
   )
 }
@@ -689,5 +710,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  // Soft horizontal blend overlays — semi-transparent magenta-
+  // tinted gradients on the left and right edges so the diagram
+  // dissolves into the surrounding ambient glow without a dark
+  // band or a hard edge. 100 px wide each = long, gentle falloff.
+  leftBlend: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 100,
+  },
+  rightBlend: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 100,
   },
 })
