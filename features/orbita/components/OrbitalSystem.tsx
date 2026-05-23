@@ -14,28 +14,13 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, {
-  Circle,
-  Defs,
-  G,
-  Image as SvgImage,
-  Line,
-  LinearGradient,
-  RadialGradient,
-  Stop,
-} from 'react-native-svg'
+import Svg, { Circle, Defs, G, LinearGradient, Line, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
+import { ConstellationDrawing } from './ConstellationDrawing'
 import { Cosmos } from './Cosmos'
-
-// The ornamental constellation drawing — a single PNG with the
-// scrollwork the Genshin-style hero needs. Imported source had a
-// magenta-on-transparent line art at 818 × 912 (aspect 0.897); the
-// box below matches that aspect exactly so `meet` and `slice`
-// resolve to the same output and there's no letterbox or squish.
-const diaOrnamentPng = require('@/assets/constellations/day-const.png') as number
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -67,39 +52,37 @@ const VB_H = 382
 // screen.
 const ZOOM_SCALE = 2.4
 
-// The PNG ornament is rendered at (IMG_X, IMG_Y) with size (IMG_W,
-// IMG_H) inside the viewBox. The PNG itself is 818 × 912 pixels;
-// IMG_H = IMG_W / (818/912) = 312 keeps the box at the source's
-// exact aspect ratio. These constants both size the ornament and
-// let us project the art's intrinsic star centres (detected from
-// the PNG, in fractional coords) into the SVG's user space.
-const IMG_X = 46
-const IMG_Y = 20
-const IMG_W = 280
-const IMG_H = 312
+// The ConstellationDrawing is authored in a 1024 × 1024 SVG space;
+// we project it into our viewBox via a single transform. ORNAMENT_S
+// scales source-space units into viewBox-space units; ORNAMENT_TX/TY
+// then shift so the source content centre (~520, 450) lands on the
+// canvas centre. The same transform is used both on the <G> that
+// renders the drawing AND on the star positions below — keeping
+// the live stars perfectly aligned with the drawn bursts.
+const ORNAMENT_S = 0.5
+const ORNAMENT_TX = -74
+const ORNAMENT_TY = -61.75
 
-// The art draws decorative bursts at fixed anchor points; the live
-// dimension stars MUST land on those bursts so the constellation
-// reads as one figure, not two layers. Fractional positions were
-// detected programmatically from the PNG (cluster of pixels above
-// the white-core threshold, blob-merged within a 70-px halo radius).
-// `fx, fy` here go through the same mapping the <SvgImage> uses, so
-// any time IMG_X/Y/W/H change the stars move with the art.
-function ornamentPos(fx: number, fy: number): { x: number; y: number } {
-  return { x: IMG_X + fx * IMG_W, y: IMG_Y + fy * IMG_H }
+/** Project a source-space (1024-space) point into the SVG viewBox. */
+function ornamentPos(sx: number, sy: number): { x: number; y: number } {
+  return { x: ORNAMENT_TX + sx * ORNAMENT_S, y: ORNAMENT_TY + sy * ORNAMENT_S }
 }
 
+// Six dimension stars sit on six of the eight burst points in the
+// drawing (the central diamond and a right-mid burst stay
+// decorative). Source coords are read directly from the SVG's
+// star-* paths in constellation_app_day.svg.
 const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
-  // Top burst — slightly right of centre.
-  mente: ornamentPos(0.548, 0.119),
-  // Left side: upper burst and lower burst.
-  cuerpo: ornamentPos(0.095, 0.285),
-  energia: ornamentPos(0.046, 0.712),
-  // Right side: upper-right burst and the mid-right burst.
-  sueno: ornamentPos(0.778, 0.276),
-  alimento: ornamentPos(0.665, 0.704),
+  // Top burst.
+  mente: ornamentPos(492, 145),
+  // Upper-left and lower-left.
+  cuerpo: ornamentPos(323, 252),
+  energia: ornamentPos(319, 563),
+  // Upper-right and right-of-centre.
+  sueno: ornamentPos(662, 252),
+  alimento: ornamentPos(604, 568),
   // Bottom burst.
-  ciclo: ornamentPos(0.51, 0.809),
+  ciclo: ornamentPos(509, 755),
 }
 
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -203,13 +186,7 @@ export function OrbitalSystem({
     <View style={styles.wrap}>
       <Svg viewBox={`0 ${VB_TOP} ${W} ${VB_H}`} style={styles.svg}>
         <Defs>
-          {/* The central star — white-hot fading to magenta. */}
-          <RadialGradient id="orb-self" cx="50%" cy="50%" r="60%">
-            <Stop offset="0%" stopColor="#FFFFFF" />
-            <Stop offset="40%" stopColor="#FBD7E3" />
-            <Stop offset="100%" stopColor="#9A2150" />
-          </RadialGradient>
-          {/* A dimension star — same warm core but smaller. */}
+          {/* A dimension star — warm white core fading to magenta. */}
           <RadialGradient id="orb-star" cx="50%" cy="50%" r="55%">
             <Stop offset="0%" stopColor="#FFFFFF" />
             <Stop offset="35%" stopColor="#FBD7E3" />
@@ -260,26 +237,16 @@ export function OrbitalSystem({
           {/* The deep field — nebula + starfield. */}
           <Cosmos t={t} drift={drift} />
 
-          {/* The ornamental constellation drawing — scrollwork and
-              decorative curves around the dimension stars. Sized
-              smaller than the full viewBox so the figure fits within
-              the topFade + bottomFade dissolve, and so the live
-              dimension stars (whose positions are computed from the
-              same IMG_X/Y/W/H constants) land exactly on the art's
-              own burst points. Aspect of the box matches the PNG, so
-              `meet` and `slice` resolve to the same output. */}
-          <SvgImage
-            x={IMG_X}
-            y={IMG_Y}
-            width={IMG_W}
-            height={IMG_H}
-            href={diaOrnamentPng}
-            preserveAspectRatio="xMidYMid meet"
-            opacity={0.82}
-          />
-
-          {/* The central star — the "you" the dimensions orbit. */}
-          <CenterStar t={t} />
+          {/* The ornamental constellation — native SVG paths from
+              `assets/constellations/constellation_app_day.svg`,
+              projected into our viewBox via ORNAMENT_S/TX/TY. Lives
+              inside the zoom AnimatedG so it scales with the zoom
+              transform like everything else. The drawing ships its
+              own central diamond, so the previous app-drawn
+              CenterStar is no longer needed and was removed. */}
+          <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
+            <ConstellationDrawing />
+          </G>
 
           {/* Dimension stars — small luminous points on each orbit. */}
           {placed.map(({ d, pos }) => (
@@ -354,49 +321,6 @@ export function OrbitalSystem({
         pointerEvents="none"
       />
     </View>
-  )
-}
-
-/* The central star — small, bright, breathing. Shrunk after the
- * ornamental PNG arrived: the art has its own central diamond, and
- * the previous CORE_R=9 painted a bright disc that competed with it.
- * Now the diamond carries the centre; this is just a quiet pulse. */
-const CORE_R = 3.2
-
-function CenterStar({ t }: { t: SharedValue<number> }) {
-  const breath = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
-    const scale = 1 + wave * 0.06
-    return {
-      transform: [
-        { translateX: CX },
-        { translateY: CY },
-        { scale },
-        { translateX: -CX },
-        { translateY: -CY },
-      ],
-    }
-  })
-
-  return (
-    <AnimatedG animatedProps={breath}>
-      {/* Bloom — soft layered halo. Tighter than before now that the
-          ornament's central diamond sits behind the core; the very
-          wide outermost layers were creating a magenta wash over the
-          art. The bright disc carries most of the centre's weight. */}
-      <Circle cx={CX} cy={CY} r={CORE_R * 4.2} fill={colors.magenta} opacity={0.03} />
-      <Circle cx={CX} cy={CY} r={CORE_R * 2.6} fill={colors.magenta} opacity={0.07} />
-      <Circle cx={CX} cy={CY} r={CORE_R * 1.6} fill={colors.magenta} opacity={0.14} />
-      {/* Diffraction spikes — shorter and softer than before. The
-          previous CORE_R * 5 with 0.4 opacity painted a high-contrast
-          cross over the magenta ornament that read as a visual glitch
-          rather than a flare. */}
-      <DiffractionSpikes x={CX} y={CY} length={CORE_R * 3} opacity={0.25} strokeWidth={0.5} />
-      {/* The point itself. */}
-      <Circle cx={CX} cy={CY} r={CORE_R} fill="url(#orb-self)" />
-      <Circle cx={CX} cy={CY} r={CORE_R * 0.5} fill="#FFFFFF" opacity={0.85} />
-    </AnimatedG>
   )
 }
 
