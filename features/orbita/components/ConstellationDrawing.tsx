@@ -1,57 +1,62 @@
-import { G, Path } from 'react-native-svg'
+import { Circle, Ellipse, G, Line } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
 /*
- * The ornamental constellation — extracted from
- * `assets/constellations/constellation_app_day.svg`. Source viewBox
- * is 1024 × 1024; the parent <G transform> in OrbitalSystem scales
+ * The Día orbital drawing — vectorised from
+ * `assets/constellations/orbital_tab_day.svg`. Source viewBox is
+ * 1200 × 1200; the parent <G transform> in OrbitalSystem scales
  * and positions this into our smaller canvas.
  *
- * Lines + ornamental scrollwork ONLY. The eight burst-star diamond
- * paths from the source were intentionally dropped — the app paints
- * its own luminous bursts (StarNode for the six interactive
- * dimensions, DecorativeStar for the two extras) so every star
- * gets the proper bloom + diffraction-spike treatment. Drawing the
- * flat SVG diamonds underneath just produced competing visual
- * shapes that the bright stars couldn't dominate.
+ * The figure is the SCAFFOLDING of the system: outer guide circles,
+ * four tilted orbital ellipses, an axis cross, three central rings.
+ * The six dimension stars + the central "tú" star are drawn by
+ * StarNode / DecorativeStar layered ON TOP of this drawing — so
+ * this component does not render any star nodes itself.
+ *
+ * Original SVG used `#F7A8D7 / #FFD6F0 / #FF7CCB` (pinks). We
+ * project onto STELAR's magenta + low-opacity bruma so the figure
+ * stays inside the app's palette while keeping the original
+ * structure.
  */
+
+const ORBIT_STROKE = colors.magenta
+const THIN_STROKE = colors.magenta
+
 export function ConstellationDrawing() {
   return (
     <>
-      {/* Lines + ornamental curves — stroked. */}
-      <G
-        stroke={colors.magenta}
-        strokeWidth={2.6}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.72}
-      >
-        {/* Main constellation lines */}
-        <Path d="M323 252 L492 145" />
-        <Path d="M492 145 L662 252" />
-        <Path d="M662 252 C731 315 750 404 719 488" />
-        <Path d="M662 252 L604 568" />
-        <Path d="M719 488 L604 568 L509 755" />
-        <Path d="M319 563 L509 755" />
-        <Path d="M323 252 C257 347 259 475 319 563" />
-        <Path d="M509 755 L509 528" />
+      {/* Outer guide circles — two thin concentric rings that frame
+          the whole figure. Static, very subtle. */}
+      <G stroke={THIN_STROKE} fill="none" strokeWidth={1.6} opacity={0.28}>
+        <Circle cx={600} cy={600} r={420} />
+        <Circle cx={600} cy={600} r={280} />
+      </G>
 
-        {/* Ornamental curves */}
-        <Path d="M323 252 C366 184 432 157 492 145 C556 134 626 174 662 252" />
-        <Path d="M492 145 C525 93 588 86 607 122 C625 156 582 174 569 143 C559 119 590 110 600 132" />
-        <Path d="M323 252 C270 300 254 386 285 459 C301 496 325 521 319 563" />
-        <Path d="M334 290 C292 354 307 407 362 435 C398 454 405 506 365 543" />
-        <Path d="M313 525 C265 529 261 589 305 595 C338 599 338 557 309 562" />
-        <Path d="M300 349 C319 367 335 363 351 337 C326 338 311 342 300 349Z" />
-        <Path d="M662 252 C738 315 756 441 719 488 C675 545 638 624 509 755" />
-        <Path d="M642 301 C574 344 544 431 571 490 C585 519 607 543 604 568" />
-        <Path d="M588 335 C625 339 650 319 669 277 C621 285 596 305 588 335Z" />
-        <Path d="M624 646 C673 619 709 563 717 493 C666 528 635 578 624 646Z" />
-        <Path d="M640 584 C679 554 693 515 697 480 C650 504 628 543 640 584Z" />
-        <Path d="M509 755 C548 796 597 805 624 773 C591 779 561 763 533 722" />
-        <Path d="M505 479 C531 435 581 438 584 482 C586 511 544 517 548 487 C552 464 577 470 570 490" />
+      {/* Four orbital ellipses — each tilted to a different angle so
+          the system reads as a real 3-D orbital cluster rather than
+          a flat mandala. AnimatedConstellation overlays travelling
+          particles on these same shapes. */}
+      <G stroke={ORBIT_STROKE} fill="none" strokeWidth={3.5} strokeLinecap="round" opacity={0.7}>
+        <Ellipse cx={600} cy={600} rx={360} ry={150} transform="rotate(20 600 600)" />
+        <Ellipse cx={600} cy={600} rx={180} ry={420} transform="rotate(10 600 600)" />
+        <Ellipse cx={600} cy={600} rx={420} ry={210} transform="rotate(-28 600 600)" />
+        <Ellipse cx={600} cy={600} rx={240} ry={120} transform="rotate(-55 600 600)" />
+      </G>
+
+      {/* Three central rings — small concentric circles around the
+          centre, like the inner shells of an atom. */}
+      <G stroke={THIN_STROKE} fill="none" strokeWidth={1.4} opacity={0.32}>
+        <Circle cx={600} cy={600} r={50} />
+        <Circle cx={600} cy={600} r={90} />
+        <Circle cx={600} cy={600} r={140} />
+      </G>
+
+      {/* Axis cross — vertical + horizontal lines through the
+          centre, reaching to the inside of the outer guide. */}
+      <G stroke={THIN_STROKE} fill="none" strokeWidth={1.6} opacity={0.22}>
+        <Line x1={600} y1={180} x2={600} y2={1020} />
+        <Line x1={180} y1={600} x2={1020} y2={600} />
       </G>
     </>
   )

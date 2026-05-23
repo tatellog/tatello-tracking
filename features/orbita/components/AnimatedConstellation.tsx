@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import { Path } from 'react-native-svg'
+import { Ellipse, G } from 'react-native-svg'
 
 import {
   CONSTELLATION_COLORS,
@@ -18,38 +18,35 @@ import {
 } from '../constants/constellationTheme'
 import { ConstellationDrawing } from './ConstellationDrawing'
 
-const AnimatedPath = Animated.createAnimatedComponent(Path)
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 
 /*
- * The eight MAIN connecting lines from constellation_app_day.svg.
- * Each gets a sliding bright dash overlay for the energy-flow effect.
- * The ornamental scrollwork from ConstellationDrawing stays static —
- * animating ALL of it would feel circuital; animating only the
- * star-to-star traces reads as energy flowing through the figure.
+ * The four orbital ellipses from orbital_tab_day.svg. Each gets a
+ * small bright dash that travels around its closed perimeter — the
+ * "particle on an orbit" energy flow. Closed paths means the dash
+ * wraps invisibly at offset = -1, so the orbit loops feel continuous
+ * with no respawn artefact.
  */
-const MAIN_LINES = [
-  'M323 252 L492 145',
-  'M492 145 L662 252',
-  'M662 252 C731 315 750 404 719 488',
-  'M662 252 L604 568',
-  'M719 488 L604 568 L509 755',
-  'M319 563 L509 755',
-  'M323 252 C257 347 259 475 319 563',
-  'M509 755 L509 528',
+const ANIMATED_ORBITS = [
+  { cx: 600, cy: 600, rx: 360, ry: 150, rotation: 20 },
+  { cx: 600, cy: 600, rx: 180, ry: 420, rotation: 10 },
+  { cx: 600, cy: 600, rx: 420, ry: 210, rotation: -28 },
+  { cx: 600, cy: 600, rx: 240, ry: 120, rotation: -55 },
 ] as const
 
 type Props = {
   /** Animation intensity. Default 'medium'. */
   intensity?: ConstellationIntensity
-  /** Stroke colour for the bright flow highlight. */
+  /** Stroke colour for the bright travelling particle. */
   highlightColor?: string
 }
 
 /*
  * Wraps the static ConstellationDrawing and overlays an animated
- * energy-flow layer on the connecting lines. Drop-in replacement for
- * <ConstellationDrawing /> — emits the same drawing plus the moving
- * highlights, ready to live inside the parent SVG's transform group.
+ * "particle on an orbit" highlight on each of the four orbital
+ * ellipses. Drop-in for <ConstellationDrawing /> — emits the same
+ * drawing plus the moving highlights, ready to live inside the
+ * parent SVG's transform group.
  */
 export function AnimatedConstellation({
   intensity = 'medium',
@@ -58,8 +55,8 @@ export function AnimatedConstellation({
   const reducedMotion = useReducedMotion()
   const profile = getConstellationProfile(intensity, reducedMotion ?? false)
 
-  // One shared clock for the flow effect — each path adds a phase
-  // shift so they don't all light up in lock-step.
+  // One shared clock for the orbital particles — each particle adds
+  // a phase shift so they don't all sit at the same angle.
   const flowClock = useSharedValue(0)
   useEffect(() => {
     if (!profile.flowEnabled) {
@@ -74,22 +71,28 @@ export function AnimatedConstellation({
     return () => cancelAnimation(flowClock)
   }, [profile.flowEnabled, profile.flowDurationMs, flowClock])
 
+  // A small dash relative to the orbit's circumference — the
+  // particle is a brief blip, not a long streak. Half of the path
+  // profile's dashLength setting because orbital "particles" read
+  // better tighter than a connecting-line streak.
+  const orbitDashLength = profile.flowDashLength * 0.45
+
   return (
     <>
-      {/* Base layer — the static drawing (lines + scrollwork). */}
+      {/* Base layer — the static orbital drawing. */}
       <ConstellationDrawing />
 
-      {/* Energy-flow overlay — only when the profile enables it. */}
+      {/* Energy-flow overlay — one travelling particle per orbit. */}
       {profile.flowEnabled
-        ? MAIN_LINES.map((d, i) => (
-            <FlowSegment
-              key={`flow-${i}`}
-              d={d}
+        ? ANIMATED_ORBITS.map((orbit, i) => (
+            <OrbitParticle
+              key={`orbit-${i}`}
+              orbit={orbit}
               clock={flowClock}
-              phase={i / MAIN_LINES.length}
+              phase={i / ANIMATED_ORBITS.length}
               color={highlightColor}
               maxOpacity={profile.flowOpacity}
-              dashLength={profile.flowDashLength}
+              dashLength={orbitDashLength}
             />
           ))
         : null}
@@ -98,19 +101,21 @@ export function AnimatedConstellation({
 }
 
 /*
- * A single line's flow highlight. The dash slides from path start to
- * end over one clock cycle, with `fade-in` at the start and `fade-out`
- * at the end so the loop wrap (offset jump back to 0) is invisible.
+ * A single orbit's travelling particle. Uses pathLength=1 +
+ * strokeDasharray + an animated strokeDashoffset on a duplicate
+ * <Ellipse> over each orbital path. The dash is small, so it reads
+ * as a particle on a closed orbit — and because the orbit IS
+ * closed, the offset wrap loops seamlessly.
  */
-function FlowSegment({
-  d,
+function OrbitParticle({
+  orbit,
   clock,
   phase,
   color,
   maxOpacity,
   dashLength,
 }: {
-  d: string
+  orbit: { cx: number; cy: number; rx: number; ry: number; rotation: number }
   clock: SharedValue<number>
   phase: number
   color: string
@@ -120,34 +125,27 @@ function FlowSegment({
   const animatedProps = useAnimatedProps(() => {
     'worklet'
     const t = (clock.value + phase) % 1
-    // Fade band at the start and end of each cycle (10 % each)
-    // smooths the dash's re-spawn at the loop boundary.
-    const fadeIn = Math.min(1, t / 0.1)
-    const fadeOut = Math.min(1, (1 - t) / 0.1)
-    const visibility = Math.max(0, Math.min(fadeIn, fadeOut))
-    return {
-      strokeDashoffset: -t,
-      opacity: visibility * maxOpacity,
-    }
+    return { strokeDashoffset: -t }
   })
-
-  // `pathLength` IS supported at runtime by react-native-svg 15
-  // (and is the cleanest way to make strokeDasharray work in
-  // normalised 0–1 units regardless of the curve's true length), but
-  // the TS types haven't caught up yet. Spread bypass + cast keeps
-  // the source readable without an inline `as any` on every prop.
+  // `pathLength` is supported at runtime by react-native-svg 15 but
+  // not in its TS types yet — spread through a Record cast.
   const runtimeProps = { pathLength: 1 } as Record<string, unknown>
   return (
-    <AnimatedPath
-      d={d}
-      fill="none"
-      stroke={color}
-      strokeWidth={3.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeDasharray={`${dashLength} ${1 - dashLength}`}
-      animatedProps={animatedProps}
-      {...runtimeProps}
-    />
+    <G transform={`rotate(${orbit.rotation} ${orbit.cx} ${orbit.cy})`}>
+      <AnimatedEllipse
+        cx={orbit.cx}
+        cy={orbit.cy}
+        rx={orbit.rx}
+        ry={orbit.ry}
+        fill="none"
+        stroke={color}
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeDasharray={`${dashLength} ${1 - dashLength}`}
+        opacity={maxOpacity}
+        animatedProps={animatedProps}
+        {...runtimeProps}
+      />
+    </G>
   )
 }

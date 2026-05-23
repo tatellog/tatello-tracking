@@ -58,45 +58,43 @@ const VB_H = 382
 // screen.
 const ZOOM_SCALE = 2.4
 
-// The ConstellationDrawing is authored in a 1024 × 1024 SVG space;
-// we project it into our viewBox via a single transform. ORNAMENT_S
-// scales source-space units into viewBox-space units; ORNAMENT_TX/TY
-// then shift so the source content centre (~520, 450) lands on the
+// ConstellationDrawing is authored in a 1200 × 1200 SVG space
+// (orbital_tab_day.svg); we project it into our viewBox via a single
+// transform. ORNAMENT_S scales source-space units into viewBox
+// units; ORNAMENT_TX/TY shift the source centre (600, 600) onto the
 // canvas centre. The same transform is used both on the <G> that
-// renders the drawing AND on the star positions below — keeping
-// the live stars perfectly aligned with the drawn bursts.
-const ORNAMENT_S = 0.5
-const ORNAMENT_TX = -74
-const ORNAMENT_TY = -61.75
+// renders the drawing AND on the star positions below — keeping the
+// live stars perfectly aligned with the drawn orbits.
+const ORNAMENT_S = 0.31
+const ORNAMENT_TX = 0
+const ORNAMENT_TY = -23
 
-/** Project a source-space (1024-space) point into the SVG viewBox. */
+/** Project a source-space (1200-space) point into the SVG viewBox. */
 function ornamentPos(sx: number, sy: number): { x: number; y: number } {
   return { x: ORNAMENT_TX + sx * ORNAMENT_S, y: ORNAMENT_TY + sy * ORNAMENT_S }
 }
 
-// Six dimension stars sit on six of the eight burst points in the
-// drawing (the central diamond and a right-mid burst stay
-// decorative). Source coords are read directly from the SVG's
-// star-* paths in constellation_app_day.svg.
+// Six dimension stars at the six cardinal nodes of the new orbital
+// drawing. Source coords are read directly from the <circle> elements
+// in orbital_tab_day.svg.
 const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
-  // Top burst.
-  mente: ornamentPos(492, 145),
-  // Upper-left and lower-left.
-  cuerpo: ornamentPos(323, 252),
-  energia: ornamentPos(319, 563),
-  // Upper-right and right-of-centre.
-  sueno: ornamentPos(662, 252),
-  alimento: ornamentPos(604, 568),
-  // Bottom burst.
-  ciclo: ornamentPos(509, 755),
+  // Top node.
+  mente: ornamentPos(600, 220),
+  // Upper-left + lower-left nodes.
+  cuerpo: ornamentPos(210, 500),
+  energia: ornamentPos(320, 880),
+  // Upper-right + lower-right nodes.
+  sueno: ornamentPos(990, 500),
+  alimento: ornamentPos(880, 880),
+  // Bottom node.
+  ciclo: ornamentPos(600, 1020),
 }
 
-// The remaining two SVG burst points (right-mid and the central
-// diamond). The app paints luminous decorative stars at these so
-// every line endpoint terminates on a star — same source coords.
+// The drawing's central "tú" node. A single DecorativeStar paints
+// it so the centre shares the lens-flare + slow-glow language of
+// the dimension stars rather than the original SVG's flat dot.
 const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
-  ornamentPos(719, 488), // right-mid burst
-  ornamentPos(509, 528), // central diamond
+  ornamentPos(600, 600), // centre of the orbital system
 ]
 
 const AnimatedG = Animated.createAnimatedComponent(G)
