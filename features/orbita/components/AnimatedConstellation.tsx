@@ -20,6 +20,7 @@ import {
 } from '../constants/constellationTheme'
 import { ConstellationDrawingBack, ConstellationDrawingFront } from './ConstellationDrawing'
 
+const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 
 /*
@@ -114,9 +115,23 @@ export function AnimatedConstellation({
   // "particle" not a streak.
   const orbitDashLength = profile.flowDashLength * 0.45
 
+  // The static scaffold (guides, axis, node rings, dots, micro
+  // stars) is the "context" of the figure — useful at rest, but
+  // when the camera zooms into a single star it just becomes
+  // noise around the focus. Fade it as zoomT rises: 1 at rest,
+  // ~0.35 at full zoom. The orbits themselves + their particles
+  // stay at full opacity so the cinematic rotation reads bright.
+  const scaffoldDim = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    return { opacity: 1 - z * 0.65 }
+  })
+
   return (
     <>
-      <ConstellationDrawingBack />
+      <AnimatedG animatedProps={scaffoldDim}>
+        <ConstellationDrawingBack />
+      </AnimatedG>
 
       {ORBITS.map((orbit, i) =>
         orbit.kind === 'ellipse' ? (
@@ -136,7 +151,9 @@ export function AnimatedConstellation({
         ),
       )}
 
-      <ConstellationDrawingFront />
+      <AnimatedG animatedProps={scaffoldDim}>
+        <ConstellationDrawingFront />
+      </AnimatedG>
     </>
   )
 }

@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Rect, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
@@ -96,7 +96,6 @@ const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-const AnimatedRect = Animated.createAnimatedComponent(Rect)
 
 /** Canvas position of a dimension's star — hand-placed so the three
  *  orbital tips and the three peripheral stars compose like the
@@ -200,17 +199,6 @@ export function OrbitalSystem({
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
-  // Background dim during zoom — a near-bg-colour rectangle that
-  // sits BEHIND the live stars but in front of the cosmos +
-  // constellation drawing. As zoomT rises 0 → 1 its opacity rises
-  // to ~0.45, draining colour from everything underneath. The
-  // selected star + the dimmed-but-still-visible siblings render
-  // ON TOP of this layer, so they stay above the dim.
-  const dimProps = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: zoomT.value * 0.45 }
-  })
-
   const placed = dimensions.map((d) => ({ d, pos: place(d) }))
 
   return (
@@ -276,18 +264,6 @@ export function OrbitalSystem({
               profile={profile}
             />
           ))}
-          {/* Background dim — only visible while zoomed. Sits
-              between the constellation layers and the live stars
-              so dimensions remain bright while everything else
-              fades back. */}
-          <AnimatedRect
-            x={0}
-            y={VB_TOP}
-            width={W}
-            height={VB_H}
-            fill={colors.bg}
-            animatedProps={dimProps}
-          />
 
           {/* Dimension stars — small luminous points on each orbit. */}
           {placed.map(({ d, pos }) => (
