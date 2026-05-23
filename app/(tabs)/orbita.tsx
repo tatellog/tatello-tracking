@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import {
   DiaSegment,
@@ -28,6 +29,24 @@ export default function OrbitaScreen() {
   return (
     <View style={styles.screen}>
       <SkyBackground />
+
+      {/* Ambient warm glow — a soft radial wash centred behind the
+          Día hero so the page doesn't read as a black-and-magenta
+          rectangle. The gradient peaks at ~22 % opacity magenta in
+          the centre and fades fully transparent at the edges, so
+          it lifts the dark areas around the diagram (the bottom
+          half + the right strip near the dimension list) without
+          flattening the diagram's own contrast. */}
+      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="orbita-ambient" cx="50%" cy="45%" rx="65%" ry="55%">
+            <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.22} />
+            <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.08} />
+            <Stop offset="100%" stopColor="#E91E63" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#orbita-ambient)" />
+      </Svg>
 
       <SafeAreaView style={styles.flex} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
