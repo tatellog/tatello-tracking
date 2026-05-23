@@ -101,16 +101,15 @@ const LIST_HEIGHT = PAD_V * 2 + 6 * BADGE_SIZE + 5 * GAP_V
 // the gap instead of being clipped by the badge's own silhouette.
 const PETAL_REACH = 17
 
-// Per-row horizontal offset — the BADGES trace a single CRESCENT
-// (media luna) arc from top to bottom: the two endpoints sit on
-// the right side of the list, the middle pair bulges to the left.
-// Computed from a half-period sine wave so the shape is smooth and
-// symmetric: `offset(t) = AMP - AMP · sin(t · π)` for t = i/(N-1).
-// Tracing the resulting badge centres gives a clean ⊃ shape that
-// curves toward the constellation on the diagram's right edge.
-const X_AMP = 16
+// Per-row horizontal offset — the BADGES trace a single ")" arc
+// from top to bottom: the two endpoints sit on the LEFT edge of
+// the list, the middle pair bulges to the RIGHT (away from the
+// diagram). Computed from a half-period sine: `offset(t) = AMP ·
+// sin(t · π)` for t = i/(N-1). The resulting badge centres draw a
+// clean right-paren shape ).
+const X_AMP = 22
 const X_OFFSETS = Array.from({ length: 6 }, (_, i) =>
-  Math.round(X_AMP - X_AMP * Math.sin((i / 5) * Math.PI)),
+  Math.round(X_AMP * Math.sin((i / 5) * Math.PI)),
 ) as readonly number[]
 
 /** Centre X of badge `i` within the list View (left = 0). */
@@ -124,15 +123,11 @@ function badgeCenterY(i: number): number {
 }
 
 /*
- * Five smooth C-curves connecting the snake-curve of badges. Each
- * segment runs from the bottom of badge `i` to the top of badge
- * `i+1`, with both control points pinned to vertical tangents at
- * the endpoints — control 1 stays on x = badgeCenterX(i) and
- * control 2 stays on x = badgeCenterX(i+1). The curve therefore
- * exits the lower badge going straight down and approaches the
- * next badge from above going straight down; all the horizontal
- * motion happens in the middle of the span, producing the soft
- * S-shapes from the reference.
+ * Five STRAIGHT line segments linking the badges. The badges are
+ * what trace the ")" curve — the connectors are chords (straight
+ * lines) between consecutive badge perimeters. Tracing them in
+ * order produces a polygonal approximation of a curve, which is
+ * exactly the visual the user is after.
  */
 function buildConnectorPath(): string {
   const cmds: string[] = []
@@ -141,10 +136,7 @@ function buildConnectorPath(): string {
     const y0 = badgeCenterY(i) + PETAL_REACH
     const x1 = badgeCenterX(i + 1)
     const y1 = badgeCenterY(i + 1) - PETAL_REACH
-    const span = y1 - y0
-    const c1y = y0 + span * 0.4
-    const c2y = y1 - span * 0.4
-    cmds.push(`M ${x0} ${y0} C ${x0} ${c1y}, ${x1} ${c2y}, ${x1} ${y1}`)
+    cmds.push(`M ${x0} ${y0} L ${x1} ${y1}`)
   }
   return cmds.join(' ')
 }
