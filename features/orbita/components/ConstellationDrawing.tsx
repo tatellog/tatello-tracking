@@ -6,17 +6,15 @@ import { colors } from '@/theme'
  * The ornamental constellation — extracted from
  * `assets/constellations/constellation_app_day.svg`. Source viewBox
  * is 1024 × 1024; the parent <G transform> in OrbitalSystem scales
- * and positions this into our smaller canvas. Native vector means
- * the figure stays crisp at any zoom and the parent's colour /
- * opacity props ripple through to every stroke.
+ * and positions this into our smaller canvas.
  *
- * Two visual layers:
- *   • Lines + ornamental scrollwork — stroked, no fill, magenta.
- *   • Eight burst stars — filled diamonds at the line endpoints.
- *
- * The app overlays its six live `StarNode`s on top of six of the
- * eight burst positions; the two extra bursts (right-mid and the
- * central diamond) read as decorative anchors.
+ * Lines + ornamental scrollwork ONLY. The eight burst-star diamond
+ * paths from the source were intentionally dropped — the app paints
+ * its own luminous bursts (StarNode for the six interactive
+ * dimensions, DecorativeStar for the two extras) so every star
+ * gets the proper bloom + diffraction-spike treatment. Drawing the
+ * flat SVG diamonds underneath just produced competing visual
+ * shapes that the bright stars couldn't dominate.
  */
 export function ConstellationDrawing() {
   return (
@@ -24,11 +22,11 @@ export function ConstellationDrawing() {
       {/* Lines + ornamental curves — stroked. */}
       <G
         stroke={colors.magenta}
-        strokeWidth={3}
+        strokeWidth={2.6}
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity={0.78}
+        opacity={0.72}
       >
         {/* Main constellation lines */}
         <Path d="M323 252 L492 145" />
@@ -54,21 +52,6 @@ export function ConstellationDrawing() {
         <Path d="M640 584 C679 554 693 515 697 480 C650 504 628 543 640 584Z" />
         <Path d="M509 755 C548 796 597 805 624 773 C591 779 561 763 533 722" />
         <Path d="M505 479 C531 435 581 438 584 482 C586 511 544 517 548 487 C552 464 577 470 570 490" />
-      </G>
-
-      {/* Eight burst stars — filled diamonds at the line endpoints.
-          The app's live StarNodes overlay six of these; the centre
-          and right-mid remain as decorative anchors. Drawn slightly
-          darker than the lines so the live stars pop above them. */}
-      <G fill={colors.magentaDeep} stroke="none" opacity={0.55}>
-        <Path d="M492 103 L507 135 L540 145 L507 155 L492 187 L477 155 L444 145 L477 135Z" />
-        <Path d="M323 214 L335 244 L365 252 L335 260 L323 290 L311 260 L281 252 L311 244Z" />
-        <Path d="M662 214 L674 244 L704 252 L674 260 L662 290 L650 260 L620 252 L650 244Z" />
-        <Path d="M319 528 L330 555 L358 563 L330 571 L319 598 L308 571 L280 563 L308 555Z" />
-        <Path d="M719 454 L731 480 L759 488 L731 496 L719 522 L707 496 L679 488 L707 480Z" />
-        <Path d="M604 536 L616 561 L642 568 L616 575 L604 600 L592 575 L566 568 L592 561Z" />
-        <Path d="M509 714 L523 745 L556 755 L523 765 L509 796 L495 765 L462 755 L495 745Z" />
-        <Path d="M509 502 L517 521 L537 528 L517 535 L509 554 L501 535 L481 528 L501 521Z" />
       </G>
     </>
   )

@@ -85,6 +85,14 @@ const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
   ciclo: ornamentPos(509, 755),
 }
 
+// The remaining two SVG burst points (right-mid and the central
+// diamond). The app paints luminous decorative stars at these so
+// every line endpoint terminates on a star — same source coords.
+const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
+  ornamentPos(719, 488), // right-mid burst
+  ornamentPos(509, 528), // central diamond
+]
+
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
@@ -241,12 +249,19 @@ export function OrbitalSystem({
               `assets/constellations/constellation_app_day.svg`,
               projected into our viewBox via ORNAMENT_S/TX/TY. Lives
               inside the zoom AnimatedG so it scales with the zoom
-              transform like everything else. The drawing ships its
-              own central diamond, so the previous app-drawn
-              CenterStar is no longer needed and was removed. */}
+              transform like everything else. */}
           <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
             <ConstellationDrawing />
           </G>
+          {/* Decorative stars at the two SVG burst endpoints that
+              aren't bound to a dimension (the right-mid burst and
+              the central diamond). Static — they don't carry state
+              or accept taps; they exist so the constellation's line
+              endpoints all terminate on a luminous body, matching
+              the Genshin reference where every line-end is a star. */}
+          {DECORATIVE_STAR_POS.map((p, i) => (
+            <DecorativeStar key={`decor-${i}`} x={p.x} y={p.y} />
+          ))}
 
           {/* Dimension stars — small luminous points on each orbit. */}
           {placed.map(({ d, pos }) => (
@@ -321,6 +336,31 @@ export function OrbitalSystem({
         pointerEvents="none"
       />
     </View>
+  )
+}
+
+/* A static luminous star — no breath, no Pressable, no state. Used
+ * for the two SVG burst endpoints that aren't bound to a dimension
+ * (right-mid and the central diamond). Same visual language as a
+ * lit StarNode but without the animation clocks or selection logic. */
+function DecorativeStar({ x, y }: { x: number; y: number }) {
+  const R = 3.6
+  return (
+    <G>
+      <Circle cx={x} cy={y} r={R * 5.5} fill={colors.magenta} opacity={0.13} />
+      <Circle cx={x} cy={y} r={R * 2.8} fill="#FBD7E3" opacity={0.16} />
+      <Circle cx={x} cy={y} r={R * 1.5} fill="#FBD7E3" opacity={0.32} />
+      <DiffractionSpikes
+        x={x}
+        y={y}
+        length={R * 6.5}
+        opacity={0.5}
+        diagOpacity={0.18}
+        strokeWidth={0.5}
+      />
+      <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
+      <Circle cx={x} cy={y} r={R * 0.6} fill="#FFFFFF" />
+    </G>
   )
 }
 
@@ -462,15 +502,15 @@ function StarNode({
   const { x, y } = pos
   const b = dim.brightness
   const enLuz = b >= EN_LUZ_THRESHOLD
-  // Small stars — size driven by brightness, with a clear gap
-  // between en luz and lejos so the eye reads them as different
-  // states. The core is the bright disc; the bloom is the halo.
-  // Bloom/aura sized down from the old orbital diagram now that the
-  // PNG carries its own burst halo behind each star — the previous
-  // R*5 made big magenta blobs that fought the ornament.
-  const R = enLuz ? 3.2 + b * 2.6 : 2
-  const bloomR = enLuz ? R * 2.8 : R * 1.6
-  const auraR = enLuz ? R * 1.7 : R * 1.2
+  // Lens-flare stars in the Genshin Constellation style: every en
+  // luz star is a luminous starburst with a white-hot core, three
+  // layered blooms (outer wide → mid → inner aura), and a
+  // diffraction-spike cross. Lejos stars stay small and quiet so
+  // the contrast between states is loud.
+  const R = enLuz ? 3.4 + b * 3 : 2
+  const outerR = enLuz ? R * 5.5 : R * 2
+  const midR = enLuz ? R * 2.8 : R * 1.5
+  const auraR = enLuz ? R * 1.5 : R * 1.2
 
   // Each star breathes on its own phase so the constellation feels
   // alive but not synchronised.
@@ -561,45 +601,53 @@ function StarNode({
         />
       ) : null}
       <AnimatedG animatedProps={breath}>
-        {/* Bloom — the star's outer light. Soft, low-opacity now
-            (the PNG ornament already paints its own burst behind
-            each anchor, so the live star is the bright POINT, not
-            another big halo). */}
+        {/* Three-layer bloom: wide outer magenta → mid pink → tight
+            warm aura. Layered radii + opacities produce a gradient
+            falloff that reads as light spilling out of the core,
+            rather than a flat filled disc.  */}
         <Circle
           cx={x}
           cy={y}
-          r={bloomR}
+          r={outerR}
           fill={colors.magenta}
-          opacity={enLuz ? 0.04 + b * 0.08 : 0.04}
+          opacity={enLuz ? 0.1 + b * 0.1 : 0.05}
         />
-        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.06 + b * 0.1 : 0.05} />
+        <Circle cx={x} cy={y} r={midR} fill="#FBD7E3" opacity={enLuz ? 0.14 + b * 0.12 : 0.06} />
+        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.28 + b * 0.18 : 0.1} />
+        {/* Diffraction-spike starburst — ON for EVERY en luz star,
+            not just the selected one. Length + opacity scale with
+            brightness so brighter dimensions throw bigger flares. */}
+        {enLuz ? (
+          <DiffractionSpikes
+            x={x}
+            y={y}
+            length={R * 7}
+            opacity={0.4 + b * 0.35}
+            diagOpacity={0.16 + b * 0.12}
+            strokeWidth={0.5}
+          />
+        ) : null}
         {/* Impact flash — a brief expanding white burst that fires
-            on selection, driven by popT (peak ≈ 240 ms after the
-            tap). Sits in front of the aura so it briefly washes out
-            into the bloom on arrival, then fades. */}
+            on selection, driven by popT. */}
         {selected ? (
           <AnimatedCircle cx={x} cy={y} fill="#FFFFFF" animatedProps={flashAnim} />
         ) : null}
-        {/* Lens-flare starburst — wrapped in an AnimatedG that scales
-            + fades in alongside the zoom progress (and lingers a
-            beat after deselect so it eases out instead of vanishing).
-            The inner opacity is high; the outer AnimatedG multiplies
-            it down — at peak zoom the visible opacity lands around
-            0.85 × 0.85 ≈ 0.7. */}
+        {/* Lens-flare starburst (the BIG flare) — only the selected
+            star, wrapped in an AnimatedG that scales + fades in with
+            the zoom. Stacks on top of the always-on spikes above. */}
         {showFlare ? (
           <AnimatedG animatedProps={flareAnim}>
             <DiffractionSpikes
               x={x}
               y={y}
-              length={R * 6}
-              opacity={0.85}
-              diagOpacity={0.32}
-              strokeWidth={0.55}
+              length={R * 10}
+              opacity={0.7}
+              diagOpacity={0.28}
+              strokeWidth={0.6}
             />
           </AnimatedG>
         ) : null}
-        {/* Selection crown — sits between the aura and the bright
-            point. */}
+        {/* Selection crown — a cream outline ring around the core. */}
         {selected ? (
           <Circle
             cx={x}
@@ -611,9 +659,12 @@ function StarNode({
             opacity={0.9}
           />
         ) : null}
-        {/* The luminous point. */}
+        {/* The luminous point — gradient disc + bright white centre.
+            The centre is bigger and at full opacity now, so the core
+            reads as white-hot like a real over-exposed star. */}
         <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-        {enLuz ? <Circle cx={x} cy={y} r={R * 0.45} fill="#FFFFFF" opacity={0.85} /> : null}
+        {enLuz ? <Circle cx={x} cy={y} r={R * 0.6} fill="#FFFFFF" opacity={1} /> : null}
+        {enLuz ? <Circle cx={x} cy={y} r={R * 0.3} fill="#FFFFFF" /> : null}
       </AnimatedG>
       {/* Labels intentionally removed — the right-side DimensionNodeList
           is the single source of identification. Two labels for the
