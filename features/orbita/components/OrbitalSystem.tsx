@@ -17,8 +17,8 @@ import Animated, {
 import Svg, {
   Circle,
   Defs,
-  Ellipse,
   G,
+  Image as SvgImage,
   Line,
   LinearGradient,
   RadialGradient,
@@ -30,6 +30,13 @@ import { colors, typography } from '@/theme'
 
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 import { Cosmos } from './Cosmos'
+
+// The ornamental constellation drawing — a single PNG with the
+// scrollwork the Genshin-style hero needs. White background was
+// stripped during import (see scripts in assets/constellations/),
+// so the line art sits on the deep-field cosmos. Aspect 785:906;
+// `preserveAspectRatio="xMidYMid meet"` fits it inside the viewBox.
+const diaOrnamentPng = require('@/assets/constellations/dia.png') as number
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -66,30 +73,6 @@ const ZOOM_SCALE = 2.4
 // two opposite diagonals meeting at the centre). They are FIXED,
 // independent of the dimensions: the orbits are the structural
 // drawing of the diagram, not derived from data.
-const ORBITS: readonly {
-  cx: number
-  cy: number
-  rx: number
-  ry: number
-  rotation: number
-  /** Per-orbit stroke params so the three lines have depth, not the
-   *  same flat weight. One feels closer, one farther — like a long
-   *  exposure where the brightness of each path varies. */
-  strokeOpacity: number
-  strokeWidth: number
-}[] = [
-  // Tres trazos cósmicos asimétricos: ninguno comparte centro, eje
-  // ni inclinación con otro. Ángulos 95° / 25° / 145° — diferencias
-  // de 70° / 50° / 120°, jamás perpendiculares ni en triqueta. Cada
-  // órbita encierra al núcleo y cruza a las otras dos en puntos
-  // distintos → tejido cósmico real, no logotipo.
-  // 1 — la vertical-tendida: larga, casi vertical, ligeramente caída.
-  { cx: 175, cy: 145, rx: 130, ry: 50, rotation: 95, strokeOpacity: 0.4, strokeWidth: 1.4 },
-  // 2 — la cometa diagonal: la más estirada (3:1), brilla un poco más.
-  { cx: 200, cy: 215, rx: 120, ry: 40, rotation: 25, strokeOpacity: 0.5, strokeWidth: 1.6 },
-  // 3 — la barrida amplia: más redonda, contracorriente, se desvanece.
-  { cx: 165, cy: 195, rx: 110, ry: 60, rotation: 145, strokeOpacity: 0.32, strokeWidth: 1.2 },
-]
 
 // Three dimensions live ON the orbits (at the prominent tip of each).
 // The other three are PERIPHERAL — distant stars in the field around
@@ -128,39 +111,19 @@ export function OrbitalSystem({
   onSelect: (key: DimensionKey) => void
 }) {
   // Clocks for ambient motion. t (8 s) drives breath + twinkle; drift
-  // (44 s) drives the nebula. orbit1/2/3 (relatively prime periods)
-  // drive the destello traveling along each orbit; spin1/2/3 (longer,
-  // also relatively prime) precess each ellipse's tilt — the bright
-  // spot of the gradient sweeps around as the orbit slowly rotates,
-  // so the three traces never freeze into a static drawing.
+  // (44 s) drives the nebula. The orbits — and their destellos — were
+  // retired when the ornamental PNG took over as the constellation
+  // drawing; only the two field clocks remain.
   const t = useSharedValue(0)
   const drift = useSharedValue(0)
-  const orbit1 = useSharedValue(0)
-  const orbit2 = useSharedValue(0)
-  const orbit3 = useSharedValue(0)
-  const spin1 = useSharedValue(0)
-  const spin2 = useSharedValue(0)
-  const spin3 = useSharedValue(0)
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
-    orbit1.value = withRepeat(withTiming(1, { duration: 13000, easing: Easing.linear }), -1, false)
-    orbit2.value = withRepeat(withTiming(1, { duration: 17000, easing: Easing.linear }), -1, false)
-    orbit3.value = withRepeat(withTiming(1, { duration: 22000, easing: Easing.linear }), -1, false)
-    spin1.value = withRepeat(withTiming(1, { duration: 38000, easing: Easing.linear }), -1, false)
-    spin2.value = withRepeat(withTiming(1, { duration: 47000, easing: Easing.linear }), -1, false)
-    spin3.value = withRepeat(withTiming(1, { duration: 53000, easing: Easing.linear }), -1, false)
     return () => {
       cancelAnimation(t)
       cancelAnimation(drift)
-      cancelAnimation(orbit1)
-      cancelAnimation(orbit2)
-      cancelAnimation(orbit3)
-      cancelAnimation(spin1)
-      cancelAnimation(spin2)
-      cancelAnimation(spin3)
     }
-  }, [t, drift, orbit1, orbit2, orbit3, spin1, spin2, spin3])
+  }, [t, drift])
 
   // Tap feedback: popT amplifies the selected star; rippleT drives
   // a shockwave ring out of it.
@@ -232,27 +195,6 @@ export function OrbitalSystem({
             <Stop offset="35%" stopColor="#FBD7E3" />
             <Stop offset="100%" stopColor={colors.magenta} />
           </RadialGradient>
-          {/* Per-orbit pink gradient — runs along each ellipse's
-              un-rotated major axis. Outer ends fade to cream-pink,
-              middle blooms to soft rosy pink. The gradient rotates
-              with the ellipse (same animated transform), so the
-              bright zone sweeps around the orbit as it precesses. */}
-          {ORBITS.map((o, i) => (
-            <LinearGradient
-              key={`orb-grad-${i}`}
-              id={`orb-grad-${i}`}
-              gradientUnits="userSpaceOnUse"
-              x1={o.cx - o.rx}
-              y1={o.cy}
-              x2={o.cx + o.rx}
-              y2={o.cy}
-            >
-              <Stop offset="0%" stopColor="#FBD7E3" stopOpacity={0.2} />
-              <Stop offset="32%" stopColor="#F4ABC8" stopOpacity={0.95} />
-              <Stop offset="68%" stopColor="#F4ABC8" stopOpacity={0.95} />
-              <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0.2} />
-            </LinearGradient>
-          ))}
           {/* Flare streak gradients — transparent at the tips, bright
               at the centre, so the diffraction spikes taper into the
               field instead of ending on hard cut-off points. One
@@ -298,13 +240,21 @@ export function OrbitalSystem({
           {/* The deep field — nebula + starfield. */}
           <Cosmos t={t} drift={drift} />
 
-          {/* Cosmic interlace — three asymmetric orbits, each with its
-              own centre, axis tilt and weight. Each ellipse + its
-              destello live inside a slowly-precessing group so the
-              tilt drifts over time; the pink gradient sweeps with it. */}
-          <OrbitGroup orbit={ORBITS[0]!} gradId="orb-grad-0" spin={spin1} particle={orbit1} />
-          <OrbitGroup orbit={ORBITS[1]!} gradId="orb-grad-1" spin={spin2} particle={orbit2} />
-          <OrbitGroup orbit={ORBITS[2]!} gradId="orb-grad-2" spin={spin3} particle={orbit3} />
+          {/* The ornamental constellation drawing — scrollwork and
+              decorative curves around the dimension stars. Fits the
+              viewBox with `meet` so aspect is preserved (the art is a
+              bit taller than the canvas; the SVG centres it). The
+              opacity holds the line art back so it sits *behind* the
+              live luminous stars, not over them. */}
+          <SvgImage
+            x={0}
+            y={VB_TOP}
+            width={W}
+            height={VB_H}
+            href={diaOrnamentPng}
+            preserveAspectRatio="xMidYMid meet"
+            opacity={0.78}
+          />
 
           {/* The central star — the "you" the dimensions orbit. */}
           <CenterStar t={t} />
@@ -529,128 +479,6 @@ function DiffractionSpikes({
           />
         </>
       ) : null}
-    </G>
-  )
-}
-
-/* A precessing orbit group — wraps the ellipse and its destello
- * inside an AnimatedG that rotates around the orbit's centre. The
- * static asymmetric tilt is baked into the same transform, so we
- * apply it once here instead of on the ellipse itself; the particle
- * stays anchored to the rotating frame and the pink gradient
- * sweeps along with the ellipse. */
-function OrbitGroup({
-  orbit,
-  gradId,
-  spin,
-  particle,
-}: {
-  orbit: {
-    cx: number
-    cy: number
-    rx: number
-    ry: number
-    rotation: number
-    strokeOpacity: number
-    strokeWidth: number
-  }
-  gradId: string
-  spin: SharedValue<number>
-  particle: SharedValue<number>
-}) {
-  const spinProps = useAnimatedProps(() => {
-    'worklet'
-    // 360° per full clock cycle, on top of the static tilt.
-    const deg = orbit.rotation + spin.value * 360
-    return {
-      transform: [
-        { translateX: orbit.cx },
-        { translateY: orbit.cy },
-        { rotate: `${deg}deg` },
-        { translateX: -orbit.cx },
-        { translateY: -orbit.cy },
-      ],
-    }
-  })
-
-  return (
-    <AnimatedG animatedProps={spinProps}>
-      <Ellipse
-        cx={orbit.cx}
-        cy={orbit.cy}
-        rx={orbit.rx}
-        ry={orbit.ry}
-        fill="none"
-        stroke={`url(#${gradId})`}
-        strokeOpacity={orbit.strokeOpacity}
-        strokeWidth={orbit.strokeWidth}
-      />
-      <OrbitParticle orbit={orbit} clock={particle} />
-    </AnimatedG>
-  )
-}
-
-/* A luminous particle traveling along an orbit — it pulses as it
- * advances: from a tiny dim point it grows into a clear destello at
- * the far side of the orbit, then fades back. Position is computed
- * in the orbit's un-rotated local frame; the OrbitGroup wrapper
- * applies the static tilt + dynamic precession. */
-function OrbitParticle({
-  orbit,
-  clock,
-}: {
-  orbit: { cx: number; cy: number; rx: number; ry: number }
-  clock: SharedValue<number>
-}) {
-  // Wide bloom — a soft outer halo that only really lights up near
-  // the peak, so the destello explodes at its zenith and disappears
-  // in between. The exponent crushes the curve toward 0 in the dim
-  // phase, giving the flash a sharper "on" moment.
-  const bloomProps = useAnimatedProps(() => {
-    'worklet'
-    const phase = clock.value * 2 * Math.PI
-    const pulse = 0.5 + 0.5 * Math.sin(phase - Math.PI / 2)
-    const peakish = pulse * pulse
-    return {
-      cx: orbit.cx + orbit.rx * Math.cos(phase),
-      cy: orbit.cy + orbit.ry * Math.sin(phase),
-      r: 2 + peakish * 8,
-      opacity: peakish * 0.35,
-    }
-  })
-
-  // Outer glow — wider radius and softer; carries the bulk of the
-  // brightness modulation so the destello reads as light, not mass.
-  const glowProps = useAnimatedProps(() => {
-    'worklet'
-    const phase = clock.value * 2 * Math.PI
-    const pulse = 0.5 + 0.5 * Math.sin(phase - Math.PI / 2)
-    return {
-      cx: orbit.cx + orbit.rx * Math.cos(phase),
-      cy: orbit.cy + orbit.ry * Math.sin(phase),
-      r: 1.4 + pulse * 4.4,
-      opacity: 0.08 + pulse * 0.7,
-    }
-  })
-
-  // Bright core — the white-hot point at the centre of the destello.
-  const coreProps = useAnimatedProps(() => {
-    'worklet'
-    const phase = clock.value * 2 * Math.PI
-    const pulse = 0.5 + 0.5 * Math.sin(phase - Math.PI / 2)
-    return {
-      cx: orbit.cx + orbit.rx * Math.cos(phase),
-      cy: orbit.cy + orbit.ry * Math.sin(phase),
-      r: 0.5 + pulse * 2.1,
-      opacity: 0.5 + pulse * 0.5,
-    }
-  })
-
-  return (
-    <G>
-      <AnimatedCircle animatedProps={bloomProps} fill="#FBD7E3" />
-      <AnimatedCircle animatedProps={glowProps} fill="#F5EDE7" />
-      <AnimatedCircle animatedProps={coreProps} fill="#FFFFFF" />
     </G>
   )
 }
