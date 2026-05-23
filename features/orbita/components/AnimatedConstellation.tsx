@@ -186,14 +186,33 @@ function StaticEllipseOrbit({
   phase: number
   zoomT?: SharedValue<number>
 }) {
-  const particleProps = useAnimatedProps(() => {
+  // The "energy beam" — two stacked dashes travelling around the
+  // orbit. HEAD is a narrow bright-white core; HALO is a wider
+  // magenta glow trailing slightly behind. Both share an opacity
+  // PULSE driven by sin(flowClock·3) so the beam intensifies and
+  // dims as it sweeps the orbit (like a real plasma pulse, not a
+  // constant-brightness particle).
+  //
+  // Trail offset (HALO_TRAIL) sits the halo ~1.5 % of the perimeter
+  // behind the head; the visual is a comet-like wake.
+  const HALO_TRAIL = 0.015
+  const PULSE_FREQ = 3
+  const headProps = useAnimatedProps(() => {
     'worklet'
     const t = (flowClock.value + phase) % 1
-    // Energy-on-zoom: when zoomT rises, the orbit particle gets
-    // brighter — up to ~1.7× its base opacity. Reads as the
-    // constellation lines lighting up around the selected star.
+    const pulse = 0.55 + 0.45 * Math.sin((flowClock.value + phase) * 2 * Math.PI * PULSE_FREQ)
     const boost = zoomT ? 1 + zoomT.value * 0.7 : 1
-    const op = Math.min(1, flowMaxOpacity * boost)
+    const op = Math.min(1, flowMaxOpacity * pulse * boost * 1.3)
+    return { strokeDashoffset: -t, opacity: op }
+  })
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    // +1 keeps the modulo positive when (t - HALO_TRAIL) is slightly
+    // negative at the start of a cycle.
+    const t = (flowClock.value + phase - HALO_TRAIL + 1) % 1
+    const pulse = 0.55 + 0.45 * Math.sin((flowClock.value + phase) * 2 * Math.PI * PULSE_FREQ)
+    const boost = zoomT ? 1 + zoomT.value * 0.7 : 1
+    const op = Math.min(1, flowMaxOpacity * pulse * boost * 0.55)
     return { strokeDashoffset: -t, opacity: op }
   })
   // `pathLength` is supported at runtime by react-native-svg 15 but
@@ -213,19 +232,39 @@ function StaticEllipseOrbit({
         opacity={0.72}
       />
       {flowEnabled ? (
-        <AnimatedEllipse
-          cx={orbit.cx}
-          cy={orbit.cy}
-          rx={orbit.rx}
-          ry={orbit.ry}
-          fill="none"
-          stroke={flowColor}
-          strokeWidth={3.2}
-          strokeLinecap="round"
-          strokeDasharray={`${flowDashLength} ${1 - flowDashLength}`}
-          animatedProps={particleProps}
-          {...runtimeProps}
-        />
+        <>
+          {/* Halo — wider magenta glow, slightly longer dash, trails
+              behind the head. Drawn first so the bright head sits on
+              top in z-order. */}
+          <AnimatedEllipse
+            cx={orbit.cx}
+            cy={orbit.cy}
+            rx={orbit.rx}
+            ry={orbit.ry}
+            fill="none"
+            stroke={CONSTELLATION_COLORS.starHalo}
+            strokeWidth={7}
+            strokeLinecap="round"
+            strokeDasharray={`${flowDashLength * 1.5} ${1 - flowDashLength * 1.5}`}
+            animatedProps={haloProps}
+            {...runtimeProps}
+          />
+          {/* Head — narrow white-hot core. The bright crest of the
+              energy pulse. */}
+          <AnimatedEllipse
+            cx={orbit.cx}
+            cy={orbit.cy}
+            rx={orbit.rx}
+            ry={orbit.ry}
+            fill="none"
+            stroke={flowColor}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeDasharray={`${flowDashLength * 0.85} ${1 - flowDashLength * 0.85}`}
+            animatedProps={headProps}
+            {...runtimeProps}
+          />
+        </>
       ) : null}
     </G>
   )
