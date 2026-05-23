@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
 import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
@@ -164,7 +164,15 @@ export function DiaSegment() {
       </View>
 
       {selected && selectedTone ? (
-        <Animated.View key={selected.key} entering={FadeIn.duration(220)} style={styles.readout}>
+        <Animated.View
+          key={selected.key}
+          // FadeInDown lands the card with a tiny drop from above +
+          // fade-in. The 180 ms delay times it to AFTER the zoom
+          // begins, so the visual flow reads as: tap → zoom starts →
+          // card emerges from the diagram area into the readout slot.
+          entering={FadeInDown.duration(360).delay(180)}
+          style={styles.readout}
+        >
           <View style={styles.readoutTop}>
             <View style={styles.readoutLabelRow}>
               <Text style={styles.readoutLabel}>{selected.label}</Text>

@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
@@ -99,6 +99,7 @@ const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+const AnimatedRect = Animated.createAnimatedComponent(Rect)
 
 /** Canvas position of a dimension's star — hand-placed so the three
  *  orbital tips and the three peripheral stars compose like the
@@ -204,6 +205,17 @@ export function OrbitalSystem({
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
+  // Background dim during zoom — a near-bg-colour rectangle that
+  // sits BEHIND the live stars but in front of the cosmos +
+  // constellation drawing. As zoomT rises 0 → 1 its opacity rises
+  // to ~0.45, draining colour from everything underneath. The
+  // selected star + the dimmed-but-still-visible siblings render
+  // ON TOP of this layer, so they stay above the dim.
+  const dimProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: zoomT.value * 0.45 }
+  })
+
   const placed = dimensions.map((d) => ({ d, pos: place(d) }))
 
   return (
@@ -249,7 +261,7 @@ export function OrbitalSystem({
               overlay on the eight connecting lines; everything else
               about ConstellationDrawing renders untouched. */}
           <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
-            <AnimatedConstellation intensity={intensity} />
+            <AnimatedConstellation intensity={intensity} zoomT={zoomT} />
           </G>
           {/* Decorative stars at the two SVG burst endpoints not
               bound to a dimension (right-mid burst + central
@@ -266,6 +278,18 @@ export function OrbitalSystem({
               profile={profile}
             />
           ))}
+          {/* Background dim — only visible while zoomed. Sits
+              between the constellation layers and the live stars
+              so dimensions remain bright while everything else
+              fades back. */}
+          <AnimatedRect
+            x={0}
+            y={VB_TOP}
+            width={W}
+            height={VB_H}
+            fill={colors.bg}
+            animatedProps={dimProps}
+          />
 
           {/* Dimension stars — small luminous points on each orbit. */}
           {placed.map(({ d, pos }) => (
@@ -353,6 +377,47 @@ export function OrbitalSystem({
       />
     </View>
   )
+}
+
+// Cardinal + diagonal directions for the arrival burst. Eight
+// fixed angles, hard-coded so React can render BurstParticle in a
+// .map() without violating rules-of-hooks (the array is static).
+const BURST_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315] as const
+
+/* A single arrival-burst particle — a tiny white dot that spawns
+ * at (x, y) on selection (popT = 0), flies outward by `distance`
+ * along `angle`, then fades. Opacity peaks at popT = 0.5 so the
+ * particle is brightest mid-flight, fading both in and out around
+ * that peak. Driven by popT, the same shared value powering the
+ * impact flash + selection scale-pop. */
+function BurstParticle({
+  x,
+  y,
+  angle,
+  popT,
+  distance,
+}: {
+  x: number
+  y: number
+  angle: number
+  popT: SharedValue<number>
+  distance: number
+}) {
+  const cosA = Math.cos(angle)
+  const sinA = Math.sin(angle)
+  const props = useAnimatedProps(() => {
+    'worklet'
+    const u = popT.value
+    return {
+      cx: x + cosA * u * distance,
+      cy: y + sinA * u * distance,
+      // u * (1 - u) * 4 peaks at u = 0.5 with value 1, then drops
+      // back to 0 — a sharp twinkle, not a fade.
+      opacity: u * (1 - u) * 4,
+      r: 1.4 - u * 0.7,
+    }
+  })
+  return <AnimatedCircle fill="#FFFFFF" animatedProps={props} />
 }
 
 /* A luminous decorative star — no Pressable, no state, but shares
@@ -621,6 +686,27 @@ function StarNode({
     }
   })
 
+  // Lens-flare shimmer — continuous tiny scale wobble on the
+  // always-on starburst so the rays feel alive instead of frozen.
+  // Different phase per star (re-uses dim.angleDeg's phase) and a
+  // 1.3× frequency on top of slowClock so the shimmer is faster
+  // than the breath/glow cycles, evoking the high-frequency
+  // twinkle of real camera-lens diffraction.
+  const shimmerAnim = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI * 1.3)
+    const scale = 0.92 + wave * 0.16
+    return {
+      transform: [
+        { translateX: x },
+        { translateY: y },
+        { scale },
+        { translateX: -x },
+        { translateY: -y },
+      ],
+    }
+  })
+
   return (
     <G opacity={faded ? 0.45 : 1}>
       {selected ? (
@@ -662,23 +748,43 @@ function StarNode({
         <Circle cx={x} cy={y} r={midR} fill="#FBD7E3" opacity={enLuz ? 0.14 + b * 0.12 : 0.06} />
         <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.28 + b * 0.18 : 0.1} />
         {/* Diffraction-spike starburst — ON for EVERY en luz star,
-            not just the selected one. Length + opacity scale with
-            brightness so brighter dimensions throw bigger flares. */}
+            not just the selected one. Wrapped in an AnimatedG that
+            shimmers (slight scale wobble on slowClock) so the rays
+            never feel frozen. Length + opacity scale with brightness
+            so brighter dimensions throw bigger flares. */}
         {enLuz ? (
-          <DiffractionSpikes
-            x={x}
-            y={y}
-            length={R * 7}
-            opacity={0.4 + b * 0.35}
-            diagOpacity={0.16 + b * 0.12}
-            strokeWidth={0.5}
-          />
+          <AnimatedG animatedProps={shimmerAnim}>
+            <DiffractionSpikes
+              x={x}
+              y={y}
+              length={R * 7}
+              opacity={0.4 + b * 0.35}
+              diagOpacity={0.16 + b * 0.12}
+              strokeWidth={0.5}
+            />
+          </AnimatedG>
         ) : null}
         {/* Impact flash — a brief expanding white burst that fires
             on selection, driven by popT. */}
         {selected ? (
           <AnimatedCircle cx={x} cy={y} fill="#FFFFFF" animatedProps={flashAnim} />
         ) : null}
+        {/* Arrival burst — eight tiny white particles that spawn at
+            the star centre when popT fires, fly outward in a ring,
+            and fade. Adds the cinematic "impact pop" sparks Genshin
+            uses at the moment the camera arrives. */}
+        {selected
+          ? BURST_ANGLES.map((deg) => (
+              <BurstParticle
+                key={`burst-${deg}`}
+                x={x}
+                y={y}
+                angle={(deg * Math.PI) / 180}
+                popT={popT}
+                distance={R * 5}
+              />
+            ))
+          : null}
         {/* Lens-flare starburst (the BIG flare) — only the selected
             star, wrapped in an AnimatedG that scales + fades in with
             the zoom. Stacks on top of the always-on spikes above. */}

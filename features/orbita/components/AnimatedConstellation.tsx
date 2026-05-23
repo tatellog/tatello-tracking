@@ -80,11 +80,16 @@ const ORBITS: readonly OrbitSpec[] = [
 type Props = {
   intensity?: ConstellationIntensity
   highlightColor?: string
+  /** Zoom progress (0 → 1). When > 0 the orbit particles get an
+   *  opacity boost — the "energy through the lines" pulse the
+   *  Genshin reference uses at the moment of selection. */
+  zoomT?: SharedValue<number>
 }
 
 export function AnimatedConstellation({
   intensity = 'medium',
   highlightColor = CONSTELLATION_COLORS.lineFlow,
+  zoomT,
 }: Props) {
   const reducedMotion = useReducedMotion()
   const profile = getConstellationProfile(intensity, reducedMotion ?? false)
@@ -124,6 +129,7 @@ export function AnimatedConstellation({
             flowDashLength={orbitDashLength}
             flowColor={highlightColor}
             phase={i / ORBITS.length}
+            zoomT={zoomT}
           />
         ) : (
           <StaticPathOrbit key={`orbit-${i}`} orbit={orbit} />
@@ -149,6 +155,7 @@ function StaticEllipseOrbit({
   flowDashLength,
   flowColor,
   phase,
+  zoomT,
 }: {
   orbit: EllipseOrbit
   flowClock: SharedValue<number>
@@ -157,11 +164,17 @@ function StaticEllipseOrbit({
   flowDashLength: number
   flowColor: string
   phase: number
+  zoomT?: SharedValue<number>
 }) {
   const particleProps = useAnimatedProps(() => {
     'worklet'
     const t = (flowClock.value + phase) % 1
-    return { strokeDashoffset: -t }
+    // Energy-on-zoom: when zoomT rises, the orbit particle gets
+    // brighter — up to ~1.7× its base opacity. Reads as the
+    // constellation lines lighting up around the selected star.
+    const boost = zoomT ? 1 + zoomT.value * 0.7 : 1
+    const op = Math.min(1, flowMaxOpacity * boost)
+    return { strokeDashoffset: -t, opacity: op }
   })
   // `pathLength` is supported at runtime by react-native-svg 15 but
   // not in its TS types yet — spread through a Record cast.
@@ -190,7 +203,6 @@ function StaticEllipseOrbit({
           strokeWidth={3.2}
           strokeLinecap="round"
           strokeDasharray={`${flowDashLength} ${1 - flowDashLength}`}
-          opacity={flowMaxOpacity}
           animatedProps={particleProps}
           {...runtimeProps}
         />
