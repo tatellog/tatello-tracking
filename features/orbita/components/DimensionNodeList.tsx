@@ -91,10 +91,14 @@ const GLYPHS: Record<DimensionKey, ReactNode> = {
 type State = 'dim' | 'lit' | 'selected'
 
 const BADGE_SIZE = 36
-const BADGE_R = 11.5 // inner disc radius
+const BADGE_R = 11.5 // inner disc radius (used by DimensionBadge)
 const PAD_V = 4
-const GAP_V = 10
+const GAP_V = 14
 const LIST_HEIGHT = PAD_V * 2 + 6 * BADGE_SIZE + 5 * GAP_V
+// Y-offset from a badge's centre out to its petal tip. The
+// connector starts/ends just BEYOND the petal so it emerges into
+// the gap instead of being clipped by the badge's own silhouette.
+const PETAL_REACH = 17
 
 /** Centre Y of badge `i` within the list View (top = 0). */
 function badgeCenterY(i: number): number {
@@ -102,23 +106,24 @@ function badgeCenterY(i: number): number {
 }
 
 /*
- * The connector path — five gentle S-curves linking the six badges.
- * Each segment runs from the bottom of badge `i` to the top of
- * badge `i+1`, with the control points pulled ±4 px sideways so the
- * line bulges one way then the next, alternating per pair. Mirrors
- * the skill-tree branch in the Genshin reference (image #4 from
- * the user) — a tree spine, not a straight column.
+ * The connector path — five C-curves linking the six badges, each
+ * bulging strongly to one side then the next pair bulges the
+ * opposite way. The control points are at the centre line vertically
+ * and pulled ±14 px sideways, so the visible arc through the gap
+ * reaches ~9 px off-axis (visibly curved at our scale). Mirrors the
+ * skill-tree branch in the Genshin reference — a tree spine, not a
+ * straight column.
  */
 function buildConnectorPath(): string {
   const cmds: string[] = []
   const cx = BADGE_SIZE / 2
   for (let i = 0; i < 5; i++) {
-    const y0 = badgeCenterY(i) + BADGE_R
-    const y1 = badgeCenterY(i + 1) - BADGE_R
+    const y0 = badgeCenterY(i) + PETAL_REACH
+    const y1 = badgeCenterY(i + 1) - PETAL_REACH
     const span = y1 - y0
-    const c1y = y0 + span * 0.35
-    const c2y = y0 + span * 0.65
-    const bulge = i % 2 === 0 ? 4 : -4
+    const c1y = y0 + span * 0.3
+    const c2y = y0 + span * 0.7
+    const bulge = i % 2 === 0 ? 14 : -14
     const bx = cx + bulge
     cmds.push(`M ${cx} ${y0} C ${bx} ${c1y}, ${bx} ${c2y}, ${cx} ${y1}`)
   }
@@ -212,9 +217,9 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
           d={CONNECTOR_PATH}
           fill="none"
           stroke={colors.bruma}
-          strokeWidth={1}
+          strokeWidth={1.2}
           strokeLinecap="round"
-          opacity={0.55}
+          opacity={0.7}
         />
       </Svg>
 
