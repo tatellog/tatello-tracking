@@ -195,8 +195,12 @@ function StaticEllipseOrbit({
   //
   // Trail offset (HALO_TRAIL) sits the halo ~1.5 % of the perimeter
   // behind the head; the visual is a comet-like wake.
-  const HALO_TRAIL = 0.015
-  const PULSE_FREQ = 3
+  const HALO_TRAIL = 0.018
+  // Slower pulse — 1.5 brightness cycles per orbit cycle. At
+  // flowDurationMs ≈ 9.5 s on medium intensity, that's a peak
+  // every ~6.3 s. Combined with the slower flowClock the beam
+  // reads as a build-up + sweep rather than a fast blip.
+  const PULSE_FREQ = 1.5
   const headProps = useAnimatedProps(() => {
     'worklet'
     const t = (flowClock.value + phase) % 1
