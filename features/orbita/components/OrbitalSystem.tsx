@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, G, LinearGradient, Line, RadialGradient, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
@@ -218,39 +218,20 @@ export function OrbitalSystem({
             <Stop offset="35%" stopColor="#FBD7E3" />
             <Stop offset="100%" stopColor={colors.magenta} />
           </RadialGradient>
-          {/* Flare streak gradients — transparent at the tips, bright
-              at the centre, so the diffraction spikes taper into the
-              field instead of ending on hard cut-off points. One
-              gradient per axis so each line maps onto its bounding
-              box: horizontal, vertical, and the two diagonals. */}
-          <LinearGradient id="flare-h" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
+          {/* Soft radial fill for the lens-flare streak ellipses —
+              white-hot core fading evenly to transparent at the
+              ellipse boundary. Mapped onto each streak's bounding
+              box, so a horizontally-stretched ellipse renders as a
+              long feathered horizontal smear (the natural anamorphic
+              shape of a real camera flare) and a tall narrow ellipse
+              renders as a vertical smear. Single gradient handles
+              every streak orientation. */}
+          <RadialGradient id="flare-soft" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="28%" stopColor="#FFFFFF" stopOpacity={0.72} />
+            <Stop offset="62%" stopColor="#FFFFFF" stopOpacity={0.22} />
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
-          </LinearGradient>
-          <LinearGradient id="flare-v" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
-          </LinearGradient>
-          <LinearGradient id="flare-d1" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
-          </LinearGradient>
-          <LinearGradient id="flare-d2" x1="0" y1="1" x2="1" y2="0">
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="35%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="65%" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
-          </LinearGradient>
+          </RadialGradient>
         </Defs>
 
         {/* Everything below sits inside the zoom transform — when a
@@ -421,16 +402,26 @@ function DecorativeStar({
   )
 }
 
-/* Lens-flare spikes — the organic starburst a real camera lens
- * produces around a bright point, not a rigid geometric "+". The
- * horizontal streak is slightly longer and brighter than the
- * vertical (the anamorphic signature); each axis layers a wide soft
- * halo behind a thin bright core; tipless gradients taper the ends
- * to transparent so the streaks fade into the field; and four faint
- * diagonal whiskers soften the rigid cross into a starburst.
+/* Lens-flare bloom — the organic starburst a real camera lens
+ * produces around a bright point. Built from soft-edged ellipses
+ * + a handful of sparkle dots instead of line strokes, so the
+ * result reads as ATMOSPHERIC LIGHT (feathered, photographic)
+ * rather than a geometric "+" cross.
  *
- * Requires the parent SVG's <Defs> to define `flare-h`, `flare-v`,
- * `flare-d1`, `flare-d2` — one tapered gradient per axis.
+ * Anatomy:
+ *  • Horizontal streak — long, wider — the dominant anamorphic flare.
+ *  • Vertical streak   — shorter, narrower — the secondary axis.
+ *  • Two diagonal streaks — even narrower, rotated 45°/-45°.
+ *  • A scatter of tiny sparkle dots — the photographic "twinkle"
+ *    that real cameras pick up around a bright point.
+ *
+ * Each streak is an <Ellipse> with `fill="url(#flare-soft)"` — a
+ * radial-gradient that goes from full-white at the centre to
+ * transparent at the ellipse edge. Stretching the ellipse on one
+ * axis stretches that gradient into a feathered streak that tapers
+ * to nothing at its tips. No lines means no geometric edges.
+ *
+ * Requires the parent SVG's <Defs> to define `flare-soft`.
  */
 function DiffractionSpikes({
   x,
@@ -447,89 +438,56 @@ function DiffractionSpikes({
   diagOpacity?: number
   strokeWidth: number
 }) {
-  // Anamorphic asymmetry — what a real lens does, never a perfect
-  // geometric square cross.
+  // Anamorphic asymmetry — the H streak is longer and wider than V,
+  // which is itself longer and wider than the diagonals. What a real
+  // camera lens produces; never a symmetric square cross.
   const hLen = length * 1.18
   const vLen = length * 0.74
-  // Diagonal whiskers project onto each axis by `dLen` — a short
-  // overall length (≈0.6 × the vertical) so they read as faint
-  // starburst whiskers, not full rays.
-  const dLen = length * 0.3
-  const dOp = diagOpacity ?? opacity * 0.35
-  // Two-layer streak per axis: a wide soft halo behind a thin bright
-  // core. The combination is what reads as "light", not a line.
-  const haloW = Math.max(1, strokeWidth * 3.4)
-  const coreW = Math.max(0.45, strokeWidth * 0.6)
+  const dLen = length * 0.34
+  const dOp = diagOpacity ?? opacity * 0.32
+  // Ellipse semi-minor axes — these set the streak THICKNESS. They
+  // scale with `length` so a small star produces a thin streak and a
+  // big star produces a fatter one. `strokeWidth` continues to
+  // influence base thickness for backwards-compatible call sites.
+  const hRy = Math.max(1.4, length * 0.055 + strokeWidth * 0.4)
+  const vRx = Math.max(1.1, length * 0.045 + strokeWidth * 0.3)
+  const dRy = Math.max(0.9, length * 0.038 + strokeWidth * 0.25)
+  // Sparkle dots — hand-picked offsets so they fall OFF the cardinal
+  // axes (not on the cross itself). Tiny radii, descending opacity,
+  // they add the "twinkle" that breaks the symmetric starburst.
+  const sparkles = [
+    { dx: length * 0.42, dy: -length * 0.22, r: length * 0.025, op: opacity * 0.55 },
+    { dx: -length * 0.28, dy: length * 0.38, r: length * 0.022, op: opacity * 0.5 },
+    { dx: length * 0.16, dy: length * 0.52, r: length * 0.018, op: opacity * 0.45 },
+    { dx: -length * 0.45, dy: -length * 0.12, r: length * 0.02, op: opacity * 0.45 },
+  ]
   return (
     <G>
-      {/* Horizontal — the dominant streak (anamorphic). */}
-      <Line
-        x1={x - hLen}
-        y1={y}
-        x2={x + hLen}
-        y2={y}
-        stroke="url(#flare-h)"
-        strokeWidth={haloW}
-        strokeLinecap="round"
-        opacity={opacity * 0.5}
-      />
-      <Line
-        x1={x - hLen}
-        y1={y}
-        x2={x + hLen}
-        y2={y}
-        stroke="url(#flare-h)"
-        strokeWidth={coreW}
-        strokeLinecap="round"
-        opacity={opacity}
-      />
-      {/* Vertical — quieter, shorter than the horizontal. */}
-      <Line
-        x1={x}
-        y1={y - vLen}
-        x2={x}
-        y2={y + vLen}
-        stroke="url(#flare-v)"
-        strokeWidth={haloW * 0.78}
-        strokeLinecap="round"
-        opacity={opacity * 0.42}
-      />
-      <Line
-        x1={x}
-        y1={y - vLen}
-        x2={x}
-        y2={y + vLen}
-        stroke="url(#flare-v)"
-        strokeWidth={coreW}
-        strokeLinecap="round"
-        opacity={opacity * 0.78}
-      />
-      {/* Diagonal whiskers — short and faint, the starburst breaks
-          that keep the cross from reading as a rigid "+". */}
+      {/* Horizontal streak — wide ellipse, radial-gradient fill
+          gives a feathered tapered shape no line can match. */}
+      <Ellipse cx={x} cy={y} rx={hLen} ry={hRy} fill="url(#flare-soft)" opacity={opacity * 0.92} />
+      {/* Vertical streak — narrower + shorter. */}
+      <Ellipse cx={x} cy={y} rx={vRx} ry={vLen} fill="url(#flare-soft)" opacity={opacity * 0.74} />
+      {/* Diagonal streaks — thin ellipses rotated 45° / -45° so the
+          starburst feels eight-pointed without resorting to lines.
+          Wrapped in <G transform="rotate(...)"> since SVG Ellipse
+          itself has no rotation attribute. */}
       {dOp > 0 ? (
         <>
-          <Line
-            x1={x - dLen}
-            y1={y - dLen}
-            x2={x + dLen}
-            y2={y + dLen}
-            stroke="url(#flare-d1)"
-            strokeWidth={coreW}
-            strokeLinecap="round"
-            opacity={dOp}
-          />
-          <Line
-            x1={x - dLen}
-            y1={y + dLen}
-            x2={x + dLen}
-            y2={y - dLen}
-            stroke="url(#flare-d2)"
-            strokeWidth={coreW}
-            strokeLinecap="round"
-            opacity={dOp}
-          />
+          <G transform={`rotate(45 ${x} ${y})`}>
+            <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
+          </G>
+          <G transform={`rotate(-45 ${x} ${y})`}>
+            <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
+          </G>
         </>
       ) : null}
+      {/* Sparkles — a handful of tiny offset twinkles. They sit at
+          asymmetric positions (no two on the same axis or angle) so
+          the bloom never reads as geometric. */}
+      {sparkles.map((s, i) => (
+        <Circle key={`sp-${i}`} cx={x + s.dx} cy={y + s.dy} r={s.r} fill="#FFFFFF" opacity={s.op} />
+      ))}
     </G>
   )
 }
