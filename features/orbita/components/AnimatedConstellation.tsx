@@ -20,31 +20,28 @@ import {
 } from '../constants/constellationTheme'
 import { ConstellationDrawingBack, ConstellationDrawingFront } from './ConstellationDrawing'
 
-const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 
 /*
  * Animated orbital layer. Seven orbits in total:
  *
- *   • Five tilted closed ellipses (orbit paths around the centre).
- *     Each rotates around (600, 600) on its own clock, and carries
- *     a small bright particle dash that travels around the closed
- *     curve (offset wrap is invisible because the path is closed).
+ *   • Five tilted closed ellipses — render statically at their
+ *     baseRotation. Each carries a small bright particle dash that
+ *     travels around the closed curve via an animated
+ *     strokeDashoffset (offset wrap is invisible because the path
+ *     is closed).
  *
- *   • Two open S-curve paths sweeping through the centre. They
- *     rotate around (600, 600) on their own clocks but DON'T carry
- *     a travelling particle — open paths would show the loop's
- *     respawn at the wrap point.
+ *   • Two open S-curve paths sweeping through the centre — render
+ *     statically. Open paths would show the loop respawn at the
+ *     wrap, so no travelling particle is drawn on them.
  *
- * Adjacent orbits counter-rotate, and every orbit has a distinct
- * period so the cluster reads as a real ensemble of bodies on
- * independent traces rather than a coordinated spin.
+ * The orbits themselves do NOT rotate (an earlier version spun
+ * each one around the centre; the user found the motion too busy).
+ * Only the dash highlight slides along the closed ellipses.
  */
 
 type OrbitBase = {
   baseRotation: number
-  spinMs: number
-  spinDir: 1 | -1
 }
 type EllipseOrbit = OrbitBase & {
   kind: 'ellipse'
@@ -55,82 +52,28 @@ type EllipseOrbit = OrbitBase & {
 }
 type PathOrbit = OrbitBase & {
   kind: 'path'
-  cx: number
-  cy: number
   d: string
 }
 type OrbitSpec = EllipseOrbit | PathOrbit
 
 const ORBITS: readonly OrbitSpec[] = [
   // Five closed ellipses.
-  {
-    kind: 'ellipse',
-    cx: 600,
-    cy: 600,
-    rx: 430,
-    ry: 138,
-    baseRotation: 7,
-    spinMs: 58000,
-    spinDir: 1,
-  },
-  {
-    kind: 'ellipse',
-    cx: 600,
-    cy: 600,
-    rx: 432,
-    ry: 132,
-    baseRotation: -32,
-    spinMs: 72000,
-    spinDir: -1,
-  },
-  {
-    kind: 'ellipse',
-    cx: 600,
-    cy: 600,
-    rx: 210,
-    ry: 455,
-    baseRotation: 13,
-    spinMs: 84000,
-    spinDir: 1,
-  },
-  {
-    kind: 'ellipse',
-    cx: 600,
-    cy: 600,
-    rx: 128,
-    ry: 398,
-    baseRotation: -23,
-    spinMs: 96000,
-    spinDir: -1,
-  },
-  {
-    kind: 'ellipse',
-    cx: 600,
-    cy: 600,
-    rx: 278,
-    ry: 110,
-    baseRotation: -56,
-    spinMs: 66000,
-    spinDir: 1,
-  },
-  // Two open S-curves sweeping through the centre.
+  { kind: 'ellipse', cx: 600, cy: 600, rx: 430, ry: 138, baseRotation: 7 },
+  { kind: 'ellipse', cx: 600, cy: 600, rx: 432, ry: 132, baseRotation: -32 },
+  { kind: 'ellipse', cx: 600, cy: 600, rx: 210, ry: 455, baseRotation: 13 },
+  { kind: 'ellipse', cx: 600, cy: 600, rx: 128, ry: 398, baseRotation: -23 },
+  { kind: 'ellipse', cx: 600, cy: 600, rx: 278, ry: 110, baseRotation: -56 },
+  // Two open S-curves sweeping through the centre (no rotation
+  // transform — they sit in their authored orientation).
   {
     kind: 'path',
-    cx: 600,
-    cy: 600,
     d: 'M190 455 C340 472 465 520 600 600 C735 680 860 728 1010 745',
     baseRotation: 0,
-    spinMs: 112000,
-    spinDir: -1,
   },
   {
     kind: 'path',
-    cx: 600,
-    cy: 600,
     d: 'M210 755 C355 735 488 670 600 600 C712 530 845 465 990 445',
     baseRotation: 0,
-    spinMs: 104000,
-    spinDir: 1,
   },
 ] as const
 
@@ -146,41 +89,8 @@ export function AnimatedConstellation({
   const reducedMotion = useReducedMotion()
   const profile = getConstellationProfile(intensity, reducedMotion ?? false)
 
-  // One clock per orbit for the rotation. Reanimated requires every
-  // useSharedValue to be a top-level hook call, so we declare them
-  // explicitly (seven orbits → seven clocks).
-  const spin0 = useSharedValue(0)
-  const spin1 = useSharedValue(0)
-  const spin2 = useSharedValue(0)
-  const spin3 = useSharedValue(0)
-  const spin4 = useSharedValue(0)
-  const spin5 = useSharedValue(0)
-  const spin6 = useSharedValue(0)
-  const spins = [spin0, spin1, spin2, spin3, spin4, spin5, spin6] as const
-
-  useEffect(() => {
-    if (!profile.flowEnabled) {
-      spins.forEach((s) => {
-        s.value = 0
-      })
-      return
-    }
-    ORBITS.forEach((orbit, i) => {
-      const s = spins[i]!
-      s.value = withRepeat(
-        withTiming(1, { duration: orbit.spinMs, easing: Easing.linear }),
-        -1,
-        false,
-      )
-    })
-    return () => {
-      spins.forEach((s) => cancelAnimation(s))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.flowEnabled])
-
-  // Energy flow on the closed ellipses — one clock shared across all
-  // ellipse particles. Each ellipse picks its own phase.
+  // Single clock shared across every closed-ellipse particle. Each
+  // ellipse picks its own phase so the highlights don't bunch up.
   const flowClock = useSharedValue(0)
   useEffect(() => {
     if (!profile.flowEnabled) {
@@ -195,8 +105,8 @@ export function AnimatedConstellation({
     return () => cancelAnimation(flowClock)
   }, [profile.flowEnabled, profile.flowDurationMs, flowClock])
 
-  // Tighter dash for orbital particles (vs the connecting-line
-  // setting) — reads as a "particle" not a streak.
+  // Tighter dash than the connecting-line setting — reads as a
+  // "particle" not a streak.
   const orbitDashLength = profile.flowDashLength * 0.45
 
   return (
@@ -205,10 +115,9 @@ export function AnimatedConstellation({
 
       {ORBITS.map((orbit, i) =>
         orbit.kind === 'ellipse' ? (
-          <AnimatedEllipseOrbit
+          <StaticEllipseOrbit
             key={`orbit-${i}`}
             orbit={orbit}
-            spinClock={spins[i]!}
             flowClock={flowClock}
             flowEnabled={profile.flowEnabled}
             flowMaxOpacity={profile.flowOpacity}
@@ -217,7 +126,7 @@ export function AnimatedConstellation({
             phase={i / ORBITS.length}
           />
         ) : (
-          <AnimatedPathOrbit key={`orbit-${i}`} orbit={orbit} spinClock={spins[i]!} />
+          <StaticPathOrbit key={`orbit-${i}`} orbit={orbit} />
         ),
       )}
 
@@ -226,34 +135,14 @@ export function AnimatedConstellation({
   )
 }
 
-/* Rotation transform shared by both orbit-kind components.
- * Translate-rotate-translate around the orbit's centre so it spins
- * in place. The angle is `baseRotation + spinClock * 360 * spinDir`,
- * so spinClock cycling 0 → 1 = one full revolution per spinMs. */
-function useSpinTransform(orbit: OrbitSpec, spinClock: SharedValue<number>) {
-  return useAnimatedProps(() => {
-    'worklet'
-    const angle = orbit.baseRotation + spinClock.value * 360 * orbit.spinDir
-    return {
-      transform: [
-        { translateX: orbit.cx },
-        { translateY: orbit.cy },
-        { rotate: `${angle}deg` },
-        { translateX: -orbit.cx },
-        { translateY: -orbit.cy },
-      ],
-    }
-  })
-}
-
 /*
- * A closed elliptical orbit: static line + travelling particle, both
- * inside an AnimatedG whose transform spins the orbit around its
- * centre. Particle stays glued to the orbit at any rotation angle.
+ * A closed elliptical orbit drawn statically at its baseRotation,
+ * with a particle dash sliding along the closed curve via animated
+ * strokeDashoffset. The outer <G> uses a STATIC `transform` string
+ * — no rotation animation.
  */
-function AnimatedEllipseOrbit({
+function StaticEllipseOrbit({
   orbit,
-  spinClock,
   flowClock,
   flowEnabled,
   flowMaxOpacity,
@@ -262,7 +151,6 @@ function AnimatedEllipseOrbit({
   phase,
 }: {
   orbit: EllipseOrbit
-  spinClock: SharedValue<number>
   flowClock: SharedValue<number>
   flowEnabled: boolean
   flowMaxOpacity: number
@@ -270,15 +158,16 @@ function AnimatedEllipseOrbit({
   flowColor: string
   phase: number
 }) {
-  const spinTransform = useSpinTransform(orbit, spinClock)
   const particleProps = useAnimatedProps(() => {
     'worklet'
     const t = (flowClock.value + phase) % 1
     return { strokeDashoffset: -t }
   })
+  // `pathLength` is supported at runtime by react-native-svg 15 but
+  // not in its TS types yet — spread through a Record cast.
   const runtimeProps = { pathLength: 1 } as Record<string, unknown>
   return (
-    <AnimatedG animatedProps={spinTransform}>
+    <G transform={`rotate(${orbit.baseRotation} ${orbit.cx} ${orbit.cy})`}>
       <Ellipse
         cx={orbit.cx}
         cy={orbit.cy}
@@ -306,34 +195,25 @@ function AnimatedEllipseOrbit({
           {...runtimeProps}
         />
       ) : null}
-    </AnimatedG>
+    </G>
   )
 }
 
 /*
- * An open path orbit (S-curve through the centre): static stroke
- * only. No travelling particle — open paths would show the loop's
- * respawn artifact at the wrap point.
+ * An open path orbit (S-curve). Drawn statically, with no rotation
+ * and no travelling particle (open paths would show the loop's
+ * respawn).
  */
-function AnimatedPathOrbit({
-  orbit,
-  spinClock,
-}: {
-  orbit: PathOrbit
-  spinClock: SharedValue<number>
-}) {
-  const spinTransform = useSpinTransform(orbit, spinClock)
+function StaticPathOrbit({ orbit }: { orbit: PathOrbit }) {
   return (
-    <AnimatedG animatedProps={spinTransform}>
-      <Path
-        d={orbit.d}
-        fill="none"
-        stroke={colors.magenta}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.72}
-      />
-    </AnimatedG>
+    <Path
+      d={orbit.d}
+      fill="none"
+      stroke={colors.magenta}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      opacity={0.72}
+    />
   )
 }
