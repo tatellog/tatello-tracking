@@ -94,11 +94,29 @@ const BADGE_SIZE = 36
 const BADGE_R = 11.5 // inner disc radius (used by DimensionBadge)
 const PAD_V = 4
 const GAP_V = 14
+const LIST_WIDTH = 124
 const LIST_HEIGHT = PAD_V * 2 + 6 * BADGE_SIZE + 5 * GAP_V
 // Y-offset from a badge's centre out to its petal tip. The
 // connector starts/ends just BEYOND the petal so it emerges into
 // the gap instead of being clipped by the badge's own silhouette.
 const PETAL_REACH = 17
+
+// Per-row horizontal offset — the BADGES trace a single CRESCENT
+// (media luna) arc from top to bottom: the two endpoints sit on
+// the right side of the list, the middle pair bulges to the left.
+// Computed from a half-period sine wave so the shape is smooth and
+// symmetric: `offset(t) = AMP - AMP · sin(t · π)` for t = i/(N-1).
+// Tracing the resulting badge centres gives a clean ⊃ shape that
+// curves toward the constellation on the diagram's right edge.
+const X_AMP = 16
+const X_OFFSETS = Array.from({ length: 6 }, (_, i) =>
+  Math.round(X_AMP - X_AMP * Math.sin((i / 5) * Math.PI)),
+) as readonly number[]
+
+/** Centre X of badge `i` within the list View (left = 0). */
+function badgeCenterX(i: number): number {
+  return X_OFFSETS[i]! + BADGE_SIZE / 2
+}
 
 /** Centre Y of badge `i` within the list View (top = 0). */
 function badgeCenterY(i: number): number {
@@ -106,26 +124,27 @@ function badgeCenterY(i: number): number {
 }
 
 /*
- * The connector path — five C-curves linking the six badges, each
- * bulging strongly to one side then the next pair bulges the
- * opposite way. The control points are at the centre line vertically
- * and pulled ±14 px sideways, so the visible arc through the gap
- * reaches ~9 px off-axis (visibly curved at our scale). Mirrors the
- * skill-tree branch in the Genshin reference — a tree spine, not a
- * straight column.
+ * Five smooth C-curves connecting the snake-curve of badges. Each
+ * segment runs from the bottom of badge `i` to the top of badge
+ * `i+1`, with both control points pinned to vertical tangents at
+ * the endpoints — control 1 stays on x = badgeCenterX(i) and
+ * control 2 stays on x = badgeCenterX(i+1). The curve therefore
+ * exits the lower badge going straight down and approaches the
+ * next badge from above going straight down; all the horizontal
+ * motion happens in the middle of the span, producing the soft
+ * S-shapes from the reference.
  */
 function buildConnectorPath(): string {
   const cmds: string[] = []
-  const cx = BADGE_SIZE / 2
   for (let i = 0; i < 5; i++) {
+    const x0 = badgeCenterX(i)
     const y0 = badgeCenterY(i) + PETAL_REACH
+    const x1 = badgeCenterX(i + 1)
     const y1 = badgeCenterY(i + 1) - PETAL_REACH
     const span = y1 - y0
-    const c1y = y0 + span * 0.3
-    const c2y = y0 + span * 0.7
-    const bulge = i % 2 === 0 ? 14 : -14
-    const bx = cx + bulge
-    cmds.push(`M ${cx} ${y0} C ${bx} ${c1y}, ${bx} ${c2y}, ${cx} ${y1}`)
+    const c1y = y0 + span * 0.4
+    const c2y = y1 - span * 0.4
+    cmds.push(`M ${x0} ${y0} C ${x0} ${c1y}, ${x1} ${c2y}, ${x1} ${y1}`)
   }
   return cmds.join(' ')
 }
@@ -212,7 +231,7 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
       {/* Connector branch — an SVG curve snaking through the six
           badge centres. Absolute, sits behind the badges; pointer
           events disabled so taps fall through to the badges. */}
-      <Svg width={BADGE_SIZE} height={LIST_HEIGHT} style={styles.connector} pointerEvents="none">
+      <Svg width={LIST_WIDTH} height={LIST_HEIGHT} style={styles.connector} pointerEvents="none">
         <Path
           d={CONNECTOR_PATH}
           fill="none"
@@ -223,7 +242,7 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
         />
       </Svg>
 
-      {ordered.map((dim) => {
+      {ordered.map((dim, i) => {
         const enLuz = dim.brightness >= EN_LUZ_THRESHOLD
         const isSelected = dim.key === selectedKey
         const state: State = isSelected ? 'selected' : enLuz ? 'lit' : 'dim'
@@ -231,7 +250,10 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
           <Pressable
             key={dim.key}
             onPress={() => onSelect(dim.key)}
-            style={styles.row}
+            // marginLeft drives the crescent layout — each row sits
+            // at X_OFFSETS[i] from the list's left edge so the badges
+            // trace the media-luna arc instead of stacking vertically.
+            style={[styles.row, { marginLeft: X_OFFSETS[i] }]}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={dim.label}
@@ -255,7 +277,7 @@ const styles = StyleSheet.create({
   // Height is the intrinsic stack height (LIST_HEIGHT) so the SVG
   // connector and the badges share an explicit coordinate frame.
   list: {
-    width: 112,
+    width: LIST_WIDTH,
     height: LIST_HEIGHT,
     paddingTop: PAD_V,
     paddingBottom: PAD_V,
