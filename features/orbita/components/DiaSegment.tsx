@@ -18,6 +18,7 @@ import {
 } from '../logic'
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
 import { AccionDelDia } from './AccionDelDia'
+import { DimensionNodeList } from './DimensionNodeList'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
@@ -138,10 +139,19 @@ export function DiaSegment() {
       {/* Lifted lede — STELAR's read in two lines, before the visual. */}
       <StelarHeadline parts={MOCK_HEADLINE.parts} />
 
-      {/* Full-bleed — the diagram is the hero, it breaks out of the
-          screen's 20px gutter so the bodies read large. */}
-      <View style={styles.diagram}>
-        <OrbitalSystem
+      {/* Hero row — the orbital diagram (left, flexes) and the
+          six-dimension node list (right, fixed strip). Genshin's
+          Constellation page: the figure dominates, the list of
+          nodes sits along the right edge as a tappable index. */}
+      <View style={styles.heroRow}>
+        <View style={styles.diagramFlex}>
+          <OrbitalSystem
+            dimensions={dimensions}
+            selectedKey={selectedKey}
+            onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
+          />
+        </View>
+        <DimensionNodeList
           dimensions={dimensions}
           selectedKey={selectedKey}
           onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
@@ -250,6 +260,20 @@ const styles = StyleSheet.create({
   diagram: {
     marginHorizontal: -20,
     marginTop: 4,
+  },
+  // The hero row: orbital diagram on the left (flexes) + the
+  // node-list strip on the right. Full-bleed (same -20 trick as
+  // `diagram`), aligned centred so the node list sits at the
+  // vertical middle of the diagram.
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: -20,
+    marginTop: 4,
+  },
+  diagramFlex: {
+    flex: 1,
+    minWidth: 0,
   },
   header: {
     alignItems: 'center',
