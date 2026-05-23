@@ -74,20 +74,20 @@ function ornamentPos(sx: number, sy: number): { x: number; y: number } {
   return { x: ORNAMENT_TX + sx * ORNAMENT_S, y: ORNAMENT_TY + sy * ORNAMENT_S }
 }
 
-// Six dimension stars at the six cardinal nodes of the new orbital
-// drawing. Source coords are read directly from the <circle> elements
-// in orbital_tab_day.svg.
+// Six dimension stars at the six cardinal nodes of the orbital
+// drawing. Source coords read directly from the node-ring circles
+// in orbital_constellation_no_labels.svg.
 const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
   // Top node.
-  mente: ornamentPos(600, 220),
+  mente: ornamentPos(600, 185),
   // Upper-left + lower-left nodes.
-  cuerpo: ornamentPos(210, 500),
-  energia: ornamentPos(320, 880),
+  cuerpo: ornamentPos(180, 455),
+  energia: ornamentPos(310, 885),
   // Upper-right + lower-right nodes.
-  sueno: ornamentPos(990, 500),
-  alimento: ornamentPos(880, 880),
+  sueno: ornamentPos(1020, 455),
+  alimento: ornamentPos(890, 885),
   // Bottom node.
-  ciclo: ornamentPos(600, 1020),
+  ciclo: ornamentPos(600, 1035),
 }
 
 // The drawing's central "tú" node. A single DecorativeStar paints
