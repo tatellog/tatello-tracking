@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 // Aliased — react-native-svg also exports a `LinearGradient` (the
 // SVG paint server used for the orbit strokes).
 import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -156,9 +156,15 @@ export function OrbitalSystem({
   // again, or the right-side list) zooms back out. The transform is
   // an interpolation between identity and `translate(CX - Z*sx, CY -
   // Z*sy) * scale(Z)`, which maps the target (sx, sy) onto the
-  // viewBox centre at full zoom. `zoomT` runs 0→1 over ~520 ms;
-  // `targetX/Y` are themselves animated so SWITCHING between zoomed
-  // stars pans smoothly instead of snapping.
+  // viewBox centre at full zoom. `targetX/Y` are themselves animated
+  // so SWITCHING between zoomed stars pans smoothly instead of
+  // snapping.
+  //
+  // The zoom runs a two-stage `withSequence`: 480 ms ease-out cubic
+  // to a slight overshoot (1.08), then 240 ms ease-in-out cubic back
+  // to 1.0. That recoil gives the arrival the punctuated, cinematic
+  // beat the user asked for — the camera goes a touch too far and
+  // pulls itself back, instead of decelerating into the target.
   const zoomT = useSharedValue(0)
   const targetXVal = useSharedValue(CX)
   const targetYVal = useSharedValue(CY)
@@ -173,7 +179,10 @@ export function OrbitalSystem({
         duration: 520,
         easing: Easing.inOut(Easing.cubic),
       })
-      zoomT.value = withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })
+      zoomT.value = withSequence(
+        withTiming(1.08, { duration: 480, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 240, easing: Easing.inOut(Easing.cubic) }),
+      )
     } else {
       zoomT.value = withTiming(0, { duration: 380, easing: Easing.inOut(Easing.cubic) })
     }
@@ -281,6 +290,7 @@ export function OrbitalSystem({
               t={t}
               popT={popT}
               rippleT={rippleT}
+              zoomT={zoomT}
               selected={d.key === selectedKey}
               faded={selectedKey != null && d.key !== selectedKey}
             />
@@ -510,6 +520,7 @@ function StarNode({
   t,
   popT,
   rippleT,
+  zoomT,
   selected,
   faded,
 }: {
@@ -518,6 +529,7 @@ function StarNode({
   t: SharedValue<number>
   popT: SharedValue<number>
   rippleT: SharedValue<number>
+  zoomT: SharedValue<number>
   selected: boolean
   faded: boolean
 }) {
@@ -560,6 +572,55 @@ function StarNode({
     return { r: R + u * R * 6, opacity: (1 - u) * 0.55 }
   })
 
+  // Linger the flare render for ~420 ms after deselection so it can
+  // fade out alongside the zoom-out instead of vanishing the moment
+  // the React `selected` prop flips back to false.
+  const [showFlare, setShowFlare] = useState(selected)
+  useEffect(() => {
+    if (selected) {
+      setShowFlare(true)
+      return
+    }
+    const id = setTimeout(() => setShowFlare(false), 420)
+    return () => clearTimeout(id)
+  }, [selected])
+
+  // Flare bloom-in: scale + opacity ramp with the zoom. The flare
+  // appears later in the zoom progress (power curve on opacity) so
+  // it reads as the brightness "catching up" to the camera, and
+  // overshoots scale just like the camera does — when the zoom
+  // recoils from 1.08 back to 1.0, the flare breathes back with it.
+  const flareAnim = useAnimatedProps(() => {
+    'worklet'
+    const z = Math.max(0, Math.min(zoomT.value, 1.1))
+    const opacity = z * z * 0.85
+    const scale = 0.35 + z * 0.7
+    return {
+      transform: [
+        { translateX: x },
+        { translateY: y },
+        { scale },
+        { translateX: -x },
+        { translateY: -y },
+      ],
+      opacity,
+    }
+  })
+
+  // Impact flash — a brief bright white circle that bursts out of
+  // the star core right as the camera arrives. Driven by popT
+  // (which the parent already drives 0 → 1 over 240 ms → 0 over
+  // 520 ms on selection). Squared opacity so the in + out feel
+  // sharper than a linear ramp.
+  const flashAnim = useAnimatedProps(() => {
+    'worklet'
+    const p = popT.value
+    return {
+      r: R * (1 + p * 2.4),
+      opacity: p * p * 0.55,
+    }
+  })
+
   // Label sits along the radial vector outward from the centre.
   const dx = x - CX
   const dy = y - CY
@@ -594,21 +655,30 @@ function StarNode({
           opacity={enLuz ? 0.04 + b * 0.08 : 0.04}
         />
         <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.06 + b * 0.1 : 0.05} />
-        {/* When this star is the focus of the zoom, a discreet
-            lens-flare starburst — shorter and softer than the centre
-            star's, because the outer zoom transform amplifies it
-            2.4× already. The previous R*12 length + 0.85 opacity
-            turned into a screen-filling cross when scaled; R*6 with
-            opacity 0.55 reads as a flare not a flash. */}
+        {/* Impact flash — a brief expanding white burst that fires
+            on selection, driven by popT (peak ≈ 240 ms after the
+            tap). Sits in front of the aura so it briefly washes out
+            into the bloom on arrival, then fades. */}
         {selected ? (
-          <DiffractionSpikes
-            x={x}
-            y={y}
-            length={R * 6}
-            opacity={0.55}
-            diagOpacity={0.22}
-            strokeWidth={0.55}
-          />
+          <AnimatedCircle cx={x} cy={y} fill="#FFFFFF" animatedProps={flashAnim} />
+        ) : null}
+        {/* Lens-flare starburst — wrapped in an AnimatedG that scales
+            + fades in alongside the zoom progress (and lingers a
+            beat after deselect so it eases out instead of vanishing).
+            The inner opacity is high; the outer AnimatedG multiplies
+            it down — at peak zoom the visible opacity lands around
+            0.85 × 0.85 ≈ 0.7. */}
+        {showFlare ? (
+          <AnimatedG animatedProps={flareAnim}>
+            <DiffractionSpikes
+              x={x}
+              y={y}
+              length={R * 6}
+              opacity={0.85}
+              diagOpacity={0.32}
+              strokeWidth={0.55}
+            />
+          </AnimatedG>
         ) : null}
         {/* Selection crown — sits between the aura and the bright
             point. */}
