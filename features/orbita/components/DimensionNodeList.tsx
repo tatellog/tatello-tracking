@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, G, Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
@@ -14,15 +14,24 @@ const CLOCKWISE_ORDER: DimensionKey[] = ['mente', 'sueno', 'alimento', 'ciclo', 
 
 /*
  * Per-dimension glyph — drawn inside a 24 × 24 viewport with white
- * fills/strokes. Each is a quick semantic shorthand for its domain
- * (heart for body, eye for mind, flame for energy, bowl for food,
- * crescent for sleep, spiral for cycle). Designed to read clearly
- * at ~14 px in the badge.
+ * fills/strokes. Each path has been re-centred on (12, 12) so its
+ * visible mass sits at the disc centre when the glyph is translated
+ * into the badge. Adjustments per glyph:
+ *
+ *   cuerpo  — heart shifted down 1 unit; the visual centroid of a
+ *             heart sits above its bbox centre (lobes at top, point
+ *             at bottom), so the bbox needs to be slightly bottom-
+ *             heavy to read as centred.
+ *   alimento— bowl raised + steam compacted so the heavy bowl mass
+ *             sits at the badge centre, not below it.
+ *   sueno   — crescent body slid right so the *moon body* (not the
+ *             empty opening) lands on centre.
+ *   mente, energia, ciclo — already centred by their geometry.
  */
 const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: (
     <Path
-      d="M12 19 C8 15.5 3.5 12 3.5 7.8 C3.5 5.7 5.2 4 7.3 4 C9.3 4 10.8 5.2 12 6.8 C13.2 5.2 14.7 4 16.7 4 C18.8 4 20.5 5.7 20.5 7.8 C20.5 12 16 15.5 12 19 Z"
+      d="M12 20 C8.5 17 4.5 14 4.5 10 C4.5 8 6 6.5 8 6.5 C9.7 6.5 11 7.5 12 9 C13 7.5 14.3 6.5 16 6.5 C18 6.5 19.5 8 19.5 10 C19.5 14 15.5 17 12 20 Z"
       fill="#FFFFFF"
     />
   ),
@@ -33,21 +42,25 @@ const GLYPHS: Record<DimensionKey, ReactNode> = {
     </>
   ),
   energia: (
-    <Path d="M13.6 3 L6.5 13.2 L10.6 13.2 L8.8 21 L17.5 9.8 L13 9.8 L14.8 3 Z" fill="#FFFFFF" />
+    <Path
+      d="M13.5 3.5 L6.5 13.2 L10.5 13.2 L9 20.5 L17.5 10.5 L13.5 10.5 L15 3.5 Z"
+      fill="#FFFFFF"
+    />
   ),
   alimento: (
     <>
-      {/* Bowl — a semicircle with a flat rim. */}
+      {/* Bowl — a semicircle sitting just below centre so the heavy
+          mass lands at the disc midpoint. */}
       <Path
-        d="M3.5 11 L20.5 11 A8.5 8.5 0 0 1 3.5 11 Z M2.5 10.5 L21.5 10.5"
+        d="M4.5 12 L19.5 12 A7.5 7.5 0 0 1 4.5 12 Z"
         fill="#FFFFFF"
         stroke="#FFFFFF"
         strokeWidth={1.2}
-        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      {/* Two wisps of steam. */}
+      {/* Three steam wisps above the bowl. */}
       <Path
-        d="M8 7 Q9 4 10 7 M13 7 Q14 4 15 7 M11 5 Q12 2 13 5"
+        d="M8 8 Q9 5.5 10 8 M14 8 Q15 5.5 16 8 M11 6 Q12 3.5 13 6"
         fill="none"
         stroke="#FFFFFF"
         strokeWidth={1.2}
@@ -57,7 +70,7 @@ const GLYPHS: Record<DimensionKey, ReactNode> = {
   ),
   sueno: (
     <Path
-      d="M17 3.5 C12.5 3.5 8 7.5 8 12 C8 16.5 12.5 20.5 17 20.5 C14.5 18 13.5 15 13.5 12 C13.5 9 14.5 6 17 3.5 Z"
+      d="M17 3.5 C11.5 3.5 7 7.5 7 12 C7 16.5 11.5 20.5 17 20.5 C14 18 13 15 13 12 C13 9 14 6 17 3.5 Z"
       fill="#FFFFFF"
     />
   ),
@@ -76,6 +89,43 @@ const GLYPHS: Record<DimensionKey, ReactNode> = {
 }
 
 type State = 'dim' | 'lit' | 'selected'
+
+const BADGE_SIZE = 36
+const BADGE_R = 11.5 // inner disc radius
+const PAD_V = 4
+const GAP_V = 10
+const LIST_HEIGHT = PAD_V * 2 + 6 * BADGE_SIZE + 5 * GAP_V
+
+/** Centre Y of badge `i` within the list View (top = 0). */
+function badgeCenterY(i: number): number {
+  return PAD_V + i * (BADGE_SIZE + GAP_V) + BADGE_SIZE / 2
+}
+
+/*
+ * The connector path — five gentle S-curves linking the six badges.
+ * Each segment runs from the bottom of badge `i` to the top of
+ * badge `i+1`, with the control points pulled ±4 px sideways so the
+ * line bulges one way then the next, alternating per pair. Mirrors
+ * the skill-tree branch in the Genshin reference (image #4 from
+ * the user) — a tree spine, not a straight column.
+ */
+function buildConnectorPath(): string {
+  const cmds: string[] = []
+  const cx = BADGE_SIZE / 2
+  for (let i = 0; i < 5; i++) {
+    const y0 = badgeCenterY(i) + BADGE_R
+    const y1 = badgeCenterY(i + 1) - BADGE_R
+    const span = y1 - y0
+    const c1y = y0 + span * 0.35
+    const c2y = y0 + span * 0.65
+    const bulge = i % 2 === 0 ? 4 : -4
+    const bx = cx + bulge
+    cmds.push(`M ${cx} ${y0} C ${bx} ${c1y}, ${bx} ${c2y}, ${cx} ${y1}`)
+  }
+  return cmds.join(' ')
+}
+
+const CONNECTOR_PATH = buildConnectorPath()
 
 /*
  * The Genshin-style constellation node: an inner dark disc with a
@@ -96,7 +146,7 @@ function DimensionBadge({ glyph, state }: { glyph: ReactNode; state: State }) {
   // the node feels lit-from-within against the dark page bg.
   const glowOp = state === 'selected' ? 0.55 : state === 'lit' ? 0.32 : 0
   return (
-    <Svg width={36} height={36} viewBox="0 0 36 36">
+    <Svg width={BADGE_SIZE} height={BADGE_SIZE} viewBox="0 0 36 36">
       {/* Backdrop glow — a soft magenta wash behind the badge that
           only switches on for lit/selected. */}
       {glowOp > 0 ? (
@@ -110,22 +160,22 @@ function DimensionBadge({ glyph, state }: { glyph: ReactNode; state: State }) {
       <Path d="M1.6 18 L5.4 20.4 L8.4 18 L5.4 15.6 Z" fill={colors.magenta} opacity={petalOp} />
       {/* The dark disc — sits on top of the petals so the petals
           read as radiating from behind the badge. */}
-      <Circle cx={18} cy={18} r={11.5} fill={colors.bgCard2} />
+      <Circle cx={18} cy={18} r={BADGE_R} fill={colors.bgCard2} />
       {/* The ring around the disc. */}
       <Circle
         cx={18}
         cy={18}
-        r={11.5}
+        r={BADGE_R}
         fill="none"
         stroke={ringStroke}
         strokeWidth={ringWidth}
         opacity={state === 'dim' ? 0.55 : 1}
       />
       {/* The glyph — drawn in its own 24 × 24 space, translated to
-          sit centred inside the disc. */}
-      <Svg x={6} y={6} width={24} height={24} viewBox="0 0 24 24">
-        {glyph}
-      </Svg>
+          sit centred inside the disc. Using `G transform` instead of
+          a nested <Svg> so positioning is dead-reliable across the
+          react-native-svg renderer. */}
+      <G transform="translate(6, 6)">{glyph}</G>
     </Svg>
   )
 }
@@ -139,9 +189,8 @@ type Props = {
 /*
  * The right-side dimension list — six tappable Genshin-style nodes
  * stacked along the right edge of the Día hero. Each node carries
- * its own glyph + a state-driven petal halo so the list itself
- * communicates which dimensions are en luz, lejos or selected
- * without the eye darting back to the constellation.
+ * its own glyph + a state-driven petal halo; an SVG connector path
+ * snakes between them so the list reads as a skill-tree branch.
  */
 export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) {
   // Reorder by the constellation's clockwise traversal so walking the
@@ -155,9 +204,19 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
 
   return (
     <View style={styles.list}>
-      {/* Faint connecting branch — a thin vertical hairline passing
-          through the badge centres. Sits behind the badges. */}
-      <View style={styles.branch} pointerEvents="none" />
+      {/* Connector branch — an SVG curve snaking through the six
+          badge centres. Absolute, sits behind the badges; pointer
+          events disabled so taps fall through to the badges. */}
+      <Svg width={BADGE_SIZE} height={LIST_HEIGHT} style={styles.connector} pointerEvents="none">
+        <Path
+          d={CONNECTOR_PATH}
+          fill="none"
+          stroke={colors.bruma}
+          strokeWidth={1}
+          strokeLinecap="round"
+          opacity={0.55}
+        />
+      </Svg>
 
       {ordered.map((dim) => {
         const enLuz = dim.brightness >= EN_LUZ_THRESHOLD
@@ -186,29 +245,24 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
   )
 }
 
-const BADGE_SIZE = 36
-
 const styles = StyleSheet.create({
-  // The whole list — a vertical column on the right side of the hero
-  // row. Width holds room for the wider Genshin-style badge plus its
-  // petals.
+  // The whole list — a column at the right side of the hero row.
+  // Height is the intrinsic stack height (LIST_HEIGHT) so the SVG
+  // connector and the badges share an explicit coordinate frame.
   list: {
     width: 112,
-    justifyContent: 'center',
+    height: LIST_HEIGHT,
+    paddingTop: PAD_V,
+    paddingBottom: PAD_V,
     paddingRight: 4,
-    paddingVertical: 4,
-    gap: 8,
+    gap: GAP_V,
   },
-  // The connecting branch — absolute, sits on the centre line of the
-  // badge column (BADGE_SIZE/2 from the left edge of the list).
-  branch: {
+  // The connector sits behind the badge stack, aligned to the
+  // badge column.
+  connector: {
     position: 'absolute',
-    top: 16,
-    bottom: 16,
-    left: BADGE_SIZE / 2 - 0.5,
-    width: 1,
-    backgroundColor: colors.bruma,
-    opacity: 0.45,
+    top: 0,
+    left: 0,
   },
   row: {
     flexDirection: 'row',
