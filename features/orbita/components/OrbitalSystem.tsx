@@ -31,11 +31,11 @@ import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 import { Cosmos } from './Cosmos'
 
 // The ornamental constellation drawing — a single PNG with the
-// scrollwork the Genshin-style hero needs. White background was
-// stripped during import (see scripts in assets/constellations/),
-// so the line art sits on the deep-field cosmos. Aspect 785:906;
-// `preserveAspectRatio="xMidYMid meet"` fits it inside the viewBox.
-const diaOrnamentPng = require('@/assets/constellations/dia.png') as number
+// scrollwork the Genshin-style hero needs. Imported source had a
+// magenta-on-transparent line art at 818 × 912 (aspect 0.897); the
+// box below matches that aspect exactly so `meet` and `slice`
+// resolve to the same output and there's no letterbox or squish.
+const diaOrnamentPng = require('@/assets/constellations/day-const.png') as number
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -68,20 +68,21 @@ const VB_H = 382
 const ZOOM_SCALE = 2.4
 
 // The PNG ornament is rendered at (IMG_X, IMG_Y) with size (IMG_W,
-// IMG_H) inside the viewBox. The PNG itself is 782 × 899 pixels;
-// these constants both size the ornament and let us project the
-// art's intrinsic star centres (detected from the PNG, in fractional
-// coords) into the SVG's user space.
+// IMG_H) inside the viewBox. The PNG itself is 818 × 912 pixels;
+// IMG_H = IMG_W / (818/912) = 312 keeps the box at the source's
+// exact aspect ratio. These constants both size the ornament and
+// let us project the art's intrinsic star centres (detected from
+// the PNG, in fractional coords) into the SVG's user space.
 const IMG_X = 46
 const IMG_Y = 20
 const IMG_W = 280
-const IMG_H = 322
+const IMG_H = 312
 
 // The art draws decorative bursts at fixed anchor points; the live
 // dimension stars MUST land on those bursts so the constellation
 // reads as one figure, not two layers. Fractional positions were
 // detected programmatically from the PNG (cluster of pixels above
-// the white-core threshold, blob-merged within a 60-px halo radius).
+// the white-core threshold, blob-merged within a 70-px halo radius).
 // `fx, fy` here go through the same mapping the <SvgImage> uses, so
 // any time IMG_X/Y/W/H change the stars move with the art.
 function ornamentPos(fx: number, fy: number): { x: number; y: number } {
@@ -90,15 +91,15 @@ function ornamentPos(fx: number, fy: number): { x: number; y: number } {
 
 const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
   // Top burst — slightly right of centre.
-  mente: ornamentPos(0.471, 0.072),
+  mente: ornamentPos(0.548, 0.119),
   // Left side: upper burst and lower burst.
-  cuerpo: ornamentPos(0.1, 0.25),
-  energia: ornamentPos(0.08, 0.699),
-  // Right side: upper-right burst and the central-diamond burst.
-  sueno: ornamentPos(0.79, 0.259),
-  alimento: ornamentPos(0.671, 0.638),
+  cuerpo: ornamentPos(0.095, 0.285),
+  energia: ornamentPos(0.046, 0.712),
+  // Right side: upper-right burst and the mid-right burst.
+  sueno: ornamentPos(0.778, 0.276),
+  alimento: ornamentPos(0.665, 0.704),
   // Bottom burst.
-  ciclo: ornamentPos(0.432, 0.861),
+  ciclo: ornamentPos(0.51, 0.809),
 }
 
 const AnimatedG = Animated.createAnimatedComponent(G)
