@@ -241,9 +241,10 @@ export function OrbitalSystem({
           <Cosmos t={t} drift={drift} />
 
           {/* The ornamental constellation drawing — scrollwork and
-              decorative curves around the dimension stars. Fits the
-              viewBox with `meet` so aspect is preserved (the art is a
-              bit taller than the canvas; the SVG centres it). The
+              decorative curves around the dimension stars. `slice`
+              fills the whole viewBox by width AND height, clipping
+              the tip/tail flourishes that fall outside (preferable
+              to the empty side margins `meet` was leaving). The
               opacity holds the line art back so it sits *behind* the
               live luminous stars, not over them. */}
           <SvgImage
@@ -252,8 +253,8 @@ export function OrbitalSystem({
             width={W}
             height={VB_H}
             href={diaOrnamentPng}
-            preserveAspectRatio="xMidYMid meet"
-            opacity={0.78}
+            preserveAspectRatio="xMidYMid slice"
+            opacity={0.82}
           />
 
           {/* The central star — the "you" the dimensions orbit. */}
