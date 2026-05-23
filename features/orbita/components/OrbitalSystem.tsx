@@ -484,10 +484,13 @@ function DiffractionSpikes({
       <Ellipse cx={x} cy={y} rx={hLen} ry={hRy} fill="url(#flare-soft)" opacity={opacity * 0.92} />
       {/* Vertical streak — narrower + shorter. */}
       <Ellipse cx={x} cy={y} rx={vRx} ry={vLen} fill="url(#flare-soft)" opacity={opacity * 0.74} />
-      {/* Diagonal streaks — thin ellipses rotated 45° / -45° so the
-          starburst feels eight-pointed without resorting to lines.
-          Wrapped in <G transform="rotate(...)"> since SVG Ellipse
-          itself has no rotation attribute. */}
+      {/* Diagonal + asymmetric streaks — six total rays at varied
+          angles so the starburst feels organic, not a perfect 4- or
+          8-pointed shape. The four classic diagonals at ±45° anchor
+          the cross; the two extra rays at 22° and −68° break the
+          symmetry so the eye never lands on a regular pattern. Each
+          rotation wraps an Ellipse since SVG Ellipse has no native
+          rotation attribute. */}
       {dOp > 0 ? (
         <>
           <G transform={`rotate(45 ${x} ${y})`}>
@@ -495,6 +498,27 @@ function DiffractionSpikes({
           </G>
           <G transform={`rotate(-45 ${x} ${y})`}>
             <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
+          </G>
+          {/* Asymmetric extra rays — slightly shorter + dimmer. */}
+          <G transform={`rotate(22 ${x} ${y})`}>
+            <Ellipse
+              cx={x}
+              cy={y}
+              rx={dLen * 0.78}
+              ry={dRy * 0.85}
+              fill="url(#flare-soft)"
+              opacity={dOp * 0.7}
+            />
+          </G>
+          <G transform={`rotate(-68 ${x} ${y})`}>
+            <Ellipse
+              cx={x}
+              cy={y}
+              rx={dLen * 0.65}
+              ry={dRy * 0.8}
+              fill="url(#flare-soft)"
+              opacity={dOp * 0.62}
+            />
           </G>
         </>
       ) : null}
@@ -753,18 +777,11 @@ function StarNode({
             />
           </AnimatedG>
         ) : null}
-        {/* Selection crown — a cream outline ring around the core. */}
-        {selected ? (
-          <Circle
-            cx={x}
-            cy={y}
-            r={R + 5}
-            fill="none"
-            stroke="#F4ECDE"
-            strokeWidth={1.3}
-            opacity={0.9}
-          />
-        ) : null}
+        {/* Selection crown removed — the crisp cream outline ring
+            was reading as the inner circle of a rifle-scope reticle
+            at full zoom. The selected star is already clearly marked
+            by popT scale-pop + impact flash + arrival burst +
+            amplified flare; the ring was redundant. */}
         {/* The luminous point — gradient disc + bright white centre.
             The centre is bigger and at full opacity now, so the core
             reads as white-hot like a real over-exposed star. */}

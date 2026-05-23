@@ -115,16 +115,19 @@ export function AnimatedConstellation({
   // "particle" not a streak.
   const orbitDashLength = profile.flowDashLength * 0.45
 
-  // The static scaffold (guides, axis, node rings, dots, micro
-  // stars) is the "context" of the figure — useful at rest, but
-  // when the camera zooms into a single star it just becomes
-  // noise around the focus. Fade it as zoomT rises: 1 at rest,
-  // ~0.35 at full zoom. The orbits themselves + their particles
-  // stay at full opacity so the cinematic rotation reads bright.
+  // The static scaffold (outer guides, axis cross, central rings,
+  // node rings, orbit dots, micro stars) is the "context" of the
+  // figure — useful at rest, but at zoom it forms a perfect-circle
+  // + cross pattern around the selected star that reads as a
+  // rifle-scope reticle. Fade aggressively: 1 at rest, ~0.06 at
+  // full zoom — basically invisible so the selected star + its
+  // flare are the only things in the frame. The orbits and their
+  // particles render OUTSIDE this dim group, so they keep their
+  // own opacity.
   const scaffoldDim = useAnimatedProps(() => {
     'worklet'
     const z = zoomT ? zoomT.value : 0
-    return { opacity: 1 - z * 0.65 }
+    return { opacity: 1 - z * 0.94 }
   })
 
   return (
