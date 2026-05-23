@@ -1,9 +1,24 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated'
 import Svg, { Circle, G, Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
+import {
+  getConstellationProfile,
+  type ConstellationIntensity,
+  type ConstellationProfile,
+} from '../constants/constellationTheme'
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 
 // Clockwise traversal of the constellation from the top burst. The
@@ -153,7 +168,17 @@ const CONNECTOR_PATH = buildConnectorPath()
  *   lit      — petals 0.80, ring magenta solid  (en luz)
  *   selected — petals 1.00, ring leche, thicker (cream halo)
  */
-function DimensionBadge({ glyph, state }: { glyph: ReactNode; state: State }) {
+function DimensionBadge({
+  glyph,
+  state,
+  pulseClock,
+  profile,
+}: {
+  glyph: ReactNode
+  state: State
+  pulseClock: SharedValue<number>
+  profile: ConstellationProfile
+}) {
   const petalOp = state === 'selected' ? 1 : state === 'lit' ? 0.8 : 0.25
   const ringStroke =
     state === 'selected' ? colors.leche : state === 'lit' ? colors.magenta : colors.bruma
@@ -161,38 +186,63 @@ function DimensionBadge({ glyph, state }: { glyph: ReactNode; state: State }) {
   // A faint backdrop glow sits behind the disc when lit/selected so
   // the node feels lit-from-within against the dark page bg.
   const glowOp = state === 'selected' ? 0.55 : state === 'lit' ? 0.32 : 0
+  const isSelected = state === 'selected'
+  // Pulse only applies to the selected badge — everything else
+  // stays still. The worklet reads the prop on every frame, so
+  // toggling `state` flips between pulsing and steady without
+  // remounting.
+  const pulseStyle = useAnimatedStyle(() => {
+    if (!isSelected) {
+      return { transform: [{ scale: 1 }], opacity: 1 }
+    }
+    const wave = 0.5 + 0.5 * Math.sin(pulseClock.value * 2 * Math.PI)
+    return {
+      transform: [{ scale: 1 + wave * profile.badgePulseScale }],
+      opacity: 1 - profile.badgePulseOpacity * (1 - wave),
+    }
+  })
   return (
-    <Svg width={BADGE_SIZE} height={BADGE_SIZE} viewBox="0 0 36 36">
-      {/* Backdrop glow — a soft magenta wash behind the badge that
+    <Animated.View style={pulseStyle}>
+      <Svg width={BADGE_SIZE} height={BADGE_SIZE} viewBox="0 0 36 36">
+        {/* Backdrop glow — a soft magenta wash behind the badge that
           only switches on for lit/selected. */}
-      {glowOp > 0 ? (
-        <Circle cx={18} cy={18} r={15} fill={colors.magenta} opacity={glowOp * 0.5} />
-      ) : null}
-      {/* Four cardinal petals (top, right, bottom, left). Tapered
+        {glowOp > 0 ? (
+          <Circle cx={18} cy={18} r={15} fill={colors.magenta} opacity={glowOp * 0.5} />
+        ) : null}
+        {/* Four cardinal petals (top, right, bottom, left). Tapered
           diamonds — narrow and pointed outward. */}
-      <Path d="M18 1.6 L20.4 5.4 L18 8.4 L15.6 5.4 Z" fill={colors.magenta} opacity={petalOp} />
-      <Path d="M34.4 18 L30.6 20.4 L27.6 18 L30.6 15.6 Z" fill={colors.magenta} opacity={petalOp} />
-      <Path d="M18 34.4 L20.4 30.6 L18 27.6 L15.6 30.6 Z" fill={colors.magenta} opacity={petalOp} />
-      <Path d="M1.6 18 L5.4 20.4 L8.4 18 L5.4 15.6 Z" fill={colors.magenta} opacity={petalOp} />
-      {/* The dark disc — sits on top of the petals so the petals
+        <Path d="M18 1.6 L20.4 5.4 L18 8.4 L15.6 5.4 Z" fill={colors.magenta} opacity={petalOp} />
+        <Path
+          d="M34.4 18 L30.6 20.4 L27.6 18 L30.6 15.6 Z"
+          fill={colors.magenta}
+          opacity={petalOp}
+        />
+        <Path
+          d="M18 34.4 L20.4 30.6 L18 27.6 L15.6 30.6 Z"
+          fill={colors.magenta}
+          opacity={petalOp}
+        />
+        <Path d="M1.6 18 L5.4 20.4 L8.4 18 L5.4 15.6 Z" fill={colors.magenta} opacity={petalOp} />
+        {/* The dark disc — sits on top of the petals so the petals
           read as radiating from behind the badge. */}
-      <Circle cx={18} cy={18} r={BADGE_R} fill={colors.bgCard2} />
-      {/* The ring around the disc. */}
-      <Circle
-        cx={18}
-        cy={18}
-        r={BADGE_R}
-        fill="none"
-        stroke={ringStroke}
-        strokeWidth={ringWidth}
-        opacity={state === 'dim' ? 0.55 : 1}
-      />
-      {/* The glyph — drawn in its own 24 × 24 space, translated to
+        <Circle cx={18} cy={18} r={BADGE_R} fill={colors.bgCard2} />
+        {/* The ring around the disc. */}
+        <Circle
+          cx={18}
+          cy={18}
+          r={BADGE_R}
+          fill="none"
+          stroke={ringStroke}
+          strokeWidth={ringWidth}
+          opacity={state === 'dim' ? 0.55 : 1}
+        />
+        {/* The glyph — drawn in its own 24 × 24 space, translated to
           sit centred inside the disc. Using `G transform` instead of
           a nested <Svg> so positioning is dead-reliable across the
           react-native-svg renderer. */}
-      <G transform="translate(6, 6)">{glyph}</G>
-    </Svg>
+        <G transform="translate(6, 6)">{glyph}</G>
+      </Svg>
+    </Animated.View>
   )
 }
 
@@ -200,6 +250,8 @@ type Props = {
   dimensions: readonly Dimension[]
   selectedKey: DimensionKey | null
   onSelect: (key: DimensionKey) => void
+  /** Animation intensity for the selected-badge pulse. Default 'medium'. */
+  intensity?: ConstellationIntensity
 }
 
 /*
@@ -208,7 +260,33 @@ type Props = {
  * its own glyph + a state-driven petal halo; an SVG connector path
  * snakes between them so the list reads as a skill-tree branch.
  */
-export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) {
+export function DimensionNodeList({
+  dimensions,
+  selectedKey,
+  onSelect,
+  intensity = 'medium',
+}: Props) {
+  const reducedMotion = useReducedMotion()
+  const profile = getConstellationProfile(intensity, reducedMotion ?? false)
+
+  // A single shared clock drives the selected-badge pulse — only the
+  // selected DimensionBadge actually reads it; the rest of the
+  // badges ignore it. Always-running clock is cheaper than
+  // start/stopping on selection (no remount).
+  const pulseClock = useSharedValue(0)
+  useEffect(() => {
+    if (profile.badgePulseScale === 0 && profile.badgePulseOpacity === 0) {
+      pulseClock.value = 0
+      return
+    }
+    pulseClock.value = withRepeat(
+      withTiming(1, { duration: profile.badgePulseDurationMs, easing: Easing.linear }),
+      -1,
+      false,
+    )
+    return () => cancelAnimation(pulseClock)
+  }, [profile.badgePulseScale, profile.badgePulseOpacity, profile.badgePulseDurationMs, pulseClock])
+
   // Reorder by the constellation's clockwise traversal so walking the
   // list = walking the figure (top → upper-right → lower-right →
   // bottom → lower-left → upper-left). `deriveDimensions` returns
@@ -250,7 +328,12 @@ export function DimensionNodeList({ dimensions, selectedKey, onSelect }: Props) 
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={dim.label}
           >
-            <DimensionBadge glyph={GLYPHS[dim.key]} state={state} />
+            <DimensionBadge
+              glyph={GLYPHS[dim.key]}
+              state={state}
+              pulseClock={pulseClock}
+              profile={profile}
+            />
             <Text
               style={[styles.label, enLuz && styles.labelLit, isSelected && styles.labelSelected]}
               numberOfLines={1}

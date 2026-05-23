@@ -7,6 +7,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -17,8 +18,14 @@ import Svg, { Circle, Defs, G, LinearGradient, Line, RadialGradient, Stop } from
 
 import { colors } from '@/theme'
 
+import {
+  CONSTELLATION_COLORS,
+  getConstellationProfile,
+  type ConstellationIntensity,
+  type ConstellationProfile,
+} from '../constants/constellationTheme'
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
-import { ConstellationDrawing } from './ConstellationDrawing'
+import { AnimatedConstellation } from './AnimatedConstellation'
 import { Cosmos } from './Cosmos'
 
 /*
@@ -106,25 +113,37 @@ export function OrbitalSystem({
   dimensions,
   selectedKey,
   onSelect,
+  intensity = 'medium',
 }: {
   dimensions: Dimension[]
   selectedKey: DimensionKey | null
   onSelect: (key: DimensionKey) => void
+  intensity?: ConstellationIntensity
 }) {
-  // Clocks for ambient motion. t (8 s) drives breath + twinkle; drift
-  // (44 s) drives the nebula. The orbits — and their destellos — were
-  // retired when the ornamental PNG took over as the constellation
-  // drawing; only the two field clocks remain.
+  const reducedMotion = useReducedMotion()
+  const profile = getConstellationProfile(intensity, reducedMotion ?? false)
+
+  // Clocks for ambient motion. `t` (8 s) drives the existing star
+  // breath + twinkle. `drift` (44 s) drives the nebula. `slowClock`
+  // drives the slow respirating glow behind active stars; its period
+  // comes from the profile so 'low' breathes ~10 s, 'high' ~5.5 s.
   const t = useSharedValue(0)
   const drift = useSharedValue(0)
+  const slowClock = useSharedValue(0)
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
+    slowClock.value = withRepeat(
+      withTiming(1, { duration: profile.glowDurationMs, easing: Easing.linear }),
+      -1,
+      false,
+    )
     return () => {
       cancelAnimation(t)
       cancelAnimation(drift)
+      cancelAnimation(slowClock)
     }
-  }, [t, drift])
+  }, [t, drift, slowClock, profile.glowDurationMs])
 
   // Tap feedback: popT amplifies the selected star; rippleT drives
   // a shockwave ring out of it.
@@ -246,20 +265,27 @@ export function OrbitalSystem({
 
           {/* The ornamental constellation — native SVG paths from
               `assets/constellations/constellation_app_day.svg`,
-              projected into our viewBox via ORNAMENT_S/TX/TY. Lives
-              inside the zoom AnimatedG so it scales with the zoom
-              transform like everything else. */}
+              projected into our viewBox via ORNAMENT_S/TX/TY. The
+              AnimatedConstellation wrapper adds an energy-flow
+              overlay on the eight connecting lines; everything else
+              about ConstellationDrawing renders untouched. */}
           <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
-            <ConstellationDrawing />
+            <AnimatedConstellation intensity={intensity} />
           </G>
-          {/* Decorative stars at the two SVG burst endpoints that
-              aren't bound to a dimension (the right-mid burst and
-              the central diamond). Static — they don't carry state
-              or accept taps; they exist so the constellation's line
-              endpoints all terminate on a luminous body, matching
-              the Genshin reference where every line-end is a star. */}
+          {/* Decorative stars at the two SVG burst endpoints not
+              bound to a dimension (right-mid burst + central
+              diamond). They share StarNode's slow-glow language so
+              every line endpoint feels alive, not just the six
+              interactive ones. */}
           {DECORATIVE_STAR_POS.map((p, i) => (
-            <DecorativeStar key={`decor-${i}`} x={p.x} y={p.y} />
+            <DecorativeStar
+              key={`decor-${i}`}
+              x={p.x}
+              y={p.y}
+              slowClock={slowClock}
+              phase={(i + 1) / (DECORATIVE_STAR_POS.length + 1)}
+              profile={profile}
+            />
           ))}
 
           {/* Dimension stars — small luminous points on each orbit. */}
@@ -272,6 +298,8 @@ export function OrbitalSystem({
               popT={popT}
               rippleT={rippleT}
               zoomT={zoomT}
+              slowClock={slowClock}
+              profile={profile}
               selected={d.key === selectedKey}
               faded={selectedKey != null && d.key !== selectedKey}
             />
@@ -348,15 +376,35 @@ export function OrbitalSystem({
   )
 }
 
-/* A static luminous star — no breath, no Pressable, no state. Used
- * for the two SVG burst endpoints that aren't bound to a dimension
- * (right-mid and the central diamond). Same visual language as a
- * lit StarNode but without the animation clocks or selection logic. */
-function DecorativeStar({ x, y }: { x: number; y: number }) {
+/* A luminous decorative star — no Pressable, no state, but shares
+ * the slow-glow language of StarNode so every line endpoint feels
+ * alive. Used for the two SVG burst endpoints not bound to a
+ * dimension (right-mid + central diamond). */
+function DecorativeStar({
+  x,
+  y,
+  slowClock,
+  phase,
+  profile,
+}: {
+  x: number
+  y: number
+  slowClock: SharedValue<number>
+  phase: number
+  profile: ConstellationProfile
+}) {
   const R = 3.6
+  const baseGlowR = R * 5.5
+  const slowGlow = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI)
+    const scale = profile.glowMinScale + wave * (profile.glowMaxScale - profile.glowMinScale)
+    const op = profile.glowMinOpacity + wave * (profile.glowMaxOpacity - profile.glowMinOpacity)
+    return { r: baseGlowR * scale, opacity: op * 0.55 }
+  })
   return (
     <G>
-      <Circle cx={x} cy={y} r={R * 5.5} fill={colors.magenta} opacity={0.13} />
+      <AnimatedCircle cx={x} cy={y} fill={CONSTELLATION_COLORS.starHalo} animatedProps={slowGlow} />
       <Circle cx={x} cy={y} r={R * 2.8} fill="#FBD7E3" opacity={0.16} />
       <Circle cx={x} cy={y} r={R * 1.5} fill="#FBD7E3" opacity={0.32} />
       <DiffractionSpikes
@@ -496,6 +544,8 @@ function StarNode({
   popT,
   rippleT,
   zoomT,
+  slowClock,
+  profile,
   selected,
   faded,
 }: {
@@ -505,6 +555,8 @@ function StarNode({
   popT: SharedValue<number>
   rippleT: SharedValue<number>
   zoomT: SharedValue<number>
+  slowClock: SharedValue<number>
+  profile: ConstellationProfile
   selected: boolean
   faded: boolean
 }) {
@@ -522,13 +574,16 @@ function StarNode({
   const auraR = enLuz ? R * 1.5 : R * 1.2
 
   // Each star breathes on its own phase so the constellation feels
-  // alive but not synchronised.
+  // alive but not synchronised. The 8 s `t` clock drives scale +
+  // opacity together — both ride a sine wave but the opacity range
+  // is shallower so the star never "blinks", it dips softly.
   const phase = (dim.angleDeg / 360) % 1
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
-    let scale = 1 + wave * (enLuz ? 0.12 : 0.05)
+    let scale = 1 + wave * (enLuz ? profile.pulseScale + 0.04 : 0.05)
     if (selected) scale *= 1 + popT.value * 0.6
+    const opacity = enLuz ? 1 - profile.pulseOpacity * (1 - wave) : 1
     return {
       transform: [
         { translateX: x },
@@ -537,7 +592,21 @@ function StarNode({
         { translateX: -x },
         { translateY: -y },
       ],
+      opacity,
     }
+  })
+
+  // Slow respirating glow behind active stars. Runs on `slowClock`
+  // (~7.5 s at medium intensity) and uses the profile's glowMin/Max
+  // ranges so 'low' barely moves and 'high' really breathes. A
+  // SEPARATE animated layer from `breath` so the bright core itself
+  // never blinks — only the surrounding halo expands and contracts.
+  const slowGlow = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI)
+    const scale = profile.glowMinScale + wave * (profile.glowMaxScale - profile.glowMinScale)
+    const op = profile.glowMinOpacity + wave * (profile.glowMaxOpacity - profile.glowMinOpacity)
+    return { r: outerR * scale, opacity: enLuz ? op : 0 }
   })
 
   // Tap ripple — a ring radiating out of the star.
@@ -610,6 +679,19 @@ function StarNode({
         />
       ) : null}
       <AnimatedG animatedProps={breath}>
+        {/* Slow respirating glow — only en luz stars get one. Sits
+            BEHIND every other layer so it reads as ambient breathing
+            light, not a competing bloom. Its `r` and opacity vary on
+            slowClock; the breath group above only contributes scale
+            + the soft opacity dip. */}
+        {enLuz ? (
+          <AnimatedCircle
+            cx={x}
+            cy={y}
+            fill={CONSTELLATION_COLORS.starHalo}
+            animatedProps={slowGlow}
+          />
+        ) : null}
         {/* Three-layer bloom: wide outer magenta → mid pink → tight
             warm aura. Layered radii + opacities produce a gradient
             falloff that reads as light spilling out of the core,

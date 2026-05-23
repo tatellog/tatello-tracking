@@ -18,6 +18,7 @@ import {
 } from '../logic'
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
 import { AccionDelDia } from './AccionDelDia'
+import { CosmicParticles } from './CosmicParticles'
 import { DimensionNodeList } from './DimensionNodeList'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
@@ -142,8 +143,12 @@ export function DiaSegment() {
       {/* Hero row — the orbital diagram (left, flexes) and the
           six-dimension node list (right, fixed strip). Genshin's
           Constellation page: the figure dominates, the list of
-          nodes sits along the right edge as a tappable index. */}
+          nodes sits along the right edge as a tappable index. A
+          CosmicParticles layer sits BEHIND both regions so the
+          ambient dust spans the whole hero and bridges the gap
+          between diagram and list. */}
       <View style={styles.heroRow}>
+        <CosmicParticles />
         <View style={styles.diagramFlex}>
           <OrbitalSystem
             dimensions={dimensions}
@@ -270,6 +275,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: -20,
     marginTop: 4,
+    // `position: relative` so the absolute-positioned
+    // CosmicParticles child anchors to this row's bounds.
+    position: 'relative',
   },
   diagramFlex: {
     flex: 1,
