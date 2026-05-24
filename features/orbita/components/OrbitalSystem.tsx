@@ -1,4 +1,6 @@
 import * as Haptics from 'expo-haptics'
+// Aliased — react-native-svg also exports a LinearGradient.
+import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
@@ -331,12 +333,28 @@ export function OrbitalSystem({
         />
       )}
 
-      {/* No edge fades — the cosmic backdrop (nebulae + starfield)
-          is now painted by ScreenCosmos at the page level and
-          extends BEYOND the diagram, so the diagram blends into
-          the surrounding screen naturally. No dark frame, no soft
-          tint band: the constellation just floats on the same
-          cosmos that fills the rest of the tab. */}
+      {/* Soft horizontal edge fades — very low opacity dim tint
+          (≈ 35 % at the edge, 0 % toward centre) over the outer
+          130 px of each side. Wide + barely-there so it does NOT
+          form a visible "frame" the way the previous 60 %-opacity
+          version did. Its only job is to take the hard transition
+          between the bright orbital lines on the diagram and the
+          sparser list / page area, and smooth it out into a
+          gentle gradient. */}
+      <FadeGradient
+        colors={['rgba(20, 8, 16, 0.35)', 'transparent']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={styles.leftSoftFade}
+        pointerEvents="none"
+      />
+      <FadeGradient
+        colors={['transparent', 'rgba(20, 8, 16, 0.4)']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={styles.rightSoftFade}
+        pointerEvents="none"
+      />
     </View>
   )
 }
@@ -833,5 +851,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  // Soft edge fades — very subtle dim tint that takes the edge off
+  // the diagram's hard boundary against the surrounding cosmos / list
+  // without forming a visible band. Wide (130 px each side) so the
+  // gradient is barely perceptible; low end opacity (0.35–0.4) so
+  // it doesn't read as a coloured frame.
+  leftSoftFade: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 130,
+  },
+  rightSoftFade: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 130,
   },
 })
