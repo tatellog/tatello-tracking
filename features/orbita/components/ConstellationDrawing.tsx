@@ -52,11 +52,23 @@ const HEX_INNER_PATH = `M ${HEX_INNER.map((p) => `${p.x} ${p.y}`).join(' L ')} Z
 //   • SPOKE     — 3 beads per spoke between inner-hex vertex and
 //                 outer-hex vertex (18 total). Chase-animated.
 //   • INNER     — 2 beads per inner-hex edge (12 total).
-const PERIMETER_BEADS: { x: number; y: number }[] = HEX_OUTER.flatMap((a, i) => {
+// Perimeter beads — `fraction` is the bead's position along the hex
+// PERIMETER as a number in [0, 1). Same parameterisation the
+// travelling sweep dash uses (strokeDashoffset on a pathLength=1
+// path), so the bead under the sweep crest at any instant has its
+// peak brightness — the beads light up in unison WITH the sweep,
+// reading as the sweep "energising" each pearl as it passes.
+const PERIMETER_BEADS: { x: number; y: number; fraction: number }[] = HEX_OUTER.flatMap((a, i) => {
   const b = HEX_OUTER[(i + 1) % HEX_OUTER.length]!
   return [1, 2, 3, 4, 5].map((f) => {
     const t = f / 6
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+    return {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+      // Six equal edges, so the perimeter fraction is just the edge
+      // index plus the within-edge fraction, divided by 6.
+      fraction: (i + t) / HEX_OUTER.length,
+    }
   })
 })
 
@@ -87,6 +99,42 @@ const INNER_BEADS: { x: number; y: number }[] = HEX_INNER.flatMap((a, i) => {
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
   })
 })
+
+// Mid-cardinal markers — 8 positions at 30°/60°/120°/150°/210°/240°/
+// 300°/330° on the outermost orbital ring (r = 455 from centre).
+// Combined with the 4 authored cardinal ornaments (N/E/S/W), they
+// turn the outer ring into a 12-point astrolabe scale.
+const MID_CARDINAL_R = 455
+const MID_CARDINAL_ANGLES = [30, 60, 120, 150, 210, 240, 300, 330] as const
+const MID_CARDINALS = MID_CARDINAL_ANGLES.map((angleDeg) => {
+  // 0° = north (up). Convert to standard math angle (0° = east, ccw).
+  const rad = ((angleDeg - 90) * Math.PI) / 180
+  return {
+    x: CENTRE.x + MID_CARDINAL_R * Math.cos(rad),
+    y: CENTRE.y + MID_CARDINAL_R * Math.sin(rad),
+    angle: angleDeg,
+  }
+})
+
+/** A four-point diamond at (cx, cy) oriented so its long axis points
+ *  toward the centre (i.e., perpendicular to the outer ring at the
+ *  marker's angle). `halfW` is half the perpendicular width, `halfH`
+ *  half the radial length. */
+function diamondPath(cx: number, cy: number, halfW: number, halfH: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  // Local diamond: top (0, -halfH), right (halfW, 0), bottom (0, halfH),
+  // left (-halfW, 0). Rotate by `rad` (long axis pointing outward),
+  // then translate to (cx, cy).
+  const pts = [
+    [0, -halfH],
+    [halfW, 0],
+    [0, halfH],
+    [-halfW, 0],
+  ].map(([px, py]) => [px! * cos - py! * sin + cx, px! * sin + py! * cos + cy] as const)
+  return `M ${pts[0]![0]} ${pts[0]![1]} L ${pts[1]![0]} ${pts[1]![1]} L ${pts[2]![0]} ${pts[2]![1]} L ${pts[3]![0]} ${pts[3]![1]} Z`
+}
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
@@ -177,12 +225,50 @@ export function ConstellationDrawingFront({
         ))}
       </G>
 
-      {/* Perimeter beads — 5 spaced along each outer-hex edge. Reads
-          like a pearl-strung hexagonal outline (the bright dots in
-          the reference's hex perimeter). */}
+      {/* In-node symbols — one mythic icon per dimension authored
+          inside the SVG. Sit deep INSIDE the StarNode bloom radius
+          so they read as a faint silhouette / engraved medallion
+          texture rather than a competing visual. Render BEFORE the
+          luminous StarNode (which paints over them in z-order).
+          Order matches HEX_OUTER: mente · sueno · alimento · ciclo
+          · energia · cuerpo. */}
+      <G
+        stroke={STROKE}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.4}
+        opacity={0.42}
+      >
+        {/* mente — 4-point star at the top */}
+        <Path d="M512 182 L518 204 L540 210 L518 216 L512 238 L506 216 L484 210 L506 204 Z" />
+        {/* sueno — eight-ray starburst at upper-right */}
+        <Path d="M773.5 329 V393 M741.5 361 H805.5 M751 338.5 L796 383.5 M796 338.5 L751 383.5" />
+        {/* alimento — wider diamond star at lower-right */}
+        <Path d="M773.5 635 L784 652.5 L801.5 663 L784 673.5 L773.5 691 L763 673.5 L745.5 663 L763 652.5 Z" />
+        {/* ciclo — crescent moon at the bottom */}
+        <Path d="M527 790 C505 793 491 811 497 831 C504 852 529 859 548 844 C528 849 510 835 512 814 C514 802 520 794 527 790 Z" />
+        {/* energia — three-petal lotus at lower-left */}
+        <Path d="M250.5 690 C233 671 233 649 250.5 633 C268 649 268 671 250.5 690 Z" />
+        <Path d="M250.5 688 C224 680 215 659 224 641 C242 649 251 665 250.5 688 Z" opacity={0.85} />
+        <Path d="M250.5 688 C277 680 286 659 277 641 C259 649 250 665 250.5 688 Z" opacity={0.85} />
+        {/* cuerpo — backward crescent at upper-left */}
+        <Path d="M266 337 C245 341 232 359 238 379 C244 397 267 403 285 390 C263 394 246 379 250 358 C253 347 258 340 266 337 Z" />
+      </G>
+
+      {/* Perimeter beads — 5 spaced along each outer-hex edge,
+          each pulsing on flowClock with a phase tied to its
+          perimeter fraction so the wave of brightness travels
+          around the hex in sync with the outline sweep. */}
       <G fill={STROKE}>
         {PERIMETER_BEADS.map((p, i) => (
-          <Circle key={`pb-${i}`} cx={p.x} cy={p.y} r={3} opacity={0.72} />
+          <PerimeterBead
+            key={`pb-${i}`}
+            cx={p.x}
+            cy={p.y}
+            fraction={p.fraction}
+            flowClock={flowClock}
+          />
         ))}
       </G>
 
@@ -214,6 +300,24 @@ export function ConstellationDrawingFront({
         <Circle cx={512} cy={911} r={8} />
         <Circle cx={113} cy={512} r={8} />
         <Circle cx={911} cy={512} r={8} />
+      </G>
+
+      {/* Mid-cardinal markers — 8 small diamonds at the 30°/60°/120°/
+          150°/210°/240°/300°/330° positions on the outermost ring
+          (r=455). Combined with the 4 cardinals they form a 12-point
+          astrolabe degree ring around the figure, denser + more
+          ornamented than just the 4 cardinals like the reference. */}
+      <G
+        stroke={STROKE}
+        fill="none"
+        strokeWidth={1}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.65}
+      >
+        {MID_CARDINALS.map((m, i) => (
+          <Path key={`mc-${i}`} d={diamondPath(m.x, m.y, 5, 7, m.angle)} />
+        ))}
       </G>
 
       {/* Corner sparks — four "+" marks + four small dots in the
@@ -264,6 +368,39 @@ function SpokeBead({
     const wave = 0.5 + 0.5 * Math.cos((flowClock.value - phase) * 2 * Math.PI)
     const eased = Math.pow(wave, 0.6)
     return { opacity: 0.32 + eased * 0.62 }
+  })
+  return <AnimatedCircle cx={cx} cy={cy} r={3} animatedProps={animatedProps} />
+}
+
+/*
+ * A single perimeter bead — sits at `fraction` along the outer-hex
+ * perimeter (0 = top vertex, sweeping clockwise to 1). Pulses on
+ * flowClock with a SHARP peak (cos³ envelope) right when the
+ * travelling outline sweep crest passes over it, so the brightness
+ * propagates around the hex in lock-step with the sweep dash.
+ *
+ * Static at 0.72 opacity when flowClock is missing (reduced-motion).
+ */
+function PerimeterBead({
+  cx,
+  cy,
+  fraction,
+  flowClock,
+}: {
+  cx: number
+  cy: number
+  fraction: number
+  flowClock?: SharedValue<number>
+}) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    if (!flowClock) return { opacity: 0.72 }
+    // Cosine pulse centred on (flowClock - fraction). Cubed so the
+    // peak is narrow — a sharp lit moment as the sweep crest passes
+    // each bead, instead of all beads slowly oscillating together.
+    const wave = 0.5 + 0.5 * Math.cos((flowClock.value - fraction) * 2 * Math.PI)
+    const eased = wave * wave * wave
+    return { opacity: 0.42 + eased * 0.55 }
   })
   return <AnimatedCircle cx={cx} cy={cy} r={3} animatedProps={animatedProps} />
 }
