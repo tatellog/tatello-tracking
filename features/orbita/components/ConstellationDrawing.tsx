@@ -50,6 +50,14 @@ export function ConstellationDrawingBack() {
         <Path d="M260 940 L940 260" />
         <Path d="M260 260 L940 940" />
       </G>
+      {/* Constellation outline — a thin hexagonal line that passes
+          EXACTLY through the six dimension nodes. Makes the stars
+          read as anchored points of a single figure rather than
+          drifting bodies near the orbital scaffold. Drawn here in
+          Back so the stars + orbits render on top. */}
+      <G stroke={STROKE} fill="none" strokeWidth={1.4} strokeLinecap="round" opacity={0.38}>
+        <Path d="M 600 185 L 1020 455 L 890 885 L 600 1035 L 310 885 L 180 455 Z" />
+      </G>
     </>
   )
 }

@@ -618,13 +618,27 @@ function StarNode({
   // alive but not synchronised. The 8 s `t` clock drives scale +
   // opacity together — both ride a sine wave but the opacity range
   // is shallower so the star never "blinks", it dips softly.
+  //
+  // When the star is the focus of the zoom-in, two extra inputs
+  // amplify the breath:
+  //   • popT contributes a brief impact scale-up at selection.
+  //   • zoomT contributes a SUSTAINED 30 % grow as the camera
+  //     locks on, AND cancels the breath opacity dip — the
+  //     focused star stays bright + bigger throughout zoom.
+  // Together they give the focused star the "alive, focused"
+  // amplitude the user asked for, beyond the global 2.4 × zoom.
   const phase = (dim.angleDeg / 360) % 1
   const breath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
     let scale = 1 + wave * (enLuz ? profile.pulseScale + 0.04 : 0.05)
-    if (selected) scale *= 1 + popT.value * 0.6
-    const opacity = enLuz ? 1 - profile.pulseOpacity * (1 - wave) : 1
+    if (selected) scale *= 1 + popT.value * 0.6 + zoomT.value * 0.3
+    // The dim half of the breath fades less and less as zoom rises:
+    // at zoomT=1 the dip is completely suppressed so the focused
+    // star sits at 100 % brightness even on the trough of its
+    // breath sine.
+    const dipSuppression = 1 - zoomT.value
+    const opacity = enLuz ? 1 - profile.pulseOpacity * (1 - wave) * dipSuppression : 1
     return {
       transform: [
         { translateX: x },
@@ -678,8 +692,12 @@ function StarNode({
   const flareAnim = useAnimatedProps(() => {
     'worklet'
     const z = Math.max(0, Math.min(zoomT.value, 1.1))
-    const opacity = z * z * 0.85
-    const scale = 0.35 + z * 0.7
+    // Slightly punchier than before — opacity peaks at 0.95 (was
+    // 0.85) and the flare scale ramps to 1.2 (was 1.05) at the
+    // overshoot. Combined with the breath's zoom-boosted scale,
+    // the focused star reads markedly more alive at full zoom.
+    const opacity = z * z * 0.95
+    const scale = 0.35 + z * 0.85
     return {
       transform: [
         { translateX: x },
