@@ -63,7 +63,7 @@ const ZOOM_SCALE = 2.4
 // renders the drawing AND on the star positions below — keeping the
 // live stars perfectly aligned with the drawn orbits.
 const ORNAMENT_S = 0.31
-const ORNAMENT_TX = 0
+const ORNAMENT_TX = 30
 const ORNAMENT_TY = -23
 
 /** Project a source-space (1200-space) point into the SVG viewBox. */
