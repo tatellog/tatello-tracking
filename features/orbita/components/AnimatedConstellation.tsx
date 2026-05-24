@@ -252,7 +252,7 @@ export function AnimatedConstellation({
       )}
 
       <AnimatedG animatedProps={scaffoldDim}>
-        <ConstellationDrawingFront />
+        <ConstellationDrawingFront flowClock={flowClock} />
       </AnimatedG>
     </>
   )
