@@ -514,7 +514,7 @@ export function LunarConstellation({
             burstId={burstId}
             trainedCount={trainedCount}
           />
-          <CenterText cx={cx} cy={cy} zodiacGlyph={zodiac.glyph} numberPulse={numberPulse} />
+          <CenterText cx={cx} cy={cy} zodiacLabel={zodiac.label} numberPulse={numberPulse} />
           {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
         </Svg>
 
@@ -1859,24 +1859,27 @@ function CenterScrim({ cx, cy }: { cx: number; cy: number }) {
 function CenterText({
   cx,
   cy,
-  zodiacGlyph,
+  zodiacLabel,
   numberPulse,
 }: {
   cx: number
   cy: number
-  /** Unicode zodiac glyph (♌, ♉, …) for the active sign. Rendered
-   *  below the count, low opacity, as an identity ornament. */
-  zodiacGlyph: string
+  /** Display label for the active zodiac sign ('LEO', 'TAURO', …)
+   *  rendered as a small tracking-caps identity stamp under the
+   *  count. We used to render the unicode glyph (♌) here, but
+   *  iOS substituted it with the colour-emoji font, producing a
+   *  purple emoji badge that clashed with the rest of the figure.
+   *  The portable label reads as a quiet "this is your sign"
+   *  mark on every platform. */
+  zodiacLabel: string
   /** Pulse driven by the parent on every commit. Drives a soft
    *  expand+fade on the glow halo behind the counter so the moment
    *  the number ticks up reads as a luminous heartbeat. */
   numberPulse: SharedValue<number>
 }) {
   // Glow halo — sits BEHIND the React Native counter overlay so the
-  // big number reads as a luminous body, not flat text. The halo
-  // pulses with numberPulse: r 22 → 30, opacity 0.10 → 0.36 on each
-  // commit. Tied to the SVG layer so it respects scaffoldDim if
-  // ever added.
+  // big number reads as a luminous body, not flat text. Pulses on
+  // numberPulse: r 22 → 30, opacity 0.10 → 0.36 on each commit.
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const p = numberPulse.value
@@ -1904,19 +1907,34 @@ function CenterText({
       >
         DE 28 DÍAS
       </SvgText>
-      {/* Zodiac glyph — small mark of identity below the subtitle.
-          Faint magenta-leche tone so it reads as ornament, not
-          competing copy. */}
+      {/* Identity divider — short thin line that separates the
+          count line from the sign label, so the layout reads as two
+          distinct pieces of info rather than one block of copy. */}
+      <Line
+        x1={cx - 14}
+        y1={cy + 33}
+        x2={cx + 14}
+        y2={cy + 33}
+        stroke={colors.niebla}
+        strokeOpacity={0.28}
+        strokeWidth={0.6}
+        strokeLinecap="round"
+      />
+      {/* Sign label — small tracking-caps identity stamp. Sans-bold
+          (uiBold tracking 3) instead of serif so it reads as a
+          quiet meta-label, not a second poetic line competing with
+          the italic subtitle above. */}
       <SvgText
         x={cx}
-        y={cy + 40}
+        y={cy + 43}
         textAnchor="middle"
-        fontFamily={typography.serifSemi}
-        fontSize={14}
-        fill={colors.leche}
-        opacity={0.5}
+        fontFamily={typography.uiBold}
+        fontSize={8}
+        fill={colors.niebla}
+        letterSpacing={3}
+        opacity={0.55}
       >
-        {zodiacGlyph}
+        {zodiacLabel}
       </SvgText>
     </G>
   )
