@@ -26,6 +26,7 @@ import {
 } from '../constants/constellationTheme'
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
 import { AnimatedConstellation } from './AnimatedConstellation'
+import { GLYPHS } from './DimensionNodeList'
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -756,6 +757,29 @@ function StarNode({
     return { opacity: Math.max(0.08, 0.6 - zoomT.value * 0.5) }
   })
 
+  // Core fade — fades the white-hot disc layers (the R*1.1, R*0.7,
+  // R*0.4 stack) as the camera locks on a selected star, so the
+  // dimension GLYPH materialising on top can be seen against the
+  // magenta bloom instead of disappearing into the bright core.
+  // Drops 1 → 0.15 across the zoom. Non-selected stars: no fade.
+  const coreFade = useAnimatedProps(() => {
+    'worklet'
+    if (!selected) return { opacity: 1 }
+    return { opacity: Math.max(0.15, 1 - zoomT.value * 0.85) }
+  })
+
+  // Glyph reveal — the dimension's icon (heart, bolt, moon, bowl,
+  // …) materialises at the star centre as zoom progresses. Invisible
+  // at rest (zoomT = 0); fully visible by zoomT ≈ 0.7 thanks to the
+  // 1.4× multiplier on the eased curve. Non-selected stars: never
+  // visible.
+  const glyphAnim = useAnimatedProps(() => {
+    'worklet'
+    if (!selected) return { opacity: 0 }
+    const z = Math.min(1, zoomT.value * 1.4)
+    return { opacity: z * z * 0.95 }
+  })
+
   // Lens-flare shimmer — continuous tiny scale wobble on the
   // always-on starburst so the rays feel alive instead of frozen.
   // Different phase per star (re-uses dim.angleDeg's phase) and a
@@ -877,12 +901,39 @@ function StarNode({
             white-hot core. The outermost halo is a wider soft
             white wash to mimic the overexposed Genshin core glow;
             below that, two opaque white discs at R*0.7 and R*0.4
-            give the centre its blown-out brightness peak. */}
+            give the centre its blown-out brightness peak.
+
+            The three WHITE discs are wrapped in an AnimatedG that
+            fades them during zoom on the SELECTED star — so the
+            dimension glyph rendered below has a magenta-bloom
+            canvas to land on instead of being washed out by the
+            opaque white core. */}
         <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-        {enLuz ? <Circle cx={x} cy={y} r={R * 1.1} fill="#FFFFFF" opacity={0.32} /> : null}
-        {enLuz ? <Circle cx={x} cy={y} r={R * 0.7} fill="#FFFFFF" opacity={1} /> : null}
-        {enLuz ? <Circle cx={x} cy={y} r={R * 0.4} fill="#FFFFFF" /> : null}
+        {enLuz ? (
+          <AnimatedG animatedProps={coreFade}>
+            <Circle cx={x} cy={y} r={R * 1.1} fill="#FFFFFF" opacity={0.32} />
+            <Circle cx={x} cy={y} r={R * 0.7} fill="#FFFFFF" opacity={1} />
+            <Circle cx={x} cy={y} r={R * 0.4} fill="#FFFFFF" />
+          </AnimatedG>
+        ) : null}
       </AnimatedG>
+      {/* Dimension glyph — the icon (heart, bolt, moon, bowl, …) of
+          the selected dimension materialises at the star centre as
+          zoom progresses. The static G handles positioning (24-unit
+          glyph viewBox scaled to ~18 viewBox units centred on the
+          star); the AnimatedG wrapper drives the opacity reveal.
+          Drawn OUTSIDE the breath group so the icon doesn't inherit
+          the star's scale-respiration — it sits steady at the
+          centre while the bloom around it breathes. */}
+      {selected ? (
+        <AnimatedG animatedProps={glyphAnim}>
+          <G
+            transform={`translate(${x - GLYPH_HALF * GLYPH_SCALE} ${y - GLYPH_HALF * GLYPH_SCALE}) scale(${GLYPH_SCALE})`}
+          >
+            {GLYPHS[dim.key]}
+          </G>
+        </AnimatedG>
+      ) : null}
       {/* Labels intentionally removed — the right-side DimensionNodeList
           is the single source of identification. Two labels for the
           same dimension was visual noise and they kept colliding with
@@ -890,6 +941,13 @@ function StarNode({
     </AnimatedG>
   )
 }
+
+// Dimension glyphs are authored in a 24×24 viewport; we render them
+// at ~18 viewBox units (scale 0.75) so the icon mass sits clearly
+// inside the star's bloom radius without overflowing past the
+// magenta wash into empty space.
+const GLYPH_SCALE = 0.75
+const GLYPH_HALF = 12 // half the source 24-unit viewport — used to recentre.
 
 const styles = StyleSheet.create({
   wrap: {

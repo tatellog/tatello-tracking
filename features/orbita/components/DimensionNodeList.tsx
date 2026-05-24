@@ -43,7 +43,7 @@ const CLOCKWISE_ORDER: DimensionKey[] = ['mente', 'sueno', 'alimento', 'ciclo', 
  *             empty opening) lands on centre.
  *   mente, energia, ciclo — already centred by their geometry.
  */
-const GLYPHS: Record<DimensionKey, ReactNode> = {
+export const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: (
     <Path
       d="M12 20 C8.5 17 4.5 14 4.5 10 C4.5 8 6 6.5 8 6.5 C9.7 6.5 11 7.5 12 9 C13 7.5 14.3 6.5 16 6.5 C18 6.5 19.5 8 19.5 10 C19.5 14 15.5 17 12 20 Z"
