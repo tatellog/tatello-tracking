@@ -22,6 +22,7 @@ import { ConstellationDrawingBack, ConstellationDrawingFront } from './Constella
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
+const AnimatedPath = Animated.createAnimatedComponent(Path)
 
 /*
  * Animated orbital layer. Seven orbits in total:
@@ -115,6 +116,23 @@ export function AnimatedConstellation({
   // "particle" not a streak.
   const orbitDashLength = profile.flowDashLength * 0.45
 
+  // Boost orbit + hexagon stroke during zoom — the orbital
+  // scaffold grows in thickness + brightness alongside the
+  // focused star instead of staying thin while everything else
+  // amplifies. Static at rest; at zoomT = 1 the lines are ~1.9 ×
+  // thicker and noticeably brighter, so the figure feels
+  // "alive" + bigger as a whole, not just the selected node.
+  const lineBoost = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    return { strokeWidth: 1.8 + z * 1.7, opacity: 0.72 + z * 0.2 }
+  })
+  const outlineBoost = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    return { strokeWidth: 1.4 + z * 1.5, opacity: 0.38 + z * 0.32 }
+  })
+
   // The static scaffold (outer guides, axis cross, central rings,
   // node rings, orbit dots, micro stars) is the "context" of the
   // figure — useful at rest, but at zoom it forms a perfect-circle
@@ -136,6 +154,18 @@ export function AnimatedConstellation({
         <ConstellationDrawingBack />
       </AnimatedG>
 
+      {/* Hexagonal constellation outline — passes EXACTLY through
+          the six dimension nodes. Stays OUT of the scaffoldDim
+          fade and grows in stroke + brightness alongside the
+          focused star, so the figure remains legible at zoom. */}
+      <AnimatedPath
+        d="M 600 185 L 1020 455 L 890 885 L 600 1035 L 310 885 L 180 455 Z"
+        fill="none"
+        stroke={colors.magenta}
+        strokeLinecap="round"
+        animatedProps={outlineBoost}
+      />
+
       {ORBITS.map((orbit, i) =>
         orbit.kind === 'ellipse' ? (
           <StaticEllipseOrbit
@@ -148,9 +178,10 @@ export function AnimatedConstellation({
             flowColor={highlightColor}
             phase={i / ORBITS.length}
             zoomT={zoomT}
+            lineBoost={lineBoost}
           />
         ) : (
-          <StaticPathOrbit key={`orbit-${i}`} orbit={orbit} />
+          <StaticPathOrbit key={`orbit-${i}`} orbit={orbit} lineBoost={lineBoost} />
         ),
       )}
 
@@ -176,6 +207,7 @@ function StaticEllipseOrbit({
   flowColor,
   phase,
   zoomT,
+  lineBoost,
 }: {
   orbit: EllipseOrbit
   flowClock: SharedValue<number>
@@ -185,6 +217,10 @@ function StaticEllipseOrbit({
   flowColor: string
   phase: number
   zoomT?: SharedValue<number>
+  /** Animated stroke+opacity boost driven by zoomT (see
+   *  AnimatedConstellation). Applied to the static orbit line so
+   *  the orbital scaffold grows alongside the focused star. */
+  lineBoost: ReturnType<typeof useAnimatedProps>
 }) {
   // The "energy beam" — two stacked dashes travelling around the
   // orbit. HEAD is a narrow bright-white core; HALO is a wider
@@ -224,16 +260,15 @@ function StaticEllipseOrbit({
   const runtimeProps = { pathLength: 1 } as Record<string, unknown>
   return (
     <G transform={`rotate(${orbit.baseRotation} ${orbit.cx} ${orbit.cy})`}>
-      <Ellipse
+      <AnimatedEllipse
         cx={orbit.cx}
         cy={orbit.cy}
         rx={orbit.rx}
         ry={orbit.ry}
         fill="none"
         stroke={colors.magenta}
-        strokeWidth={1.8}
         strokeLinecap="round"
-        opacity={0.72}
+        animatedProps={lineBoost}
       />
       {flowEnabled ? (
         <>
@@ -279,16 +314,21 @@ function StaticEllipseOrbit({
  * and no travelling particle (open paths would show the loop's
  * respawn).
  */
-function StaticPathOrbit({ orbit }: { orbit: PathOrbit }) {
+function StaticPathOrbit({
+  orbit,
+  lineBoost,
+}: {
+  orbit: PathOrbit
+  lineBoost: ReturnType<typeof useAnimatedProps>
+}) {
   return (
-    <Path
+    <AnimatedPath
       d={orbit.d}
       fill="none"
       stroke={colors.magenta}
-      strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
-      opacity={0.72}
+      animatedProps={lineBoost}
     />
   )
 }
