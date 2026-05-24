@@ -194,8 +194,17 @@ export function OrbitalSystem({
     'worklet'
     const tz = zoomT.value
     const s = 1 + tz * (ZOOM_SCALE - 1)
-    const tx = tz * (CX - ZOOM_SCALE * targetXVal.value)
-    const ty = tz * (CY - ZOOM_SCALE * targetYVal.value)
+    // Zoom IN-PLACE around the selected star's own position rather
+    // than panning it to the viewBox centre. The selected star
+    // stays exactly where it was at rest, and everything else
+    // scales outward from that point. Mathematically, that's the
+    // standard "scale about (px, py)" transform expanded:
+    //   translate(px·(1−s), py·(1−s)) · scale(s)
+    // At s = 1 (rest) the translate is 0 — pure identity. At s =
+    // ZOOM_SCALE the star is unchanged while the surrounding
+    // figure expands outward.
+    const tx = targetXVal.value * (1 - s)
+    const ty = targetYVal.value * (1 - s)
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
