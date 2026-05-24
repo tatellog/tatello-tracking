@@ -51,11 +51,15 @@ const HIT = 66 // tap-target box, in px
 // against the edge. The height extends to match so nothing squishes.
 const VB_TOP = -28
 const VB_H = 382
-// Zoom factor for the selected-dimension cinematic. 2.4x gives a
-// neighbourhood ~155 units wide around the target — the star + its
-// flare fill the frame, the rest of the constellation drifts off
-// screen.
-const ZOOM_SCALE = 2.4
+// Zoom factor for the selected-dimension cinematic. Reduced
+// 2.4 → 1.9 so MORE of the constellation stays visible during
+// zoom — multiple stars + their long flares + the connecting
+// hexagon all read at the same time, matching the Genshin
+// reference where several luminous bodies share the frame with
+// the focused one. With the bigger R + longer flares + selected
+// star's +30 % breath bump on top, the focused star still
+// clearly dominates.
+const ZOOM_SCALE = 1.9
 
 // ConstellationDrawing is authored in a 1200 × 1200 SVG space
 // (orbital_tab_day.svg); we project it into our viewBox via a single
@@ -605,14 +609,17 @@ function StarNode({
   const b = dim.brightness
   const enLuz = b >= EN_LUZ_THRESHOLD
   // Lens-flare stars in the Genshin Constellation style: every en
-  // luz star is a luminous starburst with a white-hot core, three
-  // layered blooms (outer wide → mid → inner aura), and a
-  // diffraction-spike cross. Lejos stars stay small and quiet so
-  // the contrast between states is loud.
-  const R = enLuz ? 3.4 + b * 3 : 2
-  const outerR = enLuz ? R * 5.5 : R * 2
-  const midR = enLuz ? R * 2.8 : R * 1.5
-  const auraR = enLuz ? R * 1.5 : R * 1.2
+  // luz star is a LARGE luminous starburst with a white-hot core,
+  // three layered blooms (outer wide → mid → inner aura), and a
+  // long diffraction-spike cross. R bumped 3.4 → 5 (base) and
+  // b * 3 → b * 4 (brightness contribution); lejos stars stay
+  // small + quiet so the contrast between states is loud and the
+  // bright stars carry the dramatic "luminous body" weight the
+  // Genshin reference set as the target.
+  const R = enLuz ? 5 + b * 4 : 2.5
+  const outerR = enLuz ? R * 5 : R * 1.8
+  const midR = enLuz ? R * 2.5 : R * 1.5
+  const auraR = enLuz ? R * 1.4 : R * 1.2
 
   // Each star breathes on its own phase so the constellation feels
   // alive but not synchronised. The 8 s `t` clock drives scale +
@@ -773,32 +780,32 @@ function StarNode({
           />
         ) : null}
         {/* Three-layer bloom: wide outer magenta → mid pink → tight
-            warm aura. Layered radii + opacities produce a gradient
-            falloff that reads as light spilling out of the core,
-            rather than a flat filled disc.  */}
+            warm aura. Opacities bumped from the previous version so
+            the dramatic Genshin-style "luminous body" reads at the
+            same scale as the bigger R. */}
         <Circle
           cx={x}
           cy={y}
           r={outerR}
           fill={colors.magenta}
-          opacity={enLuz ? 0.1 + b * 0.1 : 0.05}
+          opacity={enLuz ? 0.14 + b * 0.12 : 0.05}
         />
-        <Circle cx={x} cy={y} r={midR} fill="#FBD7E3" opacity={enLuz ? 0.14 + b * 0.12 : 0.06} />
-        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.28 + b * 0.18 : 0.1} />
+        <Circle cx={x} cy={y} r={midR} fill="#FBD7E3" opacity={enLuz ? 0.2 + b * 0.14 : 0.06} />
+        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.38 + b * 0.22 : 0.1} />
         {/* Diffraction-spike starburst — ON for EVERY en luz star,
-            not just the selected one. Wrapped in an AnimatedG that
-            shimmers (slight scale wobble on slowClock) so the rays
-            never feel frozen. Length + opacity scale with brightness
-            so brighter dimensions throw bigger flares. */}
+            not just the selected one. Length bumped R*7 → R*11 so
+            the anamorphic horizontal streak extends much further
+            (Genshin-style long flare). Wrapped in an AnimatedG that
+            shimmers so the rays never feel frozen. */}
         {enLuz ? (
           <AnimatedG animatedProps={shimmerAnim}>
             <DiffractionSpikes
               x={x}
               y={y}
-              length={R * 7}
-              opacity={0.4 + b * 0.35}
-              diagOpacity={0.16 + b * 0.12}
-              strokeWidth={0.5}
+              length={R * 11}
+              opacity={0.55 + b * 0.35}
+              diagOpacity={0.22 + b * 0.14}
+              strokeWidth={0.7}
             />
           </AnimatedG>
         ) : null}
@@ -825,30 +832,31 @@ function StarNode({
           : null}
         {/* Lens-flare starburst (the BIG flare) — only the selected
             star, wrapped in an AnimatedG that scales + fades in with
-            the zoom. Stacks on top of the always-on spikes above. */}
+            the zoom. Length bumped R*10 → R*16 + opacity 0.7 → 0.85
+            so the selected star throws a much longer + brighter cross
+            on zoom — the dramatic Genshin "Condensed Pyronado"-style
+            burst. Stacks on top of the always-on spikes above. */}
         {showFlare ? (
           <AnimatedG animatedProps={flareAnim}>
             <DiffractionSpikes
               x={x}
               y={y}
-              length={R * 10}
-              opacity={0.7}
-              diagOpacity={0.28}
-              strokeWidth={0.6}
+              length={R * 16}
+              opacity={0.85}
+              diagOpacity={0.36}
+              strokeWidth={0.8}
             />
           </AnimatedG>
         ) : null}
-        {/* Selection crown removed — the crisp cream outline ring
-            was reading as the inner circle of a rifle-scope reticle
-            at full zoom. The selected star is already clearly marked
-            by popT scale-pop + impact flash + arrival burst +
-            amplified flare; the ring was redundant. */}
-        {/* The luminous point — gradient disc + bright white centre.
-            The centre is bigger and at full opacity now, so the core
-            reads as white-hot like a real over-exposed star. */}
+        {/* The luminous point — gradient disc + multi-layer
+            white-hot core. The outermost halo is a wider soft
+            white wash to mimic the overexposed Genshin core glow;
+            below that, two opaque white discs at R*0.7 and R*0.4
+            give the centre its blown-out brightness peak. */}
         <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-        {enLuz ? <Circle cx={x} cy={y} r={R * 0.6} fill="#FFFFFF" opacity={1} /> : null}
-        {enLuz ? <Circle cx={x} cy={y} r={R * 0.3} fill="#FFFFFF" /> : null}
+        {enLuz ? <Circle cx={x} cy={y} r={R * 1.1} fill="#FFFFFF" opacity={0.32} /> : null}
+        {enLuz ? <Circle cx={x} cy={y} r={R * 0.7} fill="#FFFFFF" opacity={1} /> : null}
+        {enLuz ? <Circle cx={x} cy={y} r={R * 0.4} fill="#FFFFFF" /> : null}
       </AnimatedG>
       {/* Labels intentionally removed — the right-side DimensionNodeList
           is the single source of identification. Two labels for the
