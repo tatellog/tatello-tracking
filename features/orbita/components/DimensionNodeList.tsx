@@ -182,10 +182,16 @@ function DimensionBadge({
   const petalOp = state === 'selected' ? 1 : state === 'lit' ? 0.8 : 0.25
   const ringStroke =
     state === 'selected' ? colors.leche : state === 'lit' ? colors.magenta : colors.bruma
-  const ringWidth = state === 'selected' ? 1.7 : state === 'lit' ? 1.3 : 1
-  // A faint backdrop glow sits behind the disc when lit/selected so
-  // the node feels lit-from-within against the dark page bg.
-  const glowOp = state === 'selected' ? 0.55 : state === 'lit' ? 0.32 : 0
+  // Selected ring noticeably thicker (2.6 vs 1.3 lit / 1 dim). On
+  // top of that, a second cream-coloured HALO ring sits OUTSIDE
+  // the disc only on the selected badge — see the render below.
+  // Combined the two rings make "selected" unmistakable vs "lit",
+  // which were reading as identical (both bright rings) on a dark
+  // bg.
+  const ringWidth = state === 'selected' ? 2.6 : state === 'lit' ? 1.3 : 1
+  // Backdrop glow — stronger on selected so the node clearly
+  // "lights up" from behind when picked.
+  const glowOp = state === 'selected' ? 0.75 : state === 'lit' ? 0.32 : 0
   const isSelected = state === 'selected'
   // Pulse only applies to the selected badge — everything else
   // stays still. The worklet reads the prop on every frame, so
@@ -205,9 +211,17 @@ function DimensionBadge({
     <Animated.View style={pulseStyle}>
       <Svg width={BADGE_SIZE} height={BADGE_SIZE} viewBox="0 0 36 36">
         {/* Backdrop glow — a soft magenta wash behind the badge that
-          only switches on for lit/selected. */}
+          only switches on for lit/selected. Selected gets a WIDER
+          glow (full viewBox) so the lighting-from-behind feels
+          stronger; lit stays tight. */}
         {glowOp > 0 ? (
-          <Circle cx={18} cy={18} r={15} fill={colors.magenta} opacity={glowOp * 0.5} />
+          <Circle
+            cx={18}
+            cy={18}
+            r={isSelected ? 19 : 15}
+            fill={colors.magenta}
+            opacity={glowOp * 0.5}
+          />
         ) : null}
         {/* Four cardinal petals (top, right, bottom, left). Tapered
           diamonds — narrow and pointed outward. */}
@@ -223,6 +237,22 @@ function DimensionBadge({
           opacity={petalOp}
         />
         <Path d="M1.6 18 L5.4 20.4 L8.4 18 L5.4 15.6 Z" fill={colors.magenta} opacity={petalOp} />
+        {/* Outer halo ring — ONLY on the selected badge. Sits
+          OUTSIDE the disc so the selected node looks haloed +
+          clearly different from "lit". This is the visual cue
+          that resolves the prior "lit and selected look the same"
+          ambiguity. */}
+        {isSelected ? (
+          <Circle
+            cx={18}
+            cy={18}
+            r={BADGE_R + 4.5}
+            fill="none"
+            stroke={colors.leche}
+            strokeWidth={1.3}
+            opacity={0.7}
+          />
+        ) : null}
         {/* The dark disc — sits on top of the petals so the petals
           read as radiating from behind the badge. */}
         <Circle cx={18} cy={18} r={BADGE_R} fill={colors.bgCard2} />
