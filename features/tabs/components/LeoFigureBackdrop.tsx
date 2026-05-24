@@ -14,26 +14,34 @@ import { colors } from '@/theme'
  * — present only when the active sign is Leo, since the figure is
  * specifically the lion.
  *
- * SCALE — 290 / 2106 ~ 0.1377. At that scale the source 2016 tall
- * renders ~277.6 viewBox units, vertically centred via a +6.2 y
- * offset. The strokes are emitted at a fixed `strokeWidth` (source
- * units, ~2.5 px at viewBox scale) so the line weight reads the
- * same regardless of the source scale.
+ * LAYOUT — the lion no longer fills the whole canvas. CANVAS_FILL
+ * is the maximum scale that fits the source 2106-wide into the
+ * 290-wide viewBox (~0.1377). FIT_SCALE 0.65 then shrinks the
+ * figure to 65 % of that, leaving ~50 viewBox units of breath on
+ * every edge so the constellation stars surround the silhouette
+ * rather than competing for the same area. Opacity dropped 0.18 →
+ * 0.14 so the line art reads as a watermark under the bright
+ * stars, not a second layer fighting for attention. Stroke width
+ * bumped 18 → 22 to compensate for the smaller projected line
+ * weight at the tighter scale.
  */
 
-const LEO_SCALE = 290 / 2106
+const CANVAS_FILL = 290 / 2106
+const FIT_SCALE = 0.65
+const LEO_SCALE = CANVAS_FILL * FIT_SCALE
+const LEO_X_OFFSET = (290 - 2106 * LEO_SCALE) / 2
 const LEO_Y_OFFSET = (290 - 2016 * LEO_SCALE) / 2
 
 export function LeoFigureBackdrop() {
   return (
     <G
-      transform={`translate(0 ${LEO_Y_OFFSET.toFixed(3)}) scale(${LEO_SCALE.toFixed(6)})`}
+      transform={`translate(${LEO_X_OFFSET.toFixed(3)} ${LEO_Y_OFFSET.toFixed(3)}) scale(${LEO_SCALE.toFixed(6)})`}
       stroke={colors.magenta}
-      strokeWidth={18}
+      strokeWidth={22}
       strokeLinecap="round"
       strokeLinejoin="round"
       fill="none"
-      opacity={0.18}
+      opacity={0.14}
     >
       <Path d="M1790.000000,1036.000000 C1788.705322,1027.998657 1792.359619,1022.493408 1797.882568,1016.884338 C1836.748291,977.413025 1871.624390,934.515625 1899.583008,886.755859 C1917.514648,856.124268 1932.168579,823.338562 1938.874023,787.976135 C1945.586426,752.577271 1944.924927,717.276550 1930.768066,683.597473 C1923.345337,665.938782 1911.966187,650.406311 1898.008667,636.991028 C1880.491089,620.153870 1860.594604,606.988464 1837.994751,598.013245 C1811.286377,587.406189 1783.625854,581.043701 1755.025635,577.776001 C1733.711304,575.340820 1712.504395,572.166016 1691.002319,573.057068 C1669.332153,573.955078 1647.566040,573.554749 1626.011475,576.097107 C1579.660278,581.564270 1533.267822,586.947266 1488.003540,599.013367 C1481.506348,600.745422 1475.434082,600.395630 1470.000000,596.000000" />
       <Path d="M439.000000,1110.000000 C426.290375,1115.632202 415.960266,1124.918213 405.154114,1133.201050 C377.746185,1154.209106 351.103180,1176.217896 326.003113,1200.003296 C282.046570,1241.657471 243.737930,1287.710693 218.197418,1343.091064 C206.750748,1367.911133 199.905792,1394.449097 200.194550,1421.997925 C200.505356,1451.648071 210.535507,1477.767700 230.865936,1500.121948 C253.825958,1525.367310 283.074249,1540.057251 314.054260,1551.857544 C342.034851,1562.515259 371.268341,1568.181885 400.972260,1572.204834 C438.530670,1577.291504 476.180511,1580.173218 513.992249,1578.788574 C543.047852,1577.724609 572.045105,1575.074585 601.030945,1572.326416 C623.545044,1570.191895 645.788269,1566.904053 667.994080,1562.966675 C668.374573,1562.899292 668.666626,1562.333374 669.000000,1562.000000" />
