@@ -731,6 +731,20 @@ function StarNode({
     }
   })
 
+  // Non-selected fade — when a selection is active, every OTHER en-
+  // luz star fades aggressively as the camera zooms in. At zoomT=0
+  // (the instant a selection starts) the non-selected drops to 0.6;
+  // by zoomT=1 it's ~0.10 — basically invisible. This kills the
+  // "ghost selection" effect where CUERPO's long anamorphic flare
+  // (R·11) stretched into the viewport from off-screen at full
+  // zoom and read like a second highlighted star. Only the
+  // selected node stays at full opacity in the frame.
+  const fadedAnim = useAnimatedProps(() => {
+    'worklet'
+    if (!faded) return { opacity: 1 }
+    return { opacity: Math.max(0.08, 0.6 - zoomT.value * 0.5) }
+  })
+
   // Lens-flare shimmer — continuous tiny scale wobble on the
   // always-on starburst so the rays feel alive instead of frozen.
   // Different phase per star (re-uses dim.angleDeg's phase) and a
@@ -753,7 +767,7 @@ function StarNode({
   })
 
   return (
-    <G opacity={faded ? 0.45 : 1}>
+    <AnimatedG animatedProps={fadedAnim}>
       {selected ? (
         <AnimatedCircle
           cx={x}
@@ -862,7 +876,7 @@ function StarNode({
           is the single source of identification. Two labels for the
           same dimension was visual noise and they kept colliding with
           the ornament's flourishes. */}
-    </G>
+    </AnimatedG>
   )
 }
 
