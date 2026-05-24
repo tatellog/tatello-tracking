@@ -126,29 +126,68 @@ export function AnimatedConstellation({
     const z = zoomT ? zoomT.value : 0
     return { strokeWidth: 1.8 + z * 1.7, opacity: 0.72 + z * 0.2 }
   })
-  // Hexagon outline — drawn as TWO stacked paths so it reads like
-  // the Genshin reference: a vibrant bright core line with a wider
-  // soft glow halo bleeding around it.
+  // Hexagon outline — drawn as FIVE stacked layers so it reads like
+  // the Genshin reference: a vibrant bi-tone core line bleeding into
+  // a wide bloom, with a bright cream "shine" sliding around the
+  // perimeter as if energy is filling the figure.
   //
-  //   • outlineGlow  — wide, faint, blurred-looking stroke that
-  //                    bleeds beyond the core line. At rest 9 pt /
-  //                    0.22; at zoom 15 pt / 0.50. Acts as the
-  //                    luminous bloom around the constellation
-  //                    figure.
-  //   • outlineBoost — the bright core line. Much thicker than
-  //                    before (1.4 → 3.8 at rest, 2.9 → 6.4 at
-  //                    zoom) and at near-full opacity, so the
-  //                    hexagon now reads as a strong figure on
-  //                    its own rather than ambient scaffolding.
+  //   1. outlineGlowOuter — widest faint halo (18 → 28 pt at zoom).
+  //      Ambient scatter around the line, like the atmosphere.
+  //   2. outlineGlow      — closer bloom (9 → 15 pt). Magenta.
+  //   3. outlineBoost     — magenta core (3.8 → 6.4 pt, 0.85 → 1.0).
+  //   4. outlineShine     — cream highlight on top of the magenta
+  //      core (1.6 → 2.8 pt) so the line reads bi-tone — warm pink
+  //      shine ON magenta instead of plain magenta. This is the
+  //      "other colour for more shine" the reference asked for.
+  //   5. hexFill (head + halo) — a bright cream-pink dash that
+  //      slides around the hexagon perimeter on flowClock, leaving
+  //      a wider magenta wake just behind it. Reads as "energy
+  //      filling the constellation" — same vocabulary as the
+  //      travelling beam on the orbital rings.
+  const outlineGlowOuter = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    return { strokeWidth: 18 + z * 10, opacity: 0.16 + z * 0.22 }
+  })
   const outlineGlow = useAnimatedProps(() => {
     'worklet'
     const z = zoomT ? zoomT.value : 0
-    return { strokeWidth: 9 + z * 6, opacity: 0.22 + z * 0.28 }
+    return { strokeWidth: 9 + z * 6, opacity: 0.32 + z * 0.32 }
   })
   const outlineBoost = useAnimatedProps(() => {
     'worklet'
     const z = zoomT ? zoomT.value : 0
-    return { strokeWidth: 3.8 + z * 2.6, opacity: 0.78 + z * 0.18 }
+    return { strokeWidth: 3.8 + z * 2.6, opacity: 0.85 + z * 0.15 }
+  })
+  const outlineShine = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    return { strokeWidth: 1.6 + z * 1.2, opacity: 0.55 + z * 0.35 }
+  })
+
+  // Travelling fill dash — slides around the hexagon perimeter on
+  // flowClock so the constellation feels like it's continuously
+  // being charged. Same head + halo vocabulary as the orbital
+  // beam: a bright narrow cream head followed by a wider magenta
+  // halo trailing slightly behind. Both share an opacity pulse so
+  // the sweep crescendos + dims rhythmically (PULSE_FREQ = 1.5).
+  const HEX_HALO_TRAIL = 0.022
+  const HEX_PULSE_FREQ = 1.5
+  const hexFillHead = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    const t = flowClock.value
+    const pulse = 0.55 + 0.45 * Math.sin(flowClock.value * 2 * Math.PI * HEX_PULSE_FREQ)
+    const op = Math.min(1, (0.75 + z * 0.25) * pulse * 1.25)
+    return { strokeDashoffset: -t, opacity: op }
+  })
+  const hexFillHalo = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    const t = (flowClock.value - HEX_HALO_TRAIL + 1) % 1
+    const pulse = 0.55 + 0.45 * Math.sin(flowClock.value * 2 * Math.PI * HEX_PULSE_FREQ)
+    const op = Math.min(1, (0.45 + z * 0.25) * pulse)
+    return { strokeDashoffset: -t, opacity: op }
   })
 
   // The static scaffold (outer guides, axis cross, central rings,
@@ -179,24 +218,18 @@ export function AnimatedConstellation({
           alongside the focused star, so the figure remains
           legible at zoom.
 
-          Rendered as a wider faint glow halo first, then the
-          bright core on top — the bloom around the bright line
-          reads as the Genshin-style luminous-vein vibe. */}
-      <AnimatedPath
-        d="M 512 210 L 773.5 361 L 773.5 663 L 512 814 L 250.5 663 L 250.5 361 Z"
-        fill="none"
-        stroke={colors.magenta}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        animatedProps={outlineGlow}
-      />
-      <AnimatedPath
-        d="M 512 210 L 773.5 361 L 773.5 663 L 512 814 L 250.5 663 L 250.5 361 Z"
-        fill="none"
-        stroke={colors.magenta}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        animatedProps={outlineBoost}
+          Five stacked layers — see the outline* / hexFill*
+          useAnimatedProps blocks above for the brightness +
+          stroke ramps. Bottom layer paints first, brightest
+          travelling head paints last. */}
+      <HexagonOutline
+        outlineGlowOuter={outlineGlowOuter}
+        outlineGlow={outlineGlow}
+        outlineBoost={outlineBoost}
+        outlineShine={outlineShine}
+        hexFillHead={hexFillHead}
+        hexFillHalo={hexFillHalo}
+        flowEnabled={profile.flowEnabled}
       />
 
       {ORBITS.map((orbit, i) =>
@@ -363,5 +396,121 @@ function StaticPathOrbit({
       strokeLinejoin="round"
       animatedProps={lineBoost}
     />
+  )
+}
+
+/*
+ * The hexagonal constellation outline — six stacked layers painting
+ * the same path:
+ *
+ *   1. Outer magenta bloom (widest, faintest)
+ *   2. Inner magenta glow
+ *   3. Magenta core line
+ *   4. Cream "shine" highlight on top
+ *   5. Dash halo (magenta, trailing wake of the sweep)
+ *   6. Dash head (bright cream, the brightest crest)
+ *
+ * The dash layers use pathLength=1 so the dash pattern is path-
+ * normalised; the head is 18 % of the perimeter, the halo 26 %.
+ * Both slide on flowClock-driven strokeDashoffset → the sweep
+ * travels around the six edges continuously, reading as "energy
+ * filling the figure" — the same vocabulary as the orbit beams.
+ */
+const HEX_PATH = 'M 512 210 L 773.5 361 L 773.5 663 L 512 814 L 250.5 663 L 250.5 361 Z'
+const HEX_DASH_RUNTIME = { pathLength: 1 } as Record<string, unknown>
+
+function HexagonOutline({
+  outlineGlowOuter,
+  outlineGlow,
+  outlineBoost,
+  outlineShine,
+  hexFillHead,
+  hexFillHalo,
+  flowEnabled,
+}: {
+  outlineGlowOuter: ReturnType<typeof useAnimatedProps>
+  outlineGlow: ReturnType<typeof useAnimatedProps>
+  outlineBoost: ReturnType<typeof useAnimatedProps>
+  outlineShine: ReturnType<typeof useAnimatedProps>
+  hexFillHead: ReturnType<typeof useAnimatedProps>
+  hexFillHalo: ReturnType<typeof useAnimatedProps>
+  flowEnabled: boolean
+}) {
+  return (
+    <>
+      {/* 1. Outermost magenta bloom — the ambient atmospheric scatter
+            around the line, widest and faintest. */}
+      <AnimatedPath
+        d={HEX_PATH}
+        fill="none"
+        stroke={colors.magenta}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        animatedProps={outlineGlowOuter}
+      />
+      {/* 2. Inner magenta glow — closer halo bleeding off the core. */}
+      <AnimatedPath
+        d={HEX_PATH}
+        fill="none"
+        stroke={colors.magenta}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        animatedProps={outlineGlow}
+      />
+      {/* 3. Magenta core — the body of the line. */}
+      <AnimatedPath
+        d={HEX_PATH}
+        fill="none"
+        stroke={colors.magenta}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        animatedProps={outlineBoost}
+      />
+      {/* 4. Cream "shine" highlight — sits ON TOP of the magenta
+            core so the line reads bi-tone (warm pink shine over a
+            magenta body) rather than a single-colour stroke. This
+            is the "other colour for more brightness" the reference
+            asked for. */}
+      <AnimatedPath
+        d={HEX_PATH}
+        fill="none"
+        stroke={CONSTELLATION_COLORS.lineFlow}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        animatedProps={outlineShine}
+      />
+      {/* 5. + 6. Travelling fill — head + halo. Gated on flowEnabled
+            so the OS reduced-motion fallback skips them. */}
+      {flowEnabled ? (
+        <>
+          {/* Halo — wider magenta glow trailing the head. Drawn
+              first so the bright head sits on top. */}
+          <AnimatedPath
+            d={HEX_PATH}
+            fill="none"
+            stroke={CONSTELLATION_COLORS.starHalo}
+            strokeWidth={9}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="0.26 0.74"
+            animatedProps={hexFillHalo}
+            {...HEX_DASH_RUNTIME}
+          />
+          {/* Head — narrow bright cream crest. The brightest point
+              of the sweep — the "filling" of the hexagon. */}
+          <AnimatedPath
+            d={HEX_PATH}
+            fill="none"
+            stroke={CONSTELLATION_COLORS.lineFlow}
+            strokeWidth={3.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="0.18 0.82"
+            animatedProps={hexFillHead}
+            {...HEX_DASH_RUNTIME}
+          />
+        </>
+      ) : null}
+    </>
   )
 }
