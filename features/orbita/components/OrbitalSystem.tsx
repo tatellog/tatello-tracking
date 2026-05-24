@@ -61,43 +61,53 @@ const VB_H = 382
 // clearly dominates.
 const ZOOM_SCALE = 1.9
 
-// ConstellationDrawing is authored in a 1200 × 1200 SVG space
-// (orbital_tab_day.svg); we project it into our viewBox via a single
-// transform. ORNAMENT_S scales source-space units into viewBox
-// units; ORNAMENT_TX/TY shift the source centre (600, 600) onto the
-// canvas centre. The same transform is used both on the <G> that
-// renders the drawing AND on the star positions below — keeping the
-// live stars perfectly aligned with the drawn orbits.
-const ORNAMENT_S = 0.31
+// ConstellationDrawing is authored in a 1024 × 1024 SVG space
+// (daily_constellation.svg); we project it into our viewBox via a
+// single transform. ORNAMENT_S scales source-space units into
+// viewBox units; ORNAMENT_TX/TY shift the source centre (512, 512)
+// onto the canvas centre (216, 163 — same place the old 1200-space
+// figure landed). The same transform is used both on the <G> that
+// renders the drawing AND on the star positions below — keeping
+// the live stars perfectly aligned with the drawn orbits.
+//
+// ORNAMENT_S 0.31 → 0.363 keeps the figure at the same on-screen
+// size after the source dropped 1200 → 1024 (1024 × 0.363 ≈ 372,
+// matching the viewBox width). Cardinal ornaments at source
+// r ≈ 475 from centre extend slightly past the viewBox right edge
+// at this scale; that's intentional — they're decorative diamond
+// tips and the small clipping reads as them fading off the figure.
+const ORNAMENT_S = 0.363
 const ORNAMENT_TX = 30
 const ORNAMENT_TY = -23
 
-/** Project a source-space (1200-space) point into the SVG viewBox. */
+/** Project a source-space (1024-space) point into the SVG viewBox. */
 function ornamentPos(sx: number, sy: number): { x: number; y: number } {
   return { x: ORNAMENT_TX + sx * ORNAMENT_S, y: ORNAMENT_TY + sy * ORNAMENT_S }
 }
 
 // Six dimension stars at the six cardinal nodes of the orbital
-// drawing. Source coords read directly from the node-ring circles
-// in orbital_constellation_no_labels.svg.
+// drawing. Source coords read directly from the constellation
+// polygon in daily_constellation.svg — top, upper-right, lower-
+// right, bottom, lower-left, upper-left.
 const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
   // Top node.
-  mente: ornamentPos(600, 185),
-  // Upper-left + lower-left nodes.
-  cuerpo: ornamentPos(180, 455),
-  energia: ornamentPos(310, 885),
+  mente: ornamentPos(512, 210),
   // Upper-right + lower-right nodes.
-  sueno: ornamentPos(1020, 455),
-  alimento: ornamentPos(890, 885),
+  sueno: ornamentPos(773.5, 361),
+  alimento: ornamentPos(773.5, 663),
   // Bottom node.
-  ciclo: ornamentPos(600, 1035),
+  ciclo: ornamentPos(512, 814),
+  // Lower-left + upper-left nodes.
+  energia: ornamentPos(250.5, 663),
+  cuerpo: ornamentPos(250.5, 361),
 }
 
 // The drawing's central "tú" node. A single DecorativeStar paints
 // it so the centre shares the lens-flare + slow-glow language of
-// the dimension stars rather than the original SVG's flat dot.
+// the dimension stars rather than the SVG's authored static
+// ornament.
 const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
-  ornamentPos(600, 600), // centre of the orbital system
+  ornamentPos(512, 512), // centre of the orbital system
 ]
 
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -269,11 +279,12 @@ export function OrbitalSystem({
               live stars now. */}
 
           {/* The ornamental constellation — native SVG paths from
-              `assets/constellations/constellation_app_day.svg`,
+              `assets/constellations/daily_constellation.svg`,
               projected into our viewBox via ORNAMENT_S/TX/TY. The
-              AnimatedConstellation wrapper adds an energy-flow
-              overlay on the eight connecting lines; everything else
-              about ConstellationDrawing renders untouched. */}
+              AnimatedConstellation wrapper renders the six
+              concentric orbits + hexagonal outline with an energy
+              beam on the outer two rings; ConstellationDrawing
+              paints the static axis cross + spokes + ornaments. */}
           <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
             <AnimatedConstellation intensity={intensity} zoomT={zoomT} />
           </G>

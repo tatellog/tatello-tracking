@@ -1,176 +1,157 @@
-import { Circle, Ellipse, G, Path } from 'react-native-svg'
+import { Circle, G, Path } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
 /*
  * Static layers of the orbital constellation
- * (orbital_constellation_no_labels.svg). Source viewBox 1200 × 1200.
+ * (daily_constellation.svg). Source viewBox 1024 × 1024.
  *
  * Split into Back + Front so AnimatedConstellation can interleave
- * its rotating orbital ellipses + curves between them, matching the
- * source SVG's z-order:
+ * its travelling-particle orbits between them, matching the source
+ * SVG's z-order:
  *
- *   1. outer guides + core axes  (Back)
- *   2. orbital ellipses + curves (AnimatedConstellation, rotating)
- *   3. central rings + node rings + glows + orbit points + micro-stars (Front)
- *   4. dimension star nodes      (StarNode / DecorativeStar in OrbitalSystem)
+ *   1. outer concentric rings + axis cross  (Back)
+ *   2. orbit rings with particles           (AnimatedConstellation)
+ *   3. spokes + node frames + ornaments + sparks (Front)
+ *   4. dimension star nodes                 (StarNode / DecorativeStar in OrbitalSystem)
  *
- * The SVG's `star-nodes` group is NOT rendered here — the app's
- * StarNode (interactive) + DecorativeStar (centre) handle every
- * luminous point. Everything else is painted with `colors.magenta`
- * at varied opacities so the figure sits inside STELAR's palette
- * while preserving the source structure.
+ * The SVG's central star ornament, node frame rings, and in-node
+ * symbols overlap with the live luminous bodies (DecorativeStar +
+ * StarNode), so we skip the brightest ones — only the faint outer
+ * node frames + the central star's outer circle remain as
+ * decorative shadow under the live stars. Everything is painted in
+ * `colors.magenta` at the source's authored opacities so the figure
+ * sits inside STELAR's palette while preserving the source
+ * structure.
  */
 
 const STROKE = colors.magenta
 
+// Six dimension node positions + the centre. Used by the Front
+// layer to draw the outer node frame ring.
+//
+// Order matches CLOCKWISE: top → upper-right → lower-right →
+// bottom → lower-left → upper-left.
+const NODE_POS = [
+  { x: 512, y: 210 }, // mente
+  { x: 773.5, y: 361 }, // sueno
+  { x: 773.5, y: 663 }, // alimento
+  { x: 512, y: 814 }, // ciclo
+  { x: 250.5, y: 663 }, // energia
+  { x: 250.5, y: 361 }, // cuerpo
+] as const
+
 export function ConstellationDrawingBack() {
   return (
     <>
-      {/* Outer dotted orbital guides — three concentric-ish shells
-          drawn in a thin dashed line so they read as ambient
-          scaffolding rather than as visible orbits. */}
-      <G
-        stroke={STROKE}
-        fill="none"
-        strokeWidth={1.15}
-        strokeLinecap="round"
-        strokeDasharray="2 8"
-        opacity={0.28}
-      >
-        <Circle cx={600} cy={600} r={455} />
-        <Circle cx={600} cy={600} r={335} />
-        <Ellipse cx={600} cy={600} rx={420} ry={250} transform="rotate(-19 600 600)" />
+      {/* Six concentric outer rings — the orbital "shells" the
+          figure sits inside. Stroke + opacity ramps so the outer
+          ring reads as the boundary and the inner ones fade
+          progressively, building depth toward the centre. */}
+      <G stroke={STROKE} fill="none" strokeLinecap="round">
+        <Circle cx={512} cy={512} r={430} strokeWidth={2} />
+        <Circle cx={512} cy={512} r={397} strokeWidth={1.2} opacity={0.8} />
+        <Circle cx={512} cy={512} r={354} strokeWidth={1} opacity={0.65} />
+        <Circle cx={512} cy={512} r={301} strokeWidth={0.9} opacity={0.45} />
+        <Circle cx={512} cy={512} r={244} strokeWidth={0.8} opacity={0.35} />
+        <Circle cx={512} cy={512} r={185} strokeWidth={0.8} opacity={0.3} />
       </G>
-      {/* Core axes — vertical, horizontal, and two diagonals. The
-          compass cross of the astrolabe. */}
-      <G stroke={STROKE} fill="none" strokeWidth={1} strokeLinecap="round" opacity={0.22}>
-        <Path d="M600 120 L600 1080" />
-        <Path d="M120 600 L1080 600" />
-        <Path d="M260 940 L940 260" />
-        <Path d="M260 260 L940 940" />
+      {/* Axis cross + two diagonals — the compass of the astrolabe. */}
+      <G stroke={STROKE} fill="none" strokeLinecap="round">
+        <Path d="M512 57 V967" strokeWidth={1.4} opacity={0.85} />
+        <Path d="M57 512 H967" strokeWidth={1.4} opacity={0.85} />
+        <Path d="M190.5 190.5 L833.5 833.5" strokeWidth={1} opacity={0.5} />
+        <Path d="M833.5 190.5 L190.5 833.5" strokeWidth={1} opacity={0.5} />
       </G>
-      {/* (Hexagonal constellation outline lives in
-          AnimatedConstellation now — kept OUTSIDE the scaffoldDim
-          fade group so it stays visible at zoom AND grows in
-          stroke width as the camera locks in.) */}
     </>
   )
 }
 
-// Six dimension node positions + the centre. Used by the Front
-// layer to draw their rings, glows, and compass-tick markers.
-const NODE_POS = [
-  { x: 600, y: 185 }, // mente (top)
-  { x: 180, y: 455 }, // cuerpo (upper-left)
-  { x: 1020, y: 455 }, // sueno (upper-right)
-  { x: 310, y: 885 }, // energia (lower-left)
-  { x: 890, y: 885 }, // alimento (lower-right)
-  { x: 600, y: 1035 }, // ciclo (bottom)
-] as const
-
-// 17 small "orbit point" dots — minor planet markers scattered
-// along the orbital paths. 10 brighter (`tiny`, opacity 0.7),
-// 7 fainter (`tiny-soft`, opacity 0.38).
-const ORBIT_POINTS: { x: number; y: number; r: number; op: number }[] = [
-  { x: 760, y: 250, r: 7, op: 0.7 },
-  { x: 745, y: 350, r: 5, op: 0.7 },
-  { x: 835, y: 415, r: 7, op: 0.7 },
-  { x: 930, y: 322, r: 5, op: 0.7 },
-  { x: 450, y: 448, r: 5, op: 0.7 },
-  { x: 520, y: 510, r: 6, op: 0.7 },
-  { x: 385, y: 735, r: 7, op: 0.7 },
-  { x: 695, y: 735, r: 5, op: 0.7 },
-  { x: 720, y: 820, r: 7, op: 0.7 },
-  { x: 790, y: 885, r: 5, op: 0.7 },
-  { x: 270, y: 298, r: 3, op: 0.38 },
-  { x: 935, y: 252, r: 3, op: 0.38 },
-  { x: 1058, y: 790, r: 3, op: 0.38 },
-  { x: 178, y: 790, r: 3, op: 0.38 },
-  { x: 468, y: 930, r: 3, op: 0.38 },
-  { x: 350, y: 570, r: 3, op: 0.38 },
-  { x: 980, y: 590, r: 3, op: 0.38 },
-]
-
-// 7 tiny four-point stars used as decorative micro-stars in the
-// surrounding field. Just path data + opacity.
-const MICRO_STARS: { d: string; op: number }[] = [
-  { d: 'M238 245 L243 257 L256 262 L243 267 L238 280 L233 267 L220 262 L233 257 Z', op: 0.75 },
-  { d: 'M960 248 L965 260 L978 265 L965 270 L960 283 L955 270 L942 265 L955 260 Z', op: 0.65 },
-  {
-    d: 'M1080 780 L1086 794 L1100 800 L1086 806 L1080 820 L1074 806 L1060 800 L1074 794 Z',
-    op: 0.65,
-  },
-  { d: 'M205 760 L211 774 L225 780 L211 786 L205 800 L199 786 L185 780 L199 774 Z', op: 0.65 },
-  { d: 'M320 330 L324 339 L334 343 L324 347 L320 357 L316 347 L306 343 L316 339 Z', op: 0.45 },
-  { d: 'M840 300 L844 309 L854 313 L844 317 L840 327 L836 317 L826 313 L836 309 Z', op: 0.45 },
-  { d: 'M515 260 L519 269 L529 273 L519 277 L515 287 L511 277 L501 273 L511 269 Z', op: 0.45 },
-]
-
 export function ConstellationDrawingFront() {
   return (
     <>
-      {/* The central-astrolabe rings (five concentric circles at
-          r = 36/62/90/122/158 around the system centre) were
-          removed — they all fell INSIDE the DecorativeStar's lens-
-          flare radius and combined with it to look like a rifle-
-          scope reticle around the central node. The orbital
-          ellipses + axis cross + outer guides already supply
-          enough astrolabe context around the centre. */}
+      {/* Spokes — five lines from the centre out to non-bottom
+          nodes (the bottom spoke is just the vertical axis above).
+          Drawn faintly so the bright StarNode + DecorativeStar
+          remain the focal points; these read as "guidance rays"
+          connecting the centre to every dimension. */}
+      <G stroke={STROKE} fill="none" strokeLinecap="round" opacity={0.55} strokeWidth={1.2}>
+        <Path d="M512 210 L512 512 L773.5 361" />
+        <Path d="M512 512 L773.5 663" />
+        <Path d="M512 512 L512 814" />
+        <Path d="M512 512 L250.5 663" />
+        <Path d="M512 512 L250.5 361" />
+      </G>
 
-      {/* Per-dimension framing — an inner ring + outer halo + four
-          compass-tick markers at each node position. The bright
-          StarNode lands inside this frame; the rings give every
-          luminous point a small astrolabe medallion behind it. */}
-      <G stroke={STROKE} fill="none" strokeWidth={1.2} opacity={0.55}>
+      {/* Central star ornament — two concentric circles + a small
+          4-point star + two short axis stubs. Sits BEHIND the
+          DecorativeStar's lens flare so it reads as the engraved
+          medallion the bright centre star rests inside. The
+          DecorativeStar fades to ~10 % at zoom, so this ornament
+          stays visible during zoom — but scaffoldDim drops it to
+          ~6 % too, keeping the focus on the selected star. */}
+      <G stroke={STROKE} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}>
+        <Circle cx={512} cy={512} r={66} />
+        <Circle cx={512} cy={512} r={43} opacity={0.6} />
+        <Path d="M512 427 L527 497 L597 512 L527 527 L512 597 L497 527 L427 512 L497 497 Z" />
+        <Path d="M512 466 V558" opacity={0.9} />
+        <Path d="M466 512 H558" opacity={0.9} />
+      </G>
+
+      {/* Outer node frame — a single ring around each dimension
+          node. The two inner rings (r=34, r=18) and the in-node
+          symbols are intentionally OMITTED: they all fall inside
+          StarNode's bloom radius and combined with it to look
+          busy. The single outer ring (r=48) reads as a thin
+          medallion behind the bright luminous star. */}
+      <G stroke={STROKE} fill="none" strokeWidth={1.5} opacity={0.55}>
         {NODE_POS.map((p, i) => (
-          <Circle key={`nr-${i}`} cx={p.x} cy={p.y} r={i === 5 ? 42 : 48} />
-        ))}
-      </G>
-      <G stroke={STROKE} fill="none" strokeWidth={1.2} opacity={0.25}>
-        {NODE_POS.map((p, i) => (
-          <Circle key={`nro-${i}`} cx={p.x} cy={p.y} r={i === 5 ? 62 : 72} />
-        ))}
-      </G>
-      {/* Compass ticks — four short strokes at the cardinal
-          directions of each node, like astrolabe degree markers.
-          The expressions adapt to each node position; only the top
-          (mente) and bottom (ciclo) use the vertical version while
-          the left/right pairs use horizontal ones. */}
-      <G stroke={STROKE} fill="none" strokeWidth={1.2} opacity={0.55}>
-        <Path d="M600 105 L600 145 M600 225 L600 265" />
-        <Path d="M140 455 L100 455 M220 455 L260 455" />
-        <Path d="M980 455 L940 455 M1060 455 L1100 455" />
-        <Path d="M270 885 L230 885 M350 885 L390 885" />
-        <Path d="M850 885 L810 885 M930 885 L970 885" />
-        <Path d="M600 963 L600 993 M600 1075 L600 1110" />
-      </G>
-
-      {/* Soft node glows — a magenta-tint pad under each node so the
-          luminous star StarNode draws sits on a warm shadow. The
-          centre gets two pads (a wider soft + a smaller mid). */}
-      <G fill={STROKE}>
-        {NODE_POS.map((p, i) => (
-          <Circle key={`ng-${i}`} cx={p.x} cy={p.y} r={i === 5 ? 56 : 64} opacity={0.16} />
-        ))}
-        <Circle cx={600} cy={600} r={88} opacity={0.16} />
-        <Circle cx={600} cy={600} r={42} opacity={0.28} />
-      </G>
-
-      {/* Orbit-point dots — tiny markers along the orbits, like
-          minor planets or punctuation in the figure. */}
-      <G fill={STROKE}>
-        {ORBIT_POINTS.map((p, i) => (
-          <Circle key={`op-${i}`} cx={p.x} cy={p.y} r={p.r} opacity={p.op} />
+          <Circle key={`nr-${i}`} cx={p.x} cy={p.y} r={48} />
         ))}
       </G>
 
-      {/* Decorative micro-stars — small 4-point stars in the
-          ambient field. Lower opacity than the orbit dots. */}
+      {/* Beads — small filled dots punctuating the spokes. Like the
+          minor planets that mark the orbital paths. */}
       <G fill={STROKE}>
-        {MICRO_STARS.map((s, i) => (
-          <Path key={`ms-${i}`} d={s.d} opacity={s.op} />
-        ))}
+        <Circle cx={512} cy={355} r={4} />
+        <Circle cx={512} cy={669} r={4} />
+        <Circle cx={638} cy={438} r={4} />
+        <Circle cx={638} cy={586} r={4} />
+        <Circle cx={386} cy={438} r={4} />
+        <Circle cx={386} cy={586} r={4} />
+        <Circle cx={642.8} cy={285.5} r={4} />
+        <Circle cx={642.8} cy={738.5} r={4} />
+        <Circle cx={381.2} cy={285.5} r={4} />
+        <Circle cx={381.2} cy={738.5} r={4} />
+      </G>
+
+      {/* Cardinal ornaments — four diamond tips + four small
+          circles at the cardinal directions of the outermost
+          ring. Markers of N/E/S/W on the astrolabe. */}
+      <G stroke={STROKE} fill="none" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M512 37 L521 57 L512 77 L503 57 Z" />
+        <Path d="M512 947 L521 967 L512 987 L503 967 Z" />
+        <Path d="M37 512 L57 503 L77 512 L57 521 Z" />
+        <Path d="M947 512 L967 503 L987 512 L967 521 Z" />
+        <Circle cx={512} cy={113} r={8} />
+        <Circle cx={512} cy={911} r={8} />
+        <Circle cx={113} cy={512} r={8} />
+        <Circle cx={911} cy={512} r={8} />
+      </G>
+
+      {/* Corner sparks — four "+" marks + four small filled dots
+          scattered in the ambient field outside the orbit rings. */}
+      <G stroke={STROKE} fill="none" strokeWidth={1} strokeLinecap="round" opacity={0.7}>
+        <Path d="M182 205 V229 M170 217 H194" />
+        <Path d="M842 205 V229 M830 217 H854" />
+        <Path d="M182 795 V819 M170 807 H194" />
+        <Path d="M842 795 V819 M830 807 H854" />
+      </G>
+      <G fill={STROKE} opacity={0.7}>
+        <Circle cx={177} cy={332} r={4} />
+        <Circle cx={847} cy={332} r={4} />
+        <Circle cx={177} cy={692} r={4} />
+        <Circle cx={847} cy={692} r={4} />
       </G>
     </>
   )

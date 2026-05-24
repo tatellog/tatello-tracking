@@ -44,6 +44,10 @@ const AnimatedPath = Animated.createAnimatedComponent(Path)
 
 type OrbitBase = {
   baseRotation: number
+  /** Whether this orbit gets the travelling energy beam. False ones
+   *  render as static line — the line still tracks lineBoost, so it
+   *  thickens during zoom along with the rest of the scaffold. */
+  flow?: boolean
 }
 type EllipseOrbit = OrbitBase & {
   kind: 'ellipse'
@@ -58,25 +62,20 @@ type PathOrbit = OrbitBase & {
 }
 type OrbitSpec = EllipseOrbit | PathOrbit
 
+// daily_constellation.svg authors six concentric rings at radii 430,
+// 397, 354, 301, 244, 185 (centre 512, 512). The outer two carry the
+// travelling energy beam (the brightest plasma sweep); the inner
+// four are static lines that still respond to the lineBoost at zoom.
+// Spreading the particles across only the outer two keeps the figure
+// from feeling busy — the eye follows the sweep at the rim while
+// the inner rings read as the orbital depth.
 const ORBITS: readonly OrbitSpec[] = [
-  // Five closed ellipses.
-  { kind: 'ellipse', cx: 600, cy: 600, rx: 430, ry: 138, baseRotation: 7 },
-  { kind: 'ellipse', cx: 600, cy: 600, rx: 432, ry: 132, baseRotation: -32 },
-  { kind: 'ellipse', cx: 600, cy: 600, rx: 210, ry: 455, baseRotation: 13 },
-  { kind: 'ellipse', cx: 600, cy: 600, rx: 128, ry: 398, baseRotation: -23 },
-  { kind: 'ellipse', cx: 600, cy: 600, rx: 278, ry: 110, baseRotation: -56 },
-  // Two open S-curves sweeping through the centre (no rotation
-  // transform — they sit in their authored orientation).
-  {
-    kind: 'path',
-    d: 'M190 455 C340 472 465 520 600 600 C735 680 860 728 1010 745',
-    baseRotation: 0,
-  },
-  {
-    kind: 'path',
-    d: 'M210 755 C355 735 488 670 600 600 C712 530 845 465 990 445',
-    baseRotation: 0,
-  },
+  { kind: 'ellipse', cx: 512, cy: 512, rx: 430, ry: 430, baseRotation: 0, flow: true },
+  { kind: 'ellipse', cx: 512, cy: 512, rx: 397, ry: 397, baseRotation: 0, flow: true },
+  { kind: 'ellipse', cx: 512, cy: 512, rx: 354, ry: 354, baseRotation: 0, flow: false },
+  { kind: 'ellipse', cx: 512, cy: 512, rx: 301, ry: 301, baseRotation: 0, flow: false },
+  { kind: 'ellipse', cx: 512, cy: 512, rx: 244, ry: 244, baseRotation: 0, flow: false },
+  { kind: 'ellipse', cx: 512, cy: 512, rx: 185, ry: 185, baseRotation: 0, flow: false },
 ] as const
 
 type Props = {
@@ -155,11 +154,13 @@ export function AnimatedConstellation({
       </AnimatedG>
 
       {/* Hexagonal constellation outline — passes EXACTLY through
-          the six dimension nodes. Stays OUT of the scaffoldDim
-          fade and grows in stroke + brightness alongside the
-          focused star, so the figure remains legible at zoom. */}
+          the six dimension nodes (top, upper-right, lower-right,
+          bottom, lower-left, upper-left). Stays OUT of the
+          scaffoldDim fade and grows in stroke + brightness
+          alongside the focused star, so the figure remains
+          legible at zoom. */}
       <AnimatedPath
-        d="M 600 185 L 1020 455 L 890 885 L 600 1035 L 310 885 L 180 455 Z"
+        d="M 512 210 L 773.5 361 L 773.5 663 L 512 814 L 250.5 663 L 250.5 361 Z"
         fill="none"
         stroke={colors.magenta}
         strokeLinecap="round"
@@ -172,7 +173,7 @@ export function AnimatedConstellation({
             key={`orbit-${i}`}
             orbit={orbit}
             flowClock={flowClock}
-            flowEnabled={profile.flowEnabled}
+            flowEnabled={profile.flowEnabled && (orbit.flow ?? true)}
             flowMaxOpacity={profile.flowOpacity}
             flowDashLength={orbitDashLength}
             flowColor={highlightColor}
