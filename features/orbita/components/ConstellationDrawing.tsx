@@ -106,15 +106,13 @@ const MICRO_STARS: { d: string; op: number }[] = [
 export function ConstellationDrawingFront() {
   return (
     <>
-      {/* Central astrolabe — five concentric rings around the
-          system's centre. The two outermost are extra-faint. */}
-      <G stroke={STROKE} fill="none" strokeWidth={1.2} opacity={0.55}>
-        <Circle cx={600} cy={600} r={36} />
-        <Circle cx={600} cy={600} r={62} />
-        <Circle cx={600} cy={600} r={90} />
-        <Circle cx={600} cy={600} r={122} opacity={0.35} />
-        <Circle cx={600} cy={600} r={158} opacity={0.22} />
-      </G>
+      {/* The central-astrolabe rings (five concentric circles at
+          r = 36/62/90/122/158 around the system centre) were
+          removed — they all fell INSIDE the DecorativeStar's lens-
+          flare radius and combined with it to look like a rifle-
+          scope reticle around the central node. The orbital
+          ellipses + axis cross + outer guides already supply
+          enough astrolabe context around the centre. */}
 
       {/* Per-dimension framing — an inner ring + outer halo + four
           compass-tick markers at each node position. The bright
