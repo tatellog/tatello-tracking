@@ -126,10 +126,29 @@ export function AnimatedConstellation({
     const z = zoomT ? zoomT.value : 0
     return { strokeWidth: 1.8 + z * 1.7, opacity: 0.72 + z * 0.2 }
   })
+  // Hexagon outline — drawn as TWO stacked paths so it reads like
+  // the Genshin reference: a vibrant bright core line with a wider
+  // soft glow halo bleeding around it.
+  //
+  //   • outlineGlow  — wide, faint, blurred-looking stroke that
+  //                    bleeds beyond the core line. At rest 9 pt /
+  //                    0.22; at zoom 15 pt / 0.50. Acts as the
+  //                    luminous bloom around the constellation
+  //                    figure.
+  //   • outlineBoost — the bright core line. Much thicker than
+  //                    before (1.4 → 3.8 at rest, 2.9 → 6.4 at
+  //                    zoom) and at near-full opacity, so the
+  //                    hexagon now reads as a strong figure on
+  //                    its own rather than ambient scaffolding.
+  const outlineGlow = useAnimatedProps(() => {
+    'worklet'
+    const z = zoomT ? zoomT.value : 0
+    return { strokeWidth: 9 + z * 6, opacity: 0.22 + z * 0.28 }
+  })
   const outlineBoost = useAnimatedProps(() => {
     'worklet'
     const z = zoomT ? zoomT.value : 0
-    return { strokeWidth: 1.4 + z * 1.5, opacity: 0.38 + z * 0.32 }
+    return { strokeWidth: 3.8 + z * 2.6, opacity: 0.78 + z * 0.18 }
   })
 
   // The static scaffold (outer guides, axis cross, central rings,
@@ -158,12 +177,25 @@ export function AnimatedConstellation({
           bottom, lower-left, upper-left). Stays OUT of the
           scaffoldDim fade and grows in stroke + brightness
           alongside the focused star, so the figure remains
-          legible at zoom. */}
+          legible at zoom.
+
+          Rendered as a wider faint glow halo first, then the
+          bright core on top — the bloom around the bright line
+          reads as the Genshin-style luminous-vein vibe. */}
       <AnimatedPath
         d="M 512 210 L 773.5 361 L 773.5 663 L 512 814 L 250.5 663 L 250.5 361 Z"
         fill="none"
         stroke={colors.magenta}
         strokeLinecap="round"
+        strokeLinejoin="round"
+        animatedProps={outlineGlow}
+      />
+      <AnimatedPath
+        d="M 512 210 L 773.5 361 L 773.5 663 L 512 814 L 250.5 663 L 250.5 361 Z"
+        fill="none"
+        stroke={colors.magenta}
+        strokeLinecap="round"
+        strokeLinejoin="round"
         animatedProps={outlineBoost}
       />
 
