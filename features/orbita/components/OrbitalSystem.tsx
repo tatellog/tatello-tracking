@@ -769,16 +769,52 @@ function StarNode({
   })
 
   // Glyph reveal — the dimension's icon (heart, bolt, moon, bowl,
-  // …) materialises at the star centre as zoom progresses. Invisible
-  // at rest (zoomT = 0); fully visible by zoomT ≈ 0.7 thanks to the
-  // 1.4× multiplier on the eased curve. Non-selected stars: never
-  // visible.
+  // …) materialises at the star centre as zoom progresses.
+  //
+  // Two layered animations share the same worklet:
+  //   • OPACITY — eased fade-in tied to zoomT. The 1.4× multiplier
+  //     on the squared curve puts the icon at full op by zoomT ≈ 0.7,
+  //     so it arrives in step with the camera, not after.
+  //   • PULSE — gentle ±5 % scale breath on the 8-s system clock,
+  //     so the icon throbs slowly even after the camera settles.
+  //     Composed with GLYPH_SCALE into a single `scale` so the
+  //     final scale on the 24-unit viewport is `GLYPH_SCALE × pulse`.
+  //   • POSITION — translate is recomputed every frame to keep the
+  //     glyph centred on (x, y) regardless of the breathing scale.
+  //
+  // The worklet doesn't gate on `selected` — instead the AnimatedG
+  // is conditionally mounted based on `showGlyph` (linger state
+  // below), so non-selected stars' worklets never run. Letting the
+  // worklet always use zoomT lets the icon FADE OUT smoothly with
+  // the zoom-out instead of vanishing the instant `selected` flips.
   const glyphAnim = useAnimatedProps(() => {
     'worklet'
-    if (!selected) return { opacity: 0 }
     const z = Math.min(1, zoomT.value * 1.4)
-    return { opacity: z * z * 0.95 }
+    const op = z * z * 0.95
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    const s = GLYPH_SCALE * (1 + wave * 0.05)
+    return {
+      opacity: op,
+      transform: [
+        { translateX: x - GLYPH_HALF * s },
+        { translateY: y - GLYPH_HALF * s },
+        { scale: s },
+      ],
+    }
   })
+
+  // Linger the glyph render for ~420 ms after deselection so it can
+  // fade out alongside the zoom-out instead of unmounting the moment
+  // the React `selected` prop flips back to false.
+  const [showGlyph, setShowGlyph] = useState(selected)
+  useEffect(() => {
+    if (selected) {
+      setShowGlyph(true)
+      return
+    }
+    const id = setTimeout(() => setShowGlyph(false), 420)
+    return () => clearTimeout(id)
+  }, [selected])
 
   // Lens-flare shimmer — continuous tiny scale wobble on the
   // always-on starburst so the rays feel alive instead of frozen.
@@ -919,19 +955,15 @@ function StarNode({
       </AnimatedG>
       {/* Dimension glyph — the icon (heart, bolt, moon, bowl, …) of
           the selected dimension materialises at the star centre as
-          zoom progresses. The static G handles positioning (24-unit
-          glyph viewBox scaled to ~18 viewBox units centred on the
-          star); the AnimatedG wrapper drives the opacity reveal.
-          Drawn OUTSIDE the breath group so the icon doesn't inherit
-          the star's scale-respiration — it sits steady at the
-          centre while the bloom around it breathes. */}
-      {selected ? (
+          zoom progresses. The AnimatedG owns position, scale,
+          opacity AND the gentle breath pulse (see glyphAnim).
+          Wrapped in `color="#FBD7E3"` so the glyph paths' fill +
+          stroke (which use `currentColor`) read as warm cream-pink
+          against the magenta bloom, instead of the white-hot
+          tone of the underlying core. */}
+      {showGlyph ? (
         <AnimatedG animatedProps={glyphAnim}>
-          <G
-            transform={`translate(${x - GLYPH_HALF * GLYPH_SCALE} ${y - GLYPH_HALF * GLYPH_SCALE}) scale(${GLYPH_SCALE})`}
-          >
-            {GLYPHS[dim.key]}
-          </G>
+          <G color="#FBD7E3">{GLYPHS[dim.key]}</G>
         </AnimatedG>
       ) : null}
       {/* Labels intentionally removed — the right-side DimensionNodeList
@@ -943,10 +975,12 @@ function StarNode({
 }
 
 // Dimension glyphs are authored in a 24×24 viewport; we render them
-// at ~18 viewBox units (scale 0.75) so the icon mass sits clearly
-// inside the star's bloom radius without overflowing past the
-// magenta wash into empty space.
-const GLYPH_SCALE = 0.75
+// at ~22.8 viewBox units (scale 0.95) so the icon dominates the
+// star's bloom radius and reads clearly as the focal element of
+// the zoomed star — bigger than the white core that fades behind
+// it, comparable in size to the right-side badge so the user reads
+// "that's the energía star" without comparing them.
+const GLYPH_SCALE = 0.95
 const GLYPH_HALF = 12 // half the source 24-unit viewport — used to recentre.
 
 const styles = StyleSheet.create({

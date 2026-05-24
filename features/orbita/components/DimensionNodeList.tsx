@@ -43,23 +43,33 @@ const CLOCKWISE_ORDER: DimensionKey[] = ['mente', 'sueno', 'alimento', 'ciclo', 
  *             empty opening) lands on centre.
  *   mente, energia, ciclo — already centred by their geometry.
  */
+// Glyph fills + strokes use `currentColor` so the SAME source-of-
+// truth shapes can be tinted differently per host:
+//
+//   • The badge list wraps each GLYPH in a parent <G color="#FFFFFF">
+//     so the icons read white on the magenta disc (no change to
+//     the badge appearance).
+//   • OrbitalSystem's StarNode wraps the same GLYPH in a parent
+//     <G color="#FBD7E3"> (cream) so the icon at the zoomed star
+//     centre reads as warm-pink on the magenta bloom — a softer
+//     tone than the bright white-hot core it replaces during zoom.
 export const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: (
     <Path
       d="M12 20 C8.5 17 4.5 14 4.5 10 C4.5 8 6 6.5 8 6.5 C9.7 6.5 11 7.5 12 9 C13 7.5 14.3 6.5 16 6.5 C18 6.5 19.5 8 19.5 10 C19.5 14 15.5 17 12 20 Z"
-      fill="#FFFFFF"
+      fill="currentColor"
     />
   ),
   mente: (
     <>
-      <Circle cx={12} cy={12} r={7.2} fill="none" stroke="#FFFFFF" strokeWidth={1.5} />
-      <Circle cx={12} cy={12} r={2.6} fill="#FFFFFF" />
+      <Circle cx={12} cy={12} r={7.2} fill="none" stroke="currentColor" strokeWidth={1.5} />
+      <Circle cx={12} cy={12} r={2.6} fill="currentColor" />
     </>
   ),
   energia: (
     <Path
       d="M13.5 3.5 L6.5 13.2 L10.5 13.2 L9 20.5 L17.5 10.5 L13.5 10.5 L15 3.5 Z"
-      fill="#FFFFFF"
+      fill="currentColor"
     />
   ),
   alimento: (
@@ -68,8 +78,8 @@ export const GLYPHS: Record<DimensionKey, ReactNode> = {
           mass lands at the disc midpoint. */}
       <Path
         d="M4.5 12 L19.5 12 A7.5 7.5 0 0 1 4.5 12 Z"
-        fill="#FFFFFF"
-        stroke="#FFFFFF"
+        fill="currentColor"
+        stroke="currentColor"
         strokeWidth={1.2}
         strokeLinejoin="round"
       />
@@ -77,7 +87,7 @@ export const GLYPHS: Record<DimensionKey, ReactNode> = {
       <Path
         d="M8 8 Q9 5.5 10 8 M14 8 Q15 5.5 16 8 M11 6 Q12 3.5 13 6"
         fill="none"
-        stroke="#FFFFFF"
+        stroke="currentColor"
         strokeWidth={1.2}
         strokeLinecap="round"
       />
@@ -86,7 +96,7 @@ export const GLYPHS: Record<DimensionKey, ReactNode> = {
   sueno: (
     <Path
       d="M17 3.5 C11.5 3.5 7 7.5 7 12 C7 16.5 11.5 20.5 17 20.5 C14 18 13 15 13 12 C13 9 14 6 17 3.5 Z"
-      fill="#FFFFFF"
+      fill="currentColor"
     />
   ),
   ciclo: (
@@ -94,11 +104,11 @@ export const GLYPHS: Record<DimensionKey, ReactNode> = {
       <Path
         d="M19 12 A7 7 0 1 1 12 5 A4.5 4.5 0 1 0 16.5 9.5"
         fill="none"
-        stroke="#FFFFFF"
+        stroke="currentColor"
         strokeWidth={1.6}
         strokeLinecap="round"
       />
-      <Circle cx={12} cy={12} r={1.6} fill="#FFFFFF" />
+      <Circle cx={12} cy={12} r={1.6} fill="currentColor" />
     </>
   ),
 }
@@ -269,8 +279,13 @@ function DimensionBadge({
         {/* The glyph — drawn in its own 24 × 24 space, translated to
           sit centred inside the disc. Using `G transform` instead of
           a nested <Svg> so positioning is dead-reliable across the
-          react-native-svg renderer. */}
-        <G transform="translate(6, 6)">{glyph}</G>
+          react-native-svg renderer. `color="#FFFFFF"` propagates as
+          the resolved value of `currentColor` for every fill/stroke
+          inside the glyph (the glyphs use currentColor so they can
+          be tinted cream when rendered in the OrbitalSystem zoom). */}
+        <G transform="translate(6, 6)" color="#FFFFFF">
+          {glyph}
+        </G>
       </Svg>
     </Animated.View>
   )
