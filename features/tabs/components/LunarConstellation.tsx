@@ -225,6 +225,30 @@ export function LunarConstellation({
     return set
   }, [elementsLit, sequence])
 
+  // Centroid + radius of the LIT star cluster — drives a warm
+  // cream-magenta wash that "bathes" the lit half of the figure
+  // (LitClusterAura, rendered between FieldStars and LitLines so
+  // every lit star sits inside the aura). Recomputed only when the
+  // set of lit stars changes.
+  const litCluster = useMemo(() => {
+    const litStars: { x: number; y: number }[] = []
+    for (let i = 0; i < stars.length; i++) {
+      if (litKeys.has(`star-${i}`)) {
+        const s = stars[i]
+        if (s) litStars.push({ x: s.x, y: s.y })
+      }
+    }
+    if (litStars.length === 0) return null
+    // Centroid: simple mean of x/y.
+    const cx = litStars.reduce((acc, p) => acc + p.x, 0) / litStars.length
+    const cy = litStars.reduce((acc, p) => acc + p.y, 0) / litStars.length
+    // Radius: max distance from centroid to any lit star, +24 padding
+    // so the wash extends past the cluster edges into the surrounding
+    // sky (otherwise the aura abruptly stops at the outer stars).
+    const maxDist = litStars.reduce((acc, p) => Math.max(acc, Math.hypot(p.x - cx, p.y - cy)), 0)
+    return { cx, cy, r: maxDist + 24, count: litStars.length }
+  }, [stars, litKeys])
+
   // Map of lit-star idx → days since the user marked it. Reads:
   // recency 0 = today, 7 = a week ago, 27 = nearly four weeks ago.
   // Used by LitStar to scale its halo intensity — recent stars shine
@@ -431,6 +455,26 @@ export function LunarConstellation({
             />
           ) : null}
           <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+          {/* Warm cream-magenta wash bathing the lit cluster — sits
+              behind the constellation base layer so every lit star
+              + line lands inside the aura. The lit half of the
+              figure visibly burns warmer than the unlit half. */}
+          {litCluster ? (
+            <>
+              <LitClusterAura
+                cx={litCluster.cx}
+                cy={litCluster.cy}
+                r={litCluster.r}
+                breathT={breathT}
+              />
+              {/* Dust motes — 6 tiny cream particles scattered around
+                  the cluster, each twinkling on its own phase. Sit
+                  on top of the aura wash but BELOW the lit stars
+                  themselves. Reads as cosmic dust catching the
+                  cluster's warm light. */}
+              <LitClusterMotes cx={litCluster.cx} cy={litCluster.cy} r={litCluster.r} t={t} />
+            </>
+          ) : null}
           <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
           <LitLines
             zodiac={zodiac}
@@ -470,7 +514,7 @@ export function LunarConstellation({
             burstId={burstId}
             trainedCount={trainedCount}
           />
-          <CenterText cx={cx} cy={cy} />
+          <CenterText cx={cx} cy={cy} zodiacGlyph={zodiac.glyph} numberPulse={numberPulse} />
           {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
         </Svg>
 
@@ -614,6 +658,16 @@ function SvgGradients() {
         <Stop offset="0%" stopColor="#FFB8D4" />
         <Stop offset="55%" stopColor="#E91E63" />
         <Stop offset="100%" stopColor="#7A1737" />
+      </RadialGradient>
+      {/* Lit-cluster aura — warm cream-pink wash that bathes the
+          lit half of the constellation. Bright cream at the centre
+          fades to transparent at the rim. Cream → magenta gives the
+          aura a Leo-fire-sign warmth without straying from STELAR's
+          palette. */}
+      <RadialGradient id="litClusterAura" cx="50%" cy="50%" r="50%">
+        <Stop offset="0%" stopColor="#FFE9D6" stopOpacity={0.85} />
+        <Stop offset="45%" stopColor="#F4ECDE" stopOpacity={0.45} />
+        <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
       </RadialGradient>
     </Defs>
   )
@@ -1688,6 +1742,98 @@ function LitLineFilament({
  * the counter, fading out smoothly so there's no hard edge. */
 const SCRIM_LAYERS = 7
 
+/*
+ * Lit-cluster aura — a warm cream-magenta radial wash centred on
+ * the centroid of all currently-lit stars, with radius spanning
+ * the cluster + a small padding. Reads as "this side of the figure
+ * is burning warm" — the lit half is BATHED in light vs the dim
+ * unlit half. Subtle breath on the system breathT keeps it alive.
+ *
+ * Drawn between FieldStars and BaseLayer in z-order so lit stars +
+ * lines + halos all land ON TOP of the aura (the wash sits behind,
+ * the bright stars in front). The radial gradient `litClusterAura`
+ * is declared in SvgGradients.
+ */
+function LitClusterAura({
+  cx,
+  cy,
+  r,
+  breathT,
+}: {
+  cx: number
+  cy: number
+  r: number
+  breathT: SharedValue<number>
+}) {
+  const auraProps = useAnimatedProps(() => {
+    'worklet'
+    // ±4 % radius + ±0.10 opacity breath on the 16s clock so the
+    // wash slowly expands + contracts like the figure is inhaling
+    // light.
+    const wave = 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI)
+    return {
+      r: r * (1 + wave * 0.04),
+      opacity: 0.18 + wave * 0.1,
+    }
+  })
+  return (
+    <AnimatedCircle cx={cx} cy={cy} r={r} fill="url(#litClusterAura)" animatedProps={auraProps} />
+  )
+}
+
+// Six dust motes scattered in fixed offsets around the lit cluster
+// centroid. Each twinkles on its own phase so the field never reads
+// as synchronised pulses — looks like dust catching the cluster's
+// warm light. Frequency 1.4 × the 8 s clock so the twinkles read
+// faster than the breath.
+const MOTE_LAYOUT = [
+  { dx: 0.42, dy: -0.58, phase: 0.13 },
+  { dx: -0.52, dy: -0.32, phase: 0.27 },
+  { dx: -0.34, dy: 0.48, phase: 0.41 },
+  { dx: 0.58, dy: 0.22, phase: 0.55 },
+  { dx: 0.18, dy: 0.72, phase: 0.69 },
+  { dx: -0.7, dy: -0.08, phase: 0.83 },
+] as const
+
+function LitClusterMotes({
+  cx,
+  cy,
+  r,
+  t,
+}: {
+  cx: number
+  cy: number
+  r: number
+  t: SharedValue<number>
+}) {
+  return (
+    <G>
+      {MOTE_LAYOUT.map((m, i) => (
+        <ClusterMote key={`mt-${i}`} cx={cx + m.dx * r} cy={cy + m.dy * r} phase={m.phase} t={t} />
+      ))}
+    </G>
+  )
+}
+
+function ClusterMote({
+  cx,
+  cy,
+  phase,
+  t,
+}: {
+  cx: number
+  cy: number
+  phase: number
+  t: SharedValue<number>
+}) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI * 1.4)
+    return { opacity: 0.18 + wave * 0.55 }
+  })
+  return <AnimatedCircle cx={cx} cy={cy} r={0.85} fill="#FFF1F6" animatedProps={animatedProps} />
+}
+
 function CenterScrim({ cx, cy }: { cx: number; cy: number }) {
   return (
     <G>
@@ -1710,19 +1856,69 @@ function CenterScrim({ cx, cy }: { cx: number; cy: number }) {
  * `text` prop trick. The static "DE 28 DÍAS" stays in SVG (cheap);
  * the progress phrase moved BELOW the SVG so it never collides with
  * the centre bloom. */
-function CenterText({ cx, cy }: { cx: number; cy: number }) {
+function CenterText({
+  cx,
+  cy,
+  zodiacGlyph,
+  numberPulse,
+}: {
+  cx: number
+  cy: number
+  /** Unicode zodiac glyph (♌, ♉, …) for the active sign. Rendered
+   *  below the count, low opacity, as an identity ornament. */
+  zodiacGlyph: string
+  /** Pulse driven by the parent on every commit. Drives a soft
+   *  expand+fade on the glow halo behind the counter so the moment
+   *  the number ticks up reads as a luminous heartbeat. */
+  numberPulse: SharedValue<number>
+}) {
+  // Glow halo — sits BEHIND the React Native counter overlay so the
+  // big number reads as a luminous body, not flat text. The halo
+  // pulses with numberPulse: r 22 → 30, opacity 0.10 → 0.36 on each
+  // commit. Tied to the SVG layer so it respects scaffoldDim if
+  // ever added.
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    const p = numberPulse.value
+    return {
+      r: 22 + p * 8,
+      opacity: 0.1 + p * 0.26,
+    }
+  })
   return (
-    <SvgText
-      x={cx}
-      y={cy + 22}
-      textAnchor="middle"
-      fontFamily={typography.uiBold}
-      fontSize={10}
-      fill={colors.niebla}
-      letterSpacing={2.4}
-    >
-      DE 28 DÍAS
-    </SvgText>
+    <G>
+      {/* Number halo — luminous wash behind the React Native counter. */}
+      <AnimatedCircle cx={cx} cy={cy - 6} r={22} fill={colors.magenta} animatedProps={haloProps} />
+      {/* Subtitle — serif italic (coach voice) instead of upright UI
+          sans, so "DE 28 DÍAS" lands in STELAR's poetic register
+          rather than as a stat label. */}
+      <SvgText
+        x={cx}
+        y={cy + 22}
+        textAnchor="middle"
+        fontFamily={typography.serifSemi}
+        fontStyle="italic"
+        fontSize={12}
+        fill={colors.niebla}
+        letterSpacing={1.6}
+      >
+        DE 28 DÍAS
+      </SvgText>
+      {/* Zodiac glyph — small mark of identity below the subtitle.
+          Faint magenta-leche tone so it reads as ornament, not
+          competing copy. */}
+      <SvgText
+        x={cx}
+        y={cy + 40}
+        textAnchor="middle"
+        fontFamily={typography.serifSemi}
+        fontSize={14}
+        fill={colors.leche}
+        opacity={0.5}
+      >
+        {zodiacGlyph}
+      </SvgText>
+    </G>
   )
 }
 
@@ -2127,47 +2323,131 @@ function IgnitingLine({
 function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
   const baseR = starRadius(s.mag) + 0.5
 
-  // Ring pulse 0.65 → 1.0 opacity. Brighter range than before so the
-  // affordance reads on first glance — this is the spot to fill next.
-  // Period ≈ 2.6 s. Faster than the 8 s ambient (it should draw the
-  // eye) but well slower than haptic-grade pulses.
-  const ringProps = useAnimatedProps(() => {
+  // Sigilo orbital — four layered elements telegraphing "this is
+  // the next ignition":
+  //
+  //   • OUTER RING — thin solid magenta at r = baseR + 14, rotates
+  //     CCW slowly (~28 s/turn). The outermost frame of the sigil.
+  //   • INNER RING — dashed magenta at r = baseR + 9, rotates CW at
+  //     the same period. Counter-rotation reads as gears engaging,
+  //     not a single spinning thing.
+  //   • 8 RADIAL TICKS — small magenta strokes at 45° increments,
+  //     attached to the outer-ring rotation so they sweep with it.
+  //   • PULSE RING — expands from baseR+9 to baseR+20 over each t
+  //     cycle and fades, telegraphing the next ignition like a
+  //     wish-circle countdown.
+  //
+  // Centre still hosts a faint StarSparkle so the user reads the
+  // shape as "queued star slot," not just a sigil.
+  const RING_PERIOD = 28 / 8 // turn per 28s ≡ (8s / 28s) = 0.286 turns per t cycle
+  const ringRotateCW = useAnimatedProps(() => {
+    'worklet'
+    const deg = (t.value * (360 / RING_PERIOD)) % 360
+    return {
+      transform: [
+        { translateX: s.x },
+        { translateY: s.y },
+        { rotate: `${deg}deg` },
+        { translateX: -s.x },
+        { translateY: -s.y },
+      ],
+    }
+  })
+  const ringRotateCCW = useAnimatedProps(() => {
+    'worklet'
+    const deg = (-t.value * (360 / RING_PERIOD)) % 360
+    return {
+      transform: [
+        { translateX: s.x },
+        { translateY: s.y },
+        { rotate: `${deg}deg` },
+        { translateX: -s.x },
+        { translateY: -s.y },
+      ],
+    }
+  })
+  // Pulse ring grows + fades each cycle. The expansion looks like
+  // "the spot is opening up for the next star to land."
+  const pulseProps = useAnimatedProps(() => {
+    'worklet'
+    const u = t.value % 1
+    return {
+      r: baseR + 9 + u * 11,
+      opacity: 0.6 * (1 - u),
+    }
+  })
+  // Subtle brightness pulse on the inner dashed ring so the sigil
+  // never feels frozen even between expansions.
+  const innerBreath = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * (8 / 2.6))
-    return { opacity: 0.65 + 0.35 * wave }
+    return { opacity: 0.55 + 0.35 * wave }
   })
 
-  // Outer halo ring (larger, faded) gives the next affordance a soft
-  // glow that radiates out, so the eye locks on it even at small
-  // sizes. Pulses with the same wave but at a lower opacity range.
-  const haloProps = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * (8 / 2.6))
-    return { opacity: 0.18 + 0.22 * wave }
+  // Ticks at 8 equally-spaced angles, radius baseR + 12.5, length 2.4.
+  const TICK_R = baseR + 12.5
+  const TICK_LEN = 2.4
+  const ticks = [0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+    const rad = (deg * Math.PI) / 180
+    const x1 = s.x + Math.cos(rad) * (TICK_R - TICK_LEN / 2)
+    const y1 = s.y + Math.sin(rad) * (TICK_R - TICK_LEN / 2)
+    const x2 = s.x + Math.cos(rad) * (TICK_R + TICK_LEN / 2)
+    const y2 = s.y + Math.sin(rad) * (TICK_R + TICK_LEN / 2)
+    return { x1, y1, x2, y2, deg }
   })
 
   return (
     <G>
+      {/* Pulse ring — emanating wish-countdown */}
       <AnimatedCircle
         cx={s.x}
         cy={s.y}
-        r={baseR + 11}
+        r={baseR + 9}
         fill="none"
         stroke={colors.magenta}
-        strokeWidth={1}
-        animatedProps={haloProps}
+        strokeWidth={0.8}
+        animatedProps={pulseProps}
       />
-      <AnimatedCircle
-        cx={s.x}
-        cy={s.y}
-        r={baseR + 7}
-        fill="none"
-        stroke={colors.magenta}
-        strokeWidth={2}
-        strokeDasharray="3 4"
-        strokeLinecap="round"
-        animatedProps={ringProps}
-      />
+      {/* Outer ring + ticks — rotates CCW slowly */}
+      <AnimatedG animatedProps={ringRotateCCW}>
+        <Circle
+          cx={s.x}
+          cy={s.y}
+          r={baseR + 14}
+          fill="none"
+          stroke={colors.magenta}
+          strokeWidth={0.8}
+          opacity={0.55}
+        />
+        {ticks.map((tk) => (
+          <Line
+            key={`tk-${tk.deg}`}
+            x1={tk.x1}
+            y1={tk.y1}
+            x2={tk.x2}
+            y2={tk.y2}
+            stroke={colors.magenta}
+            strokeWidth={0.7}
+            strokeLinecap="round"
+            opacity={0.7}
+          />
+        ))}
+      </AnimatedG>
+      {/* Inner dashed ring — rotates CW (counter to the outer), with
+          its own breath. */}
+      <AnimatedG animatedProps={ringRotateCW}>
+        <AnimatedCircle
+          cx={s.x}
+          cy={s.y}
+          r={baseR + 9}
+          fill="none"
+          stroke={colors.magenta}
+          strokeWidth={1.4}
+          strokeDasharray="3 4"
+          strokeLinecap="round"
+          animatedProps={innerBreath}
+        />
+      </AnimatedG>
       <G opacity={0.85}>
         <StarSparkle cx={s.x} cy={s.y} r={baseR} mag={s.mag} fill="url(#starNext)" />
       </G>
