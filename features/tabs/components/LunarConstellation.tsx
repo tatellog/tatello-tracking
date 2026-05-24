@@ -31,6 +31,7 @@ import { colors, typography } from '@/theme'
 
 import { ZODIAC } from '../zodiac/data'
 import type { ZodiacDef, ZodiacSign } from '../zodiac/types'
+import { LeoFigureBackdrop } from './LeoFigureBackdrop'
 
 // Inner-to-outer radius ratio of the 4-point star polygon. Lower
 // values mean sharper "rays"; 0.32 matches the asterisk look in the
@@ -417,6 +418,12 @@ export function LunarConstellation({
           <ShootingStar t={t} />
           <AmbientGlow cx={cx} cy={cy} />
           <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
+          {/* Leo silhouette backdrop — only when the active sign IS
+              Leo. The lion art sits BEHIND the field stars and
+              zodiac base layer so the constellation stars + lines
+              stay the focal element, with the figure showing as a
+              faint engraved magenta silhouette under them. */}
+          {sign === 'leo' ? <LeoFigureBackdrop /> : null}
           <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
           <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
           <LitLines
