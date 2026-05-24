@@ -421,9 +421,15 @@ export function LunarConstellation({
           {/* Leo silhouette backdrop — only when the active sign IS
               Leo. The lion art sits BEHIND the field stars and
               zodiac base layer so the constellation stars + lines
-              stay the focal element, with the figure showing as a
-              faint engraved magenta silhouette under them. */}
-          {sign === 'leo' ? <LeoFigureBackdrop /> : null}
+              stay the focal element. Now WAKES with progress:
+              opacity ramps 0.10 → 0.34 with trainedCount, and
+              breathes on the system breathT. */}
+          {sign === 'leo' ? (
+            <LeoFigureBackdrop
+              progress={Math.min(1, trainedCount / TARGET_DAYS)}
+              breathT={breathT}
+            />
+          ) : null}
           <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
           <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
           <LitLines
@@ -435,6 +441,7 @@ export function LunarConstellation({
             litPulse={litPulse}
             breathT={breathT}
             lineDepth={lineDepth}
+            t={t}
           />
           <StarsLayer
             stars={stars}
@@ -1462,6 +1469,7 @@ function LitLines({
   litPulse,
   breathT,
   lineDepth,
+  t,
 }: {
   zodiac: ZodiacDef
   stars: Resolved[]
@@ -1482,6 +1490,10 @@ function LitLines({
    *  endpoint). Used to offset each line's breath window so the wave
    *  radiates outward in time. */
   lineDepth: readonly number[]
+  /** The 8s system clock — drives the travelling energy beam dash
+   *  on each lit filament so a bright cream "particle" slides from
+   *  the alpha side toward the far endpoint of every lit edge. */
+  t: SharedValue<number>
 }) {
   const groupProps = useAnimatedProps(() => {
     'worklet'
@@ -1512,6 +1524,7 @@ function LitLines({
               by={B.y}
               breathT={breathT}
               depth={lineDepth[idx] ?? 0}
+              t={t}
             />
           )
         }
@@ -1545,6 +1558,7 @@ function LitLineFilament({
   by,
   breathT,
   depth,
+  t,
 }: {
   idx: number
   ax: number
@@ -1553,6 +1567,10 @@ function LitLineFilament({
   by: number
   breathT: SharedValue<number>
   depth: number
+  /** 8 s system clock — drives the travelling cream "particle" that
+   *  slides from the A endpoint toward the B endpoint on every lit
+   *  edge, reading as energy flowing outward from the alpha. */
+  t: SharedValue<number>
 }) {
   const gradId = `litLine-${idx}`
   // Same cascade timing as LitStar: each shell brightens 0.02 of the
@@ -1568,6 +1586,22 @@ function LitLineFilament({
       breath = Math.sin(local * Math.PI) * 0.18
     }
     return { opacity: 0.88 + breath }
+  })
+
+  // Travelling beam — a short bright cream dash slides from (ax, ay)
+  // toward (bx, by) on every t cycle. Cycle = lineLen + dashLen + gap,
+  // so when one dash exits past B it's already invisible (in the gap)
+  // when t wraps back to 0 — no jarring snap. Phase offset per-line
+  // index so adjacent edges don't all flash at once.
+  const lineLen = Math.hypot(bx - ax, by - ay)
+  const DASH_LEN = 10
+  const GAP_PAD = 22
+  const cycle = lineLen + DASH_LEN + GAP_PAD
+  const phase = (idx * 0.143) % 1
+  const beamProps = useAnimatedProps(() => {
+    'worklet'
+    const u = (t.value + phase) % 1
+    return { strokeDashoffset: -u * cycle }
   })
   return (
     <AnimatedG animatedProps={filamentProps}>
@@ -1623,6 +1657,22 @@ function LitLineFilament({
         strokeOpacity={0.6}
         strokeWidth={0.7}
         strokeLinecap="round"
+      />
+      {/* Energy beam — bright cream particle sliding A→B on `t`.
+          dasharray sums to the cycle (DASH_LEN + lineLen + GAP_PAD)
+          so the bright segment crosses the line once per cycle and
+          the gap covers everything else, hiding the loop seam. */}
+      <AnimatedLine
+        x1={ax}
+        y1={ay}
+        x2={bx}
+        y2={by}
+        stroke="#FFF1F6"
+        strokeWidth={1.6}
+        strokeOpacity={0.85}
+        strokeLinecap="round"
+        strokeDasharray={`${DASH_LEN} ${lineLen + GAP_PAD}`}
+        animatedProps={beamProps}
       />
     </AnimatedG>
   )
@@ -1840,6 +1890,10 @@ function IgnitingOverlay({
   return null
 }
 
+// Burst spark angles — 8 directions, slightly off-cardinal so the
+// pattern reads as organic (not a perfect compass rose).
+const BURST_ANGLES = [12, 57, 102, 147, 192, 237, 282, 327] as const
+
 function IgnitingStar({ s, igniteT }: { s: Resolved; igniteT: SharedValue<number> }) {
   const baseR = starRadius(s.mag) + 0.5
 
@@ -1879,8 +1933,44 @@ function IgnitingStar({ s, igniteT }: { s: Resolved; igniteT: SharedValue<number
     }
   })
 
+  // White-hot flash — a brief overexposed disc that peaks ~u=0.18
+  // and fades by u=0.6. Reads as the camera/eye being momentarily
+  // overwhelmed by the ignition. Quadratic envelope so the rise
+  // and fall both feel snappy.
+  const flashProps = useAnimatedProps(() => {
+    'worklet'
+    const u = igniteT.value
+    const env = Math.max(0, 1 - Math.abs(u - 0.18) / 0.42)
+    return {
+      r: baseR * (1 + u * 3),
+      opacity: env * env * 0.85,
+    }
+  })
+
+  // Diffraction cross spike — grows from 0 to full during 0..0.35,
+  // then fades by 0.8. The big anamorphic moment of the ignition.
+  const spikeProps = useAnimatedProps(() => {
+    'worklet'
+    const u = igniteT.value
+    const grow = Math.min(1, u / 0.35)
+    const fade = u < 0.55 ? 1 : Math.max(0, 1 - (u - 0.55) / 0.45)
+    return {
+      opacity: grow * fade * 0.95,
+      transform: [
+        { translateX: s.x },
+        { translateY: s.y },
+        { scale: grow * (1 + u * 0.6) },
+        { translateX: -s.x },
+        { translateY: -s.y },
+      ],
+    }
+  })
+
+  const spikeLen = baseR * 9
+
   return (
     <G>
+      {/* Emanating shockwave ring */}
       <AnimatedCircle
         cx={s.x}
         cy={s.y}
@@ -1890,11 +1980,106 @@ function IgnitingStar({ s, igniteT }: { s: Resolved; igniteT: SharedValue<number
         strokeWidth={0.8}
         animatedProps={ringProps}
       />
+      {/* White-hot flash — overexposed disc at the moment of impact. */}
+      <AnimatedCircle cx={s.x} cy={s.y} r={baseR} fill="#FFFFFF" animatedProps={flashProps} />
+      {/* Diffraction cross — H + V + 2 diagonal rays grow out of the
+          centre as the star ignites. The dramatic Genshin "moment of
+          ignition" anamorphic flare. */}
+      <AnimatedG animatedProps={spikeProps}>
+        <Line
+          x1={s.x - spikeLen}
+          y1={s.y}
+          x2={s.x + spikeLen}
+          y2={s.y}
+          stroke="#FFF1F6"
+          strokeWidth={1.1}
+          strokeLinecap="round"
+        />
+        <Line
+          x1={s.x}
+          y1={s.y - spikeLen * 0.85}
+          x2={s.x}
+          y2={s.y + spikeLen * 0.85}
+          stroke="#FFF1F6"
+          strokeWidth={0.9}
+          strokeLinecap="round"
+          opacity={0.85}
+        />
+        <Line
+          x1={s.x - spikeLen * 0.55}
+          y1={s.y - spikeLen * 0.55}
+          x2={s.x + spikeLen * 0.55}
+          y2={s.y + spikeLen * 0.55}
+          stroke="#FFF1F6"
+          strokeWidth={0.6}
+          strokeLinecap="round"
+          opacity={0.55}
+        />
+        <Line
+          x1={s.x - spikeLen * 0.55}
+          y1={s.y + spikeLen * 0.55}
+          x2={s.x + spikeLen * 0.55}
+          y2={s.y - spikeLen * 0.55}
+          stroke="#FFF1F6"
+          strokeWidth={0.6}
+          strokeLinecap="round"
+          opacity={0.55}
+        />
+      </AnimatedG>
+      {/* Spark particles — 8 small cream dots that fly outward from
+          the centre and fade. Each is independent (own worklet) so
+          their motion stays per-particle smooth. */}
+      {BURST_ANGLES.map((deg) => (
+        <BurstSpark
+          key={`bs-${deg}`}
+          cx={s.x}
+          cy={s.y}
+          angle={(deg * Math.PI) / 180}
+          distance={baseR * 7}
+          igniteT={igniteT}
+        />
+      ))}
       <AnimatedG animatedProps={starProps}>
         <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="url(#starLit)" />
       </AnimatedG>
     </G>
   )
+}
+
+/*
+ * A single spark particle for the ignition burst. Flies outward
+ * from (cx, cy) along `angle` to `distance`, fading opacity 1 → 0
+ * over the igniteT cycle. Cubic ease on position so the spark
+ * decelerates as it travels (organic, not constant-velocity).
+ */
+function BurstSpark({
+  cx,
+  cy,
+  angle,
+  distance,
+  igniteT,
+}: {
+  cx: number
+  cy: number
+  angle: number
+  distance: number
+  igniteT: SharedValue<number>
+}) {
+  const cosA = Math.cos(angle)
+  const sinA = Math.sin(angle)
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const u = igniteT.value
+    // Cubic ease-out: 1 - (1-u)^3 — fast start, slow at the end.
+    const eased = 1 - (1 - u) * (1 - u) * (1 - u)
+    const d = eased * distance
+    return {
+      cx: cx + cosA * d,
+      cy: cy + sinA * d,
+      opacity: (1 - u) * 0.9,
+    }
+  })
+  return <AnimatedCircle r={1.1} fill="#FFF1F6" animatedProps={animatedProps} />
 }
 
 function IgnitingLine({
@@ -2139,6 +2324,19 @@ function LitStar({
     }
   })
 
+  // Flare intensity scales with magnitude — the brightest lit stars
+  // get a prominent anamorphic streak + diffraction cross; dimmer
+  // lit stars get nothing (no clutter).
+  //
+  //   mag 1.5 (Regulus) → intensity 0.57
+  //   mag 2.0 (Denebola) → 0.43
+  //   mag 2.6 (Zosma) → 0.26
+  //   mag 3.0+ → 0 (no flare)
+  //
+  // The cutoff at 3.0 keeps the field from feeling busy when many
+  // lit stars are visible.
+  const flareIntensity = Math.max(0, (3.0 - s.mag) / 3.0)
+
   return (
     <G>
       {isHero ? <HeroGlow cx={s.x} cy={s.y} r={r} t={t} phase={phase} /> : null}
@@ -2150,11 +2348,126 @@ function LitStar({
         animatedProps={outerHaloProps}
       />
       <AnimatedCircle cx={s.x} cy={s.y} r={r + 7} fill={colors.magenta} animatedProps={haloProps} />
+      {flareIntensity > 0 ? (
+        <LitStarFlare
+          cx={s.x}
+          cy={s.y}
+          r={r}
+          intensity={flareIntensity}
+          haloMult={haloMult}
+          t={t}
+          phase={phase}
+        />
+      ) : null}
       <AnimatedCircle cx={s.x} cy={s.y} r={r + 2} fill="#FBD7E3" animatedProps={coreProps} />
       <AnimatedG animatedProps={starProps}>
         <StarSparkle cx={s.x} cy={s.y} r={r} mag={s.mag} fill="url(#starLit)" lit />
       </AnimatedG>
     </G>
+  )
+}
+
+/*
+ * Anamorphic lens flare for the brightest lit stars — a long
+ * horizontal cream streak (camera anamorphic look) crossed by a
+ * 4-ray diffraction starburst (H/V/two diagonals). Shimmers with a
+ * subtle continuous scale wobble on `t` so the rays never freeze.
+ *
+ * Length + opacity both scale with `intensity` (per-magnitude
+ * weight from LitStar) and `haloMult` (recency fade), so an older
+ * lit star's flare dims along with its halo.
+ */
+function LitStarFlare({
+  cx,
+  cy,
+  r,
+  intensity,
+  haloMult,
+  t,
+  phase,
+}: {
+  cx: number
+  cy: number
+  r: number
+  intensity: number
+  haloMult: number
+  t: SharedValue<number>
+  phase: number
+}) {
+  // Geometry. Anamorphic streak is a wide thin horizontal ellipse;
+  // diffraction rays are 4 thin lines crossing the centre.
+  const flareLen = r * (3 + intensity * 4) // 3r dim → 7r bright
+  const flareThickness = Math.max(0.6, r * 0.18)
+  const rayLen = flareLen * 0.85
+  const op = intensity * 0.7 * haloMult
+  const diagOp = op * 0.55
+
+  // Shimmer: scale-about-(cx, cy) wobble on the 8 s clock, ×1.3
+  // frequency so the lens twinkle reads faster than the surrounding
+  // bloom breath.
+  const shimmer = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI * 1.3)
+    const scale = 0.94 + wave * 0.12
+    return {
+      transform: [
+        { translateX: cx },
+        { translateY: cy },
+        { scale },
+        { translateX: -cx },
+        { translateY: -cy },
+      ],
+    }
+  })
+
+  return (
+    <AnimatedG animatedProps={shimmer} opacity={op}>
+      {/* Horizontal anamorphic streak — wide thin cream ellipse. */}
+      <Ellipse cx={cx} cy={cy} rx={flareLen} ry={flareThickness} fill="#FFF1F6" opacity={0.55} />
+      {/* Diffraction cross — H + V rays at full opacity, diagonals
+          at half so the cardinals dominate (matches real-camera
+          starbursts where the H/V spikes are brightest). */}
+      <Line
+        x1={cx - rayLen}
+        y1={cy}
+        x2={cx + rayLen}
+        y2={cy}
+        stroke="#FFF1F6"
+        strokeWidth={0.7}
+        strokeLinecap="round"
+        opacity={0.9}
+      />
+      <Line
+        x1={cx}
+        y1={cy - rayLen * 0.85}
+        x2={cx}
+        y2={cy + rayLen * 0.85}
+        stroke="#FFF1F6"
+        strokeWidth={0.6}
+        strokeLinecap="round"
+        opacity={0.7}
+      />
+      <Line
+        x1={cx - rayLen * 0.6}
+        y1={cy - rayLen * 0.6}
+        x2={cx + rayLen * 0.6}
+        y2={cy + rayLen * 0.6}
+        stroke="#FFF1F6"
+        strokeWidth={0.5}
+        strokeLinecap="round"
+        opacity={diagOp}
+      />
+      <Line
+        x1={cx - rayLen * 0.6}
+        y1={cy + rayLen * 0.6}
+        x2={cx + rayLen * 0.6}
+        y2={cy - rayLen * 0.6}
+        stroke="#FFF1F6"
+        strokeWidth={0.5}
+        strokeLinecap="round"
+        opacity={diagOp}
+      />
+    </AnimatedG>
   )
 }
 
