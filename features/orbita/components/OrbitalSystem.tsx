@@ -210,6 +210,19 @@ export function OrbitalSystem({
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
+  // Fades the DecorativeStar(s) at the system centre during zoom.
+  // At rest the centre "tú" star reads full brightness; at full
+  // zoom into a dimension it gets pushed off the centre by the
+  // in-place transform and stays bright unless we dim it. Without
+  // this, the visible scene has TWO luminous bodies — the selected
+  // star AND the centre wandering to a corner — which reads as
+  // "stars are out of orbit" (user's words). At zoomT = 1 the
+  // centre drops to ~10 % opacity, basically out of the way.
+  const decorativeFade = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: 1 - zoomT.value * 0.9 }
+  })
+
   const placed = dimensions.map((d) => ({ d, pos: place(d) }))
 
   return (
@@ -260,21 +273,24 @@ export function OrbitalSystem({
           <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
             <AnimatedConstellation intensity={intensity} zoomT={zoomT} />
           </G>
-          {/* Decorative stars at the two SVG burst endpoints not
-              bound to a dimension (right-mid burst + central
-              diamond). They share StarNode's slow-glow language so
-              every line endpoint feels alive, not just the six
-              interactive ones. */}
-          {DECORATIVE_STAR_POS.map((p, i) => (
-            <DecorativeStar
-              key={`decor-${i}`}
-              x={p.x}
-              y={p.y}
-              slowClock={slowClock}
-              phase={(i + 1) / (DECORATIVE_STAR_POS.length + 1)}
-              profile={profile}
-            />
-          ))}
+          {/* Decorative stars at the unused burst endpoints. They
+              share StarNode's slow-glow language so every line
+              endpoint feels alive — except during zoom, where they
+              get pushed off-centre by the in-place scale and would
+              otherwise compete with the selected star. The
+              AnimatedG fades them to ~10 % at full zoom. */}
+          <AnimatedG animatedProps={decorativeFade}>
+            {DECORATIVE_STAR_POS.map((p, i) => (
+              <DecorativeStar
+                key={`decor-${i}`}
+                x={p.x}
+                y={p.y}
+                slowClock={slowClock}
+                phase={(i + 1) / (DECORATIVE_STAR_POS.length + 1)}
+                profile={profile}
+              />
+            ))}
+          </AnimatedG>
 
           {/* Dimension stars — small luminous points on each orbit. */}
           {placed.map(({ d, pos }) => (
