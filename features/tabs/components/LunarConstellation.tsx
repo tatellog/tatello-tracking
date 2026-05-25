@@ -1366,26 +1366,45 @@ function ConstellationRay({
     return segs.join(' ')
   }, [stars, traversal])
 
-  // dash 0.10 ... gap 1.20 → cycle 1.30. The bright dash crosses
-  // the path once per cycle and the gap covers the seam so the
-  // loop wrap is invisible. Halo dash is slightly wider + trails
-  // 2 % behind the head for the comet-wake.
-  const HEAD_DASH = 0.1
-  const HALO_DASH = 0.16
-  const GAP = 1.2
-  const HEAD_CYCLE = HEAD_DASH + GAP
-  const HALO_CYCLE = HALO_DASH + GAP
-  const HALO_TRAIL = 0.02
+  // Comet-trail composition — four stacked dashes ALL in cream
+  // (no magenta) so the ray POPS against the magenta constellation
+  // lines instead of blending with them. Each dash is wider +
+  // dimmer + slightly behind the previous, faking a tapering
+  // tail behind a bright head:
+  //
+  //   HALO  — widest, faintest, longest dash → atmospheric glow
+  //           around the whole comet
+  //   TAIL  — wide cream wake at lower opacity, trailing  2%
+  //   TRAIL — medium narrow cream, trailing 0.8%
+  //   HEAD  — narrow white-hot core, the brightest crest
+  //
+  // Gap > 1 so only one bright dash exists on the path at any
+  // moment; the loop seam hides inside the invisible gap.
+  const HEAD_DASH = 0.05
+  const TRAIL_DASH = 0.12
+  const TAIL_DASH = 0.22
+  const HALO_DASH = 0.36
+  const GAP = 1.4
 
   const headProps = useAnimatedProps(() => {
     'worklet'
     const u = t.value
-    return { strokeDashoffset: -u * HEAD_CYCLE }
+    return { strokeDashoffset: -u * (HEAD_DASH + GAP) }
+  })
+  const trailProps = useAnimatedProps(() => {
+    'worklet'
+    const u = (t.value - 0.008 + 1) % 1
+    return { strokeDashoffset: -u * (TRAIL_DASH + GAP) }
+  })
+  const tailProps = useAnimatedProps(() => {
+    'worklet'
+    const u = (t.value - 0.02 + 1) % 1
+    return { strokeDashoffset: -u * (TAIL_DASH + GAP) }
   })
   const haloProps = useAnimatedProps(() => {
     'worklet'
-    const u = (t.value - HALO_TRAIL + 1) % 1
-    return { strokeDashoffset: -u * HALO_CYCLE }
+    const u = (t.value - 0.04 + 1) % 1
+    return { strokeDashoffset: -u * (HALO_DASH + GAP) }
   })
 
   // pathLength=1 isn't in react-native-svg's TS types yet but it's
@@ -1396,28 +1415,58 @@ function ConstellationRay({
 
   return (
     <G>
-      {/* Halo — wider magenta wake trailing behind the head. */}
+      {/* Outer halo — wide warm-cream glow that bleeds beyond the
+          comet, reading as the atmospheric light around the energy. */}
       <AnimatedPath
         d={pathD}
         fill="none"
-        stroke={colors.magenta}
-        strokeWidth={5}
+        stroke="#FFE9B4"
+        strokeWidth={13}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.55}
+        strokeOpacity={0.22}
         strokeDasharray={`${HALO_DASH} ${GAP}`}
         animatedProps={haloProps}
         {...runtimeProps}
       />
-      {/* Head — bright cream-white core. */}
+      {/* Tail — the visible cometing wake. Trails 2% behind so it
+          reads as a wide trail behind the brighter head. */}
+      <AnimatedPath
+        d={pathD}
+        fill="none"
+        stroke="#FFE9C2"
+        strokeWidth={7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={0.55}
+        strokeDasharray={`${TAIL_DASH} ${GAP}`}
+        animatedProps={tailProps}
+        {...runtimeProps}
+      />
+      {/* Trail — narrower brighter wake just behind the head. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFF6E5"
-        strokeWidth={2}
+        strokeWidth={4}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.95}
+        strokeOpacity={0.85}
+        strokeDasharray={`${TRAIL_DASH} ${GAP}`}
+        animatedProps={trailProps}
+        {...runtimeProps}
+      />
+      {/* Head — white-hot leading crest. The brightest point of
+          the comet, narrower than the trail so it reads as the
+          "tip" of the energy beam. */}
+      <AnimatedPath
+        d={pathD}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={1}
         strokeDasharray={`${HEAD_DASH} ${GAP}`}
         animatedProps={headProps}
         {...runtimeProps}
