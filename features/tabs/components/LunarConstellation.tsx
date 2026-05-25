@@ -456,16 +456,20 @@ export function LunarConstellation({
           ) : null}
           <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
           {/* Constellation transform group — shrinks the figure to
-              82 % and rotates 12° CW about the canvas centre so the
-              constellation sits MORE INSIDE the bigger lion
-              backdrop instead of competing with it for the full
-              canvas area. Wraps every layer that belongs to the
-              zodiac figure (cluster aura + motes + base + lit lines
-              + stars + ignition overlay); the cosmic field below
-              and the centre orb / text above stay UNTRANSFORMED.
-              translate-scale-rotate-translate so rotation + scale
-              both happen about (145, 145). */}
-          <G transform={`translate(${cx} ${cy}) rotate(22) scale(0.82) translate(-${cx} -${cy})`}>
+              82 %, rotates 22° CW about the canvas centre, and
+              shifts 18 viewBox units RIGHT so the constellation
+              sits inscribed inside the lion's chest + body area
+              rather than overlapping the lion's face. Wraps every
+              layer that belongs to the zodiac figure (cluster aura
+              + motes + base + lit lines + stars + ignition
+              overlay); the cosmic field below and the centre orb /
+              text above stay UNTRANSFORMED. The final translate
+              applies the right shift AFTER scaling + rotation, so
+              it's a pure viewBox translation that doesn't change
+              the figure's internal geometry. */}
+          <G
+            transform={`translate(${cx + 18} ${cy}) rotate(22) scale(0.82) translate(-${cx} -${cy})`}
+          >
             {/* Warm cream-magenta wash bathing the lit cluster — sits
                 behind the constellation base layer so every lit star
                 + line lands inside the aura. The lit half of the
