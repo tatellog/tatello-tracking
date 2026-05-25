@@ -81,6 +81,7 @@ function fourPointStarPath(cx: number, cy: number, outer: number): string {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
+const AnimatedPath = Animated.createAnimatedComponent(Path)
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 
 const W = 290
@@ -520,6 +521,14 @@ export function LunarConstellation({
               breathT={breathT}
               starDepth={starDepth}
             />
+            {/* Constellation ray — a single bright cream particle
+                slides along a Hamilton path through every star on
+                every t cycle, reading as a zig-zag lightning bolt
+                tracing the figure. Drawn ABOVE the lit stars + lines
+                so the ray is the brightest sliding element in the
+                frame, BELOW the ignition overlay so a star firing
+                still wins focus at the moment of commit. */}
+            <ConstellationRay stars={stars} lines={zodiac.lines} t={t} />
             <IgnitingOverlay
               zodiac={zodiac}
               stars={stars}
@@ -1266,6 +1275,152 @@ function FieldStar({
       <Circle cx={cx} cy={cy} r={1.6} fill={colors.magenta} />
       <Circle cx={cx} cy={cy} r={0.7} fill="#FBD7E3" opacity={0.9} />
     </AnimatedG>
+  )
+}
+
+/* ─ Constellation ray ─────────────────────────────────────────────
+ *
+ * A single bright cream particle that travels a continuous Hamilton
+ * path through every star in the figure on the system `t` clock —
+ * reads as a lightning bolt zigzagging through the constellation.
+ *
+ * Path derivation: a depth-first walk that visits every star,
+ * preferring un-visited neighbours sorted by ascending degree (so
+ * leaves are saved for last). For Leo this lands on the natural
+ * traversal 5 → 4 → 3 → 2 → 1 → 0 → 6 → 7 → 8 (Sickle hook down,
+ * then jump to body triangle).
+ *
+ * Animation: pathLength=1 normalises the dash pattern. A short
+ * bright dash (10 % of the path) slides from start to end via
+ * strokeDashoffset = -t·cycle. A magenta halo dash trails ~2 %
+ * behind for the comet-wake feel. Cycle = dash + gap, with the
+ * gap > 1 so only one bright dash is on the path at any moment
+ * and the loop seam falls inside the invisible gap.
+ */
+
+function deriveHamiltonPath(
+  numStars: number,
+  lines: readonly (readonly [number, number])[],
+): number[] {
+  if (numStars === 0) return []
+  const adj = new Map<number, Set<number>>()
+  for (let i = 0; i < numStars; i++) adj.set(i, new Set<number>())
+  for (const [a, b] of lines) {
+    adj.get(a)?.add(b)
+    adj.get(b)?.add(a)
+  }
+  // Pick a starting vertex with low degree (likely a leaf) so the
+  // walk has the best chance of reaching every star without
+  // backtracking.
+  let startIdx = 0
+  let minDeg = Infinity
+  for (const [i, s] of adj) {
+    const d = s.size
+    if (d > 0 && d < minDeg) {
+      minDeg = d
+      startIdx = i
+    }
+  }
+  const visited = new Set<number>()
+  const path: number[] = []
+  function dfs(node: number): boolean {
+    visited.add(node)
+    path.push(node)
+    if (visited.size === numStars) return true
+    const candidates = [...(adj.get(node) ?? [])]
+      .filter((n) => !visited.has(n))
+      .sort((a, b) => (adj.get(a)?.size ?? 0) - (adj.get(b)?.size ?? 0))
+    for (const next of candidates) {
+      if (dfs(next)) return true
+    }
+    visited.delete(node)
+    path.pop()
+    return false
+  }
+  dfs(startIdx)
+  return path
+}
+
+function ConstellationRay({
+  stars,
+  lines,
+  t,
+}: {
+  stars: Resolved[]
+  lines: readonly (readonly [number, number])[]
+  t: SharedValue<number>
+}) {
+  const traversal = useMemo(() => deriveHamiltonPath(stars.length, lines), [stars.length, lines])
+  const pathD = useMemo(() => {
+    if (traversal.length === 0) return ''
+    const first = stars[traversal[0]!]
+    if (!first) return ''
+    const segs = [`M ${first.x} ${first.y}`]
+    for (let i = 1; i < traversal.length; i++) {
+      const s = stars[traversal[i]!]
+      if (!s) continue
+      segs.push(`L ${s.x} ${s.y}`)
+    }
+    return segs.join(' ')
+  }, [stars, traversal])
+
+  // dash 0.10 ... gap 1.20 → cycle 1.30. The bright dash crosses
+  // the path once per cycle and the gap covers the seam so the
+  // loop wrap is invisible. Halo dash is slightly wider + trails
+  // 2 % behind the head for the comet-wake.
+  const HEAD_DASH = 0.1
+  const HALO_DASH = 0.16
+  const GAP = 1.2
+  const HEAD_CYCLE = HEAD_DASH + GAP
+  const HALO_CYCLE = HALO_DASH + GAP
+  const HALO_TRAIL = 0.02
+
+  const headProps = useAnimatedProps(() => {
+    'worklet'
+    const u = t.value
+    return { strokeDashoffset: -u * HEAD_CYCLE }
+  })
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    const u = (t.value - HALO_TRAIL + 1) % 1
+    return { strokeDashoffset: -u * HALO_CYCLE }
+  })
+
+  // pathLength=1 isn't in react-native-svg's TS types yet but it's
+  // supported at runtime — spread through a Record cast.
+  const runtimeProps = { pathLength: 1 } as Record<string, unknown>
+
+  if (!pathD) return null
+
+  return (
+    <G>
+      {/* Halo — wider magenta wake trailing behind the head. */}
+      <AnimatedPath
+        d={pathD}
+        fill="none"
+        stroke={colors.magenta}
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={0.55}
+        strokeDasharray={`${HALO_DASH} ${GAP}`}
+        animatedProps={haloProps}
+        {...runtimeProps}
+      />
+      {/* Head — bright cream-white core. */}
+      <AnimatedPath
+        d={pathD}
+        fill="none"
+        stroke="#FFF6E5"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={0.95}
+        strokeDasharray={`${HEAD_DASH} ${GAP}`}
+        animatedProps={headProps}
+        {...runtimeProps}
+      />
+    </G>
   )
 }
 
