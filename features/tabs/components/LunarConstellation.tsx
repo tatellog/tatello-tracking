@@ -1471,8 +1471,9 @@ function BaseLayer({
                 y1={A.y}
                 x2={B.x}
                 y2={B.y}
-                stroke="rgba(244,236,222,0.3)"
-                strokeWidth={1.4}
+                stroke="rgba(233,30,99,0.32)"
+                strokeWidth={1}
+                strokeDasharray="2 4"
                 strokeLinecap="round"
               />
             </G>
@@ -2046,32 +2047,31 @@ function CenterText({
 }) {
   // Glow halo — sits BEHIND the React Native counter overlay so the
   // big number reads as a luminous body, not flat text. Pulses on
-  // numberPulse: r 22 → 30, opacity 0.10 → 0.36 on each commit.
-  // Positioned at cy - 24 so it tracks the lifted number (which
-  // sits at marginTop -36 in numberOverlay) and the halo wraps the
-  // number's vertical centre cleanly.
+  // numberPulse: r 24 → 34, opacity 0.12 → 0.38 on each commit.
+  // Positioned at cy - 42 so it tracks the lifted number (marginTop
+  // -52 in numberOverlay) and wraps the number's vertical centre.
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const p = numberPulse.value
     return {
-      r: 22 + p * 8,
-      opacity: 0.1 + p * 0.26,
+      r: 24 + p * 10,
+      opacity: 0.12 + p * 0.26,
     }
   })
   return (
     <G>
-      {/* Number halo — luminous gold wash behind the React Native
-          counter so the cream "11" reads as a star-warm body
-          unified with the rest of the gold zodiac figure. */}
-      <AnimatedCircle cx={cx} cy={cy - 24} r={22} fill={colors.magenta} animatedProps={haloProps} />
-      {/* Subtitle — serif italic (coach voice) instead of upright UI
-          sans, so "DE 28 DÍAS" lands in STELAR's poetic register
-          rather than as a stat label. Sits right under the lifted
-          number at cy + 4 so the text-stack reads as a tight pair
-          (count + scale) instead of stretched across the centre. */}
+      {/* Number halo — luminous magenta wash behind the React Native
+          counter so the cream count reads as a bicromatic body
+          (cream-on-magenta) that ties the bronze lion + the
+          magenta constellation through a single luminous point. */}
+      <AnimatedCircle cx={cx} cy={cy - 42} r={24} fill={colors.magenta} animatedProps={haloProps} />
+      {/* Subtitle — serif italic (coach voice) so "DE 28 DÍAS"
+          lands in STELAR's poetic register. Sits right under the
+          lifted number at cy - 12 so the text stack reads as a
+          tight pair high in the canvas, not stretched across it. */}
       <SvgText
         x={cx}
-        y={cy + 4}
+        y={cy - 12}
         textAnchor="middle"
         fontFamily={typography.serifSemi}
         fontStyle="italic"
@@ -2975,23 +2975,22 @@ const styles = StyleSheet.create({
     // the constellation is the hero, the count is metadata-on-top.
     fontFamily: typography.displaySemi,
     fontSize: 52,
-    // Warm cream (leche) instead of magenta — the count reads as
-    // luminous starlight against the magenta halo behind it,
-    // rather than competing with the magenta hexagon lines + halos.
-    // The magenta textShadow stays, so the cream number is wrapped
-    // in a pink glow — bicromatic body, not flat sign-text.
+    // Warm cream (leche) — the count reads as luminous starlight,
+    // tying the lion's bronze + the constellation's magenta halo
+    // through a single bicromatic body. Pink textShadow toned down
+    // from 0.65 → 0.42 so the cream pops without being eaten by
+    // the glow.
     color: colors.leche,
     letterSpacing: -2.6,
     textAlign: 'center',
-    textShadowColor: 'rgba(233,30,99,0.65)',
+    textShadowColor: 'rgba(233,30,99,0.42)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 16,
-    // Bias upward beyond the geometric centre so the number sits
-    // ABOVE the lit-body diagonals (Algieba↔Zosma back line,
-    // Regulus↔Chort belly line) that cross the canvas centre.
-    // -36 lifts the count out of the line geometry into the
-    // breathing room over the back of the figure.
-    marginTop: -36,
+    textShadowRadius: 18,
+    // -52 lifts the count well above the lion's face + the back
+    // line that crosses the canvas centre. The poetic header is
+    // outside the figure now, so the count can move into the
+    // upper-quarter clean space without crowding the title.
+    marginTop: -52,
     padding: 0,
     includeFontPadding: false,
     minWidth: 80,

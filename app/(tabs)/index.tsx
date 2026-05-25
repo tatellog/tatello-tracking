@@ -221,8 +221,14 @@ function TodayContent({ ctx, cadence }: ContentProps) {
             <StreakLine streak={ctx.streak_days} />
           </Animated.View>
 
-          <Animated.View entering={enter(220)}>
-            <SectionHeader label={`Tu ${capitalize(signLabel)}`} />
+          {/* Constellation header — serif italic lowercase 'tu leo'
+              centred above the figure. Replaces the previous
+              EyebrowLabel-tracking-caps treatment so the section
+              lands in STELAR's poetic register (matching the coach
+              line that follows below the figure) instead of a
+              clinical stat label. */}
+          <Animated.View entering={enter(220)} style={styles.constellationHeader}>
+            <Text style={styles.constellationHeaderText}>tu {signLabel.toLowerCase()}</Text>
           </Animated.View>
 
           <Animated.View entering={enter(320)}>
@@ -287,10 +293,6 @@ function TodayContent({ ctx, cadence }: ContentProps) {
       {showCelebration ? <Day1Celebration /> : null}
     </View>
   )
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
 /* Editorial copy that follows the user through the 28-day cycle.
@@ -421,5 +423,19 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginTop: -4,
     marginBottom: 4,
+  },
+  // Constellation header — serif italic 'tu leo' centred above the
+  // figure, matching the coach voice that follows below it.
+  constellationHeader: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 6,
+  },
+  constellationHeaderText: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 22,
+    color: colors.leche,
+    letterSpacing: 0.6,
   },
 })
