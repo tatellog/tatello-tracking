@@ -31,7 +31,13 @@ import { colors } from '@/theme'
  */
 
 const CANVAS_FILL = 290 / 2106
-const FIT_SCALE = 0.92
+// FIT_SCALE 1.05 — the lion now slightly overflows the viewBox at
+// its widest tips (mane curls + a tail edge clip ~7 viewBox units
+// per side), which reads cinematic: the figure is too large to
+// fit the frame, like an engraved seal pressed onto the page.
+// Combined with the smaller constellation (wrapped in a 0.82 scale
+// group), the constellation lands clearly INSIDE the lion.
+const FIT_SCALE = 1.05
 const LEO_SCALE = CANVAS_FILL * FIT_SCALE
 const LEO_X_OFFSET = (290 - 2106 * LEO_SCALE) / 2
 const LEO_Y_OFFSET = (290 - 2016 * LEO_SCALE) / 2

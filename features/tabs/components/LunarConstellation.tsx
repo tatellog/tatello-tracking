@@ -465,56 +465,74 @@ export function LunarConstellation({
             />
           ) : null}
           <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
-          {/* Warm cream-magenta wash bathing the lit cluster — sits
-              behind the constellation base layer so every lit star
-              + line lands inside the aura. The lit half of the
-              figure visibly burns warmer than the unlit half. */}
-          {litCluster ? (
-            <>
-              <LitClusterAura
-                cx={litCluster.cx}
-                cy={litCluster.cy}
-                r={litCluster.r}
-                breathT={breathT}
-              />
-              {/* Dust motes — 6 tiny cream particles scattered around
-                  the cluster, each twinkling on its own phase. Sit
-                  on top of the aura wash but BELOW the lit stars
-                  themselves. Reads as cosmic dust catching the
-                  cluster's warm light. */}
-              <LitClusterMotes cx={litCluster.cx} cy={litCluster.cy} r={litCluster.r} t={t} />
-            </>
-          ) : null}
-          <BaseLayer zodiac={zodiac} stars={stars} slowT={slowT} radialPulse={radialPulse} t={t} />
-          <LitLines
-            zodiac={zodiac}
-            stars={stars}
-            litKeys={litKeys}
-            nextEl={nextEl}
-            ignitingKey={ignitingKey}
-            litPulse={litPulse}
-            breathT={breathT}
-            lineDepth={lineDepth}
-            t={t}
-          />
-          <StarsLayer
-            stars={stars}
-            litKeys={litKeys}
-            nextEl={nextEl}
-            t={t}
-            ignitingKey={ignitingKey}
-            intensity={intensity}
-            litPulse={litPulse}
-            starRecency={starRecency}
-            breathT={breathT}
-            starDepth={starDepth}
-          />
-          <IgnitingOverlay
-            zodiac={zodiac}
-            stars={stars}
-            ignitingKey={ignitingKey}
-            igniteT={igniteT}
-          />
+          {/* Constellation transform group — shrinks the figure to
+              82 % and rotates 12° CW about the canvas centre so the
+              constellation sits MORE INSIDE the bigger lion
+              backdrop instead of competing with it for the full
+              canvas area. Wraps every layer that belongs to the
+              zodiac figure (cluster aura + motes + base + lit lines
+              + stars + ignition overlay); the cosmic field below
+              and the centre orb / text above stay UNTRANSFORMED.
+              translate-scale-rotate-translate so rotation + scale
+              both happen about (145, 145). */}
+          <G transform={`translate(${cx} ${cy}) rotate(12) scale(0.82) translate(-${cx} -${cy})`}>
+            {/* Warm cream-magenta wash bathing the lit cluster — sits
+                behind the constellation base layer so every lit star
+                + line lands inside the aura. The lit half of the
+                figure visibly burns warmer than the unlit half. */}
+            {litCluster ? (
+              <>
+                <LitClusterAura
+                  cx={litCluster.cx}
+                  cy={litCluster.cy}
+                  r={litCluster.r}
+                  breathT={breathT}
+                />
+                {/* Dust motes — 6 tiny cream particles scattered
+                    around the cluster, each twinkling on its own
+                    phase. Sit on top of the aura wash but BELOW the
+                    lit stars themselves. Reads as cosmic dust
+                    catching the cluster's warm light. */}
+                <LitClusterMotes cx={litCluster.cx} cy={litCluster.cy} r={litCluster.r} t={t} />
+              </>
+            ) : null}
+            <BaseLayer
+              zodiac={zodiac}
+              stars={stars}
+              slowT={slowT}
+              radialPulse={radialPulse}
+              t={t}
+            />
+            <LitLines
+              zodiac={zodiac}
+              stars={stars}
+              litKeys={litKeys}
+              nextEl={nextEl}
+              ignitingKey={ignitingKey}
+              litPulse={litPulse}
+              breathT={breathT}
+              lineDepth={lineDepth}
+              t={t}
+            />
+            <StarsLayer
+              stars={stars}
+              litKeys={litKeys}
+              nextEl={nextEl}
+              t={t}
+              ignitingKey={ignitingKey}
+              intensity={intensity}
+              litPulse={litPulse}
+              starRecency={starRecency}
+              breathT={breathT}
+              starDepth={starDepth}
+            />
+            <IgnitingOverlay
+              zodiac={zodiac}
+              stars={stars}
+              ignitingKey={ignitingKey}
+              igniteT={igniteT}
+            />
+          </G>
           <CenterOrb cx={cx} cy={cy} clock={t} />
           <CenterScrim cx={cx} cy={cy} />
           <StarBurst
