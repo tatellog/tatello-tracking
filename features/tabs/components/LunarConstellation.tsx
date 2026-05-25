@@ -1411,20 +1411,18 @@ function ConstellationRay({
   // (no magenta) so the ray POPS against the magenta constellation
   // lines instead of blending with them. Each dash is wider +
   // dimmer + slightly behind the previous, faking a tapering
-  // tail behind a bright head:
+  // tail behind a bright head.
   //
-  //   HALO  — widest, faintest, longest dash → atmospheric glow
-  //           around the whole comet
-  //   TAIL  — wide cream wake at lower opacity, trailing  2%
-  //   TRAIL — medium narrow cream, trailing 0.8%
-  //   HEAD  — narrow white-hot core, the brightest crest
-  //
-  // Gap > 1 so only one bright dash exists on the path at any
-  // moment; the loop seam hides inside the invisible gap.
-  const HEAD_DASH = 0.05
-  const TRAIL_DASH = 0.12
-  const TAIL_DASH = 0.22
-  const HALO_DASH = 0.36
+  // DASH LENGTHS are deliberately SHORT (max 0.15 of path = 15 %)
+  // so the eye perceives a SINGLE moving particle with a brief
+  // wake, not a long stationary streak that lights up half the
+  // figure and reads as a frozen drawn shape. Combined the four
+  // layers cover ~15-20 % of the path at any moment — small
+  // enough to feel like a comet, large enough to have body.
+  const HEAD_DASH = 0.025
+  const TRAIL_DASH = 0.05
+  const TAIL_DASH = 0.09
+  const HALO_DASH = 0.15
   const GAP = 1.4
 
   // Cycle envelope — the comet visibly enters at t≈0.05, traces
