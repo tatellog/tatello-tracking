@@ -555,13 +555,6 @@ export function LunarConstellation({
           plusOne={plusOne}
           initialCount={trainedCount}
         />
-        {/* Week gauge — four vertical pills on the right edge, one
-            per week of the 28-day cycle. Each fills bottom-up
-            with the days completed that week, giving an
-            instant-read of "where am I in the rhythm?" without
-            replicating the count or the scrollable WeekStrip
-            below the figure. */}
-        <WeekGauge trainedCount={trainedCount} />
       </View>
 
       {isComplete ? (
@@ -2956,41 +2949,6 @@ function CompletionRings({ cx, cy, t }: { cx: number; cy: number; t: SharedValue
   )
 }
 
-/* ─ Week gauge ─────────────────────────────────────────────────────
- *
- * Four vertical pills on the right edge of the figure, one per
- * week of the 28-day cycle. Each fills bottom-up with the days
- * completed in that week (0..7 → 0%..100%). Sits in the right
- * margin of the constellation View so it never overlaps the
- * figure itself.
- *
- * Reads in a single glance:
- *   - "Which week am I in?" (first non-full pill from the bottom)
- *   - "How far through the cycle?" (proportion of total fill)
- *   - "Did I miss a chunk?" (a partial pill below a fuller one)
- *
- * The gauge is intentionally TINY (4 pt × 38 pt per pill) so it
- * reads as ambient meta-info, never competing with the
- * constellation hero or the count.
- */
-function WeekGauge({ trainedCount }: { trainedCount: number }) {
-  const fills = [0, 1, 2, 3].map((weekIdx) => {
-    const start = weekIdx * 7
-    const inWeek = Math.min(7, Math.max(0, trainedCount - start))
-    return inWeek / 7
-  })
-  // Render top → bottom as Week1 → Week4 (chronological top-down).
-  return (
-    <View style={styles.weekGauge} pointerEvents="none">
-      {fills.map((fillRatio, i) => (
-        <View key={`wg-${i}`} style={styles.weekGaugeTrack}>
-          <View style={[styles.weekGaugeFill, { height: `${fillRatio * 100}%` }]} />
-        </View>
-      ))}
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
@@ -3001,34 +2959,6 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     position: 'relative',
-  },
-  // Week gauge — 4 vertical pills stacked on the right edge of the
-  // constellation View. Vertically centred so the pill column sits
-  // at the mid-height of the canvas.
-  weekGauge: {
-    position: 'absolute',
-    right: 10,
-    top: '50%',
-    // Total stack height: 4 × 38 + 3 × 7 gap = 173. Marginal offset
-    // moves the gauge's mid-line onto the canvas mid-line.
-    marginTop: -86,
-    alignItems: 'center',
-  },
-  weekGaugeTrack: {
-    width: 4,
-    height: 38,
-    backgroundColor: 'rgba(233,30,99,0.18)',
-    borderRadius: 2,
-    marginBottom: 7,
-    overflow: 'hidden',
-    // Children flow from the bottom up so the height percentage of
-    // the fill grows upward from the floor of the pill.
-    justifyContent: 'flex-end',
-  },
-  weekGaugeFill: {
-    width: '100%',
-    backgroundColor: colors.leche,
-    borderRadius: 2,
   },
   svg: {
     width: '100%',
