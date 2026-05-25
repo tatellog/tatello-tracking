@@ -1362,14 +1362,17 @@ function ConstellationRay({
     // P[i] to P[i+1] becomes a cubic curve whose control points are
     // derived from the slope at P[i] (using P[i-1] and P[i+1]) and
     // the slope at P[i+1] (using P[i] and P[i+2]). The curve passes
-    // through every star but sweeps between them instead of
-    // hitting sharp corners — reads as flowing plasma rather than
-    // a wireframe polygon.
+    // through every star.
     //
-    // TENSION 0.3 gives a relaxed sweep: tight enough that each
-    // star is clearly the on-curve point, loose enough that the
-    // path feels organic (not Catmull-Rom's looser ~0.5).
-    const TENSION = 0.3
+    // TENSION 0.12 — DELIBERATELY LOW. Higher tensions (0.3+) made
+    // the path too smooth, obscuring the direction of travel: the
+    // eye couldn't tell which way the comet was moving because the
+    // angles between stars dissolved into a single sweeping line.
+    // At 0.12 the corners are just enough rounded that they don't
+    // read as wireframe polygon edges, but the angle changes
+    // BETWEEN segments stay visible, so the comet's traversal
+    // direction (start → end) reads on every frame.
+    const TENSION = 0.12
     const segs = [`M ${points[0]!.x} ${points[0]!.y}`]
     for (let i = 0; i < points.length - 1; i++) {
       const p0 = points[i - 1] ?? points[i]!
@@ -1405,25 +1408,53 @@ function ConstellationRay({
   const HALO_DASH = 0.36
   const GAP = 1.4
 
+  // Cycle envelope — the comet visibly enters at t≈0.05, traces
+  // start → end through t≈0.05 → 0.85, then fades out by t=1.
+  // Reads as "the energy entered the figure, traversed it, and
+  // briefly disappeared before re-igniting at the start" — a
+  // clear beginning/end on each cycle, instead of an infinite
+  // anonymous loop.
+  //
+  //   t = 0.00 → 0.05  fade IN at the start
+  //   t = 0.05 → 0.85  bright traversal start → end
+  //   t = 0.85 → 1.00  fade OUT at the end
+  function cometEnvelope(u: number) {
+    'worklet'
+    if (u < 0.05) return u / 0.05
+    if (u < 0.85) return 1
+    return Math.max(0, 1 - (u - 0.85) / 0.15)
+  }
   const headProps = useAnimatedProps(() => {
     'worklet'
     const u = t.value
-    return { strokeDashoffset: -u * (HEAD_DASH + GAP) }
+    return {
+      strokeDashoffset: -u * (HEAD_DASH + GAP),
+      opacity: cometEnvelope(u),
+    }
   })
   const trailProps = useAnimatedProps(() => {
     'worklet'
     const u = (t.value - 0.008 + 1) % 1
-    return { strokeDashoffset: -u * (TRAIL_DASH + GAP) }
+    return {
+      strokeDashoffset: -u * (TRAIL_DASH + GAP),
+      opacity: cometEnvelope(t.value),
+    }
   })
   const tailProps = useAnimatedProps(() => {
     'worklet'
     const u = (t.value - 0.02 + 1) % 1
-    return { strokeDashoffset: -u * (TAIL_DASH + GAP) }
+    return {
+      strokeDashoffset: -u * (TAIL_DASH + GAP),
+      opacity: cometEnvelope(t.value),
+    }
   })
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const u = (t.value - 0.04 + 1) % 1
-    return { strokeDashoffset: -u * (HALO_DASH + GAP) }
+    return {
+      strokeDashoffset: -u * (HALO_DASH + GAP),
+      opacity: cometEnvelope(t.value),
+    }
   })
 
   // pathLength=1 isn't in react-native-svg's TS types yet but it's
