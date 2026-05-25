@@ -1,4 +1,3 @@
-// Source viewBox 2106 x 2016. Extracted 132 path commands.
 import Animated, { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
 import { G, Path } from 'react-native-svg'
 

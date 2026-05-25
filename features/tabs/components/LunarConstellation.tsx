@@ -2330,14 +2330,11 @@ function IgnitingLine({
   )
 }
 
-/* "Next" was previously inflated (+1.5 radius) with a magenta gradient
- * fill, a big halo and a mid breath — visually it competed with lit
- * stars and made the moment of ignition feel like a downgrade. The
- * redesign keeps it deliberately quiet: same radius as a lit star, a
- * dim magenta fill (0.55 opacity), and a single thin dashed ring that
- * pulses slowly. Reads as "queued, waiting for you" — so when the
- * user marks the day, the flash-to-lit transition feels like a
- * promise fulfilled, not a swap to a lesser state. */
+/* "Next" reads as a queued summoning slot — quiet enough that the
+ * lit stars stay the focal layer, but visibly turning so the user
+ * sees a clock running. The actual sigilo layout (outer ring +
+ * ticks rotating CCW, inner dashed ring rotating CW, plus a wish-
+ * countdown pulse ring) is described inline below. */
 function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
   const baseR = starRadius(s.mag) + 0.5
 
