@@ -356,6 +356,17 @@ export function LunarConstellation({
   // chrome). Stays at 0 on undo / first paint.
   const plusOne = useSharedValue(0)
 
+  // Global presence multiplier for the constellation ray. The ray's
+  // job is to SUGGEST the constellation path while the figure is
+  // still being built; once every star is lit the actual figure
+  // is fully visible and the bright ray competes with it instead
+  // of helping. We tween this to 0 on isComplete so the ray
+  // retires gracefully when the user finishes the 28-day cycle.
+  const rayPresence = useSharedValue(isComplete ? 0 : 1)
+  useEffect(() => {
+    rayPresence.value = withTiming(isComplete ? 0 : 1, { duration: 900 })
+  }, [isComplete, rayPresence])
+
   // Detect upward changes → fire haptic, run centre animations, push
   // new SequenceEls onto the queue. Downward changes (undo) just sync
   // the displayed number without replaying any animation.
@@ -528,7 +539,7 @@ export function LunarConstellation({
                 so the ray is the brightest sliding element in the
                 frame, BELOW the ignition overlay so a star firing
                 still wins focus at the moment of commit. */}
-            <ConstellationRay stars={stars} lines={zodiac.lines} t={t} />
+            <ConstellationRay stars={stars} lines={zodiac.lines} t={t} rayPresence={rayPresence} />
             <IgnitingOverlay
               zodiac={zodiac}
               stars={stars}
@@ -1347,10 +1358,18 @@ function ConstellationRay({
   stars,
   lines,
   t,
+  rayPresence,
 }: {
   stars: Resolved[]
   lines: readonly (readonly [number, number])[]
   t: SharedValue<number>
+  /** 0..1 global presence multiplier. The ray's job is to SUGGEST
+   *  the constellation path while it's still being built; once
+   *  the user has lit every star the actual figure is visible and
+   *  the ray competes with it. The parent passes 1 while there
+   *  are unlit stars and 0 (smoothly tweened by Reanimated) when
+   *  the constellation completes. */
+  rayPresence: SharedValue<number>
 }) {
   const traversal = useMemo(() => deriveHamiltonPath(stars.length, lines), [stars.length, lines])
   const pathD = useMemo(() => {
@@ -1410,10 +1429,7 @@ function ConstellationRay({
 
   // Cycle envelope — the comet visibly enters at t≈0.05, traces
   // start → end through t≈0.05 → 0.85, then fades out by t=1.
-  // Reads as "the energy entered the figure, traversed it, and
-  // briefly disappeared before re-igniting at the start" — a
-  // clear beginning/end on each cycle, instead of an infinite
-  // anonymous loop.
+  // Reads as a clear beginning/end on each cycle.
   //
   //   t = 0.00 → 0.05  fade IN at the start
   //   t = 0.05 → 0.85  bright traversal start → end
@@ -1429,7 +1445,7 @@ function ConstellationRay({
     const u = t.value
     return {
       strokeDashoffset: -u * (HEAD_DASH + GAP),
-      opacity: cometEnvelope(u),
+      opacity: cometEnvelope(u) * rayPresence.value,
     }
   })
   const trailProps = useAnimatedProps(() => {
@@ -1437,7 +1453,7 @@ function ConstellationRay({
     const u = (t.value - 0.008 + 1) % 1
     return {
       strokeDashoffset: -u * (TRAIL_DASH + GAP),
-      opacity: cometEnvelope(t.value),
+      opacity: cometEnvelope(t.value) * rayPresence.value,
     }
   })
   const tailProps = useAnimatedProps(() => {
@@ -1445,7 +1461,7 @@ function ConstellationRay({
     const u = (t.value - 0.02 + 1) % 1
     return {
       strokeDashoffset: -u * (TAIL_DASH + GAP),
-      opacity: cometEnvelope(t.value),
+      opacity: cometEnvelope(t.value) * rayPresence.value,
     }
   })
   const haloProps = useAnimatedProps(() => {
@@ -1453,7 +1469,7 @@ function ConstellationRay({
     const u = (t.value - 0.04 + 1) % 1
     return {
       strokeDashoffset: -u * (HALO_DASH + GAP),
-      opacity: cometEnvelope(t.value),
+      opacity: cometEnvelope(t.value) * rayPresence.value,
     }
   })
 
@@ -1465,58 +1481,57 @@ function ConstellationRay({
 
   return (
     <G>
-      {/* Outer halo — wide warm-cream glow that bleeds beyond the
-          comet, reading as the atmospheric light around the energy. */}
+      {/* Outer halo — soft warm-cream glow. Thinner + dimmer than
+          before so the ray doesn't drown the constellation it's
+          tracing. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFE9B4"
-        strokeWidth={13}
+        strokeWidth={7}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.22}
+        strokeOpacity={0.16}
         strokeDasharray={`${HALO_DASH} ${GAP}`}
         animatedProps={haloProps}
         {...runtimeProps}
       />
-      {/* Tail — the visible cometing wake. Trails 2% behind so it
-          reads as a wide trail behind the brighter head. */}
+      {/* Tail — visible cometing wake at moderate weight. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFE9C2"
-        strokeWidth={7}
+        strokeWidth={4}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.55}
+        strokeOpacity={0.35}
         strokeDasharray={`${TAIL_DASH} ${GAP}`}
         animatedProps={tailProps}
         {...runtimeProps}
       />
-      {/* Trail — narrower brighter wake just behind the head. */}
+      {/* Trail — inner wake just behind the head. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFF6E5"
-        strokeWidth={4}
+        strokeWidth={2.4}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.85}
+        strokeOpacity={0.6}
         strokeDasharray={`${TRAIL_DASH} ${GAP}`}
         animatedProps={trailProps}
         {...runtimeProps}
       />
-      {/* Head — white-hot leading crest. The brightest point of
-          the comet, narrower than the trail so it reads as the
-          "tip" of the energy beam. */}
+      {/* Head — white-hot leading crest. Narrower than before so
+          it reads as a sliding particle, not a wide chunk. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFFFFF"
-        strokeWidth={2.5}
+        strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={1}
+        strokeOpacity={0.85}
         strokeDasharray={`${HEAD_DASH} ${GAP}`}
         animatedProps={headProps}
         {...runtimeProps}
