@@ -475,7 +475,7 @@ export function LunarConstellation({
               and the centre orb / text above stay UNTRANSFORMED.
               translate-scale-rotate-translate so rotation + scale
               both happen about (145, 145). */}
-          <G transform={`translate(${cx} ${cy}) rotate(12) scale(0.82) translate(-${cx} -${cy})`}>
+          <G transform={`translate(${cx} ${cy}) rotate(22) scale(0.82) translate(-${cx} -${cy})`}>
             {/* Warm cream-magenta wash bathing the lit cluster — sits
                 behind the constellation base layer so every lit star
                 + line lands inside the aura. The lit half of the
