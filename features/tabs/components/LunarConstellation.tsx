@@ -1387,11 +1387,11 @@ function HeroGlow({
   })
   return (
     <AnimatedG animatedProps={animatedProps}>
-      <Circle cx={cx} cy={cy} r={r * 6.4} fill={colors.magenta} opacity={0.05} />
-      <Circle cx={cx} cy={cy} r={r * 4.6} fill={colors.magenta} opacity={0.09} />
-      <Circle cx={cx} cy={cy} r={r * 3.1} fill={colors.magenta} opacity={0.16} />
-      <Circle cx={cx} cy={cy} r={r * 2.0} fill={colors.magenta} opacity={0.26} />
-      <Circle cx={cx} cy={cy} r={r * 1.2} fill="#FBD7E3" opacity={0.32} />
+      <Circle cx={cx} cy={cy} r={r * 6.4} fill={ZODIAC_GOLD} opacity={0.05} />
+      <Circle cx={cx} cy={cy} r={r * 4.6} fill={ZODIAC_GOLD} opacity={0.09} />
+      <Circle cx={cx} cy={cy} r={r * 3.1} fill={ZODIAC_GOLD} opacity={0.16} />
+      <Circle cx={cx} cy={cy} r={r * 2.0} fill={ZODIAC_GOLD} opacity={0.26} />
+      <Circle cx={cx} cy={cy} r={r * 1.2} fill={ZODIAC_GOLD_BRIGHT} opacity={0.32} />
     </AnimatedG>
   )
 }
@@ -1898,8 +1898,10 @@ function CenterText({
   })
   return (
     <G>
-      {/* Number halo — luminous wash behind the React Native counter. */}
-      <AnimatedCircle cx={cx} cy={cy - 24} r={22} fill={colors.magenta} animatedProps={haloProps} />
+      {/* Number halo — luminous gold wash behind the React Native
+          counter so the cream "11" reads as a star-warm body
+          unified with the rest of the gold zodiac figure. */}
+      <AnimatedCircle cx={cx} cy={cy - 24} r={22} fill={ZODIAC_GOLD} animatedProps={haloProps} />
       {/* Subtitle — serif italic (coach voice) instead of upright UI
           sans, so "DE 28 DÍAS" lands in STELAR's poetic register
           rather than as a stat label. Sits right under the lifted
@@ -2817,15 +2819,15 @@ const styles = StyleSheet.create({
     // the constellation is the hero, the count is metadata-on-top.
     fontFamily: typography.displaySemi,
     fontSize: 52,
-    // Warm cream (leche) instead of magenta — the count reads as
-    // luminous starlight against the magenta halo behind it,
-    // rather than competing with the magenta hexagon lines + halos.
-    // The magenta textShadow stays, so the cream number is wrapped
-    // in a pink glow — bicromatic body, not flat sign-text.
+    // Warm cream (leche) reads as luminous starlight against the
+    // gold halo behind it, wrapped in a warm-amber textShadow so
+    // the "11" sits inside the same gold palette as the rest of
+    // the figure instead of striking a magenta brand-accent that
+    // breaks the unified warm-tone scheme.
     color: colors.leche,
     letterSpacing: -2.6,
     textAlign: 'center',
-    textShadowColor: 'rgba(233,30,99,0.65)',
+    textShadowColor: 'rgba(212,168,95,0.7)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 16,
     // Bias upward beyond the geometric centre so the number sits

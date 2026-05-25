@@ -52,13 +52,15 @@ export function LeoFigureBackdrop({
 }) {
   const liveProps = useAnimatedProps(() => {
     'worklet'
-    // Opacity 0.25 → 0.65 with progress. Quadratic ease so the lion
-    // starts at a visible quarter and accelerates into full presence
-    // — the gain between day-12 and day-24 reads stronger than
-    // between day-0 and day-12, matching the user's lived sense of
-    // momentum building.
+    // Opacity 0.40 → 0.85 with progress. Boosted from the previous
+    // 0.25–0.65 because the gold constellation needs to read as
+    // INSIDE the lion (engraved ON the figure) rather than floating
+    // in front of it. At day 0 the lion is already 40 % present —
+    // a visible silhouette the constellation paints over — and
+    // strengthens toward day 28 when the engraved figure fully
+    // materialises.
     const p = Math.max(0, Math.min(1, progress))
-    const opacity = 0.25 + 0.4 * p * p
+    const opacity = 0.4 + 0.45 * p * p
     // Breath: ±2 % scale, centred on canvas (145, 145). One slow
     // inhale every 16 s.
     const wave = breathT ? 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI) : 0
