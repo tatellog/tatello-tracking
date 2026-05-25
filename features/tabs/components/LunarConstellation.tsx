@@ -1481,30 +1481,28 @@ function ConstellationRay({
 
   return (
     <G>
-      {/* Outer halo — soft warm-cream glow. Thinner + dimmer than
-          before so the ray doesn't drown the constellation it's
-          tracing. */}
+      {/* Outer halo — soft warm-cream glow around the comet. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFE9B4"
-        strokeWidth={7}
+        strokeWidth={9}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.16}
+        strokeOpacity={0.2}
         strokeDasharray={`${HALO_DASH} ${GAP}`}
         animatedProps={haloProps}
         {...runtimeProps}
       />
-      {/* Tail — visible cometing wake at moderate weight. */}
+      {/* Tail — visible cometing wake. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFE9C2"
-        strokeWidth={4}
+        strokeWidth={5.5}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.35}
+        strokeOpacity={0.42}
         strokeDasharray={`${TAIL_DASH} ${GAP}`}
         animatedProps={tailProps}
         {...runtimeProps}
@@ -1514,24 +1512,23 @@ function ConstellationRay({
         d={pathD}
         fill="none"
         stroke="#FFF6E5"
-        strokeWidth={2.4}
+        strokeWidth={3.2}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.6}
+        strokeOpacity={0.7}
         strokeDasharray={`${TRAIL_DASH} ${GAP}`}
         animatedProps={trailProps}
         {...runtimeProps}
       />
-      {/* Head — white-hot leading crest. Narrower than before so
-          it reads as a sliding particle, not a wide chunk. */}
+      {/* Head — white-hot leading crest. */}
       <AnimatedPath
         d={pathD}
         fill="none"
         stroke="#FFFFFF"
-        strokeWidth={1.5}
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity={0.85}
+        strokeOpacity={0.95}
         strokeDasharray={`${HEAD_DASH} ${GAP}`}
         animatedProps={headProps}
         {...runtimeProps}
