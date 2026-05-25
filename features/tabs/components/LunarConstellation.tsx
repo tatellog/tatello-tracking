@@ -83,16 +83,6 @@ const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 
-// Warm-gold zodiac palette — pulled from the engraved-astrolabe
-// reference where the active constellation is rendered in gold
-// against a quiet dark cosmos. Used everywhere a lit star, line,
-// aura, or queued slot needs warm presence. Magenta is preserved
-// for focused brand anchors (the "11" count halo) and the broader
-// nebula wash, so STELAR's brand colour still threads through the
-// figure without dominating it.
-const ZODIAC_GOLD = '#D4A85F'
-const ZODIAC_GOLD_BRIGHT = '#FFE9C2'
-
 const W = 290
 const H = 290
 // Inner padding around the figure. Lower values let the constellation
@@ -687,15 +677,14 @@ function SvgGradients() {
         <Stop offset="55%" stopColor="#E91E63" />
         <Stop offset="100%" stopColor="#7A1737" />
       </RadialGradient>
-      {/* Lit-cluster aura — warm GOLD wash bathing the lit half of
-          the constellation. Bright cream-gold at the centre fades
-          to transparent gold at the rim. Matches the engraved-
-          astrolabe reference: the lit cluster glows like brass
-          catching candlelight against the quiet cosmos. */}
+      {/* Lit-cluster aura — warm cream-pink wash bathing the lit
+          half of the constellation. Bright cream at the centre
+          fades to transparent magenta at the rim — Leo's fire-sign
+          warmth threaded through STELAR's brand palette. */}
       <RadialGradient id="litClusterAura" cx="50%" cy="50%" r="50%">
-        <Stop offset="0%" stopColor={ZODIAC_GOLD_BRIGHT} stopOpacity={0.85} />
-        <Stop offset="45%" stopColor={ZODIAC_GOLD} stopOpacity={0.4} />
-        <Stop offset="100%" stopColor={ZODIAC_GOLD} stopOpacity={0} />
+        <Stop offset="0%" stopColor="#FFE9D6" stopOpacity={0.85} />
+        <Stop offset="45%" stopColor="#F4ECDE" stopOpacity={0.45} />
+        <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
       </RadialGradient>
     </Defs>
   )
@@ -716,11 +705,7 @@ function SvgGradients() {
  * Static — no animation — so the eye reads it as the scene's lighting,
  * not as an effect. */
 const AMBIENT_LAYERS = 12
-// Dropped from 0.022 → 0.013 so the magenta nebula wash no longer
-// dominates. The bronze lion + warm-gold constellation read against
-// a quieter background, matching the engraved-astrolabe reference's
-// dark cosmos. Total centre alpha is now ~0.156 instead of ~0.264.
-const AMBIENT_PER_LAYER_ALPHA = 0.013
+const AMBIENT_PER_LAYER_ALPHA = 0.022
 const AMBIENT_RX_MAX = W * 0.6
 const AMBIENT_RX_MIN = W * 0.08
 const AMBIENT_ASPECT = 1.45
@@ -1405,11 +1390,11 @@ function HeroGlow({
   })
   return (
     <AnimatedG animatedProps={animatedProps}>
-      <Circle cx={cx} cy={cy} r={r * 6.4} fill={ZODIAC_GOLD} opacity={0.05} />
-      <Circle cx={cx} cy={cy} r={r * 4.6} fill={ZODIAC_GOLD} opacity={0.09} />
-      <Circle cx={cx} cy={cy} r={r * 3.1} fill={ZODIAC_GOLD} opacity={0.16} />
-      <Circle cx={cx} cy={cy} r={r * 2.0} fill={ZODIAC_GOLD} opacity={0.26} />
-      <Circle cx={cx} cy={cy} r={r * 1.2} fill={ZODIAC_GOLD_BRIGHT} opacity={0.32} />
+      <Circle cx={cx} cy={cy} r={r * 6.4} fill={colors.magenta} opacity={0.05} />
+      <Circle cx={cx} cy={cy} r={r * 4.6} fill={colors.magenta} opacity={0.09} />
+      <Circle cx={cx} cy={cy} r={r * 3.1} fill={colors.magenta} opacity={0.16} />
+      <Circle cx={cx} cy={cy} r={r * 2.0} fill={colors.magenta} opacity={0.26} />
+      <Circle cx={cx} cy={cy} r={r * 1.2} fill="#FBD7E3" opacity={0.32} />
     </AnimatedG>
   )
 }
@@ -1698,11 +1683,11 @@ function LitLineFilament({
             stars connected by their own light" rather than a uniform
             stroke. */}
         <LinearGradient id={gradId} gradientUnits="userSpaceOnUse" x1={ax} y1={ay} x2={bx} y2={by}>
-          <Stop offset="0%" stopColor={ZODIAC_GOLD_BRIGHT} stopOpacity={0.95} />
-          <Stop offset="15%" stopColor={ZODIAC_GOLD} stopOpacity={0.85} />
-          <Stop offset="50%" stopColor={ZODIAC_GOLD} stopOpacity={0.32} />
-          <Stop offset="85%" stopColor={ZODIAC_GOLD} stopOpacity={0.85} />
-          <Stop offset="100%" stopColor={ZODIAC_GOLD_BRIGHT} stopOpacity={0.95} />
+          <Stop offset="0%" stopColor="#FBD7E3" stopOpacity={0.95} />
+          <Stop offset="15%" stopColor={colors.magenta} stopOpacity={0.85} />
+          <Stop offset="50%" stopColor={colors.magenta} stopOpacity={0.32} />
+          <Stop offset="85%" stopColor={colors.magenta} stopOpacity={0.85} />
+          <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0.95} />
         </LinearGradient>
       </Defs>
       {/* Three-layer light filament:
@@ -1720,7 +1705,7 @@ function LitLineFilament({
         y1={ay}
         x2={bx}
         y2={by}
-        stroke={ZODIAC_GOLD}
+        stroke={colors.magenta}
         strokeOpacity={0.22}
         strokeWidth={6}
         strokeLinecap="round"
@@ -1739,7 +1724,7 @@ function LitLineFilament({
         y1={ay}
         x2={bx}
         y2={by}
-        stroke={ZODIAC_GOLD_BRIGHT}
+        stroke="#FBD7E3"
         strokeOpacity={0.65}
         strokeWidth={0.7}
         strokeLinecap="round"
@@ -1919,7 +1904,7 @@ function CenterText({
       {/* Number halo — luminous gold wash behind the React Native
           counter so the cream "11" reads as a star-warm body
           unified with the rest of the gold zodiac figure. */}
-      <AnimatedCircle cx={cx} cy={cy - 24} r={22} fill={ZODIAC_GOLD} animatedProps={haloProps} />
+      <AnimatedCircle cx={cx} cy={cy - 24} r={22} fill={colors.magenta} animatedProps={haloProps} />
       {/* Subtitle — serif italic (coach voice) instead of upright UI
           sans, so "DE 28 DÍAS" lands in STELAR's poetic register
           rather than as a stat label. Sits right under the lifted
@@ -2420,7 +2405,7 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
         cy={s.y}
         r={baseR + 9}
         fill="none"
-        stroke={ZODIAC_GOLD}
+        stroke={colors.magenta}
         strokeWidth={0.8}
         animatedProps={pulseProps}
       />
@@ -2431,7 +2416,7 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
           cy={s.y}
           r={baseR + 14}
           fill="none"
-          stroke={ZODIAC_GOLD}
+          stroke={colors.magenta}
           strokeWidth={0.8}
           opacity={0.55}
         />
@@ -2442,7 +2427,7 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
             y1={tk.y1}
             x2={tk.x2}
             y2={tk.y2}
-            stroke={ZODIAC_GOLD}
+            stroke={colors.magenta}
             strokeWidth={0.7}
             strokeLinecap="round"
             opacity={0.7}
@@ -2457,7 +2442,7 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
           cy={s.y}
           r={baseR + 9}
           fill="none"
-          stroke={ZODIAC_GOLD}
+          stroke={colors.magenta}
           strokeWidth={1.4}
           strokeDasharray="3 4"
           strokeLinecap="round"
@@ -2640,10 +2625,10 @@ function LitStar({
         cx={s.x}
         cy={s.y}
         r={r + 16}
-        fill={ZODIAC_GOLD}
+        fill={colors.magenta}
         animatedProps={outerHaloProps}
       />
-      <AnimatedCircle cx={s.x} cy={s.y} r={r + 7} fill={ZODIAC_GOLD} animatedProps={haloProps} />
+      <AnimatedCircle cx={s.x} cy={s.y} r={r + 7} fill={colors.magenta} animatedProps={haloProps} />
       {flareIntensity > 0 ? (
         <LitStarFlare
           cx={s.x}
@@ -2655,13 +2640,7 @@ function LitStar({
           phase={phase}
         />
       ) : null}
-      <AnimatedCircle
-        cx={s.x}
-        cy={s.y}
-        r={r + 2}
-        fill={ZODIAC_GOLD_BRIGHT}
-        animatedProps={coreProps}
-      />
+      <AnimatedCircle cx={s.x} cy={s.y} r={r + 2} fill="#FBD7E3" animatedProps={coreProps} />
       <AnimatedG animatedProps={starProps}>
         <StarSparkle cx={s.x} cy={s.y} r={r} mag={s.mag} fill="url(#starLit)" lit />
       </AnimatedG>
@@ -2837,15 +2816,15 @@ const styles = StyleSheet.create({
     // the constellation is the hero, the count is metadata-on-top.
     fontFamily: typography.displaySemi,
     fontSize: 52,
-    // Warm cream (leche) reads as luminous starlight against the
-    // gold halo behind it, wrapped in a warm-amber textShadow so
-    // the "11" sits inside the same gold palette as the rest of
-    // the figure instead of striking a magenta brand-accent that
-    // breaks the unified warm-tone scheme.
+    // Warm cream (leche) instead of magenta — the count reads as
+    // luminous starlight against the magenta halo behind it,
+    // rather than competing with the magenta hexagon lines + halos.
+    // The magenta textShadow stays, so the cream number is wrapped
+    // in a pink glow — bicromatic body, not flat sign-text.
     color: colors.leche,
     letterSpacing: -2.6,
     textAlign: 'center',
-    textShadowColor: 'rgba(212,168,95,0.7)',
+    textShadowColor: 'rgba(233,30,99,0.65)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 16,
     // Bias upward beyond the geometric centre so the number sits

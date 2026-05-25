@@ -58,13 +58,13 @@ export function LeoFigureBackdrop({
 }) {
   const liveProps = useAnimatedProps(() => {
     'worklet'
-    // Opacity 0.36 → 0.72 with progress. Pulled back from the
-    // previous 0.52–0.95: with the lion now larger (FIT_SCALE
-    // 1.22, overflowing the frame), the figure occupies more of
-    // the visible area, so a lighter opacity keeps the bronze
-    // silhouette legible without dominating. The constellation
-    // still reads as inscribed inside the lion, but with more
-    // breathing room between the lion's lines and the cosmos.
+    // Opacity 0.36 → 0.72 with progress. With the lion now
+    // larger (FIT_SCALE 1.22, overflowing the frame) the figure
+    // occupies more of the visible area, so a lighter opacity
+    // keeps the bronze silhouette legible without dominating.
+    // The magenta constellation still reads as inscribed inside
+    // the lion, with breathing room between the lion's lines and
+    // the cosmos.
     const p = Math.max(0, Math.min(1, progress))
     const opacity = 0.36 + 0.36 * p * p
     // Breath: ±2 % scale, centred on canvas (145, 145). One slow
