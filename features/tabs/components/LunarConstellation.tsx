@@ -514,7 +514,7 @@ export function LunarConstellation({
             burstId={burstId}
             trainedCount={trainedCount}
           />
-          <CenterText cx={cx} cy={cy} zodiacLabel={zodiac.label} numberPulse={numberPulse} />
+          <CenterText cx={cx} cy={cy} numberPulse={numberPulse} />
           {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
         </Svg>
 
@@ -1859,19 +1859,10 @@ function CenterScrim({ cx, cy }: { cx: number; cy: number }) {
 function CenterText({
   cx,
   cy,
-  zodiacLabel,
   numberPulse,
 }: {
   cx: number
   cy: number
-  /** Display label for the active zodiac sign ('LEO', 'TAURO', …)
-   *  rendered as a small tracking-caps identity stamp under the
-   *  count. We used to render the unicode glyph (♌) here, but
-   *  iOS substituted it with the colour-emoji font, producing a
-   *  purple emoji badge that clashed with the rest of the figure.
-   *  The portable label reads as a quiet "this is your sign"
-   *  mark on every platform. */
-  zodiacLabel: string
   /** Pulse driven by the parent on every commit. Drives a soft
    *  expand+fade on the glow halo behind the counter so the moment
    *  the number ticks up reads as a luminous heartbeat. */
@@ -1880,6 +1871,9 @@ function CenterText({
   // Glow halo — sits BEHIND the React Native counter overlay so the
   // big number reads as a luminous body, not flat text. Pulses on
   // numberPulse: r 22 → 30, opacity 0.10 → 0.36 on each commit.
+  // Positioned at cy - 24 so it tracks the lifted number (which
+  // sits at marginTop -36 in numberOverlay) and the halo wraps the
+  // number's vertical centre cleanly.
   const haloProps = useAnimatedProps(() => {
     'worklet'
     const p = numberPulse.value
@@ -1891,13 +1885,15 @@ function CenterText({
   return (
     <G>
       {/* Number halo — luminous wash behind the React Native counter. */}
-      <AnimatedCircle cx={cx} cy={cy - 6} r={22} fill={colors.magenta} animatedProps={haloProps} />
+      <AnimatedCircle cx={cx} cy={cy - 24} r={22} fill={colors.magenta} animatedProps={haloProps} />
       {/* Subtitle — serif italic (coach voice) instead of upright UI
           sans, so "DE 28 DÍAS" lands in STELAR's poetic register
-          rather than as a stat label. */}
+          rather than as a stat label. Sits right under the lifted
+          number at cy + 4 so the text-stack reads as a tight pair
+          (count + scale) instead of stretched across the centre. */}
       <SvgText
         x={cx}
-        y={cy + 22}
+        y={cy + 4}
         textAnchor="middle"
         fontFamily={typography.serifSemi}
         fontStyle="italic"
@@ -1906,35 +1902,6 @@ function CenterText({
         letterSpacing={1.6}
       >
         DE 28 DÍAS
-      </SvgText>
-      {/* Identity divider — short thin line that separates the
-          count line from the sign label, so the layout reads as two
-          distinct pieces of info rather than one block of copy. */}
-      <Line
-        x1={cx - 14}
-        y1={cy + 33}
-        x2={cx + 14}
-        y2={cy + 33}
-        stroke={colors.niebla}
-        strokeOpacity={0.28}
-        strokeWidth={0.6}
-        strokeLinecap="round"
-      />
-      {/* Sign label — small tracking-caps identity stamp. Sans-bold
-          (uiBold tracking 3) instead of serif so it reads as a
-          quiet meta-label, not a second poetic line competing with
-          the italic subtitle above. */}
-      <SvgText
-        x={cx}
-        y={cy + 43}
-        textAnchor="middle"
-        fontFamily={typography.uiBold}
-        fontSize={8}
-        fill={colors.niebla}
-        letterSpacing={3}
-        opacity={0.55}
-      >
-        {zodiacLabel}
       </SvgText>
     </G>
   )
@@ -2828,23 +2795,25 @@ const styles = StyleSheet.create({
     // displaySemi (600) instead of displayHeavy (900) — at 64 px the
     // heavy weight competed with the constellation as visual focus;
     // the constellation is the hero, the count is metadata-on-top.
-    // Semibold + smaller size lets the figure breathe while still
-    // reading as a hero number.
     fontFamily: typography.displaySemi,
     fontSize: 52,
-    color: colors.magenta,
+    // Warm cream (leche) instead of magenta — the count reads as
+    // luminous starlight against the magenta halo behind it,
+    // rather than competing with the magenta hexagon lines + halos.
+    // The magenta textShadow stays, so the cream number is wrapped
+    // in a pink glow — bicromatic body, not flat sign-text.
+    color: colors.leche,
     letterSpacing: -2.6,
     textAlign: 'center',
-    // Native magenta glow — replaces the SVG RadialGradient bloom that
-    // was rendering as a solid disk on iOS. RN's textShadow works
-    // cleanly on both platforms.
-    textShadowColor: 'rgba(233,30,99,0.55)',
+    textShadowColor: 'rgba(233,30,99,0.65)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 16,
-    // The SVG drew the number at y = cy - 4 (above geometric centre).
-    // RN centres via flex so we bias upward to match the original
-    // composition. includeFontPadding off kills Android's extra space.
-    marginTop: -18,
+    // Bias upward beyond the geometric centre so the number sits
+    // ABOVE the lit-body diagonals (Algieba↔Zosma back line,
+    // Regulus↔Chort belly line) that cross the canvas centre.
+    // -36 lifts the count out of the line geometry into the
+    // breathing room over the back of the figure.
+    marginTop: -36,
     padding: 0,
     includeFontPadding: false,
     minWidth: 80,
