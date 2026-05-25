@@ -10,26 +10,28 @@ import { colors } from '@/theme'
  * 290 canvas via a single transform.
  *
  * Renders BEHIND the zodiac stars + connecting lines so the lion
- * art reads as a faint engraved silhouette under the constellation
+ * art reads as an engraved bronze figure under the constellation
  * — present only when the active sign is Leo.
  *
- * MOTION — the figure "wakes up" with progress:
- *   • OPACITY ramps 0.10 (day 0) → 0.34 (day 28) so the lion
- *     materialises as the user's constellation completes. Day-0
- *     reads as a faint ghost; day-28 reads as a present spirit.
- *   • BREATH is a gentle ±1.8 % scale-about-centre on the system
- *     breathT clock (16 s loop) so the figure is never frozen.
- *     Independent of progress — the lion always breathes once
- *     opacity is even 0.10.
- *
- * LAYOUT — the lion no longer fills the whole canvas. CANVAS_FILL
- * is the maximum scale that fits the source 2106-wide into the
- * 290-wide viewBox (~0.1377). FIT_SCALE 0.65 shrinks it to 65 %
- * of that, leaving ~50 viewBox units of breath on every edge.
+ * AESTHETIC — modelled after engraved-astrolabe references (warm
+ * gold lion on a dark cosmos):
+ *   • COLOUR is colors.bone (warm cream-gold #C9B8A5) instead of
+ *     magenta, so the figure CONTRASTS with the surrounding
+ *     magenta nebula wash rather than blending into it.
+ *   • SCALE is 92 % of the canvas-fitting maximum, so the lion
+ *     fills the visible area like the reference engraving — only
+ *     ~12 viewBox units of breath per edge.
+ *   • OPACITY ramps 0.25 (day 0) → 0.65 (day 28) so the lion is
+ *     visibly present even on day-0 and materialises into full
+ *     presence by completion.
+ *   • STROKE is 14 source units — finer, more elegant than the
+ *     previous 22, matching the reference's delicate line weight.
+ *   • BREATH is a gentle ±2 % scale-about-centre on the 16 s
+ *     breathT so the figure is never frozen.
  */
 
 const CANVAS_FILL = 290 / 2106
-const FIT_SCALE = 0.65
+const FIT_SCALE = 0.92
 const LEO_SCALE = CANVAS_FILL * FIT_SCALE
 const LEO_X_OFFSET = (290 - 2106 * LEO_SCALE) / 2
 const LEO_Y_OFFSET = (290 - 2016 * LEO_SCALE) / 2
@@ -50,16 +52,17 @@ export function LeoFigureBackdrop({
 }) {
   const liveProps = useAnimatedProps(() => {
     'worklet'
-    // Opacity 0.10 → 0.34 with progress. Quadratic ease so the lion
-    // STARTS faint and ACCELERATES into presence as more stars light
-    // — the difference between day-12 and day-24 reads stronger than
-    // between day-0 and day-12.
+    // Opacity 0.25 → 0.65 with progress. Quadratic ease so the lion
+    // starts at a visible quarter and accelerates into full presence
+    // — the gain between day-12 and day-24 reads stronger than
+    // between day-0 and day-12, matching the user's lived sense of
+    // momentum building.
     const p = Math.max(0, Math.min(1, progress))
-    const opacity = 0.1 + 0.24 * p * p
-    // Breath: ±1.8 % scale, centred on canvas (145, 145). One slow
-    // breath every 16 s.
+    const opacity = 0.25 + 0.4 * p * p
+    // Breath: ±2 % scale, centred on canvas (145, 145). One slow
+    // inhale every 16 s.
     const wave = breathT ? 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI) : 0
-    const breath = 1 + wave * 0.018
+    const breath = 1 + wave * 0.02
     return {
       opacity,
       transform: [
@@ -76,8 +79,8 @@ export function LeoFigureBackdrop({
     <AnimatedG animatedProps={liveProps}>
       <G
         transform={`translate(${LEO_X_OFFSET.toFixed(3)} ${LEO_Y_OFFSET.toFixed(3)}) scale(${LEO_SCALE.toFixed(6)})`}
-        stroke={colors.magenta}
-        strokeWidth={22}
+        stroke={colors.bone}
+        strokeWidth={14}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
