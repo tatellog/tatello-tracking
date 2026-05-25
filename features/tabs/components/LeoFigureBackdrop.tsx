@@ -31,13 +31,13 @@ import { colors } from '@/theme'
  */
 
 const CANVAS_FILL = 290 / 2106
-// FIT_SCALE 1.14 — the lion overflows the viewBox by ~14 viewBox
+// FIT_SCALE 1.22 — the lion overflows the viewBox by ~22 viewBox
 // units per side at its widest mane tips, reading cinematic: the
 // figure is too large to fit the frame, like an engraved seal
 // pressed onto the page. Combined with the smaller constellation
 // (wrapped in a 0.82 scale group), the constellation lands clearly
 // INSIDE the lion.
-const FIT_SCALE = 1.14
+const FIT_SCALE = 1.22
 const LEO_SCALE = CANVAS_FILL * FIT_SCALE
 const LEO_X_OFFSET = (290 - 2106 * LEO_SCALE) / 2
 const LEO_Y_OFFSET = (290 - 2016 * LEO_SCALE) / 2
@@ -58,15 +58,15 @@ export function LeoFigureBackdrop({
 }) {
   const liveProps = useAnimatedProps(() => {
     'worklet'
-    // Opacity 0.52 → 0.95 with progress. Lifted from 0.40–0.85 so
-    // the lion is firmly present from day 0 (a clear bronze
-    // silhouette, not just visible) and reaches near-full opacity
-    // by day 28. The bumped floor matters most: with the gold
-    // constellation already brighter, the lion needs comparable
-    // weight to read as containing the figure instead of sitting
-    // behind it.
+    // Opacity 0.36 → 0.72 with progress. Pulled back from the
+    // previous 0.52–0.95: with the lion now larger (FIT_SCALE
+    // 1.22, overflowing the frame), the figure occupies more of
+    // the visible area, so a lighter opacity keeps the bronze
+    // silhouette legible without dominating. The constellation
+    // still reads as inscribed inside the lion, but with more
+    // breathing room between the lion's lines and the cosmos.
     const p = Math.max(0, Math.min(1, progress))
-    const opacity = 0.52 + 0.43 * p * p
+    const opacity = 0.36 + 0.36 * p * p
     // Breath: ±2 % scale, centred on canvas (145, 145). One slow
     // inhale every 16 s.
     const wave = breathT ? 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI) : 0
