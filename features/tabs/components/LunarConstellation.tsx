@@ -1355,13 +1355,32 @@ function ConstellationRay({
   const traversal = useMemo(() => deriveHamiltonPath(stars.length, lines), [stars.length, lines])
   const pathD = useMemo(() => {
     if (traversal.length === 0) return ''
-    const first = stars[traversal[0]!]
-    if (!first) return ''
-    const segs = [`M ${first.x} ${first.y}`]
-    for (let i = 1; i < traversal.length; i++) {
-      const s = stars[traversal[i]!]
-      if (!s) continue
-      segs.push(`L ${s.x} ${s.y}`)
+    const points = traversal.map((idx) => stars[idx]).filter((s): s is Resolved => !!s)
+    if (points.length === 0) return ''
+    if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`
+    // Catmull-Rom → cubic bezier conversion. Each segment from
+    // P[i] to P[i+1] becomes a cubic curve whose control points are
+    // derived from the slope at P[i] (using P[i-1] and P[i+1]) and
+    // the slope at P[i+1] (using P[i] and P[i+2]). The curve passes
+    // through every star but sweeps between them instead of
+    // hitting sharp corners — reads as flowing plasma rather than
+    // a wireframe polygon.
+    //
+    // TENSION 0.3 gives a relaxed sweep: tight enough that each
+    // star is clearly the on-curve point, loose enough that the
+    // path feels organic (not Catmull-Rom's looser ~0.5).
+    const TENSION = 0.3
+    const segs = [`M ${points[0]!.x} ${points[0]!.y}`]
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] ?? points[i]!
+      const p1 = points[i]!
+      const p2 = points[i + 1]!
+      const p3 = points[i + 2] ?? points[i + 1]!
+      const cp1x = p1.x + (p2.x - p0.x) * TENSION
+      const cp1y = p1.y + (p2.y - p0.y) * TENSION
+      const cp2x = p2.x - (p3.x - p1.x) * TENSION
+      const cp2y = p2.y - (p3.y - p1.y) * TENSION
+      segs.push(`C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`)
     }
     return segs.join(' ')
   }, [stars, traversal])
