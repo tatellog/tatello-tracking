@@ -58,15 +58,14 @@ export function LeoFigureBackdrop({
 }) {
   const liveProps = useAnimatedProps(() => {
     'worklet'
-    // Opacity 0.36 → 0.72 with progress. With the lion now
-    // larger (FIT_SCALE 1.22, overflowing the frame) the figure
-    // occupies more of the visible area, so a lighter opacity
-    // keeps the bronze silhouette legible without dominating.
-    // The magenta constellation still reads as inscribed inside
-    // the lion, with breathing room between the lion's lines and
-    // the cosmos.
+    // Opacity 0.22 → 0.52 with progress. Pulled back from
+    // 0.36–0.72 so the bigger lion (FIT_SCALE 1.22, overflowing
+    // the frame) stops dominating the constellation. The figure
+    // still reads as a clear bronze silhouette inscribed under
+    // the stars, but the constellation gets its visual weight
+    // back as the primary "your progress" focus.
     const p = Math.max(0, Math.min(1, progress))
-    const opacity = 0.36 + 0.36 * p * p
+    const opacity = 0.22 + 0.3 * p * p
     // Breath: ±2 % scale, centred on canvas (145, 145). One slow
     // inhale every 16 s.
     const wave = breathT ? 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI) : 0

@@ -692,11 +692,13 @@ function SvgGradients() {
       </RadialGradient>
       {/* Lit-cluster aura — warm cream-pink wash bathing the lit
           half of the constellation. Bright cream at the centre
-          fades to transparent magenta at the rim — Leo's fire-sign
-          warmth threaded through STELAR's brand palette. */}
+          fades to transparent magenta at the rim. Centre + mid
+          opacities bumped (0.85→0.95, 0.45→0.6) so the lit area
+          glows with enough warmth to compete with the bronze
+          lion behind it instead of being absorbed by it. */}
       <RadialGradient id="litClusterAura" cx="50%" cy="50%" r="50%">
-        <Stop offset="0%" stopColor="#FFE9D6" stopOpacity={0.85} />
-        <Stop offset="45%" stopColor="#F4ECDE" stopOpacity={0.45} />
+        <Stop offset="0%" stopColor="#FFE9D6" stopOpacity={0.95} />
+        <Stop offset="45%" stopColor="#F4ECDE" stopOpacity={0.6} />
         <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
       </RadialGradient>
     </Defs>
