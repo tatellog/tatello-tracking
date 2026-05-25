@@ -2066,12 +2066,14 @@ function CenterText({
           magenta constellation through a single luminous point. */}
       <AnimatedCircle cx={cx} cy={cy - 42} r={24} fill={colors.magenta} animatedProps={haloProps} />
       {/* Subtitle — serif italic (coach voice) so "DE 28 DÍAS"
-          lands in STELAR's poetic register. Sits right under the
-          lifted number at cy - 12 so the text stack reads as a
-          tight pair high in the canvas, not stretched across it. */}
+          lands in STELAR's poetic register. Drops to cy + 18 so
+          the subtitle sits CLEARLY BELOW the lifted React Native
+          counter (whose visual bottom lands around cy - 26),
+          opening ~44 pt of breathing room between the count's
+          glow and the subtitle's baseline. */}
       <SvgText
         x={cx}
-        y={cy - 12}
+        y={cy + 18}
         textAnchor="middle"
         fontFamily={typography.serifSemi}
         fontStyle="italic"
