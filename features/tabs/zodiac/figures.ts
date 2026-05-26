@@ -25,20 +25,25 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   aries: {
     label: 'ARIES',
     glyph: '♈',
+    // Aligned to the ram in aries-art.svg — 6-star Aries curve
+    // (continuous chain) repositioned to trace the ram's outline:
+    // snout (left) → lower jaw → Hamal on the horn peak → back
+    // shoulder → hip → rear-leg / tail. Same 6 stars + 5 lines
+    // as the canonical asterism, just better anatomical fit.
     stars: [
-      { x: 0.09, y: 0.46, mag: 2.6 }, // 0 far-left — second brightest
-      { x: 0.25, y: 0.55, mag: 3.4 }, // 1 dip
-      { x: 0.42, y: 0.25, mag: 1.5 }, // 2 Hamal — the peak (anchor)
-      { x: 0.66, y: 0.36, mag: 2.9 }, // 3 shoulder
-      { x: 0.8, y: 0.58, mag: 3.0 }, // 4 descent
-      { x: 0.91, y: 0.8, mag: 3.3 }, // 5 tail tip
+      { x: 0.18, y: 0.42, mag: 2.6 }, // 0 snout (ram facing left)
+      { x: 0.32, y: 0.5, mag: 3.4 }, // 1 lower jaw
+      { x: 0.45, y: 0.32, mag: 1.5 }, // 2 Hamal — horn peak (anchor) ★
+      { x: 0.62, y: 0.45, mag: 2.9 }, // 3 shoulder / back ridge
+      { x: 0.72, y: 0.62, mag: 3.0 }, // 4 hip
+      { x: 0.82, y: 0.78, mag: 3.3 }, // 5 rear leg / tail
     ],
     lines: [
-      [0, 1],
-      [1, 2], // rise to Hamal
-      [2, 3], // curving descent
-      [3, 4],
-      [4, 5],
+      [0, 1], // snout → jaw
+      [1, 2], // rise to Hamal (horn peak)
+      [2, 3], // back curve
+      [3, 4], // shoulder to hip
+      [4, 5], // hip to tail
     ],
   },
 
@@ -48,30 +53,39 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   tauro: {
     label: 'TAURO',
     glyph: '♉',
+    // Clean Taurus shape — symmetric short HORNS rising from the
+    // bull's face (aligned with the art), tight HYADES V on the
+    // face, ALDEBARAN as the bright eye at the V's apex, and a
+    // short BODY chain extending right toward the rose. Lines
+    // don't cross; the figure reads as bull-head + body trail.
+    // 10 stars + 10 lines = 20 elements.
     stars: [
-      { x: 0.2, y: 0.08, mag: 2.0 }, // 0 top horn tip
-      { x: 0.46, y: 0.35, mag: 3.0 }, // 1 top horn base
-      { x: 0.06, y: 0.31, mag: 3.0 }, // 2 left horn tip
-      { x: 0.38, y: 0.62, mag: 3.0 }, // 3 left horn base
-      { x: 0.49, y: 0.46, mag: 4.0 }, // 4 Hyades V — upper
-      { x: 0.44, y: 0.54, mag: 4.0 }, // 5 Hyades V — mid
-      { x: 0.52, y: 0.61, mag: 4.0 }, // 6 Hyades V — lower
-      { x: 0.57, y: 0.69, mag: 3.0 }, // 7 face hinge
-      { x: 0.69, y: 0.81, mag: 1.5 }, // 8 Aldebaran (anchor / the eye)
-      { x: 0.89, y: 0.73, mag: 3.2 }, // 9 body
-      { x: 0.92, y: 0.93, mag: 3.5 }, // 10 body tip
+      // Horns (short, symmetric, rising from the face)
+      { x: 0.32, y: 0.16, mag: 3.0 }, // 0 left horn tip
+      { x: 0.4, y: 0.34, mag: 3.5 }, // 1 left horn base
+      { x: 0.58, y: 0.16, mag: 2.0 }, // 2 right horn tip — Elnath ★
+      { x: 0.5, y: 0.34, mag: 3.5 }, // 3 right horn base
+      // Hyades V (tight triangle on the bull's face)
+      { x: 0.36, y: 0.46, mag: 4.0 }, // 4 V upper-left
+      { x: 0.54, y: 0.46, mag: 4.0 }, // 5 V upper-right
+      { x: 0.45, y: 0.58, mag: 4.0 }, // 6 V apex (bottom of V)
+      // Aldebaran (eye) sits just below the V apex
+      { x: 0.5, y: 0.7, mag: 1.5 }, // 7 Aldebaran ★★
+      // Body chain (toward the rose decoration on the right)
+      { x: 0.68, y: 0.8, mag: 3.2 }, // 8 body forward
+      { x: 0.86, y: 0.86, mag: 3.5 }, // 9 body tip
     ],
     lines: [
-      [0, 1], // top horn
-      [2, 3], // left horn
-      [1, 4], // top horn base into the Hyades V
-      [4, 5],
-      [5, 6],
-      [6, 7], // V down to the face hinge
-      [3, 7], // left horn base to the hinge
-      [7, 8], // hinge to Aldebaran
-      [8, 9], // Aldebaran into the body
-      [9, 10], // body tip
+      [0, 1], // left horn
+      [2, 3], // right horn
+      [1, 4], // left horn base into V upper-left
+      [3, 5], // right horn base into V upper-right
+      [4, 5], // V top edge
+      [4, 6], // V left edge (down to apex)
+      [5, 6], // V right edge (down to apex)
+      [6, 7], // V apex to Aldebaran (the eye)
+      [7, 8], // Aldebaran to body forward
+      [8, 9], // body tip
     ],
   },
 
@@ -86,48 +100,42 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   geminis: {
     label: 'GÉMINIS',
     glyph: '♊',
+    // Iconic Géminis "II" — two parallel chains for the two twins
+    // facing each other in geminis-art.svg, connected by the heads
+    // at the top (Castor ↔ Pollux) and the feet at the bottom
+    // (Alzirr ↔ Alhena). 10 stars + 10 lines = 20 elements.
     stars: [
-      // The constellation reads as two visual tiers, per the chart:
-      //   L (size = "large") — Castor, Pollux, Alhena: bright anchor
-      //     stars rendered with the hero glow (mag ≤ 1.7).
-      //   M (size = "medium") — every other point: uniform mid-mag
-      //     so they're visible connectors without competing with the
-      //     anchors. We use mag 1.5 / 3.0 as the two tiers so the
-      //     LunarConstellation HERO_MAG=1.7 cleanly splits them.
-      // L
-      { x: 0.28, y: 0.15, mag: 1.5 }, // 0 Castor (α Gem)
-      { x: 0.2, y: 0.26, mag: 1.5 }, // 1 Pollux (β Gem)
-      // M — Pollux's hand to Al Kirkab and then into Wasat
-      { x: 0.1, y: 0.42, mag: 3.0 }, // 2 Al Kirkab (κ Gem)
-      // M — Castor's body descending right to Mebsuta
-      { x: 0.52, y: 0.32, mag: 3.0 }, // 3 Mebsuta (ε Gem)
-      // M — the meeting point of the two twin bodies
-      { x: 0.42, y: 0.55, mag: 3.0 }, // 4 Wasat (δ Gem)
-      // L — the bright foot off to the right
-      { x: 0.66, y: 0.68, mag: 1.5 }, // 5 Alhena (γ Gem)
-      // M — Pollux's leg down toward Alzirr (the left foot)
-      { x: 0.48, y: 0.72, mag: 3.0 }, // 6 Mekbuda (ζ Gem)
-      { x: 0.42, y: 0.92, mag: 3.0 }, // 7 Alzirr (ξ Gem)
-      // M — Castor's right arm out to Propus (the rightmost star)
-      { x: 0.82, y: 0.48, mag: 3.0 }, // 8 Tejat Posterior (μ Gem)
-      { x: 0.92, y: 0.42, mag: 3.0 }, // 9 Propus (η Gem)
+      // Heads (the bright pair — α and β Gem)
+      { x: 0.32, y: 0.15, mag: 1.5 }, // 0 Castor (left twin) ★
+      { x: 0.62, y: 0.15, mag: 1.5 }, // 1 Pollux (right twin) ★
+      // Upper bodies (shoulders)
+      { x: 0.32, y: 0.32, mag: 3.0 }, // 2 left twin shoulder
+      { x: 0.62, y: 0.32, mag: 3.0 }, // 3 right twin shoulder
+      // Mid bodies (waists)
+      { x: 0.32, y: 0.5, mag: 3.0 }, // 4 left twin waist
+      { x: 0.62, y: 0.5, mag: 3.0 }, // 5 right twin waist (Wasat)
+      // Lower bodies (knees)
+      { x: 0.34, y: 0.68, mag: 3.0 }, // 6 left twin knee
+      { x: 0.6, y: 0.68, mag: 3.0 }, // 7 right twin knee
+      // Feet
+      { x: 0.34, y: 0.88, mag: 3.0 }, // 8 Alzirr (left foot)
+      { x: 0.6, y: 0.88, mag: 1.5 }, // 9 Alhena (right foot, bright) ★
     ],
     lines: [
-      // Heads
-      [0, 1], // Castor → Pollux
-      // Twin 1 — Castor down to its foot at Alzirr
-      [0, 3], // Castor → Mebsuta
-      [3, 4], // Mebsuta → Wasat
-      [4, 6], // Wasat → Mekbuda
-      [6, 7], // Mekbuda → Alzirr
-      // Twin 2 — Pollux's hand merges into the shared body at Wasat
-      [1, 2], // Pollux → Al Kirkab
-      [2, 4], // Al Kirkab → Wasat
-      // Right arm — from Mebsuta out to Propus, plus the brace down
-      // to Alhena
-      [3, 8], // Mebsuta → Tejat Posterior
-      [8, 9], // Tejat Posterior → Propus
-      [4, 5], // Wasat → Alhena
+      // Twin bond — heads connected at top
+      [0, 1],
+      // Left twin chain (Castor → foot)
+      [0, 2],
+      [2, 4],
+      [4, 6],
+      [6, 8],
+      // Right twin chain (Pollux → Alhena)
+      [1, 3],
+      [3, 5],
+      [5, 7],
+      [7, 9],
+      // Feet connected at bottom
+      [8, 9],
     ],
   },
 
@@ -173,18 +181,20 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     label: 'LEO',
     glyph: '♌',
     stars: [
-      // The Sickle — the lion's head & mane: a backwards-question-mark
-      // hook that rises from Regulus and curls over the top.
-      { x: 0.14, y: 0.74, mag: 1.5 }, // 0 Regulus — the heart, anchor & brightest
-      { x: 0.21, y: 0.56, mag: 3.5 }, // 1 Eta — up the neck
-      { x: 0.28, y: 0.38, mag: 2.3 }, // 2 Algieba — the bright bend of the hook
-      { x: 0.28, y: 0.2, mag: 3.5 }, // 3 Adhafera — straight up
-      { x: 0.39, y: 0.12, mag: 3.9 }, // 4 Rasalas — over the crown
-      { x: 0.5, y: 0.19, mag: 3.0 }, // 5 Epsilon — the hook's open end, curling down
-      // The hindquarters — a triangle trailing back to the tail.
-      { x: 0.58, y: 0.62, mag: 3.3 }, // 6 Chort — the haunch
-      { x: 0.63, y: 0.41, mag: 2.6 }, // 7 Zosma — the hip
-      { x: 0.9, y: 0.52, mag: 2.0 }, // 8 Denebola — the tail tip
+      // The Sickle — the lion's head & mane: positioned so each
+      // star lands on a visible part of the leo-art portrait.
+      { x: 0.18, y: 0.68, mag: 1.5, name: 'Regulus', role: 'el corazón del león' },
+      { x: 0.24, y: 0.52, mag: 3.5, name: 'Eta', role: 'su cuello' },
+      { x: 0.3, y: 0.38, mag: 2.3, name: 'Algieba', role: 'la curva de su melena' },
+      { x: 0.3, y: 0.22, mag: 3.5, name: 'Adhafera', role: 'la trenza de su melena' },
+      { x: 0.4, y: 0.14, mag: 3.9, name: 'Rasalas', role: 'la corona de su cabeza' },
+      { x: 0.5, y: 0.22, mag: 3.0, name: 'Epsilon', role: 'su mirada' },
+      // The hindquarters — compacted so the triangle stays inside
+      // the visible lion area instead of stretching past the
+      // ornate mane decorations.
+      { x: 0.52, y: 0.55, mag: 3.3, name: 'Chort', role: 'el inicio de su rugido' },
+      { x: 0.58, y: 0.4, mag: 2.6, name: 'Zosma', role: 'la fuerza de su andar' },
+      { x: 0.72, y: 0.5, mag: 2.0, name: 'Denebola', role: 'el último resplandor' },
     ],
     lines: [
       [0, 1], // sickle hook
@@ -213,20 +223,24 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   virgo: {
     label: 'VIRGO',
     glyph: '♍',
+    // Pentagon + branches kept as the canonical Virgo topology
+    // but compacted so the whole figure fits inside the visible
+    // woman silhouette in virgo-art.svg — antenna over the hair,
+    // pentagon on the torso, legs descending through the dress.
     stars: [
-      { x: 0.22, y: 0.1, mag: 3.4 }, // 0 H — antenna tip
-      { x: 0.4, y: 0.2, mag: 1.5 }, // 1 C — pentagon top-left (anchor)
-      { x: 0.63, y: 0.28, mag: 3.0 }, // 2 D — pentagon top-right
-      { x: 0.78, y: 0.15, mag: 3.2 }, // 3 B — arm
-      { x: 0.92, y: 0.05, mag: 3.4 }, // 4 A — arm tip
-      { x: 0.66, y: 0.47, mag: 3.4 }, // 5 F — pentagon right knee
-      { x: 0.71, y: 0.69, mag: 1.9 }, // 6 G — pentagon bottom-right
-      { x: 0.33, y: 0.66, mag: 2.6 }, // 7 E — pentagon bottom-left (node)
-      { x: 0.2, y: 0.79, mag: 3.2 }, // 8 I — left leg
-      { x: 0.07, y: 0.93, mag: 3.2 }, // 9 J — left foot
-      { x: 0.58, y: 0.83, mag: 3.2 }, // 10 L — right leg fork
-      { x: 0.74, y: 0.91, mag: 3.2 }, // 11 K — right foot
-      { x: 0.46, y: 0.95, mag: 3.4 }, // 12 M — lower dangle
+      { x: 0.28, y: 0.12, mag: 3.4 }, // 0 H — antenna tip (hair flourish)
+      { x: 0.4, y: 0.22, mag: 1.5 }, // 1 C — pentagon top-left (anchor) ★
+      { x: 0.55, y: 0.3, mag: 3.0 }, // 2 D — pentagon top-right (shoulder)
+      { x: 0.65, y: 0.18, mag: 3.2 }, // 3 B — arm bend
+      { x: 0.78, y: 0.1, mag: 3.4 }, // 4 A — arm tip (reaching up)
+      { x: 0.6, y: 0.46, mag: 3.4 }, // 5 F — right hip / knee
+      { x: 0.62, y: 0.68, mag: 1.9 }, // 6 G — pentagon bottom-right ★
+      { x: 0.34, y: 0.58, mag: 2.6 }, // 7 E — pentagon bottom-left (node)
+      { x: 0.28, y: 0.74, mag: 3.2 }, // 8 I — left leg
+      { x: 0.2, y: 0.88, mag: 3.2 }, // 9 J — left foot
+      { x: 0.54, y: 0.82, mag: 3.2 }, // 10 L — right leg fork
+      { x: 0.64, y: 0.9, mag: 3.2 }, // 11 K — right foot
+      { x: 0.44, y: 0.9, mag: 3.4 }, // 12 M — lower dangle
     ],
     lines: [
       [1, 0], // antenna — C to H
@@ -253,25 +267,29 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   libra: {
     label: 'LIBRA',
     glyph: '♎',
+    // Aligned to the scale in libra-art.svg: the TRIANGLE forms
+    // the balance beam (A–B horizontal at top) converging down to
+    // C where the woman holds it; the two TAILS are the chains
+    // descending to the pans on each side. 8 stars + 8 lines = 16.
     stars: [
-      { x: 0.26, y: 0.2, mag: 1.5 }, // 0 A — top-left (anchor)
-      { x: 0.66, y: 0.24, mag: 1.9 }, // 1 B — top-right
-      { x: 0.74, y: 0.6, mag: 1.9 }, // 2 C — bottom-right
-      { x: 0.28, y: 0.4, mag: 3.2 }, // 3 D — left tail
-      { x: 0.22, y: 0.54, mag: 3.2 }, // 4 E — left tail
-      { x: 0.15, y: 0.7, mag: 3.0 }, // 5 F — left tail end
-      { x: 0.6, y: 0.78, mag: 3.2 }, // 6 G — lower tail
-      { x: 0.68, y: 0.92, mag: 3.0 }, // 7 H — lower tail end
+      { x: 0.22, y: 0.3, mag: 1.5 }, // 0 A — left beam end (anchor) ★
+      { x: 0.72, y: 0.3, mag: 1.9 }, // 1 B — right beam end
+      { x: 0.5, y: 0.58, mag: 1.9 }, // 2 C — woman's hands (lower vertex)
+      { x: 0.18, y: 0.48, mag: 3.2 }, // 3 D — left chain upper
+      { x: 0.16, y: 0.66, mag: 3.2 }, // 4 E — left chain mid
+      { x: 0.18, y: 0.84, mag: 3.0 }, // 5 F — left pan
+      { x: 0.78, y: 0.66, mag: 3.2 }, // 6 G — right chain
+      { x: 0.82, y: 0.84, mag: 3.0 }, // 7 H — right pan
     ],
     lines: [
-      [0, 1], // triangle — top edge
-      [0, 2], // triangle — diagonal
-      [1, 2], // triangle — right edge
-      [0, 3], // left tail
+      [0, 1], // beam — horizontal top
+      [0, 2], // left diagonal down to hands
+      [1, 2], // right diagonal down to hands
+      [0, 3], // left chain
       [3, 4],
-      [4, 5],
-      [2, 6], // lower tail
-      [6, 7],
+      [4, 5], // left pan
+      [1, 6], // right chain (from B, not from C — chains hang from beam ends)
+      [6, 7], // right pan
     ],
   },
 
@@ -280,17 +298,22 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   escorpio: {
     label: 'ESCORPIO',
     glyph: '♏',
+    // Realigned to the escorpio-art.svg silhouette: scorpion body
+    // is vertical with the head + claws at the top, body running
+    // down the centre, and the tail wrapping to the lower-right
+    // with the stinger curling back up. Coordinates trace that
+    // anatomy so each lit star lands on a recognisable body part.
     stars: [
-      { x: 0.1, y: 0.2, mag: 2.7 }, // 0 left claw
-      { x: 0.22, y: 0.3, mag: 2.3 }, // 1 head
-      { x: 0.4, y: 0.18, mag: 2.7 }, // 2 right claw
-      { x: 0.36, y: 0.42, mag: 2.9 }, // 3 body high
-      { x: 0.5, y: 0.55, mag: 1.5 }, // 4 Antares (anchor)
-      { x: 0.55, y: 0.72, mag: 3.0 }, // 5 body mid
-      { x: 0.7, y: 0.82, mag: 2.8 }, // 6 body bend
-      { x: 0.84, y: 0.78, mag: 2.4 }, // 7 tail curl
-      { x: 0.9, y: 0.62, mag: 2.6 }, // 8 tail
-      { x: 0.8, y: 0.45, mag: 1.9 }, // 9 stinger tip
+      { x: 0.32, y: 0.22, mag: 2.7 }, // 0 left claw — upper-left horn tip
+      { x: 0.5, y: 0.3, mag: 2.3 }, // 1 head — between the horns
+      { x: 0.68, y: 0.22, mag: 2.7 }, // 2 right claw — upper-right horn tip
+      { x: 0.5, y: 0.42, mag: 2.9 }, // 3 body high — upper torso
+      { x: 0.5, y: 0.55, mag: 1.5 }, // 4 Antares — the heart, anchor
+      { x: 0.52, y: 0.68, mag: 3.0 }, // 5 body mid — lower torso
+      { x: 0.58, y: 0.78, mag: 2.8 }, // 6 body bend — where tail starts curving
+      { x: 0.72, y: 0.84, mag: 2.4 }, // 7 tail curl — tail extending right
+      { x: 0.82, y: 0.72, mag: 2.6 }, // 8 tail — curving back up
+      { x: 0.78, y: 0.55, mag: 1.9 }, // 9 stinger tip — pointing up
     ],
     lines: [
       [0, 1],
@@ -315,54 +338,52 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   sagitario: {
     label: 'SAGITARIO',
     glyph: '♐',
+    // Aligned to the archer in sagitario-art.svg: BOW arc on the
+    // upper-right (matching the art's bow), ARROW horizontal
+    // through the archer's drawing hand, BODY on her torso,
+    // LEGS extending down. 14 stars + 14 lines = 28 — fits the
+    // cycle exactly so every element lights by day 28.
     stars: [
-      // Left bracket + fork
-      { x: 0.05, y: 0.28, mag: 2.4 }, // 0 bracket top-left
-      { x: 0.24, y: 0.22, mag: 2.6 }, // 1 bracket top-right
-      { x: 0.05, y: 0.72, mag: 2.4 }, // 2 bracket bottom-left
-      { x: 0.23, y: 0.72, mag: 2.8 }, // 3 bracket bottom-mid
-      { x: 0.3, y: 0.9, mag: 3.0 }, // 4 fork
-      // Upper chain
-      { x: 0.46, y: 0.07, mag: 2.8 }, // 5 topmost
-      { x: 0.5, y: 0.22, mag: 2.8 }, // 6 upper-mid
-      { x: 0.59, y: 0.26, mag: 3.0 }, // 7 hook
-      // Teapot body
-      { x: 0.46, y: 0.37, mag: 2.0 }, // 8 body top-left (junction)
-      { x: 0.62, y: 0.41, mag: 2.4 }, // 9 body top-right
-      { x: 0.44, y: 0.51, mag: 2.4 }, // 10 body bottom-left
-      { x: 0.58, y: 0.53, mag: 2.2 }, // 11 body bottom-right
-      { x: 0.35, y: 0.45, mag: 2.8 }, // 12 spout tip
-      // Handle + bright star
-      { x: 0.72, y: 0.43, mag: 2.6 }, // 13 handle junction
-      { x: 0.85, y: 0.31, mag: 1.5 }, // 14 right bright star (anchor)
-      { x: 0.81, y: 0.55, mag: 2.8 }, // 15 handle lower
-      // Legs
-      { x: 0.65, y: 0.65, mag: 2.4 }, // 16 leg junction
-      { x: 0.61, y: 0.86, mag: 3.0 }, // 17 leg foot
-      { x: 0.81, y: 0.74, mag: 3.0 }, // 18 leg right
+      // Bow (right side — three stars arcing along the bow's curve)
+      { x: 0.82, y: 0.38, mag: 2.8 }, // 0 bow upper tip
+      { x: 0.95, y: 0.55, mag: 2.0 }, // 1 bow apex (rightmost) ★
+      { x: 0.82, y: 0.72, mag: 2.8 }, // 2 bow lower tip
+      // Arrow (horizontal — nocked on bow string, shaft going left
+      // toward the archer's hand)
+      { x: 0.86, y: 0.55, mag: 3.2 }, // 3 arrow nock (on bow string)
+      { x: 0.68, y: 0.55, mag: 3.0 }, // 4 arrow shaft mid
+      { x: 0.55, y: 0.52, mag: 2.6 }, // 5 arrow tip (front hand)
+      // Archer body — torso compact rectangle on the figure
+      { x: 0.44, y: 0.4, mag: 2.4 }, // 6 head / shoulder line ★
+      { x: 0.5, y: 0.48, mag: 3.0 }, // 7 right shoulder
+      { x: 0.36, y: 0.52, mag: 2.8 }, // 8 left shoulder / chest
+      { x: 0.48, y: 0.62, mag: 2.6 }, // 9 right waist
+      { x: 0.38, y: 0.66, mag: 2.8 }, // 10 left waist
+      // Lower body — legs / dress flowing down
+      { x: 0.42, y: 0.78, mag: 2.6 }, // 11 hip / upper leg
+      { x: 0.4, y: 0.9, mag: 3.0 }, // 12 lower leg
+      { x: 0.52, y: 0.95, mag: 2.8 }, // 13 foot
     ],
     lines: [
-      [1, 0], // bracket — top edge
-      [0, 2], // bracket — left edge
-      [2, 3], // bracket — bottom edge
-      [3, 4], // fork
-      [1, 8], // bridge to the teapot
-      [5, 6], // upper chain
+      // Bow curve
+      [0, 1],
+      [1, 2],
+      // Arrow on bow string + shaft + tip
+      [1, 3], // arrow nock joins bow
+      [3, 4],
+      [4, 5],
+      // Arrow tip joins the archer's hand at the shoulder
+      [5, 7],
+      // Body — head down through shoulders to waist
       [6, 7],
       [6, 8],
-      [8, 9], // body
+      [7, 9],
       [8, 10],
+      [9, 10],
+      // Legs flow down
       [10, 11],
-      [9, 11],
-      [12, 8], // spout
-      [12, 10],
-      [9, 13], // handle
-      [13, 14],
-      [13, 15],
-      [15, 11],
-      [11, 16], // legs
-      [16, 17],
-      [16, 18],
+      [11, 12],
+      [12, 13],
     ],
   },
 
@@ -375,31 +396,41 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   capricornio: {
     label: 'CAPRICORNIO',
     glyph: '♑',
+    // Aligned to the goat-mermaid in capricornio-art.svg. The
+    // classic Capricornus wedge is rotated so its apex (the
+    // brightest pair) lands on the goat's HEAD/horns (upper-left),
+    // the upper edge follows the back, and the tail tip falls
+    // where the fish tail curls (lower-right). 11 stars + 11
+    // lines = 22 elements (fits the 28-day cycle).
     stars: [
-      { x: 0.56, y: 0.08, mag: 2.4 }, // 0 apex top
-      { x: 0.54, y: 0.17, mag: 1.5 }, // 1 apex (anchor)
-      { x: 0.33, y: 0.5, mag: 3.0 }, // 2 left edge
-      { x: 0.21, y: 0.63, mag: 2.8 }, // 3 lower-left
-      { x: 0.11, y: 0.74, mag: 2.6 }, // 4 bottom-left
-      { x: 0.2, y: 0.79, mag: 3.0 }, // 5 base
-      { x: 0.35, y: 0.76, mag: 3.0 }, // 6 base
-      { x: 0.5, y: 0.75, mag: 2.8 }, // 7 base
-      { x: 0.63, y: 0.72, mag: 2.8 }, // 8 base
-      { x: 0.75, y: 0.67, mag: 2.4 }, // 9 lower-right
-      { x: 0.81, y: 0.58, mag: 2.0 }, // 10 right edge
+      // Head: horn tip + alpha (the brightest star sits on the snout)
+      { x: 0.3, y: 0.18, mag: 2.4 }, // 0 horn tip
+      { x: 0.34, y: 0.26, mag: 1.5 }, // 1 head / alpha (anchor) ★
+      // Back ridge (chain along the goat's spine going right)
+      { x: 0.44, y: 0.32, mag: 3.0 }, // 2 neck
+      { x: 0.55, y: 0.34, mag: 3.0 }, // 3 upper back
+      { x: 0.66, y: 0.4, mag: 2.6 }, // 4 mid back
+      { x: 0.76, y: 0.5, mag: 2.4 }, // 5 hip
+      // Tail (curving down-right then curling back)
+      { x: 0.84, y: 0.6, mag: 2.0 }, // 6 tail upper ★
+      { x: 0.84, y: 0.74, mag: 2.8 }, // 7 tail mid
+      { x: 0.72, y: 0.82, mag: 3.0 }, // 8 tail curl
+      // Belly chain (returning right-to-left under the body)
+      { x: 0.54, y: 0.78, mag: 2.8 }, // 9 belly
+      { x: 0.4, y: 0.72, mag: 2.6 }, // 10 belly front (closes back to head)
     ],
     lines: [
-      [0, 1], // apex pair
-      [1, 2], // left edge
-      [2, 3],
-      [3, 4],
-      [4, 5], // base chain
-      [5, 6],
-      [6, 7],
-      [7, 8],
-      [8, 9],
-      [9, 10], // right edge
-      [10, 1],
+      [0, 1], // horn to head (apex pair)
+      [1, 2], // head to neck
+      [2, 3], // neck to back
+      [3, 4], // back ridge
+      [4, 5], // back to hip
+      [5, 6], // hip to tail
+      [6, 7], // tail curve
+      [7, 8], // tail curl
+      [8, 9], // tail back to belly
+      [9, 10], // belly chain
+      [10, 1], // close figure (belly to head)
     ],
   },
 
@@ -407,34 +438,48 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   acuario: {
     label: 'ACUARIO',
     glyph: '♒',
+    // Exact 1:1 with the reference photograph of the real
+    // Aquarius asterism — top star descending to the Y-junction
+    // water jar, two right extensions, a left-going chain, a
+    // central zigzag knot, and the bottom-right V. 13 stars + 12
+    // lines = 25 elements (fits comfortably in the 28-day cycle).
     stars: [
-      { x: 0.998, y: 0.998, mag: 3.5 }, // 0 right arm tip / foot
-      { x: 0.765, y: 0.568, mag: 3.0 }, // 1 right elbow
-      { x: 0.57, y: 0.181, mag: 1.5 }, // 2 shoulder / urn (anchor + branch)
-      { x: 0.416, y: 0.155, mag: 2.5 }, // 3 upper torso
-      { x: 0.387, y: 0.002, mag: 2.5 }, // 4 head top
-      { x: 0.28, y: 0.04, mag: 3.5 }, // 5 head/neck
-      { x: 0.002, y: 0.32, mag: 2.5 }, // 6 far-left arm tip
-      { x: 0.148, y: 0.411, mag: 3.5 }, // 7 left elbow
-      { x: 0.186, y: 0.668, mag: 3.5 }, // 8 hip
-      { x: 0.094, y: 0.771, mag: 3.5 }, // 9 knee
-      { x: 0.024, y: 0.944, mag: 3.5 }, // 10 foot
-      { x: 0.449, y: 0.507, mag: 4.0 }, // 11 water stream upper
-      { x: 0.474, y: 0.831, mag: 3.5 }, // 12 water stream lower
+      { x: 0.78, y: 0.13, mag: 2.5 }, // 0 top-right (descent start)
+      { x: 0.62, y: 0.32, mag: 2.8 }, // 1 bend
+      { x: 0.36, y: 0.42, mag: 2.0 }, // 2 Y-junction ★
+      // Right arm chain (Y → mid → far)
+      { x: 0.55, y: 0.5, mag: 3.0 }, // 3 right of Y
+      { x: 0.72, y: 0.55, mag: 2.8 }, // 4 far right
+      // Left chain (Y → below → far-left)
+      { x: 0.32, y: 0.52, mag: 3.0 }, // 5 below Y
+      { x: 0.21, y: 0.62, mag: 2.8 }, // 6 far-left
+      // Central knot + zigzag
+      { x: 0.32, y: 0.7, mag: 2.6 }, // 7 knot
+      { x: 0.45, y: 0.78, mag: 2.8 }, // 8 zigzag down
+      { x: 0.55, y: 0.7, mag: 3.0 }, // 9 zigzag up
+      { x: 0.7, y: 0.78, mag: 2.8 }, // 10 zigzag right peak
+      // Bottom V (water landing point)
+      { x: 0.48, y: 0.92, mag: 2.6 }, // 11 bottom V left
+      { x: 0.78, y: 0.92, mag: 2.6 }, // 12 bottom V right
     ],
     lines: [
+      // Top descent into Y-junction
       [0, 1],
       [1, 2],
+      // Right arm chain
       [2, 3],
       [3, 4],
-      [4, 5],
+      // Left chain
+      [2, 5],
       [5, 6],
-      [6, 7],
+      // Down into the knot + zigzag
+      [5, 7],
       [7, 8],
       [8, 9],
       [9, 10],
-      [2, 11],
-      [11, 12],
+      // Bottom V
+      [8, 11],
+      [10, 12],
     ],
   },
 

@@ -30,6 +30,7 @@ import {
   type WeekDayCell,
 } from '@/features/tabs/components'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
 
@@ -228,10 +229,10 @@ function TodayContent({ ctx, cadence }: ContentProps) {
               line that follows below the figure) instead of a
               clinical stat label. */}
           <Animated.View entering={enter(220)} style={styles.constellationHeader}>
-            <Text style={styles.constellationHeaderText}>tu {signLabel.toLowerCase()}</Text>
+            <Text style={styles.constellationHeaderText}>Tu {signLabel}</Text>
           </Animated.View>
 
-          <Animated.View entering={enter(320)}>
+          <Animated.View entering={enter(320)} style={styles.constellationWrap}>
             <LunarConstellation
               trained={ctx.grid_28_days.map((c) => c.completed)}
               todayIdx={27}
@@ -240,11 +241,32 @@ function TodayContent({ ctx, cadence }: ContentProps) {
             />
           </Animated.View>
 
-          <Animated.View entering={enter(420)}>
+          <Animated.View entering={enter(420)} style={styles.coachLineWrap}>
             <CoachLine
               align="center"
-              {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained')}
+              {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
             />
+            {(() => {
+              if (dayState !== 'trained') return null
+              // Final-day case: tomorrow is the closing of the
+              // 28-day cycle, not another star ignition. Replace
+              // the "Mañana: X" star teaser with a closing line.
+              const TARGET_DAYS = 28
+              if (trainedThisMonth + 1 >= TARGET_DAYS) {
+                return (
+                  <Text style={styles.tomorrowHint}>
+                    Mañana <Text style={styles.tomorrowHintEmphasis}>cierras tu cielo</Text>.
+                  </Text>
+                )
+              }
+              const next = pickStarForCount(sign, trainedThisMonth + 1)
+              if (!next) return null
+              return (
+                <Text style={styles.tomorrowHint}>
+                  Mañana: <Text style={styles.tomorrowHintEmphasis}>{next.name}</Text>, {next.role}
+                </Text>
+              )
+            })()}
           </Animated.View>
 
           {/* "Tus 28 días" — the editable calendar twin of the
@@ -350,7 +372,27 @@ const COACH_PHASE_POOLS: { min: number; lines: CoachCopy[] }[] = [
   },
 ]
 
-function getCoachCopy(count: number, signLabel: string, trainedToday: boolean): CoachCopy {
+// Cycle through the sign's named stars deterministically by count
+// so the day-end subtitle calls out a different anatomical part
+// each time the user trains. Returns null when the sign's figure
+// has no named stars (signs other than Leo for now).
+function pickStarForCount(sign: ZodiacSign, count: number): { name: string; role: string } | null {
+  if (count <= 0) return null
+  const named = ZODIAC[sign].stars.filter(
+    (s): s is typeof s & { name: string; role: string } =>
+      typeof s.name === 'string' && typeof s.role === 'string',
+  )
+  if (named.length === 0) return null
+  const star = named[(count - 1) % named.length]!
+  return { name: star.name, role: star.role }
+}
+
+function getCoachCopy(
+  count: number,
+  signLabel: string,
+  trainedToday: boolean,
+  sign: ZodiacSign,
+): CoachCopy {
   const lower = signLabel.toLowerCase()
 
   // Milestone counts — landmark lines, shown whenever the count lands
@@ -383,9 +425,19 @@ function getCoachCopy(count: number, signLabel: string, trainedToday: boolean): 
   }
 
   // Today already marked — a past-tense closing line so the screen
-  // rests on "done", not "pending" (peak-end rule, #6). Rotates by
-  // count so consecutive done days don't repeat.
+  // rests on "done", not "pending" (peak-end rule, #6). When the
+  // sign's figure data names the stars, prefer the day-specific
+  // line that calls out which star lit today; otherwise rotate
+  // through the generic done lines.
   if (trainedToday) {
+    const namedStar = pickStarForCount(sign, count)
+    if (namedStar) {
+      return {
+        before: `Hoy encendiste ${namedStar.name} — `,
+        emphasis: namedStar.role,
+        after: '.',
+      }
+    }
     const done: CoachCopy[] = [
       { before: 'Hoy quedó. Una estrella más en tu ', emphasis: lower, after: '.' },
       { before: 'Listo por hoy. Tu cielo ', emphasis: 'creció', after: '.' },
@@ -428,14 +480,43 @@ const styles = StyleSheet.create({
   // figure, matching the coach voice that follows below it.
   constellationHeader: {
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 6,
+    marginTop: 10,
+    // Title-case "Tu Leo" carries more visual weight than the
+    // previous all-lowercase, so it needs proper air to the card
+    // below instead of negative margin pulling it down.
+    marginBottom: 8,
+  },
+  // Full-bleed — pulls the constellation card to the very edges
+  // of the screen so the ornate ring + lion art use 100 % of the
+  // available width. `-20` exactly cancels the content padding.
+  constellationWrap: {
+    marginHorizontal: -20,
   },
   constellationHeaderText: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: 26,
     color: colors.leche,
-    letterSpacing: 0.6,
+    letterSpacing: 1.0,
+  },
+  // Breathing room around the coach line so it doesn't get clipped
+  // by the section header below ("TUS 28 DÍAS").
+  coachLineWrap: {
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  // Microcopy below the coach line — preview of tomorrow's star
+  // so each day connects to the next narratively.
+  tomorrowHint: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: 11,
+    color: colors.niebla,
+    textAlign: 'center',
+    marginTop: 4,
+    letterSpacing: 0.4,
+  },
+  tomorrowHintEmphasis: {
+    color: colors.bone,
   },
 })

@@ -21,7 +21,13 @@ export function useProfile() {
   return useQuery({
     queryKey: queryKeys.profile.me(),
     queryFn: getProfile,
-    staleTime: 1000 * 60 * 5,
+    // In dev: refetch on every mount and treat data as immediately
+    // stale, so DB-side edits (date_of_birth, sign-affecting
+    // changes) show up on the next reload without nuking
+    // AsyncStorage. Prod keeps the 5 min staleTime since the
+    // profile rarely changes.
+    staleTime: __DEV__ ? 0 : 1000 * 60 * 5,
+    refetchOnMount: __DEV__ ? 'always' : true,
   })
 }
 

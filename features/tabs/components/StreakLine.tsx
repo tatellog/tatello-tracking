@@ -67,9 +67,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 5,
-    marginTop: -8,
-    marginBottom: 2,
-    marginLeft: 2,
+    marginTop: 4,
+    marginBottom: 4,
+    // Bronze hairline border underneath the streak — same colour
+    // family as the constellation card's frame so the chip reads
+    // as part of the same visual vocabulary, not an isolated UI
+    // element. Tiny self-aligned to stay subtle.
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderBottomWidth: 0.8,
+    borderColor: 'rgba(217, 174, 111, 0.28)',
   },
   star: {
     fontSize: 10,

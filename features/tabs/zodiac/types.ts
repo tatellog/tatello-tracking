@@ -18,6 +18,12 @@ export type ZodiacStar = {
   y: number
   /** 1 = brightest (largest dot), 5 = faintest. */
   mag: number
+  /** Optional astronomical name (e.g. "Regulus"). Used by daily
+   *  coach copy to name the star that lit today. */
+  name?: string
+  /** Optional anatomical role on the figure (e.g. "el corazón
+   *  del león"). Pairs with `name` in the day-specific subtitle. */
+  role?: string
 }
 
 export type ZodiacDef = {
