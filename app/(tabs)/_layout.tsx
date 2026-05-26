@@ -1,84 +1,60 @@
 import { Tabs } from 'expo-router'
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg'
+import { View } from 'react-native'
 
+import FoodIcon from '@/assets/icons/food-vect.svg'
+import OrbitIcon from '@/assets/icons/orbit-vect.svg'
+import ProgressIcon from '@/assets/icons/progress-vect.svg'
+import TodayIcon from '@/assets/icons/today-vect.svg'
 import { AppTabBar } from '@/features/tabs/components'
 
 type IconProps = {
   color: string
   size?: number
+  focused?: boolean
 }
 
-/* Tab glyphs. Each tab carries a crafted icon rather than a bare
- * outline — a filled core or node gives the set weight so it reads as
- * designed, not wireframe. Color comes from the tab's active/inactive
- * tint, applied as both stroke and fill. */
-
-// Hoy — a sun: filled core, eight rays. "Today" as the day itself.
-function SunIcon({ color, size = 20 }: IconProps) {
+/* Tab glyphs. Illustrated white vectors from assets/icons.
+ * Hierarchy treatment:
+ *   • inactive  → opacity 0.45 + no scale     (recedes)
+ *   • active    → opacity 1.0  + scale 1.08   (pops)
+ *
+ * `bold` prop renders the icon 5 times at sub-pixel offsets
+ * (centre + 4 cardinals) for faux-thicker linework. Used for
+ * thin-line icons (today, progress) where the raw SVG strokes
+ * read too thin against the dark pill bg. */
+function TabIcon({
+  Component,
+  size = 32,
+  focused = false,
+  bold = false,
+}: IconProps & {
+  Component: React.ComponentType<{
+    width: number
+    height: number
+    preserveAspectRatio?: string
+  }>
+  bold?: boolean
+}) {
+  const icon = <Component width={size} height={size} preserveAspectRatio="xMidYMid meet" />
   return (
-    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
-      <Circle cx={12} cy={12} r={4.6} fill={color} />
-      <Path
-        d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M5.3 18.7L7 17"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-    </Svg>
-  )
-}
-
-// Comidas — a bowl holding a star. The bowl reads unambiguously as
-// food; the star inside anchors it to the celestial set and to the
-// app's own metaphor — a meal is a star you light in your sky.
-function MealBowlIcon({ color, size = 20 }: IconProps) {
-  return (
-    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
-      <Path
-        d="M3.4 10.5H20.6M5 10.5C5 16.2 8.2 19.6 12 19.6C15.8 19.6 19 16.2 19 10.5"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path d="M12 11 13 13.1 15.1 14 13 14.9 12 17 11 14.9 8.9 14 11 13.1Z" fill={color} />
-    </Svg>
-  )
-}
-
-// Órbita — a core with a body orbiting it on a tilted ellipse. The
-// app's central metaphor, distilled into a glyph.
-function OrbitIcon({ color, size = 20 }: IconProps) {
-  return (
-    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
-      <Ellipse
-        cx={12}
-        cy={12}
-        rx={10}
-        ry={4.4}
-        stroke={color}
-        strokeWidth={2}
-        transform="rotate(-30 12 12)"
-      />
-      <Circle cx={12} cy={12} r={3.2} fill={color} />
-      <Circle cx={20.7} cy={7} r={2.5} fill={color} />
-    </Svg>
-  )
-}
-
-// Progreso — a rising trend line with a bright node at its peak.
-function TrendIcon({ color, size = 20 }: IconProps) {
-  return (
-    <Svg viewBox="0 0 24 24" width={size} height={size} fill="none">
-      <Path
-        d="M3 17l6.5-6.5 4 3.5L20 6"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Circle cx={20} cy={6} r={2.7} fill={color} />
-    </Svg>
+    <View
+      style={{
+        opacity: focused ? 1 : 0.45,
+        transform: [{ scale: focused ? 1.08 : 1 }],
+      }}
+    >
+      {bold ? (
+        <View style={{ width: size, height: size }}>
+          <View style={{ position: 'absolute', left: -0.7, top: 0 }}>{icon}</View>
+          <View style={{ position: 'absolute', left: 0.7, top: 0 }}>{icon}</View>
+          <View style={{ position: 'absolute', left: 0, top: -0.7 }}>{icon}</View>
+          <View style={{ position: 'absolute', left: 0, top: 0.7 }}>{icon}</View>
+          {icon}
+        </View>
+      ) : (
+        icon
+      )}
+    </View>
   )
 }
 
@@ -100,28 +76,36 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Hoy',
-          tabBarIcon: ({ color, size }) => <SunIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon Component={TodayIcon} color={color} size={size} focused={focused} bold />
+          ),
         }}
       />
       <Tabs.Screen
         name="meals"
         options={{
           title: 'Comidas',
-          tabBarIcon: ({ color, size }) => <MealBowlIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon Component={FoodIcon} color={color} size={size} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: 'Progreso',
-          tabBarIcon: ({ color, size }) => <TrendIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon Component={ProgressIcon} color={color} size={size} focused={focused} bold />
+          ),
         }}
       />
       <Tabs.Screen
         name="orbita"
         options={{
           title: 'Órbita',
-          tabBarIcon: ({ color, size }) => <OrbitIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon Component={OrbitIcon} color={color} size={size} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen

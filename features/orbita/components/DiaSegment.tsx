@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
@@ -9,7 +10,6 @@ import { colors, typography } from '@/theme'
 import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals, useTodaySignals } from '../hooks'
 import {
-  countTones,
   deriveDimensions,
   dimensionDetail,
   dimensionEvidence,
@@ -19,7 +19,6 @@ import {
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
 import { AccionDelDia } from './AccionDelDia'
 import { CosmicParticles } from './CosmicParticles'
-import { DimensionNodeList } from './DimensionNodeList'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
@@ -49,7 +48,6 @@ export function DiaSegment() {
   const dimensions = deriveDimensions(signals)
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
 
-  const tones = countTones(dimensions)
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedTone = selected ? dimensionTone(selected.brightness) : null
   const evidence = selected ? dimensionEvidence(selected.key, signals) : []
@@ -94,130 +92,117 @@ export function DiaSegment() {
           an example, not a real reading. */}
       {ENGINE_ACTIVE ? null : <PreviewBanner />}
 
-      {/* Compressed header — archetype as the only hero, with a single
-          dense meta line that names tones, the read window, and how
-          deep STELAR has read so far. */}
+      {/* Compact header — archetype as the only hero. The "Tu
+          lente de hoy" eyebrow + per-tone counts were removed:
+          the orbital diagram itself shows how many dimensions are
+          brillantes (bright halos) and en formación (dim), so the
+          textual meta was duplicating visual info. LiveDot stays
+          when the engine is active to signal a live read. */}
       <View style={styles.header}>
-        {/* Frames the archetype as a lens for today — something that
-            shifts — not a fixed identity label. */}
-        <Text style={styles.lensEyebrow}>Tu lente de hoy</Text>
         <EmText
           text={MOCK_ARQUETIPO.name}
           emphasis={MOCK_ARQUETIPO.emphasis}
           style={styles.archetype}
           emStyle={styles.archetypeEm}
         />
-        <View style={styles.metaRow}>
-          <LiveDot />
-          <View style={styles.metaStack}>
-            {/* Leads with the light. The header names what shines and
-                what's forming; it never counts the dimensions "en
-                silencio" at the user — those are discoverable by
-                tapping the diagram, not a daily tally of absence. */}
-            <Text
-              style={styles.meta}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-            >
-              <Text style={styles.toneBrillante}>{tones.brillantes} brillantes</Text>
-              <Text style={styles.metaSep}> · </Text>
-              <Text style={styles.toneFormacion}>{tones.formacion} en formación</Text>
+        {ENGINE_ACTIVE ? (
+          <View style={styles.metaRow}>
+            <LiveDot />
+            <Text style={styles.metaB} numberOfLines={1}>
+              <Text>leído por </Text>
+              <Text style={styles.metaStelar}>Stelar</Text>
+              <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
             </Text>
-            {/* "leído por Stelar · N días" — a claim only true once
-                the engine has run; hidden while the prose is mock. */}
-            {ENGINE_ACTIVE ? (
-              <Text style={styles.metaB} numberOfLines={1}>
-                <Text>leído por </Text>
-                <Text style={styles.metaStelar}>Stelar</Text>
-                <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
-              </Text>
-            ) : null}
           </View>
-        </View>
+        ) : null}
       </View>
 
       {/* Lifted lede — STELAR's read in two lines, before the visual. */}
       <StelarHeadline parts={MOCK_HEADLINE.parts} />
 
-      {/* Hero row — the orbital diagram (left, flexes) and the
-          six-dimension node list (right, fixed strip). Genshin's
-          Constellation page: the figure dominates, the list of
-          nodes sits along the right edge as a tappable index. A
-          CosmicParticles layer sits BEHIND both regions so the
-          ambient dust spans the whole hero and bridges the gap
-          between diagram and list. */}
+      {/* Hero — the orbital diagram takes the full bleed. The
+          right-side six-dimension node list was retired: with each
+          star now carrying its own DIM_COLOR halo + an on-orbital
+          serif mini-label, the column was duplicating info, eating
+          ~35 % horizontal real estate and clipping the focus label
+          behind the panel. Discovery now lives inside the orbital
+          (mini-labels at rest, glyph + "tu cuerpo / tu sueño /..."
+          when zoomed in). */}
       <View style={styles.heroRow}>
         <CosmicParticles />
-        <View style={styles.diagramFlex}>
-          <OrbitalSystem
-            dimensions={dimensions}
-            selectedKey={selectedKey}
-            onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
-          />
-        </View>
-        <DimensionNodeList
+        <OrbitalSystem
           dimensions={dimensions}
           selectedKey={selectedKey}
           onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
         />
+        {/* Bottom fade — softens the hard edge where the orbital
+            ends and the page bg (SkyBackground) shows. Extended to
+            140 px height + linear locations [0, 1] so the fade is
+            continuous, no "knee" or band where the gradient stop
+            visually appears. */}
+        <LinearGradient
+          colors={['transparent', colors.bg]}
+          locations={[0, 1]}
+          pointerEvents="none"
+          style={styles.heroFade}
+        />
+
+        {/* Readout overlay — when a dimension is selected, the
+            informational layer rises INSIDE the orbital container
+            (bottom band) instead of sitting in a separate card the
+            user had to scroll to find. Same FadeInDown timing as
+            before (180 ms delay so it lands after the camera flies
+            in). The orbital fades behind the overlay so the focus
+            cinematic + the data land in the same eyeline. */}
+        {selected && selectedTone ? (
+          <Animated.View
+            key={selected.key}
+            entering={FadeInDown.duration(360).delay(180)}
+            style={styles.readoutOverlay}
+          >
+            <View style={styles.readoutTop}>
+              <View style={styles.readoutLabelRow}>
+                <Text style={styles.readoutLabel}>{selected.label}</Text>
+                {selected.word ? <Text style={styles.readoutWord}>{selected.word}</Text> : null}
+              </View>
+              <Text
+                style={[
+                  styles.readoutState,
+                  selectedTone === 'brillante'
+                    ? styles.toneBrillante
+                    : selectedTone === 'en formación'
+                      ? styles.toneFormacion
+                      : styles.toneSilencio,
+                ]}
+              >
+                {selectedTone}
+              </Text>
+            </View>
+            <Text style={styles.readoutDetail}>{dimensionDetail(selected.key, signals)}</Text>
+            {evidence.length > 0 ? (
+              <View style={styles.evidenceBlock}>
+                <Text style={styles.evidenceEyebrow}>Señales leídas</Text>
+                <View style={styles.evidenceList}>
+                  {evidence.map((e, i) => (
+                    <View key={e.label} style={styles.evidenceRow}>
+                      <Text style={styles.evidenceLabel}>{e.label}</Text>
+                      <Text style={styles.evidenceDot}>·</Text>
+                      <Text style={styles.evidenceValue}>{e.value}</Text>
+                      {i < evidence.length - 1 ? <View style={styles.evidenceGap} /> : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.evidenceQuiet}>
+                Cuando hay silencio, Stelar no inventa. Espera a que registres.
+              </Text>
+            )}
+          </Animated.View>
+        ) : null}
       </View>
 
-      {selected && selectedTone ? (
-        <Animated.View
-          key={selected.key}
-          // FadeInDown lands the card with a tiny drop from above +
-          // fade-in. The 180 ms delay times it to AFTER the zoom
-          // begins, so the visual flow reads as: tap → zoom starts →
-          // card emerges from the diagram area into the readout slot.
-          entering={FadeInDown.duration(360).delay(180)}
-          style={styles.readout}
-        >
-          <View style={styles.readoutTop}>
-            <View style={styles.readoutLabelRow}>
-              <Text style={styles.readoutLabel}>{selected.label}</Text>
-              {/* The one-word poetic state — lifted from the orbital
-                  so it lands here when the user is reading, not as
-                  ambient noise on the diagram. */}
-              {selected.word ? <Text style={styles.readoutWord}>{selected.word}</Text> : null}
-            </View>
-            <Text
-              style={[
-                styles.readoutState,
-                selectedTone === 'brillante'
-                  ? styles.toneBrillante
-                  : selectedTone === 'en formación'
-                    ? styles.toneFormacion
-                    : styles.toneSilencio,
-              ]}
-            >
-              {selectedTone}
-            </Text>
-          </View>
-          <Text style={styles.readoutDetail}>{dimensionDetail(selected.key, signals)}</Text>
-          {evidence.length > 0 ? (
-            <View style={styles.evidenceBlock}>
-              <Text style={styles.evidenceEyebrow}>Señales leídas</Text>
-              <View style={styles.evidenceList}>
-                {evidence.map((e, i) => (
-                  <View key={e.label} style={styles.evidenceRow}>
-                    <Text style={styles.evidenceLabel}>{e.label}</Text>
-                    <Text style={styles.evidenceDot}>·</Text>
-                    <Text style={styles.evidenceValue}>{e.value}</Text>
-                    {i < evidence.length - 1 ? <View style={styles.evidenceGap} /> : null}
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.evidenceQuiet}>
-              Cuando hay silencio, Stelar no inventa. Espera a que registres.
-            </Text>
-          )}
-        </Animated.View>
-      ) : (
-        <Text style={styles.hint}>Toca una dimensión para leerla.</Text>
-      )}
+      {!selected ? <Text style={styles.hint}>Toca una dimensión para leerla.</Text> : null}
 
       {/* The one move STELAR weights highest today. Heavier card than
           Voz so it reads as call-to-action, not narration. */}
@@ -274,22 +259,38 @@ const styles = StyleSheet.create({
     marginHorizontal: -20,
     marginTop: 4,
   },
-  // The hero row: orbital diagram on the left (flexes) + the
-  // node-list strip on the right. Full-bleed (same -20 trick as
-  // `diagram`), aligned centred so the node list sits at the
-  // vertical middle of the diagram.
+  // Full-bleed hero — the orbital fills the screen width (escaping
+  // the 20 px gutter from orbita.tsx). `position: relative` anchors
+  // the absolute-positioned CosmicParticles + heroFade overlays.
   heroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginHorizontal: -20,
     marginTop: 4,
-    // `position: relative` so the absolute-positioned
-    // CosmicParticles child anchors to this row's bounds.
     position: 'relative',
   },
-  diagramFlex: {
-    flex: 1,
-    minWidth: 0,
+  heroFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 140,
+  },
+  // Readout overlay — translucent panel anchored to the bottom of
+  // the orbital container. Replaces the old below-the-hero card so
+  // the info lands within the same eyeline as the focus cinematic.
+  // Bg is dark + slightly translucent so the orbital reads as a
+  // soft texture underneath. Bronze hairline top edge to feel like
+  // a stelar artifact emerging from the system.
+  readoutOverlay: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 18,
+    backgroundColor: 'rgba(20, 8, 18, 0.82)',
+    borderRadius: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(217, 174, 111, 0.22)',
+    padding: 16,
+    gap: 10,
   },
   header: {
     alignItems: 'center',

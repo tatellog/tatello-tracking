@@ -296,6 +296,34 @@ export default function SettingsScreen() {
               </View>
             </Pressable>
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+            {__DEV__ ? (
+              <Pressable
+                onPress={() => router.push('/dev-constellations')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 18,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: 14,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV — ver todas las constelaciones
+                </Text>
+              </Pressable>
+            ) : null}
           </Animated.View>
 
           <Animated.View entering={enter(320)}>

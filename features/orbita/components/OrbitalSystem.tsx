@@ -2,11 +2,12 @@ import * as Haptics from 'expo-haptics'
 // Aliased — react-native-svg also exports a LinearGradient.
 import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
+  useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withRepeat,
@@ -14,9 +15,20 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  G,
+  Image as SvgImage,
+  RadialGradient,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg'
 
-import { colors } from '@/theme'
+import { colors, typography } from '@/theme'
+
+import { DIM_COLOR, DIM_LABEL } from '../constants/dimensionColors'
 
 import {
   CONSTELLATION_COLORS,
@@ -25,8 +37,18 @@ import {
   type ConstellationProfile,
 } from '../constants/constellationTheme'
 import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
-import { AnimatedConstellation } from './AnimatedConstellation'
-import { GLYPHS } from './DimensionNodeList'
+
+import { GLYPHS } from './dimensionGlyphs'
+
+const DAY_ORB_PNG = require('@/assets/orbits-art/day-orb.png')
+
+// Glyphs are authored in a 24×24 viewport. Bumped 1.5× → 2.6×
+// after the raster rose-gold icons started reading as small
+// blobs inside the bigger coloured halo — at this scale the
+// illustrated detail of each icon is legible and the icon
+// becomes the unambiguous emblem of the zoomed dimension.
+const GLYPH_SCALE = 2.6
+const GLYPH_HALF = 12
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -52,15 +74,15 @@ const HIT = 66 // tap-target box, in px
 // against the edge. The height extends to match so nothing squishes.
 const VB_TOP = -28
 const VB_H = 382
-// Zoom factor for the selected-dimension cinematic. Reduced
-// 2.4 → 1.9 so MORE of the constellation stays visible during
-// zoom — multiple stars + their long flares + the connecting
-// hexagon all read at the same time, matching the Genshin
-// reference where several luminous bodies share the frame with
-// the focused one. With the bigger R + longer flares + selected
-// star's +30 % breath bump on top, the focused star still
-// clearly dominates.
-const ZOOM_SCALE = 1.9
+// Zoom factor for the selected-dimension cinematic. Currently
+// 2.6 — a Genshin Constellation-style focus event where the
+// selected star + its glyph dominate the frame and the rest of
+// the figure goes intentionally off-screen. With the bigger base
+// ART_S (0.4) + DIM_SCALE 1.35 the off-screen part is the bulk of
+// the galaxy + the 5 other stars; that's the point — the
+// selection is meant to feel like the camera flew in on one
+// luminous body.
+const ZOOM_SCALE = 2.6
 
 // ConstellationDrawing is authored in a 1024 × 1024 SVG space
 // (daily_constellation.svg); we project it into our viewBox via a
@@ -78,12 +100,57 @@ const ZOOM_SCALE = 1.9
 // at this scale; that's intentional — they're decorative diamond
 // tips and the small clipping reads as them fading off the figure.
 const ORNAMENT_S = 0.363
-const ORNAMENT_TX = 30
+// ORNAMENT_TX shifted 30 → 0 to recentre the figure horizontally
+// inside the now full-width orbital container. With 0 the figure
+// centre lands exactly on the viewBox midpoint (186): 0 + 1024 ·
+// 0.363 / 2 ≈ 186. Galaxy, six stars, labels all translate left
+// in sync because STAR_POS/ART_CENTER_X derive from ORNAMENT_TX.
+const ORNAMENT_TX = 0
 const ORNAMENT_TY = -23
 
-/** Project a source-space (1024-space) point into the SVG viewBox. */
+// The Day-segment art PNG (`day-orb.png`) is authored in a
+// 1254 × 1254 source space and already carries the photographic
+// galaxy + the 6 dimension star halos + the orbital ring baked in.
+// We project it to the same 372 px on-screen extent + (216, 163)
+// figure centre the original AnimatedConstellation used so the
+// programmatic StarNode positions (STAR_POS) land on top of the
+// painted halos. Programmatic orbital scaffolding (the 7 dashed
+// rings + per-star Saturn rings + galaxy-bulge gradient) was
+// removed because it would duplicate what the PNG already paints.
+const ART_SRC = 1254
+// Bumped 0.297 → 0.4 so the galaxy reads big enough to dominate
+// the (narrow) orbital container next to the right-side
+// DimensionNodeList. The painted halos in day-orb.png sit at
+// source radius ≈ 370 (measured by scanning bright-pixel
+// clusters); at S = 0.4 they land at viewBox radius ≈ 148. We
+// rescale STAR_POS by the matching DIM_SCALE = 1.35 below so the
+// programmatic StarNodes still drop directly onto the painted
+// halos. PNG corners now extend a bit past the viewBox edges,
+// but that area is transparent in the asset so the clipping is
+// invisible.
+const ART_S = 0.4
+const ART_CENTER_X = ORNAMENT_TX + (1024 * ORNAMENT_S) / 2
+const ART_CENTER_Y = ORNAMENT_TY + (1024 * ORNAMENT_S) / 2
+const ART_TX = ART_CENTER_X - (ART_SRC * ART_S) / 2
+const ART_TY = ART_CENTER_Y - (ART_SRC * ART_S) / 2
+const DIM_SCALE = 1.35
+
+// The Y coordinate that the focus zoom should land the selected
+// star on. Shifted ~35 px above the figure centre because the
+// heroFade gradient + readoutOverlay take up the bottom portion
+// of the visible orbital area during focus.
+const FOCUS_CENTER_Y = ART_CENTER_Y - 35
+
+/** Project a source-space (1024-space) point into the SVG viewBox,
+ *  then push it outward by DIM_SCALE so the dimension hexagon
+ *  matches the painted hexagon in day-orb.png at ART_S = 0.4. */
 function ornamentPos(sx: number, sy: number): { x: number; y: number } {
-  return { x: ORNAMENT_TX + sx * ORNAMENT_S, y: ORNAMENT_TY + sy * ORNAMENT_S }
+  const x0 = ORNAMENT_TX + sx * ORNAMENT_S
+  const y0 = ORNAMENT_TY + sy * ORNAMENT_S
+  return {
+    x: ART_CENTER_X + (x0 - ART_CENTER_X) * DIM_SCALE,
+    y: ART_CENTER_Y + (y0 - ART_CENTER_Y) * DIM_SCALE,
+  }
 }
 
 // Six dimension stars at the six cardinal nodes of the orbital
@@ -111,8 +178,89 @@ const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
   ornamentPos(512, 512), // centre of the orbital system
 ]
 
+// Ambient dust scattered in the annulus between the galaxy bulge
+// (≈ r 50) and the dimension hexagon (≈ r 148). Bumped 28 → 70
+// motes for a richer field. Each mote carries its OWN angular
+// speed factor (inversely proportional to its radius — Keplerian-
+// style "inner faster than outer"): the field rotates as a whole
+// but inner particles outpace outer ones, so the deterministic
+// initial positions deform into visible spiral arms over time
+// even though every particle stays in its own circular orbit.
+const DUST_MOTE_COUNT = 120
+const DUST_MOTES: {
+  initialAngle: number
+  radius: number
+  speed: number
+  r: number
+  op: number
+  phase: number
+}[] = Array.from({ length: DUST_MOTE_COUNT }, (_, i) => {
+  const angBase = (i * 360) / DUST_MOTE_COUNT
+  const angJitter = (((i * 73) % 31) - 15) * 0.6
+  // Wider radial spread (40 .. 180): some motes hug the bulge,
+  // some drift past the dimension hexagon → reads as depth, not
+  // a single thin ring.
+  const radius = 40 + ((i * 19) % 140)
+  // Pseudo-random depth 0..1 per mote → drives size + opacity so
+  // the field has near (big + bright) and far (small + dim)
+  // particles co-existing.
+  const depth = ((i * 53) % 100) / 100
+  return {
+    initialAngle: angBase + angJitter,
+    radius,
+    // Keplerian speed — inner faster than outer. Negative so the
+    // whole field spirals counter-clockwise (visually "to the
+    // left") on screen.
+    speed: -120 / radius,
+    r: 0.4 + depth * 1.6, // 0.4 .. 2.0 — varied sizes for depth
+    op: 0.12 + depth * 0.55, // 0.12 .. 0.67 — varied brightness
+    phase: (i % 11) / 11,
+  }
+})
+
+// Per-star label offset (in viewBox units). Homogenised: every
+// label sits directly ABOVE its star (upper half) or directly
+// BELOW (lower half) at the SAME vertical distance, with dx = 0
+// so labels never push past the viewBox edges. Earlier mixed
+// outward-radial offsets clipped SUEÑO + ALIMENTO against the
+// right edge of the viewBox (372 px) once the star hexagon was
+// scaled to radius 148.
+const LABEL_DY = 18
+const STAR_LABEL_OFFSETS: Record<DimensionKey, { dx: number; dy: number }> = {
+  mente: { dx: 0, dy: -LABEL_DY },
+  sueno: { dx: 0, dy: -LABEL_DY },
+  cuerpo: { dx: 0, dy: -LABEL_DY },
+  alimento: { dx: 0, dy: LABEL_DY },
+  ciclo: { dx: 0, dy: LABEL_DY },
+  energia: { dx: 0, dy: LABEL_DY },
+}
+
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+
+function DustMote({
+  mote,
+  slowClock,
+  dustOrbit,
+}: {
+  mote: (typeof DUST_MOTES)[number]
+  slowClock: SharedValue<number>
+  dustOrbit: SharedValue<number>
+}) {
+  const animated = useAnimatedProps(() => {
+    'worklet'
+    // Per-particle position: initial angle + shared rotation
+    // scaled by this mote's speed factor. Inner particles
+    // (high speed) advance faster than outer (low speed),
+    // deforming the initial ring into spiral arms over time.
+    const angle = ((mote.initialAngle + dustOrbit.value * mote.speed) * Math.PI) / 180
+    const cx = ART_CENTER_X + Math.cos(angle) * mote.radius
+    const cy = ART_CENTER_Y + Math.sin(angle) * mote.radius
+    const wave = 0.5 + 0.5 * Math.sin((slowClock.value + mote.phase) * 2 * Math.PI)
+    return { cx, cy, opacity: mote.op * (0.55 + 0.45 * wave) }
+  })
+  return <AnimatedCircle r={mote.r} animatedProps={animated} />
+}
 
 /** Canvas position of a dimension's star — hand-placed so the three
  *  orbital tips and the three peripheral stars compose like the
@@ -207,21 +355,74 @@ export function OrbitalSystem({
     }
   }, [selectedKey, zoomT, targetXVal, targetYVal])
 
+  // Focus label key + opacity — lingers ~420 ms after deselect so
+  // the bottom-of-wrap RN Text overlay fades out alongside the
+  // zoom-out instead of unmounting the instant selectedKey flips.
+  const [focusLabelKey, setFocusLabelKey] = useState<DimensionKey | null>(selectedKey)
+  useEffect(() => {
+    if (selectedKey) {
+      setFocusLabelKey(selectedKey)
+      return
+    }
+    const id = setTimeout(() => setFocusLabelKey(null), 420)
+    return () => clearTimeout(id)
+  }, [selectedKey])
+  const focusLabelStyle = useAnimatedStyle(() => {
+    'worklet'
+    const z = Math.min(1, zoomT.value * 1.2)
+    return { opacity: z * z * 0.95 }
+  })
+
+  // Echo of the galaxy painted OUTSIDE the zoom transform so it
+  // stays put while the main figure scales out during focus.
+  // Fades in 0 → 0.22 as zoomT climbs, so:
+  //   • at rest: invisible (only the main galaxy renders)
+  //   • during zoom: a ghost of the system stays visible behind
+  //     the focused star, preserving the context the cinematic
+  //     would otherwise erase
+  const echoProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: zoomT.value * 0.22 }
+  })
+  // Dust drift — the ambient dust motes scattered between bulge
+  // and dimension hexagon orbit slowly around the galaxy centre,
+  // like a slow gravitational current. The galaxy itself, the
+  // dimension stars, the labels, and the painted halos all stay
+  // fixed. 180 s/cycle (2°/s) — visible but not distracting.
+  const dustOrbit = useSharedValue(0)
+  useEffect(() => {
+    dustOrbit.value = withRepeat(
+      withTiming(360, { duration: 180000, easing: Easing.linear }),
+      -1,
+      false,
+    )
+    return () => cancelAnimation(dustOrbit)
+  }, [dustOrbit])
+  // Rest-state mini labels — visible at zoomT = 0 (no selection)
+  // so a new user can read "mente / sueño / alimento / …" right
+  // next to each star without needing a side panel. Fade aggressively
+  // (opacity drops to 0 by zoomT ≈ 0.4) so they never overlap the
+  // big focused glyph + halo + "tu cuerpo" label during the
+  // cinematic.
+  const restLabelsProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: Math.max(0, 1 - zoomT.value * 2.5) }
+  })
+
   const zoomTransform = useAnimatedProps(() => {
     'worklet'
     const tz = zoomT.value
     const s = 1 + tz * (ZOOM_SCALE - 1)
-    // Zoom IN-PLACE around the selected star's own position rather
-    // than panning it to the viewBox centre. The selected star
-    // stays exactly where it was at rest, and everything else
-    // scales outward from that point. Mathematically, that's the
-    // standard "scale about (px, py)" transform expanded:
-    //   translate(px·(1−s), py·(1−s)) · scale(s)
-    // At s = 1 (rest) the translate is 0 — pure identity. At s =
-    // ZOOM_SCALE the star is unchanged while the surrounding
-    // figure expands outward.
-    const tx = targetXVal.value * (1 - s)
-    const ty = targetYVal.value * (1 - s)
+    // PAN + SCALE: linearly interpolate the translate so the
+    // selected star ends up centred in the VISIBLE half of the
+    // orbital container. We target (ART_CENTER_X, FOCUS_CENTER_Y)
+    // where FOCUS_CENTER_Y is shifted ~35 viewBox units ABOVE
+    // the figure centre to compensate for the heroFade gradient
+    // + readoutOverlay that occupy the bottom of the container
+    // during focus — otherwise the focused glyph sat visually
+    // below centre and the composition read as bottom-heavy.
+    const tx = tz * (ART_CENTER_X - ZOOM_SCALE * targetXVal.value)
+    const ty = tz * (FOCUS_CENTER_Y - ZOOM_SCALE * targetYVal.value)
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
@@ -264,7 +465,99 @@ export function OrbitalSystem({
             <Stop offset="62%" stopColor="#FFFFFF" stopOpacity={0.22} />
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
           </RadialGradient>
+          {/* Focus well — bg-coloured radial gradient that fades
+              from fully opaque at the centre (masking the PNG's
+              painted halo behind the focused star) to transparent
+              at the edge. Replaces the hard-edged solid disc that
+              made the focus look like two stacked circles. */}
+          <RadialGradient id="focus-well" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.bg} stopOpacity={0.96} />
+            <Stop offset="55%" stopColor={colors.bg} stopOpacity={0.88} />
+            <Stop offset="85%" stopColor={colors.bg} stopOpacity={0.4} />
+            <Stop offset="100%" stopColor={colors.bg} stopOpacity={0} />
+          </RadialGradient>
+          {/* Focus spark — soft warm-cream glow painted BEHIND the
+              icon. Gives the centre of the focus state a subtle
+              luminous spark without re-introducing the bright
+              white-hot core that washed the rose-gold icon out. */}
+          <RadialGradient id="focus-spark" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#FFE9D6" stopOpacity={0.6} />
+            <Stop offset="40%" stopColor="#FFE9D6" stopOpacity={0.25} />
+            <Stop offset="100%" stopColor="#FFE9D6" stopOpacity={0} />
+          </RadialGradient>
+          {/* Per-dimension focus halo gradients — one TRUE radial
+              gradient per dim. Replaces the fake "stack of nested
+              circles" cascade which still showed visible step
+              banding. With real gradients the bloom is fully
+              continuous from centre opacity 0.5 to edge 0. */}
+          <RadialGradient id="halo-cuerpo" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="halo-mente" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={DIM_COLOR.mente} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={DIM_COLOR.mente} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={DIM_COLOR.mente} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={DIM_COLOR.mente} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="halo-sueno" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={DIM_COLOR.sueno} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={DIM_COLOR.sueno} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={DIM_COLOR.sueno} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={DIM_COLOR.sueno} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="halo-alimento" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={DIM_COLOR.alimento} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={DIM_COLOR.alimento} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={DIM_COLOR.alimento} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={DIM_COLOR.alimento} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="halo-ciclo" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={DIM_COLOR.ciclo} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={DIM_COLOR.ciclo} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={DIM_COLOR.ciclo} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={DIM_COLOR.ciclo} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="halo-energia" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={DIM_COLOR.energia} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={DIM_COLOR.energia} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={DIM_COLOR.energia} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={DIM_COLOR.energia} stopOpacity={0} />
+          </RadialGradient>
         </Defs>
+
+        {/* Galaxy echo — sits OUTSIDE the zoom transform so it
+            never moves when the cinematic pushes the main galaxy
+            off-screen. Driven by echoProps: invisible at rest,
+            fades to ~22 % during focus. Stays static; orbit motion
+            is on the stars layer above, not the galaxy itself. */}
+        <AnimatedG animatedProps={echoProps}>
+          <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
+            <SvgImage
+              href={DAY_ORB_PNG}
+              x={0}
+              y={0}
+              width={ART_SRC}
+              height={ART_SRC}
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </G>
+        </AnimatedG>
+
+        {/* Ambient dust — 120 cream specks orbiting the bulge in
+            shifting spiral arms. SITS OUTSIDE the zoom transform
+            so the motion stays visible throughout the focus
+            cinematic (inside the zoom group the dust scaled 2.6×
+            and most particles flew off-screen, making the motion
+            read as "frozen"). Each mote computes its own (cx, cy)
+            from dustOrbit + an inverse-radius speed factor. */}
+        <G fill="#FBD7E3">
+          {DUST_MOTES.map((m, i) => (
+            <DustMote key={`dust-${i}`} mote={m} slowClock={slowClock} dustOrbit={dustOrbit} />
+          ))}
+        </G>
 
         {/* Everything below sits inside the zoom transform — when a
             dimension is selected, this whole group translates+scales
@@ -279,34 +572,27 @@ export function OrbitalSystem({
               more. OrbitalSystem only renders the constellation +
               live stars now. */}
 
-          {/* The ornamental constellation — native SVG paths from
-              `assets/constellations/daily_constellation.svg`,
-              projected into our viewBox via ORNAMENT_S/TX/TY. The
-              AnimatedConstellation wrapper renders the six
-              concentric orbits + hexagonal outline with an energy
-              beam on the outer two rings; ConstellationDrawing
-              paints the static axis cross + spokes + ornaments. */}
-          <G transform={`translate(${ORNAMENT_TX} ${ORNAMENT_TY}) scale(${ORNAMENT_S})`}>
-            <AnimatedConstellation intensity={intensity} zoomT={zoomT} />
+          {/* The ornamental backdrop — the photographic Day art
+              PNG. Static. The orbital motion lives on the stars
+              layer below, not on the galaxy itself. */}
+          <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
+            <SvgImage
+              href={DAY_ORB_PNG}
+              x={0}
+              y={0}
+              width={ART_SRC}
+              height={ART_SRC}
+              preserveAspectRatio="xMidYMid meet"
+            />
           </G>
-          {/* Decorative stars at the unused burst endpoints. They
-              share StarNode's slow-glow language so every line
-              endpoint feels alive — except during zoom, where they
-              get pushed off-centre by the in-place scale and would
-              otherwise compete with the selected star. The
-              AnimatedG fades them to ~10 % at full zoom. */}
-          <AnimatedG animatedProps={decorativeFade}>
-            {DECORATIVE_STAR_POS.map((p, i) => (
-              <DecorativeStar
-                key={`decor-${i}`}
-                x={p.x}
-                y={p.y}
-                slowClock={slowClock}
-                phase={(i + 1) / (DECORATIVE_STAR_POS.length + 1)}
-                profile={profile}
-              />
-            ))}
-          </AnimatedG>
+          {/* Centre "tú" DecorativeStar removed — the painted
+              galactic bulge in day-orb.png is now the only luminous
+              centre. A programmatic white core on top of it would
+              either over-saturate (if perfectly aligned) or read as
+              a second misaligned star (if slightly off). */}
+
+          {/* Dust moved OUTSIDE the zoom group (see above) so its
+              spiral motion stays visible throughout focus. */}
 
           {/* Dimension stars — small luminous points on each orbit. */}
           {placed.map(({ d, pos }) => (
@@ -324,8 +610,46 @@ export function OrbitalSystem({
               faded={selectedKey != null && d.key !== selectedKey}
             />
           ))}
+
+          {/* At-rest mini labels — anchored at fixed STAR_POS so
+              each label stays adjacent to its dim. Fade during
+              focus zoom (restLabelsProps). */}
+          <AnimatedG animatedProps={restLabelsProps}>
+            {placed.map(({ d, pos }) => {
+              const offset = STAR_LABEL_OFFSETS[d.key]
+              return (
+                <SvgText
+                  key={`rest-label-${d.key}`}
+                  x={pos.x + offset.dx}
+                  y={pos.y + offset.dy}
+                  fill="#FFE9D6"
+                  fontSize={9}
+                  fontFamily="HankenGrotesk_700Bold"
+                  letterSpacing={1}
+                  textAnchor="middle"
+                  opacity={0.78}
+                >
+                  {d.label.toUpperCase()}
+                </SvgText>
+              )
+            })}
+          </AnimatedG>
         </AnimatedG>
       </Svg>
+
+      {/* Focus label — "tu cuerpo / tu sueño / …" rendered as an
+          RN Text overlay anchored to the bottom-centre of the
+          wrap. Always visible inside the orbital container
+          regardless of which star is focused, so it can't be
+          clipped by the right-side DimensionNodeList. Fades in
+          with selection (zoomT) and lingers ~420 ms after
+          deselection so the text fades out alongside the
+          zoom-out. */}
+      {focusLabelKey != null ? (
+        <Animated.View style={[styles.focusLabel, focusLabelStyle]} pointerEvents="none">
+          <Text style={styles.focusLabelText}>{DIM_LABEL[focusLabelKey]}</Text>
+        </Animated.View>
+      ) : null}
 
       {selectedKey == null ? (
         // Not zoomed — the six per-star hit targets. RN Pressables
@@ -513,13 +837,18 @@ function DiffractionSpikes({
   diagOpacity?: number
   strokeWidth: number
 }) {
-  // Anamorphic asymmetry — the H streak is longer and wider than V,
-  // which is itself longer and wider than the diagonals. What a real
-  // camera lens produces; never a symmetric square cross.
-  const hLen = length * 1.18
-  const vLen = length * 0.74
-  const dLen = length * 0.34
-  const dOp = diagOpacity ?? opacity * 0.32
+  // Anamorphic asymmetry kept (real camera flares are never a
+  // perfect square cross) but tamed: previously hLen 1.18 made the
+  // horizontal streak feel like a hard geometric ruling. New
+  // ratios push the spikes closer together (h ≈ 0.85, v ≈ 0.6,
+  // diagonals 0.45) so the flare reads as a soft 4-pointed bloom
+  // rather than a "+" sign with a long flag. Spikes are also
+  // shorter overall — feels more like a luminous bloom than a
+  // lens optical artefact.
+  const hLen = length * 0.85
+  const vLen = length * 0.6
+  const dLen = length * 0.45
+  const dOp = diagOpacity ?? opacity * 0.4
   // Ellipse semi-minor axes — these set the streak THICKNESS. They
   // scale with `length` so a small star produces a thin streak and a
   // big star produces a fatter one. `strokeWidth` continues to
@@ -620,18 +949,17 @@ function StarNode({
   const { x, y } = pos
   const b = dim.brightness
   const enLuz = b >= EN_LUZ_THRESHOLD
-  // Lens-flare stars in the Genshin Constellation style: every en
-  // luz star is a LARGE luminous starburst with a white-hot core,
-  // three layered blooms (outer wide → mid → inner aura), and a
-  // long diffraction-spike cross. R bumped 3.4 → 5 (base) and
-  // b * 3 → b * 4 (brightness contribution); lejos stars stay
-  // small + quiet so the contrast between states is loud and the
-  // bright stars carry the dramatic "luminous body" weight the
-  // Genshin reference set as the target.
-  const R = enLuz ? 5 + b * 4 : 2.5
-  const outerR = enLuz ? R * 5 : R * 1.8
-  const midR = enLuz ? R * 2.5 : R * 1.5
-  const auraR = enLuz ? R * 1.4 : R * 1.2
+  // The day-orb.png backdrop already paints each dimension as a
+  // bright magenta halo with a thin Saturn ring. The programmatic
+  // StarNode now only adds: (1) a tiny white-hot core + (2) the
+  // diffraction-spike cross + (3) the per-star breath/selection
+  // pulse animation. Halo radii are minimal so the painted star
+  // stays the visual subject and the programmatic layer just
+  // contributes life.
+  const R = enLuz ? 2.5 + b * 1.5 : 2
+  const outerR = enLuz ? R * 1.8 : R * 1.4
+  const midR = enLuz ? R * 1.4 : R * 1.2
+  const auraR = enLuz ? R * 1.1 : R * 1.05
 
   // Each star breathes on its own phase so the constellation feels
   // alive but not synchronised. The 8 s `t` clock drives scale +
@@ -690,44 +1018,59 @@ function StarNode({
     return { r: R + u * R * 6, opacity: (1 - u) * 0.55 }
   })
 
-  // Linger the flare render for ~420 ms after deselection so it can
-  // fade out alongside the zoom-out instead of vanishing the moment
-  // the React `selected` prop flips back to false.
-  const [showFlare, setShowFlare] = useState(selected)
-  useEffect(() => {
-    if (selected) {
-      setShowFlare(true)
-      return
-    }
-    const id = setTimeout(() => setShowFlare(false), 420)
-    return () => clearTimeout(id)
-  }, [selected])
-
-  // Flare bloom-in: scale + opacity ramp with the zoom. The flare
-  // appears later in the zoom progress (power curve on opacity) so
-  // it reads as the brightness "catching up" to the camera, and
-  // overshoots scale just like the camera does — when the zoom
-  // recoils from 1.08 back to 1.0, the flare breathes back with it.
-  const flareAnim = useAnimatedProps(() => {
+  // Glyph (heart, bolt, moon, …) reveal on the selected star —
+  // fades in with the zoom progression. The opacity is gated on
+  // zoomT (1.4× multiplier puts the icon at full op by zoomT ≈ 0.7,
+  // arriving in step with the camera). Position re-anchored every
+  // frame so the icon stays centred on (x, y) even with breath
+  // scaling. `showGlyph` lingers ~420 ms after deselection so the
+  // icon fades out alongside the zoom-out rather than vanishing
+  // the instant React's `selected` prop flips.
+  const glyphAnim = useAnimatedProps(() => {
     'worklet'
-    const z = Math.max(0, Math.min(zoomT.value, 1.1))
-    // Slightly punchier than before — opacity peaks at 0.95 (was
-    // 0.85) and the flare scale ramps to 1.2 (was 1.05) at the
-    // overshoot. Combined with the breath's zoom-boosted scale,
-    // the focused star reads markedly more alive at full zoom.
-    const opacity = z * z * 0.95
-    const scale = 0.35 + z * 0.85
+    const z = Math.min(1, zoomT.value * 1.4)
+    const op = z * z * 0.95
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    const s = GLYPH_SCALE * (1 + wave * 0.05)
     return {
+      opacity: op,
       transform: [
-        { translateX: x },
-        { translateY: y },
-        { scale },
-        { translateX: -x },
-        { translateY: -y },
+        { translateX: x - GLYPH_HALF * s },
+        { translateY: y - GLYPH_HALF * s },
+        { scale: s },
       ],
-      opacity,
     }
   })
+  // Focus halo — soft coloured glow around the glyph. Caps at
+  // ~0.7 opacity (with breath wave) so the coloured bloom feels
+  // atmospheric, not opaque.
+  const haloAnim = useAnimatedProps(() => {
+    'worklet'
+    const z = Math.min(1, zoomT.value * 1.6)
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { opacity: z * z * (0.55 + 0.18 * wave) }
+  })
+  // Dark well — separate animation that ramps to full 1.0 opacity.
+  // The well NEEDS to be near-opaque so it fully masks the PNG
+  // painted halo at the focused dimension's position (otherwise
+  // the bright pink halo bleeds through and erases the rose-gold
+  // icon's contrast). Lives outside haloAnim because that group's
+  // ~0.73 cap would multiply against the well's own opacity and
+  // let the PNG show through.
+  const wellAnim = useAnimatedProps(() => {
+    'worklet'
+    const z = Math.min(1, zoomT.value * 1.6)
+    return { opacity: z * z }
+  })
+  const [showGlyph, setShowGlyph] = useState(selected)
+  useEffect(() => {
+    if (selected) {
+      setShowGlyph(true)
+      return
+    }
+    const id = setTimeout(() => setShowGlyph(false), 420)
+    return () => clearTimeout(id)
+  }, [selected])
 
   // Impact flash — a brief bright white circle that bursts out of
   // the star core right as the camera arrives. Driven by popT
@@ -757,64 +1100,16 @@ function StarNode({
     return { opacity: Math.max(0.08, 0.6 - zoomT.value * 0.5) }
   })
 
-  // Core fade — fades the white-hot disc layers (the R*1.1, R*0.7,
-  // R*0.4 stack) as the camera locks on a selected star, so the
-  // dimension GLYPH materialising on top can be seen against the
-  // magenta bloom instead of disappearing into the bright core.
-  // Drops 1 → 0.15 across the zoom. Non-selected stars: no fade.
+  // Core fade — drops the warm-white gradient core + the white-hot
+  // disc stack to ZERO on a selected star as the camera zooms.
+  // Without this the bright center washes out the rose-gold raster
+  // glyph above. Non-selected stars: no fade (the bright core IS
+  // their identity at rest).
   const coreFade = useAnimatedProps(() => {
     'worklet'
     if (!selected) return { opacity: 1 }
-    return { opacity: Math.max(0.15, 1 - zoomT.value * 0.85) }
+    return { opacity: Math.max(0, 1 - zoomT.value * 1.6) }
   })
-
-  // Glyph reveal — the dimension's icon (heart, bolt, moon, bowl,
-  // …) materialises at the star centre as zoom progresses.
-  //
-  // Two layered animations share the same worklet:
-  //   • OPACITY — eased fade-in tied to zoomT. The 1.4× multiplier
-  //     on the squared curve puts the icon at full op by zoomT ≈ 0.7,
-  //     so it arrives in step with the camera, not after.
-  //   • PULSE — gentle ±5 % scale breath on the 8-s system clock,
-  //     so the icon throbs slowly even after the camera settles.
-  //     Composed with GLYPH_SCALE into a single `scale` so the
-  //     final scale on the 24-unit viewport is `GLYPH_SCALE × pulse`.
-  //   • POSITION — translate is recomputed every frame to keep the
-  //     glyph centred on (x, y) regardless of the breathing scale.
-  //
-  // The worklet doesn't gate on `selected` — instead the AnimatedG
-  // is conditionally mounted based on `showGlyph` (linger state
-  // below), so non-selected stars' worklets never run. Letting the
-  // worklet always use zoomT lets the icon FADE OUT smoothly with
-  // the zoom-out instead of vanishing the instant `selected` flips.
-  const glyphAnim = useAnimatedProps(() => {
-    'worklet'
-    const z = Math.min(1, zoomT.value * 1.4)
-    const op = z * z * 0.95
-    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
-    const s = GLYPH_SCALE * (1 + wave * 0.05)
-    return {
-      opacity: op,
-      transform: [
-        { translateX: x - GLYPH_HALF * s },
-        { translateY: y - GLYPH_HALF * s },
-        { scale: s },
-      ],
-    }
-  })
-
-  // Linger the glyph render for ~420 ms after deselection so it can
-  // fade out alongside the zoom-out instead of unmounting the moment
-  // the React `selected` prop flips back to false.
-  const [showGlyph, setShowGlyph] = useState(selected)
-  useEffect(() => {
-    if (selected) {
-      setShowGlyph(true)
-      return
-    }
-    const id = setTimeout(() => setShowGlyph(false), 420)
-    return () => clearTimeout(id)
-  }, [selected])
 
   // Lens-flare shimmer — continuous tiny scale wobble on the
   // always-on starburst so the rays feel alive instead of frozen.
@@ -826,7 +1121,15 @@ function StarNode({
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI * 1.3)
     const scale = 0.92 + wave * 0.16
+    // During the focus cinematic the diffraction cross competes
+    // with the glyph + halo and reads as a hard geometric line at
+    // 2.6× scale. Faded to ZERO by zoomT ≈ 0.45 so the focus state
+    // is carried by the soft coloured halo + the glyph alone —
+    // organic bloom, no compass cross persisting through the
+    // animation. Non-selected en-luz stars keep their full sparkle.
+    const focusDim = selected ? Math.max(0, 1 - zoomT.value * 2.2) : 1
     return {
+      opacity: focusDim,
       transform: [
         { translateX: x },
         { translateY: y },
@@ -877,20 +1180,20 @@ function StarNode({
         />
         <Circle cx={x} cy={y} r={midR} fill="#FBD7E3" opacity={enLuz ? 0.2 + b * 0.14 : 0.06} />
         <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.38 + b * 0.22 : 0.1} />
-        {/* Diffraction-spike starburst — ON for EVERY en luz star,
-            not just the selected one. Length bumped R*7 → R*11 so
-            the anamorphic horizontal streak extends much further
-            (Genshin-style long flare). Wrapped in an AnimatedG that
-            shimmers so the rays never feel frozen. */}
+        {/* Diffraction-spike starburst — ON for EVERY en luz star.
+            Length cut R*11 → R*6 + opacity 0.55+b*0.35 → 0.4+b*0.2
+            so the cross reads as a soft luminous pin-prick over the
+            painted halos, not a giant compass-rose that overpowers
+            the photographic galaxy. */}
         {enLuz ? (
           <AnimatedG animatedProps={shimmerAnim}>
             <DiffractionSpikes
               x={x}
               y={y}
-              length={R * 11}
-              opacity={0.55 + b * 0.35}
-              diagOpacity={0.22 + b * 0.14}
-              strokeWidth={0.7}
+              length={R * 6}
+              opacity={0.4 + b * 0.2}
+              diagOpacity={0.16 + b * 0.08}
+              strokeWidth={0.55}
             />
           </AnimatedG>
         ) : null}
@@ -915,24 +1218,13 @@ function StarNode({
               />
             ))
           : null}
-        {/* Lens-flare starburst (the BIG flare) — only the selected
-            star, wrapped in an AnimatedG that scales + fades in with
-            the zoom. Length bumped R*10 → R*16 + opacity 0.7 → 0.85
-            so the selected star throws a much longer + brighter cross
-            on zoom — the dramatic Genshin "Condensed Pyronado"-style
-            burst. Stacks on top of the always-on spikes above. */}
-        {showFlare ? (
-          <AnimatedG animatedProps={flareAnim}>
-            <DiffractionSpikes
-              x={x}
-              y={y}
-              length={R * 16}
-              opacity={0.85}
-              diagOpacity={0.36}
-              strokeWidth={0.8}
-            />
-          </AnimatedG>
-        ) : null}
+        {/* Big "selection flare" removed — it was the geometric
+            horizontal streak that persisted across the focus
+            cinematic. The arrival burst (BurstParticle ring) +
+            impact flash already give the moment of selection its
+            punch; the halo + glyph carry the focus state itself,
+            without a directional cross. Result: organic bloom, not
+            compass rose. */}
         {/* The luminous point — gradient disc + multi-layer
             white-hot core. The outermost halo is a wider soft
             white wash to mimic the overexposed Genshin core glow;
@@ -944,28 +1236,65 @@ function StarNode({
             dimension glyph rendered below has a magenta-bloom
             canvas to land on instead of being washed out by the
             opaque white core. */}
-        <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-        {enLuz ? (
-          <AnimatedG animatedProps={coreFade}>
-            <Circle cx={x} cy={y} r={R * 1.1} fill="#FFFFFF" opacity={0.32} />
-            <Circle cx={x} cy={y} r={R * 0.7} fill="#FFFFFF" opacity={1} />
-            <Circle cx={x} cy={y} r={R * 0.4} fill="#FFFFFF" />
-          </AnimatedG>
-        ) : null}
+        <AnimatedG animatedProps={coreFade}>
+          <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
+          {enLuz ? (
+            <>
+              <Circle cx={x} cy={y} r={R * 1.1} fill="#FFFFFF" opacity={0.32} />
+              <Circle cx={x} cy={y} r={R * 0.7} fill="#FFFFFF" opacity={1} />
+              <Circle cx={x} cy={y} r={R * 0.4} fill="#FFFFFF" />
+            </>
+          ) : null}
+        </AnimatedG>
       </AnimatedG>
-      {/* Dimension glyph — the icon (heart, bolt, moon, bowl, …) of
-          the selected dimension materialises at the star centre as
-          zoom progresses. The AnimatedG owns position, scale,
-          opacity AND the gentle breath pulse (see glyphAnim).
-          Wrapped in `color="#FBD7E3"` so the glyph paths' fill +
-          stroke (which use `currentColor`) read as warm cream-pink
-          against the magenta bloom, instead of the white-hot
-          tone of the underlying core. */}
+      {/* Focus halo — TWO independent layers, both edge-feathered:
+            • haloAnim group: 4 nested coloured rings with
+              descending opacity simulate a radial gradient bloom
+              (no per-dim RadialGradient needed since fill colour
+              varies per dimension).
+            • wellAnim group: bg-coloured RADIAL GRADIENT that
+              fades opaque-at-centre → transparent-at-edge, so
+              the well DIFFUSES into the colored halo around it
+              instead of showing a hard "two stacked circles"
+              edge. The well also has slack radius (r=42) that
+              extends INTO the inner ring of the halo — the
+              transition zone blends. */}
+      {showGlyph ? (
+        <>
+          {/* Halo bloom — TRUE radial gradient per dimension.
+              Continuous from centre (opacity 0.5) to edge 0, no
+              step banding. The gradient id resolves to
+              `halo-${dim.key}` defined in <Defs>. */}
+          <AnimatedG animatedProps={haloAnim}>
+            <Circle cx={x} cy={y} r={68} fill={`url(#halo-${dim.key})`} />
+          </AnimatedG>
+          <AnimatedG animatedProps={wellAnim}>
+            <Circle cx={x} cy={y} r={42} fill="url(#focus-well)" />
+          </AnimatedG>
+          {/* Centre spark — soft warm-cream glow painted between
+              the well and the icon. Gives the focus state a
+              subtle luminous centre without re-introducing the
+              washing-out white-hot core. */}
+          <AnimatedG animatedProps={wellAnim}>
+            <Circle cx={x} cy={y} r={28} fill="url(#focus-spark)" />
+          </AnimatedG>
+        </>
+      ) : null}
+      {/* Dimension glyph — materialises at the star centre as the
+          zoom cinematic progresses. Cream tint so the icon reads
+          as the bright spark inside the coloured halo. */}
       {showGlyph ? (
         <AnimatedG animatedProps={glyphAnim}>
-          <G color="#FBD7E3">{GLYPHS[dim.key]}</G>
+          <G color="#FFE9D6">{GLYPHS[dim.key]}</G>
         </AnimatedG>
       ) : null}
+      {/* Focus label moved out of the SVG to a sibling RN Text
+          overlay (see OrbitalSystem return below). With the
+          in-place zoom + the right-side DimensionNodeList the
+          label rendered inside the SVG (anchored to the star)
+          ended up behind the list panel for stars on the right
+          half of the hexagon. The RN overlay always centres on
+          the wrap so it can't clip. */}
       {/* Labels intentionally removed — the right-side DimensionNodeList
           is the single source of identification. Two labels for the
           same dimension was visual noise and they kept colliding with
@@ -973,15 +1302,6 @@ function StarNode({
     </AnimatedG>
   )
 }
-
-// Dimension glyphs are authored in a 24×24 viewport; we render them
-// at ~22.8 viewBox units (scale 0.95) so the icon dominates the
-// star's bloom radius and reads clearly as the focal element of
-// the zoomed star — bigger than the white core that fades behind
-// it, comparable in size to the right-side badge so the user reads
-// "that's the energía star" without comparing them.
-const GLYPH_SCALE = 0.95
-const GLYPH_HALF = 12 // half the source 24-unit viewport — used to recentre.
 
 const styles = StyleSheet.create({
   wrap: {
@@ -1010,6 +1330,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  // Focus label overlay — RN Text anchored to bottom-centre of the
+  // wrap so it always renders inside the orbital container, never
+  // clipped by the right-side DimensionNodeList. pointerEvents off
+  // so the tap-to-exit Pressable still catches taps in this area.
+  focusLabel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 22,
+    alignItems: 'center',
+  },
+  focusLabelText: {
+    fontFamily: typography.serif,
+    fontSize: 14,
+    color: '#FFE9D6',
+    letterSpacing: 1.6,
   },
   // Soft edge fades — very subtle dim tint that takes the edge off
   // the diagram's hard boundary against the surrounding cosmos / list

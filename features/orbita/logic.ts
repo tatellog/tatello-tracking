@@ -26,7 +26,7 @@ export const DIMENSIONS: readonly DimensionLayout[] = [
   { key: 'mente', label: 'MENTE', angleDeg: 8, radiusFrac: 1.0 },
   { key: 'energia', label: 'ENERGÍA', angleDeg: 250, radiusFrac: 0.72 },
   { key: 'sueno', label: 'SUEÑO', angleDeg: 64, radiusFrac: 0.78 },
-  { key: 'alimento', label: 'ALIMENTO', angleDeg: 128, radiusFrac: 0.88 },
+  { key: 'alimento', label: 'COMIDA', angleDeg: 128, radiusFrac: 0.88 },
 ]
 
 export type Dimension = DimensionLayout & {

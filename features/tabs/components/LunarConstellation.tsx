@@ -88,7 +88,7 @@ const SIGN_ENGRAVINGS: Record<
 const SIGN_CONSTELLATION_TRANSFORM: Record<ZodiacSign, string> = {
   acuario: 'translate(47 41) scale(0.68)',
   aries: 'translate(46 37) scale(0.68)',
-  cancer: 'translate(42 52) scale(0.68)',
+  cancer: 'translate(45 40) scale(0.68)',
   capricornio: 'translate(33 46) scale(0.68)',
   // Escorpio uses a non-uniform scale (0.72 × 0.82) to stretch
   // the figure vertically — the asterism is elongated to match

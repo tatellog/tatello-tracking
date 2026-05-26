@@ -660,7 +660,7 @@ const FIRST_CYCLE_DIMENSIONS: readonly {
   },
   {
     key: 'alimento',
-    label: 'alimento',
+    label: 'comida',
     days: [
       0.55, 0.62, 0.5, 0.68, 0.55, 0.72, 0.82, 0.62, 0.5, 0.45, 0.3, 0.45, 0.55, 0.62, 0.65, 0.55,
       0.5, 0.55, 0.6, 0.65, 0.62, 0.68,

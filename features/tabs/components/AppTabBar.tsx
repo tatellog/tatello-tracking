@@ -149,8 +149,11 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
                 accessibilityState={{ selected: focused }}
                 accessibilityLabel={label}
               >
-                {options.tabBarIcon?.({ focused, color, size: 20 })}
-                <Text style={[styles.label, { color }]} numberOfLines={1}>
+                {options.tabBarIcon?.({ focused, color, size: 40 })}
+                <Text
+                  style={[styles.label, { color, opacity: focused ? 1 : 0.5 }]}
+                  numberOfLines={1}
+                >
                   {label}
                 </Text>
               </Pressable>
@@ -178,16 +181,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
   },
-  // The navigation pill — a stadium holding the four tabs.
+  // The navigation pill — a stadium holding the four tabs. Bg
+  // shifted to a magenta-tinted darker tone so it separates from
+  // the page bg. Subtle black shadow for elevation (no longer a
+  // magenta glow — that was overpowering and made the whole pill
+  // halo brightly when combined with the active capsule). Border
+  // opacity 0.22 so the perimeter reads as a clear surface edge.
   pill: {
     flex: 1,
     flexDirection: 'row',
     height: PILL_HEIGHT,
     borderRadius: PILL_HEIGHT / 2,
-    backgroundColor: colors.bgCard2,
+    backgroundColor: '#1A0810',
     borderWidth: 1,
-    borderColor: colors.hairline,
+    borderColor: 'rgba(244, 236, 222, 0.22)',
     padding: 5,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tab: {
     flex: 1,
@@ -196,9 +209,11 @@ const styles = StyleSheet.create({
     gap: 3,
     borderRadius: (PILL_HEIGHT - 10) / 2,
   },
-  // Active tab — an inset magenta-tint capsule inside the pill.
+  // Active tab — an inset magenta-tint capsule inside the pill,
+  // bumped to magentaTint2 (0.18 opacity) so it reads clearly as
+  // "this is the active one" without being loud.
   tabActive: {
-    backgroundColor: colors.magentaTint,
+    backgroundColor: colors.magentaTint2,
   },
   label: {
     fontFamily: typography.uiBold,

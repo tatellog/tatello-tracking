@@ -149,15 +149,21 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   cancer: {
     label: 'CÁNCER',
     glyph: '♋',
+    // Aligned to the two crabs in cancer-art.svg — arms extend
+    // wide to reach each crab on either side, the JUNCTION
+    // (anchor) sits in the central empty space between them,
+    // and the STEM + claws descend below into the lower
+    // composition. Same Y topology, repositioned for the
+    // two-crab symmetry.
     stars: [
-      { x: 0.2, y: 0.18, mag: 2.8 }, // 0 left arm tip
-      { x: 0.34, y: 0.25, mag: 3.2 }, // 1 left arm mid (bows up)
-      { x: 0.5, y: 0.37, mag: 1.5 }, // 2 junction (anchor)
-      { x: 0.66, y: 0.25, mag: 3.2 }, // 3 right arm mid (bows up)
-      { x: 0.8, y: 0.17, mag: 2.8 }, // 4 right arm tip
-      { x: 0.5, y: 0.62, mag: 3.2 }, // 5 stem mid
-      { x: 0.36, y: 0.82, mag: 3.0 }, // 6 left claw
-      { x: 0.63, y: 0.84, mag: 3.0 }, // 7 right claw
+      { x: 0.1, y: 0.4, mag: 2.8 }, // 0 left arm tip — on left crab
+      { x: 0.3, y: 0.46, mag: 3.2 }, // 1 left arm mid
+      { x: 0.5, y: 0.5, mag: 1.5 }, // 2 junction (anchor) ★ — dead centre
+      { x: 0.7, y: 0.46, mag: 3.2 }, // 3 right arm mid
+      { x: 0.9, y: 0.4, mag: 2.8 }, // 4 right arm tip — on right crab
+      { x: 0.5, y: 0.7, mag: 3.2 }, // 5 stem mid
+      { x: 0.4, y: 0.88, mag: 3.0 }, // 6 left claw
+      { x: 0.6, y: 0.88, mag: 3.0 }, // 7 right claw
     ],
     lines: [
       [0, 1], // left arm
