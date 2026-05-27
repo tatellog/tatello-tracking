@@ -557,7 +557,7 @@ export type DiaSemana = {
  *  observations and the experimento card is suppressed. From cycle
  *  3 onward, surfaced patterns are the ones that survived FDR
  *  correction + replication across ≥2 cycles. */
-export const MOCK_CICLO = {
+export const MOCK_CYCLE = {
   day: 22,
   length: 28,
   // The thematic "lens" of the month — used by the Mes archetype
@@ -763,17 +763,17 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
  *  month. NO menstrual-cycle framing — the "mes" here is a
  *  28-day observation window for pattern detection. */
 export function buildFirstCycleVoz(
-  ciclo: typeof MOCK_CICLO,
+  cycle: typeof MOCK_CYCLE,
   observations: readonly Observation[],
 ): { parts: readonly VozParte[] } {
   const peak = observations.find((o) => o.id === 'peak')
-  const remaining = Math.max(0, ciclo.length - ciclo.day)
+  const remaining = Math.max(0, cycle.length - cycle.day)
   return {
     parts: [
       { text: 'Este es tu ' },
       { text: 'primer mes', tone: 'accent' },
       {
-        text: ` leído. En ${ciclo.day} días tuviste algunos brillantes y otros más callados. Tu pico fue el `,
+        text: ` leído. En ${cycle.day} días tuviste algunos brillantes y otros más callados. Tu pico fue el `,
       },
       { text: peak?.shortValue ?? '', tone: 'accent' },
       { text: '. Por ahora Stelar está ' },

@@ -10,7 +10,7 @@ import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals } from '../hooks'
 import {
   buildFirstCycleVoz,
-  MOCK_CICLO,
+  MOCK_CYCLE,
   MOCK_OBSERVATIONS,
   MOCK_PATRONES,
   MOCK_VOZ,
@@ -20,7 +20,7 @@ import {
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PreviewBanner } from './PreviewBanner'
-import { TuCielo, type Satellite } from './TuCielo'
+import { TuCielo, type Satellite, type SatelliteKind } from './TuCielo'
 import { VozDeStelar } from './VozDeStelar'
 
 /*
@@ -52,8 +52,8 @@ import { VozDeStelar } from './VozDeStelar'
  */
 export function MesSegment() {
   const router = useRouter()
-  const ciclo = MOCK_CICLO
-  const isFirstCycle = ciclo.cycleNumber === 1
+  const cycle = MOCK_CYCLE
+  const isFirstCycle = cycle.cycleNumber === 1
   const { data: hasAny } = useHasAnySignals()
 
   // Cycle-1: which observation is currently summoned. Default is
@@ -93,19 +93,18 @@ export function MesSegment() {
 
   // Voz: first-cycle prose with honest scope, or mature reading.
   const voz = useMemo(
-    () => (isFirstCycle ? buildFirstCycleVoz(ciclo, MOCK_OBSERVATIONS) : null),
-    [isFirstCycle, ciclo],
+    () => (isFirstCycle ? buildFirstCycleVoz(cycle, MOCK_OBSERVATIONS) : null),
+    [isFirstCycle, cycle],
   )
 
   // Header archetype — "tu primer mes en {phase}" / "tu mes en
-  // {phase}". Reframed from "ciclo" → "mes": this app reads
-  // monthly behaviour patterns, not menstrual-cycle phases. The
-  // phase value is now a data-derived theme (e.g. "lectura",
-  // "ritmo bajo", "ascenso") instead of a menstrual phase.
+  // {phase}". The phase value here is a data-derived theme (e.g.
+  // "lectura", "ritmo bajo", "ascenso"), NOT a menstrual cycle
+  // phase — this segment reads monthly behaviour patterns.
   const archetypeName = isFirstCycle
-    ? `tu primer mes en ${ciclo.phase.toLowerCase()}`
-    : `tu mes en ${ciclo.phase.toLowerCase()}`
-  const archetypeEmphasis = ciclo.phase.toLowerCase()
+    ? `tu primer mes en ${cycle.phase.toLowerCase()}`
+    : `tu mes en ${cycle.phase.toLowerCase()}`
+  const archetypeEmphasis = cycle.phase.toLowerCase()
 
   // Empty-state branch: hide the satellites + readout + voz. The BH
   // hero still renders (visual identity of Mes) but with empty
@@ -122,7 +121,7 @@ export function MesSegment() {
           />
         </View>
         <View style={styles.diagram}>
-          <TuCielo ciclo={ciclo} satellites={[]} onSatellitePress={undefined} />
+          <TuCielo satellites={[]} onSatellitePress={undefined} />
         </View>
         <EmptySegmentCard
           eyebrow="El cielo se forma día a día"
@@ -152,13 +151,13 @@ export function MesSegment() {
           <LiveDot />
           <Text style={styles.meta} numberOfLines={1}>
             <Text>Día </Text>
-            <Text style={styles.metaNum}>{ciclo.day}</Text>
+            <Text style={styles.metaNum}>{cycle.day}</Text>
             <Text> · </Text>
             {isFirstCycle ? (
               <Text style={styles.metaQuiet}>primera lectura</Text>
             ) : (
               <>
-                <Text style={styles.metaNum}>{ciclo.patternsConfirmed}</Text>
+                <Text style={styles.metaNum}>{cycle.patternsConfirmed}</Text>
                 <Text> patrones</Text>
               </>
             )}
@@ -173,7 +172,6 @@ export function MesSegment() {
           separate card below. Mature cycles navigate away. */}
       <View style={styles.diagram}>
         <TuCielo
-          ciclo={ciclo}
           satellites={satellites}
           onSatellitePress={handleSatellitePress}
           selectedSatelliteId={isFirstCycle ? selectedObsId : null}
@@ -202,18 +200,17 @@ export function MesSegment() {
 }
 
 function observationToSatellite(o: Observation): Satellite {
-  // Derive the visual "kind" from the observation id — keeps the
-  // visual differentiation map in one place. Tentative observations
-  // get the dashed halo treatment regardless of which content slot
-  // they fill.
-  const kind: Satellite['kind'] = o.tentative
+  // `kind` is the single visual-treatment knob: tentative wins
+  // (dashed halo) regardless of slot; otherwise the observation
+  // id picks one of peak / valley / stable.
+  const kind: SatelliteKind = o.tentative
     ? 'tentative'
     : o.id === 'peak'
       ? 'peak'
       : o.id === 'valley'
         ? 'valley'
         : 'stable'
-  return { id: o.id, label: o.label, kind, tentative: o.tentative }
+  return { id: o.id, label: o.label, kind }
 }
 
 function patronToSatellite(p: Patron): Satellite {

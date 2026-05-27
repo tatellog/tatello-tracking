@@ -29,23 +29,15 @@ import Svg, {
 
 import { colors, typography } from '@/theme'
 
-// The hero artwork — `orbit-month-bh.png` paints just the BH +
-// accretion with a couple of cardinal sparkles and small axis
-// diamonds. Clean cosmic identity that the programmatic decoration
-// layers (nebula clouds, deep starfield, orbital rings, etc.)
-// complement instead of fight. Was the experimental `1.png`;
-// renamed for clarity.
+// The hero artwork — paints the BH + accretion + cardinal
+// sparkles + axis diamonds. The programmatic layers around it
+// (nebula clouds, deep starfield, orbital rings) complement this
+// painting rather than duplicate it.
 const MONTH_ART_PNG = require('@/assets/orbits-art/orbit-month-bh.png')
-
-/* (Pattern icon SVG imports removed — the AI-generated
- * illustrations were too dark to read at chain-badge size. Replaced
- * with programmatic SVG symbols drawn by `PatternSymbol` based on
- * the satellite `kind`.) */
 
 /** A satellite slot in the hero — agnostic to whether it represents
  *  a confirmed pattern (mature view) or a first-month observation.
- *  `kind` drives the visual treatment of the chain badge so each
- *  type of pattern reads differently at a glance:
+ *  `kind` is the single source of truth for the visual treatment:
  *    · peak       — warm, brighter glow (high-energy day/event)
  *    · valley     — cool, quieter glow (low-energy day/event)
  *    · stable     — solid magenta frame ring (steady anchor)
@@ -55,7 +47,6 @@ export type Satellite = {
   id: string
   label: string
   kind?: SatelliteKind
-  tentative?: boolean
   selected?: boolean
 }
 
@@ -104,9 +95,9 @@ function rand(seed: number, i: number): number {
   return s - Math.floor(s)
 }
 
-/** Background starfield — quieter than v2. The reference has only a
- *  light sprinkle of background stars (the eye reads "deep cosmic
- *  void", not "Milky Way"). 70 candidates, ~55 visible. */
+/** Background starfield — a sparse sprinkle so the eye reads
+ *  "deep cosmic void", not "Milky Way". 70 candidates, ~55
+ *  survive the central skip-zone around the BH. */
 type Star = { x: number; y: number; r: number; op: number; phase: number }
 const STARS: readonly Star[] = Array.from({ length: 70 }, (_, i) => {
   const x = rand(11, i) * W
@@ -191,16 +182,15 @@ const NODES: readonly { x: number; y: number; size: number }[] = [
   { x: 140, y: 50, size: 0.85 }, // upper-left (11 o'clock, small)
 ]
 
-/** Pattern-chain positions — four satellites stacked in a vertical
- *  column on the right side of the canvas, with a subtle S-curve.
- *  Moved INWARD from the edge (was 312/296) so the labels to the
- *  left have horizontal breathing room and don't clip at the
- *  screen edge on narrower phones. */
+/** Pattern-chain positions — vertical S-curve on the right side
+ *  of the canvas. Constraints: x must be > 250 (out of BH plasma
+ *  zone) and < W - 28 (chain badge half-width) so labels read
+ *  clean. Adjust the spacing if the SatBody halo radius changes. */
 const SAT_POS: readonly { x: number; y: number }[] = [
-  { x: 296, y: 72 }, // top — slight right curve
-  { x: 282, y: 142 }, // upper mid — slight left curve
-  { x: 282, y: 214 }, // lower mid — slight left curve
-  { x: 296, y: 286 }, // bottom — back right
+  { x: 296, y: 72 },
+  { x: 282, y: 142 },
+  { x: 282, y: 214 },
+  { x: 296, y: 286 },
 ]
 
 /* A single background star — twinkles asynchronously via its
@@ -250,7 +240,6 @@ function SatBody({
   clock,
   phase,
   kind,
-  tentative,
   selected,
 }: {
   x: number
@@ -258,7 +247,6 @@ function SatBody({
   clock: SharedValue<number>
   phase: number
   kind?: SatelliteKind
-  tentative?: boolean
   selected?: boolean
 }) {
   // Resolve halo colours + tone per kind. Falls back to the
@@ -300,8 +288,8 @@ function SatBody({
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((clock.value * 0.5 + phase) * 2 * Math.PI)
     // Stable patterns breathe LESS — they're the steady ones.
-    // Tentative + peak/valley keep normal breath.
-    const amplitude = kind === 'stable' ? 0.04 : tentative || kind === 'tentative' ? 0.06 : 0.09
+    // Tentative breathes a touch quieter than peak/valley.
+    const amplitude = kind === 'stable' ? 0.04 : kind === 'tentative' ? 0.06 : 0.09
     const scale = 1 + wave * amplitude
     return {
       transform: [
@@ -321,7 +309,7 @@ function SatBody({
         <Circle
           cx={x}
           cy={y}
-          r={24}
+          r={SAT_HALO_R}
           fill="none"
           stroke={haloFill}
           strokeWidth={1}
@@ -330,15 +318,15 @@ function SatBody({
           opacity={haloOp}
         />
       ) : (
-        <Circle cx={x} cy={y} r={24} fill={haloFill} opacity={haloOp} />
+        <Circle cx={x} cy={y} r={SAT_HALO_R} fill={haloFill} opacity={haloOp} />
       )}
-      <Circle cx={x} cy={y} r={19} fill={auraFill} opacity={auraOp} />
+      <Circle cx={x} cy={y} r={SAT_AURA_R} fill={auraFill} opacity={auraOp} />
       {/* Stable extra: solid magenta frame ring — the "anchor" cue. */}
       {kind === 'stable' ? (
         <Circle
           cx={x}
           cy={y}
-          r={22}
+          r={SAT_STABLE_FRAME_R}
           fill="none"
           stroke={colors.magenta}
           strokeWidth={0.8}
@@ -349,7 +337,7 @@ function SatBody({
         <Circle
           cx={x}
           cy={y}
-          r={21}
+          r={SAT_RING_R}
           fill="none"
           stroke={colors.magenta}
           strokeWidth={1.4}
@@ -360,12 +348,18 @@ function SatBody({
   )
 }
 
-// Chain badge geometry. Reduced from v1 (32/42) so the chain
-// reads as supporting nav, not the visual hero. Icon 28 inside a
-// 36 disc keeps the pattern recognisable while letting the BH
-// cosmos dominate the eye.
+// Chain badge geometry. The chain reads as supporting nav, not
+// the visual hero: a 28 px symbol inside a 36 px disc, framed by
+// halo + aura + selected rings that scale with these constants —
+// resize them as a group rather than tweaking the rings in
+// isolation. The halo radii live as viewBox units (372 wide), so
+// they aren't 1:1 with the disc/icon pixel sizes.
 const PATTERN_ICON_SIZE = 28
 const PATTERN_DISC_SIZE = 36
+const SAT_HALO_R = 24
+const SAT_AURA_R = 19
+const SAT_RING_R = 21
+const SAT_STABLE_FRAME_R = 22
 
 /* Pattern symbol — a small SVG icon drawn by kind. Replaces the
  * AI-illustrated pattern1-4 PNGs that were too dark at chain-
@@ -432,7 +426,6 @@ function PatternChainIcon({
   kind,
   clock,
   phase,
-  tentative,
   dimmed,
   affordance,
 }: {
@@ -440,14 +433,14 @@ function PatternChainIcon({
   kind: SatelliteKind | undefined
   clock: SharedValue<number>
   phase: number
-  tentative?: boolean
   dimmed?: boolean
   affordance?: boolean
 }) {
+  const isTentative = kind === 'tentative'
   const animatedStyle = useAnimatedStyle(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((clock.value * 0.5 + phase) * 2 * Math.PI)
-    let scale = 1 + wave * (tentative ? 0.06 : 0.09)
+    let scale = 1 + wave * (isTentative ? 0.06 : 0.09)
     // Affordance pulse: a stronger periodic scale boost (~1.5 s
     // sub-period) layered on top of the breath. Cues "tap me"
     // without an explicit text label.
@@ -466,7 +459,7 @@ function PatternChainIcon({
         {
           left: `${(pos.x / W) * 100}%`,
           top: `${(pos.y / W) * 100}%`,
-          opacity: (dimmed ? 0.35 : 1) * (tentative ? 0.7 : 1),
+          opacity: (dimmed ? 0.35 : 1) * (isTentative ? 0.7 : 1),
         },
       ]}
     >
@@ -856,18 +849,12 @@ function getIgnitionLayout(kind: SatelliteKind | undefined): {
 }
 
 export function TuCielo({
-  ciclo,
   satellites,
   onSatellitePress,
   selectedSatelliteId,
   evidence,
   onCloseSatellite,
 }: {
-  ciclo: {
-    day: number
-    length: number
-    band: readonly [number, number]
-  }
   satellites: readonly Satellite[]
   onSatellitePress?: (id: string) => void
   /** Which chain item is currently active. Drives the
@@ -1083,12 +1070,9 @@ export function TuCielo({
         />
       </Svg>
 
-      {/* FRONT SVG — bright nodes + chain halos + labels. The
-          sparkles + axis diamonds we used to render here lived in
-          the orbit-month-art.svg image; with the cleaner 1.png
-          that already paints those (top + bottom 4-pointed sparkle
-          + small diamonds around the BH), the programmatic
-          versions would just ghost on top. Removed. */}
+      {/* FRONT SVG — bright nodes + chain halos + labels.
+          Cardinal sparkles + axis diamonds are PAINTED IN the BH
+          PNG; rendering them here too would double up. */}
       <Svg viewBox={`0 0 ${W} ${W}`} style={[styles.svg, StyleSheet.absoluteFill]}>
         {/* Layer 6 — bright pin-point nodes on the rings. */}
         {NODES.map((n, i) => (
@@ -1112,7 +1096,6 @@ export function TuCielo({
                 clock={t}
                 phase={sat.breathPhase}
                 kind={sat.kind}
-                tentative={sat.tentative}
                 selected={sat.selected}
               />
               <SvgText
@@ -1123,7 +1106,7 @@ export function TuCielo({
                 fontSize={10}
                 letterSpacing={1.2}
                 fill={sat.selected ? colors.magenta : '#F4ECDE'}
-                opacity={sat.selected ? 1 : sat.tentative ? 0.55 : 0.85}
+                opacity={sat.selected ? 1 : sat.kind === 'tentative' ? 0.55 : 0.85}
               >
                 {sat.label}
               </SvgText>
@@ -1154,7 +1137,6 @@ export function TuCielo({
             kind={sat.kind}
             clock={t}
             phase={sat.breathPhase}
-            tentative={sat.tentative}
             dimmed={dimmed}
             affordance={affordance}
           />

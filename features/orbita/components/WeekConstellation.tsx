@@ -33,20 +33,16 @@ import type { DiaSemana } from '../mock'
 const WEEK_ART_PNG = require('@/assets/orbits-art/orbit-week-art.png')
 
 /*
- * The Semana hero — your week as a SPIRAL GALAXY. Domingo sits
- * closest to the core, Sábado trails out at the rim. Past days are
- * luminous magenta bodies; days that haven't arrived are tiny cream
- * ghosts. Today wears the selection crown by default; tapping a
- * halo draws a tendril down to the DayCard below and scrolls it
- * into view.
+ * The Semana hero — the week rendered as a spiral galaxy centred
+ * on `orbit-week-art.png`. Each day sits on a painted halo node;
+ * tapping a halo opens a `HaloBubble` with the day's archetype +
+ * voice phrase, and (today only) an "Abrir Día" CTA.
  *
- * NOTE on declaration order: all sub-components live ABOVE the
- * main `WeekConstellation` export. Reanimated's Babel plugin
- * transforms components that contain `useAnimatedProps`, and the
- * transform breaks the normal function-declaration hoisting that
- * JavaScript would otherwise provide — so referring to a sub-
- * component defined further down throws "Property X doesn't exist"
- * at runtime. Keeping the helpers first is the durable fix.
+ * Helper components are defined ABOVE the main `WeekConstellation`
+ * export. Reanimated's Babel plugin transforms components that use
+ * `useAnimatedProps`; that transform has interacted badly with
+ * function-declaration hoisting in our setup, so we keep the
+ * helpers first as a durable fix.
  */
 
 const W = 372
