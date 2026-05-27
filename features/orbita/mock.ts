@@ -9,7 +9,7 @@
 /** The coach's reading for the Mes segment — plain serif narration.
  *  Día and Semana have their own richer readings below. */
 export const MOCK_VOZ: Record<'mes', string> = {
-  mes: 'Vas en el día 22. Los antojos más altos y el sueño más cortito son la fase lútea. Pasa todos los meses.',
+  mes: 'Vas en el día 22 de tu primer mes leído. Empiezo a ver algunos ritmos: días más altos los lunes, más callados los jueves. Te confirmo si se repite el mes que viene.',
 }
 
 /** A run of the coach's reading, split so a word can carry an accent
@@ -54,8 +54,7 @@ export const MOCK_HEADLINE: { parts: readonly VozParte[] } = {
  *  command); reason names the data behind it. */
 export const MOCK_ACCION_DEL_DIA = {
   title: 'Dormir antes de las 23:00',
-  reason:
-    'Estás en fase lútea y arrancando una semana baja en energía. Una hora más de sueño hoy te ahorra el jueves.',
+  reason: 'Arrancas una semana más baja en energía. Una hora más de sueño hoy te ahorra el jueves.',
 }
 
 /*
@@ -561,11 +560,14 @@ export type DiaSemana = {
 export const MOCK_CICLO = {
   day: 22,
   length: 28,
-  phase: 'Fase lútea',
+  // The thematic "lens" of the month — used by the Mes archetype
+  // ("tu primer mes en {phase}"). For first month this is always
+  // "lectura" (Stelar is still learning); from cycle 3+ the engine
+  // surfaces a data-derived theme (e.g. "ritmo bajo", "ascenso").
+  phase: 'Lectura',
   band: [20, 26] as const,
-  // Descriptive of the cycle turning — not a task that "seals" with
-  // the user's effort.
-  note: 'Faltan 6 días para tu próximo ciclo.',
+  // Days remaining to close the current month-window of observation.
+  note: 'Faltan 6 días para cerrar tu primer mes.',
   cycleNumber: 1,
   patternsConfirmed: 0,
 }
@@ -605,6 +607,16 @@ export type Observation = {
   label: string
   /** A 2-4 word value that the prose can quote (e.g. "Lunes 7"). */
   shortValue: string
+  /** One-line summary that floats in the cosmos when this
+   *  observation is selected — the headline next to the evidence
+   *  constellation. Serif italic, ~6 words max. */
+  caption: string
+  /** Days in the cycle where this pattern was detected. Renders
+   *  as bright pin-points on the orbital ring + connecting lines
+   *  forming a sub-constellation. Optional: continuous patterns
+   *  (e.g. "stable across all days") leave it undefined and just
+   *  rely on the caption. */
+  evidenceDays?: readonly number[]
   /** Full sentence shown when the user wants more context. */
   detail: string
   /** Visual evidence — the mini-chart shown beside the detail. */
@@ -695,13 +707,17 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
     id: 'peak',
     label: 'tu pico',
     shortValue: 'lunes 7',
-    detail: 'Lunes 7. 5 de 6 dimensiones en luz. Tu día más alto de este ciclo.',
+    caption: 'lunes 7 · tu día más alto',
+    evidenceDays: [7],
+    detail: 'Lunes 7. 5 de 6 dimensiones en luz. Tu día más alto de este mes.',
     chart: { kind: 'daily', days: FIRST_CYCLE_DAILY, focusDay: 7, focusKind: 'peak' },
   },
   {
     id: 'valley',
     label: 'tu pausa',
     shortValue: 'jueves 11',
+    caption: 'jueves 11 · tu día más bajo',
+    evidenceDays: [11],
     detail:
       'Jueves 11 — el cuerpo pidió más calma. Por ahora es un día, todavía no algo que se repita.',
     chart: { kind: 'daily', days: FIRST_CYCLE_DAILY, focusDay: 11, focusKind: 'valley' },
@@ -710,8 +726,11 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
     id: 'stable',
     label: 'tu ancla',
     shortValue: 'mente',
+    // No discrete evidence days — stability is continuous, not
+    // episodic. The caption carries the whole story.
+    caption: 'mente · 22 días estable',
     detail:
-      'Mente. Apenas se movió mientras las otras 5 subían y bajaban. Fue tu zona estable este ciclo.',
+      'Mente. Apenas se movió mientras las otras 5 subían y bajaban. Fue tu zona estable este mes.',
     chart: {
       kind: 'dimensionStack',
       dimensions: FIRST_CYCLE_DIMENSIONS,
@@ -722,7 +741,12 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
     id: 'hypothesis',
     label: 'stelar observa',
     shortValue: 'algo en los jueves',
-    detail: 'Algo se mueve en tus jueves. Necesitamos 2 ciclos más para confirmarlo.',
+    caption: '3 jueves bajos · señal débil',
+    // The thursdays of a Monday-starting cycle, but only the ones
+    // that have already happened by day 22 (current). The 4th
+    // jueves (day 25) is still in the future.
+    evidenceDays: [4, 11, 18],
+    detail: 'Algo se mueve en tus jueves. Necesitamos 2 meses más para confirmarlo.',
     tentative: true,
     chart: {
       kind: 'weekday',
@@ -733,33 +757,29 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
   },
 ]
 
-/** First-cycle Voz de Stelar — honest about the learning state.
- *  Quotes the observed peak day, names the current phase using
- *  population-level cycle knowledge (not personal inference), and
- *  ends with the promise of confirmed patterns next cycle. */
+/** First-month Voz de Stelar — honest about the learning state.
+ *  Quotes the observed peak day, names what Stelar can/can't say
+ *  yet, and ends with the promise of confirmed patterns next
+ *  month. NO menstrual-cycle framing — the "mes" here is a
+ *  28-day observation window for pattern detection. */
 export function buildFirstCycleVoz(
   ciclo: typeof MOCK_CICLO,
   observations: readonly Observation[],
 ): { parts: readonly VozParte[] } {
   const peak = observations.find((o) => o.id === 'peak')
   const remaining = Math.max(0, ciclo.length - ciclo.day)
-  const phaseLower = ciclo.phase.toLowerCase().replace('fase ', '')
   return {
     parts: [
       { text: 'Este es tu ' },
-      { text: 'primer ciclo', tone: 'accent' },
+      { text: 'primer mes', tone: 'accent' },
       {
         text: ` leído. En ${ciclo.day} días tuviste algunos brillantes y otros más callados. Tu pico fue el `,
       },
       { text: peak?.shortValue ?? '', tone: 'accent' },
-      { text: '. Estás en ' },
-      { text: phaseLower, tone: 'accent' },
-      {
-        text: '. Esta fase explica los antojos y el sueño más cortito de estos días. Por ahora Stelar está ',
-      },
+      { text: '. Por ahora Stelar está ' },
       { text: 'aprendiendo a leerte', tone: 'accent' },
       {
-        text: `. En ${remaining} días arranca tu segundo ciclo y empezamos a confirmar lo que se repite.`,
+        text: `: lo que ve son señales, no patrones confirmados. En ${remaining} días arranca tu segundo mes y empezamos a confirmar lo que se repite.`,
       },
     ],
   }

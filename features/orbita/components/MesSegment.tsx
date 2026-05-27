@@ -4,7 +4,6 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
-import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
 import { ENGINE_ACTIVE } from '../engine'
@@ -20,7 +19,6 @@ import {
 } from '../mock'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
-import { ObservationChart } from './ObservationChart'
 import { PreviewBanner } from './PreviewBanner'
 import { TuCielo, type Satellite } from './TuCielo'
 import { VozDeStelar } from './VozDeStelar'
@@ -58,25 +56,22 @@ export function MesSegment() {
   const isFirstCycle = ciclo.cycleNumber === 1
   const { data: hasAny } = useHasAnySignals()
 
-  // Cycle-1 only: which observation the user has tapped open. Default
-  // to the peak so the chart shows on first paint — the gesture
-  // (tap satellites to switch) is then learned by exploration.
-  // Tap the same satellite again to close. Mature cycles navigate
-  // away on tap so this state stays null in that branch.
-  const [selectedObsId, setSelectedObsId] = useState<string | null>(() =>
-    isFirstCycle ? (MOCK_OBSERVATIONS[0]?.id ?? null) : null,
-  )
+  // Cycle-1: which observation is currently summoned. Default is
+  // null — the hero opens with a clean cosmos; the user invokes a
+  // pattern by tapping a chain item. Tapping the backdrop (outside
+  // the chain) closes the summon and returns to the cosmos view.
+  const [selectedObsId, setSelectedObsId] = useState<string | null>(null)
   const selectedObs = selectedObsId
     ? (MOCK_OBSERVATIONS.find((o) => o.id === selectedObsId) ?? null)
     : null
 
   // Tap handler:
-  //  · cycle 1 → toggle inline readout for the observation
+  //  · cycle 1 → switch the readout to that observation (no toggle)
   //  · cycle 3+ → navigate to the existing pattern detail screen
   const handleSatellitePress = useCallback(
     (id: string) => {
       if (isFirstCycle) {
-        setSelectedObsId((prev) => (prev === id ? null : id))
+        setSelectedObsId(id)
       } else {
         router.push(`/orbita/patron/${id}`)
       }
@@ -102,11 +97,14 @@ export function MesSegment() {
     [isFirstCycle, ciclo],
   )
 
-  // Header archetype: "tu primer ciclo en X" in cycle 1, "tu ciclo
-  // en X" thereafter — the "primer" marker is its own honesty.
+  // Header archetype — "tu primer mes en {phase}" / "tu mes en
+  // {phase}". Reframed from "ciclo" → "mes": this app reads
+  // monthly behaviour patterns, not menstrual-cycle phases. The
+  // phase value is now a data-derived theme (e.g. "lectura",
+  // "ritmo bajo", "ascenso") instead of a menstrual phase.
   const archetypeName = isFirstCycle
-    ? `tu primer ciclo en ${ciclo.phase.toLowerCase()}`
-    : `tu ciclo en ${ciclo.phase.toLowerCase()}`
+    ? `tu primer mes en ${ciclo.phase.toLowerCase()}`
+    : `tu mes en ${ciclo.phase.toLowerCase()}`
   const archetypeEmphasis = ciclo.phase.toLowerCase()
 
   // Empty-state branch: hide the satellites + readout + voz. The BH
@@ -117,8 +115,8 @@ export function MesSegment() {
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         <View style={styles.header}>
           <EmText
-            text="tu primer ciclo"
-            emphasis="primer ciclo"
+            text="tu primer mes"
+            emphasis="primer mes"
             style={styles.archetype}
             emStyle={styles.archetypeEm}
           />
@@ -129,7 +127,7 @@ export function MesSegment() {
         <EmptySegmentCard
           eyebrow="El cielo se forma día a día"
           body="Stelar no inventa patrones. Necesita verte primero — al menos un día con algo registrado."
-          hint="A partir del segundo ciclo, Stelar empieza a confirmar lo que se repite."
+          hint="A partir del segundo mes, Stelar empieza a confirmar lo que se repite."
         />
       </Animated.View>
     )
@@ -140,10 +138,10 @@ export function MesSegment() {
       {/* Honest framing while the engine is mock. */}
       {ENGINE_ACTIVE ? null : <PreviewBanner />}
 
-      {/* Compressed header — mirrors Día / Semana. */}
+      {/* Tighter header — title + inline status, no separate
+          eyebrow + meta row. Saves ~40 px vertical and gives the
+          hero more presence. */}
       <View style={styles.header}>
-        {/* Frames the cycle archetype as a lens, not an identity. */}
-        <Text style={styles.lensEyebrow}>Tu lente del mes</Text>
         <EmText
           text={archetypeName}
           emphasis={archetypeEmphasis}
@@ -152,20 +150,14 @@ export function MesSegment() {
         />
         <View style={styles.metaRow}>
           <LiveDot />
-          {/* Where you are in the cycle — a day, a phase — not an
-              "X de 28" progress bar. The cycle turns; it isn't a
-              task you complete. */}
           <Text style={styles.meta} numberOfLines={1}>
             <Text>Día </Text>
             <Text style={styles.metaNum}>{ciclo.day}</Text>
+            <Text> · </Text>
             {isFirstCycle ? (
-              <>
-                <Text> · </Text>
-                <Text style={styles.metaQuiet}>primera lectura</Text>
-              </>
+              <Text style={styles.metaQuiet}>primera lectura</Text>
             ) : (
               <>
-                <Text> · </Text>
                 <Text style={styles.metaNum}>{ciclo.patternsConfirmed}</Text>
                 <Text> patrones</Text>
               </>
@@ -174,59 +166,54 @@ export function MesSegment() {
         </View>
       </View>
 
-      {/* The hero — same visual for both cycles, fed differently. */}
+      {/* The hero — BH cosmos + pattern chain. Tapping a chain
+          item lights up the days in the cosmos where Stelar
+          detected that pattern, plus a one-line caption beneath
+          the BH. The cosmos itself becomes the readout — no
+          separate card below. Mature cycles navigate away. */}
       <View style={styles.diagram}>
-        <TuCielo ciclo={ciclo} satellites={satellites} onSatellitePress={handleSatellitePress} />
+        <TuCielo
+          ciclo={ciclo}
+          satellites={satellites}
+          onSatellitePress={handleSatellitePress}
+          selectedSatelliteId={isFirstCycle ? selectedObsId : null}
+          evidence={
+            isFirstCycle && selectedObs
+              ? {
+                  label: selectedObs.label,
+                  caption: selectedObs.caption,
+                  detail: selectedObs.detail,
+                  tentative: selectedObs.tentative,
+                }
+              : null
+          }
+          onCloseSatellite={() => setSelectedObsId(null)}
+        />
       </View>
-
-      {/* Cycle-1 readout: when the user taps an observation, its
-          meaning lands here, mirroring Día's selected-dimension
-          flow. Re-mounts on selection change so it fades in. */}
-      {selectedObs ? (
-        <Animated.View key={selectedObs.id} entering={FadeIn.duration(220)}>
-          <ObservationReadout observation={selectedObs} />
-        </Animated.View>
-      ) : isFirstCycle ? (
-        <Text style={styles.hint}>Toca una observación para leerla.</Text>
-      ) : null}
 
       {/* Voz — first-cycle honest version OR mature paragraph. */}
       {voz ? (
         <VozDeStelar scope="primera lectura" parts={voz.parts} />
       ) : (
-        <VozDeStelar scope="este ciclo" text={MOCK_VOZ.mes} />
+        <VozDeStelar scope="este mes" text={MOCK_VOZ.mes} />
       )}
     </Animated.View>
   )
 }
 
-/* The inline readout for a tapped observation. Renders the
- * mini-chart (the dynamic evidence), the satellite's label in the
- * eyebrow, and the full sentence in coach voice. Tentative
- * observations get an extra micro-line at the end naming the wait
- * so the user understands why it's not being treated as a
- * confirmed pattern yet. */
-function ObservationReadout({ observation }: { observation: Observation }) {
-  return (
-    <View style={styles.readoutCard}>
-      <EyebrowLabel tone="magenta" size={10}>
-        {observation.label}
-      </EyebrowLabel>
-      <View style={styles.readoutChart}>
-        <ObservationChart chart={observation.chart} />
-      </View>
-      <Text style={styles.readoutBody}>{observation.detail}</Text>
-      {observation.tentative ? (
-        <Text style={styles.readoutHint}>
-          Stelar lo marca como observación. Para llamarlo patrón necesita verlo al menos otra vez.
-        </Text>
-      ) : null}
-    </View>
-  )
-}
-
 function observationToSatellite(o: Observation): Satellite {
-  return { id: o.id, label: o.label, tentative: o.tentative }
+  // Derive the visual "kind" from the observation id — keeps the
+  // visual differentiation map in one place. Tentative observations
+  // get the dashed halo treatment regardless of which content slot
+  // they fill.
+  const kind: Satellite['kind'] = o.tentative
+    ? 'tentative'
+    : o.id === 'peak'
+      ? 'peak'
+      : o.id === 'valley'
+        ? 'valley'
+        : 'stable'
+  return { id: o.id, label: o.label, kind, tentative: o.tentative }
 }
 
 function patronToSatellite(p: Patron): Satellite {
@@ -247,20 +234,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
   },
-  // Frames the archetype as a passing lens, not an identity.
-  lensEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 8,
-  },
   archetype: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 27,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 28,
     color: colors.leche,
     textAlign: 'center',
   },
@@ -268,7 +246,7 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
   metaRow: {
-    marginTop: 14,
+    marginTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -295,44 +273,5 @@ const styles = StyleSheet.create({
   diagram: {
     marginHorizontal: -20,
     marginTop: 4,
-  },
-  // ── Cycle-1 readout (tapped observation) ────────────────────
-  readoutCard: {
-    marginTop: 18,
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  readoutChart: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  readoutBody: {
-    marginTop: 12,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.leche,
-  },
-  readoutHint: {
-    marginTop: 10,
-    fontFamily: typography.uiMedium,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: colors.niebla,
-  },
-  // Hint when nothing is selected yet — mirrors Día's quiet
-  // "Toca una dimensión para leerla."
-  hint: {
-    marginTop: 18,
-    fontFamily: typography.uiMedium,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: colors.niebla,
-    textAlign: 'center',
   },
 })

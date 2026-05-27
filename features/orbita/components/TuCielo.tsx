@@ -1,11 +1,15 @@
 import * as Haptics from 'expo-haptics'
-import { useEffect } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import React, { useEffect } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
+  FadeOut,
   useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withTiming,
   type SharedValue,
@@ -13,237 +17,851 @@ import Animated, {
 import Svg, {
   Circle,
   Defs,
+  Ellipse,
   G,
+  Image as SvgImage,
   Line,
-  LinearGradient,
   Path,
   RadialGradient,
   Stop,
   Text as SvgText,
 } from 'react-native-svg'
 
-import { phaseForDay, type CyclePhase } from '@/features/cycle/phase'
 import { colors, typography } from '@/theme'
 
-import { Cosmos } from './Cosmos'
+// The hero artwork — `orbit-month-bh.png` paints just the BH +
+// accretion with a couple of cardinal sparkles and small axis
+// diamonds. Clean cosmic identity that the programmatic decoration
+// layers (nebula clouds, deep starfield, orbital rings, etc.)
+// complement instead of fight. Was the experimental `1.png`;
+// renamed for clarity.
+const MONTH_ART_PNG = require('@/assets/orbits-art/orbit-month-bh.png')
+
+/* (Pattern icon SVG imports removed — the AI-generated
+ * illustrations were too dark to read at chain-badge size. Replaced
+ * with programmatic SVG symbols drawn by `PatternSymbol` based on
+ * the satellite `kind`.) */
 
 /** A satellite slot in the hero — agnostic to whether it represents
- *  a confirmed pattern (mature view) or a first-cycle observation.
- *  The parent (MesSegment) decides what it carries and how taps
- *  route. `tentative` dims the visual + flags the satellite as
- *  hypothesis-in-formation. `selected` adds a cream ring so the
- *  user sees which one corresponds to the current readout. */
+ *  a confirmed pattern (mature view) or a first-month observation.
+ *  `kind` drives the visual treatment of the chain badge so each
+ *  type of pattern reads differently at a glance:
+ *    · peak       — warm, brighter glow (high-energy day/event)
+ *    · valley     — cool, quieter glow (low-energy day/event)
+ *    · stable     — solid magenta frame ring (steady anchor)
+ *    · tentative  — dashed halo (hypothesis, not confirmed) */
+export type SatelliteKind = 'peak' | 'valley' | 'stable' | 'tentative'
 export type Satellite = {
   id: string
   label: string
+  kind?: SatelliteKind
   tentative?: boolean
   selected?: boolean
 }
 
 /*
- * The Mes hero — "Tu Cielo": a Gargantua-style black hole.
+ * The Mes hero — "Tu Cielo": a painted black hole + accretion disk
+ * (orbit-month.png) sits at the centre, surrounded by a programmatic
+ * cosmic system: dashed orbital rings, 4-pointed sparkle stars at
+ * the cardinal points, bright comets on the rings, and a deep
+ * background starfield. The four pattern satellites float at the
+ * corners. Layers, back to front:
  *
- * The cycle is rendered as an accretion disk seen near edge-on: a
- * thin band of light passes in front of the void below, and the
- * back-half of the disk — bent by gravitational lensing — arches
- * up over the top of the void as a wider, taller halo. The four
- * pattern satellites float above and below the disk plane, in
- * inclined orbits around the central mass.
- *
- * The 28 day-dots scatter along the two visible arcs (front + lensed
- * back) instead of forming a flat ring — that's what sells the
- * "black hole" reading. The current phase (lutea band) glows
- * brighter on whichever arc its days fall on; today sits at the
- * left edge of the disk where the math projects it as the brightest
- * point (the Doppler beaming sweet spot) and wears a vertical
- * spike for extra signal.
- *
- * Motion layers, none synced:
- *  1. Photon ring around the void breathes (5 s).
- *  2. Today's day-dot pulses with the photon ring.
- *  3. Left/right Doppler streaks fade up and down with their own clock.
- *  4. Each satellite breathes on its own phase.
+ *   1. Background starfield (twinkling sparse specks)
+ *   2. Magenta nebula glow (subtle radial wash)
+ *   3. Orbital rings (5 dashed ellipses at varying tilts)
+ *   4. Black-hole PNG
+ *   5. Sparkle stars (4-pointed crosses at top/bottom/sides)
+ *   6. Comets (bright tear-drops with trailing tails)
+ *   7. Tiny orbital markers (small diamonds on the rings)
+ *   8. Satellites + tap-targets
  */
 
 const W = 372
 const CX = W / 2
 const CY = W / 2
-const RX = 142 // disk's horizontal half-extent
-// Layers from outer-soft to inner-sharp. The back is dramatically
-// taller than the front — that asymmetry is the gravitational
-// lensing signature. A near-flat front + a towering arched back is
-// what makes the eye read "Gargantua" instead of "ellipse".
-const RY_FRONT = [16, 10, 5] as const
-const RY_BACK = [88, 65, 44] as const
-const EH = 26 // event horizon radius
-const PHOTON_BASE = EH * 1.08
-const EINSTEIN_R = EH * 1.55 // outer Einstein ring — second halo of light
+const HIT = 56
 
-// The accretion disk's light rises and falls with the cycle phase —
-// quietest in the menstrual rest, fullest at ovulation. A gentle
-// opacity modulation across the whole disk.
-const PHASE_DISK_GLOW: Record<CyclePhase, number> = {
-  menstrual: 0.82,
-  folicular: 0.93,
-  ovulatoria: 1,
-  lutea: 0.9,
-}
-const DISK_TILT_DEG = -8 // breaks the perfect horizontal symmetry
-const HIT = 56 // satellite tap-target box
+// Art size + offset — the BH PNG is rendered at 320×320 with a
+// horizontal nudge LEFT so the cosmos doesn't sit directly behind
+// the chain on the right edge. The painted BH is compact in the
+// PNG's centre with extended fade-out; the bounding box overlaps
+// with the chain area but only via the transparent fade, so chain
+// badges + halos remain visible. Vertical: centred. Horizontal:
+// ~18 px left of canvas centre.
+const ART_SIZE = 320
+const ART_OFFSET_X = (W - ART_SIZE) / 2 - 18 // nudged LEFT
+const ART_OFFSET_Y = (W - ART_SIZE) / 2 // centred vertically
 
-/** Deterministic 1-D PRNG — same seed → same streaks every render. */
+const AnimatedG = Animated.createAnimatedComponent(G)
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+const AnimatedLine = Animated.createAnimatedComponent(Line)
+const AnimatedPath = Animated.createAnimatedComponent(Path)
+
+/** Deterministic 1-D PRNG — same seed → same star field every render. */
 function rand(seed: number, i: number): number {
   const s = Math.sin(seed * 9301 + i * 49297) * 233280
   return s - Math.floor(s)
 }
 
-/** Where day i sits on the projected disk. Day 1 starts at the top
- *  of the back arc; days advance clockwise around the ring (8 → right
- *  edge-on, 15 → front bottom, 22 → left edge-on, 28 → back near top). */
-function dayPos(i: number): { x: number; y: number; back: boolean; sinAbs: number } {
-  const theta = Math.PI / 2 - ((i - 1) * 2 * Math.PI) / 28
-  const c = Math.cos(theta)
-  const sn = Math.sin(theta)
-  const x = CX + RX * c
-  if (sn > 0) {
-    // back / lensed half — use the middle back layer's ry for placement
-    return { x, y: CY - RY_BACK[1] * sn, back: true, sinAbs: Math.abs(sn) }
-  }
-  return { x, y: CY + RY_FRONT[1] * -sn, back: false, sinAbs: Math.abs(sn) }
-}
+/** Background starfield — quieter than v2. The reference has only a
+ *  light sprinkle of background stars (the eye reads "deep cosmic
+ *  void", not "Milky Way"). 70 candidates, ~55 visible. */
+type Star = { x: number; y: number; r: number; op: number; phase: number }
+const STARS: readonly Star[] = Array.from({ length: 70 }, (_, i) => {
+  const x = rand(11, i) * W
+  const y = rand(12, i) * W
+  if (Math.hypot(x - CX, y - CY) < 60) return null
+  return {
+    x,
+    y,
+    r: 0.25 + rand(13, i) * 0.6,
+    op: 0.25 + rand(14, i) * 0.45,
+    phase: rand(15, i),
+  } as Star
+}).filter((s): s is Star => s !== null)
 
-const DAYS: readonly { day: number; x: number; y: number; back: boolean }[] = Array.from(
-  { length: 28 },
-  (_, i) => {
-    const p = dayPos(i + 1)
-    return { day: i + 1, x: p.x, y: p.y, back: p.back }
-  },
-)
+/** Deep starfield — 80 candidate distant pinpoints painted ON the
+ *  cosmic backdrop (below the foreground twinkling stars). Tinier
+ *  + dimmer + static — the layer that pushes the visual horizon
+ *  further away, Genshin-style. */
+type DeepStar = { x: number; y: number; r: number; op: number }
+const DEEP_STARS: readonly DeepStar[] = Array.from({ length: 80 }, (_, i) => {
+  const x = rand(31, i) * W
+  const y = rand(32, i) * W
+  if (Math.hypot(x - CX, y - CY) < 50) return null
+  return {
+    x,
+    y,
+    r: 0.15 + rand(33, i) * 0.4,
+    op: 0.1 + rand(34, i) * 0.32,
+  } as DeepStar
+}).filter((s): s is DeepStar => s !== null)
 
-/** Precomputed Doppler streaks — short bright lines emanating from
- *  the disk's edge-on points (left and right). Built once at module
- *  scope so the layout is stable. */
-type Streak = { x1: number; y1: number; x2: number; y2: number; op: number }
-const STREAKS: readonly Streak[] = (() => {
-  const out: Streak[] = []
-  for (const sign of [-1, 1] as const) {
-    const edgeX = CX + sign * RX
-    for (let i = 0; i < 9; i++) {
-      const len = 22 + rand(7 + sign, i) * 42
-      const angJitter = (rand(8 + sign, i) - 0.5) * 0.18
-      const ex = edgeX + sign * len * Math.cos(angJitter)
-      const ey = CY + (rand(9 + sign, i) - 0.5) * 18
-      out.push({
-        x1: edgeX,
-        y1: CY,
-        x2: ex,
-        y2: ey,
-        op: 0.22 + rand(10 + sign, i) * 0.36,
-      })
-    }
-  }
-  return out
-})()
-
-type Dust = { x: number; y: number; r: number; opacity: number; fill: string }
-
-/** Disk dust — hundreds of fine particles scattered along the back
- *  and front arc paths. The disk gains real volumetric density,
- *  carrying the visual weight that the 3 stroke layers alone
- *  couldn't. Distributed deterministically. */
-function buildDiskDust(
-  seedBase: number,
-  ryRange: readonly [number, number],
-  side: 'back' | 'front',
-  count: number,
-): Dust[] {
-  const out: Dust[] = []
-  for (let i = 0; i < count; i++) {
-    // Bias theta away from the very top/bottom (where the lensed
-    // arc peaks) so the texture concentrates around the brighter
-    // mid-arc zones.
-    const theta = rand(seedBase, i) * Math.PI
-    const ryNorm = rand(seedBase + 1, i)
-    const ry = ryRange[0] + ryNorm * (ryRange[1] - ryRange[0])
-    const x = CX + RX * Math.cos(theta)
-    const y = side === 'back' ? CY - ry * Math.sin(theta) : CY + ry * Math.sin(theta)
-    const size = 0.35 + rand(seedBase + 2, i) * 0.9
-    // Outer particles dim, inner sharp. Edges (theta near 0 or π)
-    // get a brightness boost — that's where Doppler beaming lives.
-    const edgeBoost = Math.pow(Math.abs(Math.cos(theta)), 2) * 0.4
-    const opacity = (0.22 + rand(seedBase + 3, i) * 0.55 + edgeBoost) * (1 - ryNorm * 0.45)
-    const tint = rand(seedBase + 4, i)
-    const fill =
-      tint > 0.93 ? '#9DB5D6' : tint > 0.87 ? '#D9B57A' : tint > 0.55 ? '#FBD7E3' : '#FCE5EE'
-    out.push({ x, y, r: size, opacity, fill })
-  }
-  return out
-}
-
-const DUST_BACK: readonly Dust[] = buildDiskDust(11, [RY_BACK[2], RY_BACK[0]], 'back', 140)
-const DUST_FRONT: readonly Dust[] = buildDiskDust(21, [RY_FRONT[2], RY_FRONT[0]], 'front', 110)
-
-/** Doppler hotspots — clustered bright particles at the edge-on
- *  tips. Make the brightest visual points feel like solar flares,
- *  not flat ellipse endpoints. */
-const HOTSPOTS: readonly Dust[] = (() => {
-  const out: Dust[] = []
-  for (const sign of [-1, 1] as const) {
-    for (let i = 0; i < 22; i++) {
-      const r2 = rand(40 + sign * 3, i)
-      const ang = rand(41 + sign * 3, i) * 2 * Math.PI
-      // Cluster radius — tight near the edge, spreading horizontally.
-      const dist = r2 * 11
-      const x = CX + sign * RX + Math.cos(ang) * dist * 1.6
-      const y = CY + Math.sin(ang) * dist * 0.6
-      const size = 0.5 + rand(42 + sign * 3, i) * 1.0
-      const opacity = 0.4 + rand(43 + sign * 3, i) * 0.55
-      out.push({ x, y, r: size, opacity, fill: '#FFFFFF' })
-    }
-  }
-  return out
-})()
-
-/** Nebular dust — sparse cloud particles in a wide field around
- *  the BH, mostly above and below the disk plane. Multi-tint so the
- *  field reads as cosmic dust, not a monochrome speckle. */
-const NEBULA: readonly Dust[] = (() => {
-  const out: Dust[] = []
-  for (let i = 0; i < 110; i++) {
-    const ang = rand(50, i) * 2 * Math.PI
-    const dist = 55 + rand(51, i) * 130
-    const x = CX + Math.cos(ang) * dist
-    const y = CY + Math.sin(ang) * dist
-    // Skip particles too close to the disk plane line — they'd
-    // muddle the disk's silhouette.
-    if (Math.abs(y - CY) < 18) continue
-    const size = 0.35 + rand(52, i) * 1.2
-    const opacity = (0.14 + rand(53, i) * 0.32) * (1 - dist / 220)
-    const tint = rand(54, i)
-    const fill =
-      tint > 0.93 ? '#9DB5D6' : tint > 0.87 ? '#D9B57A' : tint > 0.55 ? '#FBD7E3' : '#F4ECDE'
-    out.push({ x, y, r: size, opacity, fill })
-  }
-  return out
-})()
-
-const AnimatedG = Animated.createAnimatedComponent(G)
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-
-/** Satellite positions — four corners, off-cardinal, so the four
- *  patterns float above and below the disk plane like bodies in
- *  inclined orbits. */
-const SAT_POS: readonly { x: number; y: number }[] = [
-  { x: CX - 100, y: CY - 95 },
-  { x: CX + 100, y: CY - 80 },
-  { x: CX + 115, y: CY + 82 },
-  { x: CX - 110, y: CY + 92 },
+/** Off-centre nebula clouds — soft radial gradients painted on
+ *  the cosmic backdrop to add atmospheric depth. Each cloud lives
+ *  off the BH axis so the cosmos feels asymmetric and lived-in,
+ *  not a flat magenta wash. */
+const NEBULA_CLOUDS: readonly {
+  cx: number
+  cy: number
+  r: number
+  color: string
+  opacity: number
+}[] = [
+  { cx: 86, cy: 104, r: 130, color: '#4A1545', opacity: 0.28 }, // upper-left purple
+  { cx: 284, cy: 248, r: 142, color: '#5C1838', opacity: 0.3 }, // lower-right magenta
+  { cx: 312, cy: 76, r: 100, color: '#3A0C28', opacity: 0.22 }, // upper-right dark
+  { cx: 60, cy: 290, r: 110, color: '#2C0A1F', opacity: 0.2 }, // lower-left deep
 ]
+
+/** Orbital rings — sparse dotted ellipses sized to orbit AROUND
+ *  the scaled-down PNG (260 px = 130 px half-extent from centre).
+ *  Each rx/ry is comfortably > 130 so the dotted ring tracks
+ *  visibly outside the painted plasma rather than being swallowed
+ *  by it. Three rings at distinct tilts give a sense of orbital
+ *  inclination without the busy six-ring nest of v2. */
+const ORBITS: readonly {
+  rx: number
+  ry: number
+  rotation: number
+  strokeWidth: number
+  dash: string
+  opacity: number
+}[] = [
+  // Main ring — prominent horizontal tilt around the BH
+  { rx: 158, ry: 144, rotation: -8, strokeWidth: 0.6, dash: '0.5 5', opacity: 0.8 },
+  // Wide tilted outer ring — same orbital plane rotated outward
+  { rx: 178, ry: 134, rotation: 22, strokeWidth: 0.55, dash: '0.5 5.5', opacity: 0.62 },
+  // Vertical-leaning ring — counter-tilt for orbital depth
+  { rx: 140, ry: 175, rotation: -30, strokeWidth: 0.55, dash: '0.5 5.5', opacity: 0.6 },
+]
+
+/** Bright pin-point nodes scattered on the orbital rings — replace
+ *  the long-tailed comets with simple "bright spots where the orbit
+ *  shines" (matches the reference's clean dots). All positions sit
+ *  OUTSIDE the 130-px PNG radius so they're visible on the cosmic
+ *  background, not buried inside the painted plasma. */
+const NODES: readonly { x: number; y: number; size: number }[] = [
+  { x: 332, y: 168, size: 1.1 }, // far-right (3 o'clock)
+  { x: 40, y: 205, size: 1.05 }, // far-left (9 o'clock)
+  { x: 305, y: 92, size: 0.95 }, // upper-right (2 o'clock)
+  { x: 70, y: 268, size: 1 }, // lower-left (8 o'clock)
+  { x: 232, y: 322, size: 0.95 }, // lower-right (5 o'clock)
+  { x: 140, y: 50, size: 0.85 }, // upper-left (11 o'clock, small)
+]
+
+/** Pattern-chain positions — four satellites stacked in a vertical
+ *  column on the right side of the canvas, with a subtle S-curve.
+ *  Moved INWARD from the edge (was 312/296) so the labels to the
+ *  left have horizontal breathing room and don't clip at the
+ *  screen edge on narrower phones. */
+const SAT_POS: readonly { x: number; y: number }[] = [
+  { x: 296, y: 72 }, // top — slight right curve
+  { x: 282, y: 142 }, // upper mid — slight left curve
+  { x: 282, y: 214 }, // lower mid — slight left curve
+  { x: 296, y: 286 }, // bottom — back right
+]
+
+/* A single background star — twinkles asynchronously via its
+ * `phase`. Bright at the peak of its wave, ~40 % of base at the
+ * trough. */
+function TwinkleStar({ star, clock }: { star: Star; clock: SharedValue<number> }) {
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((clock.value + star.phase) * 2 * Math.PI)
+    return { opacity: star.op * (0.4 + 0.6 * wave) }
+  })
+  return (
+    <AnimatedCircle
+      cx={star.x}
+      cy={star.y}
+      r={star.r}
+      fill="#FFFFFF"
+      animatedProps={animatedProps}
+    />
+  )
+}
+
+/* A bright pin-point node on an orbital ring — bloom + glow +
+ * nucleus stack. No tail; clean static bright spots that mark
+ * "this orbit has activity" without competing with the BH. */
+function NodePoint({ x, y, size }: { x: number; y: number; size: number }) {
+  return (
+    <G>
+      <Circle cx={x} cy={y} r={3.5 * size} fill="#FBD7E3" opacity={0.25} />
+      <Circle cx={x} cy={y} r={2.2 * size} fill="#FCE5EE" opacity={0.55} />
+      <Circle cx={x} cy={y} r={1.1 * size} fill="#FFFFFF" />
+    </G>
+  )
+}
+
+/* A satellite halo — the breathing glow around a chain item. The
+ * core of the item is the pattern ICON rendered as an RN View
+ * outside the SVG (see `PatternChainIcon`). Visual treatment
+ * varies by `kind`:
+ *   · peak       — warm peach glow, bright + saturated
+ *   · valley     — cool violet glow, quieter
+ *   · stable     — default + an extra solid magenta frame ring
+ *   · tentative  — DASHED halo (hypothesis, not confirmed) */
+function SatBody({
+  x,
+  y,
+  clock,
+  phase,
+  kind,
+  tentative,
+  selected,
+}: {
+  x: number
+  y: number
+  clock: SharedValue<number>
+  phase: number
+  kind?: SatelliteKind
+  tentative?: boolean
+  selected?: boolean
+}) {
+  // Resolve halo colours + tone per kind. Falls back to the
+  // generic peach if no kind was specified (mature pattern view).
+  let haloFill = '#F4ABC8'
+  let auraFill = '#FBD7E3'
+  let haloOp = 0.14
+  let auraOp = 0.16
+  switch (kind) {
+    case 'peak':
+      haloFill = '#FFCDA8' // warmer peach — high energy
+      auraFill = '#FBD7E3'
+      haloOp = 0.18
+      auraOp = 0.2
+      break
+    case 'valley':
+      haloFill = '#A48BC8' // cool violet — low energy
+      auraFill = '#C9B5D8'
+      haloOp = 0.13
+      auraOp = 0.14
+      break
+    case 'stable':
+      // default warm — but with an extra solid magenta frame
+      // ring added below for the "anchor" feel.
+      haloFill = '#F4ABC8'
+      auraFill = '#FBD7E3'
+      haloOp = 0.14
+      auraOp = 0.16
+      break
+    case 'tentative':
+      haloFill = '#FCE5EE' // pale, dashed
+      auraFill = '#FBD7E3'
+      haloOp = 0.32
+      auraOp = 0.12
+      break
+  }
+
+  const breath = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((clock.value * 0.5 + phase) * 2 * Math.PI)
+    // Stable patterns breathe LESS — they're the steady ones.
+    // Tentative + peak/valley keep normal breath.
+    const amplitude = kind === 'stable' ? 0.04 : tentative || kind === 'tentative' ? 0.06 : 0.09
+    const scale = 1 + wave * amplitude
+    return {
+      transform: [
+        { translateX: x },
+        { translateY: y },
+        { scale },
+        { translateX: -x },
+        { translateY: -y },
+      ],
+    }
+  })
+  return (
+    <AnimatedG animatedProps={breath}>
+      {/* Halo — solid filled disc for peak/valley/stable; DASHED
+          stroke for tentative (the "hypothesis ring" treatment). */}
+      {kind === 'tentative' ? (
+        <Circle
+          cx={x}
+          cy={y}
+          r={24}
+          fill="none"
+          stroke={haloFill}
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          strokeLinecap="round"
+          opacity={haloOp}
+        />
+      ) : (
+        <Circle cx={x} cy={y} r={24} fill={haloFill} opacity={haloOp} />
+      )}
+      <Circle cx={x} cy={y} r={19} fill={auraFill} opacity={auraOp} />
+      {/* Stable extra: solid magenta frame ring — the "anchor" cue. */}
+      {kind === 'stable' ? (
+        <Circle
+          cx={x}
+          cy={y}
+          r={22}
+          fill="none"
+          stroke={colors.magenta}
+          strokeWidth={0.8}
+          opacity={0.55}
+        />
+      ) : null}
+      {selected ? (
+        <Circle
+          cx={x}
+          cy={y}
+          r={21}
+          fill="none"
+          stroke={colors.magenta}
+          strokeWidth={1.4}
+          opacity={1}
+        />
+      ) : null}
+    </AnimatedG>
+  )
+}
+
+// Chain badge geometry. Reduced from v1 (32/42) so the chain
+// reads as supporting nav, not the visual hero. Icon 28 inside a
+// 36 disc keeps the pattern recognisable while letting the BH
+// cosmos dominate the eye.
+const PATTERN_ICON_SIZE = 28
+const PATTERN_DISC_SIZE = 36
+
+/* Pattern symbol — a small SVG icon drawn by kind. Replaces the
+ * AI-illustrated pattern1-4 PNGs that were too dark at chain-
+ * badge size. Each kind gets a distinctive bright shape so the
+ * user reads which pattern is which at a glance:
+ *   peak     → 4-pointed sparkle (warm peach) — high energy
+ *   valley   → crescent moon (cool violet) — low energy
+ *   stable   → solid disc + ring (rose) — anchor
+ *   tentative → dashed ring + dot (pale cream) — hypothesis
+ *
+ * Drawn inside an INNER Svg (size px) embedded in the chain
+ * badge's RN View. The inner Svg uses a 0–24 viewBox so the
+ * shape geometry is independent of the on-screen size. */
+function PatternSymbol({ kind, size }: { kind: SatelliteKind | undefined; size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {kind === 'peak' ? (
+        // 4-pointed sparkle — bright high-energy emblem
+        <Path
+          d="M 12 2 L 13.4 10.6 L 22 12 L 13.4 13.4 L 12 22 L 10.6 13.4 L 2 12 L 10.6 10.6 Z"
+          fill="#FFCDA8"
+        />
+      ) : null}
+      {kind === 'valley' ? (
+        // Crescent — dip / low-energy emblem
+        <Path d="M 16.5 6 A 7.5 7.5 0 1 0 16.5 18 A 6 6 0 1 1 16.5 6 Z" fill="#A48BC8" />
+      ) : null}
+      {kind === 'stable' ? (
+        // Solid disc + ring — anchor / steady emblem
+        <G>
+          <Circle cx="12" cy="12" r="7.5" fill="none" stroke="#F4ABC8" strokeWidth="1.6" />
+          <Circle cx="12" cy="12" r="3.4" fill="#F4ABC8" />
+        </G>
+      ) : null}
+      {kind === 'tentative' ? (
+        // Dashed ring + centre dot — hypothesis-in-formation
+        <G>
+          <Circle
+            cx="12"
+            cy="12"
+            r="7.5"
+            fill="none"
+            stroke="#FCE5EE"
+            strokeWidth="1.2"
+            strokeDasharray="2 2.4"
+            strokeLinecap="round"
+          />
+          <Circle cx="12" cy="12" r="1.6" fill="#FCE5EE" />
+        </G>
+      ) : null}
+    </Svg>
+  )
+}
+
+/* The pattern icon — an RN View overlaying the canvas at the
+ * chain item position. The visual core is a PatternSymbol drawn
+ * by `kind`. Breath is synchronised with `SatBody` via the same
+ * `clock + phase` waveform so the icon and its halo pulse
+ * together. The `affordance` flag adds an extra "tap me" pulse —
+ * used on the first chain item before the user has interacted,
+ * so the chain is discoverable. */
+function PatternChainIcon({
+  pos,
+  kind,
+  clock,
+  phase,
+  tentative,
+  dimmed,
+  affordance,
+}: {
+  pos: { x: number; y: number }
+  kind: SatelliteKind | undefined
+  clock: SharedValue<number>
+  phase: number
+  tentative?: boolean
+  dimmed?: boolean
+  affordance?: boolean
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin((clock.value * 0.5 + phase) * 2 * Math.PI)
+    let scale = 1 + wave * (tentative ? 0.06 : 0.09)
+    // Affordance pulse: a stronger periodic scale boost (~1.5 s
+    // sub-period) layered on top of the breath. Cues "tap me"
+    // without an explicit text label.
+    if (affordance) {
+      const cue = 0.5 + 0.5 * Math.sin(clock.value * 3.3 * 2 * Math.PI)
+      scale *= 1 + cue * 0.08
+    }
+    return { transform: [{ scale }] }
+  })
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.chainIconWrap,
+        animatedStyle,
+        {
+          left: `${(pos.x / W) * 100}%`,
+          top: `${(pos.y / W) * 100}%`,
+          opacity: (dimmed ? 0.35 : 1) * (tentative ? 0.7 : 1),
+        },
+      ]}
+    >
+      <View style={styles.chainIconDisc}>
+        <PatternSymbol kind={kind} size={PATTERN_ICON_SIZE} />
+      </View>
+    </Animated.View>
+  )
+}
+
+/* IGNITION FLARE — a Genshin-style lens flare: large bloom +
+ * medium glow + bright core + 4 cross rays (vertical, horizontal,
+ * two diagonals). Scales in from 0 → 1 with a back-ease overshoot;
+ * delay parameter staggers multiple flares so they ignite
+ * sequentially rather than all at once. */
+function IgnitionFlare({
+  x,
+  y,
+  delay,
+  size = 1,
+}: {
+  x: number
+  y: number
+  delay: number
+  size?: number
+}) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withDelay(delay, withTiming(1, { duration: 300, easing: Easing.out(Easing.back(2)) }))
+    return () => cancelAnimation(t)
+  }, [t, delay])
+  const bloomProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: t.value * 0.32, r: 4 + t.value * 22 * size }
+  })
+  const glowProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: t.value * 0.7, r: 1.5 + t.value * 10 * size }
+  })
+  const coreProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: t.value, r: 0.5 + t.value * 2.6 * size }
+  })
+  const rayGroupProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: t.value * 0.95 }
+  })
+  const rayLen = 28 * size
+  return (
+    <G>
+      <AnimatedCircle cx={x} cy={y} fill="#FFCDA8" animatedProps={bloomProps} />
+      <AnimatedCircle cx={x} cy={y} fill="#FCE5EE" animatedProps={glowProps} />
+      <AnimatedG animatedProps={rayGroupProps}>
+        {/* Horizontal — longest ray (Genshin's signature). */}
+        <Line
+          x1={x - rayLen}
+          y1={y}
+          x2={x + rayLen}
+          y2={y}
+          stroke="#FFFFFF"
+          strokeWidth={0.55}
+          strokeOpacity={0.85}
+          strokeLinecap="round"
+        />
+        {/* Vertical — taller than horizontal feels. */}
+        <Line
+          x1={x}
+          y1={y - rayLen * 0.85}
+          x2={x}
+          y2={y + rayLen * 0.85}
+          stroke="#FFFFFF"
+          strokeWidth={0.5}
+          strokeOpacity={0.8}
+          strokeLinecap="round"
+        />
+        {/* Diagonals — quieter cross. */}
+        <Line
+          x1={x - rayLen * 0.6}
+          y1={y - rayLen * 0.6}
+          x2={x + rayLen * 0.6}
+          y2={y + rayLen * 0.6}
+          stroke="#FCE5EE"
+          strokeWidth={0.35}
+          strokeOpacity={0.55}
+          strokeLinecap="round"
+        />
+        <Line
+          x1={x + rayLen * 0.6}
+          y1={y - rayLen * 0.6}
+          x2={x - rayLen * 0.6}
+          y2={y + rayLen * 0.6}
+          stroke="#FCE5EE"
+          strokeWidth={0.35}
+          strokeOpacity={0.55}
+          strokeLinecap="round"
+        />
+      </AnimatedG>
+      <AnimatedCircle cx={x} cy={y} fill="#FFFFFF" animatedProps={coreProps} />
+    </G>
+  )
+}
+
+/* IGNITION LINE — a thin magenta thread between two flare points.
+ * Draws itself via stroke-dashoffset over ~360 ms after a delay.
+ * Forms the sub-constellation that gives multi-flare patterns
+ * their unique shape. */
+function IgnitionLine({
+  x1,
+  y1,
+  x2,
+  y2,
+  delay,
+}: {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  delay: number
+}) {
+  const len = Math.hypot(x2 - x1, y2 - y1)
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withDelay(delay, withTiming(1, { duration: 360, easing: Easing.out(Easing.cubic) }))
+    return () => cancelAnimation(t)
+  }, [t, delay])
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    return { strokeDashoffset: len * (1 - t.value), opacity: t.value * 0.55 }
+  })
+  return (
+    <AnimatedLine
+      x1={x1}
+      y1={y1}
+      x2={x2}
+      y2={y2}
+      stroke={colors.magentaHot}
+      strokeWidth={0.7}
+      strokeDasharray={`${len} ${len}`}
+      strokeLinecap="round"
+      animatedProps={animatedProps}
+    />
+  )
+}
+
+/* Decorative divider — a horizontal magenta line with a small
+ * diamond at the midpoint. Sits between the cosmic ignition area
+ * and the body text below. Animates in via a stretch from centre
+ * outward. Lives inside the front Svg. */
+function AnnotationDivider() {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withDelay(420, withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) }))
+    return () => cancelAnimation(t)
+  }, [t])
+  const lineProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: t.value * 0.7 }
+  })
+  const diamondProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: t.value * 0.95 }
+  })
+  // Divider sits in the left-center, below the cosmic ignition
+  // area, ABOVE the body text. Width 100 px, centred at x=150.
+  const cx = 150
+  const cy = 268
+  const half = 50
+  return (
+    <G>
+      <AnimatedLine
+        x1={cx - half}
+        y1={cy}
+        x2={cx + half}
+        y2={cy}
+        stroke={colors.magenta}
+        strokeWidth={0.7}
+        strokeLinecap="round"
+        animatedProps={lineProps}
+      />
+      <AnimatedPath
+        d={`M ${cx} ${cy - 3.4} L ${cx + 3.4} ${cy} L ${cx} ${cy + 3.4} L ${cx - 3.4} ${cy} Z`}
+        fill={colors.magenta}
+        animatedProps={diamondProps}
+      />
+    </G>
+  )
+}
+
+/* Annotation overlay — three RN Text views absolutely positioned
+ * over the cosmos canvas. Eyebrow at top, body below the divider,
+ * status pill at bottom. Width capped at ~62 % of the canvas so
+ * none of the text crashes into the chain column on the right. */
+function AnnotationOverlay({
+  eyebrow,
+  body,
+  statusLabel,
+  tentative,
+}: {
+  eyebrow: string
+  body: string
+  statusLabel: string
+  tentative?: boolean
+}) {
+  const eyebrowT = useSharedValue(0)
+  const bodyT = useSharedValue(0)
+  const statusT = useSharedValue(0)
+  useEffect(() => {
+    eyebrowT.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) })
+    bodyT.value = withDelay(540, withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) }))
+    statusT.value = withDelay(
+      720,
+      withTiming(1, { duration: 240, easing: Easing.out(Easing.back(1.6)) }),
+    )
+    return () => {
+      cancelAnimation(eyebrowT)
+      cancelAnimation(bodyT)
+      cancelAnimation(statusT)
+    }
+  }, [eyebrowT, bodyT, statusT])
+
+  const eyebrowStyle = useAnimatedStyle(() => {
+    'worklet'
+    return { opacity: eyebrowT.value }
+  })
+  const bodyStyle = useAnimatedStyle(() => {
+    'worklet'
+    return { opacity: bodyT.value }
+  })
+  const statusStyle = useAnimatedStyle(() => {
+    'worklet'
+    const scale = 0.92 + statusT.value * 0.08
+    return { opacity: statusT.value, transform: [{ scale }] }
+  })
+
+  return (
+    <>
+      <Animated.View style={[annotationStyles.eyebrowWrap, eyebrowStyle]} pointerEvents="none">
+        <Text style={annotationStyles.eyebrowText} numberOfLines={1}>
+          {eyebrow}
+        </Text>
+      </Animated.View>
+      <Animated.View style={[annotationStyles.bodyWrap, bodyStyle]} pointerEvents="none">
+        <Text style={annotationStyles.bodyText} numberOfLines={3}>
+          {body}
+        </Text>
+      </Animated.View>
+      <Animated.View style={[annotationStyles.statusWrap, statusStyle]} pointerEvents="none">
+        <View
+          style={[
+            annotationStyles.statusPill,
+            tentative ? annotationStyles.statusPillTentative : annotationStyles.statusPillActive,
+          ]}
+        >
+          <Text
+            style={[
+              annotationStyles.statusText,
+              tentative ? annotationStyles.statusTextTentative : annotationStyles.statusTextActive,
+            ]}
+          >
+            {statusLabel}
+          </Text>
+        </View>
+      </Animated.View>
+    </>
+  )
+}
+
+const annotationStyles = StyleSheet.create({
+  // Eyebrow sits at the very top of the cosmos canvas, before the
+  // cosmic ignition area. Centered horizontally within the left
+  // 64 % so it doesn't approach the chain column.
+  eyebrowWrap: {
+    position: 'absolute',
+    top: '8.5%',
+    left: 0,
+    right: '36%',
+    alignItems: 'center',
+  },
+  eyebrowText: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.magenta,
+  },
+  // Body — under the divider, multi-line italic serif.
+  bodyWrap: {
+    position: 'absolute',
+    top: '75%',
+    left: 0,
+    right: '36%',
+    paddingHorizontal: 18,
+    alignItems: 'center',
+  },
+  bodyText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13.5,
+    lineHeight: 18,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  // Status pill at the bottom — "CONFIRMADA" / "EN OBSERVACIÓN".
+  statusWrap: {
+    position: 'absolute',
+    top: '90%',
+    left: 0,
+    right: '36%',
+    alignItems: 'center',
+  },
+  statusPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  statusPillActive: {
+    backgroundColor: colors.magentaTint,
+    borderColor: colors.magenta,
+  },
+  statusPillTentative: {
+    backgroundColor: 'transparent',
+    borderColor: colors.bruma,
+  },
+  statusText: {
+    fontFamily: typography.uiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  statusTextActive: {
+    color: colors.magenta,
+  },
+  statusTextTentative: {
+    color: colors.niebla,
+  },
+})
+
+/** Ceremonial flare arrangements per pattern kind. Hard-coded
+ *  positions in viewBox coords — chosen aesthetically for each
+ *  pattern's character, NOT derived from data. The positions
+ *  avoid the chain column on the right (x > 250) so flares
+ *  remain unobstructed. */
+function getIgnitionLayout(kind: SatelliteKind | undefined): {
+  flares: { x: number; y: number; size: number }[]
+  lines: { from: number; to: number }[] // indices into flares
+} {
+  switch (kind) {
+    case 'peak':
+      return {
+        flares: [{ x: 200, y: 90, size: 1.4 }], // single bright flare top-right
+        lines: [],
+      }
+    case 'valley':
+      return {
+        flares: [{ x: 180, y: 280, size: 1.1 }], // single dim-ish flare bottom
+        lines: [],
+      }
+    case 'stable':
+      return {
+        flares: [
+          { x: 180, y: 100, size: 0.9 },
+          { x: 80, y: 190, size: 0.9 },
+          { x: 220, y: 250, size: 0.9 },
+        ], // triangle suggesting steady anchor
+        lines: [
+          { from: 0, to: 1 },
+          { from: 1, to: 2 },
+          { from: 2, to: 0 },
+        ],
+      }
+    case 'tentative':
+      return {
+        flares: [
+          { x: 130, y: 100, size: 0.7 },
+          { x: 145, y: 180, size: 0.7 },
+          { x: 130, y: 260, size: 0.7 },
+        ], // vertical-ish chain — uncertain rhythm
+        lines: [
+          { from: 0, to: 1 },
+          { from: 1, to: 2 },
+        ],
+      }
+    default:
+      return { flares: [], lines: [] }
+  }
+}
 
 export function TuCielo({
   ciclo,
   satellites,
   onSatellitePress,
+  selectedSatelliteId,
+  evidence,
+  onCloseSatellite,
 }: {
   ciclo: {
     day: number
@@ -251,105 +869,56 @@ export function TuCielo({
     band: readonly [number, number]
   }
   satellites: readonly Satellite[]
-  /** When omitted the satellites render decoratively (no tap
-   *  targets). First cycle uses this — observations are
-   *  informational, not navigable. */
   onSatellitePress?: (id: string) => void
+  /** Which chain item is currently active. Drives the
+   *  summoned-pattern reveal + the dim-on-others treatment.
+   *  `null` = no pattern summoned (cosmos shown clean). */
+  selectedSatelliteId?: string | null
+  /** Content for the centred "summoned" pattern card: name,
+   *  one-line caption, longer body, and tentative flag. The icon
+   *  itself comes from the chain (lifted up via fly animation). */
+  evidence?: {
+    label: string
+    caption: string
+    detail: string
+    tentative?: boolean
+  } | null
+  /** Called when the user taps the backdrop (anywhere outside
+   *  the chain). Used by the parent to clear the selection and
+   *  dismiss the summoned pattern. */
+  onCloseSatellite?: () => void
 }) {
-  // The disk's glow follows the cycle phase (derived from the day in
-  // cycle), so the hero brightens and quiets as the cycle turns.
-  const diskGlow = PHASE_DISK_GLOW[phaseForDay(ciclo.day, ciclo.length)]
-
-  const t = useSharedValue(0) // 5 s — photon ring, today's pulse, jet
-  const drift = useSharedValue(0) // 44 s — nebula starfield drift
-  const streakClock = useSharedValue(0) // 8 s — Doppler streak pulse
-  const cometClock1 = useSharedValue(0) // 13 s — first comet orbit
-  const cometClock2 = useSharedValue(0) // 17 s — second comet orbit
-  const dustFlicker = useSharedValue(0) // 9 s — disk turbulence flicker
-  const nebDrift = useSharedValue(0) // 45 s — nebula slow rotation
+  // Three clocks: `t` (5 s) drives satellite breath; `twinkle`
+  // (6 s) drives starfield shimmer; `orbitSpin` (120 s) rotates
+  // the dashed orbital rings very slowly — barely perceptible
+  // motion, but it keeps the cosmos feeling alive instead of
+  // static when the eye lingers.
+  const t = useSharedValue(0)
+  const twinkle = useSharedValue(0)
+  const orbitSpin = useSharedValue(0)
 
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
-    drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
-    streakClock.value = withRepeat(
-      withTiming(1, { duration: 8000, easing: Easing.linear }),
-      -1,
-      false,
-    )
-    cometClock1.value = withRepeat(
-      withTiming(1, { duration: 13000, easing: Easing.linear }),
-      -1,
-      false,
-    )
-    cometClock2.value = withRepeat(
-      withTiming(1, { duration: 17000, easing: Easing.linear }),
-      -1,
-      false,
-    )
-    dustFlicker.value = withRepeat(
-      withTiming(1, { duration: 9000, easing: Easing.linear }),
-      -1,
-      false,
-    )
-    nebDrift.value = withRepeat(
-      withTiming(1, { duration: 45000, easing: Easing.linear }),
+    twinkle.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.linear }), -1, false)
+    orbitSpin.value = withRepeat(
+      withTiming(1, { duration: 120000, easing: Easing.linear }),
       -1,
       false,
     )
     return () => {
       cancelAnimation(t)
-      cancelAnimation(drift)
-      cancelAnimation(streakClock)
-      cancelAnimation(cometClock1)
-      cancelAnimation(cometClock2)
-      cancelAnimation(dustFlicker)
-      cancelAnimation(nebDrift)
+      cancelAnimation(twinkle)
+      cancelAnimation(orbitSpin)
     }
-  }, [t, drift, streakClock, cometClock1, cometClock2, dustFlicker, nebDrift])
+  }, [t, twinkle, orbitSpin])
 
-  const photonProps = useAnimatedProps(() => {
+  // Rotate the entire orbital-ring group around the BH centre.
+  // The orbits are tilted ellipses, so rotation reads as orbital
+  // motion (not just a spin) — like watching a planetary system
+  // from above.
+  const orbitTransform = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
-    return {
-      r: PHOTON_BASE + wave * 1.4,
-      opacity: 0.78 + wave * 0.18,
-    }
-  })
-
-  const streaksProps = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(streakClock.value * 2 * Math.PI)
-    return { opacity: 0.55 + wave * 0.4 }
-  })
-
-  // Jet — wide soft bloom + bright core. Pulse with the photon ring
-  // (same 5 s clock) so the centre breathes as one body.
-  const jetProps = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
-    return { opacity: 0.78 + wave * 0.22 }
-  })
-
-  // Disk dust flicker — back and front go out of phase so when one
-  // dims the other brightens. Reads as turbulence in the disk.
-  const dustBackFlicker = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(dustFlicker.value * 2 * Math.PI)
-    return { opacity: 0.78 + wave * 0.22 }
-  })
-  const dustFrontFlicker = useAnimatedProps(() => {
-    'worklet'
-    // Half-period offset → opposite phase from back.
-    const wave = 0.5 + 0.5 * Math.sin((dustFlicker.value + 0.5) * 2 * Math.PI)
-    return { opacity: 0.78 + wave * 0.22 }
-  })
-
-  // Nebula slow rotation — the field of background dust drifts
-  // around the BH at ~45 s per revolution. Sells "everything orbits
-  // this thing" without ever calling attention to itself.
-  const nebProps = useAnimatedProps(() => {
-    'worklet'
-    const deg = nebDrift.value * 360
+    const deg = orbitSpin.value * 360
     return {
       transform: [
         { translateX: CX },
@@ -361,7 +930,6 @@ export function TuCielo({
     }
   })
 
-  // Bind the first four satellites to the four positions.
   const sats = satellites.slice(0, SAT_POS.length).map((sat, i) => ({
     ...sat,
     x: SAT_POS[i]!.x,
@@ -369,331 +937,193 @@ export function TuCielo({
     breathPhase: (i * 0.27) % 1,
   }))
 
+  // Look up the active chain item — its position is the origin
+  // for the "fly to centre" animation of the summoned pattern.
+  const activeSat = selectedSatelliteId
+    ? (sats.find((s) => s.id === selectedSatelliteId) ?? null)
+    : null
+
   return (
     <View style={styles.wrap}>
-      <Svg viewBox={`0 0 ${W} ${W}`} style={styles.svg}>
+      {/* BACK SVG — everything that should sit BEHIND the painted
+          BH art: starfield, nebula wash, vertical dot chain, and
+          the orbital rings. The imported MonthArt SVG renders
+          between this and the front Svg, so the void occludes the
+          parts of these layers that pass through it. */}
+      <Svg viewBox={`0 0 ${W} ${W}`} style={[styles.svg, StyleSheet.absoluteFill]}>
         <Defs>
-          {/* Disk-arc strokes — bright cream at the edge-on points
-              (left/right), softer rosa in the middle. The brightness
-              peak at the edges sells the Doppler beaming effect. */}
-          <LinearGradient
-            id="mc-front"
-            gradientUnits="userSpaceOnUse"
-            x1={CX - RX}
-            y1={CY}
-            x2={CX + RX}
-            y2={CY}
-          >
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="12%" stopColor="#FCE5EE" stopOpacity={0.9} />
-            <Stop offset="35%" stopColor="#F4ABC8" stopOpacity={0.55} />
-            <Stop offset="65%" stopColor="#F4ABC8" stopOpacity={0.55} />
-            <Stop offset="88%" stopColor="#FCE5EE" stopOpacity={0.9} />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={1} />
-          </LinearGradient>
-          <LinearGradient
-            id="mc-back"
-            gradientUnits="userSpaceOnUse"
-            x1={CX - RX}
-            y1={CY}
-            x2={CX + RX}
-            y2={CY}
-          >
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.9} />
-            <Stop offset="15%" stopColor="#FCE5EE" stopOpacity={0.7} />
-            <Stop offset="40%" stopColor={colors.magenta} stopOpacity={0.55} />
-            <Stop offset="60%" stopColor={colors.magenta} stopOpacity={0.55} />
-            <Stop offset="85%" stopColor="#FCE5EE" stopOpacity={0.7} />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0.9} />
-          </LinearGradient>
-          <RadialGradient id="mc-void" cx="50%" cy="50%" r="60%">
-            {/* Warm-dark, not dead-black: the void's heart still reads
-                as the quiet still centre, but it never reads as a
-                pit that swallows light. */}
-            <Stop offset="0%" stopColor="#240A16" />
-            <Stop offset="65%" stopColor="#0A0308" />
-            <Stop offset="92%" stopColor="#1A0410" />
-            <Stop offset="100%" stopColor="#5A1430" />
+          {/* Inner magenta wash — the centre-warm hue. */}
+          <RadialGradient id="m-nebula" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.08} />
+            <Stop offset="60%" stopColor={colors.magenta} stopOpacity={0.02} />
+            <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
           </RadialGradient>
-          <RadialGradient id="mc-photon" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#FFFFFF" />
-            <Stop offset="35%" stopColor="#FBD7E3" />
-            <Stop offset="100%" stopColor={colors.magenta} />
+          {/* Warm BH aura — a wider magenta-peach glow that pushes
+              outward from the void to suggest atmospheric depth. */}
+          <RadialGradient id="bh-aura" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#9A3858" stopOpacity={0.32} />
+            <Stop offset="55%" stopColor="#5C1838" stopOpacity={0.12} />
+            <Stop offset="100%" stopColor="#3A0C28" stopOpacity={0} />
           </RadialGradient>
-          {/* Vertical jet — perpendicular to the disk plane. Bright
-              cream at centre, fading to transparency at top/bottom
-              so it reads as light emerging from the BH, not a
-              full-height line. */}
-          <LinearGradient id="mc-jet" gradientUnits="userSpaceOnUse" x1={CX} y1={0} x2={CX} y2={W}>
-            <Stop offset="0%" stopColor="#FBD7E3" stopOpacity={0} />
-            <Stop offset="30%" stopColor="#FBD7E3" stopOpacity={0.35} />
-            <Stop offset="48%" stopColor="#FFFFFF" stopOpacity={0.95} />
-            <Stop offset="52%" stopColor="#FFFFFF" stopOpacity={0.95} />
-            <Stop offset="70%" stopColor="#FBD7E3" stopOpacity={0.35} />
-            <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0} />
-          </LinearGradient>
+          {/* Nebula cloud gradients — one per cloud. Each is a
+              soft radial fade from the cloud's tint at the centre
+              to transparent at the edge. */}
+          {NEBULA_CLOUDS.map((c, i) => (
+            <RadialGradient key={`cloud-grad-${i}`} id={`cloud-${i}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor={c.color} stopOpacity={c.opacity} />
+              <Stop offset="55%" stopColor={c.color} stopOpacity={c.opacity * 0.4} />
+              <Stop offset="100%" stopColor={c.color} stopOpacity={0} />
+            </RadialGradient>
+          ))}
         </Defs>
 
-        <Cosmos t={t} drift={drift} />
-
-        {/* Outer magenta haze around the BH — gives volumetric depth
-            so the disk doesn't sit on a flat black void. */}
-        {Array.from({ length: 10 }).map((_, i) => (
-          <Circle
-            key={`mc-haze-${i}`}
-            cx={CX}
-            cy={CY}
-            r={140 - i * 12}
-            fill={colors.magenta}
-            opacity={0.014 + i * 0.005}
-          />
+        {/* DEPTH LAYER A — distant starfield. Tiny, dim, static.
+            Pushes the visual horizon further away. */}
+        {DEEP_STARS.map((s, i) => (
+          <Circle key={`ds-${i}`} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.op} />
         ))}
 
-        {/* Nebular dust — sparse cosmic particles above and below
-            the disk plane. Multi-tint (cream / blue / gold) so the
-            field reads painterly, not monochrome. Wrapped in an
-            AnimatedG that rotates the whole nebula slowly around
-            the BH — the field drifts as one body. */}
-        <AnimatedG animatedProps={nebProps}>
-          {NEBULA.map((p, i) => (
-            <Circle
-              key={`mc-neb-${i}`}
-              cx={p.x}
-              cy={p.y}
-              r={p.r}
-              fill={p.fill}
-              opacity={p.opacity}
+        {/* DEPTH LAYER B — off-centre nebula clouds. Each is a
+            soft radial gradient; together they make the cosmos
+            feel asymmetric and atmospheric rather than a flat
+            magenta wash. */}
+        {NEBULA_CLOUDS.map((c, i) => (
+          <Circle key={`cloud-${i}`} cx={c.cx} cy={c.cy} r={c.r} fill={`url(#cloud-${i})`} />
+        ))}
+
+        {/* DEPTH LAYER C — warm BH aura. A wider magenta-peach
+            halo than the inner wash, pushing the BH's light
+            outward into the cosmos for an extra glow shell. */}
+        <Circle cx={CX} cy={CY} r={W * 0.42} fill="url(#bh-aura)" />
+
+        {/* Foreground starfield — twinkles asynchronously. */}
+        <G>
+          {STARS.map((s, i) => (
+            <TwinkleStar key={`star-${i}`} star={s} clock={twinkle} />
+          ))}
+        </G>
+
+        {/* Inner nebula wash — closer-in centre warmth. */}
+        <Circle cx={CX} cy={CY} r={W * 0.5} fill="url(#m-nebula)" />
+
+        {/* Pattern connectors — thin magenta threads from each
+            chain item curving inward toward the BH centre. The
+            PNG renders AFTER this, so its opaque void occludes
+            the inner portion of each thread; only the outer arc
+            (from chain badge to BH outer edge) remains visible.
+            The threads visually anchor the patterns to the
+            cosmos — they ORBIT the BH, not float in space. */}
+        {SAT_POS.map((pos, i) => {
+          // BH centre in the bumped-left layout (ART_OFFSET_X).
+          const bhCx = ART_OFFSET_X + ART_SIZE / 2
+          const bhCy = ART_OFFSET_Y + ART_SIZE / 2
+          // Curved Bezier: control point perpendicular to the
+          // chord, biased inward toward the BH. Gives each thread
+          // a graceful arc rather than a rigid straight line.
+          const midX = (bhCx + pos.x) / 2
+          const midY = (bhCy + pos.y) / 2
+          // Perpendicular bias — curve "away" from a straight
+          // line so the threads arc outward from the BH.
+          const dx = pos.x - bhCx
+          const dy = pos.y - bhCy
+          const len = Math.hypot(dx, dy) || 1
+          const nx = -dy / len
+          const ny = dx / len
+          const bias = 22
+          const ctrlX = midX + nx * bias
+          const ctrlY = midY + ny * bias
+          return (
+            <Path
+              key={`conn-${i}`}
+              d={`M ${bhCx} ${bhCy} Q ${ctrlX} ${ctrlY}, ${pos.x} ${pos.y}`}
+              fill="none"
+              stroke={colors.magentaHot}
+              strokeWidth={0.45}
+              strokeOpacity={0.25}
+              strokeLinecap="round"
+            />
+          )
+        })}
+
+        {/* Orbital rings — wrapped in an AnimatedG that spins
+            very slowly (120 s per turn). The rings are tilted
+            ellipses, so the rotation reads as orbital motion. */}
+        <AnimatedG animatedProps={orbitTransform}>
+          {ORBITS.map((o, i) => (
+            <Ellipse
+              key={`orbit-${i}`}
+              cx={CX}
+              cy={CY}
+              rx={o.rx}
+              ry={o.ry}
+              fill="none"
+              stroke="#FCE5EE"
+              strokeWidth={o.strokeWidth}
+              strokeDasharray={o.dash}
+              strokeLinecap="round"
+              opacity={o.opacity}
+              transform={`rotate(${o.rotation} ${CX} ${CY})`}
             />
           ))}
         </AnimatedG>
 
-        {/* Vertical jet — perpendicular to the disk plane. Three
-            stacked lines (wide soft → mid → sharp) give the beam
-            volume; the linearGradient fades it to transparency at
-            top/bottom so the BH centre reads as the source. Sits
-            inside the tilt group so it tilts with the disk; the
-            inner AnimatedG pulses opacity with the photon ring. */}
-        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`}>
-          <AnimatedG animatedProps={jetProps}>
-            <Line
-              x1={CX}
-              y1={0}
-              x2={CX}
-              y2={W}
-              stroke="url(#mc-jet)"
-              strokeWidth={14}
-              opacity={0.18}
-            />
-            <Line
-              x1={CX}
-              y1={0}
-              x2={CX}
-              y2={W}
-              stroke="url(#mc-jet)"
-              strokeWidth={5}
-              opacity={0.4}
-            />
-            <Line
-              x1={CX}
-              y1={0}
-              x2={CX}
-              y2={W}
-              stroke="url(#mc-jet)"
-              strokeWidth={1.2}
-              opacity={0.85}
-            />
-          </AnimatedG>
-        </G>
-
-        {/* BACK-HALF group — rotated -8° so the disk doesn't lock
-            into a perfect horizontal symmetry. Contains the lensed
-            arc, its day-specks and the Doppler streaks emerging
-            from the disk's edge-on tips. Drawn BEFORE the void so
-            the back content can be partially occluded by it.
-            `diskGlow` rises and falls with the cycle phase. */}
-        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`} opacity={diskGlow}>
-          {/* Lensed back arc — three layers, outer-soft to inner-sharp.
-              ry tops out at 88, so the arc towers ~62 px above the
-              void's edge. That gap is the Gargantua signature. */}
-          {RY_BACK.map((ry, i) => (
-            <Path
-              key={`mc-back-${i}`}
-              d={`M ${CX - RX} ${CY} A ${RX} ${ry} 0 0 0 ${CX + RX} ${CY}`}
-              fill="none"
-              stroke="url(#mc-back)"
-              strokeOpacity={[0.22, 0.6, 0.95][i]}
-              strokeWidth={[3.0, 1.4, 0.55][i]}
-            />
-          ))}
-          {/* Disk dust on the back — fine particles scattered along
-              the lensed arc. Wrapped in an AnimatedG that flickers
-              opacity out of phase with the front dust → reads as
-              turbulence in the accretion flow. */}
-          <AnimatedG animatedProps={dustBackFlicker}>
-            {DUST_BACK.map((p, i) => (
-              <Circle
-                key={`mc-db-${i}`}
-                cx={p.x}
-                cy={p.y}
-                r={p.r}
-                fill={p.fill}
-                opacity={p.opacity}
-              />
-            ))}
-          </AnimatedG>
-          {/* Travelling comets — bright destellos orbiting the BH
-              on the 3D ring, projected via lensing. Only render
-              when sin(θ) > 0 (on the back half); the front copy
-              picks up the rest. Two clocks at relatively prime
-              periods so the destellos never sync. */}
-          <DiskComet clock={cometClock1} phase={0} half="back" />
-          <DiskComet clock={cometClock2} phase={0.5} half="back" />
-          {/* Day-specks on the back arc. */}
-          {DAYS.filter((d) => d.back).map((d) => (
-            <DaySpeck key={`bk-${d.day}`} day={d} ciclo={ciclo} clock={t} />
-          ))}
-          {/* Doppler streaks — bright lines emanating from the
-              edge-on tips. Pulse together. */}
-          <AnimatedG animatedProps={streaksProps}>
-            {STREAKS.map((s, i) => (
-              <Line
-                key={`mc-streak-${i}`}
-                x1={s.x1}
-                y1={s.y1}
-                x2={s.x2}
-                y2={s.y2}
-                stroke="#FCE5EE"
-                strokeOpacity={s.op}
-                strokeWidth={0.65}
-                strokeLinecap="round"
-              />
-            ))}
-            {/* Doppler hotspot clusters — concentrated bright
-                particles at the edge-on tips. Solar-flare feel. */}
-            {HOTSPOTS.map((p, i) => (
-              <Circle
-                key={`mc-hot-${i}`}
-                cx={p.x}
-                cy={p.y}
-                r={p.r}
-                fill={p.fill}
-                opacity={p.opacity}
-              />
-            ))}
-          </AnimatedG>
-        </G>
-
-        {/* EVENT HORIZON — perfect black void with subtle magenta
-            tint at its very edge (lit by the surrounding plasma).
-            Stays axis-aligned: the BH is radially symmetric. */}
-        <Circle cx={CX} cy={CY} r={EH} fill="url(#mc-void)" />
-        {/* Inner darkness ring — gives the void a hint of depth, as
-            if the eye is looking INTO a hole rather than at a disc. */}
-        <Circle
-          cx={CX}
-          cy={CY}
-          r={EH * 0.86}
-          fill="none"
-          stroke="#000000"
-          strokeWidth={2}
-          opacity={0.8}
+        {/* Layer 5 — the BH cosmos PNG. Rendered LAST in the back
+            Svg so the painted void occludes any orbital ring +
+            vertical dot that would otherwise pass through it.
+            Sized to ART_SIZE (260 px) and centred — leaves a 56 px
+            margin around for chain items + summoned text to live
+            outside the painted plasma. */}
+        <SvgImage
+          href={MONTH_ART_PNG}
+          x={ART_OFFSET_X}
+          y={ART_OFFSET_Y}
+          width={ART_SIZE}
+          height={ART_SIZE}
+          preserveAspectRatio="xMidYMid meet"
         />
-        {/* Ember — a faint warm heartbeat at the void's heart. The
-            centre stays dark and still (the cycle's quiet point) but
-            it is warm-dark, never a dead pit: light lives here, just
-            softly. */}
-        <Circle cx={CX} cy={CY} r={EH * 0.62} fill={colors.magenta} opacity={0.12} />
-        <Circle cx={CX} cy={CY} r={EH * 0.34} fill="#F4ABC8" opacity={0.16} />
-        <Circle cx={CX} cy={CY} r={EH * 0.12} fill="#FBD7E3" opacity={0.46} />
-        {/* Photon ring — bright hot edge of the void. Breathes. */}
-        <AnimatedCircle
-          cx={CX}
-          cy={CY}
-          fill="none"
-          stroke="url(#mc-photon)"
-          strokeWidth={1.6}
-          animatedProps={photonProps}
-        />
-        {/* Einstein ring — second, fainter halo at ~1.55× EH. The
-            quiet glow of light from far-away stars bent around the
-            void. Reads as 3D depth, not a flat circle outline. */}
-        <Circle
-          cx={CX}
-          cy={CY}
-          r={EINSTEIN_R}
-          fill="none"
-          stroke="#FBD7E3"
-          strokeWidth={0.5}
-          opacity={0.38}
-        />
+      </Svg>
 
-        {/* FRONT-HALF group — same tilt so it lines up with the back
-            arc edge-on points. Drawn AFTER the void, on top.
-            `diskGlow` rises and falls with the cycle phase. */}
-        <G transform={`rotate(${DISK_TILT_DEG} ${CX} ${CY})`} opacity={diskGlow}>
-          {/* Front arc — much flatter than the back. Three layers. */}
-          {RY_FRONT.map((ry, i) => (
-            <Path
-              key={`mc-front-${i}`}
-              d={`M ${CX - RX} ${CY} A ${RX} ${ry} 0 0 1 ${CX + RX} ${CY}`}
-              fill="none"
-              stroke="url(#mc-front)"
-              strokeOpacity={[0.24, 0.65, 0.95][i]}
-              strokeWidth={[2.4, 1.2, 0.5][i]}
-            />
-          ))}
-          {/* Disk dust on the front — fine particles along the
-              front arc. Flickers out of phase with the back dust. */}
-          <AnimatedG animatedProps={dustFrontFlicker}>
-            {DUST_FRONT.map((p, i) => (
-              <Circle
-                key={`mc-df-${i}`}
-                cx={p.x}
-                cy={p.y}
-                r={p.r}
-                fill={p.fill}
-                opacity={p.opacity}
-              />
-            ))}
-          </AnimatedG>
-          {/* The two comets' front halves — when each crosses sin(θ)
-              ≤ 0, this copy lights up instead of the back one. */}
-          <DiskComet clock={cometClock1} phase={0} half="front" />
-          <DiskComet clock={cometClock2} phase={0.5} half="front" />
-          {/* Day-specks on the front arc. */}
-          {DAYS.filter((d) => !d.back).map((d) => (
-            <DaySpeck key={`fr-${d.day}`} day={d} ciclo={ciclo} clock={t} />
-          ))}
-        </G>
+      {/* FRONT SVG — bright nodes + chain halos + labels. The
+          sparkles + axis diamonds we used to render here lived in
+          the orbit-month-art.svg image; with the cleaner 1.png
+          that already paints those (top + bottom 4-pointed sparkle
+          + small diamonds around the BH), the programmatic
+          versions would just ghost on top. Removed. */}
+      <Svg viewBox={`0 0 ${W} ${W}`} style={[styles.svg, StyleSheet.absoluteFill]}>
+        {/* Layer 6 — bright pin-point nodes on the rings. */}
+        {NODES.map((n, i) => (
+          <NodePoint key={`node-${i}`} x={n.x} y={n.y} size={n.size} />
+        ))}
 
-        {/* Satellites — connector + body + label. Tentative ones
-            render dimmer; visual difference signals "this isn't
-            confirmed yet" without needing extra UI affordance. */}
+        {/* Layer 8 — pattern satellites + labels. When a chain
+            item is active, the others dim to 35 % so the focus
+            stays on the selected pattern + its evidence. */}
         {sats.map((sat) => {
-          const dx = sat.x - CX
-          const dy = sat.y - CY
-          const dist = Math.hypot(dx, dy) || 1
-          const lx = sat.x + (dx / dist) * 22
-          const ly = sat.y + (dy / dist) * 22 + 3
+          // labelX = sat.x - (disc half-width + small gap) so the
+          // label sits clear of the badge edge.
+          const labelX = sat.x - PATTERN_DISC_SIZE / 2 - 6
+          const labelY = sat.y + 3
+          const dimmed = activeSat != null && activeSat.id !== sat.id
           return (
-            <G key={sat.id}>
+            <G key={sat.id} opacity={dimmed ? 0.35 : 1}>
               <SatBody
                 x={sat.x}
                 y={sat.y}
                 clock={t}
                 phase={sat.breathPhase}
+                kind={sat.kind}
                 tentative={sat.tentative}
                 selected={sat.selected}
               />
               <SvgText
-                x={lx}
-                y={ly}
-                textAnchor="middle"
+                x={labelX}
+                y={labelY}
+                textAnchor="end"
                 fontFamily={typography.uiBold}
-                fontSize={9.5}
+                fontSize={10}
                 letterSpacing={1.2}
-                fill="#F4ECDE"
-                opacity={sat.tentative ? 0.6 : 0.85}
+                fill={sat.selected ? colors.magenta : '#F4ECDE'}
+                opacity={sat.selected ? 1 : sat.tentative ? 0.55 : 0.85}
               >
                 {sat.label}
               </SvgText>
@@ -701,6 +1131,116 @@ export function TuCielo({
           )
         })}
       </Svg>
+
+      {/* Pattern icons — rendered as RN Views overlaying the
+          canvas. They can't live inside the Svg (nesting Svgs
+          isn't supported), so this layer sits between the SVG
+          halos (back) and the tap targets (front). The ACTIVE
+          satellite's icon is hidden here — it "flew" up to the
+          centre as the SummonedPattern icon. The first item gets
+          an affordance pulse when nothing is selected, so the
+          chain is discoverable. */}
+      {sats.map((sat, i) => {
+        // Active chain item stays VISIBLE in the chain — it
+        // doesn't fly to centre anymore. The selected ring (drawn
+        // by SatBody when sat.selected is true) highlights it.
+        const isActive = activeSat?.id === sat.id
+        const dimmed = activeSat != null && !isActive
+        const affordance = i === 0 && activeSat == null
+        return (
+          <PatternChainIcon
+            key={`icon-${sat.id}`}
+            pos={{ x: sat.x, y: sat.y }}
+            kind={sat.kind}
+            clock={t}
+            phase={sat.breathPhase}
+            tentative={sat.tentative}
+            dimmed={dimmed}
+            affordance={affordance}
+          />
+        )
+      })}
+
+      {/* ANNOTATED COSMOS REVEAL — when a chain item is active, the
+          cosmos lights up with Genshin-style lens flares + connecting
+          lines, and the pattern's text annotations are layered into
+          the canvas as if it were a page from an astronomy book.
+          No lateral panel, no bottom sheet — the cosmos IS the page.
+          All visual layers re-mount on `key={selectedSatelliteId}`
+          so the ignition animations re-fire fresh on each pattern
+          switch. */}
+      {activeSat && evidence ? (
+        <React.Fragment key={`ignite-${activeSat.id}`}>
+          {/* SVG layer — flares + connecting lines + decorative
+              divider. pointerEvents=none so taps fall through to
+              the backdrop. */}
+          <Svg
+            viewBox={`0 0 ${W} ${W}`}
+            style={[styles.svg, StyleSheet.absoluteFill]}
+            pointerEvents="none"
+          >
+            {(() => {
+              const layout = getIgnitionLayout(activeSat.kind)
+              return (
+                <>
+                  {/* Connecting lines (drawn UNDER flares) */}
+                  {layout.lines.map((line, i) => {
+                    const a = layout.flares[line.from]!
+                    const b = layout.flares[line.to]!
+                    return (
+                      <IgnitionLine
+                        key={`il-${i}`}
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        delay={260 + i * 80}
+                      />
+                    )
+                  })}
+                  {/* Lens flares — staggered ignition */}
+                  {layout.flares.map((f, i) => (
+                    <IgnitionFlare
+                      key={`if-${i}`}
+                      x={f.x}
+                      y={f.y}
+                      delay={80 + i * 80}
+                      size={f.size}
+                    />
+                  ))}
+                  {/* Decorative divider between cosmic area and
+                      body text — a thin magenta line with a tiny
+                      diamond marker at the mid-point. */}
+                  <AnnotationDivider />
+                </>
+              )
+            })()}
+          </Svg>
+
+          {/* RN Text overlays — eyebrow at top, body in the
+              lower-left, status pill bottom-left. Width capped at
+              ~64 % of the canvas so they don't crash into the
+              chain on the right. pointerEvents=none. */}
+          <AnnotationOverlay
+            eyebrow={
+              (evidence.tentative ? 'STELAR APRENDE · ' : 'OBSERVACIÓN · ') +
+              evidence.label.toUpperCase()
+            }
+            body={evidence.detail}
+            statusLabel={evidence.tentative ? 'EN OBSERVACIÓN' : 'CONFIRMADA'}
+            tentative={evidence.tentative}
+          />
+
+          {/* Backdrop — captures taps outside the chain Pressables
+              (rendered after this Fragment, so they're on top). */}
+          <Pressable
+            onPress={onCloseSatellite}
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar patrón"
+          />
+        </React.Fragment>
+      ) : null}
 
       {/* Tap targets — rendered only when the parent provides a
           press handler. First cycle omits this: observations are
@@ -723,224 +1263,6 @@ export function TuCielo({
   )
 }
 
-/* A single day on the projected disk. Today wears a brighter body,
- * a selection crown and a vertical spike; days inside the lutea
- * band glow magenta; the rest are quiet cream specks. */
-function DaySpeck({
-  day,
-  ciclo,
-  clock,
-}: {
-  day: { day: number; x: number; y: number; back: boolean }
-  ciclo: { day: number; band: readonly [number, number] }
-  clock: SharedValue<number>
-}) {
-  const isToday = day.day === ciclo.day
-  const inBand = day.day >= ciclo.band[0] && day.day <= ciclo.band[1]
-  const R = isToday ? 3.4 : inBand ? 2.6 : 1.5
-
-  const breath = useAnimatedProps(() => {
-    'worklet'
-    if (!isToday) return { transform: [{ scale: 1 }] }
-    const wave = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    const scale = 1 + wave * 0.18
-    return {
-      transform: [
-        { translateX: day.x },
-        { translateY: day.y },
-        { scale },
-        { translateX: -day.x },
-        { translateY: -day.y },
-      ],
-    }
-  })
-
-  return (
-    <AnimatedG animatedProps={breath}>
-      <Circle
-        cx={day.x}
-        cy={day.y}
-        r={R * 2.6}
-        fill={colors.magenta}
-        opacity={isToday ? 0.5 : inBand ? 0.35 : 0.1}
-      />
-      <Circle
-        cx={day.x}
-        cy={day.y}
-        r={R}
-        fill={isToday ? '#FFFFFF' : inBand ? '#F4ABC8' : '#F4ECDE'}
-        opacity={isToday ? 1 : inBand ? 0.95 : 0.55}
-      />
-      {isToday ? (
-        <>
-          {/* Selection crown */}
-          <Circle
-            cx={day.x}
-            cy={day.y}
-            r={R + 4}
-            fill="none"
-            stroke="#F4ECDE"
-            strokeWidth={1.2}
-            opacity={0.88}
-          />
-          {/* Vertical spike — extra signal: this dot is today */}
-          <Line
-            x1={day.x}
-            y1={day.y - R * 4}
-            x2={day.x}
-            y2={day.y + R * 4}
-            stroke="#FFFFFF"
-            strokeOpacity={0.5}
-            strokeWidth={0.5}
-            strokeLinecap="round"
-          />
-        </>
-      ) : (
-        <Circle cx={day.x} cy={day.y} r={R * 0.4} fill="#FFFFFF" opacity={inBand ? 0.95 : 0.75} />
-      )}
-    </AnimatedG>
-  )
-}
-
-/* A bright destello travelling around the BH on the conceptual 3D
- * ring. Projected via the same lensing geometry as the day-specks:
- * back half goes high above the void (RY_BACK), front half slides
- * flat below (RY_FRONT). Each comet renders TWO instances — one
- * inside the back tilt group, one inside the front; each is only
- * visible during its own half of the orbit, so the void naturally
- * occludes the comet when it would be behind the BH.
- *
- * Brightness peaks at the edge-on tips (Doppler beaming) — the
- * comet flashes hottest as it crosses the disk's bright edges. */
-function DiskComet({
-  clock,
-  phase,
-  half,
-}: {
-  clock: SharedValue<number>
-  phase: number
-  half: 'back' | 'front'
-}) {
-  const bloomProps = useAnimatedProps(() => {
-    'worklet'
-    const angle = (clock.value + phase) * 2 * Math.PI
-    const sn = Math.sin(angle)
-    const onBack = sn > 0
-    if ((half === 'back') !== onBack) return { opacity: 0, r: 0, cx: CX, cy: CY }
-    const c = Math.cos(angle)
-    const x = CX + RX * c
-    const y = onBack ? CY - RY_BACK[1] * sn : CY + RY_FRONT[1] * -sn
-    // Edge boost — concentrate brightness at the Doppler tips.
-    const edge = Math.pow(Math.abs(c), 2.5)
-    return {
-      cx: x,
-      cy: y,
-      r: 3 + edge * 9,
-      opacity: 0.08 + edge * 0.35,
-    }
-  })
-  const glowProps = useAnimatedProps(() => {
-    'worklet'
-    const angle = (clock.value + phase) * 2 * Math.PI
-    const sn = Math.sin(angle)
-    const onBack = sn > 0
-    if ((half === 'back') !== onBack) return { opacity: 0, r: 0, cx: CX, cy: CY }
-    const c = Math.cos(angle)
-    const x = CX + RX * c
-    const y = onBack ? CY - RY_BACK[1] * sn : CY + RY_FRONT[1] * -sn
-    const edge = Math.pow(Math.abs(c), 2.5)
-    return {
-      cx: x,
-      cy: y,
-      r: 1.6 + edge * 4.2,
-      opacity: 0.2 + edge * 0.6,
-    }
-  })
-  const coreProps = useAnimatedProps(() => {
-    'worklet'
-    const angle = (clock.value + phase) * 2 * Math.PI
-    const sn = Math.sin(angle)
-    const onBack = sn > 0
-    if ((half === 'back') !== onBack) return { opacity: 0, r: 0, cx: CX, cy: CY }
-    const c = Math.cos(angle)
-    const x = CX + RX * c
-    const y = onBack ? CY - RY_BACK[1] * sn : CY + RY_FRONT[1] * -sn
-    const edge = Math.pow(Math.abs(c), 2.5)
-    return {
-      cx: x,
-      cy: y,
-      r: 0.6 + edge * 1.9,
-      opacity: 0.55 + edge * 0.45,
-    }
-  })
-  return (
-    <G>
-      <AnimatedCircle animatedProps={bloomProps} fill="#FBD7E3" />
-      <AnimatedCircle animatedProps={glowProps} fill="#FCE5EE" />
-      <AnimatedCircle animatedProps={coreProps} fill="#FFFFFF" />
-    </G>
-  )
-}
-
-/* A satellite body — pattern marker. Breathes on its own phase so
- * the four bodies feel independently alive. `tentative` dims the
- * whole stack (smaller body, less halo, paler core) so the
- * hypothesis-in-formation slot reads as quieter than the rest. */
-function SatBody({
-  x,
-  y,
-  clock,
-  phase,
-  tentative,
-  selected,
-}: {
-  x: number
-  y: number
-  clock: SharedValue<number>
-  phase: number
-  tentative?: boolean
-  selected?: boolean
-}) {
-  const R = tentative ? 4.4 : 5.5
-  const fill = tentative ? '#FCE5EE' : '#F4ABC8'
-  const haloOp = tentative ? 0.08 : 0.14
-  const auraOp = tentative ? 0.12 : 0.2
-  const coreOp = tentative ? 0.62 : 0.85
-  const breath = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((clock.value * 0.5 + phase) * 2 * Math.PI)
-    const scale = 1 + wave * (tentative ? 0.06 : 0.09)
-    return {
-      transform: [
-        { translateX: x },
-        { translateY: y },
-        { scale },
-        { translateX: -x },
-        { translateY: -y },
-      ],
-    }
-  })
-  return (
-    <AnimatedG animatedProps={breath}>
-      <Circle cx={x} cy={y} r={R * 3} fill={fill} opacity={haloOp} />
-      <Circle cx={x} cy={y} r={R * 1.8} fill="#FBD7E3" opacity={auraOp} />
-      {selected ? (
-        <Circle
-          cx={x}
-          cy={y}
-          r={R + 4}
-          fill="none"
-          stroke="#F4ECDE"
-          strokeWidth={1.2}
-          opacity={0.9}
-        />
-      ) : null}
-      <Circle cx={x} cy={y} r={R} fill={fill} />
-      <Circle cx={x} cy={y} r={R * 0.42} fill="#FFFFFF" opacity={coreOp} />
-    </AnimatedG>
-  )
-}
-
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
@@ -949,6 +1271,35 @@ const styles = StyleSheet.create({
   svg: {
     width: '100%',
     height: '100%',
+  },
+  // Pattern badge overlay — the dark disc + icon. Positioned by
+  // percentage with negative margin = -half disc size to centre on
+  // the chain item's viewBox coords. pointerEvents="none" so taps
+  // fall through to the Pressable tap target below.
+  chainIconWrap: {
+    position: 'absolute',
+    width: PATTERN_DISC_SIZE,
+    height: PATTERN_DISC_SIZE,
+    marginLeft: -PATTERN_DISC_SIZE / 2,
+    marginTop: -PATTERN_DISC_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The dark frame BEHIND the pattern icon. Sets it off from the
+  // magenta cosmos so the AI-illustrated dark-fill icons stay
+  // readable. Thin magenta border + bgCard2 fill = badge feel
+  // (chess piece / talisman) without competing with the chain's
+  // warm palette.
+  chainIconDisc: {
+    width: PATTERN_DISC_SIZE,
+    height: PATTERN_DISC_SIZE,
+    borderRadius: PATTERN_DISC_SIZE / 2,
+    backgroundColor: colors.bgCard2,
+    borderWidth: 1,
+    borderColor: colors.magentaTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   hit: {
     position: 'absolute',

@@ -135,13 +135,15 @@ export function DiaSegment() {
           selectedKey={selectedKey}
           onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
         />
-        {/* Bottom fade — softens the hard edge where the orbital
-            ends and the page bg (SkyBackground) shows. Extended to
-            140 px height + linear locations [0, 1] so the fade is
-            continuous, no "knee" or band where the gradient stop
-            visually appears. */}
+        {/* Bottom fade — the previous gradient faded to
+            `colors.bg` (#0A0608), but below heroRow the
+            SkyBackground composites magentaTint2 over the page bg
+            → about #1A0810. The mismatch produced a visible band.
+            Now the gradient fades to that composited wine tone
+            (matched to the pill bg) so the transition reads as a
+            continuous sky, not a step. */}
         <LinearGradient
-          colors={['transparent', colors.bg]}
+          colors={['transparent', '#1A0810']}
           locations={[0, 1]}
           pointerEvents="none"
           style={styles.heroFade}

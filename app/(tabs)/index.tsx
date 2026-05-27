@@ -12,6 +12,7 @@ import { Day1Celebration, HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
+import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
@@ -79,11 +80,19 @@ function dayNumOf(iso: string): number {
 export default function TodayScreen() {
   const brief = useHomeBrief()
   const cadence = useHomeCadence()
+  // Profile is also gated here (used to be inside TodayContent).
+  // If brief hits cache instantly but profile is still over-the-wire,
+  // the header would briefly render with the fallback "tú" greeting
+  // and then update to the real name mid-entering-animation —
+  // causing a visible text overlap glitch. Gating both together
+  // keeps the loading skeleton up until ALL the data the first
+  // paint needs is settled.
+  const profile = useProfile()
   useDayRollover(brief.data?.date)
 
   if (brief.isError && !brief.data) return <HomeError onRetry={brief.refetch} />
 
-  if (brief.isLoading || !brief.data || cadence == null) {
+  if (brief.isLoading || !brief.data || cadence == null || profile.isLoading) {
     return (
       <View style={styles.screen}>
         <SkyBackground />
@@ -94,15 +103,20 @@ export default function TodayScreen() {
     )
   }
 
-  return <TodayContent ctx={brief.data} cadence={cadence} />
+  return <TodayContent ctx={brief.data} cadence={cadence} profile={profile.data ?? null} />
 }
 
-type ContentProps = { ctx: BriefContext; cadence: Cadence }
+type ContentProps = {
+  ctx: BriefContext
+  cadence: Cadence
+  // Already resolved by the parent gate — may still be null if the
+  // user has no profile row, but never an unresolved Loading state.
+  profile: Profile | null
+}
 
-function TodayContent({ ctx, cadence }: ContentProps) {
+function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const qc = useQueryClient()
   const router = useRouter()
-  const { data: profile } = useProfile()
 
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()

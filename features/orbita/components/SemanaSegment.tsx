@@ -8,7 +8,6 @@ import { colors, typography } from '@/theme'
 import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals } from '../hooks'
 import { buildArquetipoSemana, buildVozSemana, buildWeekDays, MOCK_PATRONES } from '../mock'
-import { DayCard } from './DayCard'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PatternHint } from './PatternHint'
@@ -35,7 +34,6 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
   const voz = useMemo(() => buildVozSemana(days, todayIdx), [days, todayIdx])
 
   const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
-  const selectedDay = days[selectedIdx] ?? days[todayIdx]!
   const { data: hasAny } = useHasAnySignals()
 
   // Derive the state counts from the lived days so the header tells
@@ -70,7 +68,12 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
           />
         </View>
         <View style={styles.diagram}>
-          <WeekConstellation days={ghostDays} selectedIdx={todayIdx} onSelect={() => {}} />
+          <WeekConstellation
+            days={ghostDays}
+            selectedIdx={todayIdx}
+            onSelect={() => {}}
+            onOpenDia={onOpenDia}
+          />
         </View>
         <EmptySegmentCard
           eyebrow="La galaxia se enciende con la data"
@@ -121,17 +124,19 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
         </View>
       </View>
 
-      {/* Full-bleed hero — the constellation of the seven days. */}
+      {/* Full-bleed hero — the constellation of the seven days.
+          Tapping a halo opens a small HaloBubble anchored to that
+          star, carrying the day's info + (today only) the "Abrir
+          Día" CTA. There is no separate card below: the
+          constellation IS the UI. */}
       <View style={styles.diagram}>
-        <WeekConstellation days={days} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
+        <WeekConstellation
+          days={days}
+          selectedIdx={selectedIdx}
+          onSelect={setSelectedIdx}
+          onOpenDia={onOpenDia}
+        />
       </View>
-
-      {/* The day card — bound to the selected day. Today gets the
-          "Abrir Día" CTA; past days are informational. The key on
-          the wrapper makes the card fade in on each selection. */}
-      <Animated.View key={selectedIdx} entering={FadeIn.duration(220)}>
-        <DayCard day={selectedDay} onOpenDia={onOpenDia} />
-      </Animated.View>
 
       {/* Stelar's reading of the week so far. The tag flips to
           "Cierre de semana" once the week is done; mid-week it
