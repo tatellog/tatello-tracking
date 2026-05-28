@@ -1,6 +1,7 @@
 import * as ImageManipulator from 'expo-image-manipulator'
 import { z } from 'zod'
 
+import { NewMeasurementInputSchema } from '@/features/progress/api'
 import { requireUserId, supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database.types'
 
@@ -174,9 +175,14 @@ export async function uploadAvatar(uri: string): Promise<Profile> {
  */
 export async function insertInitialWeight(weightKg: number): Promise<void> {
   const userId = await requireUserId()
+  // Validate through the same schema as the in-app "add measurement"
+  // flow so an out-of-range weight (0, negative, > 500) is caught at
+  // the boundary with the Spanish error users see elsewhere instead
+  // of falling through to a Postgres CHECK violation.
+  const { weight_kg } = NewMeasurementInputSchema.parse({ weight_kg: weightKg })
   const { error } = await supabase.from('body_measurements').insert({
     user_id: userId,
-    weight_kg: weightKg,
+    weight_kg,
     measured_at: new Date().toISOString(),
   })
   if (error) throw error

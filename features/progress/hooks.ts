@@ -9,6 +9,8 @@ import {
   getMeasurements,
   getRecentSleepLogs,
   getRecentWorkoutDates,
+  NewMeasurementInputSchema,
+  type NewMeasurementInput,
 } from './api'
 import { buildMockMeasurements } from './mock'
 
@@ -57,11 +59,6 @@ export function useBeforeAfterPhotos() {
  * El brief context se refresca al toque para que el delta del Home se
  * sincronice con la nueva medida sin esperar refetch manual.
  */
-type NewMeasurement = {
-  weight_kg?: number | null
-  waist_cm?: number | null
-  measured_at?: string
-}
 
 /*
  * Reads for the Progress overview cards. Each query is keyed by the
@@ -96,13 +93,18 @@ export function useLastPeriodStart() {
 export function useAddMeasurement() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: NewMeasurement) => {
+    mutationFn: async (input: NewMeasurementInput) => {
       const userId = await requireUserId()
+      const parsed = NewMeasurementInputSchema.parse(input)
       const { error } = await supabase.from('body_measurements').insert({
         user_id: userId,
-        weight_kg: input.weight_kg ?? null,
-        waist_cm: input.waist_cm ?? null,
-        measured_at: input.measured_at ?? new Date().toISOString(),
+        weight_kg: parsed.weight_kg ?? null,
+        waist_cm: parsed.waist_cm ?? null,
+        chest_cm: parsed.chest_cm ?? null,
+        hip_cm: parsed.hip_cm ?? null,
+        thigh_cm: parsed.thigh_cm ?? null,
+        arm_cm: parsed.arm_cm ?? null,
+        measured_at: parsed.measured_at ?? new Date().toISOString(),
       })
       if (error) throw error
     },

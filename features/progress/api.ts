@@ -6,6 +6,72 @@ import { supabase } from '@/lib/supabase'
 const MeasurementListSchema = z.array(BodyMeasurementSchema)
 
 /*
+ * Bounded write schema for new body measurements. Mirrors the CHECK
+ * constraints in 20260527120001_data_validation_checks.sql so the
+ * client fails fast with a useful Spanish message instead of
+ * surfacing a Postgres CHECK-violation error. Every field is
+ * optional (a user may submit just a weight, or just a waist), but
+ * at least one must be present — otherwise the row carries no
+ * signal.
+ */
+const KG_MAX = 500
+const CM_MAX = 300
+const CM_MAX_LIMB = 200
+
+export const NewMeasurementInputSchema = z
+  .object({
+    weight_kg: z
+      .number()
+      .positive('El peso debe ser mayor a 0')
+      .lt(KG_MAX, `Máximo ${KG_MAX} kg`)
+      .nullable()
+      .optional(),
+    waist_cm: z
+      .number()
+      .positive('La medida debe ser mayor a 0')
+      .lt(CM_MAX, `Máximo ${CM_MAX} cm`)
+      .nullable()
+      .optional(),
+    chest_cm: z
+      .number()
+      .positive('La medida debe ser mayor a 0')
+      .lt(CM_MAX, `Máximo ${CM_MAX} cm`)
+      .nullable()
+      .optional(),
+    hip_cm: z
+      .number()
+      .positive('La medida debe ser mayor a 0')
+      .lt(CM_MAX, `Máximo ${CM_MAX} cm`)
+      .nullable()
+      .optional(),
+    thigh_cm: z
+      .number()
+      .positive('La medida debe ser mayor a 0')
+      .lt(CM_MAX_LIMB, `Máximo ${CM_MAX_LIMB} cm`)
+      .nullable()
+      .optional(),
+    arm_cm: z
+      .number()
+      .positive('La medida debe ser mayor a 0')
+      .lt(CM_MAX_LIMB, `Máximo ${CM_MAX_LIMB} cm`)
+      .nullable()
+      .optional(),
+    measured_at: z.string().datetime().optional(),
+  })
+  .refine(
+    (v) =>
+      v.weight_kg != null ||
+      v.waist_cm != null ||
+      v.chest_cm != null ||
+      v.hip_cm != null ||
+      v.thigh_cm != null ||
+      v.arm_cm != null,
+    'Al menos una medida debe tener valor',
+  )
+
+export type NewMeasurementInput = z.infer<typeof NewMeasurementInputSchema>
+
+/*
  * Cargar todas las medidas del usuario, opcionalmente acotadas a los
  * últimos `rangeDays` días. RLS asegura que sólo se devuelvan filas del
  * authenticated user; no pasamos user_id en el query.

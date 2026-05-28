@@ -15,6 +15,7 @@
     "types:db": "supabase gen types typescript --linked > types/database.types.ts",
     "seed:dev": "tsx scripts/seed-dev-user.ts",
     "seed:real": "tsx scripts/seed-real-data.ts",
+    "check:rls": "tsx scripts/check-rls.ts",
     "prepare": "husky"
   },
   "lint-staged": {
