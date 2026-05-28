@@ -174,6 +174,33 @@ export type Database = {
         }
         Relationships: []
       }
+      detected_patterns: {
+        Row: {
+          detected_at: string
+          id: string
+          metadata: Json
+          pattern_type: string
+          shown_to_user: boolean
+          user_id: string
+        }
+        Insert: {
+          detected_at?: string
+          id?: string
+          metadata?: Json
+          pattern_type: string
+          shown_to_user?: boolean
+          user_id: string
+        }
+        Update: {
+          detected_at?: string
+          id?: string
+          metadata?: Json
+          pattern_type?: string
+          shown_to_user?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       error_logs: {
         Row: {
           created_at: string

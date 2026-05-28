@@ -15,6 +15,7 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { PatternObservation, usePatternDetection } from '@/features/patterns'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
@@ -132,6 +133,9 @@ type ContentProps = {
 function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const qc = useQueryClient()
   const router = useRouter()
+  // Empathic observation card (Stelar's differentiator). Fires at
+  // most one detected pattern per day; null when nothing to surface.
+  const { pattern, dismiss: dismissPattern } = usePatternDetection()
 
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()
@@ -275,6 +279,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               align="center"
               {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
             />
+            {pattern ? (
+              <PatternObservation
+                message={pattern.message}
+                patternType={pattern.type}
+                onDismiss={dismissPattern}
+              />
+            ) : null}
             {(() => {
               if (dayState !== 'trained') return null
               // Final-day case: tomorrow is the closing of the
