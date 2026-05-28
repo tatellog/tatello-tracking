@@ -62,13 +62,13 @@ export default function QueHaceScreen() {
         <Text style={styles.eyebrow}>Lo que Stelar hace</Text>
 
         <Text style={styles.title}>
-          No cuento calorías.{'\n'}
-          <Text style={styles.titleEm}>Leo tus patrones.</Text>
+          Sí, cuento calorías.{'\n'}
+          <Text style={styles.titleEm}>Y también te leo.</Text>
         </Text>
 
         <Text style={styles.body}>
-          Stelar lee tu día, tu semana y tu ciclo. Encuentra qué te sostiene, qué te drena y te
-          ayuda a moverte a tu favor.
+          Mido calorías, macros y peso. Lo que ninguna otra app hace: entender por qué hasta ahora
+          no has podido sostenerlo.
         </Text>
 
         <View style={styles.previewBlock}>

@@ -34,30 +34,42 @@ type IntentOption = {
   tagline: string
 }
 
-// Ordered outcome → pattern → other. Outcome buckets ("Bajar de peso",
-// "Tener más energía") come first because most users arrive with an
-// outcome goal. Pattern-detection options ("Entender mis patrones",
-// "Conocer mi ciclo") name what Stelar actually does best; "Calmar
-// la mente" sits at the end as the more emotional bucket.
+// "Bajar de peso" leads as the outcome bucket — Stelar C is honest
+// about being a weight-loss product. The other seven name the
+// dimensions that SOSTAIN the outcome (energy, sleep, food-emotion
+// link, cycle, patterns, mind, other). All eight map to the same
+// MonthlyFocus enum the engine already understands.
 const FOCUS_OPTIONS: readonly IntentOption[] = [
-  { value: 'weight', label: 'Bajar de peso', tagline: 'El cuerpo va a moverse' },
-  { value: 'energy', label: 'Tener más energía', tagline: 'Saber de dónde sale tu fuerza' },
-  { value: 'sleep', label: 'Dormir profundo', tagline: 'La noche se vuelve descanso' },
-  { value: 'food', label: 'Comer con menos lucha', tagline: 'Que comer deje de pesar' },
-  { value: 'cycle', label: 'Conocer mi ciclo', tagline: 'Tu cuerpo va a hablarte' },
-  { value: 'patterns', label: 'Entender mis patrones', tagline: 'Stelar mapea lo que se repite' },
-  { value: 'mind', label: 'Calmar la mente', tagline: 'Menos ruido por dentro' },
-  { value: 'other', label: 'Otra cosa', tagline: 'La nombras tú' },
+  {
+    value: 'weight',
+    label: 'Bajar de peso',
+    tagline: 'El objetivo. Stelar te ayuda a sostenerlo.',
+  },
+  {
+    value: 'energy',
+    label: 'Recuperar mi energía',
+    tagline: 'Sin energía no hay déficit que aguante.',
+  },
+  { value: 'sleep', label: 'Dormir mejor', tagline: 'Sin descanso, el cuerpo no suelta.' },
+  {
+    value: 'food',
+    label: 'Soltar la lucha con comer',
+    tagline: 'Entender qué dispara los atracones.',
+  },
+  { value: 'cycle', label: 'Leer mi ciclo', tagline: 'Tu cuerpo cambia cada semana del mes.' },
+  { value: 'patterns', label: 'Entender mis patrones', tagline: 'Qué hace los viernes distintos.' },
+  { value: 'mind', label: 'Calmar la ansiedad', tagline: 'Menos ruido para decidir mejor.' },
+  { value: 'other', label: 'Algo más', tagline: 'La nombras tú.' },
 ]
 
 /** Phrase Stelar quietly utters after the user picks an intention.
  *  Lower-stakes than the reveal — it's the operant-conditioning
  *  "yes, I heard you" beat that locks in the choice. */
 const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
-  weight: 'Stelar va a leerte con eso en mente.',
-  energy: 'Stelar va a buscar de dónde sale tu energía.',
-  sleep: 'Stelar te acompaña a tu sueño más profundo.',
-  food: 'Stelar afina lo que ves cuando comes.',
+  weight: 'Stelar te lee con esa meta en el centro.',
+  energy: 'Stelar busca de dónde nace tu fuerza.',
+  sleep: 'Stelar mide cómo descansas para que el cuerpo suelte.',
+  food: 'Stelar busca el qué y el porqué de cada comida.',
   cycle: 'Stelar pone el ciclo en primer plano.',
   patterns: 'Stelar se enfoca en qué se repite en ti.',
   mind: 'Stelar afina la lectura hacia tu mente.',
@@ -65,13 +77,14 @@ const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
 }
 
 /*
- * Step 9 — Tu intención. Single-select of the dimension Stelar will
- * weight first. The earlier wrap-chip version of this screen felt
- * generic (8 identical pills floating with massive empty space
- * below). This version uses a vertical list of premium cards: each
- * option has a label + one-line tagline, the selected card gets a
- * dramatic magenta glow + scale-up, and the non-selected cards
- * quietly dim so the chosen one is the only thing the eye lands on.
+ * Step 9 — Tu objetivo. Single-select of the dimension Stelar will
+ * weight first. Stelar C is a weight-loss app with emotional
+ * intelligence; the framing makes that honest. "Bajar de peso" is
+ * the headline option (the outcome bucket); the other seven name
+ * the dimensions that SOSTAIN the outcome (energy, sleep, the
+ * food-emotion link, cycle, patterns, mind, other). Selection
+ * still drives the same MonthlyFocus enum + calcMacros logic —
+ * only the copy changed.
  *
  * Persisted to profile.monthly_focus. After Continuar fires, a brief
  * microcelebration overlay confirms Stelar received it.
@@ -91,7 +104,7 @@ export default function TuIntencionScreen() {
   )
 
   const firstName = (profile?.display_name ?? '').trim().split(' ')[0] || ''
-  const eyebrow = firstName ? `Tu intención · ${firstName}` : 'Tu intención'
+  const eyebrow = firstName ? `Tu objetivo · ${firstName}` : 'Tu objetivo'
 
   const canContinue = focus !== null
   const [celebrating, setCelebrating] = useState(false)
@@ -150,9 +163,9 @@ export default function TuIntencionScreen() {
           <StepHeader
             eyebrow={eyebrow}
             eyebrowColor="magenta"
-            question="¿Qué te trajo a Stelar?"
-            questionEmphasis="trajo"
-            hint="Una sola elección. Puedes cambiarla."
+            question="¿Qué quieres lograr?"
+            questionEmphasis="lograr"
+            hint="Stelar te ayuda a lograrlo entendiendo qué te lo ha impedido hasta ahora."
           />
 
           <View style={styles.list}>
