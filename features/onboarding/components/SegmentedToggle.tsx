@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     textTransform: 'uppercase',
     letterSpacing: 0.7,

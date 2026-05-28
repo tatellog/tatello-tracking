@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   metaInlineEm: {
@@ -71,14 +71,14 @@ const styles = StyleSheet.create({
   metaValue: {
     fontFamily: typography.displayHeavy,
     fontStyle: 'normal',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.magenta,
     letterSpacing: -0.5,
   },
   metaLabel: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
 })

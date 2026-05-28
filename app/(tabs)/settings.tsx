@@ -315,7 +315,7 @@ export default function SettingsScreen() {
                   style={{
                     fontFamily: typography.serifSemi,
                     fontStyle: 'italic',
-                    fontSize: 14,
+                    fontSize: typography.sizes.bodyLarge,
                     color: colors.bone,
                     letterSpacing: 0.6,
                   }}
@@ -458,12 +458,12 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontFamily: typography.displayHeavy,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.magenta,
   },
   name: {
     fontFamily: typography.displayHeavy,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.leche,
     letterSpacing: -0.6,
   },
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   },
   stelarBody: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
     paddingHorizontal: 16,
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
   // button instead of a card that looked tappable.
   privacyLine: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
     marginBottom: 14,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   metaValue: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     marginTop: 4,
   },
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontFamily: typography.ui,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.niebla,
   },
   // ── Cuenta ─────────────────────────────────────────────────────
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   },
   signOutLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: 0.3,
   },
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   footer: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     textAlign: 'center',
     marginTop: 32,

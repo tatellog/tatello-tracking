@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
     letterSpacing: 1.4,
   },

@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
   },

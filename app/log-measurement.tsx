@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: -0.5,
   },

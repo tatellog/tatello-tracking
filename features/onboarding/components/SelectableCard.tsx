@@ -91,12 +91,12 @@ const styles = StyleSheet.create({
   },
   squareIcon: {
     fontFamily: typography.display,
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     color: colors.inkPrimary,
   },
   squareLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.2,
     color: colors.inkPrimary,
   },
@@ -111,12 +111,12 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontFamily: typography.uiSemi,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.inkPrimary,
   },
   rowDescription: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     lineHeight: 17,
     color: colors.labelMuted,
   },

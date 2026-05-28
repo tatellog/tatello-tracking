@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   archetype: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     lineHeight: 28,
     color: colors.leche,
     textAlign: 'center',
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   metaQuiet: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.bone,
     textTransform: 'none',
     letterSpacing: 0,

@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.magenta,
     letterSpacing: -0.2,
   },

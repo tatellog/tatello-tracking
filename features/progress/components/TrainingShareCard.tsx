@@ -202,12 +202,12 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   brandStar: {
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.magenta,
   },
   brandWord: {
     fontFamily: typography.displayHeavy,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
     letterSpacing: 3,
   },
@@ -242,9 +242,9 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontFamily: typography.uiBold,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.6,
-    color: '#FFFFFF',
+    color: colors.leche,
   },
   centered: {
     textAlign: 'center',
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   signMd: {
     fontFamily: typography.displayHeavy,
-    fontSize: 28,
+    fontSize: typography.sizes.deltaNum,
     letterSpacing: 4,
     color: colors.leche,
     textAlign: 'center',
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   },
   countUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.bone,
     letterSpacing: -0.6,
   },
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   eyebrowMd: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 4,
     color: colors.niebla,
   },
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   coach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
     textAlign: 'center',

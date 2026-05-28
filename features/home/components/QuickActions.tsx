@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
   },
   icon: {
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
   },
   label: {
     fontFamily: typography.uiMedium,

@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     lineHeight: 22,
     color: colors.bone,
     letterSpacing: -0.3,
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   tagline: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     lineHeight: 15,
     letterSpacing: 0.3,
     color: colors.niebla,
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   celebText: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     lineHeight: 32,
     color: colors.leche,
     textAlign: 'center',

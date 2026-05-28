@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   kg: {
     fontFamily: typography.uiBold,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.niebla,
     marginLeft: 10,
   },

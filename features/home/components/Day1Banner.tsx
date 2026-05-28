@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiSemi,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.mauveDeep,

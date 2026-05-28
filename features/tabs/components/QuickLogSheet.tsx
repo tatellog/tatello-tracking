@@ -509,13 +509,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: -0.5,
   },
   close: {
     fontFamily: typography.uiBold,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.niebla,
     width: 24,
     textAlign: 'right',
@@ -561,13 +561,13 @@ const styles = StyleSheet.create({
   },
   stripWeight: {
     fontFamily: typography.displaySemi,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.leche,
     letterSpacing: -0.3,
   },
   chevron: {
     fontFamily: typography.ui,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.niebla,
   },
   dropletsCompact: {
@@ -597,13 +597,13 @@ const styles = StyleSheet.create({
   },
   typeSegText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.4,
   },
   frequentLabel: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     marginTop: 14,
     marginBottom: 10,
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   },
   methodLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.leche,
     letterSpacing: 0.3,
   },
@@ -676,8 +676,8 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontFamily: typography.uiBold,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
     letterSpacing: 0.3,
   },
 })

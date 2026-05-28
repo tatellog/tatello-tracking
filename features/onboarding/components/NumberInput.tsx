@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   unit: {
     flexShrink: 0,
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.labelMuted,
     letterSpacing: 0.3,
   },

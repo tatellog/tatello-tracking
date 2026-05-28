@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     lineHeight: 16,
     textTransform: 'uppercase',

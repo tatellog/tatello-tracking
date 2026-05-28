@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   unit: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.magenta,
   },
   trackHit: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   tick: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.5,
     color: colors.niebla,
   },

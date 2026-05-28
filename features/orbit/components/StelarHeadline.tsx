@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.bone,
     textAlign: 'center',

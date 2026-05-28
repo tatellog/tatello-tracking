@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   unit: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.magenta,
   },
   /* Range pill with leading status dot. */
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.bone,
     textAlign: 'center',
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     alignSelf: 'center',
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.magenta,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   formulaLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -487,13 +487,13 @@ const styles = StyleSheet.create({
   formulaSep: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.magenta,
   },
   formulaValue: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: -0.2,
   },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   anchorCopy: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.magenta,
     letterSpacing: 0.1,
     marginTop: 4,
@@ -547,7 +547,7 @@ const sheetStyles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
@@ -555,7 +555,7 @@ const sheetStyles = StyleSheet.create({
   title: {
     marginTop: 8,
     fontFamily: typography.displayHeavy,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     lineHeight: 30,
     color: colors.leche,
     letterSpacing: -0.6,
@@ -568,7 +568,7 @@ const sheetStyles = StyleSheet.create({
   section: {
     marginTop: 22,
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
@@ -576,7 +576,7 @@ const sheetStyles = StyleSheet.create({
   body: {
     marginTop: 8,
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
   },
@@ -590,8 +590,8 @@ const sheetStyles = StyleSheet.create({
   },
   closeBtnLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
     letterSpacing: 0.3,
   },
 })

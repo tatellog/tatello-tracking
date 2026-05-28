@@ -268,13 +268,13 @@ const styles = StyleSheet.create({
   em: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.magenta,
   },
   detail: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 18,
     color: colors.niebla,
   },

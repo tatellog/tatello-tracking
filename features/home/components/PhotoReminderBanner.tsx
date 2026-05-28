@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiSemi,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
     color: 'rgba(255,255,255,0.85)',
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.3,
     color: colors.mauveDeep,
   },

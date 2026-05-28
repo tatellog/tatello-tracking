@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 2.2,
   },
@@ -80,13 +80,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: colors.bruma,
     fontFamily: typography.uiBold,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     letterSpacing: -0.5,
     color: colors.leche,
     backgroundColor: 'transparent',
   },
   inputCompact: {
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
   },
   inputFocused: {
     borderBottomColor: colors.magenta,

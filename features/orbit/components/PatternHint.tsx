@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displaySemi,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 23,
     color: colors.leche,
     letterSpacing: -0.3,

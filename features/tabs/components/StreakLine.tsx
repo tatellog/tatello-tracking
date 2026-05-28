@@ -80,12 +80,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(217, 174, 111, 0.28)',
   },
   star: {
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
   },
   num: {
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.magenta,
     letterSpacing: -0.3,
   },

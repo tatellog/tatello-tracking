@@ -42,6 +42,19 @@ import { GLYPHS } from './dimensionGlyphs'
 
 const DAY_ORB_PNG = require('@/assets/orbits-art/day-orb.png')
 
+/** Star + halo palette for the Día orbital diagram. Same intent as
+ *  `SKY` in MonthSky.tsx — art colours that don't belong in the
+ *  global theme (they're scene-specific) but should live in one
+ *  named block so tweaking the mood is a single-block edit. */
+const SKY = {
+  // Bright pin-point + ripple stroke.
+  starCore: '#FFFFFF',
+  // Soft pink aura around a star.
+  starGlow: '#FBD7E3',
+  // Warm cream halo + focus label colour.
+  haloCream: '#FFE9D6',
+} as const
+
 // Glyphs are authored in a 24×24 viewport. Bumped 1.5× → 2.6×
 // after the raster rose-gold icons started reading as small
 // blobs inside the bigger coloured halo — at this scale the
@@ -447,8 +460,8 @@ export function OrbitalSystem({
         <Defs>
           {/* A dimension star — warm white core fading to magenta. */}
           <RadialGradient id="orb-star" cx="50%" cy="50%" r="55%">
-            <Stop offset="0%" stopColor="#FFFFFF" />
-            <Stop offset="35%" stopColor="#FBD7E3" />
+            <Stop offset="0%" stopColor={SKY.starCore} />
+            <Stop offset="35%" stopColor={SKY.starGlow} />
             <Stop offset="100%" stopColor={colors.magenta} />
           </RadialGradient>
           {/* Soft radial fill for the lens-flare streak ellipses —
@@ -460,10 +473,10 @@ export function OrbitalSystem({
               renders as a vertical smear. Single gradient handles
               every streak orientation. */}
           <RadialGradient id="flare-soft" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="28%" stopColor="#FFFFFF" stopOpacity={0.72} />
-            <Stop offset="62%" stopColor="#FFFFFF" stopOpacity={0.22} />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset="0%" stopColor={SKY.starCore} stopOpacity={1} />
+            <Stop offset="28%" stopColor={SKY.starCore} stopOpacity={0.72} />
+            <Stop offset="62%" stopColor={SKY.starCore} stopOpacity={0.22} />
+            <Stop offset="100%" stopColor={SKY.starCore} stopOpacity={0} />
           </RadialGradient>
           {/* Focus well — bg-coloured radial gradient that fades
               from fully opaque at the centre (masking the PNG's
@@ -481,9 +494,9 @@ export function OrbitalSystem({
               luminous spark without re-introducing the bright
               white-hot core that washed the rose-gold icon out. */}
           <RadialGradient id="focus-spark" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#FFE9D6" stopOpacity={0.6} />
-            <Stop offset="40%" stopColor="#FFE9D6" stopOpacity={0.25} />
-            <Stop offset="100%" stopColor="#FFE9D6" stopOpacity={0} />
+            <Stop offset="0%" stopColor={SKY.haloCream} stopOpacity={0.6} />
+            <Stop offset="40%" stopColor={SKY.haloCream} stopOpacity={0.25} />
+            <Stop offset="100%" stopColor={SKY.haloCream} stopOpacity={0} />
           </RadialGradient>
           {/* Per-dimension focus halo gradients — one TRUE radial
               gradient per dim. Replaces the fake "stack of nested
@@ -553,7 +566,7 @@ export function OrbitalSystem({
             and most particles flew off-screen, making the motion
             read as "frozen"). Each mote computes its own (cx, cy)
             from dustOrbit + an inverse-radius speed factor. */}
-        <G fill="#FBD7E3">
+        <G fill={SKY.starGlow}>
           {DUST_MOTES.map((m, i) => (
             <DustMote key={`dust-${i}`} mote={m} slowClock={slowClock} dustOrbit={dustOrbit} />
           ))}
@@ -622,7 +635,7 @@ export function OrbitalSystem({
                   key={`rest-label-${d.key}`}
                   x={pos.x + offset.dx}
                   y={pos.y + offset.dy}
-                  fill="#FFE9D6"
+                  fill={SKY.haloCream}
                   fontSize={9}
                   fontFamily="HankenGrotesk_700Bold"
                   letterSpacing={1}
@@ -753,7 +766,7 @@ function BurstParticle({
       r: 1.4 - u * 0.7,
     }
   })
-  return <AnimatedCircle fill="#FFFFFF" animatedProps={props} />
+  return <AnimatedCircle fill={SKY.starCore} animatedProps={props} />
 }
 
 /* A luminous decorative star — no Pressable, no state, but shares
@@ -785,8 +798,8 @@ function DecorativeStar({
   return (
     <G>
       <AnimatedCircle cx={x} cy={y} fill={CONSTELLATION_COLORS.starHalo} animatedProps={slowGlow} />
-      <Circle cx={x} cy={y} r={R * 2.8} fill="#FBD7E3" opacity={0.16} />
-      <Circle cx={x} cy={y} r={R * 1.5} fill="#FBD7E3" opacity={0.32} />
+      <Circle cx={x} cy={y} r={R * 2.8} fill={SKY.starGlow} opacity={0.16} />
+      <Circle cx={x} cy={y} r={R * 1.5} fill={SKY.starGlow} opacity={0.32} />
       <DiffractionSpikes
         x={x}
         y={y}
@@ -796,7 +809,7 @@ function DecorativeStar({
         strokeWidth={0.5}
       />
       <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-      <Circle cx={x} cy={y} r={R * 0.6} fill="#FFFFFF" />
+      <Circle cx={x} cy={y} r={R * 0.6} fill={SKY.starCore} />
     </G>
   )
 }
@@ -914,7 +927,14 @@ function DiffractionSpikes({
           asymmetric positions (no two on the same axis or angle) so
           the bloom never reads as geometric. */}
       {sparkles.map((s, i) => (
-        <Circle key={`sp-${i}`} cx={x + s.dx} cy={y + s.dy} r={s.r} fill="#FFFFFF" opacity={s.op} />
+        <Circle
+          key={`sp-${i}`}
+          cx={x + s.dx}
+          cy={y + s.dy}
+          r={s.r}
+          fill={SKY.starCore}
+          opacity={s.op}
+        />
       ))}
     </G>
   )
@@ -1148,7 +1168,7 @@ function StarNode({
           cy={y}
           r={R}
           fill="none"
-          stroke="#F4ECDE"
+          stroke={colors.leche}
           strokeWidth={1.4}
           animatedProps={ripple}
         />
@@ -1178,8 +1198,20 @@ function StarNode({
           fill={colors.magenta}
           opacity={enLuz ? 0.14 + b * 0.12 : 0.05}
         />
-        <Circle cx={x} cy={y} r={midR} fill="#FBD7E3" opacity={enLuz ? 0.2 + b * 0.14 : 0.06} />
-        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={enLuz ? 0.38 + b * 0.22 : 0.1} />
+        <Circle
+          cx={x}
+          cy={y}
+          r={midR}
+          fill={SKY.starGlow}
+          opacity={enLuz ? 0.2 + b * 0.14 : 0.06}
+        />
+        <Circle
+          cx={x}
+          cy={y}
+          r={auraR}
+          fill={SKY.starGlow}
+          opacity={enLuz ? 0.38 + b * 0.22 : 0.1}
+        />
         {/* Diffraction-spike starburst — ON for EVERY en luz star.
             Length cut R*11 → R*6 + opacity 0.55+b*0.35 → 0.4+b*0.2
             so the cross reads as a soft luminous pin-prick over the
@@ -1200,7 +1232,7 @@ function StarNode({
         {/* Impact flash — a brief expanding white burst that fires
             on selection, driven by popT. */}
         {selected ? (
-          <AnimatedCircle cx={x} cy={y} fill="#FFFFFF" animatedProps={flashAnim} />
+          <AnimatedCircle cx={x} cy={y} fill={SKY.starCore} animatedProps={flashAnim} />
         ) : null}
         {/* Arrival burst — eight tiny white particles that spawn at
             the star centre when popT fires, fly outward in a ring,
@@ -1240,9 +1272,9 @@ function StarNode({
           <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
           {enLuz ? (
             <>
-              <Circle cx={x} cy={y} r={R * 1.1} fill="#FFFFFF" opacity={0.32} />
-              <Circle cx={x} cy={y} r={R * 0.7} fill="#FFFFFF" opacity={1} />
-              <Circle cx={x} cy={y} r={R * 0.4} fill="#FFFFFF" />
+              <Circle cx={x} cy={y} r={R * 1.1} fill={SKY.starCore} opacity={0.32} />
+              <Circle cx={x} cy={y} r={R * 0.7} fill={SKY.starCore} opacity={1} />
+              <Circle cx={x} cy={y} r={R * 0.4} fill={SKY.starCore} />
             </>
           ) : null}
         </AnimatedG>
@@ -1344,8 +1376,8 @@ const styles = StyleSheet.create({
   },
   focusLabelText: {
     fontFamily: typography.serif,
-    fontSize: 14,
-    color: '#FFE9D6',
+    fontSize: typography.sizes.bodyLarge,
+    color: SKY.haloCream,
     letterSpacing: 1.6,
   },
   // Soft edge fades — very subtle dim tint that takes the edge off

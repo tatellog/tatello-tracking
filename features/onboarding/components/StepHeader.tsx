@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.bone,
   },

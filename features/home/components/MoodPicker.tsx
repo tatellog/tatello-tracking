@@ -114,6 +114,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
   },
   emoji: {
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
   },
 })

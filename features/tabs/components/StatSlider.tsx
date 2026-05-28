@@ -840,7 +840,7 @@ const styles = StyleSheet.create({
   weightUnit: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.niebla,
   },
   // Total change — the headline of progress.
@@ -858,7 +858,7 @@ const styles = StyleSheet.create({
   weeklyLine: {
     marginTop: 3,
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   emptyCard: {
@@ -874,7 +874,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.niebla,
     textAlign: 'center',
   },
@@ -904,7 +904,7 @@ const styles = StyleSheet.create({
   sleepUnit: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     marginLeft: 2,
   },
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
   },
   stepButtonLabel: {
     fontFamily: typography.ui,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 24,
     color: colors.bone,
   },
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
   axisLabel: {
     width: 104,
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -1008,14 +1008,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // Phase headline — serif italic like the weight's total delta line.
   cyclePhaseLine: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
   },
   // Phase name — the emphasised word, magenta serif.
@@ -1029,7 +1029,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.niebla,
   },
   captionEm: {

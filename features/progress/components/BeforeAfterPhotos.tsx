@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
     textAlign: 'center',
   },
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   placeholderStar: {
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.bruma,
   },
   // The tap affordance — quiet magenta so the empty frame reads as an
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   placeholderHint: {
     marginTop: 6,
     fontFamily: typography.uiSemi,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.magenta,
     letterSpacing: 0.3,
   },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingHorizontal: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
     textAlign: 'center',
   },
@@ -474,13 +474,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginLeft: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // The same gesture as the hero's "76.6 → 75.0".
   arrow: {
     fontFamily: typography.uiBold,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     color: colors.magenta,
     marginHorizontal: 12,
   },
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   },
   shareLabel: {
     fontFamily: typography.uiSemi,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.magenta,
   },
 })

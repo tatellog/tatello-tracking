@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   errorText: {
     paddingHorizontal: 24,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     lineHeight: 17,
     color: colors.feedbackError,
     textAlign: 'center',

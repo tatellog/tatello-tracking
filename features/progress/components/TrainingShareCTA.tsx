@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   },
   headerSep: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // Captured photo — 4:5 portrait-leaning tile to fit gym selfies.
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   chipHint: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 11.5,
+    fontSize: typography.sizes.caption,
     color: colors.niebla,
     letterSpacing: 0.2,
   },

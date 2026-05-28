@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   foot: {
     marginTop: 22,
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     lineHeight: 16,
     color: colors.niebla,
     textAlign: 'center',

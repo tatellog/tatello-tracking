@@ -158,13 +158,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 18,
     color: colors.niebla,
   },
   targetInviteChevron: {
     fontFamily: typography.uiMedium,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.niebla,
   },
 })

@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
   },
   subtitleEmpty: {

@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 2.4,
     textTransform: 'uppercase',
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   target: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.bone,
   },
   caption: {

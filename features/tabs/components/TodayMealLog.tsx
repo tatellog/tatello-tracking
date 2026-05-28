@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   },
   actionHint: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     marginTop: 8,
     marginBottom: 12,
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
   // Summary line under the pile.
   summary: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
   summaryStrong: {
@@ -722,13 +722,13 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontFamily: typography.displayHeavy,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: -0.5,
   },
   sheetClose: {
     fontFamily: typography.uiBold,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.niebla,
   },
   sheetBody: {
@@ -830,17 +830,17 @@ const styles = StyleSheet.create({
   meta: {
     flex: 1,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   kcal: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   kcalNum: {
     fontFamily: typography.displaySemi,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     color: colors.bone,
     letterSpacing: -0.4,
   },

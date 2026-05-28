@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontFamily: typography.uiSemi,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     letterSpacing: -0.1,
   },
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   cardDescription: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     lineHeight: 16,
     color: colors.niebla,
     letterSpacing: 0.1,
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   caveat: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     lineHeight: 17,
     color: colors.niebla,
   },

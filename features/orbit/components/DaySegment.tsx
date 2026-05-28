@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   metaB: {
     marginTop: 4,
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   metaStelar: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.magenta,
     textTransform: 'none',
     letterSpacing: 0,
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // The one-time first-reading reveal, above the Voz de Stelar card.
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   revealEyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
     color: colors.magenta,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   },
   readoutLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.leche,
     letterSpacing: 1.6,
   },
@@ -418,12 +418,12 @@ const styles = StyleSheet.create({
   readoutWord: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.magenta,
   },
   readoutState: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   evidenceEyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -471,18 +471,18 @@ const styles = StyleSheet.create({
   },
   evidenceLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   evidenceDot: {
     marginHorizontal: 6,
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.bruma,
   },
   evidenceValue: {
     fontFamily: typography.uiBold,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.leche,
   },
   evidenceGap: {
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.hairline,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
   },

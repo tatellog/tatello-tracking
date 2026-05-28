@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   valueUnit: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.bone,
   },
   track: {
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   },
   bot: {
     fontFamily: typography.uiSemi,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
   botBold: {

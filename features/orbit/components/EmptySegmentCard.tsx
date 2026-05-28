@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     lineHeight: 17,
     color: colors.niebla,
   },

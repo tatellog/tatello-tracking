@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     paddingHorizontal: 13,
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
   },
   estelaHead: {
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   },
   estelaCount: {
     fontFamily: typography.uiMedium,
-    fontSize: 11.5,
+    fontSize: typography.sizes.caption,
     color: colors.niebla,
     letterSpacing: 0.3,
   },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
     paddingVertical: 10,
   },
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   // carries the emphasis.
   newHint: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
     marginTop: 3,
@@ -502,12 +502,12 @@ const styles = StyleSheet.create({
   numberInput: {
     flex: 1,
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
   },
   numberUnit: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   previewWrap: {

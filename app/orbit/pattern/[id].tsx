@@ -390,14 +390,14 @@ const styles = StyleSheet.create({
   },
   missing: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
   },
   // Hero — the reading restated, big.
   heroTitle: {
     marginTop: 4,
     fontFamily: typography.displaySemi,
-    fontSize: 28,
+    fontSize: typography.sizes.deltaNum,
     lineHeight: 34,
     color: colors.leche,
     letterSpacing: -0.4,
@@ -405,13 +405,13 @@ const styles = StyleSheet.create({
   heroEm: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     color: colors.magenta,
   },
   meta: {
     marginTop: 12,
     fontFamily: typography.uiMedium,
-    fontSize: 11.5,
+    fontSize: typography.sizes.caption,
     color: colors.niebla,
   },
   metaLabel: {
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   // The confidence dots — magenta, slightly larger than the meta text.
   confidenceDots: {
     color: colors.magenta,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.5,
   },
   section: {
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.8,
     color: colors.niebla,
   },
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   caption: {
     marginTop: 12,
     fontFamily: typography.uiSemi,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.bone,
   },
   legend: {
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   },
   body: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
   },

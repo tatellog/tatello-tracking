@@ -102,7 +102,11 @@ function ActionButton({
           primary ? styles.actionCirclePrimary : styles.actionCircleGhost,
         ]}
       >
-        {loading ? <StarLoader size={24} color={primary ? '#FFFFFF' : colors.magenta} /> : children}
+        {loading ? (
+          <StarLoader size={24} color={primary ? colors.leche : colors.magenta} />
+        ) : (
+          children
+        )}
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
@@ -345,7 +349,7 @@ const styles = StyleSheet.create({
   },
   variantName: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
     color: colors.bone,
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
   // ── action icons ───────────────────────────────────────────────────
@@ -408,7 +412,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.6,
     color: colors.bone,
   },

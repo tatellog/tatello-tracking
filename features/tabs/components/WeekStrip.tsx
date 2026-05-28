@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   dayLetter: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   dayNum: {
     marginTop: 3,
     fontFamily: typography.displayHeavy,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     color: colors.niebla,
     letterSpacing: -0.6,
     lineHeight: 20,

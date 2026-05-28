@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.display,
-    fontSize: 28,
+    fontSize: typography.sizes.deltaNum,
     letterSpacing: -1,
     color: colors.inkPrimary,
     textAlign: 'center',
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   sub: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.labelMuted,
     textAlign: 'center',
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   },
   thumbLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.5,
     color: colors.pearlBase,
   },
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.pearlBase,
     letterSpacing: 0.3,
   },

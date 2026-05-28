@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   },
   sectionEyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   caveat: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     lineHeight: 17,
     color: colors.niebla,
     marginTop: 4,
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 22,
     color: colors.bone,
     letterSpacing: -0.3,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   tagline: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     lineHeight: 15,
     letterSpacing: 0.3,
     color: colors.niebla,

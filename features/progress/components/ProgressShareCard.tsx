@@ -195,12 +195,12 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   brandStar: {
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.magenta,
   },
   brandWord: {
     fontFamily: typography.displayHeavy,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
     letterSpacing: 3,
   },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   chipTextNow: {
-    color: '#FFFFFF',
+    color: colors.leche,
   },
   col: {
     flex: 1,
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   },
   unitMd: {
     fontFamily: typography.displayMedium,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.bone,
   },
   // ── retrato ────────────────────────────────────────────────────────
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     textAlign: 'center',
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
   deltaTag: {
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   deltaTagText: {
     fontFamily: typography.displayHeavy,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.magenta,
     letterSpacing: -0.5,
   },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   unitHuge: {
     fontFamily: typography.displayMedium,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.bone,
   },
   strip: {
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   coach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
     textAlign: 'center',

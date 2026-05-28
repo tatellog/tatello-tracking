@@ -177,12 +177,12 @@ const styles = StyleSheet.create({
   },
   name: {
     fontFamily: typography.displaySemi,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     color: colors.leche,
     letterSpacing: -0.3,
   },
   nameCompact: {
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
   },
   macros: {
     marginTop: 3,
@@ -192,10 +192,10 @@ const styles = StyleSheet.create({
   },
   macrosCompact: {
     marginTop: 1,
-    fontSize: 11.5,
+    fontSize: typography.sizes.caption,
   },
   textOnStamp: {
-    color: '#FFFFFF',
+    color: colors.leche,
   },
   // Quiet ghost circle — neutral ring, magenta glyph; goes solid white
   // only on confirm, against the stamped magenta card.
@@ -216,21 +216,21 @@ const styles = StyleSheet.create({
     borderRadius: CIRCLE_COMPACT / 2,
   },
   circleConfirmed: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
+    backgroundColor: colors.leche,
+    borderColor: colors.leche,
   },
   icon: {
     fontFamily: typography.uiBold,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 20,
     color: colors.magenta,
   },
   iconCompact: {
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 18,
   },
   iconConfirmed: {
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 17,
   },
 })

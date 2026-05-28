@@ -48,13 +48,13 @@ const styles = StyleSheet.create({
   },
   numText: {
     fontFamily: typography.displayHeavy,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.magenta,
   },
   text: {
     flex: 1,
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.leche,
   },

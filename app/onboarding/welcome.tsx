@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.bone,
     textAlign: 'center',

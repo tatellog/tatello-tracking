@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   labelNeutral: {
     flex: 1,
     fontFamily: typography.uiSemi,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     textTransform: 'uppercase',
     letterSpacing: 0.5,

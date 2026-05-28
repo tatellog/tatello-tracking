@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
   },
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   recapEyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
     color: colors.magenta,
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   },
   recapLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     color: colors.niebla,
     flexShrink: 0,
@@ -258,8 +258,8 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.5,
-    color: '#FFFFFF',
+    color: colors.leche,
   },
 })

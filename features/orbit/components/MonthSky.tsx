@@ -129,6 +129,30 @@ const DEEP_STARS: readonly DeepStar[] = Array.from({ length: 80 }, (_, i) => {
   } as DeepStar
 }).filter((s): s is DeepStar => s !== null)
 
+/** Art-only palette for the Mes hero. These colours don't belong in
+ *  `theme/colors.ts` because they're scene-specific (nebula tints,
+ *  star core whites, halo/aura pinks + violets that read against a
+ *  near-black BH). Centralised here so the cosmos has a single
+ *  source of truth and tweaking the mood is a one-block edit. */
+const SKY = {
+  // Nebula radial-gradient clouds painted off the BH axis.
+  nebulaPurple: '#4A1545',
+  nebulaMagenta: '#5C1838',
+  nebulaDark: '#3A0C28',
+  nebulaDeep: '#2C0A1F',
+  // BH plasma rim (used in the radial gradient under the painting).
+  plasmaRim: '#9A3858',
+  // Halo + aura pinks/violets — one row per satellite kind treatment.
+  haloPeach: '#F4ABC8',
+  haloPeachWarm: '#FFCDA8',
+  haloViolet: '#A48BC8',
+  auraPink: '#FBD7E3',
+  auraPale: '#FCE5EE',
+  auraVioletPale: '#C9B5D8',
+  // Bright star / pin core.
+  starCore: '#FFFFFF',
+} as const
+
 /** Off-centre nebula clouds — soft radial gradients painted on
  *  the cosmic backdrop to add atmospheric depth. Each cloud lives
  *  off the BH axis so the cosmos feels asymmetric and lived-in,
@@ -140,10 +164,10 @@ const NEBULA_CLOUDS: readonly {
   color: string
   opacity: number
 }[] = [
-  { cx: 86, cy: 104, r: 130, color: '#4A1545', opacity: 0.28 }, // upper-left purple
-  { cx: 284, cy: 248, r: 142, color: '#5C1838', opacity: 0.3 }, // lower-right magenta
-  { cx: 312, cy: 76, r: 100, color: '#3A0C28', opacity: 0.22 }, // upper-right dark
-  { cx: 60, cy: 290, r: 110, color: '#2C0A1F', opacity: 0.2 }, // lower-left deep
+  { cx: 86, cy: 104, r: 130, color: SKY.nebulaPurple, opacity: 0.28 },
+  { cx: 284, cy: 248, r: 142, color: SKY.nebulaMagenta, opacity: 0.3 },
+  { cx: 312, cy: 76, r: 100, color: SKY.nebulaDark, opacity: 0.22 },
+  { cx: 60, cy: 290, r: 110, color: SKY.nebulaDeep, opacity: 0.2 },
 ]
 
 /** Orbital rings — sparse dotted ellipses sized to orbit AROUND
@@ -207,7 +231,7 @@ function TwinkleStar({ star, clock }: { star: Star; clock: SharedValue<number> }
       cx={star.x}
       cy={star.y}
       r={star.r}
-      fill="#FFFFFF"
+      fill={SKY.starCore}
       animatedProps={animatedProps}
     />
   )
@@ -219,9 +243,9 @@ function TwinkleStar({ star, clock }: { star: Star; clock: SharedValue<number> }
 function NodePoint({ x, y, size }: { x: number; y: number; size: number }) {
   return (
     <G>
-      <Circle cx={x} cy={y} r={3.5 * size} fill="#FBD7E3" opacity={0.25} />
-      <Circle cx={x} cy={y} r={2.2 * size} fill="#FCE5EE" opacity={0.55} />
-      <Circle cx={x} cy={y} r={1.1 * size} fill="#FFFFFF" />
+      <Circle cx={x} cy={y} r={3.5 * size} fill={SKY.auraPink} opacity={0.25} />
+      <Circle cx={x} cy={y} r={2.2 * size} fill={SKY.auraPale} opacity={0.55} />
+      <Circle cx={x} cy={y} r={1.1 * size} fill={SKY.starCore} />
     </G>
   )
 }
@@ -251,34 +275,34 @@ function SatBody({
 }) {
   // Resolve halo colours + tone per kind. Falls back to the
   // generic peach if no kind was specified (mature pattern view).
-  let haloFill = '#F4ABC8'
-  let auraFill = '#FBD7E3'
+  let haloFill: string = SKY.haloPeach
+  let auraFill: string = SKY.auraPink
   let haloOp = 0.14
   let auraOp = 0.16
   switch (kind) {
     case 'peak':
-      haloFill = '#FFCDA8' // warmer peach — high energy
-      auraFill = '#FBD7E3'
+      haloFill = SKY.haloPeachWarm // warmer peach — high energy
+      auraFill = SKY.auraPink
       haloOp = 0.18
       auraOp = 0.2
       break
     case 'valley':
-      haloFill = '#A48BC8' // cool violet — low energy
-      auraFill = '#C9B5D8'
+      haloFill = SKY.haloViolet // cool violet — low energy
+      auraFill = SKY.auraVioletPale
       haloOp = 0.13
       auraOp = 0.14
       break
     case 'stable':
       // default warm — but with an extra solid magenta frame
       // ring added below for the "anchor" feel.
-      haloFill = '#F4ABC8'
-      auraFill = '#FBD7E3'
+      haloFill = SKY.haloPeach
+      auraFill = SKY.auraPink
       haloOp = 0.14
       auraOp = 0.16
       break
     case 'tentative':
-      haloFill = '#FCE5EE' // pale, dashed
-      auraFill = '#FBD7E3'
+      haloFill = SKY.auraPale // pale, dashed
+      auraFill = SKY.auraPink
       haloOp = 0.32
       auraOp = 0.12
       break
@@ -380,18 +404,18 @@ function PatternSymbol({ kind, size }: { kind: SatelliteKind | undefined; size: 
         // 4-pointed sparkle — bright high-energy emblem
         <Path
           d="M 12 2 L 13.4 10.6 L 22 12 L 13.4 13.4 L 12 22 L 10.6 13.4 L 2 12 L 10.6 10.6 Z"
-          fill="#FFCDA8"
+          fill={SKY.haloPeachWarm}
         />
       ) : null}
       {kind === 'valley' ? (
         // Crescent — dip / low-energy emblem
-        <Path d="M 16.5 6 A 7.5 7.5 0 1 0 16.5 18 A 6 6 0 1 1 16.5 6 Z" fill="#A48BC8" />
+        <Path d="M 16.5 6 A 7.5 7.5 0 1 0 16.5 18 A 6 6 0 1 1 16.5 6 Z" fill={SKY.haloViolet} />
       ) : null}
       {kind === 'stable' ? (
         // Solid disc + ring — anchor / steady emblem
         <G>
-          <Circle cx="12" cy="12" r="7.5" fill="none" stroke="#F4ABC8" strokeWidth="1.6" />
-          <Circle cx="12" cy="12" r="3.4" fill="#F4ABC8" />
+          <Circle cx="12" cy="12" r="7.5" fill="none" stroke={SKY.haloPeach} strokeWidth="1.6" />
+          <Circle cx="12" cy="12" r="3.4" fill={SKY.haloPeach} />
         </G>
       ) : null}
       {kind === 'tentative' ? (
@@ -402,12 +426,12 @@ function PatternSymbol({ kind, size }: { kind: SatelliteKind | undefined; size: 
             cy="12"
             r="7.5"
             fill="none"
-            stroke="#FCE5EE"
+            stroke={SKY.auraPale}
             strokeWidth="1.2"
             strokeDasharray="2 2.4"
             strokeLinecap="round"
           />
-          <Circle cx="12" cy="12" r="1.6" fill="#FCE5EE" />
+          <Circle cx="12" cy="12" r="1.6" fill={SKY.auraPale} />
         </G>
       ) : null}
     </Svg>
@@ -510,8 +534,8 @@ function IgnitionFlare({
   const rayLen = 28 * size
   return (
     <G>
-      <AnimatedCircle cx={x} cy={y} fill="#FFCDA8" animatedProps={bloomProps} />
-      <AnimatedCircle cx={x} cy={y} fill="#FCE5EE" animatedProps={glowProps} />
+      <AnimatedCircle cx={x} cy={y} fill={SKY.haloPeachWarm} animatedProps={bloomProps} />
+      <AnimatedCircle cx={x} cy={y} fill={SKY.auraPale} animatedProps={glowProps} />
       <AnimatedG animatedProps={rayGroupProps}>
         {/* Horizontal — longest ray (Genshin's signature). */}
         <Line
@@ -519,7 +543,7 @@ function IgnitionFlare({
           y1={y}
           x2={x + rayLen}
           y2={y}
-          stroke="#FFFFFF"
+          stroke={SKY.starCore}
           strokeWidth={0.55}
           strokeOpacity={0.85}
           strokeLinecap="round"
@@ -530,7 +554,7 @@ function IgnitionFlare({
           y1={y - rayLen * 0.85}
           x2={x}
           y2={y + rayLen * 0.85}
-          stroke="#FFFFFF"
+          stroke={SKY.starCore}
           strokeWidth={0.5}
           strokeOpacity={0.8}
           strokeLinecap="round"
@@ -541,7 +565,7 @@ function IgnitionFlare({
           y1={y - rayLen * 0.6}
           x2={x + rayLen * 0.6}
           y2={y + rayLen * 0.6}
-          stroke="#FCE5EE"
+          stroke={SKY.auraPale}
           strokeWidth={0.35}
           strokeOpacity={0.55}
           strokeLinecap="round"
@@ -551,13 +575,13 @@ function IgnitionFlare({
           y1={y - rayLen * 0.6}
           x2={x - rayLen * 0.6}
           y2={y + rayLen * 0.6}
-          stroke="#FCE5EE"
+          stroke={SKY.auraPale}
           strokeWidth={0.35}
           strokeOpacity={0.55}
           strokeLinecap="round"
         />
       </AnimatedG>
-      <AnimatedCircle cx={x} cy={y} fill="#FFFFFF" animatedProps={coreProps} />
+      <AnimatedCircle cx={x} cy={y} fill={SKY.starCore} animatedProps={coreProps} />
     </G>
   )
 }
@@ -740,7 +764,7 @@ const annotationStyles = StyleSheet.create({
   },
   eyebrowText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.magenta,
@@ -948,9 +972,9 @@ export function MonthSky({
           {/* Warm BH aura — a wider magenta-peach glow that pushes
               outward from the void to suggest atmospheric depth. */}
           <RadialGradient id="bh-aura" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#9A3858" stopOpacity={0.32} />
-            <Stop offset="55%" stopColor="#5C1838" stopOpacity={0.12} />
-            <Stop offset="100%" stopColor="#3A0C28" stopOpacity={0} />
+            <Stop offset="0%" stopColor={SKY.plasmaRim} stopOpacity={0.32} />
+            <Stop offset="55%" stopColor={SKY.nebulaMagenta} stopOpacity={0.12} />
+            <Stop offset="100%" stopColor={SKY.nebulaDark} stopOpacity={0} />
           </RadialGradient>
           {/* Nebula cloud gradients — one per cloud. Each is a
               soft radial fade from the cloud's tint at the centre
@@ -967,7 +991,7 @@ export function MonthSky({
         {/* DEPTH LAYER A — distant starfield. Tiny, dim, static.
             Pushes the visual horizon further away. */}
         {DEEP_STARS.map((s, i) => (
-          <Circle key={`ds-${i}`} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.op} />
+          <Circle key={`ds-${i}`} cx={s.x} cy={s.y} r={s.r} fill={colors.leche} opacity={s.op} />
         ))}
 
         {/* DEPTH LAYER B — off-centre nebula clouds. Each is a
@@ -1044,7 +1068,7 @@ export function MonthSky({
               rx={o.rx}
               ry={o.ry}
               fill="none"
-              stroke="#FCE5EE"
+              stroke={SKY.auraPale}
               strokeWidth={o.strokeWidth}
               strokeDasharray={o.dash}
               strokeLinecap="round"
@@ -1105,7 +1129,7 @@ export function MonthSky({
                 fontFamily={typography.uiBold}
                 fontSize={10}
                 letterSpacing={1.2}
-                fill={sat.selected ? colors.magenta : '#F4ECDE'}
+                fill={sat.selected ? colors.magenta : colors.leche}
                 opacity={sat.selected ? 1 : sat.kind === 'tentative' ? 0.55 : 0.85}
               >
                 {sat.label}

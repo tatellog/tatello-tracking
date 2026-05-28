@@ -135,14 +135,14 @@ const styles = StyleSheet.create({
   },
   segText: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     letterSpacing: 0.3,
   },
   // Editorial voice — serif italic, evidence not guilt.
   restMessage: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 20,
     color: colors.bone,
     marginTop: 10,

@@ -94,14 +94,14 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.leche,
     letterSpacing: 0.6,
   },
   subtitle: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     marginTop: 2,
   },
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   signLabel: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: 0.6,
     marginBottom: 6,

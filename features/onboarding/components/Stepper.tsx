@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   },
   btnGlyph: {
     fontFamily: typography.displaySemi,
-    fontSize: 28,
+    fontSize: typography.sizes.deltaNum,
     color: colors.leche,
     lineHeight: 32,
     includeFontPadding: false,
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   unit: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.magenta,
   },
 })

@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   },
   checkText: {
     fontFamily: typography.uiSemi,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.pearlBase,
   },
 })

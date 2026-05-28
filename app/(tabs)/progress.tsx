@@ -545,12 +545,12 @@ const styles = StyleSheet.create({
   deltaRange: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   deltaStrong: {
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
   },
   // Stadium pill — mirrors the quick-log meal-slot selector.
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   },
   periodLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
     // Tight tracking now that the labels are words ("30 días"), not
     // 2–3-char codes — wide tracking would overflow the segment.
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   },
   chartCaption: {
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
     letterSpacing: 0.3,
     marginBottom: 6,
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
   },
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
   },
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   chartEmptyText: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
     textAlign: 'center',

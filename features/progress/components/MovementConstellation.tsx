@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   weekdayLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     color: colors.niebla,
     letterSpacing: 1.4,
     width: CELL,
@@ -219,14 +219,14 @@ const styles = StyleSheet.create({
   },
   footerNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.leche,
     letterSpacing: -0.4,
   },
   footerLabel: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
 })

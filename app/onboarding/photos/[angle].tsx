@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiSemi,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.labelMuted,
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.display,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     letterSpacing: -0.6,
     color: colors.inkPrimary,
   },
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   instruction: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.labelMuted,
     lineHeight: 17,
   },
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   webCameraText: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: 'rgba(255,255,255,0.7)',
     paddingHorizontal: 24,
     textAlign: 'center',
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   rotationHint: {
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 0.4,
     color: 'rgba(255,255,255,0.95)',
   },
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     bottom: 14,
     alignSelf: 'center',
     fontFamily: typography.uiMedium,
-    fontSize: 11.5,
+    fontSize: typography.sizes.caption,
     letterSpacing: 0.3,
     color: 'rgba(255,255,255,0.85)',
     paddingHorizontal: 10,
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   uploadOverlayText: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.pearlBase,
     letterSpacing: 0.3,
   },
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 6,
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.feedbackError,
     textAlign: 'center',
   },
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.labelMuted,
   },
   metaNum: {
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   },
   footerLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.labelMuted,
     letterSpacing: 0.2,
   },
@@ -538,14 +538,14 @@ const styles = StyleSheet.create({
   },
   permTitle: {
     fontFamily: typography.display,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     letterSpacing: -0.6,
     color: colors.inkPrimary,
     textAlign: 'center',
   },
   permBody: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.labelMuted,
     textAlign: 'center',
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   },
   permCtaLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.pearlBase,
     letterSpacing: 0.3,
   },

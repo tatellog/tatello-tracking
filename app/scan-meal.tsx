@@ -862,7 +862,7 @@ const styles = StyleSheet.create({
   },
   scanBadgeText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
@@ -906,7 +906,7 @@ const styles = StyleSheet.create({
   },
   photoChipText: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.leche,
     letterSpacing: 0.3,
   },
@@ -925,13 +925,13 @@ const styles = StyleSheet.create({
   },
   photoPlaceholderText: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.magenta,
     letterSpacing: 0.3,
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
   },
   slotSegText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.4,
   },
   row: {
@@ -1004,7 +1004,7 @@ const styles = StyleSheet.create({
   },
   ingName: {
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
     letterSpacing: -0.2,
     padding: 0,
@@ -1012,7 +1012,7 @@ const styles = StyleSheet.create({
   ingMacros: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   gramsBox: {
@@ -1030,14 +1030,14 @@ const styles = StyleSheet.create({
   gramsInput: {
     flex: 1,
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
     textAlign: 'right',
     padding: 0,
   },
   gramsUnit: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   removeBtn: {
@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
   macroLabel: {
     flex: 1,
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
     letterSpacing: -0.2,
   },
@@ -1070,7 +1070,7 @@ const styles = StyleSheet.create({
   },
   addBtnText: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.magenta,
     letterSpacing: 0.3,
   },
@@ -1089,19 +1089,19 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
   },
   totalValue: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.bone,
   },
   totalNum: {
     fontFamily: typography.displaySemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
   },
 })

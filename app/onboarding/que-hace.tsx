@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.bone,
     maxWidth: 320,
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
   tileLabel: {
     position: 'absolute',
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 2,
     color: colors.magenta,
   },

@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   },
   weekHint: {
     fontFamily: typography.ui,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     marginTop: -4,
     marginBottom: 4,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   tomorrowHint: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
     textAlign: 'center',
     marginTop: 4,

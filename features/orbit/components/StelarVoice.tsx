@@ -107,14 +107,14 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.magenta,
   },
   scope: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   // The right-side tag — a quiet context like "Cierre de semana".
   tag: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     lineHeight: 25,
     color: colors.bone,
   },
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   strong: {
     fontFamily: typography.uiBold,
     fontStyle: 'normal',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
   },
   signatureBlock: {
@@ -169,12 +169,12 @@ const styles = StyleSheet.create({
   sigStelar: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.magenta,
   },
   sigMeta: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.niebla,

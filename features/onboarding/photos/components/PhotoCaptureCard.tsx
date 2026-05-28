@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiSemi,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.mauveDeep,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displayMedium,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     letterSpacing: -0.5,
     color: colors.inkPrimary,
     marginBottom: 6,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   sub: {
     fontFamily: typography.ui,
-    fontSize: 11.5,
+    fontSize: typography.sizes.caption,
     lineHeight: 17,
     color: colors.labelMuted,
     marginBottom: 12,
@@ -296,12 +296,12 @@ const styles = StyleSheet.create({
   },
   slotPlus: {
     fontFamily: typography.display,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.mauveDeep,
   },
   slotLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.4,
     color: colors.labelMuted,
   },
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   },
   checkBadgeText: {
     fontFamily: typography.uiSemi,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.pearlBase,
   },
   cta: {

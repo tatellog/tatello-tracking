@@ -143,7 +143,7 @@ function WebDateInput({
     onChange: (e: { target: { value: string } }) => onChange(e.target.value),
     style: {
       fontFamily: typography.uiBold,
-      fontSize: 22,
+      fontSize: typography.sizes.segmentTitle,
       letterSpacing: -0.5,
       color: colors.leche,
       backgroundColor: 'transparent',
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 2.2,
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontFamily: typography.uiBold,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.leche,
     letterSpacing: -0.5,
   },

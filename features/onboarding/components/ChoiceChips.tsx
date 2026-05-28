@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.bone,
   },
   labelSelected: {

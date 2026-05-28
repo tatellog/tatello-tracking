@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   phase: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 24,
     color: colors.bone,
     textAlign: 'center',

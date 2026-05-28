@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   headline: {
     marginTop: 8,
     fontFamily: typography.displayHeavy,
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     lineHeight: 36,
     color: colors.leche,
     letterSpacing: -1,
@@ -584,14 +584,14 @@ const styles = StyleSheet.create({
   headlineEm: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     color: colors.magenta,
   },
   body: {
     marginTop: 14,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.bone,
   },
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   metaTitle: {
     marginTop: 20,
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 2.2,
   },

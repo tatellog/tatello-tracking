@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   },
   eyebrowMuted: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   vozFuture: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 20,
     color: colors.bone,
   },
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 26,
     color: colors.leche,
   },
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
     color: colors.magenta,

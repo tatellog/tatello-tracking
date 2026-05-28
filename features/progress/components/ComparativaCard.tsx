@@ -353,13 +353,13 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     color: colors.niebla,
   },
   headerRight: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     color: colors.magenta,
   },
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   rowLabelEmpty: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
@@ -411,18 +411,18 @@ const styles = StyleSheet.create({
   },
   rowPast: {
     fontFamily: typography.uiMedium,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: -0.1,
   },
   rowArrow: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.magenta,
   },
   rowNow: {
     fontFamily: typography.displaySemi,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     color: colors.leche,
     letterSpacing: -0.3,
   },
@@ -432,14 +432,14 @@ const styles = StyleSheet.create({
   rowDelta: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.magenta,
     marginLeft: 'auto',
   },
   rowDeltaHighlight: {
     fontFamily: typography.displayHeavy,
     fontStyle: 'normal',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     letterSpacing: -0.2,
   },
   // Invitation row body — quieter than a filled row so empty rows
@@ -447,14 +447,14 @@ const styles = StyleSheet.create({
   emptyHint: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     opacity: 0.7,
     flex: 1,
   },
   emptyChevron: {
     fontFamily: typography.uiMedium,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.niebla,
     lineHeight: 22,
     marginLeft: 'auto',

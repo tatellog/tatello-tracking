@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontFamily: typography.displayHeavy,
-    fontSize: 28,
+    fontSize: typography.sizes.deltaNum,
     color: colors.leche,
     letterSpacing: -1.2,
     lineHeight: 30,
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.bone,
     letterSpacing: 2,
     textTransform: 'uppercase',

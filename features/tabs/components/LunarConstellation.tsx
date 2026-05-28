@@ -3775,7 +3775,7 @@ const styles = StyleSheet.create({
     // visual hero. The constellation IS the progress now; the
     // number is a literal-data complement, not a separate focal.
     fontFamily: typography.displaySemi,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     color: colors.leche,
     letterSpacing: -0.6,
     textAlign: 'center',
@@ -3790,7 +3790,7 @@ const styles = StyleSheet.create({
   numberDenominator: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
     letterSpacing: 1.0,
     marginLeft: 6,
@@ -3819,7 +3819,7 @@ const styles = StyleSheet.create({
   urgencyHint: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.magenta,
     letterSpacing: 0.6,
     marginTop: 2,
@@ -3837,7 +3837,7 @@ const styles = StyleSheet.create({
   plusOneText: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.magenta,
     textShadowColor: 'rgba(233,30,99,0.5)',
     textShadowOffset: { width: 0, height: 0 },

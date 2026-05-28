@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   unit: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.magenta,
     letterSpacing: -0.3,
   },
