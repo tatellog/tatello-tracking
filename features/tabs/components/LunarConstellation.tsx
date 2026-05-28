@@ -16,18 +16,16 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Ellipse, G, Line, Path, Rect } from 'react-native-svg'
+import Svg, { G, Rect } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 import { ZODIAC } from '../zodiac/data'
-import type { ZodiacDef } from '../zodiac/types'
 
 import { ZodiacEngraving } from './ZodiacEngraving'
 import {
   AnimatedBlurView,
   AnimatedCircle,
-  AnimatedG,
   AnimatedLine,
   AnimatedTextInput,
 } from './constellation/animation/animated-components'
@@ -40,34 +38,28 @@ import {
   StarWinks,
 } from './constellation/rendering/ambient'
 import { FieldStars } from './constellation/rendering/field'
-import { BaseLayer, HeroGlow } from './constellation/rendering/figure-base'
+import { BaseLayer } from './constellation/rendering/figure-base'
+import { IgnitingOverlay } from './constellation/rendering/ignition'
 import { LitClusterAura, LitClusterMotes } from './constellation/rendering/lit-cluster'
 import { LitLines } from './constellation/rendering/lit-lines'
 import { StarsLayer } from './constellation/rendering/lit-stars'
 import { CanvasSkeleton } from './constellation/rendering/skeleton'
-import { AmbientGlow, StarSparkle, SvgGradients } from './constellation/rendering/static'
+import { AmbientGlow, SvgGradients } from './constellation/rendering/static'
 import {
   H,
-  HERO_MAG,
   IGNITE_LINE_MS,
   IGNITE_STAR_MS,
   NUMBER_COUNTUP_MS,
   PAD,
   PARTICLE_BASE,
   PARTICLE_REACH,
-  SPARK_BASE,
   TARGET_DAYS,
   W,
 } from './constellation/constants'
 import { SIGN_CONSTELLATION_TRANSFORM, SIGN_ENGRAVINGS } from './constellation/data/sign-maps'
 import { deriveProgress } from './constellation/data/derive-progress'
-import { BURST_ANGLES, SPARK_HUES } from './constellation/data/scatter'
-import {
-  burstHash,
-  fourPointStarPath,
-  recencyHaloMultiplier,
-  starRadius,
-} from './constellation/geometry'
+import { SPARK_HUES } from './constellation/data/scatter'
+import { burstHash } from './constellation/geometry'
 import type { Props, Resolved, SequenceEl } from './constellation/types'
 
 export function LunarConstellation({
@@ -864,295 +856,6 @@ function CenterNumberOverlay({
         <Text style={styles.plusOneText}>+1</Text>
       </Animated.View>
     </View>
-  )
-}
-
-/* ─ Igniting overlay (one-shot flashes on top) ─────────────────────
- *
- * Renders the single element currently being ignited:
- *   • star → 1 → 2.5× scale flash with overshoot, plus an emanating
- *     ring that fades as it expands.
- *   • line → SVG stroke-trace via animated strokeDashoffset.
- *
- * After the timer expires upstream, `ignitingKey` clears and the
- * regular StarsLayer / LitLines render the element in its settled
- * state, so the visual hand-off is invisible.
- */
-function IgnitingOverlay({
-  zodiac,
-  stars,
-  ignitingKey,
-  igniteT,
-}: {
-  zodiac: ZodiacDef
-  stars: Resolved[]
-  ignitingKey: string | null
-  igniteT: SharedValue<number>
-}) {
-  if (!ignitingKey) return null
-  const [kind, idxStr] = ignitingKey.split('-')
-  const idx = Number(idxStr)
-  if (kind === 'star') {
-    const s = stars[idx]
-    if (!s) return null
-    return <IgnitingStar s={s} igniteT={igniteT} />
-  }
-  if (kind === 'line') {
-    const ln = zodiac.lines[idx]
-    if (!ln) return null
-    const A = stars[ln[0]]
-    const B = stars[ln[1]]
-    if (!A || !B) return null
-    return <IgnitingLine A={A} B={B} igniteT={igniteT} />
-  }
-  return null
-}
-
-function IgnitingStar({ s, igniteT }: { s: Resolved; igniteT: SharedValue<number> }) {
-  const baseR = starRadius(s.mag) + 0.5
-
-  // Three-phase scale: grow 1→2.5 (0..0.3), hold (0.3..0.5), settle
-  // 2.5→1 (0.5..1). Applied via SVG transform on the wrapping G so
-  // we only set a single string per frame, no path recompute.
-  const starProps = useAnimatedProps(() => {
-    'worklet'
-    const u = igniteT.value
-    let scale = 1
-    if (u < 0.3) {
-      scale = 1 + (1.5 * u) / 0.3
-    } else if (u < 0.5) {
-      scale = 2.5
-    } else {
-      scale = 1 + 1.5 * (1 - (u - 0.5) / 0.5)
-    }
-    return {
-      transform: [
-        { translateX: s.x },
-        { translateY: s.y },
-        { scale },
-        { translateX: -s.x },
-        { translateY: -s.y },
-      ],
-    }
-  })
-
-  // Emanating ring: grows faster than the star and fades out by ~0.7
-  // of the animation so it doesn't compete with the settled state.
-  const ringProps = useAnimatedProps(() => {
-    'worklet'
-    const u = Math.min(1, igniteT.value * 1.5)
-    return {
-      r: baseR + u * baseR * 4,
-      opacity: 0.6 * (1 - u),
-    }
-  })
-
-  // White-hot flash — a brief overexposed disc that peaks ~u=0.18
-  // and fades by u=0.6. Reads as the camera/eye being momentarily
-  // overwhelmed by the ignition. Quadratic envelope so the rise
-  // and fall both feel snappy.
-  const flashProps = useAnimatedProps(() => {
-    'worklet'
-    const u = igniteT.value
-    const env = Math.max(0, 1 - Math.abs(u - 0.18) / 0.42)
-    return {
-      r: baseR * (1 + u * 3),
-      opacity: env * env * 0.85,
-    }
-  })
-
-  // Diffraction cross spike — grows from 0 to full during 0..0.35,
-  // then fades by 0.8. The big anamorphic moment of the ignition.
-  const spikeProps = useAnimatedProps(() => {
-    'worklet'
-    const u = igniteT.value
-    const grow = Math.min(1, u / 0.35)
-    const fade = u < 0.55 ? 1 : Math.max(0, 1 - (u - 0.55) / 0.45)
-    return {
-      opacity: grow * fade * 0.95,
-      transform: [
-        { translateX: s.x },
-        { translateY: s.y },
-        { scale: grow * (1 + u * 0.6) },
-        { translateX: -s.x },
-        { translateY: -s.y },
-      ],
-    }
-  })
-
-  const spikeLen = baseR * 9
-
-  return (
-    <G>
-      {/* Emanating shockwave ring */}
-      <AnimatedCircle
-        cx={s.x}
-        cy={s.y}
-        r={baseR}
-        fill="none"
-        stroke="rgba(255,246,229,0.85)"
-        strokeWidth={0.8}
-        animatedProps={ringProps}
-      />
-      {/* White-hot flash — overexposed disc at the moment of impact. */}
-      <AnimatedCircle cx={s.x} cy={s.y} r={baseR} fill="#FFFFFF" animatedProps={flashProps} />
-      {/* Diffraction cross — H + V + 2 diagonal rays grow out of the
-          centre as the star ignites. The dramatic Genshin "moment of
-          ignition" anamorphic flare. */}
-      <AnimatedG animatedProps={spikeProps}>
-        <Line
-          x1={s.x - spikeLen}
-          y1={s.y}
-          x2={s.x + spikeLen}
-          y2={s.y}
-          stroke="#FFF1F6"
-          strokeWidth={1.1}
-          strokeLinecap="round"
-        />
-        <Line
-          x1={s.x}
-          y1={s.y - spikeLen * 0.85}
-          x2={s.x}
-          y2={s.y + spikeLen * 0.85}
-          stroke="#FFF1F6"
-          strokeWidth={0.9}
-          strokeLinecap="round"
-          opacity={0.85}
-        />
-        <Line
-          x1={s.x - spikeLen * 0.55}
-          y1={s.y - spikeLen * 0.55}
-          x2={s.x + spikeLen * 0.55}
-          y2={s.y + spikeLen * 0.55}
-          stroke="#FFF1F6"
-          strokeWidth={0.6}
-          strokeLinecap="round"
-          opacity={0.55}
-        />
-        <Line
-          x1={s.x - spikeLen * 0.55}
-          y1={s.y + spikeLen * 0.55}
-          x2={s.x + spikeLen * 0.55}
-          y2={s.y - spikeLen * 0.55}
-          stroke="#FFF1F6"
-          strokeWidth={0.6}
-          strokeLinecap="round"
-          opacity={0.55}
-        />
-      </AnimatedG>
-      {/* Spark particles — 8 small cream dots that fly outward from
-          the centre and fade. Each is independent (own worklet) so
-          their motion stays per-particle smooth. */}
-      {BURST_ANGLES.map((deg) => (
-        <BurstSpark
-          key={`bs-${deg}`}
-          cx={s.x}
-          cy={s.y}
-          angle={(deg * Math.PI) / 180}
-          distance={baseR * 7}
-          igniteT={igniteT}
-        />
-      ))}
-      <AnimatedG animatedProps={starProps}>
-        <Path d={fourPointStarPath(s.x, s.y, baseR)} fill="url(#starLit)" />
-      </AnimatedG>
-    </G>
-  )
-}
-
-/*
- * A single spark particle for the ignition burst. Flies outward
- * from (cx, cy) along `angle` to `distance`, fading opacity 1 → 0
- * over the igniteT cycle. Cubic ease on position so the spark
- * decelerates as it travels (organic, not constant-velocity).
- */
-function BurstSpark({
-  cx,
-  cy,
-  angle,
-  distance,
-  igniteT,
-}: {
-  cx: number
-  cy: number
-  angle: number
-  distance: number
-  igniteT: SharedValue<number>
-}) {
-  const cosA = Math.cos(angle)
-  const sinA = Math.sin(angle)
-  const animatedProps = useAnimatedProps(() => {
-    'worklet'
-    const u = igniteT.value
-    // Cubic ease-out: 1 - (1-u)^3 — fast start, slow at the end.
-    const eased = 1 - (1 - u) * (1 - u) * (1 - u)
-    const d = eased * distance
-    return {
-      cx: cx + cosA * d,
-      cy: cy + sinA * d,
-      opacity: (1 - u) * 0.9,
-    }
-  })
-  return <AnimatedCircle r={1.1} fill="#FFF1F6" animatedProps={animatedProps} />
-}
-
-function IgnitingLine({
-  A,
-  B,
-  igniteT,
-}: {
-  A: Resolved
-  B: Resolved
-  igniteT: SharedValue<number>
-}) {
-  const length = useMemo(() => Math.hypot(B.x - A.x, B.y - A.y), [A, B])
-
-  // strokeDasharray = full length; strokeDashoffset drops from L to 0
-  // so the visible segment slides into view, drawing the line A→B
-  // over the animation. Two layered strokes: a wide warm-gold bloom
-  // underneath and a bright white-cream spine on top, so the path
-  // reads as a luminous brushstroke being painted across the sky.
-  const drawProps = useAnimatedProps(() => {
-    'worklet'
-    return { strokeDashoffset: length * (1 - igniteT.value) }
-  })
-  // Bright head — concentrated at the leading edge of the draw so
-  // the eye sees a comet-like tip painting the line on.
-  const headProps = useAnimatedProps(() => {
-    'worklet'
-    const u = igniteT.value
-    return {
-      strokeDashoffset: length * (1 - u),
-      opacity: u < 0.85 ? 1 : 1 - (u - 0.85) / 0.15,
-    }
-  })
-
-  return (
-    <G>
-      <AnimatedLine
-        x1={A.x}
-        y1={A.y}
-        x2={B.x}
-        y2={B.y}
-        stroke="#D9AE6F"
-        strokeOpacity={0.7}
-        strokeWidth={6}
-        strokeLinecap="round"
-        strokeDasharray={`${length} ${length}`}
-        animatedProps={drawProps}
-      />
-      <AnimatedLine
-        x1={A.x}
-        y1={A.y}
-        x2={B.x}
-        y2={B.y}
-        stroke="#FFFFFF"
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        strokeDasharray={`6 ${length}`}
-        animatedProps={headProps}
-      />
-    </G>
   )
 }
 
