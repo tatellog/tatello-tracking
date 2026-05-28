@@ -17,6 +17,7 @@
     "seed:real": "tsx scripts/seed-real-data.ts",
     "check:rls": "tsx scripts/check-rls.ts",
     "report:beta": "tsx scripts/beta-report.ts",
+    "report:feedback": "tsx scripts/beta-feedback-report.ts",
     "prepare": "husky"
   },
   "lint-staged": {

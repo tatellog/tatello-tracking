@@ -7,6 +7,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
 import { track } from '@/lib/analytics'
@@ -75,6 +76,7 @@ function SettingsBody() {
       track('tab_changed', { tab: 'ajustes' })
     }, []),
   )
+  const [feedbackVisible, setFeedbackVisible] = useState(false)
   const router = useRouter()
   const qc = useQueryClient()
   const choose = useConfirm()
@@ -296,6 +298,24 @@ function SettingsBody() {
               <Text style={styles.privacyStrong}>Tus datos son tuyos.</Text> Viven en tu cuenta y
               nadie más los lee.
             </Text>
+            {profile?.is_beta ? (
+              <Pressable
+                onPress={() => setFeedbackVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Danos tu feedback"
+                style={({ pressed }) => [styles.feedbackCard, pressed && styles.rowPressed]}
+              >
+                <View style={styles.feedbackGlyph}>
+                  <Text style={styles.feedbackGlyphText}>✦</Text>
+                </View>
+                <Text style={styles.feedbackLabel}>Danos tu feedback</Text>
+                <Text style={styles.feedbackHint}>Lo que sea · lo leemos</Text>
+              </Pressable>
+            ) : null}
+            <BetaFeedbackSheet
+              visible={feedbackVisible}
+              onClose={() => setFeedbackVisible(false)}
+            />
             <Pressable
               onPress={handleSignOut}
               disabled={signingOut}
@@ -604,6 +624,67 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // ── Cuenta ─────────────────────────────────────────────────────
+  // Beta-only entry — centered card with the ✦ glyph as its emblem.
+  // The card reads as a small invitation ("we want your feedback"),
+  // not as a generic settings list row. Magenta-deep border +
+  // magentaTint wash signal it's the only "special" row in the
+  // page; faint enough to not shout against the dark page bg.
+  feedbackCard: {
+    marginTop: 18,
+    marginBottom: 18,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.magentaDeep,
+    backgroundColor: colors.magentaTint,
+    alignItems: 'center',
+    // Pressable can shrink-to-content under some parent layouts —
+    // stretching to fill the column guarantees the centered
+    // children actually have a centered axis to land on.
+    alignSelf: 'stretch',
+  },
+  feedbackGlyph: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.magenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Belt + suspenders — make this child explicitly self-centre
+    // so it can never end up flush-left, regardless of the
+    // parent's alignItems being honoured.
+    alignSelf: 'center',
+    marginBottom: 12,
+    shadowColor: colors.magenta,
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  feedbackGlyphText: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.magentaHot,
+    lineHeight: typography.sizes.segmentTitle,
+  },
+  feedbackLabel: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.title,
+    color: colors.leche,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  feedbackHint: {
+    marginTop: 4,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    textAlign: 'center',
+  },
   signOut: {
     backgroundColor: colors.bgCard,
     borderRadius: 14,

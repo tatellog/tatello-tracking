@@ -5,6 +5,7 @@ import FoodIcon from '@/assets/icons/food-vect.svg'
 import OrbitIcon from '@/assets/icons/orbit-vect.svg'
 import ProgressIcon from '@/assets/icons/progress-vect.svg'
 import TodayIcon from '@/assets/icons/today-vect.svg'
+import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
 import { AppTabBar } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
@@ -78,54 +79,57 @@ function TabIcon({
 // AppTabBar skips its route.
 export default function TabsLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <AppTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Hoy',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Component={TodayIcon} color={color} size={size} focused={focused} bold />
-          ),
+    <View style={{ flex: 1 }}>
+      <Tabs
+        tabBar={(props) => <AppTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
         }}
-      />
-      <Tabs.Screen
-        name="meals"
-        options={{
-          title: 'Comidas',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Component={FoodIcon} color={color} size={size} focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          title: 'Progreso',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Component={ProgressIcon} color={color} size={size} focused={focused} bold />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="orbit"
-        options={{
-          title: 'Órbita',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Component={OrbitIcon} color={color} size={size} focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Ajustes',
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Hoy',
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon Component={TodayIcon} color={color} size={size} focused={focused} bold />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="meals"
+          options={{
+            title: 'Comidas',
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon Component={FoodIcon} color={color} size={size} focused={focused} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="progress"
+          options={{
+            title: 'Progreso',
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon Component={ProgressIcon} color={color} size={size} focused={focused} bold />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="orbit"
+          options={{
+            title: 'Órbita',
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon Component={OrbitIcon} color={color} size={size} focused={focused} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: 'Ajustes',
+          }}
+        />
+      </Tabs>
+      <BetaFeedbackButton />
+    </View>
   )
 }

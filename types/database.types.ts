@@ -57,6 +57,30 @@ export type Database = {
         }
         Relationships: []
       }
+      beta_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          screen: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          screen?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          screen?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       body_measurements: {
         Row: {
           arm_cm: number | null

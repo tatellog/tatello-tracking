@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "STELAR",
+    "name": "Stelar",
     "slug": "tracking-app",
     "scheme": "stelar",
     "version": "1.0.0",
@@ -11,11 +11,11 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F3F0EB",
+      "backgroundColor": "#0A0608",
       "dark": {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#0B1E1A"
+        "backgroundColor": "#0A0608"
       }
     },
     "ios": {
@@ -29,7 +29,7 @@
       "package": "com.tatello.stelar",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F3F0EB"
+        "backgroundColor": "#0A0608"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -47,7 +47,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permite a STELAR usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
+          "cameraPermission": "Permite a Stelar usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
         }
       ],
       "expo-web-browser"
