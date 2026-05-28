@@ -7,6 +7,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { BriefContext } from '@/features/brief/api'
 import { Day1Celebration, HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
@@ -78,6 +79,14 @@ function dayNumOf(iso: string): number {
 }
 
 export default function TodayScreen() {
+  return (
+    <ErrorBoundary screen="hoy">
+      <TodayBody />
+    </ErrorBoundary>
+  )
+}
+
+function TodayBody() {
   const brief = useHomeBrief()
   const cadence = useHomeCadence()
   // Profile is also gated here (used to be inside TodayContent).

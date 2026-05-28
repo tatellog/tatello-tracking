@@ -150,6 +150,33 @@ export type Database = {
         }
         Relationships: []
       }
+      error_logs: {
+        Row: {
+          created_at: string
+          error_message: string
+          id: string
+          screen: string | null
+          stack: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message: string
+          id?: string
+          screen?: string | null
+          stack?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string
+          id?: string
+          screen?: string | null
+          stack?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       macro_targets: {
         Row: {
           calories: number
@@ -519,6 +546,14 @@ export type Database = {
       }
     }
     Functions: {
+      check_rls_status: {
+        Args: never
+        Returns: {
+          policy_count: number
+          rls_enabled: boolean
+          table_name: string
+        }[]
+      }
       get_brief_context: {
         Args: { p_date?: string; p_user_id?: string }
         Returns: Json

@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useProfile } from '@/features/profile/hooks'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
@@ -134,21 +135,23 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PersistQueryClientProvider
-        client={queryClient}
-        persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
-      >
-        <SafeAreaProvider>
-          <ConfirmProvider>
-            <RouteGuard />
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* Slide-up sheet for logging a measurement. Other routes
-                  inherit the default fullscreen push. */}
-              <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
-            </Stack>
-          </ConfirmProvider>
-        </SafeAreaProvider>
-      </PersistQueryClientProvider>
+      <ErrorBoundary screen="root">
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
+        >
+          <SafeAreaProvider>
+            <ConfirmProvider>
+              <RouteGuard />
+              <Stack screenOptions={{ headerShown: false }}>
+                {/* Slide-up sheet for logging a measurement. Other routes
+                    inherit the default fullscreen push. */}
+                <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
+              </Stack>
+            </ConfirmProvider>
+          </SafeAreaProvider>
+        </PersistQueryClientProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   )
 }

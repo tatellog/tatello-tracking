@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
@@ -57,6 +58,14 @@ function skyCopy(mealCount: number, phase: CyclePhase | null): SkyCopy {
 }
 
 export default function MealsScreen() {
+  return (
+    <ErrorBoundary screen="comidas">
+      <MealsBody />
+    </ErrorBoundary>
+  )
+}
+
+function MealsBody() {
   const router = useRouter()
   const today = useMemo(() => todayInTimezone(), [])
   const mealsQuery = useMealsForDate(today)

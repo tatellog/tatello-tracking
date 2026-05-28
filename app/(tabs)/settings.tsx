@@ -7,6 +7,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useLatestPhotoSet } from '@/features/onboarding/photos/hooks/useLatestPhotoSet'
@@ -60,6 +61,14 @@ const FOCUS_LABEL: Record<string, { label: string; tagline: string }> = {
  * the next sign-in.
  */
 export default function SettingsScreen() {
+  return (
+    <ErrorBoundary screen="ajustes">
+      <SettingsBody />
+    </ErrorBoundary>
+  )
+}
+
+function SettingsBody() {
   const router = useRouter()
   const qc = useQueryClient()
   const choose = useConfirm()

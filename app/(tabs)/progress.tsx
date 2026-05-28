@@ -14,6 +14,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg'
 
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
@@ -67,6 +68,14 @@ const AnimatedPath = Animated.createAnimatedComponent(Path)
 const AnimatedG = Animated.createAnimatedComponent(G)
 
 export default function ProgressScreen() {
+  return (
+    <ErrorBoundary screen="progreso">
+      <ProgressBody />
+    </ErrorBoundary>
+  )
+}
+
+function ProgressBody() {
   const router = useRouter()
   const [period, setPeriod] = useState<Period>('30D')
   // The before/after diptych is collapsed by default — viewing it is

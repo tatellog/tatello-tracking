@@ -12,6 +12,7 @@ import {
   WeekSegment,
   type OrbitSegment,
 } from '@/features/orbit/components'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
@@ -27,6 +28,14 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
  * mock.ts — until the Anthropic key is in.
  */
 export default function OrbitScreen() {
+  return (
+    <ErrorBoundary screen="orbita">
+      <OrbitBody />
+    </ErrorBoundary>
+  )
+}
+
+function OrbitBody() {
   const [segment, setSegment] = useState<OrbitSegment>('dia')
 
   return (
