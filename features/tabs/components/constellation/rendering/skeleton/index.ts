@@ -1,0 +1,1 @@
+export { CanvasSkeleton } from './skeleton'
