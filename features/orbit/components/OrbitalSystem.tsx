@@ -351,13 +351,18 @@ export function OrbitalSystem({
   useEffect(() => {
     if (selectedKey) {
       const pos = STAR_POS[selectedKey]
+      // Pan matches the first stage of the zoom (480 ms ease-out
+      // cubic) so the camera doesn't drift sideways while the
+      // canvas is still zooming up. Mismatching the curves makes
+      // the focused star "jump" toward the edge mid-animation
+      // before settling — both animations must progress together.
       targetXVal.value = withTiming(pos.x, {
-        duration: 520,
-        easing: Easing.inOut(Easing.cubic),
+        duration: 480,
+        easing: Easing.out(Easing.cubic),
       })
       targetYVal.value = withTiming(pos.y, {
-        duration: 520,
-        easing: Easing.inOut(Easing.cubic),
+        duration: 480,
+        easing: Easing.out(Easing.cubic),
       })
       zoomT.value = withSequence(
         withTiming(1.08, { duration: 480, easing: Easing.out(Easing.cubic) }),
@@ -434,8 +439,16 @@ export function OrbitalSystem({
     // + readoutOverlay that occupy the bottom of the container
     // during focus — otherwise the focused glyph sat visually
     // below centre and the composition read as bottom-heavy.
-    const tx = tz * (ART_CENTER_X - ZOOM_SCALE * targetXVal.value)
-    const ty = tz * (FOCUS_CENTER_Y - ZOOM_SCALE * targetYVal.value)
+    //
+    // The translate uses the LIVE scale `s` (not constant ZOOM_SCALE)
+    // and a focus mix clamped to [0, 1]. When zoomT overshoots past 1
+    // for the cinematic recoil, the scale grows past ZOOM_SCALE but
+    // the translate compensates so the focused glyph stays anchored
+    // at (ART_CENTER_X, FOCUS_CENTER_Y) instead of being pushed
+    // sideways past the centre and bumping back.
+    const mix = Math.min(tz, 1)
+    const tx = mix * (ART_CENTER_X - s * targetXVal.value)
+    const ty = mix * (FOCUS_CENTER_Y - s * targetYVal.value)
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
