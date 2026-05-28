@@ -4,8 +4,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
-  FadeIn,
-  FadeOut,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,

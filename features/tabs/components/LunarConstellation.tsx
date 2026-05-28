@@ -160,7 +160,6 @@ function fourPointStarPath(cx: number, cy: number, outer: number): string {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
-const AnimatedPath = Animated.createAnimatedComponent(Path)
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView)
 
@@ -1234,52 +1233,6 @@ function NebulaPatches({
   )
 }
 
-/* ─ Centre orb — luminous gravitational well behind the day count ──
- *
- * A stack of concentric magenta circles sitting under the centre
- * counter. Replaces the prior "number floats on dark scrim" read
- * with "number lives inside a glowing core" — the heart of the
- * cycle. The CenterScrim still renders on top of this orb (smaller
- * radius) so the digits stay legible against a darker pocket inside
- * a wider magenta glow.
- *
- * Slow 8 s breath (4 % scale swing) keeps the orb subtly alive
- * without competing with the star twinkle. */
-const ORB_LAYERS = 10
-
-function CenterOrb({ cx, cy, clock }: { cx: number; cy: number; clock: SharedValue<number> }) {
-  const breath = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    const scale = 1 + wave * 0.04
-    return {
-      transform: [
-        { translateX: cx },
-        { translateY: cy },
-        { scale },
-        { translateX: -cx },
-        { translateY: -cy },
-      ],
-    }
-  })
-  return (
-    <AnimatedG animatedProps={breath}>
-      {Array.from({ length: ORB_LAYERS }).map((_, i) => {
-        const tt = i / (ORB_LAYERS - 1)
-        // 92 → 28 px. Outer layers are wide and faint; inner layers
-        // tight and slightly brighter so the stack reads as a glow
-        // with a luminous heart.
-        const r = 92 - 64 * tt
-        const op = 0.018 + tt * 0.05
-        return <Circle key={i} cx={cx} cy={cy} r={r} fill={colors.magenta} opacity={op} />
-      })}
-      {/* Hot cream-pink core right under the number — adds the
-          "white-hot heart" feel without competing with type colour. */}
-      <Circle cx={cx} cy={cy} r={20} fill="#FBD7E3" opacity={0.08} />
-    </AnimatedG>
-  )
-}
-
 /* ─ Ambient star field ──────────────────────────────────────────── */
 
 type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }
@@ -1311,60 +1264,6 @@ function buildAmbientField(): AmbientStar[][] {
     buckets[bucket]!.push({ x, y, r, baseOp, sparkle })
   }
   return buckets
-}
-
-/* ─ Right-side balance swirls — composition counterweight ─────────
- *
- * Three bronze Bézier hairlines anchored to the right half of the
- * canvas so the lion engraving (left-heavy) doesn't tilt the
- * composition. Each drifts independently on the 60 s clock with a
- * tiny opacity breath, so they read as atmospheric tracery rather
- * than UI lines.
- */
-const BALANCE_PATHS: readonly { d: string; phase: number; op: number }[] = [
-  { d: 'M 230 80 Q 270 130 240 200', phase: 0.0, op: 0.2 },
-  { d: 'M 255 175 Q 280 215 230 250', phase: 0.27, op: 0.17 },
-  { d: 'M 200 60 Q 240 95 280 65', phase: 0.52, op: 0.15 },
-  // Fourth ascending curve sweeping upward on the right — adds
-  // visual weight to balance the lion silhouette on the left.
-  { d: 'M 215 240 Q 260 200 270 130', phase: 0.78, op: 0.18 },
-]
-
-function BalanceSwirls({ drift }: { drift: SharedValue<number> }) {
-  return (
-    <G>
-      {BALANCE_PATHS.map((p, i) => (
-        <BalanceSwirl key={i} d={p.d} phase={p.phase} op={p.op} drift={drift} />
-      ))}
-    </G>
-  )
-}
-
-function BalanceSwirl({
-  d,
-  phase,
-  op,
-  drift,
-}: {
-  d: string
-  phase: number
-  op: number
-  drift: SharedValue<number>
-}) {
-  const animatedProps = useAnimatedProps(() => {
-    'worklet'
-    const a = (drift.value + phase) * 2 * Math.PI
-    const breath = 0.5 + 0.5 * Math.sin(a)
-    return {
-      opacity: op * (0.6 + 0.6 * breath),
-      transform: [{ translateX: Math.sin(a) * 3 }, { translateY: Math.cos(a) * 2 }],
-    }
-  })
-  return (
-    <AnimatedG animatedProps={animatedProps}>
-      <Path d={d} stroke="#C9B8A5" strokeWidth={0.8} strokeLinecap="round" fill="none" />
-    </AnimatedG>
-  )
 }
 
 /* ─ Cosmic dust — slow rising motes ───────────────────────────────
@@ -1922,260 +1821,6 @@ function FieldStar({
   )
 }
 
-/* ─ Constellation ray ─────────────────────────────────────────────
- *
- * A single bright cream particle that travels a continuous Hamilton
- * path through every star in the figure on the system `t` clock —
- * reads as a lightning bolt zigzagging through the constellation.
- *
- * Path derivation: a depth-first walk that visits every star,
- * preferring un-visited neighbours sorted by ascending degree (so
- * leaves are saved for last). For Leo this lands on the natural
- * traversal 5 → 4 → 3 → 2 → 1 → 0 → 6 → 7 → 8 (Sickle hook down,
- * then jump to body triangle).
- *
- * Animation: pathLength=1 normalises the dash pattern. A short
- * bright dash (10 % of the path) slides from start to end via
- * strokeDashoffset = -t·cycle. A magenta halo dash trails ~2 %
- * behind for the comet-wake feel. Cycle = dash + gap, with the
- * gap > 1 so only one bright dash is on the path at any moment
- * and the loop seam falls inside the invisible gap.
- */
-
-function deriveHamiltonPath(
-  numStars: number,
-  lines: readonly (readonly [number, number])[],
-): number[] {
-  if (numStars === 0) return []
-  const adj = new Map<number, Set<number>>()
-  for (let i = 0; i < numStars; i++) adj.set(i, new Set<number>())
-  for (const [a, b] of lines) {
-    adj.get(a)?.add(b)
-    adj.get(b)?.add(a)
-  }
-  // Pick a starting vertex with low degree (likely a leaf) so the
-  // walk has the best chance of reaching every star without
-  // backtracking.
-  let startIdx = 0
-  let minDeg = Infinity
-  for (const [i, s] of adj) {
-    const d = s.size
-    if (d > 0 && d < minDeg) {
-      minDeg = d
-      startIdx = i
-    }
-  }
-  const visited = new Set<number>()
-  const path: number[] = []
-  function dfs(node: number): boolean {
-    visited.add(node)
-    path.push(node)
-    if (visited.size === numStars) return true
-    const candidates = [...(adj.get(node) ?? [])]
-      .filter((n) => !visited.has(n))
-      .sort((a, b) => (adj.get(a)?.size ?? 0) - (adj.get(b)?.size ?? 0))
-    for (const next of candidates) {
-      if (dfs(next)) return true
-    }
-    visited.delete(node)
-    path.pop()
-    return false
-  }
-  dfs(startIdx)
-  return path
-}
-
-function ConstellationRay({
-  stars,
-  lines,
-  t,
-  rayPresence,
-}: {
-  stars: Resolved[]
-  lines: readonly (readonly [number, number])[]
-  t: SharedValue<number>
-  /** 0..1 global presence multiplier. The ray's job is to SUGGEST
-   *  the constellation path while it's still being built; once
-   *  the user has lit every star the actual figure is visible and
-   *  the ray competes with it. The parent passes 1 while there
-   *  are unlit stars and 0 (smoothly tweened by Reanimated) when
-   *  the constellation completes. */
-  rayPresence: SharedValue<number>
-}) {
-  const traversal = useMemo(() => deriveHamiltonPath(stars.length, lines), [stars.length, lines])
-  const pathD = useMemo(() => {
-    if (traversal.length === 0) return ''
-    const points = traversal.map((idx) => stars[idx]).filter((s): s is Resolved => !!s)
-    if (points.length === 0) return ''
-    if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`
-    // Catmull-Rom → cubic bezier conversion. Each segment from
-    // P[i] to P[i+1] becomes a cubic curve whose control points are
-    // derived from the slope at P[i] (using P[i-1] and P[i+1]) and
-    // the slope at P[i+1] (using P[i] and P[i+2]). The curve passes
-    // through every star.
-    //
-    // TENSION 0.12 — DELIBERATELY LOW. Higher tensions (0.3+) made
-    // the path too smooth, obscuring the direction of travel: the
-    // eye couldn't tell which way the comet was moving because the
-    // angles between stars dissolved into a single sweeping line.
-    // At 0.12 the corners are just enough rounded that they don't
-    // read as wireframe polygon edges, but the angle changes
-    // BETWEEN segments stay visible, so the comet's traversal
-    // direction (start → end) reads on every frame.
-    const TENSION = 0.12
-    const segs = [`M ${points[0]!.x} ${points[0]!.y}`]
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i - 1] ?? points[i]!
-      const p1 = points[i]!
-      const p2 = points[i + 1]!
-      const p3 = points[i + 2] ?? points[i + 1]!
-      const cp1x = p1.x + (p2.x - p0.x) * TENSION
-      const cp1y = p1.y + (p2.y - p0.y) * TENSION
-      const cp2x = p2.x - (p3.x - p1.x) * TENSION
-      const cp2y = p2.y - (p3.y - p1.y) * TENSION
-      segs.push(`C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`)
-    }
-    return segs.join(' ')
-  }, [stars, traversal])
-
-  // Comet-trail composition — four stacked dashes ALL in cream
-  // (no magenta) so the ray POPS against the magenta constellation
-  // lines instead of blending with them. Each dash is wider +
-  // dimmer + slightly behind the previous, faking a tapering
-  // tail behind a bright head.
-  //
-  // DASH LENGTHS are deliberately SHORT (max 0.15 of path = 15 %)
-  // so the eye perceives a SINGLE moving particle with a brief
-  // wake, not a long stationary streak that lights up half the
-  // figure and reads as a frozen drawn shape. Combined the four
-  // layers cover ~15-20 % of the path at any moment — small
-  // enough to feel like a comet, large enough to have body.
-  // Slowed timing — the ray now takes 2× the `t` cycle to traverse
-  // the figure (16 s end-to-end instead of 8 s), so the eye can
-  // actually follow the head from start to finish. Dash lengths
-  // bumped to leave a visible "drawn" trail behind the head: the
-  // user sees the path being painted, then quickly fading, then
-  // the next cycle restarts from the leaf star.
-  const SPEED = 0.5
-  const HEAD_DASH = 0.025
-  const TRAIL_DASH = 0.1
-  const TAIL_DASH = 0.16
-  const HALO_DASH = 0.25
-  const GAP = 1.4
-
-  // Cycle envelope — the comet visibly enters at t≈0.05, traces
-  // start → end through t≈0.05 → 0.85, then fades out by t=1.
-  // Reads as a clear beginning/end on each cycle.
-  //
-  //   t = 0.00 → 0.05  fade IN at the start
-  //   t = 0.05 → 0.85  bright traversal start → end
-  //   t = 0.85 → 1.00  fade OUT at the end
-  function cometEnvelope(u: number) {
-    'worklet'
-    if (u < 0.05) return u / 0.05
-    if (u < 0.85) return 1
-    return Math.max(0, 1 - (u - 0.85) / 0.15)
-  }
-  const headProps = useAnimatedProps(() => {
-    'worklet'
-    const u = (t.value * SPEED) % 1
-    return {
-      strokeDashoffset: -u * (HEAD_DASH + GAP),
-      opacity: cometEnvelope(u) * rayPresence.value,
-    }
-  })
-  const trailProps = useAnimatedProps(() => {
-    'worklet'
-    const base = (t.value * SPEED) % 1
-    const u = (base - 0.008 + 1) % 1
-    return {
-      strokeDashoffset: -u * (TRAIL_DASH + GAP),
-      opacity: cometEnvelope(base) * rayPresence.value,
-    }
-  })
-  const tailProps = useAnimatedProps(() => {
-    'worklet'
-    const base = (t.value * SPEED) % 1
-    const u = (base - 0.02 + 1) % 1
-    return {
-      strokeDashoffset: -u * (TAIL_DASH + GAP),
-      opacity: cometEnvelope(base) * rayPresence.value,
-    }
-  })
-  const haloProps = useAnimatedProps(() => {
-    'worklet'
-    const base = (t.value * SPEED) % 1
-    const u = (base - 0.04 + 1) % 1
-    return {
-      strokeDashoffset: -u * (HALO_DASH + GAP),
-      opacity: cometEnvelope(base) * rayPresence.value,
-    }
-  })
-
-  // pathLength=1 isn't in react-native-svg's TS types yet but it's
-  // supported at runtime — spread through a Record cast.
-  const runtimeProps = { pathLength: 1 } as Record<string, unknown>
-
-  if (!pathD) return null
-
-  return (
-    <G>
-      {/* Toned-down opacities throughout — the ray should READ as
-          a subtle warm glint tracing the figure, not as a dramatic
-          comet. Halo/tail/trail/head opacities ~half of the previous
-          values, widths slightly trimmed, head no longer pure white. */}
-      <AnimatedPath
-        d={pathD}
-        fill="none"
-        stroke="#FFE9B4"
-        strokeWidth={8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity={0.16}
-        strokeDasharray={`${HALO_DASH} ${GAP}`}
-        animatedProps={haloProps}
-        {...runtimeProps}
-      />
-      <AnimatedPath
-        d={pathD}
-        fill="none"
-        stroke="#FFE9C2"
-        strokeWidth={4.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity={0.34}
-        strokeDasharray={`${TAIL_DASH} ${GAP}`}
-        animatedProps={tailProps}
-        {...runtimeProps}
-      />
-      <AnimatedPath
-        d={pathD}
-        fill="none"
-        stroke="#FFF6E5"
-        strokeWidth={2.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity={0.58}
-        strokeDasharray={`${TRAIL_DASH} ${GAP}`}
-        animatedProps={trailProps}
-        {...runtimeProps}
-      />
-      <AnimatedPath
-        d={pathD}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity={0.88}
-        strokeDasharray={`${HEAD_DASH} ${GAP}`}
-        animatedProps={headProps}
-        {...runtimeProps}
-      />
-    </G>
-  )
-}
-
 /* ─ Base placeholder layer (always visible silhouette) ──────────── */
 
 function BaseLayer({
@@ -2713,16 +2358,6 @@ function LitLineFilament({
   )
 }
 
-/* ─ Centre scrim ──────────────────────────────────────────────────
- *
- * A soft dark vignette behind the centre counter. Every zodiac figure
- * routes some stars/lines through the middle of the canvas, where the
- * big day-count number sits — without this they collide and the
- * number reads as cluttered. The scrim punches a calm "clearing":
- * stacked low-alpha bg ellipses darken the constellation just under
- * the counter, fading out smoothly so there's no hard edge. */
-const SCRIM_LAYERS = 7
-
 /*
  * Lit-cluster aura — a warm cream-magenta radial wash centred on
  * the centroid of all currently-lit stars, with radius spanning
@@ -2813,19 +2448,6 @@ function ClusterMote({
     return { opacity: 0.18 + wave * 0.55 }
   })
   return <AnimatedCircle cx={cx} cy={cy} r={0.85} fill="#FFF1F6" animatedProps={animatedProps} />
-}
-
-function CenterScrim({ cx, cy }: { cx: number; cy: number }) {
-  return (
-    <G>
-      {Array.from({ length: SCRIM_LAYERS }).map((_, i) => {
-        const tt = i / (SCRIM_LAYERS - 1)
-        const rx = 72 - 52 * tt
-        const ry = 54 - 39 * tt
-        return <Ellipse key={i} cx={cx} cy={cy} rx={rx} ry={ry} fill={colors.bg} opacity={0.1} />
-      })}
-    </G>
-  )
 }
 
 /* ─ Centre counter texts ────────────────────────────────────────── */
@@ -3580,34 +3202,6 @@ function VolumetricRays({
 
 /* Energy node — tiny bright disc pulsing under each lit star body,
  * a juncture-pulse that sells "energy flows through this point". */
-function EnergyNode({
-  cx,
-  cy,
-  r,
-  t,
-  phase,
-  haloMult,
-}: {
-  cx: number
-  cy: number
-  r: number
-  t: SharedValue<number>
-  phase: number
-  haloMult: number
-}) {
-  const animatedProps = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI * 1.6)
-    return {
-      opacity: (0.35 + 0.45 * wave) * haloMult,
-      r: r * 0.55 + wave * 0.8,
-    }
-  })
-  return (
-    <AnimatedCircle cx={cx} cy={cy} r={r * 0.55} fill="#FFF6E5" animatedProps={animatedProps} />
-  )
-}
-
 /* Today's star ring — thin cream orbital ring around the star
  * marked today. Slow rotation + breath so it doesn't compete with
  * the next-star pulse but unmistakably marks "this is THE one". */

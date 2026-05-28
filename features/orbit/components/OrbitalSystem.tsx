@@ -183,14 +183,6 @@ const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
   cuerpo: ornamentPos(250.5, 361),
 }
 
-// The drawing's central "tú" node. A single DecorativeStar paints
-// it so the centre shares the lens-flare + slow-glow language of
-// the dimension stars rather than the SVG's authored static
-// ornament.
-const DECORATIVE_STAR_POS: { x: number; y: number }[] = [
-  ornamentPos(512, 512), // centre of the orbital system
-]
-
 // Ambient dust scattered in the annulus between the galaxy bulge
 // (≈ r 50) and the dimension hexagon (≈ r 148). Bumped 28 → 70
 // motes for a richer field. Each mote carries its OWN angular
@@ -450,19 +442,6 @@ export function OrbitalSystem({
     const tx = mix * (ART_CENTER_X - s * targetXVal.value)
     const ty = mix * (FOCUS_CENTER_Y - s * targetYVal.value)
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
-  })
-
-  // Fades the DecorativeStar(s) at the system centre during zoom.
-  // At rest the centre "tú" star reads full brightness; at full
-  // zoom into a dimension it gets pushed off the centre by the
-  // in-place transform and stays bright unless we dim it. Without
-  // this, the visible scene has TWO luminous bodies — the selected
-  // star AND the centre wandering to a corner — which reads as
-  // "stars are out of orbit" (user's words). At zoomT = 1 the
-  // centre drops to ~10 % opacity, basically out of the way.
-  const decorativeFade = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 1 - zoomT.value * 0.9 }
   })
 
   const placed = dimensions.map((d) => ({ d, pos: place(d) }))
@@ -780,51 +759,6 @@ function BurstParticle({
     }
   })
   return <AnimatedCircle fill={SKY.starCore} animatedProps={props} />
-}
-
-/* A luminous decorative star — no Pressable, no state, but shares
- * the slow-glow language of StarNode so every line endpoint feels
- * alive. Used for the two SVG burst endpoints not bound to a
- * dimension (right-mid + central diamond). */
-function DecorativeStar({
-  x,
-  y,
-  slowClock,
-  phase,
-  profile,
-}: {
-  x: number
-  y: number
-  slowClock: SharedValue<number>
-  phase: number
-  profile: ConstellationProfile
-}) {
-  const R = 3.6
-  const baseGlowR = R * 5.5
-  const slowGlow = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI)
-    const scale = profile.glowMinScale + wave * (profile.glowMaxScale - profile.glowMinScale)
-    const op = profile.glowMinOpacity + wave * (profile.glowMaxOpacity - profile.glowMinOpacity)
-    return { r: baseGlowR * scale, opacity: op * 0.55 }
-  })
-  return (
-    <G>
-      <AnimatedCircle cx={x} cy={y} fill={CONSTELLATION_COLORS.starHalo} animatedProps={slowGlow} />
-      <Circle cx={x} cy={y} r={R * 2.8} fill={SKY.starGlow} opacity={0.16} />
-      <Circle cx={x} cy={y} r={R * 1.5} fill={SKY.starGlow} opacity={0.32} />
-      <DiffractionSpikes
-        x={x}
-        y={y}
-        length={R * 6.5}
-        opacity={0.5}
-        diagOpacity={0.18}
-        strokeWidth={0.5}
-      />
-      <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-      <Circle cx={x} cy={y} r={R * 0.6} fill={SKY.starCore} />
-    </G>
-  )
 }
 
 /* Lens-flare bloom — the organic starburst a real camera lens
