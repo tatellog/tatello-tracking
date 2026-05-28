@@ -1,10 +1,11 @@
-import { useRouter } from 'expo-router'
-import { useMemo } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { useCallback, useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { type CyclePhase } from '@/features/cycle/phase'
+import { track } from '@/lib/analytics'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
 import {
@@ -66,6 +67,11 @@ export default function MealsScreen() {
 }
 
 function MealsBody() {
+  useFocusEffect(
+    useCallback(() => {
+      track('tab_changed', { tab: 'comidas' })
+    }, []),
+  )
   const router = useRouter()
   const today = useMemo(() => todayInTimezone(), [])
   const mealsQuery = useMealsForDate(today)

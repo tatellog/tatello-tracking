@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { track } from '@/lib/analytics'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -107,6 +108,7 @@ export function useAddMeasurement() {
         measured_at: parsed.measured_at ?? new Date().toISOString(),
       })
       if (error) throw error
+      if (parsed.weight_kg != null) track('weight_logged')
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.progress.all })

@@ -33,6 +33,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: string
+          metadata: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: string
+          metadata?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: string
+          metadata?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       body_measurements: {
         Row: {
           arm_cm: number | null
@@ -324,6 +348,7 @@ export type Database = {
           goal: string | null
           height_cm: number | null
           id: string
+          is_beta: boolean
           monthly_focus: string | null
           notification_window: string | null
           onboarding_completed_at: string | null
@@ -346,6 +371,7 @@ export type Database = {
           goal?: string | null
           height_cm?: number | null
           id: string
+          is_beta?: boolean
           monthly_focus?: string | null
           notification_window?: string | null
           onboarding_completed_at?: string | null
@@ -368,6 +394,7 @@ export type Database = {
           goal?: string | null
           height_cm?: number | null
           id?: string
+          is_beta?: boolean
           monthly_focus?: string | null
           notification_window?: string | null
           onboarding_completed_at?: string | null

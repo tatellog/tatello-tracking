@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useFocusEffect } from 'expo-router'
+import { useCallback, useEffect, useState } from 'react'
 import { Dimensions, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -14,6 +15,7 @@ import {
 } from '@/features/orbit/components'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
+import { track } from '@/lib/analytics'
 import { colors } from '@/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
@@ -36,7 +38,19 @@ export default function OrbitScreen() {
 }
 
 function OrbitBody() {
+  useFocusEffect(
+    useCallback(() => {
+      track('tab_changed', { tab: 'orbita' })
+    }, []),
+  )
   const [segment, setSegment] = useState<OrbitSegment>('dia')
+
+  // Fires on initial render + every segment change. The default
+  // 'dia' is meaningful — beta data should reflect that Día is
+  // the landing surface.
+  useEffect(() => {
+    track('orbit_viewed', { segment })
+  }, [segment])
 
   return (
     <View style={styles.screen}>

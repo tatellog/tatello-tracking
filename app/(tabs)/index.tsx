@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
-import { useMemo, useState } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { useCallback, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -17,6 +17,7 @@ import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
+import { track } from '@/lib/analytics'
 import {
   CoachLine,
   DayCheckIn,
@@ -87,6 +88,11 @@ export default function TodayScreen() {
 }
 
 function TodayBody() {
+  useFocusEffect(
+    useCallback(() => {
+      track('tab_changed', { tab: 'hoy' })
+    }, []),
+  )
   const brief = useHomeBrief()
   const cadence = useHomeCadence()
   // Profile is also gated here (used to be inside TodayContent).

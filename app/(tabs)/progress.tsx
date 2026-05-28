@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -16,6 +16,7 @@ import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { track } from '@/lib/analytics'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
@@ -76,6 +77,11 @@ export default function ProgressScreen() {
 }
 
 function ProgressBody() {
+  useFocusEffect(
+    useCallback(() => {
+      track('tab_changed', { tab: 'progreso' })
+    }, []),
+  )
   const router = useRouter()
   const [period, setPeriod] = useState<Period>('30D')
   // The before/after diptych is collapsed by default — viewing it is

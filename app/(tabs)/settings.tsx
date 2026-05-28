@@ -1,14 +1,15 @@
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
-import { type ReactNode, useState } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { type ReactNode, useCallback, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
+import { track } from '@/lib/analytics'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useLatestPhotoSet } from '@/features/onboarding/photos/hooks/useLatestPhotoSet'
 import { avatarUrl } from '@/features/profile/api'
@@ -69,6 +70,11 @@ export default function SettingsScreen() {
 }
 
 function SettingsBody() {
+  useFocusEffect(
+    useCallback(() => {
+      track('tab_changed', { tab: 'ajustes' })
+    }, []),
+  )
   const router = useRouter()
   const qc = useQueryClient()
   const choose = useConfirm()

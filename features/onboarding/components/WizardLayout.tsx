@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
+import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
 import { ProgressBar } from './ProgressBar'
@@ -46,6 +47,13 @@ export function WizardLayout({
     else if (router.canGoBack()) router.back()
   }
 
+  // Wrap the caller's onContinue so every step advance fires the
+  // analytics event without each onboarding screen having to remember.
+  const handleContinue = () => {
+    track('onboarding_step_completed', { step })
+    onContinue()
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       {/* Per-screen cosmic backdrop. Used to be in the layout root
@@ -80,7 +88,7 @@ export function WizardLayout({
       <View style={styles.footer}>
         <PrimaryCta
           label={continueLabel}
-          onPress={onContinue}
+          onPress={handleContinue}
           disabled={!canContinue}
           loading={loading}
           pill={ctaPill}

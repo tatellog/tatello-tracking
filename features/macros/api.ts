@@ -1,6 +1,7 @@
 import * as ImageManipulator from 'expo-image-manipulator'
 import { z } from 'zod'
 
+import { track } from '@/lib/analytics'
 import { requireUserId, supabase } from '@/lib/supabase'
 import type { Database, Json } from '@/types/database.types'
 
@@ -262,6 +263,7 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
     .select()
     .single()
   if (error) throw error
+  track('meal_logged', { hour: parsed.consumed_at.getHours() })
   return data
 }
 

@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router'
+import { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
 import type { Patron } from '../mock'
@@ -19,6 +21,12 @@ import type { Patron } from '../mock'
  */
 export function PatternHint({ patron }: { patron: Patron }) {
   const router = useRouter()
+  // Fires once per mount of a given pattern — the patron.id key
+  // upstream re-mounts this when the surfaced pattern changes, so
+  // we get one event per "the coach noticed this pattern" moment.
+  useEffect(() => {
+    track('coach_message_shown', { pattern_type: patron.data.kind })
+  }, [patron.id, patron.data.kind])
   return (
     <Pressable
       style={styles.card}

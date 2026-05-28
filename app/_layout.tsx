@@ -26,6 +26,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useProfile } from '@/features/profile/hooks'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
+import { track } from '@/lib/analytics'
 import { ConfirmProvider } from '@/lib/confirm'
 import { ensureDevUserSession } from '@/lib/devAuth'
 import { clearVisitedDayOne, useVisitedDayOne } from '@/lib/onboardingFlags'
@@ -129,6 +130,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {})
+  }, [ready])
+
+  // Analytics: fire `app_opened` once per cold launch, after the
+  // session is known. Fire-and-forget — the tracker no-ops if the
+  // user isn't beta or if there's no session.
+  useEffect(() => {
+    if (!ready) return
+    track('app_opened')
   }, [ready])
 
   if (!ready) return null

@@ -2,6 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import { z } from 'zod'
 
 import { NewMeasurementInputSchema } from '@/features/progress/api'
+import { track } from '@/lib/analytics'
 import { requireUserId, supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database.types'
 
@@ -186,6 +187,7 @@ export async function insertInitialWeight(weightKg: number): Promise<void> {
     measured_at: new Date().toISOString(),
   })
   if (error) throw error
+  track('weight_logged')
 }
 
 /*

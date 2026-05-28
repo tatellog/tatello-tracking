@@ -27,6 +27,7 @@ import {
 import { calculateMacros } from '@/features/profile/calcMacros'
 import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
 import { ZODIAC, zodiacFromDate, type ZodiacSign } from '@/features/tabs/zodiac'
+import { track } from '@/lib/analytics'
 import { deviceTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -179,6 +180,7 @@ export default function RevealScreen() {
         onboarding_completed_at: new Date().toISOString(),
         timezone: deviceTimezone(),
       })
+      track('onboarding_completed')
       const macros = calculateMacros({
         weight_kg: brief?.latest_measurement?.weight_kg ?? null,
         height_cm: profile?.height_cm ?? null,
