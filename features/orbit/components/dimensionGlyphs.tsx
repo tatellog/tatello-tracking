@@ -6,23 +6,32 @@ import EnergyVect from '@/assets/icons/energy-vect.svg'
 import FoodVect from '@/assets/icons/food-vect.svg'
 import MindVect from '@/assets/icons/mind-vect.svg'
 import MoonVect from '@/assets/icons/moon-vect.svg'
+import { colors } from '@/theme'
+
 import { type DimensionKey } from '../logic'
 
 /*
  * Dimension glyphs — 24×24 line illustrations, one per dimension.
  *
- * The SVGs are tintable: every fill is `currentColor`, so the
- * paint is whatever colour the parent `<G color="...">` provides.
- * That keeps a single source of truth — `theme/colors.ts` — for
- * what tint the glyph reads as in each context (cream as a bright
- * core inside the coloured halo, dimension colour for solo chips,
- * etc).
+ * Body / cycle / energy / mind / moon paint themselves in rose
+ * (`#FFB8B3`) regardless of the parent `<G color="...">`. The rose
+ * was chosen for these constellation-style illustrations because
+ * cream washed out against the violet/magenta halo in focus view.
+ *
+ * Food is the exception — its SVG uses `currentColor` so the same
+ * file can serve the tab bar and the dimension halo. The `color`
+ * prop must be set on the SVG component directly: `<G color>` from
+ * a parent doesn't cross the nested `<Svg>` boundary that
+ * react-native-svg-transformer generates, so currentColor would
+ * fall back to black if the prop is omitted.
  */
 export const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: <BodyVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
   mente: <MindVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
   energia: <EnergyVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
-  alimento: <FoodVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
+  alimento: (
+    <FoodVect width={24} height={24} color={colors.leche} preserveAspectRatio="xMidYMid meet" />
+  ),
   sueno: <MoonVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
   ciclo: <CycleVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
 }
