@@ -11,7 +11,7 @@ import { getTodaySignals, hasAnySignals } from './api'
  */
 export function useTodaySignals() {
   return useQuery({
-    queryKey: queryKeys.orbita.today(),
+    queryKey: queryKeys.orbit.today(),
     queryFn: getTodaySignals,
     staleTime: 60_000,
   })
@@ -26,7 +26,7 @@ export function useTodaySignals() {
  */
 export function useHasAnySignals() {
   return useQuery({
-    queryKey: queryKeys.orbita.hasAny(),
+    queryKey: queryKeys.orbit.hasAny(),
     queryFn: hasAnySignals,
     staleTime: 1000 * 60 * 5,
   })

@@ -100,7 +100,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="orbita"
+        name="orbit"
         options={{
           title: 'Órbita',
           tabBarIcon: ({ color, size, focused }) => (

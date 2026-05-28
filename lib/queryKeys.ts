@@ -64,9 +64,9 @@ export const queryKeys = {
     all: ['wellbeing'] as const,
     day: (date: string) => ['wellbeing', date] as const,
   },
-  orbita: {
-    all: ['orbita'] as const,
-    today: () => ['orbita', 'today'] as const,
-    hasAny: () => ['orbita', 'hasAny'] as const,
+  orbit: {
+    all: ['orbit'] as const,
+    today: () => ['orbit', 'today'] as const,
+    hasAny: () => ['orbit', 'hasAny'] as const,
   },
 } as const

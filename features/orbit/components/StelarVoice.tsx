@@ -14,7 +14,7 @@ import type { VozParte } from '../mock'
  * dots, confidence and comparison scope. Content is MOCK; the engine
  * writes it from daily_signals.
  */
-export function VozDeStelar({
+export function StelarVoice({
   scope,
   text,
   parts,

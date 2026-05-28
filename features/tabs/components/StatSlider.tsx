@@ -667,7 +667,7 @@ function WellbeingSlide({ date }: { date: string }) {
 
 // Mock — derivation from cycle_events is deferred to the cycle
 // lifecycle sprint. Day 22 / fase lútea matches the Voz de Stelar
-// copy in features/orbita/mock.ts so the two surfaces tell the same
+// copy in features/orbit/mock.ts so the two surfaces tell the same
 // story while this slide is still on placeholder data.
 const MOCK_CYCLE = {
   day: 22,

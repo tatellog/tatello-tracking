@@ -12,7 +12,7 @@ import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PatternHint } from './PatternHint'
 import { PreviewBanner } from './PreviewBanner'
-import { VozDeStelar } from './VozDeStelar'
+import { StelarVoice } from './StelarVoice'
 import { WeekConstellation } from './WeekConstellation'
 
 /*
@@ -23,7 +23,7 @@ import { WeekConstellation } from './WeekConstellation'
  * is selected (today by default), and the Voz de Stelar closes the
  * week with confidence + scope. MOCK content (../mock.ts).
  */
-export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
+export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
   // The whole week is built procedurally from the real day-of-week —
   // days, archetype, counts and prose all stay in sync regardless
   // of which day the user opens the app. JS Date.getDay() returns
@@ -141,7 +141,7 @@ export function SemanaSegment({ onOpenDia }: { onOpenDia: () => void }) {
       {/* Stelar's reading of the week so far. The tag flips to
           "Cierre de semana" once the week is done; mid-week it
           stays "Hasta ahora". */}
-      <VozDeStelar
+      <StelarVoice
         parts={voz.parts}
         tag={todayIdx === 6 ? 'Cierre de semana' : 'Hasta ahora'}
         // The confidence signature ("Confianza alta · N días") is a

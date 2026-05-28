@@ -20,11 +20,11 @@ import {
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PreviewBanner } from './PreviewBanner'
-import { TuCielo, type Satellite, type SatelliteKind } from './TuCielo'
-import { VozDeStelar } from './VozDeStelar'
+import { MonthSky, type Satellite, type SatelliteKind } from './MonthSky'
+import { StelarVoice } from './StelarVoice'
 
 /*
- * The Mes segment — "El Cielo". Single visual hero (TuCielo) +
+ * The Mes segment — "El Cielo". Single visual hero (MonthSky) +
  * Voz de Stelar + (mature only) one experimento. The view splits
  * into two clear surfaces based on cycle history:
  *
@@ -50,7 +50,7 @@ import { VozDeStelar } from './VozDeStelar'
  *
  * Content is MOCK (../mock.ts); the inference engine will fill in.
  */
-export function MesSegment() {
+export function MonthSegment() {
   const router = useRouter()
   const cycle = MOCK_CYCLE
   const isFirstCycle = cycle.cycleNumber === 1
@@ -73,7 +73,7 @@ export function MesSegment() {
       if (isFirstCycle) {
         setSelectedObsId(id)
       } else {
-        router.push(`/orbita/patron/${id}`)
+        router.push(`/orbit/pattern/${id}`)
       }
     },
     [isFirstCycle, router],
@@ -121,7 +121,7 @@ export function MesSegment() {
           />
         </View>
         <View style={styles.diagram}>
-          <TuCielo satellites={[]} onSatellitePress={undefined} />
+          <MonthSky satellites={[]} onSatellitePress={undefined} />
         </View>
         <EmptySegmentCard
           eyebrow="El cielo se forma día a día"
@@ -171,7 +171,7 @@ export function MesSegment() {
           the BH. The cosmos itself becomes the readout — no
           separate card below. Mature cycles navigate away. */}
       <View style={styles.diagram}>
-        <TuCielo
+        <MonthSky
           satellites={satellites}
           onSatellitePress={handleSatellitePress}
           selectedSatelliteId={isFirstCycle ? selectedObsId : null}
@@ -191,9 +191,9 @@ export function MesSegment() {
 
       {/* Voz — first-cycle honest version OR mature paragraph. */}
       {voz ? (
-        <VozDeStelar scope="primera lectura" parts={voz.parts} />
+        <StelarVoice scope="primera lectura" parts={voz.parts} />
       ) : (
-        <VozDeStelar scope="este mes" text={MOCK_VOZ.mes} />
+        <StelarVoice scope="este mes" text={MOCK_VOZ.mes} />
       )}
     </Animated.View>
   )

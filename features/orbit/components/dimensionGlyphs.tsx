@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 
 import BodyVect from '@/assets/icons/body-vect.svg'
-import CycleVect from '@/assets/icons/cicle-vect.svg'
+import CycleVect from '@/assets/icons/cycle-vect.svg'
 import EnergyVect from '@/assets/icons/energy-vect.svg'
 import FoodVect from '@/assets/icons/food-vect-rose.svg'
 import MindVect from '@/assets/icons/mind-vect.svg'

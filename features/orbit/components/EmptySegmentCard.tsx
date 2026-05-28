@@ -15,7 +15,7 @@ type Props = {
 /*
  * The "Stelar has nothing to read yet" card. Used by Día / Semana /
  * Mes when the user hasn't logged anything to daily_signals. Same
- * visual register as VozDeStelar so the empty state doesn't feel
+ * visual register as StelarVoice so the empty state doesn't feel
  * like a different surface — it reads as Stelar's first sentence,
  * not as an error.
  *

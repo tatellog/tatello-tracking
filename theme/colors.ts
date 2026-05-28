@@ -45,6 +45,20 @@ export const colors = {
   // ── Scrim — a dark wash for chips sitting over a photo ─────────
   scrim: 'rgba(0, 0, 0, 0.55)',
 
+  // ── Dimension identity ─────────────────────────────────────────
+  // One colour per dimension. Drives focus halos, dimension badges,
+  // and the "tu cuerpo / tu sueño / ..." accents. Palette stays in
+  // the warm-dark + magenta brand: no neons, every value shares a
+  // slightly desaturated tinted base.
+  dimension: {
+    cuerpo: '#FF4886', // magenta hot
+    sueno: '#7C8FFF', // indigo
+    alimento: '#9FE2A8', // sage
+    ciclo: '#B5C4DD', // cool silver-blue
+    energia: '#FFC56B', // warm gold
+    mente: '#C18FFF', // violet
+  },
+
   // ── Legacy Pearl Mauve aliases (deprecated — see file header) ──
   /** @deprecated Use `bg` */
   pearlBase: '#0A0608',

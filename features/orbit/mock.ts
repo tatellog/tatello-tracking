@@ -549,11 +549,11 @@ export type DiaSemana = {
 
 /** The current cycle, for the Mes segment. The `band` marks the
  *  days of the current phase — it lights up the accretion disk of
- *  the TuCielo hero.
+ *  the MonthSky hero.
  *
  *  `cycleNumber` and `patternsConfirmed` drive the first-cycle vs
  *  mature view branch: in cycle 1 the engine has no statistical
- *  basis to confirm patterns, so TuCielo's satellites render as
+ *  basis to confirm patterns, so MonthSky's satellites render as
  *  observations and the experimento card is suppressed. From cycle
  *  3 onward, surfaced patterns are the ones that survived FDR
  *  correction + replication across ≥2 cycles. */

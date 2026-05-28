@@ -201,7 +201,7 @@ export function PatternCard({ patron }: { patron: Patron }) {
   return (
     <Pressable
       style={styles.card}
-      onPress={() => router.push(`/orbita/patron/${patron.id}`)}
+      onPress={() => router.push(`/orbit/pattern/${patron.id}`)}
       accessibilityRole="button"
       accessibilityLabel={patron.title}
     >

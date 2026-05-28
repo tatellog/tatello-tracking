@@ -17,14 +17,14 @@ import {
   type DimensionKey,
 } from '../logic'
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
-import { AccionDelDia } from './AccionDelDia'
+import { DayAction } from './DayAction'
 import { CosmicParticles } from './CosmicParticles'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
 import { PreviewBanner } from './PreviewBanner'
 import { StelarHeadline } from './StelarHeadline'
-import { VozDeStelar } from './VozDeStelar'
+import { StelarVoice } from './StelarVoice'
 
 /*
  * The Día segment — "El Sistema". Reads today's signals, resolves the
@@ -35,13 +35,13 @@ import { VozDeStelar } from './VozDeStelar'
  *   StelarHeadline   ← lifted lede of the reading, above the orbital
  *   orbital diagram  ← the visual system
  *   readout          ← tap a dimension; shows verdict + evidence
- *   AccionDelDia     ← the one move the IA recommends today
+ *   DayAction     ← the one move the IA recommends today
  *   Voz de Stelar    ← the full prose reading
  *
  * Archetype + Voz de Stelar + headline + action are MOCK
  * (../mock.ts); the engine will write them from daily_signals.
  */
-export function DiaSegment() {
+export function DaySegment() {
   const { data } = useTodaySignals()
   const { data: hasAny } = useHasAnySignals()
   const signals = data ?? null
@@ -122,7 +122,7 @@ export function DiaSegment() {
 
       {/* Hero — the orbital diagram takes the full bleed. The
           right-side six-dimension node list was retired: with each
-          star now carrying its own DIM_COLOR halo + an on-orbital
+          star now carrying its own colors.dimension halo + an on-orbital
           serif mini-label, the column was duplicating info, eating
           ~35 % horizontal real estate and clipping the focus label
           behind the panel. Discovery now lives inside the orbital
@@ -208,7 +208,7 @@ export function DiaSegment() {
 
       {/* The one move STELAR weights highest today. Heavier card than
           Voz so it reads as call-to-action, not narration. */}
-      <AccionDelDia title={MOCK_ACCION_DEL_DIA.title} reason={MOCK_ACCION_DEL_DIA.reason} />
+      <DayAction title={MOCK_ACCION_DEL_DIA.title} reason={MOCK_ACCION_DEL_DIA.reason} />
 
       {reveal ? (
         <Animated.View entering={FadeIn.duration(700)}>
@@ -221,11 +221,11 @@ export function DiaSegment() {
             </Text>
           </View>
           <Animated.View entering={FadeIn.duration(1100).delay(420)}>
-            <VozDeStelar parts={MOCK_VOZ_DIA.parts} />
+            <StelarVoice parts={MOCK_VOZ_DIA.parts} />
           </Animated.View>
         </Animated.View>
       ) : (
-        <VozDeStelar parts={MOCK_VOZ_DIA.parts} />
+        <StelarVoice parts={MOCK_VOZ_DIA.parts} />
       )}
     </Animated.View>
   )

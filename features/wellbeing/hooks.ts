@@ -29,7 +29,7 @@ export function useSaveWellbeing(date: string) {
       saveWellbeing(date, id, draft),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.wellbeing.day(date) })
-      qc.invalidateQueries({ queryKey: queryKeys.orbita.today() })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.today() })
     },
   })
 }

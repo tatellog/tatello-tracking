@@ -848,7 +848,7 @@ function getIgnitionLayout(kind: SatelliteKind | undefined): {
   }
 }
 
-export function TuCielo({
+export function MonthSky({
   satellites,
   onSatellitePress,
   selectedSatelliteId,

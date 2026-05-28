@@ -37,7 +37,7 @@ const AnimatedLine = Animated.createAnimatedComponent(Line)
  *   DÍA    — a sunrise from space: a small luminous body just
  *             above the planet's horizon with a vertical light beam.
  *   SEMANA — 2 spiral arms (a thumbnail of WeekConstellation).
- *   MES    — a black void + photon ring (a thumbnail of TuCielo).
+ *   MES    — a black void + photon ring (a thumbnail of MonthSky).
  *
  * The thumbnails are big enough to be recognisable (90 × 90), each
  * with its own gentle animation so the screen reads as alive. The
@@ -296,7 +296,7 @@ function SemanaPreview({ size, clock }: { size: number; clock: SharedValue<numbe
 }
 
 /* MES mini — small dark void + bright photon ring + 4 tiny
- * satellites around it. Thumbnail of TuCielo's BH. */
+ * satellites around it. Thumbnail of MonthSky's BH. */
 function MesPreview({ size, clock }: { size: number; clock: SharedValue<number> }) {
   const CX = size / 2
   const CY = size / 2

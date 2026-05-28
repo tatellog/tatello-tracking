@@ -8,14 +8,14 @@ import Toast from 'react-native-toast-message'
 import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
-import { VozDeStelar } from '@/features/orbita/components/VozDeStelar'
+import { StelarVoice } from '@/features/orbit/components/StelarVoice'
 import {
   MOCK_PATRONES,
   type CycleData,
   type PairedData,
   type Patron,
   type WeekdayData,
-} from '@/features/orbita/mock'
+} from '@/features/orbit/mock'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
@@ -88,7 +88,7 @@ export default function PatronDetailScreen() {
           </Section>
 
           {/* 2 · The why — coach voice, systemic not moral. */}
-          <VozDeStelar scope="este patrón" text={patron.voz} />
+          <StelarVoice scope="este patrón" text={patron.voz} />
 
           {/* 3 · The correlation — what moves it. */}
           <Section title="Qué lo mueve">

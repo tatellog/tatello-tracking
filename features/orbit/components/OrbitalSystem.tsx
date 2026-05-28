@@ -28,7 +28,7 @@ import Svg, {
 
 import { colors, typography } from '@/theme'
 
-import { DIM_COLOR, DIM_LABEL } from '../constants/dimensionColors'
+import { DIM_LABEL } from '../constants/dimensionColors'
 
 import {
   CONSTELLATION_COLORS,
@@ -491,40 +491,40 @@ export function OrbitalSystem({
               banding. With real gradients the bloom is fully
               continuous from centre opacity 0.5 to edge 0. */}
           <RadialGradient id="halo-cuerpo" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0.5} />
-            <Stop offset="40%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0.32} />
-            <Stop offset="75%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0.14} />
-            <Stop offset="100%" stopColor={DIM_COLOR.cuerpo} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.dimension.cuerpo} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={colors.dimension.cuerpo} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={colors.dimension.cuerpo} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={colors.dimension.cuerpo} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="halo-mente" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={DIM_COLOR.mente} stopOpacity={0.5} />
-            <Stop offset="40%" stopColor={DIM_COLOR.mente} stopOpacity={0.32} />
-            <Stop offset="75%" stopColor={DIM_COLOR.mente} stopOpacity={0.14} />
-            <Stop offset="100%" stopColor={DIM_COLOR.mente} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.dimension.mente} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={colors.dimension.mente} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={colors.dimension.mente} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={colors.dimension.mente} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="halo-sueno" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={DIM_COLOR.sueno} stopOpacity={0.5} />
-            <Stop offset="40%" stopColor={DIM_COLOR.sueno} stopOpacity={0.32} />
-            <Stop offset="75%" stopColor={DIM_COLOR.sueno} stopOpacity={0.14} />
-            <Stop offset="100%" stopColor={DIM_COLOR.sueno} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.dimension.sueno} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={colors.dimension.sueno} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={colors.dimension.sueno} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={colors.dimension.sueno} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="halo-alimento" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={DIM_COLOR.alimento} stopOpacity={0.5} />
-            <Stop offset="40%" stopColor={DIM_COLOR.alimento} stopOpacity={0.32} />
-            <Stop offset="75%" stopColor={DIM_COLOR.alimento} stopOpacity={0.14} />
-            <Stop offset="100%" stopColor={DIM_COLOR.alimento} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.dimension.alimento} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={colors.dimension.alimento} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={colors.dimension.alimento} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={colors.dimension.alimento} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="halo-ciclo" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={DIM_COLOR.ciclo} stopOpacity={0.5} />
-            <Stop offset="40%" stopColor={DIM_COLOR.ciclo} stopOpacity={0.32} />
-            <Stop offset="75%" stopColor={DIM_COLOR.ciclo} stopOpacity={0.14} />
-            <Stop offset="100%" stopColor={DIM_COLOR.ciclo} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.dimension.ciclo} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={colors.dimension.ciclo} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={colors.dimension.ciclo} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={colors.dimension.ciclo} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="halo-energia" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={DIM_COLOR.energia} stopOpacity={0.5} />
-            <Stop offset="40%" stopColor={DIM_COLOR.energia} stopOpacity={0.32} />
-            <Stop offset="75%" stopColor={DIM_COLOR.energia} stopOpacity={0.14} />
-            <Stop offset="100%" stopColor={DIM_COLOR.energia} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.dimension.energia} stopOpacity={0.5} />
+            <Stop offset="40%" stopColor={colors.dimension.energia} stopOpacity={0.32} />
+            <Stop offset="75%" stopColor={colors.dimension.energia} stopOpacity={0.14} />
+            <Stop offset="100%" stopColor={colors.dimension.energia} stopOpacity={0} />
           </RadialGradient>
         </Defs>
 

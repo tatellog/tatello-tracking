@@ -5,13 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import {
-  DiaSegment,
-  MesSegment,
+  DaySegment,
+  MonthSegment,
   OrbitSegments,
   ScreenCosmos,
-  SemanaSegment,
+  WeekSegment,
   type OrbitSegment,
-} from '@/features/orbita/components'
+} from '@/features/orbit/components'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
@@ -23,10 +23,10 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
  * Mes (El Cielo). See docs/tu-orbita-design.md.
  *
  * Día renders the live orbital diagram. The engine-fed pieces (Voz de
- * Stelar, patrones) currently run on MOCK data — see features/orbita/
+ * Stelar, patrones) currently run on MOCK data — see features/orbit/
  * mock.ts — until the Anthropic key is in.
  */
-export default function OrbitaScreen() {
+export default function OrbitScreen() {
   const [segment, setSegment] = useState<OrbitSegment>('dia')
 
   return (
@@ -46,13 +46,13 @@ export default function OrbitaScreen() {
           regions of the screen, not just behind the diagram. */}
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
-          <RadialGradient id="orbita-ambient" cx="50%" cy="48%" rx="75%" ry="70%">
+          <RadialGradient id="orbit-ambient" cx="50%" cy="48%" rx="75%" ry="70%">
             <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.18} />
             <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.06} />
             <Stop offset="100%" stopColor="#E91E63" stopOpacity={0} />
           </RadialGradient>
         </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#orbita-ambient)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#orbit-ambient)" />
       </Svg>
 
       <SafeAreaView style={styles.flex} edges={['top']}>
@@ -69,11 +69,11 @@ export default function OrbitaScreen() {
               Semana hands the segment switch back so its "Abrir Día"
               CTA can swap us into Día. */}
           {segment === 'dia' ? (
-            <DiaSegment key="dia" />
+            <DaySegment key="dia" />
           ) : segment === 'semana' ? (
-            <SemanaSegment key="semana" onOpenDia={() => setSegment('dia')} />
+            <WeekSegment key="semana" onOpenDia={() => setSegment('dia')} />
           ) : (
-            <MesSegment key="mes" />
+            <MonthSegment key="mes" />
           )}
         </ScrollView>
       </SafeAreaView>
