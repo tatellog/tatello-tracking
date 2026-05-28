@@ -1,7 +1,10 @@
+import { BlurView } from 'expo-blur'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native'
 import Animated, {
   Easing,
+  FadeIn,
+  FadeOut,
   cancelAnimation,
   interpolate,
   interpolateColor,
@@ -159,6 +162,7 @@ const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
 const AnimatedPath = Animated.createAnimatedComponent(Path)
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView)
 
 const W = 290
 const H = 290
@@ -207,6 +211,142 @@ type Props = {
    *  debt: once you've checked in today, the figure shouldn't be
    *  whispering "one more". The ring reappears the next day. */
   committed?: boolean
+}
+
+/*
+ * Skeleton shown for the brief window between mount and the moment
+ * the nested zodiac-art <Svg> has settled its size. Draws the
+ * user's actual sign constellation as if it were being plotted:
+ * stars ignite one by one in index order, then the connecting
+ * lines stroke in between them. Ping-pongs forever so a slow
+ * device sees the build → dissolve → rebuild loop instead of a
+ * frozen frame.
+ *
+ * BlurView over the whole thing reads as "not yet in focus" —
+ * when the real Svg fades in, the silhouette is exactly where it
+ * was being drawn, so the eye perceives the constellation
+ * snapping into focus rather than swapping in.
+ */
+function SkeletonStar({
+  star,
+  idx,
+  total,
+  build,
+}: {
+  star: Resolved
+  idx: number
+  total: number
+  build: SharedValue<number>
+}) {
+  const startT = total === 0 ? 0 : (idx / total) * 0.45
+  const props = useAnimatedProps(() => {
+    'worklet'
+    const localT = Math.max(0, Math.min(1, (build.value - startT) / 0.12))
+    return { opacity: localT * 0.7 }
+  })
+  return (
+    <AnimatedCircle
+      cx={star.x}
+      cy={star.y}
+      r={Math.max(2.4, 5.4 - (star.mag - 1) * 0.55)}
+      fill={colors.leche}
+      animatedProps={props}
+    />
+  )
+}
+
+function SkeletonLine({
+  a,
+  b,
+  idx,
+  total,
+  build,
+}: {
+  a: Resolved
+  b: Resolved
+  idx: number
+  total: number
+  build: SharedValue<number>
+}) {
+  const length = Math.hypot(b.x - a.x, b.y - a.y)
+  // Lines start appearing after most stars have already lit, so
+  // the cascade reads "stars first, then we connect them".
+  const startT = total === 0 ? 0.4 : 0.4 + (idx / total) * 0.5
+  const props = useAnimatedProps(() => {
+    'worklet'
+    const localT = Math.max(0, Math.min(1, (build.value - startT) / 0.15))
+    return {
+      strokeDashoffset: length * (1 - localT),
+      opacity: localT * 0.6,
+    }
+  })
+  return (
+    <AnimatedLine
+      x1={a.x}
+      y1={a.y}
+      x2={b.x}
+      y2={b.y}
+      stroke={colors.leche}
+      strokeWidth={1}
+      strokeLinecap="round"
+      strokeDasharray={`${length} ${length}`}
+      animatedProps={props}
+    />
+  )
+}
+
+function CanvasSkeleton({
+  stars,
+  lines,
+  transform,
+}: {
+  stars: readonly Resolved[]
+  lines: readonly (readonly [number, number])[]
+  transform: string
+}) {
+  // Ping-pong 0 ↔ 1 over 1.5 s each direction. During the forward
+  // pass stars cascade in (one by one in index order) and lines
+  // stroke between them once most stars are lit; during the
+  // reverse the figure dissolves. Looks like the cosmos is being
+  // plotted live, paused, wiped, plotted again — exactly the
+  // "rendering" cue the canvas was missing as a flat dark frame.
+  const build = useSharedValue(0)
+  useEffect(() => {
+    build.value = withRepeat(
+      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.cubic) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(build)
+  }, [build])
+
+  return (
+    <View style={styles.canvasSkeleton}>
+      <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
+        <G transform={transform}>
+          {lines.map(([aIdx, bIdx], i) => {
+            const a = stars[aIdx]
+            const b = stars[bIdx]
+            if (!a || !b) return null
+            return (
+              <SkeletonLine
+                key={`sk-l-${i}`}
+                a={a}
+                b={b}
+                idx={i}
+                total={lines.length}
+                build={build}
+              />
+            )
+          })}
+          {stars.map((s, i) => (
+            <SkeletonStar key={`sk-s-${i}`} star={s} idx={i} total={stars.length} build={build} />
+          ))}
+        </G>
+      </Svg>
+      <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+    </View>
+  )
 }
 
 export function LunarConstellation({
@@ -412,6 +552,36 @@ export function LunarConstellation({
   // centre and shouldn't strobe.
   const prevLitRef = useRef(elementsLit)
   const prevCountRef = useRef(trainedCount)
+  // The zodiac-art SVG (a react-native-svg-transformer component
+  // nested inside our parent <Svg>) mis-sizes on the very first
+  // paint — it briefly renders at its file's intrinsic 1254 × 1254
+  // before honouring the width/height props, leaving the art
+  // clipped to the canvas's top-left for one frame. Hold the canvas
+  // behind the skeleton for 1000 ms so (a) the nested Svg has
+  // settled, and (b) the skeleton's drawing animation completes
+  // one full pass before we fade the real composition in — the
+  // user reads "the cosmos was plotted", then the real sign appears.
+  const [canvasReady, setCanvasReady] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setCanvasReady(true), 1500)
+    return () => clearTimeout(timer)
+  }, [])
+  // Rack-focus blur on the real Svg. The Svg is born matching the
+  // skeleton's blur intensity (18) so the cross-fade reads "same
+  // image, just dissolving"; then over 700 ms after canvasReady
+  // the blur drains to 0 so the constellation + art comes into
+  // sharp focus. Without this the cross-fade jumps from BLURRED
+  // (skeleton) to SHARP (Svg) and the eye reads two visual
+  // registers instead of one continuous transition.
+  const revealBlur = useSharedValue(18)
+  useEffect(() => {
+    if (!canvasReady) return
+    revealBlur.value = withTiming(0, { duration: 700, easing: Easing.out(Easing.cubic) })
+  }, [canvasReady, revealBlur])
+  const revealBlurProps = useAnimatedProps(() => ({
+    intensity: revealBlur.value,
+  }))
+
   const [ignitionQueue, setIgnitionQueue] = useState<SequenceEl[]>([])
   const [ignitingKey, setIgnitingKey] = useState<string | null>(null)
   // Increments once per upward commit — seeds the burst's per-commit
@@ -528,52 +698,72 @@ export function LunarConstellation({
   return (
     <View style={styles.wrap}>
       <View style={styles.svgWrap}>
-        <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
-          <SvgGradients />
-          <DeepField drift={driftT} />
-          <AmbientField t={t} drift={driftT} />
-          {/* Random star winks — brief flashes that read as "the
+        {/* Skeleton wrapped in Animated.View with `exiting` so it
+            stays alive (fading out over 320 ms) while the real Svg
+            below fades in (260 ms). Their opacities overlap — the
+            user reads "skeleton dissolving into the real
+            constellation" with no blank-canvas frame in between. */}
+        {canvasReady ? null : (
+          <Animated.View
+            style={StyleSheet.absoluteFill}
+            exiting={FadeOut.duration(320)}
+            pointerEvents="none"
+          >
+            <CanvasSkeleton
+              stars={stars}
+              lines={zodiac.lines}
+              transform={SIGN_CONSTELLATION_TRANSFORM[sign]}
+            />
+          </Animated.View>
+        )}
+        {canvasReady ? (
+          <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(260)}>
+            <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
+              <SvgGradients />
+              <DeepField drift={driftT} />
+              <AmbientField t={t} drift={driftT} />
+              {/* Random star winks — brief flashes that read as "the
               sky is alive". Rendered with the background field so
               they share the atmospheric layer. */}
-          <StarWinks t={t} />
-          {/* Three shooting stars staggered in phase and crossing
+              <StarWinks t={t} />
+              {/* Three shooting stars staggered in phase and crossing
               the canvas at different heights — the field feels
               alive without any single streak being constant. */}
-          <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
-          <ShootingStar t={t} cycleDiv={1.6} phase={0.42} startY={H * 0.15} endY={H * 0.85} />
-          <ShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
-          <AmbientGlow cx={cx} cy={cy} />
-          <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
-          {/* Cosmic dust — drifting motes catching ambient light.
+              <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
+              <ShootingStar t={t} cycleDiv={1.6} phase={0.42} startY={H * 0.15} endY={H * 0.85} />
+              <ShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
+              <AmbientGlow cx={cx} cy={cy} />
+              <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
+              {/* Cosmic dust — drifting motes catching ambient light.
               Sits between the nebula and the lion engraving so it
               feels like atmosphere passing through the foreground. */}
-          <CosmicDust t={t} />
-          {/* Atmospheric sign art — sits BEHIND the field stars and
+              <CosmicDust t={t} />
+              {/* Atmospheric sign art — sits BEHIND the field stars and
               the animated constellation system. The strong card
               vignette below + the lion's already-faded opacity do
               the blending; a feathered SVG <Mask> wrapping this
               was tried but react-native-svg's Mask doesn't compose
               cleanly over nested SVGs (the lion disappeared). */}
-          <ZodiacEngraving
-            {...SIGN_ENGRAVINGS[sign]}
-            progress={Math.min(1, trainedCount / TARGET_DAYS)}
-            breathT={breathT}
-          />
-          {/* BalanceSwirls removed — the zodiac-art SVGs come with
+              <ZodiacEngraving
+                {...SIGN_ENGRAVINGS[sign]}
+                progress={Math.min(1, trainedCount / TARGET_DAYS)}
+                breathT={breathT}
+              />
+              {/* BalanceSwirls removed — the zodiac-art SVGs come with
               their own ornate decorative rings that balance the
               composition. The added Bézier strokes conflicted
               with the assets' hand-drawn ornaments. */}
-          {/* Card vignette — frames the composition by darkening
+              {/* Card vignette — frames the composition by darkening
               the corners, ties the atmospheric backdrop (nebula +
               lion) into a single body before the focal layer
               renders on top. */}
-          <Rect x={0} y={0} width={W} height={H} fill="url(#cardVignette)" />
-          {/* Vertical edge fade — separately dissolves top + bottom
+              <Rect x={0} y={0} width={W} height={H} fill="url(#cardVignette)" />
+              {/* Vertical edge fade — separately dissolves top + bottom
               of the card into the page background so the art
               doesn't start/end on a hard horizontal line. */}
-          <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
-          <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
-          {/* Animated constellation — stars + connecting lines that
+              <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
+              <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+              {/* Animated constellation — stars + connecting lines that
               ignite day-by-day with progress. Now scaled 0.7 about
               the asterism's own centre + shifted so the figure
               sits INSIDE the ornate ring of the leo-new-art.svg
@@ -582,81 +772,93 @@ export function LunarConstellation({
               native bbox to [28..183, 24..150]; the leading
               translate(69, 57) brings the result back centred on
               the lion's body at canvas (174, 144). */}
-          <G transform={SIGN_CONSTELLATION_TRANSFORM[sign]}>
-            {litCluster ? (
-              <>
-                <LitClusterAura
-                  cx={litCluster.cx}
-                  cy={litCluster.cy}
-                  r={litCluster.r}
-                  breathT={breathT}
+              <G transform={SIGN_CONSTELLATION_TRANSFORM[sign]}>
+                {litCluster ? (
+                  <>
+                    <LitClusterAura
+                      cx={litCluster.cx}
+                      cy={litCluster.cy}
+                      r={litCluster.r}
+                      breathT={breathT}
+                    />
+                    <LitClusterMotes cx={litCluster.cx} cy={litCluster.cy} r={litCluster.r} t={t} />
+                  </>
+                ) : null}
+                <BaseLayer
+                  zodiac={zodiac}
+                  stars={stars}
+                  slowT={slowT}
+                  radialPulse={radialPulse}
+                  t={t}
                 />
-                <LitClusterMotes cx={litCluster.cx} cy={litCluster.cy} r={litCluster.r} t={t} />
-              </>
-            ) : null}
-            <BaseLayer
-              zodiac={zodiac}
-              stars={stars}
-              slowT={slowT}
-              radialPulse={radialPulse}
-              t={t}
-            />
-            <LitLines
-              zodiac={zodiac}
-              stars={stars}
-              litKeys={litKeys}
-              nextEl={nextEl}
-              ignitingKey={ignitingKey}
-              litPulse={litPulse}
-              breathT={breathT}
-              lineDepth={lineDepth}
-              t={t}
-            />
-            <StarsLayer
-              stars={stars}
-              litKeys={litKeys}
-              nextEl={nextEl}
-              t={t}
-              ignitingKey={ignitingKey}
-              intensity={intensity}
-              litPulse={litPulse}
-              starRecency={starRecency}
-              breathT={breathT}
-              starDepth={starDepth}
-            />
-            <IgnitingOverlay
-              zodiac={zodiac}
-              stars={stars}
-              ignitingKey={ignitingKey}
-              igniteT={igniteT}
-            />
-          </G>
-          {/* CenterOrb + CenterScrim removed — they were the
+                <LitLines
+                  zodiac={zodiac}
+                  stars={stars}
+                  litKeys={litKeys}
+                  nextEl={nextEl}
+                  ignitingKey={ignitingKey}
+                  litPulse={litPulse}
+                  breathT={breathT}
+                  lineDepth={lineDepth}
+                  t={t}
+                />
+                <StarsLayer
+                  stars={stars}
+                  litKeys={litKeys}
+                  nextEl={nextEl}
+                  t={t}
+                  ignitingKey={ignitingKey}
+                  intensity={intensity}
+                  litPulse={litPulse}
+                  starRecency={starRecency}
+                  breathT={breathT}
+                  starDepth={starDepth}
+                />
+                <IgnitingOverlay
+                  zodiac={zodiac}
+                  stars={stars}
+                  ignitingKey={ignitingKey}
+                  igniteT={igniteT}
+                />
+              </G>
+              {/* CenterOrb + CenterScrim removed — they were the
               luminous well behind the giant centre number. With
               the count now living as a small chip at the canvas
               floor (numberRow.marginTop 122), the orb was an
               orphan magenta wash competing with the asterism. */}
-          <StarBurst
-            cx={cx}
-            cy={cy}
-            pulse={radialPulse}
-            burstId={burstId}
-            trainedCount={trainedCount}
-          />
-          {/* Anticipation crown — appears from day 21 onward, a
+              <StarBurst
+                cx={cx}
+                cy={cy}
+                pulse={radialPulse}
+                burstId={burstId}
+                trainedCount={trainedCount}
+              />
+              {/* Anticipation crown — appears from day 21 onward, a
               tenue cream ring around the canvas centre that grows +
               brightens approaching day 28. Builds psychological
               tension for the final stretch. */}
-          {trainedCount >= 21 && !isComplete ? (
-            <AnticipationCrown
-              cx={cx}
-              cy={cy}
-              proximity={Math.min(1, (trainedCount - 20) / 8)}
-              breathT={breathT}
+              {trainedCount >= 21 && !isComplete ? (
+                <AnticipationCrown
+                  cx={cx}
+                  cy={cy}
+                  proximity={Math.min(1, (trainedCount - 20) / 8)}
+                  breathT={breathT}
+                />
+              ) : null}
+              {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
+            </Svg>
+            {/* Rack-focus blur. Born at 18 (matching the skeleton's
+                BlurView) so the cross-fade reads as a single image
+                dissolving; ramps to 0 over 700 ms so the
+                constellation + art comes into sharp focus. */}
+            <AnimatedBlurView
+              animatedProps={revealBlurProps}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
             />
-          ) : null}
-          {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
-        </Svg>
+          </Animated.View>
+        ) : null}
       </View>
 
       {/* Chip footer — count + denominator rendered as a proper
@@ -3757,6 +3959,15 @@ const styles = StyleSheet.create({
   svg: {
     width: '100%',
     height: '100%',
+  },
+  // Static placeholder that fills the canvas frame while the SVG's
+  // nested zodiac-art image settles its size (~2 RAFs). Same bg as
+  // the screen so only the bronze hairline border reads during the
+  // hold; the 260 ms FadeIn on the real composition that follows is
+  // what carries the reveal.
+  canvasSkeleton: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.bg,
   },
   // Footer container — sits directly below the SVG canvas so the
   // chip lives in its own row, never overlapping the constellation.
