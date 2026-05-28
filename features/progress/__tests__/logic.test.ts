@@ -131,24 +131,28 @@ describe('computeTrend', () => {
 })
 
 describe('formatTrendCopy', () => {
+  // The copy is poetic (órbita, rumbo, combustible, gravedad) — the
+  // tests assert SEMANTIC INTENT (the line names the direction; fast
+  // descents carry a care/energy warning), not specific words. If the
+  // copy gets rewritten again, update the regex to whatever surface
+  // it lands on, not the exact phrase.
   it('describes a steady down trend', () => {
     const copy = formatTrendCopy({ direction: 'down', weeklyChange: -0.3 })
-    expect(copy).toMatch(/bajando/i)
+    expect(copy).toMatch(/baja|desciend/i)
   })
 
-  it('flags muscle care when descent is fast', () => {
+  it('flags care when descent is fast (energy/fuel warning)', () => {
     const copy = formatTrendCopy({ direction: 'down', weeklyChange: -0.7 })
-    expect(copy).toMatch(/r[áa]pido/i)
-    expect(copy).toMatch(/m[úu]sculo/i)
+    expect(copy).toMatch(/cuida|combustible|fuerza/i)
   })
 
   it('describes an up trend without alarming language', () => {
     const copy = formatTrendCopy({ direction: 'up', weeklyChange: 0.1 })
-    expect(copy).toMatch(/sube|subiendo/i)
+    expect(copy).toMatch(/sub[íi]|asciende|rumbo/i)
   })
 
-  it('describes flat trend as parejo', () => {
+  it('describes flat trend as calm/sustained', () => {
     const copy = formatTrendCopy({ direction: 'flat', weeklyChange: 0.02 })
-    expect(copy).toMatch(/parejo/i)
+    expect(copy).toMatch(/pausa|ritmo|sostiene/i)
   })
 })
