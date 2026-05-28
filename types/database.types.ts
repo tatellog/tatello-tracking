@@ -400,6 +400,7 @@ export type Database = {
           height_cm: number | null
           id: string
           is_beta: boolean
+          is_dev: boolean
           monthly_focus: string | null
           notification_window: string | null
           onboarding_completed_at: string | null
@@ -423,6 +424,7 @@ export type Database = {
           height_cm?: number | null
           id: string
           is_beta?: boolean
+          is_dev?: boolean
           monthly_focus?: string | null
           notification_window?: string | null
           onboarding_completed_at?: string | null
@@ -446,6 +448,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           is_beta?: boolean
+          is_dev?: boolean
           monthly_focus?: string | null
           notification_window?: string | null
           onboarding_completed_at?: string | null

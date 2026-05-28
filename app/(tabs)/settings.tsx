@@ -331,7 +331,7 @@ function SettingsBody() {
               </View>
             </Pressable>
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-            {__DEV__ ? (
+            {profile?.is_dev ? (
               <Pressable
                 onPress={() => router.push('/dev-constellations')}
                 accessibilityRole="button"
