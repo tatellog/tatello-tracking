@@ -1285,7 +1285,7 @@ function StarNode({
           as the bright spark inside the coloured halo. */}
       {showGlyph ? (
         <AnimatedG animatedProps={glyphAnim}>
-          <G color="#FFE9D6">{GLYPHS[dim.key]}</G>
+          <G color={colors.leche}>{GLYPHS[dim.key]}</G>
         </AnimatedG>
       ) : null}
       {/* Focus label moved out of the SVG to a sibling RN Text

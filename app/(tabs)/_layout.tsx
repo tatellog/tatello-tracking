@@ -6,6 +6,7 @@ import OrbitIcon from '@/assets/icons/orbit-vect.svg'
 import ProgressIcon from '@/assets/icons/progress-vect.svg'
 import TodayIcon from '@/assets/icons/today-vect.svg'
 import { AppTabBar } from '@/features/tabs/components'
+import { colors } from '@/theme'
 
 type IconProps = {
   color: string
@@ -13,7 +14,10 @@ type IconProps = {
   focused?: boolean
 }
 
-/* Tab glyphs. Illustrated white vectors from assets/icons.
+/* Tab glyphs. Tintable line vectors from assets/icons (every fill
+ * is `currentColor` so the parent decides the paint — see the
+ * docstring on dimensionGlyphs.tsx for the rule).
+ *
  * Hierarchy treatment:
  *   • inactive  → opacity 0.45 + no scale     (recedes)
  *   • active    → opacity 1.0  + scale 1.08   (pops)
@@ -31,11 +35,19 @@ function TabIcon({
   Component: React.ComponentType<{
     width: number
     height: number
+    color?: string
     preserveAspectRatio?: string
   }>
   bold?: boolean
 }) {
-  const icon = <Component width={size} height={size} preserveAspectRatio="xMidYMid meet" />
+  const icon = (
+    <Component
+      width={size}
+      height={size}
+      color={colors.leche}
+      preserveAspectRatio="xMidYMid meet"
+    />
+  )
   return (
     <View
       style={{

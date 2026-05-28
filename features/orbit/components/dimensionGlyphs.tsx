@@ -3,25 +3,20 @@ import { type ReactNode } from 'react'
 import BodyVect from '@/assets/icons/body-vect.svg'
 import CycleVect from '@/assets/icons/cycle-vect.svg'
 import EnergyVect from '@/assets/icons/energy-vect.svg'
-import FoodVect from '@/assets/icons/food-vect-rose.svg'
+import FoodVect from '@/assets/icons/food-vect.svg'
 import MindVect from '@/assets/icons/mind-vect.svg'
 import MoonVect from '@/assets/icons/moon-vect.svg'
 import { type DimensionKey } from '../logic'
 
 /*
- * Illustrated rose-gold dimension glyphs. All six are now TRUE
- * vector SVGs imported via react-native-svg-transformer and
- * rendered at 24×24 inside the StarNode's parent SVG.
+ * Dimension glyphs — 24×24 line illustrations, one per dimension.
  *
- * Migrated from a mix of inline <Path> + Figma-export raster
- * PNGs to a homogeneous vector source — sharper at any scale,
- * one render pipeline, smaller install footprint.
- *
- * Note: the vector files use hard-coded fills (rose-pink
- * palette), so they don't inherit `currentColor` even though
- * they're vector. If we ever want per-dimension tinting, the
- * SVGs need their paths rewritten to use `currentColor` for
- * fill/stroke.
+ * The SVGs are tintable: every fill is `currentColor`, so the
+ * paint is whatever colour the parent `<G color="...">` provides.
+ * That keeps a single source of truth — `theme/colors.ts` — for
+ * what tint the glyph reads as in each context (cream as a bright
+ * core inside the coloured halo, dimension colour for solo chips,
+ * etc).
  */
 export const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: <BodyVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
