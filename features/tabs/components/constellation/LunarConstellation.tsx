@@ -186,6 +186,7 @@ export function LunarConstellation({
                   slowT={slowT}
                   radialPulse={radialPulse}
                   t={t}
+                  litKeys={litKeys}
                 />
                 <LitLines
                   zodiac={zodiac}

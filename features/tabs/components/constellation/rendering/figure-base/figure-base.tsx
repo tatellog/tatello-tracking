@@ -16,6 +16,7 @@ export function BaseLayer({
   slowT,
   radialPulse,
   t,
+  litKeys,
 }: {
   zodiac: ZodiacDef
   stars: Resolved[]
@@ -31,6 +32,10 @@ export function BaseLayer({
   /** 8 s clock shared with the lit-star layer so the placeholder
    *  stars breathe + twinkle on the same heartbeat (just dimmer). */
   t: SharedValue<number>
+  /** Skip placeholder rendering for stars already lit by StarsLayer.
+   *  Without this the lit stars draw twice (placeholder cream sparkle
+   *  + lit halo on top) — wasted worklets and SVG overdraw. */
+  litKeys: Set<string>
 }) {
   // Silhouette opacity wave — a slow breath on the unlit lines so
   // the placeholder figure feels alive, plus a parabolic flash on
@@ -69,9 +74,9 @@ export function BaseLayer({
           )
         })}
       </AnimatedG>
-      {stars.map((s, i) => (
-        <PlaceholderStar key={`bs-${i}`} s={s} i={i} t={t} />
-      ))}
+      {stars.map((s, i) =>
+        litKeys.has(`star-${i}`) ? null : <PlaceholderStar key={`bs-${i}`} s={s} i={i} t={t} />,
+      )}
     </>
   )
 }
