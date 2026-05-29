@@ -37,6 +37,8 @@ import { AmbientGlow, SvgGradients } from './constellation/rendering/static'
 import { H, PAD, TARGET_DAYS, W } from './constellation/constants'
 import { SIGN_CONSTELLATION_TRANSFORM, SIGN_ENGRAVINGS } from './constellation/data/sign-maps'
 import { deriveProgress } from './constellation/data/derive-progress'
+import { useFigureGeometry } from './constellation/data/use-figure-geometry'
+import { useLitMaps } from './constellation/data/use-lit-maps'
 import type { Props, Resolved, SequenceEl } from './constellation/types'
 
 export function LunarConstellation({
@@ -64,123 +66,14 @@ export function LunarConstellation({
     [zodiac],
   )
 
-  // The figure's "alpha" — the star with the lowest magnitude. Used
-  // to bias the nebula toward the alpha's quadrant so the sky has
-  // directionality: the warm patch sits where the brightest star
-  // radiates, the cool patch sits in the opposite quadrant. Without
-  // this the canvas reads as a flat magenta wash; with it the
-  // constellation feels placed somewhere specific in space.
-  const alphaIdx = useMemo(() => {
-    let minMag = Infinity
-    let idx = 0
-    for (let i = 0; i < stars.length; i++) {
-      if (stars[i]!.mag < minMag) {
-        minMag = stars[i]!.mag
-        idx = i
-      }
-    }
-    return idx
-  }, [stars])
-
-  const alphaPos = useMemo(() => {
-    const a = stars[alphaIdx]
-    return a ? { x: a.x, y: a.y } : { x: W / 2, y: H / 2 }
-  }, [stars, alphaIdx])
-
-  // BFS distance map from the alpha through the figure's line graph.
-  // Drives the cascading "ripple" breath: the alpha pulses first, then
-  // each shell of connected stars ~320 ms later. The constellation
-  // feels like a neural network firing outward from a source instead
-  // of a chorus chanting in unison — narrative weight on the alpha as
-  // origin, with the rest of the figure responding to it.
-  const starDepth = useMemo(() => {
-    const adj: number[][] = stars.map(() => [])
-    for (const [a, b] of zodiac.lines) {
-      adj[a]?.push(b)
-      adj[b]?.push(a)
-    }
-    const depth = new Map<number, number>()
-    depth.set(alphaIdx, 0)
-    const queue: number[] = [alphaIdx]
-    while (queue.length > 0) {
-      const u = queue.shift()!
-      const d = depth.get(u) ?? 0
-      for (const v of adj[u] ?? []) {
-        if (depth.has(v)) continue
-        depth.set(v, d + 1)
-        queue.push(v)
-      }
-    }
-    return depth
-  }, [stars, zodiac.lines, alphaIdx])
-
-  // Line depth = whichever of its endpoints is closer to the alpha.
-  // A line lights up in sync with its nearest-to-alpha endpoint so
-  // the wave radiates through stars and lines together.
-  const lineDepth = useMemo(
-    () =>
-      zodiac.lines.map(([a, b]) => {
-        const da = starDepth.get(a) ?? 0
-        const db = starDepth.get(b) ?? 0
-        return Math.min(da, db)
-      }),
-    [zodiac.lines, starDepth],
-  )
-
-  const litKeys = useMemo(() => {
-    const set = new Set<string>()
-    for (let i = 0; i < Math.min(elementsLit, sequence.length); i++) {
-      const el = sequence[i]
-      if (el) set.add(`${el.type}-${el.idx}`)
-    }
-    return set
-  }, [elementsLit, sequence])
-
-  // Centroid + radius of the LIT star cluster — drives a warm
-  // cream-magenta wash that "bathes" the lit half of the figure
-  // (LitClusterAura, rendered between FieldStars and LitLines so
-  // every lit star sits inside the aura). Recomputed only when the
-  // set of lit stars changes.
-  const litCluster = useMemo(() => {
-    const litStars: { x: number; y: number }[] = []
-    for (let i = 0; i < stars.length; i++) {
-      if (litKeys.has(`star-${i}`)) {
-        const s = stars[i]
-        if (s) litStars.push({ x: s.x, y: s.y })
-      }
-    }
-    if (litStars.length === 0) return null
-    // Centroid: simple mean of x/y.
-    const cx = litStars.reduce((acc, p) => acc + p.x, 0) / litStars.length
-    const cy = litStars.reduce((acc, p) => acc + p.y, 0) / litStars.length
-    // Radius: max distance from centroid to any lit star, +24 padding
-    // so the wash extends past the cluster edges into the surrounding
-    // sky (otherwise the aura abruptly stops at the outer stars).
-    const maxDist = litStars.reduce((acc, p) => Math.max(acc, Math.hypot(p.x - cx, p.y - cy)), 0)
-    return { cx, cy, r: maxDist + 24, count: litStars.length }
-  }, [stars, litKeys])
-
-  // Map of lit-star idx → days since the user marked it. Reads:
-  // recency 0 = today, 7 = a week ago, 27 = nearly four weeks ago.
-  // Used by LitStar to scale its halo intensity — recent stars shine
-  // bright, older ones taper to a quiet glow. Reinforces the app's
-  // "body remembers recent rhythm more vividly than old" metaphor.
-  const starRecency = useMemo(() => {
-    const trainingDayIndices: number[] = []
-    for (let i = 0; i <= todayIdx; i++) {
-      if (trained[i]) trainingDayIndices.push(i)
-    }
-    const map = new Map<number, number>()
-    for (let k = 0; k < Math.min(elementsLit, sequence.length); k++) {
-      const el = sequence[k]
-      if (el?.type !== 'star') continue
-      const dayIdx = trainingDayIndices[k]
-      if (dayIdx !== undefined) {
-        map.set(el.idx, todayIdx - dayIdx)
-      }
-    }
-    return map
-  }, [trained, todayIdx, elementsLit, sequence])
+  const { alphaPos, starDepth, lineDepth } = useFigureGeometry(zodiac, stars)
+  const { litKeys, litCluster, starRecency } = useLitMaps({
+    elementsLit,
+    sequence,
+    trained,
+    todayIdx,
+    stars,
+  })
 
   // When the user has marked today, suppress the "next" affordance so
   // neither the dashed ring around the upcoming star nor the dashed
