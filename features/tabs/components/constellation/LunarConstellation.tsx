@@ -78,7 +78,7 @@ export function LunarConstellation({
   // again and the next affordance reappears.
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
-  const { t, slowT, breathT, driftT } = useConstellationClocks()
+  const { t, breathT, driftT } = useConstellationClocks()
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence })
@@ -175,7 +175,6 @@ export function LunarConstellation({
                 <BaseLayer
                   zodiac={zodiac}
                   stars={stars}
-                  slowT={slowT}
                   radialPulse={radialPulse}
                   t={t}
                   litKeys={litKeys}

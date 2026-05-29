@@ -10,12 +10,12 @@ import {
 
 /* ─ Constellation clocks ───────────────────────────────────────────
  *
- * Two clocks share-drive every animation:
+ * Three clocks share-drive every animation:
  *   t        — 8 s loop. Star breathing, ambient bucket twinkle,
- *              centre bloom ambient pulse, completion rings.
- *   slowT    — 5 s loop. The base silhouette breath so the
- *              placeholder lines+stars feel like a constellation
- *              waiting (not a static stamp), especially at count=0.
+ *              centre bloom ambient pulse, completion rings. The
+ *              placeholder silhouette breath also rides this clock
+ *              at factor 8/5 (BaseLayer derives a 5 s wave internally),
+ *              so we don't need a dedicated SharedValue for it.
  *   breathT  — 16 s loop. Drives the cascading "ripple" breath —
  *              every cycle the alpha brightens first, then each
  *              shell of connected stars ~320 ms later, until the
@@ -32,27 +32,23 @@ import {
 
 export function useConstellationClocks(): {
   t: SharedValue<number>
-  slowT: SharedValue<number>
   breathT: SharedValue<number>
   driftT: SharedValue<number>
 } {
   const t = useSharedValue(0)
-  const slowT = useSharedValue(0)
   const breathT = useSharedValue(0)
   const driftT = useSharedValue(0)
 
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
-    slowT.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
     breathT.value = withRepeat(withTiming(1, { duration: 16000, easing: Easing.linear }), -1, false)
     driftT.value = withRepeat(withTiming(1, { duration: 42000, easing: Easing.linear }), -1, false)
     return () => {
       cancelAnimation(t)
-      cancelAnimation(slowT)
       cancelAnimation(breathT)
       cancelAnimation(driftT)
     }
-  }, [t, slowT, breathT, driftT])
+  }, [t, breathT, driftT])
 
-  return { t, slowT, breathT, driftT }
+  return { t, breathT, driftT }
 }
