@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
@@ -8,18 +7,21 @@ import Animated, {
   FadeIn,
   useAnimatedProps,
   useAnimatedStyle,
-  useDerivedValue,
   useSharedValue,
   withRepeat,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
 
 import NorthStar from '@/assets/icons/north-star.svg'
 import { PrimaryCta } from '@/components/PrimaryCta'
-import { ProgressBar, WizardBackdrop } from '@/features/onboarding/components'
+import {
+  AtmosphericSky,
+  DustMote,
+  ProgressBar,
+  WizardBackdrop,
+} from '@/features/onboarding/components'
 import { colors, typography } from '@/theme'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
@@ -36,6 +38,11 @@ const AnimatedG = Animated.createAnimatedComponent(G)
  * behind the warm core, creating aerial perspective. We keep ~60-70%
  * negative space; every alpha is whisper-low. Dark only — every layer
  * terminates in bg (#0A0608) at opacity 0, never cold black.
+ *
+ * AtmosphericSky + DustMote now live in features/onboarding/components
+ * so step 2 (que-hace) breathes with the same sky. This step mounts
+ * AtmosphericSky with its DEFAULT glow (38%/42%/65%) so it renders
+ * exactly as before the extraction.
  *
  * Z-stack back-to-front:
  *
@@ -151,107 +158,6 @@ const DUST: {
   { x: 0.42, baseR: 0.6, period: 1.25, sway: 16, opacity: 0.28, phase: 0.18 },
   { x: 0.68, baseR: 0.7, period: 1.15, sway: 12, opacity: 0.3, phase: 0.5 },
 ]
-
-/*
- * Full-screen atmosphere. Sits behind the 320px hero stage and fills
- * the whole screen so the light is no longer trapped on a black
- * rectangle. Three static expo-linear / radial layers, all whisper
- * low (alphas 0.03–0.12), all resolving to transparent so the bg
- * shows through. Static on purpose — the recipe keeps motion in the
- * hero so this never competes with it. pointerEvents none.
- */
-function AtmosphericSky() {
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* S0. Cool edge wash — diagonal índigo (sueno) → transparent →
-          silver-blue (ciclo). The cold stratum that recedes and gives
-          aerial perspective the old all-warm scene lacked. */}
-      <LinearGradient
-        colors={['rgba(124,143,255,0.06)', 'rgba(124,143,255,0)', 'rgba(181,196,221,0.05)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* S1. Vertical density — lightens the ceiling, sinks the floor
-          into a near-bg shadow so the canvas reads top→bottom. */}
-      <LinearGradient
-        colors={['rgba(10,6,8,0)', 'rgba(10,6,8,0)', 'rgba(8,4,6,0.6)']}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* S2. Off-centre warm glow — the "sun outside the frame" at
-          38%/42% (deliberately not coaxial). Drawn with an SVG radial
-          so it has true falloff to transparent. */}
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Defs>
-          <RadialGradient id="skyGlow" cx="38%" cy="42%" r="65%">
-            <Stop offset="0" stopColor={colors.magentaHot} stopOpacity="0.10" />
-            <Stop offset="0.5" stopColor={colors.magentaDeep} stopOpacity="0.04" />
-            <Stop offset="1" stopColor={colors.magentaDeep} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Circle cx="38%" cy="42%" r="65%" fill="url(#skyGlow)" />
-      </Svg>
-    </View>
-  )
-}
-
-function DustMote({
-  x,
-  baseR,
-  period,
-  sway,
-  opacity,
-  phase,
-  clock,
-}: {
-  x: number
-  baseR: number
-  period: number
-  sway: number
-  opacity: number
-  phase: number
-  clock: SharedValue<number>
-}) {
-  const baseX = x * STAGE
-  // Suspended-light halo (fake falloff): the outer soft ring and the
-  // inner point share one transform so the mote glows instead of being
-  // a solid dot. The rising kinematics (position + fade curve) are
-  // computed ONCE here; halo/core only differ in the final opacity
-  // factor, so they read this derived value instead of each recomputing
-  // the same sin/modulo per frame (×5 motes = 10 worklets → 5).
-  const motion = useDerivedValue(() => {
-    'worklet'
-    const u = (clock.value / period + phase) % 1
-    const y = STAGE + 10 - u * (STAGE + 20)
-    const cx = baseX + Math.sin(u * Math.PI * 2) * sway
-    let op = opacity
-    if (u < 0.12) op *= u / 0.12
-    else if (u > 0.88) op *= 1 - (u - 0.88) / 0.12
-    return { cx, cy: y, op }
-  })
-  const haloProps = useAnimatedProps(() => {
-    'worklet'
-    return { cx: motion.value.cx, cy: motion.value.cy, opacity: motion.value.op * 0.3 }
-  })
-  const coreProps = useAnimatedProps(() => {
-    'worklet'
-    return { cx: motion.value.cx, cy: motion.value.cy, opacity: motion.value.op }
-  })
-  return (
-    <>
-      <AnimatedCircle
-        cx={baseX}
-        cy={STAGE}
-        r={baseR * 3}
-        fill="#F8DBCE"
-        animatedProps={haloProps}
-      />
-      <AnimatedCircle cx={baseX} cy={STAGE} r={baseR} fill="#F8DBCE" animatedProps={coreProps} />
-    </>
-  )
-}
 
 function ManifestoHero() {
   // 6 s breath / glow / core / flare / icon clock.
@@ -482,7 +388,7 @@ function ManifestoHero() {
 
         {/* 5. Cosmic dust motes — suspended light, rising (rides dust drift). */}
         {DUST.map((d, i) => (
-          <DustMote key={`dust-${i}`} {...d} clock={dust} />
+          <DustMote key={`dust-${i}`} {...d} clock={dust} stage={STAGE} />
         ))}
 
         {/* 6. Perimeter micro-stars — nearest field, warm, halo + 9px
@@ -567,7 +473,8 @@ export default function ManifiestoScreen() {
       <WizardBackdrop />
       {/* Full-screen atmosphere — sits above the shared backdrop but
           behind all content, so depth fills the whole screen rather
-          than living only inside the 320px hero island. */}
+          than living only inside the 320px hero island. Default glow
+          (38%/42%/65%) = unchanged from before the extraction. */}
       <AtmosphericSky />
       <View style={styles.progressWrap}>
         <ProgressBar current={1} total={12} />
