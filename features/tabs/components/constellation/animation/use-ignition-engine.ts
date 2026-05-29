@@ -42,7 +42,6 @@ export function useIgnitionEngine(opts: {
   radialPulse: SharedValue<number>
   plusOne: SharedValue<number>
   rayPresence: SharedValue<number>
-  burstId: number
 } {
   const { trainedCount, elementsLit, sequence, isComplete } = opts
 
@@ -51,9 +50,6 @@ export function useIgnitionEngine(opts: {
 
   const [ignitionQueue, setIgnitionQueue] = useState<SequenceEl[]>([])
   const [ignitingKey, setIgnitingKey] = useState<string | null>(null)
-  // Increments once per upward commit — seeds the burst's per-commit
-  // variability (spark count, jitter, hue) so no two fireworks match.
-  const [burstId, setBurstId] = useState(0)
 
   const igniteT = useSharedValue(0)
   const numberPulse = useSharedValue(0)
@@ -120,8 +116,6 @@ export function useIgnitionEngine(opts: {
     )
     radialPulse.value = 0
     radialPulse.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
-    // Bump the burst seed so this firework varies from the last one.
-    setBurstId((n) => n + 1)
 
     if (elementsLit > prevLit) {
       // Field stars don't run through the ignition flash — they just
@@ -171,6 +165,5 @@ export function useIgnitionEngine(opts: {
     radialPulse,
     plusOne,
     rayPresence,
-    burstId,
   }
 }

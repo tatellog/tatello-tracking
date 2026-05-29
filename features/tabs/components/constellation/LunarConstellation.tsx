@@ -80,16 +80,8 @@ export function LunarConstellation({
 
   const { t, slowT, breathT, driftT } = useConstellationClocks()
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
-  const {
-    ignitingKey,
-    igniteT,
-    numberPulse,
-    displayedCount,
-    litPulse,
-    radialPulse,
-    plusOne,
-    burstId,
-  } = useIgnitionEngine({ trainedCount, elementsLit, sequence, isComplete })
+  const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
+    useIgnitionEngine({ trainedCount, elementsLit, sequence, isComplete })
 
   return (
     <View style={styles.wrap}>
@@ -223,13 +215,7 @@ export function LunarConstellation({
               the count now living as a small chip at the canvas
               floor (numberRow.marginTop 122), the orb was an
               orphan magenta wash competing with the asterism. */}
-              <StarBurst
-                cx={cx}
-                cy={cy}
-                pulse={radialPulse}
-                burstId={burstId}
-                trainedCount={trainedCount}
-              />
+              <StarBurst cx={cx} cy={cy} pulse={radialPulse} trainedCount={trainedCount} />
               {/* Anticipation crown — appears from day 21 onward, a
               tenue cream ring around the canvas centre that grows +
               brightens approaching day 28. Builds psychological
