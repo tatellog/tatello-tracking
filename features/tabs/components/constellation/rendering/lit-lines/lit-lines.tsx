@@ -1,5 +1,5 @@
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
-import { Defs, Line, LinearGradient, Stop } from 'react-native-svg'
+import { Line } from 'react-native-svg'
 
 import type { ZodiacDef } from '../../../../zodiac/types'
 import { AnimatedG, AnimatedLine } from '../../animation/animated-components'
@@ -161,20 +161,10 @@ function LitLineFilament({
   })
   return (
     <AnimatedG animatedProps={filamentProps}>
-      <Defs>
-        {/* Gradient runs along the line in user space so it orients
-            to A→B, not to the SVG viewBox. Stops are bright at each
-            node and dim at the midpoint — each line reads as "two
-            stars connected by their own light" rather than a uniform
-            stroke. */}
-        <LinearGradient id={gradId} gradientUnits="userSpaceOnUse" x1={ax} y1={ay} x2={bx} y2={by}>
-          <Stop offset="0%" stopColor="#FFF6E5" stopOpacity={0.85} />
-          <Stop offset="15%" stopColor="#D9AE6F" stopOpacity={0.78} />
-          <Stop offset="50%" stopColor="#D9AE6F" stopOpacity={0.4} />
-          <Stop offset="85%" stopColor="#D9AE6F" stopOpacity={0.78} />
-          <Stop offset="100%" stopColor="#FFF6E5" stopOpacity={0.85} />
-        </LinearGradient>
-      </Defs>
+      {/* The per-line gradient `litLine-${idx}` lives globally in
+          SvgGradients (declared once per zodiac edge with stable
+          ids) so toggling litKeys doesn't create/destroy gradients
+          alongside the filaments themselves. */}
       {/* Three-layer light filament. Recoloured from magenta to
           warm cream-gold so magenta is reserved exclusively for the
           next-to-light action signal; lit lines + stars share one

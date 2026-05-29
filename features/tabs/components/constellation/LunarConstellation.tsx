@@ -107,7 +107,7 @@ export function LunarConstellation({
         {canvasReady ? (
           <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(260)}>
             <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
-              <SvgGradients />
+              <SvgGradients zodiac={zodiac} stars={stars} />
               <DeepField drift={driftT} />
               <AmbientField t={t} drift={driftT} />
               {/* Random star winks — brief flashes that read as "the

@@ -2,7 +2,10 @@ import { Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
 
-export function SvgGradients() {
+import type { ZodiacDef } from '../../../../zodiac/types'
+import type { Resolved } from '../../types'
+
+export function SvgGradients({ zodiac, stars }: { zodiac: ZodiacDef; stars: Resolved[] }) {
   return (
     <Defs>
       <RadialGradient id="starLit" cx="35%" cy="35%">
@@ -53,6 +56,37 @@ export function SvgGradients() {
         <Stop offset="94%" stopColor={colors.bg} stopOpacity={0.85} />
         <Stop offset="100%" stopColor={colors.bg} stopOpacity={1} />
       </LinearGradient>
+      {/* Per-line gradients for LitLineFilament. Declared globally
+          (one per zodiac edge) with stable ids `litLine-${idx}` so
+          they don't get reconciled when litKeys changes — the
+          previous version had a <Defs><LinearGradient> inside each
+          LitLineFilament instance, which forced create/destroy of
+          the gradient every time a line lit up or undid. Stops are
+          bright at each node and dim at the midpoint — each lit
+          line reads as "two stars connected by their own light"
+          rather than a uniform stroke. */}
+      {zodiac.lines.map(([a, b], idx) => {
+        const A = stars[a]
+        const B = stars[b]
+        if (!A || !B) return null
+        return (
+          <LinearGradient
+            key={`litLine-${idx}`}
+            id={`litLine-${idx}`}
+            gradientUnits="userSpaceOnUse"
+            x1={A.x}
+            y1={A.y}
+            x2={B.x}
+            y2={B.y}
+          >
+            <Stop offset="0%" stopColor="#FFF6E5" stopOpacity={0.85} />
+            <Stop offset="15%" stopColor="#D9AE6F" stopOpacity={0.78} />
+            <Stop offset="50%" stopColor="#D9AE6F" stopOpacity={0.4} />
+            <Stop offset="85%" stopColor="#D9AE6F" stopOpacity={0.78} />
+            <Stop offset="100%" stopColor="#FFF6E5" stopOpacity={0.85} />
+          </LinearGradient>
+        )
+      })}
     </Defs>
   )
 }
