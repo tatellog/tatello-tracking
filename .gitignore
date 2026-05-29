@@ -48,3 +48,8 @@ scripts/reset-onboarding.ts
 # generated native folders
 /ios
 /android
+
+# Refactor safety net — visual-diff captures stay local
+scripts/visual-diff/baseline/
+scripts/visual-diff/current/
+scripts/visual-diff/diff/

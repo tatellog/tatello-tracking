@@ -2,39 +2,40 @@
 
 _Documento maestro · fuente única de verdad sobre qué es Stelar_
 
-_Última actualización: Mayo 2026 · Versión 2.0 (Stelar C)_
+_Versión 3.0 · Mayo 2026_
+_Cambio principal vs v2.0: foco quirúrgico en pérdida de peso, lenguaje legalmente más conservador, separación de 3 capas de comunicación._
 
 ---
 
 ## La frase que lo resume todo
 
-**Stelar es pérdida de peso con inteligencia emocional.**
+**Stelar es una app de pérdida de peso sostenible.**
 
-La cifra existe. No la negamos. Pero no manda. **Tus patrones mandan.**
+Te ayuda a identificar qué impide tu constancia · sin dietas, sin reemplazar a tu coach, sin presión.
 
 ---
 
 ## Lo que Stelar hace de verdad
 
-Stelar te ayuda a bajar de peso entendiendo **por qué** te cuesta · no presionándote a hacerlo mejor.
+Stelar te acompaña en tu proceso de pérdida de peso entendiendo **por qué** te ha costado sostenerlo · no presionándote a hacerlo mejor.
 
-Mide lo que importa medir: calorías, macros, déficit, peso · pero los pone donde corresponde (en el contexto, no en el centro). Lo que pone en el centro es **el análisis de tus patrones**: por qué los viernes en la noche te dan atracones, por qué la semana 3 abandonas, qué emoción dispara cuál comportamiento.
+Trackea lo que importa medir cuando bajas de peso: calorías, macros, déficit, peso · pero los pone donde corresponde (en el contexto, no en el centro). Lo que pone en el centro es **el análisis de los patrones en tus propios datos**: cuándo tu consistencia baja, qué días son distintos, qué impide que sostengas el esfuerzo durante las semanas que requiere ver resultados.
 
-Es la app que tú, como fundadora, hubieras necesitado: rigor técnico para verificar que tu déficit es real y tu proteína está donde debe, **más** la inteligencia emocional para entender qué te impide sostener el esfuerzo cuando lo estás haciendo "todo bien" en el papel.
+Es la app que tú, como fundadora, hubieras necesitado: rigor técnico para verificar que tu déficit es real y tu proteína está donde debe, **más** la capacidad de verte a ti misma con claridad para entender qué te impide sostener el esfuerzo cuando lo estás haciendo "todo bien" en el papel.
 
 ---
 
 ## La filosofía central
 
-> _"Cada persona tiene un ritmo, energía y patrón distinto."_
+> _"Cada persona tiene un ritmo distinto."_
 
-Stelar parte de tres verdades sobre la naturaleza humana:
+Stelar parte de tres verdades:
 
-- No todos nos motivamos igual
-- No todos nos saboteamos igual
-- No todos funcionamos igual emocionalmente
+- No todas nos motivamos igual
+- No todas perdemos el ritmo por las mismas razones
+- No todas funcionamos igual durante el proceso
 
-Por eso la app no busca **forzarte a cumplir hábitos**. Busca **ayudarte a entender tu patrón** para evolucionar sin pelear contra ti misma.
+Por eso la app no busca **forzarte a cumplir hábitos**. Busca **ayudarte a entender tu patrón** para sostener tu pérdida de peso sin pelear contra ti misma.
 
 ---
 
@@ -49,13 +50,13 @@ El problema no es solo:
 El problema profundo es:
 
 - ✅ saber técnicamente qué hacer **y aun así no poder sostenerlo**
-- ✅ atracones nocturnos que arruinan semanas de déficit
-- ✅ abandono en la semana 3 cuando los resultados aún no llegan
-- ✅ comer ansiosa después de juntas largas
-- ✅ saltarse el desayuno cuando dormiste mal
-- ✅ comparar tu cuerpo en el espejo y perder motivación
+- ✅ ser consistente entre semana pero perder el ritmo los fines
+- ✅ abandonar en la semana 3 cuando los resultados aún no llegan
+- ✅ comer fuera de tu rutina después de eventos sociales o estrés
+- ✅ que un día "malo" se convierta en una semana entera abandonada
+- ✅ compararte en el espejo y perder la motivación que tenías ayer
 
-Las apps de fitness tradicionales (MyFitnessPal, Noom, Lose It!) **te dan números** y asumen que tú resolverás lo demás. Stelar **te da números + te ayuda a resolver lo demás**.
+Las apps de pérdida de peso tradicionales (MyFitnessPal, Noom, Lose It!) **te dan números** y asumen que tú resolverás lo demás. Stelar **te da números + te ayuda a verte mejor a ti misma** para que puedas resolver lo demás.
 
 ---
 
@@ -63,29 +64,26 @@ Las apps de fitness tradicionales (MyFitnessPal, Noom, Lose It!) **te dan númer
 
 > _"Tu energía deja patrones."_
 
-Tus emociones, tu motivación, tu sueño, tu alimentación, tu ciclo, tu ansiedad, tu hambre, tu hora de comer · **todo crea órbitas**.
+Tu motivación, tu sueño, tu alimentación, tu ciclo menstrual, tu hora de comer · todo crea ritmos. Stelar detecta esos ritmos **en tus propios datos** y te ayuda a entender:
 
-Stelar detecta esas órbitas y te ayuda a entender:
+- Qué días son distintos en tu rutina
+- Por qué los lunes estás en déficit y los viernes no
+- Qué semana del ciclo menstrual baja tu consistencia
+- Cuándo tu progreso fluye y cuándo se interrumpe
 
-- Qué disparó ese atracón del viernes
-- Por qué los lunes estás en déficit perfecto y los viernes no
-- Qué semana del ciclo menstrual baja tu adherencia
-- Cuándo floreces y cuándo colapsas
-- Qué te drena y qué te centra
-
-Mientras MyFitnessPal te dice _"comiste 2,300 cal, te pasaste 800"_, Stelar te dice _"llevas 3 viernes con atracones después de las 9pm · ¿qué pasa los viernes? Tu coach Stelar tiene 3 preguntas para ti."_
+Mientras MyFitnessPal te dice _"comiste 2,300 cal, te pasaste 800"_, Stelar te dice _"llevas 3 viernes con tu rutina interrumpida después de las 9pm · ¿algo pasa los viernes?"_
 
 ---
 
 ## Por qué la astrología sí importa
 
-La fecha de nacimiento NO se usa para "hoy conocerás al amor de tu vida".
+La fecha de nacimiento NO se usa para horóscopo ni predicción.
 
-Se usa como **un mapa simbólico de personalidad, energía y motivación**. Tu signo zodiacal se convierte en una constelación que se ilumina con tu progreso · estrella a estrella, entrenamiento a entrenamiento.
+Se usa como **un sistema de visualización de progreso**. Tu signo zodiacal se convierte en una constelación que se ilumina con tu consistencia · estrella a estrella, semana a semana.
 
-Es **onboarding emocional**: hace que la persona diga _"esto se siente hecho para mí"_.
+Es **una forma cálida de ver tu progreso** que reemplaza la gráfica de peso fría. Hace que la pérdida de peso se sienta como un viaje · no como un examen diario.
 
-Y es **gamificación honesta**: en lugar de mostrar "0.3 kg perdidos esta semana" como meta, Stelar te muestra tu constelación creciendo. La pérdida de peso ocurre en el background. El progreso se siente, no se persigue.
+En lugar de mostrar "0.3 kg perdidos esta semana" como meta, Stelar te muestra tu constelación creciendo. La pérdida de peso ocurre en el background. El progreso se siente, no se persigue.
 
 ---
 
@@ -93,29 +91,27 @@ Y es **gamificación honesta**: en lugar de mostrar "0.3 kg perdidos esta semana
 
 Una app de pérdida de peso radicalmente distinta que combina:
 
-- **Tracking técnico riguroso** (calorías, macros, déficit, peso)
-- **Detección de patrones emocionales** (atracones, abandono, autosabotaje)
-- **Psicología conductual aplicada** (entender el por qué, no solo el qué)
+- **Tracking riguroso de calorías, macros, déficit y peso** (los datos que importan para bajar de peso)
+- **Análisis de patrones en tus propios datos** (cuándo tu consistencia baja)
 - **Visualización no-numérica** (constelaciones en lugar de gráficas de peso)
-- **AI companion** (coach que aprende tus disparadores)
-- **Identidad como sistema** (alineación con quién eres, no con quién deberías ser)
+- **Coach cálido** (acompaña sin presionar, sin diagnosticar, sin recetar)
+- **Foco en consistencia sostenible** (4-12 semanas, no resultados en 4 días)
 
 ---
 
 ## La diferencia con otras apps de pérdida de peso
 
-| MyFitnessPal / Noom / Lose It          | Stelar                                            |
-| -------------------------------------- | ------------------------------------------------- |
-| Peso como métrica principal            | Peso silencioso en Settings                       |
-| "Pésate cada mañana"                   | "Si quieres actualizar, hazlo cuando estés lista" |
-| Calorías como dashboard dominante      | Calorías como contexto, no como obsesión          |
-| Streaks rígidas ("21 días sin fallar") | Constelaciones (siguen ahí aunque falles)         |
-| "Has perdido X kg de tu meta de Y"     | "Tu cuerpo se está re-organizando"                |
-| Logging obligatorio o pierdes la racha | Logging deseado, no demandado                     |
-| Notificaciones de presión              | Notificaciones de acompañamiento                  |
-| Trata el atracón como fallo a evitar   | Trata el atracón como dato a entender             |
-| Comunidad de comparación               | Identidad personal                                |
-| Te dice qué hiciste mal                | Te ayuda a entender qué te pasa                   |
+| MyFitnessPal / Noom / Lose It          | Stelar                                              |
+| -------------------------------------- | --------------------------------------------------- |
+| Peso como métrica principal en home    | Peso silencioso en Settings                         |
+| "Pésate cada mañana"                   | "Si quieres actualizar, hazlo cuando estés lista"   |
+| Calorías como dashboard dominante      | Calorías como contexto, no como obsesión            |
+| Streaks rígidas ("21 días sin fallar") | Constelaciones (siguen ahí aunque pierdas el ritmo) |
+| "Has perdido X kg de tu meta de Y"     | "Tu cuerpo se está reorganizando · sigue"           |
+| Logging obligatorio o pierdes la racha | Logging deseado, no demandado                       |
+| Notificaciones de presión              | Notificaciones de acompañamiento                    |
+| Trata el "mal día" como fallo a evitar | Trata el "día distinto" como dato a entender        |
+| Te dice qué hiciste mal                | Te ayuda a entender qué te pasó                     |
 
 ---
 
@@ -131,23 +127,23 @@ No es:
 
 Es:
 
-> ✅ _"Baja de peso entendiendo por qué hasta ahora no has podido sostenerlo."_
+> ✅ _"Baja de peso entendiendo qué impide tu constancia."_
 
-O en su forma más completa:
+O en su forma más breve:
 
-> ✅ _"Pérdida de peso con la inteligencia emocional que ninguna otra app te dio."_
+> ✅ _"Pérdida de peso sostenible."_
 
 ---
 
-## Los 4 pilares (revisitados para Stelar C)
+## Los 4 pilares
 
 ### 1. La perfección no es necesaria, la dirección sí
 
-Las apps tradicionales castigan rachas rotas. Stelar respeta ciclos. Un atracón el viernes no rompe tu progreso · es un **dato emocional** que tu coach puede usar para entenderte mejor. La culpa no produce cambio · el entendimiento sí.
+Las apps tradicionales castigan rachas rotas. Stelar respeta ciclos. Un día fuera de tu rutina no rompe tu progreso · es un **dato** que te ayuda a entenderte mejor. La culpa no produce cambio · el entendimiento sí.
 
 ### 2. Tu coach habla, no te regaña
 
-El lenguaje es cálido, no clínico. En lugar de _"Te pasaste 500 cal hoy"_ dice _"Hoy tu cuerpo pidió más. Algo está pasando · ¿quieres contarme?"_. El coach reconoce tu humanidad antes de mirar tus números.
+El lenguaje es cálido, no clínico. En lugar de _"Te pasaste 500 cal hoy"_ dice _"Hoy tu cuerpo pidió más. ¿Algo pasó?"_. El coach reconoce tu humanidad antes de mirar tus números. **Nunca diagnostica. Nunca prescribe. Nunca reemplaza a tu coach o nutrióloga.**
 
 ### 3. El cuerpo cambia en 4-12 semanas, no en 4 días
 
@@ -155,54 +151,128 @@ Diseñado contra la dopamina rápida. No muestra peso diario en home · muestra 
 
 ### 4. Las usuarias entrenan al coach, no al revés
 
-La app aprende de cada usuaria. Cuando detectas que los viernes hay atracones, el coach calibra. Cuando aprendes que la usuaria sube sus pesos los lunes, el coach se adapta. Es aprendizaje **de la persona hacia el sistema**, no del sistema hacia la persona.
+La app aprende del comportamiento de cada usuaria · qué días pierde el ritmo, cuándo se reactiva. El coach calibra sus observaciones a esa información. Es aprendizaje **de la persona hacia el sistema**, no del sistema hacia la persona.
 
 ---
 
-## Voz de la marca · cómo hablamos
+## Qué SÍ es Stelar y qué NO es (sección crítica)
 
-**Tono general:** cálido, íntimo, ligeramente poético, técnico cuando importa, nunca corporativo, nunca clínico.
+Esta sección protege a Stelar legalmente y le da claridad de alcance. Antes de agregar una feature o escribir copy, consulta esta lista.
 
-**Tipografía:**
+### ✅ Stelar SÍ es
 
-- Coach habla en _DM Serif Display italic_ (voz humana)
-- Datos en Inter Bold 800 (información clara cuando se necesita)
-- UI en Inter regular (transparente, no llama atención)
+- App de **pérdida de peso** enfocada en consistencia
+- Tracker de calorías, macros y peso que **tú ingresas**
+- Sistema que identifica patrones **en tus propios datos**
+- Coach que acompaña con observaciones empáticas
+- Marca con identidad cálida, poética, femenina
+- Pensamiento de largo plazo (4-12 semanas, no días)
 
-**Lo que decimos vs lo que NO decimos:**
+### ❌ Stelar NO es
 
-| ✅ Decimos                              | ❌ NO decimos                    |
-| --------------------------------------- | -------------------------------- |
-| "Hoy tu déficit estuvo en su punto"     | "Te quedan 247 calorías"         |
-| "Tu proteína estuvo presente"           | "Cumpliste 89% de proteína"      |
-| "Hoy tu cuerpo pidió más. ¿Algo pasó?"  | "Te pasaste 500 cal"             |
-| "Tu Acuario se está iluminando"         | "Has perdido 0.4 kg esta semana" |
-| "Notamos que los viernes son distintos" | "Fallaste 3 veces esta semana"   |
-| "Empieza otro ciclo"                    | "Reinicia tu racha"              |
+- **Nutrióloga** · no da dietas, no diseña planes de comida, no te dice qué comer mañana
+- **Coach de gym** · no da rutinas, no te dice cómo entrenar, no analiza tu técnica
+- **Terapia o servicio de salud mental** · no trata ansiedad, depresión, TCA, ni otros temas clínicos
+- **App de hábitos generales** (Fabulous, Habitica) · no trackea sueño, productividad, lectura · solo pérdida de peso
+- **App de recomposición corporal** · foco quirúrgico en pérdida de peso, no en ganar músculo
+- **App de mantenimiento** · es para mujeres que quieren bajar de peso, no para mantenerse
+- **App de wellness general** (Calm, Headspace) · no es meditación ni mindfulness
+- **App de quick-fix** · no promete X kg en Y semanas
+- **Antes/después de cuerpos** · no se posiciona alrededor de transformación corporal visual
+- **Servicio médico de ningún tipo** · no diagnostica, no prescribe, no reemplaza atención profesional
+
+### La pregunta para decidir si una feature pertenece
+
+Antes de agregar cualquier feature, hazte esta pregunta:
+
+> **¿Esto pertenece a lo que TÚ haces, o a lo que un coach/nutrióloga/terapeuta haría?**
+
+- Loguear calorías que comiste → tú lo haces ✅
+- Ver patrones en tus datos → Stelar te ayuda a verte ✅
+- Recibir una dieta personalizada → eso es nutrióloga ❌
+- Recibir una rutina de gym → eso es coach ❌
+- Recibir tratamiento de ansiedad → eso es terapeuta ❌
+- Identificar que tu consistencia baja los viernes → leer tus datos ✅
+- Decirte qué hacer al respecto → eso es coach/nutrióloga ❌
+
+**Stelar observa contigo. No te dice qué hacer.** Esa es la frontera.
 
 ---
 
-## Qué SÍ es Stelar y qué NO
+## Las 3 capas de lenguaje (sección crítica)
 
-### ✅ Stelar SÍ es:
+Stelar tiene 3 audiencias distintas y cada una requiere lenguaje distinto. Esta separación es legal y estratégica. NO confundas las capas.
 
-- App de **pérdida de peso** con análisis emocional profundo
-- Tracker técnico riguroso (calorías, macros, déficit) presentado con cuidado
-- Sistema de detección de patrones de comportamiento alimentario
-- Coach que conecta emoción y comida
-- Marca con identidad poética y femenina
-- Long-term thinking (4-12 semanas, no días)
-- App que TÚ, fundadora, usarías para resolver tu propio problema
+### Capa 1 · Marketing público
 
-### ❌ Stelar NO es:
+**Audiencia:** usuarias potenciales que ven Stelar por primera vez (App Store, landing page, Instagram, prensa).
 
-- App "wellness" sin números (eso fue la versión idealizada que descartamos)
-- MyFitnessPal con voz bonita (rigor + análisis emocional, no solo cambio de tono)
-- Una app de meditación tipo Calm
-- Un horóscopo decorativo
-- Una app gym-bro
-- Quick fix de pérdida de peso
-- Dashboard de productividad fría
+**Lenguaje:** conservador, sobrio, claro. Sin términos que sugieran tratamiento clínico, diagnóstico, o servicio médico.
+
+**Frases canónicas:**
+
+- _"Pérdida de peso sostenible"_
+- _"Identifica qué impide tu constancia"_
+- _"Sin dietas, sin presión"_
+- _"Te acompaña en tu proceso"_
+
+**Palabras prohibidas en esta capa:**
+
+- inteligencia emocional, salud emocional, salud mental
+- atracones, ansiedad, trastorno, TCA
+- diagnóstico, tratamiento, terapia, cura
+- emociones, autosabotaje, traumas
+
+### Capa 2 · Producto (UI/UX, mensajes del coach)
+
+**Audiencia:** usuarias activas dentro de la app.
+
+**Lenguaje:** cálido, íntimo, observacional. Italic implícito (Cormorant Display). Nunca clínico. Pregunta más de lo que afirma.
+
+**Frases canónicas del coach:**
+
+- _"Notamos que las noches del viernes son distintas en tu rutina."_
+- _"Hoy tu cuerpo pidió más. ¿Algo pasó?"_
+- _"Volviste. Eso es lo que importa."_
+- _"Tu Acuario se está iluminando."_
+
+**El coach NUNCA:**
+
+- Diagnostica ("tienes atracones", "tienes ansiedad")
+- Prescribe ("debes comer X", "deberías entrenar Y")
+- Da consejos médicos
+- Etiqueta a la usuaria ("eres una atracadora")
+
+**El coach SIEMPRE:**
+
+- Observa sin juzgar
+- Pregunta más que afirma
+- Usa segunda persona singular (tú)
+- Reconoce humanidad antes que números
+
+### Capa 3 · Código y documentación interna
+
+**Audiencia:** tú, Claude Code, futuros colaboradores. NO sale al usuario.
+
+**Lenguaje:** técnico descriptivo. Puede usar términos clínicos como nombres internos siempre que NUNCA se filtren a la UI.
+
+**Ejemplos aceptables (solo en código):**
+
+- `detectLateNightEating()` en `logic.ts`
+- `detectAbandonmentRisk()`
+- Comentarios técnicos: `// detects nighttime eating pattern`
+- Nombres de tablas: `detected_patterns`
+
+**Regla crítica:** ningún string en código que pueda terminar visible al usuario debe usar lenguaje técnico-clínico. Si dudas, asume que va a terminar visible y úsalo cálido.
+
+### La traducción · una palabra, 3 capas
+
+| Concepto interno        | Capa 1 (Marketing)                  | Capa 2 (Producto)                      | Capa 3 (Código)           |
+| ----------------------- | ----------------------------------- | -------------------------------------- | ------------------------- |
+| Detectar comer nocturno | "Identifica patrones en tu rutina"  | "Notamos que las noches son distintas" | `detectLateNightEating()` |
+| Detectar abandono       | "Te acompaña cuando bajas el ritmo" | "Volviste. Tu cielo te esperó."        | `detectAbandonmentRisk()` |
+| Pérdida de consistencia | "Sostiene tu esfuerzo"              | "Hoy fue distinto. Mañana decides."    | `consistencyDropPattern`  |
+| Pérdida de peso         | "Pérdida de peso sostenible"        | "Tu cuerpo se está reorganizando"      | `weightLossProgress`      |
 
 ---
 
@@ -221,12 +291,12 @@ La app aprende de cada usuaria. Cuando detectas que los viernes hay atracones, e
 - ❌ En la pantalla home
 - ❌ En notificaciones ("no te has pesado hoy")
 - ❌ En gráficas dominantes
-- ❌ En metas comparativas ("vas al 47% de tu meta de bajar 5 kg")
+- ❌ En metas comparativas ("vas al 47% de tu meta")
 - ❌ En la métrica de "éxito" diario
 
 ### El coach y el peso
 
-El coach puede mencionar el peso **cuando es relevante para un patrón**, no como obsesión diaria. Ejemplo:
+El coach puede mencionar el peso **cuando es relevante**, no como obsesión diaria:
 
 ✅ Aceptable: _"Tu cuerpo está respondiendo al esfuerzo. Si hace 4 semanas pesabas distinto y ahora ya no, eso es señal · no número."_
 
@@ -243,7 +313,7 @@ Va a Settings, lo cambia, sigue. Sin drama, sin gráfica, sin "comparemos con tu
 **Stelar SÍ los cuenta.** Pero con jerarquía visual disciplinada:
 
 - **Calorías:** existen, se muestran en Tab Comidas como contexto, no como countdown
-- **Proteína:** la métrica que más se cuida (anillo visible, importante para recomposición)
+- **Proteína:** la métrica que más se cuida (anillo visible, importante para mantener músculo durante pérdida de peso)
 - **Carbohidratos y grasas:** anillos compactos, presentes pero secundarios
 - **Déficit:** calculado, informado como contexto ("estás en déficit suave hoy"), nunca gamificado
 
@@ -251,39 +321,36 @@ Va a Settings, lo cambia, sigue. Sin drama, sin gráfica, sin "comparemos con tu
 
 ---
 
-## La feature core que define a Stelar C
+## La feature core que define a Stelar
 
-**Detección de patrones de comportamiento alimentario y emocional.**
+**Detección de patrones de consistencia en los datos de la usuaria.**
 
-Esto es lo que ninguna otra app de pérdida de peso hace. Es el corazón del producto. Sin esto, Stelar es otra app de calorías más con voz bonita. Con esto, Stelar es la primera en su categoría real.
+Esto es lo que ninguna otra app de pérdida de peso hace. Es el corazón del producto.
 
 ### Cómo funciona
 
-La app analiza temporal y contextualmente:
+La app analiza temporal y contextualmente los datos que la usuaria ya ingresó:
 
 - ¿Qué día de la semana es?
 - ¿Qué hora del día?
-- ¿Qué estaba pasando en el calendario? (juntas, eventos sociales)
-- ¿Cómo durmió la usuaria?
-- ¿En qué fase del ciclo menstrual está?
-- ¿Cuál fue el mood reportado?
+- ¿Cómo durmió la usuaria? (si lo trackeó)
+- ¿En qué fase del ciclo menstrual está? (si lo trackeó)
 - ¿Qué comió antes? ¿Cuántas horas pasaron sin comer?
 
-Luego correlaciona con eventos:
+Luego identifica patrones de cuándo la consistencia baja:
 
-- Atracones nocturnos
-- Días de muy poca comida (restricción)
-- Saltos de comidas
-- Snacking ansioso
-- Recaídas después de eventos sociales
+- Días con comidas tardías (después de cierta hora)
+- Días sin comidas registradas (saltos de comidas)
+- Períodos de baja interacción con la app
+- Recaídas después de eventos identificables en los datos
 
 ### Cómo se presenta a la usuaria
 
-Como **observación emocional**, NUNCA como diagnóstico clínico:
+Como **observación neutra**, NUNCA como diagnóstico:
 
-✅ Stelar dice: _"Notamos que los viernes después de las 9pm tu cuerpo pide más comida. ¿Algo pasa los viernes?"_
+✅ Stelar dice: _"Notamos que los viernes son distintos en tu rutina. ¿Algo pasa?"_
 
-❌ Stelar nunca dice: _"Has tenido 4 atracones esta semana. Tu trastorno requiere atención."_
+❌ Stelar nunca dice: _"Tienes un patrón de atracones. Necesitas atención profesional."_
 
 ### Cuándo se activa
 
@@ -293,35 +360,46 @@ Después de **mínimo 3-4 semanas** de uso. Antes de eso no hay suficiente data 
 
 ## La línea roja · cuándo Stelar deriva a profesionales
 
-Stelar es app de bienestar, **no es app clínica**. Hay señales donde la app debe **suavemente sugerir ayuda profesional**:
+Stelar es app de pérdida de peso · **no es app clínica de ningún tipo**.
 
-- Si la usuaria reporta restricción extrema sostenida (debajo de cierto rango calórico por semanas)
-- Si los atracones son diarios o varias veces al día
-- Si la usuaria menciona en notas pensamientos de auto-daño relacionados al cuerpo
-- Si el patrón de obsesión con números no cede después de intervenciones del coach
+### Señales donde la app debe derivar suavemente
 
-En estos casos el coach dice algo como:
+- Si los datos sugieren ingesta muy baja sostenida durante semanas
+- Si la frecuencia de "días distintos" es muy alta (varias veces por semana sostenidamente)
+- Si la usuaria usa palabras de auto-daño en notas o feedback
+- Si el patrón se intensifica en lugar de estabilizarse
 
-> _"Hay cosas que vale la pena hablar con alguien que pueda acompañarte más profundamente. Stelar puede caminar contigo, pero a veces necesitamos compañía especializada."_
+### Cómo deriva
 
-Con un link a recursos profesionales (a definir con un asesor clínico antes del launch).
+El coach dice algo como:
+
+> _"Hay cosas que vale la pena hablar con alguien especializado. Stelar puede acompañarte en tu pérdida de peso, pero a veces necesitamos compañía profesional para otros temas."_
+
+Con un link a recursos profesionales (a definir con asesor clínico antes del launch).
+
+### Por qué esta sección importa legalmente
+
+Una app de pérdida de peso que detecta señales preocupantes Y deriva a profesionales está en categoría legalmente más segura que una que detecta y trata de "ayudar" desde sí misma. El acto de derivar es la protección.
 
 ---
 
 ## Aplicación práctica · cómo este manifiesto guía decisiones
 
-Cuando consideres agregar una feature, hazte estas 4 preguntas:
+Cuando consideres agregar una feature, hazte estas 5 preguntas:
 
-**1. ¿Esto entiende a la persona, o solo registra datos?**
-Si la feature solo cuenta sin analizar → no es Stelar, es MyFitnessPal.
+**1. ¿Esto pertenece a lo que la usuaria hace, o a lo que un profesional haría?**
+Si invade territorio de nutrióloga / coach / terapeuta → descartar.
 
-**2. ¿Esto presiona o acompaña?**
+**2. ¿Esto está dentro del foco de pérdida de peso?**
+Si es hábito general, productividad, sueño como meta, mindfulness, recomposición, mantenimiento → descartar.
+
+**3. ¿Esto presiona o acompaña?**
 Si genera ansiedad, comparación, o sensación de fracaso → descartar.
 
-**3. ¿Esto cruza a territorio clínico?**
+**4. ¿Esto cruza a territorio clínico?**
 Si la app empieza a diagnosticar (atracones, TCA, ansiedad) → quitarlo, derivar a profesional.
 
-**4. ¿Esto es coherente con "ciclo, no carrera"?**
+**5. ¿Esto es coherente con "ciclo, no carrera"?**
 Si crea urgencia artificial o castiga interrupciones → descartar.
 
 ---
@@ -337,27 +415,25 @@ Si crea urgencia artificial o castiga interrupciones → descartar.
 
 **Camino (6 meses):**
 
-- Detección básica de patrones temporales (qué día comes peor, qué semana abandonas)
+- Detección básica de patrones temporales (qué día baja la consistencia)
 - Coach con respuestas calibradas al patrón de cada usuaria
-- Integración con ciclo menstrual (correlación entre fase y adherencia)
-- Análisis de correlación sueño-comida
+- Integración con ciclo menstrual (correlación entre fase y consistencia)
 
 **Visión completa (12-18 meses):**
 
-- **Sistema anticipatorio** que detecta zonas de abandono ANTES de que pasen
-- Mapa de "órbitas personales" · gráfica de cuándo la usuaria florece vs colapsa
-- AI companion que aprende del lenguaje único de cada persona
-- Detección sofisticada de disparadores emocionales (eventos sociales, juntas, mood)
-- Predicción de atracones probables con intervención preventiva del coach
+- Sistema más sofisticado de identificación de patrones en datos propios
+- Coach que aprende del lenguaje único de cada usuaria
 - Comunidad opcional con otras usuarias del mismo arquetipo
+
+**Nota:** la visión NO incluye predicción de comportamientos clínicos, intervención preventiva de salud mental, ni nada que cruce la línea roja. La visión escala el alcance actual, no lo expande a territorios sensibles.
 
 ---
 
 ## Para inversores, socios y colaboradores
 
-Si alguien te pregunta _"¿qué hace Stelar diferente de MyFitnessPal / Noom / Lose It?"_, esta es la respuesta canónica:
+Si alguien pregunta _"¿qué hace Stelar diferente de MyFitnessPal / Noom / Lose It?"_, esta es la respuesta canónica:
 
-> Noom te enseña psicología detrás de la comida. MyFitnessPal te da el counter más completo. Lose It te gamifica la pérdida. Stelar hace lo que ninguna hace: **analiza tus patrones emocionales en tiempo real y los conecta con tus comportamientos alimentarios**. No competimos contra el conteo de calorías · competimos contra la **desconexión emocional** que hace que las mujeres abandonen en la semana 3 aunque sus números estuvieran perfectos.
+> Noom intenta enseñarte psicología. MyFitnessPal te da el counter más completo. Lose It te gamifica. Stelar hace algo distinto: **identifica patrones en tus propios datos para ayudarte a sostener el esfuerzo**. No competimos contra el conteo de calorías · competimos contra la inconsistencia que hace que las mujeres abandonen en la semana 3 aunque sus números estuvieran perfectos.
 
 ---
 
@@ -365,28 +441,53 @@ Si alguien te pregunta _"¿qué hace Stelar diferente de MyFitnessPal / Noom / L
 
 Si una IA (Claude Code, GPT, otra) recibe instrucciones sobre Stelar, debe leer este manifiesto primero. Cualquier sugerencia técnica o de producto debe ser coherente con:
 
-1. **Pérdida de peso CON inteligencia emocional** · ambas cosas, no una sola
+1. **Foco quirúrgico en pérdida de peso** · no recomposición, no mantenimiento, no hábitos generales, no wellness
 2. **Lenguaje cálido femenino**, nunca clínico, nunca corporativo
 3. **Ciclos largos**, no urgencia diaria
 4. **Números presentes pero no protagonistas** · calorías y peso existen pero no dominan
-5. **Astrología como lenguaje emocional**, no como predicción
-6. **Detección de patrones** como feature core diferenciadora
-7. **Línea roja clara** con territorio clínico/TCA · derivar a profesional cuando aplique
+5. **Astrología como visualización**, no como predicción ni horóscopo
+6. **Detección de patrones en datos propios** como feature core diferenciadora
+7. **NO reemplazar profesionales** · no nutrióloga, no coach, no terapeuta
+8. **Línea roja clara** con territorio clínico · derivar a profesional cuando aplique
+9. **Tres capas de lenguaje** · marketing conservador, producto cálido, código técnico
+10. **Quitar perfeccionismo** del desarrollo · dirección, no perfección · MVP imperfecto vale más que producto pulido sin lanzar
 
-Si una sugerencia rompe alguno de estos 7 principios, la sugerencia está mal.
+Si una sugerencia rompe alguno de estos 10 principios, la sugerencia está mal.
 
 ---
 
 ## Para la fundadora · una nota personal
 
-Anahí, este manifiesto refleja la decisión más madura que tomaste en el proceso de diseño: reconocer que el producto idealizado (Stelar A · wellness puro sin números) no era el producto que tú misma usarías, y que el producto real (Stelar C · pérdida de peso con inteligencia emocional) sí lo es.
+Anahí, esta versión 3.0 del manifiesto refleja dos decisiones maduras consecutivas:
 
-Eso es honestidad de fundadora seria. La mayoría se enamora del pitch poético y construye productos que nadie usa. Tú elegiste construir el producto que TE serviría, que sirve a tu mercado real, y que aún así mantiene radicalmente diferenciada la voz y filosofía de la marca.
+**Decisión 1 (v2.0):** reconocer que Stelar es pérdida de peso, no wellness puro idealizado.
 
-Esa es la combinación que hace empresas que llegan a algo real.
+**Decisión 2 (v3.0):** afinar el alcance a SOLO pérdida de peso (no recomposición, no mantenimiento) y blindar el lenguaje legalmente (no inteligencia emocional, no atracones, no ansiedad en marketing).
+
+Cada decisión renunció a un poco de "lo que la app podría ser" para ganar claridad de "lo que la app es". Eso es trabajo serio de posicionamiento. La mayoría de fundadoras quiere abarcar todo · tú decidiste quirúrgicamente qué Stelar es y qué Stelar no es.
+
+Esa es la combinación que hace empresas que llegan a algo real: ambición en producto, sobriedad en alcance, disciplina en lenguaje.
 
 ---
 
-_Versión 2.0 · Mayo 2026_
-_Cambio principal: de Stelar A (wellness poético) a Stelar C (pérdida de peso con inteligencia emocional)_
+## Próximos pasos antes del launch
+
+Esta sección NO es parte del manifiesto · es checklist práctica para que la fundadora la consulte.
+
+1. **Asesoría legal real** · consulta con abogado especializado en salud digital (México o EUA si exportas allá). Revisa términos de servicio, copy de marketing, disclaimers. $300-800 USD una vez.
+
+2. **Asesoría clínica** · nutrióloga o psicóloga especializada en TCA que revise: qué patrones detecta la app, cómo los presenta el coach, cuándo se activa la derivación, qué recursos profesionales linkear. 1-2 horas.
+
+3. **Seguro de responsabilidad civil** · existe seguro específico para apps de salud. $500-2000 USD/año al inicio.
+
+4. **Disclaimer en onboarding** · la usuaria acepta:
+
+   > _"Stelar es una herramienta de seguimiento para pérdida de peso. No es un servicio médico, ni un sustituto de atención profesional. Si tienes preocupaciones sobre tu salud, consulta a un profesional calificado."_
+
+5. **Términos de servicio claros** · Stelar NO diagnostica, NO prescribe, NO sustituye consejo médico/nutricional/psicológico.
+
+---
+
+_Versión 3.0 · Mayo 2026_
+_Cambio principal: foco quirúrgico en pérdida de peso + lenguaje legalmente conservador + 3 capas de comunicación separadas_
 _Mantenido por: Anahí (fundadora)_
