@@ -1,42 +1,574 @@
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
   useAnimatedProps,
+  useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withRepeat,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Circle, Defs, G, Line, LinearGradient, RadialGradient, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
 
+import NorthStar from '@/assets/icons/north-star.svg'
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { ProgressBar, WizardBackdrop } from '@/features/onboarding/components'
 import { colors, typography } from '@/theme'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-const AnimatedLine = Animated.createAnimatedComponent(Line)
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 const AnimatedG = Animated.createAnimatedComponent(G)
 
 /*
- * Step 1 — Manifesto. The visual hero is a North Star: a single
- * luminous body with a long upward spike (the literal "dirección"
- * the manifesto names). Centred on the canvas, it gives the quote
- * an anchor instead of leaving the lower 60 % of the screen empty.
+ * Step 1 — Manifesto. Hero is the `north-star` glyph from the design
+ * system. After a SECOND illustrator audit ("se ve plana, no parece
+ * Genshin") the depth was rebuilt around three ideas the flat version
+ * lacked: (1) atmosphere fills the WHOLE screen, not a 320px island;
+ * (2) light sources are OFF-CENTRE so the scene reads as 3D space, not
+ * a coaxial "diana"; (3) a COOL stratum (índigo/silver-blue) recedes
+ * behind the warm core, creating aerial perspective. We keep ~60-70%
+ * negative space; every alpha is whisper-low. Dark only — every layer
+ * terminates in bg (#0A0608) at opacity 0, never cold black.
  *
- * The star breathes on a 5 s cycle, plus 4 satellite points orbit
- * it slowly — so the manifesto doesn't read as a static poster,
- * it reads as something alive that the user is being introduced to.
+ * Z-stack back-to-front:
+ *
+ *   FULL-SCREEN SKY (AtmosphericSky, absoluteFill, behind the hero):
+ *     S0. Cool edge wash — diagonal índigo→silver, recedes (aerial
+ *         perspective). The cold stratum the old scene was missing.
+ *     S1. Vertical density gradient — lightens the ceiling, sinks the
+ *         floor into bg, so the canvas has up/down weight.
+ *     S2. Off-centre warm glow — radial at 38%/42% (NOT 50/50): the
+ *         "sun outside the frame" that advances toward the viewer.
+ *
+ *   HERO SVG (320px stage, centred on the icon):
+ *     0. Nebula — pushed far down-right + enlarged: abstract elliptical
+ *        mass (no figure), the deepest atmosphere.
+ *     1. Far stars — COOL (silver-blue), near-invisible: lo lejano es
+ *        frío. Slow 2px parallax drift. Each carries a soft halo.
+ *     2. heroGlow — large magenta RadialGradient, OFF-CENTRE (42%/44%),
+ *        bleeding past the viewBox, breathing on t. The light body.
+ *     3. heroCore — warm core bloom that burns to WHITE at centre
+ *        (color-dodge ignition), CENTRED exactly = the icon anchor.
+ *        The off-centre glow vs centred core is what makes depth.
+ *     4. Mid stars — intermediate tint, middle depth, 5px drift.
+ *     5. Cosmic dust × 5 — suspended light (halo falloff, not solid
+ *        dots) rising bottom→top with sway.
+ *     6. Micro stars — nearest field, warm, 9px drift + group twinkle,
+ *        each with a 2.5× halo so they glow rather than sit drawn.
+ *     7. Lens-flare — ONE soft horizontal streak faked as 3 concentric
+ *        ellipses (fake gaussian: rx grows, opacity decays) — no hard
+ *        vector edges, no second tilted twin (read as a cross).
+ *     8. Vignette — directional: denser bottom-right, lighter top-left,
+ *        matching the light that now originates upper-left.
+ *     [end Svg]
+ *     9. NorthStar icon — breathing scale (1.0 → 1.03 over 6 s).
+ *    10. White-hot pinpoint — dead-centre ignition spark, 4 s pulse.
+ *
+ * Shared clocks (unchanged set — no new shared values introduced):
+ *   t      6 s  breath / glow / core / flare / icon
+ *   pulse  4 s  white-hot pinpoint
+ *   orbit 40 s  starfield parallax (god-rays removed; orbit still
+ *               drives the three star strata's differential drift)
+ *   dust  18 s  dust drift
+ * Removed in this pass: the 6 rotating god-rays and the radar pulse
+ * ring (both delators of "sun-icon / radar / diana") and their
+ * GOD_RAYS const, godRaysProps + radar animatedProps.
  */
+
+const STAGE = 320
+const STAGE_CX = STAGE / 2
+const STAGE_CY = STAGE / 2
+const ICON_W = 260
+const ICON_H = 260
+
+// Perimeter micro-stars (twinkle as a group via 1 worklet). Nearest
+// field — warmest tint, largest parallax drift, gets a halo so they
+// read as points of light.
+const MICRO_STARS: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.12, y: 0.18, r: 1.4, opacity: 0.5 },
+  { x: 0.86, y: 0.24, r: 1.1, opacity: 0.4 },
+  { x: 0.92, y: 0.74, r: 1.6, opacity: 0.6 },
+  { x: 0.08, y: 0.82, r: 1.2, opacity: 0.45 },
+  { x: 0.5, y: 0.06, r: 0.9, opacity: 0.35 },
+  { x: 0.18, y: 0.5, r: 1.0, opacity: 0.38 },
+  { x: 0.82, y: 0.52, r: 1.0, opacity: 0.38 },
+  { x: 0.34, y: 0.92, r: 0.9, opacity: 0.32 },
+  { x: 0.7, y: 0.88, r: 1.2, opacity: 0.42 },
+]
+
+// Mid-depth stars — middle stratum. Intermediate tint (#E8D9DD),
+// medium parallax drift. Irregular scatter, no grid.
+const MID_STARS: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.22, y: 0.28, r: 0.8, opacity: 0.26 },
+  { x: 0.74, y: 0.16, r: 0.7, opacity: 0.24 },
+  { x: 0.9, y: 0.46, r: 0.9, opacity: 0.3 },
+  { x: 0.66, y: 0.7, r: 0.8, opacity: 0.27 },
+  { x: 0.38, y: 0.64, r: 0.7, opacity: 0.23 },
+  { x: 0.14, y: 0.4, r: 0.9, opacity: 0.28 },
+  { x: 0.48, y: 0.84, r: 0.7, opacity: 0.22 },
+  { x: 0.28, y: 0.1, r: 0.8, opacity: 0.25 },
+  { x: 0.84, y: 0.86, r: 0.9, opacity: 0.29 },
+  { x: 0.56, y: 0.36, r: 0.7, opacity: 0.24 },
+]
+
+// Far background stars — COOL silver-blue (dimension.ciclo) and very
+// dim: the farthest things are cold and almost invisible, which is
+// what gives aerial perspective. Slow 2px parallax.
+const FAR_STARS: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.04, y: 0.32, r: 0.6, opacity: 0.12 },
+  { x: 0.96, y: 0.4, r: 0.7, opacity: 0.14 },
+  { x: 0.6, y: 0.98, r: 0.5, opacity: 0.1 },
+  { x: 0.42, y: 0.04, r: 0.6, opacity: 0.12 },
+  { x: 0.96, y: 0.92, r: 0.5, opacity: 0.09 },
+  { x: 0.02, y: 0.62, r: 0.5, opacity: 0.09 },
+  { x: 0.32, y: 0.46, r: 0.5, opacity: 0.08 },
+  { x: 0.78, y: 0.62, r: 0.6, opacity: 0.11 },
+  { x: 0.5, y: 0.72, r: 0.5, opacity: 0.08 },
+  { x: 0.24, y: 0.78, r: 0.6, opacity: 0.1 },
+]
+
+// 5 dust motes. Each carries its own period + sway + phase so the
+// field reads as floating pollen, not a stamped pattern. Two motes are
+// smaller / fainter (background depth) and ride the same drift clock.
+const DUST: {
+  x: number
+  baseR: number
+  period: number
+  sway: number
+  opacity: number
+  phase: number
+}[] = [
+  { x: 0.3, baseR: 1.2, period: 1.0, sway: 10, opacity: 0.55, phase: 0 },
+  { x: 0.55, baseR: 0.9, period: 0.9, sway: 14, opacity: 0.45, phase: 0.33 },
+  { x: 0.75, baseR: 1.4, period: 1.1, sway: 8, opacity: 0.6, phase: 0.66 },
+  { x: 0.42, baseR: 0.6, period: 1.25, sway: 16, opacity: 0.28, phase: 0.18 },
+  { x: 0.68, baseR: 0.7, period: 1.15, sway: 12, opacity: 0.3, phase: 0.5 },
+]
+
+/*
+ * Full-screen atmosphere. Sits behind the 320px hero stage and fills
+ * the whole screen so the light is no longer trapped on a black
+ * rectangle. Three static expo-linear / radial layers, all whisper
+ * low (alphas 0.03–0.12), all resolving to transparent so the bg
+ * shows through. Static on purpose — the recipe keeps motion in the
+ * hero so this never competes with it. pointerEvents none.
+ */
+function AtmosphericSky() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* S0. Cool edge wash — diagonal índigo (sueno) → transparent →
+          silver-blue (ciclo). The cold stratum that recedes and gives
+          aerial perspective the old all-warm scene lacked. */}
+      <LinearGradient
+        colors={['rgba(124,143,255,0.06)', 'rgba(124,143,255,0)', 'rgba(181,196,221,0.05)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* S1. Vertical density — lightens the ceiling, sinks the floor
+          into a near-bg shadow so the canvas reads top→bottom. */}
+      <LinearGradient
+        colors={['rgba(10,6,8,0)', 'rgba(10,6,8,0)', 'rgba(8,4,6,0.6)']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* S2. Off-centre warm glow — the "sun outside the frame" at
+          38%/42% (deliberately not coaxial). Drawn with an SVG radial
+          so it has true falloff to transparent. */}
+      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="skyGlow" cx="38%" cy="42%" r="65%">
+            <Stop offset="0" stopColor={colors.magentaHot} stopOpacity="0.10" />
+            <Stop offset="0.5" stopColor={colors.magentaDeep} stopOpacity="0.04" />
+            <Stop offset="1" stopColor={colors.magentaDeep} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx="38%" cy="42%" r="65%" fill="url(#skyGlow)" />
+      </Svg>
+    </View>
+  )
+}
+
+function DustMote({
+  x,
+  baseR,
+  period,
+  sway,
+  opacity,
+  phase,
+  clock,
+}: {
+  x: number
+  baseR: number
+  period: number
+  sway: number
+  opacity: number
+  phase: number
+  clock: SharedValue<number>
+}) {
+  const baseX = x * STAGE
+  // Suspended-light halo (fake falloff): the outer soft ring and the
+  // inner point share one transform so the mote glows instead of being
+  // a solid dot. The rising kinematics (position + fade curve) are
+  // computed ONCE here; halo/core only differ in the final opacity
+  // factor, so they read this derived value instead of each recomputing
+  // the same sin/modulo per frame (×5 motes = 10 worklets → 5).
+  const motion = useDerivedValue(() => {
+    'worklet'
+    const u = (clock.value / period + phase) % 1
+    const y = STAGE + 10 - u * (STAGE + 20)
+    const cx = baseX + Math.sin(u * Math.PI * 2) * sway
+    let op = opacity
+    if (u < 0.12) op *= u / 0.12
+    else if (u > 0.88) op *= 1 - (u - 0.88) / 0.12
+    return { cx, cy: y, op }
+  })
+  const haloProps = useAnimatedProps(() => {
+    'worklet'
+    return { cx: motion.value.cx, cy: motion.value.cy, opacity: motion.value.op * 0.3 }
+  })
+  const coreProps = useAnimatedProps(() => {
+    'worklet'
+    return { cx: motion.value.cx, cy: motion.value.cy, opacity: motion.value.op }
+  })
+  return (
+    <>
+      <AnimatedCircle
+        cx={baseX}
+        cy={STAGE}
+        r={baseR * 3}
+        fill="#F8DBCE"
+        animatedProps={haloProps}
+      />
+      <AnimatedCircle cx={baseX} cy={STAGE} r={baseR} fill="#F8DBCE" animatedProps={coreProps} />
+    </>
+  )
+}
+
+function ManifestoHero() {
+  // 6 s breath / glow / core / flare / icon clock.
+  const t = useSharedValue(0)
+  // 4 s slower core pulse, decoupled so it doesn't lock with t.
+  const pulse = useSharedValue(0)
+  // 40 s slow rotation — now drives ONLY the starfield parallax
+  // (god-rays removed). Kept: the three strata still derive their
+  // differential drift from it.
+  const orbit = useSharedValue(0)
+  // 18 s dust drift base — each mote derives its own phase from this.
+  const dust = useSharedValue(0)
+
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.linear }), -1, false)
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    )
+    orbit.value = withRepeat(withTiming(1, { duration: 40000, easing: Easing.linear }), -1, false)
+    dust.value = withRepeat(withTiming(1, { duration: 18000, easing: Easing.linear }), -1, false)
+    return () => {
+      cancelAnimation(t)
+      cancelAnimation(pulse)
+      cancelAnimation(orbit)
+      cancelAnimation(dust)
+    }
+  }, [t, pulse, orbit, dust])
+
+  // Starfield parallax — each stratum drifts on a tiny Lissajous curve
+  // derived from `orbit` (no new clock). Amplitude grows toward the
+  // viewer: far 2px, mid 5px, micro 9px — depth via differential motion.
+  const farDriftProps = useAnimatedProps(() => {
+    'worklet'
+    const u = orbit.value * 2 * Math.PI
+    return { transform: `translate(${Math.sin(u) * 2} ${Math.cos(u) * 2})` }
+  })
+  const midDriftProps = useAnimatedProps(() => {
+    'worklet'
+    const u = orbit.value * 2 * Math.PI
+    return { transform: `translate(${Math.sin(u) * 5} ${Math.cos(u) * 5})` }
+  })
+
+  // Micro-star group: parallax drift (9px) combined with the group
+  // twinkle. Opacity scintillates 3× per 6 s cycle; keeps the nearest
+  // perimeter alive without per-star worklets.
+  const microGroupProps = useAnimatedProps(() => {
+    'worklet'
+    const u = orbit.value * 2 * Math.PI
+    const flicker = 0.85 + 0.15 * Math.sin(t.value * 2 * Math.PI * 3)
+    return {
+      transform: `translate(${Math.sin(u) * 9} ${Math.cos(u) * 9})`,
+      opacity: flicker,
+    }
+  })
+
+  // Hero glow — large OFF-CENTRE magenta RadialGradient with real
+  // falloff to zero (centre lives in the gradient def at 42%/44%, so
+  // the light body is decoupled from the dead-centre icon → depth).
+  // Breathes on t; radius bleeds well past the viewBox edge.
+  const glowProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { r: 152 + w * 18, opacity: 0.85 + w * 0.15 }
+  })
+
+  // Warm core bloom — burns to white at the centre (color-dodge
+  // ignition) → magentaHot → 0. Stays dead-centre: the contrast of a
+  // centred core against the off-centre glow is what reads as 3D.
+  const coreBloomProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { opacity: 0.8 + w * 0.2 }
+  })
+
+  // Lens-flare — single soft horizontal streak, faked as three
+  // concentric ellipses (rx grows, opacity decays) so there is no hard
+  // vector edge and no second tilted twin (which read as a cross).
+  // One worklet drives all three via a shared inhale `w`.
+  const flareInnerProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { rx: 70 + w * 10, opacity: 0.16 + w * 0.08 }
+  })
+  const flareMidProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { rx: 100 + w * 12, opacity: 0.08 + w * 0.04 }
+  })
+  const flareOuterProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { rx: 132 + w * 14, opacity: 0.03 + w * 0.02 }
+  })
+
+  // Icon breath — slow scale 1.0 → 1.03 over 6 s.
+  const iconStyle = useAnimatedStyle(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    return { transform: [{ scale: 1 + w * 0.03 }] }
+  })
+
+  // White-hot core pinpoint — pulse on the 4 s clock.
+  const coreStyle = useAnimatedStyle(() => {
+    'worklet'
+    return {
+      opacity: 0.6 + pulse.value * 0.4,
+      transform: [{ scale: 0.85 + pulse.value * 0.35 }],
+    }
+  })
+
+  return (
+    // Decorative atmospheric field — hidden from the screen reader so the
+    // VO reading order is eyebrow → titular → coach → meta → CTA, never
+    // landing on the (purely visual) hero.
+    <Animated.View
+      entering={FadeIn.duration(800)}
+      style={styles.hero}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {/* Atmospheric backdrop — single Svg holds the layered field
+          so z-order is implicit and we don't grow a canvas per layer. */}
+      <Svg
+        width={STAGE}
+        height={STAGE}
+        viewBox={`0 0 ${STAGE} ${STAGE}`}
+        style={StyleSheet.absoluteFill}
+      >
+        <Defs>
+          {/* Off-centre nebula wash — the deepest atmosphere. */}
+          <RadialGradient id="nebula" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#A6164A" stopOpacity="0.07" />
+            <Stop offset="0.6" stopColor="#A6164A" stopOpacity="0.03" />
+            <Stop offset="1" stopColor="#A6164A" stopOpacity="0" />
+          </RadialGradient>
+          {/* Hero glow — magenta light body, OFF-CENTRE (42%/44%),
+              falloff to zero. Decoupled from the centred icon. */}
+          <RadialGradient id="heroGlow" cx="42%" cy="44%" r="50%">
+            <Stop offset="0" stopColor="#E91E63" stopOpacity="0.42" />
+            <Stop offset="0.35" stopColor="#E91E63" stopOpacity="0.20" />
+            <Stop offset="0.7" stopColor="#A6164A" stopOpacity="0.07" />
+            <Stop offset="1" stopColor="#A6164A" stopOpacity="0" />
+          </RadialGradient>
+          {/* Warm core bloom — burns to WHITE at centre (color-dodge
+              ignition) → leche → magentaHot → transparent. Centred. */}
+          <RadialGradient id="heroCore" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.5" />
+            <Stop offset="0.18" stopColor="#FBD7E3" stopOpacity="0.7" />
+            <Stop offset="0.4" stopColor="#FF4886" stopOpacity="0.22" />
+            <Stop offset="1" stopColor="#FF4886" stopOpacity="0" />
+          </RadialGradient>
+          {/* Star halo — a tight white falloff that lets each near star
+              glow rather than read as a flat drawn dot. */}
+          <RadialGradient id="starGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.9" />
+            <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+          </RadialGradient>
+          {/* Vignette — directional: lighter top-left, denser
+              bottom-right, matching the upper-left light source. Radius
+              widened (62%→72%) and the final stop softened (0.6→0.45)
+              so the falloff bleeds out instead of reading as a hard
+              circular ring / "diana". */}
+          <RadialGradient id="vignette" cx="38%" cy="36%" r="72%">
+            <Stop offset="0.5" stopColor="#0A0608" stopOpacity="0" />
+            <Stop offset="1" stopColor="#0A0608" stopOpacity="0.45" />
+          </RadialGradient>
+        </Defs>
+
+        {/* 0. Nebula — pushed far down-right + enlarged: abstract
+            elliptical mass (no figure), the deepest atmosphere. */}
+        <Ellipse cx={STAGE_CX * 0.65} cy={STAGE_CY * 1.35} rx={260} ry={200} fill="url(#nebula)" />
+
+        {/* 1. Far cool stars — deep depth of field, halo + slow 2px drift. */}
+        <AnimatedG animatedProps={farDriftProps}>
+          {FAR_STARS.map((s, i) => (
+            <G key={`far-${i}`}>
+              <Circle
+                cx={s.x * STAGE}
+                cy={s.y * STAGE}
+                r={s.r * 2.2}
+                fill="url(#starGlow)"
+                opacity={s.opacity * 0.6}
+              />
+              <Circle
+                cx={s.x * STAGE}
+                cy={s.y * STAGE}
+                r={s.r}
+                fill={colors.dimension.ciclo}
+                opacity={s.opacity}
+              />
+            </G>
+          ))}
+        </AnimatedG>
+
+        {/* 2. Hero glow — off-centre radial falloff, breathing. */}
+        <AnimatedCircle
+          cx={STAGE_CX}
+          cy={STAGE_CY}
+          fill="url(#heroGlow)"
+          animatedProps={glowProps}
+        />
+
+        {/* 3. Warm core bloom — centred ignition, white-hot core. */}
+        <AnimatedCircle
+          cx={STAGE_CX}
+          cy={STAGE_CY}
+          r={64}
+          fill="url(#heroCore)"
+          animatedProps={coreBloomProps}
+        />
+
+        {/* 4. Mid stars — middle depth, intermediate tint, 5px drift. */}
+        <AnimatedG animatedProps={midDriftProps}>
+          {MID_STARS.map((s, i) => (
+            <Circle
+              key={`mid-${i}`}
+              cx={s.x * STAGE}
+              cy={s.y * STAGE}
+              r={s.r}
+              fill="#E8D9DD"
+              opacity={s.opacity}
+            />
+          ))}
+        </AnimatedG>
+
+        {/* 5. Cosmic dust motes — suspended light, rising (rides dust drift). */}
+        {DUST.map((d, i) => (
+          <DustMote key={`dust-${i}`} {...d} clock={dust} />
+        ))}
+
+        {/* 6. Perimeter micro-stars — nearest field, warm, halo + 9px
+            parallax + twinkle. Halo first so the point sits on a glow. */}
+        <AnimatedG animatedProps={microGroupProps}>
+          {MICRO_STARS.map((s, i) => (
+            <G key={`m-${i}`}>
+              <Circle
+                cx={s.x * STAGE}
+                cy={s.y * STAGE}
+                r={s.r * 2.5}
+                fill="url(#starGlow)"
+                opacity={0.15}
+              />
+              <Circle
+                cx={s.x * STAGE}
+                cy={s.y * STAGE}
+                r={s.r}
+                fill="#FBD7E3"
+                opacity={s.opacity}
+              />
+            </G>
+          ))}
+        </AnimatedG>
+
+        {/* 7. Anamorphic lens-flare — single soft horizontal streak,
+            three concentric ellipses (fake gaussian: rx grows, opacity
+            decays). No hard edge, no tilted twin. */}
+        <AnimatedEllipse
+          cx={STAGE_CX}
+          cy={STAGE_CY}
+          rx={132}
+          ry={9}
+          fill="#FFE9D6"
+          animatedProps={flareOuterProps}
+        />
+        <AnimatedEllipse
+          cx={STAGE_CX}
+          cy={STAGE_CY}
+          rx={100}
+          ry={6}
+          fill="#FFE9D6"
+          animatedProps={flareMidProps}
+        />
+        <AnimatedEllipse
+          cx={STAGE_CX}
+          cy={STAGE_CY}
+          rx={70}
+          ry={3.5}
+          fill="#FFE9D6"
+          animatedProps={flareInnerProps}
+        />
+
+        {/* 8. Vignette — directional, denser bottom-right. */}
+        <Circle cx={STAGE_CX} cy={STAGE_CY} r={STAGE_CX} fill="url(#vignette)" />
+      </Svg>
+
+      {/* 9. The hero icon — breathing cream north star, tinted via
+          currentColor (react-native-svg maps `color` → currentColor). */}
+      <Animated.View style={iconStyle}>
+        <NorthStar
+          width={ICON_W}
+          height={ICON_H}
+          color={colors.leche}
+          preserveAspectRatio="xMidYMid meet"
+        />
+      </Animated.View>
+
+      {/* 10. White-hot pinpoint dead-centre — the ignition spark. */}
+      <Animated.View style={[styles.coreWrap, coreStyle]} pointerEvents="none">
+        <View style={styles.core} />
+      </Animated.View>
+    </Animated.View>
+  )
+}
+
 export default function ManifiestoScreen() {
   const router = useRouter()
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <WizardBackdrop />
+      {/* Full-screen atmosphere — sits above the shared backdrop but
+          behind all content, so depth fills the whole screen rather
+          than living only inside the 320px hero island. */}
+      <AtmosphericSky />
       <View style={styles.progressWrap}>
         <ProgressBar current={1} total={12} />
       </View>
@@ -47,321 +579,25 @@ export default function ManifiestoScreen() {
         <Text style={styles.quoteEmphasis}>La dirección sí.</Text>
 
         <View style={styles.heroWrap}>
-          <NorthStar />
+          <ManifestoHero />
         </View>
 
         <Text style={styles.meta}>
-          Stelar te lee patrones, no perfección.{'\n'}
-          <Text style={styles.metaStrong}>En 28 días</Text> ves tus primeros patrones confirmados.
+          Stelar observa contigo, sin presión.{'\n'}
+          Desde hoy. <Text style={styles.metaStrong}>En 28 días</Text>, tu propio ritmo.
         </Text>
       </View>
 
       <View style={styles.footer}>
-        <PrimaryCta label="Continuar →" onPress={() => router.push('/onboarding/que-hace')} />
+        <PrimaryCta
+          label="Empecemos"
+          variant="soft"
+          transform="none"
+          onPress={() => router.push('/onboarding/que-hace')}
+        />
       </View>
     </SafeAreaView>
   )
-}
-
-/* The North Star — a cinematic luminous body rather than a vector
- * diagram. Five layers compose the body:
- *
- *   1. Atmospheric bloom — 5 concentric halos with smooth opacity
- *      falloff so the glow reads like light through dust, not
- *      stacked circles.
- *   2. Radial rays — 22 fine lines emanating at varied angles and
- *      lengths, very low opacity. Creates the "explosive starburst"
- *      effect of a real long-exposure photo.
- *   3. 8-point diffraction cross — 4 cardinal spikes (the upward
- *      one significantly longer = "norte") + 4 diagonal spikes,
- *      each drawn with a gradient that fades to transparent at the
- *      tip so the spikes feel like emitted light, not vector lines.
- *   4. Lens-flare artefacts — 2 small offset dots along the
- *      vertical axis, like camera halos. Sells the "this was
- *      photographed" feeling.
- *   5. The luminous core — white-hot centre + bright highlight,
- *      both pulsing with the breath cycle.
- *
- * Plus 3 satellite stars orbiting on slow elliptical paths. */
-function NorthStar() {
-  const W = 260
-  const H = 300
-  const CX = W / 2
-  const CY = H * 0.6 // sit the core slightly below mid so the up-spike has room
-  const CORE_R = 18
-  const SPIKE_UP_LEN = CY - 6
-  const SPIKE_DOWN_LEN = 50
-  const SPIKE_H_LEN = 86
-  const SPIKE_DIAG_LEN = 40
-
-  // 5 s breath drives bloom + spike intensity.
-  const t = useSharedValue(0)
-  // 22 s slow rotation drives the satellite orbits.
-  const orbit = useSharedValue(0)
-
-  useEffect(() => {
-    t.value = withRepeat(
-      withTiming(1, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    )
-    orbit.value = withRepeat(withTiming(1, { duration: 22000, easing: Easing.linear }), -1, false)
-    return () => {
-      cancelAnimation(t)
-      cancelAnimation(orbit)
-    }
-  }, [t, orbit])
-
-  // 5-layer atmospheric bloom — smooth opacity ramp.
-  const halo5 = useAnimatedProps(() => {
-    'worklet'
-    const w = t.value
-    return { r: CORE_R * 7 + w * 8, opacity: 0.02 + w * 0.025 }
-  })
-  const halo4 = useAnimatedProps(() => {
-    'worklet'
-    const w = t.value
-    return { r: CORE_R * 5 + w * 6, opacity: 0.05 + w * 0.05 }
-  })
-  const halo3 = useAnimatedProps(() => {
-    'worklet'
-    const w = t.value
-    return { r: CORE_R * 3.4 + w * 4, opacity: 0.1 + w * 0.08 }
-  })
-  const halo2 = useAnimatedProps(() => {
-    'worklet'
-    const w = t.value
-    return { r: CORE_R * 2.1 + w * 2.4, opacity: 0.18 + w * 0.12 }
-  })
-  const halo1 = useAnimatedProps(() => {
-    'worklet'
-    const w = t.value
-    return { r: CORE_R * 1.35 + w * 1.4, opacity: 0.28 + w * 0.15 }
-  })
-
-  // Core highlight — bright tiny white centre.
-  const coreHighlight = useAnimatedProps(() => {
-    'worklet'
-    const w = t.value
-    return { r: CORE_R * 0.4 + w * 1.1, opacity: 0.88 + w * 0.12 }
-  })
-
-  // Spike opacities — all ride the breath but at different amplitudes
-  // so the upward "norte" spike is always the loudest.
-  const upSpikeOpacity = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 0.85 + t.value * 0.15 }
-  })
-  const cardinalSpikeOpacity = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 0.45 + t.value * 0.2 }
-  })
-  const diagSpikeOpacity = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 0.22 + t.value * 0.12 }
-  })
-  const raysOpacity = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 0.55 + t.value * 0.25 }
-  })
-
-  return (
-    <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Defs>
-        <RadialGradient id="ns-core" cx="50%" cy="50%" r="60%">
-          <Stop offset="0%" stopColor="#FFFFFF" />
-          <Stop offset="38%" stopColor="#FBD7E3" />
-          <Stop offset="100%" stopColor="#9A2150" />
-        </RadialGradient>
-        {/* Spike gradients — bright at the core, fade to transparent
-            at the tip so the lines read as light leaks, not lines. */}
-        <LinearGradient id="ns-spike-up" x1="50%" y1="100%" x2="50%" y2="0%">
-          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-          <Stop offset="50%" stopColor="#FBD7E3" stopOpacity={0.55} />
-          <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0} />
-        </LinearGradient>
-        <LinearGradient id="ns-spike-down" x1="50%" y1="0%" x2="50%" y2="100%">
-          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-          <Stop offset="60%" stopColor="#FBD7E3" stopOpacity={0.45} />
-          <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0} />
-        </LinearGradient>
-        <LinearGradient id="ns-spike-h" x1="0%" y1="50%" x2="100%" y2="50%">
-          <Stop offset="0%" stopColor="#FBD7E3" stopOpacity={0} />
-          <Stop offset="50%" stopColor="#FFFFFF" stopOpacity={1} />
-          <Stop offset="100%" stopColor="#FBD7E3" stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-
-      {/* 3 satellite stars orbiting on slow ellipses. Render first so
-          they sit behind the bloom. */}
-      <OrbitDot orbit={orbit} cx={CX} cy={CY} radius={88} angleBase={0.3} sizeBase={2} />
-      <OrbitDot
-        orbit={orbit}
-        cx={CX}
-        cy={CY}
-        radius={100}
-        angleBase={Math.PI * 0.85}
-        sizeBase={1.4}
-      />
-      <OrbitDot
-        orbit={orbit}
-        cx={CX}
-        cy={CY}
-        radius={84}
-        angleBase={Math.PI * 1.4}
-        sizeBase={1.8}
-      />
-
-      {/* 22 radial rays — varied angles and lengths so the eye reads
-          "explosive light" instead of "ruler-drawn lines". Generated
-          deterministically; the field is the same every render. */}
-      <AnimatedG animatedProps={raysOpacity}>
-        {RAYS.map((ray, i) => (
-          <Line
-            key={`ray-${i}`}
-            x1={CX}
-            y1={CY}
-            x2={CX + Math.cos(ray.angle) * ray.length}
-            y2={CY + Math.sin(ray.angle) * ray.length}
-            stroke="#FBD7E3"
-            strokeWidth={ray.width}
-            strokeOpacity={ray.opacity}
-            strokeLinecap="round"
-          />
-        ))}
-      </AnimatedG>
-
-      {/* 5-layer atmospheric bloom. */}
-      <AnimatedCircle cx={CX} cy={CY} fill={colors.magenta} animatedProps={halo5} />
-      <AnimatedCircle cx={CX} cy={CY} fill={colors.magenta} animatedProps={halo4} />
-      <AnimatedCircle cx={CX} cy={CY} fill={colors.magenta} animatedProps={halo3} />
-      <AnimatedCircle cx={CX} cy={CY} fill={colors.magenta} animatedProps={halo2} />
-      <AnimatedCircle cx={CX} cy={CY} fill={colors.magenta} animatedProps={halo1} />
-
-      {/* 4 diagonal spikes — 45°/135°/225°/315°, shorter than the
-          cardinal cross, low opacity so they recede. */}
-      <AnimatedG animatedProps={diagSpikeOpacity}>
-        {[45, 135, 225, 315].map((deg) => {
-          const rad = (deg * Math.PI) / 180
-          return (
-            <Line
-              key={`diag-${deg}`}
-              x1={CX}
-              y1={CY}
-              x2={CX + Math.cos(rad) * SPIKE_DIAG_LEN}
-              y2={CY + Math.sin(rad) * SPIKE_DIAG_LEN}
-              stroke="#FFFFFF"
-              strokeWidth={0.8}
-              strokeLinecap="round"
-            />
-          )
-        })}
-      </AnimatedG>
-
-      {/* Horizontal spike — symmetric, gradient at both ends. */}
-      <AnimatedLine
-        x1={CX - SPIKE_H_LEN}
-        y1={CY}
-        x2={CX + SPIKE_H_LEN}
-        y2={CY}
-        stroke="url(#ns-spike-h)"
-        strokeWidth={1.2}
-        strokeLinecap="round"
-        animatedProps={cardinalSpikeOpacity}
-      />
-
-      {/* Downward spike — shorter than up, gradient fades to top. */}
-      <AnimatedLine
-        x1={CX}
-        y1={CY}
-        x2={CX}
-        y2={CY + SPIKE_DOWN_LEN}
-        stroke="url(#ns-spike-down)"
-        strokeWidth={1.1}
-        strokeLinecap="round"
-        animatedProps={cardinalSpikeOpacity}
-      />
-
-      {/* Upward spike — the "norte". Longest, brightest, with a
-          gradient that fades to transparent at the very top so the
-          line dissolves into the cosmos. */}
-      <AnimatedLine
-        x1={CX}
-        y1={CY - SPIKE_UP_LEN}
-        x2={CX}
-        y2={CY}
-        stroke="url(#ns-spike-up)"
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        animatedProps={upSpikeOpacity}
-      />
-
-      {/* The luminous core. */}
-      <Circle cx={CX} cy={CY} r={CORE_R} fill="url(#ns-core)" />
-      <AnimatedCircle cx={CX} cy={CY} fill="#FFFFFF" animatedProps={coreHighlight} />
-
-      {/* Lens flare artefacts — 2 small offset dots along the
-          upward axis. Tiny cosmic camera halos that sell the photo
-          aesthetic. */}
-      <Circle cx={CX} cy={CY - SPIKE_UP_LEN * 0.35} r={1.6} fill="#FBD7E3" opacity={0.7} />
-      <Circle cx={CX} cy={CY - SPIKE_UP_LEN * 0.65} r={1.1} fill="#F4ABC8" opacity={0.45} />
-    </Svg>
-  )
-}
-
-/* Deterministic ray spec: 22 light rays at evenly-spaced angles
- * with subtle variation in length, width, opacity so the starburst
- * doesn't read as ruler-drawn. */
-type Ray = { angle: number; length: number; width: number; opacity: number }
-const RAYS: readonly Ray[] = (() => {
-  const out: Ray[] = []
-  const N = 22
-  const rand = (i: number) => {
-    const v = Math.sin(i * 9301 + 49297) * 233280
-    return v - Math.floor(v)
-  }
-  for (let i = 0; i < N; i++) {
-    const baseAngle = (i / N) * 2 * Math.PI
-    const angle = baseAngle + (rand(i + 1) - 0.5) * 0.08
-    // Length varies dramatically — some rays short, some long, so
-    // the eye reads organic starlight, not a sun-icon.
-    const len = 30 + rand(i + 100) * 80
-    const width = 0.4 + rand(i + 200) * 0.5
-    const opacity = 0.08 + rand(i + 300) * 0.22
-    out.push({ angle, length: len, width, opacity })
-  }
-  return out
-})()
-
-/* One small satellite star orbiting the core. Uses two animated
- * shared values: position around the orbit + a slight breath so
- * each satellite twinkles independently. */
-function OrbitDot({
-  orbit,
-  cx,
-  cy,
-  radius,
-  angleBase,
-  sizeBase,
-}: {
-  orbit: SharedValue<number>
-  cx: number
-  cy: number
-  radius: number
-  angleBase: number
-  sizeBase: number
-}) {
-  const props = useAnimatedProps(() => {
-    'worklet'
-    const a = angleBase + orbit.value * 2 * Math.PI
-    const x = cx + Math.cos(a) * radius
-    const y = cy + Math.sin(a) * radius * 0.6 // squash vertically so orbits feel like ellipses
-    // Twinkle: opacity rides the position so each dot peaks at
-    // different points in its orbit.
-    const w = 0.5 + 0.5 * Math.sin(a * 2)
-    return { cx: x, cy: y, r: sizeBase * (0.8 + w * 0.4), opacity: 0.4 + w * 0.45 }
-  })
-  return <AnimatedCircle animatedProps={props} fill="#FBD7E3" />
 }
 
 const styles = StyleSheet.create({
@@ -377,6 +613,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 18,
+    // CAMBIO 4 — single reading axis: everything in the stage is
+    // centred, so the eye no longer jumps left (block) → centre (meta).
+    alignItems: 'center',
   },
   eyebrow: {
     fontFamily: typography.uiBold,
@@ -385,6 +624,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5,
     textTransform: 'uppercase',
     marginBottom: 14,
+    textAlign: 'center',
   },
   quote: {
     fontFamily: typography.displayHeavy,
@@ -392,6 +632,7 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     color: colors.leche,
     letterSpacing: -1.6,
+    textAlign: 'center',
   },
   quoteEmphasis: {
     marginTop: 6,
@@ -401,26 +642,65 @@ const styles = StyleSheet.create({
     color: colors.magenta,
     lineHeight: 40,
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
+  // CAMBIO 5 — stable vertical rhythm: the hero no longer relies only
+  // on flex:1 (which over-compressed it on an SE/mini and left dead
+  // air on a Pro Max). It keeps flex:1 to absorb spare space but is
+  // bounded by a minHeight (so the SE never crushes it / the CTA stays
+  // on-screen) and a maxHeight (so the Pro Max air doesn't feel
+  // indifferent). marginTop 18→30 separates the coach line from the
+  // atmospheric field; marginBottom adds explicit hero→meta breathing.
   heroWrap: {
     flex: 1,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
+    marginTop: 30,
+    marginBottom: 24,
+    minHeight: 240,
+    maxHeight: STAGE,
   },
+  hero: {
+    width: STAGE,
+    height: STAGE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coreWrap: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  core: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#FFB8D4',
+    shadowOpacity: 1,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+  },
+  // CAMBIO 3 — accessibility: the meta is the promise, so it must read.
+  // Bumped 13→15 (typography.sizes.ui, ≥14pt min), lineHeight 20→22,
+  // and the body colour lifted bone→leche for legibility. The "En 28
+  // días" emphasis stays leche/serif as before.
   meta: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.bone,
+    fontSize: typography.sizes.ui,
+    lineHeight: 22,
+    color: colors.leche,
     textAlign: 'center',
     paddingHorizontal: 12,
   },
   metaStrong: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 14.5,
-    color: colors.magenta,
+    fontSize: 16,
+    color: colors.leche,
   },
   footer: {
     paddingHorizontal: 24,

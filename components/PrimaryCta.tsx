@@ -7,6 +7,11 @@ import { StarLoader } from './StarLoader'
 
 export type CtaVariant = 'primary' | 'ghost' | 'soft' | 'destructive'
 
+/** Label casing. Default `uppercase` preserves the wizard/installer
+ *  CTA language used everywhere else in the app. `none` opts a single
+ *  CTA into a warmer sentence-case voice (e.g. the manifesto step). */
+export type CtaTransform = 'uppercase' | 'none'
+
 type Props = {
   label: string
   onPress: () => void
@@ -21,6 +26,9 @@ type Props = {
    *  Used by the new identidad / cuerpo onboarding screens whose
    *  language is rounder than the rest of the wizard. */
   pill?: boolean
+  /** Label casing. Defaults to `uppercase` (unchanged for every
+   *  existing CTA). Pass `none` for a sentence-case, calmer label. */
+  transform?: CtaTransform
 }
 
 export function PrimaryCta({
@@ -34,11 +42,13 @@ export function PrimaryCta({
   marginBottom = 0,
   accessibilityLabel,
   pill = false,
+  transform = 'uppercase',
 }: Props) {
   const inactive = disabled || loading
   const isGhost = variant === 'ghost'
   const isSoft = variant === 'soft'
   const isDestructive = variant === 'destructive'
+  const isPlain = transform === 'none'
 
   const handlePress = () => {
     if (inactive) return
@@ -70,7 +80,14 @@ export function PrimaryCta({
             size={18}
             color={isGhost ? colors.leche : isSoft ? colors.magenta : '#FFFFFF'}
           />
-          <Text style={[styles.label, isGhost && styles.labelGhost, isSoft && styles.labelSoft]}>
+          <Text
+            style={[
+              styles.label,
+              isGhost && styles.labelGhost,
+              isSoft && styles.labelSoft,
+              isPlain && styles.labelPlain,
+            ]}
+          >
             {loadingLabel}
           </Text>
         </View>
@@ -80,6 +97,7 @@ export function PrimaryCta({
             styles.label,
             isGhost && styles.labelGhost,
             isSoft && styles.labelSoft,
+            isPlain && styles.labelPlain,
             inactive && !isGhost && !isSoft && styles.labelDisabled,
           ]}
         >
@@ -137,7 +155,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 12,
+    fontSize: 13,
     color: '#FFFFFF',
     letterSpacing: 2.16,
     textTransform: 'uppercase',
@@ -151,6 +169,16 @@ const styles = StyleSheet.create({
   },
   labelSoft: {
     color: colors.magenta,
+  },
+  // Plain — sentence-case voice: drops the uppercase + wide tracking
+  // so the label reads as a warm invitation, not a wizard step. Size
+  // nudged up slightly to keep optical weight now that the caps are
+  // gone. Used by the manifesto CTA ("Empecemos").
+  labelPlain: {
+    textTransform: 'none',
+    letterSpacing: 0.2,
+    fontFamily: typography.uiSemi,
+    fontSize: 15,
   },
   labelDisabled: {
     color: colors.niebla,
