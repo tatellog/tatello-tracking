@@ -1,13 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeOut,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated'
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
@@ -18,6 +11,7 @@ import { ZodiacEngraving } from './ZodiacEngraving'
 import { AnimatedBlurView } from './constellation/animation/animated-components'
 import { useCanvasReveal } from './constellation/animation/use-canvas-reveal'
 import { useConstellationClocks } from './constellation/animation/use-clocks'
+import { useIgnitionEngine } from './constellation/animation/use-ignition-engine'
 import {
   AmbientField,
   CosmicDust,
@@ -40,15 +34,7 @@ import {
 } from './constellation/rendering/overlay'
 import { CanvasSkeleton } from './constellation/rendering/skeleton'
 import { AmbientGlow, SvgGradients } from './constellation/rendering/static'
-import {
-  H,
-  IGNITE_LINE_MS,
-  IGNITE_STAR_MS,
-  NUMBER_COUNTUP_MS,
-  PAD,
-  TARGET_DAYS,
-  W,
-} from './constellation/constants'
+import { H, PAD, TARGET_DAYS, W } from './constellation/constants'
 import { SIGN_CONSTELLATION_TRANSFORM, SIGN_ENGRAVINGS } from './constellation/data/sign-maps'
 import { deriveProgress } from './constellation/data/derive-progress'
 import type { Props, Resolved, SequenceEl } from './constellation/types'
@@ -203,139 +189,17 @@ export function LunarConstellation({
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
   const { t, slowT, breathT, driftT } = useConstellationClocks()
-
-  // ── Ignition engine ────────────────────────────────────────────────
-  //
-  // When `elementsLit` jumps up we want each newly-lit star/line to
-  // play a one-shot flash before settling into its ambient state. The
-  // engine has three moving parts:
-  //   1. A queue of pending SequenceEl[] additions. Pushing to it
-  //      kicks the dispatch effect.
-  //   2. `ignitingKey` (the key currently mid-animation). While set,
-  //      the regular lit/next layers skip it and IgnitingOverlay
-  //      draws the flash on top.
-  //   3. `igniteT` 0→1 shared value driving the flash and the line
-  //      stroke trace. Reset to 0 + withTiming each dispatch.
-  //
-  // The bloom burst, number pulse and count-up fire once per tap
-  // (regardless of how many elements bumped), since they live in the
-  // centre and shouldn't strobe.
-  const prevLitRef = useRef(elementsLit)
-  const prevCountRef = useRef(trainedCount)
   const { canvasReady, revealBlurProps } = useCanvasReveal()
-
-  const [ignitionQueue, setIgnitionQueue] = useState<SequenceEl[]>([])
-  const [ignitingKey, setIgnitingKey] = useState<string | null>(null)
-  // Increments once per upward commit — seeds the burst's per-commit
-  // variability (spark count, jitter, hue) so no two fireworks match.
-  const [burstId, setBurstId] = useState(0)
-
-  const igniteT = useSharedValue(0)
-  const numberPulse = useSharedValue(0)
-  const displayedCount = useSharedValue(trainedCount)
-  // 0→1→0 ripple of brightness across every star/line that is
-  // already lit. Fires once per slider commit so the constellation
-  // "breathes brighter" the moment the user marks the day.
-  const litPulse = useSharedValue(0)
-  // 0→1 radial wave that expands from the centre on each commit. Drives
-  // a magenta ring expansion + a parallel placeholder-silhouette flash
-  // so the WHOLE figure (lit + unlit) lights up momentarily, then
-  // settles back to the current state.
-  const radialPulse = useSharedValue(0)
-  // 0→1 ramp fired once per upward commit — drives the floating "+1"
-  // ghost that rises above the counter and fades. The literal
-  // increment, made visible for ~700 ms then gone (a flourish, not
-  // chrome). Stays at 0 on undo / first paint.
-  const plusOne = useSharedValue(0)
-
-  // Global presence multiplier for the constellation ray. The ray's
-  // job is to SUGGEST the constellation path while the figure is
-  // still being built; once every star is lit the actual figure
-  // is fully visible and the bright ray competes with it instead
-  // of helping. We tween this to 0 on isComplete so the ray
-  // retires gracefully when the user finishes the 28-day cycle.
-  const rayPresence = useSharedValue(isComplete ? 0 : 1)
-  useEffect(() => {
-    rayPresence.value = withTiming(isComplete ? 0 : 1, { duration: 900 })
-  }, [isComplete, rayPresence])
-
-  // Detect upward changes → fire haptic, run centre animations, push
-  // new SequenceEls onto the queue. Downward changes (undo) just sync
-  // the displayed number without replaying any animation.
-  useEffect(() => {
-    const prevLit = prevLitRef.current
-    const prevCount = prevCountRef.current
-    prevLitRef.current = elementsLit
-    prevCountRef.current = trainedCount
-
-    if (trainedCount === prevCount) return
-
-    if (trainedCount < prevCount) {
-      displayedCount.value = trainedCount
-      return
-    }
-
-    displayedCount.value = withTiming(trainedCount, {
-      duration: NUMBER_COUNTUP_MS,
-      easing: Easing.out(Easing.cubic),
-    })
-    numberPulse.value = 0
-    numberPulse.value = withSequence(
-      withTiming(1, { duration: 220, easing: Easing.out(Easing.back(1.4)) }),
-      withTiming(0, { duration: 340, easing: Easing.inOut(Easing.cubic) }),
-    )
-    // The "+1" ghost — a single 0→1 ramp; the overlay derives both
-    // its rise and its fade from this value.
-    plusOne.value = 0
-    plusOne.value = withTiming(1, { duration: 760, easing: Easing.out(Easing.cubic) })
-    litPulse.value = 0
-    litPulse.value = withSequence(
-      withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }),
-      withTiming(0, { duration: 480, easing: Easing.inOut(Easing.cubic) }),
-    )
-    radialPulse.value = 0
-    radialPulse.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
-    // Bump the burst seed so this firework varies from the last one.
-    setBurstId((n) => n + 1)
-
-    if (elementsLit > prevLit) {
-      // Field stars don't run through the ignition flash — they just
-      // fade in. Only figure stars/lines get the dramatic ignition.
-      const newEls = sequence.slice(prevLit, elementsLit).filter((el) => el.type !== 'field')
-      setIgnitionQueue((q) => [...q, ...newEls])
-    }
-    // The commit haptic is owned by the Hoy screen's action handlers
-    // (a designed two-beat phrase) — the constellation no longer
-    // fires its own single tick, which would double up.
-  }, [
-    trainedCount,
-    elementsLit,
-    sequence,
-    displayedCount,
+  const {
+    ignitingKey,
+    igniteT,
     numberPulse,
+    displayedCount,
     litPulse,
     radialPulse,
     plusOne,
-  ])
-
-  // Drain the queue one element at a time. Each fire sets igniteT 0→1
-  // over the element-typed duration, holds for 30ms post-completion,
-  // then clears `ignitingKey` which retriggers this effect.
-  useEffect(() => {
-    if (ignitingKey != null || ignitionQueue.length === 0) return
-    const [next, ...rest] = ignitionQueue
-    if (!next) return
-    setIgnitionQueue(rest)
-
-    const key = `${next.type}-${next.idx}`
-    const duration = next.type === 'line' ? IGNITE_LINE_MS : IGNITE_STAR_MS
-    igniteT.value = 0
-    igniteT.value = withTiming(1, { duration, easing: Easing.out(Easing.cubic) })
-    setIgnitingKey(key)
-
-    const timer = setTimeout(() => setIgnitingKey(null), duration + 30)
-    return () => clearTimeout(timer)
-  }, [ignitingKey, ignitionQueue, igniteT])
+    burstId,
+  } = useIgnitionEngine({ trainedCount, elementsLit, sequence, isComplete })
 
   return (
     <View style={styles.wrap}>
