@@ -1,0 +1,46 @@
+import type { ZodiacSign } from '../../zodiac/types'
+
+export type Resolved = {
+  x: number
+  y: number
+  mag: number
+}
+
+// 'star'/'line' are figure elements; 'field' is a padding star — an
+// unconnected point of sky added so a small figure still fills the
+// whole 28-day cycle. See deriveProgress.
+export type SequenceEl = { type: 'star' | 'line' | 'field'; idx: number }
+
+export type Props = {
+  /** 28-day boolean array; index i is the i-th cell. */
+  trained: readonly boolean[]
+  todayIdx: number
+  sign?: ZodiacSign
+  /** When true (today is already marked as complete), the "next"
+   *  affordance — the dashed magenta ring around the upcoming star,
+   *  and the dashed magenta segment for the next line — is hidden.
+   *  Mirrors the app's philosophy that progress is a ritual, not a
+   *  debt: once you've checked in today, the figure shouldn't be
+   *  whispering "one more". The ring reappears the next day. */
+  committed?: boolean
+}
+
+export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }
+
+export type DustParticle = {
+  /** X anchor 0..1 (will be multiplied by W). */
+  x: number
+  /** Sway amplitude in pixels. */
+  sway: number
+  /** Cycle period — divisor of `t` (which is an 8 s clock).
+   *  E.g. period = 1.6 → particle rises every 12.8 s. */
+  period: number
+  /** Phase offset 0..1 so particles are staggered. */
+  phase: number
+  /** Particle radius in px. */
+  r: number
+  /** Peak opacity. */
+  opacity: number
+}
+
+export type DeepStar = { x: number; y: number; r: number; op: number }
