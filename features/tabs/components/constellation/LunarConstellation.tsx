@@ -81,7 +81,7 @@ export function LunarConstellation({
   const { t, slowT, breathT, driftT } = useConstellationClocks()
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
-    useIgnitionEngine({ trainedCount, elementsLit, sequence, isComplete })
+    useIgnitionEngine({ trainedCount, elementsLit, sequence })
 
   return (
     <View style={styles.wrap}>
