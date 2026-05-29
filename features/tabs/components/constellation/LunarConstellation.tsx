@@ -79,7 +79,7 @@ export function LunarConstellation({
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
   const { t, slowT, breathT, driftT } = useConstellationClocks()
-  const { canvasReady, revealBlurProps } = useCanvasReveal()
+  const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const {
     ignitingKey,
     igniteT,
@@ -244,16 +244,21 @@ export function LunarConstellation({
               ) : null}
               {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
             </Svg>
-            {/* Rack-focus blur. Born at 18 (matching the skeleton's
-                BlurView) so the cross-fade reads as a single image
-                dissolving; ramps to 0 over 700 ms so the
-                constellation + art comes into sharp focus. */}
-            <AnimatedBlurView
-              animatedProps={revealBlurProps}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
+            {/* Rack-focus blur. Born at intensity 18 (matching the
+                skeleton's BlurView) so the cross-fade reads as a single
+                image dissolving; wrapper opacity fades to 0 over 700 ms
+                so the constellation comes into sharp focus, then the
+                whole BlurView unmounts to free the GPU layer. */}
+            {blurMounted ? (
+              <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
+                <AnimatedBlurView
+                  intensity={18}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+              </Animated.View>
+            ) : null}
           </Animated.View>
         ) : null}
       </View>
