@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
 import { G } from 'react-native-svg'
 
@@ -15,7 +16,7 @@ import { H, W } from '../../constants'
  * don't spawn another timer. Position lerps from upper-left to lower-
  * right with a small head trail.
  */
-export function ShootingStar({
+export const ShootingStar = memo(function ShootingStar({
   t,
   cycleDiv = 1.6,
   phase = 0,
@@ -81,4 +82,4 @@ export function ShootingStar({
       <AnimatedCircle cx={0} cy={0} r={2.2} fill="#FFFFFF" animatedProps={animatedProps} />
     </G>
   )
-}
+})
