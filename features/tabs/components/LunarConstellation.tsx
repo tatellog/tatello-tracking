@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { StyleSheet, Text, View, type TextInputProps } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
   FadeOut,
   cancelAnimation,
-  interpolate,
-  interpolateColor,
   useAnimatedProps,
-  useAnimatedStyle,
-  useDerivedValue,
   useSharedValue,
   withRepeat,
   withSequence,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
@@ -23,11 +18,7 @@ import { colors, typography } from '@/theme'
 import { ZODIAC } from '../zodiac/data'
 
 import { ZodiacEngraving } from './ZodiacEngraving'
-import {
-  AnimatedBlurView,
-  AnimatedCircle,
-  AnimatedTextInput,
-} from './constellation/animation/animated-components'
+import { AnimatedBlurView } from './constellation/animation/animated-components'
 import {
   AmbientField,
   CosmicDust,
@@ -43,6 +34,11 @@ import { IgnitingOverlay } from './constellation/rendering/ignition'
 import { LitClusterAura, LitClusterMotes } from './constellation/rendering/lit-cluster'
 import { LitLines } from './constellation/rendering/lit-lines'
 import { StarsLayer } from './constellation/rendering/lit-stars'
+import {
+  AnticipationCrown,
+  CenterNumberOverlay,
+  CompletionRings,
+} from './constellation/rendering/overlay'
 import { CanvasSkeleton } from './constellation/rendering/skeleton'
 import { AmbientGlow, SvgGradients } from './constellation/rendering/static'
 import {
@@ -591,198 +587,6 @@ export function LunarConstellation({
   )
 }
 
-/* ─ Centre counter texts ────────────────────────────────────────── */
-
-/* The big number used to live here as SvgText, but animating its
- * children would force per-frame React re-renders. It moved out to
- * the React Native overlay (<CenterNumberOverlay>) so the count-up
- * and scale pulse can run on the UI thread via the AnimatedTextInput
- * `text` prop trick. The static "DE 28 DÍAS" stays in SVG (cheap);
- * the progress phrase moved BELOW the SVG so it never collides with
- * the centre bloom. */
-// CenterText removed — the chip now lives outside the SVG as a
-// footer row (CenterNumberOverlay), so the in-SVG halo + label
-// the original CenterText painted are no longer needed.
-
-/* React Native overlay positioned over the SVG centre. Uses the
- * AnimatedTextInput `text` prop trick (same pattern as StreakNumber)
- * so the integer climb runs on the UI thread without re-rendering
- * React. `marginTop: -22` biases the baseline upward to match the
- * old SvgText y = cy - 4. */
-function CenterNumberOverlay({
-  displayedCount,
-  numberPulse,
-  plusOne,
-  initialCount,
-  urgent = false,
-  remaining = 0,
-}: {
-  displayedCount: SharedValue<number>
-  numberPulse: SharedValue<number>
-  plusOne: SharedValue<number>
-  initialCount: number
-  /** Final-stretch flag — last 3 days before completion. Switches
-   *  the chip to a celebratory state (extra microcopy + warmer
-   *  tone) so the user sees they're almost there. */
-  urgent?: boolean
-  /** Days remaining until completion. Used by the urgency
-   *  microcopy ("falta 1", "faltan 2", etc.). */
-  remaining?: number
-}) {
-  const rounded = useDerivedValue(() => Math.round(displayedCount.value))
-  const textProps = useAnimatedProps(() => {
-    const text = String(rounded.value)
-    return { text, defaultValue: text } as unknown as Partial<TextInputProps>
-  })
-  // Opacity ramps from 0.42 at count=0 to 1.0 once the user has marked
-  // at least one day — the dim "0" reads as "waiting for you to begin"
-  // rather than a bright assertion. The commit scale-pop is bigger now
-  // (0.18, was 0.08) so the increment lands as a beat, not a twitch.
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + numberPulse.value * 0.18 }],
-    opacity: 0.42 + Math.min(1, displayedCount.value) * 0.58,
-  }))
-  // The digit flashes pale at the peak of the pop — magenta → near
-  // white → magenta — so the eye catches the number *changing*.
-  const colorStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(numberPulse.value, [0, 1], [colors.magenta, '#FFF3FA']),
-  }))
-  // The "+1" ghost — rises ~22 px and fades. Appears fast, holds
-  // briefly, gone by the end of the ramp.
-  const ghostStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(plusOne.value, [0, 0.12, 0.6, 1], [0, 1, 1, 0]),
-    transform: [{ translateY: -plusOne.value * 22 }],
-  }))
-  return (
-    <View style={styles.numberOverlay} pointerEvents="none">
-      <Animated.View style={[styles.numberRow, pulseStyle]}>
-        <View style={styles.chipFrameDot} />
-        <View style={styles.chipFrameLine} />
-        <AnimatedTextInput
-          editable={false}
-          underlineColorAndroid="transparent"
-          animatedProps={textProps}
-          defaultValue={String(initialCount)}
-          style={[styles.numberOverlayText, colorStyle]}
-        />
-        <Text style={styles.numberDenominator}>/ {TARGET_DAYS} días</Text>
-        <View style={styles.chipFrameLine} />
-        <View style={styles.chipFrameDot} />
-      </Animated.View>
-      {urgent && remaining > 0 ? (
-        <Text style={styles.urgencyHint}>
-          {remaining === 1 ? 'una más' : `faltan ${remaining}`}
-        </Text>
-      ) : null}
-      <Animated.View style={[styles.plusOne, ghostStyle]} pointerEvents="none">
-        <Text style={styles.plusOneText}>+1</Text>
-      </Animated.View>
-    </View>
-  )
-}
-
-/* ─ Anticipation crown ─────────────────────────────────────────────
- *
- * A faint cream ring around the canvas centre that emerges from day
- * 21 and grows/brightens as the user approaches completion. Builds
- * the "casi llegás" tension visible in the last week without
- * stealing focus from the lit constellation.
- */
-function AnticipationCrown({
-  cx,
-  cy,
-  proximity,
-  breathT,
-}: {
-  cx: number
-  cy: number
-  /** 0..1 — 0 = day 21, 1 = day 28. Drives radius + opacity. */
-  proximity: number
-  breathT: SharedValue<number>
-}) {
-  // Smaller radius (75 → 95 px) keeps the crown inside the bright
-  // focal area rather than at the canvas edge where the vignette
-  // and the lion's ornate ring would absorb it. Opacities ~2× the
-  // previous so the buildup actually reads in the last week.
-  const baseR = 75 + proximity * 20
-  const innerProps = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI)
-    return {
-      opacity: (0.18 + 0.18 * wave) * (0.4 + proximity * 0.6),
-      r: baseR + wave * 4,
-    }
-  })
-  const outerProps = useAnimatedProps(() => {
-    'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI + Math.PI * 0.4)
-    return {
-      opacity: (0.12 + 0.12 * wave) * (0.4 + proximity * 0.6),
-      r: baseR + 10 + wave * 3,
-    }
-  })
-  return (
-    <G>
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        r={baseR}
-        fill="none"
-        stroke="#FFF6E5"
-        strokeWidth={1.2}
-        strokeDasharray="2 6"
-        animatedProps={innerProps}
-      />
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        r={baseR + 10}
-        fill="none"
-        stroke="#D9AE6F"
-        strokeWidth={0.8}
-        strokeDasharray="1 7"
-        animatedProps={outerProps}
-      />
-    </G>
-  )
-}
-
-function CompletionRings({ cx, cy, t }: { cx: number; cy: number; t: SharedValue<number> }) {
-  const innerProps = useAnimatedProps(() => {
-    'worklet'
-    // 5s loop derived from the 8s base.
-    const p = (t.value * (8 / 5)) % 1
-    return { r: 110 + p * 20, opacity: 0.35 * (1 - p) }
-  })
-  const outerProps = useAnimatedProps(() => {
-    'worklet'
-    const p = (t.value * (8 / 5) + 0.32) % 1
-    return { r: 130 + p * 20, opacity: 0.2 * (1 - p) }
-  })
-  return (
-    <G>
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        r={110}
-        fill="none"
-        stroke="rgba(233,30,99,0.35)"
-        strokeWidth={0.5}
-        animatedProps={innerProps}
-      />
-      <AnimatedCircle
-        cx={cx}
-        cy={cy}
-        r={130}
-        fill="none"
-        stroke="rgba(233,30,99,0.20)"
-        strokeWidth={0.5}
-        animatedProps={outerProps}
-      />
-    </G>
-  )
-}
-
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
@@ -808,91 +612,6 @@ const styles = StyleSheet.create({
   svg: {
     width: '100%',
     height: '100%',
-  },
-  // Footer container — sits directly below the SVG canvas so the
-  // chip lives in its own row, never overlapping the constellation.
-  numberOverlay: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  numberRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  numberOverlayText: {
-    // Shrunk from 52 → 24 so the count reads as metadata, not as
-    // visual hero. The constellation IS the progress now; the
-    // number is a literal-data complement, not a separate focal.
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.displaySm,
-    color: colors.leche,
-    letterSpacing: -0.6,
-    textAlign: 'center',
-    // Soft pink textShadow kept for warmth, halved from before.
-    textShadowColor: 'rgba(233,30,99,0.32)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-    padding: 0,
-    includeFontPadding: false,
-    minWidth: 28,
-  },
-  numberDenominator: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 1.0,
-    marginLeft: 6,
-  },
-  // Decorative chip frame — thin niebla hairlines + bullet dots
-  // flanking the count, so the chip reads as a designed UI element
-  // rather than plain text floating in the constellation.
-  chipFrameLine: {
-    width: 18,
-    height: 1,
-    backgroundColor: colors.niebla,
-    opacity: 0.6,
-    marginHorizontal: 8,
-    alignSelf: 'center',
-  },
-  chipFrameDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.bone,
-    opacity: 0.85,
-    alignSelf: 'center',
-  },
-  // Urgency microcopy — appears only in the final 3 days. Tiny
-  // italic warm tag below the count chip ("una más" / "faltan 2").
-  urgencyHint: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.magenta,
-    letterSpacing: 0.6,
-    marginTop: 2,
-    textTransform: 'lowercase',
-  },
-  // The "+1" ghost — floats above the counter and rises out on each
-  // commit. Absolute so it never shifts the centred number's layout.
-  plusOne: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: H / 2 - 62,
-    alignItems: 'center',
-  },
-  plusOneText: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.magenta,
-    textShadowColor: 'rgba(233,30,99,0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
   },
   // Visible only once the user completes the 28-day cycle — a single
   // small magenta caps stamp announcing the achievement. Replaces the
