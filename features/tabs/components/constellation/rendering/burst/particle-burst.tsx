@@ -1,4 +1,10 @@
-import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
+import { useState } from 'react'
+import {
+  runOnJS,
+  useAnimatedProps,
+  useAnimatedReaction,
+  type SharedValue,
+} from 'react-native-reanimated'
 import { G } from 'react-native-svg'
 
 import { colors } from '@/theme'
@@ -30,6 +36,21 @@ export function ParticleBurst({
   burstId: number
   trainedCount: number
 }) {
+  // Gate the render on pulse mid-flight. Without this every ParticleSpark
+  // keeps its useAnimatedProps worklet alive 60 fps × ~28 sparks even when
+  // pulse sits at 0 or 1 (idle / settled) — ~1.6k zombie ops/second. The
+  // reaction flips a React state at the burst boundaries so the SVG nodes
+  // unmount when there's nothing to show.
+  const [active, setActive] = useState(false)
+  useAnimatedReaction(
+    () => pulse.value > 0 && pulse.value < 1,
+    (isActive, prev) => {
+      if (isActive !== prev) runOnJS(setActive)(isActive)
+    },
+    [],
+  )
+  if (!active) return null
+
   // Every 5th commit is an amplified "bigger moment" — a cadence the
   // user can't quite predict, which keeps the reward-prediction error
   // (and so the dopamine) alive.
