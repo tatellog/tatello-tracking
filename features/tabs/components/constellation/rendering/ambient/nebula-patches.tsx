@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
 import { Ellipse, G } from 'react-native-svg'
 
@@ -22,7 +23,7 @@ import { H, NEBULA_LAYERS, W } from '../../constants'
  * Each patch drifts on its own phase so the sky reads as weather,
  * not a synchronised loop.
  */
-export function NebulaPatches({
+export const NebulaPatches = memo(function NebulaPatches({
   ax,
   ay,
   drift,
@@ -143,4 +144,4 @@ export function NebulaPatches({
       </AnimatedG>
     </G>
   )
-}
+})

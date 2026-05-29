@@ -24,16 +24,11 @@ export function StarBurst({
   cx,
   cy,
   pulse,
-  burstId,
   trainedCount,
 }: {
   cx: number
   cy: number
   pulse: SharedValue<number>
-  /** Increments once per commit — seeds the per-burst variability so
-   *  no two fireworks render the same frame (a fixed burst
-   *  habituates fast). */
-  burstId: number
   /** Day count — drives the early-window (days 2–12) amplification
    *  that flattens the post-day-1 reward cliff. */
   trainedCount: number
@@ -41,7 +36,7 @@ export function StarBurst({
   return (
     <G>
       <BurstCore cx={cx} cy={cy} pulse={pulse} />
-      <ParticleBurst cx={cx} cy={cy} pulse={pulse} burstId={burstId} trainedCount={trainedCount} />
+      <ParticleBurst cx={cx} cy={cy} pulse={pulse} trainedCount={trainedCount} />
     </G>
   )
 }

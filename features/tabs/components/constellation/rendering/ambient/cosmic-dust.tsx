@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
 import { G } from 'react-native-svg'
 
@@ -19,7 +20,7 @@ import type { DustParticle } from '../../types'
  * the cycle off-canvas (well below or above), so at any moment
  * only ~3-4 are actually visible.
  */
-export function CosmicDust({ t }: { t: SharedValue<number> }) {
+export const CosmicDust = memo(function CosmicDust({ t }: { t: SharedValue<number> }) {
   return (
     <G>
       {DUST.map((p, i) => (
@@ -27,7 +28,7 @@ export function CosmicDust({ t }: { t: SharedValue<number> }) {
       ))}
     </G>
   )
-}
+})
 
 function DustMote({ particle, t }: { particle: DustParticle; t: SharedValue<number> }) {
   const baseX = particle.x * W

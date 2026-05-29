@@ -1,4 +1,4 @@
-import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
+import { useAnimatedProps, useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import { Circle, Ellipse, G, Line } from 'react-native-svg'
 
 import { colors } from '@/theme'
@@ -171,9 +171,16 @@ function LitStar({
   // pulsing in unison. Modular so the cascade wraps cleanly when
   // very deep figures push the last shell past bc=1.0.
   const breathStart = 0.85 + depth * 0.02
+  // Shared 8 s breath wave — the 4 layered worklets below (halo + body
+  // + outer halo + core) used to each call Math.sin((t + phase) * 2π)
+  // independently. useDerivedValue runs it ONCE per frame on the UI
+  // thread and the worklets just read .value — saves 3 sin calls per
+  // lit star per frame (~85 / s with 5 stars lit; scales linearly).
+  const waveSV = useDerivedValue(() => 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI))
+
   const haloProps = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    const wave = waveSV.value
     // Halved ambient range vs. before (0.22→0.12 floor, 0.16→0.10
     // wave) so the lit halos read as glints, not glows. The
     // composition was reading "heavy" with full-strength halos
@@ -200,7 +207,7 @@ function LitStar({
   // (not the Path) so the gradient fill `url(#starLit)` stays stable.
   const starProps = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    const wave = waveSV.value
     const scale = 1 + wave * 0.1
 
     // Twinkle: t cycles 0..1 every 8 s; ×2.4 ⇒ ~3.3 s per twinkle.
@@ -241,7 +248,7 @@ function LitStar({
   // breath; recency-aware like the main halo.
   const outerHaloProps = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    const wave = waveSV.value
     // Halved + radius trimmed so the outer bloom feels like a
     // breath of warmth, not a solid disc on top of every lit star.
     const ambient = (0.025 + 0.02 * wave) * haloMult
@@ -256,7 +263,7 @@ function LitStar({
   // makes stars read as light, not stickers.
   const coreProps = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    const wave = waveSV.value
     return {
       opacity: (0.35 + 0.2 * wave) * haloMult + litPulse.value * 0.2,
       r: r + 2 + wave * 1.2,

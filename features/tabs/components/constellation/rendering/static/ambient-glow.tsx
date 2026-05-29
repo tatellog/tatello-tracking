@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Ellipse, G } from 'react-native-svg'
 
 import { colors } from '@/theme'
@@ -24,7 +25,7 @@ import {
  *
  * Static — no animation — so the eye reads it as the scene's lighting,
  * not as an effect. */
-export function AmbientGlow({ cx, cy }: { cx: number; cy: number }) {
+export const AmbientGlow = memo(function AmbientGlow({ cx, cy }: { cx: number; cy: number }) {
   return (
     <G>
       {Array.from({ length: AMBIENT_LAYERS }).map((_, i) => {
@@ -45,4 +46,4 @@ export function AmbientGlow({ cx, cy }: { cx: number; cy: number }) {
       })}
     </G>
   )
-}
+})

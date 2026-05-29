@@ -78,18 +78,10 @@ export function LunarConstellation({
   // again and the next affordance reappears.
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
-  const { t, slowT, breathT, driftT } = useConstellationClocks()
-  const { canvasReady, revealBlurProps } = useCanvasReveal()
-  const {
-    ignitingKey,
-    igniteT,
-    numberPulse,
-    displayedCount,
-    litPulse,
-    radialPulse,
-    plusOne,
-    burstId,
-  } = useIgnitionEngine({ trainedCount, elementsLit, sequence, isComplete })
+  const { t, breathT, driftT } = useConstellationClocks()
+  const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
+  const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
+    useIgnitionEngine({ trainedCount, elementsLit, sequence })
 
   return (
     <View style={styles.wrap}>
@@ -183,9 +175,9 @@ export function LunarConstellation({
                 <BaseLayer
                   zodiac={zodiac}
                   stars={stars}
-                  slowT={slowT}
                   radialPulse={radialPulse}
                   t={t}
+                  litKeys={litKeys}
                 />
                 <LitLines
                   zodiac={zodiac}
@@ -222,13 +214,7 @@ export function LunarConstellation({
               the count now living as a small chip at the canvas
               floor (numberRow.marginTop 122), the orb was an
               orphan magenta wash competing with the asterism. */}
-              <StarBurst
-                cx={cx}
-                cy={cy}
-                pulse={radialPulse}
-                burstId={burstId}
-                trainedCount={trainedCount}
-              />
+              <StarBurst cx={cx} cy={cy} pulse={radialPulse} trainedCount={trainedCount} />
               {/* Anticipation crown — appears from day 21 onward, a
               tenue cream ring around the canvas centre that grows +
               brightens approaching day 28. Builds psychological
@@ -243,16 +229,21 @@ export function LunarConstellation({
               ) : null}
               {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
             </Svg>
-            {/* Rack-focus blur. Born at 18 (matching the skeleton's
-                BlurView) so the cross-fade reads as a single image
-                dissolving; ramps to 0 over 700 ms so the
-                constellation + art comes into sharp focus. */}
-            <AnimatedBlurView
-              animatedProps={revealBlurProps}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
+            {/* Rack-focus blur. Born at intensity 18 (matching the
+                skeleton's BlurView) so the cross-fade reads as a single
+                image dissolving; wrapper opacity fades to 0 over 700 ms
+                so the constellation comes into sharp focus, then the
+                whole BlurView unmounts to free the GPU layer. */}
+            {blurMounted ? (
+              <Animated.View style={[StyleSheet.absoluteFill, blurStyle]} pointerEvents="none">
+                <AnimatedBlurView
+                  intensity={18}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+              </Animated.View>
+            ) : null}
           </Animated.View>
         ) : null}
       </View>

@@ -1,4 +1,10 @@
-import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
+import { useState } from 'react'
+import {
+  runOnJS,
+  useAnimatedProps,
+  useAnimatedReaction,
+  type SharedValue,
+} from 'react-native-reanimated'
 import { G } from 'react-native-svg'
 
 import { colors } from '@/theme'
@@ -21,15 +27,36 @@ export function ParticleBurst({
   cx,
   cy,
   pulse,
-  burstId,
   trainedCount,
 }: {
   cx: number
   cy: number
   pulse: SharedValue<number>
-  burstId: number
   trainedCount: number
 }) {
+  // Gate the render on pulse mid-flight + own a local burstId counter
+  // (bumped on every burst start). Two reasons it lives here instead of
+  // in useIgnitionEngine:
+  //   1. setBurstId there forced a re-render of the entire orchestrator
+  //      (and its ~150-component subtree) every commit. Owning it locally
+  //      keeps the bump scoped to this subtree.
+  //   2. Without the active gate, ~28 ParticleSpark worklets evaluated
+  //      every frame even with pulse=0 (~1.6k zombie ops/sec). The
+  //      reaction flips React state at the burst boundaries so the SVG
+  //      nodes unmount when there's nothing to show.
+  const [active, setActive] = useState(false)
+  const [burstId, setBurstId] = useState(0)
+  useAnimatedReaction(
+    () => pulse.value > 0 && pulse.value < 1,
+    (isActive, prev) => {
+      if (isActive === prev) return
+      runOnJS(setActive)(isActive)
+      if (isActive) runOnJS(setBurstId)((n) => n + 1)
+    },
+    [],
+  )
+  if (!active) return null
+
   // Every 5th commit is an amplified "bigger moment" — a cadence the
   // user can't quite predict, which keeps the reward-prediction error
   // (and so the dopamine) alive.

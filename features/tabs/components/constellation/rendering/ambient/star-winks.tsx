@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
 import { Circle, G, Path } from 'react-native-svg'
 
@@ -14,7 +15,7 @@ import { fourPointStarPath } from '../../geometry'
  * every ~1 s on average. Sells "the sky is alive" without
  * tipping into noise.
  */
-export function StarWinks({ t }: { t: SharedValue<number> }) {
+export const StarWinks = memo(function StarWinks({ t }: { t: SharedValue<number> }) {
   return (
     <G>
       {WINK_POSITIONS.map((w, i) => (
@@ -22,7 +23,7 @@ export function StarWinks({ t }: { t: SharedValue<number> }) {
       ))}
     </G>
   )
-}
+})
 
 function StarWink({ wink, t }: { wink: (typeof WINK_POSITIONS)[number]; t: SharedValue<number> }) {
   const cx = wink.x * W

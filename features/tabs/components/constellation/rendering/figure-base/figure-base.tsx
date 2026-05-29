@@ -13,31 +13,34 @@ import { StarSparkle } from '../static'
 export function BaseLayer({
   zodiac,
   stars,
-  slowT,
   radialPulse,
   t,
+  litKeys,
 }: {
   zodiac: ZodiacDef
   stars: Resolved[]
-  /** 5 s clock — modulates a sin wave between 0.78× and 1.22× of the
-   *  base opacity so the placeholder silhouette gently breathes. Most
-   *  visible at count = 0 where nothing else is lit; once stars sit on
-   *  top, the breath happens "behind" them and reads as ambient. */
-  slowT: SharedValue<number>
   /** 0..1 one-shot wave fired on commit. While > 0 the placeholder
    *  silhouette gets a brightness boost so the WHOLE figure flashes
    *  alongside the magenta radial ring — "the constellation fills up". */
   radialPulse: SharedValue<number>
   /** 8 s clock shared with the lit-star layer so the placeholder
-   *  stars breathe + twinkle on the same heartbeat (just dimmer). */
+   *  stars breathe + twinkle on the same heartbeat (just dimmer). The
+   *  line silhouette derives its own ~5 s breath from this same clock
+   *  (factor 8/5) so we don't need a dedicated SharedValue + withRepeat
+   *  for one consumer. */
   t: SharedValue<number>
+  /** Skip placeholder rendering for stars already lit by StarsLayer.
+   *  Without this the lit stars draw twice (placeholder cream sparkle
+   *  + lit halo on top) — wasted worklets and SVG overdraw. */
+  litKeys: Set<string>
 }) {
   // Silhouette opacity wave — a slow breath on the unlit lines so
   // the placeholder figure feels alive, plus a parabolic flash on
   // every commit so the full shape pulses with the ignition.
   const linesProps = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin(slowT.value * 2 * Math.PI)
+    // ~5 s loop derived from the 8 s base clock (period = 8/(8/5) = 5).
+    const wave = 0.5 + 0.5 * Math.sin(t.value * (8 / 5) * 2 * Math.PI)
     const flash = radialPulse.value * (1 - radialPulse.value) * 2
     const op = 0.55 + 0.25 * wave + flash * 0.4
     return { opacity: op > 1 ? 1 : op }
@@ -69,9 +72,9 @@ export function BaseLayer({
           )
         })}
       </AnimatedG>
-      {stars.map((s, i) => (
-        <PlaceholderStar key={`bs-${i}`} s={s} i={i} t={t} />
-      ))}
+      {stars.map((s, i) =>
+        litKeys.has(`star-${i}`) ? null : <PlaceholderStar key={`bs-${i}`} s={s} i={i} t={t} />,
+      )}
     </>
   )
 }

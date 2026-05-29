@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated'
+import {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 
 /* ─ Canvas reveal ──────────────────────────────────────────────────
  *
@@ -16,28 +22,45 @@ import { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-nati
  * Rack-focus blur on the real Svg. The Svg is born matching the
  * skeleton's blur intensity (18) so the cross-fade reads "same
  * image, just dissolving"; then over 700 ms after canvasReady
- * the blur drains to 0 so the constellation + art comes into
- * sharp focus. Without this the cross-fade jumps from BLURRED
- * (skeleton) to SHARP (Svg) and the eye reads two visual
- * registers instead of one continuous transition.
+ * the wrapper opacity drops to 0 so the constellation + art comes
+ * into sharp focus. The BlurView's `intensity` stays FIXED at 18
+ * (animating intensity in expo-blur is expensive on iOS because
+ * UIVisualEffectView re-composes its layer every frame); we fade
+ * the layer above by opacity instead, which the GPU can do as a
+ * cheap composite property. When the fade ends, blurMounted flips
+ * to false and the BlurView unmounts — zero ongoing GPU cost.
  */
 
 export function useCanvasReveal(): {
   canvasReady: boolean
-  revealBlurProps: ReturnType<typeof useAnimatedProps>
+  blurMounted: boolean
+  blurStyle: ReturnType<typeof useAnimatedStyle>
 } {
   const [canvasReady, setCanvasReady] = useState(false)
+  const [blurMounted, setBlurMounted] = useState(false)
+
   useEffect(() => {
     const timer = setTimeout(() => setCanvasReady(true), 1500)
     return () => clearTimeout(timer)
   }, [])
-  const revealBlur = useSharedValue(18)
+
+  const blurOpacity = useSharedValue(1)
   useEffect(() => {
     if (!canvasReady) return
-    revealBlur.value = withTiming(0, { duration: 700, easing: Easing.out(Easing.cubic) })
-  }, [canvasReady, revealBlur])
-  const revealBlurProps = useAnimatedProps(() => ({
-    intensity: revealBlur.value,
+    setBlurMounted(true)
+    blurOpacity.value = 1
+    blurOpacity.value = withTiming(
+      0,
+      { duration: 700, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(setBlurMounted)(false)
+      },
+    )
+  }, [canvasReady, blurOpacity])
+
+  const blurStyle = useAnimatedStyle(() => ({
+    opacity: blurOpacity.value,
   }))
-  return { canvasReady, revealBlurProps }
+
+  return { canvasReady, blurMounted, blurStyle }
 }

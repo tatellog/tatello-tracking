@@ -32,7 +32,6 @@ export function useIgnitionEngine(opts: {
   trainedCount: number
   elementsLit: number
   sequence: SequenceEl[]
-  isComplete: boolean
 }): {
   ignitingKey: string | null
   igniteT: SharedValue<number>
@@ -41,19 +40,14 @@ export function useIgnitionEngine(opts: {
   litPulse: SharedValue<number>
   radialPulse: SharedValue<number>
   plusOne: SharedValue<number>
-  rayPresence: SharedValue<number>
-  burstId: number
 } {
-  const { trainedCount, elementsLit, sequence, isComplete } = opts
+  const { trainedCount, elementsLit, sequence } = opts
 
   const prevLitRef = useRef(elementsLit)
   const prevCountRef = useRef(trainedCount)
 
   const [ignitionQueue, setIgnitionQueue] = useState<SequenceEl[]>([])
   const [ignitingKey, setIgnitingKey] = useState<string | null>(null)
-  // Increments once per upward commit — seeds the burst's per-commit
-  // variability (spark count, jitter, hue) so no two fireworks match.
-  const [burstId, setBurstId] = useState(0)
 
   const igniteT = useSharedValue(0)
   const numberPulse = useSharedValue(0)
@@ -72,17 +66,6 @@ export function useIgnitionEngine(opts: {
   // increment, made visible for ~700 ms then gone (a flourish, not
   // chrome). Stays at 0 on undo / first paint.
   const plusOne = useSharedValue(0)
-
-  // Global presence multiplier for the constellation ray. The ray's
-  // job is to SUGGEST the constellation path while the figure is
-  // still being built; once every star is lit the actual figure
-  // is fully visible and the bright ray competes with it instead
-  // of helping. We tween this to 0 on isComplete so the ray
-  // retires gracefully when the user finishes the 28-day cycle.
-  const rayPresence = useSharedValue(isComplete ? 0 : 1)
-  useEffect(() => {
-    rayPresence.value = withTiming(isComplete ? 0 : 1, { duration: 900 })
-  }, [isComplete, rayPresence])
 
   // Detect upward changes → fire haptic, run centre animations, push
   // new SequenceEls onto the queue. Downward changes (undo) just sync
@@ -120,8 +103,6 @@ export function useIgnitionEngine(opts: {
     )
     radialPulse.value = 0
     radialPulse.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
-    // Bump the burst seed so this firework varies from the last one.
-    setBurstId((n) => n + 1)
 
     if (elementsLit > prevLit) {
       // Field stars don't run through the ignition flash — they just
@@ -170,7 +151,5 @@ export function useIgnitionEngine(opts: {
     litPulse,
     radialPulse,
     plusOne,
-    rayPresence,
-    burstId,
   }
 }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
 import { Circle, G, Path } from 'react-native-svg'
 
@@ -8,7 +8,13 @@ import { BUCKET_DRIFT, buildAmbientField } from '../../data/scatter'
 import { fourPointStarPath } from '../../geometry'
 import type { AmbientStar } from '../../types'
 
-export function AmbientField({ t, drift }: { t: SharedValue<number>; drift: SharedValue<number> }) {
+export const AmbientField = memo(function AmbientField({
+  t,
+  drift,
+}: {
+  t: SharedValue<number>
+  drift: SharedValue<number>
+}) {
   const buckets = useMemo(() => buildAmbientField(), [])
   return (
     <G>
@@ -17,7 +23,7 @@ export function AmbientField({ t, drift }: { t: SharedValue<number>; drift: Shar
       ))}
     </G>
   )
-}
+})
 
 function AmbientBucket({
   stars,
