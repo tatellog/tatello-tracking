@@ -28,7 +28,12 @@ export const AMBIENT_RX_MAX = W * 0.6
 export const AMBIENT_RX_MIN = W * 0.08
 export const AMBIENT_ASPECT = 1.45
 
-export const NEBULA_LAYERS = 13
+// Lowered from 13 → 8 (audit #9). Each nebula patch stacks
+// NEBULA_LAYERS ellipses to fake a radial gradient (avoiding the iOS
+// alpha-stop bug in <RadialGradient>); 8 keeps the falloff smooth
+// enough not to band while cutting paint cost from 4 × 13 = 52 nodes
+// to 4 × 8 = 32 nodes per nebula refresh.
+export const NEBULA_LAYERS = 8
 
 export const PARTICLE_BASE = 28 // spark count varies ±~20% around this
 export const PARTICLE_REACH = 120 // baseline radial reach (px)
