@@ -133,7 +133,3 @@ La regla: incluso en código interno, evita términos clínicos. Reduce el riesg
 2. Invoca `manifesto-reviewer` con el diff
 3. Si tocaste `messages.ts`, invoca `voice-and-copy` con los strings nuevos
 4. Si tocaste `logic.ts`, revisa que la complejidad sigue siendo razonable
-
-## Recordatorio del compromiso de lanzamiento
-
-Cualquier feature nueva en patterns durante las próximas 8 semanas (hasta 27 jul 2026) DEBE ser parte del MVP definido. Si propones agregar un patrón nuevo que no está en los 5 prompts del MVP, BLOQUEA · va a post-launch.

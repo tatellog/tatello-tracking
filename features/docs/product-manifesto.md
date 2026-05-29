@@ -450,7 +450,6 @@ Si una IA (Claude Code, GPT, otra) recibe instrucciones sobre Stelar, debe leer 
 7. **NO reemplazar profesionales** · no nutrióloga, no coach, no terapeuta
 8. **Línea roja clara** con territorio clínico · derivar a profesional cuando aplique
 9. **Tres capas de lenguaje** · marketing conservador, producto cálido, código técnico
-10. **Quitar perfeccionismo** del desarrollo · dirección, no perfección · MVP imperfecto vale más que producto pulido sin lanzar
 
 Si una sugerencia rompe alguno de estos 10 principios, la sugerencia está mal.
 
