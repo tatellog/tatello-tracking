@@ -20,7 +20,6 @@ import Svg, {
   Ellipse,
   G,
   Image as SvgImage,
-  Line,
   LinearGradient as SvgLinearGradient,
   Rect,
   RadialGradient,
@@ -39,9 +38,7 @@ import { type BiologicalSex } from '@/features/profile/api'
 import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
 import { colors, typography } from '@/theme'
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
-const AnimatedLine = Animated.createAnimatedComponent(Line)
 const AnimatedG = Animated.createAnimatedComponent(G)
 
 const HEIGHT_MIN = 140
@@ -79,8 +76,7 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
  *   4. CuerpoSky   — star strata in a "U" (ceiling + floor populated, the
  *                    central band 0.30–0.72 left empty), dust along the
  *                    edges, plus a wide-and-low COOL WISP in the media-baja
- *                    zone. The CalibrationPreview body emerges OUT of that
- *                    wisp, so the calibration star reads as part of the sky.
+ *                    zone — pure ambient depth that fills the lower half.
  *
  * PRECISION MODE — the whole atmosphere DIMS (opacity → 0.4) while the user
  * DRAGS the height slider (on the same 200 ms / ease-out-quad compás as
@@ -88,8 +84,7 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
  * dim — only the continuous slider drag calms the sky.
  *
  * The three clocks (5 s / 18 s / 40 s) are created ONCE on the screen and
- * shared by every atmosphere layer (incl. the CalibrationPreview body) so
- * there is one compás.
+ * shared by every atmosphere layer so there is one compás.
  */
 export default function CuerpoBaseScreen() {
   const router = useRouter()
@@ -116,10 +111,9 @@ export default function CuerpoBaseScreen() {
   const [dragging, setDragging] = useState(false)
 
   // Shared clocks for the whole step — created ONCE here so every
-  // atmosphere layer (NebulaWash, WarmBloomField, star strata + dust, and
-  // the CalibrationPreview body) breathes on the SAME values, mirroring
-  // about-you's periods:
-  //   clock  5 s  warm-field breath + nebula-texture breath + calib body
+  // atmosphere layer (NebulaWash, WarmBloomField, star strata + dust)
+  // breathes on the SAME values, mirroring about-you's periods:
+  //   clock  5 s  warm-field breath + nebula-texture breath
   //   dust  18 s  cosmic-dust drift + cool-wisp breath
   //   orbit 40 s  star-strata parallax
   const clock = useSharedValue(0)
@@ -229,12 +223,6 @@ export default function CuerpoBaseScreen() {
           <SexPills value={sex} onChange={setSex} />
           <Text style={styles.caveat}>Es solo para el cálculo. No identidad.</Text>
         </Section>
-
-        {/* Calibration preview — visually confirms the promise of the
-            title. A small star that brightens as the user completes inputs,
-            sitting OVER the sky's cool wisp so it emerges from the bruma.
-            Shares the screen's 5 s clock so it breathes on one compás. */}
-        <CalibrationPreview heightValid={heightValid} sexValid={sexValid} clock={clock} />
       </ScrollView>
     </WizardLayout>
   )
@@ -267,14 +255,11 @@ function Section({ question, children }: { question: string; children: React.Rea
  *
  * COOL WISP — a single wide-and-LOW cool ellipse (ciclo #B5C4DD) in the
  * media-baja zone (cy 0.66) that breathes very faintly on the dust clock.
- * The CalibrationPreview body sits directly over this wisp, so the calib
- * star reads as a point of light EMERGING from the bruma — depth without a
- * free-floating focal star, keeping the manifiesto's central channel clear.
+ * It carries the lower half on its own — depth without a free-floating
+ * focal star, keeping the manifiesto's central channel clear.
  *
- * CONSTELLATION-SAFE: no connected points, no figure, no glyph. Unlike
- * about-you (which blooms a lone date star on validation), cuerpo-base's
- * completion feedback lives entirely in the CalibrationPreview body, so
- * this layer has NO bloom-on-valid — it is pure ambient depth.
+ * CONSTELLATION-SAFE: no connected points, no figure, no glyph, no
+ * bloom-on-valid — it is pure ambient depth.
  *
  * Gradient ids are namespaced `cuerpo-*` so they never collide with
  * about-you's `aboutyou-*` defs.
@@ -357,8 +342,8 @@ function CuerpoSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedVa
   // ── Cool wisp breath ─────────────────────────────────────────────
   // A wide, low ellipse of cool ciclo light in the media-baja zone (cy
   // 0.66). It breathes between 0.04 and 0.06 on the 18 s dust clock —
-  // opacity only (numeric, UI-thread safe). The CalibrationPreview body
-  // sits over this band so its star emerges from the bruma.
+  // opacity only (numeric, UI-thread safe). It carries the lower half as
+  // ambient depth.
   const coolWispProps = useAnimatedProps(() => {
     'worklet'
     const w = 0.5 + 0.5 * Math.sin(dust.value * 2 * Math.PI)
@@ -393,8 +378,8 @@ function CuerpoSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedVa
         </Defs>
 
         {/* Cool wisp — wide-and-low ellipse in the media-baja zone (cy
-            0.66). Breathes faintly on the dust clock. The calib body sits
-            over it; depth without a free-floating focal point. */}
+            0.66). Breathes faintly on the dust clock; depth without a
+            free-floating focal point. */}
         <AnimatedEllipse
           cx={0.5 * SKY_W}
           cy={0.66 * SKY_H}
@@ -600,224 +585,6 @@ function NebulaWash({ clock }: { clock: SharedValue<number> }) {
   )
 }
 
-/* ─────────────────────── CalibrationPreview ─────────────────────── */
-
-/** A small luminous body that brightens as the user completes the two
- *  inputs. Idle: dim, slowly breathing. One input set: half-bright. Both
- *  set: full magenta with bloom + the copy line confirms "Stelar ya tiene
- *  tu base."
- *
- *  It sits OVER the sky's cool wisp (cy 0.66), so the star reads as a point
- *  of light emerging from the bruma rather than floating in a void. It now
- *  shares the screen's 5 s `clock` (no local breath) so it breathes on the
- *  one compás as the rest of the atmosphere.
- *
- *  PAINTERLY (illustrator pass): a wisp-ellipse behind the bloom gives the
- *  body an organic, off-axis falloff instead of a clean disc; the bloom
- *  idle floor drops to 0.38 so the idle→complete ignition is felt MORE
- *  against the sky behind. Still NO cardinal cross — only the × + 8 jittered
- *  rays, and the wisp axis is deliberately off any ray angle. */
-function CalibrationPreview({
-  heightValid,
-  sexValid,
-  clock,
-}: {
-  heightValid: boolean
-  sexValid: boolean
-  clock: SharedValue<number>
-}) {
-  const completion = (heightValid ? 0.5 : 0) + (sexValid ? 0.5 : 0)
-
-  // Tween the completion value so brightness changes feel animated.
-  const lit = useSharedValue(completion)
-  useEffect(() => {
-    lit.value = withSpring(completion, { damping: 18, stiffness: 180 })
-    return () => cancelAnimation(lit)
-  }, [completion, lit])
-
-  // The body breathes on the SHARED 5 s clock (no local breath). The clock
-  // is a 0→1 linear ramp, so `Math.sin(clock * 2π)` is the breath phase —
-  // same expression every other layer uses, one compás.
-  const bloomProps = useAnimatedProps(() => {
-    'worklet'
-    const b = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    return {
-      r: 36 + lit.value * 8 + b * 3,
-      // Idle floor lowered 0.45 → 0.38 so the idle→complete ignition reads
-      // more strongly now that the sky sits behind the body.
-      opacity: 0.38 + lit.value * 0.4 + b * 0.08,
-    }
-  })
-  // The wisp-ellipse behind the bloom — organic off-axis falloff. Opacity
-  // only; the radius is static. 0.10 idle + lit*0.10 so it warms as inputs
-  // complete, in step with the bloom.
-  const wispProps = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 0.1 + lit.value * 0.1 }
-  })
-  const coreProps = useAnimatedProps(() => {
-    'worklet'
-    const b = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    return { r: 3.6 + lit.value * 1.6 + b * 0.3 }
-  })
-  // Diagonal × spikes only — the cardinal cross (+) reads as a crosshair.
-  const diagonalSpikes = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: 0.16 + lit.value * 0.3 }
-  })
-  // 8 fine radial rays at jittered angles — organic starburst, not a compass.
-  const raysProps = useAnimatedProps(() => {
-    'worklet'
-    const b = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    return { opacity: 0.18 + lit.value * 0.5 + b * 0.06 }
-  })
-  // Dust drifts OUTSIDE the bloom so it reads as cosmic dust orbiting.
-  const dustProps = useAnimatedProps(() => {
-    'worklet'
-    const b = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    return { opacity: 0.35 + lit.value * 0.45 + b * 0.1 }
-  })
-
-  // Copy fades between two states.
-  const idleOpacity = useAnimatedStyle(() => ({ opacity: 1 - lit.value }))
-  const doneOpacity = useAnimatedStyle(() => ({ opacity: Math.max(0, lit.value * 2 - 1) }))
-
-  const W = 160
-  const H = 130
-  const CX = W / 2
-  const CY = H / 2
-
-  // 8 thin radial rays — deterministic jittered angles + varied lengths so
-  // the starburst reads as organic light, not a compass rose.
-  const RAYS: { angle: number; length: number }[] = [
-    { angle: -1.5, length: 22 },
-    { angle: -0.65, length: 17 },
-    { angle: 0.2, length: 24 },
-    { angle: 0.95, length: 19 },
-    { angle: 1.6, length: 16 },
-    { angle: 2.4, length: 23 },
-    { angle: 3.1, length: 20 },
-    { angle: -2.55, length: 18 },
-  ]
-
-  // 6 dust particles OUTSIDE the bloom so they orbit, not wash inside.
-  const DUST_PX = [
-    { dx: -42, dy: -28, r: 1.0 },
-    { dx: 46, dy: -18, r: 1.3 },
-    { dx: 38, dy: 32, r: 0.9 },
-    { dx: -48, dy: 22, r: 1.1 },
-    { dx: -16, dy: -40, r: 0.8 },
-    { dx: 52, dy: 14, r: 0.7 },
-  ]
-
-  return (
-    <View style={styles.calibration}>
-      <Svg width={W} height={H}>
-        <Defs>
-          <RadialGradient id="calibration-core" cx="50%" cy="50%" r="60%">
-            <Stop offset="0%" stopColor="#FFFFFF" />
-            <Stop offset="40%" stopColor="#FBD7E3" />
-            <Stop offset="100%" stopColor={colors.magenta} />
-          </RadialGradient>
-          {/* Bloom gradient: full magenta at centre, transparent at the
-              edge. Single Circle filled with this looks like real
-              atmospheric falloff — no concentric ring artefacts. */}
-          <RadialGradient id="calibration-bloom" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.6} />
-            <Stop offset="40%" stopColor={colors.magenta} stopOpacity={0.22} />
-            <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
-          </RadialGradient>
-          {/* Wisp behind the bloom — deeper magenta, off-axis, gives the
-              body an organic painterly border instead of a clean disc. */}
-          <RadialGradient id="calibration-wisp" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={colors.magentaDeep} stopOpacity={0.04} />
-            <Stop offset="100%" stopColor={colors.magentaDeep} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-
-        {/* Wisp-ellipse BEHIND the bloom — rotated -18° so its long axis
-            does NOT line up with any of the 8 rays (those sit at ±1.5,
-            -0.65, 0.2, 0.95, 1.6, 2.4, 3.1, -2.55 rad ≈ none near -0.31
-            rad). Organic off-axis falloff, no diana. */}
-        <AnimatedEllipse
-          cx={CX}
-          cy={CY}
-          rx={52}
-          ry={34}
-          transform={`rotate(-18 ${CX} ${CY})`}
-          fill="url(#calibration-wisp)"
-          animatedProps={wispProps}
-        />
-
-        {/* Single atmospheric bloom — RadialGradient fill. Radius + overall
-            opacity ride breath + lit. No ring edges. */}
-        <AnimatedCircle cx={CX} cy={CY} fill="url(#calibration-bloom)" animatedProps={bloomProps} />
-
-        {/* 8 fine radial rays at jittered angles — organic starburst. */}
-        {RAYS.map((ray, i) => (
-          <AnimatedLine
-            key={`ray-${i}`}
-            x1={CX}
-            y1={CY}
-            x2={CX + Math.cos(ray.angle) * ray.length}
-            y2={CY + Math.sin(ray.angle) * ray.length}
-            stroke="#FBD7E3"
-            strokeWidth={0.5}
-            strokeLinecap="round"
-            animatedProps={raysProps}
-          />
-        ))}
-
-        {/* 2 diagonal spikes — light × that twinkles, not a crosshair. */}
-        <AnimatedLine
-          x1={CX - 12}
-          y1={CY - 12}
-          x2={CX + 12}
-          y2={CY + 12}
-          stroke="#FFFFFF"
-          strokeWidth={0.6}
-          strokeLinecap="round"
-          animatedProps={diagonalSpikes}
-        />
-        <AnimatedLine
-          x1={CX + 12}
-          y1={CY - 12}
-          x2={CX - 12}
-          y2={CY + 12}
-          stroke="#FFFFFF"
-          strokeWidth={0.6}
-          strokeLinecap="round"
-          animatedProps={diagonalSpikes}
-        />
-
-        {/* Core with radial gradient. */}
-        <AnimatedCircle cx={CX} cy={CY} fill="url(#calibration-core)" animatedProps={coreProps} />
-
-        {/* Dust drifting OUTSIDE the bloom. */}
-        {DUST_PX.map((d, i) => (
-          <AnimatedCircle
-            key={i}
-            cx={CX + d.dx}
-            cy={CY + d.dy}
-            r={d.r}
-            fill="#FBD7E3"
-            animatedProps={dustProps}
-          />
-        ))}
-      </Svg>
-
-      <View style={styles.calibrationCopyWrap}>
-        <Animated.Text style={[styles.calibrationCopyIdle, idleOpacity]}>
-          Stelar está leyendo…
-        </Animated.Text>
-        <Animated.Text style={[styles.calibrationCopyDone, doneOpacity]}>
-          Stelar ya tiene tu base.
-        </Animated.Text>
-      </View>
-    </View>
-  )
-}
-
 /* ─────────────────────── SexPills ─────────────────────── */
 
 function SexPills({
@@ -956,35 +723,6 @@ const styles = StyleSheet.create({
     color: colors.bone,
     letterSpacing: 0.1,
     textAlign: 'center',
-  },
-  /* Calibration preview — sits over the sky's cool wisp (cy 0.66). The
-     marginTop pulls it up so the body emerges FROM the bruma rather than
-     floating below it in a void. */
-  calibration: {
-    marginTop: 28,
-    alignItems: 'center',
-    gap: 6,
-  },
-  calibrationCopyWrap: {
-    height: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calibrationCopyIdle: {
-    position: 'absolute',
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.1,
-  },
-  calibrationCopyDone: {
-    position: 'absolute',
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.magenta,
-    letterSpacing: 0.1,
   },
   /* Sex pills. Horizontal padding insets the pills 14 px inside the row so
      the selected pill has room to scale (1.03) AND project its magenta glow

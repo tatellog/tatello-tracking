@@ -75,6 +75,7 @@ export function PrimaryCta({
         isGhost && styles.btnGhost,
         isSoft && styles.btnSoft,
         softReady && styles.btnSoftReady,
+        isSoft && inactive && styles.btnSoftDisabled,
         isDestructive && styles.btnDestructive,
         inactive && !isGhost && !isSoft && styles.btnDisabled,
         pill && styles.btnPill,
@@ -109,6 +110,7 @@ export function PrimaryCta({
             isSoft && styles.labelSoft,
             isPlain && styles.labelPlain,
             inactive && !isGhost && !isSoft && styles.labelDisabled,
+            isSoft && inactive && styles.labelSoftDisabled,
           ]}
         >
           {label}
@@ -173,6 +175,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
+  // Soft + DISABLED (waiting) — the soft cta must look clearly NOT-yet
+  // tappable, otherwise the magenta border/label read as enabled and the
+  // user taps a dead button (it only ignites once the step validates).
+  // Muted border + no fill + no glow; the label dims to niebla.
+  btnSoftDisabled: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   // Pill — full rounded shape.
   btnPill: {
     borderRadius: 100,
@@ -205,6 +217,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   labelDisabled: {
+    color: colors.niebla,
+  },
+  labelSoftDisabled: {
     color: colors.niebla,
   },
   loadingRow: {

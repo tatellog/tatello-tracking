@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -8,41 +8,88 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSpring,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Line, RadialGradient, Stop } from 'react-native-svg'
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  G,
+  Image as SvgImage,
+  LinearGradient as SvgLinearGradient,
+  Rect,
+  RadialGradient,
+  Stop,
+} from 'react-native-svg'
 
-import { StepHeader, WheelPicker, WizardLayout } from '@/features/onboarding/components'
+import {
+  AtmosphericSky,
+  DustMote,
+  StepHeader,
+  WarmBloomField,
+  WheelPicker,
+  WizardLayout,
+} from '@/features/onboarding/components'
 import { useInsertInitialWeight } from '@/features/profile/hooks'
 import { saveSkipWeight } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-const AnimatedLine = Animated.createAnimatedComponent(Line)
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
+const AnimatedG = Animated.createAnimatedComponent(G)
 
 const MIN_KG = 30
 const MAX_KG = 200
 const DEFAULT_KG = 70
+
+// Painted galaxy used as whisper-low background texture — the same PNG that
+// ships as the SEMANA orb, cloned LOCALLY from cuerpo-base/about-you. Here it
+// reads as abstract nebular texture, never as an object.
+const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 
 /** Round to 1 decimal — avoids floating-point drift when composing
  *  integer + decimal/10. */
 const round1 = (n: number) => Math.round(n * 10) / 10
 
 /*
- * Weight — the body composition baseline. Optional via the
- * "aún no tengo báscula" skip; otherwise, the wheel picker collects
- * the decimal value (Mifflin-St Jeor needs precision; a stepper
- * would mean 700 taps for the range).
+ * Weight — the body composition baseline (step 6), and the THIRD sister of
+ * the calibration triptych (cuerpo-base → weight → tu-base). Optional via
+ * the "aún no tengo báscula" skip; otherwise, the dual wheel picker collects
+ * the decimal value (Mifflin-St Jeor needs precision; a stepper would mean
+ * hundreds of taps for the range).
  *
- * The value lands in body_measurements (time series), not profiles,
- * so the first reading anchors the historical graph from day 1.
+ * The value lands in body_measurements (time series), not profiles, so the
+ * first reading anchors the historical graph from day 1.
  *
- * Visual companion: a small cosmic body below the wheel that
- * confirms Stelar has the punto de partida — fills the bottom half
- * of the screen and echoes the cuerpo-base calibration body so the
- * three baseline screens (cuerpo-base → weight → tu-base) all carry
- * the same "Stelar is reading you" beat.
+ * STRAIGHTENED-SISTER ATMOSPHERE (illustrator pass) — weight wears the SAME
+ * visual grammar as its twins about-you (leans left, +22°) and cuerpo-base
+ * (leans right, -22°), but ENDEREZADA: every pivot is CENTRED and every
+ * rotation is 0°. After the sky "rotated" corner-to-corner across steps 4→5,
+ * it comes to rest, centred and calm, on the weight screen.
+ *
+ * MANIFIESTO CARE — this is the PESO screen, so the atmosphere is deliberately
+ * ~15–25% MORE tenue than its sisters and is composed so the NUMBER is never
+ * made dominant or celebrated. The warm weight is pulled LOW and never climbs
+ * to the wheel; the COOL glow is the one that touches the number's zone (calm,
+ * not reward). The digits themselves stay perfectly still — nothing scales,
+ * ignites, or brightens in response to the chosen value. Back→front:
+ *   1. WeightNebulaWash — the painted galaxy, pivoted PISO-CENTRO-BAJO
+ *      (cx50%/cy96%), rotation 0° (the straightened version), faded hard to
+ *      black by offset 0.70 (more aggressive — the wheel lives high). Reduced
+ *      breath opacity.
+ *   2. AtmosphericSky — the cool glow CENTRED-HIGH over the header
+ *      (50%/30%/60%), far from the number.
+ *   3. WarmBloomField variant="exposed" — warm pooled low + de-coaxialised
+ *      (reused attribution variant; NOT touched).
+ *   4. WeightSky — symmetric "U" strata (micro cluster centred at x≈0.5, both
+ *      ceiling and floor), edge dust, and a LOW cool wisp (cy0.70), all
+ *      reduced in opacity.
+ *
+ * PRECISION MODE — the whole atmosphere DIMS (opacity → 0.4) while the user
+ * SPINS either wheel, on the same 200 ms / ease-out-quad compás as the twins.
+ *
+ * The three clocks (5 s / 18 s / 40 s) are created ONCE here and shared by
+ * every atmosphere layer so there is one compás.
  */
 export default function WeightScreen() {
   const router = useRouter()
@@ -51,6 +98,9 @@ export default function WeightScreen() {
   const [skip, setSkip] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingError, setSavingError] = useState<string | null>(null)
+
+  // Precision mode — true only while a wheel is being spun.
+  const [dragging, setDragging] = useState(false)
 
   // Decomposed into integer + decimal/10 so the picker can show
   // two side-by-side wheels (kilos + tenths) instead of one 1700-row
@@ -66,6 +116,41 @@ export default function WeightScreen() {
   }
 
   const canContinue = skip || (value >= MIN_KG && value <= MAX_KG + 0.9)
+
+  // Shared clocks for the whole step — created ONCE here so every
+  // atmosphere layer breathes on the SAME values, mirroring the twins:
+  //   clock  5 s  warm-field breath + nebula-texture breath
+  //   dust  18 s  cosmic-dust drift + cool-wisp breath
+  //   orbit 40 s  star-strata parallax
+  const clock = useSharedValue(0)
+  const dust = useSharedValue(0)
+  const orbit = useSharedValue(0)
+
+  // Precision-mode atmosphere dimmer — 1 = full sky, 0.4 = calm (spinning).
+  const atmoDim = useSharedValue(1)
+
+  useEffect(() => {
+    clock.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
+    dust.value = withRepeat(withTiming(1, { duration: 18000, easing: Easing.linear }), -1, false)
+    orbit.value = withRepeat(withTiming(1, { duration: 40000, easing: Easing.linear }), -1, false)
+    return () => {
+      cancelAnimation(clock)
+      cancelAnimation(dust)
+      cancelAnimation(orbit)
+    }
+  }, [clock, dust, orbit])
+
+  useEffect(() => {
+    atmoDim.value = withTiming(dragging ? 0.4 : 1, {
+      duration: 200,
+      easing: Easing.out(Easing.quad),
+    })
+    // Defensive cleanup — withTiming is one-shot, but cancel on unmount so a
+    // teardown mid-tween never leaves a dangling animation.
+    return () => cancelAnimation(atmoDim)
+  }, [dragging, atmoDim])
+
+  const atmoDimStyle = useAnimatedStyle(() => ({ opacity: atmoDim.value }))
 
   const handleContinue = async () => {
     if (!canContinue) return
@@ -94,6 +179,29 @@ export default function WeightScreen() {
       loading={saving}
       errorMessage={savingError ?? insertWeight.error?.message ?? null}
       onContinue={handleContinue}
+      continueLabel="Continuar"
+      ctaVariant="soft"
+      ctaTransform="none"
+      atmosphere={
+        // Precision-mode wrapper — the ONE Animated.View whose opacity dims
+        // the whole sky while a wheel is spun. a11y-hidden + pointerEvents
+        // none so VoiceOver never reads it between the inputs.
+        <Animated.View
+          style={[StyleSheet.absoluteFill, atmoDimStyle]}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {/* 1. Painterly texture — straightened, centred low, faded hard. */}
+          <WeightNebulaWash clock={clock} />
+          {/* 2. Cool glow CENTRED-HIGH over the header (far from the number). */}
+          <AtmosphericSky glow={{ cx: '50%', cy: '30%', r: '60%' }} />
+          {/* 3. Warm weight pooled low + de-coaxialised (reused exposed). */}
+          <WarmBloomField clock={clock} variant="exposed" />
+          {/* 4. Symmetric "U" star strata + edge dust + a low cool wisp. */}
+          <WeightSky dust={dust} orbit={orbit} />
+        </Animated.View>
+      }
     >
       <StepHeader
         eyebrow="El punto de partida"
@@ -119,6 +227,8 @@ export default function WeightScreen() {
                 value={integerPart}
                 onChange={handleIntegerChange}
                 decimals={0}
+                onDragChange={setDragging}
+                valueGlow="soft"
               />
             </View>
             <Text style={styles.separator}>.</Text>
@@ -130,6 +240,8 @@ export default function WeightScreen() {
                 value={decimalPart}
                 onChange={handleDecimalChange}
                 decimals={0}
+                onDragChange={setDragging}
+                valueGlow="soft"
               />
             </View>
             <Text style={styles.unitLabel}>kg</Text>
@@ -141,182 +253,355 @@ export default function WeightScreen() {
         <Text style={styles.skipLink} onPress={() => setSkip((prev) => !prev)} suppressHighlighting>
           {skip ? 'Sí tengo báscula' : 'Aún no tengo báscula'}
         </Text>
-
-        {/* Cosmic anchor at the bottom — fills the void below the
-            skip link, breathes constantly, and confirms with a single
-            line that Stelar has the punto de partida. Same visual
-            language as the cuerpo-base CalibrationPreview so the
-            three baseline screens feel like one continuous read. */}
-        <StartingPointBody active={!skip} />
       </View>
     </WizardLayout>
   )
 }
 
-/* ─────────────────────── Cosmic body ─────────────────────── */
+/* ───────────────────── Full-screen star sky ────────────────────── */
 
-/** Small cosmic body + phrase that anchors the bottom half of the
- *  screen. Always alive (breathes); brightens slightly when the user
- *  has a real weight (vs. skipped). */
-function StartingPointBody({ active }: { active: boolean }) {
-  const lit = useSharedValue(active ? 1 : 0.4)
-  useEffect(() => {
-    lit.value = withSpring(active ? 1 : 0.4, { damping: 18, stiffness: 180 })
-  }, [active, lit])
+/*
+ * WeightSky — full-screen painted depth, the STRAIGHTENED SISTER of
+ * cuerpo-base's CuerpoSky. Same "U" composition (ceiling y 0.06–0.20 + floor
+ * y 0.80–0.94 populated, central band left EMPTY), same three strata +
+ * parallax on the orbit clock, dust on the dust clock — but ENDEREZADA: the
+ * dense micro cluster sits CENTRED at x≈0.5 (about-you leans left, cuerpo-base
+ * leans right; weight rests centred), and the cool wisp is REDUCED in opacity
+ * and pushed slightly LOWER (cy 0.70).
+ *
+ * MANIFIESTO CARE — opacities here are ~15–20% lower than the twins (it is the
+ * peso screen). No connected points, no figure, no glyph, no bloom-on-valid —
+ * pure ambient depth that never makes the number dominant.
+ *
+ * Gradient ids are namespaced `weight-*` so they never collide with the twins'
+ * `cuerpo-*` / `aboutyou-*` defs.
+ */
+const CEIL_FAR: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.12, y: 0.07, r: 0.6, opacity: 0.08 },
+  { x: 0.88, y: 0.09, r: 0.7, opacity: 0.1 },
+  { x: 0.5, y: 0.06, r: 0.5, opacity: 0.07 },
+  { x: 0.3, y: 0.15, r: 0.6, opacity: 0.08 },
+  { x: 0.7, y: 0.17, r: 0.5, opacity: 0.07 },
+]
+const CEIL_MID: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.18, y: 0.12, r: 0.8, opacity: 0.16 },
+  { x: 0.82, y: 0.14, r: 0.7, opacity: 0.18 },
+  { x: 0.6, y: 0.1, r: 0.7, opacity: 0.16 },
+  { x: 0.4, y: 0.19, r: 0.7, opacity: 0.15 },
+]
+// Dense micro cluster CENTRED at x≈0.5 (straightened — neither lean-left nor
+// lean-right).
+const CEIL_MICRO: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.5, y: 0.09, r: 1.0, opacity: 0.3 },
+  { x: 0.42, y: 0.16, r: 0.9, opacity: 0.26 },
+  { x: 0.58, y: 0.17, r: 0.85, opacity: 0.25 },
+]
 
-  const breath = useSharedValue(0)
-  useEffect(() => {
-    breath.value = withRepeat(
-      withTiming(1, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    )
-    return () => cancelAnimation(breath)
-  }, [breath])
+// FLOOR strata.
+const FLOOR_FAR: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.1, y: 0.84, r: 0.6, opacity: 0.08 },
+  { x: 0.9, y: 0.86, r: 0.7, opacity: 0.1 },
+  { x: 0.34, y: 0.92, r: 0.5, opacity: 0.07 },
+  { x: 0.66, y: 0.9, r: 0.6, opacity: 0.08 },
+]
+const FLOOR_MID: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.16, y: 0.88, r: 0.8, opacity: 0.16 },
+  { x: 0.86, y: 0.82, r: 0.7, opacity: 0.18 },
+  { x: 0.5, y: 0.94, r: 0.7, opacity: 0.16 },
+]
+// Floor micro cluster CENTRED too, mirroring the ceiling's straightening.
+const FLOOR_MICRO: { x: number; y: number; r: number; opacity: number }[] = [
+  { x: 0.5, y: 0.85, r: 1.0, opacity: 0.28 },
+  { x: 0.42, y: 0.9, r: 0.9, opacity: 0.25 },
+  { x: 0.58, y: 0.89, r: 0.85, opacity: 0.25 },
+]
 
-  const bloomProps = useAnimatedProps(() => {
+// Dust — 4 motes rising up the EDGES only (x 0.10 / 0.88), never the centre.
+const DUST: {
+  x: number
+  baseR: number
+  period: number
+  sway: number
+  opacity: number
+  phase: number
+}[] = [
+  { x: 0.1, baseR: 0.9, period: 1.05, sway: 7, opacity: 0.28, phase: 0.1 },
+  { x: 0.88, baseR: 0.8, period: 0.95, sway: 8, opacity: 0.25, phase: 0.5 },
+  { x: 0.12, baseR: 0.65, period: 1.2, sway: 6, opacity: 0.22, phase: 0.7 },
+  { x: 0.86, baseR: 0.7, period: 1.12, sway: 7, opacity: 0.23, phase: 0.3 },
+]
+
+const WeightSky = memo(function WeightSky({
+  dust,
+  orbit,
+}: {
+  dust: SharedValue<number>
+  orbit: SharedValue<number>
+}) {
+  const SKY_W = 360
+  const SKY_H = 760
+
+  const farDriftProps = useAnimatedProps(() => {
     'worklet'
-    const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
-    return {
-      r: 38 + lit.value * 6 + b * 3,
-      opacity: 0.4 + lit.value * 0.4 + b * 0.08,
-    }
+    const u = orbit.value * 2 * Math.PI
+    return { transform: `translate(${Math.sin(u) * 2} ${Math.cos(u) * 2})` }
   })
-  const coreProps = useAnimatedProps(() => {
+  const midDriftProps = useAnimatedProps(() => {
     'worklet'
-    const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
-    return { r: 3.6 + lit.value * 1.4 + b * 0.3 }
+    const u = orbit.value * 2 * Math.PI
+    return { transform: `translate(${Math.sin(u) * 5} ${Math.cos(u) * 5})` }
   })
-  const diagonalSpikes = useAnimatedProps(() => {
+  const microGroupProps = useAnimatedProps(() => {
     'worklet'
-    return { opacity: 0.15 + lit.value * 0.3 }
-  })
-  const raysProps = useAnimatedProps(() => {
-    'worklet'
-    const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
-    return { opacity: 0.18 + lit.value * 0.45 + b * 0.06 }
-  })
-  const dustProps = useAnimatedProps(() => {
-    'worklet'
-    const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
-    return { opacity: 0.3 + lit.value * 0.45 + b * 0.1 }
+    const u = orbit.value * 2 * Math.PI
+    const flicker = 0.85 + 0.15 * Math.sin(orbit.value * 2 * Math.PI * 3)
+    return { transform: `translate(${Math.sin(u) * 9} ${Math.cos(u) * 9})`, opacity: flicker }
   })
 
-  // Phrase only resolves to the magenta confirmation once the user
-  // has actually committed to a weight (i.e., not skipped).
-  const idleStyle = useAnimatedStyle(() => ({
-    opacity: Math.max(0, 1 - lit.value),
-  }))
-  const doneStyle = useAnimatedStyle(() => ({
-    opacity: Math.max(0, lit.value * 1.4 - 0.4),
-  }))
-
-  const W = 160
-  const H = 130
-  const CX = W / 2
-  const CY = H / 2
-
-  // 8 radial rays at jittered angles + lengths — organic starburst,
-  // no compass cross.
-  const RAYS = [
-    { angle: -1.5, length: 22 },
-    { angle: -0.65, length: 17 },
-    { angle: 0.2, length: 24 },
-    { angle: 0.95, length: 19 },
-    { angle: 1.6, length: 16 },
-    { angle: 2.4, length: 23 },
-    { angle: 3.1, length: 20 },
-    { angle: -2.55, length: 18 },
-  ]
-
-  // Dust orbiting OUTSIDE the bloom radius.
-  const DUST = [
-    { dx: -42, dy: -28, r: 1.0 },
-    { dx: 46, dy: -18, r: 1.3 },
-    { dx: 38, dy: 32, r: 0.9 },
-    { dx: -48, dy: 22, r: 1.1 },
-    { dx: -16, dy: -40, r: 0.8 },
-    { dx: 52, dy: 14, r: 0.7 },
-  ]
+  // ── Cool wisp breath ─────────────────────────────────────────────
+  // A wide, low ellipse of cool ciclo light pushed LOWER (cy 0.70) and
+  // REDUCED in opacity (0.03 + w*0.015) vs. the twins — manifiesto care:
+  // the lower half breathes but never pulls focus to the number. Opacity
+  // only (numeric, UI-thread safe).
+  const coolWispProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(dust.value * 2 * Math.PI)
+    return { opacity: 0.03 + w * 0.015 }
+  })
 
   return (
-    <View style={styles.anchor}>
-      <Svg width={W} height={H}>
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Svg
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${SKY_W} ${SKY_H}`}
+        preserveAspectRatio="xMidYMid slice"
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      >
         <Defs>
-          <RadialGradient id="weight-core" cx="50%" cy="50%" r="60%">
-            <Stop offset="0%" stopColor="#FFFFFF" />
-            <Stop offset="40%" stopColor="#FBD7E3" />
-            <Stop offset="100%" stopColor={colors.magenta} />
+          <RadialGradient id="weight-starGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.9" />
+            <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
           </RadialGradient>
-          <RadialGradient id="weight-bloom" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.6} />
-            <Stop offset="40%" stopColor={colors.magenta} stopOpacity={0.22} />
-            <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
+          {/* Cool wisp — silver-blue ciclo, faint, falls off to nothing. */}
+          <RadialGradient id="weight-coolWisp" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={colors.dimension.ciclo} stopOpacity="0.045" />
+            <Stop offset="1" stopColor={colors.dimension.ciclo} stopOpacity="0" />
           </RadialGradient>
         </Defs>
 
-        <AnimatedCircle cx={CX} cy={CY} fill="url(#weight-bloom)" animatedProps={bloomProps} />
-
-        {RAYS.map((ray, i) => (
-          <AnimatedLine
-            key={`ray-${i}`}
-            x1={CX}
-            y1={CY}
-            x2={CX + Math.cos(ray.angle) * ray.length}
-            y2={CY + Math.sin(ray.angle) * ray.length}
-            stroke="#FBD7E3"
-            strokeWidth={0.5}
-            strokeLinecap="round"
-            animatedProps={raysProps}
-          />
-        ))}
-
-        <AnimatedLine
-          x1={CX - 12}
-          y1={CY - 12}
-          x2={CX + 12}
-          y2={CY + 12}
-          stroke="#FFFFFF"
-          strokeWidth={0.6}
-          strokeLinecap="round"
-          animatedProps={diagonalSpikes}
-        />
-        <AnimatedLine
-          x1={CX + 12}
-          y1={CY - 12}
-          x2={CX - 12}
-          y2={CY + 12}
-          stroke="#FFFFFF"
-          strokeWidth={0.6}
-          strokeLinecap="round"
-          animatedProps={diagonalSpikes}
+        {/* Cool wisp — wide-and-low ellipse pushed lower (cy 0.70). */}
+        <AnimatedEllipse
+          cx={0.5 * SKY_W}
+          cy={0.7 * SKY_H}
+          rx={0.55 * SKY_W}
+          ry={0.06 * SKY_H}
+          fill="url(#weight-coolWisp)"
+          animatedProps={coolWispProps}
         />
 
-        <AnimatedCircle cx={CX} cy={CY} fill="url(#weight-core)" animatedProps={coreProps} />
-
+        {/* Cosmic dust rising along the EDGES only. */}
         {DUST.map((d, i) => (
-          <AnimatedCircle
-            key={i}
-            cx={CX + d.dx}
-            cy={CY + d.dy}
-            r={d.r}
-            fill="#FBD7E3"
-            animatedProps={dustProps}
-          />
+          <DustMote key={`sky-dust-${i}`} {...d} clock={dust} stage={SKY_H} fill="#F8DBCE" />
         ))}
-      </Svg>
 
-      <View style={styles.anchorCopyWrap}>
-        <Animated.Text style={[styles.anchorCopyIdle, idleStyle]}>
-          Stelar te leerá cuando registres.
-        </Animated.Text>
-        <Animated.Text style={[styles.anchorCopyDone, doneStyle]}>
-          Stelar empieza desde aquí.
-        </Animated.Text>
-      </View>
+        {/* ── CEILING strata ── populated y 0.06–0.20 ── */}
+        <AnimatedG animatedProps={farDriftProps}>
+          {CEIL_FAR.map((s, i) => (
+            <G key={`cfar-${i}`}>
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r * 2.4}
+                fill="url(#weight-starGlow)"
+                opacity={s.opacity * 0.6}
+              />
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r}
+                fill={colors.dimension.ciclo}
+                opacity={s.opacity}
+              />
+            </G>
+          ))}
+        </AnimatedG>
+        <AnimatedG animatedProps={midDriftProps}>
+          {CEIL_MID.map((s, i) => (
+            <Circle
+              key={`cmid-${i}`}
+              cx={s.x * SKY_W}
+              cy={s.y * SKY_H}
+              r={s.r}
+              fill="#E8D9DD"
+              opacity={s.opacity}
+            />
+          ))}
+        </AnimatedG>
+        <AnimatedG animatedProps={microGroupProps}>
+          {CEIL_MICRO.map((s, i) => (
+            <G key={`cmicro-${i}`}>
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r * 2.5}
+                fill="url(#weight-starGlow)"
+                opacity={0.13}
+              />
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r}
+                fill="#FBD7E3"
+                opacity={s.opacity}
+              />
+            </G>
+          ))}
+        </AnimatedG>
+
+        {/* ── FLOOR strata ── populated y 0.80–0.94 ── */}
+        <AnimatedG animatedProps={farDriftProps}>
+          {FLOOR_FAR.map((s, i) => (
+            <G key={`ffar-${i}`}>
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r * 2.4}
+                fill="url(#weight-starGlow)"
+                opacity={s.opacity * 0.6}
+              />
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r}
+                fill={colors.dimension.ciclo}
+                opacity={s.opacity}
+              />
+            </G>
+          ))}
+        </AnimatedG>
+        <AnimatedG animatedProps={midDriftProps}>
+          {FLOOR_MID.map((s, i) => (
+            <Circle
+              key={`fmid-${i}`}
+              cx={s.x * SKY_W}
+              cy={s.y * SKY_H}
+              r={s.r}
+              fill="#E8D9DD"
+              opacity={s.opacity}
+            />
+          ))}
+        </AnimatedG>
+        <AnimatedG animatedProps={microGroupProps}>
+          {FLOOR_MICRO.map((s, i) => (
+            <G key={`fmicro-${i}`}>
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r * 2.5}
+                fill="url(#weight-starGlow)"
+                opacity={0.13}
+              />
+              <Circle
+                cx={s.x * SKY_W}
+                cy={s.y * SKY_H}
+                r={s.r}
+                fill="#FBD7E3"
+                opacity={s.opacity}
+              />
+            </G>
+          ))}
+        </AnimatedG>
+      </Svg>
     </View>
   )
-}
+})
+
+/* ─────────────────────── Painted galaxy texture ─────────────────────── */
+
+/*
+ * WeightNebulaWash — the painterly base layer, cloned LOCALLY from cuerpo-base
+ * and STRAIGHTENED for this screen. The same painted galaxy PNG blown up so it
+ * bleeds past every edge and reads as nebular TEXTURE. Pivoted PISO-CENTRO-BAJO
+ * (cx 50% / cy 96%) and rotated 0° (the straightened version — neither
+ * about-you's +22° nor cuerpo-base's -22°), then dropped to whisper opacity.
+ *
+ * The vertical fade is MORE aggressive than the twins (to transparent by
+ * offset 0.70 instead of 0.62) because the wheel lives HIGH on this screen —
+ * nothing painterly may climb under the number.
+ *
+ * Only the PNG OPACITY breathes, REDUCED to 0.06 ↔ ~0.085 (vs. the twins'
+ * 0.08 ↔ 0.11) — manifiesto care for the peso screen. Transform / size /
+ * position are STATIC. Gradient id is `weight-*`.
+ */
+const WeightNebulaWash = memo(function WeightNebulaWash({ clock }: { clock: SharedValue<number> }) {
+  const SKY_W = 360
+  const SKY_H = 760
+
+  const IMG_W = SKY_W * 1.5
+  const IMG_H = IMG_W // square source art
+  // Pivot floor-centre-low: (50% w, 96% h) — straightened, centred.
+  const PIVOT_X = SKY_W * 0.5
+  const PIVOT_Y = SKY_H * 0.96
+  const IMG_X = PIVOT_X - IMG_W / 2
+  const IMG_Y = PIVOT_Y - IMG_H / 2
+
+  const imgProps = useAnimatedProps(() => {
+    'worklet'
+    const w = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
+    return { opacity: 0.06 + w * 0.025 }
+  })
+
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Svg
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${SKY_W} ${SKY_H}`}
+        preserveAspectRatio="xMidYMid slice"
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      >
+        <Defs>
+          {/* Vertical fade — bg opaque at the top → transparent by 0.70 so
+              the PNG melts well before the high wheel channel. */}
+          <SvgLinearGradient id="weight-nebulaFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.bg} stopOpacity="1" />
+            <Stop offset="0.7" stopColor={colors.bg} stopOpacity="0" />
+          </SvgLinearGradient>
+        </Defs>
+
+        {/* Painted galaxy — rotation 0° (straightened), centred low, breathing. */}
+        <AnimatedG animatedProps={imgProps}>
+          <G transform={`rotate(0 ${PIVOT_X} ${PIVOT_Y})`}>
+            <SvgImage
+              href={NEBULA_ART}
+              x={IMG_X}
+              y={IMG_Y}
+              width={IMG_W}
+              height={IMG_H}
+              preserveAspectRatio="xMidYMid slice"
+            />
+          </G>
+        </AnimatedG>
+
+        {/* Fade the PNG's top edge into bg (no seam under the wheel). */}
+        <Rect x={0} y={0} width={SKY_W} height={SKY_H} fill="url(#weight-nebulaFade)" />
+      </Svg>
+    </View>
+  )
+})
 
 const styles = StyleSheet.create({
   body: {
@@ -393,41 +678,19 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     maxWidth: 260,
   },
+  // The dignified opt-out / toggle. Sentence-case (NOT uppercase) with a
+  // soft letterSpacing (0.3) — on a deliberately gentle screen, the exit
+  // should be the KINDEST element, not the most shouted. Magenta is kept
+  // (it is the toggle's affordance) along with the size + the paddingVertical
+  // tap target. The two strings ("Aún no tengo báscula" / "Sí tengo báscula")
+  // both read calm in sentence-case.
   skipLink: {
     marginTop: 14,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.micro,
     color: colors.magenta,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+    letterSpacing: 0.3,
     textAlign: 'center',
     paddingVertical: 8,
-  },
-  /* Cosmic anchor at the bottom of the screen. */
-  anchor: {
-    marginTop: 24,
-    alignItems: 'center',
-    gap: 6,
-  },
-  anchorCopyWrap: {
-    height: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  anchorCopyIdle: {
-    position: 'absolute',
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.1,
-  },
-  anchorCopyDone: {
-    position: 'absolute',
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.magenta,
-    letterSpacing: 0.1,
   },
 })
