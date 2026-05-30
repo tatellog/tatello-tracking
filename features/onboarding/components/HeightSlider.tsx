@@ -37,6 +37,13 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  *
  * Range is integer cm; the slider snaps to whole numbers. Each new
  * integer fires a selection haptic so the drag feels tactile.
+ *
+ * `onDragChange` (optional, defaults to a no-op) reports the touch
+ * lifecycle UP to the host screen so it can enter "precision mode"
+ * (e.g. dim the surrounding atmosphere while the user drags). It is
+ * fired true on grant and false on release/terminate. It never
+ * touches the slider's own value/haptic logic, so existing callers
+ * that omit it behave exactly as before.
  */
 
 type Props = {
@@ -44,13 +51,22 @@ type Props = {
   onChange: (next: number) => void
   min?: number
   max?: number
+  onDragChange?: (dragging: boolean) => void
 }
 
 const TRACK_HEIGHT = 3
 const THUMB_BOX = 36
 const STAR_R = 6
 
-export function HeightSlider({ value, onChange, min = 140, max = 200 }: Props) {
+const NOOP = () => {}
+
+export function HeightSlider({
+  value,
+  onChange,
+  min = 140,
+  max = 200,
+  onDragChange = NOOP,
+}: Props) {
   const [trackWidth, setTrackWidth] = useState(0)
 
   const progress = useSharedValue(0)
@@ -60,6 +76,7 @@ export function HeightSlider({ value, onChange, min = 140, max = 200 }: Props) {
       duration: 220,
       easing: Easing.out(Easing.cubic),
     })
+    return () => cancelAnimation(progress)
   }, [value, min, max, trackWidth, progress])
 
   // Slow breath drives the thumb's halo + the number's quiet pulse.
@@ -142,8 +159,13 @@ export function HeightSlider({ value, onChange, min = 140, max = 200 }: Props) {
         onLayout={onLayout}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
-        onResponderGrant={(e) => handleTouch(e.nativeEvent.locationX)}
+        onResponderGrant={(e) => {
+          onDragChange(true)
+          handleTouch(e.nativeEvent.locationX)
+        }}
         onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
+        onResponderRelease={() => onDragChange(false)}
+        onResponderTerminate={() => onDragChange(false)}
         accessibilityRole="adjustable"
         accessibilityValue={{ min, max, now: value }}
       >
@@ -238,7 +260,9 @@ const styles = StyleSheet.create({
   track: {
     height: TRACK_HEIGHT,
     borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    // Warm leche-tinted base (was cold white 0.10) so the empty track
+    // reads in temperature with the palette, not a cold grey line.
+    backgroundColor: 'rgba(244, 236, 222, 0.10)',
   },
   trackFillWrap: {
     position: 'absolute',

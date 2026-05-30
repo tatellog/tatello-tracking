@@ -133,6 +133,16 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  *              corner; the second nebula ellipse opens its angle from
  *              cx22%/cy80% to cx14%/cy86%; the far ember core stays tucked
  *              at cx16%/cy92% r14%.
+ *   'exposed-low-right'
+ *              — for step 5 (cuerpo-base), the MIRRORED TWIN of about-you.
+ *              An EXACT horizontal mirror of 'exposed-low-left' (every x →
+ *              100−x, every rotation angle negated, every rotation pivot
+ *              mirrored across the 50% axis: 79 → 281 ≈ 78%×360). The warm
+ *              weight pools in the lower-RIGHT corner, so advancing from
+ *              step 4 → 5 reads as the sky "rotating": the cold stays high,
+ *              the warm slides corner-to-corner. Central channel (slider +
+ *              sex pills) stays clear. Same wisp-nebula technique, same
+ *              fieldProps/coreProps, only the geometry is reflected.
  *
  * All variants share the SAME four gradient defs (wbf-nebula / -field /
  * -core / -fog) and breathe on the SAME 5 s clock with the SAME opacity
@@ -143,7 +153,7 @@ export function WarmBloomField({
   variant = 'orbs',
 }: {
   clock: SharedValue<number>
-  variant?: 'orbs' | 'exposed' | 'exposed-low-left'
+  variant?: 'orbs' | 'exposed' | 'exposed-low-left' | 'exposed-low-right'
 }) {
   // Field-bloom breath — OPACITY only on the 5 s clock. The radius is a
   // static % (no animated length-percent: react-native-svg re-resolves
@@ -284,6 +294,56 @@ export function WarmBloomField({
                 rincón (cx 16% / cy 92% / r 14%). Breathes on core worklet. */}
             <AnimatedCircle
               cx="16%"
+              cy="92%"
+              r="14%"
+              fill="url(#wbf-core)"
+              animatedProps={coreProps}
+            />
+          </>
+        ) : variant === 'exposed-low-right' ? (
+          <>
+            {/* LOW-RIGHT WASH — the MIRRORED TWIN for cuerpo-base. An exact
+                horizontal reflection of 'exposed-low-left': every cx → 100−cx,
+                every rotation angle negated, every rotation pivot mirrored
+                across the 50% axis (px 79 → 281, i.e. 22%×360 → 78%×360). The
+                warm weight pools in the lower-RIGHT corner so the sky appears
+                to "rotate" when advancing from step 4. Central channel
+                (slider + sex pills) stays clear. */}
+
+            {/* Deep nebula — TWO crossed rotated ellipses, mirror of the
+                low-left pair. First (rotate +20) at cx78%/cy80%; second
+                (rotate -35) opened OUT to cx86%/cy86% so the wisp fans
+                diagonally into the RIGHT corner. Both share wbf-nebula. */}
+            <G transform="rotate(20 281 608)">
+              <Ellipse cx="78%" cy="80%" rx="74%" ry="38%" fill="url(#wbf-nebula)" />
+            </G>
+            <G transform="rotate(-35 281 608)">
+              <Ellipse cx="86%" cy="86%" rx="50%" ry="48%" fill="url(#wbf-nebula)" />
+            </G>
+
+            {/* Field bloom — mirror of low-left's cx34% → cx66%, same
+                cy86% / r46%, pooling as a painterly diagonal wisp in the
+                inf-right corner. Clear of the central channel. Breathing
+                on the same fieldProps worklet. */}
+            <AnimatedCircle
+              cx="66%"
+              cy="86%"
+              r="46%"
+              fill="url(#wbf-field)"
+              animatedProps={fieldProps}
+            />
+
+            {/* Volumetric haze — THREE floor-hugging bands. cx50% is
+                symmetric under the mirror, so these are byte-for-byte the
+                low-left bands (cy 80 / 88 / 94%, opac 0.05 / 0.035 / 0.025). */}
+            <Ellipse cx="50%" cy="80%" rx="100%" ry="8%" fill="url(#wbf-fog)" opacity={0.05} />
+            <Ellipse cx="50%" cy="88%" rx="95%" ry="11%" fill="url(#wbf-fog)" opacity={0.035} />
+            <Ellipse cx="50%" cy="94%" rx="90%" ry="13%" fill="url(#wbf-fog)" opacity={0.025} />
+
+            {/* White-hot core — far ember mirrored to the bottom-RIGHT
+                rincón (cx 84% / cy 92% / r 14%). Breathes on core worklet. */}
+            <AnimatedCircle
+              cx="84%"
               cy="92%"
               r="14%"
               fill="url(#wbf-core)"
