@@ -51,9 +51,15 @@ export function AtmosphericSky({ glow = DEFAULT_GLOW }: { glow?: Glow }) {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {/* S1. Vertical density — sinks the floor into near-bg shadow. */}
+      {/* S1. Vertical density — sinks the floor into near-bg shadow. An
+          intermediate stop (0.74 → 0.32) was added so the floor curve is
+          continuous and empalma cleanly with step 2's in-scene floor-fade
+          (qh-floorFade). The ceiling stays transparent and the floor still
+          lands at 0.6, so step 1 (welcome) is affected only imperceptibly
+          (~0.03 alpha mid-floor, on a near-black layer). */}
       <LinearGradient
-        colors={['rgba(10,6,8,0)', 'rgba(10,6,8,0)', 'rgba(8,4,6,0.6)']}
+        colors={['rgba(10,6,8,0)', 'rgba(10,6,8,0)', 'rgba(9,5,7,0.32)', 'rgba(8,4,6,0.6)']}
+        locations={[0, 0.45, 0.74, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
