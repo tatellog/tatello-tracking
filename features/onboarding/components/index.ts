@@ -1,4 +1,4 @@
-export { AtmosphericSky, DustMote } from './AtmosphericSky'
+export { AtmosphericSky, DustMote, WarmBloomField } from './AtmosphericSky'
 export { ChoiceChips, type Choice } from './ChoiceChips'
 export { DateField } from './DateField'
 export { DateOfBirthInput } from './DateOfBirthInput'

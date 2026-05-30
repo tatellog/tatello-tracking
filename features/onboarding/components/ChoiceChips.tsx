@@ -15,11 +15,18 @@ type Props<V extends string> = {
 }
 
 /*
- * A wrap-grid of single-select chips. Used for monthly_focus in
- * tu-intencion (7 options): chips fold into 2-3 rows on phone widths,
- * the picked one fills magenta. Different from SelectableCard
+ * A wrap-grid of single-select chips. Currently used by atribucion
+ * (acquisition source, 6 options): chips fold into 2-3 rows on phone
+ * widths, the picked one fills magenta. Different from SelectableCard
  * (which is for richer rows with descriptions); chips are for short
  * labels where the visual focus is the choice itself.
+ *
+ * Each chip carries `accessibilityRole="radio"`. The consumer is
+ * expected to wrap the group (and any mutually-exclusive opt-out) in a
+ * `radiogroup` container so VoiceOver announces the single-select set.
+ *
+ * Touch target: paddingVertical 13 + body line-height lands the chip at
+ * ~44pt tall, meeting the a11y minimum without changing the wrap layout.
  */
 export function ChoiceChips<V extends string>({ options, value, onChange }: Props<V>) {
   return (
@@ -55,7 +62,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 13,
     borderRadius: 24,
     borderWidth: 1,
   },

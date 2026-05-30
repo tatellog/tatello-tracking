@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { PrimaryCta } from '@/components/PrimaryCta'
+import { PrimaryCta, type CtaTransform, type CtaVariant } from '@/components/PrimaryCta'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
@@ -25,6 +25,23 @@ type Props = {
   /** Render the bottom CTA as a pill (border-radius 100) — used by
    *  the new identidad / cuerpo onboarding screens. */
   ctaPill?: boolean
+  /** Pass-through CTA variant (default `primary`). Lets a step opt the
+   *  shared CTA into the calmer `soft` language used by welcome /
+   *  que-hace without each step re-implementing the footer. Default
+   *  undefined → PrimaryCta's own default (`primary`), so the other
+   *  nine wizard steps are unaffected. */
+  ctaVariant?: CtaVariant
+  /** Pass-through CTA label casing (default `uppercase`). Pass `none`
+   *  for a sentence-case label. Default undefined → PrimaryCta's own
+   *  default, so the other nine steps are unaffected. */
+  ctaTransform?: CtaTransform
+  /** Optional full-screen atmosphere, mounted in absoluteFill JUST
+   *  AFTER the backdrop and BEHIND the content (pointerEvents none).
+   *  Lets a step paint depth (AtmosphericSky / WarmBloomField / star
+   *  strata) without leaving WizardLayout (which already owns back,
+   *  analytics, error + loading). Default undefined → the other nine
+   *  steps render exactly as before. */
+  atmosphere?: ReactNode
 }
 
 export function WizardLayout({
@@ -39,6 +56,9 @@ export function WizardLayout({
   loading = false,
   errorMessage = null,
   ctaPill = false,
+  ctaVariant,
+  ctaTransform,
+  atmosphere,
 }: Props) {
   const router = useRouter()
 
@@ -63,6 +83,15 @@ export function WizardLayout({
           its own backdrop + an opaque contentStyle means each screen
           covers its neighbour cleanly during transitions. */}
       <WizardBackdrop />
+      {/* Optional full-screen atmosphere — z-order: backdrop →
+          atmosphere → content → footer/CTA. pointerEvents none so it
+          never intercepts touches on the chips / CTA. Default
+          undefined → not rendered, so the other steps are identical. */}
+      {atmosphere ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {atmosphere}
+        </View>
+      ) : null}
       <View style={styles.progressWrap}>
         <ProgressBar current={step} total={totalSteps} />
       </View>
@@ -92,6 +121,8 @@ export function WizardLayout({
           disabled={!canContinue}
           loading={loading}
           pill={ctaPill}
+          variant={ctaVariant}
+          transform={ctaTransform}
         />
       </View>
     </SafeAreaView>

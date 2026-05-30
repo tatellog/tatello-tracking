@@ -49,6 +49,15 @@ export function PrimaryCta({
   const isSoft = variant === 'soft'
   const isDestructive = variant === 'destructive'
   const isPlain = transform === 'none'
+  // Activation glow — when a SOFT cta is READY (enabled, not loading),
+  // its border picks up the SAME magentaHot halo language as the
+  // about-you hairline that "lights up" when a field fills, and its
+  // translucent fill warms one step (magentaTint). Default-inocuo:
+  // ONLY the soft variant in its enabled state is touched — primary /
+  // ghost / destructive, and a disabled (waiting) soft cta, are all
+  // exactly as before. welcome / que-hace / atribución use soft and so
+  // simply gain the same coherent ready-glow once their step validates.
+  const softReady = isSoft && !inactive
 
   const handlePress = () => {
     if (inactive) return
@@ -65,6 +74,7 @@ export function PrimaryCta({
         styles.btn,
         isGhost && styles.btnGhost,
         isSoft && styles.btnSoft,
+        softReady && styles.btnSoftReady,
         isDestructive && styles.btnDestructive,
         inactive && !isGhost && !isSoft && styles.btnDisabled,
         pill && styles.btnPill,
@@ -137,6 +147,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 12,
     elevation: 3,
+  },
+  // Soft + READY (enabled) — the activation state. Shares the about-you
+  // hairline's "constellation lights up" language: a tighter magentaHot
+  // halo (radius ~6, opacity ~0.4) reads as ignition rather than the
+  // resting magenta drop-shadow, and the fill warms one step to
+  // magentaTint. Layered AFTER btnSoft so these props win when ready.
+  // iOS-first (shadowColor/Radius glow); Android keeps elevation 3 from
+  // btnSoft and degrades to the flat tinted pill — no break.
+  btnSoftReady: {
+    backgroundColor: colors.magentaTint,
+    shadowColor: colors.magentaHot,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
   },
   // Destructive — same filled-CTA geometry, swapped to the warning
   // red with a matching red glow. For delete / sign-out confirms.

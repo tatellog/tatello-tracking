@@ -90,7 +90,8 @@ export default function CuerpoBaseScreen() {
       errorMessage={updateProfile.error?.message}
       onContinue={handleContinue}
       continueLabel="Continuar"
-      ctaPill
+      ctaVariant="soft"
+      ctaTransform="none"
     >
       <ScrollView
         style={styles.scroll}
