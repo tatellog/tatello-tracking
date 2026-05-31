@@ -43,7 +43,7 @@ const MAX_KG = 200
 const DEFAULT_KG = 70
 
 // Painted galaxy used as whisper-low background texture — the same PNG that
-// ships as the SEMANA orb, cloned LOCALLY from cuerpo-base/about-you. Here it
+// ships as the SEMANA orb, cloned LOCALLY from body-base/about-you. Here it
 // reads as abstract nebular texture, never as an object.
 const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 
@@ -53,7 +53,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 
 /*
  * Weight — the body composition baseline (step 6), and the THIRD sister of
- * the calibration triptych (cuerpo-base → weight → tu-base). Optional via
+ * the calibration triptych (body-base → weight → baseline). Optional via
  * the "aún no tengo báscula" skip; otherwise, the dual wheel picker collects
  * the decimal value (Mifflin-St Jeor needs precision; a stepper would mean
  * hundreds of taps for the range).
@@ -62,7 +62,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10
  * first reading anchors the historical graph from day 1.
  *
  * STRAIGHTENED-SISTER ATMOSPHERE (illustrator pass) — weight wears the SAME
- * visual grammar as its twins about-you (leans left, +22°) and cuerpo-base
+ * visual grammar as its twins about-you (leans left, +22°) and body-base
  * (leans right, -22°), but ENDEREZADA: every pivot is CENTRED and every
  * rotation is 0°. After the sky "rotated" corner-to-corner across steps 4→5,
  * it comes to rest, centred and calm, on the weight screen.
@@ -163,7 +163,7 @@ export default function WeightScreen() {
         await saveSkipWeight(false)
         await insertWeight.mutateAsync(Number(value.toFixed(1)))
       }
-      router.push('/onboarding/tu-base')
+      router.push('/onboarding/baseline')
     } catch (e) {
       setSavingError(e instanceof Error ? e.message : 'No pudimos guardar tu peso.')
     } finally {
@@ -208,7 +208,7 @@ export default function WeightScreen() {
         eyebrowColor="magenta"
         question="Hoy pesas…"
         questionEmphasis="pesas"
-        hint="No es un veredicto. Es solo de dónde empezamos."
+        hint="De dónde empezamos."
       />
 
       <View style={styles.body}>
@@ -262,10 +262,10 @@ export default function WeightScreen() {
 
 /*
  * WeightSky — full-screen painted depth, the STRAIGHTENED SISTER of
- * cuerpo-base's CuerpoSky. Same "U" composition (ceiling y 0.06–0.20 + floor
+ * body-base's BodySky. Same "U" composition (ceiling y 0.06–0.20 + floor
  * y 0.80–0.94 populated, central band left EMPTY), same three strata +
  * parallax on the orbit clock, dust on the dust clock — but ENDEREZADA: the
- * dense micro cluster sits CENTRED at x≈0.5 (about-you leans left, cuerpo-base
+ * dense micro cluster sits CENTRED at x≈0.5 (about-you leans left, body-base
  * leans right; weight rests centred), and the cool wisp is REDUCED in opacity
  * and pushed slightly LOWER (cy 0.70).
  *
@@ -526,11 +526,11 @@ const WeightSky = memo(function WeightSky({
 /* ─────────────────────── Painted galaxy texture ─────────────────────── */
 
 /*
- * WeightNebulaWash — the painterly base layer, cloned LOCALLY from cuerpo-base
+ * WeightNebulaWash — the painterly base layer, cloned LOCALLY from body-base
  * and STRAIGHTENED for this screen. The same painted galaxy PNG blown up so it
  * bleeds past every edge and reads as nebular TEXTURE. Pivoted PISO-CENTRO-BAJO
  * (cx 50% / cy 96%) and rotated 0° (the straightened version — neither
- * about-you's +22° nor cuerpo-base's -22°), then dropped to whisper opacity.
+ * about-you's +22° nor body-base's -22°), then dropped to whisper opacity.
  *
  * The vertical fade is MORE aggressive than the twins (to transparent by
  * offset 0.70 instead of 0.62) because the wheel lives HIGH on this screen —

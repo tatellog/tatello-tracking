@@ -38,16 +38,22 @@ function SkeletonStar({
   idx,
   total,
   build,
+  reduce,
 }: {
   star: Resolved
   idx: number
   total: number
   build: SharedValue<number>
+  /** When ON, `build` is parked at 1 but the per-element ramp would
+   *  still leave the last-cascading stars short of full opacity. We
+   *  clamp localT = 1 so every star rests fully drawn. Constant prop
+   *  captured as a worklet closure scalar. */
+  reduce: boolean
 }) {
   const startT = total === 0 ? 0 : (idx / total) * 0.45
   const props = useAnimatedProps(() => {
     'worklet'
-    const localT = Math.max(0, Math.min(1, (build.value - startT) / 0.12))
+    const localT = reduce ? 1 : Math.max(0, Math.min(1, (build.value - startT) / 0.12))
     return { opacity: localT * 0.7 }
   })
   return (
@@ -67,12 +73,18 @@ function SkeletonLine({
   idx,
   total,
   build,
+  reduce,
 }: {
   a: Resolved
   b: Resolved
   idx: number
   total: number
   build: SharedValue<number>
+  /** When ON, `build` is parked at 1 but the later lines (startT≈0.9)
+   *  would only reach localT≈0.66, resting half-stroked / dim. We clamp
+   *  localT = 1 so every line rests fully stroked + opaque. Constant
+   *  prop captured as a worklet closure scalar. */
+  reduce: boolean
 }) {
   const length = Math.hypot(b.x - a.x, b.y - a.y)
   // Lines start appearing after most stars have already lit, so
@@ -80,7 +92,7 @@ function SkeletonLine({
   const startT = total === 0 ? 0.4 : 0.4 + (idx / total) * 0.5
   const props = useAnimatedProps(() => {
     'worklet'
-    const localT = Math.max(0, Math.min(1, (build.value - startT) / 0.15))
+    const localT = reduce ? 1 : Math.max(0, Math.min(1, (build.value - startT) / 0.15))
     return {
       strokeDashoffset: length * (1 - localT),
       opacity: localT * 0.6,
@@ -105,10 +117,17 @@ export function CanvasSkeleton({
   stars,
   lines,
   transform,
+  reduce,
 }: {
   stars: readonly Resolved[]
   lines: readonly (readonly [number, number])[]
   transform: string
+  /** iOS "Reducir movimiento". When ON the build ping-pong never
+   *  starts — `build` is parked at 1 AND each SkeletonStar/Line clamps
+   *  its own localT to 1, so the skeleton shows the figure FULLY DRAWN
+   *  (all stars + lines fully stroked at their final opacity): a
+   *  legible static placeholder instead of a looping plot. */
+  reduce: boolean
 }) {
   // Ping-pong 0 ↔ 1 over 1.5 s each direction. During the forward
   // pass stars cascade in (one by one in index order) and lines
@@ -118,13 +137,20 @@ export function CanvasSkeleton({
   // "rendering" cue the canvas was missing as a flat dark frame.
   const build = useSharedValue(0)
   useEffect(() => {
+    if (reduce) {
+      // Park fully drawn. The per-element clamp (localT = 1) does the
+      // real work — parking build at 1 alone leaves late-cascade lines
+      // (startT≈0.9) short — so we park here and clamp there.
+      build.value = 1
+      return () => cancelAnimation(build)
+    }
     build.value = withRepeat(
       withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.cubic) }),
       -1,
       true,
     )
     return () => cancelAnimation(build)
-  }, [build])
+  }, [build, reduce])
 
   return (
     <View style={styles.canvasSkeleton}>
@@ -142,11 +168,19 @@ export function CanvasSkeleton({
                 idx={i}
                 total={lines.length}
                 build={build}
+                reduce={reduce}
               />
             )
           })}
           {stars.map((s, i) => (
-            <SkeletonStar key={`sk-s-${i}`} star={s} idx={i} total={stars.length} build={build} />
+            <SkeletonStar
+              key={`sk-s-${i}`}
+              star={s}
+              idx={i}
+              total={stars.length}
+              build={build}
+              reduce={reduce}
+            />
           ))}
         </G>
       </Svg>

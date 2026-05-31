@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   // The selected row gets a soft cream halo against the dark cosmic
-  // backdrop — same vocabulary as the 58 px hero on cuerpo-base.
+  // backdrop — same vocabulary as the 58 px hero on body-base.
   valueActive: {
     color: colors.leche,
     textShadowColor: 'rgba(252, 246, 235, 0.22)',

@@ -77,7 +77,7 @@ export function useInsertInitialWeight() {
 
 /*
  * Records the user's last period start during the onboarding's
- * tu-ciclo step. The raw event lands in cycle_events; downstream
+ * cycle step. The raw event lands in cycle_events; downstream
  * features that read cycles will pick it up via their own query
  * keys, so we don't pre-invalidate anything here.
  */

@@ -1,12 +1,23 @@
 import { useRouter } from 'expo-router'
 import { memo, useEffect, useMemo, useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
+  useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
   withTiming,
   type SharedValue,
@@ -36,6 +47,7 @@ import { colors, typography } from '@/theme'
 
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 const AnimatedG = Animated.createAnimatedComponent(G)
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput)
 
 // Painted galaxy used as whisper-low background texture — the same PNG that
 // ships as the SEMANA orb, cloned LOCALLY from weight. Here it reads as
@@ -43,7 +55,7 @@ const AnimatedG = Animated.createAnimatedComponent(G)
 const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 
 /*
- * Tu base (step 7) — the optional reflection step between weight and tu-ciclo.
+ * Tu base (step 7) — the optional reflection step between weight and cycle.
  * Only surfaces when we have BOTH height and weight; otherwise auto-advances
  * silently (no point holding the user on a screen with nothing to compute).
  *
@@ -68,7 +80,7 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
  *   · closing "Listo. Stelar ya te lee." — calm.
  * The phrase "punto de partida/salida" must appear exactly ONCE (the headline).
  *
- * STRAIGHTENED-SISTER ATMOSPHERE — tu-base wears the SAME contained grammar as
+ * STRAIGHTENED-SISTER ATMOSPHERE — baseline wears the SAME contained grammar as
  * weight ("tercera hermana enderezada"): every pivot CENTRED, every rotation
  * 0°, but ~10% MORE tenue (it is the BMI screen). The golden rule: the central
  * vertical band — where the formula rows live — stays EMPTY of warm light. The
@@ -90,7 +102,7 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
  * every atmosphere layer so there is one compás. No precision-mode dimmer here
  * (there is no wheel to spin).
  */
-export default function TuBaseScreen() {
+export default function BaseScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const { data: brief } = useBriefContext()
@@ -110,7 +122,7 @@ export default function TuBaseScreen() {
   useEffect(() => {
     if (bmi == null && !auto) {
       setAuto(true)
-      router.replace('/onboarding/tu-ciclo')
+      router.replace('/onboarding/cycle')
     }
   }, [bmi, auto, router])
 
@@ -143,7 +155,7 @@ export default function TuBaseScreen() {
       step={7}
       totalSteps={9}
       canContinue
-      onContinue={() => router.push('/onboarding/tu-ciclo')}
+      onContinue={() => router.push('/onboarding/cycle')}
       continueLabel="Continuar"
       ctaVariant="soft"
       ctaTransform="none"
@@ -206,27 +218,29 @@ export default function TuBaseScreen() {
           <View style={styles.formulaRow}>
             <Text style={styles.formulaLabel}>Tu peso</Text>
             <Text style={styles.formulaSep}>·</Text>
-            <Text style={styles.formulaValue}>{weightKg!.toFixed(1)} kg</Text>
+            {/* Number counts up; unit "kg" stays static. */}
+            <CountUpValue target={weightKg!} decimals={1} unit="kg" delay={0} />
           </View>
           <View style={styles.formulaRow}>
             <Text style={styles.formulaLabel}>Tu altura</Text>
             <Text style={styles.formulaSep}>·</Text>
-            <Text style={styles.formulaValue}>{heightCm} cm</Text>
+            <CountUpValue target={heightCm!} decimals={0} unit="cm" delay={150} />
           </View>
           <View style={styles.formulaRow}>
             <Text style={styles.formulaLabel}>Tu IMC</Text>
             <Text style={styles.formulaSep}>·</Text>
-            <Text style={styles.formulaValue}>{bmi.toFixed(1)}</Text>
+            {/* IMC enters LAST — the calm close. No unit. */}
+            <CountUpValue target={bmi} decimals={1} delay={300} />
           </View>
         </View>
 
-        {/* Inline IMC explanation — the essential "what is it / what is it for /
-            it is not a grade" now lives ON the screen (niebla, small), not
-            hidden behind the sheet tap. Frames the number as a calibration,
+        {/* Inline IMC explanation — the essential "what is it / where am I /
+            from here we start" now lives ON the screen (niebla, small), not
+            hidden behind the sheet tap. Frames the number as a starting point,
             never a classification. */}
         <Text style={styles.imcNote}>
-          El IMC es una proporción entre tu peso y tu altura. Es desde donde Stelar te calibra, no
-          una calificación.
+          El IMC es una proporción entre tu peso y tu altura. Es dónde estás hoy, y desde aquí
+          empezamos.
         </Text>
 
         {/* Closing beat — calm, no star. Reorients from the figure to the act
@@ -236,6 +250,83 @@ export default function TuBaseScreen() {
 
       <HowCalculatedSheet visible={showHow} onClose={() => setShowHow(false)} />
     </WizardLayout>
+  )
+}
+
+/* ───────────────────── Contained count-up value ────────────────────── */
+
+/*
+ * CountUpValue — a CONTAINED count-up for the three formula numbers. The
+ * number counts 0 → target with ease-out (decelerates and LANDS soft, never a
+ * slot-machine), ~800ms, staggered per row (peso 0ms · altura 150ms · IMC
+ * 300ms — the IMC closes the cascade).
+ *
+ * Contained, by mandate: NO scale-pulse, halo, glow, or landing flash. The
+ * digits just count; the number keeps EXACTLY the static formulaValue style.
+ * Only the number animates — the unit ("kg"/"cm") is a static sibling.
+ *
+ * Technique: Animated TextInput + useAnimatedProps that formats `{ text }` in a
+ * worklet from a single shared value (UI-thread, no per-frame JS / setState).
+ * tabular-nums fixes digit width → zero layout reflow while counting.
+ *
+ * Reduced motion: the shared value initialises AT the target and never
+ * animates → the final value shows instantly.
+ *
+ * A11y: the TextInput is decorative (editable=false, pointerEvents none); an
+ * accessibilityLabel carries the final value + unit so VoiceOver reads the
+ * landed number (e.g. "70.0 kg"), never "0" nor the count.
+ */
+function CountUpValue({
+  target,
+  decimals,
+  unit,
+  delay,
+}: {
+  target: number
+  decimals: 0 | 1
+  unit?: string
+  delay: number
+}) {
+  const reduceMotion = useReducedMotion()
+  // Start AT target when reduced motion is on → no count, final value instantly.
+  const progress = useSharedValue(reduceMotion ? target : 0)
+
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.value = target
+      return
+    }
+    progress.value = withDelay(
+      delay,
+      withTiming(target, { duration: 800, easing: Easing.out(Easing.cubic) }),
+    )
+    return () => {
+      cancelAnimation(progress)
+    }
+  }, [progress, target, delay, reduceMotion])
+
+  // `text` is a private TextInput prop Reanimated drives natively for count-ups
+  // (it is not in TextInputProps), so the worklet return is cast.
+  const animatedProps = useAnimatedProps(() => {
+    'worklet'
+    return { text: progress.value.toFixed(decimals) } as Partial<TextInputProps>
+  })
+
+  const finalLabel = `${target.toFixed(decimals)}${unit ? ` ${unit}` : ''}`
+
+  return (
+    <View style={styles.valueWrap} accessible accessibilityLabel={finalLabel}>
+      <AnimatedTextInput
+        style={styles.countUpValue}
+        animatedProps={animatedProps}
+        defaultValue={progress.value.toFixed(decimals)}
+        editable={false}
+        underlineColorAndroid="transparent"
+        importantForAccessibility="no"
+        accessibilityElementsHidden
+      />
+      {unit ? <Text style={styles.formulaValue}> {unit}</Text> : null}
+    </View>
   )
 }
 
@@ -585,7 +676,8 @@ function HowCalculatedSheet({ visible, onClose }: { visible: boolean; onClose: (
           >
             <Text style={sheetStyles.eyebrow}>Cómo se calcula</Text>
             <Text style={sheetStyles.title}>
-              El IMC es <Text style={sheetStyles.titleEm}>una orientación</Text>, no un veredicto.
+              El IMC es <Text style={sheetStyles.titleEm}>tu punto de partida</Text> — el lugar
+              desde donde empezamos.
             </Text>
 
             <Text style={sheetStyles.section}>FÓRMULA</Text>
@@ -621,7 +713,7 @@ const styles = StyleSheet.create({
   skipPad: {
     flex: 1,
     // OPAQUE colors.bg — this transient early-return placeholder (shown for a
-    // frame before the auto-replace to tu-ciclo) keeps the same opaque grammar
+    // frame before the auto-replace to cycle) keeps the same opaque grammar
     // as every other onboarding screen, so the slide always occludes cleanly.
     backgroundColor: colors.bg,
   },
@@ -684,6 +776,27 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: -0.2,
+  },
+  /* Count-up value wrapper — the animated number + static unit sit on one
+     baseline-aligned row, replacing the old single <Text> value. */
+  valueWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  /* Animated number — IDENTICAL to formulaValue (same serif italic / size /
+     color / letterSpacing) so the count-up is visually indistinguishable from
+     the static rows. tabular-nums freezes digit width → no reflow while
+     counting. TextInput's default padding/min-height is zeroed so it lines up
+     with the surrounding <Text>. */
+  countUpValue: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.ui,
+    color: colors.bone,
+    letterSpacing: -0.2,
+    fontVariant: ['tabular-nums'],
+    padding: 0,
+    margin: 0,
   },
   /* Inline IMC explanation — small/niebla, lives below the formula rows (NOT in
      the sheet). Explains what the number is and frames it as calibration, never

@@ -30,7 +30,7 @@ const SEX_LABEL: Record<string, string> = {
   male: 'Masculino',
 }
 
-/** monthly_focus → settings display, mirrors the wizard's tu-intencion
+/** monthly_focus → settings display, mirrors the wizard's intention
  *  step. The 5 ACTIVE options (weight/energy/food/patterns/other) carry
  *  the EXACT same label + tagline the user saw in the wizard, so Settings
  *  reads as a continuation of that voice. sleep/cycle/mind are INERT —
@@ -131,7 +131,7 @@ function SettingsBody() {
   }
 
   const editIntention = () => {
-    router.push('/onboarding/tu-intencion?source=settings')
+    router.push('/onboarding/intention?source=settings')
   }
 
   const openBodyTrack = () => {

@@ -53,7 +53,7 @@ const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 // Painted galaxy used as a whisper-low background texture. The same PNG
 // that ships as the SEMANA orb — here it bleeds past the edges as
 // abstract nebular texture, never read as an object. (Shared with
-// atribución's NebulaWash; here it is re-pivoted to the lower-LEFT.)
+// attribution's NebulaWash; here it is re-pivoted to the lower-LEFT.)
 const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 
 const MIN_AGE_YEARS = 13
@@ -84,7 +84,7 @@ const SPANISH_MONTHS = [
  * Identidad — Screen 1 of the split "Cuéntame de ti" pair. Asks only
  * the two questions that name *who* the user is: their name and the
  * date that defines their constellation. Body-base questions (height,
- * sex) live in the second screen, cuerpo-base.
+ * sex) live in the second screen, body-base.
  *
  * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
  * SCREEN by WizardLayout (its own opaque <WizardBackdrop />) so the
@@ -108,7 +108,7 @@ const SPANISH_MONTHS = [
  * line). The halo opacity tweens on withTiming(200 ms, ease-out-quad) —
  * the SAME compás as atmoDim — so the screen breathes on one curve.
  *
- * ATMOSPHERE (illustrator pass, FORM-adapted): unlike atribución (a
+ * ATMOSPHERE (illustrator pass, FORM-adapted): unlike attribution (a
  * chips screen), this is a form — usability wins over atmosphere. The
  * sky is composed as a CENTRAL CLEAR CHANNEL: weight goes to the
  * ceiling + the lower corners; the vertical centre (name input + date
@@ -139,7 +139,7 @@ const SPANISH_MONTHS = [
 export default function AboutYouScreen() {
   const router = useRouter()
   // Opened from Ajustes (?source=settings) → save and return there;
-  // otherwise this is the onboarding wizard → advance to cuerpo-base.
+  // otherwise this is the onboarding wizard → advance to body-base.
   const { source } = useLocalSearchParams<{ source?: string }>()
   const fromSettings = source === 'settings'
   const { data: profile } = useProfile()
@@ -209,7 +209,7 @@ export default function AboutYouScreen() {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
           if (fromSettings) router.back()
-          else router.push('/onboarding/cuerpo-base')
+          else router.push('/onboarding/body-base')
         },
       },
     )
@@ -279,11 +279,11 @@ export default function AboutYouScreen() {
             hint="Solo para ti. Nunca lo compartimos."
           />
 
-          <Section question="¿cómo te llamas?">
+          <Section question="¿Cómo te llamas?">
             <LineInput
               value={name}
               onChangeText={setName}
-              placeholder="Anahí"
+              placeholder="Tu nombre"
               filled={nameValid}
               onFocusChange={setNameFocused}
               autoCapitalize="words"
@@ -292,7 +292,7 @@ export default function AboutYouScreen() {
             />
           </Section>
 
-          <Section question="¿cuándo naciste?" hint="Tu fecha define tu constelación.">
+          <Section question="¿Cuándo naciste?" hint="De aquí nace tu cielo.">
             <DateTrigger
               value={dob}
               onChange={setDob}
@@ -544,7 +544,7 @@ function DateTrigger({
 
 /*
  * AboutYouSky — full-screen painted depth for the FORM, cloned from
- * atribución's AtribucionSky but composed as a "U": stars populate the
+ * attribution's AttributionSky but composed as a "U": stars populate the
  * CEILING (y 0.06–0.20) and the FLOOR (y 0.80–0.94), and the central
  * band (y 0.30–0.72, where the inputs + date picker live) is left
  * EMPTY. Dust rises only along the EDGES (x ≈ 0.10 / 0.88), never up
@@ -892,13 +892,13 @@ function AboutYouSky({
 /* ─────────────────────── Painted galaxy texture ─────────────────────── */
 
 /*
- * NebulaWash — the painterly base layer, cloned from atribución and
+ * NebulaWash — the painterly base layer, cloned from attribution and
  * re-pivoted for this FORM. A single painted galaxy PNG blown up to
  * ~150% of the reference width so it bleeds past every edge and reads
  * as nebular TEXTURE, never an object. Pivoted to the lower-LEFT corner
  * (cx 18% / cy 92%) and rotated +22°, then dropped to whisper opacity.
  *
- * The vertical fade is MORE aggressive than atribución's (fades to
+ * The vertical fade is MORE aggressive than attribution's (fades to
  * transparent by offset 0.62 instead of 0.5) so absolutely nothing
  * crosses under the name field in the central channel.
  *
@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
-    // bone (not niebla) for contrast — consistent with atribución's
+    // bone (not niebla) for contrast — consistent with attribution's
     // skip label; the value leche stays the only bright voice.
     color: colors.bone,
     letterSpacing: 0.1,

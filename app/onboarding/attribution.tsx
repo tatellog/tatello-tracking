@@ -37,7 +37,7 @@ import { colors, typography } from '@/theme'
 const AnimatedG = Animated.createAnimatedComponent(G)
 
 // Painted galaxy used as a whisper-low background texture (P1). The same
-// PNG que-hace ships as the SEMANA orb — here it bleeds past the edges as
+// PNG what-it-does ships as the SEMANA orb — here it bleeds past the edges as
 // abstract nebular texture, never read as an object.
 const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 
@@ -51,7 +51,7 @@ const OPTIONS: readonly Choice<AcquisitionSource>[] = [
 ]
 
 /*
- * Step 3 — atribución. Marketing analytics question, low-friction (one
+ * Step 3 — attribution. Marketing analytics question, low-friction (one
  * tap, optional). The team uses this to measure which channel converts;
  * without it, growth budget gets spent blind.
  *
@@ -77,12 +77,12 @@ const OPTIONS: readonly Choice<AcquisitionSource>[] = [
  *                        cold recedes (aerial perspective).
  *   3. WarmBloomField  — variant="exposed": de-coaxialised warm wash +
  *                        organic nebula border + layered haze bands.
- *   4. AtribucionSky   — star strata + dust at the front (density raised).
+ *   4. AttributionSky   — star strata + dust at the front (density raised).
  *
  * The three clocks (5 s / 18 s / 40 s) are created ONCE on the screen and
  * shared by every atmosphere layer so there is one compás.
  */
-export default function AtribucionScreen() {
+export default function AttributionScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
@@ -141,7 +141,7 @@ export default function AtribucionScreen() {
 
   return (
     <WizardLayout
-      step={3}
+      step={12}
       showProgress={false}
       showBack={false}
       canContinue={canContinue}
@@ -165,7 +165,7 @@ export default function AtribucionScreen() {
           <WarmBloomField clock={clock} variant="exposed" />
           {/* 4. Painted depth — star strata + dust, full-screen,
               whisper-low, hidden from VoiceOver. */}
-          <AtribucionSky dust={dust} orbit={orbit} />
+          <AttributionSky dust={dust} orbit={orbit} />
         </>
       }
     >
@@ -199,7 +199,7 @@ export default function AtribucionScreen() {
             }}
           />
 
-          {/* Quiet opt-out — same vocabulary as tu-ciclo's "Prefiero no
+          {/* Quiet opt-out — same vocabulary as cycle's "Prefiero no
               decir": a small dot + lowercase text, set apart so it reads
               as the meta-option, not a 7th equal-weight chip. It is a
               radio inside the group above so it deselects (and is
@@ -306,7 +306,7 @@ function NebulaWash({ clock }: { clock: SharedValue<number> }) {
 
 /* ───────────────────── Full-screen star sky ────────────────────── */
 
-// Star strata cloned from que-hace, density reduced. x/y are 0→1
+// Star strata cloned from what-it-does, density reduced. x/y are 0→1
 // fractions of the screen; parallax amplitude grows toward the viewer
 // (far 2px / mid 5px / micro 9px). Concentrated in the LOWER half so the
 // depth pools under the chips, never behind the chips' text. With
@@ -376,7 +376,13 @@ const DUST: {
  * reference 360×760 box and stretching it to absoluteFill — the star
  * positions are fractions so they scale with the device.
  */
-function AtribucionSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
+function AttributionSky({
+  dust,
+  orbit,
+}: {
+  dust: SharedValue<number>
+  orbit: SharedValue<number>
+}) {
   const SKY_W = 360
   const SKY_H = 760
 
@@ -414,7 +420,7 @@ function AtribucionSky({ dust, orbit }: { dust: SharedValue<number>; orbit: Shar
       >
         <Defs>
           {/* Tight white falloff so micro-stars glow rather than read
-              as flat drawn dots (equivalent to que-hace's qh-starGlow). */}
+              as flat drawn dots (equivalent to what-it-does's qh-starGlow). */}
           <RadialGradient id="atrib-starGlow" cx="50%" cy="50%" r="50%">
             <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.9" />
             <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
@@ -496,7 +502,7 @@ const styles = StyleSheet.create({
   chipsBlock: {
     marginTop: 28,
   },
-  /* Quiet opt-out, same pattern as tu-ciclo/frictions. */
+  /* Quiet opt-out, same pattern as cycle/frictions. */
   skipRow: {
     flexDirection: 'row',
     alignItems: 'center',

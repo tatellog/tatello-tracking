@@ -23,6 +23,12 @@ export type Props = {
    *  debt: once you've checked in today, the figure shouldn't be
    *  whispering "one more". The ring reappears the next day. */
   committed?: boolean
+  /** Show the central count chip ("3/28"). Defaults to true so the
+   *  Órbita tab is unchanged. Día 1 passes false: a big "1/28" on the
+   *  first day reads as "you're missing 27" — debt, which the
+   *  manifiesto prohibits. There the visual loop (first star lit +
+   *  next star pulsing) carries the meaning instead of a number. */
+  showCount?: boolean
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

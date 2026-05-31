@@ -3,52 +3,74 @@ import { StyleSheet, View } from 'react-native'
 import { colors } from '@/theme'
 
 type Props = {
-  /** 1-indexed current step. */
+  /** 1-indexed current step within the wizard's visible spine. */
   current: number
-  /** Total steps in the flow. Drives whether we render phase mode. */
+  /** Total steps in the flow. When it matches the onboarding spine
+   *  (`ONBOARDING_SPINE_STEPS`) we render PHASE mode; any other value
+   *  (e.g. the photos sub-flow with total={4}) falls back to one
+   *  segment per step. */
   total: number
 }
 
 /*
- * The onboarding spine is 12 steps. Showing 12 raw segments (or a
- * "1 de 12" counter) on the narrative screens reads as "you still
- * have eleven screens to go" and spikes abandonment anxiety (UX
- * audit). So for the 12-step flow we collapse the steps into a small
- * number of semantic PHASES and fill them as blocks: the user feels
- * progress by chapter, not by an endless dotted ruler.
+ * The onboarding spine that carries a progress bar is 9 visible steps
+ * (welcome → rhythm). Showing 9 raw segments (or a "1 de 9" counter)
+ * on those screens reads as "you still have eight screens to go" and
+ * spikes abandonment anxiety (UX audit). Worse, a 9-of-9 ruler reaches
+ * "full" the moment the user finishes rhythm — i.e. BEFORE the "Tu
+ * cielo" ceremony (reading → reveal), so it lies: it says "terminaste"
+ * right before the emotional peak.
  *
- * The mapping lives entirely inside this component. Call sites keep
- * passing `current` (1..12) + `total={12}` exactly as before — no
- * onboarding screen had to change. Any non-12 flow (e.g. the photos
- * sub-flow with total={4}) falls back to the original 1-segment-per-
- * step rendering, so nothing else regresses.
+ * So for the spine we collapse the steps into a small number of
+ * semantic PHASES and fill them as blocks: the user feels progress by
+ * chapter, not by an endless dotted ruler. Crucially we include a
+ * fourth phase — "Tu cielo", the ceremony — which stays PENDING the
+ * whole time the bar is on screen. The ceremony screens themselves
+ * (reading / reveal / post-reveal) render NO bar (WizardLayout
+ * showProgress=false), so the user crosses into "Tu cielo" exactly when
+ * the bar disappears. Net effect: the last thing the bar ever shows is
+ * "3 of 4 phases, Tu cielo still ahead" — never a premature "9/9 = done".
  *
- * Phases for the 12-step flow (in route order):
- *   1 · Tu intención  → welcome, que-hace            (steps 1-2)
- *   2 · Tu cuerpo      → atribución … tu-base         (steps 3-7)
- *   3 · Tu ritmo       → tu-ciclo, tu-ritmo, intención (steps 8-10)
- *   4 · Tu cielo       → notificaciones, appointment   (steps 11-12)
- * A phase boundary at step N means: steps with idx <= the phase's
- * last step belong to that phase.
+ * Route order of the visible spine (1-indexed `current`):
+ *   1 · Tu intención  → welcome, what-it-does, intention   (steps 1-3)
+ *   2 · Tu cuerpo      → about-you, body-base, weight,
+ *                        baseline                            (steps 4-7)
+ *   3 · Tu ritmo       → cycle, rhythm                (steps 8-9)
+ *   4 · Tu cielo       → la ceremonia (reading → reveal →   (no bar;
+ *                        post-reveal)                         always pending)
+ *
+ * A phase's `lastStep` is the last 1-indexed spine step that belongs to
+ * it. "Tu cielo" has no spine step (it's beyond `current`'s range), so
+ * its `lastStep` sits past the spine and it can never fill while the
+ * bar is mounted.
  */
-const PHASES_12: { lastStep: number }[] = [
-  { lastStep: 2 }, // Tu intención
-  { lastStep: 7 }, // Tu cuerpo
-  { lastStep: 10 }, // Tu ritmo
-  { lastStep: 12 }, // Tu cielo
+
+/** Visible spine length (welcome → rhythm). Drives phase mode. */
+export const ONBOARDING_SPINE_STEPS = 9
+
+type Phase = { label: string; lastStep: number }
+
+const ONBOARDING_PHASES: Phase[] = [
+  { label: 'Tu intención', lastStep: 3 }, // welcome, what-it-does, intention
+  { label: 'Tu cuerpo', lastStep: 7 }, // about-you, body-base, weight, baseline
+  { label: 'Tu ritmo', lastStep: 9 }, // cycle, rhythm
+  // "Tu cielo" — the ceremony. lastStep is past the spine so it stays
+  // pending the entire time the bar is rendered; the ceremony screens
+  // hide the bar entirely. Keeps the bar from ever reading "done".
+  { label: 'Tu cielo', lastStep: ONBOARDING_SPINE_STEPS + 1 },
 ]
 
 /** First step (1-indexed) that belongs to each phase. */
-function phaseRange(phases: { lastStep: number }[], index: number) {
+function phaseRange(phases: Phase[], index: number) {
   const firstStep = index === 0 ? 1 : (phases[index - 1]?.lastStep ?? 0) + 1
   const lastStep = phases[index]?.lastStep ?? firstStep
   return { firstStep, lastStep, count: lastStep - firstStep + 1 }
 }
 
 export function ProgressBar({ current, total }: Props) {
-  // Phase mode only for the canonical 12-step spine. Everything else
-  // keeps the original per-step segments.
-  if (total !== 12) {
+  // Phase mode only for the canonical onboarding spine. Everything else
+  // (e.g. the photos sub-flow, total={4}) keeps per-step segments.
+  if (total !== ONBOARDING_SPINE_STEPS) {
     return (
       <View
         style={styles.container}
@@ -74,19 +96,16 @@ export function ProgressBar({ current, total }: Props) {
     )
   }
 
-  const phases = PHASES_12
+  const phases = ONBOARDING_PHASES
+  const activePhase = phases.findIndex((_, i) => current <= phaseRange(phases, i).lastStep) + 1
 
   return (
     <View
       style={styles.container}
       accessibilityRole="progressbar"
-      // Surface phase progress to AT, not the raw 12-count: "phase 2
-      // of 4". Keeps the same calmer framing the visual gives.
-      accessibilityValue={{
-        now: phases.findIndex((_, i) => current <= phaseRange(phases, i).lastStep) + 1,
-        min: 0,
-        max: phases.length,
-      }}
+      // Surface phase progress to AT, not the raw step count: "phase 2
+      // of 4". Keeps the calmer framing the visual gives.
+      accessibilityValue={{ now: activePhase, min: 0, max: phases.length }}
     >
       {phases.map((_, i) => {
         const { firstStep, lastStep, count } = phaseRange(phases, i)
@@ -129,7 +148,7 @@ const styles = StyleSheet.create({
     height: 3,
     width: '100%',
   },
-  // ── Per-step mode (non-12 flows) ──────────────────────────────
+  // ── Per-step mode (non-spine flows, e.g. photos) ──────────────
   segment: {
     flex: 1,
     height: 3,
@@ -149,7 +168,7 @@ const styles = StyleSheet.create({
   segmentPending: {
     backgroundColor: colors.bruma,
   },
-  // ── Phase mode (12-step spine) ────────────────────────────────
+  // ── Phase mode (onboarding spine) ─────────────────────────────
   phaseTrack: {
     flex: 1,
     height: 3,

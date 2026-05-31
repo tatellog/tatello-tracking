@@ -82,7 +82,7 @@ export function AtmosphericSky({ glow = DEFAULT_GLOW }: { glow?: Glow }) {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 /*
- * WarmBloomField — the deep WARM atmosphere for step 2 (que-hace),
+ * WarmBloomField — the deep WARM atmosphere for step 2 (what-it-does),
  * rendered FULL-SCREEN (absoluteFill, no bounded viewBox) so its big
  * radial washes resolve to transparent before ANY screen edge and can
  * never be clipped to a rectangle.
@@ -107,9 +107,9 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  * percent units — RadialGradient `r` is fine in %, and the painted
  * <Circle>/<Ellipse> use % too so everything scales with the device.
  *
- * VARIANT (illustrator pass for step 3 — atribución):
+ * VARIANT (illustrator pass for step 3 — attribution):
  *   'orbs'     (DEFAULT) — the EXACT original composition. Used by
- *              welcome (step 1, indirectly) and que-hace (step 2), where
+ *              welcome (step 1, indirectly) and what-it-does (step 2), where
  *              the painted orb PNGs sit on top of it. Four coaxial
  *              radials (all cx~50–62% / cy~66–82%) read as a smooth disc
  *              — fine BECAUSE the orbs cover them.
@@ -134,7 +134,7 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  *              cx22%/cy80% to cx14%/cy86%; the far ember core stays tucked
  *              at cx16%/cy92% r14%.
  *   'exposed-low-right'
- *              — for step 5 (cuerpo-base), the MIRRORED TWIN of about-you.
+ *              — for step 5 (body-base), the MIRRORED TWIN of about-you.
  *              An EXACT horizontal mirror of 'exposed-low-left' (every x →
  *              100−x, every rotation angle negated, every rotation pivot
  *              mirrored across the 50% axis: 79 → 281 ≈ 78%×360). The warm
@@ -302,7 +302,7 @@ export function WarmBloomField({
           </>
         ) : variant === 'exposed-low-right' ? (
           <>
-            {/* LOW-RIGHT WASH — the MIRRORED TWIN for cuerpo-base. An exact
+            {/* LOW-RIGHT WASH — the MIRRORED TWIN for body-base. An exact
                 horizontal reflection of 'exposed-low-left': every cx → 100−cx,
                 every rotation angle negated, every rotation pivot mirrored
                 across the 50% axis (px 79 → 281, i.e. 22%×360 → 78%×360). The

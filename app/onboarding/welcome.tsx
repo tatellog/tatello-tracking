@@ -40,7 +40,7 @@ const AnimatedG = Animated.createAnimatedComponent(G)
  * terminates in bg (#0A0608) at opacity 0, never cold black.
  *
  * AtmosphericSky + DustMote now live in features/onboarding/components
- * so step 2 (que-hace) breathes with the same sky. This step mounts
+ * so step 2 (what-it-does) breathes with the same sky. This step mounts
  * AtmosphericSky with its DEFAULT glow (38%/42%/65%) so it renders
  * exactly as before the extraction.
  *
@@ -478,7 +478,7 @@ function ManifestoHero() {
   )
 }
 
-export default function ManifiestoScreen() {
+export default function ManifestoScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
 
@@ -507,7 +507,8 @@ export default function ManifiestoScreen() {
 
         <Text style={styles.meta}>
           Stelar observa contigo, sin presión.{'\n'}
-          Desde hoy. <Text style={styles.metaStrong}>En 28 días</Text>, tu propio ritmo.
+          Desde hoy, una estrella a la vez. <Text style={styles.metaStrong}>En 28 días</Text>, tu
+          cielo.
         </Text>
       </View>
 
@@ -516,7 +517,7 @@ export default function ManifiestoScreen() {
           label="Empecemos"
           variant="soft"
           transform="none"
-          onPress={() => router.push('/onboarding/que-hace')}
+          onPress={() => router.push('/onboarding/what-it-does')}
         />
       </View>
     </View>

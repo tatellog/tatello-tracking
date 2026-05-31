@@ -80,10 +80,10 @@ const TRAINING_OPTIONS: readonly TrainingOption[] = [
  * ATMOSPHERE PARITY (illustrator pass — bring step 9 to the SAME line as
  * steps 1–7): this screen was a bare dark page while every step before it
  * paints a full-screen sky. We reuse the shared atmosphere primitives
- * (AtmosphericSky + WarmBloomField + a local RitmoSky) so it breathes with
+ * (AtmosphericSky + WarmBloomField + a local RhythmSky) so it breathes with
  * the rest of the wizard — but DELIBERATELY COLDER and CALMER, and TINTED
  * INDIGO because the screen opens on "Sueño habitual":
- *   • NO NebulaWash PNG. Like tu-ciclo (step 8), the beat here is calm
+ *   • NO NebulaWash PNG. Like cycle (step 8), the beat here is calm
  *     CONTAINMENT, not a painterly warm stage. The bare cool sky reads as
  *     resting-space — fitting for a screen about sleep + rhythm.
  *   • Glow pulled to cx42%/cy38% — distinct from step 8's 58%/38% so two
@@ -92,7 +92,7 @@ const TRAINING_OPTIONS: readonly TrainingOption[] = [
  *     (ciclo) uses "exposed-low-right"; using "exposed-low-left" here avoids
  *     chaining two identical skies and gives step 9 its own composition
  *     (pure reuse, no new variant authored).
- *   • RitmoSky — a reduced, COLD clone of step 8's CicloSky, but tinted
+ *   • RhythmSky — a reduced, COLD clone of step 8's CycleSky, but tinted
  *     toward dimension.sueno (#7C8FFF indigo) instead of dimension.ciclo —
  *     the micro-stars + the low cool wisp carry the indigo of "sleep". The
  *     far/mid strata stay cool-neutral so the field reads quiet, not neon.
@@ -102,7 +102,7 @@ const TRAINING_OPTIONS: readonly TrainingOption[] = [
  * clocks (5 s / 18 s / 40 s) were ADDED to match steps 1–8's compás. All
  * created ONCE on the screen (one compás, no duplicated shared values).
  */
-export default function TuRitmoScreen() {
+export default function RhythmScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
@@ -166,7 +166,7 @@ export default function TuRitmoScreen() {
         training_frequency: training,
       },
       {
-        onSuccess: () => router.push('/onboarding/leyendo'),
+        onSuccess: () => router.push('/onboarding/reading'),
       },
     )
   }
@@ -197,7 +197,7 @@ export default function TuRitmoScreen() {
           {/* 3. Painted depth — INDIGO star strata + dimmed dust + a low cool
               wisp, full-screen, whisper-low, hidden from VoiceOver. Tinted
               toward dimension.sueno (#7C8FFF) for the "sleep" register. */}
-          <RitmoSky dust={dust} orbit={orbit} />
+          <RhythmSky dust={dust} orbit={orbit} />
         </>
       }
     >
@@ -278,7 +278,7 @@ export default function TuRitmoScreen() {
 /** A training-frequency card. The idle treatment is ALWAYS the solid
  *  bgCard + warm hairline (legibility over the cosmic backdrop); selection
  *  is layered on top as a 200 ms OPACITY crossfade rather than a binary
- *  style swap — parity with tu-ciclo's CycleCard. Three absoluteFill layers
+ *  style swap — parity with cycle's CycleCard. Three absoluteFill layers
  *  fade IN on a per-card `glow` shared value:
  *    (a) shadow layer — static magenta iOS shadow, opacity-crossfaded;
  *    (b) magenta fill 0.12;
@@ -311,7 +311,7 @@ function TrainingCard({
   }))
 
   // Glow crossfade — the selected card's magenta treatment fades IN/OUT on
-  // OPACITY (200 ms / ease-out-quad, the twin compás of tu-ciclo's card
+  // OPACITY (200 ms / ease-out-quad, the twin compás of cycle's card
   // glow). We never animate shadowRadius/shadowOpacity or border/fill colors
   // numerically; dedicated layers carry the static look and only their
   // opacity tweens.
@@ -376,7 +376,7 @@ function TrainingCard({
 
 /* ───────────────────── Full-screen star sky ────────────────────── */
 
-// Star strata — a COLD, THINNED clone of step 8's CicloSky, tinted toward
+// Star strata — a COLD, THINNED clone of step 8's CycleSky, tinted toward
 // dimension.sueno (indigo). x/y are 0→1 fractions of the screen; parallax
 // amplitude grows toward the viewer (far 2px / mid 5px / micro 9px).
 // Concentrated in the LOWER half so the depth pools under the cards, never
@@ -423,14 +423,14 @@ const DUST: {
 ]
 
 /*
- * RitmoSky — full-screen painted depth for step 9. A reduced, COLD clone of
- * step 8's CicloSky: three star strata + rising dust + a low cool wisp,
+ * RhythmSky — full-screen painted depth for step 9. A reduced, COLD clone of
+ * step 8's CycleSky: three star strata + rising dust + a low cool wisp,
  * behind the content. The stars sit in the LOWER half (the cards own the
  * top, so the sky stays a whisper there). Differential parallax (2/5/9px)
  * on the 40 s orbit clock, dust + wisp on the 18 s clock. All whisper-low
  * alphas, pointerEvents none, hidden from VoiceOver.
  *
- * THEMATIC DIFFERENCE vs CicloSky — the screen opens on "Sueño habitual",
+ * THEMATIC DIFFERENCE vs CycleSky — the screen opens on "Sueño habitual",
  * so the sky tints toward dimension.sueno (#7C8FFF indigo) instead of the
  * dimension.ciclo silver-blue: the micro-stars and the cool wisp carry the
  * indigo of sleep. The far/mid strata stay cool-neutral (slightly indigo
@@ -445,7 +445,7 @@ const DUST: {
  * every frame → jank). Gradient ids are namespaced `ritmo-*` so they cannot
  * collide with step 8's `ciclo-*` / step 3's `atrib-*` defs.
  */
-function RitmoSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
+function RhythmSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
   const SKY_W = 360
   const SKY_H = 760
 
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
   // Padding horizontal so the selected card's magenta shadow
   // (radius 14) doesn't get clipped by the ScrollView's implicit
-  // overflow:hidden. Same fix pattern as tu-ciclo + cuerpo-base.
+  // overflow:hidden. Same fix pattern as cycle + body-base.
   optionsBlock: {
     gap: 10,
     paddingHorizontal: 14,

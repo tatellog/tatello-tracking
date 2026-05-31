@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg'
 
 import {
   AtmosphericSky,
@@ -35,6 +35,7 @@ import { colors, typography } from '@/theme'
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
+const AnimatedPath = Animated.createAnimatedComponent(Path)
 
 /** A single intention option with a short, low-key descriptor. The
  *  descriptor sits below the label so each card carries actual
@@ -131,7 +132,7 @@ const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
  *   • WarmBloomField variant="exposed" — REUSED. Step 8 used
  *     'exposed-low-right', step 9 'exposed-low-left'; 'exposed' here
  *     doesn't chain with the immediate neighbour (no new variant).
- *   • IntencionSky — a warm-tinted clone of step 9's RitmoSky: the
+ *   • IntentionSky — a warm-tinted clone of step 9's RhythmSky: the
  *     micro-stars + low wisp carry magenta instead of indigo, with a
  *     SECOND smaller wisp breathing in counter-phase for painted vapor.
  *
@@ -141,16 +142,17 @@ const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
  * into it instead of clipping in a hard line. The fades use colors.bg
  * (#0A0608), never bgCard, so they read as atmosphere, not a panel.
  *
- * Four clocks. dotClock (8 s, ping-pong) drives the resting breath of
- * every IntentCard's dot. Three atmosphere clocks (5 s / 18 s / 40 s)
- * match steps 1–9's compás. All created ONCE here (one compás, no
- * duplicated shared values).
+ * Three atmosphere clocks (5 s / 18 s / 40 s) match steps 1–9's compás.
+ * All created ONCE here (one compás, no duplicated shared values). The
+ * IntentCard's checkbox does NOT breathe — a casilla reads as a static
+ * affordance — so there is no per-card "dot" clock; each card's magenta
+ * fill + check ride the card's own `glow` crossfade (see IntentCard).
  */
-export default function TuIntencionScreen() {
+export default function IntentionScreen() {
   const router = useRouter()
   // Opened from Ajustes (?source=settings) → save and pop back to
   // Settings; otherwise this is the onboarding wizard → advance to
-  // notificaciones after the acknowledgment beat.
+  // notifications after the acknowledgment beat.
   const { source } = useLocalSearchParams<{ source?: string }>()
   const fromSettings = source === 'settings'
   const { data: profile } = useProfile()
@@ -170,7 +172,7 @@ export default function TuIntencionScreen() {
   })
 
   // The screen already names itself; we drop any per-name suffix for a
-  // clean eyebrow (parity with tu-ritmo step 9).
+  // clean eyebrow (parity with rhythm step 9).
   const eyebrow = 'Tu objetivo'
 
   const canContinue = selected.length > 0
@@ -178,7 +180,7 @@ export default function TuIntencionScreen() {
   const [celebrating, setCelebrating] = useState(false)
 
   // The post-acknowledgment navigation timer. Held in a ref so it is
-  // cleared on unmount — otherwise a fast back/teardown during the 1.1 s
+  // cleared on unmount — otherwise a fast back/teardown during the ~1.4 s
   // beat would fire router.push on an unmounted screen (phantom nav).
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(
@@ -187,10 +189,6 @@ export default function TuIntencionScreen() {
     },
     [],
   )
-
-  // dotClock — slow 8 s ping-pong breath driving the resting state of
-  // every IntentCard's presence dot so the column reads as alive.
-  const dotClock = useSharedValue(0)
 
   // Atmosphere clocks — created ONCE here so every atmosphere layer
   // (WarmBloomField, star strata + dust + warm wisps) breathes on the
@@ -203,21 +201,15 @@ export default function TuIntencionScreen() {
   const orbit = useSharedValue(0)
 
   useEffect(() => {
-    dotClock.value = withRepeat(
-      withTiming(1, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    )
     clock.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
     dust.value = withRepeat(withTiming(1, { duration: 18000, easing: Easing.linear }), -1, false)
     orbit.value = withRepeat(withTiming(1, { duration: 40000, easing: Easing.linear }), -1, false)
     return () => {
-      cancelAnimation(dotClock)
       cancelAnimation(clock)
       cancelAnimation(dust)
       cancelAnimation(orbit)
     }
-  }, [dotClock, clock, dust, orbit])
+  }, [clock, dust, orbit])
 
   // Toggle in ORDER. Tap an unselected card → append (becomes the new
   // last pick; if the column was empty it also becomes the priority).
@@ -264,7 +256,7 @@ export default function TuIntencionScreen() {
         onSuccess: () => {
           navTimer.current = setTimeout(() => {
             router.push('/onboarding/about-you')
-          }, 2000)
+          }, 1400)
         },
         onError: () => setCelebrating(false),
       },
@@ -297,7 +289,7 @@ export default function TuIntencionScreen() {
             {/* 3. Painted depth — WARM MAGENTA star strata + dust + two low
                 warm wisps in counter-phase, full-screen, whisper-low, hidden
                 from VoiceOver. Tinted toward intención / fuerza. */}
-            <IntencionSky dust={dust} orbit={orbit} />
+            <IntentionSky dust={dust} orbit={orbit} />
           </>
         }
       >
@@ -348,7 +340,6 @@ export default function TuIntencionScreen() {
                     priority={isPriority}
                     dim={isAnySelected && !isSelected}
                     onPress={() => handleToggle(opt.value)}
-                    clock={dotClock}
                   />
                 )
               })}
@@ -375,13 +366,19 @@ export default function TuIntencionScreen() {
 
       {/* Acknowledgment beat — full-screen overlay (outside WizardLayout
           so it covers the safe area + CTA too). A single still bloom +
-          the phrase, NOT a celebration of the answer. The phrase keys off
-          the PRIORITY (selected[0]). Choreographed over 2.0 s:
-            t=0     veil fades in (320 ms) + body starts bloom (520 ms)
-            t=300   phrase begins to emerge from the bloom (800 ms reveal:
-                    fade + rise 10→0 + scale 0.965→1), overlapping the bloom
-            t≈1100  phrase has settled — sustained ~600 ms to be read
-            t=2000  navigation fires (overlay exit fade-out kicks in, 360 ms)
+          the phrase, NOT a celebration of the answer and NOT a fake
+          "analizando" (that's reading.tsx; at step 3 there's no data yet).
+          The phrase keys off the PRIORITY (selected[0]). A SHORT beat
+          (~1.4 s), subordinate to reading + the reveal — Stelar receives →
+          holds → releases toward the next screen:
+            t=0     veil fades in (320 ms) + body blooms (420 ms) +
+                    strata fade in behind it (depth, not process)
+            t=180   phrase emerges from the bloom (680 ms reveal: fade +
+                    rise 10→0 + scale 0.965→1), overlapping the bloom
+            t≈860   phrase has settled — sustained ~250 ms to be read
+            t=1100  release fires (300 ms): bloom + strata CONTRACT and
+                    dissolve — the gesture's exhale, not a loader
+            t=1400  navigation fires (overlay exit fade-out kicks in, 360 ms)
           The body keeps a slow breath through the moment so it doesn't
           feel frozen while the text reads. The veil is translucent so the
           atmosphere is intuited behind it. Skipped entirely from Ajustes. */}
@@ -407,7 +404,7 @@ export default function TuIntencionScreen() {
 /** One intention card. The idle treatment is ALWAYS the solid bgCard +
  *  hairline (legibility over the cosmic backdrop); selection is layered
  *  on top as a 200 ms OPACITY crossfade rather than a binary style swap
- *  — parity with tu-ritmo's TrainingCard. With multi-select, SEVERAL
+ *  — parity with rhythm's TrainingCard. With multi-select, SEVERAL
  *  cards can be `selected` (magenta glow) at once — each card reads its
  *  OWN `selected`/`priority` props, so the per-card animations are fully
  *  independent. Three absoluteFill layers fade IN on a per-card `glow`
@@ -416,8 +413,18 @@ export default function TuIntencionScreen() {
  *    (b) magenta fill 0.12;
  *    (c) magenta 1 px border.
  *  All three share the EXACT borderRadius (16) of the idle card so no
- *  corner peeks out as they fade. The scale spring, the text slide and
- *  the dot breath (on dotClock) are unchanged.
+ *  corner peeks out as they fade. The scale spring + the text slide are
+ *  unchanged.
+ *
+ *  INDICATOR — a CHECKBOX, not a radio dot: the screen is multi-select,
+ *  so the indicator is a rounded SQUARE (the shape that reads as "casilla"
+ *  vs the circle that reads as "single choice"). Idle: empty square, faint
+ *  hairline border, transparent fill. Checked: the square fills with the
+ *  card's magenta treatment + a leche check (✓) drawn as an <svg Path>,
+ *  both riding the SAME per-card `glow` crossfade that lights the whole
+ *  card — so the box ignites in lockstep with the card. The check adds a
+ *  micro scale (0.6 → 1) for life, no bounce. A checkbox does NOT breathe
+ *  (breathing would break its read as a casilla), so there is no dot clock.
  *
  *  `priority` (selected[0]) adds a micro magenta "TU PRIORIDAD" eyebrow
  *  above the card — text only, never a halo/badge — so it can sit over
@@ -435,7 +442,6 @@ function IntentCard({
   priority,
   dim,
   onPress,
-  clock,
 }: {
   option: IntentOption
   separated: boolean
@@ -443,7 +449,6 @@ function IntentCard({
   priority: boolean
   dim: boolean
   onPress: () => void
-  clock: SharedValue<number>
 }) {
   // Scale spring — the tactile bounce on selection.
   const scale = useSharedValue(1)
@@ -467,6 +472,31 @@ function IntentCard({
   }, [selected, glow])
   const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }))
 
+  // Checkbox magenta fill — the square's interior lights with the card's
+  // magenta on the SAME `glow` crossfade, so the casilla ignites in lockstep
+  // with the card. Opacity only (the fill color is static in styles).
+  const boxFillStyle = useAnimatedStyle(() => {
+    'worklet'
+    return { opacity: glow.value }
+  })
+
+  // The check (✓) — fades + micro-scales (0.6 → 1) on the SAME `glow` value.
+  // SVG transform-origin is the path's own box, so we anchor the scale at
+  // the glyph's centre via a translate-scale-translate around (10,10) in the
+  // 20×20 viewBox. No bounce — a quiet reveal, not a stamp.
+  const checkProps = useAnimatedProps(() => {
+    'worklet'
+    const s = 0.6 + glow.value * 0.4
+    // SVG transform as a STRING (react-native-svg's convention for SVG nodes,
+    // same as the drift props below) — NOT the RN array form, which svg may
+    // ignore on a <Path>, silently dropping the micro-scale. scale-about-(10,10)
+    // in the 20×20 viewBox. Numeric interpolation, never a "%" string.
+    return {
+      opacity: glow.value,
+      transform: `translate(10 10) scale(${s}) translate(-10 -10)`,
+    }
+  })
+
   // Label slides 4 px to the right when claimed.
   const textStyle = useAnimatedStyle(() => {
     'worklet'
@@ -482,20 +512,12 @@ function IntentCard({
     return { opacity: selected ? 1 : 0.92 }
   })
 
-  // Idle dots breathe; selected dots ignite + grow.
-  const dotStyle = useAnimatedStyle(() => {
+  // The idle checkbox dims when ANOTHER card is selected (0.3) — "still
+  // available if I picked wrong", not closed. Checked boxes ignore dim.
+  // Opacity only, numeric, UI-thread safe.
+  const boxStyle = useAnimatedStyle(() => {
     'worklet'
-    const b = 0.5 + 0.5 * Math.sin(clock.value * 2 * Math.PI)
-    const s = selected ? 1.25 : 1
-    // The selected dot breathes a touch deeper (×0.12) so the live answer
-    // pulses just above the resting column (still ×0.08). Numeric scale.
-    const breathDepth = selected ? 0.12 : 0.08
-    return {
-      transform: [{ scale: s * (1 + b * breathDepth) }],
-      // dim 0.30 (was 0.18): the non-selected options must read as
-      // "still available if I picked wrong", not "closed / discarded".
-      opacity: selected ? 1 : dim ? 0.3 : 0.42 + b * 0.12,
-    }
+    return { opacity: selected ? 1 : dim ? 0.3 : 0.55 }
   })
 
   // Accessibility label — the priority card appends " · tu prioridad" so
@@ -504,11 +526,11 @@ function IntentCard({
 
   return (
     <View style={separated ? styles.separatedGroup : undefined}>
-      {/* Aliento — a partial-width, ultra-faint hairline that gives card 0
+      {/* Breath — a partial-width, ultra-faint hairline that gives card 0
           its own breathing room above the sustaining block. Spacing, not a
           divider: ~40% width, centred, so it reads as breath, not a list
           split. Only rendered for the separated card. */}
-      {separated ? <View style={styles.aliento} /> : null}
+      {separated ? <View style={styles.breath} /> : null}
 
       {/* TU PRIORIDAD — micro magenta eyebrow over whichever card is the
           priority (selected[0]). Text only — NO halo/badge — so it can sit
@@ -536,9 +558,29 @@ function IntentCard({
             {/* (c) Magenta border — 1 px, crossfaded in over the hairline. */}
             <Animated.View style={[styles.cardGlowBorder, glowStyle]} pointerEvents="none" />
 
-            <Animated.View
-              style={[styles.dot, selected ? styles.dotOn : styles.dotOff, dotStyle]}
-            />
+            {/* Checkbox — rounded SQUARE (reads as casilla, multi-select).
+                Idle: empty box, faint hairline border. Checked: magenta fill
+                + leche check, both riding the per-card `glow` crossfade. The
+                square shape is what distinguishes it from a radio dot. */}
+            <Animated.View style={[styles.checkbox, boxStyle]}>
+              {/* (b') Magenta fill — crossfaded in on `glow` (same value that
+                  lights the card). borderRadius matches the box so corners
+                  don't peek as it fades. */}
+              <Animated.View style={[styles.checkboxFill, boxFillStyle]} pointerEvents="none" />
+              {/* The check (✓) — fine leche stroke, drawn as a Path with round
+                  caps/joins, fading + micro-scaling in on `glow`. */}
+              <Svg width={20} height={20} viewBox="0 0 20 20" style={styles.checkSvg}>
+                <AnimatedPath
+                  d="M5 10.5 L8.5 14 L15 6.5"
+                  stroke={colors.leche}
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  animatedProps={checkProps}
+                />
+              </Svg>
+            </Animated.View>
             <Animated.View style={[styles.textCol, textStyle]}>
               <Text style={[styles.label, selected && styles.labelOn]}>{option.label}</Text>
               <Animated.Text style={[styles.tagline, selected && styles.taglineOn, taglineStyle]}>
@@ -566,9 +608,11 @@ function IntentCard({
 function CelebrationPhrase({ text }: { text: string }) {
   const reveal = useSharedValue(0)
   useEffect(() => {
+    // Tighter to the shorter beat: emerges at t=180, settles ~t=860,
+    // leaving ~250 ms of sustained reading before the release/exit.
     reveal.value = withDelay(
-      300,
-      withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) }),
+      180,
+      withTiming(1, { duration: 680, easing: Easing.out(Easing.cubic) }),
     )
     return () => cancelAnimation(reveal)
   }, [reveal])
@@ -592,17 +636,39 @@ function CelebrationPhrase({ text }: { text: string }) {
  *  (a single RadialGradient bloom + a white-hot core), DISTILLED down
  *  from an earlier fireworks burst: no sparks, no rays, no diagonal
  *  spikes. Stelar confirms it heard the choice; it does not celebrate it
- *  (the manifesto forbids dramatising any answer, weight included). */
+ *  (the manifesto forbids dramatising any answer, weight included).
+ *
+ *  DEPTH (not process): behind the bloom sit TWO static strata on a
+ *  deeper magenta (magentaDeep #A6164A) that breathe SLOW in counter-phase
+ *  — pure painted depth so the body stops reading as flat. They are NOT
+ *  particles converging and NOT a pulsing energy ring (that would imply
+ *  Stelar is computing/analysing — it isn't; reading.tsx owns that beat).
+ *
+ *  RELEASE (the exhale): in the last ~300 ms before nav, a `release`
+ *  shared value (0 → 1) CONTRACTS the bloom + strata (×(1 − release*0.18))
+ *  and fades them out (×(1 − release)). Stelar receives → holds → lets go
+ *  toward the next screen. This makes the beat a complete GESTURE, not a
+ *  loader. The bloom stays SMALL (~50 px) — subordinate to reading's halos
+ *  (~90 px) and to the reveal: this is the minor beat. */
 const CELEB_W = 220
 const CELEB_H = 200
 const CELEB_CX = CELEB_W / 2
 const CELEB_CY = CELEB_H / 2
+// magentaDeep — a darker magenta for the depth strata so they SINK behind
+// the bloom rather than competing with it (pure magenta would read as a
+// second focal point).
+const CELEB_MAGENTA_DEEP = '#A6164A'
 
 function CelebrationBody() {
-  // Slow breath keeps the body alive during the whole 1.1 s moment.
+  // Slow breath keeps the body alive during the whole moment.
   const breath = useSharedValue(0)
-  // Bloom value rises 0 → 1 in the first 320 ms (the body grows in).
+  // Bloom value rises 0 → 1 in the first ~420 ms (the body grows in).
   const bloom = useSharedValue(0)
+  // Release rises 0 → 1 in the last ~300 ms before nav (the exhale): the
+  // bloom + strata contract and dissolve. Held as a shared value, fired by
+  // a timeout at t=1100 so it lands at t=1400 (nav). cancelAnimation + the
+  // timeout are both cleaned up.
+  const release = useSharedValue(0)
 
   useEffect(() => {
     breath.value = withRepeat(
@@ -611,30 +677,66 @@ function CelebrationBody() {
       true,
     )
     bloom.value = withTiming(1, {
-      duration: 520,
+      duration: 420,
       easing: Easing.out(Easing.cubic),
     })
+    // Fire the release ~300 ms before the t=1400 nav so the body has
+    // contracted/dissolved by the time the screen swaps.
+    const releaseTimer = setTimeout(() => {
+      release.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.quad) })
+    }, 1100)
     return () => {
       cancelAnimation(breath)
       cancelAnimation(bloom)
+      cancelAnimation(release)
+      clearTimeout(releaseTimer)
     }
-  }, [breath, bloom])
+  }, [breath, bloom, release])
 
   // Bloom — single RadialGradient circle whose radius + overall opacity
-  // ride bloom (entrance) + breath (ongoing).
+  // ride bloom (entrance) + breath (ongoing), then contract + fade on release.
   const bloomProps = useAnimatedProps(() => {
     'worklet'
     const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
+    const contract = 1 - release.value * 0.18
+    const fade = 1 - release.value
     return {
-      r: 24 + bloom.value * 26 + b * 3,
-      opacity: 0.45 + bloom.value * 0.45 + b * 0.06,
+      r: (24 + bloom.value * 26 + b * 3) * contract,
+      opacity: (0.45 + bloom.value * 0.45 + b * 0.06) * fade,
     }
   })
   const coreProps = useAnimatedProps(() => {
     'worklet'
     const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
+    const contract = 1 - release.value * 0.18
     return {
-      r: 3.4 + bloom.value * 2.2 + b * 0.3,
+      r: (3.4 + bloom.value * 2.2 + b * 0.3) * contract,
+      opacity: 1 - release.value,
+    }
+  })
+
+  // Stratum 1 — outer depth layer. Enters with the bloom (0 → 0.55),
+  // breathes slow IN-phase, contracts + dissolves on release.
+  const strata1Props = useAnimatedProps(() => {
+    'worklet'
+    const b = 0.5 + 0.5 * Math.sin(breath.value * 2 * Math.PI)
+    const contract = 1 - release.value * 0.18
+    const fade = 1 - release.value
+    return {
+      r: (70 + b * 4) * contract,
+      opacity: bloom.value * 0.55 * fade,
+    }
+  })
+  // Stratum 2 — inner depth layer. Breathes in COUNTER-PHASE (1 − sin) to
+  // stratum 1 so the depth shifts slowly without ever pulsing as a ring.
+  const strata2Props = useAnimatedProps(() => {
+    'worklet'
+    const b = 0.5 - 0.5 * Math.sin(breath.value * 2 * Math.PI)
+    const contract = 1 - release.value * 0.18
+    const fade = 1 - release.value
+    return {
+      r: (48 + b * 3) * contract,
+      opacity: bloom.value * 0.4 * fade,
     }
   })
 
@@ -651,10 +753,32 @@ function CelebrationBody() {
           <Stop offset="40%" stopColor={colors.magenta} stopOpacity={0.26} />
           <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
         </RadialGradient>
+        {/* Depth strata — deeper magenta, falls off to nothing. Painted
+            depth behind the bloom, not a focal point. */}
+        <RadialGradient id="celeb-strata" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor={CELEB_MAGENTA_DEEP} stopOpacity={0.22} />
+          <Stop offset="55%" stopColor={CELEB_MAGENTA_DEEP} stopOpacity={0.08} />
+          <Stop offset="100%" stopColor={CELEB_MAGENTA_DEEP} stopOpacity={0} />
+        </RadialGradient>
       </Defs>
 
+      {/* Depth strata — painted BEHIND the bloom (drawn first) so they
+          sink. Two slow counter-phase layers → depth, never a process ring. */}
+      <AnimatedCircle
+        cx={CELEB_CX}
+        cy={CELEB_CY}
+        fill="url(#celeb-strata)"
+        animatedProps={strata1Props}
+      />
+      <AnimatedCircle
+        cx={CELEB_CX}
+        cy={CELEB_CY}
+        fill="url(#celeb-strata)"
+        animatedProps={strata2Props}
+      />
+
       {/* Atmospheric bloom — RadialGradient-filled circle, no ring edges.
-          Radius pulses with breath. */}
+          Radius pulses with breath, contracts + fades on release. */}
       <AnimatedCircle
         cx={CELEB_CX}
         cy={CELEB_CY}
@@ -675,13 +799,13 @@ function CelebrationBody() {
 
 /* ───────────────────── Full-screen star sky ────────────────────── */
 
-// Star strata — a WARM clone of step 9's RitmoSky, tinted toward magenta
+// Star strata — a WARM clone of step 9's RhythmSky, tinted toward magenta
 // (intención / fuerza). x/y are 0→1 fractions of the screen; parallax
 // amplitude grows toward the viewer (far 2px / mid 5px / micro 9px).
 // Concentrated in the LOWER half so the depth pools under the cards,
 // never behind their text. The band is held to y≥0.58 (same as step 9)
 // so a xMidYMid slice on a tall viewport keeps stars clear of the stack.
-// Alphas are IDENTICAL to RitmoSky's — only the tint changed.
+// Alphas are IDENTICAL to RhythmSky's — only the tint changed.
 const FAR_STARS: { x: number; y: number; r: number; opacity: number }[] = [
   { x: 0.1, y: 0.58, r: 0.6, opacity: 0.1 },
   { x: 0.92, y: 0.6, r: 0.7, opacity: 0.12 },
@@ -723,19 +847,19 @@ const DUST: {
 ]
 
 /*
- * IntencionSky — full-screen painted depth for step 10. A WARM clone of
- * step 9's RitmoSky: three star strata + rising dust + two low warm wisps,
+ * IntentionSky — full-screen painted depth for step 10. A WARM clone of
+ * step 9's RhythmSky: three star strata + rising dust + two low warm wisps,
  * behind the content. The stars sit in the LOWER half (the cards own the
  * top, so the sky stays a whisper there). Differential parallax (2/5/9px)
  * on the 40 s orbit clock, dust + wisps on the 18 s clock. All whisper-low
  * alphas, pointerEvents none, hidden from VoiceOver.
  *
- * THEMATIC DIFFERENCE vs RitmoSky — the screen is about intención /
+ * THEMATIC DIFFERENCE vs RhythmSky — the screen is about intención /
  * fuerza, so the sky tints toward magenta (colors.magenta) instead of
  * dimension.sueno indigo: the micro-stars and the low wisps carry magenta;
  * the far stratum is magenta very faintly; the mid stratum is a warm
  * cream-neutral (#E8D9DD) so the field reads quiet, not neon. Alphas are
- * UNCHANGED from RitmoSky — only the tint moved.
+ * UNCHANGED from RhythmSky — only the tint moved.
  *
  * WARM WISPS — a wide-and-low primary magenta ellipse at cy ~0.66 that
  * breathes 0.04↔0.06 on the dust clock, plus a SMALLER, fainter second
@@ -748,7 +872,7 @@ const DUST: {
  * every frame → jank). Gradient ids are namespaced `intencion-*` so they
  * cannot collide with step 9's `ritmo-*` / step 8's `ciclo-*` defs.
  */
-function IntencionSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
+function IntentionSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
   const SKY_W = 360
   const SKY_H = 760
 
@@ -960,10 +1084,10 @@ const styles = StyleSheet.create({
   separatedGroup: {
     marginTop: 18,
   },
-  // Aliento — partial-width, ultra-faint hairline above the separated card.
+  // Breath — partial-width, ultra-faint hairline above the separated card.
   // ~40% width, centred, half-strength hairline. Reads as breath, not a
   // divider that splits the list in two.
-  aliento: {
+  breath: {
     alignSelf: 'center',
     width: '40%',
     height: 1,
@@ -1027,21 +1151,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.magenta,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  // Checkbox — rounded SQUARE so it reads as a casilla (multi-select), not a
+  // radio dot. Idle: transparent fill + faint hairline border. The magenta
+  // fill + the check ride the per-card `glow` crossfade (layered children).
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
     marginRight: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 236, 222, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  dotOff: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-  },
-  dotOn: {
+  // Magenta fill of the checked box — crossfaded in on `glow`. Sits behind
+  // the check; borderRadius slightly tighter than the box so it tucks inside
+  // the 1 px border.
+  checkboxFill: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 5,
     backgroundColor: colors.magenta,
-    shadowColor: colors.magenta,
-    shadowOpacity: 0.95,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
+  },
+  // The check SVG overlays the box, centred.
+  checkSvg: {
+    position: 'absolute',
   },
   textCol: {
     flex: 1,
@@ -1072,14 +1206,16 @@ const styles = StyleSheet.create({
     color: '#F4ABC8',
   },
   /* Acknowledgment overlay — translucent veil so the atmosphere is
-     intuited behind it. Bumped 0.82 → 0.84 for a touch more focus on the
-     phrase. */
+     intuited behind it. Lowered 0.84 → 0.72 so the IntentionSky (stars /
+     wisps / dust already painted behind) is intuited through the veil →
+     depth, not flat black. (If the cards distract too much at 0.72, bump
+     to 0.76 — no higher.) */
   celebOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 36,
-    backgroundColor: 'rgba(10, 6, 8, 0.84)',
+    backgroundColor: 'rgba(10, 6, 8, 0.72)',
   },
   celebInner: {
     alignItems: 'center',

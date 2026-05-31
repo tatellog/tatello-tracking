@@ -7,6 +7,7 @@ import { useBriefContext } from '@/features/brief/hooks'
 import { DayOneTask, WizardBackdrop } from '@/features/onboarding/components'
 import { type MonthlyFocus } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { LunarConstellation } from '@/features/tabs/components/constellation/LunarConstellation'
 import { ZODIAC, ZodiacFigure, zodiacFromDate, type ZodiacSign } from '@/features/tabs/zodiac'
 import { markVisitedDayOne } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
@@ -19,10 +20,6 @@ const TASKS: { num: number; text: string }[] = [
   {
     num: 2,
     text: 'Marca tu primer entreno cuando lo termines, aunque sea caminar.',
-  },
-  {
-    num: 3,
-    text: 'Vuelve mañana. El segundo día de lectura es donde Stelar empieza a verte.',
   },
 ]
 
@@ -44,9 +41,23 @@ const FOCUS_RECAP: Record<MonthlyFocus, string> = {
  * Día 1 — the bridge between the wizard and the real Home. After
  * the reveal's cosmic moment, this page used to break the spell
  * with a light pearl theme. Now it stays in the same dark+magenta
- * register as the rest of onboarding, opens with a recap card that
- * names back what Stelar captured (sunk-cost validation), then the
- * 3 small tasks for tomorrow.
+ * register as the rest of onboarding, opens with the SAME progress
+ * constellation the user will see every day in the Hoy tab — now
+ * with its FIRST star lit (today) and the next one pulsing — then a
+ * recap card that names back what Stelar captured (sunk-cost
+ * validation), then the small tasks for today.
+ *
+ * THE OPEN LOOP (illustrator-specialist spec): the reveal's
+ * ceremony formed the sign's constellation and let it sink; Día 1
+ * RECOVERS it as the live progress system. We MOUNT the real
+ * <LunarConstellation> (the same component the tab renders) with
+ * `trained=[true, …27×false]`, `todayIdx=0`, `committed=false`. The
+ * `committed=false` is CRITICAL: it keeps the "next star" affordance
+ * alive (the magenta halo that breathes around tomorrow's point) —
+ * that pulsing next star IS the open loop, the reason to come back
+ * mañana. `showCount=false` hides the "1/28" chip: a big count on
+ * day one reads as "you're missing 27" = debt (manifiesto-prohibido);
+ * the visual loop carries the meaning instead.
  *
  * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
  * SCREEN (its own <WizardBackdrop />, opaque colors.bg base) so the
@@ -71,6 +82,27 @@ export default function DayOneScreen() {
 
   const firstName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
+  // Signo zodiacal — SAME derivation as the reveal (zodiacFromDate over
+  // date_of_birth). We gate the whole constellation render on it: if
+  // there's no birth date we never invent a sign (the reveal doesn't
+  // either), and Día 1 falls back to its prior layout (no constellation)
+  // without breaking.
+  const sign: ZodiacSign | null = useMemo(
+    () => (profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null),
+    [profile?.date_of_birth],
+  )
+
+  // The 28-day grid with ONLY today (index 0) lit — the first star of the
+  // cycle. Memoized with an empty dep so the array reference is stable
+  // across re-renders (LunarConstellation memoizes its derived progress on
+  // `trained`'s reference; a fresh array each render would invalidate the
+  // whole downstream tree — see docs/perf/lunar-constellation-audit.md).
+  const trained = useMemo<boolean[]>(() => [true, ...Array<boolean>(27).fill(false)], [])
+
+  const constellationA11yLabel = sign
+    ? `Tu constelación de ${ZODIAC[sign].label}: tu primera estrella encendida, la próxima esperándote`
+    : undefined
+
   const handleEnter = async () => {
     await markVisitedDayOne()
     router.replace('/(tabs)')
@@ -85,8 +117,8 @@ export default function DayOneScreen() {
   const recapLines = useMemo<Row[]>(() => {
     const out: Row[] = []
     if (profile?.date_of_birth) {
-      const sign = zodiacFromDate(profile.date_of_birth)
-      out.push({ label: 'TU SIGNO', value: ZODIAC[sign].label, zodiac: sign })
+      const s = zodiacFromDate(profile.date_of_birth)
+      out.push({ label: 'TU SIGNO', value: ZODIAC[s].label, zodiac: s })
     }
     if (
       profile?.cycle_situation === 'menstruates' ||
@@ -119,7 +151,37 @@ export default function DayOneScreen() {
         <Text style={styles.title}>
           {firstName}, <Text style={styles.titleEm}>hoy empieza</Text>.
         </Text>
-        <Text style={styles.sub}>Tres pasos para que Stelar arme su primera lectura.</Text>
+
+        {/* The open loop — the SAME progress constellation the Hoy tab
+            shows, recovered from the reveal with its FIRST star lit.
+            committed=false keeps the next star pulsing (the reason to
+            return); showCount=false hides the "1/28" chip so no number
+            reads as debt. Contained to ~64% width — the component is
+            width:100% of its parent, so we size it via the wrapper, not
+            the component. Only when we actually have a derived sign. */}
+        {sign ? (
+          <View
+            style={styles.constellation}
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={constellationA11yLabel}
+          >
+            <LunarConstellation
+              sign={sign}
+              trained={trained}
+              todayIdx={0}
+              committed={false}
+              showCount={false}
+            />
+          </View>
+        ) : null}
+
+        {/* Coach line (serif italic) — names the loop the constellation
+            just made visible: one star lit, the next waiting. */}
+        <Text style={styles.sub}>
+          Encendiste tu primera estrella. Mañana enciendes la siguiente, y tu cielo empieza a tomar
+          forma.
+        </Text>
 
         {/* Recap — "Stelar ya sabe esto de vos". Validates the 11
             wizard inputs by naming them back as facts Stelar holds. */}
@@ -212,6 +274,15 @@ const styles = StyleSheet.create({
     fontSize: 34,
     color: colors.magenta,
     letterSpacing: -1,
+  },
+  // The recovered progress constellation — centred + contained so the
+  // component (width:100% of parent) reads as a portrait, not a full-bleed
+  // canvas. Sits between the title and the coach line.
+  constellation: {
+    alignSelf: 'center',
+    width: '64%',
+    marginTop: 8,
+    marginBottom: 18,
   },
   sub: {
     marginTop: 12,

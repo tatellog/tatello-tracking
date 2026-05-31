@@ -5,6 +5,8 @@ _Documento maestro · fuente única de verdad sobre qué es Stelar_
 _Versión 3.0 · Mayo 2026_
 _Cambio principal vs v2.0: foco quirúrgico en pérdida de peso, lenguaje legalmente más conservador, separación de 3 capas de comunicación._
 
+> Este documento es el **QUÉ** (identidad, principios, líneas rojas). El **CÓMO** (estrategia de implementación) vive en specs DERIVADAS, en `docs/`: retención (`retention-mechanics-spec.md`), Voz del ciclo (`cycle-voice-spec.md`), órbita (`tu-orbita-design.md`), arte de la constelación (`constellation-art-brief.md`). Las specs citan este manifiesto; no lo reemplazan.
+
 ---
 
 ## La frase que lo resume todo

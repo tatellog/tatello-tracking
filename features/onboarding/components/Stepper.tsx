@@ -20,8 +20,8 @@ type Props = {
   decimals?: number
   /**
    * Display font size of the big value. Defaults to 72 — the original
-   * hero size, preserved EXACTLY for tu-ritmo / sueño (which never pass
-   * this). tu-ciclo passes a smaller value (48) because cycle length is
+   * hero size, preserved EXACTLY for rhythm / sueño (which never pass
+   * this). cycle passes a smaller value (48) because cycle length is
    * a secondary datum, not the screen's headline. The value's lineHeight,
    * the value-wrap minWidth and the unit's italic size all DERIVE from
    * this so the proportions stay balanced at any size.
@@ -31,7 +31,7 @@ type Props = {
 
 // The original hero size. When valueSize === DEFAULT_VALUE_SIZE every
 // derived metric below collapses to the historical literals, so the
-// two existing consumers (tu-ritmo, sueño) render byte-identically.
+// two existing consumers (rhythm, sueño) render byte-identically.
 const DEFAULT_VALUE_SIZE = 72
 
 /*
@@ -50,7 +50,7 @@ const DEFAULT_VALUE_SIZE = 72
  *
  * LABEL (uxui override #5): the label is sentence-case Hanken upright
  * (uiMedium, letterSpacing ~0.2, bone), a clear human field label — not
- * uppercase technical tracking. tu-ritmo passes label="" so this is
+ * uppercase technical tracking. rhythm passes label="" so this is
  * invisible there; the label COPY is the caller's (pending behavioral /
  * voice-and-copy sign-off).
  */
@@ -87,7 +87,7 @@ export function Stepper({
 
   return (
     <View style={styles.wrap}>
-      {/* Always render the label node (even when empty) so tu-ritmo —
+      {/* Always render the label node (even when empty) so rhythm —
           which passes label="" — keeps its exact previous layout (the
           wrap's gap:14 already accounted for this empty Text). */}
       <Text style={styles.label}>{label}</Text>

@@ -87,13 +87,15 @@ const FOCUS_VERB: Record<MonthlyFocus, string> = {
 }
 
 /*
- * Step 12 — Reveal. The emotional peak of the wizard. Marks
- * onboarding_completed_at (RouteGuard then lets the user into
- * /(tabs)) and shows the first personalised Voz de Stelar.
+ * Reveal — the "Tu cielo" ceremony, the emotional peak of the wizard
+ * (analytics step 10). Marks onboarding_completed_at (RouteGuard then
+ * lets the user into /(tabs)) and shows the first personalised Voz de
+ * Stelar.
  *
  * UX REFINEMENT (audit + usuaria): the reveal is the PEAK — "llegaste".
- * The 12/12 progress bar is hidden here (WizardLayout showProgress=false)
- * so nothing meters the moment. The eyebrow "Tu cielo en Stelar" is
+ * The progress bar is hidden here (WizardLayout showProgress=false) so
+ * nothing meters the moment — the bar already closed on rhythm with
+ * "Tu cielo" still pending, so the ceremony IS that pending phase. The eyebrow "Tu cielo en Stelar" is
  * CENTRED right above the art (StepHeader align="center") so it reads as
  * the art's title, not a top-left label. And the "QUÉ SIGUE" expectation
  * block MOVED to Día 1 — the reveal now closes on three clean beats:
@@ -341,7 +343,7 @@ export default function RevealScreen() {
   const auraBreath = useSharedValue(0)
 
   // Atmosphere clocks — created ONCE here, shared by every atmosphere
-  // layer so the background breathes on one compás (mirrors tu-base):
+  // layer so the background breathes on one compás (mirrors baseline):
   //   skyClock   5 s  magenta dust drift
   //   skyOrbit  40 s  star-strata parallax + ceremonial halo rotation
   const skyClock = useSharedValue(0)
@@ -597,7 +599,7 @@ export default function RevealScreen() {
       // Día 1 re-fetches the profile on mount — transient patch failure
       // doesn't strand the user here.
     }
-    router.replace('/onboarding/notificaciones')
+    router.replace('/onboarding/notifications')
   }
 
   // A11Y — announce WHAT was revealed (the SVG stage is otherwise
@@ -606,8 +608,7 @@ export default function RevealScreen() {
 
   return (
     <WizardLayout
-      step={12}
-      totalSteps={12}
+      step={10}
       // No back: the data is saved; there is nothing to edit behind this.
       showBack={false}
       // The reveal is the PEAK — hide the 12/12 meter so nothing measures
@@ -2206,7 +2207,7 @@ function ConstellationLine({
 
 /*
  * RevealSky — local volumetric depth behind the constellation. UNCHANGED
- * by the ceremony redesign. Mirrors tu-base.tsx's BaseSky tuned for the
+ * by the ceremony redesign. Mirrors baseline.tsx's BaseSky tuned for the
  * reveal: all strata <0.32, central band clear, dust MAGENTA on the 5 s
  * clock, slow parallax on the 40 s orbit. Gradient ids `reveal-sky-*`.
  */

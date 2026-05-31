@@ -21,7 +21,7 @@ import { colors, typography } from '@/theme'
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 /*
- * Build-up screen — sits between the last question (notificaciones)
+ * Build-up screen — sits between the last question (notifications)
  * and the reveal (appointment). 11 wizard pages of input deserve a
  * dramatic "Stelar is now reading you" moment instead of an instant
  * cut to the reveal. This screen holds for ~2.8 seconds with a
@@ -37,15 +37,15 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  * breath is shared via WizardPresenceContext so it never restarts.
  */
 const PHASES = [
-  'Leyendo tu primera lectura',
-  'Cruzando tus señales',
-  'Encontrando lo que se mueve',
+  'Preparando tu cielo',
+  'Trazando tu punto de partida',
+  'Encendiendo tu primera estrella',
 ] as const
 
 const TOTAL_DURATION_MS = 2800
 const PHASE_DURATION_MS = Math.floor(TOTAL_DURATION_MS / PHASES.length)
 
-export default function LeyendoScreen() {
+export default function ReadingScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const [phaseIdx, setPhaseIdx] = useState(0)
@@ -137,7 +137,7 @@ function BuildingStar({ clock }: { clock: SharedValue<number> }) {
   return (
     <Svg width={280} height={280} viewBox="0 0 280 280">
       <Defs>
-        <RadialGradient id="leyendo-core" cx="50%" cy="50%" r="60%">
+        <RadialGradient id="reading-core" cx="50%" cy="50%" r="60%">
           <Stop offset="0%" stopColor="#FFFFFF" />
           <Stop offset="40%" stopColor="#FBD7E3" />
           <Stop offset="100%" stopColor="#9A2150" />
@@ -146,7 +146,7 @@ function BuildingStar({ clock }: { clock: SharedValue<number> }) {
       <AnimatedCircle animatedProps={outerProps} cx={CX} cy={CY} fill={colors.magenta} />
       <AnimatedCircle animatedProps={midProps} cx={CX} cy={CY} fill={colors.magenta} />
       <AnimatedCircle animatedProps={innerProps} cx={CX} cy={CY} fill={colors.magenta} />
-      <AnimatedCircle animatedProps={coreProps} cx={CX} cy={CY} fill="url(#leyendo-core)" />
+      <AnimatedCircle animatedProps={coreProps} cx={CX} cy={CY} fill="url(#reading-core)" />
     </Svg>
   )
 }

@@ -42,17 +42,17 @@ const OPTIONS: readonly ReadingOption[] = [
   {
     value: 'morning',
     label: 'En la mañana',
-    description: 'Para arrancar el día con tu lectura',
+    description: 'Para abrir el día mirando tu cielo',
   },
   {
     value: 'midday',
     label: 'Al mediodía',
-    description: 'Un check-in en la mitad del día',
+    description: 'Una pausa para volver a tu cielo',
   },
   {
     value: 'evening',
     label: 'Antes de dormir',
-    description: 'Para cerrar el día con Stelar',
+    description: 'Para cerrar el día bajo tu cielo',
   },
   {
     // "Aún no" is a LEGITIMATE preference, not a skip / opt-out. It is the
@@ -101,7 +101,7 @@ const OPTIONS: readonly ReadingOption[] = [
  * COPY NOTE: "Activar mi lectura" + the priming micro-copy are PENDING
  * behavioral / voice-and-copy sign-off (next in the chain). Kept clean.
  */
-export default function NotificacionesScreen() {
+export default function NotificationsScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
@@ -111,7 +111,7 @@ export default function NotificacionesScreen() {
   const [requestingPermission, setRequestingPermission] = useState(false)
 
   // The screen already names itself; no per-name suffix (parity with
-  // tu-intencion / tu-ritmo).
+  // intention / rhythm).
   const eyebrow = 'Cuando quieras'
 
   const canContinue = window !== null
@@ -190,7 +190,7 @@ export default function NotificacionesScreen() {
         }
       }
       await updateProfile.mutateAsync({ notification_window: window })
-      router.push('/onboarding/atribucion')
+      router.push('/onboarding/attribution')
     } catch (err) {
       // Permission errors are not blocking — we save the preference either
       // way so the user reaches reveal and Settings can resurface the ask.
@@ -200,7 +200,7 @@ export default function NotificacionesScreen() {
       } catch {
         // Soft failure on the profile patch; reveal re-fetches.
       }
-      router.push('/onboarding/atribucion')
+      router.push('/onboarding/attribution')
     } finally {
       setRequestingPermission(false)
     }
@@ -231,7 +231,7 @@ export default function NotificacionesScreen() {
               warm wisps in counter-phase, full-screen, whisper-low, hidden
               from VoiceOver. NO focal anchor star (parity: no answer is
               celebrated with an astro). */}
-          <NotificacionesSky dust={dust} orbit={orbit} />
+          <NotificationsSky dust={dust} orbit={orbit} />
         </>
       }
     >
@@ -314,7 +314,7 @@ export default function NotificacionesScreen() {
 
 /* ─────────────────────── ReadingCard ─────────────────────── */
 
-/** One reading-window card — a LOCAL clone of tu-intencion's IntentCard
+/** One reading-window card — a LOCAL clone of intention's IntentCard
  *  (the shared SelectableCard is deliberately NOT touched). The idle
  *  treatment is ALWAYS the solid bgCard + hairline (legibility over the
  *  cosmic backdrop); selection is layered on top as a 200 ms OPACITY
@@ -429,7 +429,7 @@ function ReadingCard({
 
 /* ───────────────────── Full-screen star sky ────────────────────── */
 
-// Star strata — a WARM clone of tu-intencion's IntencionSky, tinted toward
+// Star strata — a WARM clone of intention's IntentionSky, tinted toward
 // magenta. x/y are 0→1 fractions of the screen; parallax amplitude grows
 // toward the viewer (far 2px / mid 5px / micro 9px). Concentrated in the
 // LOWER half so the depth pools under the cards, never behind their text.
@@ -478,8 +478,8 @@ const DUST: {
 ]
 
 /*
- * NotificacionesSky — full-screen painted depth for step 11. A WARM clone
- * of tu-intencion's IntencionSky: three star strata + rising dust + two low
+ * NotificationsSky — full-screen painted depth for step 11. A WARM clone
+ * of intention's IntentionSky: three star strata + rising dust + two low
  * warm wisps, behind the content. The stars sit in the LOWER half (the
  * cards own the top, so the sky stays a whisper there). Differential
  * parallax (2/5/9px) on the 40 s orbit clock, dust + wisps on the 18 s
@@ -499,7 +499,7 @@ const DUST: {
  * frame → jank). Gradient ids are namespaced `notif-*` so they cannot collide
  * with step 10's `intencion-*` / earlier defs.
  */
-function NotificacionesSky({
+function NotificationsSky({
   dust,
   orbit,
 }: {

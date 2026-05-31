@@ -91,7 +91,7 @@ function toISODate(d: Date): string {
  * LABEL (uxui override #5): the label is sentence-case Hanken upright
  * (uiMedium, letterSpacing ~0.2, bone) — a clear, human field label, NOT
  * uppercase technical tracking. Sensitive themes (e.g. menstruation in
- * tu-ciclo) read warmer this way. COPY of the label string itself is the
+ * cycle) read warmer this way. COPY of the label string itself is the
  * caller's responsibility (pending behavioral / voice-and-copy sign-off).
  */
 export function DateField({

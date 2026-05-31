@@ -34,7 +34,7 @@ export type MacroInputs = {
   /** YYYY-MM-DD, from profiles.date_of_birth — drives age in years */
   date_of_birth: string | null
   biological_sex: BiologicalSex | null
-  /** Replaces the legacy `goal` enum. The wizard's tu-intencion step
+  /** Replaces the legacy `goal` enum. The wizard's intention step
    *  collects this; we derive the kcal / protein deltas internally. */
   monthly_focus: MonthlyFocus | null
   training_frequency: TrainingFrequency | null

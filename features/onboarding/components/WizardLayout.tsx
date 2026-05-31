@@ -27,7 +27,7 @@ type Props = {
   ctaPill?: boolean
   /** Pass-through CTA variant (default `primary`). Lets a step opt the
    *  shared CTA into the calmer `soft` language used by welcome /
-   *  que-hace without each step re-implementing the footer. Default
+   *  what-it-does without each step re-implementing the footer. Default
    *  undefined → PrimaryCta's own default (`primary`), so the other
    *  nine wizard steps are unaffected. */
   ctaVariant?: CtaVariant
@@ -35,11 +35,13 @@ type Props = {
    *  for a sentence-case label. Default undefined → PrimaryCta's own
    *  default, so the other nine steps are unaffected. */
   ctaTransform?: CtaTransform
-  /** Show the wizard progress bar (12/12). Default `true` so the eleven
-   *  data-collection steps are unaffected. The reveal (step 12) passes
-   *  `false`: the "llegaste al cielo" peak shouldn't carry a progress
-   *  meter. When false we render an equivalent top spacer so the content
-   *  below doesn't jump up. */
+  /** Show the wizard progress bar. Default `true` so the spine's
+   *  data-collection steps (welcome → rhythm) carry it. The
+   *  post-rhythm / ceremony screens (reveal, notifications,
+   *  attribution) pass `false`: the "llegaste al cielo" peak shouldn't
+   *  carry a progress meter — by then the bar has already closed on
+   *  rhythm with the "Tu cielo" phase still pending. When false we
+   *  render an equivalent top spacer so the content below doesn't jump. */
   showProgress?: boolean
   /** Optional full-screen atmosphere, mounted in absoluteFill JUST
    *  AFTER the backdrop and BEHIND the content (pointerEvents none).

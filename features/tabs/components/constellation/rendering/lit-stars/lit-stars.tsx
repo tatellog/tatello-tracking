@@ -23,6 +23,7 @@ export function StarsLayer({
   starRecency,
   breathT,
   starDepth,
+  reduce,
 }: {
   stars: Resolved[]
   litKeys: Set<string>
@@ -44,6 +45,16 @@ export function StarsLayer({
    *  breath ripples outward from the alpha instead of firing in
    *  unison. */
   starDepth: Map<number, number>
+  /** iOS "Reducir movimiento". Passed by PROP (never read via a hook
+   *  inside this .map) to the per-star loops that can't derive a
+   *  static rest from the parked clocks: NextStar's breathing halo
+   *  rests VISIBLE at its high end ("te espera"), TodayRing rests
+   *  visible without rotating, and the rising spark particles (pure
+   *  ambient) are suppressed. The star body's breath/halo rest via the
+   *  parked t/breathT clocks, but its twinkle is also forced to full
+   *  brightness inside the worklet (a parked t leaves some indices
+   *  dimmed mid-dip). */
+  reduce: boolean
 }) {
   return (
     <>
@@ -51,7 +62,7 @@ export function StarsLayer({
         const isLit = litKeys.has(`star-${i}`)
         const isNext = nextEl?.type === 'star' && nextEl.idx === i
         if (ignitingKey === `star-${i}`) return null
-        if (isNext) return <NextStar key={`s-${i}`} s={s} t={t} />
+        if (isNext) return <NextStar key={`s-${i}`} s={s} t={t} reduce={reduce} />
         if (isLit) {
           const recency = starRecency.get(i) ?? 0
           const depth = starDepth.get(i) ?? 0
@@ -66,6 +77,7 @@ export function StarsLayer({
               recency={recency}
               breathT={breathT}
               depth={depth}
+              reduce={reduce}
             />
           )
         }
@@ -80,7 +92,7 @@ export function StarsLayer({
  * sees a clock running. The actual sigilo layout (outer ring +
  * ticks rotating CCW, inner dashed ring rotating CW, plus a wish-
  * countdown pulse ring) is described inline below. */
-function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
+function NextStar({ s, t, reduce }: { s: Resolved; t: SharedValue<number>; reduce: boolean }) {
   const baseR = starRadius(s.mag) + 0.5
 
   // Soft breath halo telegraphing "this is the next ignition" —
@@ -89,9 +101,15 @@ function NextStar({ s, t }: { s: Resolved; t: SharedValue<number> }) {
   // now: a single warm magenta halo whose alpha + radius gently
   // swell once every ~3 s, plus the central StarSparkle tinted
   // magenta so the eye still finds the slot.
+  //
+  // REDUCED MOTION: the halo MUST stay legible as "próxima / te
+  // espera", so it rests at the SWELL'S HIGH END (u = 1 → r = baseR
+  // + 10, opacity 0.40) instead of disappearing — it simply stops
+  // breathing. `reduce` is a constant prop captured as a worklet
+  // closure scalar (the reveal reads its `instant` flag the same way).
   const breathProps = useAnimatedProps(() => {
     'worklet'
-    const u = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * (8 / 3))
+    const u = reduce ? 1 : 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * (8 / 3))
     return {
       r: baseR + 4 + u * 6,
       opacity: 0.18 + 0.22 * u,
@@ -121,6 +139,7 @@ function LitStar({
   recency,
   breathT,
   depth,
+  reduce,
 }: {
   s: Resolved
   i: number
@@ -146,6 +165,14 @@ function LitStar({
   /** BFS distance from the alpha through the figure graph. 0 means
    *  this star is the alpha. Used to offset its breath window. */
   depth: number
+  /** iOS "Reducir movimiento". The body breath/halo rest at their high
+   *  end via the parked t/breathT clocks, but the twinkle CANNOT rest
+   *  from a parked t alone: `twinkleCycle = (t·2.4 + i·0.31) % 1` lands
+   *  in the dip window (<0.08) for some star indices, leaving those
+   *  stars dimmed (~0.65). So `starProps` branches on this flag to force
+   *  full body brightness; the flag also gates TodayRing's rotation and
+   *  suppresses the rising spark particles (ambient). */
+  reduce: boolean
 }) {
   const baseR = starRadius(s.mag) + 0.5
   const r = baseR * (1 + intensity * 0.18)
@@ -211,15 +238,20 @@ function LitStar({
     const scale = 1 + wave * 0.1
 
     // Twinkle: t cycles 0..1 every 8 s; ×2.4 ⇒ ~3.3 s per twinkle.
-    // Per-star phase keeps the field asynchronous.
-    const twinkleCycle = (t.value * 2.4 + i * 0.31) % 1
+    // Per-star phase keeps the field asynchronous. Under reduce-motion
+    // `t` is parked, and for some indices `twinkleCycle` would land in
+    // the dip window — so we force full brightness instead of letting
+    // those stars rest mid-flicker.
     let twinkleOp = 1
-    if (twinkleCycle < 0.04) {
-      // Fast dim down (0 → 165 ms-ish at 4 % of 3.3 s).
-      twinkleOp = 1 - (twinkleCycle / 0.04) * 0.35
-    } else if (twinkleCycle < 0.08) {
-      // Fast recover back to full brightness.
-      twinkleOp = 0.65 + ((twinkleCycle - 0.04) / 0.04) * 0.35
+    if (!reduce) {
+      const twinkleCycle = (t.value * 2.4 + i * 0.31) % 1
+      if (twinkleCycle < 0.04) {
+        // Fast dim down (0 → 165 ms-ish at 4 % of 3.3 s).
+        twinkleOp = 1 - (twinkleCycle / 0.04) * 0.35
+      } else if (twinkleCycle < 0.08) {
+        // Fast recover back to full brightness.
+        twinkleOp = 0.65 + ((twinkleCycle - 0.04) / 0.04) * 0.35
+      }
     }
 
     const ambient = (0.85 + 0.15 * wave) * twinkleOp
@@ -310,25 +342,30 @@ function LitStar({
       <Circle cx={s.x} cy={s.y} r={Math.max(0.5, r * 0.16)} fill="#FFF1D6" opacity={0.75} />
       {/* Today's star ring — only renders when this is the star
           marked TODAY. Visual tie between the coach copy and the
-          figure. */}
-      {recency === 0 ? <TodayRing cx={s.x} cy={s.y} r={r} t={t} /> : null}
+          figure. Rests visible (no rotation) under reduce-motion. */}
+      {recency === 0 ? <TodayRing cx={s.x} cy={s.y} r={r} t={t} reduce={reduce} /> : null}
       {/* Cream sparks drifting up from the star — particles. Hero
-          + today's star emit double. */}
-      <StarParticles
-        cx={s.x}
-        cy={s.y}
-        r={r}
-        t={t}
-        seed={i}
-        emit={isHero || recency === 0 ? 2 : 1}
-      />
+          + today's star emit double. Pure ambient: suppressed under
+          reduce-motion (a parked t would freeze them mid-rise); the
+          star stays fully legible without them. */}
+      {reduce ? null : (
+        <StarParticles
+          cx={s.x}
+          cy={s.y}
+          r={r}
+          t={t}
+          seed={i}
+          emit={isHero || recency === 0 ? 2 : 1}
+        />
+      )}
     </G>
   )
 }
 
 /* Volumetric rays — 8 thin cream strokes radiating from the alpha,
  * rotating slowly. The Genshin signature for "this is a real cosmic
- * body" instead of a coloured dot. */
+ * body" instead of a coloured dot. Reads the parked `t` under
+ * reduce-motion → rests static (rays stay drawn, simply stop turning). */
 function VolumetricRays({
   cx,
   cy,
@@ -388,23 +425,30 @@ function VolumetricRays({
  * a juncture-pulse that sells "energy flows through this point". */
 /* Today's star ring — thin cream orbital ring around the star
  * marked today. Slow rotation + breath so it doesn't compete with
- * the next-star pulse but unmistakably marks "this is THE one". */
+ * the next-star pulse but unmistakably marks "this is THE one".
+ *
+ * REDUCED MOTION: rests VISIBLE and static — no rotation (deg = 0)
+ * and opacity parked at the wave's high end (0.36) so it still
+ * unmistakably marks "this is THE one", it simply stops orbiting.
+ * `reduce` is a constant prop captured as a worklet closure scalar. */
 function TodayRing({
   cx,
   cy,
   r,
   t,
+  reduce,
 }: {
   cx: number
   cy: number
   r: number
   t: SharedValue<number>
+  reduce: boolean
 }) {
   const RING_R = r + 11
   const rotateProps = useAnimatedProps(() => {
     'worklet'
-    const deg = (t.value * (360 / 12)) % 360
-    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * 0.6)
+    const deg = reduce ? 0 : (t.value * (360 / 12)) % 360
+    const wave = reduce ? 1 : 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * 0.6)
     return {
       opacity: 0.18 + 0.18 * wave,
       transform: [

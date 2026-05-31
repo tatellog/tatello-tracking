@@ -55,7 +55,7 @@ export function PrimaryCta({
   // translucent fill warms one step (magentaTint). Default-inocuo:
   // ONLY the soft variant in its enabled state is touched — primary /
   // ghost / destructive, and a disabled (waiting) soft cta, are all
-  // exactly as before. welcome / que-hace / atribución use soft and so
+  // exactly as before. welcome / what-it-does / attribution use soft and so
   // simply gain the same coherent ready-glow once their step validates.
   const softReady = isSoft && !inactive
 

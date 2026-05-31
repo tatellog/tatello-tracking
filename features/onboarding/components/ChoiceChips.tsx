@@ -15,7 +15,7 @@ type Props<V extends string> = {
 }
 
 /*
- * A wrap-grid of single-select chips. Currently used by atribucion
+ * A wrap-grid of single-select chips. Currently used by attribution
  * (acquisition source, 6 options): chips fold into 2-3 rows on phone
  * widths, the picked one fills magenta. Different from SelectableCard
  * (which is for richer rows with descriptions); chips are for short

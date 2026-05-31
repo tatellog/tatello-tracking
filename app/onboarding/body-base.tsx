@@ -55,13 +55,13 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 /*
  * Cuerpo — Screen 2 of the split "Cuéntame de ti" pair, and the MIRRORED
  * TWIN of about-you (step 4). Asks the height + biological sex Stelar
- * needs to calibrate energy estimates. Lives at /onboarding/cuerpo-base,
+ * needs to calibrate energy estimates. Lives at /onboarding/body-base,
  * between about-you and weight.
  *
- * MIRRORED-TWIN ATMOSPHERE (illustrator pass) — cuerpo-base shares
+ * MIRRORED-TWIN ATMOSPHERE (illustrator pass) — body-base shares
  * about-you's EXACT visual grammar (same sky strata, same clock compás,
  * same clear central channel, same precision-dim), but MIRRORED on the
- * horizontal axis: about-you loads its weight to the LEFT, cuerpo-base
+ * horizontal axis: about-you loads its weight to the LEFT, body-base
  * spells it to the RIGHT. Advancing from step 4 → 5 reads as the sky
  * "rotating" corner-to-corner. Back→front:
  *   1. NebulaWash  — the painted galaxy PNG, re-pivoted to the lower-RIGHT
@@ -73,7 +73,7 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
  *                    over the header.
  *   3. WarmBloomField variant="exposed-low-right": warm weight in the
  *                    lower-RIGHT corner only (the mirror variant).
- *   4. CuerpoSky   — star strata in a "U" (ceiling + floor populated, the
+ *   4. BodySky   — star strata in a "U" (ceiling + floor populated, the
  *                    central band 0.30–0.72 left empty), dust along the
  *                    edges, plus a wide-and-low COOL WISP in the media-baja
  *                    zone — pure ambient depth that fills the lower half.
@@ -86,7 +86,7 @@ const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
  * The three clocks (5 s / 18 s / 40 s) are created ONCE on the screen and
  * shared by every atmosphere layer so there is one compás.
  */
-export default function CuerpoBaseScreen() {
+export default function BodyBaseScreen() {
   const router = useRouter()
   const { source } = useLocalSearchParams<{ source?: string }>()
   const fromSettings = source === 'settings'
@@ -188,7 +188,7 @@ export default function CuerpoBaseScreen() {
           {/* 3. Warm weight in the lower-RIGHT corner only (mirror variant). */}
           <WarmBloomField clock={clock} variant="exposed-low-right" />
           {/* 4. Star strata in a "U" + edge dust + a low cool wisp. */}
-          <CuerpoSky dust={dust} orbit={orbit} />
+          <BodySky dust={dust} orbit={orbit} />
         </Animated.View>
       }
     >
@@ -205,7 +205,7 @@ export default function CuerpoBaseScreen() {
           hint="Stelar lo usa para calibrar lo que registras."
         />
 
-        <Section question="¿cuánto mides?">
+        <Section label="CUÁNTO MIDES">
           <HeightSlider
             value={height}
             onChange={setHeight}
@@ -215,13 +215,13 @@ export default function CuerpoBaseScreen() {
           />
         </Section>
 
-        {/* Hairline divider — same vocabulary as tu-ritmo, so the two
+        {/* Hairline divider — same vocabulary as rhythm, so the two
             sections feel like two pieces of one base. */}
         <View style={styles.divider} />
 
-        <Section question="¿qué cuerpo lee Stelar?">
+        <Section label="QUÉ CUERPO CALCULA STELAR">
           <SexPills value={sex} onChange={setSex} />
-          <Text style={styles.caveat}>Es solo para el cálculo. No identidad.</Text>
+          <Text style={styles.caveat}>No define quién eres. Solo afina el número.</Text>
         </Section>
       </ScrollView>
     </WizardLayout>
@@ -230,10 +230,10 @@ export default function CuerpoBaseScreen() {
 
 /* ─────────────────────── Section ─────────────────────── */
 
-function Section({ question, children }: { question: string; children: React.ReactNode }) {
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{question}</Text>
+      <Text style={styles.sectionLabel}>{label}</Text>
       <View style={styles.sectionBody}>{children}</View>
     </View>
   )
@@ -242,7 +242,7 @@ function Section({ question, children }: { question: string; children: React.Rea
 /* ───────────────────── Full-screen star sky ────────────────────── */
 
 /*
- * CuerpoSky — full-screen painted depth for the FORM, the MIRRORED TWIN of
+ * BodySky — full-screen painted depth for the FORM, the MIRRORED TWIN of
  * about-you's AboutYouSky. Same "U" composition: stars populate the
  * CEILING (y 0.06–0.20) and the FLOOR (y 0.80–0.94), and the central band
  * (y 0.30–0.72, where the slider + pills live) is left EMPTY. Dust rises
@@ -318,7 +318,7 @@ const DUST: {
   { x: 0.86, baseR: 0.7, period: 1.12, sway: 7, opacity: 0.28, phase: 0.3 },
 ]
 
-function CuerpoSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
+function BodySky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
   const SKY_W = 360
   const SKY_H = 760
 
@@ -695,14 +695,18 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 36,
   },
+  /* Section label — data-field labels are NOT coach voice. Hanken bold,
+     UPPERCASE, tracked — same vocabulary as baseline's formulaLabel and the
+     other wizard labels (ÚLTIMA MENSTRUACIÓN / TU PRIORIDAD / QUÉ SIGUE).
+     letterSpacing 2.0 + lineHeight 16 keep the longest label ("QUÉ CUERPO
+     CALCULA STELAR") prolijo when it breaks to two centred lines. */
   sectionLabel: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.headingLg,
-    lineHeight: 26,
-    color: colors.leche,
-    opacity: 0.6,
-    letterSpacing: -0.2,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    lineHeight: 16,
+    color: colors.niebla,
+    letterSpacing: 2.0,
+    textTransform: 'uppercase',
     textAlign: 'center',
   },
   sectionBody: {
@@ -718,7 +722,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
-    // bone (not niebla) — homogeneity with about-you / atribución's quiet
+    // bone (not niebla) — homogeneity with about-you / attribution's quiet
     // labels. Sensitive data: it must read neutral and still, NO glow.
     color: colors.bone,
     letterSpacing: 0.1,

@@ -229,7 +229,7 @@ const SCENE_MAX_H = 256
 // so we expose them once, in reading order, on the wrapper.
 const SCENE_A11Y_LABEL = 'Tres vistas de tu progreso: Día, Semana y Mes.'
 
-export default function QueHaceScreen() {
+export default function WhatItDoesScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
 
@@ -278,7 +278,7 @@ export default function QueHaceScreen() {
 
         <Text style={styles.title}>
           Sí, cuento calorías.{'\n'}
-          <Text style={styles.titleEm}>Y también te veo.</Text>
+          <Text style={styles.titleEm}>Y también lo que no se cuenta.</Text>
         </Text>
 
         <Text style={styles.body}>
@@ -295,7 +295,7 @@ export default function QueHaceScreen() {
           label="Empezar"
           variant="soft"
           transform="none"
-          onPress={() => router.push('/onboarding/tu-intencion')}
+          onPress={() => router.push('/onboarding/intention')}
         />
       </View>
     </View>

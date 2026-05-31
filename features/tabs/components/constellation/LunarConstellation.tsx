@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
+import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
@@ -43,10 +43,21 @@ export function LunarConstellation({
   todayIdx,
   sign = 'acuario',
   committed = false,
+  showCount = true,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
   const cy = H / 2
+
+  // iOS "Reducir movimiento". Read ONCE here (same source as the reveal
+  // at app/onboarding/appointment.tsx) and threaded down: the three
+  // master clocks park at static rest values (so the figure stays lit +
+  // legible, just still), the per-loop affordances that can't derive a
+  // static rest from a frozen clock (NextStar halo, TodayRing) branch
+  // their own worklets via this flag, and pure ambient (shooting stars,
+  // dust, winks, skeleton ping-pong) is suppressed. With reduce OFF
+  // nothing below changes — every clock + worklet runs exactly as today.
+  const reduceMotion = useReducedMotion()
 
   const { trainedCount, elementsLit, sequence, fieldStars, isComplete, intensity } = useMemo(
     () => deriveProgress(trained, todayIdx, zodiac),
@@ -78,7 +89,7 @@ export function LunarConstellation({
   // again and the next affordance reappears.
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
-  const { t, breathT, driftT } = useConstellationClocks()
+  const { t, breathT, driftT } = useConstellationClocks(reduceMotion)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence })
@@ -101,6 +112,7 @@ export function LunarConstellation({
               stars={stars}
               lines={zodiac.lines}
               transform={SIGN_CONSTELLATION_TRANSFORM[sign]}
+              reduce={reduceMotion}
             />
           </Animated.View>
         )}
@@ -112,20 +124,37 @@ export function LunarConstellation({
               <AmbientField t={t} drift={driftT} />
               {/* Random star winks — brief flashes that read as "the
               sky is alive". Rendered with the background field so
-              they share the atmospheric layer. */}
-              <StarWinks t={t} />
+              they share the atmospheric layer. Pure ambient: with
+              reduce-motion ON they're suppressed (a frozen wink would
+              freeze mid-flash) — the figure's legibility doesn't
+              depend on them. */}
+              {reduceMotion ? null : <StarWinks t={t} />}
               {/* Three shooting stars staggered in phase and crossing
               the canvas at different heights — the field feels
-              alive without any single streak being constant. */}
-              <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
-              <ShootingStar t={t} cycleDiv={1.6} phase={0.42} startY={H * 0.15} endY={H * 0.85} />
-              <ShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
+              alive without any single streak being constant. Pure
+              ambient → suppressed under reduce-motion (a static t
+              would freeze a streak mid-canvas). */}
+              {reduceMotion ? null : (
+                <>
+                  <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
+                  <ShootingStar
+                    t={t}
+                    cycleDiv={1.6}
+                    phase={0.42}
+                    startY={H * 0.15}
+                    endY={H * 0.85}
+                  />
+                  <ShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
+                </>
+              )}
               <AmbientGlow cx={cx} cy={cy} />
               <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
               {/* Cosmic dust — drifting motes catching ambient light.
               Sits between the nebula and the lion engraving so it
-              feels like atmosphere passing through the foreground. */}
-              <CosmicDust t={t} />
+              feels like atmosphere passing through the foreground.
+              Ambient → suppressed under reduce-motion (motes parked
+              at a static t would freeze mid-rise). */}
+              {reduceMotion ? null : <CosmicDust t={t} />}
               {/* Atmospheric sign art — sits BEHIND the field stars and
               the animated constellation system. The strong card
               vignette below + the lion's already-faded opacity do
@@ -201,6 +230,7 @@ export function LunarConstellation({
                   starRecency={starRecency}
                   breathT={breathT}
                   starDepth={starDepth}
+                  reduce={reduceMotion}
                 />
                 <IgnitingOverlay
                   zodiac={zodiac}
@@ -250,15 +280,18 @@ export function LunarConstellation({
 
       {/* Chip footer — count + denominator rendered as a proper
           footer row OUTSIDE the SVG, so the chip never overlaps
-          the constellation lines. */}
-      <CenterNumberOverlay
-        displayedCount={displayedCount}
-        numberPulse={numberPulse}
-        plusOne={plusOne}
-        initialCount={trainedCount}
-        urgent={trainedCount >= TARGET_DAYS - 3 && !isComplete}
-        remaining={Math.max(0, TARGET_DAYS - trainedCount)}
-      />
+          the constellation lines. Gated by `showCount` (default true):
+          Día 1 hides it so a big "1/28" doesn't read as debt. */}
+      {showCount ? (
+        <CenterNumberOverlay
+          displayedCount={displayedCount}
+          numberPulse={numberPulse}
+          plusOne={plusOne}
+          initialCount={trainedCount}
+          urgent={trainedCount >= TARGET_DAYS - 3 && !isComplete}
+          remaining={Math.max(0, TARGET_DAYS - trainedCount)}
+        />
+      ) : null}
 
       {isComplete ? (
         <View style={styles.completionCap}>

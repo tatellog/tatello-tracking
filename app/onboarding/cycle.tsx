@@ -50,14 +50,14 @@ type CycleOption = {
 const SITUATION_OPTIONS: readonly CycleOption[] = [
   {
     value: 'menstruates',
-    label: 'Más o menos regular',
-    description: 'Más o menos cada mes',
+    label: 'Mi ciclo es regular',
+    description: 'Llega cada mes',
     hidesCycleInputs: false,
   },
   {
     value: 'irregular',
     label: 'Es irregular',
-    description: 'Sangrado o ausencia sin patrón claro',
+    description: 'No siempre llega igual',
     hidesCycleInputs: false,
   },
   {
@@ -67,15 +67,18 @@ const SITUATION_OPTIONS: readonly CycleOption[] = [
     // reproductive-state question the owner asked us to drop. Neutral copy.
     value: 'skip',
     label: 'No tengo ciclo',
-    description: 'Stelar lee tu cuerpo sin esa pieza',
+    description: 'Stelar funciona igual',
     hidesCycleInputs: true,
   },
 ]
 
-// Cycle length is no longer asked during onboarding (it added perceived
-// friction without earning its keep). We still persist a sane default so
-// the downstream macro / cycle engine — which expects cycle_length_days —
-// never sees null. The user can refine it later in Settings.
+// La duración del ciclo NO se pregunta en onboarding: casi nadie la sabe de
+// memoria y la feature que la usa (derivación de fase) vive en el cycle
+// sprint. Se persiste default 28 (DEFAULT_CYCLE_LENGTH) y el motor DERIVARÁ
+// la duración real del gap entre period_start registrados (cycle_events).
+// Patrones en datos propios, no un número adivinado en frío. Por eso esta
+// pantalla NO renderiza un Stepper de duración — solo se escribe el default
+// silencioso para las situaciones cycle-active (regular / irregular).
 const DEFAULT_CYCLE_LENGTH = 28
 const PERIOD_WINDOW_DAYS = 60
 
@@ -93,11 +96,13 @@ type Selection = CycleSituation | typeof OPT_OUT
  * only surfaces the OPTIONAL last-period date when the situation implies an
  * active cycle (menstruates, irregular).
  *
- * OVER-ASKING REDUCTION (owner + uxui): the screen used to ask three things
- * — situation, last-period date (required), cycle length (Stepper). It now
- * asks ONE required thing (situation) plus ONE optional opt-in (the date).
- * Cycle length was removed from onboarding entirely; we persist a silent
- * DEFAULT_CYCLE_LENGTH (28) so the engine keeps its value.
+ * INPUTS (owner, 2026-05): for the active-cycle situations the screen asks
+ * ONE required thing (situation) plus, in the revealed cycle-active block,
+ * the OPTIONAL last-period date. The cycle LENGTH is deliberately NOT asked
+ * here — it's persisted as a silent default (28) and the engine derives the
+ * real value from the gap between registered period_start dates in the cycle
+ * sprint (see DEFAULT_CYCLE_LENGTH). Skip / opt-out ask nothing beyond the
+ * situation.
  *
  * MENSTRUAL-FLOW-ONLY (owner decision): the screen no longer asks about
  * reproductive state (contraception / pregnancy / menopause). It offers
@@ -127,16 +132,16 @@ type Selection = CycleSituation | typeof OPT_OUT
  *     per-card `glow` shared value.
  *   • The conditional cycle input REVEALS with a fade+rise on a
  *     screen-level `reveal` shared value.
- *   • CicloSky gains a low COOL WISP so the cold lower half has ambient
+ *   • CycleSky gains a low COOL WISP so the cold lower half has ambient
  *     depth without a focal star to celebrate.
  *
  * ATMOSPHERE PARITY (illustrator): shared atmosphere primitives
- * (AtmosphericSky + WarmBloomField + a local CicloSky), DELIBERATELY COLDER
+ * (AtmosphericSky + WarmBloomField + a local CycleSky), DELIBERATELY COLDER
  * and CALMER than steps 1–6 (no NebulaWash PNG; the sensitive theme calls
  * for a calm, contained cool sky). Three clocks (5 s / 18 s / 40 s) created
  * ONCE here, shared by every layer (one compás, same periods as steps 1–6).
  */
-export default function TuCicloScreen() {
+export default function CycleScreen() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
@@ -171,7 +176,7 @@ export default function TuCicloScreen() {
 
   // Precision-mode atmosphere dimmer — withTiming target driven by the
   // pickerOpen flag. 1 = full sky, 0.4 = calm (while picking a date).
-  // Same compás (200 ms / ease-out-quad) as about-you / cuerpo-base.
+  // Same compás (200 ms / ease-out-quad) as about-you / body-base.
   const atmoDim = useSharedValue(1)
 
   useEffect(() => {
@@ -271,9 +276,11 @@ export default function TuCicloScreen() {
       const cycleSituation: CycleSituation = situation === OPT_OUT ? 'skip' : situation
       await updateProfile.mutateAsync({
         cycle_situation: cycleSituation,
-        // Cycle length is no longer edited in onboarding, but the engine
-        // still expects a value → persist the silent default for any
-        // active-cycle situation so nothing downstream sees null.
+        // Cycle length is NOT asked in onboarding (owner, 2026-05): persist a
+        // SILENT default (28) for any active-cycle situation (regular +
+        // irregular) so the engine has a value to work with until the cycle
+        // sprint DERIVES the real duration from registered period_start gaps.
+        // Skip / opt-out write nothing here (no cycle dimension).
         ...(askCycleInputs ? { cycle_length_days: DEFAULT_CYCLE_LENGTH } : {}),
       })
       // The date is OPTIONAL: only record a period when the user actually
@@ -281,7 +288,7 @@ export default function TuCicloScreen() {
       if (askCycleInputs && lastPeriod) {
         await recordPeriod.mutateAsync(toISODate(lastPeriod))
       }
-      router.push('/onboarding/tu-ritmo')
+      router.push('/onboarding/rhythm')
     } catch (e) {
       setSavingError(e instanceof Error ? e.message : 'No pudimos guardar tu ciclo.')
     } finally {
@@ -325,7 +332,7 @@ export default function TuCicloScreen() {
           {/* 3. Painted depth — COLD star strata + dimmed dust + a low cool
               wisp, full-screen, whisper-low, hidden from VoiceOver. Cooler
               + quieter than step 3 (silver-blue micro-stars, thinned). */}
-          <CicloSky dust={dust} orbit={orbit} />
+          <CycleSky dust={dust} orbit={orbit} />
         </Animated.View>
       }
     >
@@ -340,7 +347,7 @@ export default function TuCicloScreen() {
           eyebrowColor="magenta"
           question="¿Cómo trabaja tu cuerpo?"
           questionEmphasis="trabaja"
-          hint="Stelar lee tu ciclo cuando lo hay. Si no, lee el resto igual."
+          hint="Stelar lee tu ciclo cuando lo hay."
         />
 
         {/* Single-select group — the three cards + the opt-out form ONE
@@ -381,6 +388,13 @@ export default function TuCicloScreen() {
           <Animated.View style={revealStyle}>
             <View style={styles.divider} />
             <View style={styles.cycleBlock}>
+              {/* La duración del ciclo NO se pregunta aquí (owner, 2026-05):
+                  casi nadie la sabe de memoria y la derivación de fase vive
+                  en el cycle sprint. Solo se persiste el default 28 y el
+                  motor DERIVARÁ la duración real del gap entre period_start
+                  registrados (cycle_events). Por eso este bloque solo expone
+                  la fecha de última menstruación (opcional), que es la que
+                  siembra esos cycle_events. */}
               <View style={styles.field}>
                 <DateField
                   // Sentence-case label with an explicit "· opcional" so the
@@ -414,7 +428,7 @@ export default function TuCicloScreen() {
 /** A leaner card than the shared SelectableCard. The idle treatment is
  *  ALWAYS the solid bgCard + warm hairline (legibility over the cosmic
  *  backdrop); selection is layered on top as a 200 ms OPACITY crossfade
- *  rather than a binary style swap — parity with cuerpo-base's SexPill
+ *  rather than a binary style swap — parity with body-base's SexPill
  *  glow + about-you's hairline ignition. Three absoluteFill layers fade
  *  IN on a per-card `glow` shared value:
  *    (a) shadow layer — static magenta iOS shadow, opacity-crossfaded;
@@ -447,7 +461,7 @@ function CycleCard({
   }))
 
   // Glow crossfade — the selected card's magenta treatment fades IN/OUT on
-  // OPACITY (200 ms / ease-out-quad, the twin compás of cuerpo-base's pill
+  // OPACITY (200 ms / ease-out-quad, the twin compás of body-base's pill
   // glow). We never animate shadowRadius/shadowOpacity or border/fill colors
   // numerically; instead dedicated layers carry the static look and only
   // their opacity tweens.
@@ -519,7 +533,7 @@ function toISODate(d: Date): string {
 
 /* ───────────────────── Full-screen star sky ────────────────────── */
 
-// Star strata — a COLD, THINNED clone of step 3's AtribucionSky. x/y are
+// Star strata — a COLD, THINNED clone of step 3's AttributionSky. x/y are
 // 0→1 fractions of the screen; parallax amplitude grows toward the viewer
 // (far 2px / mid 5px / micro 9px). Concentrated in the LOWER half so the
 // depth pools under the cards, never behind their text. The band is held
@@ -571,15 +585,15 @@ const DUST: {
 ]
 
 /*
- * CicloSky — full-screen painted depth for step 7. A reduced, COLD clone
- * of AtribucionSky: three star strata + rising dust + a low cool wisp,
+ * CycleSky — full-screen painted depth for step 7. A reduced, COLD clone
+ * of AttributionSky: three star strata + rising dust + a low cool wisp,
  * behind the content. The stars sit in the LOWER half (the cards own the
  * top, so the sky stays a whisper there). Differential parallax (2/5/9px)
  * on the 40 s orbit clock, dust + wisp on the 18 s clock. All whisper-low
  * alphas, pointerEvents none, hidden from VoiceOver (the reading order is
  * the cards, never the decorative sky).
  *
- * COOL WISP — ported from cuerpo-base: a wide-and-low cool ellipse (ciclo
+ * COOL WISP — ported from body-base: a wide-and-low cool ellipse (ciclo
  * #B5C4DD) at cy ~0.66 that breathes 0.04↔0.06 on the dust clock. It
  * enriches the cold lower half with ambient depth, NO free-floating focal
  * star to celebrate any one answer (sensitive theme → containment).
@@ -589,7 +603,7 @@ const DUST: {
  * every frame → jank). Gradient ids are namespaced `ciclo-*` so they
  * cannot collide with step 3's `atrib-*` / step 5's `cuerpo-*` defs.
  */
-function CicloSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
+function CycleSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
   const SKY_W = 360
   const SKY_H = 760
 
@@ -614,7 +628,7 @@ function CicloSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedVal
   // A wide, low ellipse of cool ciclo light at cy 0.66 (media-baja). It
   // breathes between 0.04 and 0.06 on the 18 s dust clock — opacity only
   // (numeric, UI-thread safe). Carries the cold lower half as ambient
-  // depth (ported from cuerpo-base; reuses the shared dust clock, no new
+  // depth (ported from body-base; reuses the shared dust clock, no new
   // shared value).
   const coolWispProps = useAnimatedProps(() => {
     'worklet'
@@ -743,7 +757,7 @@ const styles = StyleSheet.create({
   },
   // Padding horizontal so the selected card's magenta shadow
   // (radius 14) doesn't get clipped by the ScrollView's implicit
-  // overflow:hidden. Same fix pattern as the sex pills in cuerpo-base.
+  // overflow:hidden. Same fix pattern as the sex pills in body-base.
   optionsBlock: {
     marginTop: 18,
     gap: 8,
@@ -865,8 +879,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  // The single conditional input block (just the optional DateField now —
-  // the cycle-length Stepper was removed from onboarding).
+  // The conditional input block — only the optional last-period DateField
+  // now (the cycle-length Stepper was removed per owner, 2026-05: duration is
+  // derived from period_start gaps in the cycle sprint, not asked here).
+  // paddingBottom keeps the CTA clear on small devices (scrollToEnd handles
+  // the picker spinner).
   cycleBlock: {
     marginTop: 22,
     paddingBottom: 24,
@@ -880,7 +897,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     lineHeight: 17,
     // bone (not niebla) — sensitive data reads neutral + still, NO glow.
-    // Homogeneity with cuerpo-base / about-you's quiet labels. textAlign
+    // Homogeneity with body-base / about-you's quiet labels. textAlign
     // stays left (the caveats accompany left-aligned fields).
     color: colors.bone,
   },
