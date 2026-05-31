@@ -222,7 +222,7 @@ export default function AboutYouScreen() {
     >
       <WizardLayout
         step={4}
-        totalSteps={12}
+        totalSteps={9}
         canContinue={canContinue}
         loading={updateProfile.isPending}
         // Map any raw Supabase/network error to warm Stelar copy — never

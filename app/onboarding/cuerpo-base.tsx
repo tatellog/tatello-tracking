@@ -162,7 +162,7 @@ export default function CuerpoBaseScreen() {
   return (
     <WizardLayout
       step={5}
-      totalSteps={12}
+      totalSteps={9}
       canContinue={canContinue}
       loading={updateProfile.isPending}
       errorMessage={updateProfile.error?.message}

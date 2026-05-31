@@ -174,7 +174,7 @@ export default function WeightScreen() {
   return (
     <WizardLayout
       step={6}
-      totalSteps={12}
+      totalSteps={9}
       canContinue={canContinue}
       loading={saving}
       errorMessage={savingError ?? insertWeight.error?.message ?? null}

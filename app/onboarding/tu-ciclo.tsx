@@ -294,7 +294,7 @@ export default function TuCicloScreen() {
   return (
     <WizardLayout
       step={8}
-      totalSteps={12}
+      totalSteps={9}
       canContinue={canContinue}
       loading={saving}
       errorMessage={savingError}

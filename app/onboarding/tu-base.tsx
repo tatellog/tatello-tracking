@@ -141,7 +141,7 @@ export default function TuBaseScreen() {
   return (
     <WizardLayout
       step={7}
-      totalSteps={12}
+      totalSteps={9}
       canContinue
       onContinue={() => router.push('/onboarding/tu-ciclo')}
       continueLabel="Continuar"

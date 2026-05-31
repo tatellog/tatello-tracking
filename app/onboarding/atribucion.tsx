@@ -122,13 +122,13 @@ export default function AtribucionScreen() {
 
   const handleContinue = () => {
     if (skipped) {
-      router.push('/onboarding/about-you')
+      router.replace('/onboarding/day-one')
       return
     }
     if (!source) return
     updateProfile.mutate(
       { acquisition_source: source },
-      { onSuccess: () => router.push('/onboarding/about-you') },
+      { onSuccess: () => router.replace('/onboarding/day-one') },
     )
   }
 
@@ -142,7 +142,8 @@ export default function AtribucionScreen() {
   return (
     <WizardLayout
       step={3}
-      totalSteps={12}
+      showProgress={false}
+      showBack={false}
       canContinue={canContinue}
       loading={updateProfile.isPending}
       errorMessage={updateProfile.error?.message}

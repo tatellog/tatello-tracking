@@ -270,7 +270,7 @@ export default function QueHaceScreen() {
           sits low (cy ~66%) so the warm pool falls under the trio. */}
       <WarmBloomField clock={clock} />
       <View style={styles.progressWrap}>
-        <ProgressBar current={2} total={12} />
+        <ProgressBar current={2} total={9} />
       </View>
 
       <View style={styles.stage}>
@@ -295,7 +295,7 @@ export default function QueHaceScreen() {
           label="Empezar"
           variant="soft"
           transform="none"
-          onPress={() => router.push('/onboarding/atribucion')}
+          onPress={() => router.push('/onboarding/tu-intencion')}
         />
       </View>
     </View>

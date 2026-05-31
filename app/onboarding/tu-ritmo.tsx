@@ -166,7 +166,7 @@ export default function TuRitmoScreen() {
         training_frequency: training,
       },
       {
-        onSuccess: () => router.push('/onboarding/tu-intencion'),
+        onSuccess: () => router.push('/onboarding/leyendo'),
       },
     )
   }
@@ -174,7 +174,7 @@ export default function TuRitmoScreen() {
   return (
     <WizardLayout
       step={9}
-      totalSteps={12}
+      totalSteps={9}
       canContinue={canContinue}
       loading={updateProfile.isPending}
       errorMessage={updateProfile.error?.message}

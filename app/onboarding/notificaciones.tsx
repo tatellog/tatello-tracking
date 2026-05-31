@@ -190,7 +190,7 @@ export default function NotificacionesScreen() {
         }
       }
       await updateProfile.mutateAsync({ notification_window: window })
-      router.push('/onboarding/leyendo')
+      router.push('/onboarding/atribucion')
     } catch (err) {
       // Permission errors are not blocking — we save the preference either
       // way so the user reaches reveal and Settings can resurface the ask.
@@ -200,7 +200,7 @@ export default function NotificacionesScreen() {
       } catch {
         // Soft failure on the profile patch; reveal re-fetches.
       }
-      router.push('/onboarding/leyendo')
+      router.push('/onboarding/atribucion')
     } finally {
       setRequestingPermission(false)
     }
@@ -209,7 +209,8 @@ export default function NotificacionesScreen() {
   return (
     <WizardLayout
       step={11}
-      totalSteps={12}
+      showProgress={false}
+      showBack={false}
       canContinue={canContinue}
       loading={requestingPermission || updateProfile.isPending}
       errorMessage={updateProfile.error?.message}

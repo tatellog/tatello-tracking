@@ -597,7 +597,7 @@ export default function RevealScreen() {
       // Día 1 re-fetches the profile on mount — transient patch failure
       // doesn't strand the user here.
     }
-    router.replace('/onboarding/day-one')
+    router.replace('/onboarding/notificaciones')
   }
 
   // A11Y — announce WHAT was revealed (the SVG stage is otherwise

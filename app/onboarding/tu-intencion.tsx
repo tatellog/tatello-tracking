@@ -6,11 +6,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  Extrapolation,
   FadeIn,
   FadeOut,
+  interpolate,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSpring,
   withTiming,
@@ -260,8 +263,8 @@ export default function TuIntencionScreen() {
       {
         onSuccess: () => {
           navTimer.current = setTimeout(() => {
-            router.push('/onboarding/notificaciones')
-          }, 1100)
+            router.push('/onboarding/about-you')
+          }, 2000)
         },
         onError: () => setCelebrating(false),
       },
@@ -271,8 +274,8 @@ export default function TuIntencionScreen() {
   return (
     <>
       <WizardLayout
-        step={10}
-        totalSteps={12}
+        step={3}
+        totalSteps={9}
         canContinue={canContinue}
         loading={updateProfile.isPending}
         errorMessage={updateProfile.error?.message}
@@ -373,17 +376,19 @@ export default function TuIntencionScreen() {
       {/* Acknowledgment beat — full-screen overlay (outside WizardLayout
           so it covers the safe area + CTA too). A single still bloom +
           the phrase, NOT a celebration of the answer. The phrase keys off
-          the PRIORITY (selected[0]). Choreographed over 1.1 s:
-            t=0    veil fades in + body starts bloom (320 ms)
-            t=560  phrase fades in + settles up (translateY 6→0)
-            t=1100 navigation fires (exit fade-out kicks in)
+          the PRIORITY (selected[0]). Choreographed over 2.0 s:
+            t=0     veil fades in (320 ms) + body starts bloom (520 ms)
+            t=300   phrase begins to emerge from the bloom (800 ms reveal:
+                    fade + rise 10→0 + scale 0.965→1), overlapping the bloom
+            t≈1100  phrase has settled — sustained ~600 ms to be read
+            t=2000  navigation fires (overlay exit fade-out kicks in, 360 ms)
           The body keeps a slow breath through the moment so it doesn't
           feel frozen while the text reads. The veil is translucent so the
           atmosphere is intuited behind it. Skipped entirely from Ajustes. */}
       {celebrating && priority ? (
         <Animated.View
-          entering={FadeIn.duration(220)}
-          exiting={FadeOut.duration(280)}
+          entering={FadeIn.duration(320)}
+          exiting={FadeOut.duration(360)}
           pointerEvents="none"
           style={styles.celebOverlay}
         >
@@ -549,27 +554,35 @@ function IntentCard({
 
 /* ─────────────────────── CelebrationPhrase ─────────────────────── */
 
-/** The acknowledgment phrase. Fades in late (delay 560 ms) AND settles
- *  upward (translateY 6 → 0) so it "se asienta" rather than popping. The
- *  FadeIn carries the opacity; a dedicated shared value carries the
- *  translate so we never animate it as a string. */
+/** The acknowledgment phrase. A SINGLE animation system: one `reveal`
+ *  shared value (0 → 1) drives opacity + translateY + scale through one
+ *  useAnimatedStyle. NO layout-animation `entering` here — mixing it with
+ *  a transform in useAnimatedStyle made both fight for the transform on
+ *  the first frame in Reanimated 4 (the jump). The phrase now EMERGES from
+ *  the bloom: fade + rise (10 → 0) + scale (0.965 → 1) on ease-out cubic,
+ *  overlapping the body's bloom. Exit fade-out is owned by the parent
+ *  `celebOverlay` (FadeOut), so we don't duplicate an exit on the text.
+ *  letter-spacing stays fixed (-0.3 in celebText) — never animated. */
 function CelebrationPhrase({ text }: { text: string }) {
-  const lift = useSharedValue(6)
+  const reveal = useSharedValue(0)
   useEffect(() => {
-    lift.value = withTiming(0, { duration: 460, easing: Easing.out(Easing.cubic) })
-    return () => cancelAnimation(lift)
-  }, [lift])
+    reveal.value = withDelay(
+      300,
+      withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) }),
+    )
+    return () => cancelAnimation(reveal)
+  }, [reveal])
 
-  const liftStyle = useAnimatedStyle(() => {
+  const style = useAnimatedStyle(() => {
     'worklet'
-    return { transform: [{ translateY: lift.value }] }
+    const r = reveal.value
+    const opacity = interpolate(r, [0, 0.7], [0, 1], Extrapolation.CLAMP)
+    const translateY = interpolate(r, [0, 1], [10, 0])
+    const scale = interpolate(r, [0, 1], [0.965, 1])
+    return { opacity, transform: [{ translateY }, { scale }] }
   })
 
-  return (
-    <Animated.Text entering={FadeIn.duration(420).delay(560)} style={[styles.celebText, liftStyle]}>
-      {text}
-    </Animated.Text>
-  )
+  return <Animated.Text style={[styles.celebText, style]}>{text}</Animated.Text>
 }
 
 /* ─────────────────────── CelebrationBody ─────────────────────── */
@@ -598,7 +611,7 @@ function CelebrationBody() {
       true,
     )
     bloom.value = withTiming(1, {
-      duration: 320,
+      duration: 520,
       easing: Easing.out(Easing.cubic),
     })
     return () => {

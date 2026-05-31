@@ -303,12 +303,19 @@ function ManifestoHero() {
             <Stop offset="1" stopColor="#A6164A" stopOpacity="0" />
           </RadialGradient>
           {/* Hero glow — magenta light body, OFF-CENTRE (42%/44%),
-              falloff to zero. Decoupled from the centred icon. */}
+              falloff to zero. Decoupled from the centred icon.
+              The gradient centre is off-centre but the Circle it fills is
+              centred, so the circle's NEAR edge (toward the gradient centre)
+              sits at ~offset 0.8 of the gradient. The opacity MUST reach 0
+              before that (here by 0.72) or the circle geometry cuts off a
+              still-visible ~0.02 band → a hard circular seam against the bg.
+              Reaching 0 by 0.72 keeps every edge of the circle transparent,
+              so the glow blends seamlessly (offsets 0.72→1 pad to 0). */}
           <RadialGradient id="heroGlow" cx="42%" cy="44%" r="50%">
             <Stop offset="0" stopColor="#E91E63" stopOpacity="0.42" />
-            <Stop offset="0.35" stopColor="#E91E63" stopOpacity="0.20" />
-            <Stop offset="0.7" stopColor="#A6164A" stopOpacity="0.07" />
-            <Stop offset="1" stopColor="#A6164A" stopOpacity="0" />
+            <Stop offset="0.32" stopColor="#E91E63" stopOpacity="0.20" />
+            <Stop offset="0.6" stopColor="#A6164A" stopOpacity="0.06" />
+            <Stop offset="0.72" stopColor="#A6164A" stopOpacity="0" />
           </RadialGradient>
           {/* Warm core bloom — burns to WHITE at centre (color-dodge
               ignition) → leche → magentaHot → transparent. Centred. */}
@@ -486,7 +493,7 @@ export default function ManifiestoScreen() {
       <WizardBackdrop />
       <AtmosphericSky />
       <View style={styles.progressWrap}>
-        <ProgressBar current={1} total={12} />
+        <ProgressBar current={1} total={9} />
       </View>
 
       <View style={styles.stage}>
