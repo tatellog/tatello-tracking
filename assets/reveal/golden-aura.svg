@@ -1,0 +1,60 @@
+<!--
+  Golden aura — el HALO DORADO CIRCULAR en reposo que pidió la usuaria.
+  NO es un anillo HUD/diana: es un GLOW RADIAL DIFUSO, un aura de luz
+  cálida que envuelve el arte+constelación como un sello dorado. Vive
+  DETRÁS del CeremonialHalo (el anillo art-deco roto) — juntos = aura
+  dorada CON estructura, sin leer como dial.
+
+  Tres capas radiales superpuestas, todas con falloff suave a transparente:
+    - bloom    radio amplio, oro tenue (el "respiro" exterior, casi vapor)
+    - body     radio medio, oro+cream, la masa del aura
+    - rim       un realce cálido a media distancia que insinúa un borde
+                SIN cerrar un stroke (queda como halo, no como anillo)
+
+  El borde NUNCA es un stroke fino cerrado: el "rim" es un gradiente con
+  un pico de opacidad a ~62-72% del radio que decae a 0 — sugiere círculo
+  sin dibujar diana. Asimetría: el centro óptico está levísimamente
+  desplazado (cy 48%) para que no sea un círculo geométrico perfecto.
+
+  Frontend: fade-in en el settle (op 0 → ~0.5 global) creciendo desde el
+  centro (scale 0.86 → 1), luego respira en reposo (pulso lento de
+  opacidad/escala, desincronizado del CeremonialHalo y de la AmbientWash).
+  viewBox 360, centrado en 180,180. Solo opacidades/gradientes — sin
+  strings % en r/transform a nivel RN; aquí en SVG los % son del propio
+  gradiente (válido), el componente RN replica estos stops.
+
+  Paleta: oro #D9AE6F (cream-gold), cream #FFF6E5, amber cálido #E8B872.
+-->
+<svg viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- bloom — el vapor dorado exterior, muy difuso -->
+    <radialGradient id="aura-bloom" cx="50%" cy="48%" r="50%">
+      <stop offset="0%"   stop-color="#FFF6E5" stop-opacity="0.10"/>
+      <stop offset="42%"  stop-color="#D9AE6F" stop-opacity="0.16"/>
+      <stop offset="78%"  stop-color="#D9AE6F" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#D9AE6F" stop-opacity="0"/>
+    </radialGradient>
+    <!-- body — la masa cálida del aura, cream→oro -->
+    <radialGradient id="aura-body" cx="50%" cy="48%" r="50%">
+      <stop offset="0%"   stop-color="#FFF6E5" stop-opacity="0.22"/>
+      <stop offset="34%"  stop-color="#E8B872" stop-opacity="0.20"/>
+      <stop offset="68%"  stop-color="#D9AE6F" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#D9AE6F" stop-opacity="0"/>
+    </radialGradient>
+    <!-- rim — el realce que INSINÚA borde circular: pico a ~66%, decae a 0.
+         Esto reemplaza el "stroke fino cerrado" prohibido. -->
+    <radialGradient id="aura-rim" cx="50%" cy="48%" r="50%">
+      <stop offset="0%"   stop-color="#D9AE6F" stop-opacity="0"/>
+      <stop offset="52%"  stop-color="#D9AE6F" stop-opacity="0"/>
+      <stop offset="66%"  stop-color="#FFE9C2" stop-opacity="0.30"/>
+      <stop offset="76%"  stop-color="#D9AE6F" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#D9AE6F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- back→front. Centro óptico levemente alto (cy 174) para romper la
+       simetría perfecta sin que se note como descuadre. -->
+  <circle cx="180" cy="174" r="180" fill="url(#aura-bloom)"/>
+  <circle cx="180" cy="174" r="148" fill="url(#aura-body)"/>
+  <circle cx="180" cy="174" r="150" fill="url(#aura-rim)"/>
+</svg>

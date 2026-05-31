@@ -86,6 +86,14 @@ const SPANISH_MONTHS = [
  * date that defines their constellation. Body-base questions (height,
  * sex) live in the second screen, cuerpo-base.
  *
+ * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
+ * SCREEN by WizardLayout (its own opaque <WizardBackdrop />) so the
+ * slide transition fully occludes the screen behind it. The presence
+ * breath is shared via WizardPresenceContext so it never restarts. The
+ * KeyboardAvoidingView root is OPAQUE (colors.bg); this step's own
+ * atmosphere (NebulaWash + AtmosphericSky + WarmBloomField + AboutYouSky)
+ * layers above the backdrop via WizardLayout's `atmosphere` prop.
+ *
  * Visual language is calmer than the previous combined form: no
  * presence-star glyphs on the left (those read as form-language), no
  * gradient underline — just a magenta hairline that appears under a
@@ -1014,6 +1022,10 @@ function parseISODate(v: string | null | undefined): Date | null {
 /* ─────────────────────── Styles ─────────────────────── */
 
 const styles = StyleSheet.create({
+  // OPAQUE root (colors.bg) so the incoming screen occludes the outgoing
+  // one during the slide. WizardLayout mounts its own opaque
+  // WizardBackdrop; this step paints its own atmosphere ABOVE that
+  // backdrop via the `atmosphere` prop.
   kb: {
     flex: 1,
     backgroundColor: colors.bg,

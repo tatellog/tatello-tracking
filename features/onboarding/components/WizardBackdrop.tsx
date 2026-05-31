@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useContext, useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -11,6 +11,8 @@ import Animated, {
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors } from '@/theme'
+
+import { WizardPresenceContext } from './WizardPresenceContext'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
@@ -29,21 +31,34 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  *     becomes the CosmicStar at the reveal: the visual contract
  *     "Stelar has been with you the whole way".
  *
- * Rendered once via the onboarding Stack layout so every screen
- * inherits the same backdrop without per-screen integration.
+ * Mounted PER SCREEN (each onboarding step paints its own opaque
+ * backdrop so the slide transition fully occludes the screen behind
+ * it). The deterministic starfield repaints identical pixels on every
+ * mount → imperceptible. The presence breath would normally restart on
+ * each mount; to keep it continuous, the breath shared value is OWNED by
+ * the onboarding Stack layout and shared via WizardPresenceContext. This
+ * component consumes that value. FALLBACK: outside the onboarding flow
+ * (no provider) it creates + drives its own local shared value so it
+ * never breaks.
  */
 export function WizardBackdrop() {
-  // The Stelar mark breathes over a long 6-s cycle so the eye
-  // catches movement without ever feeling busy.
-  const presence = useSharedValue(0)
+  // Consume the flow-wide presence value if a provider is present.
+  const ctxPresence = useContext(WizardPresenceContext)
+  // Local fallback — always created (hooks can't be conditional), but
+  // only DRIVEN when there is no provider, so we never run a redundant
+  // animation when the layout already owns the breath.
+  const localPresence = useSharedValue(0)
+  const presence = ctxPresence ?? localPresence
+
   useEffect(() => {
-    presence.value = withRepeat(
+    if (ctxPresence) return // the layout owns + drives the breath
+    localPresence.value = withRepeat(
       withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
       -1,
       true,
     )
-    return () => cancelAnimation(presence)
-  }, [presence])
+    return () => cancelAnimation(localPresence)
+  }, [ctxPresence, localPresence])
 
   const haloProps = useAnimatedProps(() => {
     'worklet'

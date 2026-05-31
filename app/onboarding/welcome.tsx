@@ -11,7 +11,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Ellipse, G, RadialGradient, Stop } from 'react-native-svg'
 
 import NorthStar from '@/assets/icons/north-star.svg'
@@ -43,6 +43,12 @@ const AnimatedG = Animated.createAnimatedComponent(G)
  * so step 2 (que-hace) breathes with the same sky. This step mounts
  * AtmosphericSky with its DEFAULT glow (38%/42%/65%) so it renders
  * exactly as before the extraction.
+ *
+ * The base cosmic backdrop (starfield + Stelar presence) is mounted
+ * PER SCREEN (its own <WizardBackdrop />, opaque colors.bg base) so the
+ * slide transition fully occludes the screen behind it. The presence
+ * breath is shared via WizardPresenceContext so it never restarts.
+ * AtmosphericSky still layers above the backdrop.
  *
  * Z-stack back-to-front:
  *
@@ -467,14 +473,17 @@ function ManifestoHero() {
 
 export default function ManifiestoScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* The base cosmic backdrop is mounted PER SCREEN (opaque colors.bg
+          base + starfield + breathing presence) so the slide transition
+          fully occludes the screen behind it. The presence breath is
+          shared via WizardPresenceContext so it never restarts. The
+          full-screen atmosphere below sits above this backdrop but behind
+          all content. Default glow (38%/42%/65%) = unchanged. */}
       <WizardBackdrop />
-      {/* Full-screen atmosphere — sits above the shared backdrop but
-          behind all content, so depth fills the whole screen rather
-          than living only inside the 320px hero island. Default glow
-          (38%/42%/65%) = unchanged from before the extraction. */}
       <AtmosphericSky />
       <View style={styles.progressWrap}>
         <ProgressBar current={1} total={12} />
@@ -503,11 +512,13 @@ export default function ManifiestoScreen() {
           onPress={() => router.push('/onboarding/que-hace')}
         />
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  // OPAQUE so the incoming screen occludes the outgoing one during the
+  // slide; the per-screen WizardBackdrop paints the sky on top of this.
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

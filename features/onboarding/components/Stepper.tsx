@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { colors, typography } from '@/theme'
 
 type Props = {
-  /** Uppercase label drawn above the value. */
+  /** Label drawn above the value. Sentence-case, human (uxui override). */
   label: string
   /** Current value. Clamped to [min, max] on every render. */
   value: number
@@ -18,7 +18,21 @@ type Props = {
   unit?: string
   /** Number of decimals to render. Defaults to 0. */
   decimals?: number
+  /**
+   * Display font size of the big value. Defaults to 72 — the original
+   * hero size, preserved EXACTLY for tu-ritmo / sueño (which never pass
+   * this). tu-ciclo passes a smaller value (48) because cycle length is
+   * a secondary datum, not the screen's headline. The value's lineHeight,
+   * the value-wrap minWidth and the unit's italic size all DERIVE from
+   * this so the proportions stay balanced at any size.
+   */
+  valueSize?: number
 }
+
+// The original hero size. When valueSize === DEFAULT_VALUE_SIZE every
+// derived metric below collapses to the historical literals, so the
+// two existing consumers (tu-ritmo, sueño) render byte-identically.
+const DEFAULT_VALUE_SIZE = 72
 
 /*
  * A simple stepper: − [big value] +. Used for sleep hours (3–14, step
@@ -28,12 +42,40 @@ type Props = {
  *
  * The buttons disable themselves at the bounds so the user can't push
  * past min/max. Visual style mirrors the rest of the wizard (cream
- * label, magenta accents).
+ * label, magenta accents). The big value carries a SUBTLE warm halo
+ * (magentaHot @ 0.18) — the same inputFilled glow as about-you's filled
+ * values — so the number reads as premium light, not flat ink (applies
+ * to BOTH consumers: "7.0 horas" and "28 días" both gain the warm glow,
+ * a deliberate coherence decision).
+ *
+ * LABEL (uxui override #5): the label is sentence-case Hanken upright
+ * (uiMedium, letterSpacing ~0.2, bone), a clear human field label — not
+ * uppercase technical tracking. tu-ritmo passes label="" so this is
+ * invisible there; the label COPY is the caller's (pending behavioral /
+ * voice-and-copy sign-off).
  */
-export function Stepper({ label, value, onChange, min, max, step = 1, unit, decimals = 0 }: Props) {
+export function Stepper({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  unit,
+  decimals = 0,
+  valueSize = DEFAULT_VALUE_SIZE,
+}: Props) {
   const clamped = Math.max(min, Math.min(max, value))
   const canDec = clamped > min
   const canInc = clamped < max
+
+  // Derived proportions. At the default 72 these resolve to the original
+  // literals (lineHeight 72, minWidth 140, unit = sizes.title) so the
+  // existing screens are untouched; at 48 they scale down proportionally.
+  const ratio = valueSize / DEFAULT_VALUE_SIZE
+  const valueLineHeight = valueSize
+  const valueMinWidth = Math.round(140 * ratio)
+  const unitFontSize = Math.round(typography.sizes.title * ratio)
 
   const handleStep = (direction: -1 | 1) => {
     const next = Math.max(min, Math.min(max, clamped + direction * step))
@@ -45,6 +87,9 @@ export function Stepper({ label, value, onChange, min, max, step = 1, unit, deci
 
   return (
     <View style={styles.wrap}>
+      {/* Always render the label node (even when empty) so tu-ritmo —
+          which passes label="" — keeps its exact previous layout (the
+          wrap's gap:14 already accounted for this empty Text). */}
       <Text style={styles.label}>{label}</Text>
       <View style={styles.row}>
         <Pressable
@@ -62,9 +107,11 @@ export function Stepper({ label, value, onChange, min, max, step = 1, unit, deci
           <Text style={[styles.btnGlyph, !canDec && styles.btnGlyphDisabled]}>−</Text>
         </Pressable>
 
-        <View style={styles.valueWrap}>
-          <Text style={styles.value}>{clamped.toFixed(decimals)}</Text>
-          {unit ? <Text style={styles.unit}>{unit}</Text> : null}
+        <View style={[styles.valueWrap, { minWidth: valueMinWidth }]}>
+          <Text style={[styles.value, { fontSize: valueSize, lineHeight: valueLineHeight }]}>
+            {clamped.toFixed(decimals)}
+          </Text>
+          {unit ? <Text style={[styles.unit, { fontSize: unitFontSize }]}>{unit}</Text> : null}
         </View>
 
         <Pressable
@@ -90,12 +137,13 @@ const styles = StyleSheet.create({
   wrap: {
     gap: 14,
   },
+  // Sentence-case Hanken upright (uxui override #5) — a clear, human field
+  // label, not uppercase technical tracking. bone for warm legibility.
   label: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    color: colors.niebla,
-    letterSpacing: 2.2,
-    textTransform: 'uppercase',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    letterSpacing: 0.2,
   },
   // Centred group with gap, not space-between — keeps the value
   // visually attached to its − / + controls instead of stranding the
@@ -106,6 +154,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 18,
   },
+  // Buttons are FIXED (52×52, hitSlop) regardless of valueSize —
+  // usability of the touch targets never scales down.
   btn: {
     width: 52,
     height: 52,
@@ -133,25 +183,31 @@ const styles = StyleSheet.create({
   btnGlyphDisabled: {
     color: colors.niebla,
   },
+  // minWidth is supplied inline (derived from valueSize); the rest stays
+  // constant so the baseline-aligned unit keeps its relationship.
   valueWrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
-    minWidth: 140,
     justifyContent: 'center',
   },
+  // fontSize + lineHeight are supplied inline (derived from valueSize).
+  // The warm halo (magentaHot @ 0.18 / radius 8) is the same inputFilled
+  // glow as about-you's filled values — the big number reads as premium
+  // light rather than flat ink, for both consumers.
   value: {
     fontFamily: typography.displayHeavy,
-    fontSize: 72,
     color: colors.leche,
     letterSpacing: -2,
-    lineHeight: 72,
     includeFontPadding: false,
+    textShadowColor: 'rgba(255,72,134,0.18)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
+  // fontSize supplied inline (derived from valueSize).
   unit: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: typography.sizes.title,
     color: colors.magenta,
   },
 })

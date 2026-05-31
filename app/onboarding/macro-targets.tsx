@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { MacroTargetsInputSchema, type MacroTargetsInput } from '@/features/macros/api'
 import { useMacroTargets, useUpsertMacroTargets } from '@/features/macros/hooks'
@@ -27,6 +27,7 @@ type Source = 'banner' | 'settings' | 'onboarding' | undefined
  */
 export default function MacroTargetsScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { source } = useLocalSearchParams<{ source?: Source }>()
   const targetsQuery = useMacroTargets()
   const upsert = useUpsertMacroTargets()
@@ -63,7 +64,7 @@ export default function MacroTargetsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -129,7 +130,7 @@ export default function MacroTargetsScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   )
 }
 

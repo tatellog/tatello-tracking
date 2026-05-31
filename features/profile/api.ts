@@ -70,8 +70,10 @@ export type AcquisitionSource = (typeof ACQUISITION_SOURCE_VALUES)[number]
 /** Preferred time of day for Stelar to send notifications. The
  *  warmup pattern: pick this BEFORE we fire the iOS native permission
  *  prompt, so the prompt lands with consent already mentally given.
- *  `not_yet` means "asked + declined"; the future re-ask logic uses
- *  that flag to decide when to surface a soft nudge later. */
+ *  `not_yet` means the user DEFERRED the decision — "not now", a
+ *  legitimate preference, NOT a rejection to convert (behavioral). The
+ *  future re-ask must treat it as someone who chose their own rhythm:
+ *  a soft, capped reminder (ideally pull from Ajustes), never insistence. */
 export const NOTIFICATION_WINDOW_VALUES = ['morning', 'midday', 'evening', 'not_yet'] as const
 export type NotificationWindow = (typeof NOTIFICATION_WINDOW_VALUES)[number]
 

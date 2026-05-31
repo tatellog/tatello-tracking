@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { WizardBackdrop } from '@/features/onboarding/components'
@@ -30,6 +30,11 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
  * Psychology: anticipation amplifies the dopamine hit of the reveal
  * that follows. Without this beat, the reveal feels too cheap for
  * the work the user just did.
+ *
+ * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
+ * SCREEN (its own <WizardBackdrop />, opaque colors.bg base) so the
+ * slide transition fully occludes the screen behind it. The presence
+ * breath is shared via WizardPresenceContext so it never restarts.
  */
 const PHASES = [
   'Leyendo tu primera lectura',
@@ -42,6 +47,7 @@ const PHASE_DURATION_MS = Math.floor(TOTAL_DURATION_MS / PHASES.length)
 
 export default function LeyendoScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const [phaseIdx, setPhaseIdx] = useState(0)
   const t = useSharedValue(0)
 
@@ -70,7 +76,19 @@ export default function LeyendoScreen() {
   }, [router, t])
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View
+      style={[
+        styles.safe,
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
+      {/* Per-screen opaque backdrop (starfield + shared breathing
+          presence) so the slide occludes and the breath never restarts. */}
       <WizardBackdrop />
       <View style={styles.stage}>
         <BuildingStar clock={t} />
@@ -83,7 +101,7 @@ export default function LeyendoScreen() {
       >
         {PHASES[phaseIdx]}
       </Animated.Text>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -134,6 +152,8 @@ function BuildingStar({ clock }: { clock: SharedValue<number> }) {
 }
 
 const styles = StyleSheet.create({
+  // OPAQUE so the incoming screen occludes the outgoing one during the
+  // slide; the per-screen WizardBackdrop paints the sky on top of this.
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

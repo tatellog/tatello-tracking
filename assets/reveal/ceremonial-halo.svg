@@ -1,0 +1,36 @@
+<!--
+  Ceremonial halo / frame — the SETTLE-state ornament that stays around
+  the constellation after the climax (the "this is now YOUR sky, framed"
+  read). Two broken concentric rings (cream-gold + magenta) with an
+  intentional asymmetric gap + a scatter of ornament ticks at irregular
+  angles, so it reads as an art-deco astral chart frame, NOT a clean
+  HUD circle. Drawn broken/dashed and gapped on purpose.
+
+  This is the ENMARCA element: it celebrates the figure, sits behind it,
+  never closes into a solid ring (which would read as a dial/target).
+  Frontend fades it in during the settle beat (~opacity 0 → 0.4) and
+  lets it rotate VERY slowly (40 s) like the Tab's ambient orbit clock.
+
+  viewBox 360. currentColor = cream-gold tint pass; magenta hardcoded.
+-->
+<svg viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- outer cream-gold ring, broken with a wide top-right gap (asymmetry) -->
+  <path d="M 180 22
+           A 158 158 0 1 1 70 60"
+        stroke="currentColor" stroke-width="0.8" opacity="0.4" stroke-linecap="round"/>
+  <!-- inner magenta ring, dashed, gap offset to the lower-left -->
+  <path d="M 246 300
+           A 138 138 0 1 1 116 312"
+        stroke="#E91E63" stroke-width="0.6" opacity="0.3"
+        stroke-dasharray="2 9" stroke-linecap="round"/>
+  <!-- ornament ticks at irregular angles (odd count, uneven spacing) -->
+  <g stroke="currentColor" stroke-width="0.7" stroke-linecap="round" opacity="0.5">
+    <line x1="180" y1="14"  x2="180" y2="26"/>
+    <line x1="296" y1="64"  x2="288" y2="73"/>
+    <line x1="346" y1="180" x2="334" y2="180"/>
+    <line x1="300" y1="292" x2="291" y2="284"/>
+    <line x1="120" y1="338" x2="124" y2="327"/>
+    <line x1="34"  y1="230" x2="46"  y2="225"/>
+    <line x1="42"  y1="108" x2="53"  y2="113"/>
+  </g>
+</svg>

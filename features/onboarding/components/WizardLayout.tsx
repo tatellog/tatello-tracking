@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta, type CtaTransform, type CtaVariant } from '@/components/PrimaryCta'
@@ -35,6 +35,12 @@ type Props = {
    *  for a sentence-case label. Default undefined → PrimaryCta's own
    *  default, so the other nine steps are unaffected. */
   ctaTransform?: CtaTransform
+  /** Show the wizard progress bar (12/12). Default `true` so the eleven
+   *  data-collection steps are unaffected. The reveal (step 12) passes
+   *  `false`: the "llegaste al cielo" peak shouldn't carry a progress
+   *  meter. When false we render an equivalent top spacer so the content
+   *  below doesn't jump up. */
+  showProgress?: boolean
   /** Optional full-screen atmosphere, mounted in absoluteFill JUST
    *  AFTER the backdrop and BEHIND the content (pointerEvents none).
    *  Lets a step paint depth (AtmosphericSky / WarmBloomField / star
@@ -58,9 +64,11 @@ export function WizardLayout({
   ctaPill = false,
   ctaVariant,
   ctaTransform,
+  showProgress = true,
   atmosphere,
 }: Props) {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
 
   const handleBack = () => {
     if (onBack) onBack()
@@ -75,13 +83,12 @@ export function WizardLayout({
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Per-screen cosmic backdrop. Used to be in the layout root
-          shared across all screens, but the Stack's slide_from_right
-          + transparent contentStyle let the previous screen show
-          through during the 240 ms slide. Wrapping each screen with
-          its own backdrop + an opaque contentStyle means each screen
-          covers its neighbour cleanly during transitions. */}
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* The cosmic backdrop is mounted PER SCREEN (opaque colors.bg base
+          + starfield + breathing presence) so the slide transition fully
+          occludes the screen behind it — no double content. The presence
+          breath is shared via WizardPresenceContext (owned by the
+          onboarding layout) so it never restarts between screens. */}
       <WizardBackdrop />
       {/* Optional full-screen atmosphere — z-order: backdrop →
           atmosphere → content → footer/CTA. pointerEvents none so it
@@ -92,9 +99,18 @@ export function WizardLayout({
           {atmosphere}
         </View>
       ) : null}
-      <View style={styles.progressWrap}>
-        <ProgressBar current={step} total={totalSteps} />
-      </View>
+      {/* Progress meter. Hidden on the reveal (showProgress=false): the
+          peak shouldn't carry a 12/12 bar. We swap in an equal-height
+          spacer (paddingTop 12 + the bar's 3 px track) so the content
+          below keeps the same top offset and never jumps. Default true →
+          the other eleven steps are unaffected. */}
+      {showProgress ? (
+        <View style={styles.progressWrap}>
+          <ProgressBar current={step} total={totalSteps} />
+        </View>
+      ) : (
+        <View style={styles.progressSpacer} />
+      )}
 
       {showBack ? (
         <Pressable onPress={handleBack} hitSlop={12} style={styles.backWrap}>
@@ -125,17 +141,21 @@ export function WizardLayout({
           transform={ctaTransform}
         />
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  // Opaque page bg so the screen covers its neighbour during the
-  // Stack's slide transition. The backdrop renders on top of this
-  // (absolutely positioned) and the screen content renders on top of
-  // the backdrop.
+  // OPAQUE page surface so the incoming screen occludes the outgoing one
+  // during the slide (no double content). Each screen owns its own
+  // WizardBackdrop; the persistent presence shared value keeps the
+  // breath continuous across transitions.
   safe: { flex: 1, backgroundColor: colors.bg },
   progressWrap: { paddingHorizontal: 24, paddingTop: 12 },
+  // Mirrors progressWrap's footprint (paddingTop 12 + the ProgressBar's
+  // own 3 px track height) so hiding the bar keeps the layout steady
+  // instead of pulling everything up.
+  progressSpacer: { paddingTop: 12, height: 15 },
   backWrap: { paddingHorizontal: 24, paddingTop: 18, paddingBottom: 4 },
   backSpacer: { height: 22 },
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },

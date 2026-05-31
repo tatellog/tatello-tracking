@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { OrnamentShape } from '@/features/onboarding/components'
 import { usePhotosToday, type PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
@@ -38,6 +38,7 @@ const ANGLE_ORDER: PhotoAngle[] = ['front', 'side_right', 'side_left', 'back']
  */
 export default function PhotosDoneScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { source } = useLocalSearchParams<{ source?: string }>()
   const { data: photos = [] } = usePhotosToday()
 
@@ -79,7 +80,7 @@ export default function PhotosDoneScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <OrnamentShape variant="br" />
 
       <View style={styles.content}>
@@ -128,7 +129,7 @@ export default function PhotosDoneScreen() {
           <Text style={styles.ctaLabel}>{ctaLabel}</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 

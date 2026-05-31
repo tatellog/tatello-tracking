@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -20,7 +20,6 @@ import {
   DateField,
   DustMote,
   StepHeader,
-  Stepper,
   WarmBloomField,
   WizardLayout,
 } from '@/features/onboarding/components'
@@ -35,114 +34,107 @@ type CycleOption = {
   value: CycleSituation
   label: string
   description: string
-  /** When true, hide the period + length inputs — those questions
-   *  don't apply to this situation. */
+  /** When true, hide the period input — that question doesn't apply to
+   *  this situation. */
   hidesCycleInputs: boolean
 }
 
-// Five real situations rendered as cards. "skip" lives as a tertiary
-// text-link below so the screen doesn't read as 6 equal options when
-// one is an opt-out.
+// MENSTRUAL-FLOW-ONLY REDUCTION (owner decision, 2026-05): the screen used
+// to surface FIVE situations — including reproductive-state questions
+// (contraception / pregnant / postmenopause) that felt invasive to ask up
+// front. We now offer ONLY THREE menstrual-flow answers as cards + the
+// "Prefiero no decir" opt-out below. The OTHER enum values
+// (contraception / pregnant / postmenopause) STILL EXIST in
+// CYCLE_SITUATION_VALUES / the DB — existing rows use them — the UI just
+// stops OFFERING them. No migration: this UI writes a SUBSET of the enum.
 const SITUATION_OPTIONS: readonly CycleOption[] = [
   {
     value: 'menstruates',
-    label: 'Tengo ciclo menstrual',
-    description: 'Más o menos regular cada mes',
-    hidesCycleInputs: false,
-  },
-  {
-    value: 'contraception',
-    label: 'Tomo anticonceptivo',
-    description: 'Píldora, parche, inyección, DIU hormonal',
+    label: 'Más o menos regular',
+    description: 'Más o menos cada mes',
     hidesCycleInputs: false,
   },
   {
     value: 'irregular',
-    label: 'Mi ciclo es irregular',
+    label: 'Es irregular',
     description: 'Sangrado o ausencia sin patrón claro',
     hidesCycleInputs: false,
   },
   {
-    value: 'pregnant',
-    label: 'Estoy embarazada',
-    description: 'Stelar pausa el track de ciclo',
-    hidesCycleInputs: true,
-  },
-  {
-    value: 'postmenopause',
-    label: 'No menstrúo · menopausia',
-    description: 'Stelar lee tu cuerpo sin la pieza ciclo',
+    // "No tengo ciclo" — the engine treats it like the old `skip`: no
+    // cycle dimension, no optional date. We deliberately do NOT assert a
+    // REASON (menopause / pregnancy / etc.) — that would re-introduce the
+    // reproductive-state question the owner asked us to drop. Neutral copy.
+    value: 'skip',
+    label: 'No tengo ciclo',
+    description: 'Stelar lee tu cuerpo sin esa pieza',
     hidesCycleInputs: true,
   },
 ]
 
-const MIN_CYCLE_LENGTH = 21
-const MAX_CYCLE_LENGTH = 45
+// Cycle length is no longer asked during onboarding (it added perceived
+// friction without earning its keep). We still persist a sane default so
+// the downstream macro / cycle engine — which expects cycle_length_days —
+// never sees null. The user can refine it later in Settings.
 const DEFAULT_CYCLE_LENGTH = 28
 const PERIOD_WINDOW_DAYS = 60
 
+// "Prefiero no decir" opt-out — a LOCAL selection sentinel, NOT an enum
+// value (so it stays visually distinct from the "No tengo ciclo" card even
+// though both persist the same thing). On continue it behaves exactly like
+// before: it writes `cycle_situation: 'skip'` and lets the user advance,
+// without surfacing the optional date. Kept separate from the 'skip' card
+// purely so the radiogroup selection reads as two different choices.
+const OPT_OUT = 'opt-out' as const
+type Selection = CycleSituation | typeof OPT_OUT
+
 /*
- * Step 7 — Tu ciclo. Asks for the user's cycle situation first; only
- * surfaces the last-period date + cycle length when the situation
- * implies an active cycle (menstruates, contraception, irregular).
+ * Step 7 — Tu ciclo. Asks for the user's MENSTRUAL-FLOW situation first;
+ * only surfaces the OPTIONAL last-period date when the situation implies an
+ * active cycle (menstruates, irregular).
  *
- * Visual upgrades over the previous version (which read as saturated
- * with 6 stacked SelectableCards + two input sections + two caveats):
- *   • Local CycleCard with lighter borders + tighter padding so 5
- *     cards take ~80 px less than the 6 SelectableCards did.
- *   • "Prefiero no decir" moves out of the card list and becomes a
- *     small text-link below — opt-out, not a 6th option.
- *   • Hairline divider between the cards and the cycle-active inputs
- *     so the two zones read as separate without taking extra space.
- *   • Caveats tightened, voseo corrected to MX Spanish.
+ * OVER-ASKING REDUCTION (owner + uxui): the screen used to ask three things
+ * — situation, last-period date (required), cycle length (Stepper). It now
+ * asks ONE required thing (situation) plus ONE optional opt-in (the date).
+ * Cycle length was removed from onboarding entirely; we persist a silent
+ * DEFAULT_CYCLE_LENGTH (28) so the engine keeps its value.
  *
- * ELEVATION PASS (illustrator — incremental, parity with cuerpo-base):
- *   • CycleCard "ignites" with a 200 ms OPACITY crossfade (the twin of
- *     cuerpo-base's SexPill glow + about-you's hairline ignition) rather
- *     than swapping styles binary. The idle card ALWAYS keeps its solid
- *     bgCard + hairline border (legibility); two absoluteFill layers (a
- *     magenta fill 0.10 + a magenta border) and a separate shadow layer
- *     fade IN on a per-card `glow` shared value. The card "breathes toward
- *     magenta" instead of flickering.
- *   • The conditional cycle inputs REVEAL with a 280 ms fade+rise on a
- *     screen-level `reveal` shared value (robust inside the ScrollView,
- *     no fragile layout animations).
- *   • CicloSky gains a low COOL WISP (ported from cuerpo-base) so the cold
- *     lower half has ambient depth without a focal star to celebrate.
+ * MENSTRUAL-FLOW-ONLY (owner decision): the screen no longer asks about
+ * reproductive state (contraception / pregnancy / menopause). It offers
+ * exactly THREE menstrual-flow cards + the "Prefiero no decir" opt-out. See
+ * SITUATION_OPTIONS for the enum-subset note.
  *
- * SENSITIVITY PASS (behavioral validation — manifiesto care): the magenta
- * halo (cardGlowShadow — the festive "bloom under the card") is SUPPRESSED
- * for the two sensitive answers (pregnant + postmenopause, i.e. the cards
- * with hidesCycleInputs). Magenta is Stelar's color-afirmación; blooming it
- * under "Estoy embarazada" / "menopausia" can read as CELEBRATING a reply
- * the user may not be celebrating. Those cards still "ignite" clearly via
- * the fill (rgba magenta 0.10) + the 1 px magenta border — the selected
- * state stays unmistakable — just without the festive halo. See `subdued`
- * (derived from option.hidesCycleInputs) in CycleCard.
+ * Visual: a leaner local CycleCard with light borders + tight padding;
+ * "Prefiero no decir" lives as a quiet text-link below the cards (opt-out,
+ * not a 4th equal option); a hairline divider separates the cards from the
+ * cycle-active input.
  *
- * ATMOSPHERE PARITY (illustrator pass — bring step 7 to the SAME line as
- * steps 1–6): this screen was a bare dark page while every step before it
- * paints a full-screen sky. We reuse the shared atmosphere primitives
- * (AtmosphericSky + WarmBloomField + a local CicloSky) so it breathes with
- * the rest of the wizard — but DELIBERATELY COLDER and CALMER:
- *   • NO NebulaWash PNG. Steps 3's painted galaxy lends a "scene" warmth;
- *     here the theme is sensitive (cycle / pregnancy / menopause) and the
- *     beat is CONTAINMENT, not a painterly stage. The bare cool sky reads
- *     as calm holding-space.
- *   • WarmBloomField variant="exposed-low-right" — REUSED, not new. Step 6
- *     (weight) already uses "exposed", so reusing it here would chain two
- *     identical skies; "exposed-low-right" gives step 7 its own composition
- *     while protecting steps 4/5/6 (pure reuse, no new variant authored).
- *   • CicloSky — a reduced, COLD clone of step 3's AtribucionSky. The
- *     micro-stars switch from warm pink (#FBD7E3) to dimension.ciclo
- *     (#B5C4DD, the cool silver-blue cycle accent), the strata are thinned
- *     (1–2 motes pulled from each band) and the dust dimmed, so the field
- *     is quieter than step 3 — quietness as the emotional register, no
- *     focal anchor star to celebrate any one answer.
+ * INPUT ELEVATION (illustrator + uxui):
+ *   • The conditional DateField "ignites": a faint idle hairline that lights
+ *     up to magenta + a magentaHot halo when filled / picking. Placeholder
+ *     warmed to bone, "Toca para elegir", 44 pt tap target,
+ *     accessibilityValue exposes the chosen date to VoiceOver.
+ *   • The field's label carries an explicit "· opcional". COPY pending
+ *     behavioral / voice-and-copy sign-off.
+ *   • PRECISION-DIM: opening the date picker dims ONLY the atmosphere
+ *     (atmoDim → 0.4) on the same 200 ms curve as about-you.
+ *   • SCROLL-INTO-VIEW: scrollToEnd when the inline spinner mounts.
  *
- * Three clocks (5 s / 18 s / 40 s) created ONCE on the screen, shared by
- * every layer (one compás, no duplicated shared values), same periods as
- * steps 1–6.
+ * ELEVATION PASS (illustrator):
+ *   • CycleCard "ignites" with a 200 ms OPACITY crossfade. The idle card
+ *     ALWAYS keeps its solid bgCard + hairline border (legibility); a
+ *     magenta fill (0.10), a magenta border and a magenta halo fade IN on a
+ *     per-card `glow` shared value.
+ *   • The conditional cycle input REVEALS with a fade+rise on a
+ *     screen-level `reveal` shared value.
+ *   • CicloSky gains a low COOL WISP so the cold lower half has ambient
+ *     depth without a focal star to celebrate.
+ *
+ * ATMOSPHERE PARITY (illustrator): shared atmosphere primitives
+ * (AtmosphericSky + WarmBloomField + a local CicloSky), DELIBERATELY COLDER
+ * and CALMER than steps 1–6 (no NebulaWash PNG; the sensitive theme calls
+ * for a calm, contained cool sky). Three clocks (5 s / 18 s / 40 s) created
+ * ONCE here, shared by every layer (one compás, same periods as steps 1–6).
  */
 export default function TuCicloScreen() {
   const router = useRouter()
@@ -150,15 +142,21 @@ export default function TuCicloScreen() {
   const updateProfile = useUpdateProfile()
   const recordPeriod = useRecordLastPeriodStart()
 
-  const [situation, setSituation] = useState<CycleSituation | null>(
+  const [situation, setSituation] = useState<Selection | null>(
     (profile?.cycle_situation as CycleSituation | null) ?? null,
   )
   const [lastPeriod, setLastPeriod] = useState<Date | null>(null)
-  const [cycleLength, setCycleLength] = useState<number>(
-    profile?.cycle_length_days ?? DEFAULT_CYCLE_LENGTH,
-  )
   const [saving, setSaving] = useState(false)
   const [savingError, setSavingError] = useState<string | null>(null)
+
+  // Precision-dim — the date picker open flag. While the inline spinner
+  // is open the atmosphere dims (atmoDim → 0.4) and we scroll it into view.
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  // ScrollView ref so we can pull the inline spinner into view when it
+  // mounts (on small devices the ~200 px spinner can push the CTA below
+  // the fold).
+  const scrollRef = useRef<ScrollView>(null)
 
   // Shared clocks for the whole step — created ONCE here so every
   // atmosphere layer (WarmBloomField, star strata + dust) breathes on
@@ -171,6 +169,11 @@ export default function TuCicloScreen() {
   const dust = useSharedValue(0)
   const orbit = useSharedValue(0)
 
+  // Precision-mode atmosphere dimmer — withTiming target driven by the
+  // pickerOpen flag. 1 = full sky, 0.4 = calm (while picking a date).
+  // Same compás (200 ms / ease-out-quad) as about-you / cuerpo-base.
+  const atmoDim = useSharedValue(1)
+
   useEffect(() => {
     clock.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
     dust.value = withRepeat(withTiming(1, { duration: 18000, easing: Easing.linear }), -1, false)
@@ -182,29 +185,58 @@ export default function TuCicloScreen() {
     }
   }, [clock, dust, orbit])
 
-  const situationMeta =
-    SITUATION_OPTIONS.find((o) => o.value === situation) ??
-    (situation === 'skip'
-      ? { value: 'skip' as const, label: '', description: '', hidesCycleInputs: true }
-      : null)
+  useEffect(() => {
+    atmoDim.value = withTiming(pickerOpen ? 0.4 : 1, {
+      duration: 200,
+      easing: Easing.out(Easing.quad),
+    })
+    // Defensive cleanup — withTiming is one-shot, but cancel on unmount
+    // so a teardown mid-tween never leaves a dangling animation.
+    return () => cancelAnimation(atmoDim)
+  }, [pickerOpen, atmoDim])
+
+  const atmoDimStyle = useAnimatedStyle(() => ({ opacity: atmoDim.value }))
+
+  // The optional last-period date is offered ONLY for the active-cycle
+  // answers. With reproductive-state cards gone, that's just the two flow
+  // cards whose hidesCycleInputs is false (menstruates + irregular). "No
+  // tengo ciclo" ('skip') and the "Prefiero no decir" opt-out never show it.
+  const situationMeta = SITUATION_OPTIONS.find((o) => o.value === situation) ?? null
   const askCycleInputs = situationMeta !== null && !situationMeta.hidesCycleInputs
 
-  // Conditional-inputs reveal — a 280 ms fade+rise on a screen-level shared
-  // value (NOT a layout animation: those are fragile inside a ScrollView).
-  // Goes to 1 when the cycle inputs should show, back to 0 when they hide.
-  // The Animated.View container below tweens opacity + a 12→0 px translateY.
+  // Conditional-input reveal — a fade+rise on a screen-level shared value
+  // (NOT a layout animation: those are fragile inside a ScrollView). Goes
+  // to 1 when the cycle input should show, back to 0 when it hides. The
+  // Animated.View container below tweens opacity + a 16→0 px translateY.
   const reveal = useSharedValue(0)
   useEffect(() => {
     reveal.value = withTiming(askCycleInputs ? 1 : 0, {
-      duration: 280,
+      duration: 320,
       easing: Easing.out(Easing.cubic),
     })
     return () => cancelAnimation(reveal)
   }, [askCycleInputs, reveal])
   const revealStyle = useAnimatedStyle(() => ({
     opacity: reveal.value,
-    transform: [{ translateY: (1 - reveal.value) * 12 }],
+    transform: [{ translateY: (1 - reveal.value) * 16 }],
   }))
+
+  // When the situation changes away from an active cycle, the input hides;
+  // make sure the picker-open flag (and its dim) clears too.
+  useEffect(() => {
+    if (!askCycleInputs && pickerOpen) setPickerOpen(false)
+  }, [askCycleInputs, pickerOpen])
+
+  // Picker open/close — dim the atmosphere + pull the inline spinner into
+  // view so it never hides the CTA on small devices.
+  const handlePickerToggle = (open: boolean) => {
+    setPickerOpen(open)
+    if (open) {
+      // Defer to the next frame so the spinner has mounted before we
+      // measure / scroll to the end of the content.
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))
+    }
+  }
 
   // Period picker bounds — last 60 days. A first period that long
   // ago would already mean an irregular cycle.
@@ -217,9 +249,12 @@ export default function TuCicloScreen() {
     return { defaultDate: def, minDate: min, maxDate: today }
   }, [])
 
-  const canContinue = situation !== null && (askCycleInputs ? lastPeriod !== null : true)
+  // Solo la situación de ciclo bloquea Continuar. La fecha de última
+  // menstruación es OPCIONAL (opt-in): se guarda si la usuaria la da, pero
+  // nunca es requisito — puede decirla más adelante.
+  const canContinue = situation !== null
 
-  const handlePick = (next: CycleSituation) => {
+  const handlePick = (next: Selection) => {
     Haptics.selectionAsync().catch(() => {})
     setSituation(next)
   }
@@ -229,10 +264,20 @@ export default function TuCicloScreen() {
     setSavingError(null)
     setSaving(true)
     try {
+      // The "Prefiero no decir" opt-out persists the same thing the card
+      // "No tengo ciclo" does ('skip') — it advances without a cycle
+      // dimension and without an optional date. Only the LOCAL selection
+      // sentinel differs (so the two read as distinct choices in the UI).
+      const cycleSituation: CycleSituation = situation === OPT_OUT ? 'skip' : situation
       await updateProfile.mutateAsync({
-        cycle_situation: situation,
-        ...(askCycleInputs ? { cycle_length_days: cycleLength } : {}),
+        cycle_situation: cycleSituation,
+        // Cycle length is no longer edited in onboarding, but the engine
+        // still expects a value → persist the silent default for any
+        // active-cycle situation so nothing downstream sees null.
+        ...(askCycleInputs ? { cycle_length_days: DEFAULT_CYCLE_LENGTH } : {}),
       })
+      // The date is OPTIONAL: only record a period when the user actually
+      // gave one. If she left it empty we advance without inserting it.
       if (askCycleInputs && lastPeriod) {
         await recordPeriod.mutateAsync(toISODate(lastPeriod))
       }
@@ -244,7 +289,7 @@ export default function TuCicloScreen() {
     }
   }
 
-  const skipSelected = situation === 'skip'
+  const skipSelected = situation === OPT_OUT
 
   return (
     <WizardLayout
@@ -258,7 +303,16 @@ export default function TuCicloScreen() {
       ctaVariant="soft"
       ctaTransform="none"
       atmosphere={
-        <>
+        // Precision-mode wrapper — the ONE Animated.View whose opacity
+        // dims the WHOLE sky (never the content) while the date picker is
+        // open. a11y-hidden + pointerEvents none so VoiceOver never reads
+        // it between the cards and the inputs.
+        <Animated.View
+          style={[StyleSheet.absoluteFill, atmoDimStyle]}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           {/* 1. Shared cool glow — pulled up-mid so the cold recedes
               (aerial perspective); the warm lives lower. NO NebulaWash
               PNG here: the sensitive theme calls for a calm, contained
@@ -272,10 +326,11 @@ export default function TuCicloScreen() {
               wisp, full-screen, whisper-low, hidden from VoiceOver. Cooler
               + quieter than step 3 (silver-blue micro-stars, thinned). */}
           <CicloSky dust={dust} orbit={orbit} />
-        </>
+        </Animated.View>
       }
     >
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -288,9 +343,9 @@ export default function TuCicloScreen() {
           hint="Stelar lee tu ciclo cuando lo hay. Si no, lee el resto igual."
         />
 
-        {/* Single-select group — the five cards + the opt-out form ONE
+        {/* Single-select group — the three cards + the opt-out form ONE
             logical radiogroup so VoiceOver announces the mutual exclusion
-            (picking a card clears skip and vice-versa). */}
+            (picking a card clears the opt-out and vice-versa). */}
         <View
           style={styles.optionsBlock}
           accessibilityRole="radiogroup"
@@ -301,10 +356,6 @@ export default function TuCicloScreen() {
               key={opt.value}
               option={opt}
               selected={situation === opt.value}
-              // Sensitive answers (pregnant + postmenopause) suppress the
-              // festive magenta halo when selected — see CycleCard / the
-              // SENSITIVITY PASS note above. Fill + border still ignite.
-              subdued={opt.hidesCycleInputs}
               onPress={() => handlePick(opt.value)}
             />
           ))}
@@ -313,7 +364,7 @@ export default function TuCicloScreen() {
               real options. It is a radio inside the group above so it
               deselects (and is deselected by) the cards. */}
           <Pressable
-            onPress={() => handlePick('skip')}
+            onPress={() => handlePick(OPT_OUT)}
             style={styles.skipRow}
             accessibilityRole="radio"
             accessibilityLabel="Prefiero no decir"
@@ -332,31 +383,22 @@ export default function TuCicloScreen() {
             <View style={styles.cycleBlock}>
               <View style={styles.field}>
                 <DateField
-                  label="ÚLTIMA MENSTRUACIÓN"
+                  // Sentence-case label with an explicit "· opcional" so the
+                  // field never reads as a requirement — the date is opt-in.
+                  // COPY pending behavioral / voice-and-copy sign-off.
+                  label="Tu última menstruación · opcional"
+                  accessibilityLabel="Elegir tu última menstruación (opcional)"
                   value={lastPeriod}
                   onChange={setLastPeriod}
                   defaultDate={defaultDate}
                   minDate={minDate}
                   maxDate={maxDate}
-                  placeholder="Tocar para elegir"
+                  placeholder="Toca para elegir"
+                  onPickerToggle={handlePickerToggle}
                 />
                 <Text style={styles.caveat}>
-                  Si no recuerdas exacto, una aproximación está bien.
-                </Text>
-              </View>
-
-              <View style={styles.field}>
-                <Stepper
-                  label="DURACIÓN DEL CICLO"
-                  value={cycleLength}
-                  onChange={setCycleLength}
-                  min={MIN_CYCLE_LENGTH}
-                  max={MAX_CYCLE_LENGTH}
-                  step={1}
-                  unit="días"
-                />
-                <Text style={styles.caveat}>
-                  Entre 21 y 45 días. Si no estás segura, 28 es el promedio.
+                  Si no recuerdas la fecha exacta, una aproximación está bien. También puedes
+                  decírmelo más adelante.
                 </Text>
               </View>
             </View>
@@ -381,21 +423,17 @@ export default function TuCicloScreen() {
  *  All three share the EXACT borderRadius (12) of the idle card so no
  *  corner peeks out as they fade. The scale spring is unchanged.
  *
- *  `subdued` (manifiesto / sensitivity) — when true (pregnant +
- *  postmenopause), layer (a), the festive magenta HALO, is NOT rendered:
- *  magenta is Stelar's color-afirmación and blooming it under a sensitive
- *  answer can read as CELEBRATING it. The fill (b) + border (c) still
- *  crossfade in, so the selected state stays unmistakable — it simply
- *  "lights up" without the festive bloom. */
+ *  (The earlier `subdued` flag — which suppressed the festive magenta halo
+ *  for the pregnant / postmenopause answers — was removed along with those
+ *  cards. None of the three remaining flow answers is a sensitive
+ *  reproductive-state reply, so every card ignites with the full halo.) */
 function CycleCard({
   option,
   selected,
-  subdued,
   onPress,
 }: {
   option: CycleOption
   selected: boolean
-  subdued: boolean
   onPress: () => void
 }) {
   // Scale spring (unchanged) — the existing tactile bounce on selection.
@@ -434,13 +472,8 @@ function CycleCard({
             stays legible over the cosmic backdrop regardless of selection. */}
         <View style={styles.card}>
           {/* (a) Shadow layer — static magenta iOS shadow, crossfaded by
-              opacity. Behind the content so the halo blooms under the card.
-              SUPPRESSED for `subdued` cards (pregnant + postmenopause): the
-              festive magenta bloom must not "celebrate" a sensitive answer.
-              Fill + border below still ignite, so selection stays clear. */}
-          {subdued ? null : (
-            <Animated.View style={[styles.cardGlowShadow, glowStyle]} pointerEvents="none" />
-          )}
+              opacity. Behind the content so the halo blooms under the card. */}
+          <Animated.View style={[styles.cardGlowShadow, glowStyle]} pointerEvents="none" />
           {/* (b) Magenta fill — 0.10 tint, crossfaded in. */}
           <Animated.View style={[styles.cardGlowFill, glowStyle]} pointerEvents="none" />
           {/* (c) Magenta border — 1 px, crossfaded in over the hairline. */}
@@ -713,7 +746,7 @@ const styles = StyleSheet.create({
   // overflow:hidden. Same fix pattern as the sex pills in cuerpo-base.
   optionsBlock: {
     marginTop: 18,
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 14,
   },
   /* CycleCard — much lighter than the shared SelectableCard. */
@@ -736,8 +769,7 @@ const styles = StyleSheet.create({
   // per-card glow value. backgroundColor stays transparent (Android View
   // shadows don't blur → harmless transparent rect; iOS is the validation
   // platform). borderRadius matches `card` so the halo blooms from the same
-  // rounded silhouette. NOT rendered for `subdued` cards (pregnant +
-  // postmenopause) — see CycleCard's SENSITIVITY PASS note.
+  // rounded silhouette.
   cardGlowShadow: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 12,
@@ -780,15 +812,15 @@ const styles = StyleSheet.create({
   cardDescriptionOn: {
     color: colors.bone,
   },
-  /* Opt-out as a tertiary text-link, not a 6th equal-weight option.
-     marginTop 10 (vs the 6 between cards) so it reads as a meta-option
+  /* Opt-out as a tertiary text-link, not a 4th equal-weight option.
+     marginTop 14 (vs the 8 between cards) so it reads as a meta-option
      set apart from the card stack — without a full divider. */
   skipRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    marginTop: 10,
+    marginTop: 14,
     gap: 10,
   },
   // The dot is a crossfade stack: an idle dot with the selected dot fading
@@ -826,16 +858,17 @@ const styles = StyleSheet.create({
   skipLabelOn: {
     color: colors.leche,
   },
-  /* Hairline divider between cards and cycle-active inputs. marginTop 20
-     (was 22): the reveal animation now supplies its own separation. */
+  /* Hairline divider between cards and the cycle-active input. marginTop 20:
+     the reveal animation supplies its own separation. */
   divider: {
     height: 1,
     marginTop: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
+  // The single conditional input block (just the optional DateField now —
+  // the cycle-length Stepper was removed from onboarding).
   cycleBlock: {
     marginTop: 22,
-    gap: 24,
     paddingBottom: 24,
   },
   field: {

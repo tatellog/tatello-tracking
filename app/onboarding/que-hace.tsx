@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, {
   Circle,
   Defs,
@@ -51,6 +51,12 @@ const AnimatedG = Animated.createAnimatedComponent(G)
  * mounted inside the Svg via <Image href> and crowned with two thin
  * SVG overlays (a breathing ring + one orbiting dust particle) so the
  * painted orb is alive rather than a pasted thumbnail.
+ *
+ * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
+ * SCREEN (its own <WizardBackdrop />, opaque colors.bg base) so the
+ * slide transition fully occludes the screen behind it. The presence
+ * breath is shared via WizardPresenceContext so it never restarts.
+ * AtmosphericSky + WarmBloomField layer above the backdrop.
  *
  * ATMOSPHERE LIVES FULL-SCREEN (clip fix): the deep WARM apparatus (a
  * breathing field bloom, an off-frame sceneCore "sun", the nebula and a
@@ -225,6 +231,7 @@ const SCENE_A11Y_LABEL = 'Tres vistas de tu progreso: Día, Semana y Mes.'
 
 export default function QueHaceScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
 
   // Shared clocks for the whole step — hoisted here so the full-screen
   // WarmBloomField and the bounded scene Svg breathe on the SAME values
@@ -249,10 +256,14 @@ export default function QueHaceScreen() {
   }, [clock, dust, orbit])
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* The base cosmic backdrop is mounted PER SCREEN (opaque colors.bg
+          base + starfield + breathing presence) so the slide transition
+          fully occludes the screen behind it. The presence breath is
+          shared via WizardPresenceContext so it never restarts. Shared
+          cool atmosphere below — same sky as step 1, glow lowered to where
+          the three bodies live so the cool wash pools under them. */}
       <WizardBackdrop />
-      {/* Shared cool atmosphere — same sky as step 1, glow lowered to
-          where the three bodies live so the cool wash pools under them. */}
       <AtmosphericSky glow={{ cx: '50%', cy: '64%', r: '70%' }} />
       {/* Deep WARM atmosphere — full-screen so it NEVER clips to a
           rectangle. Breathes on the shared 5 s clock; its bloom centre
@@ -287,7 +298,7 @@ export default function QueHaceScreen() {
           onPress={() => router.push('/onboarding/atribucion')}
         />
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -712,6 +723,8 @@ function FlowingParticle({ clock, offset }: { clock: SharedValue<number>; offset
 }
 
 const styles = StyleSheet.create({
+  // OPAQUE so the incoming screen occludes the outgoing one during the
+  // slide; the per-screen WizardBackdrop paints the sky on top of this.
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics'
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import { createElement, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { StarLoader } from '@/components/StarLoader'
 import { ProgressBar } from '@/features/onboarding/components'
@@ -83,6 +83,7 @@ function PhotoCaptureScreen({
   single?: boolean
 }) {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const choose = useConfirm()
   const [permission, requestPermission] = useCameraPermissions()
   const cameraRef = useRef<CameraView>(null)
@@ -174,7 +175,7 @@ function PhotoCaptureScreen({
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.topBar}>
         <ProgressBar current={stepNumber} total={4} />
         <Text style={styles.eyebrow}>Foto {stepNumber} de 4</Text>
@@ -255,13 +256,14 @@ function PhotoCaptureScreen({
           <Text style={styles.footerLabel}>Saltar</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 
 function PermissionDeniedView({ onGrant }: { onGrant: () => Promise<unknown> }) {
+  const insets = useSafeAreaInsets()
   return (
-    <SafeAreaView style={styles.permSafe} edges={['top', 'bottom']}>
+    <View style={[styles.permSafe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.permWrap}>
         <Text style={styles.permTitle}>Necesitamos la cámara</Text>
         <Text style={styles.permBody}>
@@ -275,7 +277,7 @@ function PermissionDeniedView({ onGrant }: { onGrant: () => Promise<unknown> }) 
           <Text style={styles.permCtaLabel}>Permitir cámara</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 

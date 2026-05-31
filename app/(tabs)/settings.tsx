@@ -31,17 +31,21 @@ const SEX_LABEL: Record<string, string> = {
 }
 
 /** monthly_focus → settings display, mirrors the wizard's tu-intencion
- *  step. Each option carries the same poetic tagline the user saw
- *  there, so Settings reads as a continuation of the wizard's voice. */
+ *  step. The 5 ACTIVE options (weight/energy/food/patterns/other) carry
+ *  the EXACT same label + tagline the user saw in the wizard, so Settings
+ *  reads as a continuation of that voice. sleep/cycle/mind are INERT —
+ *  pruned from the wizard UI but kept here so legacy rows that still carry
+ *  those values render a label instead of falling through to null. */
 const FOCUS_LABEL: Record<string, { label: string; tagline: string }> = {
-  weight: { label: 'Bajar de peso', tagline: 'El cuerpo va a moverse' },
-  energy: { label: 'Tener más energía', tagline: 'Saber de dónde sale tu fuerza' },
+  weight: { label: 'Bajar de peso', tagline: 'Stelar trabaja para que se sostenga.' },
+  energy: { label: 'Recuperar mi energía', tagline: 'De tu energía nace la constancia.' },
+  food: { label: 'Entender cómo me alimento', tagline: 'Qué se repite alrededor de comer.' },
+  patterns: { label: 'Entender mis patrones', tagline: 'Qué hace los viernes distintos.' },
+  other: { label: 'Algo más', tagline: 'La nombras tú.' },
+  // ── Inert: pruned from the wizard UI, kept for legacy rows only. ──
   sleep: { label: 'Dormir profundo', tagline: 'La noche se vuelve descanso' },
-  food: { label: 'Comer con menos lucha', tagline: 'Que comer deje de pesar' },
   cycle: { label: 'Conocer mi ciclo', tagline: 'Tu cuerpo va a hablarte' },
-  patterns: { label: 'Entender mis patrones', tagline: 'Stelar mapea lo que se repite' },
   mind: { label: 'Calmar la mente', tagline: 'Menos ruido por dentro' },
-  other: { label: 'Otra cosa', tagline: 'La nombras tú' },
 }
 
 /*
@@ -111,7 +115,7 @@ function SettingsBody() {
     const ok = await confirmBinary(choose, {
       title: '¿Cerrar sesión?',
       description:
-        'Tus datos en este dispositivo se limpian. Podés volver a entrar con el mismo email cuando quieras.',
+        'Tus datos en este dispositivo se limpian. Puedes volver a entrar con el mismo email cuando quieras.',
       confirmLabel: 'Cerrar sesión',
       destructive: true,
     })
@@ -244,7 +248,7 @@ function SettingsBody() {
             <SectionHeader label="Tu plan" />
             <PlanRow
               label={intention?.label ?? 'Aún sin definir'}
-              value={intention?.tagline ?? 'Tocá para elegir un foco'}
+              value={intention?.tagline ?? 'Toca para elegir un foco'}
               onPress={editIntention}
               accessibilityLabel="Editar tu intención"
             />

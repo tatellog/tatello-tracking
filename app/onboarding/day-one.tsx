@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useBriefContext } from '@/features/brief/hooks'
 import { DayOneTask, WizardBackdrop } from '@/features/onboarding/components'
@@ -48,12 +48,24 @@ const FOCUS_RECAP: Record<MonthlyFocus, string> = {
  * names back what Stelar captured (sunk-cost validation), then the
  * 3 small tasks for tomorrow.
  *
+ * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
+ * SCREEN (its own <WizardBackdrop />, opaque colors.bg base) so the
+ * slide transition fully occludes the screen behind it. The presence
+ * breath is shared via WizardPresenceContext so it never restarts.
+ *
+ * The expectation note at the bottom (formerly the reveal's "QUÉ SIGUE"
+ * block) was moved here off the peak: it sets the longer arc — Stelar
+ * arma la lectura cada día, y los patrones llegan a partir del segundo
+ * ciclo — without crowding the reveal. Phrased as coach voice (serif
+ * italic), it lands as a calm promise, not a target to hit.
+ *
  * The body composition track (4 photos + initial weight) lives in
  * Settings → Track corporal; not surfaced here so Día 1 stays
  * focused on signals, not measurements.
  */
 export default function DayOneScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { data: profile } = useProfile()
   const { data: brief } = useBriefContext()
 
@@ -94,7 +106,9 @@ export default function DayOneScreen() {
   }, [profile, brief])
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* Per-screen opaque backdrop (starfield + shared breathing
+          presence) so the slide occludes and the breath never restarts. */}
       <WizardBackdrop />
       <ScrollView
         style={styles.scroll}
@@ -133,6 +147,18 @@ export default function DayOneScreen() {
             <DayOneTask key={task.num} num={task.num} text={task.text} />
           ))}
         </View>
+
+        {/* Expectation note — moved off the reveal's peak. Sets the longer
+            arc in coach voice: Stelar reads every day, and the confirmed
+            patterns arrive from the second cycle on. A calm promise, no
+            target. PLACEHOLDER COPY — voice-and-copy should review. */}
+        <View style={styles.horizonNote}>
+          <Text style={styles.horizonEyebrow}>Lo que viene</Text>
+          <Text style={styles.horizonBody}>
+            Cada día que registras, Stelar arma tu lectura. Los patrones se confirman a partir de tu
+            segundo ciclo: ahí es donde de verdad empieza a verte.
+          </Text>
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -146,11 +172,13 @@ export default function DayOneScreen() {
           <Text style={styles.ctaLabel}>Entrar a tu órbita →</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  // OPAQUE so the incoming screen occludes the outgoing one during the
+  // slide; the per-screen WizardBackdrop paints the sky on top of this.
   safe: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -243,6 +271,30 @@ const styles = StyleSheet.create({
   tasksList: {
     marginTop: 24,
     gap: 10,
+  },
+  // Expectation note — quiet horizon line below the tasks. Separated by a
+  // hairline so it reads as an aside, not a 4th task. Coach voice (serif
+  // italic), bone tone so it sits softer than the tasks.
+  horizonNote: {
+    marginTop: 22,
+    borderTopWidth: 1,
+    borderTopColor: colors.bruma,
+    paddingTop: 16,
+  },
+  horizonEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 8,
+  },
+  horizonBody: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.bone,
   },
   footer: {
     paddingHorizontal: 24,
