@@ -7,7 +7,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { type CyclePhase } from '@/features/cycle/phase'
 import { track } from '@/lib/analytics'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
-import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
+import { useMacroTargets, useMealsForDate, useWeeklyMealStats } from '@/features/macros/hooks'
+import { WeekSummary } from '@/features/macros/components/WeekSummary'
 import {
   CoachLine,
   DaySky,
@@ -94,6 +95,7 @@ function MealsBody() {
 
   const cycle = useCyclePhase()
   const coachCopy = skyCopy(meals.length, cycle?.phase ?? null)
+  const week = useWeeklyMealStats()
 
   return (
     <View style={styles.screen}>
@@ -135,6 +137,11 @@ function MealsBody() {
               <Text style={styles.targetInviteChevron}>›</Text>
             </Pressable>
           )}
+
+          {/* Esta semana — a calm, collapsible weekly read (protein +
+              logging consistency), in coach voice. Lives here, not in a
+              stats tab and not in Progreso (which is the body). */}
+          <WeekSummary stats={week.stats} isLoading={week.isLoading} isError={week.isError} />
 
           {/* Sumar comida (search / create) + Tu estela (the food
               history) — two sections, both owned by MealComposer. */}

@@ -154,6 +154,19 @@ export async function getMealsForDate(mealDate: string): Promise<Meal[]> {
   return data
 }
 
+/** Meals across an inclusive [startDate, endDate] range — feeds the
+ *  weekly aggregate in Comidas. RLS scopes rows to the caller. */
+export async function getMealsInRange(startDate: string, endDate: string): Promise<Meal[]> {
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .gte('meal_date', startDate)
+    .lte('meal_date', endDate)
+    .order('meal_date', { ascending: true })
+  if (error) throw error
+  return data
+}
+
 export async function getMealById(id: string): Promise<Meal | null> {
   const { data, error } = await supabase.from('meals').select('*').eq('id', id).maybeSingle()
   if (error) throw error

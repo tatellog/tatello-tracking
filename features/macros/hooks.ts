@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 import { useBriefContext } from '@/features/brief/hooks'
 import { patchBriefCache, restoreBriefCache } from '@/lib/briefCache'
 import { queryKeys } from '@/lib/queryKeys'
+import { todayInTimezone } from '@/lib/time'
 
 import {
   createMeal,
@@ -10,6 +12,7 @@ import {
   getFrequentMeals,
   getMealById,
   getMealsForDate,
+  getMealsInRange,
   updateMeal,
   upsertMacroTargets,
   type CreateMealInput,
@@ -17,6 +20,7 @@ import {
   type Meal,
   type UpdateMealInput,
 } from './api'
+import { computeWeeklyMealStats, lastNDates, type WeeklyMealStats } from './logic'
 
 import type { MacroTargetsRow } from '@/features/brief/api'
 
@@ -67,6 +71,44 @@ export function useMealsForDate(date: string) {
     queryKey: queryKeys.macros.meals(date),
     queryFn: () => getMealsForDate(date),
   })
+}
+
+/*
+ * The "Esta semana" aggregate for Comidas — protein + logging
+ * consistency over the trailing 7 days. Keyed under the ['macros','meals']
+ * prefix so meal mutations refresh it for free. Stats are computed in a
+ * memo (combining the week's meals with the optional protein reference),
+ * so the protein target updating recomputes without a refetch.
+ */
+export function useWeeklyMealStats(): {
+  stats: WeeklyMealStats | null
+  isLoading: boolean
+  isError: boolean
+} {
+  const today = todayInTimezone()
+  const { weekDates, start } = useMemo(() => {
+    const dates = lastNDates(today, 7)
+    return { weekDates: dates, start: dates[0]! }
+  }, [today])
+
+  const targetsQuery = useMacroTargets()
+  const mealsQuery = useQuery({
+    queryKey: queryKeys.macros.weeklyStats(today),
+    queryFn: () => getMealsInRange(start, today),
+    staleTime: 5 * 60_000,
+    refetchOnMount: 'always',
+  })
+
+  const proteinTarget = targetsQuery.data?.protein_g ?? null
+  const stats = useMemo(
+    () =>
+      mealsQuery.data
+        ? computeWeeklyMealStats(mealsQuery.data, weekDates, proteinTarget)
+        : null,
+    [mealsQuery.data, weekDates, proteinTarget],
+  )
+
+  return { stats, isLoading: mealsQuery.isLoading, isError: mealsQuery.isError }
 }
 
 export function useMealById(id: string | undefined) {

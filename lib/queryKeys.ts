@@ -30,6 +30,9 @@ export const queryKeys = {
     all: ['macros'] as const,
     targets: () => ['macros', 'targets'] as const,
     meals: (date: string) => ['macros', 'meals', date] as const,
+    // Under the 'macros','meals' prefix so meal mutations that invalidate
+    // ['macros','meals'] also refresh the weekly aggregate for free.
+    weeklyStats: (today: string) => ['macros', 'meals', 'weekly', today] as const,
     meal: (id: string) => ['macros', 'meal', id] as const,
     frequentMeals: () => ['macros', 'frequentMeals'] as const,
     suggestions: (mealType: string) => ['mealSuggestions', mealType] as const,

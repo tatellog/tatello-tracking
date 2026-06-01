@@ -1,0 +1,198 @@
+import { useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeIn } from 'react-native-reanimated'
+
+import { EyebrowLabel } from '@/components/EyebrowLabel'
+import type { WeeklyMealStats } from '@/features/macros/logic'
+import { colors, typography } from '@/theme'
+
+/*
+ * "Esta semana" — a calm, collapsible weekly read of food, living in the
+ * Comidas tab (its natural home; NOT a stats tab, NOT Progreso — that's
+ * the body). Manifesto-safe by construction: it surfaces PROTEIN (the
+ * cared metric) and logging CONSISTENCY, in coach voice, opening with a
+ * warm line before any number. It never counts "good/bad" foods, never
+ * shows a %-to-goal, never a calorie headline.
+ *
+ * Collapsed by default — the day's sky stays the tab's focus; the week is
+ * a layer the user opens, not one that asks for attention.
+ */
+
+/** The warm opening line — picks the sentence from the shape of the week,
+ *  always observing, never racing or scolding. */
+function coachLine(stats: WeeklyMealStats): string {
+  const { daysLogged, daysHitProtein } = stats
+  if (daysHitProtein != null && daysLogged > 0 && daysHitProtein * 2 >= daysLogged) {
+    return 'Esta semana cuidaste tu proteína. Tu cuerpo lo nota.'
+  }
+  if (daysLogged >= 4) {
+    return 'Vas dejando rastro. Cada registro te ayuda a verte.'
+  }
+  return 'Tu semana se está dibujando, día a día.'
+}
+
+function ConsistencyLine({ stats }: { stats: WeeklyMealStats }) {
+  // No fixed "/7" denominator — a count, never a streak/quota (which the
+  // manifesto forbids). "Registraste · N días" observes, doesn't grade.
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>Registraste</Text>
+      <Text style={styles.rowValue}>
+        <Text style={styles.rowNum}>{stats.daysLogged}</Text>
+        <Text style={styles.rowUnit}> días</Text>
+      </Text>
+    </View>
+  )
+}
+
+function ProteinLine({ stats }: { stats: WeeklyMealStats }) {
+  if (stats.proteinTarget != null && stats.daysHitProtein != null) {
+    return (
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Proteína en tu referencia</Text>
+        <Text style={styles.rowValue}>
+          <Text style={styles.rowNum}>{stats.daysHitProtein}</Text>
+          <Text style={styles.rowUnit}> de {stats.daysLogged} días</Text>
+        </Text>
+      </View>
+    )
+  }
+  if (stats.proteinAvgPerLoggedDay != null) {
+    return (
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Proteína promedio</Text>
+        <Text style={styles.rowValue}>
+          <Text style={styles.rowNum}>{Math.round(stats.proteinAvgPerLoggedDay)}</Text>
+          <Text style={styles.rowUnit}> g por día</Text>
+        </Text>
+      </View>
+    )
+  }
+  return null
+}
+
+export function WeekSummary({
+  stats,
+  isLoading,
+  isError,
+}: {
+  stats: WeeklyMealStats | null
+  isLoading: boolean
+  isError: boolean
+}) {
+  const [open, setOpen] = useState(false)
+
+  // Hide the section entirely while the first load is in flight or on
+  // error — a weekly read is supplementary; it should never block or
+  // clutter the day. (The day's sky already carries the screen.)
+  if (isLoading || isError || !stats) return null
+
+  const hasData = stats.daysLogged > 0
+
+  return (
+    <View style={styles.wrap}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        style={styles.header}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel="Esta semana"
+      >
+        <EyebrowLabel tone="magenta" size={10}>
+          Esta semana
+        </EyebrowLabel>
+        <Text style={styles.toggle}>{open ? 'Ocultar' : 'Ver'}</Text>
+      </Pressable>
+
+      {open ? (
+        <Animated.View entering={FadeIn.duration(260)} style={styles.body}>
+          {hasData ? (
+            <>
+              <Text style={styles.coach}>{coachLine(stats)}</Text>
+              <ConsistencyLine stats={stats} />
+              <ProteinLine stats={stats} />
+            </>
+          ) : (
+            <Text style={styles.empty}>
+              Tu semana apenas comienza. Con unos días de registro aparece tu patrón.
+            </Text>
+          )}
+        </Animated.View>
+      ) : null}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    marginTop: 22,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  toggle: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+  },
+  body: {
+    marginTop: 12,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  // The warm line opens the card, before any number.
+  coach: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: colors.bone,
+    marginBottom: 14,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  rowLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    flex: 1,
+  },
+  rowValue: {
+    marginLeft: 12,
+  },
+  rowNum: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.heading,
+    color: colors.leche,
+    letterSpacing: -0.3,
+  },
+  rowUnit: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  empty: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13.5,
+    lineHeight: 20,
+    color: colors.bone,
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+})

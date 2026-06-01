@@ -76,3 +76,67 @@ export function deriveMacroMessage(
   // 8 — default summary line.
   return `Te quedan ${proteinRemaining}g de proteína y ${calRemaining} cal.`
 }
+
+/* ─── Weekly meal aggregate (the "Esta semana" layer in Comidas) ─────
+ *
+ * Pure: takes the week's meals + the 7 target dates + an optional protein
+ * reference, returns the read-only stats the weekly view shows. Framing
+ * is manifesto-safe by construction — it counts protein and logging
+ * CONSISTENCY, never "good/bad" food categories, and never a %-to-goal.
+ */
+export type WeeklyMealStats = {
+  /** Distinct days within the window that have at least one logged meal. */
+  daysLogged: number
+  /** Window length (7). */
+  totalDays: number
+  /** Mean protein over the LOGGED days only (null if none logged) — we
+   *  never average over unlogged days, which would read as a punishment. */
+  proteinAvgPerLoggedDay: number | null
+  /** The protein reference, if the user set one. */
+  proteinTarget: number | null
+  /** Of the logged days, how many reached the protein reference (null
+   *  when there's no reference to compare against). */
+  daysHitProtein: number | null
+}
+
+/** The N calendar dates ending at `today` (inclusive), oldest first.
+ *  Pure Y-M-D calendar math (UTC epoch days) so it's timezone-agnostic. */
+export function lastNDates(today: string, n: number): string[] {
+  const [y, m, d] = today.split('-').map(Number)
+  const base = Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1)
+  const out: string[] = []
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const dt = new Date(base - i * 86_400_000)
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+    const dd = String(dt.getUTCDate()).padStart(2, '0')
+    out.push(`${dt.getUTCFullYear()}-${mm}-${dd}`)
+  }
+  return out
+}
+
+export function computeWeeklyMealStats(
+  meals: readonly { meal_date: string | null; protein_g: number | string }[],
+  weekDates: readonly string[],
+  proteinTarget: number | null,
+): WeeklyMealStats {
+  const inWeek = new Set(weekDates)
+  const proteinByDate = new Map<string, number>()
+  for (const meal of meals) {
+    if (meal.meal_date == null || !inWeek.has(meal.meal_date)) continue
+    proteinByDate.set(
+      meal.meal_date,
+      (proteinByDate.get(meal.meal_date) ?? 0) + Number(meal.protein_g),
+    )
+  }
+  const perDay = [...proteinByDate.values()]
+  const daysLogged = perDay.length
+  return {
+    daysLogged,
+    totalDays: weekDates.length,
+    proteinAvgPerLoggedDay:
+      daysLogged === 0 ? null : perDay.reduce((a, b) => a + b, 0) / daysLogged,
+    proteinTarget,
+    daysHitProtein:
+      proteinTarget == null ? null : perDay.filter((p) => p >= proteinTarget).length,
+  }
+}
