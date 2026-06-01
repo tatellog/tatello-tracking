@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { BodyMeasurementSchema, type BodyMeasurement } from '@/features/brief/api'
 import { supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/withTimeout'
 
 const MeasurementListSchema = z.array(BodyMeasurementSchema)
 
@@ -179,9 +180,20 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
  * (the next-oldest front photo becomes the "antes").
  */
 export async function deletePhoto(id: string, storagePath: string): Promise<void> {
-  const { error } = await supabase.from('photos').delete().eq('id', id)
+  const { error } = await withTimeout(
+    // Promise.resolve adopts the Postgrest thenable into a real Promise.
+    Promise.resolve(supabase.from('photos').delete().eq('id', id)),
+    15_000,
+    'No se pudo eliminar la foto. Revisa tu conexión e intenta de nuevo.',
+  )
   if (error) throw error
-  await supabase.storage.from('progress-photos').remove([storagePath])
+  // Best-effort storage cleanup — timeout-guarded so a stalled remove
+  // can't hang the mutation; an orphaned object only leaks bytes.
+  try {
+    await withTimeout(supabase.storage.from('progress-photos').remove([storagePath]), 15_000)
+  } catch {
+    // Ignore — the row is gone, which is what the diptych reads.
+  }
 }
 
 /* ─── extra reads for the Progress overview cards ────────────────── */

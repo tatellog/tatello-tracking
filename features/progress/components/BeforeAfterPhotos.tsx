@@ -291,8 +291,11 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     if (result.canceled || !result.assets[0]) return
     try {
       await takePhoto.mutateAsync({ uri: result.assets[0].uri, angle: 'front' })
-    } catch {
-      Alert.alert('Foto', 'No se pudo subir la foto. Inténtalo de nuevo.')
+    } catch (err) {
+      Alert.alert(
+        'No se pudo subir',
+        err instanceof Error ? err.message : 'Intenta de nuevo.',
+      )
     }
   }
 
@@ -320,7 +323,17 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
       {
         text: 'Eliminar',
         style: 'destructive',
-        onPress: () => deletePhoto.mutate({ id: photo.id, storagePath: photo.storage_path }),
+        onPress: () =>
+          deletePhoto.mutate(
+            { id: photo.id, storagePath: photo.storage_path },
+            {
+              onError: (err) =>
+                Alert.alert(
+                  'No se pudo eliminar',
+                  err instanceof Error ? err.message : 'Intenta de nuevo.',
+                ),
+            },
+          ),
       },
     ])
   }

@@ -2,6 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import { Platform } from 'react-native'
 
 import { requireUserId, supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/withTimeout'
 
 import type { PhotoAngle } from './hooks/usePhotosToday'
 
@@ -12,10 +13,14 @@ type UploadResult = {
   byte_size: number
 }
 
-// 1280 px wide keeps a progress photo crisp in the diptych while cutting
-// upload bytes ~30% vs 1500 — uploads finish noticeably faster.
-const MAX_WIDTH = 1280
-const JPEG_QUALITY = 0.8
+// 1080 px wide is plenty for a progress photo (shown ~150 px in the
+// diptych, fine in the share card too) and keeps the upload small so it
+// finishes fast on a phone connection.
+const MAX_WIDTH = 1080
+const JPEG_QUALITY = 0.72
+// Hard ceilings so a stalled connection fails (recoverable) instead of
+// hanging the spinner forever.
+const UPLOAD_TIMEOUT_MS = 30_000
 
 /*
  * Resize → JPEG-compress → upload-to-bucket → insert metadata row.
@@ -54,22 +59,31 @@ export async function processAndUploadFromUri(
   // — the SDK reads zero from the Blob. An ArrayBuffer carries the
   // real bytes, which is the documented RN pattern (same fix lives in
   // profile/api.ts uploadAvatar).
-  const { error: uploadErr } = await supabase.storage
-    .from('progress-photos')
-    .upload(path, compressed.bytes, {
+  const { error: uploadErr } = await withTimeout(
+    supabase.storage.from('progress-photos').upload(path, compressed.bytes, {
       contentType: 'image/jpeg',
       cacheControl: '3600',
-    })
+    }),
+    UPLOAD_TIMEOUT_MS,
+    'La foto tardó demasiado en subir. Revisa tu conexión e intenta de nuevo.',
+  )
   if (uploadErr) throw uploadErr
 
-  const { error: insertErr } = await supabase.from('photos').insert({
-    user_id: userId,
-    angle,
-    storage_path: path,
-    width: compressed.width,
-    height: compressed.height,
-    byte_size: compressed.byteSize,
-  })
+  const { error: insertErr } = await withTimeout(
+    // Promise.resolve adopts the Postgrest thenable into a real Promise so
+    // Promise.race (inside withTimeout) accepts it.
+    Promise.resolve(
+      supabase.from('photos').insert({
+        user_id: userId,
+        angle,
+        storage_path: path,
+        width: compressed.width,
+        height: compressed.height,
+        byte_size: compressed.byteSize,
+      }),
+    ),
+    UPLOAD_TIMEOUT_MS,
+  )
   if (insertErr) {
     // Best-effort cleanup: if the metadata row fails, the storage
     // object is orphaned. Try to delete it so we don't leak bytes.
