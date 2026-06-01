@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Circle, Line } from 'react-native-svg'
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { CycleRing } from '@/features/progress/components/CycleRing'
 import {
   ACTIVE_CYCLE_SITUATIONS,
   cyclePhaseFromPeriod,
@@ -17,12 +17,25 @@ import { colors, typography } from '@/theme'
 
 import { useLastPeriodStart } from '../hooks'
 
-// Spanish display label for each phase key.
+// Visible phase labels in lenguaje de EXPERIENCIA, never clinical /
+// fertility terms ("Ovulatoria"/"Lútea" read as a pregnancy app and are
+// off-limits per cycle-voice-spec). The engine keeps the clinical keys
+// internally; only the UI is translated.
 const PHASE_LABEL: Record<CyclePhase, string> = {
-  menstrual: 'Menstrual',
-  folicular: 'Folicular',
-  ovulatoria: 'Ovulatoria',
-  lutea: 'Lútea',
+  menstrual: 'Tu período',
+  folicular: 'Primera mitad',
+  ovulatoria: 'Mitad del ciclo',
+  lutea: 'Semana antes',
+}
+
+// The card's reason to exist for a weight app: a warm line that keeps the
+// scale from reading as failure when it's really the cycle (anti-culpa de
+// balanza, cycle-voice-spec Capa A). Only the two phases where water
+// retention moves the number speak; the calm phases stay silent.
+const COACH_LINE: Partial<Record<CyclePhase, string>> = {
+  menstrual: 'Estos días tu cuerpo retiene más agua. Si la balanza sube, no es grasa: es tu ciclo.',
+  lutea:
+    'Tu cuerpo puede retener algo de agua estos días. Es normal y se va. No dejes que el número te diga cómo vas.',
 }
 
 /* ─────────────────────── Component ─────────────────────── */
@@ -43,6 +56,7 @@ const PHASE_LABEL: Record<CyclePhase, string> = {
  */
 export function CycleCard() {
   const router = useRouter()
+  const reduce = useReducedMotion()
   const { data: profile } = useProfile()
   const { data: lastPeriod } = useLastPeriodStart()
 
@@ -89,95 +103,29 @@ export function CycleCard() {
     )
   }
 
+  const coachLine = COACH_LINE[state.phaseKey]
+  // Estimate, never a deterministic forecast: "alrededor de" keeps it as
+  // context, not a fertility/calendar countdown (cycle-voice-spec §2.1, §8).
+  const nextPeriod =
+    state.daysToNext <= 1 ? 'pronto' : `alrededor de ${state.daysToNext} días`
+
   return (
     <Animated.View entering={FadeIn.duration(360).delay(320)}>
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Tu ciclo
       </EyebrowLabel>
       <View style={styles.card}>
-        <View style={styles.headRow}>
-          <View>
-            <Text style={styles.dayNum}>Día {state.day}</Text>
-            <Text style={styles.phaseLabel}>{PHASE_LABEL[state.phaseKey]}</Text>
-          </View>
-          <View style={styles.headRight}>
-            <Text style={styles.headRightLabel}>Próximo período</Text>
-            <Text style={styles.headRightValue}>
-              {state.daysToNext <= 1 ? 'mañana' : `en ${state.daysToNext} días`}
-            </Text>
-          </View>
-        </View>
-
-        <Timeline day={state.day} length={state.length} phaseKey={state.phaseKey} />
+        <CycleRing
+          day={state.day}
+          length={state.length}
+          phaseKey={state.phaseKey}
+          phaseLabel={PHASE_LABEL[state.phaseKey]}
+          reduce={reduce}
+        />
+        <Text style={styles.nextPeriod}>Próximo período · {nextPeriod}</Text>
+        {coachLine ? <Text style={styles.coachLine}>{coachLine}</Text> : null}
       </View>
     </Animated.View>
-  )
-}
-
-/* Mini timeline — a horizontal track with a marker at today's day +
- * coloured bands for each phase. The whole length spans the full
- * cycle (`length` days) so a quick glance shows how far through the
- * arc the user is. */
-function Timeline({
-  day,
-  length,
-  phaseKey,
-}: {
-  day: number
-  length: number
-  phaseKey: CyclePhase
-}) {
-  const W = 340
-  const H = 28
-  const padX = 6
-  const trackY = H / 2
-
-  // Phase boundaries (in days).
-  const menstrualEnd = 5
-  const ovStart = Math.floor(length / 2) - 2
-  const ovEnd = ovStart + 4
-
-  const x = (d: number) => padX + ((d - 1) / (length - 1)) * (W - 2 * padX)
-
-  const xToday = x(day)
-
-  // Highlight band for the current phase, dim band for everything else.
-  const phaseRange = (() => {
-    if (phaseKey === 'menstrual') return [1, menstrualEnd]
-    if (phaseKey === 'folicular') return [menstrualEnd + 1, ovStart - 1]
-    if (phaseKey === 'ovulatoria') return [ovStart, ovEnd]
-    return [ovEnd + 1, length]
-  })()
-
-  return (
-    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
-      {/* Base track — quiet hairline across the whole cycle. */}
-      <Line
-        x1={padX}
-        y1={trackY}
-        x2={W - padX}
-        y2={trackY}
-        stroke="#FFFFFF"
-        strokeOpacity={0.1}
-        strokeWidth={1.2}
-        strokeLinecap="round"
-      />
-      {/* Current phase highlight band. */}
-      <Line
-        x1={x(phaseRange[0]!)}
-        y1={trackY}
-        x2={x(phaseRange[1]!)}
-        y2={trackY}
-        stroke={colors.magenta}
-        strokeOpacity={0.55}
-        strokeWidth={2.4}
-        strokeLinecap="round"
-      />
-      {/* Today marker — a luminous dot with bloom. */}
-      <Circle cx={xToday} cy={trackY} r={9} fill={colors.magenta} opacity={0.18} />
-      <Circle cx={xToday} cy={trackY} r={5} fill={colors.magenta} />
-      <Circle cx={xToday} cy={trackY} r={2} fill="#FFFFFF" opacity={0.95} />
-    </Svg>
   )
 }
 
@@ -197,42 +145,27 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.6,
   },
-  headRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  dayNum: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 26,
-    color: colors.leche,
-    letterSpacing: -0.6,
-  },
-  phaseLabel: {
-    marginTop: 2,
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.ui,
-    color: colors.magenta,
-    letterSpacing: -0.2,
-  },
-  headRight: {
-    alignItems: 'flex-end',
-  },
-  headRightLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 1.6,
-    color: colors.niebla,
-    textTransform: 'uppercase',
-  },
-  headRightValue: {
+  // "Próximo período · en N días" — a quiet anchor below the ring, never
+  // the headline. Honest projection, never a fertility/ovulation forecast.
+  nextPeriod: {
     marginTop: 4,
-    fontFamily: typography.serifSemi,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  // Coach line — the anti-culpa-de-balanza message. Cormorant italic (coach
+  // voice), warm, only present in the two phases that move the scale.
+  coachLine: {
+    marginTop: 14,
+    fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: colors.bone,
+    textAlign: 'center',
+    paddingHorizontal: 6,
   },
   emptyHint: {
     fontFamily: typography.serif,
