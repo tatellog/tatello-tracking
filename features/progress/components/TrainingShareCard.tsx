@@ -118,16 +118,13 @@ function PhotoFrame({
  *             gold glow (no magenta on the sign). Photo medium 4:5 keeps
  *             the lone second magenta as a soft halo.
  */
-/* The sign's celestial glyph in oro — a constellation emblem, the
- * brand's "tu cielo te reconoce" made into a mark. `glow` adds a soft
- * gold halo (the hero treatment on the sello variant). */
-function SignGlyph({ sign, size, glow }: { sign: ZodiacSign; size: number; glow?: boolean }) {
+/* The sign's celestial glyph in oro — a small, delicate mark. The line
+ * symbol is minimal, so it reads as an intentional crown at a small size
+ * but looks crude blown up; keep it compact on every variant (the hero
+ * is the photo / number / the big LEO text, not the glyph). */
+function SignGlyph({ sign, size }: { sign: ZodiacSign; size: number }) {
   const Glyph = GLYPH_BY_SIGN[sign]
-  return (
-    <View style={glow ? styles.glyphGlow : undefined}>
-      <Glyph width={size} height={size} color={colors.oro} />
-    </View>
-  )
+  return <Glyph width={size} height={size} color={colors.oro} />
 }
 
 export function TrainingShareCard({
@@ -230,7 +227,7 @@ export function TrainingShareCard({
         <>
           <View style={styles.middle}>
             <View style={styles.sealHeader}>
-              <SignGlyph sign={sign} size={54} glow />
+              <SignGlyph sign={sign} size={30} />
               <Text style={styles.eyebrowMd}>TU</Text>
               <Text style={styles.signHuge}>{signLabel.toUpperCase().replace('TU ', '')}</Text>
               <Text style={styles.dayEyebrow}>{dayLine}</Text>
@@ -353,15 +350,6 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     textTransform: 'uppercase',
     textAlign: 'center',
-  },
-  // Soft gold halo behind the glyph — the hero treatment on sello. The
-  // wrapper is small, so the rectangular iOS shadow reads as ambient
-  // light, not a box.
-  glyphGlow: {
-    shadowColor: colors.oro,
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
   },
   // ── cifra: glyph + sign label, stacked and centred ──
   cifraSign: {
