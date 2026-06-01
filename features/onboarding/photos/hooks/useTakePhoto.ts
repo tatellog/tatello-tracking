@@ -9,14 +9,16 @@ export function useTakePhoto() {
   return useMutation({
     mutationFn: ({ uri, angle }: { uri: string; angle: PhotoAngle }) =>
       processAndUploadFromUri(uri, angle),
-    onSuccess: async () => {
+    onSuccess: () => {
+      // Fire-and-forget — do NOT await. The spinner is tied to this
+      // mutation's pending state, and awaiting the refetch (which re-signs
+      // every photo URL) kept the spinner up for the whole round-trip AFTER
+      // the upload already finished. Invalidate in the background; the
+      // diptych fills in a beat later when the refetch lands.
       // `refetchType: 'all'` forces inactive queries to refetch too —
       // covers the case where the antes/después preview was mounted
       // earlier but is paused while the picker is up.
-      await qc.invalidateQueries({
-        queryKey: queryKeys.photos.all,
-        refetchType: 'all',
-      })
+      void qc.invalidateQueries({ queryKey: queryKeys.photos.all, refetchType: 'all' })
     },
   })
 }

@@ -12,7 +12,9 @@ type UploadResult = {
   byte_size: number
 }
 
-const MAX_WIDTH = 1500
+// 1280 px wide keeps a progress photo crisp in the diptych while cutting
+// upload bytes ~30% vs 1500 — uploads finish noticeably faster.
+const MAX_WIDTH = 1280
 const JPEG_QUALITY = 0.8
 
 /*
