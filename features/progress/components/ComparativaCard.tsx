@@ -13,7 +13,6 @@ import { useMeasurements, useRecentSleepLogs, useRecentWorkoutDates } from '../h
 
 type Snapshot = {
   weightKg: number | null
-  waistCm: number | null
   workouts28d: number
   sleepAvg7d: number | null
 }
@@ -55,7 +54,6 @@ function buildNowSnapshot(
       : recentSleep.reduce((sum, s) => sum + s.hours, 0) / recentSleep.length
   return {
     weightKg: latest?.weight_kg ?? null,
-    waistCm: latest?.waist_cm ?? null,
     workouts28d,
     sleepAvg7d,
   }
@@ -87,7 +85,6 @@ function buildPastSnapshot(
       : recentSleep.reduce((sum, s) => sum + s.hours, 0) / recentSleep.length
   return {
     weightKg: past?.weight_kg ?? null,
-    waistCm: past?.waist_cm ?? null,
     workouts28d: workoutsPast,
     sleepAvg7d: sleepAvgPast,
   }
@@ -96,11 +93,13 @@ function buildPastSnapshot(
 /* ─────────────────────── Component ─────────────────────── */
 
 /**
- * Multi-metric "Hace 30 días vs Hoy" card. Surfaces 4 dimensions at
- * once — weight, cintura, entrenos, sueño — so the user reads their
- * change as a multi-axis snapshot, not just a weight number. Each
- * metric is only rendered when there's data for it; missing rows are
- * silently skipped instead of showing "—" placeholders.
+ * Multi-metric "Hace 30 días vs Hoy" card. Surfaces 3 dimensions at
+ * once — weight, entrenos, sueño — so the user reads their change as a
+ * multi-axis snapshot, not just a weight number. (Cintura was dropped
+ * until there's a UI to log waist — it has no capture surface yet, so
+ * tapping it only ever routed to the weight logger.) A dimension with
+ * no data on one or both sides renders as an invitation row that routes
+ * to the right logging surface.
  */
 export function ComparativaCard() {
   const measurements = useMeasurements(null)
@@ -117,10 +116,7 @@ export function ComparativaCard() {
     // only opened the app yesterday, the past column would be all
     // dashes — better to render nothing.
     const has =
-      pastSnap.weightKg != null ||
-      pastSnap.waistCm != null ||
-      pastSnap.workouts28d > 0 ||
-      pastSnap.sleepAvg7d != null
+      pastSnap.weightKg != null || pastSnap.workouts28d > 0 || pastSnap.sleepAvg7d != null
     return { now: nowSnap, past: pastSnap, hasComparison: has }
   }, [measurements.data, workouts.data, sleeps.data])
 
@@ -169,26 +165,6 @@ export function ComparativaCard() {
         now.weightKg == null
           ? 'Registra tu peso de hoy'
           : 'Necesitamos otra medición para comparar',
-      onPress: () => router.push('/log-measurement'),
-    })
-  }
-
-  // ── Cintura ──
-  if (past.waistCm != null && now.waistCm != null) {
-    const diff = now.waistCm - past.waistCm
-    rows.push({
-      kind: 'filled',
-      label: 'Cintura',
-      past: `${past.waistCm.toFixed(0)} cm`,
-      now: `${now.waistCm.toFixed(0)} cm`,
-      delta: formatDelta(diff, 'cm'),
-      relPct: relPct(diff, past.waistCm),
-    })
-  } else {
-    rows.push({
-      kind: 'empty',
-      label: 'Cintura',
-      cta: 'Suma tu cintura cuando midas',
       onPress: () => router.push('/log-measurement'),
     })
   }
@@ -319,18 +295,20 @@ function relPct(delta: number, base: number): number {
   return (Math.abs(delta) / Math.abs(base)) * 100
 }
 
+// No pictographic arrow: U+2197/2198 render as a color emoji in fonts
+// that lack the text glyph (e.g. the displayHeavy highlight face), which
+// looked like a stray iOS sticker. The +/− sign already carries the
+// direction and is plain text in every font.
 function formatDelta(delta: number, unit: string): string | null {
   if (Math.abs(delta) < 0.05) return null
-  const arrow = delta < 0 ? '↘' : '↗'
   const sign = delta < 0 ? '−' : '+'
-  return `${arrow} ${sign}${Math.abs(delta).toFixed(1)} ${unit}`
+  return `${sign}${Math.abs(delta).toFixed(1)} ${unit}`
 }
 
 function formatCount(delta: number): string | null {
   if (delta === 0) return null
-  const arrow = delta < 0 ? '↘' : '↗'
   const sign = delta < 0 ? '−' : '+'
-  return `${arrow} ${sign}${Math.abs(delta)}`
+  return `${sign}${Math.abs(delta)}`
 }
 
 const styles = StyleSheet.create({
