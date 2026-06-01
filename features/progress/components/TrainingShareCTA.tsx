@@ -120,13 +120,14 @@ export function TrainingShareCTA() {
           variant={v.id}
           photoUri={photoUri}
           dayCount={dayCount}
+          sign={sign}
           signLabel={signLabel}
           coachCopy={coachCopy}
           onReady={onReady}
         />
       ),
     }))
-  }, [photoUri, dayCount, signLabel, coachCopy])
+  }, [photoUri, dayCount, sign, signLabel, coachCopy])
 
   // Gate: only show this section once the user has marked today as
   // trained. The CTA disappears when the user untoggles or rolls

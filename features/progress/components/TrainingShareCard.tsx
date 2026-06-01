@@ -2,6 +2,8 @@ import { useRef } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
+import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
 // Same 9:16 frame as ProgressShareCard so the captured PNG lives in
@@ -51,6 +53,8 @@ type Props = {
   photoUri: string
   /** Number of trained days within the current 28-day cycle. */
   dayCount: number
+  /** Sign key — drives the celestial glyph (GLYPH_BY_SIGN). */
+  sign: ZodiacSign
   /** "Tu Leo", "Tu Acuario"… — the user's sign label. */
   signLabel: string
   /** One short serif-italic line in the coach voice. */
@@ -114,10 +118,23 @@ function PhotoFrame({
  *             gold glow (no magenta on the sign). Photo medium 4:5 keeps
  *             the lone second magenta as a soft halo.
  */
+/* The sign's celestial glyph in oro — a constellation emblem, the
+ * brand's "tu cielo te reconoce" made into a mark. `glow` adds a soft
+ * gold halo (the hero treatment on the sello variant). */
+function SignGlyph({ sign, size, glow }: { sign: ZodiacSign; size: number; glow?: boolean }) {
+  const Glyph = GLYPH_BY_SIGN[sign]
+  return (
+    <View style={glow ? styles.glyphGlow : undefined}>
+      <Glyph width={size} height={size} color={colors.oro} />
+    </View>
+  )
+}
+
 export function TrainingShareCard({
   variant,
   photoUri,
   dayCount,
+  sign,
   signLabel,
   coachCopy,
   onReady,
@@ -180,6 +197,7 @@ export function TrainingShareCard({
           <View style={styles.middle}>
             <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
             <View style={styles.meta}>
+              <SignGlyph sign={sign} size={30} />
               <Text style={styles.dayEyebrow}>{dayLine}</Text>
               <Text style={styles.signMd}>{signUpper}</Text>
             </View>
@@ -193,7 +211,10 @@ export function TrainingShareCard({
               <Text style={styles.dayEyebrow}>DÍA</Text>
               <Text style={styles.countHuge}>{dayCount}</Text>
             </View>
-            <Text style={styles.signEyebrow}>{signUpper}</Text>
+            <View style={styles.cifraSign}>
+              <SignGlyph sign={sign} size={24} />
+              <Text style={styles.signEyebrow}>{signUpper}</Text>
+            </View>
             <View style={styles.cifraPhoto}>
               <PhotoFrame uri={photoUri} onSettled={handleSettled} />
             </View>
@@ -204,6 +225,7 @@ export function TrainingShareCard({
         <>
           <View style={styles.middle}>
             <View style={styles.sealHeader}>
+              <SignGlyph sign={sign} size={54} glow />
               <Text style={styles.eyebrowMd}>TU</Text>
               <Text style={styles.signHuge}>{signLabel.toUpperCase().replace('TU ', '')}</Text>
               <Text style={styles.dayEyebrow}>{dayLine}</Text>
@@ -315,6 +337,20 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     textTransform: 'uppercase',
     textAlign: 'center',
+  },
+  // Soft gold halo behind the glyph — the hero treatment on sello. The
+  // wrapper is small, so the rectangular iOS shadow reads as ambient
+  // light, not a box.
+  glyphGlow: {
+    shadowColor: colors.oro,
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  // ── cifra: glyph + sign label, stacked and centred ──
+  cifraSign: {
+    alignItems: 'center',
+    gap: 4,
   },
   // ── momento ────────────────────────────────────────────────────────
   meta: {
