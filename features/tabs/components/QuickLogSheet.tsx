@@ -150,6 +150,18 @@ function CameraIcon({ color }: { color: string }) {
   )
 }
 
+// A ✦ four-point star — signals the AI text parse ("describe it, we read it").
+function SparkleIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
+        fill={color}
+      />
+    </Svg>
+  )
+}
+
 // Meal type pre-selected by time of day so the common case needs no tap.
 function defaultMealType(): MealType {
   const h = new Date().getHours()
@@ -274,6 +286,14 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     )
   }
 
+  // Con texto — the scan-meal screen in describe mode: type what you ate,
+  // the AI parses it into ingredients (same confirm form as the photo scan).
+  const handleTextLog = () => {
+    if (confirmingName != null) return
+    onClose()
+    router.push({ pathname: '/scan-meal', params: { describe: '1' } })
+  }
+
   // Log manual — the scan-meal screen in manual mode: type the macros
   // by hand, photo and ingredients optional.
   const handleManualLog = () => {
@@ -393,6 +413,18 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                     <CameraIcon color={colors.magenta} />
                   </View>
                   <Text style={styles.methodLabel}>Con foto</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleTextLog}
+                  disabled={confirmingName != null}
+                  style={[styles.method, styles.methodPhoto]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Registrar una comida describiéndola"
+                >
+                  <View style={[styles.methodIcon, styles.methodIconPhoto]}>
+                    <SparkleIcon color={colors.magenta} />
+                  </View>
+                  <Text style={styles.methodLabel}>Con texto</Text>
                 </Pressable>
                 <Pressable
                   onPress={handleManualLog}

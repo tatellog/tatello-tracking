@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { supabase } from '@/lib/supabase'
 
-import { type DishIngredient } from './dishes'
+import { DISHES, type DishIngredient } from './dishes'
 
 export type ScannedIngredient = DishIngredient & { id: string }
 
@@ -36,6 +36,18 @@ export function mealTotals(ingredients: ScannedIngredient[]): {
   )
 }
 
+/*
+ * MOCK MODE — while the AI integration is being finished (paso 3), both
+ * the photo scan and the text ("escritura") scan return mock data so the
+ * whole entry UX is demoable WITHOUT an OpenAI key. The real edge-function
+ * calls are kept below, behind this flag: flip to false + deploy the
+ * `scan-meal` function (with its text branch) to go live.
+ */
+const USE_MOCK_SCAN = true
+
+const SCAN_ERROR = 'No pudimos leer tu plato. Intenta de nuevo.'
+const SCAN_DELAY_MS = 1500
+
 // Shape the edge function returns (already validated + clamped server-
 // side); we re-validate here so a bad/changed response degrades to a warm
 // error instead of feeding NaNs into the confirm form.
@@ -51,18 +63,34 @@ const ScanResponseSchema = z.object({
   ),
 })
 
-const SCAN_ERROR = 'No pudimos leer tu plato. Intenta de nuevo.'
+function withIds(meal: { name: string; ingredients: DishIngredient[] }): ScannedMeal {
+  return { name: meal.name, ingredients: meal.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })) }
+}
 
-/*
- * The real scan: resize the photo (small + cheap — the server uses
- * detail:low ≈ 512px anyway), base64 it in one pass, and hand it to the
- * `scan-meal` edge function (gpt-4o-mini, key server-side). Returns the
- * dish + ingredients the confirm form renders. A non-food photo comes
- * back as { name:'', ingredients:[] } — the UI then falls to manual entry.
- *
- * This is the seam the UI was built against; the signature is unchanged.
- */
-export async function scanMeal(photoUri: string): Promise<ScannedMeal> {
+function randomDish() {
+  return DISHES[Math.floor(Math.random() * DISHES.length)] ?? DISHES[0]!
+}
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/* ── MOCKS (paso 1) ─────────────────────────────────────────────────── */
+
+async function scanMealMock(): Promise<ScannedMeal> {
+  await delay(SCAN_DELAY_MS)
+  return withIds(randomDish())
+}
+
+async function scanMealFromTextMock(description: string): Promise<ScannedMeal> {
+  await delay(SCAN_DELAY_MS)
+  const dish = randomDish()
+  // Echo the user's words as the meal name when they wrote something, so
+  // the confirm form feels like it parsed *their* text.
+  return withIds({ name: description.trim() || dish.name, ingredients: dish.ingredients })
+}
+
+/* ── REAL calls (activated in paso 3: USE_MOCK_SCAN=false + deploy) ───── */
+
+async function scanMealReal(photoUri: string): Promise<ScannedMeal> {
   const processed = await ImageManipulator.manipulateAsync(
     photoUri,
     [{ resize: { width: 768 } }],
@@ -77,9 +105,31 @@ export async function scanMeal(photoUri: string): Promise<ScannedMeal> {
 
   const parsed = ScanResponseSchema.safeParse(data)
   if (!parsed.success) throw new Error(SCAN_ERROR)
+  return withIds(parsed.data)
+}
 
-  return {
-    name: parsed.data.name,
-    ingredients: parsed.data.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })),
-  }
+async function scanMealFromTextReal(description: string): Promise<ScannedMeal> {
+  // The edge function gets a `text` branch in paso 3 (parse a description
+  // into the same ingredient shape). Same validation contract.
+  const { data, error } = await supabase.functions.invoke('scan-meal', {
+    body: { text: description },
+  })
+  if (error) throw new Error(SCAN_ERROR)
+
+  const parsed = ScanResponseSchema.safeParse(data)
+  if (!parsed.success) throw new Error(SCAN_ERROR)
+  return withIds(parsed.data)
+}
+
+/* ── Public seams (UI calls these; mock vs real is internal) ─────────── */
+
+/** Scan a meal PHOTO → dish + ingredients. Mocked until paso 3. */
+export async function scanMeal(photoUri: string): Promise<ScannedMeal> {
+  return USE_MOCK_SCAN ? scanMealMock() : scanMealReal(photoUri)
+}
+
+/** Parse a TEXT description ("2 huevos con pan") → dish + ingredients.
+ *  Mocked until paso 3. */
+export async function scanMealFromText(description: string): Promise<ScannedMeal> {
+  return USE_MOCK_SCAN ? scanMealFromTextMock(description) : scanMealFromTextReal(description)
 }

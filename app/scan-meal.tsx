@@ -44,6 +44,7 @@ import {
   ingredientProtein,
   mealTotals,
   scanMeal,
+  scanMealFromText,
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
 import { SkyBackground } from '@/features/tabs/components'
@@ -261,22 +262,27 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  */
 export default function ScanMealScreen() {
   const router = useRouter()
-  const { uri, editId, manual } = useLocalSearchParams<{
+  const { uri, editId, manual, describe } = useLocalSearchParams<{
     uri?: string
     editId?: string
     manual?: string
+    describe?: string
   }>()
   const isEdit = !!editId
   // Manual log — no scan, no ingredient breakdown; the user types the
   // protein + calories. The photo and name stay optional.
   const isManual = !!manual
+  // Describe-by-AI — the user types what they ate; the AI parses it into
+  // ingredients (same confirm form as the photo scan).
+  const isDescribe = !!describe
   const createMeal = useCreateMeal()
   const updateMeal = useUpdateMeal()
   const editMeal = useMealById(editId)
 
-  const [phase, setPhase] = useState<'scanning' | 'confirm'>(
-    isEdit || isManual ? 'confirm' : 'scanning',
+  const [phase, setPhase] = useState<'describe' | 'scanning' | 'confirm'>(
+    isEdit || isManual ? 'confirm' : isDescribe ? 'describe' : 'scanning',
   )
+  const [description, setDescription] = useState('')
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
   const [name, setName] = useState('')
@@ -291,10 +297,10 @@ export default function ScanMealScreen() {
   const [photoChanged, setPhotoChanged] = useState(false)
   const populatedRef = useRef(false)
 
-  // Scan whenever we (re-)enter the scanning phase — skipped in edit
-  // and manual modes, which open straight on the confirm form.
+  // Photo scan whenever we (re-)enter the scanning phase — skipped in
+  // edit / manual / describe modes (describe runs the text scan on submit).
   useEffect(() => {
-    if (isEdit || isManual || phase !== 'scanning') return
+    if (isEdit || isManual || isDescribe || phase !== 'scanning') return
     let alive = true
     scanMeal(photoUri ?? '')
       .then((meal) => {
@@ -313,7 +319,26 @@ export default function ScanMealScreen() {
     return () => {
       alive = false
     }
-  }, [isEdit, isManual, phase, photoUri])
+  }, [isEdit, isManual, isDescribe, phase, photoUri])
+
+  // Describe-by-AI submit — parse the typed description into ingredients,
+  // then drop into the same confirm form. Reuses the scanning theatre.
+  const handleDescribeSubmit = () => {
+    const text = description.trim()
+    if (text.length < 2 || phase === 'scanning') return
+    Haptics.selectionAsync().catch(() => {})
+    setPhase('scanning')
+    scanMealFromText(text)
+      .then((meal) => {
+        setName(meal.name)
+        setIngredients(meal.ingredients)
+        setPhase('confirm')
+      })
+      .catch(() => {
+        Alert.alert('No pudimos leerlo', 'Puedes registrarlo a mano.')
+        setPhase('confirm')
+      })
+  }
 
   // Edit mode — fill the form from the meal once it loads. The ref
   // gates it to a single run so a refetch can't clobber edits; a meal
@@ -556,6 +581,53 @@ export default function ScanMealScreen() {
             <View style={styles.scanCenter}>
               <StarLoader size={40} />
             </View>
+          </View>
+        ) : phase === 'describe' ? (
+          <View style={styles.describeWrap}>
+            <View style={styles.describeHeaderRow}>
+              <Text style={styles.describeTitle}>Describe tu comida</Text>
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+              >
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M6 6 L18 18 M18 6 L6 18"
+                    stroke={colors.bone}
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                  />
+                </Svg>
+              </Pressable>
+            </View>
+            <Text style={styles.describeHint}>
+              Escríbelo como lo dirías. Ej: 2 huevos revueltos con pan tostado y café.
+            </Text>
+            <TextInput
+              style={styles.describeInput}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="¿Qué comiste?"
+              placeholderTextColor={colors.niebla}
+              multiline
+              autoFocus
+              textAlignVertical="top"
+            />
+            <Pressable
+              onPress={handleDescribeSubmit}
+              disabled={description.trim().length < 2}
+              style={[
+                styles.describeCta,
+                description.trim().length < 2 && styles.describeCtaOff,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Analizar lo que escribiste"
+            >
+              <SparkleIcon color={colors.leche} />
+              <Text style={styles.describeCtaLabel}>Analizar</Text>
+            </Pressable>
           </View>
         ) : phase === 'scanning' ? (
           <View style={styles.scanning}>
@@ -874,6 +946,66 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
+  },
+  // ── describe (escritura por IA) ────────────────────────────────────
+  describeWrap: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  describeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+  },
+  describeTitle: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+    letterSpacing: -0.5,
+  },
+  describeHint: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    color: colors.niebla,
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  describeInput: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    borderRadius: 16,
+    backgroundColor: colors.bgCard,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    lineHeight: 24,
+  },
+  describeCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 18,
+    paddingVertical: 15,
+    borderRadius: 14,
+    backgroundColor: colors.magenta,
+  },
+  describeCtaOff: {
+    opacity: 0.4,
+  },
+  describeCtaLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+    letterSpacing: 0.3,
   },
   // ── confirm ────────────────────────────────────────────────────────
   header: {
