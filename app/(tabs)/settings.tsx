@@ -493,16 +493,21 @@ function SettingsBody() {
               accessibilityRole="button"
               accessibilityLabel="Eliminar mi cuenta"
               accessibilityState={{ busy: deleteAccount.isPending }}
-              style={({ pressed }) => [styles.deleteRow, pressed && styles.rowPressed]}
+              style={({ pressed }) => pressed && styles.rowPressed}
             >
-              {deleteAccount.isPending ? (
-                <View style={styles.deletePending}>
-                  <StarLoader size={14} color={colors.feedbackError} />
-                  <Text style={styles.deletePendingLabel}>Borrando tu cuenta...</Text>
-                </View>
-              ) : (
-                <Text style={styles.deleteLabel}>Eliminar mi cuenta</Text>
-              )}
+              {/* Button chrome (border + tint) lives on this inner View, not
+                  the Pressable — border/bg don't render straight on a
+                  Pressable in this RN setup (same as signOut / PlanRow). */}
+              <View style={styles.deleteRow}>
+                {deleteAccount.isPending ? (
+                  <View style={styles.deletePending}>
+                    <StarLoader size={14} color={colors.feedbackError} />
+                    <Text style={styles.deletePendingLabel}>Borrando tu cuenta...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.deleteLabel}>Eliminar mi cuenta</Text>
+                )}
+              </View>
             </Pressable>
             {deleteAccount.error ? (
               <Text style={styles.errorText}>
