@@ -46,18 +46,13 @@ export default function PhotosDoneScreen() {
     transform: [{ scale: checkScale.value }],
   }))
 
-  const destination =
-    source === 'reminder'
-      ? '/(tabs)'
-      : source === 'settings'
-        ? '/(tabs)/settings'
-        : '/onboarding/day-one'
-  const ctaLabel =
-    source === 'reminder'
-      ? 'Volver al inicio'
-      : source === 'settings'
-        ? 'Volver a Ajustes'
-        : 'Volver a Día 1'
+  // Capturing photos from Ajustes (or a reminder) is "body tracking" — the
+  // payoff lives in Progreso → Tu cambio visual (the before/after diptych).
+  // Land the user there with the section open, instead of dead-ending back
+  // in Ajustes. First-run onboarding still flows to Día 1.
+  const fromTracking = source === 'settings' || source === 'reminder'
+  const destination = fromTracking ? '/(tabs)/progress?photos=open' : '/onboarding/day-one'
+  const ctaLabel = fromTracking ? 'Ver mi progreso' : 'Volver a Día 1'
 
   const handleContinue = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
@@ -82,7 +77,7 @@ export default function PhotosDoneScreen() {
         <Text style={styles.title}>
           Tu <Text style={styles.titleEmphasis}>antes</Text> queda guardado.
         </Text>
-        <Text style={styles.sub}>En 30 días te avisamos para tomar las siguientes y comparar.</Text>
+        <Text style={styles.sub}>Cuando vuelvas a tomarlas, se ponen al lado de estas.</Text>
 
         <View style={styles.grid}>
           {ANGLE_ORDER.map((angle) => {

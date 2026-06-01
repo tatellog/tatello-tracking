@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -85,10 +85,17 @@ function ProgressBody() {
     }, []),
   )
   const router = useRouter()
+  // Arriving from the photo-capture flow (Ajustes → Seguimiento corporal →
+  // done) carries ?photos=open so the diptych is the payoff the user lands
+  // on, instead of having to hunt for it in a collapsed section.
+  const { photos: photosParam } = useLocalSearchParams<{ photos?: string }>()
   const [period, setPeriod] = useState<Period>('30D')
   // The before/after diptych is collapsed by default — viewing it is
   // a deliberate choice, not a passive daily exposure.
   const [photosOpen, setPhotosOpen] = useState(false)
+  useEffect(() => {
+    if (photosParam === 'open') setPhotosOpen(true)
+  }, [photosParam])
   const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
   const { data: profile } = useProfile()
 
