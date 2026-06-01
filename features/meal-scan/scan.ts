@@ -1,4 +1,9 @@
-import { DISHES, type DishIngredient } from './dishes'
+import * as ImageManipulator from 'expo-image-manipulator'
+import { z } from 'zod'
+
+import { supabase } from '@/lib/supabase'
+
+import { type DishIngredient } from './dishes'
 
 export type ScannedIngredient = DishIngredient & { id: string }
 
@@ -31,18 +36,50 @@ export function mealTotals(ingredients: ScannedIngredient[]): {
   )
 }
 
-const SCAN_DELAY_MS = 1700
+// Shape the edge function returns (already validated + clamped server-
+// side); we re-validate here so a bad/changed response degrades to a warm
+// error instead of feeding NaNs into the confirm form.
+const ScanResponseSchema = z.object({
+  name: z.string(),
+  ingredients: z.array(
+    z.object({
+      name: z.string(),
+      grams: z.number(),
+      proteinPer100: z.number(),
+      kcalPer100: z.number(),
+    }),
+  ),
+})
+
+const SCAN_ERROR = 'No pudimos leer tu plato. Intenta de nuevo.'
 
 /*
- * The "scan" — STUB, no AI. Waits, then returns a random dish from
- * the dummy library. This signature is the seam: a real vision model
- * drops in here later without touching the UI.
+ * The real scan: resize the photo (small + cheap — the server uses
+ * detail:low ≈ 512px anyway), base64 it in one pass, and hand it to the
+ * `scan-meal` edge function (gpt-4o-mini, key server-side). Returns the
+ * dish + ingredients the confirm form renders. A non-food photo comes
+ * back as { name:'', ingredients:[] } — the UI then falls to manual entry.
+ *
+ * This is the seam the UI was built against; the signature is unchanged.
  */
-export async function scanMeal(_photoUri: string): Promise<ScannedMeal> {
-  await new Promise((resolve) => setTimeout(resolve, SCAN_DELAY_MS))
-  const dish = DISHES[Math.floor(Math.random() * DISHES.length)] ?? DISHES[0]!
+export async function scanMeal(photoUri: string): Promise<ScannedMeal> {
+  const processed = await ImageManipulator.manipulateAsync(
+    photoUri,
+    [{ resize: { width: 768 } }],
+    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+  )
+  if (!processed.base64) throw new Error(SCAN_ERROR)
+
+  const { data, error } = await supabase.functions.invoke('scan-meal', {
+    body: { imageBase64: processed.base64, mimeType: 'image/jpeg' },
+  })
+  if (error) throw new Error(SCAN_ERROR)
+
+  const parsed = ScanResponseSchema.safeParse(data)
+  if (!parsed.success) throw new Error(SCAN_ERROR)
+
   return {
-    name: dish.name,
-    ingredients: dish.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })),
+    name: parsed.data.name,
+    ingredients: parsed.data.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })),
   }
 }

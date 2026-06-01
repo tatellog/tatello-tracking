@@ -296,12 +296,20 @@ export default function ScanMealScreen() {
   useEffect(() => {
     if (isEdit || isManual || phase !== 'scanning') return
     let alive = true
-    scanMeal(photoUri ?? '').then((meal) => {
-      if (!alive) return
-      setName(meal.name)
-      setIngredients(meal.ingredients)
-      setPhase('confirm')
-    })
+    scanMeal(photoUri ?? '')
+      .then((meal) => {
+        if (!alive) return
+        setName(meal.name)
+        setIngredients(meal.ingredients)
+        setPhase('confirm')
+      })
+      .catch(() => {
+        // Vision failed (network / key / unreadable photo) — never leave
+        // the user stuck in the scanning theatre. Fall to manual entry.
+        if (!alive) return
+        Alert.alert('No pudimos leer tu plato', 'Puedes registrarlo a mano.')
+        setPhase('confirm')
+      })
     return () => {
       alive = false
     }
