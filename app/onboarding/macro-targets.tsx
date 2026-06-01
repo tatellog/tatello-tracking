@@ -73,7 +73,7 @@ export default function MacroTargetsScreen() {
           <View style={{ gap: spacing.sm }}>
             <Text style={styles.meta}>METAS DIARIAS</Text>
             <Text style={styles.headline}>
-              {isEdit ? 'Ajustá tus metas' : 'Configurá tus metas'}
+              {isEdit ? 'Ajusta tus metas' : 'Configura tus metas'}
             </Text>
             <Text style={styles.editorial}>
               Proteína y calorías del día. Puedes cambiarlas cuando quieras.
@@ -166,7 +166,7 @@ function NumberField({
           }}
           onBlur={onBlur}
           placeholder={placeholder}
-          placeholderTextColor={colors.labelDim}
+          placeholderTextColor={colors.niebla}
           keyboardType="numeric"
           inputMode="numeric"
           style={styles.input}
@@ -179,7 +179,7 @@ function NumberField({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.pearlBase },
+  screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   container: {
     flex: 1,
@@ -192,47 +192,47 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: typography.sizes.smallLabel,
     letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.inkPrimary,
+    color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
   editorial: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.labelMuted,
+    color: colors.bone,
     lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.borderDashed,
+    borderColor: colors.hairlineStrong,
     borderRadius: radius.tile,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bgCard,
     paddingHorizontal: spacing.md,
   },
   inputError: {
-    borderColor: colors.mauveDeep,
+    borderColor: colors.feedbackError,
   },
   input: {
     flex: 1,
     fontSize: typography.sizes.deltaNum,
     fontFamily: typography.displayMedium,
-    color: colors.inkPrimary,
+    color: colors.leche,
     paddingVertical: spacing.md,
   },
   suffix: {
     fontSize: typography.sizes.body,
-    color: colors.labelMuted,
+    color: colors.niebla,
     marginLeft: spacing.sm,
   },
   errorText: {
     fontSize: typography.sizes.smallLabel,
-    color: colors.mauveDeep,
+    color: colors.feedbackError,
   },
   actions: { gap: spacing.md },
   primary: {
@@ -240,15 +240,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
   },
+  // Dim the magenta pill while saving / invalid, rather than swapping it
+  // for a flat fill — keeps the button identity, just quietens it.
   primaryDisabled: {
-    backgroundColor: colors.pearlBase,
+    opacity: 0.4,
   },
   primaryLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.pearlBase,
+    color: colors.leche,
   },
   secondary: {
     alignItems: 'center',
@@ -258,6 +260,6 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
 })
