@@ -16,7 +16,7 @@ import Svg, { Path } from 'react-native-svg'
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
 import type { ProgressPhoto } from '@/features/progress/api'
-import { useBeforeAfterPhotos, useMeasurements } from '@/features/progress/hooks'
+import { useBeforeAfterPhotos, useDeletePhoto, useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
   computeTrend,
@@ -119,6 +119,23 @@ function formatAfterDate(after: ProgressPhoto, before: ProgressPhoto | null): st
  * `dateOverride` lets the caller substitute the default `taken_at`
  * stringifier — used to render "Hoy" / "Mismo día" in the after slot
  * when the pair shares a date. */
+/* "Recaptura estelar" — the editable affordance on a filled frame. A ✦
+ * (the Stelar seal) wrapped in two orbital arcs that read as "this can be
+ * re-made", a sibling of the cycle ring's language. Oro, not magenta:
+ * editing chrome is "the sky's light on the UI", and magenta is already
+ * spent on the arrow + share link. */
+function RecaptureGlyph() {
+  return (
+    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+      <Path d="M6.5 8.2 A7 7 0 0 1 17.8 7.3" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
+      <Path d="M17.5 15.8 A7 7 0 0 1 6.2 16.7" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
+      <Path d="M17.8 7.3 L17.0 4.9 M17.8 7.3 L20.2 6.8" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
+      <Path d="M6.2 16.7 L7.0 19.1 M6.2 16.7 L3.8 17.2" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
+      <Path d="M12 8 L12.9 11.1 L16 12 L12.9 12.9 L12 16 L11.1 12.9 L8 12 L11.1 11.1 Z" fill={colors.oro} />
+    </Svg>
+  )
+}
+
 function PhotoColumn({
   label,
   tone,
@@ -126,6 +143,7 @@ function PhotoColumn({
   onPress,
   uploading,
   dateOverride,
+  accent,
 }: {
   label: string
   tone: EyebrowTone
@@ -133,6 +151,9 @@ function PhotoColumn({
   onPress?: () => void
   uploading?: boolean
   dateOverride?: string
+  /** Lift this frame with a faint oro border — used on "Ahora" so the
+   *  antes/ahora trajectory reads as a temperature shift, not a label. */
+  accent?: boolean
 }) {
   // 3-state render: uploading spinner, full image, or placeholder.
   // The placeholder distinguishes between "no photo yet" (✦ + Subir
@@ -140,25 +161,32 @@ function PhotoColumn({
   // second state shows a soft error so the user doesn't think the
   // upload didn't happen.
   const photoButNoUrl = photo && !photo.signed_url
+  const filled = !!photo?.signed_url
 
   const frame = uploading ? (
     <View style={[styles.frame, styles.framePlaceholder]}>
-      <ActivityIndicator color={colors.magenta} />
+      <ActivityIndicator color={colors.oro} />
     </View>
-  ) : photo?.signed_url ? (
-    <View style={styles.frame}>
+  ) : filled ? (
+    <View style={[styles.frame, accent && styles.frameAccent]}>
       {/* resizeMode "contain" so the full body stays visible in the
           frame — the diptych's whole point is comparing silhouettes,
           and "cover" was cropping the head/feet of portrait shots. */}
-      <Image source={{ uri: photo.signed_url }} style={styles.img} resizeMode="contain" />
+      <Image source={{ uri: photo!.signed_url! }} style={styles.img} resizeMode="contain" />
+      {/* The editable affordance — only when the frame is interactive. */}
+      {onPress ? (
+        <View pointerEvents="none" style={styles.editGlyph}>
+          <RecaptureGlyph />
+        </View>
+      ) : null}
     </View>
   ) : (
     <View style={[styles.frame, styles.framePlaceholder]}>
       {photoButNoUrl ? (
         <>
-          <Text style={styles.placeholderStar}>⚠︎</Text>
-          <Text style={styles.placeholderError}>No pudimos cargar la foto</Text>
-          {onPress ? <Text style={styles.placeholderHint}>Toca para volver a subir</Text> : null}
+          <Text style={styles.placeholderStar}>✦</Text>
+          <Text style={styles.placeholderError}>Esta foto no se cargó</Text>
+          {onPress ? <Text style={styles.placeholderHint}>Toca para gestionarla</Text> : null}
         </>
       ) : (
         <>
@@ -179,7 +207,9 @@ function PhotoColumn({
           activeOpacity={0.7}
           onPress={onPress}
           accessibilityRole="button"
-          accessibilityLabel={`Subir foto de ${label.toLowerCase()}`}
+          accessibilityLabel={
+            filled ? `Gestionar foto de ${label.toLowerCase()}` : `Subir foto de ${label.toLowerCase()}`
+          }
         >
           {frame}
         </TouchableOpacity>
@@ -203,6 +233,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   const { data } = useBeforeAfterPhotos()
   const measurements = useMeasurements(null)
   const takePhoto = useTakePhoto()
+  const deletePhoto = useDeletePhoto()
   const [shareOpen, setShareOpen] = useState(false)
 
   // Build the card-config used to feed the generic share sheet. Lives
@@ -277,7 +308,62 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   }
 
   const canShare = data.count >= 2
-  const busy = takePhoto.isPending
+  const busy = takePhoto.isPending || deletePhoto.isPending
+  // Which slot is mid-delete, so only that column shows the spinner.
+  const deletingId = deletePhoto.isPending ? deletePhoto.variables?.id : undefined
+
+  // Soft, reversible-tone confirm before removing a photo (irreversible,
+  // emotionally costly). "Conservar" reads warmer than "Cancelar".
+  const confirmDelete = (photo: ProgressPhoto) => {
+    Alert.alert('Eliminar esta foto', 'Esta foto se quita de tu comparación. No se puede recuperar.', [
+      { text: 'Conservar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () => deletePhoto.mutate({ id: photo.id, storagePath: photo.storage_path }),
+      },
+    ])
+  }
+
+  // Manage a FILLED frame. "Ahora" (the latest) can be replaced — a new
+  // upload is always the most recent — or deleted. "Antes" (the earliest)
+  // can only be deleted: a new photo never lands as the oldest, so
+  // "replace the antes" is meaningless. Deleting recomputes the pair.
+  const manage = (slot: 'before' | 'after', photo: ProgressPhoto) => {
+    if (slot === 'after') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Tu foto de ahora',
+          options: ['Reemplazar foto', 'Eliminar foto', 'Cancelar'],
+          cancelButtonIndex: 2,
+          destructiveButtonIndex: 1,
+        },
+        (i) => {
+          if (i === 0) choosePhoto()
+          else if (i === 1) confirmDelete(photo)
+        },
+      )
+    } else {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Tu foto de antes',
+          options: ['Eliminar foto', 'Cancelar'],
+          cancelButtonIndex: 1,
+          destructiveButtonIndex: 0,
+        },
+        (i) => {
+          if (i === 0) confirmDelete(photo)
+        },
+      )
+    }
+  }
+
+  // Tapping a filled frame manages it; an empty/failed frame uploads.
+  const onColumnPress = (slot: 'before' | 'after', photo: ProgressPhoto | null) => {
+    if (busy) return undefined
+    if (photo?.signed_url) return () => manage(slot, photo)
+    return choosePhoto
+  }
 
   // Section eyebrow + empty-state header. The eyebrow ties this
   // section into the redesigned page architecture (each section
@@ -320,16 +406,21 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
               label="Antes"
               tone="niebla"
               photo={data.before}
-              onPress={!busy && (!data.before || !data.before.signed_url) ? choosePhoto : undefined}
-              uploading={busy && data.count === 0}
+              onPress={onColumnPress('before', data.before)}
+              uploading={
+                (takePhoto.isPending && data.count === 0) || deletingId === data.before?.id
+              }
             />
             <Text style={styles.arrow}>→</Text>
             <PhotoColumn
               label="Ahora"
               tone="magenta"
               photo={data.after}
-              onPress={!busy ? choosePhoto : undefined}
-              uploading={busy && data.count >= 1}
+              accent
+              onPress={onColumnPress('after', data.after)}
+              uploading={
+                (takePhoto.isPending && data.count >= 1) || deletingId === data.after?.id
+              }
               dateOverride={data.after ? formatAfterDate(data.after, data.before) : undefined}
             />
           </View>
@@ -432,6 +523,26 @@ const styles = StyleSheet.create({
     borderColor: colors.bruma,
     backgroundColor: colors.bgCard2,
     overflow: 'hidden',
+  },
+  // "Ahora" frame — a faint oro edge so the antes (cool bruma) → ahora
+  // (warm light) trajectory is told by temperature, not just the label.
+  frameAccent: {
+    borderColor: colors.oroHairline,
+  },
+  // The editable affordance disc, lower-right of a filled frame: a dark
+  // scrim pill behind the oro recapture glyph so it reads on any photo.
+  editGlyph: {
+    position: 'absolute',
+    bottom: 7,
+    right: 7,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.scrim,
+    borderWidth: 0.5,
+    borderColor: colors.oroHairline,
   },
   framePlaceholder: {
     borderStyle: 'dashed',

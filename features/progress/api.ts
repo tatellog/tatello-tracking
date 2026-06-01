@@ -101,6 +101,8 @@ export async function getMeasurements(rangeDays: number | null): Promise<BodyMea
 export type ProgressPhoto = {
   id: string
   taken_at: string
+  /** Bucket path — needed to remove the storage object on delete. */
+  storage_path: string
   /** Signed URL into the private bucket; null if signing failed. */
   signed_url: string | null
 }
@@ -151,7 +153,12 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
         error: signErr?.message ?? 'no signedUrl returned',
       })
     }
-    return { id: row.id, taken_at: row.taken_at, signed_url: signed?.signedUrl ?? null }
+    return {
+      id: row.id,
+      taken_at: row.taken_at,
+      storage_path: row.storage_path,
+      signed_url: signed?.signedUrl ?? null,
+    }
   }
 
   const lastRow = rows[rows.length - 1]
@@ -160,6 +167,21 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
   }
   const [before, after] = await Promise.all([sign(firstRow), sign(lastRow)])
   return { before, after, count: rows.length }
+}
+
+/*
+ * Delete one progress photo — the row in `photos` plus its storage
+ * object. RLS scopes both to the owner (auth.uid() = user_id on the
+ * table; the {userId}/ folder gate on the bucket). The DB row is the
+ * source of truth for the diptych, so we delete it FIRST; the storage
+ * removal is best-effort cleanup (an orphaned object only leaks bytes,
+ * never shows). After a delete the before/after pair recomputes itself
+ * (the next-oldest front photo becomes the "antes").
+ */
+export async function deletePhoto(id: string, storagePath: string): Promise<void> {
+  const { error } = await supabase.from('photos').delete().eq('id', id)
+  if (error) throw error
+  await supabase.storage.from('progress-photos').remove([storagePath])
 }
 
 /* ─── extra reads for the Progress overview cards ────────────────── */

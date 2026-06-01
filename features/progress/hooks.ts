@@ -5,6 +5,7 @@ import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
 import {
+  deletePhoto,
   getBeforeAfterPhotos,
   getLastPeriodStart,
   getMeasurements,
@@ -48,6 +49,22 @@ export function useBeforeAfterPhotos() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     staleTime: 30_000,
+  })
+}
+
+/* Delete one progress photo (row + storage object). Invalidates the
+ * before/after pair so the diptych recomputes — the next-oldest front
+ * photo becomes the "antes" on its own. */
+export function useDeletePhoto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, storagePath }: { id: string; storagePath: string }) =>
+      deletePhoto(id, storagePath),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.photos.all })
+      qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+    },
   })
 }
 
