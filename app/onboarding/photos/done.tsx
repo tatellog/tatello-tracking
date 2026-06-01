@@ -59,6 +59,16 @@ export default function PhotosDoneScreen() {
     router.replace(destination)
   }
 
+  // Optional, no-pressure anchor: pairing a number with the photo gives the
+  // future comparison substance (delta beside the diptych). Pushed, not
+  // replaced — log-measurement returns here on save, then the user goes on
+  // to Progreso. Only offered for tracking captures; onboarding collects
+  // weight in its own step.
+  const handleAnchorWeight = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    router.push('/log-measurement')
+  }
+
   return (
     <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <OrnamentShape variant="br" />
@@ -108,6 +118,17 @@ export default function PhotosDoneScreen() {
         >
           <Text style={styles.ctaLabel}>{ctaLabel}</Text>
         </TouchableOpacity>
+        {fromTracking ? (
+          <TouchableOpacity
+            onPress={handleAnchorWeight}
+            style={styles.secondary}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Anclar mi peso de hoy"
+          >
+            <Text style={styles.secondaryLabel}>Anclar mi peso de hoy</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   )
@@ -214,5 +235,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.ui,
     color: colors.pearlBase,
     letterSpacing: 0.3,
+  },
+  // Quiet, optional anchor below the primary CTA — a calm link, never a
+  // second pill, so logging weight reads as an invitation, not a demand.
+  secondary: {
+    marginTop: 14,
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  secondaryLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.labelMuted,
+    letterSpacing: 0.2,
   },
 })
