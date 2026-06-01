@@ -195,7 +195,12 @@ export function TrainingShareCard({
       {variant === 'momento' ? (
         <>
           <View style={styles.middle}>
-            <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
+            {/* Capped width so the 4:5 photo's height leaves room for the
+                brand, meta and coach — at full width it overflowed up over
+                the STELAR title. */}
+            <View style={styles.momentoPhoto}>
+              <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
+            </View>
             <View style={styles.meta}>
               <SignGlyph sign={sign} size={30} />
               <Text style={styles.dayEyebrow}>{dayLine}</Text>
@@ -250,10 +255,21 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 26,
     justifyContent: 'space-between',
+    // Clip any content to the card bounds (belt-and-suspenders against a
+    // tall photo bleeding past the edge).
+    overflow: 'hidden',
+  },
+  // Momento's photo — capped width so its 4:5 height fits with room for
+  // the brand/meta/coach. The hero is still clearly the photo.
+  momentoPhoto: {
+    width: '80%',
+    alignSelf: 'center',
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Stay above the middle block so a tall photo never covers the title.
+    zIndex: 2,
     justifyContent: 'center',
     gap: 7,
   },
