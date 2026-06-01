@@ -125,7 +125,7 @@ export function MonthSegment() {
         </View>
         <EmptySegmentCard
           eyebrow="El cielo se forma día a día"
-          body="Stelar no inventa patrones. Necesita verte primero — al menos un día con algo registrado."
+          body="Stelar no inventa patrones. Necesita verte primero: al menos un día con algo registrado."
           hint="A partir del segundo mes, Stelar empieza a confirmar lo que se repite."
         />
       </Animated.View>

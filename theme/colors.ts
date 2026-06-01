@@ -34,6 +34,19 @@ export const colors = {
   hairline: 'rgba(244, 236, 222, 0.10)',
   hairlineStrong: 'rgba(244, 236, 222, 0.22)',
 
+  // ── Oro / aura — la luz del cielo (misma paleta que el reveal) ──
+  // The observatory light: eyebrows, glyphs, chips, borders. Magenta
+  // stays the voice of Stelar (title emphasis + CTA only); gold is the
+  // sky's light spilling onto the surrounding chrome.
+  oro: '#D9AE6F',
+  oroSoft: '#E8B872',
+  oroLight: '#FFE9C2',
+  oroLeche: '#FFF6E5',
+  oroHairline: 'rgba(217, 174, 111, 0.22)',
+  oroTint: 'rgba(217, 174, 111, 0.08)',
+  // Even fainter hairline for "astral chart" row dividers inside cards.
+  oroHairlineSoft: 'rgba(217, 174, 111, 0.12)',
+
   // ── Feedback ───────────────────────────────────────────────────
   feedbackSuccess: '#5A6F4C',
   feedbackError: '#B85045',

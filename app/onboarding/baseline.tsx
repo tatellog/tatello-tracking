@@ -676,8 +676,8 @@ function HowCalculatedSheet({ visible, onClose }: { visible: boolean; onClose: (
           >
             <Text style={sheetStyles.eyebrow}>Cómo se calcula</Text>
             <Text style={sheetStyles.title}>
-              El IMC es <Text style={sheetStyles.titleEm}>tu punto de partida</Text> — el lugar
-              desde donde empezamos.
+              El IMC es <Text style={sheetStyles.titleEm}>tu punto de partida</Text>, el lugar desde
+              donde empezamos.
             </Text>
 
             <Text style={sheetStyles.section}>FÓRMULA</Text>

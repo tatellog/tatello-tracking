@@ -23,7 +23,7 @@ export const MOCK_VOZ_DIA: { parts: readonly VozParte[] } = {
   parts: [
     { text: 'Cuerpo entero, mente más lenta', tone: 'accent' },
     {
-      text: ' — ¿se siente así tu día? Anoche fueron cinco horas de sueño; quizá la tarde pida un poco más de calma.',
+      text: ', ¿se siente así tu día? Anoche fueron cinco horas de sueño; quizá la tarde pida un poco más de calma.',
     },
   ],
 }
@@ -498,7 +498,7 @@ export const MOCK_PATRONES: readonly Patron[] = [
     category: 'correlacion',
     title: '¿Duermes mejor si entrenas?',
     emphasis: 'entrenas',
-    detail: 'Lo vimos 4 semanas seguidas — unos 45 min más.',
+    detail: 'Lo vimos 4 semanas seguidas, unos 45 min más.',
     data: {
       kind: 'paired',
       groups: [
@@ -719,7 +719,7 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
     caption: 'jueves 11 · tu día más bajo',
     evidenceDays: [11],
     detail:
-      'Jueves 11 — el cuerpo pidió más calma. Por ahora es un día, todavía no algo que se repita.',
+      'Jueves 11: el cuerpo pidió más calma. Por ahora es un día, todavía no algo que se repita.',
     chart: { kind: 'daily', days: FIRST_CYCLE_DAILY, focusDay: 11, focusKind: 'valley' },
   },
   {

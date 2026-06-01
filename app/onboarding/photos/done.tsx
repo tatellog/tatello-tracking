@@ -26,16 +26,6 @@ const ANGLE_LABELS: Record<PhotoAngle, string> = {
 
 const ANGLE_ORDER: PhotoAngle[] = ['front', 'side_right', 'side_left', 'back']
 
-/*
- * Closing scene of the photo wizard. Same vocabulary as the wizard's
- * Done screen — animated check, headline with mauve emphasis, soft
- * subtitle — but the focus is the 2×2 grid of thumbnails so the user
- * sees their "antes" cement into the record.
- *
- * "Volver a Día 1" is the default destination; if the wizard was
- * launched from the 30-day reminder banner (?source=reminder) we
- * route back to the Home tabs instead.
- */
 export default function PhotosDoneScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -56,11 +46,6 @@ export default function PhotosDoneScreen() {
     transform: [{ scale: checkScale.value }],
   }))
 
-  // Three entry points map to three return paths:
-  //  · reminder  → back to home (the 30-day reminder banner deep-link)
-  //  · settings  → back to settings (the "Track corporal" optional card)
-  //  · undefined → the wizard's Día 1 (the legacy default; still used
-  //                when the photo walk is somehow opened standalone)
   const destination =
     source === 'reminder'
       ? '/(tabs)'

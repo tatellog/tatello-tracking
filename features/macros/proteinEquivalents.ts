@@ -65,5 +65,5 @@ export function suggestProteinSource(gramsNeeded: number, hour: number): string 
     return 'mete algo proteico fuerte'
   }
 
-  return 'son varias comidas — pollo, atún o pescado'
+  return 'son varias comidas: pollo, atún o pescado'
 }

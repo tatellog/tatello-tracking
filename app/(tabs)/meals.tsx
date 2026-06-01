@@ -37,7 +37,7 @@ function skyCopy(mealCount: number, phase: CyclePhase | null): SkyCopy {
   // (a "your body asks for more" line makes no sense at zero).
   if (phase === 'lutea') {
     return {
-      before: 'Fase lútea — tu cuerpo pide más estos días. Y ',
+      before: 'Fase lútea: tu cuerpo pide más estos días. Y ',
       emphasis: 'está bien',
       after: '.',
     }

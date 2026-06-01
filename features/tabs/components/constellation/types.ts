@@ -29,6 +29,20 @@ export type Props = {
    *  manifiesto prohibits. There the visual loop (first star lit +
    *  next star pulsing) carries the meaning instead of a number. */
   showCount?: boolean
+  /** Paint the commit firework (StarBurst) GOLD instead of magenta and
+   *  push it out / amplify it into a Genshin-grade celebration. Defaults
+   *  to false → the global magenta family at baseline scale, so the
+   *  Órbita tab + dev/test call sites are untouched. The Home passes it:
+   *  the gold burst blooming from the figure's centre outward IS the
+   *  Day-1 (and every-commit) celebration now that the screen overlay
+   *  is gone. */
+  burstGold?: boolean
+  /** Suppress the in-canvas commit burst (StarBurst) entirely. The Home
+   *  passes this: its commit reward is a native Lottie firework overlay
+   *  rendered above the card, so the in-SVG burst would double up. The
+   *  constellation still flashes its figure on radialPulse — only the
+   *  central particle burst is omitted. */
+  suppressBurst?: boolean
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

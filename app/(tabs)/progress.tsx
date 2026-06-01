@@ -194,8 +194,8 @@ function ProgressBody() {
                 <Animated.View entering={FadeIn.duration(360).delay(290)}>
                   <Text style={styles.cycleNote}>
                     {cycle.phase === 'lutea'
-                      ? 'Fase lútea — el peso sube por agua estos días. Es normal.'
-                      : 'Estás menstruando — el peso se mueve por agua, no por grasa.'}
+                      ? 'Fase lútea: el peso sube por agua estos días. Es normal.'
+                      : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
                   </Text>
                 </Animated.View>
               ) : null}
@@ -221,7 +221,7 @@ function ProgressBody() {
 
               <Text style={styles.heroEmptyHint}>
                 {count === 0
-                  ? 'Marcá tu peso para empezar a trazar tu trayectoria.'
+                  ? 'Marca tu peso para empezar a trazar tu trayectoria.'
                   : 'Una segunda marca traza tu trayectoria.'}
               </Text>
 

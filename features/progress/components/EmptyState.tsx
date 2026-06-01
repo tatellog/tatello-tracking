@@ -22,7 +22,7 @@ export function EmptyState({ measurementCount, onAdd }: Props) {
       <View style={styles.zeroRoot}>
         <Text style={styles.zeroTitle}>Sin medidas todavía</Text>
         <Text style={styles.zeroBody}>
-          Empezá registrando tu peso de hoy. Volvé en una semana y vas a empezar a ver la línea.
+          Empieza registrando tu peso de hoy. Vuelve en una semana y vas a empezar a ver la línea.
         </Text>
         <Pressable onPress={onAdd} accessibilityRole="button" accessibilityLabel="Agregar peso">
           <View style={shadows.ctaMauve}>
@@ -43,7 +43,7 @@ export function EmptyState({ measurementCount, onAdd }: Props) {
   // Caso 1 medida: ya hay hero stat arriba, este es un CTA secundario.
   return (
     <View style={styles.oneRoot}>
-      <Text style={styles.oneCopy}>Agregá una segunda medida para ver tu trayectoria.</Text>
+      <Text style={styles.oneCopy}>Agrega una segunda medida para ver tu trayectoria.</Text>
       <Pressable
         onPress={onAdd}
         accessibilityRole="button"

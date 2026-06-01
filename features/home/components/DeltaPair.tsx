@@ -64,7 +64,7 @@ export function DeltaPair({ weightDeltaKg, waistDeltaCm, periodWeeks = 4 }: Prop
       <View
         style={styles.empty}
         accessible
-        accessibilityLabel="Todavía no hay medidas registradas. Agregá tu primera medida."
+        accessibilityLabel="Todavía no hay medidas registradas. Agrega tu primera medida."
       >
         <Text style={styles.emptyText}>Agrega tu primera medida</Text>
       </View>

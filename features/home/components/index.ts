@@ -1,6 +1,5 @@
 export { AnchorLine } from './AnchorLine'
 export { Day1Banner } from './Day1Banner'
-export { Day1Celebration } from './Day1Celebration'
 export { DeltaPair } from './DeltaPair'
 export { HomeError } from './HomeError'
 export { HomeHeader } from './HomeHeader'

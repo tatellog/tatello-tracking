@@ -47,19 +47,19 @@ export function deriveMacroMessage(
 
   // 3 — protein goal met, calories still have room.
   if (proteinPct >= 1 && calPct < 1) {
-    return `Proteína cerrada. Te quedan ${calRemaining} cal — espacio para una buena cena.`
+    return `Proteína cerrada. Te quedan ${calRemaining} cal, espacio para una buena cena.`
   }
 
   // 4 — large protein gap, evening hours: reassure + suggest dinner.
   if (proteinRemaining > 30 && hour >= 17) {
     const suggestion = suggestProteinSource(proteinRemaining, hour)
-    return `Vas atrasada. ${proteinRemaining}g por delante — ${suggestion} y la pegas.`
+    return `Vas atrasada. ${proteinRemaining}g por delante: ${suggestion} y la pegas.`
   }
 
   // 5 — large protein gap, still daytime: distribute across the day.
   if (proteinRemaining > 30 && hour < 17) {
     const suggestion = suggestProteinSource(proteinRemaining, hour)
-    return `Andas baja en proteína. ${proteinRemaining}g pendientes — ${suggestion}.`
+    return `Andas baja en proteína. ${proteinRemaining}g pendientes: ${suggestion}.`
   }
 
   // 6 — comfortably on track, just nudge the remainder.

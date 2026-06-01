@@ -44,6 +44,8 @@ export function LunarConstellation({
   sign = 'acuario',
   committed = false,
   showCount = true,
+  burstGold = false,
+  suppressBurst = false,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -91,8 +93,16 @@ export function LunarConstellation({
 
   const { t, breathT, driftT } = useConstellationClocks(reduceMotion)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
-  const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
-    useIgnitionEngine({ trainedCount, elementsLit, sequence })
+  const {
+    ignitingKey,
+    igniteT,
+    numberPulse,
+    displayedCount,
+    litPulse,
+    radialPulse,
+    goldBurst,
+    plusOne,
+  } = useIgnitionEngine({ trainedCount, elementsLit, sequence, reduce: reduceMotion })
 
   return (
     <View style={styles.wrap}>
@@ -244,7 +254,29 @@ export function LunarConstellation({
               the count now living as a small chip at the canvas
               floor (numberRow.marginTop 122), the orb was an
               orphan magenta wash competing with the asterism. */}
-              <StarBurst cx={cx} cy={cy} pulse={radialPulse} trainedCount={trainedCount} />
+              {/* The commit firework — blooms from the canvas centre
+              (cx,cy) and grows outward. `gold` (Home only) repaints
+              it as the Genshin-grade golden celebration: a warm
+              white→oro flash core + gold sparks pushed out to fill
+              the circle, and runs on its OWN slow clock `burstClock`
+              (goldBurst) so the concentric waves read as an
+              appreciable expansion. Every other call site omits
+              `gold`/`burstClock` and keeps the magenta family on
+              radialPulse (Órbita, dev, test — unchanged). */}
+              {/* Home suppresses this in-canvas burst and uses the
+                  native Lottie firework overlay instead (the heavy
+                  hand-coded burst crashed on mount). Órbita/dev/test
+                  keep the magenta StarBurst. */}
+              {suppressBurst ? null : (
+                <StarBurst
+                  cx={cx}
+                  cy={cy}
+                  pulse={radialPulse}
+                  burstClock={goldBurst}
+                  trainedCount={trainedCount}
+                  gold={burstGold}
+                />
+              )}
               {/* Anticipation crown — appears from day 21 onward, a
               tenue cream ring around the canvas centre that grows +
               brightens approaching day 28. Builds psychological

@@ -1205,17 +1205,17 @@ const styles = StyleSheet.create({
   taglineOn: {
     color: '#F4ABC8',
   },
-  /* Acknowledgment overlay — translucent veil so the atmosphere is
-     intuited behind it. Lowered 0.84 → 0.72 so the IntentionSky (stars /
-     wisps / dust already painted behind) is intuited through the veil →
-     depth, not flat black. (If the cards distract too much at 0.72, bump
-     to 0.76 — no higher.) */
+  /* Acknowledgment overlay — near-opaque veil so the beat reads as a
+     dedicated moment, not a phrase floating over the cards. An earlier
+     0.72 let the card list bleed through (the phrase looked misplaced
+     over a card); depth is carried by CelebrationBody's OWN strata, not
+     by seeing the screen behind, so the veil can sit near-solid. */
   celebOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 36,
-    backgroundColor: 'rgba(10, 6, 8, 0.72)',
+    backgroundColor: 'rgba(10, 6, 8, 0.95)',
   },
   celebInner: {
     alignItems: 'center',

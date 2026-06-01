@@ -249,7 +249,9 @@ export function MealComposer({ onOpenMeal }: Props) {
           <Text style={styles.newName} numberOfLines={1}>
             {name.trim()}
           </Text>
-          <Text style={styles.newHint}>Aún no está en tu cielo. Dale su proteína y calorías.</Text>
+          <Text style={styles.newHint}>
+            Aún no está en tu cielo. Asígnale su proteína y calorías.
+          </Text>
 
           <View style={styles.numberRow}>
             <View style={styles.fieldCol}>
@@ -356,7 +358,7 @@ export function MealComposer({ onOpenMeal }: Props) {
         {history.length === 0 ? (
           <Text style={styles.emptyHint}>
             {composing
-              ? 'Nada con ese nombre — créala arriba.'
+              ? 'Nada con ese nombre, créala arriba.'
               : 'Tu estela está vacía. La comida que sumes aparecerá aquí.'}
           </Text>
         ) : null}

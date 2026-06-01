@@ -9,8 +9,11 @@ type Props = {
 
 /*
  * Single task row of the Día 1 list. Numbered chip on the left, body
- * copy on the right. Pearl-elevated surface with a hairline border
- * keeps it visually subordinate to the photo card above it.
+ * copy on the right. The chip carries the observatory GOLD (oro) so it
+ * reads as the sky's light landing on the task, not as a magenta CTA —
+ * magenta stays reserved for the screen's voice (title emphasis + CTA).
+ * The surface is bgCard2 with a gold hairline so it sits in the same
+ * warm register as the recap card above it (matching radius 16).
  */
 export function DayOneTask({ num, text }: Props) {
   return (
@@ -30,26 +33,26 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.bgCard2,
     borderWidth: 1,
-    borderColor: colors.bruma,
-    borderRadius: 14,
+    borderColor: colors.oroHairline,
+    borderRadius: 16,
   },
   numChip: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.magentaTint,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.oroTint,
     borderWidth: 1,
-    borderColor: colors.magentaDeep,
+    borderColor: colors.oroHairline,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
   },
   numText: {
-    fontFamily: typography.displayHeavy,
+    fontFamily: typography.displaySemi,
     fontSize: typography.sizes.micro,
-    color: colors.magenta,
+    color: colors.oro,
   },
   text: {
     flex: 1,

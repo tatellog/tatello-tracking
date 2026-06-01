@@ -158,7 +158,7 @@ function PhotoColumn({
         <>
           <Text style={styles.placeholderStar}>⚠︎</Text>
           <Text style={styles.placeholderError}>No pudimos cargar la foto</Text>
-          {onPress ? <Text style={styles.placeholderHint}>Tocá para volver a subir</Text> : null}
+          {onPress ? <Text style={styles.placeholderHint}>Toca para volver a subir</Text> : null}
         </>
       ) : (
         <>
@@ -302,10 +302,10 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
           activeOpacity={0.7}
           onPress={!busy ? choosePhoto : undefined}
           accessibilityRole="button"
-          accessibilityLabel="Empezá con una foto frontal"
+          accessibilityLabel="Empieza con una foto frontal"
         >
           <Text style={styles.emptyStar}>✦</Text>
-          <Text style={styles.emptyTitle}>Empezá con una foto frontal</Text>
+          <Text style={styles.emptyTitle}>Empieza con una foto frontal</Text>
           <Text style={styles.emptyHint}>Tu próxima marca abre la comparación</Text>
           {busy ? (
             <View style={styles.emptyBusy}>

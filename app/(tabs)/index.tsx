@@ -3,13 +3,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import LottieView from 'lottie-react-native'
+import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { BriefContext } from '@/features/brief/api'
-import { Day1Celebration, HomeError } from '@/features/home/components'
+import { HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
@@ -37,8 +38,6 @@ import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
-
-const CELEBRATION_MS = 2000
 
 /*
  * The commit haptic — a designed two-beat "phrase", not a tick:
@@ -147,7 +146,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const setRest = useSetRestToday(ctx.date)
   const restedToday = restQuery.data ?? false
 
-  const [showCelebration, setShowCelebration] = useState(false)
+  // The commit reward — a native Lottie firework played over the
+  // constellation's centre. `celebrateKey` bumps on every upward commit
+  // (Entrené, or marking a calendar day); the keyed LottieView remounts
+  // and plays once. Native render = no per-particle RN nodes (the old
+  // hand-coded SVG burst crashed). Suppressed under reduce-motion.
+  const reducedMotion = useReducedMotion()
+  const [celebrateKey, setCelebrateKey] = useState(0)
+
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
   // The 28-day strip is the constellation's data twin — collapsed by
   // default so it doesn't compete with the hero constellation above.
@@ -190,15 +196,22 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       if (restedToday) setRest.mutate(false)
       toggleToday.mutate(true)
       playCommitHaptic('trained')
-      // No flat screen wash — the reward light blooms from the
-      // constellation itself (its internal radialPulse), so it
-      // radiates from the figure rather than tinting the whole app.
+      // Fire the Lottie firework reward (centred on the constellation).
+      setCelebrateKey((k) => k + 1)
+      // No flat screen wash, no overlay — the Day-1 reward IS the
+      // constellation's own GOLD firework (its internal radialPulse +
+      // StarBurst), blooming from the figure's centre and growing
+      // outward. It already fires on this commit (count 0→1).
+      //
+      // On the first-ever workout the DB trigger stamps
+      // profiles.first_workout_at; invalidate the profile query so a
+      // later same-session paint reads the real value (the same-day
+      // transition out of "Día 1" is already covered optimistically
+      // by ctx.today_workout_completed flipping true). This used to
+      // live in the celebration's dismissal timer — moved here so it
+      // fires with the commit, not on a now-deleted overlay's timeout.
       if (wasFirstDay) {
-        setShowCelebration(true)
-        setTimeout(() => {
-          setShowCelebration(false)
-          qc.invalidateQueries({ queryKey: queryKeys.profile.all })
-        }, CELEBRATION_MS)
+        qc.invalidateQueries({ queryKey: queryKeys.profile.all })
       }
     } else if (next === 'rested') {
       if (ctx.today_workout_completed) toggleToday.mutate(false)
@@ -224,6 +237,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     // re-animates on its own once the trained count rises). Undo
     // toggles stay silent — matching the constellation, which never
     // animates downward.
+    // NO fireworks on calendar backfill — the Lottie reward is reserved
+    // for marking TODAY ("Entrené"). Backfilling a past day just fills the
+    // constellation (its star lights via the normal commit flow) + a haptic.
     if (willComplete) {
       playCommitHaptic('backfill')
     }
@@ -266,12 +282,37 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(320)} style={styles.constellationWrap}>
+            {/* burstGold — the Home constellation fires the GOLD
+                (Genshin-grade) firework from its centre on each commit;
+                this IS the Day-1 celebration now that the overlay is
+                gone. Every other LunarConstellation call site (Órbita
+                tab, dev, refactor-test) omits the prop and keeps the
+                magenta family untouched. */}
             <LunarConstellation
               trained={ctx.grid_28_days.map((c) => c.completed)}
               todayIdx={27}
               sign={sign}
               committed={ctx.today_workout_completed}
+              suppressBurst
             />
+            {/* The reward firework — a native Lottie played over the
+                constellation's centre on each upward commit. Replaces the
+                hand-coded SVG burst (which crashed mounting ~60 animated
+                nodes). Keyed so it remounts + plays once per commit; the
+                animation ends fully faded, so it rests invisible. */}
+            {!reducedMotion && celebrateKey > 0 ? (
+              <View pointerEvents="none" style={styles.celebration}>
+                <LottieView
+                  key={celebrateKey}
+                  source={require('../../assets/lottie/gold-fireworks.json')}
+                  autoPlay
+                  loop={false}
+                  speed={0.7}
+                  resizeMode="contain"
+                  style={styles.celebrationLottie}
+                />
+              </View>
+            ) : null}
           </Animated.View>
 
           <Animated.View entering={enter(420)} style={styles.coachLineWrap}>
@@ -351,8 +392,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
-
-      {showCelebration ? <Day1Celebration /> : null}
     </View>
   )
 }
@@ -473,7 +512,7 @@ function getCoachCopy(
     const namedStar = pickStarForCount(sign, count)
     if (namedStar) {
       return {
-        before: `Hoy encendiste ${namedStar.name} — `,
+        before: `Hoy encendiste ${namedStar.name}. `,
         emphasis: namedStar.role,
         after: '.',
       }
@@ -531,6 +570,17 @@ const styles = StyleSheet.create({
   // available width. `-20` exactly cancels the content padding.
   constellationWrap: {
     marginHorizontal: -20,
+  },
+  // Lottie reward overlay — fills the constellation card, centred on its
+  // circle so the firework blooms from the centre outward. Non-interactive.
+  celebration: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  celebrationLottie: {
+    width: '100%',
+    height: '100%',
   },
   constellationHeaderText: {
     fontFamily: typography.serifSemi,

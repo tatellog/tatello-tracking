@@ -137,9 +137,9 @@ export default function AuthScreen() {
 
           <View style={styles.stack}>
             <Animated.View entering={enter(100)} style={{ gap: spacing.sm }}>
-              <Text style={styles.headline}>Entrá a STELAR</Text>
+              <Text style={styles.headline}>Entra a STELAR</Text>
               <Text style={styles.editorial}>
-                Si ya tenés cuenta, ponemos tu email y contraseña. Si es la primera vez, te creamos
+                Si ya tienes cuenta, ponemos tu email y contraseña. Si es la primera vez, te creamos
                 la cuenta automáticamente.
               </Text>
             </Animated.View>

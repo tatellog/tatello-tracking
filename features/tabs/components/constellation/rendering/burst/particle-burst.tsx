@@ -28,11 +28,27 @@ export function ParticleBurst({
   cy,
   pulse,
   trainedCount,
+  hues,
+  reach,
+  countScale = 1,
+  widthScale = 1,
 }: {
   cx: number
   cy: number
   pulse: SharedValue<number>
   trainedCount: number
+  // Optional palette override. When omitted the burst uses the global
+  // magenta-family SPARK_HUES (the Órbita tab firework, unchanged). The
+  // Day1 celebration passes a gold palette so its sparks read as oro.
+  hues?: readonly string[]
+  // Optional baseline radial reach (px). Omitted → PARTICLE_REACH (the
+  // Órbita tab, unchanged). Day1 pushes it out so sparks clear the halo.
+  reach?: number
+  // Optional spark-count multiplier (default 1 → Órbita unchanged). When
+  // > 1 the count cap lifts from 54 → 80 so a 1.6× Day1 burst isn't capped.
+  countScale?: number
+  // Optional stroke-width multiplier (default 1 → Órbita unchanged).
+  widthScale?: number
 }) {
   // Gate the render on pulse mid-flight + own a local burstId counter
   // (bumped on every burst start). Two reasons it lives here instead of
@@ -68,7 +84,10 @@ export function ParticleBurst({
   const earlyBoost =
     trainedCount >= 2 && trainedCount <= 12 ? 1 + 0.4 * ((12 - trainedCount) / 10) : 1
   const base = big ? 46 : PARTICLE_BASE + Math.floor(burstHash(burstId, 1) * 9) - 4
-  const count = Math.min(54, Math.round(base * earlyBoost))
+  // Cap lifts to 80 when an explicit countScale amplifies the burst
+  // (Day1's 1.6×) so the extra sparks aren't clipped back to 54.
+  const cap = countScale > 1 ? 80 : 54
+  const count = Math.min(cap, Math.round(base * earlyBoost * countScale))
   return (
     <G>
       {Array.from({ length: count }).map((_, i) => (
@@ -81,6 +100,9 @@ export function ParticleBurst({
           burstId={burstId}
           big={big}
           pulse={pulse}
+          hues={hues}
+          reach={reach}
+          widthScale={widthScale}
         />
       ))}
     </G>
@@ -100,6 +122,9 @@ function ParticleSpark({
   burstId,
   big,
   pulse,
+  hues,
+  reach,
+  widthScale = 1,
 }: {
   cx: number
   cy: number
@@ -108,6 +133,9 @@ function ParticleSpark({
   burstId: number
   big: boolean
   pulse: SharedValue<number>
+  hues?: readonly string[]
+  reach?: number
+  widthScale?: number
 }) {
   // Even spacing + a small per-spark angular jitter — the ring breathes.
   const jitter = (burstHash(burstId, index) - 0.5) * 0.16
@@ -117,10 +145,15 @@ function ParticleSpark({
   const isLong = burstHash(burstId, index * 3 + 5) > 0.86
   const reachMul =
     (0.85 + burstHash(burstId, index + 40) * 0.3) * (isLong ? 1.5 : 1) * (big ? 1.22 : 1)
-  const reach = PARTICLE_REACH * reachMul
+  // Baseline reach overridable per-call (Day1 pushes it out); defaults
+  // to the global PARTICLE_REACH so the Órbita tab is untouched.
+  const spark = (reach ?? PARTICLE_REACH) * reachMul
+  // Palette override (Day1 = gold) falls back to the global magenta
+  // family. Same burstHash index so colour choice stays deterministic.
+  const palette = hues ?? SPARK_HUES
   const color =
-    SPARK_HUES[Math.floor(burstHash(burstId, index + 7) * SPARK_HUES.length)] ?? colors.magenta
-  const width = 2 + Math.abs(Math.sin(index * 17.3)) * 0.8
+    palette[Math.floor(burstHash(burstId, index + 7) * palette.length)] ?? colors.magenta
+  const width = (2 + Math.abs(Math.sin(index * 17.3)) * 0.8) * widthScale
   const dirX = Math.cos(angle)
   const dirY = Math.sin(angle)
   const flickPhase = (index * 0.37) % 1
@@ -137,10 +170,10 @@ function ParticleSpark({
     const uTail = u < lag ? 0 : u - lag
     const tHead = 1 - (1 - u) * (1 - u)
     const tTail = 1 - (1 - uTail) * (1 - uTail)
-    const xHead = cx + dirX * reach * tHead
-    const yHead = cy + dirY * reach * tHead
-    const xTail = cx + dirX * reach * tTail
-    const yTail = cy + dirY * reach * tTail
+    const xHead = cx + dirX * spark * tHead
+    const yHead = cy + dirY * spark * tHead
+    const xTail = cx + dirX * spark * tTail
+    const yTail = cy + dirY * spark * tTail
     // fast fade-in, long fade-out, plus a fast flicker.
     const fade = u < 0.06 ? u / 0.06 : 1 - (u - 0.06) / 0.94
     const flicker = 0.7 + 0.3 * Math.sin(u * 70 + flickPhase * 6.283)

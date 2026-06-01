@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -5,21 +6,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useBriefContext } from '@/features/brief/hooks'
 import { DayOneTask, WizardBackdrop } from '@/features/onboarding/components'
-import { type MonthlyFocus } from '@/features/profile/api'
+import { type CycleSituation, type MonthlyFocus } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
-import { LunarConstellation } from '@/features/tabs/components/constellation/LunarConstellation'
+import { ZodiacArt } from '@/features/tabs/components/constellation'
 import { ZODIAC, ZodiacFigure, zodiacFromDate, type ZodiacSign } from '@/features/tabs/zodiac'
 import { markVisitedDayOne } from '@/lib/onboardingFlags'
-import { colors, typography } from '@/theme'
+import { colors, shadows, typography } from '@/theme'
 
 const TASKS: { num: number; text: string }[] = [
   {
     num: 1,
     text: 'Registra tu primera comida del día. La señal más rápida que Stelar lee.',
-  },
-  {
-    num: 2,
-    text: 'Marca tu primer entreno cuando lo termines, aunque sea caminar.',
   },
 ]
 
@@ -37,27 +34,38 @@ const FOCUS_RECAP: Record<MonthlyFocus, string> = {
   other: 'tienes una intención propia',
 }
 
+/** TU CICLO recap value — a real FACT per situation (not the old
+ *  "leyéndose mes a mes" process phrase). Warm, factual, never clinical.
+ *  The current wizard only writes menstruates / irregular / skip; the
+ *  other three exist in the model for legacy/completeness. */
+const CYCLE_RECAP: Record<CycleSituation, string> = {
+  menstruates: 'regular',
+  irregular: 'sin patrón fijo',
+  contraception: 'con anticoncepción',
+  pregnant: 'en embarazo',
+  postmenopause: 'en otra etapa',
+  skip: 'no lo seguimos',
+}
+
 /*
  * Día 1 — the bridge between the wizard and the real Home. After
- * the reveal's cosmic moment, this page used to break the spell
- * with a light pearl theme. Now it stays in the same dark+magenta
- * register as the rest of onboarding, opens with the SAME progress
- * constellation the user will see every day in the Hoy tab — now
- * with its FIRST star lit (today) and the next one pulsing — then a
- * recap card that names back what Stelar captured (sunk-cost
- * validation), then the small tasks for today.
+ * the reveal's cosmic moment, this page stays in the same
+ * dark+magenta register as the rest of onboarding.
  *
- * THE OPEN LOOP (illustrator-specialist spec): the reveal's
- * ceremony formed the sign's constellation and let it sink; Día 1
- * RECOVERS it as the live progress system. We MOUNT the real
- * <LunarConstellation> (the same component the tab renders) with
- * `trained=[true, …27×false]`, `todayIdx=0`, `committed=false`. The
- * `committed=false` is CRITICAL: it keeps the "next star" affordance
- * alive (the magenta halo that breathes around tomorrow's point) —
- * that pulsing next star IS the open loop, the reason to come back
- * mañana. `showCount=false` hides the "1/28" chip: a big count on
- * day one reads as "you're missing 27" = debt (manifiesto-prohibido);
- * the visual loop carries the meaning instead.
+ * THE SKY, NOT THE METER (illustrator-specialist spec): the LIVE
+ * progress constellation lives in the Hoy tab — repeating it here in
+ * the same framed card read as redundant. So Día 1 shows ONLY the
+ * sign's pictorial art floating free over a diffuse golden halo, with
+ * NO card frame. That echoes the reveal's RESTING state (arte + aura,
+ * sin contenedor) and visually distinguishes this screen from the tab.
+ * The art + halo are fully static — no Reanimated, no stars, no count.
+ *
+ * COLOUR ECONOMY: the art introduced GOLD (oro). The surrounding chrome
+ * follows it — eyebrows, the recap glyph, the task chip and every border
+ * are gold, read as the sky's light spilling onto the page. MAGENTA is
+ * kept to exactly two beats (the screen's voice): the "hoy empieza"
+ * title emphasis and the CTA. That honours the "max 2 magenta/screen"
+ * rule in colors.ts and lets the gold do the unifying.
  *
  * The base cosmic backdrop (starfield + Stelar presence) is mounted PER
  * SCREEN (its own <WizardBackdrop />, opaque colors.bg base) so the
@@ -83,25 +91,16 @@ export default function DayOneScreen() {
   const firstName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
   // Signo zodiacal — SAME derivation as the reveal (zodiacFromDate over
-  // date_of_birth). We gate the whole constellation render on it: if
-  // there's no birth date we never invent a sign (the reveal doesn't
-  // either), and Día 1 falls back to its prior layout (no constellation)
-  // without breaking.
+  // date_of_birth). We gate the whole sky render on it: if there's no
+  // birth date we never invent a sign (the reveal doesn't either), and
+  // Día 1 falls back to its prior layout (no art, no halo) without
+  // breaking.
   const sign: ZodiacSign | null = useMemo(
     () => (profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null),
     [profile?.date_of_birth],
   )
 
-  // The 28-day grid with ONLY today (index 0) lit — the first star of the
-  // cycle. Memoized with an empty dep so the array reference is stable
-  // across re-renders (LunarConstellation memoizes its derived progress on
-  // `trained`'s reference; a fresh array each render would invalidate the
-  // whole downstream tree — see docs/perf/lunar-constellation-audit.md).
-  const trained = useMemo<boolean[]>(() => [true, ...Array<boolean>(27).fill(false)], [])
-
-  const constellationA11yLabel = sign
-    ? `Tu constelación de ${ZODIAC[sign].label}: tu primera estrella encendida, la próxima esperándote`
-    : undefined
+  const skyA11yLabel = sign ? `Tu cielo de ${ZODIAC[sign].label}` : undefined
 
   const handleEnter = async () => {
     await markVisitedDayOne()
@@ -120,12 +119,20 @@ export default function DayOneScreen() {
       const s = zodiacFromDate(profile.date_of_birth)
       out.push({ label: 'TU SIGNO', value: ZODIAC[s].label, zodiac: s })
     }
-    if (
-      profile?.cycle_situation === 'menstruates' ||
-      profile?.cycle_situation === 'contraception'
-    ) {
-      out.push({ label: 'TU CICLO', value: 'leyéndose mes a mes' })
+    // TU CICLO — a real fact per situation (regular / sin patrón fijo / no
+    // lo seguimos), shown ALWAYS when the situation is set. Not the old
+    // "leyéndose mes a mes" process phrase.
+    const cs = (profile?.cycle_situation as CycleSituation | null) ?? null
+    if (cs) {
+      out.push({ label: 'TU CICLO', value: CYCLE_RECAP[cs] })
     }
+    // TU BASE — the starting weight, shown as an honest fact. Día 1 is the
+    // close of onboarding (where weight legitimately lives) and the number
+    // IS the credible starting point for a weight-loss goal: it helps, it
+    // doesn't shame — "esto es lo que soy y cómo empiezo". The manifiesto
+    // lines that still hold are the ones about DOMINANCE: weight never shows
+    // in Home, in notifications, or as a comparative goal ("47% de tu meta").
+    // A one-time baseline at the close is honest, not preciousness.
     const w = brief?.latest_measurement?.weight_kg
     if (w != null) {
       out.push({ label: 'TU BASE', value: `${w.toFixed(1)} kg` })
@@ -152,49 +159,51 @@ export default function DayOneScreen() {
           {firstName}, <Text style={styles.titleEm}>hoy empieza</Text>.
         </Text>
 
-        {/* The open loop — the SAME progress constellation the Hoy tab
-            shows, recovered from the reveal with its FIRST star lit.
-            committed=false keeps the next star pulsing (the reason to
-            return); showCount=false hides the "1/28" chip so no number
-            reads as debt. Contained to ~64% width — the component is
-            width:100% of its parent, so we size it via the wrapper, not
-            the component. Only when we actually have a derived sign. */}
+        {/* The sky — ONLY the sign's pictorial art floating free over a
+            diffuse golden halo, no card frame. Echoes the reveal's resting
+            state and stays distinct from the live constellation in the Hoy
+            tab. Static art + halo, gated on an actual derived sign. */}
         {sign ? (
           <View
-            style={styles.constellation}
+            style={styles.skyArt}
             accessible
             accessibilityRole="image"
-            accessibilityLabel={constellationA11yLabel}
+            accessibilityLabel={skyA11yLabel}
           >
-            <LunarConstellation
-              sign={sign}
-              trained={trained}
-              todayIdx={0}
-              committed={false}
-              showCount={false}
-            />
+            <ZodiacArt sign={sign} size={188} />
           </View>
         ) : null}
 
-        {/* Coach line (serif italic) — names the loop the constellation
-            just made visible: one star lit, the next waiting. */}
+        {/* Coach line (serif italic) — names the sky the art just made
+            visible, framed as something that reveals itself over time. */}
         <Text style={styles.sub}>
-          Encendiste tu primera estrella. Mañana enciendes la siguiente, y tu cielo empieza a tomar
-          forma.
+          Este es tu cielo. Cada día que registras, se revela un poco más.
         </Text>
 
         {/* Recap — "Stelar ya sabe esto de vos". Validates the 11
-            wizard inputs by naming them back as facts Stelar holds. */}
+            wizard inputs by naming them back as facts Stelar holds. The
+            card carries a faint gold halo at its top edge so the sky's
+            light feels like it spills down onto the recap. */}
         {recapLines.length > 0 ? (
           <View style={styles.recapCard}>
+            {/* Gold halo bleeding down from the top — the observatory light
+                falling onto the card. Behind the content, non-interactive. */}
+            <LinearGradient
+              colors={[colors.oroTint, 'transparent']}
+              style={styles.recapGlow}
+              pointerEvents="none"
+            />
             <Text style={styles.recapEyebrow}>Stelar ya sabe esto de ti</Text>
             <View style={styles.recapList}>
-              {recapLines.map((row) => (
-                <View key={row.label} style={styles.recapRow}>
+              {recapLines.map((row, i) => (
+                <View
+                  key={row.label}
+                  style={[styles.recapRow, i < recapLines.length - 1 && styles.recapRowDivider]}
+                >
                   <Text style={styles.recapLabel}>{row.label}</Text>
                   <View style={styles.recapValueWrap}>
                     {'zodiac' in row ? (
-                      <ZodiacFigure sign={row.zodiac} size={20} color={colors.magenta} />
+                      <ZodiacFigure sign={row.zodiac} size={20} color={colors.oro} />
                     ) : null}
                     <Text style={styles.recapValue}>{row.value}</Text>
                   </View>
@@ -209,6 +218,13 @@ export default function DayOneScreen() {
             <DayOneTask key={task.num} num={task.num} text={task.text} />
           ))}
         </View>
+
+        {/* Movement as a soft, UN-numbered coach aside — not a second task.
+            Kept off the numbered chip so it reads as permission, not duty:
+            move if you moved, otherwise it waits for tomorrow. */}
+        <Text style={styles.moveAside}>
+          Y si hoy te moviste, aunque sea caminar, márcalo. Si no, mañana sigue ahí.
+        </Text>
 
         {/* Expectation note — moved off the reveal's peak. Sets the longer
             arc in coach voice: Stelar reads every day, and the confirmed
@@ -229,9 +245,9 @@ export default function DayOneScreen() {
           style={styles.cta}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Entrar a tu órbita"
+          accessibilityLabel="Entrar a tu constelación"
         >
-          <Text style={styles.ctaLabel}>Entrar a tu órbita →</Text>
+          <Text style={styles.ctaLabel}>Entrar a tu constelación →</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -258,7 +274,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     letterSpacing: 2.5,
     textTransform: 'uppercase',
-    color: colors.magenta,
+    color: colors.oro,
     marginBottom: 12,
   },
   title: {
@@ -275,48 +291,81 @@ const styles = StyleSheet.create({
     color: colors.magenta,
     letterSpacing: -1,
   },
-  // The recovered progress constellation — centred + contained so the
-  // component (width:100% of parent) reads as a portrait, not a full-bleed
-  // canvas. Sits between the title and the coach line.
-  constellation: {
+  // The sky — sign art floating free over its golden halo. 188×188 box,
+  // overflow:'visible' so the ~240×240 halo can bleed past the edges
+  // without clipping into a hard ring. Sits between the title and the
+  // coach line.
+  skyArt: {
+    width: 188,
+    height: 188,
     alignSelf: 'center',
-    width: '64%',
-    marginTop: 8,
-    marginBottom: 18,
+    marginTop: 12,
+    marginBottom: 16,
+    overflow: 'visible',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.58,
   },
   sub: {
-    marginTop: 12,
+    marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
   },
+  // overflow:'hidden' so the gold glow gradient respects the 16 radius.
   recapCard: {
-    marginTop: 26,
-    backgroundColor: colors.bgCard,
+    marginTop: 30,
+    backgroundColor: colors.bgCard2,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.bruma,
+    borderColor: colors.oroHairline,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    // NO overflow:'hidden' — it clipped the sign glyph in the first row.
+    // The gold glow rounds its OWN top corners instead (see recapGlow).
+  },
+  // Gold halo over the top ~40% of the card — the sky's light spilling
+  // down. Absolute, behind content (zIndex untouched = paint order). Its
+  // top corners are rounded to match the card so it doesn't need the
+  // card's overflow:'hidden' (which was clipping the glyph).
+  recapGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
   },
   recapEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
-    color: colors.magenta,
+    color: colors.oro,
   },
   recapList: {
     marginTop: 12,
-    gap: 12,
   },
+  // Rows read as an "astral chart" register: a faint gold hairline divides
+  // each entry (skipped on the last). paddingBottom gives the rule air.
   recapRow: {
+    // 'center' (not 'baseline'): the sign row carries an SVG glyph, which
+    // has no text baseline — under 'baseline' it was pushed up out of the
+    // row and clipped by the card's overflow:'hidden'. Centering keeps the
+    // glyph in bounds and reads clean against the label/value.
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 16,
+    paddingBottom: 12,
+  },
+  recapRowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.oroHairlineSoft,
+    marginBottom: 12,
   },
   recapLabel: {
     fontFamily: typography.uiBold,
@@ -343,13 +392,23 @@ const styles = StyleSheet.create({
     marginTop: 24,
     gap: 10,
   },
+  // Movement aside — coach voice (serif italic, bone) so it sits softer
+  // than the numbered task above and reads as an invitation, not a duty.
+  moveAside: {
+    marginTop: 16,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.bone,
+  },
   // Expectation note — quiet horizon line below the tasks. Separated by a
-  // hairline so it reads as an aside, not a 4th task. Coach voice (serif
-  // italic), bone tone so it sits softer than the tasks.
+  // gold hairline so it reads as an aside, not a 4th task. Coach voice
+  // (serif italic), bone tone so it sits softer than the tasks.
   horizonNote: {
     marginTop: 22,
     borderTopWidth: 1,
-    borderTopColor: colors.bruma,
+    borderTopColor: 'rgba(217, 174, 111, 0.14)',
     paddingTop: 16,
   },
   horizonEyebrow: {
@@ -372,12 +431,15 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 14,
   },
+  // Magenta CTA with the brand glow (shadows.ctaMagenta) — NOT a gradient.
+  // This is one of the screen's two permitted magenta beats.
   cta: {
     backgroundColor: colors.magenta,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.ctaMagenta,
   },
   ctaLabel: {
     fontFamily: typography.uiBold,

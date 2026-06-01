@@ -79,7 +79,7 @@ export function DaySegment() {
         </View>
         <EmptySegmentCard
           eyebrow="Stelar te empieza a leer"
-          body="Registra algo — una comida, tu sueño de anoche, un entreno, un vaso de agua. Cualquier señal vale."
+          body="Registra algo: una comida, tu sueño de anoche, un entreno, un vaso de agua. Cualquier señal vale."
           hint="Cuando haya algo registrado, esta pantalla se transforma en tu lectura."
         />
       </Animated.View>

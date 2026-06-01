@@ -141,16 +141,16 @@ export function computeTrend(points: WeightPoint[]): Trend | null {
  * coach line se sienta parte del mismo cielo que el resto de Progreso.
  */
 export function formatTrendCopy(trend: Trend): string {
-  if (trend.direction === 'flat') return 'Tu órbita está en pausa — el cielo sostiene tu ritmo.'
+  if (trend.direction === 'flat') return 'Tu órbita está en pausa: el cielo sostiene tu ritmo.'
 
   const abs = Math.abs(trend.weeklyChange)
   if (trend.direction === 'down') {
-    if (abs > 0.5) return 'Vas bajando con fuerza — cuida tu combustible para no perder brillo.'
+    if (abs > 0.5) return 'Vas bajando con fuerza: cuida tu combustible para no perder brillo.'
     if (abs >= 0.2) return 'Tu trayectoria desciende con calma, sin prisa.'
-    return 'Bajas de a poquito — gravedad amable.'
+    return 'Bajas poco a poco: gravedad amable.'
   }
 
   if (abs > 0.5) return 'Tu rumbo sube rápido estas semanas.'
   if (abs >= 0.2) return 'Tu órbita asciende, paso a paso.'
-  return 'Subís apenas un grado — luz tibia.'
+  return 'Subes apenas un grado: luz tibia.'
 }

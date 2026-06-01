@@ -21,7 +21,7 @@ export function HomeError({ onRetry }: Props) {
         <Text style={styles.meta}>SIN CONEXIÓN</Text>
         <Text style={styles.headline}>No pudimos traer tu brief</Text>
         <Text style={styles.editorial}>
-          Revisá tu conexión o intentá de nuevo en un momento. Tu racha y tus medidas siguen a
+          Revisa tu conexión o intenta de nuevo en un momento. Tu racha y tus medidas siguen a
           salvo.
         </Text>
         <Pressable onPress={onRetry} style={styles.retry}>

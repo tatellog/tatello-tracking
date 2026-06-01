@@ -76,7 +76,7 @@ export default function MacroTargetsScreen() {
               {isEdit ? 'Ajustá tus metas' : 'Configurá tus metas'}
             </Text>
             <Text style={styles.editorial}>
-              Proteína y calorías del día. Podés cambiarlas cuando quieras.
+              Proteína y calorías del día. Puedes cambiarlas cuando quieras.
             </Text>
           </View>
 
