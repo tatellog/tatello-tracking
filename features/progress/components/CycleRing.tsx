@@ -1,3 +1,4 @@
+import LottieView from 'lottie-react-native'
 import { useEffect } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -110,6 +111,20 @@ export function CycleRing({
 
   return (
     <View style={styles.wrap}>
+      {/* Ambient Genshin glow BEHIND the ring — drifting cool dust + faint
+          halo + slow gold glints. Pure decoration: pointerEvents none, and
+          suppressed under reduced motion (the SVG ring still renders). */}
+      {reduce ? null : (
+        <View style={styles.glow} pointerEvents="none">
+          <LottieView
+            source={require('../../../assets/lottie/cycle-ring-glow.json')}
+            autoPlay
+            loop
+            style={StyleSheet.absoluteFill}
+            resizeMode="contain"
+          />
+        </View>
+      )}
       <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
         <Defs>
           <LinearGradient
@@ -187,6 +202,9 @@ const styles = StyleSheet.create({
     height: SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  glow: {
+    ...StyleSheet.absoluteFillObject,
   },
   center: {
     ...StyleSheet.absoluteFillObject,

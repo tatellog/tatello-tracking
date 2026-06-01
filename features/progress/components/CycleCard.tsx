@@ -28,12 +28,20 @@ const PHASE_LABEL: Record<CyclePhase, string> = {
   lutea: 'Semana antes',
 }
 
-// The card's reason to exist for a weight app: a warm line that keeps the
-// scale from reading as failure when it's really the cycle (anti-culpa de
-// balanza, cycle-voice-spec Capa A). Only the two phases where water
-// retention moves the number speak; the calm phases stay silent.
-const COACH_LINE: Partial<Record<CyclePhase, string>> = {
-  menstrual: 'Estos días tu cuerpo retiene más agua. Si la balanza sube, no es grasa: es tu ciclo.',
+// One read-only context line per phase (the user asked for "más
+// información"). Vetted by behavioral-specialist + voice-and-copy against
+// cycle-voice-spec: período/semana-antes carry the anti-culpa-de-balanza
+// message (water, not fat); the calm phases speak only in POBLACIONAL,
+// conditional voice ("a algunas", "muchas") — never "tu energía/tu cuerpo"
+// about a suggestible state, to avoid a nocebo / horoscope read. Only the
+// ACTIVE phase's line shows, never all four at once.
+// NOTE: do NOT add antojo/ánimo to the lútea line without re-running it
+// through behavioral-specialist — it's the highest nocebo-risk phase.
+const PHASE_NOTE: Record<CyclePhase, string> = {
+  menstrual:
+    'Estos días tu cuerpo retiene más agua. Si la balanza sube, no es grasa: es tu ciclo. No dejes que el número te diga cómo vas.',
+  folicular: 'A algunas les vuelve algo de energía por acá. Si lo sientes, es tuyo. Si no, también está bien.',
+  ovulatoria: 'Es el punto medio de tu ciclo. Muchas notan más energía por estos días.',
   lutea:
     'Tu cuerpo puede retener algo de agua estos días. Es normal y se va. No dejes que el número te diga cómo vas.',
 }
@@ -103,7 +111,7 @@ export function CycleCard() {
     )
   }
 
-  const coachLine = COACH_LINE[state.phaseKey]
+  const phaseNote = PHASE_NOTE[state.phaseKey]
   // Estimate, never a deterministic forecast: "alrededor de" keeps it as
   // context, not a fertility/calendar countdown (cycle-voice-spec §2.1, §8).
   const nextPeriod =
@@ -123,7 +131,7 @@ export function CycleCard() {
           reduce={reduce}
         />
         <Text style={styles.nextPeriod}>Próximo período · {nextPeriod}</Text>
-        {coachLine ? <Text style={styles.coachLine}>{coachLine}</Text> : null}
+        <Text style={styles.coachLine}>{phaseNote}</Text>
       </View>
     </Animated.View>
   )
