@@ -282,7 +282,11 @@ export default function IntentionScreen() {
         loading={updateProfile.isPending}
         errorMessage={updateProfile.error?.message}
         onContinue={handleContinue}
-        continueLabel="Continuar"
+        continueLabel={fromSettings ? 'Guardar' : 'Continuar'}
+        // From Ajustes this is an EDIT, not an onboarding step — hide the
+        // wizard progress bar so it doesn't read as "back in onboarding".
+        // The "‹ Atrás" stays (it pops back to Ajustes via router.back()).
+        showProgress={!fromSettings}
         ctaVariant="soft"
         ctaTransform="none"
         atmosphere={
