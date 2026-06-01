@@ -59,16 +59,14 @@ alter table public.profiles
       -- pass these checks the same as a non-empty one. Without coalesce,
       -- `null <= 7` evaluates to null, and CHECK silently fails for `{}`.
       coalesce(array_length(monthly_focus_secondary, 1), 0) <= 7
-      -- Elements must be unique. The scalar subquery is evaluated per
-      -- row at insert/update and references only the same row's column,
-      -- so it carries the row-scope guarantees CHECK expects (no
-      -- cross-row reads, deterministic). `count(distinct)` ignores NULL
-      -- elements; the `<@` check below rejects arrays containing NULL
-      -- against the literal text[] domain, so duplicate-NULL inputs
-      -- can't slip through.
-      and coalesce(array_length(monthly_focus_secondary, 1), 0) = (
-        select count(distinct e) from unnest(monthly_focus_secondary) as e
-      )
+      -- NOTE: element UNIQUENESS is enforced at the APPLICATION layer
+      -- (intention.tsx dedupes the picks before persisting), NOT in this
+      -- CHECK. Postgres forbids subqueries / set-returning functions in a
+      -- CHECK constraint ("cannot use subquery in check constraint",
+      -- SQLSTATE 0A000), so "no duplicate array elements" can't be
+      -- expressed here. The single-writer (the wizard) makes app-layer
+      -- enforcement enough — same rationale as the priority-not-duplicated
+      -- invariant noted above.
       -- Every element must be in the same enum as `monthly_focus` (see
       -- profiles_monthly_focus_check in 20260520120002). If the enum
       -- ever grows, BOTH checks need updating — kept duplicated rather
