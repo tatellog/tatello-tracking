@@ -691,15 +691,21 @@ function AccountRow({
       onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [styles.accountRow, pressed && styles.rowPressed]}
+      style={({ pressed }) => pressed && styles.rowPressed}
     >
-      <View style={styles.metaMain}>
-        <Text style={styles.accountLabel}>{label}</Text>
-        {tagline ? <Text style={styles.accountTagline}>{tagline}</Text> : null}
+      {/* Row layout lives on this inner View, not the Pressable — same
+          reason PlanRow does it: flex doesn't render reliably when applied
+          straight to a Pressable in this RN setup, which left the chevron
+          stacking below the text instead of aligning right. */}
+      <View style={styles.accountRow}>
+        <View style={styles.metaMain}>
+          <Text style={styles.accountLabel}>{label}</Text>
+          {tagline ? <Text style={styles.accountTagline}>{tagline}</Text> : null}
+        </View>
+        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+          ›
+        </Text>
       </View>
-      <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
-        ›
-      </Text>
     </Pressable>
   )
 }
