@@ -1,9 +1,7 @@
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRef } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle } from 'react-native-svg'
+import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
 // Same 9:16 frame as ProgressShareCard so the captured PNG lives in
@@ -21,7 +19,8 @@ export const TRAINING_SHARE_VARIANTS: { id: TrainingShareVariant; label: string 
 ]
 
 // Seeded starfield with three brightness tiers — the celestial bed
-// that lives behind every shareable STELAR card.
+// that lives behind every shareable STELAR card. The brightest tier
+// (o > 0.36) gets a bloom halo, echoing the "today" moon of CycleRing.
 const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
   const arr: { x: number; y: number; r: number; o: number }[] = []
   let s = 77119
@@ -43,6 +42,9 @@ const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
   return arr
 })()
 
+// Pre-split the brightest stars so the bloom layer only paints those.
+const BLOOM_STARS = CARD_STARS.filter((st) => st.o > 0.36)
+
 type Props = {
   variant: TrainingShareVariant
   /** Local file URI of the just-captured workout photo. */
@@ -57,24 +59,37 @@ type Props = {
   onReady: () => void
 }
 
-/* The single workout-photo frame, shared across variants. The chip in
- * the corner says "HOY" — the only timestamp the card needs, since
- * the entreno is by definition today's moment. */
+/* The single workout-photo frame, shared across variants and always
+ * 4:5 so the body is never cropped (manifesto: no body-cropping).
+ *
+ * The photo is shown in `contain` so nothing is clipped; to avoid dead
+ * letterbox bars, the same photo sits behind it blurred + `cover` under
+ * a dark scrim, so the bars read as a soft bokeh extension of the shot.
+ *
+ * The chip says "HOY" — the only timestamp the card needs, since the
+ * entreno is by definition today's moment. `halo` adds the single soft
+ * magenta glow that makes the photo the hero of its variant. */
 function PhotoFrame({
   uri,
-  aspect,
+  halo,
   onSettled,
 }: {
   uri: string
-  aspect: number
+  /** When true, the frame carries a soft magenta halo (its variant's hero). */
+  halo?: boolean
   onSettled: () => void
 }) {
   return (
-    <View style={[styles.frame, { aspectRatio: aspect }]}>
+    <View style={[styles.frame, halo && styles.frameHalo]}>
+      {/* Blurred cover backdrop — fills the letterbox so contain has no
+          dead bars. */}
+      <Image source={{ uri }} style={styles.imgBackdrop} resizeMode="cover" blurRadius={18} />
+      <View style={styles.imgScrim} />
+      {/* The real, uncropped photo. */}
       <Image
         source={{ uri }}
         style={styles.img}
-        resizeMode="cover"
+        resizeMode="contain"
         onLoad={onSettled}
         onError={onSettled}
       />
@@ -87,15 +102,17 @@ function PhotoFrame({
 
 /*
  * The shareable training card — a 9:16 Instagram-story image. Three
- * variants share the celestial bed and brand but rearrange the same
- * pieces (photo, day count, sign, coach line):
+ * variants share the celestial bed + brand but rearrange the same
+ * pieces (photo, day, sign, coach line). Each variant has ONE hero and
+ * keeps magenta to ≤2 accents (brand ✦ + the hero's single touch):
  *
- *   momento — balanced: photo prominent, then "DÍA N · 28", sign as
- *             a quiet header line, coach line at the bottom.
- *   cifra   — the count huge ("16 / 28"), photo as a smaller strip
- *             beneath. The flex of the cycle, not the photo.
- *   sello   — the sign as visual hero ("TU LEO" big), photo framed
- *             smaller below it. The card reads as a passport stamp.
+ *   momento — the photo is the hero: large 4:5 with a soft magenta halo.
+ *             Sign in leche, day as a quiet gold eyebrow.
+ *   cifra   — the count is the hero: magenta number, gold "DÍA" eyebrow.
+ *             Photo is a smaller 4:5 with a gold (not magenta) frame.
+ *   sello   — the sign is the hero, rendered in serif italic leche with a
+ *             gold glow (no magenta on the sign). Photo medium 4:5 keeps
+ *             the lone second magenta as a soft halo.
  */
 export function TrainingShareCard({
   variant,
@@ -113,12 +130,41 @@ export function TrainingShareCard({
   }
 
   const signUpper = signLabel.toUpperCase()
-  const dayLine = `DÍA ${dayCount} · 28`
+  // Public fraction removed — "N / 28" reads as a comparative goal /
+  // countdown, which the manifesto forbids. Day stands on its own.
+  const dayLine = `DÍA ${dayCount}`
 
   return (
     <View style={styles.card}>
-      <LinearGradient colors={[colors.magentaTint2, 'transparent']} style={styles.nebula} />
+      {/* Celestial bed — two asymmetric radial glows for depth. */}
       <Svg style={StyleSheet.absoluteFill} width={TRAINING_CARD_W} height={TRAINING_CARD_H}>
+        <Defs>
+          {/* Magenta wash, top-right. */}
+          <RadialGradient id="tsc-magenta" cx="72%" cy="16%" r="62%">
+            <Stop offset="0" stopColor={colors.magenta} stopOpacity="0.20" />
+            <Stop offset="0.6" stopColor={colors.magentaDeep} stopOpacity="0.06" />
+            <Stop offset="1" stopColor={colors.magentaDeep} stopOpacity="0" />
+          </RadialGradient>
+          {/* Gold wash, low-left — the observatory light. */}
+          <RadialGradient id="tsc-oro" cx="20%" cy="30%" r="60%">
+            <Stop offset="0" stopColor={colors.oro} stopOpacity="0.07" />
+            <Stop offset="1" stopColor={colors.oro} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect width={TRAINING_CARD_W} height={TRAINING_CARD_H} fill="url(#tsc-magenta)" />
+        <Rect width={TRAINING_CARD_W} height={TRAINING_CARD_H} fill="url(#tsc-oro)" />
+
+        {/* Bloom under the brightest stars (drawn first, below the body). */}
+        {BLOOM_STARS.map((st, i) => (
+          <Circle
+            key={`bloom-${i}`}
+            cx={st.x}
+            cy={st.y}
+            r={st.r * 2.6}
+            fill={colors.leche}
+            opacity={st.o * 0.18}
+          />
+        ))}
         {CARD_STARS.map((st, i) => (
           <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
         ))}
@@ -132,11 +178,9 @@ export function TrainingShareCard({
       {variant === 'momento' ? (
         <>
           <View style={styles.middle}>
-            <PhotoFrame uri={photoUri} aspect={4 / 5} onSettled={handleSettled} />
+            <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
             <View style={styles.meta}>
-              <EyebrowLabel tone="niebla" size={9.5} style={styles.centered}>
-                {dayLine}
-              </EyebrowLabel>
+              <Text style={styles.dayEyebrow}>{dayLine}</Text>
               <Text style={styles.signMd}>{signUpper}</Text>
             </View>
           </View>
@@ -145,15 +189,13 @@ export function TrainingShareCard({
       ) : variant === 'cifra' ? (
         <>
           <View style={styles.middle}>
-            <View style={styles.countRow}>
+            <View style={styles.countBlock}>
+              <Text style={styles.dayEyebrow}>DÍA</Text>
               <Text style={styles.countHuge}>{dayCount}</Text>
-              <Text style={styles.countUnit}>/ 28</Text>
             </View>
-            <EyebrowLabel tone="niebla" size={9.5} style={styles.centered}>
-              {signUpper}
-            </EyebrowLabel>
-            <View style={styles.strip}>
-              <PhotoFrame uri={photoUri} aspect={16 / 9} onSettled={handleSettled} />
+            <Text style={styles.signEyebrow}>{signUpper}</Text>
+            <View style={styles.cifraPhoto}>
+              <PhotoFrame uri={photoUri} onSettled={handleSettled} />
             </View>
           </View>
           <Text style={styles.coach}>{coachCopy}</Text>
@@ -164,12 +206,10 @@ export function TrainingShareCard({
             <View style={styles.sealHeader}>
               <Text style={styles.eyebrowMd}>TU</Text>
               <Text style={styles.signHuge}>{signLabel.toUpperCase().replace('TU ', '')}</Text>
-              <EyebrowLabel tone="magenta" size={9.5} style={styles.centered}>
-                {dayLine}
-              </EyebrowLabel>
+              <Text style={styles.dayEyebrow}>{dayLine}</Text>
             </View>
             <View style={styles.sealPhoto}>
-              <PhotoFrame uri={photoUri} aspect={1} onSettled={handleSettled} />
+              <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
             </View>
           </View>
           <Text style={styles.coach}>{coachCopy}</Text>
@@ -187,13 +227,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 30,
     paddingBottom: 26,
-  },
-  nebula: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: TRAINING_CARD_H * 0.6,
+    justifyContent: 'space-between',
   },
   brand: {
     flexDirection: 'row',
@@ -214,18 +248,35 @@ const styles = StyleSheet.create({
   middle: {
     flex: 1,
     justifyContent: 'center',
+    gap: 22,
   },
-  // The workout photo — frame shared across variants. Aspect ratio
-  // is passed by the caller so each variant can size it differently.
-  // Magenta border signals "now / earned", echoing the "Ahora" frame
-  // in the antes-y-ahora cards.
+  // The workout photo — a fixed 4:5 frame across variants so the body is
+  // never cropped. A gold hairline keeps the edge quiet; the magenta voice
+  // lives only in the optional halo (the hero's single accent).
   frame: {
     width: '100%',
+    aspectRatio: 4 / 5,
     borderRadius: 16,
-    borderWidth: 1.4,
-    borderColor: colors.magenta,
+    borderWidth: 0.75,
+    borderColor: colors.oroHairline,
     backgroundColor: colors.bgCard2,
     overflow: 'hidden',
+  },
+  // The single soft magenta accent on the hero photo — an exterior glow.
+  frameHalo: {
+    shadowColor: colors.magenta,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+    transform: [{ scale: 1.04 }],
+  },
+  imgBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  imgScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.scrim,
   },
   img: {
     width: '100%',
@@ -235,7 +286,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     left: 10,
-    backgroundColor: colors.magenta,
+    backgroundColor: colors.scrim,
+    borderWidth: 0.5,
+    borderColor: colors.oroHairline,
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 7,
@@ -244,14 +297,27 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.6,
-    color: colors.leche,
+    color: colors.oroLight,
   },
-  centered: {
+  // Shared gold eyebrow — the quiet day / label tier (no magenta).
+  dayEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 2.2,
+    color: colors.oro,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  signEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 2.2,
+    color: colors.niebla,
+    textTransform: 'uppercase',
     textAlign: 'center',
   },
   // ── momento ────────────────────────────────────────────────────────
   meta: {
-    marginTop: 22,
     alignItems: 'center',
     gap: 6,
   },
@@ -263,37 +329,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   // ── cifra ──────────────────────────────────────────────────────────
-  countRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: 6,
-    marginBottom: 4,
+  countBlock: {
+    alignItems: 'center',
+    gap: 2,
   },
   countHuge: {
     fontFamily: typography.displayHeavy,
-    fontSize: 110,
-    paddingTop: 12,
-    paddingBottom: 10,
+    fontSize: 84,
+    paddingTop: 8,
+    paddingBottom: 6,
     color: colors.magenta,
-    letterSpacing: -5,
+    textAlign: 'center',
   },
-  countUnit: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.bone,
-    letterSpacing: -0.6,
-  },
-  strip: {
-    marginTop: 30,
+  // A smaller 4:5 photo, centred — the count is the hero, not the photo.
+  cifraPhoto: {
     alignSelf: 'center',
-    width: 240,
+    width: '46%',
   },
   // ── sello ──────────────────────────────────────────────────────────
   sealHeader: {
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 26,
+    gap: 6,
   },
   eyebrowMd: {
     fontFamily: typography.uiBold,
@@ -301,17 +357,25 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
     color: colors.niebla,
   },
+  // The sign as serif-italic hero with a gold glow behind it — no magenta
+  // on the type; the lone second magenta accent is the photo halo below.
   signHuge: {
+    // Hanken upright (NOT serif italic): serif italic is reserved for the
+    // coach voice, and the coach line on this same card is already italic —
+    // reusing it for the sign name would blur that signal. The celestial
+    // feel comes from the oro glow + letter-spacing + leche, not italic.
     fontFamily: typography.displayHeavy,
-    fontSize: 56,
+    fontSize: 52,
     letterSpacing: 4,
-    color: colors.magenta,
+    color: colors.leche,
     textAlign: 'center',
-    marginBottom: 4,
+    textShadowColor: colors.oro,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
   },
   sealPhoto: {
     alignSelf: 'center',
-    width: '78%',
+    width: '62%',
   },
   // ── coach line ─────────────────────────────────────────────────────
   coach: {
@@ -321,5 +385,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.bone,
     textAlign: 'center',
+    marginTop: 18,
+    paddingHorizontal: 14,
   },
 })
