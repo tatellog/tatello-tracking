@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
+import * as Linking from 'expo-linking'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { type ReactNode, useCallback, useState } from 'react'
@@ -14,7 +15,7 @@ import { track } from '@/lib/analytics'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useLatestPhotoSet } from '@/features/onboarding/photos/hooks/useLatestPhotoSet'
 import { avatarUrl } from '@/features/profile/api'
-import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
+import { useDeleteAccount, useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
@@ -29,6 +30,15 @@ const SEX_LABEL: Record<string, string> = {
   female: 'Femenino',
   male: 'Masculino',
 }
+
+// Support contact + legal links. PLACEHOLDERS — these must be replaced
+// with the real support inbox + hosted policy URLs before any public
+// build. The mailto subject pre-fills so support can triage Stelar mail.
+// TODO: confirmar email de soporte real
+const SUPPORT_EMAIL = 'hola@stelar.app'
+// TODO: URLs reales (términos + privacidad hospedados)
+const TERMS_URL = 'https://stelar.app/terminos'
+const PRIVACY_URL = 'https://stelar.app/privacidad'
 
 /** monthly_focus → settings display, mirrors the wizard's intention
  *  step. The 5 ACTIVE options (weight/energy/food/patterns/other) carry
@@ -53,18 +63,24 @@ const FOCUS_LABEL: Record<string, { label: string; tagline: string }> = {
  *   1. Mi perfil — identity (name + zodiac + age + altura + sexo).
  *      Tappable card: opens /onboarding/about-you?source=settings.
  *   2. Tu plan — the three levers the user controls, grouped into a
- *      single card with one tappable row each: intención del mes,
- *      macros diarios, seguimiento corporal. They used to be three
- *      separate one-row sections — collapsing them kills the
- *      header-row-header-row rhythm and lifts everything up.
- *   3. Cómo te lee Stelar — one line naming what the intelligence
- *      reads (the privacy promise moved to Cuenta, where it belongs).
- *   4. Cuenta — the data-ownership line + sign out.
+ *      single section with one tappable card each: intención del mes,
+ *      macros diarios, seguimiento corporal.
+ *   3. Cómo te lee Stelar — one line naming what the intelligence reads.
+ *   4. Cuenta — the data-ownership line, account actions (notificaciones,
+ *      escríbenos, términos), sign out, and the destructive delete row.
  *
- * Sign-out is destructive: confirmation, then a coordinated cleanup
- * (in-memory query cache + persisted store + visited-day-one flag)
- * before signOut — skipping any leaks the previous user's data into
- * the next sign-in.
+ * Three remote reads feed this screen: useProfile (the heart — name,
+ * zodiac, intención), useMacroTargets, useLatestPhotoSet. Each is read
+ * with its loading state so the screen never shows "—" / "Aún sin definir"
+ * while a query is still in flight (that reads like the data was wiped).
+ * Loading → neutral skeleton; resolved-and-null → the warm empty copy;
+ * profile error → a tappable retry line.
+ *
+ * Both sign-out and delete-account are destructive: each is a two-step
+ * confirmBinary, then a coordinated teardown (in-memory query cache +
+ * persisted store + visited-day-one flag) before signOut — skipping any
+ * leaks the previous user's data into the next sign-in. Delete's teardown
+ * lives in the useDeleteAccount hook; sign-out's lives here.
  */
 export default function SettingsScreen() {
   return (
@@ -84,12 +100,26 @@ function SettingsBody() {
   const router = useRouter()
   const qc = useQueryClient()
   const choose = useConfirm()
-  const { data: profile } = useProfile()
-  const { data: targets } = useMacroTargets()
-  const { data: lastPhotoSetAt } = useLatestPhotoSet()
+
+  // The three remote reads — we keep their loading state, not just data, so
+  // we can tell "still loading" apart from "genuinely empty".
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    isError: profileError,
+    isSuccess: profileLoaded,
+    refetch: refetchProfile,
+  } = useProfile()
+  // useMacroTargets is derived from the brief query and exposes only
+  // data / isLoading / isError / refetch (no isSuccess) — so we treat
+  // "resolved" as "not loading".
+  const { data: targets, isLoading: targetsLoading } = useMacroTargets()
+  const { data: lastPhotoSetAt, isLoading: photoLoading } = useLatestPhotoSet()
 
   const [signingOut, setSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const deleteAccount = useDeleteAccount()
 
   const performSignOut = async () => {
     setSigningOut(true)
@@ -122,6 +152,29 @@ function SettingsBody() {
     if (ok) void performSignOut()
   }
 
+  // Delete account — double-step confirm, then the hook's teardown
+  // (clear cache + persister + flags + signOut). Navigation is ours: on
+  // success the session is already gone, so we replace to /auth. The hook
+  // surfaces isPending (StarLoader) + error (tappable retry line).
+  const handleDeleteAccount = async () => {
+    if (deleteAccount.isPending) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+
+    const ok = await confirmBinary(choose, {
+      title: '¿Eliminar tu cuenta?',
+      description:
+        'Esto borra tu cuenta y todo lo que vive en ella: tu perfil, tus datos, tu cielo. No hay vuelta atrás.',
+      confirmLabel: 'Eliminar todo',
+      cancelLabel: 'Mejor no',
+      destructive: true,
+    })
+    if (!ok) return
+
+    deleteAccount.mutate(undefined, {
+      onSuccess: () => router.replace('/auth'),
+    })
+  }
+
   const editTargets = () => {
     router.push('/onboarding/macro-targets?source=settings')
   }
@@ -138,10 +191,30 @@ function SettingsBody() {
     router.push('/onboarding/photos/front?source=settings')
   }
 
-  // Status line for the Track corporal card. We compute it from the
-  // latest complete (4-angle) set so the card honestly says "X days
-  // since your last comparativa" instead of pretending fresh state.
+  const editNotifications = () => {
+    router.push('/onboarding/notifications?source=settings')
+  }
+
+  const openSupportMail = () => {
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Stelar')}`).catch(
+      () => {},
+    )
+  }
+
+  const openTerms = () => {
+    Linking.openURL(TERMS_URL).catch(() => {})
+  }
+
+  const openPrivacy = () => {
+    Linking.openURL(PRIVACY_URL).catch(() => {})
+  }
+
+  // Status line for the Track corporal card. While the query is in flight
+  // we hand back null so the row shows a neutral skeleton instead of
+  // "Aún sin fotos" (which would read as "your photos were deleted"). We
+  // only commit to the empty copy once the query has actually resolved.
   const bodyTrackStatus = (() => {
+    if (photoLoading) return null
     if (lastPhotoSetAt == null) return 'Aún sin fotos'
     const days = Math.max(0, Math.floor((Date.now() - lastPhotoSetAt) / (1000 * 60 * 60 * 24)))
     if (days === 0) return 'Capturado hoy'
@@ -166,7 +239,7 @@ function SettingsBody() {
   }
 
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
-  const sexLabel = profile?.biological_sex ? (SEX_LABEL[profile.biological_sex] ?? '—') : '—'
+  const sexLabel = profile?.biological_sex ? (SEX_LABEL[profile.biological_sex] ?? null) : null
   const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
   // Secondary focuses (the picks AFTER the priority in the intention
   // wizard). Each one resolves to its label via FOCUS_LABEL; values we
@@ -174,6 +247,18 @@ function SettingsBody() {
   const secondaryIntentionLabels: string[] = (profile?.monthly_focus_secondary ?? [])
     .map((v) => FOCUS_LABEL[v]?.label)
     .filter((s): s is string => typeof s === 'string')
+  // Truncate the secondary list: show at most 2, fold the rest into a
+  // quiet "y N más" so a heavy multi-pick can't crowd the priority. The
+  // dimmer metaSecondary style carries the hierarchy; no "También:" label.
+  const SECONDARY_VISIBLE = 2
+  const secondaryLine = (() => {
+    if (secondaryIntentionLabels.length === 0) return null
+    const shown = secondaryIntentionLabels.slice(0, SECONDARY_VISIBLE)
+    const rest = secondaryIntentionLabels.length - shown.length
+    const parts = [...shown]
+    if (rest > 0) parts.push(`y ${rest} más`)
+    return parts.join('  ·  ')
+  })()
 
   // Celestial identity line — sign comes from the same source as the
   // Hoy-tab constellation, so the two screens agree.
@@ -193,84 +278,121 @@ function SettingsBody() {
             <TabHeader title="Ajustes" pillLabel="STELAR · v1.0.0" />
           </Animated.View>
 
-          {/* ── Mi perfil — the identity card, tap to edit. The
-              pressed style covers the whole card so tapping the
-              Altura / Sexo rows (which have no chevron of their own)
-              still gives feedback — they read as static otherwise. ── */}
+          {/* ── Mi perfil — the identity card, tap to edit. The whole card
+              is one "Editar perfil" target: the header row carries the
+              chevron, and Altura / Sexo read as the SAME card's lower
+              detail rows (a hint line under them names the gesture), not a
+              separate static list. The profile is the heart, so this block
+              owns the loading / error states for the screen. ── */}
           <Animated.View entering={enter(100)}>
             <SectionHeader label="Mi perfil" />
-            <Pressable
-              onPress={editProfile}
-              accessibilityRole="button"
-              accessibilityLabel="Editar mi perfil"
-              style={({ pressed }) => pressed && styles.rowPressed}
-            >
-              <View style={styles.profileCard}>
-                <View style={styles.identity}>
-                  {/* Avatar — its own tap target: tap it to change the
-                      photo, tap the rest of the card to edit profile. */}
-                  <Pressable
-                    onPress={pickAvatar}
-                    disabled={uploadAvatar.isPending}
-                    accessibilityRole="button"
-                    accessibilityLabel="Cambiar foto de perfil"
-                  >
-                    <View style={styles.avatar}>
-                      {uploadAvatar.isPending ? (
-                        <StarLoader size={16} color={colors.magenta} />
-                      ) : avatarUri ? (
-                        <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
-                      ) : zodiacSign ? (
-                        <ZodiacFigure sign={zodiacSign} size={30} color={colors.magenta} />
-                      ) : (
-                        <Text style={styles.avatarInitial}>{initial}</Text>
-                      )}
+            {profileError ? (
+              <ProfileErrorCard onRetry={() => void refetchProfile()} />
+            ) : profileLoading ? (
+              <ProfileSkeleton />
+            ) : (
+              <Pressable
+                onPress={editProfile}
+                accessibilityRole="button"
+                accessibilityLabel="Editar mi perfil"
+                accessibilityHint="Abre el editor de perfil"
+                style={({ pressed }) => pressed && styles.rowPressed}
+              >
+                <View style={styles.profileCard}>
+                  <View style={styles.identity}>
+                    {/* Avatar — its own tap target: tap it to change the
+                        photo, tap the rest of the card to edit profile. */}
+                    <Pressable
+                      onPress={pickAvatar}
+                      disabled={uploadAvatar.isPending}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cambiar foto de perfil"
+                    >
+                      <View style={styles.avatar}>
+                        {uploadAvatar.isPending ? (
+                          <StarLoader size={16} color={colors.magenta} />
+                        ) : avatarUri ? (
+                          <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                        ) : zodiacSign ? (
+                          <ZodiacFigure sign={zodiacSign} size={30} color={colors.magenta} />
+                        ) : (
+                          <Text style={styles.avatarInitial}>{initial}</Text>
+                        )}
+                      </View>
+                    </Pressable>
+                    <View style={styles.identityText}>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {profile?.display_name ?? 'Aún sin nombre'}
+                      </Text>
+                      {identityLine ? <Text style={styles.signAge}>{identityLine}</Text> : null}
                     </View>
-                  </Pressable>
-                  <View style={styles.identityText}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {profile?.display_name ?? '—'}
+                    <Text
+                      style={styles.chevron}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      ›
                     </Text>
-                    {identityLine ? <Text style={styles.signAge}>{identityLine}</Text> : null}
                   </View>
-                  <Text style={styles.chevron}>›</Text>
+                  <View style={styles.cardDivider} />
+                  {/* Detail rows — read-only values that belong to the same
+                      "edit profile" gesture as the header. The hint line
+                      below them names the gesture so they don't read as an
+                      orphaned static list. */}
+                  <ProfileRow
+                    label="Altura"
+                    value={profile?.height_cm ? `${profile.height_cm} cm` : 'Aún sin definir'}
+                  />
+                  <ProfileRow label="Sexo biológico" value={sexLabel ?? 'Aún sin definir'} />
+                  <Text style={styles.cardHint}>Toca para editar tu perfil</Text>
                 </View>
-                <View style={styles.cardDivider} />
-                <ProfileRow
-                  label="Altura"
-                  value={profile?.height_cm ? `${profile.height_cm} cm` : '—'}
-                />
-                <ProfileRow label="Sexo biológico" value={sexLabel} />
-              </View>
-            </Pressable>
+              </Pressable>
+            )}
+            {/* Avatar upload error — silent failure was the old behaviour;
+                now we name it warmly without blame. */}
+            {uploadAvatar.isError ? (
+              <Pressable
+                onPress={pickAvatar}
+                accessibilityRole="button"
+                accessibilityLabel="Reintentar cambiar la foto"
+              >
+                <Text style={styles.inlineError}>
+                  No pudimos cambiar tu foto. Toca para reintentar.
+                </Text>
+              </Pressable>
+            ) : null}
           </Animated.View>
 
-          {/* ── Tu plan — the three levers the user controls. One
-              section header over three distinct cards: solves the
-              eyebrow-soup (3 headers → 1) without melting them into a
-              single slab of full-bleed dividers, which read as an
-              unstyled list. ── */}
+          {/* ── Tu plan — the three levers the user controls. One section
+              header over three distinct cards. Each row shows a neutral
+              skeleton while its query is in flight; the empty copy only
+              appears once the query has resolved. ── */}
           <Animated.View entering={enter(150)}>
             <SectionHeader label="Tu plan" />
             <PlanRow
-              label={intention?.label ?? 'Aún sin definir'}
+              label={
+                profileLoaded ? (intention?.label ?? 'Aún sin definir') : 'Tu intención del mes'
+              }
               onPress={editIntention}
               accessibilityLabel="Editar tu intención"
               valueNode={
-                <>
-                  <Text style={styles.metaValue}>
-                    {intention?.tagline ?? 'Toca para elegir un foco'}
-                  </Text>
-                  {/* Secondary focuses — the picks after the priority in the
-                      intention wizard. Whispered as a dimmer line below the
-                      tagline so the priority stays the read; hidden entirely
-                      when the user only picked one. */}
-                  {secondaryIntentionLabels.length > 0 ? (
-                    <Text style={styles.metaSecondary}>
-                      También: {secondaryIntentionLabels.join('  ·  ')}
+                !profileLoaded ? (
+                  <SkeletonLine width="62%" />
+                ) : (
+                  <>
+                    <Text style={styles.metaValue}>
+                      {intention?.tagline ?? 'Toca para elegir un foco'}
                     </Text>
-                  ) : null}
-                </>
+                    {/* Secondary focuses — whispered as a dimmer line below
+                        the tagline so the priority stays the read. Truncated
+                        to 2 + "y N más", single line, no "También:" label. */}
+                    {secondaryLine ? (
+                      <Text style={styles.metaSecondary} numberOfLines={1}>
+                        {secondaryLine}
+                      </Text>
+                    ) : null}
+                  </>
+                )
               }
             />
             <PlanRow
@@ -278,7 +400,9 @@ function SettingsBody() {
               onPress={editTargets}
               accessibilityLabel="Editar macros diarios"
               valueNode={
-                targets ? (
+                targetsLoading ? (
+                  <SkeletonLine width="70%" />
+                ) : targets ? (
                   <Text style={styles.metaValue}>
                     <Text style={styles.metaNum}>{targets.protein_g}</Text> g proteína
                     {'   ·   '}
@@ -291,17 +415,21 @@ function SettingsBody() {
             />
             <PlanRow
               label="Seguimiento corporal"
-              value={bodyTrackStatus}
               onPress={openBodyTrack}
               accessibilityLabel="Abrir seguimiento corporal"
+              valueNode={
+                bodyTrackStatus == null ? (
+                  <SkeletonLine width="48%" />
+                ) : (
+                  <Text style={styles.metaValue}>{bodyTrackStatus}</Text>
+                )
+              }
               last
             />
           </Animated.View>
 
-          {/* ── Cómo te lee Stelar — one line naming what the
-              intelligence reads. The privacy promise moved to Cuenta,
-              so this is no longer a two-paragraph block with a
-              misleading internal divider. ── */}
+          {/* ── Cómo te lee Stelar — one line naming what the intelligence
+              reads. ── */}
           <Animated.View entering={enter(200)}>
             <SectionHeader label="Cómo te lee Stelar" />
             <View style={styles.stelarCard}>
@@ -315,14 +443,15 @@ function SettingsBody() {
             </View>
           </Animated.View>
 
-          {/* ── Cuenta — the data-ownership promise sits here, beside
-              the account actions it actually relates to. ── */}
+          {/* ── Cuenta — the data-ownership promise + account actions +
+              the destructive zone (sign out, delete). ── */}
           <Animated.View entering={enter(240)}>
             <SectionHeader label="Cuenta" />
             <Text style={styles.privacyLine}>
               <Text style={styles.privacyStrong}>Tus datos son tuyos.</Text> Viven en tu cuenta y
               nadie más los lee.
             </Text>
+
             {profile?.is_beta ? (
               <Pressable
                 onPress={() => setFeedbackVisible(true)}
@@ -341,6 +470,34 @@ function SettingsBody() {
               visible={feedbackVisible}
               onClose={() => setFeedbackVisible(false)}
             />
+
+            {/* Account-action list — same tappable-row vocabulary as Tu plan,
+                grouped into one card with internal hairline dividers since
+                they're a related cluster. Notificaciones / Escríbenos carry a
+                tagline; Términos is a plain row. */}
+            <View style={styles.accountCard}>
+              <AccountRow
+                label="Notificaciones"
+                tagline="Tú eliges cuándo aparecemos."
+                onPress={editNotifications}
+                accessibilityLabel="Editar notificaciones"
+              />
+              <View style={styles.accountDivider} />
+              <AccountRow
+                label="Escríbenos"
+                tagline="Estamos del otro lado."
+                onPress={openSupportMail}
+                accessibilityLabel="Escríbenos por correo"
+              />
+              <View style={styles.accountDivider} />
+              <AccountRow
+                label="Términos y privacidad"
+                onPress={openTerms}
+                onLongPress={openPrivacy}
+                accessibilityLabel="Ver términos y privacidad"
+              />
+            </View>
+
             <Pressable
               onPress={handleSignOut}
               disabled={signingOut}
@@ -356,6 +513,34 @@ function SettingsBody() {
               </View>
             </Pressable>
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+            {/* Delete account — the most destructive action, kept dim + last
+                so it never competes with the magenta voice. No card chrome:
+                a quiet centred line in a muted red. Spinner while the hook's
+                teardown runs; a tappable retry line on error. */}
+            <Pressable
+              onPress={handleDeleteAccount}
+              disabled={deleteAccount.isPending}
+              accessibilityRole="button"
+              accessibilityLabel="Eliminar mi cuenta"
+              accessibilityState={{ busy: deleteAccount.isPending }}
+              style={({ pressed }) => [styles.deleteRow, pressed && styles.rowPressed]}
+            >
+              {deleteAccount.isPending ? (
+                <View style={styles.deletePending}>
+                  <StarLoader size={14} color={colors.feedbackError} />
+                  <Text style={styles.deletePendingLabel}>Borrando tu cuenta...</Text>
+                </View>
+              ) : (
+                <Text style={styles.deleteLabel}>Eliminar mi cuenta</Text>
+              )}
+            </Pressable>
+            {deleteAccount.error ? (
+              <Text style={styles.errorText}>
+                No pudimos eliminar tu cuenta ahora. Toca para reintentar.
+              </Text>
+            ) : null}
+
             {profile?.is_dev ? (
               <Pressable
                 onPress={() => router.push('/dev-constellations')}
@@ -436,11 +621,11 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-/* A "Tu plan" item — its own bordered card: a bold label, a
- * sub-value (a plain string via `value`, or a rich node via
- * `valueNode` for the macros line) and a chevron. Three of these
- * stack under a single section header. `last` drops the bottom
- * margin so the section doesn't over-pad before the next header. */
+/* A "Tu plan" item — its own bordered card: a bold label, a sub-value
+ * (a plain string via `value`, or a rich node via `valueNode` for the
+ * macros / skeleton lines) and a chevron. Three of these stack under a
+ * single section header. `last` drops the bottom margin so the section
+ * doesn't over-pad before the next header. */
 function PlanRow({
   label,
   value,
@@ -474,8 +659,106 @@ function PlanRow({
           <Text style={styles.metaLabel}>{label}</Text>
           {valueNode ?? <Text style={styles.metaValue}>{value}</Text>}
         </View>
-        <Text style={styles.chevron}>›</Text>
+        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+          ›
+        </Text>
       </View>
+    </Pressable>
+  )
+}
+
+/* A "Cuenta" action row — a single tappable line inside the account card:
+ * a bold label, an optional tagline beneath it, and a chevron. Rows are
+ * separated by a hairline divider rendered by the parent. onLongPress is an
+ * optional secondary action (used so "Términos y privacidad" can also reach
+ * the privacy URL). minHeight keeps a 44pt+ target even without a tagline. */
+function AccountRow({
+  label,
+  tagline,
+  onPress,
+  onLongPress,
+  accessibilityLabel,
+}: {
+  label: string
+  tagline?: string
+  onPress: () => void
+  onLongPress?: () => void
+  accessibilityLabel: string
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [styles.accountRow, pressed && styles.rowPressed]}
+    >
+      <View style={styles.metaMain}>
+        <Text style={styles.accountLabel}>{label}</Text>
+        {tagline ? <Text style={styles.accountTagline}>{tagline}</Text> : null}
+      </View>
+      <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+        ›
+      </Text>
+    </Pressable>
+  )
+}
+
+/* Neutral placeholder bar — used inside PlanRow value slots while a query
+ * is in flight, so the row reads as "loading" instead of "empty". A dim
+ * hairline-filled pill; no shimmer animation (keeps it calm, no extra
+ * reanimated surface to audit). */
+function SkeletonLine({ width }: { width: number | `${number}%` }) {
+  return <View style={[styles.skeletonLine, { width }]} accessibilityElementsHidden />
+}
+
+/* The Mi perfil card in its loading shape — same silhouette as the real
+ * card (avatar circle + two text bars + two detail rows) so the layout
+ * doesn't jump when the profile resolves. Calm, no shimmer. */
+function ProfileSkeleton() {
+  return (
+    <View
+      style={styles.profileCard}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View style={styles.identity}>
+        <View style={[styles.avatar, styles.avatarSkeleton]} />
+        <View style={styles.identityText}>
+          <View style={[styles.skeletonLine, styles.skeletonName]} />
+          <View style={[styles.skeletonLine, styles.skeletonSub]} />
+        </View>
+      </View>
+      <View style={styles.cardDivider} />
+      <View style={styles.row}>
+        <View style={[styles.skeletonLine, { width: 56 }]} />
+        <View style={[styles.skeletonLine, { width: 64 }]} />
+      </View>
+      <View style={styles.row}>
+        <View style={[styles.skeletonLine, { width: 96 }]} />
+        <View style={[styles.skeletonLine, { width: 72 }]} />
+      </View>
+    </View>
+  )
+}
+
+/* The profile failed to load — the screen's heart, so this gets a warm,
+ * tappable retry line (not a buried toast). One tap re-runs the query. */
+function ProfileErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Pressable
+      onPress={onRetry}
+      accessibilityRole="button"
+      accessibilityLabel="Reintentar cargar tu perfil"
+      style={({ pressed }) => [
+        styles.profileCard,
+        styles.profileErrorCard,
+        pressed && styles.rowPressed,
+      ]}
+    >
+      <Text style={styles.profileErrorText}>
+        No pudimos leer tu perfil ahora. Toca para reintentar.
+      </Text>
     </Pressable>
   )
 }
@@ -540,6 +823,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  // Skeleton avatar — neutral fill, no magenta rim (nothing to celebrate
+  // while loading).
+  avatarSkeleton: {
+    backgroundColor: colors.hairline,
+    borderColor: colors.hairline,
+  },
   avatarImg: {
     width: 52,
     height: 52,
@@ -566,6 +855,17 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.hairline,
   },
+  // Hint line under the Altura / Sexo detail rows — names the whole-card
+  // gesture so those rows don't read as an orphaned static list.
+  cardHint: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.3,
+    color: colors.bruma,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 13,
+  },
   // ── Cómo te lee Stelar ─────────────────────────────────────────
   stelarCard: {
     backgroundColor: colors.bgCard,
@@ -588,8 +888,6 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
   // ── Cuenta — privacy line ──────────────────────────────────────
-  // The data-ownership promise, now a quiet line above the sign-out
-  // button instead of a card that looked tappable.
   privacyLine: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
@@ -624,16 +922,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   // ── Tu plan ────────────────────────────────────────────────────
-  // The Pressable carries only spacing; the visible card lives on an
-  // inner View (planCard) so its border + fill render reliably.
   planWrap: {
     marginBottom: 10,
   },
   planWrapLast: {
     marginBottom: 0,
   },
-  // Each PlanRow is its own distinct card — same vocabulary as the
-  // Mi perfil card — stacked with a small gap under one header.
   planCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -645,8 +939,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
-  // Whole-card press feedback — used by PlanRow and the Mi perfil
-  // card so every tappable surface dims on touch.
+  // Whole-card press feedback — used by every tappable surface.
   rowPressed: {
     opacity: 0.6,
   },
@@ -667,8 +960,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   // Secondary line under the priority tagline — dimmer + smaller so the
-  // priority pick stays the visual read. Upright (not italic) because the
-  // serif italic is reserved for the coach/poetic voice; this is meta.
+  // priority pick stays the visual read. Upright (not italic): the serif
+  // italic is reserved for the coach/poetic voice; this is meta.
   metaSecondary: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
@@ -687,12 +980,46 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.segmentTitle,
     color: colors.niebla,
   },
-  // ── Cuenta ─────────────────────────────────────────────────────
-  // Beta-only entry — centered card with the ✦ glyph as its emblem.
-  // The card reads as a small invitation ("we want your feedback"),
-  // not as a generic settings list row. Magenta-deep border +
-  // magentaTint wash signal it's the only "special" row in the
-  // page; faint enough to not shout against the dark page bg.
+  // ── Skeleton primitives ────────────────────────────────────────
+  // A dim filled pill standing in for text while a query loads. Calm,
+  // static (no shimmer) — reads as "loading", never as "empty".
+  skeletonLine: {
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: colors.hairline,
+    marginTop: 6,
+  },
+  skeletonName: {
+    width: '55%',
+    height: 18,
+    marginTop: 0,
+  },
+  skeletonSub: {
+    width: '38%',
+    height: 12,
+    marginTop: 10,
+  },
+  // ── Inline / profile error ─────────────────────────────────────
+  profileErrorCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    borderColor: colors.hairlineStrong,
+  },
+  profileErrorText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 21,
+    color: colors.bone,
+  },
+  inlineError: {
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: 12.5,
+    color: colors.feedbackError,
+    paddingHorizontal: 2,
+  },
+  // ── Cuenta — feedback card ─────────────────────────────────────
   feedbackCard: {
     marginTop: 18,
     marginBottom: 18,
@@ -703,9 +1030,6 @@ const styles = StyleSheet.create({
     borderColor: colors.magentaDeep,
     backgroundColor: colors.magentaTint,
     alignItems: 'center',
-    // Pressable can shrink-to-content under some parent layouts —
-    // stretching to fill the column guarantees the centered
-    // children actually have a centered axis to land on.
     alignSelf: 'stretch',
   },
   feedbackGlyph: {
@@ -717,9 +1041,6 @@ const styles = StyleSheet.create({
     borderColor: colors.magenta,
     alignItems: 'center',
     justifyContent: 'center',
-    // Belt + suspenders — make this child explicitly self-centre
-    // so it can never end up flush-left, regardless of the
-    // parent's alignItems being honoured.
     alignSelf: 'center',
     marginBottom: 12,
     shadowColor: colors.magenta,
@@ -749,6 +1070,46 @@ const styles = StyleSheet.create({
     color: colors.bone,
     textAlign: 'center',
   },
+  // ── Cuenta — account-action list ───────────────────────────────
+  // One card holding the tappable account rows (notificaciones, escríbenos,
+  // términos), same vocabulary as the plan cards but grouped with internal
+  // hairline dividers since they're a related cluster, not separate levers.
+  accountCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    overflow: 'hidden',
+    marginBottom: 18,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    // Min 44pt touch target even when there's no tagline.
+    minHeight: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  accountDivider: {
+    height: 1,
+    backgroundColor: colors.hairline,
+    marginLeft: 16,
+  },
+  accountLabel: {
+    fontFamily: typography.displaySemi,
+    fontSize: 16.5,
+    color: colors.leche,
+    letterSpacing: -0.3,
+  },
+  accountTagline: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+    marginTop: 4,
+  },
+  // ── Cuenta — sign out ──────────────────────────────────────────
   signOut: {
     backgroundColor: colors.bgCard,
     borderRadius: 14,
@@ -769,8 +1130,37 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: 12.5,
     color: colors.feedbackError,
+    textAlign: 'center',
   },
-  // Editorial sign-off — serif italic with one magenta word.
+  // ── Cuenta — delete account ────────────────────────────────────
+  // The most destructive action: quiet, last, muted red. No card chrome so
+  // it never competes with the magenta voice; a generous touch target.
+  deleteRow: {
+    marginTop: 18,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  deleteLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.feedbackError,
+    letterSpacing: 0.3,
+    opacity: 0.85,
+  },
+  deletePending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  deletePendingLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.feedbackError,
+    opacity: 0.85,
+  },
+  // ── Footer ─────────────────────────────────────────────────────
   footer: {
     fontFamily: typography.serif,
     fontStyle: 'italic',

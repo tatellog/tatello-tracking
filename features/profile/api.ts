@@ -219,3 +219,25 @@ export async function recordLastPeriodStart(eventDateIso: string): Promise<void>
   )
   if (error) throw error
 }
+
+/*
+ * Permanently deletes the signed-in user's account and ALL their data.
+ *
+ * The actual teardown (rows in every per-user table + objects in the
+ * progress-photos / meal-photos / avatars buckets + the auth.users row)
+ * runs server-side in the `delete-account` edge function, because
+ * deleting an auth user requires the service-role key — which never
+ * ships in the app bundle. The function reads the user id from the JWT
+ * we forward via supabase.functions.invoke (the access token rides
+ * along automatically), so the client can't ask to delete anyone else.
+ *
+ * No body is sent: the id is the token's, not ours to choose. We surface
+ * a clean Spanish error if the function fails so the caller can show a
+ * warm message instead of a raw transport error.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account', {
+    method: 'POST',
+  })
+  if (error) throw new Error('No pudimos eliminar tu cuenta. Intenta de nuevo.')
+}

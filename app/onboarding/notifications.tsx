@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Notifications from 'expo-notifications'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -100,9 +100,18 @@ const OPTIONS: readonly ReadingOption[] = [
  *
  * COPY NOTE: "Activar mi lectura" + the priming micro-copy are PENDING
  * behavioral / voice-and-copy sign-off (next in the chain). Kept clean.
+ *
+ * SETTINGS RE-ENTRY (?source=settings): the same screen doubles as the
+ * "Notificaciones" editor reachable from Ajustes. When fromSettings we
+ * SAVE the window and pop straight back (router.back()) instead of
+ * advancing to /onboarding/attribution; we still fire the OS prompt for a
+ * real window (that's the whole point of re-entering), show a back chevron,
+ * and the CTA reads "Guardar". This mirrors intention.tsx's re-entry.
  */
 export default function NotificationsScreen() {
   const router = useRouter()
+  const { source } = useLocalSearchParams<{ source?: string }>()
+  const fromSettings = source === 'settings'
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
   const [window, setWindow] = useState<NotificationWindow | null>(
@@ -119,9 +128,14 @@ export default function NotificationsScreen() {
   const willAskPermission = window !== null && window !== 'not_yet'
 
   // CTA label primes the permission: a real window names the action; a
-  // neutral "Continuar" for 'not_yet' / no selection. ctaVariant="soft" +
-  // ctaTransform="none" preserved.
-  const continueLabel = willAskPermission ? 'Activar mi lectura' : 'Continuar'
+  // neutral "Continuar" for 'not_yet' / no selection. From Ajustes this is
+  // an edit, so the verb is "Guardar". ctaVariant="soft" + ctaTransform="none"
+  // preserved.
+  const continueLabel = fromSettings
+    ? 'Guardar'
+    : willAskPermission
+      ? 'Activar mi lectura'
+      : 'Continuar'
 
   // dotClock — slow 8 s ping-pong breath driving the resting state of
   // every ReadingCard's presence dot so the column reads as alive.
@@ -190,17 +204,22 @@ export default function NotificationsScreen() {
         }
       }
       await updateProfile.mutateAsync({ notification_window: window })
-      router.push('/onboarding/attribution')
+      // From Ajustes this is an edit: pop back to Settings. In the wizard,
+      // advance to the next step.
+      if (fromSettings) router.back()
+      else router.push('/onboarding/attribution')
     } catch (err) {
       // Permission errors are not blocking — we save the preference either
-      // way so the user reaches reveal and Settings can resurface the ask.
+      // way so the user reaches reveal (or returns to Settings) and the ask
+      // can resurface.
       console.warn('notification permission flow:', err)
       try {
         await updateProfile.mutateAsync({ notification_window: window })
       } catch {
-        // Soft failure on the profile patch; reveal re-fetches.
+        // Soft failure on the profile patch; reveal / Settings re-fetches.
       }
-      router.push('/onboarding/attribution')
+      if (fromSettings) router.back()
+      else router.push('/onboarding/attribution')
     } finally {
       setRequestingPermission(false)
     }
@@ -210,7 +229,10 @@ export default function NotificationsScreen() {
     <WizardLayout
       step={11}
       showProgress={false}
-      showBack={false}
+      // From Ajustes this is a re-entry edit, not a forward wizard step, so
+      // we surface the back chevron (it pops to Settings via router.back()).
+      // In the wizard the step has no back affordance (parity preserved).
+      showBack={fromSettings}
       canContinue={canContinue}
       loading={requestingPermission || updateProfile.isPending}
       errorMessage={updateProfile.error?.message}

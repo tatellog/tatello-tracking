@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { clearAnalyticsCache } from '@/lib/analytics'
+import { clearVisitedDayOne } from '@/lib/onboardingFlags'
+import { queryPersister } from '@/lib/queryClient'
 import { queryKeys } from '@/lib/queryKeys'
+import { supabase } from '@/lib/supabase'
 
 import {
+  deleteAccount,
   getProfile,
   insertInitialWeight,
   recordLastPeriodStart,
@@ -84,5 +89,49 @@ export function useInsertInitialWeight() {
 export function useRecordLastPeriodStart() {
   return useMutation({
     mutationFn: (eventDateIso: string) => recordLastPeriodStart(eventDateIso),
+  })
+}
+
+/*
+ * Permanently delete the user's account + all their data (App Store
+ * requirement + the "tus datos son tuyos" promise). The server-side
+ * teardown runs in the delete-account edge function (api.deleteAccount);
+ * once it succeeds the device must be left in the exact same clean state
+ * as a sign-out, otherwise the just-deleted user's cached rows / persisted
+ * store / visited-day-one flag would bleed into the next sign-in.
+ *
+ * onSuccess mirrors settings.tsx performSignOut:
+ *   1. qc.clear()                  — drop the in-memory query cache
+ *   2. queryPersister.removeClient — drop the AsyncStorage-persisted cache
+ *   3. clearVisitedDayOne()        — reset the Day One flag
+ *   4. supabase.auth.signOut()     — clear the local session (the server
+ *                                    session is already gone, but the
+ *                                    device still holds tokens to wipe)
+ *
+ * The mutation exposes the standard surface (mutate, isPending, error).
+ * Navigation (router.replace('/auth')) belongs to the screen that calls
+ * this — the hook stays UI-free. analytics fires before teardown so the
+ * event isn't lost when the cache is cleared.
+ */
+export function useDeleteAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteAccount(),
+    onSuccess: async () => {
+      // No analytics insert here — the user's analytics_events rows were
+      // just deleted server-side; an insert would race the deletion. We
+      // only drop the cached is_beta flag so it can't bleed to the next
+      // sign-in on this device.
+      clearAnalyticsCache()
+      qc.clear()
+      await Promise.all([
+        Promise.resolve(queryPersister.removeClient()).catch(() => {}),
+        clearVisitedDayOne().catch(() => {}),
+      ])
+      // The server already deleted the auth user; this clears the local
+      // session + tokens. Errors here are non-fatal — the account is gone
+      // regardless — so we swallow them rather than fail the mutation.
+      await supabase.auth.signOut().catch(() => {})
+    },
   })
 }
