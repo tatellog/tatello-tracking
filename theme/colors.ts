@@ -50,6 +50,10 @@ export const colors = {
   // ── Feedback ───────────────────────────────────────────────────
   feedbackSuccess: '#5A6F4C',
   feedbackError: '#B85045',
+  // Muted-red chrome for the destructive delete-account button — reads as
+  // a tappable surface without competing with the magenta voice.
+  feedbackErrorHairline: 'rgba(184, 80, 69, 0.30)',
+  feedbackErrorTint: 'rgba(184, 80, 69, 0.07)',
 
   // ── Scan beam — the AI scan-line light sweep ───────────────────
   beamTint: 'rgba(255, 72, 134, 0.32)',

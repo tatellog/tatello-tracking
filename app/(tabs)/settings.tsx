@@ -1,6 +1,5 @@
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
-import * as Linking from 'expo-linking'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { type ReactNode, useCallback, useState } from 'react'
@@ -31,14 +30,10 @@ const SEX_LABEL: Record<string, string> = {
   male: 'Masculino',
 }
 
-// Support contact + legal links. PLACEHOLDERS — these must be replaced
-// with the real support inbox + hosted policy URLs before any public
-// build. The mailto subject pre-fills so support can triage Stelar mail.
-// TODO: confirmar email de soporte real
-const SUPPORT_EMAIL = 'hola@stelar.app'
-// TODO: URLs reales (términos + privacidad hospedados)
-const TERMS_URL = 'https://stelar.app/terminos'
-const PRIVACY_URL = 'https://stelar.app/privacidad'
+// TODO: Términos y privacidad — la fila "Términos y privacidad" está
+// disabled hasta que estas páginas estén hospedadas. Cuando existan,
+// agregar las URLs y reactivar la fila (onPress → Linking.openURL).
+// Feedback se canaliza por el BetaFeedbackSheet, no por mailto.
 
 /** monthly_focus → settings display, mirrors the wizard's intention
  *  step. The 5 ACTIVE options (weight/energy/food/patterns/other) carry
@@ -193,20 +188,6 @@ function SettingsBody() {
 
   const editNotifications = () => {
     router.push('/onboarding/notifications?source=settings')
-  }
-
-  const openSupportMail = () => {
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Stelar')}`).catch(
-      () => {},
-    )
-  }
-
-  const openTerms = () => {
-    Linking.openURL(TERMS_URL).catch(() => {})
-  }
-
-  const openPrivacy = () => {
-    Linking.openURL(PRIVACY_URL).catch(() => {})
   }
 
   // Status line for the Track corporal card. While the query is in flight
@@ -452,20 +433,6 @@ function SettingsBody() {
               nadie más los lee.
             </Text>
 
-            {profile?.is_beta ? (
-              <Pressable
-                onPress={() => setFeedbackVisible(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Danos tu feedback"
-                style={({ pressed }) => [styles.feedbackCard, pressed && styles.rowPressed]}
-              >
-                <View style={styles.feedbackGlyph}>
-                  <Text style={styles.feedbackGlyphText}>✦</Text>
-                </View>
-                <Text style={styles.feedbackLabel}>Danos tu feedback</Text>
-                <Text style={styles.feedbackHint}>Lo que sea · lo leemos</Text>
-              </Pressable>
-            ) : null}
             <BetaFeedbackSheet
               visible={feedbackVisible}
               onClose={() => setFeedbackVisible(false)}
@@ -473,8 +440,9 @@ function SettingsBody() {
 
             {/* Account-action list — same tappable-row vocabulary as Tu plan,
                 grouped into one card with internal hairline dividers since
-                they're a related cluster. Notificaciones / Escríbenos carry a
-                tagline; Términos is a plain row. */}
+                they're a related cluster. Feedback reuses the existing
+                BetaFeedbackSheet design. Términos stays disabled until the
+                pages are hosted (see the TODO near the top of the file). */}
             <View style={styles.accountCard}>
               <AccountRow
                 label="Notificaciones"
@@ -484,17 +452,17 @@ function SettingsBody() {
               />
               <View style={styles.accountDivider} />
               <AccountRow
-                label="Escríbenos"
-                tagline="Estamos del otro lado."
-                onPress={openSupportMail}
-                accessibilityLabel="Escríbenos por correo"
+                label="Feedback"
+                tagline="Lo que sea, lo leemos."
+                onPress={() => setFeedbackVisible(true)}
+                accessibilityLabel="Danos tu feedback"
               />
               <View style={styles.accountDivider} />
               <AccountRow
                 label="Términos y privacidad"
-                onPress={openTerms}
-                onLongPress={openPrivacy}
-                accessibilityLabel="Ver términos y privacidad"
+                tagline="Pronto."
+                accessibilityLabel="Términos y privacidad, próximamente"
+                disabled
               />
             </View>
 
@@ -514,9 +482,10 @@ function SettingsBody() {
             </Pressable>
             {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-            {/* Delete account — the most destructive action, kept dim + last
-                so it never competes with the magenta voice. No card chrome:
-                a quiet centred line in a muted red. Spinner while the hook's
+            {/* Delete account — the most destructive action, kept last and
+                in muted red so it stays subordinate to the magenta voice, but
+                with button chrome (border + faint tint) so it reads as
+                tappable rather than floating text. Spinner while the hook's
                 teardown runs; a tappable retry line on error. */}
             <Pressable
               onPress={handleDeleteAccount}
@@ -678,33 +647,40 @@ function AccountRow({
   onPress,
   onLongPress,
   accessibilityLabel,
+  disabled,
 }: {
   label: string
   tagline?: string
-  onPress: () => void
+  onPress?: () => void
   onLongPress?: () => void
   accessibilityLabel: string
+  // Dimmed, non-tappable, no chevron — e.g. Términos until the pages exist.
+  disabled?: boolean
 }) {
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
+      disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => pressed && styles.rowPressed}
+      accessibilityState={{ disabled: !!disabled }}
+      style={({ pressed }) => pressed && !disabled && styles.rowPressed}
     >
       {/* Row layout lives on this inner View, not the Pressable — same
           reason PlanRow does it: flex doesn't render reliably when applied
           straight to a Pressable in this RN setup, which left the chevron
           stacking below the text instead of aligning right. */}
-      <View style={styles.accountRow}>
+      <View style={[styles.accountRow, disabled && styles.accountRowDisabled]}>
         <View style={styles.metaMain}>
           <Text style={styles.accountLabel}>{label}</Text>
           {tagline ? <Text style={styles.accountTagline}>{tagline}</Text> : null}
         </View>
-        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
-          ›
-        </Text>
+        {disabled ? null : (
+          <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+            ›
+          </Text>
+        )}
       </View>
     </Pressable>
   )
@@ -1025,59 +1001,8 @@ const styles = StyleSheet.create({
     color: colors.feedbackError,
     paddingHorizontal: 2,
   },
-  // ── Cuenta — feedback card ─────────────────────────────────────
-  feedbackCard: {
-    marginTop: 18,
-    marginBottom: 18,
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.magentaDeep,
-    backgroundColor: colors.magentaTint,
-    alignItems: 'center',
-    alignSelf: 'stretch',
-  },
-  feedbackGlyph: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.magenta,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 12,
-    shadowColor: colors.magenta,
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
-  },
-  feedbackGlyphText: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.magentaHot,
-    lineHeight: typography.sizes.segmentTitle,
-  },
-  feedbackLabel: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    letterSpacing: -0.3,
-    textAlign: 'center',
-  },
-  feedbackHint: {
-    marginTop: 4,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-    textAlign: 'center',
-  },
   // ── Cuenta — account-action list ───────────────────────────────
-  // One card holding the tappable account rows (notificaciones, escríbenos,
+  // One card holding the tappable account rows (notificaciones, feedback,
   // términos), same vocabulary as the plan cards but grouped with internal
   // hairline dividers since they're a related cluster, not separate levers.
   accountCard: {
@@ -1096,6 +1021,10 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: 16,
     paddingVertical: 13,
+  },
+  // Disabled row (e.g. Términos until pages are hosted) — dimmed, no chevron.
+  accountRowDisabled: {
+    opacity: 0.4,
   },
   accountDivider: {
     height: 1,
@@ -1139,21 +1068,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   // ── Cuenta — delete account ────────────────────────────────────
-  // The most destructive action: quiet, last, muted red. No card chrome so
-  // it never competes with the magenta voice; a generous touch target.
+  // The most destructive action: quiet, last, muted red. Reads as a tappable
+  // button (bordered, faint red tint) — same silhouette as Cerrar sesión so
+  // it doesn't float as bare text — but in muted red so it stays subordinate
+  // to the magenta voice rather than competing with it.
   deleteRow: {
-    marginTop: 18,
-    minHeight: 44,
+    marginTop: 12,
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.feedbackErrorHairline,
+    backgroundColor: colors.feedbackErrorTint,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 15,
   },
   deleteLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.ui,
     color: colors.feedbackError,
     letterSpacing: 0.3,
-    opacity: 0.85,
   },
   deletePending: {
     flexDirection: 'row',
