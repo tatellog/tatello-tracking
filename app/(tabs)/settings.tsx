@@ -183,7 +183,13 @@ function SettingsBody() {
   }
 
   const openBodyTrack = () => {
-    router.push('/onboarding/photos/front?source=settings')
+    // Body tracking lives in Progreso → Tu cambio visual. That section is
+    // both the payoff (view the before/after) and the capture surface: the
+    // "Ahora" column / empty card open a quick single-frontal capture. The
+    // 4-angle wizard stays the first-run onboarding flow only — for tracking
+    // it was effort with no payoff, since just the frontal feeds the
+    // comparison. So tapping here goes to "see", not "re-photograph".
+    router.push('/(tabs)/progress?photos=open')
   }
 
   const editNotifications = () => {
