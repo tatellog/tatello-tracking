@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Circle, Line } from 'react-native-svg'
 
@@ -41,6 +42,7 @@ const PHASE_LABEL: Record<CyclePhase, string> = {
  * than weight — they can plan training / nutrition / mood around it.
  */
 export function CycleCard() {
+  const router = useRouter()
   const { data: profile } = useProfile()
   const { data: lastPeriod } = useLastPeriodStart()
 
@@ -62,20 +64,27 @@ export function CycleCard() {
 
   if (!isActive) return null
 
-  // No period logged yet — quiet placeholder; the user added the
-  // cycle situation in onboarding but hasn't anchored it with a date.
+  // No period logged yet — the user picked a cycle situation in
+  // onboarding but the last-period date is optional and was skipped.
+  // The card is the right place to invite it (the value is visible here),
+  // so it's TAPPABLE and routes straight to the cycle editor — never to a
+  // dead-end "Ajustes → Mi perfil" that has no cycle field.
   if (!state) {
     return (
       <Animated.View entering={FadeIn.duration(360).delay(320)}>
         <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
           Tu ciclo
         </EyebrowLabel>
-        <View style={styles.card}>
+        <Pressable
+          onPress={() => router.push('/onboarding/cycle?source=settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Anclar mi última menstruación"
+          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        >
           <Text style={styles.emptyHint}>
-            Anclá tu última menstruación en Ajustes → Mi perfil para que Stelar marque tu día del
-            ciclo.
+            Dime tu última menstruación y Stelar marca tu día del ciclo. Toca para anclarla.
           </Text>
-        </View>
+        </Pressable>
       </Animated.View>
     )
   }
@@ -184,6 +193,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 14,
     paddingBottom: 18,
+  },
+  cardPressed: {
+    opacity: 0.6,
   },
   headRow: {
     flexDirection: 'row',

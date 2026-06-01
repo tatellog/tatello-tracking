@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -143,6 +143,11 @@ type Selection = CycleSituation | typeof OPT_OUT
  */
 export default function CycleScreen() {
   const router = useRouter()
+  // Reachable from Progreso → Tu ciclo (?source=settings) to anchor the
+  // last period after onboarding. From there it's an edit: hide the wizard
+  // chrome, label the CTA "Guardar", and return to Progreso on save.
+  const { source } = useLocalSearchParams<{ source?: string }>()
+  const fromSettings = source === 'settings'
   const { data: profile } = useProfile()
   const updateProfile = useUpdateProfile()
   const recordPeriod = useRecordLastPeriodStart()
@@ -288,7 +293,8 @@ export default function CycleScreen() {
       if (askCycleInputs && lastPeriod) {
         await recordPeriod.mutateAsync(toISODate(lastPeriod))
       }
-      router.push('/onboarding/rhythm')
+      if (fromSettings) router.back()
+      else router.push('/onboarding/rhythm')
     } catch (e) {
       setSavingError(e instanceof Error ? e.message : 'No pudimos guardar tu ciclo.')
     } finally {
@@ -306,7 +312,8 @@ export default function CycleScreen() {
       loading={saving}
       errorMessage={savingError}
       onContinue={handleContinue}
-      continueLabel="Continuar"
+      continueLabel={fromSettings ? 'Guardar' : 'Continuar'}
+      showProgress={!fromSettings}
       ctaVariant="soft"
       ctaTransform="none"
       atmosphere={

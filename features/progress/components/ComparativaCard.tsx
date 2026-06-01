@@ -7,14 +7,13 @@ import type { BodyMeasurement } from '@/features/brief/api'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
-import { useMeasurements, useRecentSleepLogs, useRecentWorkoutDates } from '../hooks'
+import { useMeasurements, useRecentWorkoutDates } from '../hooks'
 
 /* ─────────────────────── Math helpers ─────────────────────── */
 
 type Snapshot = {
   weightKg: number | null
   workouts28d: number
-  sleepAvg7d: number | null
 }
 
 /** Find the measurement closest to `targetMsAgo` ms in the past from now. */
@@ -41,28 +40,19 @@ const DAY_MS = 24 * 60 * 60 * 1000
 function buildNowSnapshot(
   measurements: readonly BodyMeasurement[],
   workouts: readonly string[],
-  sleeps: readonly { date: string; hours: number }[],
 ): Snapshot {
   const latest = measurements[measurements.length - 1] ?? null
   const since28 = Date.now() - 28 * DAY_MS
-  const since7 = Date.now() - 7 * DAY_MS
   const workouts28d = workouts.filter((d) => new Date(d).getTime() >= since28).length
-  const recentSleep = sleeps.filter((s) => new Date(s.date).getTime() >= since7)
-  const sleepAvg7d =
-    recentSleep.length === 0
-      ? null
-      : recentSleep.reduce((sum, s) => sum + s.hours, 0) / recentSleep.length
   return {
     weightKg: latest?.weight_kg ?? null,
     workouts28d,
-    sleepAvg7d,
   }
 }
 
 function buildPastSnapshot(
   measurements: readonly BodyMeasurement[],
   workouts: readonly string[],
-  sleeps: readonly { date: string; hours: number }[],
 ): Snapshot {
   const past = nearestMeasurement(measurements, 30 * DAY_MS)
   // Workouts during the 28 days that ENDED 30 days ago.
@@ -72,63 +62,49 @@ function buildPastSnapshot(
     const t = new Date(d).getTime()
     return t >= wStart && t < wEnd
   }).length
-  // Sleep during the 7 days that ENDED 30 days ago.
-  const sEnd = Date.now() - 30 * DAY_MS
-  const sStart = sEnd - 7 * DAY_MS
-  const recentSleep = sleeps.filter((s) => {
-    const t = new Date(s.date).getTime()
-    return t >= sStart && t < sEnd
-  })
-  const sleepAvgPast =
-    recentSleep.length === 0
-      ? null
-      : recentSleep.reduce((sum, s) => sum + s.hours, 0) / recentSleep.length
   return {
     weightKg: past?.weight_kg ?? null,
     workouts28d: workoutsPast,
-    sleepAvg7d: sleepAvgPast,
   }
 }
 
 /* ─────────────────────── Component ─────────────────────── */
 
 /**
- * Multi-metric "Hace 30 días vs Hoy" card. Surfaces 3 dimensions at
- * once — weight, entrenos, sueño — so the user reads their change as a
- * multi-axis snapshot, not just a weight number. (Cintura was dropped
- * until there's a UI to log waist — it has no capture surface yet, so
- * tapping it only ever routed to the weight logger.) A dimension with
- * no data on one or both sides renders as an invitation row that routes
- * to the right logging surface.
+ * Multi-metric "Hace 30 días vs Hoy" card. Surfaces 2 dimensions —
+ * weight + entrenos — so the user reads their change as a snapshot, not
+ * just a weight number. (Cintura and sueño were dropped: cintura has no
+ * capture UI, and sueño's onboarding value is a single typical-hours
+ * baseline, not the nightly series a 30-day comparison needs — it stays
+ * context for the Voz, not a comparison row.) A dimension with no data
+ * on one or both sides renders as an invitation row that routes to the
+ * right logging surface.
  */
 export function ComparativaCard() {
   const measurements = useMeasurements(null)
   const workouts = useRecentWorkoutDates(60)
-  const sleeps = useRecentSleepLogs(40)
 
   const { now, past, hasComparison } = useMemo(() => {
     const m = measurements.data ?? []
     const w = workouts.data ?? []
-    const s = sleeps.data ?? []
-    const nowSnap = buildNowSnapshot(m, w, s)
-    const pastSnap = buildPastSnapshot(m, w, s)
+    const nowSnap = buildNowSnapshot(m, w)
+    const pastSnap = buildPastSnapshot(m, w)
     // Show only when there's some past anchor to compare. If the user
     // only opened the app yesterday, the past column would be all
     // dashes — better to render nothing.
-    const has =
-      pastSnap.weightKg != null || pastSnap.workouts28d > 0 || pastSnap.sleepAvg7d != null
+    const has = pastSnap.weightKg != null || pastSnap.workouts28d > 0
     return { now: nowSnap, past: pastSnap, hasComparison: has }
-  }, [measurements.data, workouts.data, sleeps.data])
+  }, [measurements.data, workouts.data])
 
   const router = useRouter()
 
   if (!hasComparison) return null
 
-  // Build rows in the same fixed order every time — we now ALWAYS
-  // render all four metrics so the card reads as a "panel" instead of
-  // shifting layout based on what's logged. Rows with no data on one
-  // or both sides become invitation rows that route the user to the
-  // correct logging surface.
+  // Build rows in the same fixed order every time — we always render
+  // both metrics so the card reads as a "panel" instead of shifting
+  // layout based on what's logged. A row with no data on one or both
+  // sides becomes an invitation that routes to the correct logging
+  // surface.
   type FilledRow = {
     kind: 'filled'
     label: string
@@ -189,26 +165,6 @@ export function ComparativaCard() {
       kind: 'empty',
       label: 'Entrenos (28 d)',
       cta: 'Loguea tu primer entreno desde ✦',
-      onPress: () => router.push('/(tabs)'),
-    })
-  }
-
-  // ── Sueño (sem.) ──
-  if (past.sleepAvg7d != null && now.sleepAvg7d != null) {
-    const diff = now.sleepAvg7d - past.sleepAvg7d
-    rows.push({
-      kind: 'filled',
-      label: 'Sueño (sem.)',
-      past: `${past.sleepAvg7d.toFixed(1)} h`,
-      now: `${now.sleepAvg7d.toFixed(1)} h`,
-      delta: formatDelta(diff, 'h'),
-      relPct: relPct(diff, past.sleepAvg7d),
-    })
-  } else {
-    rows.push({
-      kind: 'empty',
-      label: 'Sueño (sem.)',
-      cta: 'Suma tu sueño desde Hoy',
       onPress: () => router.push('/(tabs)'),
     })
   }
