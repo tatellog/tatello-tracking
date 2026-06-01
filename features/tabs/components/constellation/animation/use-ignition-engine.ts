@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  cancelAnimation,
   Easing,
   useSharedValue,
   withSequence,
@@ -33,10 +32,6 @@ export function useIgnitionEngine(opts: {
   trainedCount: number
   elementsLit: number
   sequence: SequenceEl[]
-  /** iOS "Reduce Motion". When true the gold celebration burst stays
-   *  parked at 0 (no expansion). Read once in LunarConstellation and
-   *  threaded down so the suppression decision lives with the trigger. */
-  reduce?: boolean
 }): {
   ignitingKey: string | null
   igniteT: SharedValue<number>
@@ -44,10 +39,9 @@ export function useIgnitionEngine(opts: {
   displayedCount: SharedValue<number>
   litPulse: SharedValue<number>
   radialPulse: SharedValue<number>
-  goldBurst: SharedValue<number>
   plusOne: SharedValue<number>
 } {
-  const { trainedCount, elementsLit, sequence, reduce = false } = opts
+  const { trainedCount, elementsLit, sequence } = opts
 
   const prevLitRef = useRef(elementsLit)
   const prevCountRef = useRef(trainedCount)
@@ -68,13 +62,6 @@ export function useIgnitionEngine(opts: {
   // settles back to the current state. Shared by BaseLayer + the Órbita
   // magenta StarBurst — DO NOT re-time it here.
   const radialPulse = useSharedValue(0)
-  // 0→1 ramp DEDICATED to the Home gold celebration burst. A separate
-  // clock from radialPulse so the gold layers can run a slow,
-  // anti-front-loaded curve (Easing.bezier(0.12, 0.32, 0.2, 1), 2600 ms)
-  // where the EXPANSION is actually appreciable — radialPulse's
-  // Easing.out(cubic) is front-loaded and made the gold ring "jump". The
-  // magenta burst + every other layer keep radialPulse untouched.
-  const goldBurst = useSharedValue(0)
   // 0→1 ramp fired once per upward commit — drives the floating "+1"
   // ghost that rises above the counter and fades. The literal
   // increment, made visible for ~700 ms then gone (a flourish, not
@@ -117,22 +104,6 @@ export function useIgnitionEngine(opts: {
     )
     radialPulse.value = 0
     radialPulse.value = withTiming(1, { duration: 2200, easing: Easing.out(Easing.cubic) })
-    // Gold celebration clock — fired ATOMICALLY in the same effect as
-    // radialPulse (no useAnimatedReaction race). Anti-front-loaded
-    // bezier so the concentric waves read as a GROWING expansion across
-    // the 0.4–1.9s window instead of snapping out. Suppressed (parked at
-    // 0) under reduce-motion → the gold layers gate on u<=0 → no burst.
-    cancelAnimation(goldBurst)
-    goldBurst.value = 0
-    if (!reduce) {
-      goldBurst.value = withTiming(1, {
-        // 2000 ms — snappier than the draggy 2600 (the anti-front-loaded
-        // bezier at 2600 felt "muy lento"). The curve keeps a visible
-        // expansion (not the cubic snap) but starts with more energy.
-        duration: 2000,
-        easing: Easing.bezier(0.2, 0.55, 0.3, 1),
-      })
-    }
 
     if (elementsLit > prevLit) {
       // Field stars don't run through the ignition flash — they just
@@ -147,12 +118,10 @@ export function useIgnitionEngine(opts: {
     trainedCount,
     elementsLit,
     sequence,
-    reduce,
     displayedCount,
     numberPulse,
     litPulse,
     radialPulse,
-    goldBurst,
     plusOne,
   ])
 
@@ -182,7 +151,6 @@ export function useIgnitionEngine(opts: {
     displayedCount,
     litPulse,
     radialPulse,
-    goldBurst,
     plusOne,
   }
 }

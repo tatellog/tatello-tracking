@@ -198,10 +198,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       playCommitHaptic('trained')
       // Fire the Lottie firework reward (centred on the constellation).
       setCelebrateKey((k) => k + 1)
-      // No flat screen wash, no overlay — the Day-1 reward IS the
-      // constellation's own GOLD firework (its internal radialPulse +
-      // StarBurst), blooming from the figure's centre and growing
-      // outward. It already fires on this commit (count 0→1).
+      // The commit reward is the native Lottie firework above (bumped via
+      // celebrateKey); the constellation suppresses its own in-SVG burst.
       //
       // On the first-ever workout the DB trigger stamps
       // profiles.first_workout_at; invalidate the profile query so a
@@ -282,12 +280,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(320)} style={styles.constellationWrap}>
-            {/* burstGold — the Home constellation fires the GOLD
-                (Genshin-grade) firework from its centre on each commit;
-                this IS the Day-1 celebration now that the overlay is
-                gone. Every other LunarConstellation call site (Órbita
-                tab, dev, refactor-test) omits the prop and keeps the
-                magenta family untouched. */}
+            {/* The Home suppresses the constellation's in-SVG commit burst
+                (suppressBurst) — its commit reward is the native Lottie
+                firework rendered below. Every other LunarConstellation call
+                site (Órbita tab, dev, refactor-test) keeps the magenta
+                StarBurst. */}
             <LunarConstellation
               trained={ctx.grid_28_days.map((c) => c.completed)}
               todayIdx={27}
