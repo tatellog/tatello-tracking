@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
@@ -81,46 +80,36 @@ export function WeekSummary({
   isLoading: boolean
   isError: boolean
 }) {
-  const [open, setOpen] = useState(false)
-
   // Hide the section entirely while the first load is in flight or on
-  // error — a weekly read is supplementary; it should never block or
-  // clutter the day. (The day's sky already carries the screen.)
+  // error — a weekly read is supplementary; it should never block the day.
   if (isLoading || isError || !stats) return null
 
   const hasData = stats.daysLogged > 0
 
+  // Always visible (not collapsible) — the owner wants the week present,
+  // not behind a tap.
   return (
     <View style={styles.wrap}>
-      <Pressable
-        onPress={() => setOpen((v) => !v)}
-        style={styles.header}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel="Esta semana"
-      >
+      <View style={styles.header}>
         <EyebrowLabel tone="magenta" size={10}>
           Esta semana
         </EyebrowLabel>
-        <Text style={styles.toggle}>{open ? 'Ocultar' : 'Ver'}</Text>
-      </Pressable>
+      </View>
 
-      {open ? (
-        <Animated.View entering={FadeIn.duration(260)} style={styles.body}>
-          {hasData ? (
-            <>
-              <Text style={styles.coach}>{coachLine(stats)}</Text>
-              <WeekRing stats={stats} />
-              <ConsistencyLine stats={stats} />
-              <ProteinLine stats={stats} />
-            </>
-          ) : (
-            <Text style={styles.empty}>
-              Tu semana apenas comienza. Con unos días de registro aparece tu patrón.
-            </Text>
-          )}
-        </Animated.View>
-      ) : null}
+      <Animated.View entering={FadeIn.duration(260)} style={styles.body}>
+        {hasData ? (
+          <>
+            <Text style={styles.coach}>{coachLine(stats)}</Text>
+            <WeekRing stats={stats} />
+            <ConsistencyLine stats={stats} />
+            <ProteinLine stats={stats} />
+          </>
+        ) : (
+          <Text style={styles.empty}>
+            Tu semana apenas comienza. Con unos días de registro aparece tu patrón.
+          </Text>
+        )}
+      </Animated.View>
     </View>
   )
 }
@@ -130,16 +119,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 4,
-  },
-  toggle: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.magenta,
   },
   body: {
     marginTop: 12,
