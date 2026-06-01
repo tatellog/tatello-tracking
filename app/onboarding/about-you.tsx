@@ -229,7 +229,11 @@ export default function AboutYouScreen() {
         // surface the technical English string (manifiesto voice line).
         errorMessage={updateProfile.error ? SAVE_ERROR_COPY : null}
         onContinue={handleContinue}
-        continueLabel="Continuar"
+        // From Ajustes this is a profile edit, not onboarding step 4 of 9:
+        // hide the phase progress bar (a 4-step meter makes no sense here)
+        // and label the CTA "Guardar". Mirrors intention.tsx's settings mode.
+        continueLabel={fromSettings ? 'Guardar' : 'Continuar'}
+        showProgress={!fromSettings}
         ctaVariant="soft"
         ctaTransform="none"
         atmosphere={
