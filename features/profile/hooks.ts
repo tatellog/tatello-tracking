@@ -81,14 +81,21 @@ export function useInsertInitialWeight() {
 }
 
 /*
- * Records the user's last period start during the onboarding's
- * cycle step. The raw event lands in cycle_events; downstream
- * features that read cycles will pick it up via their own query
- * keys, so we don't pre-invalidate anything here.
+ * Records the user's last period start (onboarding's cycle step, or
+ * the Progreso → Tu ciclo editor). The raw event lands in cycle_events.
+ * We MUST invalidate the readers: the last-period query has a 5-min
+ * staleTime and React Query's RN focus is AppState-based, so a plain
+ * back-navigation never refetches it — without this, Tu ciclo keeps
+ * showing the empty state right after the user anchors a date.
  */
 export function useRecordLastPeriodStart() {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: (eventDateIso: string) => recordLastPeriodStart(eventDateIso),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+      qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+    },
   })
 }
 

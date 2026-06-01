@@ -25,6 +25,7 @@ import {
 } from '@/features/onboarding/components'
 import { type CycleSituation } from '@/features/profile/api'
 import { useProfile, useRecordLastPeriodStart, useUpdateProfile } from '@/features/profile/hooks'
+import { useLastPeriodStart } from '@/features/progress/hooks'
 import { colors, typography } from '@/theme'
 
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -158,6 +159,20 @@ export default function CycleScreen() {
   const [lastPeriod, setLastPeriod] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
   const [savingError, setSavingError] = useState<string | null>(null)
+
+  // Prefill the date field with the period already on file (editing from
+  // Progreso → Tu ciclo), so it shows the current anchor instead of an
+  // empty picker. Seeds once; never clobbers a date the user is editing.
+  const { data: existingPeriod } = useLastPeriodStart()
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (seededRef.current || !existingPeriod) return
+    const parsed = parseISODateLocal(existingPeriod)
+    if (parsed) {
+      setLastPeriod(parsed)
+      seededRef.current = true
+    }
+  }, [existingPeriod])
 
   // Precision-dim — the date picker open flag. While the inline spinner
   // is open the atmosphere dims (atmoDim → 0.4) and we scroll it into view.
@@ -536,6 +551,18 @@ function toISODate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+/** Parse a 'YYYY-MM-DD' event_date as a LOCAL date (not UTC) so the
+ *  prefilled picker lands on the same calendar day the user saved,
+ *  never one off due to timezone. */
+function parseISODateLocal(v: string | null | undefined): Date | null {
+  if (!v) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v)
+  if (!m) return null
+  const [, y, mo, d] = m
+  const date = new Date(Number(y), Number(mo) - 1, Number(d))
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 /* ───────────────────── Full-screen star sky ────────────────────── */
