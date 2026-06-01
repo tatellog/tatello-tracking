@@ -45,7 +45,6 @@ export default function LoginScreen() {
   return (
     <AuthScreenLayout>
       <Animated.View entering={enter(80)} style={styles.headerBlock}>
-        <Text style={styles.meta}>STELAR</Text>
         <Text style={styles.headline}>Bienvenida de vuelta</Text>
         <Text style={styles.editorial}>Entra con tu correo y contraseña.</Text>
       </Animated.View>

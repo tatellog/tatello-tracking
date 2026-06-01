@@ -27,11 +27,27 @@ export function useSession(): SessionState {
   useEffect(() => {
     let active = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      setLoading(false)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!active) return
+        // A stale/invalid stored token (e.g. "Invalid Refresh Token") makes
+        // getSession reject internally; clear it so we don't keep retrying
+        // and land the user cleanly on /auth.
+        if (error) {
+          void supabase.auth.signOut({ scope: 'local' })
+          setSession(null)
+        } else {
+          setSession(data.session)
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!active) return
+        void supabase.auth.signOut({ scope: 'local' })
+        setSession(null)
+        setLoading(false)
+      })
 
     const {
       data: { subscription },

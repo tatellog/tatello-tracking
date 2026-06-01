@@ -19,6 +19,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
+import { LogBox } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
@@ -40,6 +41,12 @@ import {
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Ignore — on fast refresh the splash is already hidden.
 })
+
+// supabase-js logs this as a console.error when it tries to refresh a
+// stale/invalid stored token on launch (e.g. a leftover session). It's
+// benign — the user just lands on /auth — and useSession clears the bad
+// token. Silence the dev-only LogBox red screen for it (no-op in prod).
+LogBox.ignoreLogs(['Invalid Refresh Token: Refresh Token Not Found'])
 
 export default function RootLayout() {
   // Norte carga Hanken Grotesk para todo el UI (display + body) y

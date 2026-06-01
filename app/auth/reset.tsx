@@ -44,7 +44,6 @@ export default function ResetScreen() {
     return (
       <AuthScreenLayout anchorPulseOnce>
         <Animated.View entering={enter(80)} style={styles.headerBlock}>
-          <Text style={styles.meta}>STELAR</Text>
           <Text style={styles.headline}>Revisa tu correo</Text>
         </Animated.View>
 
@@ -92,7 +91,6 @@ export default function ResetScreen() {
   return (
     <AuthScreenLayout>
       <Animated.View entering={enter(80)} style={styles.headerBlock}>
-        <Text style={styles.meta}>STELAR</Text>
         <Text style={styles.headline}>Restablecer contraseña</Text>
         <Text style={styles.editorial}>
           Escribe tu correo y te enviamos un enlace para crear una nueva contraseña.

@@ -54,7 +54,6 @@ export default function SignUpScreen() {
   return (
     <AuthScreenLayout>
       <Animated.View entering={enter(80)} style={styles.headerBlock}>
-        <Text style={styles.meta}>STELAR</Text>
         <Text style={styles.headline}>Crea tu cuenta</Text>
         <Text style={styles.editorial}>
           Solo tu cuenta por ahora. Lo demás lo vemos juntas.
