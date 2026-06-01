@@ -2,6 +2,18 @@ import { type CycleSituation } from '@/features/profile/api'
 
 export type CyclePhase = 'menstrual' | 'folicular' | 'ovulatoria' | 'lutea'
 
+/** Visible phase labels in lenguaje de EXPERIENCIA — never the clinical
+ *  terms ("lútea"/"folicular" read as a pregnancy app, off-limits per
+ *  cycle-voice-spec). Single source for every surface that shows a phase
+ *  to the user (Progreso CycleCard, the Hoy slider). The engine keeps the
+ *  clinical keys internally. */
+export const PHASE_LABEL: Record<CyclePhase, string> = {
+  menstrual: 'Tu período',
+  folicular: 'Primera mitad',
+  ovulatoria: 'Mitad del ciclo',
+  lutea: 'Semana antes',
+}
+
 // Cycle situations that have an active monthly cycle. Pregnant /
 // postmenopause / not-tracking have no phase.
 export const ACTIVE_CYCLE_SITUATIONS: readonly CycleSituation[] = [

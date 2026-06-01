@@ -26,6 +26,8 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
+import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
+import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
 import type { SleepDraft } from '@/features/sleep/api'
@@ -40,13 +42,6 @@ import { RingCard } from './RingCard'
 // rituals (sleep, check-in), the cycle phase (read-only, reframes
 // the rest), and the slow weight trend. Water lives in the QuickLog
 // (✦); registering it here too would duplicate that.
-const SLIDE_TITLES = [
-  'Macros de hoy',
-  'Sueño de anoche',
-  'Cómo amaneciste',
-  'Tu ciclo',
-  'Tu peso',
-] as const
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 type Props = { ctx: BriefContext }
@@ -69,6 +64,25 @@ export function StatSlider({ ctx }: Props) {
     scrollX.value = e.contentOffset.x
   })
 
+  // Real cycle phase (null when the user has no active/anchored cycle).
+  const cycle = useCyclePhase()
+
+  // Slides are built dynamically so the cycle slide ONLY appears when
+  // there's a real cycle to show — never a fake/mock one for users who
+  // don't menstruate or haven't anchored a period (matches Progreso's
+  // gating).
+  // Stable ids (not titles) for keys, and the cycle slide LAST so it
+  // appearing/disappearing never shifts the indices of slides the user
+  // may already be paged to (keeps scrollX / active in sync).
+  const slides: { id: string; title: string; node: ReactNode }[] = [
+    { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
+    { id: 'sleep', title: 'Sueño de anoche', node: <SleepSlide date={ctx.date} /> },
+    { id: 'wellbeing', title: 'Cómo amaneciste', node: <WellbeingSlide date={ctx.date} /> },
+    { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
+    ...(cycle ? [{ id: 'cycle', title: 'Tu ciclo', node: <CycleSlide cycle={cycle} /> }] : []),
+  ]
+  const safeActive = Math.min(active, slides.length - 1)
+
   const onLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width
     if (w !== width) setWidth(w)
@@ -77,15 +91,15 @@ export function StatSlider({ ctx }: Props) {
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (width === 0) return
     const idx = Math.round(e.nativeEvent.contentOffset.x / width)
-    if (idx !== active && idx >= 0 && idx < SLIDE_TITLES.length) setActive(idx)
+    if (idx !== active && idx >= 0 && idx < slides.length) setActive(idx)
   }
 
   return (
     <View onLayout={onLayout}>
       <View style={styles.header}>
         {/* Re-keyed on `active` so the title cross-fades when paging. */}
-        <Animated.View key={active} entering={FadeIn.duration(280)}>
-          <EyebrowLabel tone="magenta">{SLIDE_TITLES[active] ?? ''}</EyebrowLabel>
+        <Animated.View key={safeActive} entering={FadeIn.duration(280)}>
+          <EyebrowLabel tone="magenta">{slides[safeActive]?.title ?? ''}</EyebrowLabel>
         </Animated.View>
       </View>
 
@@ -98,27 +112,17 @@ export function StatSlider({ ctx }: Props) {
           onScroll={scrollHandler}
           scrollEventThrottle={16}
         >
-          <Slide index={0} width={width} scrollX={scrollX}>
-            <MacroSlide ctx={ctx} />
-          </Slide>
-          <Slide index={1} width={width} scrollX={scrollX}>
-            <SleepSlide date={ctx.date} />
-          </Slide>
-          <Slide index={2} width={width} scrollX={scrollX}>
-            <WellbeingSlide date={ctx.date} />
-          </Slide>
-          <Slide index={3} width={width} scrollX={scrollX}>
-            <CycleSlide />
-          </Slide>
-          <Slide index={4} width={width} scrollX={scrollX}>
-            <WeightSlide ctx={ctx} />
-          </Slide>
+          {slides.map((s, i) => (
+            <Slide key={s.id} index={i} width={width} scrollX={scrollX}>
+              {s.node}
+            </Slide>
+          ))}
         </Animated.ScrollView>
       ) : (
         <View style={styles.measurePlaceholder} />
       )}
 
-      <Dots count={SLIDE_TITLES.length} active={active} />
+      <Dots count={slides.length} active={safeActive} />
     </View>
   )
 }
@@ -665,25 +669,6 @@ function WellbeingSlide({ date }: { date: string }) {
 
 /* ─── Slide — cycle phase ──────────────────────────────────────────── */
 
-// Mock — derivation from cycle_events is deferred to the cycle
-// lifecycle sprint. Day 22 / fase lútea matches the Voz de Stelar
-// copy in features/orbit/mock.ts so the two surfaces tell the same
-// story while this slide is still on placeholder data.
-const MOCK_CYCLE = {
-  day: 22,
-  cycleLength: 28,
-  daysToNextPeriod: 6,
-}
-
-type CyclePhase = 'menstrual' | 'folicular' | 'ovulación' | 'lútea'
-
-function phaseForDay(day: number): CyclePhase {
-  if (day <= 5) return 'menstrual'
-  if (day <= 13) return 'folicular'
-  if (day <= 16) return 'ovulación'
-  return 'lútea'
-}
-
 // Dial — a full ring of the cycle's days, the lit arc growing from
 // the top clockwise to today and tipped with a small marker. Visual
 // rhyme with the weight sparkline (a curve + a tip dot).
@@ -734,26 +719,30 @@ function CycleDial({ day, cycleLength }: { day: number; cycleLength: number }) {
  * (calories, sleep, mood), which is why it lives next to them on Hoy.
  * Inputs (period start / end) belong in QuickLog ✦, not this slide.
  */
-function CycleSlide() {
-  const { day, cycleLength, daysToNextPeriod } = MOCK_CYCLE
-  const phase = phaseForDay(day)
+function CycleSlide({
+  cycle,
+}: {
+  cycle: { day: number; phase: CyclePhase; length: number; daysToNext: number }
+}) {
+  // Soft projection, never a deterministic forecast ("unos" = estimate),
+  // consistent with the Progreso card.
+  const nextLine =
+    cycle.daysToNext <= 1 ? 'tu regla, pronto' : `tu regla, en unos ${cycle.daysToNext} días`
 
   return (
     <View style={styles.slide}>
       <View style={styles.card}>
         <View style={styles.weightRow}>
           <View style={styles.cycleDialWrap}>
-            <CycleDial day={day} cycleLength={cycleLength} />
+            <CycleDial day={cycle.day} cycleLength={cycle.length} />
             <View style={styles.cycleDialCenter} pointerEvents="none">
-              <Text style={styles.cycleDialDay}>{day}</Text>
-              <Text style={styles.cycleDialOf}>/ {cycleLength}</Text>
+              <Text style={styles.cycleDialDay}>{cycle.day}</Text>
+              <Text style={styles.cycleDialOf}>/ {cycle.length}</Text>
             </View>
           </View>
           <View style={styles.numberStack}>
-            <Text style={styles.cyclePhaseLine}>
-              Fase <Text style={styles.cyclePhaseEm}>{phase}</Text>
-            </Text>
-            <Text style={styles.weeklyLine}>regla en {daysToNextPeriod} días</Text>
+            <Text style={styles.cyclePhaseLine}>{PHASE_LABEL[cycle.phase]}</Text>
+            <Text style={styles.weeklyLine}>{nextLine}</Text>
           </View>
         </View>
       </View>
@@ -1017,12 +1006,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.ui,
     color: colors.bone,
-  },
-  // Phase name — the emphasised word, magenta serif.
-  cyclePhaseEm: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    color: colors.magenta,
   },
   // ── Shared caption — the serif italic line under a slide. ──────
   captionLine: {

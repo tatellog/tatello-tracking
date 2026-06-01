@@ -10,6 +10,7 @@ import {
   cyclePhaseFromPeriod,
   type CyclePhase,
   DEFAULT_CYCLE_LENGTH,
+  PHASE_LABEL,
 } from '@/features/cycle/phase'
 import { type CycleSituation } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
@@ -17,16 +18,8 @@ import { colors, typography } from '@/theme'
 
 import { useLastPeriodStart } from '../hooks'
 
-// Visible phase labels in lenguaje de EXPERIENCIA, never clinical /
-// fertility terms ("Ovulatoria"/"Lútea" read as a pregnancy app and are
-// off-limits per cycle-voice-spec). The engine keeps the clinical keys
-// internally; only the UI is translated.
-const PHASE_LABEL: Record<CyclePhase, string> = {
-  menstrual: 'Tu período',
-  folicular: 'Primera mitad',
-  ovulatoria: 'Mitad del ciclo',
-  lutea: 'Semana antes',
-}
+// Phase labels come from the shared PHASE_LABEL in features/cycle/phase
+// (single source — the Hoy slider uses the same map).
 
 // One read-only context line per phase (the user asked for "más
 // información"). Vetted by behavioral-specialist + voice-and-copy against
