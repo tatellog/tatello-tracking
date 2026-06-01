@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { WeekRing } from '@/features/macros/components/WeekRing'
 import type { WeeklyMealStats } from '@/features/macros/logic'
 import { colors, typography } from '@/theme'
 
@@ -109,6 +110,7 @@ export function WeekSummary({
           {hasData ? (
             <>
               <Text style={styles.coach}>{coachLine(stats)}</Text>
+              <WeekRing stats={stats} />
               <ConsistencyLine stats={stats} />
               <ProteinLine stats={stats} />
             </>

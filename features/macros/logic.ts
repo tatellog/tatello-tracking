@@ -84,6 +84,11 @@ export function deriveMacroMessage(
  * is manifesto-safe by construction — it counts protein and logging
  * CONSISTENCY, never "good/bad" food categories, and never a %-to-goal.
  */
+/** Meal-time buckets — classified by WHEN (neutral), never by good/bad
+ *  food. Drives the celestial week ring. */
+export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const
+export type MealTypeKey = (typeof MEAL_TYPES)[number]
+
 export type WeeklyMealStats = {
   /** Distinct days within the window that have at least one logged meal. */
   daysLogged: number
@@ -97,6 +102,10 @@ export type WeeklyMealStats = {
   /** Of the logged days, how many reached the protein reference (null
    *  when there's no reference to compare against). */
   daysHitProtein: number | null
+  /** Count of MEALS in the window per meal-time (the ring's segments). */
+  byMealType: Record<MealTypeKey, number>
+  /** Total meals logged in the window. */
+  totalMeals: number
 }
 
 /** The N calendar dates ending at `today` (inclusive), oldest first.
@@ -115,18 +124,24 @@ export function lastNDates(today: string, n: number): string[] {
 }
 
 export function computeWeeklyMealStats(
-  meals: readonly { meal_date: string | null; protein_g: number | string }[],
+  meals: readonly { meal_date: string | null; protein_g: number | string; meal_type?: string }[],
   weekDates: readonly string[],
   proteinTarget: number | null,
 ): WeeklyMealStats {
   const inWeek = new Set(weekDates)
   const proteinByDate = new Map<string, number>()
+  const byMealType: Record<MealTypeKey, number> = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 }
+  let totalMeals = 0
   for (const meal of meals) {
     if (meal.meal_date == null || !inWeek.has(meal.meal_date)) continue
     proteinByDate.set(
       meal.meal_date,
       (proteinByDate.get(meal.meal_date) ?? 0) + Number(meal.protein_g),
     )
+    totalMeals += 1
+    if (meal.meal_type && meal.meal_type in byMealType) {
+      byMealType[meal.meal_type as MealTypeKey] += 1
+    }
   }
   const perDay = [...proteinByDate.values()]
   const daysLogged = perDay.length
@@ -138,5 +153,7 @@ export function computeWeeklyMealStats(
     proteinTarget,
     daysHitProtein:
       proteinTarget == null ? null : perDay.filter((p) => p >= proteinTarget).length,
+    byMealType,
+    totalMeals,
   }
 }
