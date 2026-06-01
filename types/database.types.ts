@@ -402,6 +402,7 @@ export type Database = {
           is_beta: boolean
           is_dev: boolean
           monthly_focus: string | null
+          monthly_focus_secondary: string[] | null
           notification_window: string | null
           onboarding_completed_at: string | null
           timezone: string
@@ -426,6 +427,7 @@ export type Database = {
           is_beta?: boolean
           is_dev?: boolean
           monthly_focus?: string | null
+          monthly_focus_secondary?: string[] | null
           notification_window?: string | null
           onboarding_completed_at?: string | null
           timezone?: string
@@ -450,6 +452,7 @@ export type Database = {
           is_beta?: boolean
           is_dev?: boolean
           monthly_focus?: string | null
+          monthly_focus_secondary?: string[] | null
           notification_window?: string | null
           onboarding_completed_at?: string | null
           timezone?: string

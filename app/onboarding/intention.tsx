@@ -107,20 +107,21 @@ const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
  * The user can pick MORE THAN ONE — `selected` is an ORDERED array in
  * order of selection. The FIRST element (`selected[0]`) is the PRIORITY:
  * the one that drives the engine (persisted to profile.monthly_focus)
- * and the one marked with a micro "TU PRIORIDAD" eyebrow. The secondary
- * picks are remembered in-state (and acknowledged visually with the same
- * magenta treatment, minus the priority marker) but NOT persisted yet —
- * there's no column for them. Tap a card to add; tap again to remove. If
- * the priority is removed, the next selection slides up to become it.
+ * and the one marked with a micro "TU PRIORIDAD" eyebrow. The remaining
+ * picks (`selected[1..]`) persist to profile.monthly_focus_secondary —
+ * context for the Voz, not engine inputs. Tap a card to add; tap again
+ * to remove. If the priority is removed, the next selection slides up
+ * to become it.
  *
  * Selection still drives the same MonthlyFocus enum + calcMacros logic
  * via selected[0] — the engine is untouched.
  *
- * Persisted to profile.monthly_focus. After Continuar fires in the
- * wizard, a quiet acknowledgment overlay confirms Stelar received it
- * (a still bloom + the phrase, no celebration of the answer). When
- * opened from Ajustes we skip the overlay entirely — editing a
- * preference is not a milestone — and pop straight back after saving.
+ * Persisted to profile.monthly_focus + profile.monthly_focus_secondary.
+ * After Continuar fires in the wizard, a quiet acknowledgment overlay
+ * confirms Stelar received it (a still bloom + the phrase, no
+ * celebration of the answer). When opened from Ajustes we skip the
+ * overlay entirely — editing a preference is not a milestone — and pop
+ * straight back after saving.
  *
  * ATMOSPHERE PARITY (illustrator pass — same line as steps 1–9): the
  * screen paints a full-screen sky so it breathes with the rest of the
@@ -159,16 +160,25 @@ export default function IntentionScreen() {
   const updateProfile = useUpdateProfile()
 
   // Ordered selection: selected[0] is the PRIORITY (the one that drives
-  // the engine + carries the "TU PRIORIDAD" marker). Seeded from the
-  // persisted monthly_focus (single value → single-element array) so
-  // re-entering from Ajustes restores the priority. Secondary picks were
-  // never persisted, so they start empty on re-entry.
+  // the engine + carries the "TU PRIORIDAD" marker). Seeded from BOTH
+  // persisted columns so re-entering from Ajustes restores the full
+  // multi-select state, not just the priority:
+  //   • monthly_focus            → selected[0]
+  //   • monthly_focus_secondary  → selected[1..]
+  // Legacy rows carry a pruned value (sleep/cycle/mind) in either column;
+  // we filter to the options the UI currently OFFERS so a pruned value
+  // doesn't render as a selected card with no matching tap target.
   const [selected, setSelected] = useState<MonthlyFocus[]>(() => {
-    const persisted = profile?.monthly_focus as MonthlyFocus | null | undefined
-    // Only seed if the persisted value is one we still OFFER — a legacy
-    // row carrying a pruned value (sleep/cycle/mind) would otherwise show
-    // no selected card while pretending one exists.
-    return persisted && FOCUS_OPTIONS.some((o) => o.value === persisted) ? [persisted] : []
+    const offered = (v: unknown): v is MonthlyFocus =>
+      typeof v === 'string' && FOCUS_OPTIONS.some((o) => o.value === v)
+    const priority = profile?.monthly_focus
+    const secondary = profile?.monthly_focus_secondary ?? []
+    const seed: MonthlyFocus[] = []
+    if (offered(priority)) seed.push(priority)
+    for (const v of secondary) {
+      if (offered(v) && !seed.includes(v)) seed.push(v)
+    }
+    return seed
   })
 
   // The screen already names itself; we drop any per-name suffix for a
@@ -226,15 +236,19 @@ export default function IntentionScreen() {
   const handleContinue = () => {
     if (!canContinue || !priority) return
 
+    // Persist the FULL ordered selection split across two columns:
+    //   • monthly_focus           → priority (selected[0]) — engine input
+    //   • monthly_focus_secondary → selected[1..]          — Voz context
+    // The engine contract (calcMacros etc.) reads monthly_focus only, so
+    // it is unchanged; the secondary list adds nuance the Voz can use
+    // without affecting macro math.
+    const secondary = selected.slice(1)
+
     // From Ajustes: editing a preference is not a milestone. Save and
     // pop straight back — no acknowledgment overlay, no haptic flourish.
-    // We persist the PRIORITY (selected[0]) as monthly_focus — the engine
-    // contract is unchanged.
-    // TODO: persistir selected[1..] requiere columna nueva (backend) para
-    // que la Voz use el contexto secundario.
     if (fromSettings) {
       updateProfile.mutate(
-        { monthly_focus: priority },
+        { monthly_focus: priority, monthly_focus_secondary: secondary },
         {
           onSuccess: () => router.back(),
         },
@@ -245,13 +259,9 @@ export default function IntentionScreen() {
     // Wizard flow: quiet acknowledgment beat, then advance. No Success
     // notification haptic — the selectionAsync on pick already gave the
     // tactile feedback, and a Success buzz would dramatise the answer.
-    // Only the priority is persisted (monthly_focus = selected[0]); the
-    // secondaries are not stored yet (no column).
-    // TODO: persistir selected[1..] requiere columna nueva (backend) para
-    // que la Voz use el contexto secundario.
     setCelebrating(true)
     updateProfile.mutate(
-      { monthly_focus: priority },
+      { monthly_focus: priority, monthly_focus_secondary: secondary },
       {
         onSuccess: () => {
           navTimer.current = setTimeout(() => {

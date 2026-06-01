@@ -168,6 +168,12 @@ function SettingsBody() {
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const sexLabel = profile?.biological_sex ? (SEX_LABEL[profile.biological_sex] ?? '—') : '—'
   const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
+  // Secondary focuses (the picks AFTER the priority in the intention
+  // wizard). Each one resolves to its label via FOCUS_LABEL; values we
+  // don't know how to label (a hypothetical out-of-enum row) drop out.
+  const secondaryIntentionLabels: string[] = (profile?.monthly_focus_secondary ?? [])
+    .map((v) => FOCUS_LABEL[v]?.label)
+    .filter((s): s is string => typeof s === 'string')
 
   // Celestial identity line — sign comes from the same source as the
   // Hoy-tab constellation, so the two screens agree.
@@ -248,9 +254,24 @@ function SettingsBody() {
             <SectionHeader label="Tu plan" />
             <PlanRow
               label={intention?.label ?? 'Aún sin definir'}
-              value={intention?.tagline ?? 'Toca para elegir un foco'}
               onPress={editIntention}
               accessibilityLabel="Editar tu intención"
+              valueNode={
+                <>
+                  <Text style={styles.metaValue}>
+                    {intention?.tagline ?? 'Toca para elegir un foco'}
+                  </Text>
+                  {/* Secondary focuses — the picks after the priority in the
+                      intention wizard. Whispered as a dimmer line below the
+                      tagline so the priority stays the read; hidden entirely
+                      when the user only picked one. */}
+                  {secondaryIntentionLabels.length > 0 ? (
+                    <Text style={styles.metaSecondary}>
+                      También: {secondaryIntentionLabels.join('  ·  ')}
+                    </Text>
+                  ) : null}
+                </>
+              }
             />
             <PlanRow
               label="Macros diarios"
@@ -644,6 +665,17 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     marginTop: 4,
+  },
+  // Secondary line under the priority tagline — dimmer + smaller so the
+  // priority pick stays the visual read. Upright (not italic) because the
+  // serif italic is reserved for the coach/poetic voice; this is meta.
+  metaSecondary: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    lineHeight: 16,
+    letterSpacing: 0.2,
+    color: colors.bruma,
+    marginTop: 6,
   },
   metaNum: {
     fontFamily: typography.displaySemi,

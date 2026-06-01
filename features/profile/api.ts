@@ -102,6 +102,11 @@ export const ProfileUpdateSchema = z
     training_frequency: z.enum(TRAINING_FREQUENCY_VALUES),
     cycle_situation: z.enum(CYCLE_SITUATION_VALUES),
     monthly_focus: z.enum(MONTHLY_FOCUS_VALUES),
+    // Ordered list of secondary focuses (the picks AFTER the priority).
+    // The priority lives in `monthly_focus`; the engine reads only that.
+    // These provide additional context for the Voz. Stored as text[] in
+    // Postgres with a CHECK that elements are unique + in the enum.
+    monthly_focus_secondary: z.array(z.enum(MONTHLY_FOCUS_VALUES)),
     acquisition_source: z.enum(ACQUISITION_SOURCE_VALUES),
     notification_window: z.enum(NOTIFICATION_WINDOW_VALUES),
   })
