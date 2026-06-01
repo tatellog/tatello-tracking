@@ -184,7 +184,7 @@ export default function AuthScreen() {
                     <Feather
                       name={showPassword ? 'eye-off' : 'eye'}
                       size={18}
-                      color={colors.labelMuted}
+                      color={colors.niebla}
                     />
                   </Pressable>
                 }
@@ -260,13 +260,13 @@ function Field({
     borderColor: interpolateColor(
       focusProgress.value,
       [0, 1],
-      [colors.borderDashed, colors.mauveDeep],
+      [colors.hairlineStrong, colors.magenta],
     ),
   }))
 
   return (
     <Animated.View style={[styles.inputContainer, animatedContainer]}>
-      <Feather name={icon} size={18} color={focused ? colors.mauveDeep : colors.labelDim} />
+      <Feather name={icon} size={18} color={focused ? colors.magenta : colors.niebla} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -274,9 +274,9 @@ function Field({
         onBlur={() => setFocused(false)}
         onSubmitEditing={onSubmitEditing}
         placeholder={placeholder}
-        placeholderTextColor={colors.labelDim}
-        selectionColor={colors.mauveDeep}
-        cursorColor={colors.mauveDeep}
+        placeholderTextColor={colors.niebla}
+        selectionColor={colors.magenta}
+        cursorColor={colors.magenta}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         autoCorrect={false}
@@ -311,7 +311,7 @@ function SubmitButton({ canSubmit, isSubmitting, onPress }: SubmitButtonProps) {
 
   const animatedContainer = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    backgroundColor: interpolateColor(ready.value, [0, 1], [colors.pearlBase, colors.mauveDeep]),
+    backgroundColor: interpolateColor(ready.value, [0, 1], [colors.bgCard2, colors.magenta]),
   }))
 
   const onPressIn = () => {
@@ -335,7 +335,7 @@ function SubmitButton({ canSubmit, isSubmitting, onPress }: SubmitButtonProps) {
         accessibilityRole="button"
         accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
       >
-        {showIcon && <Feather name="arrow-right" size={16} color={colors.pearlBase} />}
+        {showIcon && <Feather name="arrow-right" size={16} color={colors.leche} />}
         <Text style={[styles.submitLabel, !canSubmit && styles.submitLabelDisabled]}>
           {isSubmitting ? 'Entrando…' : 'Entrar'}
         </Text>
@@ -347,7 +347,7 @@ function SubmitButton({ canSubmit, isSubmitting, onPress }: SubmitButtonProps) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
   },
   container: {
     flex: 1,
@@ -362,29 +362,29 @@ const styles = StyleSheet.create({
   brandBar: {
     height: 1,
     width: 48,
-    backgroundColor: colors.mauveDeep,
-    opacity: 0.5,
+    backgroundColor: colors.magenta,
+    opacity: 0.6,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.inkPrimary,
+    color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
   editorial: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.labelMuted,
+    color: colors.niebla,
     lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   footerNote: {
     textAlign: 'center',
-    color: colors.labelDim,
+    color: colors.niebla,
   },
   meta: {
     fontSize: typography.sizes.smallLabel,
     letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   error: {
     fontFamily: typography.ui,
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.tile,
     borderWidth: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bgCard,
     paddingLeft: spacing.md,
     paddingRight: spacing.sm,
   },
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingRight: spacing.sm,
     fontSize: typography.sizes.body,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
   trailing: {
     paddingHorizontal: spacing.sm,
@@ -427,9 +427,9 @@ const styles = StyleSheet.create({
   submitLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.pearlBase,
+    color: colors.leche,
   },
   submitLabelDisabled: {
-    color: colors.labelDim,
+    color: colors.niebla,
   },
 })
