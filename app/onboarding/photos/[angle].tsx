@@ -165,7 +165,7 @@ function PhotoCaptureScreen({
     if (!permission) {
       return (
         <View style={styles.fullCenter}>
-          <StarLoader size={32} color={colors.mauveDeep} />
+          <StarLoader size={32} color={colors.magenta} />
         </View>
       )
     }
@@ -218,7 +218,7 @@ function PhotoCaptureScreen({
 
         {takePhoto.isPending ? (
           <View pointerEvents="none" style={styles.uploadOverlay}>
-            <StarLoader size={30} color={colors.pearlBase} />
+            <StarLoader size={30} color={colors.leche} />
             <Text style={styles.uploadOverlayText}>Subiendo…</Text>
           </View>
         ) : null}
@@ -361,11 +361,11 @@ function WebCaptureButton({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
   },
   fullCenter: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   titleBlock: {
     paddingHorizontal: 22,
@@ -391,17 +391,17 @@ const styles = StyleSheet.create({
     fontFamily: typography.display,
     fontSize: typography.sizes.displaySm,
     letterSpacing: -0.6,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
   titleEmphasis: {
     fontFamily: typography.displaySemi,
     fontWeight: typography.fontWeight.medium,
-    color: colors.mauveDeep,
+    color: colors.leche,
   },
   instruction: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,
-    color: colors.labelMuted,
+    color: colors.niebla,
     lineHeight: 17,
   },
   cameraWrap: {
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   uploadOverlayText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    color: colors.pearlBase,
+    color: colors.leche,
     letterSpacing: 0.3,
   },
   errorText: {
@@ -507,11 +507,11 @@ const styles = StyleSheet.create({
   meta: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   metaNum: {
     fontFamily: typography.displayMedium,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
   footer: {
     flexDirection: 'row',
@@ -524,12 +524,12 @@ const styles = StyleSheet.create({
   footerLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.labelMuted,
+    color: colors.niebla,
     letterSpacing: 0.2,
   },
   permSafe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
   },
   permWrap: {
     flex: 1,
@@ -542,19 +542,19 @@ const styles = StyleSheet.create({
     fontFamily: typography.display,
     fontSize: typography.sizes.displaySm,
     letterSpacing: -0.6,
-    color: colors.inkPrimary,
+    color: colors.leche,
     textAlign: 'center',
   },
   permBody: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
     lineHeight: 20,
-    color: colors.labelMuted,
+    color: colors.niebla,
     textAlign: 'center',
   },
   permCta: {
     marginTop: 8,
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
     borderRadius: 100,
     paddingVertical: 14,
     paddingHorizontal: 22,
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   permCtaLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.pearlBase,
+    color: colors.leche,
     letterSpacing: 0.3,
   },
 })

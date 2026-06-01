@@ -14,7 +14,7 @@ export default function PhotosLayout() {
         headerShown: false,
         animation: 'slide_from_right',
         gestureEnabled: false,
-        contentStyle: { backgroundColor: colors.pearlBase },
+        contentStyle: { backgroundColor: colors.bg },
       }}
     />
   )

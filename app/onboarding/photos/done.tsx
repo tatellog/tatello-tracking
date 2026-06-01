@@ -76,12 +76,12 @@ export default function PhotosDoneScreen() {
       <View style={styles.content}>
         <Animated.View style={[styles.checkCircle, checkAnim]}>
           <LinearGradient
-            colors={[colors.mauveLight, colors.mauveDeep]}
+            colors={[colors.magentaHot, colors.magenta]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <Text style={styles.checkIcon}>✓</Text>
+          <Text style={styles.checkIcon}>✦</Text>
         </Animated.View>
 
         <Text style={styles.title}>
@@ -93,7 +93,12 @@ export default function PhotosDoneScreen() {
           {ANGLE_ORDER.map((angle) => {
             const photo = photos.find((p) => p.angle === angle)
             return (
-              <View key={angle} style={styles.thumb}>
+              <View
+                key={angle}
+                style={styles.thumb}
+                accessibilityRole="image"
+                accessibilityLabel={`Foto de ${ANGLE_LABELS[angle]}`}
+              >
                 {photo?.signed_url ? (
                   <Image source={{ uri: photo.signed_url }} style={StyleSheet.absoluteFill} />
                 ) : (
@@ -137,7 +142,7 @@ export default function PhotosDoneScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
   },
   content: {
     flex: 1,
@@ -153,7 +158,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.mauveDeep,
+    shadowColor: colors.magenta,
     shadowOpacity: 0.3,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
@@ -162,25 +167,25 @@ const styles = StyleSheet.create({
   checkIcon: {
     fontFamily: typography.display,
     fontSize: 26,
-    color: colors.pearlBase,
+    color: colors.leche,
   },
   title: {
     fontFamily: typography.display,
     fontSize: typography.sizes.deltaNum,
     letterSpacing: -1,
-    color: colors.inkPrimary,
+    color: colors.leche,
     textAlign: 'center',
   },
   titleEmphasis: {
     fontFamily: typography.displaySemi,
     fontWeight: typography.fontWeight.medium,
-    color: colors.mauveDeep,
+    color: colors.leche,
   },
   sub: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
     lineHeight: 20,
-    color: colors.labelMuted,
+    color: colors.niebla,
     textAlign: 'center',
     paddingHorizontal: 16,
   },
@@ -197,7 +202,7 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 4,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: colors.inkDark,
+    backgroundColor: colors.bg,
     position: 'relative',
   },
   thumbPlaceholder: {
@@ -217,14 +222,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.5,
-    color: colors.pearlBase,
+    color: colors.leche,
   },
   footer: {
     paddingHorizontal: 22,
     paddingBottom: 12,
   },
   cta: {
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
@@ -233,7 +238,7 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.ui,
-    color: colors.pearlBase,
+    color: colors.leche,
     letterSpacing: 0.3,
   },
   // Quiet, optional anchor below the primary CTA — a calm link, never a
@@ -246,7 +251,7 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.labelMuted,
+    color: colors.niebla,
     letterSpacing: 0.2,
   },
 })
