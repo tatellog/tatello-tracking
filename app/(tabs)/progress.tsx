@@ -43,23 +43,25 @@ import {
 } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
-type Period = '7D' | '30D' | '90D' | 'TODO'
+// `ALL` (not `TODO`) for the "todo el historial" option — the all-caps
+// Spanish word read as a dev-leftover marker in grep + tripped code
+// review tools. English keys + Spanish display labels mirrors the
+// pattern in RangeChips.tsx.
+type Period = '7D' | '30D' | '90D' | 'ALL'
 
 const PERIOD_DAYS: Record<Period, number | null> = {
   '7D': 7,
   '30D': 30,
   '90D': 90,
-  TODO: null,
+  ALL: null,
 }
 
-// Display labels — the keys stay terse codes, but the pills read in
-// plain Spanish instead of the "7D / TODO" mix (TODO all-caps even
-// looked like a dev marker).
+// Display labels — the pills read in plain Spanish.
 const PERIOD_LABEL: Record<Period, string> = {
   '7D': '7 días',
   '30D': '30 días',
   '90D': '90 días',
-  TODO: 'Todo',
+  ALL: 'Todo',
 }
 
 // 4-point star — the shared glyph; here it marks the trajectory origin.

@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics'
+import LottieView from 'lottie-react-native'
 import React, { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -6,6 +7,7 @@ import Animated, {
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -902,6 +904,7 @@ export function MonthSky({
   // the dashed orbital rings very slowly — barely perceptible
   // motion, but it keeps the cosmos feeling alive instead of
   // static when the eye lingers.
+  const reducedMotion = useReducedMotion()
   const t = useSharedValue(0)
   const twinkle = useSharedValue(0)
   const orbitSpin = useSharedValue(0)
@@ -1091,6 +1094,24 @@ export function MonthSky({
           preserveAspectRatio="xMidYMid meet"
         />
       </Svg>
+
+      {/* Genshin ambient (Lottie) — drifting star dust + a breathing
+          accretion-disk shimmer + staggered 4-point glints, a calm infinite
+          loop. Sits BETWEEN the back SVG (BH/rings) and the front SVG
+          (nodes/labels): in front of the void, behind the chain + text.
+          pointerEvents none so taps fall through; skipped under
+          reduce-motion and on the empty cosmos (no satellites yet). */}
+      {!reducedMotion && satellites.length > 0 ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <LottieView
+            source={require('../../../assets/lottie/month-sky-ambient.json')}
+            autoPlay
+            loop
+            resizeMode="cover"
+            style={{ width: '100%', height: '100%' }}
+          />
+        </View>
+      ) : null}
 
       {/* FRONT SVG — bright nodes + chain halos + labels.
           Cardinal sparkles + axis diamonds are PAINTED IN the BH
