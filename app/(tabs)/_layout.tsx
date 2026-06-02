@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router'
 import { View } from 'react-native'
 
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
+import { IgnitionToast } from '@/features/orbit/components/IgnitionToast'
 import { AppTabBar } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
@@ -147,6 +148,7 @@ export default function TabsLayout() {
         />
       </Tabs>
       <BetaFeedbackButton />
+      <IgnitionToast />
     </View>
   )
 }

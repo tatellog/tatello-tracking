@@ -1,5 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
@@ -41,12 +43,65 @@ import { StelarVoice } from './StelarVoice'
  * Archetype + Voz de Stelar + headline + action are MOCK
  * (../mock.ts); the engine will write them from daily_signals.
  */
+// When a dimension is in silence, invite the user to register the signal
+// that lights it — instead of a dead-end. Oro afford, tappable. Ciclo has
+// no afford (it's anchored when the period actually starts, not "today").
+const AFFORD_TEXT: Partial<Record<DimensionKey, string>> = {
+  sueno: 'Registra tu sueño para encender esta estrella',
+  mente: 'Cuéntale a Stelar cómo te sentiste',
+  cuerpo: 'Anota tu movimiento de hoy',
+  energia: 'Marca tu energía de hoy',
+  alimento: 'Registra una comida',
+}
+
+// Arrival payoff (P2A, contained): which dimensions crossed into "brillante"
+// since the last visit. We snapshot the lit set in AsyncStorage and, on the
+// next open, celebrate what newly lit — the visible reward for registering.
+// Ciclo is excluded (it's anchored by its own chip, not "lit" daily).
+const LIT_SNAPSHOT_KEY = '@app:orbit_lit'
+const LIT_PHRASE: Partial<Record<DimensionKey, string>> = {
+  cuerpo: 'tu cuerpo',
+  energia: 'tu energía',
+  mente: 'tu mente',
+  alimento: 'tu comida',
+  sueno: 'tu sueño',
+}
+
 export function DaySegment() {
+  const router = useRouter()
   const { data } = useTodaySignals()
   const { data: hasAny } = useHasAnySignals()
   const signals = data ?? null
   const dimensions = deriveDimensions(signals)
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
+  const [ignited, setIgnited] = useState<DimensionKey[]>([])
+
+  // On arrival, compare today's lit dimensions to the last snapshot and
+  // celebrate the ones that newly crossed into "brillante". Persist the
+  // new snapshot so the same lighting doesn't re-celebrate next visit.
+  useEffect(() => {
+    if (!signals) return
+    const dims = deriveDimensions(signals)
+    const current: Record<string, boolean> = {}
+    dims.forEach((d) => {
+      current[d.key] = dimensionTone(d.brightness) === 'brillante'
+    })
+    let alive = true
+    AsyncStorage.getItem(LIT_SNAPSHOT_KEY)
+      .then((raw) => {
+        if (!alive) return
+        const prev = raw ? (JSON.parse(raw) as Record<string, boolean>) : {}
+        const newly = dims
+          .filter((d) => d.key !== 'ciclo' && current[d.key] && !prev[d.key])
+          .map((d) => d.key)
+        if (newly.length) setIgnited(newly)
+        void AsyncStorage.setItem(LIT_SNAPSHOT_KEY, JSON.stringify(current))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [signals])
 
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedTone = selected ? dimensionTone(selected.brightness) : null
@@ -116,6 +171,15 @@ export function DaySegment() {
           </View>
         ) : null}
       </View>
+
+      {/* Arrival payoff — what newly lit since the last visit (P2A). */}
+      {ignited.length > 0 ? (
+        <Animated.Text entering={FadeIn.duration(600)} style={styles.ignited}>
+          {ignited.length === 1
+            ? `✦ Encendiste ${LIT_PHRASE[ignited[0]!] ?? 'una luz'} en tu cielo.`
+            : '✦ Encendiste nuevas luces en tu cielo.'}
+        </Animated.Text>
+      ) : null}
 
       {/* Lifted lede — STELAR's read in two lines, before the visual. */}
       <StelarHeadline parts={MOCK_HEADLINE.parts} />
@@ -196,9 +260,24 @@ export function DaySegment() {
                 </View>
               </View>
             ) : (
-              <Text style={styles.evidenceQuiet}>
-                Cuando hay silencio, Stelar no inventa. Espera a que registres.
-              </Text>
+              <View style={styles.silence}>
+                <Text style={styles.evidenceQuiet}>
+                  Aún no hay señal aquí. Stelar espera, no inventa.
+                </Text>
+                {AFFORD_TEXT[selected.key] ? (
+                  <Pressable
+                    onPress={() =>
+                      router.push(selected.key === 'alimento' ? '/(tabs)/meals' : '/(tabs)')
+                    }
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={AFFORD_TEXT[selected.key]}
+                    style={styles.afford}
+                  >
+                    <Text style={styles.affordText}>{AFFORD_TEXT[selected.key]} →</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             )}
           </Animated.View>
         ) : null}
@@ -500,5 +579,30 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
+  },
+  // Arrival payoff — the line that celebrates a newly-lit dimension.
+  ignited: {
+    marginTop: 12,
+    textAlign: 'center',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: colors.oro,
+  },
+  // Silence block — the honest line + the oro afford that invites the
+  // user to register the signal that lights this dimension.
+  silence: {
+    gap: 8,
+  },
+  afford: {
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+  },
+  affordText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+    letterSpacing: 0.2,
   },
 })

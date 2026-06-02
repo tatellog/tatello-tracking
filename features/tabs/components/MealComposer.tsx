@@ -16,6 +16,7 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { igniteDimension } from '@/features/orbit/ignitionBus'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
 import { colors, typography } from '@/theme'
@@ -242,6 +243,7 @@ export function MealComposer({ onOpenMeal }: Props) {
   // photo the original logged instance had via the frequent-meal row).
   const log = (meal: { name: string; protein_g: number; calories: number }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    igniteDimension('alimento')
     createMeal.mutate({
       name: meal.name,
       protein_g: meal.protein_g,
@@ -320,6 +322,7 @@ export function MealComposer({ onOpenMeal }: Props) {
       },
       {
         onSuccess: () => {
+          igniteDimension('alimento')
           clear()
           setSubmitting(false)
         },
