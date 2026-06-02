@@ -20,8 +20,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -32,9 +31,14 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-const RequestSchema = z.object({
+// Two input shapes: a meal PHOTO (base64) OR a TEXT description. Exactly
+// one is required; the handler branches on whichever parses.
+const PhotoRequestSchema = z.object({
   imageBase64: z.string().min(1).max(15_000_000),
   mimeType: z.string().default('image/jpeg'),
+})
+const TextRequestSchema = z.object({
+  text: z.string().trim().min(2).max(500),
 })
 
 // What we accept back from the model (and clamp into sane ranges so a
@@ -50,16 +54,69 @@ const MealSchema = z.object({
   ingredients: z.array(IngredientSchema).max(12),
 })
 
-const SYSTEM_PROMPT = [
-  'Eres un nutricionista que analiza fotos de comida y devuelve SOLO JSON válido.',
-  'Identifica el plato y sus ingredientes principales con porciones estimadas.',
+// Shared JSON contract appended to both prompts.
+const JSON_CONTRACT = [
   'Para cada ingrediente devuelve: name (en español), grams (porción estimada en gramos),',
   'proteinPer100 (gramos de proteína por cada 100 g del alimento) y kcalPer100 (kcal por 100 g).',
-  'Estima porciones de forma realista para un plato de una persona.',
-  'Si la imagen NO es comida, devuelve {"name":"","ingredients":[]}.',
+  'Estima porciones de forma realista para una persona.',
   'Responde con este formato exacto:',
   '{"name": string, "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number}]}',
 ].join(' ')
+
+const PHOTO_SYSTEM_PROMPT = [
+  'Eres un nutricionista que analiza fotos de comida y devuelve SOLO JSON válido.',
+  'Identifica el plato y sus ingredientes principales con porciones estimadas.',
+  'Si la imagen NO es comida, devuelve {"name":"","ingredients":[]}.',
+  JSON_CONTRACT,
+].join(' ')
+
+const TEXT_SYSTEM_PROMPT = [
+  'Eres un nutricionista que analiza descripciones de comida escritas y devuelve SOLO JSON válido.',
+  'A partir de la descripción, identifica el plato y sus ingredientes principales con porciones estimadas.',
+  'Si el texto NO describe comida, devuelve {"name":"","ingredients":[]}.',
+  JSON_CONTRACT,
+].join(' ')
+
+// One gpt-4o-mini completion → validated meal, or null on any failure
+// (network / non-OK / bad JSON / schema). The handler maps null to a warm
+// generic error so raw model/network strings never reach the client.
+async function analyzeMeal(messages: unknown[], openaiKey: string) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 700,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages,
+    }),
+  })
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '')
+    console.error('scan-meal: OpenAI error', res.status, detail.slice(0, 500))
+    return null
+  }
+  const completion = await res.json()
+  const content = completion?.choices?.[0]?.message?.content
+  if (typeof content !== 'string') {
+    console.error('scan-meal: no content in completion')
+    return null
+  }
+  let raw: unknown
+  try {
+    raw = JSON.parse(content)
+  } catch {
+    console.error('scan-meal: model did not return valid JSON')
+    return null
+  }
+  const meal = MealSchema.safeParse(raw)
+  if (!meal.success) {
+    console.error('scan-meal: model JSON failed validation', meal.error.message)
+    return null
+  }
+  return meal.data
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -84,62 +141,42 @@ Deno.serve(async (req: Request) => {
     const { data: userData, error: userErr } = await authClient.auth.getUser(token)
     if (userErr || !userData?.user) return json({ error: 'No autorizado.' }, 401)
 
-    const parsedReq = RequestSchema.safeParse(await req.json().catch(() => undefined))
-    if (!parsedReq.success) return json({ error: 'Imagen inválida.' }, 400)
-    const { imageBase64, mimeType } = parsedReq.data
+    const body = await req.json().catch(() => undefined)
+    const photoReq = PhotoRequestSchema.safeParse(body)
+    const textReq = TextRequestSchema.safeParse(body)
 
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 700,
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Analiza este plato y devuelve el JSON.' },
-              {
-                type: 'image_url',
-                image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'low' },
-              },
-            ],
-          },
-        ],
-      }),
-    })
-
-    if (!openaiRes.ok) {
-      const detail = await openaiRes.text().catch(() => '')
-      console.error('scan-meal: OpenAI error', openaiRes.status, detail.slice(0, 500))
-      return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 502)
+    let messages: unknown[]
+    if (photoReq.success) {
+      const { imageBase64, mimeType } = photoReq.data
+      messages = [
+        { role: 'system', content: PHOTO_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Analiza este plato y devuelve el JSON.' },
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'low' },
+            },
+          ],
+        },
+      ]
+    } else if (textReq.success) {
+      messages = [
+        { role: 'system', content: TEXT_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Analiza esta comida y devuelve el JSON: "${textReq.data.text}"`,
+        },
+      ]
+    } else {
+      return json({ error: 'Entrada inválida.' }, 400)
     }
 
-    const completion = await openaiRes.json()
-    const content = completion?.choices?.[0]?.message?.content
-    if (typeof content !== 'string') {
-      console.error('scan-meal: no content in completion')
-      return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 502)
-    }
+    const meal = await analyzeMeal(messages, openaiKey)
+    if (!meal) return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 502)
 
-    let raw: unknown
-    try {
-      raw = JSON.parse(content)
-    } catch {
-      console.error('scan-meal: model did not return valid JSON')
-      return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 502)
-    }
-
-    const meal = MealSchema.safeParse(raw)
-    if (!meal.success) {
-      console.error('scan-meal: model JSON failed validation', meal.error.message)
-      return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 502)
-    }
-
-    return json(meal.data)
+    return json(meal)
   } catch (e) {
     console.error('scan-meal: unhandled', e instanceof Error ? e.message : String(e))
     return json({ error: 'No pudimos leer tu plato. Intenta de nuevo.' }, 500)

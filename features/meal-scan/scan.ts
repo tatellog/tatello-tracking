@@ -37,13 +37,14 @@ export function mealTotals(ingredients: ScannedIngredient[]): {
 }
 
 /*
- * MOCK MODE — while the AI integration is being finished (paso 3), both
- * the photo scan and the text ("escritura") scan return mock data so the
- * whole entry UX is demoable WITHOUT an OpenAI key. The real edge-function
- * calls are kept below, behind this flag: flip to false + deploy the
- * `scan-meal` function (with its text branch) to go live.
+ * MOCK vs REAL — env-driven so going live is a config flip, not a code
+ * change. Defaults to MOCK (safe): a missing/empty env never points the
+ * app at a non-deployed function. To go live, set
+ *   EXPO_PUBLIC_USE_MOCK_SCAN=false
+ * in .env.local AFTER deploying the `scan-meal` function + its
+ * OPENAI_API_KEY secret, then restart Expo.
  */
-const USE_MOCK_SCAN = true
+const USE_MOCK_SCAN = process.env.EXPO_PUBLIC_USE_MOCK_SCAN !== 'false'
 
 const SCAN_ERROR = 'No pudimos leer tu plato. Intenta de nuevo.'
 const SCAN_DELAY_MS = 1500
@@ -64,7 +65,10 @@ const ScanResponseSchema = z.object({
 })
 
 function withIds(meal: { name: string; ingredients: DishIngredient[] }): ScannedMeal {
-  return { name: meal.name, ingredients: meal.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })) }
+  return {
+    name: meal.name,
+    ingredients: meal.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })),
+  }
 }
 
 function randomDish() {
@@ -91,11 +95,11 @@ async function scanMealFromTextMock(description: string): Promise<ScannedMeal> {
 /* ── REAL calls (activated in paso 3: USE_MOCK_SCAN=false + deploy) ───── */
 
 async function scanMealReal(photoUri: string): Promise<ScannedMeal> {
-  const processed = await ImageManipulator.manipulateAsync(
-    photoUri,
-    [{ resize: { width: 768 } }],
-    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-  )
+  const processed = await ImageManipulator.manipulateAsync(photoUri, [{ resize: { width: 768 } }], {
+    compress: 0.7,
+    format: ImageManipulator.SaveFormat.JPEG,
+    base64: true,
+  })
   if (!processed.base64) throw new Error(SCAN_ERROR)
 
   const { data, error } = await supabase.functions.invoke('scan-meal', {
