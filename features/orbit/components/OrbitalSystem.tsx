@@ -36,7 +36,7 @@ import {
   type ConstellationIntensity,
   type ConstellationProfile,
 } from '../constants/constellationTheme'
-import { EN_LUZ_THRESHOLD, type Dimension, type DimensionKey } from '../logic'
+import { EN_LUZ_THRESHOLD, TONE_BRILLANTE, type Dimension, type DimensionKey } from '../logic'
 
 import { GLYPHS } from './dimensionGlyphs'
 
@@ -53,6 +53,12 @@ const SKY = {
   starGlow: '#FBD7E3',
   // Warm cream halo + focus label colour.
   haloCream: '#FFE9D6',
+  // Chromatic-aberration tails — the violet/cyan ghosts a real lens
+  // throws to either side of a blown-out point. Used ONLY on a
+  // RADIANTE star (b ≥ TONE_BRILLANTE) to sell the supernova /
+  // lens-flare read; never on en-formación or silencio.
+  chromaViolet: '#C18FFF',
+  chromaCyan: '#9FE8FF',
 } as const
 
 // Glyphs are authored in a 24×24 viewport. Bumped 1.5× → 2.6×
@@ -470,6 +476,22 @@ export function OrbitalSystem({
             <Stop offset="62%" stopColor={SKY.starCore} stopOpacity={0.22} />
             <Stop offset="100%" stopColor={SKY.starCore} stopOpacity={0} />
           </RadialGradient>
+          {/* Chromatic-aberration tails — translucent violet + cyan
+              ghosts thrown to either side of a blown-out RADIANTE
+              core. Same feathered ellipse trick as `flare-soft` but
+              tinted + lower peak opacity so they read as the colour
+              fringe a real lens smears past a supernova-bright point,
+              not a second coloured streak. Used ONLY on radiante. */}
+          <RadialGradient id="flare-chroma-violet" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={SKY.chromaViolet} stopOpacity={0.85} />
+            <Stop offset="45%" stopColor={SKY.chromaViolet} stopOpacity={0.3} />
+            <Stop offset="100%" stopColor={SKY.chromaViolet} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="flare-chroma-cyan" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={SKY.chromaCyan} stopOpacity={0.85} />
+            <Stop offset="45%" stopColor={SKY.chromaCyan} stopOpacity={0.3} />
+            <Stop offset="100%" stopColor={SKY.chromaCyan} stopOpacity={0} />
+          </RadialGradient>
           {/* Focus well — bg-coloured radial gradient that fades
               from fully opaque at the centre (masking the PNG's
               painted halo behind the focused star) to transparent
@@ -580,7 +602,7 @@ export function OrbitalSystem({
           {/* The ornamental backdrop — the photographic Day art
               PNG. Static. The orbital motion lives on the stars
               layer below, not on the galaxy itself. */}
-          <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
+          <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`} opacity={0.72}>
             <SvgImage
               href={DAY_ORB_PNG}
               x={0}
@@ -627,12 +649,12 @@ export function OrbitalSystem({
                   key={`rest-label-${d.key}`}
                   x={pos.x + offset.dx}
                   y={pos.y + offset.dy}
-                  fill={SKY.haloCream}
-                  fontSize={9}
+                  fill={d.brightness >= TONE_BRILLANTE ? colors.leche : SKY.haloCream}
+                  fontSize={10}
                   fontFamily="HankenGrotesk_700Bold"
-                  letterSpacing={1}
+                  letterSpacing={1.2}
                   textAnchor="middle"
-                  opacity={0.78}
+                  opacity={0.92}
                 >
                   {d.label.toUpperCase()}
                 </SvgText>
@@ -771,6 +793,10 @@ function BurstParticle({
  *  • Horizontal streak — long, wider — the dominant anamorphic flare.
  *  • Vertical streak   — shorter, narrower — the secondary axis.
  *  • Two diagonal streaks — even narrower, rotated 45°/-45°.
+ *  • Optional dense CORONA — N short spikes at deterministic angles
+ *    (a few jittered to break symmetry) for the supernova read on a
+ *    RADIANTE star. Opt-in via `coronaCount`; 0 = no corona, so
+ *    existing call sites are unchanged.
  *  • A scatter of tiny sparkle dots — the photographic "twinkle"
  *    that real cameras pick up around a bright point.
  *
@@ -789,6 +815,9 @@ function DiffractionSpikes({
   opacity,
   diagOpacity,
   strokeWidth,
+  coronaCount = 0,
+  coronaOpacity,
+  sparkleCount = 4,
 }: {
   x: number
   y: number
@@ -796,6 +825,15 @@ function DiffractionSpikes({
   opacity: number
   diagOpacity?: number
   strokeWidth: number
+  /** Number of short corona spikes radiating around the core. 0 (the
+   *  default) keeps the classic 4 + 2 ray flare unchanged so
+   *  non-radiante call sites behave exactly as before. */
+  coronaCount?: number
+  /** Group opacity for the corona spikes. Defaults to opacity * 0.62. */
+  coronaOpacity?: number
+  /** How many off-axis sparkle twinkles to draw. Defaults to 4 (the
+   *  historical value) so existing call sites are unchanged. */
+  sparkleCount?: number
 }) {
   // Anamorphic asymmetry kept (real camera flares are never a
   // perfect square cross) but tamed: previously hLen 1.18 made the
@@ -816,17 +854,57 @@ function DiffractionSpikes({
   const hRy = Math.max(1.4, length * 0.055 + strokeWidth * 0.4)
   const vRx = Math.max(1.1, length * 0.045 + strokeWidth * 0.3)
   const dRy = Math.max(0.9, length * 0.038 + strokeWidth * 0.25)
+  // Corona — N short feathered spikes radiating around the core at
+  // deterministic angles. A few are jittered (angle + length) so the
+  // ring never reads as a perfectly regular gear. Drawn as one flat
+  // list inside this <G>, so the PARENT's single animated group
+  // (shimmerAnim) animates all of them together — no per-spike
+  // animation. Spike length is length * 0.32 (short, hugging the
+  // core) so they thicken the bloom rather than competing with the
+  // long primary rays.
+  const coronaOp = coronaOpacity ?? opacity * 0.62
+  const coronaLen = length * 0.32
+  const coronaRy = Math.max(0.7, length * 0.02 + strokeWidth * 0.2)
+  const corona =
+    coronaCount > 0
+      ? Array.from({ length: coronaCount }, (_, i) => {
+          const baseAngle = (i * 360) / coronaCount
+          // Deterministic jitter on every 3rd-ish spike: break the
+          // symmetry without randomness (stable across renders).
+          const jitter = i % 3 === 0 ? (((i * 37) % 13) - 6) * 0.9 : 0
+          const lenScale = i % 4 === 0 ? 1.25 : i % 3 === 0 ? 0.78 : 1
+          return { angle: baseAngle + jitter, rx: coronaLen * lenScale }
+        })
+      : []
   // Sparkle dots — hand-picked offsets so they fall OFF the cardinal
   // axes (not on the cross itself). Tiny radii, descending opacity,
   // they add the "twinkle" that breaks the symmetric starburst.
-  const sparkles = [
+  const sparkleSeeds = [
     { dx: length * 0.42, dy: -length * 0.22, r: length * 0.025, op: opacity * 0.55 },
     { dx: -length * 0.28, dy: length * 0.38, r: length * 0.022, op: opacity * 0.5 },
     { dx: length * 0.16, dy: length * 0.52, r: length * 0.018, op: opacity * 0.45 },
     { dx: -length * 0.45, dy: -length * 0.12, r: length * 0.02, op: opacity * 0.45 },
+    { dx: length * 0.55, dy: length * 0.3, r: length * 0.016, op: opacity * 0.4 },
   ]
+  const sparkles = sparkleSeeds.slice(0, Math.max(0, sparkleCount))
   return (
     <G>
+      {/* Corona spikes — drawn FIRST so they sit behind the primary
+          rays + the sparkles. Each is a feathered ellipse rotated to
+          its angle; the whole set rides the parent's single animated
+          group, never animated individually. */}
+      {corona.map((c, i) => (
+        <G key={`corona-${i}`} transform={`rotate(${c.angle} ${x} ${y})`}>
+          <Ellipse
+            cx={x + c.rx}
+            cy={y}
+            rx={c.rx}
+            ry={coronaRy}
+            fill="url(#flare-soft)"
+            opacity={coronaOp}
+          />
+        </G>
+      ))}
       {/* Horizontal streak — wide ellipse, radial-gradient fill
           gives a feathered tapered shape no line can match. */}
       <Ellipse cx={x} cy={y} rx={hLen} ry={hRy} fill="url(#flare-soft)" opacity={opacity * 0.92} />
@@ -916,6 +994,14 @@ function StarNode({
   const { x, y } = pos
   const b = dim.brightness
   const enLuz = b >= EN_LUZ_THRESHOLD
+  // The drama is SEMANTIC: only a RADIANTE dimension (b ≥ 0.7)
+  // detonates into a full supernova / lens-flare — long rays, a
+  // dense corona, an over-exposed core and chromatic tails. An
+  // "en formación" star (EN_LUZ ≤ b < BRILLANTE) gets a modest
+  // bloom; a "silencio" star (b < EN_LUZ) stays a subtle point.
+  // Everything below is gated off `radiante` so brightness alone
+  // reads at a glance — colour + explosion = alight.
+  const radiante = b >= TONE_BRILLANTE
   // The day-orb.png backdrop already paints each dimension as a
   // bright magenta halo with a thin Saturn ring. The programmatic
   // StarNode now only adds: (1) a tiny white-hot core + (2) the
@@ -924,9 +1010,24 @@ function StarNode({
   // stays the visual subject and the programmatic layer just
   // contributes life.
   const R = enLuz ? 2.5 + b * 1.5 : 2
-  const outerR = enLuz ? R * 1.8 : R * 1.4
-  const midR = enLuz ? R * 1.4 : R * 1.2
-  const auraR = enLuz ? R * 1.1 : R * 1.05
+  // Background bloom radii — escalated by register. A radiante star
+  // throws a far wider, denser bloom (the supernova read); en
+  // formación stays modest; silencio recedes. These feed both the
+  // static three-layer bloom and the respirating slowGlow's base.
+  const outerR = radiante ? R * 3.2 : enLuz ? R * 1.8 : R * 1.4
+  const midR = radiante ? R * 2.4 : enLuz ? R * 1.4 : R * 1.2
+  const auraR = radiante ? R * 1.6 : enLuz ? R * 1.1 : R * 1.05
+
+  // Per-register lens-flare parameters. The geometry IS the drama —
+  // these stay constant so the supernova reads identically with
+  // animation OFF (reduced motion). The shimmer group only wobbles
+  // scale a little on top.
+  const spikeLength = radiante ? R * 20 : R * 6
+  const spikeOpacity = radiante ? 1 : 0.45
+  const spikeDiagOpacity = radiante ? 0.78 : 0
+  const spikeStroke = radiante ? R * 0.42 : R * 0.22
+  const coronaCount = radiante ? 24 : enLuz ? 6 : 0
+  const coronaOpacity = radiante ? spikeOpacity * 0.62 : 0.3
 
   // Each star breathes on its own phase so the constellation feels
   // alive but not synchronised. The 8 s `t` clock drives scale +
@@ -970,6 +1071,8 @@ function StarNode({
   // ranges so 'low' barely moves and 'high' really breathes. A
   // SEPARATE animated layer from `breath` so the bright core itself
   // never blinks — only the surrounding halo expands and contracts.
+  // `outerR` already carries the per-register radius (radiante = wide
+  // supernova bloom), so this respirating layer inherits the drama.
   const slowGlow = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI)
@@ -1083,7 +1186,10 @@ function StarNode({
   // Different phase per star (re-uses dim.angleDeg's phase) and a
   // 1.3× frequency on top of slowClock so the shimmer is faster
   // than the breath/glow cycles, evoking the high-frequency
-  // twinkle of real camera-lens diffraction.
+  // twinkle of real camera-lens diffraction. The dense corona +
+  // the chromatic tails live INSIDE this single group, so the
+  // whole supernova rides ONE animated transform — never 24
+  // spikes animated separately.
   const shimmerAnim = useAnimatedProps(() => {
     'worklet'
     const wave = 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI * 1.3)
@@ -1125,54 +1231,107 @@ function StarNode({
             BEHIND every other layer so it reads as ambient breathing
             light, not a competing bloom. Its `r` and opacity vary on
             slowClock; the breath group above only contributes scale
-            + the soft opacity dip. */}
+            + the soft opacity dip. A radiante star inherits the wide
+            supernova `outerR` AND tints to the dimension colour. */}
         {enLuz ? (
           <AnimatedCircle
             cx={x}
             cy={y}
-            fill={CONSTELLATION_COLORS.starHalo}
+            fill={radiante ? colors.dimension[dim.key] : CONSTELLATION_COLORS.starHalo}
             animatedProps={slowGlow}
           />
         ) : null}
-        {/* Three-layer bloom: wide outer magenta → mid pink → tight
-            warm aura. Opacities bumped from the previous version so
-            the dramatic Genshin-style "luminous body" reads at the
-            same scale as the bigger R. */}
+        {/* Three-layer bloom: wide outer → mid → tight warm aura.
+            The outer bloom carries the dimension's OWN colour ONLY when
+            it's "brillante" (b ≥ TONE_BRILLANTE) — so a glance reads
+            which dimensions are en luz today. "En formación" and
+            "silencio" stay neutral cream, so colour means "alight".
+            Radiante also drives a magenta fall to a fuller peak
+            (caída magenta) — the over-exposed supernova base. */}
         <Circle
           cx={x}
           cy={y}
           r={outerR}
-          fill={colors.magenta}
-          opacity={enLuz ? 0.14 + b * 0.12 : 0.05}
+          fill={radiante ? colors.dimension[dim.key] : SKY.starGlow}
+          opacity={radiante ? 0.3 : enLuz ? 0.14 + b * 0.12 : 0.05}
         />
+        {radiante ? (
+          <Circle cx={x} cy={y} r={midR * 1.2} fill={colors.magenta} opacity={0.22} />
+        ) : null}
         <Circle
           cx={x}
           cy={y}
           r={midR}
           fill={SKY.starGlow}
-          opacity={enLuz ? 0.2 + b * 0.14 : 0.06}
+          opacity={radiante ? 0.4 : enLuz ? 0.2 + b * 0.14 : 0.06}
         />
         <Circle
           cx={x}
           cy={y}
           r={auraR}
           fill={SKY.starGlow}
-          opacity={enLuz ? 0.38 + b * 0.22 : 0.1}
+          opacity={radiante ? 0.6 : enLuz ? 0.38 + b * 0.22 : 0.1}
         />
-        {/* Diffraction-spike starburst — ON for EVERY en luz star.
-            Length cut R*11 → R*6 + opacity 0.55+b*0.35 → 0.4+b*0.2
-            so the cross reads as a soft luminous pin-prick over the
-            painted halos, not a giant compass-rose that overpowers
-            the photographic galaxy. */}
+        {/* Lens-flare starburst — ON for EVERY en luz star, but the
+            DRAMA is gated on register. A radiante star gets long rays
+            (R*20), bright diagonals, a dense 24-spike corona and the
+            chromatic tails (all riding ONE shimmer group). En
+            formación gets a modest R*6 cross + a sparse 6-spike
+            corona, no diagonals, no chroma. Everything is geometry +
+            opacity so it reads identically with motion OFF. */}
         {enLuz ? (
           <AnimatedG animatedProps={shimmerAnim}>
+            {/* Chromatic-aberration tails — violet + cyan ghosts the
+                lens throws past a blown-out core, offset ~0.4·R from
+                the H and V axes. RADIANTE ONLY. Inside the shimmer
+                group so they twinkle + fade with focusDim like the
+                spikes. */}
+            {radiante ? (
+              <>
+                <Ellipse
+                  cx={x - R * 0.4}
+                  cy={y}
+                  rx={R * 21}
+                  ry={Math.max(1.2, R * 0.3)}
+                  fill="url(#flare-chroma-violet)"
+                  opacity={0.7}
+                />
+                <Ellipse
+                  cx={x + R * 0.4}
+                  cy={y}
+                  rx={R * 21}
+                  ry={Math.max(1.2, R * 0.3)}
+                  fill="url(#flare-chroma-cyan)"
+                  opacity={0.6}
+                />
+                <Ellipse
+                  cx={x}
+                  cy={y - R * 0.4}
+                  rx={Math.max(1, R * 0.26)}
+                  ry={R * 21}
+                  fill="url(#flare-chroma-violet)"
+                  opacity={0.7}
+                />
+                <Ellipse
+                  cx={x}
+                  cy={y + R * 0.4}
+                  rx={Math.max(1, R * 0.26)}
+                  ry={R * 21}
+                  fill="url(#flare-chroma-cyan)"
+                  opacity={0.6}
+                />
+              </>
+            ) : null}
             <DiffractionSpikes
               x={x}
               y={y}
-              length={R * 6}
-              opacity={0.4 + b * 0.2}
-              diagOpacity={0.16 + b * 0.08}
-              strokeWidth={0.55}
+              length={spikeLength}
+              opacity={spikeOpacity}
+              diagOpacity={spikeDiagOpacity}
+              strokeWidth={spikeStroke}
+              coronaCount={coronaCount}
+              coronaOpacity={coronaOpacity}
+              sparkleCount={radiante ? 5 : 2}
             />
           </AnimatedG>
         ) : null}
@@ -1208,22 +1367,44 @@ function StarNode({
             white-hot core. The outermost halo is a wider soft
             white wash to mimic the overexposed Genshin core glow;
             below that, two opaque white discs at R*0.7 and R*0.4
-            give the centre its blown-out brightness peak.
+            give the centre its blown-out brightness peak. A
+            radiante star over-exposes: a wider core-gradient disc,
+            a new innerGlow wash and a heavier white-disc stack.
 
-            The three WHITE discs are wrapped in an AnimatedG that
-            fades them during zoom on the SELECTED star — so the
-            dimension glyph rendered below has a magenta-bloom
-            canvas to land on instead of being washed out by the
-            opaque white core. */}
+            The white discs + new innerGlow are wrapped in an
+            AnimatedG that fades them during zoom on the SELECTED
+            star — so the dimension glyph rendered below has a
+            magenta-bloom canvas to land on instead of being washed
+            out by the opaque white core. */}
         <AnimatedG animatedProps={coreFade}>
-          <Circle cx={x} cy={y} r={R} fill="url(#orb-star)" />
-          {enLuz ? (
+          {/* Inner glow — a soft over-exposed wash painted under the
+              white discs. RADIANTE = wide + near-opaque (the blown
+              core); en formación = small + softer; silencio = none. */}
+          {radiante ? (
+            <Circle cx={x} cy={y} r={R * 6.4} fill="url(#flare-soft)" opacity={0.9} />
+          ) : b >= EN_LUZ_THRESHOLD ? (
+            <Circle cx={x} cy={y} r={R * 3} fill="url(#flare-soft)" opacity={0.5} />
+          ) : null}
+          <Circle
+            cx={x}
+            cy={y}
+            r={radiante ? R * 4.6 : enLuz ? R * 2.2 : R}
+            fill="url(#orb-star)"
+          />
+          {radiante ? (
+            <>
+              <Circle cx={x} cy={y} r={R * 2.2} fill={SKY.starCore} opacity={0.55} />
+              <Circle cx={x} cy={y} r={R * 1.3} fill={SKY.starCore} opacity={0.95} />
+              <Circle cx={x} cy={y} r={R * 0.7} fill={SKY.starCore} opacity={1} />
+            </>
+          ) : enLuz ? (
             <>
               <Circle cx={x} cy={y} r={R * 1.1} fill={SKY.starCore} opacity={0.32} />
-              <Circle cx={x} cy={y} r={R * 0.7} fill={SKY.starCore} opacity={1} />
-              <Circle cx={x} cy={y} r={R * 0.4} fill={SKY.starCore} />
+              <Circle cx={x} cy={y} r={R * 0.5} fill={SKY.starCore} opacity={1} />
             </>
-          ) : null}
+          ) : (
+            <Circle cx={x} cy={y} r={R * 0.4} fill={SKY.starCore} opacity={1} />
+          )}
         </AnimatedG>
       </AnimatedG>
       {/* Focus halo — TWO independent layers, both edge-feathered:
