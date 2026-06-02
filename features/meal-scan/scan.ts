@@ -22,17 +22,24 @@ export function ingredientKcal(ing: { grams: number; kcalPer100: number }): numb
   return (ing.kcalPer100 * ing.grams) / 100
 }
 
-/** Summed protein + calories across the meal's ingredients. */
+/** Sugar (g) for an ingredient at its current grams. Missing → 0. */
+export function ingredientSugar(ing: { grams: number; sugarPer100?: number }): number {
+  return ((ing.sugarPer100 ?? 0) * ing.grams) / 100
+}
+
+/** Summed protein + calories + sugar across the meal's ingredients. */
 export function mealTotals(ingredients: ScannedIngredient[]): {
   protein: number
   calories: number
+  sugar: number
 } {
   return ingredients.reduce(
     (acc, ing) => ({
       protein: acc.protein + ingredientProtein(ing),
       calories: acc.calories + ingredientKcal(ing),
+      sugar: acc.sugar + ingredientSugar(ing),
     }),
-    { protein: 0, calories: 0 },
+    { protein: 0, calories: 0, sugar: 0 },
   )
 }
 
@@ -60,6 +67,8 @@ const ScanResponseSchema = z.object({
       grams: z.number(),
       proteinPer100: z.number(),
       kcalPer100: z.number(),
+      // Optional so a response (or mock) without sugar still parses.
+      sugarPer100: z.number().optional(),
     }),
   ),
 })

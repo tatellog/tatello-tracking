@@ -9,6 +9,8 @@ export type DishIngredient = {
   grams: number
   proteinPer100: number
   kcalPer100: number
+  /** g of sugar per 100 g. Optional — older mocks omit it (treated as 0). */
+  sugarPer100?: number
 }
 
 export type Dish = {

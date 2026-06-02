@@ -48,6 +48,7 @@ import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hoo
 import {
   ingredientKcal,
   ingredientProtein,
+  ingredientSugar,
   mealTotals,
   scanMeal,
   scanMealFromText,
@@ -804,11 +805,12 @@ export default function ScanMealScreen() {
     }
 
     const storedIngredients: StoredIngredient[] = ingredients.map(
-      ({ name: ingName, grams, proteinPer100, kcalPer100 }) => ({
+      ({ name: ingName, grams, proteinPer100, kcalPer100, sugarPer100 }) => ({
         name: ingName,
         grams,
         proteinPer100,
         kcalPer100,
+        sugarPer100,
       }),
     )
     const macros = {
@@ -1142,6 +1144,9 @@ export default function ScanMealScreen() {
                         <Text style={styles.ingMacros}>
                           {Math.round(ingredientProtein(ing))} g proteína ·{' '}
                           {Math.round(ingredientKcal(ing))} kcal
+                          {ingredientSugar(ing) >= 1
+                            ? ` · ${Math.round(ingredientSugar(ing))} g azúcar`
+                            : ''}
                         </Text>
                       </View>
                       <View style={styles.gramsBox}>
@@ -1194,6 +1199,12 @@ export default function ScanMealScreen() {
                     <Text style={styles.totalNum}>{Math.round(totals.protein)}</Text> g proteína
                     {'   ·   '}
                     <Text style={styles.totalNum}>{Math.round(totals.calories)}</Text> kcal
+                    {totals.sugar >= 1 ? (
+                      <>
+                        {'   ·   '}
+                        <Text style={styles.totalNum}>{Math.round(totals.sugar)}</Text> g azúcar
+                      </>
+                    ) : null}
                   </Text>
                 </View>
               )}

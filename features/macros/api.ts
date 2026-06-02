@@ -57,6 +57,8 @@ export type StoredIngredient = {
   grams: number
   proteinPer100: number
   kcalPer100: number
+  /** g of sugar per 100 g. Optional — meals logged before sugar omit it. */
+  sugarPer100?: number
 }
 
 /** createMeal carries the optional photo + ingredients from the scan. */
@@ -76,11 +78,12 @@ export type UpdateMealInput = MealInput & {
 function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
   if (!ingredients || ingredients.length === 0) return null
   return {
-    ingredients: ingredients.map(({ name, grams, proteinPer100, kcalPer100 }) => ({
+    ingredients: ingredients.map(({ name, grams, proteinPer100, kcalPer100, sugarPer100 }) => ({
       name,
       grams,
       proteinPer100,
       kcalPer100,
+      ...(typeof sugarPer100 === 'number' ? { sugarPer100 } : {}),
     })),
   }
 }
@@ -105,6 +108,7 @@ function parseIngredients(raw: Json | null): StoredIngredient[] | null {
           grams: o.grams,
           proteinPer100: o.proteinPer100,
           kcalPer100: o.kcalPer100,
+          ...(typeof o.sugarPer100 === 'number' ? { sugarPer100: o.sugarPer100 } : {}),
         })
       }
     }

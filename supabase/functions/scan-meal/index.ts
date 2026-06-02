@@ -48,6 +48,8 @@ const IngredientSchema = z.object({
   grams: z.coerce.number().min(0).max(2000),
   proteinPer100: z.coerce.number().min(0).max(100),
   kcalPer100: z.coerce.number().min(0).max(900),
+  // Default 0 so a meal the model reports without sugar still validates.
+  sugarPer100: z.coerce.number().min(0).max(100).default(0),
 })
 const MealSchema = z.object({
   name: z.string().trim().max(80),
@@ -56,24 +58,29 @@ const MealSchema = z.object({
 
 // Shared JSON contract appended to both prompts.
 const JSON_CONTRACT = [
-  'Para cada ingrediente devuelve: name (en español), grams (porción estimada en gramos),',
-  'proteinPer100 (gramos de proteína por cada 100 g del alimento) y kcalPer100 (kcal por 100 g).',
+  'Para cada ingrediente devuelve: name (en español), grams (porción estimada en gramos;',
+  'para líquidos usa los mililitros como gramos, p. ej. 1 L = 1000), proteinPer100',
+  '(g de proteína por 100 g), kcalPer100 (kcal por 100 g) y sugarPer100 (g de azúcar por 100 g).',
   'Estima porciones de forma realista para una persona.',
+  'Para productos embotellados o de marca conocida (refrescos como Coca-Cola o Fanta, jugos, etc.)',
+  'usa sus valores nutricionales típicos.',
   'Responde con este formato exacto:',
-  '{"name": string, "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number}]}',
+  '{"name": string, "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number, "sugarPer100": number}]}',
 ].join(' ')
 
 const PHOTO_SYSTEM_PROMPT = [
-  'Eres un nutricionista que analiza fotos de comida y devuelve SOLO JSON válido.',
-  'Identifica el plato y sus ingredientes principales con porciones estimadas.',
-  'Si la imagen NO es comida, devuelve {"name":"","ingredients":[]}.',
+  'Eres un nutricionista que analiza fotos de comida Y BEBIDAS y devuelve SOLO JSON válido.',
+  'Identifica el plato o la bebida (incluye refrescos, jugos y bebidas embotelladas) y sus',
+  'ingredientes principales con porciones estimadas.',
+  'Si la imagen NO es comida ni bebida, devuelve {"name":"","ingredients":[]}.',
   JSON_CONTRACT,
 ].join(' ')
 
 const TEXT_SYSTEM_PROMPT = [
-  'Eres un nutricionista que analiza descripciones de comida escritas y devuelve SOLO JSON válido.',
-  'A partir de la descripción, identifica el plato y sus ingredientes principales con porciones estimadas.',
-  'Si el texto NO describe comida, devuelve {"name":"","ingredients":[]}.',
+  'Eres un nutricionista que analiza descripciones de comida o bebida escritas y devuelve SOLO JSON válido.',
+  'A partir de la descripción, identifica el plato o la bebida (incluye refrescos, jugos y bebidas',
+  'embotelladas) y sus ingredientes con porciones estimadas.',
+  'Si el texto NO describe comida ni bebida, devuelve {"name":"","ingredients":[]}.',
   JSON_CONTRACT,
 ].join(' ')
 
