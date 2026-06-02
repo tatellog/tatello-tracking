@@ -1,54 +1,35 @@
+import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import { View } from 'react-native'
 
-import FoodIcon from '@/assets/icons/food-vect.svg'
-import OrbitIcon from '@/assets/icons/orbit-vect.svg'
-import ProgressIcon from '@/assets/icons/progress-vect.svg'
-import TodayIcon from '@/assets/icons/today-vect.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
 import { AppTabBar } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
-type IconProps = {
-  color: string
-  size?: number
-  focused?: boolean
-}
-
-/* Tab glyphs. Tintable line vectors from assets/icons (every fill
- * is `currentColor` so the parent decides the paint — see the
- * docstring on dimensionGlyphs.tsx for the rule).
+/* Tab glyphs. Library icons from `@expo/vector-icons`:
+ *   • Feather (today, progress)
+ *   • Ionicons (orbit)
+ *   • MaterialIcons (meals)
  *
- * Hierarchy treatment:
+ * Each set has its own helper so the `name` prop stays strongly typed
+ * to that set's glyph map. Shared focused-state treatment across all:
  *   • inactive  → opacity 0.45 + no scale     (recedes)
  *   • active    → opacity 1.0  + scale 1.08   (pops)
  *
- * `bold` prop renders the icon 5 times at sub-pixel offsets
- * (centre + 4 cardinals) for faux-thicker linework. Used for
- * thin-line icons (today, progress) where the raw SVG strokes
- * read too thin against the dark pill bg. */
-function TabIcon({
-  Component,
-  size = 32,
+ * Earlier iterations used custom SVGs from assets/icons (sol2 for Hoy,
+ * progress-1 for Progreso, food-vect / orbit-vect for the rest). They
+ * read too thin / pixel-noisy at tab scale; the library glyphs carry
+ * weight out of the box. The legacy SVGs are no longer referenced from
+ * this file — safe to delete if not used elsewhere. */
+function FeatherTabIcon({
+  name,
+  size = 26,
   focused = false,
-  bold = false,
-}: IconProps & {
-  Component: React.ComponentType<{
-    width: number
-    height: number
-    color?: string
-    preserveAspectRatio?: string
-  }>
-  bold?: boolean
+}: {
+  name: React.ComponentProps<typeof Feather>['name']
+  size?: number
+  focused?: boolean
 }) {
-  const icon = (
-    <Component
-      width={size}
-      height={size}
-      color={colors.leche}
-      preserveAspectRatio="xMidYMid meet"
-    />
-  )
   return (
     <View
       style={{
@@ -56,17 +37,57 @@ function TabIcon({
         transform: [{ scale: focused ? 1.08 : 1 }],
       }}
     >
-      {bold ? (
-        <View style={{ width: size, height: size }}>
-          <View style={{ position: 'absolute', left: -0.7, top: 0 }}>{icon}</View>
-          <View style={{ position: 'absolute', left: 0.7, top: 0 }}>{icon}</View>
-          <View style={{ position: 'absolute', left: 0, top: -0.7 }}>{icon}</View>
-          <View style={{ position: 'absolute', left: 0, top: 0.7 }}>{icon}</View>
-          {icon}
-        </View>
-      ) : (
-        icon
-      )}
+      <Feather name={name} size={size} color={colors.leche} />
+    </View>
+  )
+}
+
+/* Same shell, Ionicons set — used for Órbita (`planet-outline`).
+ * The outline variants match Feather's stroke weight closely enough
+ * that the two read as the same icon family inside the pill. */
+function IoniconsTabIcon({
+  name,
+  size = 26,
+  focused = false,
+}: {
+  name: React.ComponentProps<typeof Ionicons>['name']
+  size?: number
+  focused?: boolean
+}) {
+  return (
+    <View
+      style={{
+        opacity: focused ? 1 : 0.45,
+        transform: [{ scale: focused ? 1.08 : 1 }],
+      }}
+    >
+      <Ionicons name={name} size={size} color={colors.leche} />
+    </View>
+  )
+}
+
+/* Same shell, MaterialIcons set — used for Comidas (`dinner-dining`).
+ * MaterialIcons carries Google's Material balance; the `dinner-dining`
+ * glyph is a bowl with three steam lines — clean and unambiguous as
+ * "meals". Feather has no food icon and Ionicons' food glyphs are
+ * plates/burgers/etc., not bowls. */
+function MaterialIconsTabIcon({
+  name,
+  size = 26,
+  focused = false,
+}: {
+  name: React.ComponentProps<typeof MaterialIcons>['name']
+  size?: number
+  focused?: boolean
+}) {
+  return (
+    <View
+      style={{
+        opacity: focused ? 1 : 0.45,
+        transform: [{ scale: focused ? 1.08 : 1 }],
+      }}
+    >
+      <MaterialIcons name={name} size={size} color={colors.leche} />
     </View>
   )
 }
@@ -90,17 +111,15 @@ export default function TabsLayout() {
           name="index"
           options={{
             title: 'Hoy',
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabIcon Component={TodayIcon} color={color} size={size} focused={focused} bold />
-            ),
+            tabBarIcon: ({ focused }) => <FeatherTabIcon name="sun" focused={focused} />,
           }}
         />
         <Tabs.Screen
           name="meals"
           options={{
             title: 'Comidas',
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabIcon Component={FoodIcon} color={color} size={size} focused={focused} />
+            tabBarIcon: ({ focused }) => (
+              <MaterialIconsTabIcon name="dinner-dining" focused={focused} />
             ),
           }}
         />
@@ -108,17 +127,15 @@ export default function TabsLayout() {
           name="progress"
           options={{
             title: 'Progreso',
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabIcon Component={ProgressIcon} color={color} size={size} focused={focused} bold />
-            ),
+            tabBarIcon: ({ focused }) => <FeatherTabIcon name="activity" focused={focused} />,
           }}
         />
         <Tabs.Screen
           name="orbit"
           options={{
             title: 'Órbita',
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabIcon Component={OrbitIcon} color={color} size={size} focused={focused} />
+            tabBarIcon: ({ focused }) => (
+              <IoniconsTabIcon name="planet-outline" focused={focused} />
             ),
           }}
         />
