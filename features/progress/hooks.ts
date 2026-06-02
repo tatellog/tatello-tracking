@@ -29,10 +29,11 @@ const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
  * mockeado para que la gráfica tenga datos visibles. En producción
  * ese branch es tree-shakeado.
  */
-export function useMeasurements(rangeDays: number | null) {
+export function useMeasurements(rangeDays: number | null, enabled = true) {
   return useQuery({
     queryKey: queryKeys.progress.measurements(rangeDays),
     queryFn: () => (SKIP_AUTH ? buildMockMeasurements(rangeDays) : getMeasurements(rangeDays)),
+    enabled,
   })
 }
 

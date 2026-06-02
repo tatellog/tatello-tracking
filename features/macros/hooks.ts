@@ -102,9 +102,7 @@ export function useWeeklyMealStats(): {
   const proteinTarget = targetsQuery.data?.protein_g ?? null
   const stats = useMemo(
     () =>
-      mealsQuery.data
-        ? computeWeeklyMealStats(mealsQuery.data, weekDates, proteinTarget)
-        : null,
+      mealsQuery.data ? computeWeeklyMealStats(mealsQuery.data, weekDates, proteinTarget) : null,
     [mealsQuery.data, weekDates, proteinTarget],
   )
 
@@ -124,10 +122,11 @@ export function useMealById(id: string | undefined) {
  * The limit is part of the key: the quick log wants the top few, the
  * meal search wants the whole vocabulary — distinct cache entries.
  * Invalidations use the base key, which prefix-matches both. */
-export function useFrequentMeals(limit = 8) {
+export function useFrequentMeals(limit = 8, enabled = true) {
   return useQuery({
     queryKey: [...queryKeys.macros.frequentMeals(), limit],
     queryFn: () => getFrequentMeals(limit),
+    enabled,
   })
 }
 

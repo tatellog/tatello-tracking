@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   Alert,
@@ -55,6 +55,7 @@ import {
 } from '@/features/meal-scan/scan'
 import { SkyBackground } from '@/features/tabs/components'
 import { showActionSheet } from '@/lib/actionSheet'
+import { resizeForDisplay } from '@/lib/image'
 import { colors, typography } from '@/theme'
 
 // A small sparkle — the "destello" that marks the AI-powered badge.
@@ -672,7 +673,7 @@ export default function ScanMealScreen() {
     }
   }, [photoUri])
 
-  const totals = mealTotals(ingredients)
+  const totals = useMemo(() => mealTotals(ingredients), [ingredients])
 
   // Photo box — full width, but a tall photo is capped and centred.
   let photoW = PHOTO_W
@@ -718,7 +719,8 @@ export default function ScanMealScreen() {
         ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
     if (result.canceled || !result.assets[0]) return
-    setPhotoUri(result.assets[0].uri)
+    const asset = result.assets[0]
+    setPhotoUri(await resizeForDisplay(asset.uri, asset.width))
     if (isEdit) setPhotoChanged(true)
     // In describe mode the photo is just an attachment to the customizable
     // form — never trigger the photo-scan theatre (its effect is gated out

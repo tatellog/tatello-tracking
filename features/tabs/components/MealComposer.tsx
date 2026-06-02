@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -17,6 +17,7 @@ import { PrimaryCta } from '@/components/PrimaryCta'
 import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { showActionSheet } from '@/lib/actionSheet'
+import { resizeForDisplay } from '@/lib/image'
 import { colors, typography } from '@/theme'
 
 import { MealCard } from './MealCard'
@@ -70,8 +71,20 @@ function CameraIcon({ color, size = 18 }: { color: string; size?: number }) {
 /* A star on the estela trail. Size + brightness scale with how often
  * the meal is logged — staples become bright anchor-stars, rare foods
  * stay small and faint. The head (most-logged / most-recent meal)
- * glows and breathes, like the head of a comet. */
-function TrailStar({ size, glow, isHead }: { size: number; glow: number; isHead: boolean }) {
+ * glows and breathes, like the head of a comet.
+ *
+ * Memoized: its props are primitives, so it skips re-render when the
+ * list re-renders for an unrelated reason (e.g. a +-tap toggling one
+ * row's confirmed state). */
+const TrailStar = memo(function TrailStar({
+  size,
+  glow,
+  isHead,
+}: {
+  size: number
+  glow: number
+  isHead: boolean
+}) {
   const breath = useSharedValue(0)
   useEffect(() => {
     if (!isHead) return
@@ -98,7 +111,7 @@ function TrailStar({ size, glow, isHead }: { size: number; glow: number; isHead:
       </Animated.View>
     </View>
   )
-}
+})
 
 /* The new-meal preview star — it kindles as the form fills (name is
  * already typed, so progress tracks the two macro fields) and, once
@@ -201,12 +214,21 @@ export function MealComposer({ onOpenMeal }: Props) {
   // signal is the two macro fields.
   const previewProgress = ((protein.trim() ? 1 : 0) + (calories.trim() ? 1 : 0)) / 2
 
+  // When the "nueva comida" editor closes (name cleared, or it became an
+  // exact match), drop any staged photo so it can't resurface on a
+  // different meal name later.
+  useEffect(() => {
+    if (!composing || exactMatch) setPhotoUri(null)
+  }, [composing, exactMatch])
+
   // Trail magnitudes — each star's size maps the meal's log frequency
   // onto [MIN_STAR, MAX_STAR] relative to the rest of the estela.
   const n = history.length
-  const freqs = history.map((h) => h.freq)
-  const minFreq = freqs.length ? Math.min(...freqs) : 0
-  const freqSpan = (freqs.length ? Math.max(...freqs) : 0) - minFreq
+  const { minFreq, freqSpan } = useMemo(() => {
+    const freqs = history.map((h) => h.freq)
+    const min = freqs.length ? Math.min(...freqs) : 0
+    return { minFreq: min, freqSpan: (freqs.length ? Math.max(...freqs) : 0) - min }
+  }, [history])
   const starCount = (foods ?? []).length
 
   const clear = () => {
@@ -249,7 +271,8 @@ export function MealComposer({ onOpenMeal }: Props) {
         ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
     if (result.canceled || !result.assets[0]) return
-    setPhotoUri(result.assets[0].uri)
+    const asset = result.assets[0]
+    setPhotoUri(await resizeForDisplay(asset.uri, asset.width))
   }
 
   const photoOptions = () => {

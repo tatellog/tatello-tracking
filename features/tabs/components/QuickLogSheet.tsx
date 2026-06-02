@@ -185,11 +185,15 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const router = useRouter()
   const today = useMemo(() => todayInTimezone(), [])
 
-  const { data: frequent } = useFrequentMeals()
+  // The sheet lives permanently in the tab bar, so gate its reads on
+  // `visible` — no fetching/subscribing while it's closed. Cached data
+  // (e.g. measurements, shared with Progreso) still shows instantly on
+  // open; the rest fetches then.
+  const { data: frequent } = useFrequentMeals(8, visible)
   const createMeal = useCreateMeal()
-  const { data: measurements } = useMeasurements(90)
+  const { data: measurements } = useMeasurements(90, visible)
   const addMeasurement = useAddMeasurement()
-  const { data: glasses = 0 } = useWaterToday(today)
+  const { data: glasses = 0 } = useWaterToday(today, visible)
   const setWater = useSetWater(today)
 
   const [mode, setMode] = useState<Mode>('home')
@@ -292,7 +296,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // top and carry the magenta-tinted fill. Dimmed while a 1-tap re-log
   // confirms so the disabled state reads visually.
   const disabled = confirmingName != null
-  const renderMethods = () => (
+  const methodsBlock = (
     <View style={styles.methods}>
       <Pressable
         onPress={handlePhotoLog}
@@ -422,7 +426,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                * section, up top: photo scan + describe are the headline
                * way to log, before the 1-tap "lo de siempre" below. ── */}
               <Text style={styles.newMealLabel}>Una comida nueva</Text>
-              {renderMethods()}
+              {methodsBlock}
 
               {items.length === 0 ? (
                 <Text style={styles.empty}>

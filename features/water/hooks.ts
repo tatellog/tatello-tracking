@@ -4,10 +4,11 @@ import { queryKeys } from '@/lib/queryKeys'
 
 import { getWaterGlasses, setWaterGlasses } from './api'
 
-export function useWaterToday(date: string) {
+export function useWaterToday(date: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.water.day(date),
     queryFn: () => getWaterGlasses(date),
+    enabled,
   })
 }
 
