@@ -176,11 +176,10 @@ type Props = {
  * daily: peso, agua, comida.
  *   - Peso  → opens a two-wheel weight picker (mode 'weight').
  *   - Agua  → tap a glass, logged instantly (water_intake).
- *   - Comida → the lowest-effort path leads: the slot pill + "Lo de
- *     siempre" 1-tap re-log sits up top. Below it, "una comida nueva"
- *     offers two AI methods — Con foto (shoot/pick → scan-meal) and
- *     Descríbela (type it → scan-meal describe mode). Manual entry of
- *     macros lives in the Comidas tab (MealComposer), not here.
+ *   - Comida → the AI scan methods lead, up top: Con foto (shoot/pick →
+ *     scan-meal) and Descríbela (type it → scan-meal describe mode).
+ *     Below them, the slot pill + "Lo de siempre" 1-tap re-log. Manual
+ *     entry of macros lives in the Comidas tab (MealComposer), not here.
  */
 export function QuickLogSheet({ visible, onClose }: Props) {
   const router = useRouter()
@@ -289,11 +288,11 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     router.push({ pathname: '/scan-meal', params: { describe: '1' } })
   }
 
-  // The two AI methods for a meal that ISN'T in your estela yet. Shared
-  // between the empty state and the populated one. Dimmed while a 1-tap
-  // re-log is confirming, so the disabled state reads visually too.
+  // The two AI methods — the headline way to log a meal, so they sit up
+  // top and carry the magenta-tinted fill. Dimmed while a 1-tap re-log
+  // confirms so the disabled state reads visually.
   const disabled = confirmingName != null
-  const methodsBlock = (
+  const renderMethods = () => (
     <View style={styles.methods}>
       <Pressable
         onPress={handlePhotoLog}
@@ -419,21 +418,19 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                 </View>
               </View>
 
+              {/* ── Una comida nueva — the AI scan methods lead the meal
+               * section, up top: photo scan + describe are the headline
+               * way to log, before the 1-tap "lo de siempre" below. ── */}
+              <Text style={styles.newMealLabel}>Una comida nueva</Text>
+              {renderMethods()}
+
               {items.length === 0 ? (
-                /* New user, empty estela — no 1-tap path to lead with yet,
-                 * so the AI methods ARE the primary action here. The slot
-                 * pill is hidden (nothing to re-log against). */
-                <>
-                  <Text style={styles.empty}>
-                    Aún no tienes tus de siempre. Registra una comida —con foto o describiéndola— y
-                    la próxima la sumas en un toque.
-                  </Text>
-                  {methodsBlock}
-                </>
+                <Text style={styles.empty}>
+                  Lo que registres aparecerá aquí como “lo de siempre”, para sumarlo en un toque.
+                </Text>
               ) : (
                 <>
-                  {/* Lowest-effort path leads: the slot pill + 1-tap re-log
-                   * of "lo de siempre" sit above the AI methods. */}
+                  {/* The slot pill sets the meal type for the 1-tap re-log. */}
                   <View style={styles.typePill}>
                     {MEAL_TYPES.map((mt) => {
                       const active = mt.value === mealType
@@ -473,11 +470,6 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       />
                     )
                   })}
-
-                  {/* A meal that isn't in your estela yet — the AI methods,
-                   * secondary to the 1-tap re-log above. */}
-                  <Text style={styles.newMealLabel}>Una comida nueva</Text>
-                  {methodsBlock}
                 </>
               )}
             </ScrollView>
