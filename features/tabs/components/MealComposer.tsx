@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics'
+import * as ImagePicker from 'expo-image-picker'
 import { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -9,12 +10,13 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
-import type { FrequentMeal, MealInput } from '@/features/macros/api'
+import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
 import { MealCard } from './MealCard'
@@ -46,6 +48,23 @@ function currentMealType(): MealType {
   if (h < 16) return 'lunch'
   if (h < 21) return 'dinner'
   return 'snack'
+}
+
+// A camera — the "agregar foto del platillo" affordance.
+function CameraIcon({ color, size = 18 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={7} width={18} height={13} rx={3} stroke={color} strokeWidth={1.8} />
+      <Path
+        d="M9 7 L10.4 4.6 H13.6 L15 7"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={13.4} r={3.4} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  )
 }
 
 /* A star on the estela trail. Size + brightness scale with how often
@@ -150,6 +169,8 @@ export function MealComposer({ onOpenMeal }: Props) {
   const [name, setName] = useState('')
   const [protein, setProtein] = useState('')
   const [calories, setCalories] = useState('')
+  const [photoUri, setPhotoUri] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState<string | null>(null)
 
   const q = name.trim().toLowerCase()
@@ -192,8 +213,11 @@ export function MealComposer({ onOpenMeal }: Props) {
     setName('')
     setProtein('')
     setCalories('')
+    setPhotoUri(null)
   }
 
+  // Re-log a known meal — fast path, no photo step (it keeps whatever
+  // photo the original logged instance had via the frequent-meal row).
   const log = (meal: { name: string; protein_g: number; calories: number }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     createMeal.mutate({
@@ -212,10 +236,73 @@ export function MealComposer({ onOpenMeal }: Props) {
     setTimeout(() => setConfirmed((c) => (c === item.name ? null : c)), CONFIRM_MS)
   }
 
-  const handleAddManual = () => {
-    if (!manualValid) return
-    log({ name: name.trim(), protein_g: proteinNum, calories: caloriesNum })
-    clear()
+  const pickImage = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
+        return
+      }
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
+    if (result.canceled || !result.assets[0]) return
+    setPhotoUri(result.assets[0].uri)
+  }
+
+  const photoOptions = () => {
+    const options = photoUri
+      ? ['Tomar otra foto', 'Elegir de galería', 'Quitar foto', 'Cancelar']
+      : ['Tomar foto', 'Elegir de galería', 'Cancelar']
+    showActionSheet(
+      {
+        title: 'Foto del platillo',
+        options,
+        cancelButtonIndex: options.length - 1,
+        destructiveButtonIndex: photoUri ? 2 : undefined,
+      },
+      (i) => {
+        if (i === 0) void pickImage('camera')
+        else if (i === 1) void pickImage('library')
+        else if (photoUri && i === 2) setPhotoUri(null)
+      },
+    )
+  }
+
+  const handleAddManual = async () => {
+    if (!manualValid || submitting) return
+    setSubmitting(true)
+    // Upload the dish photo first (best-effort — a failed upload still
+    // logs the meal, just without the image).
+    let photoPath: string | undefined
+    if (photoUri) {
+      try {
+        photoPath = await uploadMealPhoto(photoUri)
+      } catch (e) {
+        console.warn('[meal-composer] photo upload failed', e)
+        Alert.alert('Foto', 'No pudimos guardar la foto, pero sí registramos la comida.')
+      }
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    createMeal.mutate(
+      {
+        name: name.trim(),
+        protein_g: proteinNum,
+        calories: caloriesNum,
+        consumed_at: new Date(),
+        meal_type: currentMealType(),
+        photo_storage_path: photoPath,
+      },
+      {
+        onSuccess: () => {
+          clear()
+          setSubmitting(false)
+        },
+        onError: () => setSubmitting(false),
+      },
+    )
   }
 
   return (
@@ -290,11 +377,35 @@ export function MealComposer({ onOpenMeal }: Props) {
             </View>
           </View>
 
+          {/* Optional dish photo — same affordance as the scan-meal flow,
+              so a manually-created meal can carry its image too. */}
+          {photoUri ? (
+            <Pressable
+              onPress={photoOptions}
+              style={styles.photoRow}
+              accessibilityRole="button"
+              accessibilityLabel="Cambiar o quitar la foto del platillo"
+            >
+              <Image source={{ uri: photoUri }} style={styles.photoThumb} resizeMode="cover" />
+              <Text style={styles.photoRowText}>Foto añadida · toca para cambiar</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={photoOptions}
+              style={styles.photoPlaceholder}
+              accessibilityRole="button"
+              accessibilityLabel="Agregar una foto del platillo"
+            >
+              <CameraIcon color={colors.magenta} />
+              <Text style={styles.photoPlaceholderText}>Agregar foto</Text>
+            </Pressable>
+          )}
+
           <PrimaryCta
-            label="Sumar al cielo"
+            label={submitting ? 'Sumando…' : 'Sumar al cielo'}
             variant="soft"
             onPress={handleAddManual}
-            disabled={!manualValid}
+            disabled={!manualValid || submitting}
             marginTop={14}
             accessibilityLabel="Registrar comida nueva"
           />
@@ -510,6 +621,46 @@ const styles = StyleSheet.create({
   numberUnit: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // No-photo affordance — a quiet dashed slot, compact so it fits the
+  // inline editor without competing with the macro fields.
+  photoPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    marginTop: 14,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    borderStyle: 'dashed',
+  },
+  photoPlaceholderText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+    letterSpacing: 0.3,
+  },
+  // Attached-photo row — a thumbnail + a "tap to change" line.
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+  },
+  photoThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  photoRowText: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
   previewWrap: {
