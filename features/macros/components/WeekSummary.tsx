@@ -18,11 +18,20 @@ import { colors, typography } from '@/theme'
  * a layer the user opens, not one that asks for attention.
  */
 
+// A weekly claim ("esta semana cuidaste tu proteína") needs enough days
+// to be honest — 1-2 logged days isn't a week. Below this we use a gentler
+// "still drawing" line so the card never over-claims from thin data.
+const MIN_DAYS_FOR_WEEKLY_CLAIM = 3
+
 /** The warm opening line — picks the sentence from the shape of the week,
  *  always observing, never racing or scolding. */
 function coachLine(stats: WeeklyMealStats): string {
   const { daysLogged, daysHitProtein } = stats
-  if (daysHitProtein != null && daysLogged > 0 && daysHitProtein * 2 >= daysLogged) {
+  if (
+    daysHitProtein != null &&
+    daysLogged >= MIN_DAYS_FOR_WEEKLY_CLAIM &&
+    daysHitProtein * 2 >= daysLogged
+  ) {
     return 'Esta semana cuidaste tu proteína. Tu cuerpo lo nota.'
   }
   if (daysLogged >= 4) {
