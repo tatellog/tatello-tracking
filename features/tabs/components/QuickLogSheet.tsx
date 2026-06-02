@@ -3,7 +3,6 @@ import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ActionSheetIOS,
   Alert,
   Dimensions,
   Modal,
@@ -21,6 +20,7 @@ import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { useAddMeasurement, useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints } from '@/features/progress/logic'
 import { useSetWater, useWaterToday } from '@/features/water/hooks'
+import { showActionSheet } from '@/lib/actionSheet'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -100,13 +100,20 @@ function WaterGlass({
   filled,
   size = 26,
   onPress,
+  accessibilityLabel,
 }: {
   filled: boolean
   size?: number
   onPress: () => void
+  accessibilityLabel?: string
 }) {
   return (
-    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button">
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
       <Svg width={size} height={size} viewBox="0 0 24 24">
         <Path
           d={GLASS}
@@ -117,20 +124,6 @@ function WaterGlass({
         />
       </Svg>
     </Pressable>
-  )
-}
-
-function PencilIcon({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M4 20.2 L4.8 16 L16 4.8 L19.2 8 L8 19.2 Z M14.4 6.4 L17.6 9.6"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
   )
 }
 
@@ -182,10 +175,12 @@ type Props = {
  * Registro rápido — one sheet to log the three things that change
  * daily: peso, agua, comida.
  *   - Peso  → opens a two-wheel weight picker (mode 'weight').
- *   - Agua  → tap a droplet, logged instantly (water_intake).
- *   - Comida → the slot pill + "Lo de siempre" frequent foods; the
- *     bottom offers two methods — Log manual (scan-meal in manual
- *     mode) and Con foto (pick/shoot a photo → the scan-meal flow).
+ *   - Agua  → tap a glass, logged instantly (water_intake).
+ *   - Comida → the lowest-effort path leads: the slot pill + "Lo de
+ *     siempre" 1-tap re-log sits up top. Below it, "una comida nueva"
+ *     offers two AI methods — Con foto (shoot/pick → scan-meal) and
+ *     Descríbela (type it → scan-meal describe mode). Manual entry of
+ *     macros lives in the Comidas tab (MealComposer), not here.
  */
 export function QuickLogSheet({ visible, onClose }: Props) {
   const router = useRouter()
@@ -273,7 +268,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
 
   const handlePhotoLog = () => {
     if (confirmingName != null) return
-    ActionSheetIOS.showActionSheetWithOptions(
+    showActionSheet(
       {
         title: 'Registrar comida con foto',
         options: ['Tomar foto', 'Elegir de la galería', 'Cancelar'],
@@ -286,7 +281,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     )
   }
 
-  // Con texto — the scan-meal screen in describe mode: type what you ate,
+  // Descríbela — the scan-meal screen in describe mode: type what you ate,
   // the AI parses it into ingredients (same confirm form as the photo scan).
   const handleTextLog = () => {
     if (confirmingName != null) return
@@ -294,13 +289,38 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     router.push({ pathname: '/scan-meal', params: { describe: '1' } })
   }
 
-  // Log manual — the scan-meal screen in manual mode: type the macros
-  // by hand, photo and ingredients optional.
-  const handleManualLog = () => {
-    if (confirmingName != null) return
-    onClose()
-    router.push({ pathname: '/scan-meal', params: { manual: '1' } })
-  }
+  // The two AI methods for a meal that ISN'T in your estela yet. Shared
+  // between the empty state and the populated one. Dimmed while a 1-tap
+  // re-log is confirming, so the disabled state reads visually too.
+  const disabled = confirmingName != null
+  const methodsBlock = (
+    <View style={styles.methods}>
+      <Pressable
+        onPress={handlePhotoLog}
+        disabled={disabled}
+        style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
+        accessibilityRole="button"
+        accessibilityLabel="Registrar una comida con foto"
+      >
+        <View style={[styles.methodIcon, styles.methodIconPhoto]}>
+          <CameraIcon color={colors.magenta} />
+        </View>
+        <Text style={styles.methodLabel}>Con foto</Text>
+      </Pressable>
+      <Pressable
+        onPress={handleTextLog}
+        disabled={disabled}
+        style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
+        accessibilityRole="button"
+        accessibilityLabel="Registrar una comida describiéndola"
+      >
+        <View style={[styles.methodIcon, styles.methodIconPhoto]}>
+          <SparkleIcon color={colors.magenta} />
+        </View>
+        <Text style={styles.methodLabel}>Descríbela</Text>
+      </Pressable>
+    </View>
+  )
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
@@ -392,81 +412,48 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                         size={20}
                         filled={i < glasses}
                         onPress={() => tapDroplet(i)}
+                        accessibilityLabel={`Agua, ${i + 1} de ${WATER_TARGET} vasos`}
                       />
                     ))}
                   </View>
                 </View>
               </View>
 
-              {/* ── The two ways to log a meal, side by side near the
-               * top so neither is buried. Foto leads, carried by the
-               * magenta-tinted fill. ── */}
-              <View style={styles.methods}>
-                <Pressable
-                  onPress={handlePhotoLog}
-                  disabled={confirmingName != null}
-                  style={[styles.method, styles.methodPhoto]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Registrar una comida con foto"
-                >
-                  <View style={[styles.methodIcon, styles.methodIconPhoto]}>
-                    <CameraIcon color={colors.magenta} />
-                  </View>
-                  <Text style={styles.methodLabel}>Con foto</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleTextLog}
-                  disabled={confirmingName != null}
-                  style={[styles.method, styles.methodPhoto]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Registrar una comida describiéndola"
-                >
-                  <View style={[styles.methodIcon, styles.methodIconPhoto]}>
-                    <SparkleIcon color={colors.magenta} />
-                  </View>
-                  <Text style={styles.methodLabel}>Con texto</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleManualLog}
-                  disabled={confirmingName != null}
-                  style={[styles.method, styles.methodManual]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Registrar una comida manualmente"
-                >
-                  <View style={[styles.methodIcon, styles.methodIconManual]}>
-                    <PencilIcon color={colors.magenta} />
-                  </View>
-                  <Text style={styles.methodLabel}>Log manual</Text>
-                </Pressable>
-              </View>
-
-              {/* ── Comida ── */}
-              <View style={styles.typePill}>
-                {MEAL_TYPES.map((mt) => {
-                  const active = mt.value === mealType
-                  const tint = active ? colors.magenta : colors.niebla
-                  return (
-                    <Pressable
-                      key={mt.value}
-                      onPress={() => setMealType(mt.value)}
-                      style={[styles.typeSeg, active && styles.typeSegActive]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      accessibilityLabel={mt.label}
-                    >
-                      <MealGlyph type={mt.value} color={tint} />
-                      <Text style={[styles.typeSegText, { color: tint }]}>{mt.label}</Text>
-                    </Pressable>
-                  )
-                })}
-              </View>
-
               {items.length === 0 ? (
-                <Text style={styles.empty}>
-                  Aún no tienes comidas frecuentes. Suma tu primera con Log manual.
-                </Text>
+                /* New user, empty estela — no 1-tap path to lead with yet,
+                 * so the AI methods ARE the primary action here. The slot
+                 * pill is hidden (nothing to re-log against). */
+                <>
+                  <Text style={styles.empty}>
+                    Aún no tienes tus de siempre. Registra una comida —con foto o describiéndola— y
+                    la próxima la sumas en un toque.
+                  </Text>
+                  {methodsBlock}
+                </>
               ) : (
                 <>
+                  {/* Lowest-effort path leads: the slot pill + 1-tap re-log
+                   * of "lo de siempre" sit above the AI methods. */}
+                  <View style={styles.typePill}>
+                    {MEAL_TYPES.map((mt) => {
+                      const active = mt.value === mealType
+                      const tint = active ? colors.magenta : colors.niebla
+                      return (
+                        <Pressable
+                          key={mt.value}
+                          onPress={() => setMealType(mt.value)}
+                          style={[styles.typeSeg, active && styles.typeSegActive]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          accessibilityLabel={mt.label}
+                        >
+                          <MealGlyph type={mt.value} color={tint} />
+                          <Text style={[styles.typeSegText, { color: tint }]}>{mt.label}</Text>
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+
                   <Text style={styles.frequentLabel}>Lo de siempre</Text>
                   {items.map((item) => {
                     const confirming = confirmingName === item.name
@@ -486,6 +473,11 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       />
                     )
                   })}
+
+                  {/* A meal that isn't in your estela yet — the AI methods,
+                   * secondary to the 1-tap re-log above. */}
+                  <Text style={styles.newMealLabel}>Una comida nueva</Text>
+                  {methodsBlock}
                 </>
               )}
             </ScrollView>
@@ -640,6 +632,18 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 10,
   },
+  // Quieter eyebrow than "Lo de siempre" — marks the AI methods as the
+  // secondary path. Upright (the italic serif is reserved for the
+  // coach voice), so it reads as a plain UI section label.
+  newMealLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginTop: 20,
+    marginBottom: 10,
+  },
   cardGap: {
     marginBottom: 6,
   },
@@ -650,12 +654,13 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     paddingVertical: 14,
   },
-  // The two log methods — a side-by-side pair near the top. Foto
-  // carries a magenta-tinted fill; manual is a quieter bordered tile.
+  // The two AI log methods — a side-by-side pair, secondary to the
+  // 1-tap re-log above. Both share the same magenta-tinted tile (foto
+  // and texto are peers, not a primary/secondary pair).
   methods: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 16,
+    marginTop: 10,
   },
   method: {
     flex: 1,
@@ -666,13 +671,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
-  methodPhoto: {
+  methodTile: {
     borderColor: colors.magentaTint2,
     backgroundColor: colors.magentaTint,
   },
-  methodManual: {
-    borderColor: colors.hairlineStrong,
-    backgroundColor: colors.bgCard2,
+  // Visual echo of the disabled state while a 1-tap re-log confirms.
+  methodDimmed: {
+    opacity: 0.4,
   },
   methodIcon: {
     width: 40,
@@ -683,9 +688,6 @@ const styles = StyleSheet.create({
   },
   methodIconPhoto: {
     backgroundColor: colors.magentaTint2,
-  },
-  methodIconManual: {
-    backgroundColor: colors.bgCard,
   },
   methodLabel: {
     fontFamily: typography.uiBold,

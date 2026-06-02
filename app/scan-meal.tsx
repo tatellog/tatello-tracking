@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import {
-  ActionSheetIOS,
   Alert,
   Dimensions,
   Image,
@@ -48,6 +47,7 @@ import {
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
 import { SkyBackground } from '@/features/tabs/components'
+import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
 // A small sparkle — the "destello" that marks the AI-powered badge.
@@ -439,20 +439,23 @@ export default function ScanMealScreen() {
     if (result.canceled || !result.assets[0]) return
     setPhotoUri(result.assets[0].uri)
     if (isEdit) setPhotoChanged(true)
-    else if (!isManual) setPhase('scanning')
+    // In describe mode the photo is just an attachment to the customizable
+    // form — never trigger the photo-scan theatre (its effect is gated out
+    // for describe and would hang on "scanning" forever).
+    else if (!isManual && !isDescribe) setPhase('scanning')
   }
 
   // Tap the photo (or the placeholder) — change it. A fresh scan also
   // offers to re-run the scan on the same photo.
   const photoOptions = () => {
-    const options =
-      isEdit || isManual
-        ? ['Tomar foto', 'Elegir de galería', 'Cancelar']
-        : ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar']
-    ActionSheetIOS.showActionSheetWithOptions(
+    const attachOnly = isEdit || isManual || isDescribe
+    const options = attachOnly
+      ? ['Tomar foto', 'Elegir de galería', 'Cancelar']
+      : ['Reescanear esta foto', 'Tomar otra foto', 'Elegir de galería', 'Cancelar']
+    showActionSheet(
       { title: 'Foto del platillo', options, cancelButtonIndex: options.length - 1 },
       (i) => {
-        if (isEdit || isManual) {
+        if (attachOnly) {
           if (i === 0) void pickPhoto('camera')
           else if (i === 1) void pickPhoto('library')
         } else if (i === 0) {
@@ -618,10 +621,7 @@ export default function ScanMealScreen() {
             <Pressable
               onPress={handleDescribeSubmit}
               disabled={description.trim().length < 2}
-              style={[
-                styles.describeCta,
-                description.trim().length < 2 && styles.describeCtaOff,
-              ]}
+              style={[styles.describeCta, description.trim().length < 2 && styles.describeCtaOff]}
               accessibilityRole="button"
               accessibilityLabel="Analizar lo que escribiste"
             >
