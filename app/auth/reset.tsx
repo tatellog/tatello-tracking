@@ -115,12 +115,6 @@ export default function ResetScreen() {
           />
         </Animated.View>
 
-        {errorMessage ? (
-          <Animated.View entering={enter(0)}>
-            <Text style={styles.error}>{errorMessage}</Text>
-          </Animated.View>
-        ) : null}
-
         <Animated.View entering={enter(220)}>
           <SubmitButton
             label="Enviar enlace"
@@ -130,6 +124,13 @@ export default function ResetScreen() {
             onPress={onSubmit}
           />
         </Animated.View>
+
+        {/* Error below the button so it never shifts under the finger. */}
+        {errorMessage ? (
+          <Animated.View entering={enter(0)}>
+            <Text style={styles.error}>{errorMessage}</Text>
+          </Animated.View>
+        ) : null}
       </View>
     </AuthScreenLayout>
   )
@@ -139,12 +140,6 @@ const styles = StyleSheet.create({
   headerBlock: { gap: spacing.sm },
   form: { gap: spacing.md },
   sentBody: { gap: spacing.md },
-  meta: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.oro,
-  },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.displaySm,

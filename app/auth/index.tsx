@@ -93,12 +93,6 @@ export default function LoginScreen() {
           />
         </Animated.View>
 
-        {errorMessage ? (
-          <Animated.View entering={enter(0)}>
-            <Text style={styles.error}>{errorMessage}</Text>
-          </Animated.View>
-        ) : null}
-
         <Animated.View entering={enter(280)}>
           <SubmitButton
             label="Entrar"
@@ -108,6 +102,14 @@ export default function LoginScreen() {
             onPress={onSubmit}
           />
         </Animated.View>
+
+        {/* Error sits BELOW the button so a failed login never makes the
+            button jump under the user's finger. */}
+        {errorMessage ? (
+          <Animated.View entering={enter(0)}>
+            <Text style={styles.error}>{errorMessage}</Text>
+          </Animated.View>
+        ) : null}
       </View>
 
       <Animated.View entering={enter(340)} style={styles.links}>
@@ -138,12 +140,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   headerBlock: { gap: spacing.sm },
   form: { gap: spacing.md },
-  meta: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.oro,
-  },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.displaySm,

@@ -126,6 +126,17 @@ export default function SignUpScreen() {
           ) : null}
         </Animated.View>
 
+        <Animated.View entering={enter(320)}>
+          <SubmitButton
+            label="Crear cuenta"
+            submittingLabel="Creando tu cuenta…"
+            canSubmit={canSubmit}
+            isSubmitting={submitting}
+            onPress={onSubmit}
+          />
+        </Animated.View>
+
+        {/* Error below the button so it never shifts under the finger. */}
         {errorMessage ? (
           <Animated.View entering={enter(0)} style={styles.errorBlock}>
             <Text style={styles.error}>{errorMessage}</Text>
@@ -143,16 +154,6 @@ export default function SignUpScreen() {
             ) : null}
           </Animated.View>
         ) : null}
-
-        <Animated.View entering={enter(320)}>
-          <SubmitButton
-            label="Crear cuenta"
-            submittingLabel="Creando tu cuenta…"
-            canSubmit={canSubmit}
-            isSubmitting={submitting}
-            onPress={onSubmit}
-          />
-        </Animated.View>
       </View>
 
       <Animated.View entering={enter(380)} style={styles.links}>
@@ -171,12 +172,6 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   confirmBlock: { gap: spacing.xs },
   errorBlock: { gap: spacing.xs },
-  meta: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.oro,
-  },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.displaySm,
