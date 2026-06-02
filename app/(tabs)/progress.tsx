@@ -203,7 +203,7 @@ function ProgressBody() {
                 <Animated.View entering={FadeIn.duration(360).delay(290)}>
                   <Text style={styles.cycleNote}>
                     {cycle.phase === 'lutea'
-                      ? 'Fase lútea: el peso sube por agua estos días. Es normal.'
+                      ? 'La semana antes de tu período el cuerpo retiene agua. Lo que ves en la balanza no es lo que eres.'
                       : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
                   </Text>
                 </Animated.View>
