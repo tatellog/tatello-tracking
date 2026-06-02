@@ -1,3 +1,4 @@
+import LottieView from 'lottie-react-native'
 import { useEffect } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -10,16 +11,19 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
+import Svg, { Circle } from 'react-native-svg'
 
 import NorthStar from '@/assets/icons/north-star.svg'
 import { colors, duration, typography } from '@/theme'
 
 const ANCHOR_SIZE = 64
-const HALO_SIZE = 132
+// The Lottie canvas is square; size it generously so the bloom + orbiting
+// dust have room to breathe around the 64px star without clipping.
+const GLOW_SIZE = 180
 const BREATH_MS = 3400
 
 type BrandAnchorProps = {
-  /** When true, the halo plays a single oro pulse instead of looping —
+  /** When true, the star plays a single oro pulse instead of looping —
    *  used by the "revisa tu correo" moment. */
   pulseOnce?: boolean
   /** Whether to render the STELAR wordmark beneath the star. */
@@ -27,15 +31,24 @@ type BrandAnchorProps = {
 }
 
 /*
- * The fixed point of the auth sky: the north-star glyph in oro, with a
- * halo that breathes (looping) or pulses once. Reduced-motion parks the
- * halo at a calm resting opacity. The star itself is tinted via
- * currentColor (oro); the embedded gradient gives it warmth, the halo
- * gives it the gold light.
+ * The fixed point of the auth sky: the north-star glyph in oro over a REAL
+ * celestial glow.
+ *
+ * The glow is a scoped Lottie (auth-hero-glow.json): layered radial-gradient
+ * blooms that breathe + oro dust orbiting the star + staggered glints — the
+ * same Genshin glow language as the cycle-ring-glow behind CycleRing. It
+ * replaces the old flat oro disc (a filled View that read as an opaque
+ * mauve puck — a solid fill is matter, not light). Lottie renders gradients
+ * natively, sidestepping the iOS alpha-RadialGradient bug.
+ *
+ * Reduced motion suppresses the Lottie and falls back to a STATIC layered
+ * radial glow (concentric SVG circles, the CycleRing trick — no unreliable
+ * alpha gradient). The star itself breathes subtly (scale + opacity) on the
+ * same clock so it reads as a live point of light, not a printed glyph.
  */
 export function BrandAnchor({ pulseOnce = false, showWordmark = true }: BrandAnchorProps) {
   const breath = useSharedValue(0)
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useReducedMotion() ?? false
 
   useEffect(() => {
     if (reduceMotion) {
@@ -60,19 +73,50 @@ export function BrandAnchor({ pulseOnce = false, showWordmark = true }: BrandAnc
     return () => cancelAnimation(breath)
   }, [breath, pulseOnce, reduceMotion])
 
-  const haloStyle = useAnimatedStyle(() => ({
-    opacity: 0.12 + breath.value * 0.28,
-    transform: [{ scale: 0.92 + breath.value * 0.16 }],
+  // The star is alive: a small scale + opacity twinkle on the breath clock.
+  // Numbers only — UI-thread safe.
+  const starStyle = useAnimatedStyle(() => ({
+    opacity: 0.86 + breath.value * 0.14,
+    transform: [{ scale: 0.97 + breath.value * 0.04 }],
   }))
 
   return (
     <View style={styles.wrap}>
       <View style={styles.starWrap}>
-        <Animated.View style={[styles.halo, haloStyle]} pointerEvents="none" />
-        <NorthStar width={ANCHOR_SIZE} height={ANCHOR_SIZE} color={colors.oro} />
+        {reduceMotion ? (
+          <StaticGlow />
+        ) : (
+          <View style={styles.glow} pointerEvents="none">
+            <LottieView
+              source={require('../../../assets/lottie/auth-hero-glow.json')}
+              autoPlay
+              loop
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+            />
+          </View>
+        )}
+        <Animated.View style={starStyle} pointerEvents="none">
+          <NorthStar width={ANCHOR_SIZE} height={ANCHOR_SIZE} color={colors.oro} />
+        </Animated.View>
       </View>
       {showWordmark ? <Text style={styles.wordmark}>STELAR</Text> : null}
     </View>
+  )
+}
+
+/* Reduced-motion fallback: a still oro glow built from concentric circles
+ * of decreasing opacity (the CycleRing trick — avoids the iOS alpha
+ * RadialGradient bug). Reads as a soft resting bloom, never a flat disc. */
+function StaticGlow() {
+  const c = GLOW_SIZE / 2
+  return (
+    <Svg width={GLOW_SIZE} height={GLOW_SIZE} style={styles.glow} pointerEvents="none">
+      <Circle cx={c} cy={c} r={64} fill={colors.oro} opacity={0.05} />
+      <Circle cx={c} cy={c} r={46} fill={colors.oroSoft} opacity={0.07} />
+      <Circle cx={c} cy={c} r={30} fill={colors.oroLight} opacity={0.1} />
+      <Circle cx={c} cy={c} r={16} fill={colors.oroLeche} opacity={0.16} />
+    </Svg>
   )
 }
 
@@ -82,22 +126,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   starWrap: {
-    width: HALO_SIZE,
-    height: HALO_SIZE,
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  halo: {
+  glow: {
     position: 'absolute',
-    width: HALO_SIZE,
-    height: HALO_SIZE,
-    borderRadius: HALO_SIZE / 2,
-    backgroundColor: colors.oroLight,
-    // Soft radial glow approximated with a large blur-like shadow.
-    shadowColor: colors.oro,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 40,
-    shadowOpacity: 0.9,
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
   },
   wordmark: {
     fontFamily: typography.displayMedium,

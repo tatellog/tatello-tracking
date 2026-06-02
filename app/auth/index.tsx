@@ -83,7 +83,7 @@ export default function LoginScreen() {
             trailing={
               <Pressable
                 onPress={() => setShowPassword((v) => !v)}
-                hitSlop={12}
+                hitSlop={16}
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
@@ -162,8 +162,8 @@ const styles = StyleSheet.create({
     color: colors.feedbackError,
   },
   links: {
-    gap: spacing.xs,
-    alignItems: 'flex-start',
+    gap: spacing.sm,
+    alignItems: 'center',
   },
   linkTap: {
     minHeight: 44,

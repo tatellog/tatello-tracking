@@ -11,33 +11,49 @@
       <stop offset="0.5" stop-color="#FFF6EC" stop-opacity="0.9" />
       <stop offset="1"   stop-color="#FBD7E3" stop-opacity="0" />
     </radialGradient>
+    <linearGradient id="glintV" x1="60" y1="0" x2="60" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#FFF6E5" stop-opacity="0" />
+      <stop offset="0.5"  stop-color="#FFF6E5" stop-opacity="0.55" />
+      <stop offset="1"    stop-color="#FFF6E5" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="glintH" x1="0" y1="60" x2="120" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0"    stop-color="#FFF6E5" stop-opacity="0" />
+      <stop offset="0.5"  stop-color="#FFF6E5" stop-opacity="0.4" />
+      <stop offset="1"    stop-color="#FFF6E5" stop-opacity="0" />
+    </linearGradient>
   </defs>
-  <!-- Four primary rays — now drawn as curved spurs (Q control points
-       pull the flanks inward), so the tips read as soft, organic light
-       rather than the sharp medical/religious cross of the old straight
-       triangles. Vertical pair longer than the horizontal pair to break
-       the perfect plus symmetry. -->
+  <!-- Long, hair-thin glint rays — the celestial "twinkle" of a bright
+       star catching light. Drawn UNDER the body so the solid spurs sit on
+       top; the vertical glint is longer than the horizontal to echo the
+       asymmetry of the body rays. These read as light flare, not as a
+       drawn cross, because they fade to alpha 0 at both tips. -->
+  <rect x="59.2" y="2"  width="1.6" height="116" fill="url(#glintV)" />
+  <rect x="2" y="59.4" width="116" height="1.2" fill="url(#glintH)" />
+  <!-- Four primary rays — curved spurs (Q control points pull the flanks
+       inward), so the tips read as soft, organic light rather than the
+       sharp medical/religious cross. Vertical pair longer than the
+       horizontal pair to break the perfect plus symmetry. -->
   <g>
     <path d="M60 8 Q62.4 44 64 54 Q60 58 56 54 Q57.6 44 60 8 Z" fill="url(#starBody)" />
     <path d="M60 110 Q61.6 78 63 66 Q60 62 57 66 Q58.4 78 60 110 Z" fill="url(#starBody)" opacity="0.7" />
     <path d="M16 60 Q48 57.6 56 56 Q60 60 56 64 Q48 62.4 16 60 Z" fill="url(#starBody)" opacity="0.78" />
     <path d="M104 60 Q72 57.6 64 56 Q60 60 64 64 Q72 62.4 104 60 Z" fill="url(#starBody)" opacity="0.78" />
   </g>
-  <!-- Two minor spurs at off-cardinal angles — these are what break the
-       "cross" silhouette and make the glyph read as a celestial body
-       (a star catching light from several directions). -->
+  <!-- Two minor spurs at off-cardinal angles — these break the "cross"
+       silhouette so the glyph reads as a celestial body catching light
+       from several directions. -->
   <g>
     <path d="M60 60 Q72 42 84 30 Q74 46 62 58 Z" fill="url(#starBody)" opacity="0.34" />
     <path d="M60 60 Q46 74 33 88 Q48 74 58 62 Z" fill="url(#starBody)" opacity="0.28" />
   </g>
-  <!-- Soft inner facets — retained, lightened, to keep the dimensional
-       glint without redrawing the old hard cross diagonals. -->
+  <!-- Soft inner facets — keep the dimensional glint without redrawing the
+       hard cross diagonals. -->
   <g>
     <path d="M60 60 L77 39 L62 58 Z" fill="currentColor" opacity="0.18" />
     <path d="M60 60 L41 79 L58 62 Z" fill="currentColor" opacity="0.14" />
   </g>
   <circle cx="60" cy="60" r="11" fill="url(#starCore)" />
-  <circle cx="60" cy="60" r="2.6" fill="#FFFFFF" />
+  <circle cx="60" cy="60" r="3.2" fill="#FFFFFF" />
   <path d="M60 26 A34 34 0 0 1 94 60 A34 34 0 0 1 60 94 A34 34 0 0 1 30 74"
         stroke="currentColor" stroke-width="0.6" opacity="0.3" stroke-linecap="round" />
   <circle cx="60" cy="26" r="1.4" fill="currentColor" opacity="0.7" />

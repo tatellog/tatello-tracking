@@ -5,6 +5,7 @@ import { SkyBackground } from '@/features/tabs/components/SkyBackground'
 import { colors, spacing } from '@/theme'
 
 import { BrandAnchor } from './BrandAnchor'
+import { HorizonConstellation } from './HorizonConstellation'
 import { LightDust } from './LightDust'
 
 type AuthScreenLayoutProps = {
@@ -16,11 +17,12 @@ type AuthScreenLayoutProps = {
 
 /*
  * The shared auth chrome: the celestial backdrop (SkyBackground +
- * LightDust + BrandAnchor) plus keyboard-aware content padding. Each
- * screen re-mounts this — the re-mount is cheap (no Lottie, SVG fields
- * are seeded + static structure) and it keeps the Stack transitions
- * simple. See the file-level note in the handoff for why we didn't make
- * the sky a single persistent layer in _layout.
+ * LightDust + HorizonConstellation + BrandAnchor) plus keyboard-aware
+ * content padding. Each screen re-mounts this — the re-mount is cheap (one
+ * small scoped Lottie behind the hero, the rest is seeded static SVG) and
+ * it keeps the Stack transitions simple. See the file-level note in the
+ * handoff for why we didn't make the sky a single persistent layer in
+ * _layout.
  */
 export function AuthScreenLayout({
   children,
@@ -33,6 +35,9 @@ export function AuthScreenLayout({
     <View style={styles.root}>
       <SkyBackground />
       <LightDust />
+      {/* Faint constellation low on the horizon — fills the empty lower
+          half without noise (static SVG, no TTI cost). */}
+      <HorizonConstellation />
 
       <KeyboardAvoidingView
         style={styles.flex}
