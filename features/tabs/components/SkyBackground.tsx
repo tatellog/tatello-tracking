@@ -92,8 +92,10 @@ function TwinkleStar({ star }: { star: Star }) {
 export function SkyBackground() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* A soft magenta haze at the top — atmospheric depth. */}
-      <LinearGradient colors={[colors.magentaTint2, 'transparent']} style={styles.nebula} />
+      {/* A soft magenta haze at the top — atmospheric depth. Low start
+          opacity + a tall, gradual fade so it never reads as a hard band
+          where it meets the darker page. */}
+      <LinearGradient colors={[colors.magentaTint, 'transparent']} style={styles.nebula} />
       <Svg style={styles.starfield} width={SCREEN_W} height={SCREEN_H}>
         {SCREEN_STARS.map((st, i) =>
           st.twinkle ? (
@@ -113,7 +115,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_H * 0.55,
+    height: SCREEN_H * 0.75,
   },
   starfield: {
     position: 'absolute',
