@@ -20,6 +20,14 @@ import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { useAddMeasurement, useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints } from '@/features/progress/logic'
 import { useSetWater, useWaterToday } from '@/features/water/hooks'
+import {
+  GLASS_ML,
+  GOAL_STEP_ML,
+  MAX_GOAL_ML,
+  MIN_GOAL_ML,
+  mlToLitresLabel,
+  useWaterGoal,
+} from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -37,7 +45,6 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
 ]
 
 const CONFIRM_HOLD_MS = 520
-const WATER_TARGET = 8
 const DEFAULT_WEIGHT = 70
 // A tumbler — water is shown as a glass, matching the "vasos" copy,
 // so it never reads as a magenta blood drop / cycle tracker.
@@ -143,13 +150,16 @@ function CameraIcon({ color }: { color: string }) {
   )
 }
 
-// A ✦ four-point star — signals the AI text parse ("describe it, we read it").
-function SparkleIcon({ color }: { color: string }) {
+// A keyboard — signals "type what you ate" (the text-entry method).
+function KeyboardIcon({ color }: { color: string }) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Rect x={2} y={6} width={20} height={12} rx={2.5} stroke={color} strokeWidth={1.8} />
       <Path
-        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
-        fill={color}
+        d="M6 10 H6.01 M10 10 H10.01 M14 10 H14.01 M18 10 H18.01 M8 14 H16"
+        stroke={color}
+        strokeWidth={1.9}
+        strokeLinecap="round"
       />
     </Svg>
   )
@@ -177,7 +187,7 @@ type Props = {
  *   - Peso  → opens a two-wheel weight picker (mode 'weight').
  *   - Agua  → tap a glass, logged instantly (water_intake).
  *   - Comida → the AI scan methods lead, up top: Con foto (shoot/pick →
- *     scan-meal) and Descríbela (type it → scan-meal describe mode).
+ *     scan-meal) and Con texto (type it → scan-meal describe mode).
  *     Below them, the slot pill + "Lo de siempre" 1-tap re-log. Manual
  *     entry of macros lives in the Comidas tab (MealComposer), not here.
  */
@@ -195,13 +205,20 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const addMeasurement = useAddMeasurement()
   const { data: glasses = 0 } = useWaterToday(today, visible)
   const setWater = useSetWater(today)
+  const { goalMl, updateGoal } = useWaterGoal()
 
   const [mode, setMode] = useState<Mode>('home')
   const [mealType, setMealType] = useState<MealType>(defaultMealType)
   const [confirmingName, setConfirmingName] = useState<string | null>(null)
   const [weightDraft, setWeightDraft] = useState<number | null>(null)
+  const [editingGoal, setEditingGoal] = useState(false)
 
   const items = frequent ?? []
+
+  // Glasses are a fixed 250 ml; the count = goal ÷ 250 (2 L → 8, 3 L → 12).
+  const waterTarget = Math.max(1, Math.round(goalMl / GLASS_ML))
+  // Shrink the glyphs as the count grows so they stay on one row.
+  const glassSize = waterTarget <= 8 ? 20 : waterTarget <= 12 ? 16 : 13
 
   const latestWeight = useMemo(() => {
     const pts = toWeightPoints(measurements ?? [])
@@ -214,6 +231,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       setConfirmingName(null)
       setMealType(defaultMealType())
       setWeightDraft(null)
+      setEditingGoal(false)
     }
   }, [visible])
 
@@ -284,7 +302,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     )
   }
 
-  // Descríbela — the scan-meal screen in describe mode: type what you ate,
+  // Con texto — the scan-meal screen in describe mode: type what you ate,
   // the AI parses it into ingredients (same confirm form as the photo scan).
   const handleTextLog = () => {
     if (confirmingName != null) return
@@ -315,12 +333,12 @@ export function QuickLogSheet({ visible, onClose }: Props) {
         disabled={disabled}
         style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
         accessibilityRole="button"
-        accessibilityLabel="Registrar una comida describiéndola"
+        accessibilityLabel="Registrar una comida escribiéndola"
       >
         <View style={[styles.methodIcon, styles.methodIconPhoto]}>
-          <SparkleIcon color={colors.magenta} />
+          <KeyboardIcon color={colors.magenta} />
         </View>
-        <Text style={styles.methodLabel}>Descríbela</Text>
+        <Text style={styles.methodLabel}>Con texto</Text>
       </Pressable>
     </View>
   )
@@ -405,20 +423,62 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                 </Pressable>
                 <View style={styles.stripDivider} />
                 <View style={[styles.stripZone, styles.stripZoneWater]}>
-                  <Text style={styles.stripCaption}>
-                    Agua · {glasses}/{WATER_TARGET}
-                  </Text>
-                  <View style={styles.dropletsCompact}>
-                    {Array.from({ length: WATER_TARGET }).map((_, i) => (
-                      <WaterGlass
-                        key={i}
-                        size={20}
-                        filled={i < glasses}
-                        onPress={() => tapDroplet(i)}
-                        accessibilityLabel={`Agua, ${i + 1} de ${WATER_TARGET} vasos`}
-                      />
-                    ))}
-                  </View>
+                  <Pressable
+                    onPress={() => setEditingGoal((v) => !v)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ajustar tu meta de agua"
+                  >
+                    <Text style={styles.stripCaption}>
+                      Agua · {mlToLitresLabel(glasses * GLASS_ML)} / {mlToLitresLabel(goalMl)} L
+                    </Text>
+                  </Pressable>
+                  {editingGoal ? (
+                    <View style={styles.goalStepper}>
+                      <Pressable
+                        onPress={() => updateGoal(goalMl - GOAL_STEP_ML)}
+                        disabled={goalMl <= MIN_GOAL_ML}
+                        hitSlop={10}
+                        accessibilityRole="button"
+                        accessibilityLabel="Bajar meta de agua"
+                        style={[styles.goalStep, goalMl <= MIN_GOAL_ML && styles.goalStepOff]}
+                      >
+                        <Text style={styles.goalStepSign}>−</Text>
+                      </Pressable>
+                      <Text style={styles.goalValue}>{mlToLitresLabel(goalMl)} L</Text>
+                      <Pressable
+                        onPress={() => updateGoal(goalMl + GOAL_STEP_ML)}
+                        disabled={goalMl >= MAX_GOAL_ML}
+                        hitSlop={10}
+                        accessibilityRole="button"
+                        accessibilityLabel="Subir meta de agua"
+                        style={[styles.goalStep, goalMl >= MAX_GOAL_ML && styles.goalStepOff]}
+                      >
+                        <Text style={styles.goalStepSign}>+</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setEditingGoal(false)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Listo"
+                        style={styles.goalDoneBtn}
+                      >
+                        <Text style={styles.goalDoneText}>Listo</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View style={styles.dropletsCompact}>
+                      {Array.from({ length: waterTarget }).map((_, i) => (
+                        <WaterGlass
+                          key={i}
+                          size={glassSize}
+                          filled={i < glasses}
+                          onPress={() => tapDroplet(i)}
+                          accessibilityLabel={`Agua, ${i + 1} de ${waterTarget} vasos`}
+                        />
+                      ))}
+                    </View>
+                  )}
                 </View>
               </View>
 
@@ -593,6 +653,49 @@ const styles = StyleSheet.create({
   dropletsCompact: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  // Inline goal stepper — replaces the glasses row while editing the
+  // litres target. Same height band so the strip doesn't jump.
+  goalStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  goalStep: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.magentaTint,
+    borderWidth: 1,
+    borderColor: colors.magentaTint2,
+  },
+  goalStepOff: {
+    opacity: 0.35,
+  },
+  goalStepSign: {
+    fontFamily: typography.uiBold,
+    fontSize: 17,
+    lineHeight: 19,
+    color: colors.magenta,
+  },
+  goalValue: {
+    minWidth: 52,
+    textAlign: 'center',
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    letterSpacing: -0.3,
+  },
+  goalDoneText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.3,
+  },
+  goalDoneBtn: {
+    marginLeft: 'auto',
   },
   // One stadium pill holding the four slot segments.
   typePill: {
