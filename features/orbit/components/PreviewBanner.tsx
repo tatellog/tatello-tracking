@@ -12,9 +12,10 @@ import { colors, typography } from '@/theme'
 export function PreviewBanner() {
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>Vista previa</Text>
+      <Text style={styles.eyebrow}>Tu diagrama ya es real</Text>
       <Text style={styles.body}>
-        El motor de Stelar aún no lee tu data. Lo de abajo es un ejemplo de cómo se verá tu lectura.
+        Lee tus señales de hoy. La lectura escrita de abajo es un ejemplo · pronto la escribiremos
+        contigo.
       </Text>
     </View>
   )

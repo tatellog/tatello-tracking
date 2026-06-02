@@ -484,13 +484,13 @@ export const MOCK_PATRONES: readonly Patron[] = [
     since: 'Detectado en tus últimos 2 ciclos',
     confidence: 'media',
     caption: 'Tus antojos a lo largo del ciclo.',
-    legend: 'El pico cae del día 20 al 26. Tu fase lútea.',
-    voz: 'Los antojos en lútea son la progesterona pidiendo más energía. Es la química del ciclo trabajando.',
+    legend: 'El pico cae del día 20 al 26. La semana antes de tu período.',
+    voz: 'Esos días tu cuerpo pide más energía. No es falta de control · es tu cuerpo pidiendo lo que necesita.',
     correlacion:
       'Coinciden con tu sueño más ligero. Esos mismos días duermes unos 40 minutos menos.',
     experimento: {
       hint: 'Del día 20 al 26, suma una colación con proteína. Adelántate al antojo.',
-      action: 'Anticipar mi fase lútea',
+      action: 'Anticipar esos días',
     },
   },
   {
