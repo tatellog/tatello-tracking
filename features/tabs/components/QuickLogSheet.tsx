@@ -1,7 +1,8 @@
+import { LinearGradient } from 'expo-linear-gradient'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Dimensions,
@@ -12,12 +13,28 @@ import {
   Text,
   View,
 } from 'react-native'
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
+import { ACTIVE_CYCLE_SITUATIONS } from '@/features/cycle/phase'
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
-import { useAddMeasurement, useMeasurements } from '@/features/progress/hooks'
+import { type CycleSituation } from '@/features/profile/api'
+import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
+import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
+import { igniteDimension } from '@/features/orbit/ignitionBus'
 import { toWeightPoints } from '@/features/progress/logic'
 import { useSetWater, useWaterToday } from '@/features/water/hooks'
 import {
@@ -102,18 +119,46 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
 
 /* One water glass — a magenta-filled tumbler when logged, a faint
  * outline when not. The glass shape (not a drop) keeps it from
- * reading as the cycle tracker. */
+ * reading as the cycle tracker. On the false→true transition it pops
+ * once (scale) — a satisfying one-shot, the most-repeated action's
+ * reward. Reduced motion shows the fill with no pop. */
 function WaterGlass({
   filled,
   size = 26,
   onPress,
   accessibilityLabel,
+  tick,
 }: {
   filled: boolean
   size?: number
   onPress: () => void
   accessibilityLabel?: string
+  /** Bumped by the parent on each tap. The pop fires only on a tap-driven
+   *  fill — never when the day's count loads from the server on open. */
+  tick: number
 }) {
+  const pop = useSharedValue(0)
+  const reduce = useReducedMotion() ?? false
+  const wasFilled = useRef(filled)
+  const lastTick = useRef(tick)
+  useEffect(() => {
+    const tapped = tick !== lastTick.current
+    if (filled && !wasFilled.current && tapped && !reduce) {
+      pop.value = withSequence(
+        withTiming(1, { duration: 90, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 150, easing: Easing.inOut(Easing.sin) }),
+      )
+    }
+    wasFilled.current = filled
+    lastTick.current = tick
+    // Reset on cleanup so an aborted pop (rapid taps) snaps back to rest
+    // instead of freezing at an intermediate scale.
+    return () => {
+      cancelAnimation(pop)
+      pop.value = 0
+    }
+  }, [filled, reduce, pop, tick])
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + pop.value * 0.14 }] }))
   return (
     <Pressable
       onPress={onPress}
@@ -121,16 +166,74 @@ function WaterGlass({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
     >
-      <Svg width={size} height={size} viewBox="0 0 24 24">
-        <Path
-          d={GLASS}
-          fill={filled ? colors.magenta : 'none'}
-          stroke={filled ? colors.magenta : colors.bruma}
-          strokeWidth={1.7}
-          strokeLinejoin="round"
-        />
-      </Svg>
+      <Animated.View style={style}>
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d={GLASS}
+            fill={filled ? colors.magenta : 'none'}
+            stroke={filled ? colors.magenta : colors.bruma}
+            strokeWidth={1.7}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </Animated.View>
     </Pressable>
+  )
+}
+
+const SCREEN_W = Dimensions.get('window').width
+
+/* A faint, STATIC celestial field behind the top of the sheet — a soft
+ * warm gradient + a few oro/leche stars, so the sheet reads as part of
+ * the observatory, not a flat card. Top band only (never over the
+ * tappable content), no animation, pointer-transparent. */
+function SheetSky() {
+  return (
+    <View style={styles.sky} pointerEvents="none">
+      <LinearGradient colors={['#1E0C12', 'rgba(20,8,11,0)']} style={StyleSheet.absoluteFill} />
+      <Svg width={SCREEN_W} height={170} style={StyleSheet.absoluteFill}>
+        <Circle cx={SCREEN_W * 0.13} cy={34} r={1.2} fill={colors.leche} opacity={0.16} />
+        <Circle cx={SCREEN_W * 0.84} cy={22} r={3.4} fill={colors.oro} opacity={0.05} />
+        <Circle cx={SCREEN_W * 0.84} cy={22} r={1.5} fill={colors.oro} opacity={0.2} />
+        <Circle cx={SCREEN_W * 0.68} cy={52} r={0.9} fill={colors.leche} opacity={0.12} />
+        <Circle cx={SCREEN_W * 0.27} cy={70} r={1} fill={colors.oro} opacity={0.14} />
+        <Circle cx={SCREEN_W * 0.93} cy={66} r={0.8} fill={colors.leche} opacity={0.1} />
+        <Circle cx={SCREEN_W * 0.45} cy={28} r={0.7} fill={colors.leche} opacity={0.1} />
+      </Svg>
+    </View>
+  )
+}
+
+/* The ✦ seal next to the sheet title — oro, static. Marks "this is
+ * where you add to your sky" without a word. */
+function StarSeal({ color, size = 14 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
+        fill={color}
+      />
+    </Svg>
+  )
+}
+
+/* The moon that anchors the cycle — its light grows from new (just the
+ * ring) to full (a soft oro disc) via `lit` (0..1). Oro, never magenta
+ * (that's the CTA/voice) nor red (cycle red line). Not a drop: it's the
+ * start of a lunar arc, the same metaphor as CycleRing. */
+function MoonAnchor({ lit, size = 22 }: { lit: number; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={7.5} fill={colors.oro} opacity={0.16 + lit * 0.5} />
+      <Circle cx={12} cy={12} r={7.5} stroke={colors.oro} strokeWidth={1.1} opacity={0.85} />
+      <Path
+        d="M12 4.5 A 7.5 7.5 0 0 0 12 19.5"
+        stroke={colors.oro}
+        strokeWidth={0.8}
+        opacity={(1 - lit) * 0.5}
+      />
+      <Circle cx={12} cy={12} r={1.3} fill={colors.oroLight} opacity={0.4 + lit * 0.4} />
+    </Svg>
   )
 }
 
@@ -207,11 +310,23 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const setWater = useSetWater(today)
   const { goalMl, updateGoal } = useWaterGoal()
 
+  // Cycle — only shown for users who track it. The period-start chip is
+  // an eventual action (~1×/month), so it lives at the bottom, away from
+  // the daily strip.
+  const { data: profile } = useProfile()
+  const cycleSituation = profile?.cycle_situation as CycleSituation | null | undefined
+  const cycleActive = !!cycleSituation && ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
+  const { data: lastPeriod } = useLastPeriodStart()
+  const recordPeriod = useRecordLastPeriodStart()
+  const periodRecordedToday = lastPeriod === today
+
   const [mode, setMode] = useState<Mode>('home')
   const [mealType, setMealType] = useState<MealType>(defaultMealType)
   const [confirmingName, setConfirmingName] = useState<string | null>(null)
   const [weightDraft, setWeightDraft] = useState<number | null>(null)
   const [editingGoal, setEditingGoal] = useState(false)
+  // Bumped on each water tap so a glass pops only on a tap, not on load.
+  const [waterTick, setWaterTick] = useState(0)
 
   const items = frequent ?? []
 
@@ -248,13 +363,34 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       ingredients: item.ingredients ?? undefined,
     })
     setConfirmingName(item.name)
+    // Celestial payoff — shows on the screen behind once the sheet closes.
+    igniteDimension('alimento')
     setTimeout(onClose, CONFIRM_HOLD_MS)
   }
 
   const tapDroplet = (index: number) => {
     Haptics.selectionAsync().catch(() => {})
+    setWaterTick((t) => t + 1)
     // Tap a droplet to fill up to it; tap the current top one to step back.
     setWater.mutate(glasses === index + 1 ? index : index + 1)
+  }
+
+  // Marking the period start re-anchors the cycle to today — confirm so
+  // an accidental tap can't reset a cycle that's mid-way.
+  const onMarkPeriod = () => {
+    if (periodRecordedToday) return
+    showActionSheet(
+      {
+        title: '¿Tu período empezó hoy?',
+        options: ['Sí, anótalo', 'Cancelar'],
+        cancelButtonIndex: 1,
+      },
+      (i) => {
+        if (i !== 0) return
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+        recordPeriod.mutate(today)
+      },
+    )
   }
 
   const openWeight = () => {
@@ -359,6 +495,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
           exiting={SlideOutDown.duration(220)}
           style={styles.sheet}
         >
+          <SheetSky />
           <View style={styles.grabber} />
 
           <View style={styles.header}>
@@ -374,9 +511,12 @@ export function QuickLogSheet({ visible, onClose }: Props) {
             ) : (
               <View style={styles.backSpacer} />
             )}
-            <Text style={styles.title}>
-              {mode === 'weight' ? 'Tu peso actual' : 'Registro rápido'}
-            </Text>
+            <View style={styles.titleRow}>
+              <StarSeal color={colors.oro} />
+              <Text style={styles.title}>
+                {mode === 'weight' ? 'Tu peso actual' : 'Registro rápido'}
+              </Text>
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={12}
@@ -473,6 +613,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                           key={i}
                           size={glassSize}
                           filled={i < glasses}
+                          tick={waterTick}
                           onPress={() => tapDroplet(i)}
                           accessibilityLabel={`Agua, ${i + 1} de ${waterTarget} vasos`}
                         />
@@ -536,6 +677,29 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                   })}
                 </>
               )}
+
+              {/* Cycle — eventual (~1×/month), so it sits last, quiet. Only
+               * for users who track a cycle. Oro/luna, never clinical. */}
+              {cycleActive ? (
+                periodRecordedToday ? (
+                  <View style={[styles.cycleChip, styles.cycleChipDone]}>
+                    <MoonAnchor lit={1} />
+                    <Text style={styles.cycleLabel}>Período anotado hoy</Text>
+                    <Text style={styles.cycleCheck}>✓</Text>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={onMarkPeriod}
+                    style={styles.cycleChip}
+                    accessibilityRole="button"
+                    accessibilityLabel="Marcar que tu período empezó hoy"
+                  >
+                    <MoonAnchor lit={0} />
+                    <Text style={styles.cycleLabel}>Hoy empezó mi período</Text>
+                    <Text style={styles.cycleChevron}>›</Text>
+                  </Pressable>
+                )
+              ) : null}
             </ScrollView>
           )}
         </Animated.View>
@@ -547,21 +711,74 @@ export function QuickLogSheet({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    // Darker scrim so the screen behind (e.g. the cycle ring) recedes and
+    // the sheet is the clear focus.
+    backgroundColor: 'rgba(0,0,0,0.72)',
   },
   anchor: {
     flex: 1,
     justifyContent: 'flex-end',
   },
+  // No top hairline — the sheet separates from the scrim by its rounded
+  // corners + a soft upward shadow, not a hard line.
   sheet: {
     backgroundColor: colors.bgCard,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    borderTopWidth: 1,
-    borderColor: colors.bruma,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 34,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  // Cycle chip — full-width, oro, set apart at the bottom (eventual
+  // action). Quiet in rest; reads as a celestial artifact, not a tracker.
+  cycleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 22,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.oroTint,
+  },
+  cycleChipDone: {
+    opacity: 0.85,
+  },
+  cycleLabel: {
+    flex: 1,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+    letterSpacing: 0.2,
+  },
+  cycleChevron: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.niebla,
+  },
+  cycleCheck: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.oro,
+  },
+  // Static celestial field, clipped to the sheet's rounded top, top band
+  // only. Behind the grabber/header; never over the tappable content.
+  sky: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 170,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    overflow: 'hidden',
   },
   grabber: {
     alignSelf: 'center',
@@ -586,6 +803,12 @@ const styles = StyleSheet.create({
   },
   backSpacer: {
     width: 24,
+  },
+  // ✦ seal + title, centred together between the back-spacer and close.
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   title: {
     fontFamily: typography.displayHeavy,
@@ -739,7 +962,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    // Oro eyebrow — "luz del cielo", consistent with the app's eyebrows.
+    color: colors.oro,
     marginTop: 20,
     marginBottom: 10,
   },

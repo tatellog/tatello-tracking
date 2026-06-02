@@ -136,6 +136,10 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
                 canPreventDefault: true,
               })
               if (!focused && !event.defaultPrevented) {
+                // Light selection tick on tab change — the BitePal-style
+                // tactile feel, consistent with the buttons that already
+                // haptic. Respects the OS haptic setting; no-ops if off.
+                Haptics.selectionAsync().catch(() => {})
                 navigation.navigate(route.name)
               }
             }
