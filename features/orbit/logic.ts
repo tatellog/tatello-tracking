@@ -265,3 +265,113 @@ export function dimensionDetail(key: DimensionKey, s: DailySignals | null): stri
       return s.on_period ? 'Estás en tu periodo.' : 'Fuera del periodo.'
   }
 }
+
+/* ── La lectura del día (determinística, sin IA) ──────────────────────
+ *
+ * Una observación honesta que cruza las señales de HOY — el "para qué"
+ * útil del Día mientras el motor de órbitas (IA) llega. Solo afirma lo
+ * que está en daily_signals: no predice, no receta, no juzga. El motor
+ * después refina la redacción; la selección por prioridad ya es real.
+ *
+ * Prioridad (validada con behavioral): pre-período+bajón > proteína
+ * cuidada (identidad) > estrés+sueño corto > sueño corto+energía baja
+ * > buen día > alineado (fallback). "Sin señal" cuando no hay nada.
+ */
+export type DailyReadingCategory =
+  | 'prePeriodLow'
+  | 'proteinCared'
+  | 'stressShortSleep'
+  | 'shortSleepLowEnergy'
+  | 'goodDay'
+  | 'aligned'
+  | 'noSignal'
+
+const SHORT_SLEEP_MIN = 6 * 60
+const LOW_1_5 = 2
+const HIGH_1_5 = 4
+
+function hasAnySignalToday(s: DailySignals): boolean {
+  return (
+    s.sleep_minutes != null ||
+    s.energy != null ||
+    s.mood != null ||
+    s.stress != null ||
+    s.motivation != null ||
+    s.meal_count != null ||
+    s.trained === true ||
+    s.rested === true ||
+    s.on_period === true
+  )
+}
+
+export function dailyReadingCategory(
+  s: DailySignals | null,
+  opts: { isPrePeriod: boolean; proteinTarget: number | null },
+): DailyReadingCategory {
+  if (!s || !hasAnySignalToday(s)) return 'noSignal'
+  const shortSleep = s.sleep_minutes != null && s.sleep_minutes < SHORT_SLEEP_MIN
+  const lowEnergy = s.energy != null && s.energy <= LOW_1_5
+  const highStress = s.stress != null && s.stress >= HIGH_1_5
+  const goodSleep = s.sleep_quality != null && s.sleep_quality >= HIGH_1_5
+  const goodEnergy = s.energy != null && s.energy >= HIGH_1_5
+  const lowMood = s.mood === 'low'
+  const proteinGood =
+    opts.proteinTarget != null && s.protein_g != null && s.protein_g >= opts.proteinTarget * 0.9
+
+  if (opts.isPrePeriod && (lowEnergy || lowMood)) return 'prePeriodLow'
+  if (proteinGood) return 'proteinCared'
+  if (highStress && shortSleep) return 'stressShortSleep'
+  if (shortSleep && lowEnergy) return 'shortSleepLowEnergy'
+  if (goodSleep && goodEnergy) return 'goodDay'
+  return 'aligned'
+}
+
+/* 3 variants per category so the same line doesn't repeat day to day
+ * (the cooldown picks a fresh one). Copy: observa, no manda; pregunta
+ * más que afirma; sin culpa, sin receta, sin imperativo duro. Draft —
+ * pasa por voice-and-copy + manifesto-reviewer antes del launch. */
+export const DAILY_READING_VARIANTS: Record<DailyReadingCategory, readonly string[]> = {
+  prePeriodLow: [
+    'Estos días tu cuerpo pide más. Ir más despacio está bien.',
+    'La semana antes de tu período pesa distinto. Tiene sentido ir con calma.',
+    'Tu cuerpo está pidiendo calma estos días. Dársela está bien.',
+  ],
+  proteinCared: [
+    'Vas cuidando tu proteína. Tu cuerpo lo nota.',
+    'Buena proteína hoy. Se nota en cómo te sostiene.',
+    'Le diste a tu cuerpo lo que necesita hoy.',
+  ],
+  stressShortSleep: [
+    'Vienes con tensión y poco descanso. Hoy basta con lo suave.',
+    'Noche corta y un día cargado. ¿Algo está pesando?',
+    'Poco sueño y mucha tensión. Ser suave contigo hoy está bien.',
+  ],
+  shortSleepLowEnergy: [
+    'Dormiste poco y amaneces con poca energía. Ir suave está bien.',
+    'Noche corta, y hoy el cuerpo viene en bajo. Tiene sentido.',
+    'Poca energía después de poco sueño. Está bien que cueste.',
+  ],
+  goodDay: [
+    'Buena noche, buena energía. El cuerpo viene con impulso hoy.',
+    'Dormiste bien y se nota. Hoy hay con qué.',
+    'Energía en alto hoy. Para disfrutarla si quieres.',
+  ],
+  aligned: [
+    'Tu día va tomando forma.',
+    'Hoy tu sistema se está escribiendo.',
+    'Vas dejando señal. Sigue tu ritmo.',
+  ],
+  noSignal: [
+    'Tu día está por escribirse. En cuanto registres algo, empiezo a leerte.',
+    'Aún no hay señal de hoy. Cuando registres, te leo.',
+  ],
+}
+
+/* Categories worth repeating even on consecutive days (high value).
+ * The rest are suppressed (silence) if they'd repeat — see useDailyReading. */
+export const REPEATABLE_READINGS: readonly DailyReadingCategory[] = [
+  'prePeriodLow',
+  'proteinCared',
+  'stressShortSleep',
+  'noSignal',
+]

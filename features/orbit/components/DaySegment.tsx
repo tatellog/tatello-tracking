@@ -5,12 +5,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
+import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { useMacroTargets } from '@/features/macros/hooks'
 import { EmText } from '@/components/EmText'
 import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
 import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals, useTodaySignals } from '../hooks'
+import { useDailyReading } from '../useDailyReading'
 import {
   deriveDimensions,
   dimensionDetail,
@@ -24,7 +27,6 @@ import { CosmicParticles } from './CosmicParticles'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
-import { PreviewBanner } from './PreviewBanner'
 import { StelarHeadline } from './StelarHeadline'
 import { StelarVoice } from './StelarVoice'
 
@@ -69,12 +71,23 @@ const LIT_PHRASE: Partial<Record<DimensionKey, string>> = {
 
 export function DaySegment() {
   const router = useRouter()
-  const { data } = useTodaySignals()
+  const { data, isLoading } = useTodaySignals()
   const { data: hasAny } = useHasAnySignals()
   const signals = data ?? null
   const dimensions = deriveDimensions(signals)
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
   const [ignited, setIgnited] = useState<DimensionKey[]>([])
+
+  // The deterministic daily reading — the real, honest voice of the Día
+  // while the AI engine is mock. Crosses today's signals + cycle phase.
+  const cycle = useCyclePhase()
+  const targets = useMacroTargets()
+  const reading = useDailyReading({
+    signals,
+    ready: !isLoading,
+    isPrePeriod: cycle?.phase === 'lutea',
+    proteinTarget: targets.data?.protein_g ?? null,
+  })
 
   // On arrival, compare today's lit dimensions to the last snapshot and
   // celebrate the ones that newly crossed into "brillante". Persist the
@@ -143,34 +156,33 @@ export function DaySegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Honest framing while the engine is mock — the prose below is
-          an example, not a real reading. */}
-      {ENGINE_ACTIVE ? null : <PreviewBanner />}
-
-      {/* Compact header — archetype as the only hero. The "Tu
-          lente de hoy" eyebrow + per-tone counts were removed:
-          the orbital diagram itself shows how many dimensions are
-          brillantes (bright halos) and en formación (dim), so the
-          textual meta was duplicating visual info. LiveDot stays
-          when the engine is active to signal a live read. */}
-      <View style={styles.header}>
-        <EmText
-          text={MOCK_ARQUETIPO.name}
-          emphasis={MOCK_ARQUETIPO.emphasis}
-          style={styles.archetype}
-          emStyle={styles.archetypeEm}
-        />
-        {ENGINE_ACTIVE ? (
-          <View style={styles.metaRow}>
-            <LiveDot />
-            <Text style={styles.metaB} numberOfLines={1}>
-              <Text>leído por </Text>
-              <Text style={styles.metaStelar}>Stelar</Text>
-              <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
-            </Text>
+      {/* The day's voice. While the engine is mock, the deterministic
+          reading IS the real, honest lede (it only states today's facts,
+          verifiable by tapping the stars). The AI archetype + headline
+          take over once ENGINE_ACTIVE. */}
+      {ENGINE_ACTIVE ? (
+        <>
+          <View style={styles.header}>
+            <EmText
+              text={MOCK_ARQUETIPO.name}
+              emphasis={MOCK_ARQUETIPO.emphasis}
+              style={styles.archetype}
+              emStyle={styles.archetypeEm}
+            />
+            <View style={styles.metaRow}>
+              <LiveDot />
+              <Text style={styles.metaB} numberOfLines={1}>
+                <Text>leído por </Text>
+                <Text style={styles.metaStelar}>Stelar</Text>
+                <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
+              </Text>
+            </View>
           </View>
-        ) : null}
-      </View>
+          <StelarHeadline parts={MOCK_HEADLINE.parts} />
+        </>
+      ) : reading ? (
+        <Text style={styles.reading}>{reading}</Text>
+      ) : null}
 
       {/* Arrival payoff — what newly lit since the last visit (P2A). */}
       {ignited.length > 0 ? (
@@ -180,9 +192,6 @@ export function DaySegment() {
             : '✦ Encendiste nuevas luces en tu cielo.'}
         </Animated.Text>
       ) : null}
-
-      {/* Lifted lede — STELAR's read in two lines, before the visual. */}
-      <StelarHeadline parts={MOCK_HEADLINE.parts} />
 
       {/* Hero — the orbital diagram takes the full bleed. The
           right-side six-dimension node list was retired: with each
@@ -285,27 +294,31 @@ export function DaySegment() {
 
       {!selected ? <Text style={styles.hint}>Toca una dimensión para leerla.</Text> : null}
 
-      {/* The one move STELAR weights highest today. Heavier card than
-          Voz so it reads as call-to-action, not narration. */}
-      <DayAction title={MOCK_ACCION_DEL_DIA.title} reason={MOCK_ACCION_DEL_DIA.reason} />
-
-      {reveal ? (
-        <Animated.View entering={FadeIn.duration(700)}>
-          {/* One-time framing — names the first reading as Stelar's. */}
-          <View style={styles.revealIntro}>
-            <Text style={styles.revealEyebrow}>Tu primera lectura</Text>
-            <Text style={styles.revealLine}>
-              Stelar leyó tus últimos {MOCK_ARQUETIPO.daysRead} días para escribir lo que sigue.
-              Cuanto más registres, más te conoce.
-            </Text>
-          </View>
-          <Animated.View entering={FadeIn.duration(1100).delay(420)}>
+      {/* AI prose — the recommended move + Voz de Stelar. Hidden while
+          the engine is mock; the deterministic reading above is the real
+          voice for now. Returns when ENGINE_ACTIVE flips true. */}
+      {ENGINE_ACTIVE ? (
+        <>
+          <DayAction title={MOCK_ACCION_DEL_DIA.title} reason={MOCK_ACCION_DEL_DIA.reason} />
+          {reveal ? (
+            <Animated.View entering={FadeIn.duration(700)}>
+              {/* One-time framing — names the first reading as Stelar's. */}
+              <View style={styles.revealIntro}>
+                <Text style={styles.revealEyebrow}>Tu primera lectura</Text>
+                <Text style={styles.revealLine}>
+                  Stelar leyó tus últimos {MOCK_ARQUETIPO.daysRead} días para escribir lo que sigue.
+                  Cuanto más registres, más te conoce.
+                </Text>
+              </View>
+              <Animated.View entering={FadeIn.duration(1100).delay(420)}>
+                <StelarVoice parts={MOCK_VOZ_DIA.parts} />
+              </Animated.View>
+            </Animated.View>
+          ) : (
             <StelarVoice parts={MOCK_VOZ_DIA.parts} />
-          </Animated.View>
-        </Animated.View>
-      ) : (
-        <StelarVoice parts={MOCK_VOZ_DIA.parts} />
-      )}
+          )}
+        </>
+      ) : null}
     </Animated.View>
   )
 }
@@ -579,6 +592,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
+  },
+  // The deterministic daily reading — the real lede while the engine is
+  // mock. Serif italic, centered, calm; a sentence, not a name.
+  reading: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    textAlign: 'center',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 19,
+    lineHeight: 27,
+    color: colors.leche,
   },
   // Arrival payoff — the line that celebrates a newly-lit dimension.
   ignited: {
