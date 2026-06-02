@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import {
+  AccessibilityInfo,
   Alert,
   Dimensions,
   Image,
@@ -18,10 +19,16 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  FadeInUp,
   FadeOut,
+  type SharedValue,
+  useAnimatedProps,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -121,6 +128,42 @@ function ScanPlate({ uri }: { uri: string }) {
   )
 }
 
+// The text-analyze plate — the no-photo counterpart of ScanPlate, so a
+// describe-by-text scan is as visual as a photo scan. A dark disc with a
+// breathing ✦ (the IA sigil) inside the same OrbitLoader ring.
+function TextAnalyzePlate() {
+  const breath = useSharedValue(0)
+  const reduce = useReducedMotion() ?? false
+  useEffect(() => {
+    if (reduce) {
+      breath.value = 0.5
+      return
+    }
+    breath.value = withRepeat(
+      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(breath)
+  }, [reduce, breath])
+  const starStyle = useAnimatedStyle(() => ({
+    opacity: 0.7 + breath.value * 0.3,
+    transform: [{ scale: 0.9 + breath.value * 0.18 }],
+  }))
+  return (
+    <View style={[styles.plate, styles.textPlate]}>
+      <Animated.View style={starStyle} pointerEvents="none">
+        <Svg width={68} height={68} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
+            fill={colors.magentaHot}
+          />
+        </Svg>
+      </Animated.View>
+    </View>
+  )
+}
+
 // A pencil — marks an editable field.
 function PencilIcon({ color }: { color: string }) {
   return (
@@ -180,6 +223,206 @@ function RescanIcon({ color }: { color: string }) {
         strokeLinejoin="round"
       />
     </Svg>
+  )
+}
+
+// Coach lines for the reveal — about the ACT of logging and the day,
+// never about the dish (the scan is mocked for now). Cormorant italic.
+// Reviewed with voice-and-copy (v3.0): no judgement, no guilt, no push.
+const REVEAL_LINES = [
+  'Registrado. Tu día va tomando forma.',
+  'Una estrella más en tu cielo.',
+  'Tu cielo te acompaña.',
+  'Cada registro deja luz.',
+  'Aquí sigues.',
+  'Lo dejaste anotado. Eso ya es algo.',
+]
+
+// A faint asterism that breathes below the scanning plate — the germ of
+// the constellation this meal will join. Decorative; magenta = the IA at
+// work. Reduced motion parks it at a steady opacity.
+function ConstellationSeed() {
+  const pulse = useSharedValue(0)
+  const reduce = useReducedMotion() ?? false
+  useEffect(() => {
+    if (reduce) {
+      pulse.value = 0.5
+      return
+    }
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(pulse)
+  }, [reduce, pulse])
+  const style = useAnimatedStyle(() => ({ opacity: 0.35 + pulse.value * 0.4 }))
+  return (
+    <Animated.View style={[styles.seed, style]} pointerEvents="none">
+      <Svg width={200} height={80} viewBox="0 0 200 80" fill="none">
+        <Path
+          d="M28 22 L74 48 L120 30 L168 56"
+          stroke={colors.magenta}
+          strokeWidth={0.5}
+          opacity={0.22}
+        />
+        <Circle cx={28} cy={22} r={1.6} fill={colors.magenta} opacity={0.5} />
+        <Circle cx={74} cy={48} r={2.1} fill={colors.magenta} opacity={0.7} />
+        <Circle cx={120} cy={30} r={1.4} fill={colors.magenta} opacity={0.45} />
+        <Circle cx={168} cy={56} r={1.8} fill={colors.magenta} opacity={0.6} />
+      </Svg>
+    </Animated.View>
+  )
+}
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+const REVEAL_PLATE = 228
+const REVEAL_RING_STROKE = 3.5
+// 4-point star (48-viewBox) — the no-photo center + the burst sparkles.
+const STAR_4 = 'M24 8 L26.6 21.4 L40 24 L26.6 26.6 L24 40 L21.4 26.6 L8 24 L21.4 21.4 Z'
+// Angles (deg) the celebration sparkles fly out toward.
+const BURST_ANGLES = [-90, -34, 22, 78, 134, 190, 246]
+
+// One celebration sparkle that flies outward from the plate and fades.
+// Driven by the shared `progress`; reduced motion keeps it hidden.
+function BurstSparkle({
+  progress,
+  angle,
+  reduce,
+}: {
+  progress: SharedValue<number>
+  angle: number
+  reduce: boolean
+}) {
+  const rad = (angle * Math.PI) / 180
+  const dx = Math.cos(rad)
+  const dy = Math.sin(rad)
+  const style = useAnimatedStyle(() => {
+    const p = progress.value
+    return {
+      opacity: reduce ? 0 : p <= 0.02 ? 0 : (1 - p) * 0.9,
+      transform: [
+        { translateX: dx * p * 72 },
+        { translateY: dy * p * 72 },
+        { scale: 0.4 + p * 0.7 },
+      ],
+    }
+  })
+  return (
+    <Animated.View style={[styles.burstSparkle, style]} pointerEvents="none">
+      <Svg width={15} height={15} viewBox="0 0 48 48" fill="none">
+        <Path d={STAR_4} fill={colors.oroLight} />
+      </Svg>
+    </Animated.View>
+  )
+}
+
+// The reveal plate — the scanned photo (or a gold star) inside an oro ring
+// that COMPLETES once, on a gold bloom, with a burst of sparkles. The scan
+// theatre's spinning arc resolves here into a closed, golden "listo". A
+// single forward animation; reduced motion shows it already arrived.
+function RevealPlate({ uri }: { uri?: string }) {
+  const fill = useSharedValue(0)
+  const pop = useSharedValue(0)
+  const burst = useSharedValue(0)
+  const reduce = useReducedMotion() ?? false
+
+  useEffect(() => {
+    if (reduce) {
+      fill.value = 1
+      pop.value = 1
+      burst.value = 0
+      return
+    }
+    pop.value = withSequence(
+      withTiming(1.04, { duration: 520, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: 260, easing: Easing.inOut(Easing.sin) }),
+    )
+    fill.value = withTiming(1, { duration: 900, easing: Easing.inOut(Easing.cubic) })
+    burst.value = withDelay(420, withTiming(1, { duration: 820, easing: Easing.out(Easing.quad) }))
+    return () => {
+      cancelAnimation(fill)
+      cancelAnimation(pop)
+      cancelAnimation(burst)
+    }
+  }, [reduce, fill, pop, burst])
+
+  const c = REVEAL_PLATE / 2
+  const r = c - REVEAL_RING_STROKE
+  const circ = 2 * Math.PI * r
+
+  const ringProps = useAnimatedProps(() => ({ strokeDashoffset: circ * (1 - fill.value) }))
+  const plateStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, 0.4 + pop.value),
+    transform: [{ scale: 0.82 + pop.value * 0.18 }],
+  }))
+  const bloomStyle = useAnimatedStyle(() => ({
+    opacity: fill.value * 0.55,
+    transform: [{ scale: 0.7 + fill.value * 0.5 }],
+  }))
+
+  return (
+    <View style={styles.revealPlateWrap}>
+      <Animated.View style={[styles.revealBloom, bloomStyle]} pointerEvents="none" />
+      <Svg width={REVEAL_PLATE} height={REVEAL_PLATE} style={StyleSheet.absoluteFill}>
+        <Circle
+          cx={c}
+          cy={c}
+          r={r}
+          stroke={colors.oro}
+          strokeOpacity={0.16}
+          strokeWidth={REVEAL_RING_STROKE}
+          fill="none"
+        />
+        <AnimatedCircle
+          cx={c}
+          cy={c}
+          r={r}
+          stroke={colors.oro}
+          strokeOpacity={0.32}
+          strokeWidth={REVEAL_RING_STROKE * 2.6}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={circ}
+          animatedProps={ringProps}
+          rotation={-90}
+          originX={c}
+          originY={c}
+        />
+        <AnimatedCircle
+          cx={c}
+          cy={c}
+          r={r}
+          stroke={colors.oro}
+          strokeWidth={REVEAL_RING_STROKE}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={circ}
+          animatedProps={ringProps}
+          rotation={-90}
+          originX={c}
+          originY={c}
+        />
+      </Svg>
+      <Animated.View style={[styles.revealPlateInner, plateStyle]}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.revealPhoto} resizeMode="cover" />
+        ) : (
+          <Svg width={72} height={72} viewBox="0 0 48 48" fill="none">
+            <Circle cx={24} cy={24} r={11} fill={colors.oro} opacity={0.14} />
+            <Path d={STAR_4} fill={colors.oro} />
+            <Path
+              d="M24 14 L25 22.9 L34 24 L25 25.1 L24 34 L23 25.1 L14 24 L23 22.9 Z"
+              fill={colors.oroLeche}
+              opacity={0.9}
+            />
+          </Svg>
+        )}
+      </Animated.View>
+      {BURST_ANGLES.map((a) => (
+        <BurstSparkle key={a} progress={burst} angle={a} reduce={reduce} />
+      ))}
+    </View>
   )
 }
 
@@ -279,9 +522,16 @@ export default function ScanMealScreen() {
   const updateMeal = useUpdateMeal()
   const editMeal = useMealById(editId)
 
-  const [phase, setPhase] = useState<'describe' | 'scanning' | 'confirm'>(
+  const [phase, setPhase] = useState<'describe' | 'scanning' | 'confirm' | 'reveal'>(
     isEdit || isManual ? 'confirm' : isDescribe ? 'describe' : 'scanning',
   )
+  // The reveal state (state C) — protein of the just-logged meal + the
+  // coach line, shown after a new log before returning to the tab.
+  const [revealProtein, setRevealProtein] = useState(0)
+  const [revealLine, setRevealLine] = useState(REVEAL_LINES[0] ?? '')
+  // Warm in-app note when the scan can't read the plate/text (replaces a
+  // cold system Alert). Cleared once the user adds an ingredient.
+  const [scanError, setScanError] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
@@ -311,9 +561,10 @@ export default function ScanMealScreen() {
       })
       .catch(() => {
         // Vision failed (network / key / unreadable photo) — never leave
-        // the user stuck in the scanning theatre. Fall to manual entry.
+        // the user stuck in the scanning theatre. Fall to the confirm form
+        // with a warm in-app note (not a cold system Alert).
         if (!alive) return
-        Alert.alert('No pudimos leer tu plato', 'Puedes registrarlo a mano.')
+        setScanError('Esta foto se me complicó. Cuéntame qué hay en tu plato y lo anotamos juntas.')
         setPhase('confirm')
       })
     return () => {
@@ -335,7 +586,7 @@ export default function ScanMealScreen() {
         setPhase('confirm')
       })
       .catch(() => {
-        Alert.alert('No pudimos leerlo', 'Puedes registrarlo a mano.')
+        setScanError('No alcancé a leerlo. Ajusta los ingredientes o agrégalos tú.')
         setPhase('confirm')
       })
   }
@@ -365,6 +616,35 @@ export default function ScanMealScreen() {
     )
     if (m.photo_storage_path) setPhotoUri(mealPhotoUrl(m.photo_storage_path))
   }, [isEdit, editMeal.data])
+
+  // The reveal auto-dismisses after the star has settled — the user can
+  // also tap the checkmark to leave sooner. With a screen reader or
+  // reduced motion on, we do NOT auto-dismiss (2.4s isn't enough to read
+  // the confirmation aloud); the user closes it themselves. We announce
+  // the result either way.
+  useEffect(() => {
+    if (phase !== 'reveal') return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let cancelled = false
+    AccessibilityInfo.announceForAccessibility(
+      `Comida registrada. ${revealProtein} gramos de proteína.`,
+    )
+    Promise.all([
+      AccessibilityInfo.isScreenReaderEnabled(),
+      AccessibilityInfo.isReduceMotionEnabled(),
+    ])
+      .then(([screenReader, reduceMotion]) => {
+        if (cancelled || screenReader || reduceMotion) return
+        timer = setTimeout(() => router.back(), 2400)
+      })
+      .catch(() => {
+        if (!cancelled) timer = setTimeout(() => router.back(), 2400)
+      })
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [phase, router, revealProtein])
 
   // Advance the status line while scanning, holding on the last step.
   useEffect(() => {
@@ -414,6 +694,7 @@ export default function ScanMealScreen() {
   }
   const addIngredient = () => {
     Haptics.selectionAsync().catch(() => {})
+    setScanError(null)
     setIngredients((prev) => [
       ...prev,
       // Placeholder per-100 macros — a real food-database lookup
@@ -469,6 +750,14 @@ export default function ScanMealScreen() {
     )
   }
 
+  // New logs land on the reveal (state C) before returning to the tab —
+  // a star joins the sky + the protein of this meal + a coach line.
+  const goToReveal = (protein: number) => {
+    setRevealProtein(Math.round(protein))
+    setRevealLine(REVEAL_LINES[Math.floor(Math.random() * REVEAL_LINES.length)] ?? REVEAL_LINES[0]!)
+    setPhase('reveal')
+  }
+
   const handleConfirm = async () => {
     if (saving) return
     if (isManual) {
@@ -487,7 +776,10 @@ export default function ScanMealScreen() {
           manualPhoto = await uploadMealPhoto(photoUri)
         } catch (e) {
           console.warn('[scan-meal] photo upload failed', e)
-          Alert.alert('Foto', 'No pudimos guardar la foto, pero sí registramos la comida.')
+          Alert.alert(
+            'Tu comida quedó registrada',
+            'La foto no alcanzó a subir, pero lo que importa ya está anotado.',
+          )
         }
       }
       createMeal.mutate(
@@ -501,7 +793,10 @@ export default function ScanMealScreen() {
           meal_type: mealType,
           photo_storage_path: manualPhoto,
         },
-        { onSuccess: () => router.back(), onError: () => setSaving(false) },
+        {
+          onSuccess: () => goToReveal(Math.min(500, Math.max(0, Number(proteinInput) || 0))),
+          onError: () => setSaving(false),
+        },
       )
       return
     }
@@ -530,7 +825,10 @@ export default function ScanMealScreen() {
           photoPath = await uploadMealPhoto(photoUri)
         } catch (e) {
           console.warn('[scan-meal] photo upload failed', e)
-          Alert.alert('Foto', 'No pudimos guardar la foto, pero sí actualizamos la comida.')
+          Alert.alert(
+            'Tu comida quedó actualizada',
+            'La foto no alcanzó a subir, pero tus cambios ya están guardados.',
+          )
         }
       }
       updateMeal.mutate(
@@ -569,7 +867,7 @@ export default function ScanMealScreen() {
         ingredients: storedIngredients,
       },
       {
-        onSuccess: () => router.back(),
+        onSuccess: () => goToReveal(macros.protein_g),
         onError: () => setSaving(false),
       },
     )
@@ -637,7 +935,9 @@ export default function ScanMealScreen() {
                   <ScanPlate uri={photoUri} />
                 </OrbitLoader>
               ) : (
-                <StarLoader size={40} />
+                <OrbitLoader size={228}>
+                  <TextAnalyzePlate />
+                </OrbitLoader>
               )}
               <View style={styles.scanLabelSlot}>
                 <Animated.Text
@@ -649,11 +949,42 @@ export default function ScanMealScreen() {
                   {SCAN_STEPS[stepIndex]}
                 </Animated.Text>
               </View>
+              <ConstellationSeed />
             </View>
             <View style={styles.scanFooter}>
               <SparkleIcon color={colors.magenta} />
               <Text style={styles.scanBadgeText}>Powered by IA</Text>
             </View>
+          </View>
+        ) : phase === 'reveal' ? (
+          <View style={styles.reveal}>
+            <RevealPlate uri={photoUri} />
+            <Animated.Text entering={FadeInUp.duration(520).delay(700)} style={styles.revealLine}>
+              {revealLine}
+            </Animated.Text>
+            <Animated.View entering={FadeInUp.duration(520).delay(900)} style={styles.revealMacro}>
+              <Text style={styles.revealMacroLabel}>Proteína · </Text>
+              <Text style={styles.revealMacroValue}>{revealProtein}g</Text>
+            </Animated.View>
+            <Animated.View entering={FadeInUp.duration(520).delay(1100)}>
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={16}
+                style={styles.revealCheck}
+                accessibilityRole="button"
+                accessibilityLabel="Listo, volver a la pantalla anterior"
+              >
+                <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M5 13 L10 18 L19 7"
+                    stroke={colors.oro}
+                    strokeWidth={2.4}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              </Pressable>
+            </Animated.View>
           </View>
         ) : (
           <>
@@ -681,28 +1012,36 @@ export default function ScanMealScreen() {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
             >
+              {scanError ? (
+                <Animated.View entering={FadeIn.duration(400)} style={styles.scanErrorNote}>
+                  <Text style={styles.scanErrorText}>{scanError}</Text>
+                </Animated.View>
+              ) : null}
+
               {photoUri ? (
                 <Pressable
                   onPress={photoOptions}
                   style={[styles.photoWrap, { width: photoW, height: photoH }]}
                   accessibilityRole="button"
                   accessibilityLabel={
-                    isEdit || isManual ? 'Cambiar la foto' : 'Reescanear o cambiar la foto'
+                    isEdit || isManual || isDescribe
+                      ? 'Cambiar la foto'
+                      : 'Reescanear o cambiar la foto'
                   }
                 >
                   <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
                   <View style={styles.photoChip}>
-                    {isEdit || isManual ? (
+                    {isEdit || isManual || isDescribe ? (
                       <CameraIcon color={colors.leche} size={14} />
                     ) : (
                       <RescanIcon color={colors.leche} />
                     )}
                     <Text style={styles.photoChipText}>
-                      {isEdit || isManual ? 'Cambiar foto' : 'Reescanear'}
+                      {isEdit || isManual || isDescribe ? 'Cambiar foto' : 'Reescanear'}
                     </Text>
                   </View>
                 </Pressable>
-              ) : isEdit || isManual ? (
+              ) : isEdit || isManual || isDescribe ? (
                 <Pressable
                   onPress={photoOptions}
                   style={styles.photoPlaceholder}
@@ -730,7 +1069,9 @@ export default function ScanMealScreen() {
               <View style={styles.slotPill}>
                 {MEAL_TYPES.map((mt) => {
                   const active = mt.value === mealType
-                  const tint = active ? colors.magenta : colors.niebla
+                  // Oro (not magenta) — the moment of day is sky/light,
+                  // distinct from magenta which is the IA's voice.
+                  const tint = active ? colors.oro : colors.niebla
                   return (
                     <Pressable
                       key={mt.value}
@@ -892,6 +1233,105 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 30,
   },
+  // The constellation germ under the scanning plate.
+  seed: {
+    marginTop: 4,
+  },
+  // ── reveal (state C) ───────────────────────────────────────────────
+  reveal: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 18,
+    paddingHorizontal: 32,
+  },
+  revealPlateWrap: {
+    width: REVEAL_PLATE,
+    height: REVEAL_PLATE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Gold "listo" bloom behind the plate — a soft glowing disc.
+  revealBloom: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: colors.oroTint,
+    shadowColor: colors.oro,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 44,
+    elevation: 6,
+  },
+  revealPlateInner: {
+    width: 196,
+    height: 196,
+    borderRadius: 98,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgCard,
+  },
+  revealPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  burstSparkle: {
+    position: 'absolute',
+  },
+  revealLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.headingLg,
+    lineHeight: typography.sizes.headingLg * 1.3,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  revealMacro: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  revealMacroLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  revealMacroValue: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.title,
+    color: colors.leche,
+  },
+  // A round gold "done" stamp — reads as confirmed, not as a nav/tab
+  // button (a circle + checkmark, no stadium pill).
+  revealCheck: {
+    marginTop: 16,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.oroTint,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+  },
+  // Warm in-app note when the scan couldn't read the photo/text.
+  scanErrorNote: {
+    backgroundColor: colors.oroTint,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  scanErrorText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.sizes.bodyLarge * 1.3,
+    color: colors.leche,
+  },
   plate: {
     width: PLATE,
     height: PLATE,
@@ -900,6 +1340,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.bruma,
     backgroundColor: colors.bgCard,
+  },
+  // The text-analyze plate centers its breathing ✦.
+  textPlate: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   plateImg: {
     ...StyleSheet.absoluteFillObject,
@@ -1119,7 +1564,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   slotSegActive: {
-    backgroundColor: colors.magentaTint,
+    backgroundColor: colors.oroTint,
   },
   slotSegText: {
     fontFamily: typography.uiBold,
