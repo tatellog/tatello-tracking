@@ -17,6 +17,8 @@ import type {
   DimensionContext,
   Patron,
   VozParte,
+  WeekObservation,
+  WeekRecap,
 } from './types'
 
 const WEEKDAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
@@ -189,6 +191,183 @@ export function buildVozSemanaReal(
     signature: { confidence, scope: `${daysRead} ${daysRead === 1 ? 'día leído' : 'días leídos'}` },
   }
 }
+
+/* ── Esta semana, en números — the Semana "registros" recap ──────────
+ * This week's log totals (Sunday-first, only the days up to today). Sleep
+ * and water are averaged over the days that actually carry that signal, so
+ * a day you didn't log sleep doesn't drag the average down — null when no
+ * day carries it (the UI shows "—", never a 0 that reads as failure). */
+export function buildWeekRecap(signals: readonly DailySignals[], todayIdx: number): WeekRecap {
+  const byIdx = new Map<number, DailySignals>()
+  for (const s of signals) {
+    if (s.day) byIdx.set(weekdayOf(s.day), s)
+  }
+  let entrenos = 0
+  let meals = 0
+  let sleepSum = 0
+  let sleepN = 0
+  let waterSum = 0
+  let waterN = 0
+  for (let i = 0; i <= todayIdx && i < 7; i++) {
+    const s = byIdx.get(i)
+    if (s == null) continue
+    if (s.trained) entrenos += 1
+    if (s.meal_count) meals += s.meal_count
+    if (s.sleep_minutes != null) {
+      sleepSum += s.sleep_minutes
+      sleepN += 1
+    }
+    if (s.water_glasses != null) {
+      waterSum += s.water_glasses
+      waterN += 1
+    }
+  }
+  return {
+    entrenos,
+    meals,
+    sleepAvgMin: sleepN ? Math.round(sleepSum / sleepN) : null,
+    waterAvg: waterN ? Math.round((waterSum / waterN) * 10) / 10 : null,
+  }
+}
+
+/* ── Lo que noté esta semana — within-week micro-observations ─────────
+ * Concrete, day-named facts about THIS week (not month recurrences): the
+ * days you moved, hit protein, went over your calorie target, slept short,
+ * or ran low on energy. Honest but never a verdict — "tu comida pasó tu
+ * objetivo", not "comiste de más". Only the days actually logged count;
+ * future days are ignored. Capped so it stays a glance, wins lead. */
+const SLEEP_SHORT_MIN = 390 // < 6.5 h reads as a short night
+const LOW_ENERGY = 2 // energy ≤ 2 (of 5)
+const OBS_MAX = 4
+/* A watch covering this many logged days has SATURATED the week — sustained,
+ * not a casual note. The manifiesto's red line says the answer there is
+ * support, not a day-by-day amplification, so we suppress it (a real referral
+ * flow lives outside this glance). */
+const SATURATION = 5
+/* At most this many "watch" lines, so the card never reads as a balance of
+ * carencias — wins always lead. */
+const MAX_WATCHES = 2
+
+/** "N día" / "N días". */
+function dCount(n: number): string {
+  return `${n} ${n === 1 ? 'día' : 'días'}`
+}
+
+type Lived = { idx: number; s: DailySignals }
+
+export function buildWeekObservations(
+  signals: readonly DailySignals[],
+  todayIdx: number,
+  ctx?: DimensionContext,
+): WeekObservation[] {
+  const byIdx = new Map<number, DailySignals>()
+  for (const s of signals) {
+    if (s.day) byIdx.set(weekdayOf(s.day), s)
+  }
+  const lived: Lived[] = []
+  for (let i = 0; i <= todayIdx && i < 7; i++) {
+    const s = byIdx.get(i)
+    if (s != null) lived.push({ idx: i, s })
+  }
+  const match = (fn: (s: DailySignals) => boolean | null | undefined): Lived[] =>
+    lived.filter((d) => fn(d.s))
+
+  const calTarget = ctx?.calorieTarget ?? null
+  const protTarget = ctx?.proteinTarget ?? null
+  const trained = match((s) => s.trained)
+  const proteinHit = match(
+    (s) => protTarget != null && s.protein_g != null && s.protein_g >= protTarget,
+  )
+  const foodOver = match((s) => calTarget != null && s.calories != null && s.calories > calTarget)
+  const sleepShort = match((s) => s.sleep_minutes != null && s.sleep_minutes < SLEEP_SHORT_MIN)
+  const energyLow = match((s) => s.energy != null && s.energy <= LOW_ENERGY)
+
+  // Wins lead (manifiesto: register without guilt) and are listed freely.
+  const wins: WeekObservation[] = []
+  if (trained.length)
+    wins.push({
+      key: 'trained',
+      dimension: 'cuerpo',
+      state: 'win',
+      title: 'Tu cuerpo, presente',
+      emphasis: 'presente',
+      tag: 'esta semana',
+      detail: `Te moviste ${dCount(trained.length)}.`,
+      days: trained.map((d) => d.idx),
+      entries: trained.map((d) => ({ dayIdx: d.idx, value: 'entreno' })),
+      voz: 'Tu cuerpo dijo presente. Cada día que te moviste deja huella.',
+    })
+  if (proteinHit.length)
+    wins.push({
+      key: 'protein',
+      dimension: 'alimento',
+      state: 'win',
+      title: 'Tu proteína, en su lugar',
+      emphasis: 'proteína',
+      tag: 'esta semana',
+      detail: `La alcanzaste ${dCount(proteinHit.length)}.`,
+      days: proteinHit.map((d) => d.idx),
+      entries: proteinHit.map((d) => ({ dayIdx: d.idx, value: `${Math.round(d.s.protein_g!)} g` })),
+      voz: 'Tu proteína estuvo donde la querías. Es lo que sostiene tu cambio.',
+    })
+
+  // Watches — gentle, and suppressed when they saturate the week (red line).
+  const watches: WeekObservation[] = []
+  const addWatch = (matched: Lived[], o: WeekObservation): void => {
+    if (matched.length > 0 && matched.length < SATURATION) watches.push(o)
+  }
+  addWatch(foodOver, {
+    key: 'food-over',
+    dimension: 'alimento',
+    state: 'watch',
+    title: 'La mesa pidió más',
+    emphasis: 'más',
+    tag: 'esta semana',
+    detail: `${dCount(foodOver.length)} por encima de tu objetivo.`,
+    days: foodOver.map((d) => d.idx),
+    entries: foodOver.map((d) => ({
+      dayIdx: d.idx,
+      value: `${d.s.calories} cal`,
+      delta: calTarget != null ? `+${d.s.calories! - calTarget}` : undefined,
+    })),
+    voz: 'Algunos días la mesa pidió más. El resto sostuviste tu ritmo.',
+  })
+  addWatch(sleepShort, {
+    key: 'sleep-short',
+    dimension: 'sueno',
+    state: 'watch',
+    title: 'Noches más cortas',
+    emphasis: 'cortas',
+    tag: 'esta semana',
+    detail: `${dCount(sleepShort.length)} la noche se acortó.`,
+    days: sleepShort.map((d) => d.idx),
+    entries: sleepShort.map((d) => ({
+      dayIdx: d.idx,
+      value: `${(d.s.sleep_minutes! / 60).toFixed(1)} h`,
+    })),
+    voz: 'Algunas noches se quedaron cortas. El descanso también mueve tu cambio.',
+  })
+  addWatch(energyLow, {
+    key: 'energy-low',
+    dimension: 'energia',
+    state: 'watch',
+    title: 'Tu energía, en bajo',
+    emphasis: 'bajo',
+    tag: 'esta semana',
+    detail: `${dCount(energyLow.length)} tu energía estuvo baja.`,
+    days: energyLow.map((d) => d.idx),
+    entries: energyLow.map((d) => ({ dayIdx: d.idx, value: `${d.s.energy}/5` })),
+    voz: 'Tu energía bajó algunos días. ¿Algo te pesó esta semana?',
+  })
+
+  return [...wins, ...watches.slice(0, MAX_WATCHES)].slice(0, OBS_MAX)
+}
+
+/** Sunday-first weekday names ['Domingo'..'Sábado'] — exported so the
+ *  observation card + detail can label days from an observation's `days`. */
+export const WEEKDAY_NAMES_FULL = WEEKDAY_NAMES
+
+export type { WeekObservation, WeekObservationEntry } from './types'
 
 /* ── Lo que viene — Semana's bridge to the Mes patterns ──────────────
  * A gentle heads-up for the SOONEST upcoming day this week that carries

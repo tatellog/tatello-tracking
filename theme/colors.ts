@@ -1,15 +1,3 @@
-/**
- * Norte palette — warm dark sweat + magenta accent.
- *
- * Discipline rules:
- *   - No raw hex in components. Always pull from this token set.
- *   - Magenta appears at most twice per screen (one CTA + one
- *     emphasised word). If it spreads, it loses voice.
- *   - The legacy Pearl Mauve aliases (pearlBase, mauveDeep, …) are
- *     value-mapped to their Norte equivalents so untouched features
- *     stay coherent without a per-file refactor. Treat them as
- *     deprecated; reach for the canonical names below in new code.
- */
 export const colors = {
   // ── Surfaces ───────────────────────────────────────────────────
   bg: '#0A0608',
@@ -34,10 +22,6 @@ export const colors = {
   hairline: 'rgba(244, 236, 222, 0.10)',
   hairlineStrong: 'rgba(244, 236, 222, 0.22)',
 
-  // ── Oro / aura — la luz del cielo (misma paleta que el reveal) ──
-  // The observatory light: eyebrows, glyphs, chips, borders. Magenta
-  // stays the voice of Stelar (title emphasis + CTA only); gold is the
-  // sky's light spilling onto the surrounding chrome.
   oro: '#D9AE6F',
   oroSoft: '#E8B872',
   oroLight: '#FFE9C2',

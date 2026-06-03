@@ -167,3 +167,40 @@ export type DayIdentity = {
   emphasis: string
   enLuz: number
 }
+
+/* The Semana recap — this week's log totals, the "registros de esta semana".
+ * Averages are over the days that actually carry that signal (null when
+ * none yet), so a blank metric reads as "sin dato", never as zero/failure. */
+export type WeekRecap = {
+  entrenos: number
+  sleepAvgMin: number | null
+  meals: number
+  waterAvg: number | null
+}
+
+/* One day inside an observation's detail — the weekday, its value, and an
+ * optional delta vs target ("+400"). Powers the "Los días" list. */
+export type WeekObservationEntry = {
+  dayIdx: number // Sunday-first 0..6
+  value: string
+  delta?: string
+}
+
+/* A within-week micro-observation — a concrete fact about THIS week's actual
+ * days. NOT a recurrence (those need a month and live in Mes); just what
+ * happened, named by weekday. Now a tappable card: `title`/`emphasis` are the
+ * bold hero, `detail` the one-line subtitle, `days` light the mini week-glyph,
+ * and `entries`/`voz` fill the detail screen. `state` is 'win' (glyph in
+ * dimension color + halo) or 'watch' (glyph in oro — never red). */
+export type WeekObservation = {
+  key: string
+  dimension: DimensionKey
+  state: 'win' | 'watch'
+  title: string
+  emphasis: string
+  tag: string
+  detail: string
+  days: number[] // Sunday-first indices involved
+  entries: WeekObservationEntry[]
+  voz: string
+}

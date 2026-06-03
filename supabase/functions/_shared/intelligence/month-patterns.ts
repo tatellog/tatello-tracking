@@ -56,7 +56,10 @@ function detectTrainingCadence(history: readonly DailySignals[]): Patron | null 
 
   const wdTrained = days.filter((s) => monIdx(s.day!) < 5 && s.trained).length
   const weTrained = days.filter((s) => monIdx(s.day!) >= 5 && s.trained).length
-  const mostlyWeekday = wdTrained >= weTrained * 2
+  // Three honest shapes — the legend AND the voz both read from this, so
+  // the prose can never claim "entre semana" over weekend-leaning data.
+  const shape: 'weekday' | 'weekend' | 'spread' =
+    wdTrained >= weTrained * 2 ? 'weekday' : weTrained >= wdTrained * 2 ? 'weekend' : 'spread'
 
   // Build the weeks proof from the trained flag.
   const weeksMap = new Map<string, number[]>()
@@ -83,10 +86,18 @@ function detectTrainingCadence(history: readonly DailySignals[]): Patron | null 
     since: 'Leído en todo tu mes.',
     confidence: trained.length >= 12 ? 'alta' : 'media',
     caption: 'Tus entrenos, día por día.',
-    legend: mostlyWeekday
-      ? 'Te mueves casi siempre entre semana. El fin de semana suele quedar para descansar.'
-      : 'Tu movimiento se reparte a lo largo de la semana.',
-    voz: 'Tu cuerpo encontró un ritmo. Entre semana se mueve; cuando toca, descansa.',
+    legend:
+      shape === 'weekday'
+        ? 'Te mueves casi siempre entre semana. El fin de semana suele quedar para descansar.'
+        : shape === 'weekend'
+          ? 'Te mueves sobre todo el fin de semana. Entre semana el cuerpo descansa.'
+          : 'Tu movimiento se reparte a lo largo de la semana.',
+    voz:
+      shape === 'weekday'
+        ? 'Tu cuerpo encontró un ritmo. Entre semana se mueve; cuando toca, descansa.'
+        : shape === 'weekend'
+          ? 'Tu cuerpo encontró un ritmo. El fin de semana se mueve; entre semana descansa.'
+          : 'Tu cuerpo encontró un ritmo, repartido por la semana a su manera.',
     correlacion: `Los ${plural(MON_NAMES[focus]!)} es cuando más te mueves.`,
     experimento: {
       hint: 'Tu ritmo ya está ahí. A veces solo hace falta verlo.',

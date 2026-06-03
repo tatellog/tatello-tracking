@@ -2,22 +2,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Circle, Path, Rect, Text as SvgText } from 'react-native-svg'
-import Toast from 'react-native-toast-message'
+import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg'
 
 import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { PrimaryCta } from '@/components/PrimaryCta'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { StelarVoice } from '@/features/orbit/components/StelarVoice'
 import { useHistoryMeals, useSignalsHistory } from '@/features/orbit/hooks'
-import {
-  MOCK_PATRONES,
-  type CycleData,
-  type PairedData,
-  type Patron,
-  type WeekdayData,
-} from '@/features/orbit/mock'
+import type { CycleData, PairedData, Patron, WeekdayData } from '@/features/orbit/mock'
 import { detectHabitPatterns } from '@/features/orbit/habit-patterns'
 import { detectMonthPatterns } from '@/features/orbit/month-patterns'
 import { detectNightPattern } from '@/features/orbit/night-pattern'
@@ -28,10 +20,13 @@ import { colors, typography } from '@/theme'
 /*
  * Pattern detail — what a "Patrones detectados" card opens. A pattern
  * is a detected órbita, so this screen does four things: proves it
- * (the evidence, shaped by the pattern's kind — multi-week, cycle,
- * paired), explains it (Voz de Stelar — systemic, never moral),
- * connects it (the correlation), and turns it into a system (an
- * experiment STELAR will track). Content is MOCK.
+ * (the evidence, drawn as a constellation of the recurrence), explains
+ * it (Voz de Stelar — systemic, never moral), and turns it into
+ * something to hold in mind (no surveillance, no policing). Visually
+ * it's the sister of the observation detail: oro is the observatory
+ * light for all chrome; magenta is reserved for the two legitimate
+ * "the dimension speaking" beats — the hero emphasis and the focus day
+ * of the chart (the cuerpo dimension, which IS magenta). Content is MOCK.
  */
 export default function PatronDetailScreen() {
   const router = useRouter()
@@ -47,8 +42,10 @@ export default function PatronDetailScreen() {
     calorieTarget: macros.data?.calories ?? null,
     proteinTarget: macros.data?.protein_g ?? null,
   }
-  // Resolve from every real detector (same inputs the Semana/Mes lists
-  // use → React Query serves from cache), then the mock catalogue.
+  // Resolve from every real detector (same 35-day inputs + same detectors
+  // the Mes list uses → React Query serves from cache, so the pattern the
+  // user tapped is reproduced here). NO mock fallback: with real data the
+  // Mes is real end-to-end; an unknown id shows the honest empty state.
   const detected = history
     ? [
         ...detectWeekPatterns(history, dimCtx),
@@ -57,10 +54,12 @@ export default function PatronDetailScreen() {
       ]
     : []
   const night = histMeals ? detectNightPattern(histMeals) : null
-  const patron =
-    (night && night.id === id ? night : undefined) ??
-    detected.find((p) => p.id === id) ??
-    MOCK_PATRONES.find((p) => p.id === id)
+  const patron = (night && night.id === id ? night : undefined) ?? detected.find((p) => p.id === id)
+
+  // The one magenta on this screen = the dimension/datum speaking. Used
+  // by the hero emphasis and the chart's focus day. Everything else
+  // (chrome, chart axes, confidence, voice, CTA) is oro = observatory light.
+  const accent = colors.magenta
 
   if (!patron) {
     return (
@@ -76,15 +75,6 @@ export default function PatronDetailScreen() {
     )
   }
 
-  const activate = () => {
-    Toast.show({
-      type: 'success',
-      text1: 'Experimento activado',
-      text2: `STELAR seguirá «${patron.title.replace(/\.$/, '')}» y te avisará.`,
-    })
-    router.back()
-  }
-
   return (
     <View style={styles.screen}>
       <SkyBackground />
@@ -93,58 +83,40 @@ export default function PatronDetailScreen() {
           <BackButton onPress={() => router.back()} />
 
           {/* The reading, restated as the hero. The "detected since"
-              + confidence dots are Stelar's signature, no clinical
+              + confidence stars are Stelar's signature, no clinical
               "PATRÓN DETECTADO" eyebrow (the title already says it). */}
           <Animated.View entering={FadeInDown.duration(360)}>
             <EmText
               text={patron.title}
               emphasis={patron.emphasis}
               style={styles.heroTitle}
-              emStyle={styles.heroEm}
+              emStyle={[styles.heroEm, { color: accent }]}
             />
-            <Text style={styles.meta}>
-              {patron.since}
-              {'   ·   '}
-              <Text style={styles.metaLabel}>confianza </Text>
-              <Text style={styles.confidenceDots}>{CONFIDENCE_DOTS[patron.confidence]}</Text>
-            </Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.meta}>{patron.since}</Text>
+              <Text style={styles.metaDivider}> · </Text>
+              <Text style={styles.metaLabel}>confianza</Text>
+              <View style={styles.confidenceStars}>
+                <ConfidenceStars level={patron.confidence} />
+              </View>
+            </View>
           </Animated.View>
 
-          {/* 1 · The evidence — shape depends on the pattern's data. */}
+          {/* 1 · The evidence — the recurrence drawn as a constellation. */}
           <Section title="La evidencia">
-            <Evidence patron={patron} />
-            <Text style={styles.caption}>{patron.caption}</Text>
+            <Evidence patron={patron} accent={accent} />
             <Text style={styles.legend}>{patron.legend}</Text>
           </Section>
 
-          {/* 2 · The why — coach voice, systemic not moral. */}
-          <StelarVoice scope="este patrón" text={patron.voz} />
-
-          {/* 3 · The correlation — what moves it. */}
-          <Section title="Qué lo mueve">
-            <Text style={styles.body}>{patron.correlacion}</Text>
-          </Section>
-
-          {/* 4 · The lever — the pattern becomes a system. */}
-          <Section title="El experimento">
-            <Text style={styles.body}>{patron.experimento.hint}</Text>
-            <PrimaryCta
-              label={patron.experimento.action}
-              onPress={activate}
-              marginTop={16}
-              accessibilityLabel={`Activar: ${patron.experimento.action}`}
-            />
-          </Section>
+          {/* 2 · The why — coach voice, systemic not moral. Oro: this is
+              the observatory reading, not the dimension itself talking. It
+              closes the screen: Stelar shows the recurrence and reads it,
+              without inventing a cause or pushing an action. */}
+          <StelarVoice scope="este patrón" text={patron.voz} accent={colors.oro} />
         </ScrollView>
       </SafeAreaView>
     </View>
   )
-}
-
-const CONFIDENCE_DOTS: Record<Patron['confidence'], string> = {
-  alta: '● ● ●',
-  media: '● ● ○',
-  baja: '● ○ ○',
 }
 
 const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
@@ -184,63 +156,118 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /* The evidence — picks the visual the pattern's shape calls for. */
-function Evidence({ patron }: { patron: Patron }) {
+function Evidence({ patron, accent }: { patron: Patron; accent: string }) {
   switch (patron.data.kind) {
     case 'weekday':
-      return <WeekdayEvidence data={patron.data} />
+      return <WeekdayConstellation data={patron.data} accent={accent} />
     case 'cycle':
-      return <CycleEvidence data={patron.data} />
+      return <CycleEvidence data={patron.data} accent={accent} />
     case 'paired':
-      return <PairedEvidence data={patron.data} />
+      return <PairedEvidence data={patron.data} accent={accent} />
   }
 }
 
-/* Multi-week evidence — stacks the recent weeks so the focus day
- * is seen falling (or peaking) week after week. The recurrence is
- * literally drawn, not described. */
-function WeekdayEvidence({ data }: { data: WeekdayData }) {
-  const ROW_H = 30
+/* Multi-week evidence as a constellation: the focus day lit row after
+ * row, threaded by a vertical oro axis. Magnitude (0..1) rides in the
+ * radius of the focus halo, not in bar height. The recurrence is read
+ * as a column of light, not a stack of bars. */
+function WeekdayConstellation({ data, accent }: { data: WeekdayData; accent: string }) {
+  const ROW_H = 34,
+    LEFT = 44,
+    TOP = 18,
+    W = 320
+  const COL_GAP = (W - LEFT - 12) / 6
+  const H = data.weeks.length * ROW_H + TOP + 22
+  const cx = (j: number) => LEFT + j * COL_GAP
+  const cy = (i: number) => TOP + i * ROW_H + ROW_H / 2
+  const axisX = cx(data.focus)
   return (
     <View style={styles.chartCard}>
-      {data.weeks.map((w, i) => (
-        <View key={i} style={[styles.weekRow, { height: ROW_H }]}>
-          <Text style={styles.weekRowLabel}>{w.label}</Text>
-          <View style={styles.weekBars}>
-            {w.bars.map((v, j) => (
-              <View key={j} style={styles.weekBarCol}>
-                <View
-                  style={[
-                    styles.weekBarFill,
-                    {
-                      height: `${Math.max(8, v * 100)}%`,
-                      backgroundColor: j === data.focus ? colors.magenta : colors.bruma,
-                      opacity: j === data.focus ? 1 : 0.65,
-                    },
-                  ]}
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+        <Path
+          d={`M${axisX} ${cy(0)} L${axisX} ${cy(data.weeks.length - 1)}`}
+          stroke={colors.oroHairline}
+          strokeWidth={1}
+        />
+        {data.weeks.map((w, i) => (
+          <G key={`r-${i}`}>
+            <SvgText
+              x={8}
+              y={cy(i) + 3.5}
+              fontFamily={typography.uiBold}
+              fontSize={9.5}
+              letterSpacing={1}
+              fill={colors.niebla}
+            >
+              {w.label.toUpperCase()}
+            </SvgText>
+            {w.bars.map((v, j) =>
+              j === data.focus ? (
+                <G key={`c-${j}`}>
+                  <Circle cx={cx(j)} cy={cy(i)} r={6 + v * 5} fill={accent} opacity={0.14} />
+                  <Circle cx={cx(j)} cy={cy(i)} r={4.5} fill={accent} />
+                </G>
+              ) : (
+                <Circle
+                  key={`c-${j}`}
+                  cx={cx(j)}
+                  cy={cy(i)}
+                  r={2.5}
+                  fill={colors.bruma}
+                  opacity={0.5}
                 />
-              </View>
-            ))}
-          </View>
-        </View>
-      ))}
-      {/* Day letters — shown once, beneath the last week. */}
-      <View style={styles.weekLabelsRow}>
-        <View style={styles.weekRowLabelSpacer} />
-        <View style={styles.weekBars}>
-          {WEEK_LABELS.map((lbl, j) => (
-            <Text key={j} style={[styles.dayLabel, j === data.focus ? styles.dayLabelFocus : null]}>
-              {lbl}
-            </Text>
-          ))}
-        </View>
-      </View>
+              ),
+            )}
+          </G>
+        ))}
+        {WEEK_LABELS.map((lbl, j) => (
+          <SvgText
+            key={`l-${j}`}
+            x={cx(j)}
+            y={H - 4}
+            textAnchor="middle"
+            fontFamily={typography.uiBold}
+            fontSize={11}
+            fill={j === data.focus ? accent : colors.niebla}
+            opacity={j === data.focus ? 1 : 0.7}
+          >
+            {lbl}
+          </SvgText>
+        ))}
+      </Svg>
     </View>
+  )
+}
+
+/* Confianza como 3 puntos de luz: lleno=alcanzado (oro), anillo=aún no. */
+function ConfidenceStars({ level }: { level: 'alta' | 'media' | 'baja' }) {
+  const filled = level === 'alta' ? 3 : level === 'media' ? 2 : 1
+  return (
+    <Svg width={42} height={10} viewBox="0 0 42 10">
+      {[0, 1, 2].map((i) => {
+        const cx = 5 + i * 16
+        return i < filled ? (
+          <Circle key={i} cx={cx} cy={5} r={2.4} fill={colors.oro} />
+        ) : (
+          <Circle
+            key={i}
+            cx={cx}
+            cy={5}
+            r={2.2}
+            fill="none"
+            stroke={colors.oro}
+            strokeWidth={1}
+            opacity={0.5}
+          />
+        )
+      })}
+    </Svg>
   )
 }
 
 /* Cycle evidence — 28 dots across the cycle, the band lit and the
  * marked day called out. The eye scans it like a clock arc. */
-function CycleEvidence({ data }: { data: CycleData }) {
+function CycleEvidence({ data, accent }: { data: CycleData; accent: string }) {
   const W = 320
   const H = 90
   const pad = 12
@@ -263,7 +290,7 @@ function CycleEvidence({ data }: { data: CycleData }) {
               cx={cx}
               cy={cy}
               r={isMark ? 4 : 3}
-              fill={inBand ? colors.magenta : colors.bruma}
+              fill={inBand ? accent : colors.bruma}
               opacity={inBand ? (isMark ? 1 : 0.85) : 0.55}
             />
           )
@@ -278,7 +305,7 @@ function CycleEvidence({ data }: { data: CycleData }) {
                 cy={cy}
                 r={9}
                 fill="none"
-                stroke={colors.magenta}
+                stroke={accent}
                 strokeWidth={1.2}
                 opacity={0.8}
               />
@@ -288,7 +315,7 @@ function CycleEvidence({ data }: { data: CycleData }) {
                 textAnchor="middle"
                 fontFamily={typography.uiBold}
                 fontSize={10}
-                fill={colors.magenta}
+                fill={accent}
               >
                 día {data.markDay}
               </SvgText>
@@ -320,7 +347,7 @@ function CycleEvidence({ data }: { data: CycleData }) {
 
 /* Paired evidence — two bars side by side, each labelled with its
  * average. The visual contrast IS the pattern. */
-function PairedEvidence({ data }: { data: PairedData }) {
+function PairedEvidence({ data, accent }: { data: PairedData; accent: string }) {
   const W = 320
   const H = 130
   const BAR_W = 70
@@ -345,7 +372,7 @@ function PairedEvidence({ data }: { data: PairedData }) {
               width={BAR_W}
               height={h}
               rx={6}
-              fill={highlight ? colors.magenta : colors.bruma}
+              fill={highlight ? accent : colors.bruma}
               opacity={highlight ? 1 : 0.85}
             />
           )
@@ -363,7 +390,7 @@ function PairedEvidence({ data }: { data: PairedData }) {
               textAnchor="middle"
               fontFamily={typography.uiBold}
               fontSize={15}
-              fill={highlight ? colors.magenta : colors.bone}
+              fill={highlight ? accent : colors.bone}
             >
               {g.avg}
               {g.unit}
@@ -382,7 +409,7 @@ function PairedEvidence({ data }: { data: PairedData }) {
               fontFamily={typography.uiBold}
               fontSize={10}
               letterSpacing={1}
-              fill={highlight ? colors.magenta : colors.niebla}
+              fill={highlight ? accent : colors.niebla}
             >
               {g.label}
             </SvgText>
@@ -438,20 +465,33 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.macroNum,
     color: colors.magenta,
   },
-  meta: {
+  // Meta row — "detected since · confianza ●●○" with oro stars.
+  metaRow: {
     marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  meta: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    color: colors.niebla,
+  },
+  metaDivider: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.caption,
     color: colors.niebla,
   },
   metaLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
     color: colors.niebla,
   },
-  // The confidence dots — magenta, slightly larger than the meta text.
-  confidenceDots: {
-    color: colors.magenta,
-    fontSize: typography.sizes.label,
-    letterSpacing: 0.5,
+  confidenceStars: {
+    marginLeft: 8,
+    justifyContent: 'center',
   },
   section: {
     marginTop: 26,
@@ -464,79 +504,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.bruma,
+    borderColor: colors.oroHairline,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  // ── Multi-week (weekday) layout ─────────────────────────────
-  weekRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  weekRowLabel: {
-    width: 40,
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 1,
-    color: colors.niebla,
-    textTransform: 'uppercase',
-  },
-  weekRowLabelSpacer: {
-    width: 40,
-  },
-  weekBars: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: '100%',
-    gap: 4,
-  },
-  weekBarCol: {
-    flex: 1,
-    height: '100%',
-    justifyContent: 'flex-end',
-  },
-  weekBarFill: {
-    width: '100%',
-    borderRadius: 3,
-    minHeight: 3,
-  },
-  weekLabelsRow: {
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dayLabel: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 0.8,
-    color: colors.niebla,
-  },
-  dayLabelFocus: {
-    color: colors.magenta,
-  },
-  // ── Caption + legend under the evidence chart ───────────────
-  caption: {
-    marginTop: 12,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-  },
+  // ── Legend under the evidence chart ─────────────────────────
   legend: {
-    marginTop: 4,
+    marginTop: 12,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: colors.niebla,
-  },
-  body: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 21,
-    color: colors.bone,
   },
 })

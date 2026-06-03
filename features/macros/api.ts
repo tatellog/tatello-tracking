@@ -8,18 +8,7 @@ import type { Database, Json } from '@/types/database.types'
 type MacroTargetsRow = Database['public']['Tables']['macro_targets']['Row']
 export type Meal = Database['public']['Tables']['meals']['Row']
 
-/*
- * Input schemas mirror the DB CHECK constraints so the client
- * fails fast with a useful message instead of letting Postgres
- * throw a generic CHECK-violation. These are re-used by the form
- * resolver (react-hook-form + zod) so the user sees the same
- * rules while typing, not only on submit.
- */
-
 export const MacroTargetsInputSchema = z.object({
-  // Realistic adult range (50-300 g protein, 1000-5000 kcal). Stops
-  // typo'd values (e.g. extra zero) from landing in the targets row
-  // before the Home rings render with broken denominators.
   protein_g: z.number().int('Usa números enteros').min(50, 'Mínimo 50 g').max(300, 'Máximo 300 g'),
   calories: z
     .number()
@@ -51,30 +40,24 @@ export const MealInputSchema = z.object({
 
 export type MealInput = z.infer<typeof MealInputSchema>
 
-/** A meal's ingredient breakdown — persisted in `ai_raw_response`. */
 export type StoredIngredient = {
   name: string
   grams: number
   proteinPer100: number
   kcalPer100: number
-  /** g of sugar per 100 g. Optional — meals logged before sugar omit it. */
   sugarPer100?: number
 }
 
-/** createMeal carries the optional photo + ingredients from the scan. */
 export type CreateMealInput = MealInput & {
   photo_storage_path?: string | null
   ingredients?: StoredIngredient[]
 }
 
-/** updateMeal carries the optional edited ingredient breakdown and a
- *  newly-attached photo. */
 export type UpdateMealInput = MealInput & {
   ingredients?: StoredIngredient[]
   photo_storage_path?: string | null
 }
 
-/* The ai_raw_response payload that stores a meal's ingredients. */
 function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
   if (!ingredients || ingredients.length === 0) return null
   return {
@@ -88,7 +71,6 @@ function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
   }
 }
 
-/* Parse a stored ai_raw_response payload into ingredients. */
 function parseIngredients(raw: Json | null): StoredIngredient[] | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const list = (raw as { ingredients?: unknown }).ingredients

@@ -50,10 +50,10 @@ export function MonthSegment() {
   const theme = monthTheme(summary, daysLogged)
   const voz = useMemo(() => buildVozMes(summary, daysLogged), [summary, daysLogged])
   const hasRealData = daysLogged > 0
-  // Recurrence patterns ("todos los lunes…", "los sábados…", "las
-  // noches…") now come from the BACKEND engine (daily-intelligence Edge
-  // Function); the hook falls back to the same local rules if it's
-  // unreachable, so this never goes blank.
+  // Month patterns — the month-shape habits ("Tu semana de movimiento",
+  // "…tiene una forma") followed by the day recurrences ("todos los lunes…",
+  // "los sábados…", "las noches…"). From the BACKEND engine (daily-
+  // intelligence Edge Function); falls back to the same local rules.
   const intel = useDailyIntelligence()
   const monthPatterns = intel.data?.month.patterns ?? []
 

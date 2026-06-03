@@ -1,15 +1,8 @@
-/*
- * Dummy dish library — stands in for an AI vision model. `scanMeal`
- * returns one of these as the "detected" meal. Nutrition is stored
- * per 100 g so editing an ingredient's grams rescales it.
- */
 export type DishIngredient = {
   name: string
-  /** Detected (default) amount, grams. */
   grams: number
   proteinPer100: number
   kcalPer100: number
-  /** g of sugar per 100 g. Optional — older mocks omit it (treated as 0). */
   sugarPer100?: number
 }
 

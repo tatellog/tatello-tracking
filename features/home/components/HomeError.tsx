@@ -7,13 +7,6 @@ type Props = {
   onRetry: () => void
 }
 
-/*
- * Shown when the brief query errors and there's nothing cached to
- * fall back on. Intentionally minimal — no animation, no motion;
- * the moment of failure is when the user needs clarity, not flair.
- * A single retry button sits below a one-line prose explanation,
- * matching the editorial voice of the rest of the app.
- */
 export function HomeError({ onRetry }: Props) {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>

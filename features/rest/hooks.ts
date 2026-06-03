@@ -4,7 +4,6 @@ import { queryKeys } from '@/lib/queryKeys'
 
 import { getRestDay, markRestDay, unmarkRestDay } from './api'
 
-/** Whether a rest day is logged for `date` — drives the Hoy CTA swap. */
 export function useRestToday(date: string) {
   return useQuery({
     queryKey: queryKeys.rest.day(date),
@@ -12,11 +11,6 @@ export function useRestToday(date: string) {
   })
 }
 
-/*
- * Set the day's rest flag — optimistic. The CTA flips to the rest
- * message (or back) the instant the tap lands; the insert/delete
- * settles in the background and rolls back on error.
- */
 export function useSetRestToday(date: string) {
   const qc = useQueryClient()
   return useMutation({

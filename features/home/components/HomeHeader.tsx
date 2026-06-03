@@ -3,16 +3,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { colors, typography } from '@/theme'
 
-/*
- * Single-line uppercase 'WEEKDAY · DAY MONTH' (e.g. 'SÁBADO · 23
- * ABRIL') derived from the device's local clock, plus the day/night
- * toggle placeholder on the right (non-functional until a real dark
- * mode lands).
- *
- * Date is read from `new Date()` at render time so the masthead
- * stays current as the day rolls over — `useDayRollover` upstream
- * invalidates the brief, which re-renders this component.
- */
 export function HomeHeader() {
   const heading = formatHeadingEs(new Date())
 
@@ -26,12 +16,6 @@ export function HomeHeader() {
   )
 }
 
-/*
- * 'SÁBADO · 23 ABRIL' in es-MX. We pull weekday and month names
- * separately and uppercase them rather than calling toLocaleDateString
- * once because the ICU `long` format inserts comma + 'de' joiners
- * ('sábado, 23 de abril') that we don't want in the masthead.
- */
 function formatHeadingEs(now: Date): string {
   const weekday = now.toLocaleDateString('es-MX', { weekday: 'long' }).toUpperCase()
   const month = now.toLocaleDateString('es-MX', { month: 'long' }).toUpperCase()

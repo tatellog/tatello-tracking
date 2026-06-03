@@ -29,6 +29,13 @@ type Props = {
   /** Label casing. Defaults to `uppercase` (unchanged for every
    *  existing CTA). Pass `none` for a sentence-case, calmer label. */
   transform?: CtaTransform
+  /** SOFT variant only — recolor the border, label, and glow to a
+   *  custom accent (e.g. `colors.oro` for the observatory chrome). When
+   *  absent, the soft cta keeps its magenta identity unchanged. */
+  accent?: string
+  /** SOFT + `accent` only — the translucent fill behind the label.
+   *  Defaults to transparent. */
+  accentFill?: string
 }
 
 export function PrimaryCta({
@@ -43,6 +50,8 @@ export function PrimaryCta({
   accessibilityLabel,
   pill = false,
   transform = 'uppercase',
+  accent,
+  accentFill,
 }: Props) {
   const inactive = disabled || loading
   const isGhost = variant === 'ghost'
@@ -58,6 +67,19 @@ export function PrimaryCta({
   // exactly as before. welcome / what-it-does / attribution use soft and so
   // simply gain the same coherent ready-glow once their step validates.
   const softReady = isSoft && !inactive
+  // Custom-accent soft cta — recolor border/label/glow/fill inline so a
+  // soft cta can be "observatory light" (oro) rather than magenta. Only
+  // when `accent` is passed AND the variant is soft. The ready-glow's
+  // shadowColor follows the accent too (replacing magentaHot).
+  const accented = isSoft && !!accent
+  const accentSoftStyle = accented
+    ? {
+        borderColor: accent,
+        backgroundColor: accentFill ?? 'transparent',
+        shadowColor: accent,
+      }
+    : null
+  const accentLabelStyle = accented ? { color: accent } : null
 
   const handlePress = () => {
     if (inactive) return
@@ -79,6 +101,7 @@ export function PrimaryCta({
         isDestructive && styles.btnDestructive,
         inactive && !isGhost && !isSoft && styles.btnDisabled,
         pill && styles.btnPill,
+        accentSoftStyle,
         { marginTop, marginBottom },
       ]}
       accessibilityRole="button"
@@ -89,7 +112,7 @@ export function PrimaryCta({
         <View style={styles.loadingRow}>
           <StarLoader
             size={18}
-            color={isGhost ? colors.leche : isSoft ? colors.magenta : '#FFFFFF'}
+            color={isGhost ? colors.leche : isSoft ? (accent ?? colors.magenta) : '#FFFFFF'}
           />
           <Text
             style={[
@@ -97,6 +120,7 @@ export function PrimaryCta({
               isGhost && styles.labelGhost,
               isSoft && styles.labelSoft,
               isPlain && styles.labelPlain,
+              accentLabelStyle,
             ]}
           >
             {loadingLabel}
@@ -111,6 +135,7 @@ export function PrimaryCta({
             isPlain && styles.labelPlain,
             inactive && !isGhost && !isSoft && styles.labelDisabled,
             isSoft && inactive && styles.labelSoftDisabled,
+            accentLabelStyle,
           ]}
         >
           {label}

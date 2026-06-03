@@ -52,7 +52,7 @@ type Arquetipo = ReturnType<typeof buildArquetipoSemana>
 
 export type Intelligence = {
   day: { dimensions: Dimension[]; header: DayIdentity; readings: DayCard[] }
-  week: { days: DiaSemana[]; arquetipo: Arquetipo; voz: Voz; shape: Patron[]; ahead: string | null }
+  week: { days: DiaSemana[]; arquetipo: Arquetipo; voz: Voz; ahead: string | null }
   month: {
     summary: DimensionMonth[]
     theme: string
@@ -82,11 +82,16 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
   const weekSignals = history.filter((s) => s.day != null && s.day >= weekStart && s.day <= today)
   const days = buildWeekDaysReal(weekSignals, todayGetDay, dimCtx)
 
-  // Recurrence patterns — shared by Semana "lo que viene" + Mes cards.
+  // Recurrence patterns — day-specific ("los lunes…", "las noches…"); feed
+  // both the Mes cards and the Semana "lo que viene" nudge.
   const night = detectNightPattern(meals)
   const habits = detectHabitPatterns(history)
   const weekday = detectWeekPatterns(history, dimCtx)
   const recurrences = [...(night ? [night] : []), ...habits, ...weekday]
+
+  // Month-shape habits ("Tu semana de movimiento", "…tiene una forma") — read
+  // over the whole month, so they live in Mes (lead the patterns), NOT Semana.
+  const monthShape = detectMonthPatterns(history, dimCtx)
 
   const m30 = history.slice(-30)
   const summary = buildMonthSummary(m30, dimCtx)
@@ -102,7 +107,6 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
       days,
       arquetipo: buildArquetipoSemana(days, todayGetDay),
       voz: buildVozSemanaReal(days, todayGetDay),
-      shape: detectMonthPatterns(history, dimCtx),
       ahead: buildWeekAhead(recurrences, todayGetDay),
     },
     month: {
@@ -110,7 +114,7 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
       theme: monthTheme(summary, daysLogged),
       voz: buildVozMes(summary, daysLogged),
       satellites: buildMonthSatellites(summary, daysLogged),
-      patterns: recurrences,
+      patterns: [...monthShape, ...recurrences],
       daysLogged,
     },
   }

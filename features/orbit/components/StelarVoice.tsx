@@ -20,6 +20,7 @@ export function StelarVoice({
   parts,
   tag,
   signature,
+  accent = colors.magenta,
 }: {
   /** Optional context shown inline in the eyebrow — "esta semana",
    *  "este ciclo". Día omits it: the voice stands alone. */
@@ -31,13 +32,17 @@ export function StelarVoice({
   /** A bottom signature line: ●●● Stelar · Confianza alta · 4 sem
    *  comparadas. Tells the user how Stelar reached this reading. */
   signature?: { confidence: 'alta' | 'media' | 'baja'; scope: string }
+  /** The card's accent — dot, eyebrow, accent words, signature. Defaults
+   *  to magenta; pass `colors.oro` when the voice is "observatory light"
+   *  (pattern detail) rather than "the dimension speaking". */
+  accent?: string
 }) {
   return (
     <View style={styles.card}>
       <View style={[styles.eyebrowRow, tag ? styles.eyebrowRowSpread : null]}>
         <View style={styles.eyebrowLeft}>
-          <View style={styles.dot} />
-          <Text style={styles.eyebrow}>Voz de Stelar</Text>
+          <View style={[styles.dot, { backgroundColor: accent }]} />
+          <Text style={[styles.eyebrow, { color: accent }]}>Voz de Stelar</Text>
           {scope ? <Text style={styles.scope}> · {scope}</Text> : null}
         </View>
         {tag ? <Text style={styles.tag}>{tag}</Text> : null}
@@ -49,7 +54,7 @@ export function StelarVoice({
                 key={i}
                 style={
                   p.tone === 'accent'
-                    ? styles.accent
+                    ? [styles.accent, { color: accent }]
                     : p.tone === 'strong'
                       ? styles.strong
                       : undefined
@@ -64,8 +69,8 @@ export function StelarVoice({
         <View style={styles.signatureBlock}>
           <View style={styles.signatureRule} />
           <View style={styles.signatureRow}>
-            <Text style={styles.sigDots}>●●●</Text>
-            <Text style={styles.sigStelar}> Stelar </Text>
+            <Text style={[styles.sigDots, { color: accent }]}>●●●</Text>
+            <Text style={[styles.sigStelar, { color: accent }]}> Stelar </Text>
             <Text style={styles.sigMeta}>
               · Confianza {signature.confidence} · {signature.scope}
             </Text>

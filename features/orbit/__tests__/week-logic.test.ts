@@ -1,5 +1,5 @@
 import { deriveDimensions } from '../logic'
-import { buildVozSemanaReal, buildWeekDaysReal, dayBrightness } from '../week-logic'
+import { buildVozSemanaReal, buildWeekDaysReal, buildWeekRecap, dayBrightness } from '../week-logic'
 import { LOW, mkSig, STRONG } from './signals.fixture'
 
 describe('dayBrightness', () => {
@@ -81,5 +81,45 @@ describe('buildVozSemanaReal', () => {
       .parts.map((p) => p.text)
       .join('')
     expect(text).not.toContain('aún se escribe')
+  })
+})
+
+describe('buildWeekRecap', () => {
+  // 2026-05-31 Sun(0), 06-01 Mon(1), 06-02 Tue(2), 06-03 Wed(3).
+  test('totals: entrenos counted, meals summed, averages over logged days', () => {
+    const recap = buildWeekRecap(
+      [
+        mkSig('2026-05-31', { trained: true, meal_count: 3, sleep_minutes: 480, water_glasses: 6 }),
+        mkSig('2026-06-01', { trained: true, meal_count: 2, sleep_minutes: 420 }),
+        mkSig('2026-06-02', { meal_count: 4, water_glasses: 8 }),
+        mkSig('2026-06-03', { trained: true }),
+      ],
+      3,
+    )
+    expect(recap.entrenos).toBe(3)
+    expect(recap.meals).toBe(9)
+    expect(recap.sleepAvgMin).toBe(450) // (480+420)/2, the two days that logged sleep
+    expect(recap.waterAvg).toBe(7) // (6+8)/2
+  })
+
+  test('a metric with no day logged is null (UI shows "—", never a 0)', () => {
+    const recap = buildWeekRecap([mkSig('2026-06-01', { trained: true })], 3)
+    expect(recap.sleepAvgMin).toBeNull()
+    expect(recap.waterAvg).toBeNull()
+    expect(recap.entrenos).toBe(1)
+    expect(recap.meals).toBe(0)
+  })
+
+  test('future days (beyond today) are not counted', () => {
+    // 2026-06-05 is Friday (idx 5); with today = Wednesday (3) it must be ignored.
+    const recap = buildWeekRecap(
+      [
+        mkSig('2026-06-01', { trained: true }),
+        mkSig('2026-06-05', { trained: true, meal_count: 3 }),
+      ],
+      3,
+    )
+    expect(recap.entrenos).toBe(1)
+    expect(recap.meals).toBe(0)
   })
 })
