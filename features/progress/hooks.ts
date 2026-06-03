@@ -4,13 +4,18 @@ import { track } from '@/lib/analytics'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
+import { todayInTimezone } from '@/lib/time'
+
 import {
   deletePhoto,
+  getAllWorkoutDates,
   getBeforeAfterPhotos,
   getLastPeriodStart,
   getMeasurements,
+  getMonthWorkoutDates,
   getRecentSleepLogs,
   getRecentWorkoutDates,
+  getTotalTrainedDays,
   NewMeasurementInputSchema,
   type NewMeasurementInput,
 } from './api'
@@ -89,6 +94,36 @@ export function useRecentWorkoutDates(rangeDays: number) {
   return useQuery({
     queryKey: ['progress', 'workouts', rangeDays] as const,
     queryFn: () => getRecentWorkoutDates(rangeDays),
+    staleTime: 60_000,
+  })
+}
+
+/** All-time distinct trained-day count — the "N días entrenados" stat. */
+export function useTotalTrainedDays() {
+  return useQuery({
+    queryKey: ['progress', 'trainedTotal'] as const,
+    queryFn: getTotalTrainedDays,
+    staleTime: 60_000,
+  })
+}
+
+/** Every trained day, all-time — powers the browsable Progreso
+ *  calendar (month navigation is a client-side slice). */
+export function useAllWorkoutDates() {
+  return useQuery({
+    queryKey: ['progress', 'allWorkouts'] as const,
+    queryFn: getAllWorkoutDates,
+    staleTime: 60_000,
+  })
+}
+
+/** Workout dates in the current calendar month — feeds the month-based
+ *  constellation. Keyed by month so it re-caches on the 1st. */
+export function useMonthWorkoutDates() {
+  const monthStart = `${todayInTimezone().slice(0, 7)}-01`
+  return useQuery({
+    queryKey: ['progress', 'monthWorkouts', monthStart] as const,
+    queryFn: () => getMonthWorkoutDates(monthStart),
     staleTime: 60_000,
   })
 }

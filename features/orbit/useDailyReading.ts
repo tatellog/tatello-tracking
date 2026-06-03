@@ -30,14 +30,15 @@ export function useDailyReading(args: {
   ready: boolean
   isPrePeriod: boolean
   proteinTarget: number | null
+  calorieTarget: number | null
 }): string | null {
-  const { signals, ready, isPrePeriod, proteinTarget } = args
+  const { signals, ready, isPrePeriod, proteinTarget, calorieTarget } = args
   const [line, setLine] = useState<string | null>(null)
 
   useEffect(() => {
     if (!ready) return
     const today = todayInTimezone()
-    const category = dailyReadingCategory(signals, { isPrePeriod, proteinTarget })
+    const category = dailyReadingCategory(signals, { isPrePeriod, proteinTarget, calorieTarget })
     let alive = true
     AsyncStorage.getItem(KEY)
       .then((raw) => {
@@ -65,7 +66,7 @@ export function useDailyReading(args: {
     return () => {
       alive = false
     }
-  }, [ready, signals, isPrePeriod, proteinTarget])
+  }, [ready, signals, isPrePeriod, proteinTarget, calorieTarget])
 
   return line
 }

@@ -23,6 +23,26 @@ export async function getTodaySignals(): Promise<DailySignals | null> {
 }
 
 /*
+ * A contiguous range of daily_signals rows for the caller, oldest
+ * first. Same security_invoker view as getTodaySignals, so RLS scopes
+ * it to the authenticated user — no user_id filter needed. fromDate
+ * and toDate are inclusive 'YYYY-MM-DD' local days (the shape the view
+ * buckets on). Backs the Semana segment, which reads one orbital
+ * signal per day across the current week. Days with nothing logged
+ * simply don't come back as rows.
+ */
+export async function getWeekSignals(fromDate: string, toDate: string): Promise<DailySignals[]> {
+  const { data, error } = await supabase
+    .from('daily_signals')
+    .select('*')
+    .gte('day', fromDate)
+    .lte('day', toDate)
+    .order('day', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/*
  * Has the user ever logged anything that lands in daily_signals? The
  * 3 órbita segments (Día / Semana / Mes) flip to an empty placeholder
  * when this returns false — Stelar shouldn't render archetypes,

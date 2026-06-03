@@ -70,6 +70,25 @@ Antes de mergear mensajes nuevos, invoca `voice-and-copy` para validar.
 - anorexia, bulimia, EDNOS, ortorexia, BED → prohibido
 - ansiedad, depresión (como diagnóstico) → prohibido
 
+### Prohibido en copy de patrón (reveal · tier de cadencia)
+
+Estas dos reglas son la diferencia entre "te conozco y te acompaño" y "te
+vigilo". Bloqueantes para cualquier mensaje/eyebrow de patrón:
+
+- **Cuantificadores de duración** → prohibido. Nada de "3 meses", "12
+  semanas", "desde marzo", "la mayoría de tus noches", "llevas X días".
+  La cadencia (semanal/mensual/arraigado) se SIENTE por la estética + el
+  eyebrow ("ALGO QUE NOTÉ", "ALGO CONSTANTE", "UNA DE TUS FORMAS"), nunca
+  se CUENTA. Contar el tiempo = factura = veredicto.
+- **Verbos de observación sostenida** → prohibido. Nada de "te he
+  notado", "llevo viendo", "he registrado", "vengo observando". El verbo
+  de Stelar es de reconocimiento puntual en presente: "noté", "veo",
+  "esto se repite en ti". Reconocimiento ≠ vigilancia.
+
+Regla de sujeto (ya vigente, se reafirma): el sujeto de la frase es el
+patrón / los datos ("las noches piden más"), nunca la usuaria ("comes de
+más"). Y más profundo el tier = MÁS ternura en el copy, no más dureza.
+
 ### Palabras prohibidas en suplantación de profesionales
 
 - "como tu nutrióloga" → prohibido

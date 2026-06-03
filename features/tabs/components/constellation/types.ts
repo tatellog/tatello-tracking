@@ -12,9 +12,13 @@ export type Resolved = {
 export type SequenceEl = { type: 'star' | 'line' | 'field'; idx: number }
 
 export type Props = {
-  /** 28-day boolean array; index i is the i-th cell. */
+  /** Boolean array, one cell per day of the window; index i is day i.
+   *  Length = `target` (the current month's day count). */
   trained: readonly boolean[]
   todayIdx: number
+  /** Days to fill before the figure completes — the month's length
+   *  (28..31). Defaults to the legacy 28-day cycle. */
+  target?: number
   sign?: ZodiacSign
   /** When true (today is already marked as complete), the "next"
    *  affordance — the dashed magenta ring around the upcoming star,

@@ -3,6 +3,7 @@
 exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
 {
   "elementsLit": 7,
+  "extraLit": 0,
   "fieldStars": [
     {
       "x": 0.2442426510088535,
@@ -73,24 +74,62 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "y": 0.8272447550353081,
     },
   ],
+  "figureComplete": false,
+  "figureCount": 11,
   "intensity": 0,
   "isComplete": false,
   "sequence": [
     {
       "idx": 0,
-      "type": "field",
+      "type": "star",
+    },
+    {
+      "idx": 1,
+      "type": "star",
     },
     {
       "idx": 0,
+      "type": "line",
+    },
+    {
+      "idx": 2,
       "type": "star",
     },
     {
       "idx": 1,
+      "type": "line",
+    },
+    {
+      "idx": 3,
+      "type": "star",
+    },
+    {
+      "idx": 2,
+      "type": "line",
+    },
+    {
+      "idx": 4,
+      "type": "star",
+    },
+    {
+      "idx": 3,
+      "type": "line",
+    },
+    {
+      "idx": 5,
+      "type": "star",
+    },
+    {
+      "idx": 4,
+      "type": "line",
+    },
+    {
+      "idx": 0,
       "type": "field",
     },
     {
       "idx": 1,
-      "type": "star",
+      "type": "field",
     },
     {
       "idx": 2,
@@ -101,16 +140,8 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "type": "field",
     },
     {
-      "idx": 0,
-      "type": "line",
-    },
-    {
       "idx": 4,
       "type": "field",
-    },
-    {
-      "idx": 2,
-      "type": "star",
     },
     {
       "idx": 5,
@@ -121,16 +152,8 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "type": "field",
     },
     {
-      "idx": 1,
-      "type": "line",
-    },
-    {
       "idx": 7,
       "type": "field",
-    },
-    {
-      "idx": 3,
-      "type": "star",
     },
     {
       "idx": 8,
@@ -141,10 +164,6 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "type": "field",
     },
     {
-      "idx": 2,
-      "type": "line",
-    },
-    {
       "idx": 10,
       "type": "field",
     },
@@ -153,16 +172,8 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "type": "field",
     },
     {
-      "idx": 4,
-      "type": "star",
-    },
-    {
       "idx": 12,
       "type": "field",
-    },
-    {
-      "idx": 3,
-      "type": "line",
     },
     {
       "idx": 13,
@@ -173,16 +184,8 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "type": "field",
     },
     {
-      "idx": 5,
-      "type": "star",
-    },
-    {
       "idx": 15,
       "type": "field",
-    },
-    {
-      "idx": 4,
-      "type": "line",
     },
     {
       "idx": 16,

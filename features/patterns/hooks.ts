@@ -11,8 +11,11 @@ import { PATTERN_MESSAGES } from './messages'
  * and (if any fire) inserts a `detected_patterns` row + returns
  * the card data.
  *
- * Rate limit: at most ONE pattern per user per day. If a row
- * already exists for today, the hook bails — never overwhelm.
+ * Rate limit: at most ONE full-screen reveal per ~7 days. The
+ * reveal takes the whole screen, so it must be scarce and earned —
+ * a constant stream would feel like surveillance, not care
+ * (manifiesto). If any pattern was surfaced in the last 7 days the
+ * hook bails; a fresh finding stays silent until the window opens.
  *
  * Failures are swallowed (returns { pattern: null }). The coach
  * surface is product polish, not critical data: it must never
@@ -29,18 +32,17 @@ export function usePatternDetection() {
       try {
         const userId = await requireUserId()
 
-        // Already shown one today? Bail — never two empathic
-        // observations on the same day.
-        const todayStart = new Date()
-        todayStart.setHours(0, 0, 0, 0)
-        const { data: todayRow } = await supabase
+        // Surfaced a reveal in the last 7 days? Bail — the full-screen
+        // moment is scarce on purpose. A new finding waits its turn.
+        const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        const { data: recentRow } = await supabase
           .from('detected_patterns')
           .select('id')
           .eq('user_id', userId)
-          .gte('detected_at', todayStart.toISOString())
+          .gte('detected_at', windowStart.toISOString())
           .limit(1)
           .maybeSingle()
-        if (cancelled || todayRow) return
+        if (cancelled || recentRow) return
 
         const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
         const [mealsResult, opensResult] = await Promise.all([

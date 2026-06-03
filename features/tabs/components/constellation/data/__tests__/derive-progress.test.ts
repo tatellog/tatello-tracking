@@ -33,7 +33,7 @@ describe('deriveProgress', () => {
     expect(figureCount + fieldCount).toBe(TARGET_DAYS)
   })
 
-  it('interleaves figure and field elements (no trailing tail)', () => {
+  it('front-loads the figure — all figure elements precede any field star', () => {
     const result = deriveProgress(trainedOf(0), 0, ZODIAC.aries)
     const firstField = result.sequence.findIndex((el) => el.type === 'field')
     let lastFigure = -1
@@ -43,9 +43,29 @@ describe('deriveProgress', () => {
         break
       }
     }
-    // A figure element appears after the first field element — proves
-    // the interleave puts at least some figure work in the back half.
-    expect(firstField).toBeLessThan(lastFigure)
+    // The figure leads; "luz extra" field stars only come after it.
+    expect(lastFigure).toBeLessThan(firstField)
+    expect(lastFigure).toBe(result.figureCount - 1)
+  })
+
+  it('completes the FIGURE at figureCount, not the whole month', () => {
+    const fc = ZODIAC.aries.stars.length + ZODIAC.aries.lines.length // 11
+    const justBefore = deriveProgress(trainedOf(fc - 1), fc - 2, ZODIAC.aries, 30)
+    expect(justBefore.figureComplete).toBe(false)
+    const atGoal = deriveProgress(trainedOf(fc), fc - 1, ZODIAC.aries, 30)
+    expect(atGoal.figureComplete).toBe(true)
+    expect(atGoal.figureCount).toBe(fc)
+    expect(atGoal.extraLit).toBe(0)
+    // A rest-friendly goal: well under a 30-day month.
+    expect(fc).toBeLessThan(30)
+  })
+
+  it('counts days beyond the figure as luz extra', () => {
+    const fc = ZODIAC.aries.stars.length + ZODIAC.aries.lines.length
+    const trained = Array.from({ length: 30 }, (_, i) => i < fc + 4)
+    const result = deriveProgress(trained, 29, ZODIAC.aries, 30)
+    expect(result.figureComplete).toBe(true)
+    expect(result.extraLit).toBe(4)
   })
 
   it('keeps sequence + fieldStars stable across trained changes', () => {

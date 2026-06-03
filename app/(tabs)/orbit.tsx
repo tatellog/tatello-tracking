@@ -13,6 +13,7 @@ import {
   WeekSegment,
   type OrbitSegment,
 } from '@/features/orbit/components'
+import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { track } from '@/lib/analytics'
@@ -44,6 +45,15 @@ function OrbitBody() {
     }, []),
   )
   const [segment, setSegment] = useState<OrbitSegment>('dia')
+
+  // Deep-link: a pattern reveal ("Verlo en mi órbita") drops a desired
+  // segment in the mailbox + navigates here; we consume it on focus.
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumeOrbitSegment()
+      if (pending) setSegment(pending)
+    }, []),
+  )
 
   // Fires on initial render + every segment change. The default
   // 'dia' is meaningful — beta data should reflect that Día is

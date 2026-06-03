@@ -37,15 +37,35 @@ export function buildFieldStars(
   return out
 }
 
+/** Figure size for a sign = its stars + its connecting lines. This is
+ *  the achievable completion goal (the asterism "brilla entera"), kept
+ *  well under a month so finishing it never demands training every day
+ *  — rest stays welcome (manifiesto: sin presión). */
+export function figureElementCount(zodiac: ZodiacDef): number {
+  return zodiac.stars.length + zodiac.lines.length
+}
+
 export function deriveProgress(
   trained: readonly boolean[],
   todayIdx: number,
   zodiac: ZodiacDef,
+  /** The month's length (28..31) — the cap for how many "luz extra"
+   *  field stars can light after the figure is done. Defaults to the
+   *  legacy 28-day cycle. */
+  target: number = TARGET_DAYS,
 ): {
   trainedCount: number
   elementsLit: number
   sequence: SequenceEl[]
   fieldStars: { x: number; y: number }[]
+  /** Total figure elements (stars + lines) — the completion goal. */
+  figureCount: number
+  /** The figure (asterism) is fully lit — THE milestone/reward. */
+  figureComplete: boolean
+  /** Days trained beyond the figure — "luz extra" bonus stars. */
+  extraLit: number
+  /** Legacy: every day of the month lit. No longer the reward trigger
+   *  (that's `figureComplete`); kept for callers that still read it. */
   isComplete: boolean
   /** Overflow intensifier — now always 0: the figure is padded with
    *  field stars to exactly TARGET_DAYS elements, so there is never
@@ -79,36 +99,26 @@ export function deriveProgress(
     if (!seen.has(i)) figureSeq.push({ type: 'star', idx: i })
   }
 
-  // ── Pad to TARGET_DAYS with field stars so a small figure (e.g.
-  //    the 11-element Aries) still fills across the whole 28-day
-  //    cycle instead of completing on day 11. ──
+  // ── The figure leads (front-loaded), then "luz extra" field stars
+  //    fill the rest of the month. So the asterism completes at an
+  //    achievable count (figureCount, ~11–18), the reward fires there,
+  //    and every day after is bonus light — never a debt. ──
   const figureCount = figureSeq.length
-  const fieldStars = buildFieldStars(zodiac.stars, Math.max(0, TARGET_DAYS - figureCount))
-
-  // ── Interleave figure elements and field stars evenly, so the
-  //    figure itself keeps growing across the whole cycle rather
-  //    than finishing first and the field trailing after. ──
-  const total = figureCount + fieldStars.length
-  const seq: SequenceEl[] = []
-  let fi = 0
-  let pi = 0
-  for (let k = 0; k < total; k++) {
-    const figureTarget = Math.round(((k + 1) * figureCount) / total)
-    if (fi < figureTarget && fi < figureCount) {
-      seq.push(figureSeq[fi]!)
-      fi++
-    } else {
-      seq.push({ type: 'field', idx: pi })
-      pi++
-    }
-  }
+  const fieldStars = buildFieldStars(zodiac.stars, Math.max(0, target - figureCount))
+  const seq: SequenceEl[] = [
+    ...figureSeq,
+    ...fieldStars.map((_, i) => ({ type: 'field' as const, idx: i })),
+  ]
 
   return {
     trainedCount: count,
     elementsLit: Math.min(count, seq.length),
     sequence: seq,
     fieldStars,
-    isComplete: count >= TARGET_DAYS,
+    figureCount,
+    figureComplete: count >= figureCount,
+    extraLit: Math.max(0, count - figureCount),
+    isComplete: count >= target,
     intensity: 0,
   }
 }

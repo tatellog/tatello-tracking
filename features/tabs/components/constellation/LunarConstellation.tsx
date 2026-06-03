@@ -41,6 +41,7 @@ import type { Props, Resolved, SequenceEl } from './types'
 export function LunarConstellation({
   trained,
   todayIdx,
+  target = TARGET_DAYS,
   sign = 'acuario',
   committed = false,
   showCount = true,
@@ -60,9 +61,18 @@ export function LunarConstellation({
   // nothing below changes — every clock + worklet runs exactly as today.
   const reduceMotion = useReducedMotion()
 
-  const { trainedCount, elementsLit, sequence, fieldStars, isComplete, intensity } = useMemo(
-    () => deriveProgress(trained, todayIdx, zodiac),
-    [trained, todayIdx, zodiac],
+  const {
+    trainedCount,
+    elementsLit,
+    sequence,
+    fieldStars,
+    figureCount,
+    figureComplete,
+    extraLit,
+    intensity,
+  } = useMemo(
+    () => deriveProgress(trained, todayIdx, zodiac, target),
+    [trained, todayIdx, zodiac, target],
   )
 
   const stars: Resolved[] = useMemo(
@@ -164,7 +174,7 @@ export function LunarConstellation({
               cleanly over nested SVGs (the lion disappeared). */}
               <ZodiacEngraving
                 {...SIGN_ENGRAVINGS[sign]}
-                progress={Math.min(1, trainedCount / TARGET_DAYS)}
+                progress={Math.min(1, trainedCount / target)}
                 breathT={breathT}
               />
               {/* BalanceSwirls removed — the zodiac-art SVGs come with
@@ -254,19 +264,20 @@ export function LunarConstellation({
               {suppressBurst ? null : (
                 <StarBurst cx={cx} cy={cy} pulse={radialPulse} trainedCount={trainedCount} />
               )}
-              {/* Anticipation crown — appears from day 21 onward, a
-              tenue cream ring around the canvas centre that grows +
-              brightens approaching day 28. Builds psychological
-              tension for the final stretch. */}
-              {trainedCount >= 21 && !isComplete ? (
+              {/* Anticipation crown — appears in the last few elements
+              before the FIGURE completes, a tenue cream ring around the
+              canvas centre that grows + brightens approaching the
+              asterism's last star. Builds psychological tension for the
+              final stretch toward "tu figura brilla entera". */}
+              {figureCount > 6 && trainedCount >= figureCount - 4 && !figureComplete ? (
                 <AnticipationCrown
                   cx={cx}
                   cy={cy}
-                  proximity={Math.min(1, (trainedCount - 20) / 8)}
+                  proximity={Math.min(1, (trainedCount - (figureCount - 5)) / 4)}
                   breathT={breathT}
                 />
               ) : null}
-              {isComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
+              {figureComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
             </Svg>
             {/* Rack-focus blur. Born at intensity 18 (matching the
                 skeleton's BlurView) so the cross-fade reads as a single
@@ -297,14 +308,23 @@ export function LunarConstellation({
           numberPulse={numberPulse}
           plusOne={plusOne}
           initialCount={trainedCount}
-          urgent={trainedCount >= TARGET_DAYS - 3 && !isComplete}
-          remaining={Math.max(0, TARGET_DAYS - trainedCount)}
+          urgent={trainedCount >= figureCount - 3 && !figureComplete}
+          remaining={Math.max(0, figureCount - trainedCount)}
+          target={figureCount}
         />
       ) : null}
 
-      {isComplete ? (
+      {/* The reward — once the asterism is fully lit. Manifesto-safe:
+          completing the FIGURE (achievable, rest-friendly), not the
+          whole month. Days beyond read as "luz extra", never debt. */}
+      {figureComplete ? (
         <View style={styles.completionCap}>
-          <Text style={styles.completionLabel}>COMPLETO</Text>
+          <Text style={styles.completionLabel}>TU FIGURA BRILLA ENTERA</Text>
+          <Text style={styles.completionPoem}>
+            {extraLit > 0
+              ? `Lo que sigue es luz extra · +${extraLit}`
+              : 'Lo que sigue es luz extra.'}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -352,5 +372,15 @@ const styles = StyleSheet.create({
     color: colors.magenta,
     letterSpacing: 2.8,
     textTransform: 'uppercase',
+  },
+  // Coach voice — Cormorant italic, the poetic register reserved for
+  // emotional lines. "Luz extra" reframes the post-figure days as bonus.
+  completionPoem: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    marginTop: 4,
+    textAlign: 'center',
   },
 })

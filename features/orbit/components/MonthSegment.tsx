@@ -1,114 +1,72 @@
-import { useRouter } from 'expo-router'
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
-import { ENGINE_ACTIVE } from '../engine'
-import { useHasAnySignals } from '../hooks'
+import { useMacroTargets } from '@/features/macros/hooks'
+
+import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
-  buildFirstCycleVoz,
-  MOCK_CYCLE,
-  MOCK_OBSERVATIONS,
-  MOCK_PATRONES,
-  MOCK_VOZ,
-  type Observation,
-  type Patron,
-} from '../mock'
+  buildMonthSatellites,
+  buildMonthSummary,
+  buildVozMes,
+  monthDaysLogged,
+  monthTheme,
+  type DimensionMonth,
+} from '../month-logic'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
-import { PreviewBanner } from './PreviewBanner'
-import { MonthSky, type Satellite, type SatelliteKind } from './MonthSky'
+import { MonthSky, type Satellite } from './MonthSky'
 import { StelarVoice } from './StelarVoice'
 
 /*
- * The Mes segment — "El Cielo". Single visual hero (MonthSky) +
- * Voz de Stelar + (mature only) one experimento. The view splits
- * into two clear surfaces based on cycle history:
- *
- *  Cycle 1 (no replication possible yet):
- *    · Satellites carry OBSERVATIONS, not patterns. Decorative —
- *      no tap navigation. The fourth slot is a tentative hint
- *      marked visually as "stelar observa" — dimmer than the rest.
- *    · Voz is honest about the learning state and quotes the
- *      observed peak day.
- *    · A "Stelar está leyendo" card sets expectations: confirmed
- *      patterns arrive in cycle 2.
- *    · No experimento card (no statistical basis for one).
- *
- *  Cycle 3+ (mature):
- *    · Satellites carry confirmed Patrones. Tap → detail screen.
- *    · Voz cites anchor + gravity patterns.
- *    · Experimento card surfaces the cycle's single proposed shift.
- *
- *  Cycle 2 (transition, future work):
- *    · Tentative satellites with low-confidence flag, blended with
- *      observations. Not implemented yet — falls back to mature
- *      view shape but with reduced claims.
- *
- * Content is MOCK (../mock.ts); the inference engine will fill in.
+ * The Mes segment — "El Cielo". The ARC OF THE MONTH: how each of the six
+ * dimensions moved over ~30 days (its month level + its trend), a written
+ * month reading, on a calm cosmos hero. NOT a menstrual-cycle tracker —
+ * the cycle only feeds the `ciclo` dimension as one signal among six
+ * (docs/tu-orbita-design.md §7). All REAL + deterministic from
+ * daily_signals; no mock. The AI engine later enriches the prose.
  */
 export function MonthSegment() {
-  const router = useRouter()
-  const cycle = MOCK_CYCLE
-  const isFirstCycle = cycle.cycleNumber === 1
   const { data: hasAny } = useHasAnySignals()
-
-  // Cycle-1: which observation is currently summoned. Default is
-  // null — the hero opens with a clean cosmos; the user invokes a
-  // pattern by tapping a chain item. Tapping the backdrop (outside
-  // the chain) closes the summon and returns to the cosmos view.
-  const [selectedObsId, setSelectedObsId] = useState<string | null>(null)
-  const selectedObs = selectedObsId
-    ? (MOCK_OBSERVATIONS.find((o) => o.id === selectedObsId) ?? null)
-    : null
-
-  // Tap handler:
-  //  · cycle 1 → switch the readout to that observation (no toggle)
-  //  · cycle 3+ → navigate to the existing pattern detail screen
-  const handleSatellitePress = useCallback(
-    (id: string) => {
-      if (isFirstCycle) {
-        setSelectedObsId(id)
-      } else {
-        router.push(`/orbit/pattern/${id}`)
-      }
-    },
-    [isFirstCycle, router],
+  const { data: history } = useSignalsHistory(30)
+  // Macro targets make `alimento` deficit-aware (see deriveDimensions).
+  const macros = useMacroTargets()
+  const dimCtx = useMemo(
+    () => ({
+      calorieTarget: macros.data?.calories ?? null,
+      proteinTarget: macros.data?.protein_g ?? null,
+    }),
+    [macros.data?.calories, macros.data?.protein_g],
   )
 
-  // Build satellites; the `selected` flag highlights whichever one
-  // matches the open observation so the user can trace label → body.
-  const satellites = useMemo(() => {
-    if (isFirstCycle) {
-      return MOCK_OBSERVATIONS.map((o) => ({
-        ...observationToSatellite(o),
-        selected: o.id === selectedObsId,
-      }))
-    }
-    return MOCK_PATRONES.slice(0, 4).map(patronToSatellite)
-  }, [isFirstCycle, selectedObsId])
+  const signals = useMemo(() => history ?? [], [history])
+  const summary = useMemo(() => buildMonthSummary(signals, dimCtx), [signals, dimCtx])
+  const daysLogged = monthDaysLogged(signals)
+  const theme = monthTheme(summary, daysLogged)
+  const voz = useMemo(() => buildVozMes(summary, daysLogged), [summary, daysLogged])
+  const hasRealData = daysLogged > 0
 
-  // Voz: first-cycle prose with honest scope, or mature reading.
-  const voz = useMemo(
-    () => (isFirstCycle ? buildFirstCycleVoz(cycle, MOCK_OBSERVATIONS) : null),
-    [isFirstCycle, cycle],
+  // The month's headline satellites + their tap-reveal. The named bodies
+  // (tu brillo / tu ancla / tu calma / stelar observa) orbit the hero;
+  // tapping one reveals the real dimension behind the poetic name.
+  const monthSats = useMemo(() => buildMonthSatellites(summary, daysLogged), [summary, daysLogged])
+  const [selectedSatId, setSelectedSatId] = useState<string | null>(null)
+  const satellites = useMemo<Satellite[]>(
+    () =>
+      monthSats.map((s) => ({
+        id: s.id,
+        label: s.label,
+        kind: s.kind,
+        selected: s.id === selectedSatId,
+      })),
+    [monthSats, selectedSatId],
   )
+  const selectedSat = selectedSatId ? monthSats.find((s) => s.id === selectedSatId) : null
 
-  // Header archetype — "tu primer mes en {phase}" / "tu mes en
-  // {phase}". The phase value here is a data-derived theme (e.g.
-  // "lectura", "ritmo bajo", "ascenso"), NOT a menstrual cycle
-  // phase — this segment reads monthly behaviour patterns.
-  const archetypeName = isFirstCycle
-    ? `tu primer mes en ${cycle.phase.toLowerCase()}`
-    : `tu mes en ${cycle.phase.toLowerCase()}`
-  const archetypeEmphasis = cycle.phase.toLowerCase()
-
-  // Empty-state branch: hide the satellites + readout + voz. The BH
-  // hero still renders (visual identity of Mes) but with empty
-  // satellites so the eye doesn't see fake patterns yet.
+  // Never logged anything yet → dedicated first-run state.
   if (hasAny === false) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -125,8 +83,8 @@ export function MonthSegment() {
         </View>
         <EmptySegmentCard
           eyebrow="El cielo se forma día a día"
-          body="Stelar no inventa patrones. Necesita verte primero: al menos un día con algo registrado."
-          hint="A partir del segundo mes, Stelar empieza a confirmar lo que se repite."
+          body="Stelar no inventa nada. Necesita verte primero: registra desde Hoy y el mes se va dibujando."
+          hint="Con unos días de señales, el arco de tu mes empieza a leerse."
         />
       </Animated.View>
     )
@@ -134,94 +92,99 @@ export function MonthSegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Honest framing while the engine is mock. */}
-      {ENGINE_ACTIVE ? null : <PreviewBanner />}
-
-      {/* Tighter header — title + inline status, no separate
-          eyebrow + meta row. Saves ~40 px vertical and gives the
-          hero more presence. */}
       <View style={styles.header}>
         <EmText
-          text={archetypeName}
-          emphasis={archetypeEmphasis}
+          text={`tu mes en ${theme}`}
+          emphasis={theme}
           style={styles.archetype}
           emStyle={styles.archetypeEm}
         />
         <View style={styles.metaRow}>
           <LiveDot />
           <Text style={styles.meta} numberOfLines={1}>
-            <Text>Día </Text>
-            <Text style={styles.metaNum}>{cycle.day}</Text>
-            <Text> · </Text>
-            {isFirstCycle ? (
-              <Text style={styles.metaQuiet}>primera lectura</Text>
-            ) : (
+            <Text style={styles.metaNum}>{daysLogged}</Text>
+            <Text> días con señales</Text>
+            {hasRealData ? (
               <>
-                <Text style={styles.metaNum}>{cycle.patternsConfirmed}</Text>
-                <Text> patrones</Text>
+                <Text> · leído por </Text>
+                <Text style={styles.metaStelar}>Stelar</Text>
               </>
-            )}
+            ) : null}
           </Text>
         </View>
       </View>
 
-      {/* The hero — BH cosmos + pattern chain. Tapping a chain
-          item lights up the days in the cosmos where Stelar
-          detected that pattern, plus a one-line caption beneath
-          the BH. The cosmos itself becomes the readout — no
-          separate card below. Mature cycles navigate away. */}
+      {/* Cosmos hero with the month's headline satellites. Tapping a
+          named body reveals the real dimension behind it. */}
       <View style={styles.diagram}>
         <MonthSky
           satellites={satellites}
-          onSatellitePress={handleSatellitePress}
-          selectedSatelliteId={isFirstCycle ? selectedObsId : null}
+          onSatellitePress={setSelectedSatId}
+          selectedSatelliteId={selectedSatId}
           evidence={
-            isFirstCycle && selectedObs
+            selectedSat
               ? {
-                  label: selectedObs.label,
-                  caption: selectedObs.caption,
-                  detail: selectedObs.detail,
-                  tentative: selectedObs.tentative,
+                  label: selectedSat.label,
+                  caption: selectedSat.caption,
+                  detail: selectedSat.detail,
+                  tentative: selectedSat.tentative,
                 }
               : null
           }
-          onCloseSatellite={() => setSelectedObsId(null)}
+          onCloseSatellite={() => setSelectedSatId(null)}
         />
       </View>
 
-      {/* Voz — first-cycle honest version OR mature paragraph. */}
-      {voz ? (
-        <StelarVoice scope="primera lectura" parts={voz.parts} />
-      ) : (
-        <StelarVoice scope="este mes" text={MOCK_VOZ.mes} />
-      )}
+      {/* The arc of the month — how each dimension moved. The heart of
+          this altitude. */}
+      <View style={styles.section}>
+        <Text style={styles.sectionEyebrow}>Cómo se movió tu mes</Text>
+        <MonthDimensionSummary summary={summary} />
+      </View>
+
+      <StelarVoice
+        parts={voz.parts}
+        tag="Este mes"
+        signature={hasRealData ? voz.signature : undefined}
+      />
     </Animated.View>
   )
 }
 
-function observationToSatellite(o: Observation): Satellite {
-  // `kind` is the single visual-treatment knob: tentative wins
-  // (dashed halo) regardless of slot; otherwise the observation
-  // id picks one of peak / valley / stable.
-  const kind: SatelliteKind = o.tentative
-    ? 'tentative'
-    : o.id === 'peak'
-      ? 'peak'
-      : o.id === 'valley'
-        ? 'valley'
-        : 'stable'
-  return { id: o.id, label: o.label, kind }
-}
+const TREND_GLYPH: Record<DimensionMonth['trend'], string> = { up: '↑', down: '↓', flat: '·' }
 
-function patronToSatellite(p: Patron): Satellite {
-  const label =
-    p.data.kind === 'weekday'
-      ? (['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][p.data.focus] ??
-        p.emphasis)
-      : p.data.kind === 'cycle'
-        ? `día ${p.data.markDay}`
-        : p.emphasis
-  return { id: p.id, label }
+/* Six rows — one per dimension — each a month-average level bar + a
+ * trend mark (rose where it's moving, quiet where it's flat). */
+function MonthDimensionSummary({ summary }: { summary: readonly DimensionMonth[] }) {
+  return (
+    <View style={styles.list}>
+      {summary.map((d) => (
+        <View key={d.key} style={styles.row}>
+          <Text style={styles.dimLabel}>{d.label}</Text>
+          <View style={styles.track}>
+            <View
+              style={[
+                styles.fill,
+                { width: `${Math.round(d.avg * 100)}%`, backgroundColor: colors.dimension[d.key] },
+              ]}
+            />
+          </View>
+          <Text
+            style={[
+              styles.trend,
+              d.trend === 'up'
+                ? styles.trendUp
+                : d.trend === 'down'
+                  ? styles.trendDown
+                  : styles.trendFlat,
+            ]}
+          >
+            {TREND_GLYPH[d.trend]}
+          </Text>
+        </View>
+      ))}
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
@@ -259,16 +222,73 @@ const styles = StyleSheet.create({
   metaNum: {
     color: colors.magenta,
   },
-  metaQuiet: {
+  metaStelar: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.bone,
+    fontSize: 12.5,
+    color: colors.magenta,
     textTransform: 'none',
-    letterSpacing: 0,
   },
+  // Cosmos hero — wider than the Week glance so the satellite chain on
+  // the right has air for its labels, but not full-bleed (the bars below
+  // are the detail layer).
   diagram: {
-    marginHorizontal: -20,
-    marginTop: 4,
+    width: '88%',
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  section: {
+    marginTop: 22,
+  },
+  sectionEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 11,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 12,
+    marginLeft: 2,
+  },
+  list: {
+    gap: 14,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dimLabel: {
+    width: 78,
+    fontFamily: typography.uiBold,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.leche,
+  },
+  track: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(244,236,222,0.08)',
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  trend: {
+    width: 18,
+    textAlign: 'center',
+    fontFamily: typography.uiBold,
+    fontSize: 15,
+  },
+  trendUp: {
+    color: colors.magenta,
+  },
+  trendDown: {
+    color: colors.niebla,
+  },
+  trendFlat: {
+    color: colors.bruma,
   },
 })

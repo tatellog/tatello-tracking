@@ -8,7 +8,9 @@ import Toast from 'react-native-toast-message'
 import { EmText } from '@/components/EmText'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
+import { useMacroTargets } from '@/features/macros/hooks'
 import { StelarVoice } from '@/features/orbit/components/StelarVoice'
+import { useSignalsHistory } from '@/features/orbit/hooks'
 import {
   MOCK_PATRONES,
   type CycleData,
@@ -16,6 +18,7 @@ import {
   type Patron,
   type WeekdayData,
 } from '@/features/orbit/mock'
+import { detectWeekPatterns } from '@/features/orbit/week-patterns'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
@@ -30,7 +33,19 @@ import { colors, typography } from '@/theme'
 export default function PatronDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
-  const patron = MOCK_PATRONES.find((p) => p.id === id)
+  // Resolve the pattern from the SAME real detections the Semana list
+  // built, then fall back to the mock catalogue (cycle patterns from Mes
+  // still live there). Same history hook → React Query serves it from
+  // cache, no refetch.
+  const { data: history } = useSignalsHistory()
+  const macros = useMacroTargets()
+  const detected = history
+    ? detectWeekPatterns(history, {
+        calorieTarget: macros.data?.calories ?? null,
+        proteinTarget: macros.data?.protein_g ?? null,
+      })
+    : []
+  const patron = detected.find((p) => p.id === id) ?? MOCK_PATRONES.find((p) => p.id === id)
 
   if (!patron) {
     return (

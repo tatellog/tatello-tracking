@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur'
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Rect, Text as SvgText } from 'react-native-svg'
@@ -205,37 +206,55 @@ export function PatternCard({ patron }: { patron: Patron }) {
       accessibilityRole="button"
       accessibilityLabel={patron.title}
     >
-      <View style={styles.left}>
-        <View style={styles.glyphBox}>
-          <PatternGlyph patron={patron} />
+      {/* Frosted-glass pane — same skylight read as the week tooltip. */}
+      <BlurView intensity={22} tint="dark" style={styles.glass}>
+        <View style={styles.tint} pointerEvents="none" />
+        <View style={styles.left}>
+          <View style={styles.glyphBox}>
+            <PatternGlyph patron={patron} />
+          </View>
+          <Text style={styles.tag}>{CATEGORY_TAG[patron.category]}</Text>
         </View>
-        <Text style={styles.tag}>{CATEGORY_TAG[patron.category]}</Text>
-      </View>
-      <View style={styles.right}>
-        <EmText
-          text={patron.title}
-          emphasis={patron.emphasis}
-          style={styles.title}
-          emStyle={styles.em}
-        />
-        <Text style={styles.detail}>{patron.detail}</Text>
-      </View>
+        <View style={styles.right}>
+          <EmText
+            text={patron.title}
+            emphasis={patron.emphasis}
+            style={styles.title}
+            emStyle={styles.em}
+          />
+          <Text style={styles.detail}>{patron.detail}</Text>
+        </View>
+      </BlurView>
     </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
+  // Outer wrapper — carries the soft magenta glow + spacing. No bg or
+  // border: the frosted glass pane inside does the look.
   card: {
+    borderRadius: 16,
+    marginTop: 12,
+    shadowColor: colors.magenta,
+    shadowOpacity: 0.16,
+    shadowRadius: 13,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  // The frosted pane — rounds + clips the blur; holds the two columns.
+  glass: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bgCard,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.bruma,
+    overflow: 'hidden',
     paddingHorizontal: 18,
     paddingVertical: 18,
-    marginTop: 12,
     gap: 18,
+  },
+  // Warm translucent wash over the blur so the text stays legible.
+  tint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(18,7,11,0.42)',
   },
   // Left column — the glyph, with the soft category tag underneath.
   left: {

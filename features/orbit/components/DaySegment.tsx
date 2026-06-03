@@ -74,19 +74,24 @@ export function DaySegment() {
   const { data, isLoading } = useTodaySignals()
   const { data: hasAny } = useHasAnySignals()
   const signals = data ?? null
-  const dimensions = deriveDimensions(signals)
+  // Macro targets make the `alimento` dimension deficit-aware (protein +
+  // calories vs target) instead of a meal count — see deriveDimensions.
+  const targets = useMacroTargets()
+  const calorieTarget = targets.data?.calories ?? null
+  const proteinTarget = targets.data?.protein_g ?? null
+  const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget })
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
   const [ignited, setIgnited] = useState<DimensionKey[]>([])
 
   // The deterministic daily reading — the real, honest voice of the Día
   // while the AI engine is mock. Crosses today's signals + cycle phase.
   const cycle = useCyclePhase()
-  const targets = useMacroTargets()
   const reading = useDailyReading({
     signals,
     ready: !isLoading,
     isPrePeriod: cycle?.phase === 'lutea',
-    proteinTarget: targets.data?.protein_g ?? null,
+    proteinTarget,
+    calorieTarget,
   })
 
   // On arrival, compare today's lit dimensions to the last snapshot and
@@ -94,7 +99,7 @@ export function DaySegment() {
   // new snapshot so the same lighting doesn't re-celebrate next visit.
   useEffect(() => {
     if (!signals) return
-    const dims = deriveDimensions(signals)
+    const dims = deriveDimensions(signals, { calorieTarget, proteinTarget })
     const current: Record<string, boolean> = {}
     dims.forEach((d) => {
       current[d.key] = dimensionTone(d.brightness) === 'brillante'
@@ -114,7 +119,7 @@ export function DaySegment() {
     return () => {
       alive = false
     }
-  }, [signals])
+  }, [signals, calorieTarget, proteinTarget])
 
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedTone = selected ? dimensionTone(selected.brightness) : null

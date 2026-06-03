@@ -1,13 +1,14 @@
 import * as Haptics from 'expo-haptics'
 // Aliased — react-native-svg also exports a LinearGradient.
 import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withRepeat,
@@ -19,12 +20,29 @@ import Svg, {
   Circle,
   Defs,
   Ellipse,
+  FeColorMatrix,
+  FeGaussianBlur,
+  Filter,
   G,
   Image as SvgImage,
+  Mask,
   RadialGradient,
   Stop,
   Text as SvgText,
 } from 'react-native-svg'
+// Skia owns the volumetric flare layer (real Gaussian blur + additive
+// blend) the SVG primitives above can only fake. Aliased where the
+// name collides with react-native-svg (Circle / RadialGradient / Rect).
+import {
+  BlurMask,
+  Canvas,
+  Circle as SkiaCircle,
+  Group as SkiaGroup,
+  LinearGradient as SkiaLinearGradient,
+  RadialGradient as SkiaRadialGradient,
+  Rect as SkiaRect,
+  vec,
+} from '@shopify/react-native-skia'
 
 import { colors, typography } from '@/theme'
 
@@ -40,6 +58,11 @@ import { EN_LUZ_THRESHOLD, TONE_BRILLANTE, type Dimension, type DimensionKey } f
 
 import { GLYPHS } from './dimensionGlyphs'
 
+// The Día galaxy art — the PHOTOGRAPHIC raster (day-orb.png). A vector
+// (galaxy-day.svg) was tried but read as a flat illustration; a real
+// photo carries the grain + glow + soft gradients a vector can't fake.
+// Authored 1254×1254; rendered into the scaled <G> so its on-screen size
+// + centre keep the StarNode positions aligned.
 const DAY_ORB_PNG = require('@/assets/orbits-art/day-orb.png')
 
 /** Star + halo palette for the Día orbital diagram. Same intent as
@@ -68,6 +91,22 @@ const SKY = {
 // becomes the unambiguous emblem of the zoomed dimension.
 const GLYPH_SCALE = 2.6
 const GLYPH_HALF = 12
+
+// The six dimension keys, in a fixed order — used to emit one glyph-glow
+// SVG filter per dimension (each recolours the rose constellation to its
+// own hue, then blurs it into a bloom).
+const DIM_KEYS: DimensionKey[] = ['cuerpo', 'mente', 'energia', 'alimento', 'sueno', 'ciclo']
+
+/** FeColorMatrix `values` that flattens any input to a SOLID hue (keeping
+ *  the source alpha) — so the rose glyph becomes a single-colour
+ *  silhouette in the dimension's hue, ready to blur into a shaped glow. */
+function glowMatrix(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const r = ((n >> 16) & 255) / 255
+  const g = ((n >> 8) & 255) / 255
+  const b = (n & 255) / 255
+  return `0 0 0 0 ${r} 0 0 0 0 ${g} 0 0 0 0 ${b} 0 0 0 1 0`
+}
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -102,6 +141,13 @@ const VB_H = 382
 // selection is meant to feel like the camera flew in on one
 // luminous body.
 const ZOOM_SCALE = 2.6
+
+// When true, the soft glow + diffraction rays + chromatic edges of each
+// EN-LUZ star are drawn by the Skia <Canvas> overlay (real blur) instead
+// of the SVG ellipse-flare. The SVG keeps only the crisp core pin; Skia
+// owns everything feathered. Flip to false to fall back to the pure-SVG
+// flare (e.g. if running in a context without the Skia native module).
+const USE_SKIA_FLARE = true
 
 // ConstellationDrawing is authored in a 1024 × 1024 SVG space
 // (daily_constellation.svg); we project it into our viewBox via a
@@ -189,15 +235,15 @@ const STAR_POS: Record<DimensionKey, { x: number; y: number }> = {
   cuerpo: ornamentPos(250.5, 361),
 }
 
-// Ambient dust scattered in the annulus between the galaxy bulge
-// (≈ r 50) and the dimension hexagon (≈ r 148). Bumped 28 → 70
-// motes for a richer field. Each mote carries its OWN angular
-// speed factor (inversely proportional to its radius — Keplerian-
-// style "inner faster than outer"): the field rotates as a whole
-// but inner particles outpace outer ones, so the deterministic
-// initial positions deform into visible spiral arms over time
-// even though every particle stays in its own circular orbit.
-const DUST_MOTE_COUNT = 120
+// Ambient dust scattered in the annulus around the galaxy bulge. Cut
+// 45 → 16 motes: the Skia nebula now carries the continuous "cosmic
+// dust" texture, so the discrete points only need to sell the system's
+// ROTATION (the diagram's single Keplerian movement). They're kept
+// CLOSE to the bulge (radius 40 .. 95) — the inner motes are the ones
+// that read as a swirl; outer ones just looked like specks in the void.
+// Each mote carries its own angular speed (inverse-radius, Keplerian:
+// inner faster than outer) so the ring deforms into spiral arms.
+const DUST_MOTE_COUNT = 16
 const DUST_MOTES: {
   initialAngle: number
   radius: number
@@ -208,10 +254,8 @@ const DUST_MOTES: {
 }[] = Array.from({ length: DUST_MOTE_COUNT }, (_, i) => {
   const angBase = (i * 360) / DUST_MOTE_COUNT
   const angJitter = (((i * 73) % 31) - 15) * 0.6
-  // Wider radial spread (40 .. 180): some motes hug the bulge,
-  // some drift past the dimension hexagon → reads as depth, not
-  // a single thin ring.
-  const radius = 40 + ((i * 19) % 140)
+  // Inner radial band (40 .. 95) — hugs the bulge where the swirl reads.
+  const radius = 40 + ((i * 19) % 55)
   // Pseudo-random depth 0..1 per mote → drives size + opacity so
   // the field has near (big + bright) and far (small + dim)
   // particles co-existing.
@@ -223,8 +267,11 @@ const DUST_MOTES: {
     // whole field spirals counter-clockwise (visually "to the
     // left") on screen.
     speed: -120 / radius,
-    r: 0.4 + depth * 1.6, // 0.4 .. 2.0 — varied sizes for depth
-    op: 0.12 + depth * 0.55, // 0.12 .. 0.67 — varied brightness
+    r: 0.5 + depth * 0.9, // 0.5 .. 1.4 — calmer so the swirl doesn't
+    // compete with the galactic centre (the anchor).
+    // Floor kept confident (0.18) but ceiling lowered so the rotation is
+    // FELT, not announced — the centre stays the brightest thing here.
+    op: 0.18 + depth * 0.32, // 0.18 .. 0.50
     phase: (i % 11) / 11,
   }
 })
@@ -371,6 +418,18 @@ export function OrbitalSystem({
     }
   }, [selectedKey, zoomT, targetXVal, targetYVal])
 
+  // Arrival haptic — a soft impact ~480 ms after a selection, timed to
+  // when the camera LANDS (the end of the first zoom stage), not the tap
+  // (which already fired a selection tick in the Pressable). The body
+  // feels the moment of focus, not just the touch.
+  useEffect(() => {
+    if (selectedKey == null) return
+    const id = setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    }, 480)
+    return () => clearTimeout(id)
+  }, [selectedKey])
+
   // Focus label key + opacity — lingers ~420 ms after deselect so
   // the bottom-of-wrap RN Text overlay fades out alongside the
   // zoom-out instead of unmounting the instant selectedKey flips.
@@ -450,10 +509,24 @@ export function OrbitalSystem({
     return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] }
   })
 
-  const placed = dimensions.map((d) => ({ d, pos: place(d) }))
+  // Memoised so the Skia flare layer (which takes `placed` by prop)
+  // doesn't reconcile its whole canvas on every parent render — only
+  // when the dimensions actually change.
+  const placed = useMemo(() => dimensions.map((d) => ({ d, pos: place(d) })), [dimensions])
+
+  // viewBox → pixel factor for the Skia flare overlay. Measured from the
+  // wrap (which fills the orbital container at the viewBox aspect ratio),
+  // so k = px width ÷ viewBox width = px height ÷ viewBox height.
+  const [flareK, setFlareK] = useState(0)
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width
+        if (w > 0) setFlareK(w / W)
+      }}
+    >
       <Svg viewBox={`0 ${VB_TOP} ${W} ${VB_H}`} style={styles.svg}>
         <Defs>
           {/* A dimension star — warm white core fading to magenta. */}
@@ -508,8 +581,8 @@ export function OrbitalSystem({
               luminous spark without re-introducing the bright
               white-hot core that washed the rose-gold icon out. */}
           <RadialGradient id="focus-spark" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={SKY.haloCream} stopOpacity={0.6} />
-            <Stop offset="40%" stopColor={SKY.haloCream} stopOpacity={0.25} />
+            <Stop offset="0%" stopColor={SKY.haloCream} stopOpacity={0.72} />
+            <Stop offset="40%" stopColor={SKY.haloCream} stopOpacity={0.3} />
             <Stop offset="100%" stopColor={SKY.haloCream} stopOpacity={0} />
           </RadialGradient>
           {/* Per-dimension focus halo gradients — one TRUE radial
@@ -553,6 +626,55 @@ export function OrbitalSystem({
             <Stop offset="75%" stopColor={colors.dimension.energia} stopOpacity={0.14} />
             <Stop offset="100%" stopColor={colors.dimension.energia} stopOpacity={0} />
           </RadialGradient>
+          {/* Galactic bulge halo — a warm magenta glow painted UNDER the
+              vector galaxy so its hard SVG edge fuses into the field
+              instead of being cut against the dark. Magenta, never white:
+              the bulge is "the place", the hero star is "the event" —
+              keeping the bulge hueless-of-white means it never competes
+              with the single pure-white core. */}
+          <RadialGradient id="galaxy-bulb" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#7A2A60" stopOpacity={0.13} />
+            <Stop offset="55%" stopColor="#7A2A60" stopOpacity={0.06} />
+            <Stop offset="100%" stopColor="#7A2A60" stopOpacity={0} />
+          </RadialGradient>
+          {/* Galaxy edge-fade — a radial alpha that's fully opaque over
+              the bright disk and dissolves to nothing toward the rim, so
+              the photographic galaxy melts into the field instead of
+              showing the boxy halo edge of a pasted image. Used as a mask
+              on both galaxy renders. */}
+          <RadialGradient id="galaxy-fade" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="48%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="78%" stopColor="#FFFFFF" stopOpacity={0.5} />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+          </RadialGradient>
+          <Mask id="galaxy-mask" maskUnits="userSpaceOnUse">
+            <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={190} fill="url(#galaxy-fade)" />
+          </Mask>
+          {/* Glyph glow — one filter per dimension. Recolours the rose
+              constellation to the dimension's hue (FeColorMatrix) then
+              blurs it (FeGaussianBlur), so a soft shaped bloom in the
+              dimension colour sits behind the crisp glyph and bleeds its
+              light into the halo. The constellation stops reading as a
+              flat sticker and starts EMITTING. Generous filter region so
+              the blur isn't clipped. */}
+          {DIM_KEYS.map((key) => (
+            <Filter
+              key={`glow-${key}`}
+              id={`glyph-glow-${key}`}
+              x="-60%"
+              y="-60%"
+              width="220%"
+              height="220%"
+            >
+              <FeColorMatrix
+                type="matrix"
+                values={glowMatrix(colors.dimension[key])}
+                result="tint"
+              />
+              <FeGaussianBlur in="tint" stdDeviation={1.8} />
+            </Filter>
+          ))}
         </Defs>
 
         {/* Galaxy echo — sits OUTSIDE the zoom transform so it
@@ -561,15 +683,17 @@ export function OrbitalSystem({
             fades to ~22 % during focus. Stays static; orbit motion
             is on the stars layer above, not the galaxy itself. */}
         <AnimatedG animatedProps={echoProps}>
-          <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
-            <SvgImage
-              href={DAY_ORB_PNG}
-              x={0}
-              y={0}
-              width={ART_SRC}
-              height={ART_SRC}
-              preserveAspectRatio="xMidYMid meet"
-            />
+          <G mask="url(#galaxy-mask)">
+            <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
+              <SvgImage
+                href={DAY_ORB_PNG}
+                x={0}
+                y={0}
+                width={ART_SRC}
+                height={ART_SRC}
+                preserveAspectRatio="xMidYMid meet"
+              />
+            </G>
           </G>
         </AnimatedG>
 
@@ -599,24 +723,35 @@ export function OrbitalSystem({
               more. OrbitalSystem only renders the constellation +
               live stars now. */}
 
-          {/* The ornamental backdrop — the photographic Day art
-              PNG. Static. The orbital motion lives on the stars
+          {/* Galactic bulge halo — fuses the vector galaxy's edge into
+              the field. Sits UNDER the galaxy + the orbital traces. */}
+          <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={150} fill="url(#galaxy-bulb)" />
+
+          {/* The ornamental backdrop — the photographic Day galaxy
+              (day-orb.png). Static, edge-faded via galaxy-mask so it
+              melts into the field. The orbital motion lives on the stars
               layer below, not on the galaxy itself. */}
-          <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`} opacity={0.72}>
-            <SvgImage
-              href={DAY_ORB_PNG}
-              x={0}
-              y={0}
-              width={ART_SRC}
-              height={ART_SRC}
-              preserveAspectRatio="xMidYMid meet"
-            />
+          <G mask="url(#galaxy-mask)" opacity={0.62}>
+            <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
+              <SvgImage
+                href={DAY_ORB_PNG}
+                x={0}
+                y={0}
+                width={ART_SRC}
+                height={ART_SRC}
+                preserveAspectRatio="xMidYMid meet"
+              />
+            </G>
           </G>
-          {/* Centre "tú" DecorativeStar removed — the painted
-              galactic bulge in day-orb.png is now the only luminous
-              centre. A programmatic white core on top of it would
-              either over-saturate (if perfectly aligned) or read as
-              a second misaligned star (if slightly off). */}
+
+          {/* Orbital traces (thin magenta ellipses centre→star) were
+              tried for the vector galaxy but read as a geometric CAD
+              spirograph AND duplicate the orbital ring day-orb.png
+              already paints — so they're left to the PNG. */}
+          {/* Centre "tú" DecorativeStar removed — the galaxy's painted
+              bulge + the bulb halo are the only luminous centre. A
+              programmatic white core on top would over-saturate or read
+              as a second misaligned star. */}
 
           {/* Dust moved OUTSIDE the zoom group (see above) so its
               spiral motion stays visible throughout focus. */}
@@ -663,6 +798,25 @@ export function OrbitalSystem({
           </AnimatedG>
         </AnimatedG>
       </Svg>
+
+      {/* Skia flare overlay — real blur + additive blend on top of the
+          SVG diagram. pointerEvents off so the per-star Pressables below
+          still catch taps. Only mounts once the wrap has measured (k>0)
+          and when the Skia flare is enabled. */}
+      {USE_SKIA_FLARE && flareK > 0 ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <SkiaFlareLayer
+            placed={placed}
+            k={flareK}
+            zoomT={zoomT}
+            targetX={targetXVal}
+            targetY={targetYVal}
+            slowClock={slowClock}
+            t={t}
+            reduced={reducedMotion ?? false}
+          />
+        </View>
+      ) : null}
 
       {/* Focus label — "tu cuerpo / tu sueño / …" rendered as an
           RN Text overlay anchored to the bottom-centre of the
@@ -965,6 +1119,455 @@ function DiffractionSpikes({
   )
 }
 
+// ── Skia flare layer ────────────────────────────────────────────────
+// The SVG diagram above paints the galaxy, the orbits and a crisp core
+// pin per dimension. This Skia <Canvas> sits ON TOP of it and adds the
+// part SVG can't: real Gaussian-blurred volumetric glow, additive
+// diffraction rays, chromatic-aberration edges and sparkle motes — the
+// lens-flare read from the reference. It tracks the SAME zoom transform
+// as the SVG (so the flares ride the camera) and fades out as the focus
+// cinematic begins (zoomT → the SVG glyph/halo takes over from there).
+
+/** "#RRGGBB" → "r,g,b" so we can build rgba() strings with arbitrary
+ *  alpha for Skia gradient stops. Pure. */
+function hexToRgb(hex: string): string {
+  const h = hex.replace('#', '')
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h
+  const n = parseInt(full, 16)
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`
+}
+
+const SKIA_FLARE_CHROMA = {
+  violet: hexToRgb(SKY.chromaViolet),
+  cyan: hexToRgb(SKY.chromaCyan),
+} as const
+
+// Page background, as "r,g,b" — used to feather-knock-back the hard
+// coloured halo the day-orb.png paints behind each node, so the Skia
+// flare reads as white light on nebula rather than a coloured disc.
+const SKIA_BG_RGB = hexToRgb(colors.bg)
+
+/* One dimension's flare, drawn in Skia in LOCAL viewBox units around the
+ * origin; the wrapping <Group> transform places + scales it into canvas
+ * pixels (and applies the live zoom). Layered, back-to-front:
+ *   1. soft coloured glow (dimension hue) — wide, respirating, `screen`
+ *   2. inner bloom — white→hue, tighter
+ *   3. chromatic edges — violet/cyan ghosts (RADIANTE only), `plus`
+ *   4. diffraction rays — feathered streaks, `plus`
+ *   5. blown core — over-exposed white centre, `plus`
+ *   6. sparkles — a few off-axis twinkles, `plus`
+ * Drama is gated on register exactly like the SVG StarNode: radiante =
+ * full supernova, en-formación = a modest bloom + two short rays,
+ * silencio is never drawn here (its faint SVG point is enough). */
+function FlareNode({
+  vbX,
+  vbY,
+  b,
+  dimKey,
+  hero,
+  phase,
+  k,
+  zoomT,
+  targetX,
+  targetY,
+  slowClock,
+  reduced,
+}: {
+  vbX: number
+  vbY: number
+  b: number
+  dimKey: DimensionKey
+  /** True only for the day's brightest en-luz dimension — earns the
+   *  full lens-flare (long cross, streak, chroma, sparkles, white core).
+   *  Every other star accompanies with a calmer cream bloom. */
+  hero: boolean
+  phase: number
+  k: number
+  zoomT: SharedValue<number>
+  targetX: SharedValue<number>
+  targetY: SharedValue<number>
+  slowClock: SharedValue<number>
+  reduced: boolean
+}) {
+  const radiante = b >= TONE_BRILLANTE
+  const R = 2.5 + b * 1.5
+  const dimRgb = hexToRgb(colors.dimension[dimKey])
+  const creamRgb = hexToRgb(SKY.haloCream)
+  // CONTINUOUS intensity in brightness — replaces the old binary
+  // `radiante ? 1 : 0.68` step so 0.92 dominates 0.72 instead of every
+  // radiante star detonating identically. Formación ramps 0.45→0.69,
+  // radiante 0.70→1.0; continuous across the 0.7 boundary.
+  const m = radiante ? 0.7 + (b - 0.7) : 0.45 + (b - 0.3) * 0.6
+
+  // Mirror of OrbitalSystem's zoomTransform, baked straight to canvas
+  // pixels: place the flare at the node's live screen position and scale
+  // it by the zoom (s) × the viewBox→pixel factor (k).
+  const transform = useDerivedValue(() => {
+    const tz = zoomT.value
+    const s = 1 + tz * (ZOOM_SCALE - 1)
+    const mix = Math.min(tz, 1)
+    const tx = mix * (ART_CENTER_X - s * targetX.value)
+    const ty = mix * (FOCUS_CENTER_Y - s * targetY.value)
+    const cx = (s * vbX + tx) * k
+    const cy = (s * vbY + ty - VB_TOP) * k
+    return [{ translateX: cx }, { translateY: cy }, { scale: s * k }]
+  })
+  // Fade the whole flare out as the camera locks on (gone by zoomT ≈ 0.4)
+  // — the SVG glyph + coloured halo carry the focus state from there.
+  const opacity = useDerivedValue(() => Math.max(0, 1 - Math.min(1, zoomT.value * 2.5)))
+  // Slow respiration of the glow halo only — the core never blinks.
+  const breathe = useDerivedValue(() => {
+    const wave = reduced ? 0.5 : 0.5 + 0.5 * Math.sin((slowClock.value + phase) * 2 * Math.PI)
+    const sc = 0.9 + wave * 0.18
+    return [{ scale: sc }]
+  })
+
+  // Bloom radii — a white-hot core inside a wider dimension-hue aura, so
+  // the star reads as white light BUT each dimension keeps its colour
+  // identity (colour = "en luz"). The hue aura is feathered (blurred),
+  // never the hard disc the PNG painted.
+  const whiteBloomR = radiante ? R * 5.5 : R * 3.5
+  const hueBloomR = radiante ? R * 15 : R * 8
+
+  // The defining feature: a DENSE FINE STARBURST. Many thin spikes at
+  // even angles, alternating long/short, kept sharp (low blur). A small
+  // deterministic angular jitter stops it reading as a machined gear.
+  // Fine starburst points — kept modest for every en-luz star. Odd
+  // counts read less like a machined grid than even ones.
+  const spikeCount = radiante ? 5 : 3
+  const burst = Array.from({ length: spikeCount }, (_, i) => {
+    const ang = (i * Math.PI * 2) / spikeCount + (((i * 37) % 7) - 3) * 0.03
+    const long = i % 2 === 0
+    return {
+      ang,
+      len: R * (long ? (radiante ? 8 : 5) : radiante ? 4 : 2.5),
+      th: R * 0.22,
+      op: (long ? 0.7 : 0.4) * m,
+    }
+  })
+  // Dominant cross — the long bright rays that anchor the burst. The
+  // FULL two-ray cross is the HERO's alone; other radiante stars get a
+  // single short ray; en-formación gets none, so it reads as a calm
+  // "ember", not a competing star. The vertical ray is nudged off
+  // perfect 90° so the heroes' crosses don't tile into a grid.
+  const majors = hero
+    ? [
+        { ang: 0, len: R * 10, th: R * 0.36, op: 0.7 },
+        { ang: Math.PI / 2 + 0.05, len: R * 8, th: R * 0.3, op: 0.6 },
+      ]
+    : radiante
+      ? [{ ang: 0, len: R * 5, th: R * 0.26, op: 0.4 }]
+      : []
+  // Long soft anamorphic streak — HERO only. The far-shooting line is
+  // the single most "spectacular" element, so only the day's brightest
+  // star earns it.
+  const streaks = hero ? [{ ang: 0, len: R * 16, th: R * 0.5, op: 0.16 }] : []
+
+  // Off-axis twinkles — the hero gets a small scatter; other radiante
+  // stars a single glint; en-formación none.
+  const sparkles = hero
+    ? [
+        { x: R * 7, y: -R * 4, r: R * 0.45, op: 0.5 },
+        { x: -R * 5, y: R * 6, r: R * 0.38, op: 0.42 },
+      ]
+    : radiante
+      ? [{ x: R * 4, y: -R * 3, r: R * 0.38, op: 0.4 }]
+      : []
+
+  return (
+    <SkiaGroup transform={transform} opacity={opacity}>
+      {/* 0 · knock back the PNG's hard coloured halo behind the node so
+          the flare reads as white light on nebula, not a coloured disc.
+          Normal blend (darkens toward the page bg), feathered to nothing. */}
+      <SkiaCircle c={vec(0, 0)} r={R * 7.5}>
+        <SkiaRadialGradient
+          c={vec(0, 0)}
+          r={R * 7.5}
+          colors={[
+            `rgba(${SKIA_BG_RGB},0.5)`,
+            `rgba(${SKIA_BG_RGB},0.18)`,
+            `rgba(${SKIA_BG_RGB},0)`,
+          ]}
+        />
+      </SkiaCircle>
+
+      {/* 1 · bloom — white-dominant, with a faint hue wash beneath.
+          Respirating together. */}
+      <SkiaGroup blendMode="screen" transform={breathe}>
+        <SkiaCircle c={vec(0, 0)} r={hueBloomR}>
+          <SkiaRadialGradient
+            c={vec(0, 0)}
+            r={hueBloomR}
+            colors={[
+              `rgba(${dimRgb},${0.55 * m})`,
+              `rgba(${dimRgb},${0.18 * m})`,
+              `rgba(${dimRgb},0)`,
+            ]}
+          />
+          <BlurMask blur={R * 4} style="normal" />
+        </SkiaCircle>
+        <SkiaCircle c={vec(0, 0)} r={whiteBloomR}>
+          <SkiaRadialGradient
+            c={vec(0, 0)}
+            r={whiteBloomR}
+            colors={[
+              `rgba(255,255,255,${0.35 * m})`,
+              `rgba(255,255,255,${0.1 * m})`,
+              'rgba(255,255,255,0)',
+            ]}
+          />
+          <BlurMask blur={R * 2} style="normal" />
+        </SkiaCircle>
+      </SkiaGroup>
+
+      {/* 2 · long anamorphic streaks (soft, behind the burst). */}
+      {streaks.length > 0 ? (
+        <SkiaGroup blendMode="plus">
+          {streaks.map((s, i) => (
+            <SkiaGroup key={`streak-${i}`} transform={[{ rotate: s.ang }]}>
+              <SkiaRect x={-s.len} y={-s.th / 2} width={s.len * 2} height={s.th}>
+                <SkiaLinearGradient
+                  start={vec(-s.len, 0)}
+                  end={vec(s.len, 0)}
+                  colors={[
+                    'rgba(255,255,255,0)',
+                    `rgba(255,255,255,${s.op})`,
+                    'rgba(255,255,255,0)',
+                  ]}
+                  positions={[0, 0.5, 1]}
+                />
+                <BlurMask blur={R * 0.9} style="normal" />
+              </SkiaRect>
+            </SkiaGroup>
+          ))}
+        </SkiaGroup>
+      ) : null}
+
+      {/* 3 · fine starburst spikes + dominant cross. */}
+      <SkiaGroup blendMode="plus">
+        {burst.map((r, i) => (
+          <SkiaGroup key={`burst-${i}`} transform={[{ rotate: r.ang }]}>
+            <SkiaRect x={-r.len} y={-r.th / 2} width={r.len * 2} height={r.th}>
+              <SkiaLinearGradient
+                start={vec(-r.len, 0)}
+                end={vec(r.len, 0)}
+                colors={['rgba(255,255,255,0)', `rgba(255,255,255,${r.op})`, 'rgba(255,255,255,0)']}
+                positions={[0, 0.5, 1]}
+              />
+              <BlurMask blur={Math.max(0.4, r.th * 0.4)} style="normal" />
+            </SkiaRect>
+          </SkiaGroup>
+        ))}
+        {majors.map((r, i) => (
+          <SkiaGroup key={`major-${i}`} transform={[{ rotate: r.ang }]}>
+            <SkiaRect x={-r.len} y={-r.th / 2} width={r.len * 2} height={r.th}>
+              <SkiaLinearGradient
+                start={vec(-r.len, 0)}
+                end={vec(r.len, 0)}
+                colors={['rgba(255,255,255,0)', `rgba(255,255,255,${r.op})`, 'rgba(255,255,255,0)']}
+                positions={[0, 0.5, 1]}
+              />
+              <BlurMask blur={Math.max(0.5, r.th * 0.5)} style="normal" />
+            </SkiaRect>
+          </SkiaGroup>
+        ))}
+      </SkiaGroup>
+
+      {/* 4 · chromatic glints near the core (HERO only). */}
+      {hero ? (
+        <SkiaGroup blendMode="plus">
+          <SkiaCircle
+            c={vec(R * 1.3, -R * 0.5)}
+            r={R * 1.1}
+            color={`rgba(${SKIA_FLARE_CHROMA.cyan},0.5)`}
+          >
+            <BlurMask blur={R * 0.6} style="normal" />
+          </SkiaCircle>
+          <SkiaCircle
+            c={vec(-R * 1.3, R * 0.5)}
+            r={R * 1.1}
+            color={`rgba(${SKIA_FLARE_CHROMA.violet},0.5)`}
+          >
+            <BlurMask blur={R * 0.6} style="normal" />
+          </SkiaCircle>
+        </SkiaGroup>
+      ) : null}
+
+      {/* 5 · core — the HERO keeps a blown white centre; every other
+          star gets a softer CREAM core (feathered, lower opacity) so
+          only ONE point on screen is pure-white. A micro blur on the
+          inner disc kills the hard "pill" edge → reads as light, not a
+          solid dot. */}
+      <SkiaGroup blendMode="plus">
+        <SkiaCircle c={vec(0, 0)} r={hero ? R * 2.4 : R * 1.8}>
+          <SkiaRadialGradient
+            c={vec(0, 0)}
+            r={hero ? R * 2.4 : R * 1.8}
+            colors={
+              hero
+                ? ['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']
+                : [`rgba(${creamRgb},0.5)`, `rgba(${creamRgb},0.16)`, `rgba(${creamRgb},0)`]
+            }
+          />
+          <BlurMask blur={R} style="normal" />
+        </SkiaCircle>
+        <SkiaCircle
+          c={vec(0, 0)}
+          r={hero ? R * 0.85 : R * 0.6}
+          color={hero ? 'white' : `rgba(${creamRgb},0.75)`}
+        >
+          <BlurMask blur={R * 0.25} style="normal" />
+        </SkiaCircle>
+      </SkiaGroup>
+
+      {/* 6 · sparkles. */}
+      <SkiaGroup blendMode="plus">
+        {sparkles.map((s, i) => (
+          <SkiaCircle
+            key={`sp-${i}`}
+            c={vec(s.x, s.y)}
+            r={s.r}
+            color={`rgba(255,255,255,${s.op})`}
+          />
+        ))}
+      </SkiaGroup>
+    </SkiaGroup>
+  )
+}
+
+// Warm luminous cream (SKY.haloCream) as "r,g,b" — the mote colour.
+const WEAVE_RGB = '255,233,214'
+
+// Ambient rising motes — a slow drift of faint cosmic dust up the frame,
+// screen-space (NOT zoomed) so it stays a constant atmospheric layer.
+// This is the only thing left from the constellation-weave experiment:
+// the glowing hexagon lines + node rings were removed because hard
+// geometry over the photographic galaxy read as "background image with
+// CAD on top". The realistic astrophotography read wins: photo galaxy +
+// glowing stars + this faint drifting dust, no infographic linework.
+// Deterministic seeds keep the motes stable across renders.
+const RISE_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
+  fx: ((i * 73) % 100) / 100,
+  size: 0.7 + (((i * 37) % 10) / 10) * 1.1,
+  phase: (i % 7) / 7,
+  sway: 6 + (i % 5) * 3,
+  speed: 0.5 + (((i * 53) % 10) / 10) * 0.4,
+}))
+
+const RiseMote = memo(function RiseMote({
+  p,
+  t,
+  w,
+  h,
+  reduced,
+}: {
+  p: (typeof RISE_PARTICLES)[number]
+  t: SharedValue<number>
+  w: number
+  h: number
+  reduced: boolean
+}) {
+  const pos = useDerivedValue(() => {
+    const prog = reduced ? p.phase : (t.value * p.speed + p.phase) % 1
+    return vec(p.fx * w + Math.sin(prog * Math.PI * 2) * p.sway, h * (1 - prog))
+  })
+  const opacity = useDerivedValue(() => {
+    const prog = reduced ? p.phase : (t.value * p.speed + p.phase) % 1
+    return Math.sin(prog * Math.PI) * 0.5
+  })
+  return (
+    <SkiaCircle c={pos} r={p.size} color={`rgba(${WEAVE_RGB},1)`} opacity={opacity}>
+      <BlurMask blur={0.9} style="normal" />
+    </SkiaCircle>
+  )
+})
+
+function RisingParticles({
+  t,
+  w,
+  h,
+  reduced,
+}: {
+  t: SharedValue<number>
+  w: number
+  h: number
+  reduced: boolean
+}) {
+  return (
+    <SkiaGroup blendMode="screen">
+      {RISE_PARTICLES.map((p, i) => (
+        <RiseMote key={`rise-${i}`} p={p} t={t} w={w} h={h} reduced={reduced} />
+      ))}
+    </SkiaGroup>
+  )
+}
+
+/* The Skia overlay — one <Canvas> spanning the same box as the SVG. It
+ * draws the constellation weave + ambient particles, then a FlareNode
+ * for every EN-LUZ dimension at its viewBox position. `k` (canvas px ÷
+ * viewBox width) converts viewBox units to pixels; it comes from the
+ * wrap's measured layout. */
+const SkiaFlareLayer = memo(function SkiaFlareLayer({
+  placed,
+  k,
+  zoomT,
+  targetX,
+  targetY,
+  slowClock,
+  t,
+  reduced,
+}: {
+  placed: { d: Dimension; pos: { x: number; y: number } }[]
+  k: number
+  zoomT: SharedValue<number>
+  targetX: SharedValue<number>
+  targetY: SharedValue<number>
+  slowClock: SharedValue<number>
+  t: SharedValue<number>
+  reduced: boolean
+}) {
+  const enLuz = placed.filter(({ d }) => d.brightness >= EN_LUZ_THRESHOLD)
+  // The day's PROTAGONIST — the single brightest en-luz dimension. Only
+  // it earns the full lens-flare arsenal (long cross, streak, chroma,
+  // sparkles, pure-white core); every other star accompanies. This is
+  // the hierarchy lever: a real day has one or two things alight, not
+  // six identical suns. Ties resolve to the first in render order.
+  const heroEntry = enLuz.reduce<(typeof enLuz)[number] | null>(
+    (best, cur) => (best == null || cur.d.brightness > best.d.brightness ? cur : best),
+    null,
+  )
+  const heroKey = heroEntry?.d.key ?? null
+  return (
+    <Canvas style={StyleSheet.absoluteFill}>
+      {enLuz.map(({ d, pos }) => (
+        <FlareNode
+          key={d.key}
+          vbX={pos.x}
+          vbY={pos.y}
+          b={d.brightness}
+          dimKey={d.key}
+          hero={d.key === heroKey}
+          phase={(d.angleDeg / 360) % 1}
+          k={k}
+          zoomT={zoomT}
+          targetX={targetX}
+          targetY={targetY}
+          slowClock={slowClock}
+          reduced={reduced}
+        />
+      ))}
+      {/* Ambient rising motes — screen-space, on top, very faint. */}
+      <RisingParticles t={t} w={k * W} h={k * VB_H} reduced={reduced} />
+    </Canvas>
+  )
+})
+
 /* One dimension — a small luminous star. A radial gradient gives it
  * the white-hot core; a soft bloom around it scales with brightness.
  * The label sits radially outward, away from the centre. */
@@ -1002,6 +1605,10 @@ function StarNode({
   // Everything below is gated off `radiante` so brightness alone
   // reads at a glance — colour + explosion = alight.
   const radiante = b >= TONE_BRILLANTE
+  // When Skia owns the flare, this SVG StarNode drops its soft glow +
+  // diffraction rays + chromatic edges (Skia draws them with real blur)
+  // and keeps only the crisp core pin + the focus glyph/halo cinematic.
+  const skiaOwnsFlare = USE_SKIA_FLARE && enLuz
   // The day-orb.png backdrop already paints each dimension as a
   // bright magenta halo with a thin Saturn ring. The programmatic
   // StarNode now only adds: (1) a tiny white-hot core + (2) the
@@ -1118,7 +1725,21 @@ function StarNode({
     'worklet'
     const z = Math.min(1, zoomT.value * 1.6)
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
-    return { opacity: z * z * (0.55 + 0.18 * wave) }
+    // Arrival settle — popT (the one-shot selection pulse) gives the halo
+    // a single over-shoot breath (×1 → ×1.12 → ×1) the instant the camera
+    // lands, before it eases into the ambient `wave` respiration. Scaled
+    // about (x, y) so it grows from the star, not the origin.
+    const settle = 1 + popT.value * 0.12
+    return {
+      opacity: z * z * (0.55 + 0.18 * wave),
+      transform: [
+        { translateX: x },
+        { translateY: y },
+        { scale: settle },
+        { translateX: -x },
+        { translateY: -y },
+      ],
+    }
   })
   // Dark well — separate animation that ramps to full 1.0 opacity.
   // The well NEEDS to be near-opaque so it fully masks the PNG
@@ -1233,7 +1854,7 @@ function StarNode({
             slowClock; the breath group above only contributes scale
             + the soft opacity dip. A radiante star inherits the wide
             supernova `outerR` AND tints to the dimension colour. */}
-        {enLuz ? (
+        {enLuz && !skiaOwnsFlare ? (
           <AnimatedCircle
             cx={x}
             cy={y}
@@ -1248,30 +1869,34 @@ function StarNode({
             "silencio" stay neutral cream, so colour means "alight".
             Radiante also drives a magenta fall to a fuller peak
             (caída magenta) — the over-exposed supernova base. */}
-        <Circle
-          cx={x}
-          cy={y}
-          r={outerR}
-          fill={radiante ? colors.dimension[dim.key] : SKY.starGlow}
-          opacity={radiante ? 0.3 : enLuz ? 0.14 + b * 0.12 : 0.05}
-        />
-        {radiante ? (
-          <Circle cx={x} cy={y} r={midR * 1.2} fill={colors.magenta} opacity={0.22} />
-        ) : null}
-        <Circle
-          cx={x}
-          cy={y}
-          r={midR}
-          fill={SKY.starGlow}
-          opacity={radiante ? 0.4 : enLuz ? 0.2 + b * 0.14 : 0.06}
-        />
-        <Circle
-          cx={x}
-          cy={y}
-          r={auraR}
-          fill={SKY.starGlow}
-          opacity={radiante ? 0.6 : enLuz ? 0.38 + b * 0.22 : 0.1}
-        />
+        {skiaOwnsFlare ? null : (
+          <>
+            <Circle
+              cx={x}
+              cy={y}
+              r={outerR}
+              fill={radiante ? colors.dimension[dim.key] : SKY.starGlow}
+              opacity={radiante ? 0.3 : enLuz ? 0.14 + b * 0.12 : 0.05}
+            />
+            {radiante ? (
+              <Circle cx={x} cy={y} r={midR * 1.2} fill={colors.magenta} opacity={0.22} />
+            ) : null}
+            <Circle
+              cx={x}
+              cy={y}
+              r={midR}
+              fill={SKY.starGlow}
+              opacity={radiante ? 0.4 : enLuz ? 0.2 + b * 0.14 : 0.06}
+            />
+            <Circle
+              cx={x}
+              cy={y}
+              r={auraR}
+              fill={SKY.starGlow}
+              opacity={radiante ? 0.6 : enLuz ? 0.38 + b * 0.22 : 0.1}
+            />
+          </>
+        )}
         {/* Lens-flare starburst — ON for EVERY en luz star, but the
             DRAMA is gated on register. A radiante star gets long rays
             (R*20), bright diagonals, a dense 24-spike corona and the
@@ -1279,7 +1904,7 @@ function StarNode({
             formación gets a modest R*6 cross + a sparse 6-spike
             corona, no diagonals, no chroma. Everything is geometry +
             opacity so it reads identically with motion OFF. */}
-        {enLuz ? (
+        {enLuz && !skiaOwnsFlare ? (
           <AnimatedG animatedProps={shimmerAnim}>
             {/* Chromatic-aberration tails — violet + cyan ghosts the
                 lens throws past a blown-out core, offset ~0.4·R from
@@ -1380,30 +2005,34 @@ function StarNode({
           {/* Inner glow — a soft over-exposed wash painted under the
               white discs. RADIANTE = wide + near-opaque (the blown
               core); en formación = small + softer; silencio = none. */}
-          {radiante ? (
+          {skiaOwnsFlare ? null : radiante ? (
             <Circle cx={x} cy={y} r={R * 6.4} fill="url(#flare-soft)" opacity={0.9} />
           ) : b >= EN_LUZ_THRESHOLD ? (
             <Circle cx={x} cy={y} r={R * 3} fill="url(#flare-soft)" opacity={0.5} />
           ) : null}
-          <Circle
-            cx={x}
-            cy={y}
-            r={radiante ? R * 4.6 : enLuz ? R * 2.2 : R}
-            fill="url(#orb-star)"
-          />
-          {radiante ? (
+          {skiaOwnsFlare ? null : (
             <>
-              <Circle cx={x} cy={y} r={R * 2.2} fill={SKY.starCore} opacity={0.55} />
-              <Circle cx={x} cy={y} r={R * 1.3} fill={SKY.starCore} opacity={0.95} />
-              <Circle cx={x} cy={y} r={R * 0.7} fill={SKY.starCore} opacity={1} />
+              <Circle
+                cx={x}
+                cy={y}
+                r={radiante ? R * 4.6 : enLuz ? R * 2.2 : R}
+                fill="url(#orb-star)"
+              />
+              {radiante ? (
+                <>
+                  <Circle cx={x} cy={y} r={R * 2.2} fill={SKY.starCore} opacity={0.55} />
+                  <Circle cx={x} cy={y} r={R * 1.3} fill={SKY.starCore} opacity={0.95} />
+                  <Circle cx={x} cy={y} r={R * 0.7} fill={SKY.starCore} opacity={1} />
+                </>
+              ) : enLuz ? (
+                <>
+                  <Circle cx={x} cy={y} r={R * 1.1} fill={SKY.starCore} opacity={0.32} />
+                  <Circle cx={x} cy={y} r={R * 0.5} fill={SKY.starCore} opacity={1} />
+                </>
+              ) : (
+                <Circle cx={x} cy={y} r={R * 0.4} fill={SKY.starCore} opacity={1} />
+              )}
             </>
-          ) : enLuz ? (
-            <>
-              <Circle cx={x} cy={y} r={R * 1.1} fill={SKY.starCore} opacity={0.32} />
-              <Circle cx={x} cy={y} r={R * 0.5} fill={SKY.starCore} opacity={1} />
-            </>
-          ) : (
-            <Circle cx={x} cy={y} r={R * 0.4} fill={SKY.starCore} opacity={1} />
           )}
         </AnimatedG>
       </AnimatedG>
@@ -1441,10 +2070,15 @@ function StarNode({
         </>
       ) : null}
       {/* Dimension glyph — materialises at the star centre as the
-          zoom cinematic progresses. Cream tint so the icon reads
-          as the bright spark inside the coloured halo. */}
+          zoom cinematic progresses. A blurred, dimension-hued copy sits
+          BEHIND the crisp cream one (glyph-glow filter): the
+          constellation EMITS light in its own colour and bleeds it into
+          the halo, instead of reading as a flat rose sticker on a disc. */}
       {showGlyph ? (
         <AnimatedG animatedProps={glyphAnim}>
+          <G filter={`url(#glyph-glow-${dim.key})`} opacity={0.85}>
+            {GLYPHS[dim.key]}
+          </G>
           <G color={colors.leche}>{GLYPHS[dim.key]}</G>
         </AnimatedG>
       ) : null}

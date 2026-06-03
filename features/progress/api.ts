@@ -198,6 +198,41 @@ export async function deletePhoto(id: string, storagePath: string): Promise<void
 
 /* ─── extra reads for the Progress overview cards ────────────────── */
 
+/** Total distinct days trained, all-time. `workouts` has a UNIQUE
+ *  (user_id, workout_date), so a row count = a trained-day count. */
+export async function getTotalTrainedDays(): Promise<number> {
+  const { count, error } = await supabase
+    .from('workouts')
+    .select('*', { count: 'exact', head: true })
+  if (error) throw error
+  return count ?? 0
+}
+
+/** Every workout date (YYYY-MM-DD), all-time, ascending. Powers the
+ *  browsable Progreso calendar: navigating months is then a pure
+ *  client-side slice with no per-month refetch. The set is small (one
+ *  row per trained day), so loading the whole history is cheap. */
+export async function getAllWorkoutDates(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('workout_date')
+    .order('workout_date', { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((r) => r.workout_date as string)
+}
+
+/** YYYY-MM-DD workout dates from `monthStart` (the 1st of the current
+ *  calendar month) onward — feeds the month-based constellation. */
+export async function getMonthWorkoutDates(monthStart: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('workout_date')
+    .gte('workout_date', monthStart)
+    .order('workout_date', { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((r) => r.workout_date as string)
+}
+
 /** YYYY-MM-DD dates of every workout in the last `rangeDays`. */
 export async function getRecentWorkoutDates(rangeDays: number): Promise<string[]> {
   const since = new Date()

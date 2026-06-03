@@ -70,6 +70,8 @@ export const queryKeys = {
   orbit: {
     all: ['orbit'] as const,
     today: () => ['orbit', 'today'] as const,
+    week: (fromDate: string, toDate: string) => ['orbit', 'week', fromDate, toDate] as const,
+    history: (fromDate: string, toDate: string) => ['orbit', 'history', fromDate, toDate] as const,
     hasAny: () => ['orbit', 'hasAny'] as const,
   },
 } as const

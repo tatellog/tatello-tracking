@@ -12,16 +12,31 @@ STELAR tiene **un solo cielo**, mirado desde tres altitudes. Bajar de
 altitud = alejar la cámara del mismo cielo. Las tres altitudes SON los
 tres segmentos del tab:
 
-| Segmento   | Altitud     | Qué es                                                                           |
-| ---------- | ----------- | -------------------------------------------------------------------------------- |
-| **Día**    | El Sistema  | El diagrama orbital — tus 6 dimensiones orbitándote, en luz o lejos, ahora mismo |
-| **Semana** | Las Órbitas | Las trayectorias que esas dimensiones repiten — los patrones                     |
-| **Mes**    | El Cielo    | La constelación sellándose al cerrar el ciclo + el ciclo menstrual               |
+| Segmento   | Altitud     | Qué es                                                                                       |
+| ---------- | ----------- | -------------------------------------------------------------------------------------------- |
+| **Día**    | El Sistema  | El diagrama orbital — tus 6 dimensiones orbitándote, en luz o lejos, ahora mismo             |
+| **Semana** | Las Órbitas | Las trayectorias que esas dimensiones **repiten** — los patrones que vuelven semana a semana |
+| **Mes**    | El Cielo    | Cómo **evolucionaron** esas mismas dimensiones a lo largo de ~30 días — el arco del mes      |
 
-**La constelación no compite con el sistema orbital.** Es el mismo
-cielo a la altitud "Mes": lo que el sistema cristaliza cuando cierra un
-ciclo de 28 días. "Tu Cielo" (el sprint de ciclo diferido) es la
-acumulación de constelaciones selladas — vive aquí, en el segmento Mes.
+Las tres altitudes leen **los mismos comportamientos** (sueño, energía,
+comida, cuerpo, mente); lo que cambia es el lente:
+
+- **Día** = el estado de ahora.
+- **Semana** = lo que se **repite** (recurrencia corta — "los jueves
+  pesan más").
+- **Mes** = cómo se **movió cada dimensión en el mes** (acumulación +
+  tendencias — "tu energía cayó la 3ª semana", "tus mejores semanas
+  duermen más").
+
+**El ciclo menstrual es un DATO de contexto, no el centro del Mes.** Si
+la usuaria lo trackea, entra como una capa que puede _explicar_ un tramo
+(hinchazón → peso, antojos → comida, menos entreno → cuerpo) — nunca
+como protagonista ni con lenguaje clínico. El Mes habla de comportamiento;
+el ciclo es uno de los factores que lo contextualizan.
+
+"Tu Cielo" (sprint diferido) es la acumulación de meses/ciclos en el
+tiempo — un mapa de largo horizonte que vive aquí, en el segmento Mes,
+pero se construye después.
 
 El sistema orbital es la metáfora **central y viva**; la constelación es
 su forma cristalizada. Una sola familia visual: fondo profundo, glow
@@ -116,16 +131,25 @@ Las trayectorias que repites.
 
 ## 7. Segmento MES — El Cielo
 
-El ciclo y la cristalización.
+El arco del mes: cómo se movieron tus comportamientos a lo largo de ~30
+días. NO es un tracker del ciclo menstrual — es la lectura de mes de las
+mismas seis dimensiones (sueño, energía, comida, cuerpo, mente, ciclo).
 
-1. **La constelación** del ciclo en curso — la figura de 28 días
-   sellándose. La misma `LunarConstellation`, aquí en su hogar
-   conceptual.
-2. **El ciclo menstrual** — fase actual ("DÍA 22 · LÚTEA"), patrones
-   ligados al ciclo ("Antojos en lútea").
-3. **Voz de Stelar · este ciclo** — la lectura del arco del mes.
-4. **Tu Cielo** (futuro) — la acumulación de ciclos sellados. Este
-   segmento es el hogar del sprint de ciclo diferido.
+1. **Resumen del mes por dimensión** — para cada una, su nivel promedio
+   del mes + la tendencia (subió / cayó / estable). Derivado de los
+   `daily_signals` de los últimos ~30 días. Es el corazón del Mes:
+   "cómo evolucionó cada parte de tu sistema".
+2. **Patrones de mes** — los de mayor horizonte que la recurrencia
+   semanal no ve: "tu energía baja la 3ª semana", "tus mejores semanas
+   duermen +X h". Mini-visual por patrón (barras/curva por semana).
+3. **Voz de Stelar · este mes** — la lectura del arco completo.
+4. **Capa de ciclo (contexto, no centro)** — si trackeó período, se
+   marca dónde cayó en el mes y, solo si correlaciona, se nombra como
+   factor que explica un tramo ("esa semana baja coincidió con tu
+   período"). Sin lenguaje clínico, sin ser el tema. Es un dato más, no
+   la identidad del segmento.
+5. **Tu Cielo** (futuro) — la acumulación de meses en el tiempo, un mapa
+   de largo horizonte. Hogar del sprint diferido.
 
 ---
 
@@ -163,14 +187,20 @@ hace que no se peleen mientras tanto: están a altitudes distintas.
 - El componente del **diagrama orbital** — lee `daily_signals`,
   reusa el stack de `LunarConstellation` (svg + reanimated).
 - El grid de dimensiones + estados vacío→maduro.
-- El segmento Mes con la constelación y la fase del ciclo (derivada de
-  `cycle_events`).
+- El segmento **Semana** real: diagrama de 7 días + voz + patrones de
+  recurrencia, todo determinístico desde `daily_signals`. (HECHO.)
+- El segmento **Mes**: resumen por dimensión + tendencia del mes +
+  patrones de mes, determinístico desde `daily_signals` de ~30 días. La
+  capa de ciclo (si trackeó período) entra como contexto, derivada de
+  `cycle_events`/`on_period` — nunca como el centro.
 
 **Necesita el motor de órbitas (API key de Anthropic):**
 
-- "Voz de Stelar" — el texto narrado del coach (los 3 segmentos).
-- "Patrones detectados" — las tarjetas de patrón.
+- "Voz de Stelar" — la prosa rica del coach (hoy hay una versión
+  determinística honesta en Día/Semana; la IA la enriquece).
+- Patrones más sutiles / multivariados que las reglas determinísticas no
+  alcanzan.
 
 → El tab es ~70% construible ahora; el motor solo rellena los huecos
-narrativos. Se puede armar la estructura y el diagrama orbital sin
-esperar la key, y conectar la voz/patrones después.
+narrativos. La estructura, el diagrama y los patrones determinísticos se
+arman sin esperar la key; la voz rica se conecta después.

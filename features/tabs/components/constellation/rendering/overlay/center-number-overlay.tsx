@@ -26,6 +26,7 @@ export function CenterNumberOverlay({
   initialCount,
   urgent = false,
   remaining = 0,
+  target = TARGET_DAYS,
 }: {
   displayedCount: SharedValue<number>
   numberPulse: SharedValue<number>
@@ -38,6 +39,9 @@ export function CenterNumberOverlay({
   /** Days remaining until completion. Used by the urgency
    *  microcopy ("falta 1", "faltan 2", etc.). */
   remaining?: number
+  /** The denominator — the current month's day count (28..31).
+   *  Defaults to the legacy 28-day cycle. */
+  target?: number
 }) {
   const rounded = useDerivedValue(() => Math.round(displayedCount.value))
   const textProps = useAnimatedProps(() => {
@@ -75,7 +79,7 @@ export function CenterNumberOverlay({
           defaultValue={String(initialCount)}
           style={[styles.numberOverlayText, colorStyle]}
         />
-        <Text style={styles.numberDenominator}>/ {TARGET_DAYS} días</Text>
+        <Text style={styles.numberDenominator}>/ {target} días</Text>
         <View style={styles.chipFrameLine} />
         <View style={styles.chipFrameDot} />
       </Animated.View>

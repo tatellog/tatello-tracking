@@ -16,7 +16,8 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
-import { PatternObservation, usePatternDetection } from '@/features/patterns'
+import { PatternReveal, usePatternDetection } from '@/features/patterns'
+import { useMonthWorkoutDates, useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
@@ -34,6 +35,10 @@ import {
   WeekStrip,
   type WeekDayCell,
 } from '@/features/tabs/components'
+import {
+  buildMonthGrid,
+  buildTrailingDays,
+} from '@/features/tabs/components/constellation/data/month-grid'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
@@ -160,20 +165,63 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const [weekOpen, setWeekOpen] = useState(false)
   const todayIsoLocal = ctx.date
 
-  // The week strip shows the full 28-day window as one horizontally
-  // scrollable history — oldest day first, today last.
-  const allDays: WeekDayCell[] = ctx.grid_28_days.map((cell) => ({
-    date: cell.date,
-    trained: cell.completed,
-    dayNum: dayNumOf(cell.date),
-    weekdayIdx: dayOfWeekOf(cell.date),
-    isToday: cell.date === todayIsoLocal,
-  }))
+  // The constellation now fills against the CURRENT CALENDAR MONTH
+  // (28..31 days) instead of a rolling 28-day cycle. We build the month
+  // grid from this month's workout dates; the today cell is OR'd with the
+  // live `today_workout_completed` so a fresh check-in shows instantly,
+  // before the workouts query refetches.
+  const monthWorkouts = useMonthWorkoutDates()
+  const month = useMemo(() => {
+    const m = buildMonthGrid(todayIsoLocal, monthWorkouts.data ?? [])
+    if (ctx.today_workout_completed && m.todayIdx >= 0 && !m.grid[m.todayIdx]) {
+      m.grid[m.todayIdx] = true
+      m.cells[m.todayIdx]!.trained = true
+      m.trainedThisMonth += 1
+    }
+    return m
+  }, [todayIsoLocal, monthWorkouts.data, ctx.today_workout_completed])
 
-  const trainedThisMonth = ctx.grid_28_days.filter((c) => c.completed).length
+  // The day strip is a TRAILING window ending today (today is the lead,
+  // rightmost) — you scroll back through the last 30 days, never into the
+  // future. It spans the month boundary, so it reads from a 45-day
+  // workout window (covers the whole strip + the current month grid).
+  const stripWorkouts = useRecentWorkoutDates(45)
+  const allDays: WeekDayCell[] = useMemo(() => {
+    const cells = buildTrailingDays(todayIsoLocal, stripWorkouts.data ?? [], 30)
+    return cells.map((cell) => ({
+      date: cell.date,
+      // OR today's cell with the live check-in so a fresh log lights up
+      // before the workouts query refetches.
+      trained: cell.trained || (cell.isToday && ctx.today_workout_completed),
+      dayNum: dayNumOf(cell.date),
+      weekdayIdx: dayOfWeekOf(cell.date),
+      isToday: cell.isToday,
+    }))
+  }, [todayIsoLocal, stripWorkouts.data, ctx.today_workout_completed])
+
+  const trainedThisMonth = month.trainedThisMonth
+  const MONTHS_ES = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ]
+  const monthLabel = MONTHS_ES[Number(todayIsoLocal.slice(5, 7)) - 1] ?? 'Tu mes'
 
   const sign = useMemo(() => zodiacFromDate(profile?.date_of_birth), [profile?.date_of_birth])
   const signLabel = ZODIAC[sign].label
+  // The figure's completion goal = its stars + connecting lines. The
+  // constellation rewards completing THIS (achievable, rest-friendly),
+  // not filling the whole month; days beyond are "luz extra".
+  const figureCount = ZODIAC[sign].stars.length + ZODIAC[sign].lines.length
 
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
 
@@ -286,8 +334,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 site (Órbita tab, dev, refactor-test) keeps the magenta
                 StarBurst. */}
             <LunarConstellation
-              trained={ctx.grid_28_days.map((c) => c.completed)}
-              todayIdx={27}
+              trained={month.grid}
+              todayIdx={month.todayIdx}
+              target={month.daysInMonth}
               sign={sign}
               committed={ctx.today_workout_completed}
               suppressBurst
@@ -317,23 +366,22 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               align="center"
               {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
             />
-            {pattern ? (
-              <PatternObservation
-                message={pattern.message}
-                patternType={pattern.type}
-                onDismiss={dismissPattern}
-              />
-            ) : null}
             {(() => {
               if (dayState !== 'trained') return null
-              // Final-day case: tomorrow is the closing of the
-              // 28-day cycle, not another star ignition. Replace
-              // the "Mañana: X" star teaser with a closing line.
-              const TARGET_DAYS = 28
-              if (trainedThisMonth + 1 >= TARGET_DAYS) {
+              // Figure already complete — every further day is luz extra,
+              // not another figure star. No debt, just bonus light.
+              if (trainedThisMonth >= figureCount) {
                 return (
                   <Text style={styles.tomorrowHint}>
-                    Mañana <Text style={styles.tomorrowHintEmphasis}>cierras tu cielo</Text>.
+                    Mañana sumas <Text style={styles.tomorrowHintEmphasis}>luz extra</Text>.
+                  </Text>
+                )
+              }
+              // Last star before the asterism is whole.
+              if (trainedThisMonth + 1 >= figureCount) {
+                return (
+                  <Text style={styles.tomorrowHint}>
+                    Mañana <Text style={styles.tomorrowHintEmphasis}>completas tu figura</Text>.
                   </Text>
                 )
               }
@@ -357,7 +405,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               accessibilityState={{ expanded: weekOpen }}
             >
               <SectionHeader
-                label="Tus 28 días"
+                label={monthLabel}
                 meta={weekOpen ? 'Ocultar' : 'Ver detalle'}
                 metaEmphasis={weekOpen ? 'Ocultar' : 'Ver detalle'}
               />
@@ -389,6 +437,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+      {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
+          the root (it's a Modal) so it floats over Hoy. */}
+      <PatternReveal pattern={pattern} onClose={dismissPattern} />
     </View>
   )
 }

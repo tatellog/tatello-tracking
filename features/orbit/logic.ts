@@ -57,13 +57,24 @@ function clamp01(n: number): number {
   return n < 0 ? 0 : n > 1 ? 1 : n
 }
 
+/** Extra context the brightness heuristics can use. Today only `alimento`
+ *  reads it: with the user's macro targets set (a deficit goal), the food
+ *  dimension becomes a DEFICIT-ADHERENCE read — protein hit + calories
+ *  within target — instead of a meal-count read. Eating over the target
+ *  breaks the deficit, so the dimension dims (honestly, never "failure").
+ *  Threaded in from `useMacroTargets`; absent → the meal-count fallback. */
+export type DimensionContext = {
+  calorieTarget?: number | null
+  proteinTarget?: number | null
+}
+
 /*
  * Per-dimension brightness from today's signals. This is a deliberate
  * v1 heuristic — the órbita engine will refine the exact rule once the
  * Anthropic key is in. Each function falls back to DIM_FLOOR when its
  * signal is absent.
  */
-function brightnessFor(key: DimensionKey, s: DailySignals): number {
+function brightnessFor(key: DimensionKey, s: DailySignals, ctx?: DimensionContext): number {
   switch (key) {
     case 'cuerpo':
       // Trained today reads brightest; a logged rest day glows mid.
@@ -92,9 +103,24 @@ function brightnessFor(key: DimensionKey, s: DailySignals): number {
       return (duration + clamp01(s.sleep_quality / 5)) / 2
     }
 
-    case 'alimento':
+    case 'alimento': {
+      // Target-aware when macros are set: the food dimension lights from
+      // PROTEIN adherence + staying within the calorie target, not from
+      // sheer meal count. Over the target the deficit is gone, so it dims
+      // (≈60 % over → floor). No target → the old meal-count read.
+      const calTarget = ctx?.calorieTarget ?? null
+      if (calTarget && calTarget > 0) {
+        if (s.calories == null && s.protein_g == null && !s.meal_count) return DIM_FLOOR
+        const protTarget = ctx?.proteinTarget ?? null
+        const proteinPct =
+          protTarget && protTarget > 0 ? clamp01((s.protein_g ?? 0) / protTarget) : 0.6
+        const calPct = (s.calories ?? 0) / calTarget
+        const calFactor = calPct <= 1 ? 1 : clamp01(1 - (calPct - 1) * 1.6)
+        return Math.max(DIM_FLOOR, clamp01((0.45 + proteinPct * 0.55) * calFactor))
+      }
       // ~3 logged meals reads as a full day nourished.
       return s.meal_count ? clamp01(0.35 + (s.meal_count / 3) * 0.65) : DIM_FLOOR
+    }
 
     case 'ciclo':
       // A daily signal that's mostly quiet — it lights during the
@@ -128,10 +154,13 @@ function dimensionWord(key: DimensionKey, s: DailySignals): string | null {
 
 /** Resolve the six dimensions with today's brightness. `null` signals
  *  (nothing logged) → every dimension at the floor. */
-export function deriveDimensions(signals: DailySignals | null): Dimension[] {
+export function deriveDimensions(
+  signals: DailySignals | null,
+  ctx?: DimensionContext,
+): Dimension[] {
   return DIMENSIONS.map((d) => ({
     ...d,
-    brightness: signals == null ? DIM_FLOOR : brightnessFor(d.key, signals),
+    brightness: signals == null ? DIM_FLOOR : brightnessFor(d.key, signals, ctx),
     word: signals == null ? null : dimensionWord(d.key, signals),
   }))
 }
@@ -279,6 +308,7 @@ export function dimensionDetail(key: DimensionKey, s: DailySignals | null): stri
  */
 export type DailyReadingCategory =
   | 'prePeriodLow'
+  | 'overTarget'
   | 'proteinCared'
   | 'stressShortSleep'
   | 'shortSleepLowEnergy'
@@ -306,7 +336,7 @@ function hasAnySignalToday(s: DailySignals): boolean {
 
 export function dailyReadingCategory(
   s: DailySignals | null,
-  opts: { isPrePeriod: boolean; proteinTarget: number | null },
+  opts: { isPrePeriod: boolean; proteinTarget: number | null; calorieTarget?: number | null },
 ): DailyReadingCategory {
   if (!s || !hasAnySignalToday(s)) return 'noSignal'
   const shortSleep = s.sleep_minutes != null && s.sleep_minutes < SHORT_SLEEP_MIN
@@ -317,8 +347,18 @@ export function dailyReadingCategory(
   const lowMood = s.mood === 'low'
   const proteinGood =
     opts.proteinTarget != null && s.protein_g != null && s.protein_g >= opts.proteinTarget * 0.9
+  // Notably over the day's calorie target — for a deficit goal, the
+  // deficit is gone. Surfaced with curiosity, never blame (manifiesto).
+  const overTarget =
+    opts.calorieTarget != null &&
+    opts.calorieTarget > 0 &&
+    s.calories != null &&
+    s.calories >= opts.calorieTarget * 1.2
 
   if (opts.isPrePeriod && (lowEnergy || lowMood)) return 'prePeriodLow'
+  // Before proteinCared: a day over target shouldn't read as celebration
+  // even if protein landed — the deficit (the goal) didn't hold today.
+  if (overTarget) return 'overTarget'
   if (proteinGood) return 'proteinCared'
   if (highStress && shortSleep) return 'stressShortSleep'
   if (shortSleep && lowEnergy) return 'shortSleepLowEnergy'
@@ -335,6 +375,11 @@ export const DAILY_READING_VARIANTS: Record<DailyReadingCategory, readonly strin
     'Estos días tu cuerpo pide más. Ir más despacio está bien.',
     'La semana antes de tu período pesa distinto. Tiene sentido ir con calma.',
     'Tu cuerpo está pidiendo calma estos días. Dársela está bien.',
+  ],
+  overTarget: [
+    'Hoy tu cuerpo pidió más. ¿Algo pasó?',
+    'Hoy hubo más de lo habitual. A veces hay algo detrás.',
+    'Un día de más. Tu ritmo sigue mañana.',
   ],
   proteinCared: [
     'Vas cuidando tu proteína. Tu cuerpo lo nota.',

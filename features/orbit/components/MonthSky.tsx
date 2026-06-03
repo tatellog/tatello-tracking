@@ -17,7 +17,6 @@ import Animated, {
 import Svg, {
   Circle,
   Defs,
-  Ellipse,
   G,
   Image as SvgImage,
   Line,
@@ -42,7 +41,7 @@ const MONTH_ART_PNG = require('@/assets/orbits-art/orbit-month-bh.png')
  *    · valley     — cool, quieter glow (low-energy day/event)
  *    · stable     — solid magenta frame ring (steady anchor)
  *    · tentative  — dashed halo (hypothesis, not confirmed) */
-export type SatelliteKind = 'peak' | 'valley' | 'stable' | 'tentative'
+export type SatelliteKind = 'peak' | 'valley' | 'stable' | 'tentative' | 'rising'
 export type Satellite = {
   id: string
   label: string
@@ -148,6 +147,10 @@ const SKY = {
   haloViolet: '#A48BC8',
   auraPink: '#FBD7E3',
   auraPale: '#FCE5EE',
+  // Rising — warm gold tending amber (momentum). Distinct from peak's
+  // peach (more yellow, hue ~40° vs ~22°): reads "gaining light".
+  haloRisingGold: '#F2C879',
+  auraRisingGold: '#FBE3B8',
   auraVioletPale: '#C9B5D8',
   // Bright star / pin core.
   starCore: '#FFFFFF',
@@ -168,28 +171,6 @@ const NEBULA_CLOUDS: readonly {
   { cx: 284, cy: 248, r: 142, color: SKY.nebulaMagenta, opacity: 0.3 },
   { cx: 312, cy: 76, r: 100, color: SKY.nebulaDark, opacity: 0.22 },
   { cx: 60, cy: 290, r: 110, color: SKY.nebulaDeep, opacity: 0.2 },
-]
-
-/** Orbital rings — sparse dotted ellipses sized to orbit AROUND
- *  the scaled-down PNG (260 px = 130 px half-extent from centre).
- *  Each rx/ry is comfortably > 130 so the dotted ring tracks
- *  visibly outside the painted plasma rather than being swallowed
- *  by it. Three rings at distinct tilts give a sense of orbital
- *  inclination without the busy six-ring nest of v2. */
-const ORBITS: readonly {
-  rx: number
-  ry: number
-  rotation: number
-  strokeWidth: number
-  dash: string
-  opacity: number
-}[] = [
-  // Main ring — prominent horizontal tilt around the BH
-  { rx: 158, ry: 144, rotation: -8, strokeWidth: 0.6, dash: '0.5 5', opacity: 0.8 },
-  // Wide tilted outer ring — same orbital plane rotated outward
-  { rx: 178, ry: 134, rotation: 22, strokeWidth: 0.55, dash: '0.5 5.5', opacity: 0.62 },
-  // Vertical-leaning ring — counter-tilt for orbital depth
-  { rx: 140, ry: 175, rotation: -30, strokeWidth: 0.55, dash: '0.5 5.5', opacity: 0.6 },
 ]
 
 /** Bright pin-point nodes scattered on the orbital rings — replace
@@ -306,6 +287,12 @@ function SatBody({
       haloOp = 0.32
       auraOp = 0.12
       break
+    case 'rising':
+      haloFill = SKY.haloRisingGold // warm gold — positive momentum
+      auraFill = SKY.auraRisingGold
+      haloOp = 0.17
+      auraOp = 0.18
+      break
   }
 
   const breath = useAnimatedProps(() => {
@@ -313,7 +300,14 @@ function SatBody({
     const wave = 0.5 + 0.5 * Math.sin((clock.value * 0.5 + phase) * 2 * Math.PI)
     // Stable patterns breathe LESS — they're the steady ones.
     // Tentative breathes a touch quieter than peak/valley.
-    const amplitude = kind === 'stable' ? 0.04 : kind === 'tentative' ? 0.06 : 0.09
+    const amplitude =
+      kind === 'stable'
+        ? 0.04
+        : kind === 'tentative'
+          ? 0.06
+          : kind === 'rising'
+            ? 0.105 // a touch more than peak/valley — it's in motion
+            : 0.09
     const scale = 1 + wave * amplitude
     return {
       transform: [
@@ -356,6 +350,42 @@ function SatBody({
           strokeWidth={0.8}
           opacity={0.55}
         />
+      ) : null}
+      {/* Rising extra: an ascending glow trail (replaces the ring — a
+          ring is static, rising is movement). Three short gold strokes,
+          growing, climbing up-right like the badge icon. */}
+      {kind === 'rising' ? (
+        <G opacity={0.55}>
+          <Line
+            x1={x - 9}
+            y1={y + 13}
+            x2={x - 3}
+            y2={y + 7}
+            stroke={SKY.haloRisingGold}
+            strokeWidth={1}
+            strokeLinecap="round"
+            opacity={0.4}
+          />
+          <Line
+            x1={x - 4}
+            y1={y + 15}
+            x2={x + 3}
+            y2={y + 8}
+            stroke={SKY.haloRisingGold}
+            strokeWidth={1.2}
+            strokeLinecap="round"
+            opacity={0.7}
+          />
+          <Line
+            x1={x + 2}
+            y1={y + 16}
+            x2={x + 9}
+            y2={y + 9}
+            stroke={SKY.auraRisingGold}
+            strokeWidth={1.3}
+            strokeLinecap="round"
+          />
+        </G>
       ) : null}
       {selected ? (
         <Circle
@@ -432,6 +462,38 @@ function PatternSymbol({ kind, size }: { kind: SatelliteKind | undefined; size: 
             strokeLinecap="round"
           />
           <Circle cx="12" cy="12" r="1.6" fill={SKY.auraPale} />
+        </G>
+      ) : null}
+      {kind === 'rising' ? (
+        // Ascending spark-comet — momentum / trending up. A trail of
+        // shrinking strokes climbs up-right into a bright head + glint.
+        <G>
+          <Path
+            d="M 5 20 L 9.2 15.8"
+            stroke={SKY.haloRisingGold}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            opacity={0.5}
+          />
+          <Path
+            d="M 8 18.5 L 12 14.5"
+            stroke={SKY.haloRisingGold}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            opacity={0.75}
+          />
+          <Path
+            d="M 11 16.5 L 14.4 13.1"
+            stroke={SKY.haloRisingGold}
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+          <Circle cx="16" cy="11" r="2.4" fill={SKY.haloRisingGold} />
+          <Path
+            d="M 16 6.4 L 16.55 10.45 L 20.6 11 L 16.55 11.55 L 16 15.6 L 15.45 11.55 L 11.4 11 L 15.45 10.45 Z"
+            fill={SKY.starCore}
+            opacity={0.9}
+          />
         </G>
       ) : null}
     </Svg>
@@ -867,6 +929,20 @@ function getIgnitionLayout(kind: SatelliteKind | undefined): {
           { from: 1, to: 2 },
         ],
       }
+    case 'rising':
+      return {
+        // Ascending diagonal, flares GROWING bottom-left → top-right:
+        // the sub-constellation climbs and gains brightness (momentum).
+        flares: [
+          { x: 110, y: 250, size: 0.7 },
+          { x: 165, y: 175, size: 0.95 },
+          { x: 220, y: 95, size: 1.3 },
+        ],
+        lines: [
+          { from: 0, to: 1 },
+          { from: 1, to: 2 },
+        ],
+      }
     default:
       return { flares: [], lines: [] }
   }
@@ -907,40 +983,15 @@ export function MonthSky({
   const reducedMotion = useReducedMotion()
   const t = useSharedValue(0)
   const twinkle = useSharedValue(0)
-  const orbitSpin = useSharedValue(0)
 
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
     twinkle.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.linear }), -1, false)
-    orbitSpin.value = withRepeat(
-      withTiming(1, { duration: 120000, easing: Easing.linear }),
-      -1,
-      false,
-    )
     return () => {
       cancelAnimation(t)
       cancelAnimation(twinkle)
-      cancelAnimation(orbitSpin)
     }
-  }, [t, twinkle, orbitSpin])
-
-  // Rotate the entire orbital-ring group around the BH centre.
-  // The orbits are tilted ellipses, so rotation reads as orbital
-  // motion (not just a spin) — like watching a planetary system
-  // from above.
-  const orbitTransform = useAnimatedProps(() => {
-    'worklet'
-    const deg = orbitSpin.value * 360
-    return {
-      transform: [
-        { translateX: CX },
-        { translateY: CY },
-        { rotate: `${deg}deg` },
-        { translateX: -CX },
-        { translateY: -CY },
-      ],
-    }
-  })
+  }, [t, twinkle])
 
   const sats = satellites.slice(0, SAT_POS.length).map((sat, i) => ({
     ...sat,
@@ -1018,66 +1069,10 @@ export function MonthSky({
         {/* Inner nebula wash — closer-in centre warmth. */}
         <Circle cx={CX} cy={CY} r={W * 0.5} fill="url(#m-nebula)" />
 
-        {/* Pattern connectors — thin magenta threads from each
-            chain item curving inward toward the BH centre. The
-            PNG renders AFTER this, so its opaque void occludes
-            the inner portion of each thread; only the outer arc
-            (from chain badge to BH outer edge) remains visible.
-            The threads visually anchor the patterns to the
-            cosmos — they ORBIT the BH, not float in space. */}
-        {SAT_POS.map((pos, i) => {
-          // BH centre in the bumped-left layout (ART_OFFSET_X).
-          const bhCx = ART_OFFSET_X + ART_SIZE / 2
-          const bhCy = ART_OFFSET_Y + ART_SIZE / 2
-          // Curved Bezier: control point perpendicular to the
-          // chord, biased inward toward the BH. Gives each thread
-          // a graceful arc rather than a rigid straight line.
-          const midX = (bhCx + pos.x) / 2
-          const midY = (bhCy + pos.y) / 2
-          // Perpendicular bias — curve "away" from a straight
-          // line so the threads arc outward from the BH.
-          const dx = pos.x - bhCx
-          const dy = pos.y - bhCy
-          const len = Math.hypot(dx, dy) || 1
-          const nx = -dy / len
-          const ny = dx / len
-          const bias = 22
-          const ctrlX = midX + nx * bias
-          const ctrlY = midY + ny * bias
-          return (
-            <Path
-              key={`conn-${i}`}
-              d={`M ${bhCx} ${bhCy} Q ${ctrlX} ${ctrlY}, ${pos.x} ${pos.y}`}
-              fill="none"
-              stroke={colors.magentaHot}
-              strokeWidth={0.45}
-              strokeOpacity={0.25}
-              strokeLinecap="round"
-            />
-          )
-        })}
-
-        {/* Orbital rings — wrapped in an AnimatedG that spins
-            very slowly (120 s per turn). The rings are tilted
-            ellipses, so the rotation reads as orbital motion. */}
-        <AnimatedG animatedProps={orbitTransform}>
-          {ORBITS.map((o, i) => (
-            <Ellipse
-              key={`orbit-${i}`}
-              cx={CX}
-              cy={CY}
-              rx={o.rx}
-              ry={o.ry}
-              fill="none"
-              stroke={SKY.auraPale}
-              strokeWidth={o.strokeWidth}
-              strokeDasharray={o.dash}
-              strokeLinecap="round"
-              opacity={o.opacity}
-              transform={`rotate(${o.rotation} ${CX} ${CY})`}
-            />
-          ))}
-        </AnimatedG>
+        {/* Orbital rings + pattern connector threads removed — the
+            dotted ellipses and the lines from the BH to each satellite
+            read as busy diagram scaffolding over the photographic void.
+            The satellites now float free in the cosmos. */}
 
         {/* Layer 5 — the BH cosmos PNG. Rendered LAST in the back
             Svg so the painted void occludes any orbital ring +

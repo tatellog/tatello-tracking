@@ -41,6 +41,9 @@ export function useToggleWorkoutToday() {
     onError: (_err, _vars, context) => restoreBriefCache(qc, context),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      // Refresh the month-based constellation + the all-time trained-days
+      // count, both keyed under ['progress'].
+      qc.invalidateQueries({ queryKey: ['progress'] })
     },
   })
 }
@@ -91,6 +94,9 @@ export function useToggleWorkoutForDate() {
     onError: (_err, _vars, context) => restoreBriefCache(qc, context),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      // Refresh the month-based constellation + the all-time trained-days
+      // count, both keyed under ['progress'].
+      qc.invalidateQueries({ queryKey: ['progress'] })
     },
   })
 }

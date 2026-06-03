@@ -1,12 +1,29 @@
+import {
+  BlurMask,
+  Canvas,
+  Circle as SkiaCircle,
+  Group as SkiaGroup,
+  LinearGradient as SkiaLinearGradient,
+  RadialGradient as SkiaRadialGradient,
+  Rect as SkiaRect,
+  vec,
+} from '@shopify/react-native-skia'
+import { BlurView } from 'expo-blur'
 import * as Haptics from 'expo-haptics'
-import { useEffect, useState } from 'react'
+import { LinearGradient } from 'expo-linear-gradient'
+import { memo, useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, type ViewStyle, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
   FadeInDown,
+  interpolate,
   useAnimatedProps,
+  useAnimatedStyle,
+  useDerivedValue,
+  useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withSpring,
@@ -48,6 +65,10 @@ const WEEK_ART_PNG = require('@/assets/orbits-art/orbit-week-art.png')
 const W = 372
 const CX = W / 2
 const CY = W / 2
+// Overscan (px) for the Skia flare Canvas — it extends this far beyond
+// the diagram bounds on every side so a hero flare on an edge day (e.g.
+// HOY near the right) bleeds into the margin instead of being clipped.
+const FLARE_PAD = 72
 const HIT = 56
 
 // Static day positions — anchored to the painted orbital nodes in
@@ -182,8 +203,6 @@ function DayBody({
   // Today is the hero — body grows from 4.2 → 6.2 base so the
   // luminance gap with past days is unmistakable.
   const R = (isToday ? 6.2 : 3) + b * 2.4
-  const bloomR = R * 3.4
-  const auraR = R * 1.9
 
   const breath = useAnimatedProps(() => {
     'worklet'
@@ -205,35 +224,13 @@ function DayBody({
     // Faded (= a different day is selected): drop to 30 % so the
     // selected halo is unambiguously the focus.
     <G opacity={faded ? 0.3 : 1}>
+      {/* Just the crisp magenta base disc + a small core. The volumetric
+          bloom, diffraction rays and blown white core are painted by the
+          Skia WeekFlareLayer on top (real Gaussian blur), same split as
+          the Día view. */}
       <AnimatedG animatedProps={breath}>
-        <Circle cx={x} cy={y} r={bloomR} fill={colors.magenta} opacity={0.08 + b * 0.12} />
-        <Circle cx={x} cy={y} r={auraR} fill="#FBD7E3" opacity={0.1 + b * 0.16} />
-        {/* Permanent halo ring on HOY so it reads as the anchor
-            even before the user taps. */}
-        {isToday ? (
-          <Circle
-            cx={x}
-            cy={y}
-            r={R + 4}
-            fill="none"
-            stroke={colors.magentaHot}
-            strokeWidth={1.1}
-            opacity={0.85}
-          />
-        ) : null}
-        {selected ? (
-          <Circle
-            cx={x}
-            cy={y}
-            r={R + 6}
-            fill="none"
-            stroke="#F4ECDE"
-            strokeWidth={1.3}
-            opacity={0.9}
-          />
-        ) : null}
         <Circle cx={x} cy={y} r={R} fill="url(#weekBody)" />
-        <Circle cx={x} cy={y} r={R * 0.45} fill="#FFFFFF" opacity={0.9} />
+        <Circle cx={x} cy={y} r={R * 0.42} fill="#FFFFFF" opacity={0.9} />
       </AnimatedG>
     </G>
   )
@@ -389,6 +386,122 @@ function bubbleExiting() {
   }
 }
 
+// Premium soft ease-out (the "settle" of a glass plate coming to rest)
+// and a plain glide. Shared by the bubble's ornament choreography.
+const SETTLE = Easing.bezier(0.16, 1, 0.3, 1)
+
+/* A Genshin-style gem (rotated square) that is ALIVE: it blooms in on
+ * birth (scale overshoot + a 90°→45° settle), then idles forever with a
+ * slow glow-breath behind it and a ±2° facet wobble — so a flat rhombus
+ * reads as a faceted crystal catching light, never a dead square. */
+function AnimatedGem({
+  size = 6,
+  mr = 0,
+  reduced,
+}: {
+  size?: number
+  mr?: number
+  reduced: boolean
+}) {
+  const birth = useSharedValue(reduced ? 1 : 0)
+  const idle = useSharedValue(0)
+  useEffect(() => {
+    if (reduced) {
+      birth.value = 1
+      idle.value = 0
+      return
+    }
+    birth.value = withDelay(260, withTiming(1, { duration: 340, easing: SETTLE }))
+    idle.value = withDelay(
+      700,
+      withRepeat(withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }), -1, true),
+    )
+    return () => {
+      cancelAnimation(birth)
+      cancelAnimation(idle)
+    }
+  }, [reduced, birth, idle])
+  const gemStyle = useAnimatedStyle(() => {
+    const bloom = interpolate(birth.value, [0, 0.6, 1], [0, 1.25, 1])
+    const rot =
+      interpolate(birth.value, [0, 1], [90, 45]) + interpolate(idle.value, [0, 1], [-2, 2])
+    return { opacity: birth.value, transform: [{ scale: bloom }, { rotate: `${rot}deg` }] }
+  })
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(idle.value, [0, 1], [0.04, 0.5]) * birth.value,
+    transform: [{ scale: 1 + idle.value * 0.7 }],
+  }))
+  const halo = size * 2.6
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        marginRight: mr,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: 'absolute',
+            width: halo,
+            height: halo,
+            borderRadius: halo / 2,
+            backgroundColor: colors.magentaHot,
+          },
+          haloStyle,
+        ]}
+      />
+      <Animated.View
+        style={[{ width: size, height: size, backgroundColor: colors.magenta }, gemStyle]}
+      />
+    </View>
+  )
+}
+
+/* A slow diagonal sheen of light that sweeps across the glass every ~7s
+ * — the premium "cristal captando luz" touch. One brief pass, then a long
+ * pause, so it reads as an occasional glint, never a loop. Clipped to the
+ * rounded pane by the glass's overflow:hidden. */
+function GlassSheen({ reduced }: { reduced: boolean }) {
+  const x = useSharedValue(0)
+  useEffect(() => {
+    if (reduced) return
+    x.value = withDelay(
+      900,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1400, easing: SETTLE }),
+          withTiming(1, { duration: 5600 }),
+          withTiming(0, { duration: 0 }),
+        ),
+        -1,
+        false,
+      ),
+    )
+    return () => cancelAnimation(x)
+  }, [reduced, x])
+  const style = useAnimatedStyle(() => {
+    const tx = interpolate(x.value, [0, 1], [-BUBBLE_W * 0.7, BUBBLE_W * 1.1])
+    const op = Math.sin(Math.min(1, x.value) * Math.PI)
+    return { opacity: op, transform: [{ translateX: tx }, { rotate: '18deg' }] }
+  })
+  if (reduced) return null
+  return (
+    <Animated.View pointerEvents="none" style={[bubbleStyles.sheen, style]}>
+      <LinearGradient
+        colors={['rgba(244,236,222,0)', 'rgba(244,236,222,0.13)', 'rgba(244,236,222,0)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+    </Animated.View>
+  )
+}
+
 /* The halo-anchored info bubble — a small floating callout that
  * materialises next to the tapped halo, points back at it with a
  * triangular arrow, and contains the day's name + voice phrase +
@@ -406,6 +519,7 @@ function HaloBubble({
   isToday: boolean
   onOpenDia: () => void
 }) {
+  const reduced = useReducedMotion() ?? false
   // Decide which side of the halo the bubble appears on. The rule:
   // place the bubble toward the side of the canvas with more room.
   // Halos near the top/bottom edge get a vertical placement
@@ -468,73 +582,94 @@ function HaloBubble({
       ]}
       pointerEvents="auto"
     >
-      {/* No-op Pressable consumes taps on the bubble body so the
-          backdrop closer underneath doesn't dismiss the bubble
-          when the user just wanted to read it. */}
-      <Pressable onPress={() => {}} style={bubbleStyles.body}>
-        {isFuture ? (
-          <>
-            <Animated.Text
-              entering={FadeInDown.duration(220).delay(120).easing(Easing.out(Easing.cubic))}
-              style={bubbleStyles.eyebrowMuted}
-            >
-              {dayName.toUpperCase()}
-            </Animated.Text>
-            <Animated.Text
-              entering={FadeInDown.duration(220).delay(180).easing(Easing.out(Easing.cubic))}
-              style={bubbleStyles.vozFuture}
-            >
-              {day.note}
-            </Animated.Text>
-          </>
-        ) : (
-          <>
-            <Animated.Text
-              entering={FadeInDown.duration(220).delay(100).easing(Easing.out(Easing.cubic))}
-              style={bubbleStyles.eyebrow}
-            >
-              {isToday ? (
-                <>
-                  <Text style={bubbleStyles.eyebrowAccent}>HOY</Text>
-                  <Text> · {dayName.toUpperCase()}</Text>
-                </>
-              ) : (
-                <Text style={bubbleStyles.eyebrowAccent}>{dayName.toUpperCase()}</Text>
-              )}
-            </Animated.Text>
-            <Animated.Text
-              entering={FadeInDown.duration(220).delay(160).easing(Easing.out(Easing.cubic))}
-              style={bubbleStyles.title}
-            >
-              <Text style={bubbleStyles.titleAccent}>{word}</Text>
-              <Text> {day.archetype}</Text>
-            </Animated.Text>
-            <Animated.Text
-              entering={FadeInDown.duration(220).delay(220).easing(Easing.out(Easing.cubic))}
-              style={bubbleStyles.voz}
-              numberOfLines={3}
-            >
-              {day.note}
-            </Animated.Text>
-            {isToday ? (
+      {/* Frosted-glass body — real blur of the cosmos behind, a warm
+          translucent tint for legibility, a hairline glass edge. No
+          solid card / hard border any more: the bubble reads as a pane
+          of skylight, not a UI tooltip. */}
+      <BlurView intensity={26} tint="dark" style={bubbleStyles.glass}>
+        <View style={bubbleStyles.glassTint} pointerEvents="none" />
+        {/* Premium glint — a slow diagonal light sweep across the pane. */}
+        <GlassSheen reduced={reduced} />
+        {/* No-op Pressable consumes taps on the bubble body so the
+            backdrop closer underneath doesn't dismiss the bubble
+            when the user just wanted to read it. */}
+        <Pressable onPress={() => {}} style={bubbleStyles.body}>
+          {isFuture ? (
+            <>
               <Animated.View
-                entering={FadeInDown.duration(240)
-                  .delay(300)
-                  .easing(Easing.out(Easing.back(1.5)))}
+                entering={FadeInDown.duration(220).delay(120).easing(Easing.out(Easing.cubic))}
+                style={bubbleStyles.eyebrowRow}
               >
-                <Pressable
-                  onPress={onOpenDia}
-                  style={({ pressed }) => [bubbleStyles.cta, pressed && bubbleStyles.ctaPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Abrir Día"
-                >
-                  <Text style={bubbleStyles.ctaText}>Abrir Día →</Text>
-                </Pressable>
+                <Text style={bubbleStyles.eyebrowMuted}>{dayName.toUpperCase()}</Text>
               </Animated.View>
-            ) : null}
-          </>
-        )}
-      </Pressable>
+              <Animated.Text
+                entering={FadeInDown.duration(220).delay(180).easing(Easing.out(Easing.cubic))}
+                style={bubbleStyles.vozFuture}
+              >
+                {day.note}
+              </Animated.Text>
+            </>
+          ) : (
+            <>
+              <Animated.View
+                entering={FadeInDown.duration(220).delay(100).easing(Easing.out(Easing.cubic))}
+                style={bubbleStyles.eyebrowRow}
+              >
+                <Text style={bubbleStyles.eyebrow}>
+                  {isToday ? (
+                    <>
+                      <Text style={bubbleStyles.eyebrowAccent}>HOY</Text>
+                      <Text> · {dayName.toUpperCase()}</Text>
+                    </>
+                  ) : (
+                    <Text style={bubbleStyles.eyebrowAccent}>{dayName.toUpperCase()}</Text>
+                  )}
+                </Text>
+              </Animated.View>
+              {/* Divider with a centred rhombus — the Genshin header rule. */}
+              <Animated.View
+                entering={FadeInDown.duration(220).delay(140).easing(Easing.out(Easing.cubic))}
+                style={bubbleStyles.divider}
+                pointerEvents="none"
+              >
+                <View style={bubbleStyles.dividerLine} />
+                <AnimatedGem size={4.5} reduced={reduced} />
+                <View style={bubbleStyles.dividerLine} />
+              </Animated.View>
+              <Animated.Text
+                entering={FadeInDown.duration(220).delay(160).easing(Easing.out(Easing.cubic))}
+                style={bubbleStyles.title}
+              >
+                <Text style={bubbleStyles.titleAccent}>{word}</Text>
+                <Text> {day.archetype}</Text>
+              </Animated.Text>
+              <Animated.Text
+                entering={FadeInDown.duration(220).delay(220).easing(Easing.out(Easing.cubic))}
+                style={bubbleStyles.voz}
+                numberOfLines={3}
+              >
+                {day.note}
+              </Animated.Text>
+              {isToday ? (
+                <Animated.View
+                  entering={FadeInDown.duration(240)
+                    .delay(300)
+                    .easing(Easing.out(Easing.back(1.5)))}
+                >
+                  <Pressable
+                    onPress={onOpenDia}
+                    style={({ pressed }) => [bubbleStyles.cta, pressed && bubbleStyles.ctaPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Abrir Día"
+                  >
+                    <Text style={bubbleStyles.ctaText}>Abrir Día →</Text>
+                  </Pressable>
+                </Animated.View>
+              ) : null}
+            </>
+          )}
+        </Pressable>
+      </BlurView>
       {/* Arrow extends out toward the halo AFTER the bubble has
           settled — a tiny "kick" that visually completes the
           connection from bubble to star. */}
@@ -554,30 +689,64 @@ function HaloBubble({
 // bubble is placed to the left/right of a halo. If actual content
 // is taller/shorter, the centre is off by a few pixels — acceptable
 // since the arrow keeps the connection unambiguous.
-const BUBBLE_W = 172
-const BUBBLE_H_EST = 100
+const BUBBLE_W = 158
+const BUBBLE_H_EST = 96
 const HALO_R = 14
-const GAP = 14
-const ARROW = 7
+const GAP = 13
+const ARROW = 6
 
 const bubbleStyles = StyleSheet.create({
   bubble: {
     position: 'absolute',
-    backgroundColor: colors.bgCard,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    // Subtle shadow so the bubble lifts off the cosmos instead of
-    // sitting flat. iOS-only props are ignored on Android.
-    shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    // No bg / border here — the glass pane (BlurView) carries the look.
+    // The outer view only holds a soft MAGENTA glow so the bubble lifts
+    // off the cosmos like luminous skylight, not a black UI card.
+    borderRadius: 14,
+    shadowColor: colors.magenta,
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  // The frosted pane — rounds + clips the blur. Borderless (no hairline
+  // edge, no corner brackets) so it reads as a clean pane of skylight.
+  glass: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  // Warm translucent wash over the blur so cream/serif text stays legible
+  // against whatever (galaxy, nebula, dark) sits behind the pane.
+  glassTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(18,7,11,0.46)',
   },
   body: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  // Diagonal light band for the glass sheen sweep.
+  sheen: {
+    position: 'absolute',
+    top: -20,
+    bottom: -20,
+    width: 44,
+  },
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Header divider — a hairline rule split by a centred rhombus gem.
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 7,
+    marginBottom: 1,
+    gap: 6,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(245,237,223,0.2)',
   },
   eyebrow: {
     fontFamily: typography.uiBold,
@@ -646,8 +815,10 @@ const bubbleStyles = StyleSheet.create({
 
 // CSS-triangle technique: a 0×0 element whose borders form four
 // trapezoids meeting at the centre. Three transparent + one
-// coloured = a directional triangle. The coloured border matches
-// the bubble background so the arrow reads as part of the bubble.
+// coloured = a directional triangle. The colour is a translucent wine
+// matching the glass tint so the arrow reads as a soft pointer of the
+// same skylight pane, not a hard opaque caret.
+const GLASS_ARROW = 'rgba(20,8,12,0.62)'
 const arrowStyles = StyleSheet.create({
   base: {
     width: 0,
@@ -659,7 +830,7 @@ const arrowStyles = StyleSheet.create({
     borderLeftWidth: ARROW,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
-    borderLeftColor: colors.bgCard,
+    borderLeftColor: GLASS_ARROW,
   },
   pointLeft: {
     borderTopWidth: ARROW,
@@ -667,7 +838,7 @@ const arrowStyles = StyleSheet.create({
     borderRightWidth: ARROW,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
-    borderRightColor: colors.bgCard,
+    borderRightColor: GLASS_ARROW,
   },
   pointUp: {
     borderLeftWidth: ARROW,
@@ -675,7 +846,7 @@ const arrowStyles = StyleSheet.create({
     borderBottomWidth: ARROW,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderBottomColor: colors.bgCard,
+    borderBottomColor: GLASS_ARROW,
   },
   pointDown: {
     borderLeftWidth: ARROW,
@@ -683,7 +854,7 @@ const arrowStyles = StyleSheet.create({
     borderTopWidth: ARROW,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: colors.bgCard,
+    borderTopColor: GLASS_ARROW,
   },
 })
 
@@ -726,6 +897,211 @@ function ProgressArc({ todayIdx }: { todayIdx: number }) {
   )
 }
 
+// ── Skia volumetric flare layer (same recipe as the Día view) ───────
+// The SVG day-bodies are crisp magenta discs; this Skia <Canvas> sits on
+// top and adds the part SVG can't: real Gaussian-blurred bloom, additive
+// diffraction rays, a blown white core + sparkles — the lens-flare read.
+// No zoom here (unlike Día), so each node just maps its viewBox position
+// to pixels via `k` and scales its local drawing by `k`.
+
+/** "#RRGGBB" → "r,g,b". Pure. */
+function wkRgb(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`
+}
+const WK_BG = wkRgb(colors.bg)
+const WK_MAGENTA = wkRgb(colors.magenta)
+const WK_PINK = '251,215,227' // #FBD7E3
+
+function WeekFlareNode({
+  vbX,
+  vbY,
+  b,
+  hero,
+  faded,
+  k,
+  t,
+  phase,
+  reduced,
+}: {
+  vbX: number
+  vbY: number
+  b: number
+  hero: boolean
+  faded: boolean
+  k: number
+  t: SharedValue<number>
+  phase: number
+  reduced: boolean
+}) {
+  const R = (hero ? 6 : 3) + b * 2.4
+  const m = hero ? 1 : 0.55 + b * 0.45
+  // +FLARE_PAD because the Canvas is inset by -FLARE_PAD on every side
+  // (overscan), so the diagram origin sits at (PAD, PAD) in canvas space.
+  const transform = useDerivedValue(() => [
+    { translateX: vbX * k + FLARE_PAD },
+    { translateY: vbY * k + FLARE_PAD },
+    { scale: k },
+  ])
+  const breathe = useDerivedValue(() => {
+    if (reduced) return [{ scale: 1 }]
+    const wave = 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    return [{ scale: 0.93 + wave * 0.12 }]
+  })
+  const hueBloomR = R * (hero ? 9 : 6)
+  const whiteBloomR = R * (hero ? 4 : 3)
+  const spikeCount = hero ? 6 : 4
+  const burst = Array.from({ length: spikeCount }, (_, i) => {
+    const ang = (i * Math.PI * 2) / spikeCount + (((i * 37) % 7) - 3) * 0.03
+    const long = i % 2 === 0
+    return {
+      ang,
+      len: R * (long ? (hero ? 8 : 5) : hero ? 4 : 2.5),
+      th: R * 0.22,
+      op: (long ? 0.7 : 0.4) * m,
+    }
+  })
+  const majors = hero
+    ? [
+        { ang: 0, len: R * 11, th: R * 0.36, op: 0.75 },
+        { ang: Math.PI / 2, len: R * 9, th: R * 0.3, op: 0.62 },
+      ]
+    : [{ ang: 0, len: R * 5, th: R * 0.26, op: 0.4 }]
+  const sparkles = hero
+    ? [
+        { x: R * 6, y: -R * 4, r: R * 0.45, op: 0.5 },
+        { x: -R * 5, y: R * 5, r: R * 0.38, op: 0.42 },
+      ]
+    : []
+  return (
+    <SkiaGroup transform={transform} opacity={faded ? 0.32 : 1}>
+      {/* 0 · knock back the PNG's painted halo so the flare reads white. */}
+      <SkiaCircle c={vec(0, 0)} r={R * 7}>
+        <SkiaRadialGradient
+          c={vec(0, 0)}
+          r={R * 7}
+          colors={[`rgba(${WK_BG},0.5)`, `rgba(${WK_BG},0.16)`, `rgba(${WK_BG},0)`]}
+        />
+      </SkiaCircle>
+      {/* 1 · bloom — magenta aura + white core, respirating. */}
+      <SkiaGroup blendMode="screen" transform={breathe}>
+        <SkiaCircle c={vec(0, 0)} r={hueBloomR}>
+          <SkiaRadialGradient
+            c={vec(0, 0)}
+            r={hueBloomR}
+            colors={[
+              `rgba(${WK_MAGENTA},${0.5 * m})`,
+              `rgba(${WK_PINK},${0.16 * m})`,
+              `rgba(${WK_MAGENTA},0)`,
+            ]}
+          />
+          <BlurMask blur={R * 4} style="normal" />
+        </SkiaCircle>
+        <SkiaCircle c={vec(0, 0)} r={whiteBloomR}>
+          <SkiaRadialGradient
+            c={vec(0, 0)}
+            r={whiteBloomR}
+            colors={[
+              `rgba(255,255,255,${0.4 * m})`,
+              `rgba(255,255,255,${0.1 * m})`,
+              'rgba(255,255,255,0)',
+            ]}
+          />
+          <BlurMask blur={R * 2} style="normal" />
+        </SkiaCircle>
+      </SkiaGroup>
+      {/* 2 · fine starburst + dominant cross. */}
+      <SkiaGroup blendMode="plus">
+        {[...burst, ...majors].map((r, i) => (
+          <SkiaGroup key={`ray-${i}`} transform={[{ rotate: r.ang }]}>
+            <SkiaRect x={-r.len} y={-r.th / 2} width={r.len * 2} height={r.th}>
+              <SkiaLinearGradient
+                start={vec(-r.len, 0)}
+                end={vec(r.len, 0)}
+                colors={['rgba(255,255,255,0)', `rgba(255,255,255,${r.op})`, 'rgba(255,255,255,0)']}
+                positions={[0, 0.5, 1]}
+              />
+              <BlurMask blur={Math.max(0.4, r.th * 0.45)} style="normal" />
+            </SkiaRect>
+          </SkiaGroup>
+        ))}
+      </SkiaGroup>
+      {/* 3 · blown white core. */}
+      <SkiaGroup blendMode="plus">
+        <SkiaCircle c={vec(0, 0)} r={R * 2}>
+          <SkiaRadialGradient
+            c={vec(0, 0)}
+            r={R * 2}
+            colors={['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0)']}
+          />
+          <BlurMask blur={R} style="normal" />
+        </SkiaCircle>
+        <SkiaCircle c={vec(0, 0)} r={R * 0.8} color="white">
+          <BlurMask blur={R * 0.25} style="normal" />
+        </SkiaCircle>
+      </SkiaGroup>
+      {/* 4 · sparkles (hero only). */}
+      {sparkles.length > 0 ? (
+        <SkiaGroup blendMode="plus">
+          {sparkles.map((s, i) => (
+            <SkiaCircle
+              key={`sp-${i}`}
+              c={vec(s.x, s.y)}
+              r={s.r}
+              color={`rgba(255,255,255,${s.op})`}
+            />
+          ))}
+        </SkiaGroup>
+      ) : null}
+    </SkiaGroup>
+  )
+}
+
+/* The Skia overlay — one <Canvas> over the week SVG. Draws a flare for
+ * every lit (non-future, b>0) day at its position. `k` = canvas px ÷
+ * viewBox width, from the wrap's measured layout. */
+const WeekFlareLayer = memo(function WeekFlareLayer({
+  days,
+  todayIdx,
+  selectedIdx,
+  k,
+  t,
+  reduced,
+}: {
+  days: readonly DiaSemana[]
+  todayIdx: number
+  selectedIdx: number
+  k: number
+  t: SharedValue<number>
+  reduced: boolean
+}) {
+  const exploring = selectedIdx !== todayIdx
+  return (
+    <Canvas style={StyleSheet.absoluteFill}>
+      {days.map((d, i) => {
+        const future = todayIdx >= 0 && i > todayIdx
+        const pos = DAY_POS[i]
+        if (future || !pos || d.brightness <= 0.04) return null
+        const selected = i === selectedIdx
+        return (
+          <WeekFlareNode
+            key={i}
+            vbX={pos.x}
+            vbY={pos.y}
+            b={d.brightness}
+            hero={d.today || selected}
+            faded={exploring && !selected}
+            k={k}
+            t={t}
+            phase={(i * 0.17) % 1}
+            reduced={reduced}
+          />
+        )
+      })}
+    </Canvas>
+  )
+})
+
 export function WeekConstellation({
   days,
   selectedIdx,
@@ -740,6 +1116,10 @@ export function WeekConstellation({
    *  bubble. Wired by the parent to switch tabs into Día. */
   onOpenDia: () => void
 }) {
+  const reduced = useReducedMotion() ?? false
+  // viewBox → pixel factor for the Skia flare overlay, from the wrap's
+  // measured width. 0 until first layout (Canvas withheld until then).
+  const [flareK, setFlareK] = useState(0)
   const t = useSharedValue(0)
   const drift = useSharedValue(0)
   const spin = useSharedValue(0)
@@ -812,7 +1192,13 @@ export function WeekConstellation({
   })
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width
+        if (w > 0) setFlareK(w / W)
+      }}
+    >
       <Svg viewBox={`0 0 ${W} ${W}`} style={styles.svg}>
         <Defs>
           <RadialGradient id="weekCore" cx="50%" cy="50%" r="60%">
@@ -965,6 +1351,32 @@ export function WeekConstellation({
           )
         })}
       </Svg>
+
+      {/* Skia volumetric flare overlay — real blur + additive blend on
+          top of the SVG day-stars. pointerEvents off so the halo
+          Pressables below still catch taps. Mounts once the wrap has
+          measured (k>0). */}
+      {flareK > 0 ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: -FLARE_PAD,
+            left: -FLARE_PAD,
+            right: -FLARE_PAD,
+            bottom: -FLARE_PAD,
+          }}
+          pointerEvents="none"
+        >
+          <WeekFlareLayer
+            days={days}
+            todayIdx={todayIdx}
+            selectedIdx={selectedIdx}
+            k={flareK}
+            t={t}
+            reduced={reduced}
+          />
+        </View>
+      ) : null}
 
       {/* Backdrop — closes the bubble when the user taps anywhere
           outside of a halo or the bubble itself. Only mounted when

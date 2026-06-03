@@ -5,13 +5,15 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
-import { ENGINE_ACTIVE } from '../engine'
-import { useHasAnySignals } from '../hooks'
-import { buildArquetipoSemana, buildVozSemana, buildWeekDays, MOCK_PATRONES } from '../mock'
+import { useMacroTargets } from '@/features/macros/hooks'
+
+import { useHasAnySignals, useSignalsHistory, useWeekSignals } from '../hooks'
+import { buildArquetipoSemana } from '../mock'
+import { buildVozSemanaReal, buildWeekDaysReal } from '../week-logic'
+import { detectWeekPatterns } from '../week-patterns'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
-import { PatternHint } from './PatternHint'
-import { PreviewBanner } from './PreviewBanner'
+import { PatternCard } from './PatternCard'
 import { StelarVoice } from './StelarVoice'
 import { WeekConstellation } from './WeekConstellation'
 
@@ -29,9 +31,24 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
   // of which day the user opens the app. JS Date.getDay() returns
   // 0 for Sunday, matching the Sunday-first template layout.
   const todayIdx = useMemo(() => new Date().getDay(), [])
-  const days = useMemo(() => buildWeekDays(todayIdx), [todayIdx])
+
+  // ALWAYS real — no mock. With no signals the week simply renders its
+  // honest "forming" state (every day at the dim floor, the voice says
+  // the week's just starting). `hasRealData` only decides whether to
+  // show the "leído por Stelar" credit, never whether the data is real.
+  const { data: weekSignals } = useWeekSignals()
+  // Macro targets make `alimento` deficit-aware (see deriveDimensions).
+  const macros = useMacroTargets()
+  const calorieTarget = macros.data?.calories ?? null
+  const proteinTarget = macros.data?.protein_g ?? null
+  const dimCtx = useMemo(() => ({ calorieTarget, proteinTarget }), [calorieTarget, proteinTarget])
+  const hasRealData = (weekSignals?.length ?? 0) > 0
+  const days = useMemo(
+    () => buildWeekDaysReal(weekSignals ?? [], todayIdx, dimCtx),
+    [weekSignals, todayIdx, dimCtx],
+  )
   const arquetipo = useMemo(() => buildArquetipoSemana(days, todayIdx), [days, todayIdx])
-  const voz = useMemo(() => buildVozSemana(days, todayIdx), [days, todayIdx])
+  const voz = useMemo(() => buildVozSemanaReal(days, todayIdx), [days, todayIdx])
 
   const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
   const { data: hasAny } = useHasAnySignals()
@@ -43,7 +60,15 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
   const daysEnLuz = arquetipo.daysEnLuz
   const porVenir = days.length - livedCount
 
-  const activePattern = pickActivePattern(todayIdx)
+  // The patterns are the PROTAGONIST of this altitude ("Las Órbitas —
+  // las trayectorias que repites"). Real detection over ~5 weeks of
+  // signals; when the history is too thin to claim anything, the list
+  // shows a "still gathering" note — never mock examples.
+  const { data: history } = useSignalsHistory()
+  const weekPatterns = useMemo(
+    () => (history ? detectWeekPatterns(history, dimCtx) : []),
+    [history, dimCtx],
+  )
 
   // Empty-state branch: hide the templated archetype + meta + voz +
   // pattern hint; render the galaxy hero with all 7 days as ghosts
@@ -86,9 +111,6 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Honest framing while the engine is mock. */}
-      {ENGINE_ACTIVE ? null : <PreviewBanner />}
-
       {/* Compressed header — archetype as the only hero, then a single
           dense meta block that names the week's state, who read it
           and the insight. No eyebrow on top: the tab pill already
@@ -104,15 +126,15 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
         />
         <View style={styles.metaRow}>
           <LiveDot />
-          <Text style={styles.meta} numberOfLines={ENGINE_ACTIVE ? 2 : 1}>
+          <Text style={styles.meta} numberOfLines={hasRealData ? 2 : 1}>
             {/* Leads with the light — days "lejos" aren't tallied. */}
             <Text style={styles.metaNum}>{daysEnLuz}</Text>
             <Text> en luz · </Text>
             <Text style={styles.metaNum}>{porVenir}</Text>
             <Text> por venir</Text>
-            {/* "leído por Stelar · N días" — only true once the engine
-                has run; hidden while the week's prose is mock. */}
-            {ENGINE_ACTIVE ? (
+            {/* "leído por Stelar · N días" — shown once the week is read
+                from real signals (Stelar reads them deterministically). */}
+            {hasRealData ? (
               <>
                 <Text style={styles.metaSep}>{'\n'}</Text>
                 <Text>leído por </Text>
@@ -124,11 +146,11 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
         </View>
       </View>
 
-      {/* Full-bleed hero — the constellation of the seven days.
-          Tapping a halo opens a small HaloBubble anchored to that
-          star, carrying the day's info + (today only) the "Abrir
-          Día" CTA. There is no separate card below: the
-          constellation IS the UI. */}
+      {/* Compact week-at-a-glance — the seven-day constellation,
+          demoted from full-bleed hero to a smaller glance up top.
+          The week's REAL subject (the patterns) lives below; this
+          diagram now just sets the scene. Tapping a halo still opens
+          its HaloBubble with the day's info. */}
       <View style={styles.diagram}>
         <WeekConstellation
           days={days}
@@ -144,29 +166,27 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
       <StelarVoice
         parts={voz.parts}
         tag={todayIdx === 6 ? 'Cierre de semana' : 'Hasta ahora'}
-        // The confidence signature ("Confianza alta · N días") is a
-        // real-engine artifact — never shown over mock prose.
-        signature={ENGINE_ACTIVE ? voz.signature : undefined}
+        // The confidence signature ("Confianza alta · N días") rides the
+        // real reading only — never shown over the mock example prose.
+        signature={hasRealData ? voz.signature : undefined}
       />
 
-      {/* One pattern surfaced here as a doorway — the full list lives
-          in Mes, where the cross-week scope belongs. We pick the
-          forward-looking pattern (its focus day still ahead this
-          week) so the chip is actionable, not retrospective. */}
-      {activePattern ? <PatternHint patron={activePattern} /> : null}
+      {/* The patterns — the protagonist of "Las Órbitas". Real detections
+          over the rolling history; tapping opens the detail. When there
+          isn't enough yet, an honest "still gathering" note — never mock. */}
+      <View style={styles.patterns}>
+        <Text style={styles.patternsEyebrow}>Las órbitas que repites</Text>
+        {weekPatterns.length > 0 ? (
+          weekPatterns.map((p) => <PatternCard key={p.id} patron={p} />)
+        ) : (
+          <EmptySegmentCard
+            eyebrow="Stelar está reuniendo tus semanas"
+            body="Los patrones se revelan cuando hay suficiente para cruzar. Cada día que registras acerca el primero."
+          />
+        )}
+      </View>
     </Animated.View>
   )
-}
-
-/* Pick the pattern most worth surfacing in Semana right now. We
- * prefer a weekday pattern whose focus is still ahead (so the hint
- * is actionable), falling back to the first available. */
-function pickActivePattern(todayIdx: number) {
-  // buildWeekDays is Sunday-first; PatternCard's weekday glyph is
-  // Monday-first (L=0..D=6). Convert today's idx accordingly.
-  const monFirst = (todayIdx + 6) % 7
-  const upcoming = MOCK_PATRONES.find((p) => p.data.kind === 'weekday' && p.data.focus > monFirst)
-  return upcoming ?? MOCK_PATRONES[0] ?? null
 }
 
 const styles = StyleSheet.create({
@@ -224,9 +244,23 @@ const styles = StyleSheet.create({
   metaSep: {
     fontSize: 4,
   },
-  // ── Diagram, full-bleed ───────────────────────────────────────
+  // ── Diagram — compact glance, centred (was full-bleed hero) ───
   diagram: {
-    marginHorizontal: -20,
-    marginTop: 4,
+    width: '72%',
+    alignSelf: 'center',
+    marginTop: 10,
+  },
+  // ── Patterns — the protagonist list ──────────────────────────
+  patterns: {
+    marginTop: 24,
+  },
+  patternsEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 11,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 2,
+    marginLeft: 2,
   },
 })

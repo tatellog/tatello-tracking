@@ -159,7 +159,10 @@ function DayColumn({
     }
   })
 
-  const glow = day.isToday || justMarked
+  // Halo behind EVERY trained day (not just today/just-marked) so a
+  // marked day pops against the dim untrained outlines — otherwise the
+  // cream fill is too subtle to read "this day is lit" at a glance.
+  const glow = day.isToday || justMarked || day.trained
 
   return (
     <Animated.View style={[styles.colBox, animStyle]}>

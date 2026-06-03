@@ -4,12 +4,28 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedProps,
+  useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
 import Svg, { Circle, G, Line } from 'react-native-svg'
+// Skia owns the nebula layer now — real Gaussian blur + FractalNoise
+// gives the filamentary texture a stack of SVG circles never could.
+// Aliased where the name collides with react-native-svg (Circle).
+import {
+  BlurMask,
+  Canvas,
+  Circle as SkiaCircle,
+  FractalNoise,
+  Group as SkiaGroup,
+  Mask,
+  RadialGradient as SkiaRadialGradient,
+  Rect as SkiaRect,
+  vec,
+} from '@shopify/react-native-skia'
 
 /*
  * Cosmos — the deep field behind the orbital system. Drifting nebula
@@ -86,51 +102,258 @@ const DEFAULT_W = 372
 // viewport bounds.
 const FIELD_PAD = 48
 
-/* Nebula clouds — soft colour drifting behind everything. Each is a
- * stack of fading circles: a hand-built radial falloff, since an
- * alpha-stop RadialGradient misrenders on iOS in react-native-svg. */
+/* "#RRGGBB" + alpha → "rgba(r,g,b,a)" for Skia colour stops. Pure. */
+function hexA(hex: string, a: number): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+}
+
+/* Nebula clouds — soft colour drawn in Skia as ROTATED ELLIPSES (not
+ * circles) over TWO depth planes, which is what gives the field its
+ * sense of volume:
+ *   • FAR plane (`depth: 'far'`) — large, very faint, heavily blurred
+ *     diagonal washes that drift barely at all. They read as the distant
+ *     galactic haze the nearer clouds float in front of.
+ *   • NEAR plane (`depth: 'near'`) — the framing clouds in the outer
+ *     quadrants, brighter, more textured, drifting more (parallax = the
+ *     near layer moving faster than the far layer is the depth cue).
+ * The centre stays clear of NEAR clouds so the galaxy + protagonist star
+ * keep breathing; only the faint FAR washes pass behind it.
+ *
+ * Each cloud is drawn in LOCAL space around the origin, then a single
+ * group transform places it (translate + drift), rotates it (`rot`,
+ * radians) and squashes it to an ellipse (`aspect` = minor/major). Three
+ * layers per cloud:
+ *   A · body      — RadialGradient + heavy BlurMask (volumetric)
+ *   B · texture    — FractalNoise (octaves 3) masked by a radial falloff,
+ *                    tinted to the hue → filaments a flat shape can't fake
+ *   C · highlight  — a small warm gradient offset off-centre → the
+ *                    brighter star-forming core of a real nebula
+ * Hues stay inside warm-black + magenta (no cyan/blue). The noise seed is
+ * NEVER animated (that reads as boiling water); only position drifts. */
+// NEAR clouds are tilted to a SHARED counter-clockwise swirl around the
+// centre (opposite quadrants share the same tilt sign) so the four
+// framing ellipses read as one rotation the eye follows inward, instead
+// of crossing at random angles. The FAR washes are bigger, fainter and
+// more diffuse than before so the two planes separate cleanly.
 const NEBULAE = [
-  { fx: 0.28, fy: 0.32, r: 156, color: '#5A2A72', peak: 0.26, dx: 12, dy: 8, ph: 0 },
-  { fx: 0.75, fy: 0.7, r: 172, color: '#942C56', peak: 0.26, dx: 14, dy: 10, ph: 0.34 },
-  { fx: 0.68, fy: 0.22, r: 120, color: '#7E2C6C', peak: 0.18, dx: 9, dy: 13, ph: 0.62 },
-  { fx: 0.32, fy: 0.76, r: 130, color: '#3A2A70', peak: 0.17, dx: 11, dy: 8, ph: 0.86 },
-  { fx: 0.5, fy: 0.5, r: 104, color: '#A23E58', peak: 0.15, dx: 6, dy: 6, ph: 0.46 },
-]
-const CLOUD_STEPS = 8
+  // FAR plane — big, faint, slow, elongated diagonal haze. Off-centre so
+  // their cores never sit dead-behind the galaxy.
+  {
+    depth: 'far',
+    fx: 0.34,
+    fy: 0.4,
+    r: 1.05,
+    aspect: 0.38,
+    rot: -0.55,
+    color: '#5A2A64',
+    hl: '#7A2A60',
+    peak: 0.07,
+    tex: 0.06,
+    freq: 0.008,
+    dx: 3,
+    dy: 2,
+    ph: 0.12,
+    seed: 7,
+  },
+  {
+    depth: 'far',
+    fx: 0.66,
+    fy: 0.62,
+    r: 0.95,
+    aspect: 0.44,
+    rot: 0.7,
+    color: '#742A50',
+    hl: '#A23E58',
+    peak: 0.06,
+    tex: 0.06,
+    freq: 0.009,
+    dx: 3,
+    dy: 2,
+    ph: 0.52,
+    seed: 17,
+  },
+  // NEAR plane — framing ellipses, tilted to a shared CCW swirl.
+  {
+    depth: 'near',
+    fx: 0.22,
+    fy: 0.26,
+    r: 0.5,
+    aspect: 0.56,
+    rot: -0.9,
+    color: '#6A2A66',
+    hl: '#A23E58',
+    peak: 0.2,
+    tex: 0.13,
+    freq: 0.014,
+    dx: 7,
+    dy: 6,
+    ph: 0.0,
+    seed: 11,
+  },
+  {
+    depth: 'near',
+    fx: 0.8,
+    fy: 0.72,
+    r: 0.54,
+    aspect: 0.52,
+    rot: -0.9,
+    color: '#8C2A52',
+    hl: '#A23E58',
+    peak: 0.2,
+    tex: 0.13,
+    freq: 0.013,
+    dx: 8,
+    dy: 6,
+    ph: 0.34,
+    seed: 23,
+  },
+  {
+    depth: 'near',
+    fx: 0.74,
+    fy: 0.16,
+    r: 0.38,
+    aspect: 0.6,
+    rot: 0.9,
+    color: '#7A2A60',
+    hl: '#A23E58',
+    peak: 0.14,
+    tex: 0.11,
+    freq: 0.016,
+    dx: 6,
+    dy: 7,
+    ph: 0.62,
+    seed: 37,
+  },
+  {
+    depth: 'near',
+    fx: 0.26,
+    fy: 0.82,
+    r: 0.42,
+    aspect: 0.54,
+    rot: 0.9,
+    color: '#4A2A5E',
+    hl: '#9A3E58',
+    peak: 0.13,
+    tex: 0.11,
+    freq: 0.015,
+    dx: 6,
+    dy: 5,
+    ph: 0.86,
+    seed: 53,
+  },
+] as const
 
 function NebulaCloud({
   cloud,
   drift,
   w,
   h,
+  reduced,
 }: {
   cloud: (typeof NEBULAE)[number]
   drift: SharedValue<number>
   w: number
   h: number
+  reduced: boolean
 }) {
   const cx = cloud.fx * w
   const cy = cloud.fy * h
-  const animatedProps = useAnimatedProps(() => {
-    'worklet'
-    const a = (drift.value + cloud.ph) * 2 * Math.PI
-    return {
-      transform: [{ translateX: Math.cos(a) * cloud.dx }, { translateY: Math.sin(a) * cloud.dy }],
-    }
+  // Radius scales with width so clouds stay proportional on any screen.
+  const R = cloud.r * w
+  // Place + drift + rotate + squash-to-ellipse, all in one transform.
+  // Drawing happens in LOCAL space (origin 0,0) below, so rotate/scale
+  // pivot on the cloud centre. scaleY = aspect turns the circle into an
+  // ellipse; rotate tilts it. The noise rect + gradients ride the same
+  // transform, so the filaments stretch along the ellipse — exactly the
+  // anisotropy that sells a gas cloud.
+  const transform = useDerivedValue(() => {
+    const driftX = reduced ? 0 : Math.cos((drift.value + cloud.ph) * 2 * Math.PI) * cloud.dx
+    const driftY = reduced ? 0 : Math.sin((drift.value + cloud.ph) * 2 * Math.PI) * cloud.dy
+    return [
+      { translateX: cx + driftX },
+      { translateY: cy + driftY },
+      { rotate: cloud.rot },
+      { scaleX: 1 },
+      { scaleY: cloud.aspect },
+    ]
   })
+  const far = cloud.depth === 'far'
+  // FAR washes blur more (softer, more distant) and keep their highlight
+  // low; NEAR clouds stay crisper and let the star-forming highlight
+  // read more, so the two planes separate.
+  const bodyBlur = far ? R * 0.42 : R * 0.3
+  const hlAlpha = cloud.peak * (far ? 0.5 : 0.8)
   return (
-    <AnimatedG animatedProps={animatedProps}>
-      {Array.from({ length: CLOUD_STEPS }).map((_, i) => (
-        <Circle
-          key={i}
-          cx={cx}
-          cy={cy}
-          r={cloud.r * (1 - i / CLOUD_STEPS)}
-          fill={cloud.color}
-          opacity={cloud.peak / CLOUD_STEPS}
+    <SkiaGroup transform={transform}>
+      {/* A · volumetric body */}
+      <SkiaCircle c={vec(0, 0)} r={R}>
+        <SkiaRadialGradient
+          c={vec(0, 0)}
+          r={R}
+          colors={[
+            hexA(cloud.color, cloud.peak),
+            hexA(cloud.color, cloud.peak * 0.35),
+            hexA(cloud.color, 0),
+          ]}
         />
+        <BlurMask blur={bodyBlur} style="normal" />
+      </SkiaCircle>
+      {/* B · filament texture — noise as a luminance mask over a hue
+          gradient, faded to nothing at the cloud edge. `screen` so the
+          filaments read as faint light, never as grain. */}
+      <SkiaGroup opacity={cloud.tex} blendMode="screen">
+        <Mask
+          mode="luminance"
+          mask={
+            <SkiaRect x={-R} y={-R} width={R * 2} height={R * 2}>
+              <FractalNoise freqX={cloud.freq} freqY={cloud.freq} octaves={3} seed={cloud.seed} />
+            </SkiaRect>
+          }
+        >
+          <SkiaCircle c={vec(0, 0)} r={R}>
+            <SkiaRadialGradient
+              c={vec(0, 0)}
+              r={R}
+              colors={[hexA(cloud.color, 1), hexA(cloud.color, 0)]}
+            />
+          </SkiaCircle>
+        </Mask>
+      </SkiaGroup>
+      {/* C · warm off-centre highlight — the brighter star-forming core.
+          Alpha tracks `peak` so the faint FAR washes don't get a hot spot. */}
+      <SkiaGroup blendMode="screen">
+        <SkiaCircle c={vec(R * 0.18, -R * 0.14)} r={R * 0.42}>
+          <SkiaRadialGradient
+            c={vec(R * 0.18, -R * 0.14)}
+            r={R * 0.42}
+            colors={[hexA(cloud.hl, hlAlpha), hexA(cloud.hl, 0)]}
+          />
+          <BlurMask blur={R * 0.18} style="normal" />
+        </SkiaCircle>
+      </SkiaGroup>
+    </SkiaGroup>
+  )
+}
+
+/* The Skia nebula field — one Canvas behind the SVG starfield. */
+function SkiaNebulae({
+  width,
+  height,
+  drift,
+  reduced,
+}: {
+  width: number
+  height: number
+  drift: SharedValue<number>
+  reduced: boolean
+}) {
+  return (
+    <Canvas style={StyleSheet.absoluteFill}>
+      {NEBULAE.map((cloud, i) => (
+        <NebulaCloud key={i} cloud={cloud} drift={drift} w={width} h={height} reduced={reduced} />
       ))}
-    </AnimatedG>
+    </Canvas>
   )
 }
 
@@ -222,13 +445,11 @@ function StarBucket({ stars, index, t }: { stars: Star[]; index: number; t: Shar
 
 export function Cosmos({
   t,
-  drift,
   width = DEFAULT_W,
   height = DEFAULT_W,
   starCount = 57,
 }: {
   t: SharedValue<number>
-  drift: SharedValue<number>
   /** Viewport width in user-space units. Defaults to the legacy 372. */
   width?: number
   /** Viewport height in user-space units. Defaults to width (square). */
@@ -241,11 +462,10 @@ export function Cosmos({
     () => Array.from({ length: BUCKETS }, (_, b) => stars.filter((s) => s.bucket === b)),
     [stars],
   )
+  // Nebulae moved to the Skia layer (SkiaNebulae, behind this SVG); this
+  // SVG keeps only the starfield + the occasional shooting star.
   return (
     <G>
-      {NEBULAE.map((cloud, i) => (
-        <NebulaCloud key={`neb-${i}`} cloud={cloud} drift={drift} w={width} h={height} />
-      ))}
       {buckets.map((group, b) => (
         <StarBucket key={`bkt-${b}`} stars={group} index={b} t={t} />
       ))}
@@ -270,11 +490,13 @@ export function ScreenCosmos({
   height: number
   style?: StyleProp<ViewStyle>
 }) {
+  const reduced = useReducedMotion() ?? false
   const t = useSharedValue(0)
   const drift = useSharedValue(0)
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
-    drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
+    // Slow nebula drift — ~60 s/cycle, subliminal. (Was 44 s.)
+    drift.value = withRepeat(withTiming(1, { duration: 60000, easing: Easing.linear }), -1, false)
     return () => {
       cancelAnimation(t)
       cancelAnimation(drift)
@@ -285,8 +507,16 @@ export function ScreenCosmos({
   const starCount = Math.round(80 * (Math.min(width, height) / 393))
   return (
     <View style={[StyleSheet.absoluteFill, style]} pointerEvents="none">
-      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <Cosmos t={t} drift={drift} width={width} height={height} starCount={starCount} />
+      {/* Nebulae (Skia, real blur + filament noise) behind the SVG
+          starfield, which overlays at the same bounds. */}
+      <SkiaNebulae width={width} height={height} drift={drift} reduced={reduced} />
+      <Svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        style={StyleSheet.absoluteFill}
+      >
+        <Cosmos t={t} width={width} height={height} starCount={starCount} />
       </Svg>
     </View>
   )
