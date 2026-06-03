@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 
+import { getMealsInRange } from '@/features/macros/api'
+
 import { getTodaySignals, getWeekSignals, hasAnySignals } from './api'
 
 /*
@@ -73,6 +75,20 @@ export function useSignalsHistory(days = 35) {
     // day — or a reseed in dev — within a minute, not stay frozen for
     // ten. The query is cheap (one ranged read), so "calm over eager"
     // isn't worth a stale patterns surface.
+    staleTime: 60_000,
+  })
+}
+
+/*
+ * Recent meals (≈5 weeks) — feeds the late-night pattern detector, which
+ * needs meal TIMES (daily_signals only carries per-day totals). Same
+ * window as the signals history; 60s staleTime so it tracks new meals.
+ */
+export function useHistoryMeals(days = 35) {
+  const { from, to } = historyRange(days)
+  return useQuery({
+    queryKey: ['orbit', 'history-meals', from, to] as const,
+    queryFn: () => getMealsInRange(from, to),
     staleTime: 60_000,
   })
 }

@@ -1,0 +1,159 @@
+/*
+ * Shared intelligence types — the SINGLE SOURCE of the deterministic
+ * business rules, imported by BOTH the app (Metro) and the Edge Functions
+ * (Deno). Pure TypeScript: no React Native, no Supabase client, no Deno
+ * globals, only relative imports. Keep it that way.
+ *
+ * `DailySignals` here is a STRUCTURAL subset of the daily_signals view row
+ * (the columns the detectors read). The generated app type is a superset,
+ * so app code passes it straight in.
+ */
+
+/** One row of the daily_signals view — every órbita signal for a local day. */
+export type DailySignals = {
+  day: string | null
+  sleep_minutes: number | null
+  sleep_quality: number | null
+  energy: number | null
+  motivation: number | null
+  stress: number | null
+  mood: string | null
+  protein_g: number | null
+  calories: number | null
+  meal_count: number | null
+  trained: boolean | null
+  workout_type: string | null
+  weight_kg: number | null
+  water_glasses: number | null
+  rested: boolean | null
+  on_period: boolean | null
+}
+
+/** Slim meal shape — the night detector only needs the timestamp. */
+export type Meal = { consumed_at: string | null }
+
+/* ── Dimensions ──────────────────────────────────────────────────── */
+export type DimensionKey = 'cuerpo' | 'energia' | 'mente' | 'alimento' | 'sueno' | 'ciclo'
+
+export type DimensionLayout = {
+  key: DimensionKey
+  label: string
+  angleDeg: number
+  radiusFrac: number
+}
+
+export type Dimension = DimensionLayout & {
+  /** 0 (lejos) … 1 (en luz). */
+  brightness: number
+  /** One-word state caption ("clara", "corto") or null when quiet. */
+  word: string | null
+}
+
+/** One of the seven day-stars in the Semana constellation. */
+export type DiaSemana = {
+  label: string
+  weekday: string
+  brightness: number
+  today: boolean
+  archetype: string
+  dimEnLuz: number
+  drift: number
+  note: string
+}
+
+export type DimensionContext = {
+  calorieTarget?: number | null
+  proteinTarget?: number | null
+}
+
+export type DimensionMonth = {
+  key: DimensionKey
+  label: string
+  avg: number
+  delta: number
+  trend: 'up' | 'down' | 'flat'
+}
+
+export type MonthSatelliteKind = 'peak' | 'valley' | 'stable' | 'tentative' | 'rising'
+export type MonthSatellite = {
+  id: string
+  kind: MonthSatelliteKind
+  label: string
+  caption: string
+  detail: string
+  tentative: boolean
+}
+
+/* ── The written voice ───────────────────────────────────────────── */
+export type VozParte = { text: string; tone?: 'accent' | 'strong' }
+
+/* ── Patterns (the detected órbitas) ─────────────────────────────── */
+export type PatronCategory = 'recurrencia' | 'comparacion' | 'correlacion'
+
+export type WeekdayData = {
+  kind: 'weekday'
+  focus: number
+  week: readonly number[]
+  weeks: readonly { label: string; bars: readonly number[] }[]
+}
+
+export type CycleData = {
+  kind: 'cycle'
+  length: number
+  bars: readonly number[]
+  band: readonly [number, number]
+  markDay: number
+}
+
+export type PairedData = {
+  kind: 'paired'
+  groups: readonly { label: string; avg: number; unit: string }[]
+}
+
+export type Patron = {
+  id: string
+  category: PatronCategory
+  title: string
+  emphasis: string
+  detail: string
+  data: WeekdayData | CycleData | PairedData
+  since: string
+  confidence: 'alta' | 'media' | 'baja'
+  caption: string
+  legend: string
+  voz: string
+  correlacion: string
+  experimento: { hint: string; action: string }
+}
+
+/* ── Día: "Cómo va tu día" live readings ─────────────────────────── */
+export type DayTone = 'win' | 'context' | 'over' | 'soft'
+export type DayMetricDisplay = 'bar' | 'plain' | 'dots' | 'chip'
+export type DayCardWeight = 'hero' | 'mid' | 'soft'
+
+export type DayMetric = {
+  key: string
+  label: string
+  value: string
+  sub?: string
+  fill?: number
+  over?: number
+  dots?: number
+  display: DayMetricDisplay
+  tone: DayTone
+}
+
+export type DayCard = {
+  key: string
+  label: string
+  weight: DayCardWeight
+  status?: { text: string; tone: DayTone }
+  metrics: DayMetric[]
+  coach: string | null
+}
+
+export type DayReadingContext = {
+  calorieTarget: number | null
+  proteinTarget: number | null
+  waterGoalGlasses: number
+}

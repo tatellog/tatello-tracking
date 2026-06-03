@@ -1,174 +1,35 @@
 import type { DailySignals } from './api'
+import {
+  clamp01,
+  countEnLuz,
+  deriveDimensions,
+  DIM_FLOOR,
+  DIMENSIONS,
+  EN_LUZ_THRESHOLD,
+  TONE_BRILLANTE,
+  TONE_FORMACION,
+} from '../../supabase/functions/_shared/intelligence/dimensions'
+import type {
+  Dimension,
+  DimensionContext,
+  DimensionKey,
+  DimensionLayout,
+} from '../../supabase/functions/_shared/intelligence/types'
 
-/* The six dimensions of the system — see docs/tu-orbita-design.md §3. */
-export type DimensionKey = 'cuerpo' | 'energia' | 'mente' | 'alimento' | 'sueno' | 'ciclo'
-
-export type DimensionLayout = {
-  key: DimensionKey
-  label: string
-  /** Fixed angle on the orbital plane, degrees clockwise from 12 o'clock. */
-  angleDeg: number
-  /** Fixed orbit radius, fraction (0..1) of the canvas's max radius. */
-  radiusFrac: number
+/* The dimension compute moved to the shared intelligence lib (single
+ * source for app + Edge Functions). Re-exported so existing `from
+ * './logic'` imports keep working; the UI helpers below stay here. */
+export {
+  clamp01,
+  countEnLuz,
+  deriveDimensions,
+  DIM_FLOOR,
+  DIMENSIONS,
+  EN_LUZ_THRESHOLD,
+  TONE_BRILLANTE,
+  TONE_FORMACION,
 }
-
-/*
- * Fixed layout — the angle of each dimension NEVER changes day to
- * day, so the user learns "sueño lives upper-right" (see
- * docs/tu-orbita-design.md §4). The radius is tuned per dimension so
- * that, once the tilted plane foreshortens it, every node clears the
- * core by a similar margin — the ones near the top/bottom of the
- * plane sit further out to make up for the squash.
- */
-export const DIMENSIONS: readonly DimensionLayout[] = [
-  { key: 'cuerpo', label: 'CUERPO', angleDeg: 312, radiusFrac: 0.82 },
-  { key: 'ciclo', label: 'CICLO', angleDeg: 196, radiusFrac: 0.95 },
-  { key: 'mente', label: 'MENTE', angleDeg: 8, radiusFrac: 1.0 },
-  { key: 'energia', label: 'ENERGÍA', angleDeg: 250, radiusFrac: 0.72 },
-  { key: 'sueno', label: 'SUEÑO', angleDeg: 64, radiusFrac: 0.78 },
-  { key: 'alimento', label: 'COMIDA', angleDeg: 128, radiusFrac: 0.88 },
-]
-
-export type Dimension = DimensionLayout & {
-  /** 0 (lejos — a dark ember) … 1 (en luz — full glow). */
-  brightness: number
-  /** A one-word state caption — "clara", "corto" — shown under the
-   *  label in the diagram. `null` when there's nothing to say. */
-  word: string | null
-}
-
-/** A dimension with no signal still glows faintly — "forming", never
- *  a dead void (docs/tu-orbita-design.md §8). */
-const DIM_FLOOR = 0.14
-
-/** Brightness cutoffs for the three-tone state language. STELAR
- *  registers, doesn't judge — so the language is *brillante* (alight),
- *  *en formación* (gathering), *en silencio* (no signal yet). The
- *  visual orb lights from "en formación" up; only "en silencio" is a
- *  hollow station. */
-export const TONE_BRILLANTE = 0.7
-export const TONE_FORMACION = 0.3
-
-/** Legacy threshold kept for the existing orb-lit-or-not visual.
- *  Set to the *en formación* floor so anything with real signal lights. */
-export const EN_LUZ_THRESHOLD = TONE_FORMACION
-
-function clamp01(n: number): number {
-  return n < 0 ? 0 : n > 1 ? 1 : n
-}
-
-/** Extra context the brightness heuristics can use. Today only `alimento`
- *  reads it: with the user's macro targets set (a deficit goal), the food
- *  dimension becomes a DEFICIT-ADHERENCE read — protein hit + calories
- *  within target — instead of a meal-count read. Eating over the target
- *  breaks the deficit, so the dimension dims (honestly, never "failure").
- *  Threaded in from `useMacroTargets`; absent → the meal-count fallback. */
-export type DimensionContext = {
-  calorieTarget?: number | null
-  proteinTarget?: number | null
-}
-
-/*
- * Per-dimension brightness from today's signals. This is a deliberate
- * v1 heuristic — the órbita engine will refine the exact rule once the
- * Anthropic key is in. Each function falls back to DIM_FLOOR when its
- * signal is absent.
- */
-function brightnessFor(key: DimensionKey, s: DailySignals, ctx?: DimensionContext): number {
-  switch (key) {
-    case 'cuerpo':
-      // Trained today reads brightest; a logged rest day glows mid.
-      return s.trained ? 0.9 : s.rested ? 0.55 : DIM_FLOOR
-
-    case 'energia':
-      return s.energy == null ? DIM_FLOOR : clamp01(s.energy / 5)
-
-    case 'mente': {
-      // Mood, low stress and motivation — averaged over what exists.
-      const parts: number[] = []
-      if (s.mood != null) {
-        parts.push(s.mood === 'good' ? 1 : s.mood === 'neutral' ? 0.6 : 0.28)
-      }
-      if (s.stress != null) parts.push(clamp01((6 - s.stress) / 5))
-      if (s.motivation != null) parts.push(clamp01(s.motivation / 5))
-      if (parts.length === 0) return DIM_FLOOR
-      return parts.reduce((a, b) => a + b, 0) / parts.length
-    }
-
-    case 'sueno': {
-      if (s.sleep_minutes == null) return DIM_FLOOR
-      // 7.5 h is the bright peak, falling off either side.
-      const duration = clamp01(1 - Math.abs(s.sleep_minutes / 60 - 7.5) / 4)
-      if (s.sleep_quality == null) return duration
-      return (duration + clamp01(s.sleep_quality / 5)) / 2
-    }
-
-    case 'alimento': {
-      // Target-aware when macros are set: the food dimension lights from
-      // PROTEIN adherence + staying within the calorie target, not from
-      // sheer meal count. Over the target the deficit is gone, so it dims
-      // (≈60 % over → floor). No target → the old meal-count read.
-      const calTarget = ctx?.calorieTarget ?? null
-      if (calTarget && calTarget > 0) {
-        if (s.calories == null && s.protein_g == null && !s.meal_count) return DIM_FLOOR
-        const protTarget = ctx?.proteinTarget ?? null
-        const proteinPct =
-          protTarget && protTarget > 0 ? clamp01((s.protein_g ?? 0) / protTarget) : 0.6
-        const calPct = (s.calories ?? 0) / calTarget
-        const calFactor = calPct <= 1 ? 1 : clamp01(1 - (calPct - 1) * 1.6)
-        return Math.max(DIM_FLOOR, clamp01((0.45 + proteinPct * 0.55) * calFactor))
-      }
-      // ~3 logged meals reads as a full day nourished.
-      return s.meal_count ? clamp01(0.35 + (s.meal_count / 3) * 0.65) : DIM_FLOOR
-    }
-
-    case 'ciclo':
-      // A daily signal that's mostly quiet — it lights during the
-      // period. Phase-aware glow is a job for the engine.
-      return s.on_period ? 0.82 : DIM_FLOOR
-  }
-}
-
-/* A one-word state caption for a dimension — the engine will write
- * these; for now a light heuristic. `null` means stay quiet. */
-function dimensionWord(key: DimensionKey, s: DailySignals): string | null {
-  switch (key) {
-    case 'mente':
-      if (s.mood == null && s.stress == null && s.motivation == null) return null
-      return brightnessFor('mente', s) >= 0.6 ? 'clara' : 'nublada'
-    case 'sueno': {
-      if (s.sleep_minutes == null) return null
-      const h = s.sleep_minutes / 60
-      return h < 7 ? 'corto' : h > 8.5 ? 'largo' : 'pleno'
-    }
-    case 'cuerpo':
-      return s.trained ? 'activo' : null
-    case 'energia':
-      return s.energy == null ? null : s.energy >= 4 ? 'alta' : s.energy <= 2 ? 'baja' : null
-    case 'ciclo':
-      return s.on_period ? 'sangrado' : null
-    default:
-      return null
-  }
-}
-
-/** Resolve the six dimensions with today's brightness. `null` signals
- *  (nothing logged) → every dimension at the floor. */
-export function deriveDimensions(
-  signals: DailySignals | null,
-  ctx?: DimensionContext,
-): Dimension[] {
-  return DIMENSIONS.map((d) => ({
-    ...d,
-    brightness: signals == null ? DIM_FLOOR : brightnessFor(d.key, signals, ctx),
-    word: signals == null ? null : dimensionWord(d.key, signals),
-  }))
-}
-
-/** How many dimensions are currently "en luz" (brillante + en formación). */
-export function countEnLuz(dims: Dimension[]): number {
-  return dims.filter((d) => d.brightness >= EN_LUZ_THRESHOLD).length
-}
+export type { Dimension, DimensionContext, DimensionKey, DimensionLayout }
 
 export type DimensionTone = 'brillante' | 'en formación' | 'en silencio'
 

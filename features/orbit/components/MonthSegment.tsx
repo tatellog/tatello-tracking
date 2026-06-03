@@ -8,6 +8,7 @@ import { colors, typography } from '@/theme'
 import { useMacroTargets } from '@/features/macros/hooks'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
+import { useDailyIntelligence } from '../useDailyIntelligence'
 import {
   buildMonthSatellites,
   buildMonthSummary,
@@ -19,6 +20,7 @@ import {
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { MonthSky, type Satellite } from './MonthSky'
+import { PatternCard } from './PatternCard'
 import { StelarVoice } from './StelarVoice'
 
 /*
@@ -48,6 +50,12 @@ export function MonthSegment() {
   const theme = monthTheme(summary, daysLogged)
   const voz = useMemo(() => buildVozMes(summary, daysLogged), [summary, daysLogged])
   const hasRealData = daysLogged > 0
+  // Recurrence patterns ("todos los lunes…", "los sábados…", "las
+  // noches…") now come from the BACKEND engine (daily-intelligence Edge
+  // Function); the hook falls back to the same local rules if it's
+  // unreachable, so this never goes blank.
+  const intel = useDailyIntelligence()
+  const monthPatterns = intel.data?.month.patterns ?? []
 
   // The month's headline satellites + their tap-reveal. The named bodies
   // (tu brillo / tu ancla / tu calma / stelar observa) orbit the hero;
@@ -147,6 +155,18 @@ export function MonthSegment() {
         tag="Este mes"
         signature={hasRealData ? voz.signature : undefined}
       />
+
+      {/* Tus patrones del mes — the recurrences that need several weeks to
+          be real ("todos los lunes…", "los sábados…") + the month-shape
+          habits. Hidden until they clear. */}
+      {monthPatterns.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>Tus patrones del mes</Text>
+          {monthPatterns.map((p) => (
+            <PatternCard key={p.id} patron={p} />
+          ))}
+        </View>
+      ) : null}
     </Animated.View>
   )
 }

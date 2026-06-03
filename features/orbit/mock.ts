@@ -215,67 +215,10 @@ export function buildWeekDays(todayIdx: number): readonly DiaSemana[] {
   })
 }
 
-/** Mean of a list of numbers (0 for an empty list). */
-function average(xs: readonly number[]): number {
-  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
-}
-
-/** Derive the week's archetype + meta counts from the lived days. */
-export function buildArquetipoSemana(
-  days: readonly DiaSemana[],
-  todayIdx: number,
-): {
-  name: string
-  emphasis: string
-  daysEnLuz: number
-  nochesRotas: number
-  daysRead: number
-  signals: number
-  arcNumber: number
-  arcTotal: number
-} {
-  const lived = days.slice(0, todayIdx + 1)
-  const daysRead = lived.length
-  const daysEnLuz = lived.filter((d) => d.brightness >= EN_LUZ_THRESHOLD_WEEK).length
-  const signals = lived.reduce((s, d) => s + d.dimEnLuz + d.drift, 0) * 2
-
-  // The week archetype names the *shape* of the week — its rhythm —
-  // never a grade of how many days were "good". A rhythm isn't a
-  // pass/fail; it's something to notice and plan around.
-  let name = 'la semana arrancando'
-  let emphasis = 'arrancando'
-  if (daysRead >= 2) {
-    const bs = lived.map((d) => d.brightness)
-    const mid = Math.max(1, Math.floor(bs.length / 2))
-    const firstAvg = average(bs.slice(0, mid))
-    const secondAvg = average(bs.slice(mid))
-    const range = Math.max(...bs) - Math.min(...bs)
-    if (range < 0.18) {
-      name = 'la semana pareja'
-      emphasis = 'pareja'
-    } else if (secondAvg - firstAvg > 0.1) {
-      name = 'la semana que sube'
-      emphasis = 'sube'
-    } else if (firstAvg - secondAvg > 0.1) {
-      name = 'la semana que afloja'
-      emphasis = 'afloja'
-    } else {
-      name = 'la semana de vaivén'
-      emphasis = 'vaivén'
-    }
-  }
-
-  return {
-    name,
-    emphasis,
-    daysEnLuz,
-    nochesRotas: 0,
-    daysRead,
-    signals,
-    arcNumber: 3,
-    arcTotal: 8,
-  }
-}
+/* buildArquetipoSemana moved to the shared intelligence lib (single
+ * source for app + Edge Functions) — re-exported so existing `from
+ * './mock'` imports keep working. */
+export { buildArquetipoSemana } from '../../supabase/functions/_shared/intelligence/arquetipo'
 
 /** Assemble the Voz de Semana prose from the lived days. The
  *  structure mirrors the original hand-written copy: a Sunday

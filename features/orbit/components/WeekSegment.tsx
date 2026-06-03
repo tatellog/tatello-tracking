@@ -7,10 +7,10 @@ import { colors, typography } from '@/theme'
 
 import { useMacroTargets } from '@/features/macros/hooks'
 
-import { useHasAnySignals, useSignalsHistory, useWeekSignals } from '../hooks'
+import { useHasAnySignals, useWeekSignals } from '../hooks'
 import { buildArquetipoSemana } from '../mock'
+import { useDailyIntelligence } from '../useDailyIntelligence'
 import { buildVozSemanaReal, buildWeekDaysReal } from '../week-logic'
-import { detectWeekPatterns } from '../week-patterns'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { PatternCard } from './PatternCard'
@@ -60,15 +60,13 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
   const daysEnLuz = arquetipo.daysEnLuz
   const porVenir = days.length - livedCount
 
-  // The patterns are the PROTAGONIST of this altitude ("Las Órbitas —
-  // las trayectorias que repites"). Real detection over ~5 weeks of
-  // signals; when the history is too thin to claim anything, the list
-  // shows a "still gathering" note — never mock examples.
-  const { data: history } = useSignalsHistory()
-  const weekPatterns = useMemo(
-    () => (history ? detectWeekPatterns(history, dimCtx) : []),
-    [history, dimCtx],
-  )
+  // The week-shape patterns ("lo que repites") + the "lo que viene" nudge
+  // now come from the BACKEND engine (daily-intelligence Edge Function);
+  // the hook falls back to the same local rules if it's unreachable.
+  const intel = useDailyIntelligence()
+  const remaining = 6 - todayIdx // days still ahead this Sunday-first week
+  const weekAhead = intel.data?.week.ahead ?? null
+  const weekShape = intel.data?.week.shape ?? []
 
   // Empty-state branch: hide the templated archetype + meta + voz +
   // pattern hint; render the galaxy hero with all 7 days as ghosts
@@ -171,19 +169,29 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
         signature={hasRealData ? voz.signature : undefined}
       />
 
-      {/* The patterns — the protagonist of "Las Órbitas". Real detections
-          over the rolling history; tapping opens the detail. When there
-          isn't enough yet, an honest "still gathering" note — never mock. */}
-      <View style={styles.patterns}>
-        <Text style={styles.patternsEyebrow}>Las órbitas que repites</Text>
-        {weekPatterns.length > 0 ? (
-          weekPatterns.map((p) => <PatternCard key={p.id} patron={p} />)
-        ) : (
-          <EmptySegmentCard
-            eyebrow="Stelar está reuniendo tus semanas"
-            body="Los patrones se revelan cuando hay suficiente para cruzar. Cada día que registras acerca el primero."
-          />
-        )}
+      {/* Lo que repites en tu semana — the shape of your week (movement
+          cadence, weekday↔weekend form). */}
+      {weekShape.length > 0 ? (
+        <View style={styles.patterns}>
+          <Text style={styles.patternsEyebrow}>Lo que repites en tu semana</Text>
+          {weekShape.map((p) => (
+            <PatternCard key={p.id} patron={p} />
+          ))}
+        </View>
+      ) : null}
+
+      {/* Lo que viene — the days still ahead this week + a knowing nudge
+          from the Mes patterns (only when a patterned day is still ahead). */}
+      <View style={styles.ahead}>
+        <Text style={styles.aheadEyebrow}>Lo que viene</Text>
+        <Text style={styles.aheadDays}>
+          {remaining <= 0
+            ? 'Tu semana cierra hoy.'
+            : remaining === 1
+              ? 'Te queda 1 día esta semana.'
+              : `Te quedan ${remaining} días esta semana.`}
+        </Text>
+        {weekAhead ? <Text style={styles.aheadHint}>{weekAhead}</Text> : null}
       </View>
     </Animated.View>
   )
@@ -250,7 +258,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 10,
   },
-  // ── Patterns — the protagonist list ──────────────────────────
+  // ── Lo que repites en tu semana — the week-shape pattern cards ──
   patterns: {
     marginTop: 24,
   },
@@ -262,5 +270,35 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: 2,
     marginLeft: 2,
+  },
+  // ── Lo que viene — a quiet footnote, NOT a card. A bordered card would
+  //    amplify the heads-up above the reveal itself; a top hairline keeps
+  //    it as a gentle closing note.
+  ahead: {
+    marginTop: 22,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.hairline,
+  },
+  aheadEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 11,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 8,
+  },
+  aheadDays: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  aheadHint: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    marginTop: 6,
   },
 })

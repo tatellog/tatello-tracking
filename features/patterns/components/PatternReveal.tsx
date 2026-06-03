@@ -402,12 +402,13 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
     onClose()
   }
   const goToOrbit = (): void => {
-    // Land on the Semana segment — night_eating is a weekly pattern, so
-    // "verlo en mi órbita" opens the week, not the default Día. Routed
-    // through the mailbox (params don't reach a tab screen reliably).
+    // Land on the Semana segment — night_eating is a weekly pattern. The
+    // segment goes through the mailbox (params don't reach a tab screen
+    // reliably); navigate FIRST, then close, so the unmount can't race
+    // the navigation. Object pathname form (the one that navigated).
     requestOrbitSegment('semana')
+    router.navigate({ pathname: '/orbit' })
     onClose()
-    router.navigate('/orbit')
   }
 
   return (

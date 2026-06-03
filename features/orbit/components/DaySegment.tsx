@@ -13,6 +13,7 @@ import { colors, typography } from '@/theme'
 
 import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals, useTodaySignals } from '../hooks'
+import { useDailyIntelligence } from '../useDailyIntelligence'
 import { useDailyReading } from '../useDailyReading'
 import {
   deriveDimensions,
@@ -23,6 +24,7 @@ import {
 } from '../logic'
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
 import { DayAction } from './DayAction'
+import { DayLiveReadings } from './DayLiveReadings'
 import { CosmicParticles } from './CosmicParticles'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
@@ -80,6 +82,12 @@ export function DaySegment() {
   const calorieTarget = targets.data?.calories ?? null
   const proteinTarget = targets.data?.protein_g ?? null
   const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget })
+
+  // "Cómo va tu día" — today's goal-aware readings now come from the
+  // BACKEND engine (daily-intelligence Edge Function); the hook falls back
+  // to the same local rules if it's unreachable.
+  const intel = useDailyIntelligence()
+  const dayReadings = intel.data?.day.readings ?? []
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
   const [ignited, setIgnited] = useState<DimensionKey[]>([])
 
@@ -298,6 +306,10 @@ export function DaySegment() {
       </View>
 
       {!selected ? <Text style={styles.hint}>Toca una dimensión para leerla.</Text> : null}
+
+      {/* Hoy en vivo — today's live, goal-aware readings. Real + always
+          on (independent of the mock engine). */}
+      <DayLiveReadings cards={dayReadings} />
 
       {/* AI prose — the recommended move + Voz de Stelar. Hidden while
           the engine is mock; the deterministic reading above is the real

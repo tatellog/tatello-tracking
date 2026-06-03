@@ -10,7 +10,7 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { StelarVoice } from '@/features/orbit/components/StelarVoice'
-import { useSignalsHistory } from '@/features/orbit/hooks'
+import { useHistoryMeals, useSignalsHistory } from '@/features/orbit/hooks'
 import {
   MOCK_PATRONES,
   type CycleData,
@@ -18,6 +18,9 @@ import {
   type Patron,
   type WeekdayData,
 } from '@/features/orbit/mock'
+import { detectHabitPatterns } from '@/features/orbit/habit-patterns'
+import { detectMonthPatterns } from '@/features/orbit/month-patterns'
+import { detectNightPattern } from '@/features/orbit/night-pattern'
 import { detectWeekPatterns } from '@/features/orbit/week-patterns'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
@@ -38,14 +41,26 @@ export default function PatronDetailScreen() {
   // still live there). Same history hook → React Query serves it from
   // cache, no refetch.
   const { data: history } = useSignalsHistory()
+  const { data: histMeals } = useHistoryMeals()
   const macros = useMacroTargets()
+  const dimCtx = {
+    calorieTarget: macros.data?.calories ?? null,
+    proteinTarget: macros.data?.protein_g ?? null,
+  }
+  // Resolve from every real detector (same inputs the Semana/Mes lists
+  // use → React Query serves from cache), then the mock catalogue.
   const detected = history
-    ? detectWeekPatterns(history, {
-        calorieTarget: macros.data?.calories ?? null,
-        proteinTarget: macros.data?.protein_g ?? null,
-      })
+    ? [
+        ...detectWeekPatterns(history, dimCtx),
+        ...detectHabitPatterns(history),
+        ...detectMonthPatterns(history, dimCtx),
+      ]
     : []
-  const patron = detected.find((p) => p.id === id) ?? MOCK_PATRONES.find((p) => p.id === id)
+  const night = histMeals ? detectNightPattern(histMeals) : null
+  const patron =
+    (night && night.id === id ? night : undefined) ??
+    detected.find((p) => p.id === id) ??
+    MOCK_PATRONES.find((p) => p.id === id)
 
   if (!patron) {
     return (
