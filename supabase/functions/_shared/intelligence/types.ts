@@ -157,3 +157,13 @@ export type DayReadingContext = {
   proteinTarget: number | null
   waterGoalGlasses: number
 }
+
+/* The Día header identity — a real, one-word state for TODAY derived from
+ * the live dimensions. `emphasis` is the substring EmText italicizes;
+ * `enLuz` is the honest count of dimensions currently lit. Never a grade:
+ * "por encender" is forming, not failure. */
+export type DayIdentity = {
+  name: string
+  emphasis: string
+  enLuz: number
+}

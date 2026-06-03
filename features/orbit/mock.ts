@@ -6,12 +6,6 @@
  * when the real engine lands.
  */
 
-/** The coach's reading for the Mes segment — plain serif narration.
- *  Día and Semana have their own richer readings below. */
-export const MOCK_VOZ: Record<'mes', string> = {
-  mes: 'Vas en el día 22 de tu primer mes leído. Empiezo a ver algunos ritmos: días más altos los lunes, más callados los jueves. Te confirmo si se repite el mes que viene.',
-}
-
 /** A run of the coach's reading, split so a word can carry an accent
  *  (magenta) or strong (a bold figure) weight inline. */
 export type VozParte = { text: string; tone?: 'accent' | 'strong' }
@@ -37,18 +31,6 @@ export const MOCK_ARQUETIPO = {
   daysRead: 14,
 }
 
-/** A two-line editorial headline that sits above the orbital diagram —
- *  STELAR's *angle* on the day: not a description of the diagram (the
- *  eye already reads it), but advice or an anticipation only the IA
- *  can give. The accent carries the actionable insight. */
-export const MOCK_HEADLINE: { parts: readonly VozParte[] } = {
-  parts: [
-    { text: 'Cuerpo encendido, mente lenta. ' },
-    { text: 'Lo difícil del día se mueve mejor si lo dejas para el jueves', tone: 'accent' },
-    { text: '.' },
-  ],
-}
-
 /** Today's suggested move — one low-effort thing the reading hints
  *  might help. Title is a plain, period-less phrase (an offer, not a
  *  command); reason names the data behind it. */
@@ -57,232 +39,13 @@ export const MOCK_ACCION_DEL_DIA = {
   reason: 'Arrancas una semana más baja en energía. Una hora más de sueño hoy te ahorra el jueves.',
 }
 
-/*
- * The Semana mock is built procedurally from per-weekday templates,
- * not stored as a static snapshot. That way the prose, archetype,
- * counts and ghosts all stay coherent regardless of what day the
- * user opens the app — the same shape the real engine will produce
- * from daily_signals. Sunday-first throughout, matching the calendar
- * and JS Date.getDay().
- */
-
-/** One day of the EXAMPLE week — mock content for the preview only.
- *  The real engine derives each day from that day's own
- *  daily_signals, never from the weekday: a Thursday isn't destined
- *  to be anything. Used by the days array + the prose builder so the
- *  example stays internally coherent. */
-type WeekdayTemplate = {
-  archetype: string
-  brightness: number
-  dimEnLuz: number
-  drift: number
-  /** Used when this day is today — present-voice, full sentence. */
-  noteToday: string
-  /** Used when this day is in the past — past-voice. */
-  notePast: string
-  /** A short phrase that drops in after "Hoy …". */
-  vozTodayPhrase: string
-  /** A short phrase that drops in after "El {weekday} …" in prose. */
-  vozPastPhrase: string
-}
-
-const WEEKDAY_TEMPLATES: readonly WeekdayTemplate[] = [
-  // 0. Domingo: entrada tibia, transición desde el fin de semana.
-  {
-    archetype: 'tibia',
-    brightness: 0.58,
-    dimEnLuz: 2,
-    drift: 2,
-    noteToday: 'Domingo arranca tibio. Lo justo para empezar.',
-    notePast: 'Llegaste medio descansada del finde.',
-    vozTodayPhrase: 'arrancas la semana tibia',
-    vozPastPhrase: 'tibia',
-  },
-  // 1. Lunes: alto en esta semana de ejemplo, descansada del finde.
-  {
-    archetype: 'brillante',
-    brightness: 0.92,
-    dimEnLuz: 5,
-    drift: 1,
-    noteToday: 'Hoy llegas firme. Cuerpo, mente y energía juntos.',
-    notePast: 'Cuerpo, mente y energía llegaron juntos.',
-    vozTodayPhrase: 'llegas firme',
-    vozPastPhrase: 'brillaste',
-  },
-  // 2. Martes: sostén del impulso de lunes.
-  {
-    archetype: 'sostenida',
-    brightness: 0.74,
-    dimEnLuz: 4,
-    drift: 1,
-    noteToday: 'Hoy sigues el ritmo del lunes, un poco más bajo pero ahí.',
-    notePast: 'Seguiste el ritmo del lunes, un poco más bajo pero ahí.',
-    vozTodayPhrase: 'sigues el ritmo del lunes',
-    vozPastPhrase: 'seguiste el ritmo del lunes',
-  },
-  // 3. Miércoles: el centro de gravedad, presente.
-  {
-    archetype: 'presente',
-    brightness: 0.7,
-    dimEnLuz: 4,
-    drift: 1,
-    noteToday: 'Hoy sigues firme. El impulso del lunes todavía dura.',
-    notePast: 'Te mantuviste firme. El impulso del lunes todavía duraba.',
-    vozTodayPhrase: 'el impulso del lunes todavía dura',
-    vozPastPhrase: 'te mantuviste firme',
-  },
-  // 4. Jueves: un día más callado en esta semana de ejemplo.
-  {
-    archetype: 'callada',
-    brightness: 0.45,
-    dimEnLuz: 2,
-    drift: 3,
-    noteToday: 'Hoy el cuerpo pide bajar.',
-    notePast: 'Ese día el cuerpo pidió calma.',
-    vozTodayPhrase: 'el cuerpo pide bajar',
-    vozPastPhrase: 'aflojó',
-  },
-  // 5. Viernes: liberación, otro respiro.
-  {
-    archetype: 'libre',
-    brightness: 0.65,
-    dimEnLuz: 3,
-    drift: 2,
-    noteToday: 'Hoy la semana afloja. El cuerpo lo siente.',
-    notePast: 'La semana aflojó. El cuerpo cambió de marcha.',
-    vozTodayPhrase: 'la semana afloja',
-    vozPastPhrase: 'la semana aflojó',
-  },
-  // 6. Sábado: espacio amplio, mente y energía sueltas.
-  {
-    archetype: 'amplia',
-    brightness: 0.72,
-    dimEnLuz: 4,
-    drift: 1,
-    noteToday: 'Sábado largo. Hay tiempo y aire, mente y energía sueltas.',
-    notePast: 'Sábado largo. Tiempo, aire, mente y energía sueltas.',
-    vozTodayPhrase: 'hay margen, mente y energía sueltas',
-    vozPastPhrase: 'hubo margen',
-  },
-]
-
-const WEEKDAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
-const WEEKDAY_NAMES = [
-  'Domingo',
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
-] as const
-
-/** Brightness threshold above which a day counts as "en luz" — the
- *  same TONE_BRILLANTE used by Día. Days under this are "lejos". */
-const EN_LUZ_THRESHOLD_WEEK = 0.7
-
-/** Build the 7-day array for the current week given today's index
- *  (0 = Sunday, JS Date.getDay()). Past days carry their template's
- *  past-voice note; today carries its today-voice note; future days
- *  are blank stations waiting to arrive. */
-export function buildWeekDays(todayIdx: number): readonly DiaSemana[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const isFuture = i > todayIdx
-    if (isFuture) {
-      return {
-        label: WEEKDAY_LABELS[i]!,
-        weekday: WEEKDAY_NAMES[i]!,
-        brightness: 0,
-        today: false,
-        archetype: '',
-        dimEnLuz: 0,
-        drift: 0,
-        note: 'Aún no llega.',
-      }
-    }
-    const tpl = WEEKDAY_TEMPLATES[i]!
-    const isToday = i === todayIdx
-    return {
-      label: WEEKDAY_LABELS[i]!,
-      weekday: WEEKDAY_NAMES[i]!,
-      brightness: tpl.brightness,
-      today: isToday,
-      archetype: tpl.archetype,
-      dimEnLuz: tpl.dimEnLuz,
-      drift: tpl.drift,
-      note: isToday ? tpl.noteToday : tpl.notePast,
-    }
-  })
-}
-
 /* buildArquetipoSemana moved to the shared intelligence lib (single
  * source for app + Edge Functions) — re-exported so existing `from
- * './mock'` imports keep working. */
+ * './mock'` imports keep working. The Día/Semana readings are now built
+ * for real from daily_signals (see the shared `week.ts`); the old
+ * per-weekday mock templates + buildWeekDays/buildVozSemana were
+ * retired. */
 export { buildArquetipoSemana } from '../../supabase/functions/_shared/intelligence/arquetipo'
-
-/** Assemble the Voz de Semana prose from the lived days. The
- *  structure mirrors the original hand-written copy: a Sunday
- *  opener, a peak callout (the brightest past day excluding
- *  Sunday), the today phrase, and a future-closer when the week
- *  isn't done. Each piece is keyed to a template so the prose
- *  shifts day by day without losing voice. */
-export function buildVozSemana(
-  days: readonly DiaSemana[],
-  todayIdx: number,
-): {
-  parts: readonly VozParte[]
-  signature: { confidence: 'alta' | 'media' | 'baja'; scope: string }
-} {
-  const parts: VozParte[] = []
-  const past = days.slice(0, todayIdx)
-  const todayTpl = WEEKDAY_TEMPLATES[todayIdx]!
-  const hasFuture = todayIdx < 6
-
-  if (todayIdx > 0) {
-    // Sunday opener — always when Sunday is past.
-    const sunTpl = WEEKDAY_TEMPLATES[0]!
-    parts.push({ text: 'Arrancaste el domingo ' })
-    parts.push({ text: sunTpl.vozPastPhrase, tone: 'accent' })
-    parts.push({ text: '. ' })
-
-    // Peak callout — brightest past day (skipping Sunday, already
-    // mentioned). Only if it's bright enough to be worth naming.
-    const candidates = past.slice(1)
-    if (candidates.length > 0) {
-      const peak = candidates.reduce(
-        (max, d) => (d.brightness > max.brightness ? d : max),
-        candidates[0]!,
-      )
-      if (peak.brightness >= EN_LUZ_THRESHOLD_WEEK) {
-        const peakIdx = WEEKDAY_LABELS.indexOf(peak.label as (typeof WEEKDAY_LABELS)[number])
-        const peakTpl = WEEKDAY_TEMPLATES[peakIdx]!
-        parts.push({ text: 'El ' })
-        parts.push({ text: peak.weekday.toLowerCase(), tone: 'accent' })
-        parts.push({ text: ` ${peakTpl.vozPastPhrase}. ` })
-      }
-    }
-  }
-
-  // Today's voice — always present.
-  parts.push({ text: 'Hoy', tone: 'accent' })
-  parts.push({ text: ` ${todayTpl.vozTodayPhrase}. ` })
-
-  // Future-closer — only while the week isn't done.
-  if (hasFuture) {
-    parts.push({ text: 'El resto de la semana ' })
-    parts.push({ text: 'aún se escribe', tone: 'accent' })
-    parts.push({ text: '.' })
-  }
-
-  const daysRead = todayIdx + 1
-  const confidence: 'alta' | 'media' | 'baja' =
-    daysRead >= 5 ? 'alta' : daysRead >= 3 ? 'media' : 'baja'
-
-  return {
-    parts,
-    signature: { confidence, scope: `${daysRead} ${daysRead === 1 ? 'día leído' : 'días leídos'}` },
-  }
-}
 
 /** Lowercase, sensorial verbs the engine uses to type a pattern —
  *  rendered as a quiet serif-italic tag, never as a clinical eyebrow. */
@@ -483,12 +246,6 @@ export type DiaSemana = {
   drift: number
   note: string
 }
-
-// MOCK_SEMANA used to be a static snapshot tied to a specific day —
-// any user opening the app on a different weekday saw a mismatch
-// between the selected day and the prose. The week is now built at
-// render time from buildWeekDays(todayIdx) above, so the visual and
-// the voice stay coherent every day of the week.
 
 /** The current cycle, for the Mes segment. The `band` marks the
  *  days of the current phase — it lights up the accretion disk of

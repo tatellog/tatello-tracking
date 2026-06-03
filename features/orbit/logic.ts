@@ -1,5 +1,6 @@
 import type { DailySignals } from './api'
 import {
+  buildDayIdentity,
   clamp01,
   countEnLuz,
   deriveDimensions,
@@ -10,6 +11,7 @@ import {
   TONE_FORMACION,
 } from '../../supabase/functions/_shared/intelligence/dimensions'
 import type {
+  DayIdentity,
   Dimension,
   DimensionContext,
   DimensionKey,
@@ -20,6 +22,7 @@ import type {
  * source for app + Edge Functions). Re-exported so existing `from
  * './logic'` imports keep working; the UI helpers below stay here. */
 export {
+  buildDayIdentity,
   clamp01,
   countEnLuz,
   deriveDimensions,
@@ -29,7 +32,7 @@ export {
   TONE_BRILLANTE,
   TONE_FORMACION,
 }
-export type { Dimension, DimensionContext, DimensionKey, DimensionLayout }
+export type { DayIdentity, Dimension, DimensionContext, DimensionKey, DimensionLayout }
 
 export type DimensionTone = 'brillante' | 'en formación' | 'en silencio'
 

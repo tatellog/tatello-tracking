@@ -16,20 +16,20 @@ import { useHasAnySignals, useTodaySignals } from '../hooks'
 import { useDailyIntelligence } from '../useDailyIntelligence'
 import { useDailyReading } from '../useDailyReading'
 import {
+  buildDayIdentity,
   deriveDimensions,
   dimensionDetail,
   dimensionEvidence,
   dimensionTone,
   type DimensionKey,
 } from '../logic'
-import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_HEADLINE, MOCK_VOZ_DIA } from '../mock'
+import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_VOZ_DIA } from '../mock'
 import { DayAction } from './DayAction'
 import { DayLiveReadings } from './DayLiveReadings'
 import { CosmicParticles } from './CosmicParticles'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
-import { StelarHeadline } from './StelarHeadline'
 import { StelarVoice } from './StelarVoice'
 
 /*
@@ -37,15 +37,17 @@ import { StelarVoice } from './StelarVoice'
  * six dimensions' brightness, and renders the orbital diagram. The
  * surrounding flow is structured so the AI never feels hidden:
  *
- *   header (compressed: archetype + one meta line)
- *   StelarHeadline   ← lifted lede of the reading, above the orbital
+ *   header           ← REAL day identity (one-word state + en-luz count)
+ *   reading          ← deterministic lede, above the orbital
  *   orbital diagram  ← the visual system
  *   readout          ← tap a dimension; shows verdict + evidence
- *   DayAction     ← the one move the IA recommends today
- *   Voz de Stelar    ← the full prose reading
+ *   DayLiveReadings  ← "Cómo va tu día" — real, goal-aware readings
+ *   DayAction     ← the one move the IA recommends today (gated)
+ *   Voz de Stelar    ← the full prose reading (gated)
  *
- * Archetype + Voz de Stelar + headline + action are MOCK
- * (../mock.ts); the engine will write them from daily_signals.
+ * Header + reading + live readings are REAL (shared intelligence lib).
+ * Only DayAction + Voz de Stelar stay MOCK behind ENGINE_ACTIVE — the
+ * AI engine will write them from daily_signals.
  */
 // When a dimension is in silence, invite the user to register the signal
 // that lights it — instead of a dead-end. Oro afford, tappable. Ciclo has
@@ -82,6 +84,10 @@ export function DaySegment() {
   const calorieTarget = targets.data?.calories ?? null
   const proteinTarget = targets.data?.protein_g ?? null
   const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget })
+  // The Día header identity — a real, one-word state for TODAY from the same
+  // live dimensions the orbital draws (shared lib; the BE returns the same
+  // value in intel.day.header). Replaces the old mock archetype + headline.
+  const dayHeader = buildDayIdentity(dimensions)
 
   // "Cómo va tu día" — today's goal-aware readings now come from the
   // BACKEND engine (daily-intelligence Edge Function); the hook falls back
@@ -169,33 +175,37 @@ export function DaySegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* The day's voice. While the engine is mock, the deterministic
-          reading IS the real, honest lede (it only states today's facts,
-          verifiable by tapping the stars). The AI archetype + headline
-          take over once ENGINE_ACTIVE. */}
-      {ENGINE_ACTIVE ? (
-        <>
-          <View style={styles.header}>
-            <EmText
-              text={MOCK_ARQUETIPO.name}
-              emphasis={MOCK_ARQUETIPO.emphasis}
-              style={styles.archetype}
-              emStyle={styles.archetypeEm}
-            />
-            <View style={styles.metaRow}>
-              <LiveDot />
-              <Text style={styles.metaB} numberOfLines={1}>
-                <Text>leído por </Text>
-                <Text style={styles.metaStelar}>Stelar</Text>
-                <Text>{` · ${MOCK_ARQUETIPO.daysRead} días`}</Text>
-              </Text>
-            </View>
-          </View>
-          <StelarHeadline parts={MOCK_HEADLINE.parts} />
-        </>
-      ) : reading ? (
-        <Text style={styles.reading}>{reading}</Text>
-      ) : null}
+      {/* Header — a REAL one-word identity for today, derived from the live
+          dimensions (same shared lib the orbital + the BE use). The meta
+          line is the honest count of dimensions en luz right now. Below it,
+          the deterministic reading is the real, honest lede (states today's
+          facts, verifiable by tapping the stars). No mock here. */}
+      <View style={styles.header}>
+        <EmText
+          text={dayHeader.name}
+          emphasis={dayHeader.emphasis}
+          style={styles.archetype}
+          emStyle={styles.archetypeEm}
+        />
+        <View style={styles.metaRow}>
+          <LiveDot />
+          {/* The count names what the orbital already shows, so it drops the
+              "dimensiones" jargon — the number carries it. At zero we never
+              show a "0" (a magenta cero reads as a score in the red); the
+              line becomes a soft, no-pressure invitation instead (docs §8). */}
+          {dayHeader.enLuz === 0 ? (
+            <Text style={styles.metaB} numberOfLines={1}>
+              Aún sin registrar hoy
+            </Text>
+          ) : (
+            <Text style={styles.metaB} numberOfLines={1}>
+              <Text style={styles.metaCount}>{dayHeader.enLuz}</Text>
+              <Text> en luz hoy</Text>
+            </Text>
+          )}
+        </View>
+      </View>
+      {reading ? <Text style={styles.reading}>{reading}</Text> : null}
 
       {/* Arrival payoff — what newly lit since the last visit (P2A). */}
       {ignited.length > 0 ? (
@@ -406,15 +416,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
   },
-  // Frames the archetype as a passing lens, not an identity.
-  lensEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 8,
-  },
   // The archetype name — the app's poetic register.
   archetype: {
     fontFamily: typography.serif,
@@ -427,46 +428,27 @@ const styles = StyleSheet.create({
   archetypeEm: {
     color: colors.magenta,
   },
-  // Single dense meta row — tones + read window + depth %. The live
-  // dot keeps the "Stelar is reading you" presence; the wrap is two
-  // lines on narrow screens so depth never gets clipped.
+  // The header's meta line — a LiveDot + the honest count of dimensions
+  // en luz right now. The live dot keeps the "Stelar is reading you"
+  // presence.
   metaRow: {
     marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
-  metaStack: {
-    flex: 1,
-  },
-  meta: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  // Second meta line — same chrome as the first, slight breathing room.
   metaB: {
-    marginTop: 4,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.niebla,
   },
-  // The middle dot between the three tones — barely there, just
-  // enough to space them.
-  metaSep: {
-    color: colors.bruma,
-  },
-  metaStelar: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
+  // The en-luz count — a datum, so it stays in the UI sans (Hanken),
+  // never serif italic (that weight is the coach's voice). Magenta to
+  // lift the number out of the chrome label.
+  metaCount: {
     color: colors.magenta,
-    textTransform: 'none',
-    letterSpacing: 0,
   },
   hint: {
     marginTop: 4,
@@ -496,16 +478,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.bone,
     textAlign: 'center',
-  },
-  // The tapped dimension's readout — a quiet card under the diagram.
-  readout: {
-    marginTop: 6,
-    backgroundColor: colors.bgCard,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
   },
   readoutTop: {
     flexDirection: 'row',

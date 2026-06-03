@@ -6,7 +6,7 @@
  */
 import { buildArquetipoSemana } from './arquetipo'
 import { buildDayReadings } from './day-readings'
-import { deriveDimensions } from './dimensions'
+import { buildDayIdentity, deriveDimensions } from './dimensions'
 import { detectHabitPatterns } from './habit-patterns'
 import {
   buildMonthSatellites,
@@ -20,6 +20,7 @@ import { detectNightPattern } from './night-pattern'
 import type {
   DailySignals,
   DayCard,
+  DayIdentity,
   DiaSemana,
   Dimension,
   DimensionMonth,
@@ -50,7 +51,7 @@ type Voz = {
 type Arquetipo = ReturnType<typeof buildArquetipoSemana>
 
 export type Intelligence = {
-  day: { dimensions: Dimension[]; readings: DayCard[] }
+  day: { dimensions: Dimension[]; header: DayIdentity; readings: DayCard[] }
   week: { days: DiaSemana[]; arquetipo: Arquetipo; voz: Voz; shape: Patron[]; ahead: string | null }
   month: {
     summary: DimensionMonth[]
@@ -74,6 +75,7 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
   const dimCtx = { calorieTarget, proteinTarget }
 
   const todaySignal = history.find((s) => s.day === today) ?? null
+  const dimensions = deriveDimensions(todaySignal, dimCtx)
 
   // Sunday-first week ending today.
   const weekStart = shiftDate(today, -todayGetDay)
@@ -92,7 +94,8 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
 
   return {
     day: {
-      dimensions: deriveDimensions(todaySignal, dimCtx),
+      dimensions,
+      header: buildDayIdentity(dimensions),
       readings: buildDayReadings(todaySignal, { calorieTarget, proteinTarget, waterGoalGlasses }),
     },
     week: {

@@ -5,6 +5,7 @@
  */
 import type {
   DailySignals,
+  DayIdentity,
   Dimension,
   DimensionContext,
   DimensionKey,
@@ -120,4 +121,24 @@ export function deriveDimensions(
 /** How many dimensions are currently "en luz" (brillante + en formación). */
 export function countEnLuz(dims: Dimension[]): number {
   return dims.filter((d) => d.brightness >= EN_LUZ_THRESHOLD).length
+}
+
+/** The Día header identity from TODAY's live dimensions — replaces the old
+ *  mock archetype. One masculine state word ("el día …") plus the honest
+ *  count of dimensions en luz. Never a grade: with nothing lit it's "por
+ *  encender" (forming), never "vacío". */
+export function buildDayIdentity(dims: Dimension[]): DayIdentity {
+  const lit = dims.filter((d) => d.brightness >= EN_LUZ_THRESHOLD)
+  const enLuz = lit.length
+  if (enLuz === 0) {
+    return { name: 'Tu día por encender', emphasis: 'por encender', enLuz: 0 }
+  }
+  // The word reads how bright the LIT dimensions shine — averaging all six
+  // would drag the mean down through the dims resting at DIM_FLOOR (ciclo
+  // sits there most of the month), so the word could say "naciente" while
+  // the meta line shows 4 en luz. Averaging only the lit ones keeps the two
+  // coherent; the range here is [EN_LUZ_THRESHOLD, 1].
+  const b = lit.reduce((s, d) => s + d.brightness, 0) / enLuz
+  const word = b >= 0.8 ? 'encendido' : b >= 0.6 ? 'presente' : b >= 0.45 ? 'en marcha' : 'naciente'
+  return { name: `Tu día ${word}`, emphasis: word, enLuz }
 }
