@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
 import { useSeenMesTapHint } from '@/lib/onboardingFlags'
@@ -82,6 +88,17 @@ export function MonthSegment() {
   )
   const selectedSat = selectedSatId ? monthSats.find((s) => s.id === selectedSatId) : null
 
+  // During a reveal the header recedes so the constellation is the sole
+  // protagonist (the chain dims inside MonthSky, the bg magenta fades too).
+  const headerFade = useSharedValue(1)
+  useEffect(() => {
+    headerFade.value = withTiming(selectedSatId ? 0.35 : 1, {
+      duration: selectedSatId ? 420 : 320,
+      easing: Easing.inOut(Easing.cubic),
+    })
+  }, [selectedSatId, headerFade])
+  const headerStyle = useAnimatedStyle(() => ({ opacity: headerFade.value }))
+
   // Never logged anything yet → dedicated first-run state.
   if (hasAny === false) {
     return (
@@ -108,7 +125,7 @@ export function MonthSegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      <View style={styles.header}>
+      <Animated.View style={[styles.header, headerStyle]}>
         <EmText
           text={`tu mes en ${theme}`}
           emphasis={theme}
@@ -128,7 +145,7 @@ export function MonthSegment() {
             ) : null}
           </Text>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Cosmos hero with the month's headline satellites. Tapping a
           named body reveals the real dimension behind it. */}
@@ -262,7 +279,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
     fontSize: 12.5,
-    color: colors.magenta,
+    color: colors.oroSoft,
     textTransform: 'none',
   },
   // Cosmos hero — wider than the Week glance so the satellite chain on

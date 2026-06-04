@@ -181,21 +181,32 @@ const ORNAMENT_TY = -23
 // warm glow.
 const ART_CENTER_X = ORNAMENT_TX + (1024 * ORNAMENT_S) / 2
 const ART_CENTER_Y = ORNAMENT_TY + (1024 * ORNAMENT_S) / 2
-// m-day raster placement. Bumped 0.16 → 0.42 so the sphere has presence
-// as the gravitational anchor instead of reading as a small decoration.
-// The PNG has its visual mass HIGH (sphere centred at ~42 % of source
-// height) with mist as a decorative tail below — anchoring by the
-// geometric centre dropped the sphere below the dimension hex's centre,
-// so we anchor by the sphere's visual centre instead.
+// m-day raster placement. UX audit pulled 0.42 → 0.28 — the previous
+// scale made the sphere DOMINATE the canvas and read as the subject,
+// pushing the dimension stars into the role of decoration. Manifesto
+// reverses that: the dimensions are the data; the sphere just anchors.
+//
+// Paired with `ART_OPACITY = 0.6` on the render group so even at this
+// smaller size the orb recedes rather than competing with the stars.
+//
+// `ART_SPHERE_Y_NORM` — fraction of source height where the sphere's
+// visual centre lives (the rest of the PNG is mist tail below). Was
+// 0.38 (estimated sphere centre at upper third); bumped to 0.50 after
+// the user reported the sphere read as sitting BELOW the hex centre
+// — the real centre of the visible orb in the PNG sits closer to
+// geometric middle than the visual estimate. Bigger value = anchor
+// point pulled down in the PNG = PNG lifted up on screen = sphere
+// closer to the hex's gravity centre.
 const ART_SRC = 1254
-const ART_S = 0.42
-const ART_SPHERE_Y_NORM = 0.42
+const ART_S = 0.28
+const ART_SPHERE_Y_NORM = 0.5
+const ART_OPACITY = 0.6
 const ART_TX = ART_CENTER_X - (ART_SRC * ART_S) / 2
 const ART_TY = ART_CENTER_Y - ART_SRC * ART_S * ART_SPHERE_Y_NORM
 // Visible radius of the sphere in viewBox units — its mask + glow key off
-// it. Tightened from /2 (full PNG halfwidth) to a ~30 % portion of source
-// width because the actual sphere occupies less than the full canvas; the
-// mist tail below is decorative and shouldn't drive halo geometry.
+// it. Tightened from /2 (full PNG halfwidth) to ~18 % of source width
+// because the actual sphere occupies less than the full canvas; the mist
+// tail below is decorative and shouldn't drive halo geometry.
 const ART_R = ART_SRC * ART_S * 0.18
 // Was 1.35 (pushed the six stars out toward the edges — read as scattered,
 // disconnected). Pulled to 1.0 so they ring tightly just outside the warm
@@ -526,6 +537,27 @@ export function OrbitalSystem({
     return { opacity: 0.35 + 0.55 * litAvgSV.value }
   })
 
+  // Orb breath — a subtle opacity wobble centred on ART_OPACITY,
+  // driven by the SAME `t` clock that the stars breathe on. UX audit
+  // flagged that the orb felt "alive" while the dimensions felt
+  // "dead" because they pulsed on different rhythms (or, in the
+  // orb's case, not at all). Sharing `t` means the centerpiece +
+  // dimension stars rise and fall together — read as one system.
+  // Range tuned narrow (±0.08 around ART_OPACITY) so the orb stays
+  // recessed at all times; the stars still carry the focal motion.
+  //
+  // `zoomFade` removes the orb during focus: when the camera dives
+  // onto a star, the centerpiece would peek in from the side of the
+  // focused frame (visible art-direction failure per the audit). We
+  // fade it to 0 as zoomT rises so the focused dimension owns the
+  // canvas.
+  const orbBreathProps = useAnimatedProps(() => {
+    'worklet'
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    const zoomFade = Math.max(0, 1 - zoomT.value * 1.8)
+    return { opacity: ART_OPACITY * (0.88 + wave * 0.24) * zoomFade }
+  })
+
   // viewBox → pixel factor for the Skia flare overlay. Measured from the
   // wrap (which fills the orbital container at the viewBox aspect ratio),
   // so k = px width ÷ viewBox width = px height ÷ viewBox height.
@@ -718,9 +750,12 @@ export function OrbitalSystem({
             <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={ART_R * 0.85} fill="url(#core-glow)" />
           </AnimatedG>
 
-          {/* The small black hole — the central object the dimensions ring.
-              Edge-faded via bh-mask so it melts into the field. */}
-          <G mask="url(#bh-mask)">
+          {/* The centerpiece — the central anchor the dimensions ring.
+              Edge-faded via bh-mask so it melts into the field. Opacity
+              breathes on the same `t` clock the stars use, so the orb
+              and the dimensions rise/fall together as one system (see
+              `orbBreathProps` notes above). */}
+          <AnimatedG mask="url(#bh-mask)" animatedProps={orbBreathProps}>
             <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
               <SvgImage
                 href={DAY_ORB_PNG}
@@ -731,7 +766,7 @@ export function OrbitalSystem({
                 preserveAspectRatio="xMidYMid meet"
               />
             </G>
-          </G>
+          </AnimatedG>
 
           {/* Orbital traces (thin magenta ellipses centre→star) were
               tried for the vector galaxy but read as a geometric CAD
@@ -764,26 +799,45 @@ export function OrbitalSystem({
 
           {/* At-rest mini labels — anchored at fixed STAR_POS so
               each label stays adjacent to its dim. Fade during
-              focus zoom (restLabelsProps). */}
+              focus zoom (restLabelsProps).
+
+              UX-tuned hierarchy: the PROTAGONIST (highest-brightness
+              en-luz dim) reads in `colors.leche` at full opacity; every
+              other label recedes to `colors.bone` at 0.55 — the eye
+              lands on today's lead dimension before scanning the rest.
+              When nothing is en luz (cold start) all labels stay at the
+              bone level so no fake "lead" is fabricated. */}
           <AnimatedG animatedProps={restLabelsProps}>
-            {placed.map(({ d, pos }) => {
-              const offset = STAR_LABEL_OFFSETS[d.key]
-              return (
-                <SvgText
-                  key={`rest-label-${d.key}`}
-                  x={pos.x + offset.dx}
-                  y={pos.y + offset.dy}
-                  fill={d.brightness >= TONE_BRILLANTE ? colors.leche : SKY.haloCream}
-                  fontSize={10}
-                  fontFamily="HankenGrotesk_700Bold"
-                  letterSpacing={1.2}
-                  textAnchor="middle"
-                  opacity={0.92}
-                >
-                  {d.label.toUpperCase()}
-                </SvgText>
+            {(() => {
+              const enLuzDims = placed.filter(
+                ({ d }) => d.brightness >= EN_LUZ_THRESHOLD,
               )
-            })}
+              const heroKey =
+                enLuzDims.length > 0
+                  ? enLuzDims.reduce((best, cur) =>
+                      cur.d.brightness > best.d.brightness ? cur : best,
+                    ).d.key
+                  : null
+              return placed.map(({ d, pos }) => {
+                const offset = STAR_LABEL_OFFSETS[d.key]
+                const isHero = d.key === heroKey
+                return (
+                  <SvgText
+                    key={`rest-label-${d.key}`}
+                    x={pos.x + offset.dx}
+                    y={pos.y + offset.dy}
+                    fill={isHero ? colors.leche : colors.bone}
+                    fontSize={10}
+                    fontFamily="HankenGrotesk_700Bold"
+                    letterSpacing={1.2}
+                    textAnchor="middle"
+                    opacity={isHero ? 0.98 : 0.55}
+                  >
+                    {d.label.toUpperCase()}
+                  </SvgText>
+                )
+              })
+            })()}
           </AnimatedG>
         </AnimatedG>
       </Svg>
@@ -1692,10 +1746,18 @@ function StarNode({
   // scaling. `showGlyph` lingers ~420 ms after deselection so the
   // icon fades out alongside the zoom-out rather than vanishing
   // the instant React's `selected` prop flips.
+  // Brightness gain — drives halo + glyph opacity from the dimension's
+  // live brightness so the focused art looks AS QUIET as the dimension
+  // is. EN SILENCIO (b < EN_LUZ_THRESHOLD) targets ~0.45 of the bloom;
+  // a RADIANTE dim reaches full. Without this, every focused star
+  // shouted with identical bloom regardless of data state — the audit
+  // flagged it as "EN SILENCIO se ve igual de bright que EN LUZ".
+  const brightnessGain = 0.45 + 0.55 * Math.min(1, b / TONE_BRILLANTE)
+
   const glyphAnim = useAnimatedProps(() => {
     'worklet'
     const z = Math.min(1, zoomT.value * 1.4)
-    const op = z * z * 0.95
+    const op = z * z * 0.95 * brightnessGain
     const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
     const s = GLYPH_SCALE * (1 + wave * 0.05)
     return {
@@ -1709,7 +1771,8 @@ function StarNode({
   })
   // Focus halo — soft coloured glow around the glyph. Caps at
   // ~0.7 opacity (with breath wave) so the coloured bloom feels
-  // atmospheric, not opaque.
+  // atmospheric, not opaque. Multiplied by brightnessGain so quiet
+  // dimensions render a quiet halo.
   const haloAnim = useAnimatedProps(() => {
     'worklet'
     const z = Math.min(1, zoomT.value * 1.6)
@@ -1720,7 +1783,7 @@ function StarNode({
     // about (x, y) so it grows from the star, not the origin.
     const settle = 1 + popT.value * 0.12
     return {
-      opacity: z * z * (0.55 + 0.18 * wave),
+      opacity: z * z * (0.55 + 0.18 * wave) * brightnessGain,
       transform: [
         { translateX: x },
         { translateY: y },
@@ -2049,13 +2112,12 @@ function StarNode({
           <AnimatedG animatedProps={wellAnim}>
             <Circle cx={x} cy={y} r={42} fill="url(#focus-well)" />
           </AnimatedG>
-          {/* Centre spark — soft warm-cream glow painted between
-              the well and the icon. Gives the focus state a
-              subtle luminous centre without re-introducing the
-              washing-out white-hot core. */}
-          <AnimatedG animatedProps={wellAnim}>
-            <Circle cx={x} cy={y} r={28} fill="url(#focus-spark)" />
-          </AnimatedG>
+          {/* The neutral `focus-spark` cream layer was here. Removed
+              per art audit — the dimension-tinted halo above is more
+              confident on its own; the cream wash sat on top and
+              flattened the hue into generic "AI yellow / gold",
+              reading as a Photoshop outer-glow filter rather than
+              atmospheric light. */}
         </>
       ) : null}
       {/* Dimension glyph — materialises at the star centre as the
@@ -2068,7 +2130,13 @@ function StarNode({
           <G filter={`url(#glyph-glow-${dim.key})`} opacity={0.85}>
             {GLYPHS[dim.key]}
           </G>
-          <G color={colors.leche}>{GLYPHS[dim.key]}</G>
+          {/* Crisp glyph layer — tinted to the DIMENSION's brand hue
+              instead of generic cream. Per art audit: the glyph must
+              "bathe in the same hue as its halo" so the focused art
+              speaks one colour, not "neutral icon on coloured glow".
+              Requires line-work SVGs that respect `currentColor` (see
+              the redrawn energy-vect.svg). */}
+          <G color={colors.dimension[dim.key]}>{GLYPHS[dim.key]}</G>
         </AnimatedG>
       ) : null}
       {/* Focus label moved out of the SVG to a sibling RN Text

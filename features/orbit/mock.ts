@@ -323,7 +323,7 @@ export const MOCK_OBSERVATIONS: readonly Observation[] = [
   },
   {
     id: 'hypothesis',
-    label: 'stelar observa',
+    label: 'tu señal naciente',
     shortValue: 'algo en los jueves',
     caption: '3 jueves bajos · señal débil',
     // The thursdays of a Monday-starting cycle, but only the ones

@@ -85,7 +85,10 @@ export function dimensionEvidence(key: DimensionKey, s: DailySignals | null): Ev
       return list
     }
     case 'energia':
-      return s.energy == null ? [] : [{ label: 'check-in', value: `${s.energy}/5` }]
+      // "check-in" was productivity-app jargon (UX audit). "energía" as
+      // its own label reads as the dimension speaking for itself in
+      // Stelar voice.
+      return s.energy == null ? [] : [{ label: 'energía', value: `${s.energy}/5` }]
     case 'mente': {
       const list: Evidence[] = []
       if (s.mood != null) list.push({ label: 'ánimo', value: moodWord(s.mood) })
@@ -125,35 +128,60 @@ function formatSleep(min: number): string {
 }
 
 /** A short human readout of a dimension's day — shown when the user
- *  taps it in the orbital diagram. */
+ *  taps it in the orbital diagram. UX-audit retoned: previous empty-state
+ *  lines ("Sin check-in de…") read as productivity-app speak ("you didn't
+ *  do your homework"); the "aún no habla" pattern keeps the same factual
+ *  meaning but in Stelar's coach register — invitation, not chore. */
 export function dimensionDetail(key: DimensionKey, s: DailySignals | null): string {
-  if (s == null) return 'Sin registro hoy.'
+  if (s == null) return 'El día aún no habla.'
   switch (key) {
     case 'cuerpo':
       return s.trained
-        ? 'Entrenaste hoy.'
+        ? 'Tu cuerpo se movió hoy.'
         : s.rested
-          ? 'Día de descanso.'
-          : 'Sin movimiento registrado.'
+          ? 'Tu cuerpo eligió descansar.'
+          : 'Tu cuerpo aún no habla hoy.'
     case 'energia':
-      return s.energy == null ? 'Sin check-in de energía.' : `Energía ${s.energy} de 5.`
+      // UX audit: "Energía 5 de 5." reads as a stat. Rewritten as
+      // prose carrying the same data — "alta", "media", "baja"
+      // bucketed from the numeric value, with the number as evidence
+      // below. Matches MENTE's prose treatment for consistency.
+      if (s.energy == null) return 'Hoy tu energía aún no habla.'
+      return s.energy >= 4
+        ? 'Tu energía llegó alta hoy.'
+        : s.energy <= 2
+          ? 'Tu energía llegó baja hoy.'
+          : 'Tu energía estuvo media.'
     case 'mente': {
-      const bits: string[] = []
-      if (s.mood != null) bits.push(`ánimo ${moodWord(s.mood)}`)
-      if (s.stress != null) bits.push(`estrés ${s.stress}/5`)
-      if (s.motivation != null) bits.push(`motivación ${s.motivation}/5`)
-      if (bits.length === 0) return 'Sin check-in emocional.'
-      return `${bits.join(' · ')}.`
+      // UX audit: "ánimo X · estrés Y/5 · motivación Z/5." read as a
+      // stat block, breaking the Stelar voice in the lit state.
+      // Rewritten as prose; numbers stay as evidence rows below.
+      if (s.mood == null && s.stress == null && s.motivation == null) {
+        return 'Hoy tu mente aún no habla.'
+      }
+      const tone =
+        s.stress != null && s.stress <= 2 && s.motivation != null && s.motivation >= 4
+          ? 'Tu mente vino clara y con impulso.'
+          : s.stress != null && s.stress >= 4
+            ? 'Tu mente vino tensa hoy.'
+            : s.motivation != null && s.motivation >= 4
+              ? 'Tu mente vino con impulso.'
+              : s.mood === 'good'
+                ? 'Tu mente vino en calma.'
+                : s.mood === 'bad'
+                  ? 'Tu mente vino nublada.'
+                  : 'Tu mente vino tomando forma.'
+      return tone
     }
     case 'sueno':
-      if (s.sleep_minutes == null) return 'Sin sueño registrado.'
+      if (s.sleep_minutes == null) return 'La noche aún no habla.'
       return s.sleep_quality == null
         ? `Dormiste ${formatSleep(s.sleep_minutes)}.`
         : `${formatSleep(s.sleep_minutes)} · calidad ${s.sleep_quality}/5.`
     case 'alimento':
       return s.meal_count
         ? `${s.meal_count} ${s.meal_count === 1 ? 'comida' : 'comidas'} registradas.`
-        : 'Sin comidas registradas.'
+        : 'Hoy tu plato aún no habla.'
     case 'ciclo':
       return s.on_period ? 'Estás en tu periodo.' : 'Fuera del periodo.'
   }

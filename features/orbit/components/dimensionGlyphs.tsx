@@ -11,19 +11,20 @@ import { colors } from '@/theme'
 import { type DimensionKey } from '../logic'
 
 /*
- * Dimension glyphs — 24×24 line illustrations, one per dimension.
+ * Dimension glyphs — illustrated plates at viewBox ~800×800, one per
+ * dimension. All members of the warm-gold family (body / mind / moon /
+ * food / energy / cycle) paint themselves with filled paths in the
+ * `#EEDD91 / #DCCC7B / #9A8F40` palette — opacity modulation, not hue
+ * shift. ENERGY and CYCLE were redrawn to match the family after the
+ * UX/illustrator audit found the previous Feather utility icons broke
+ * the visual register entirely.
  *
- * Body / cycle / energy / mind / moon paint themselves in rose
- * (`#FFB8B3`) regardless of the parent `<G color="...">`. The rose
- * was chosen for these constellation-style illustrations because
- * cream washed out against the violet/magenta halo in focus view.
- *
- * Food is the exception — its SVG uses `currentColor` so the same
- * file can serve the tab bar and the dimension halo. The `color`
- * prop must be set on the SVG component directly: `<G color>` from
- * a parent doesn't cross the nested `<Svg>` boundary that
- * react-native-svg-transformer generates, so currentColor would
- * fall back to black if the prop is omitted.
+ * FOOD is the lone exception — its SVG uses `currentColor` so the same
+ * file can serve the tab bar (cream) and the dimension halo (warm).
+ * Its `color` prop must be set on the SVG component directly: `<G color>`
+ * from a parent doesn't cross the nested `<Svg>` boundary the
+ * react-native-svg-transformer generates, so currentColor would fall
+ * back to black if the prop is omitted.
  */
 export const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: <BodyVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,

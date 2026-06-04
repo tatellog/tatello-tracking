@@ -26,7 +26,6 @@ import {
 import { MOCK_ACCION_DEL_DIA, MOCK_ARQUETIPO, MOCK_VOZ_DIA } from '../mock'
 import { DayAction } from './DayAction'
 import { DayLiveReadings } from './DayLiveReadings'
-import { CosmicParticles } from './CosmicParticles'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
 import { OrbitalSystem } from './OrbitalSystem'
@@ -58,6 +57,36 @@ const AFFORD_TEXT: Partial<Record<DimensionKey, string>> = {
   cuerpo: 'Anota tu movimiento de hoy',
   energia: 'Marca tu energía de hoy',
   alimento: 'Registra una comida',
+}
+
+/* Maps the focused dimension to the StatSlider slide id that owns
+ * registering that signal — so tapping the CTA lands the user on
+ * the right card, not at the top of Hoy where they'd have to swipe
+ * looking for it. `cuerpo` has no slide (its check-in is the
+ * DayCheckIn at the top of Hoy), so the absence sends the user
+ * straight to the Hoy root. */
+const SLIDE_FOR_DIM: Partial<Record<DimensionKey, string>> = {
+  sueno: 'sleep',
+  mente: 'wellbeing',
+  energia: 'wellbeing',
+  alimento: 'macros',
+  ciclo: 'cycle',
+}
+
+/* Per-dimension QUIET line shown when no signal is registered yet
+ * — replaces the previous single "Aún no hay señal aquí. Stelar
+ * espera, no inventa." that repeated across all 5 silent states
+ * (UX audit: "a la 4ª visita pasa de íntimo a script"). Each
+ * dimension now has its own coach-voice line tied to its own
+ * metaphor; the Stelar manifest contract ("no inventa") stays
+ * implicit in the absence of evidence rather than as a recurring
+ * footer slogan. */
+const QUIET_LINE_FOR: Partial<Record<DimensionKey, string>> = {
+  cuerpo: 'Tu cuerpo aún no ha hecho su trazo hoy.',
+  mente: 'Tu mente todavía no se ha pronunciado.',
+  energia: 'Tu energía aún no ha hablado hoy.',
+  sueno: 'La noche aún no te ha contado.',
+  alimento: 'Tu plato aún no ha aparecido.',
 }
 
 // Arrival payoff (P2A, contained): which dimensions crossed into "brillante"
@@ -224,7 +253,16 @@ export function DaySegment() {
           (mini-labels at rest, glyph + "tu cuerpo / tu sueño /..."
           when zoomed in). */}
       <View style={styles.heroRow}>
-        <CosmicParticles />
+        {/* CosmicParticles REMOVED from heroRow — it was bound inside
+            heroRow as an absoluteFill, which meant its top edge sat
+            exactly at the heroRow's top boundary. The user perceived
+            this as a "line": above heroRow only SkyBackground particles
+            were visible; below heroRow the additional CosmicParticles
+            layer thickened the atmosphere visibly, creating the edge.
+            The ScreenCosmos layer at the page root (app/(tabs)/orbit.tsx)
+            already spans the whole screen with stars + nebulae — the
+            extra in-row particles were redundant. The transition into
+            the orbital is now continuous. */}
         <OrbitalSystem
           dimensions={dimensions}
           selectedKey={selectedKey}
@@ -257,23 +295,34 @@ export function DaySegment() {
             entering={FadeInDown.duration(360).delay(180)}
             style={styles.readoutOverlay}
           >
+            {/* Exit affordance — the focused star is hidden behind the
+                halo so tapping it again to deselect is invisible to
+                the user. A subtle close glyph in the corner gives an
+                obvious way back to the full orbital. */}
+            <Pressable
+              onPress={() => setSelectedKey(null)}
+              hitSlop={14}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar lectura"
+              style={styles.closeBtn}
+            >
+              <Text style={styles.closeGlyph}>✕</Text>
+            </Pressable>
+            {/* Header — eyebrow + dimension word. The earlier `selectedTone`
+                pill on the right ("brillante" / "en formación" / "en
+                silencio") was redundant with `selected.word` ("clara" /
+                "alta" / "calma") which is the same state in Stelar
+                voice — and the two competed semantically (UX audit:
+                "MENTE · clara · brillante" delivered two positive
+                labels in different registers). Removed in favour of
+                the single coach-voice `word`; the tone is still
+                conveyed implicitly via detail line + evidence presence.
+                Bonus: the close ✕ no longer collides with the pill. */}
             <View style={styles.readoutTop}>
               <View style={styles.readoutLabelRow}>
                 <Text style={styles.readoutLabel}>{selected.label}</Text>
                 {selected.word ? <Text style={styles.readoutWord}>{selected.word}</Text> : null}
               </View>
-              <Text
-                style={[
-                  styles.readoutState,
-                  selectedTone === 'brillante'
-                    ? styles.toneBrillante
-                    : selectedTone === 'en formación'
-                      ? styles.toneFormacion
-                      : styles.toneSilencio,
-                ]}
-              >
-                {selectedTone}
-              </Text>
             </View>
             <Text style={styles.readoutDetail}>{dimensionDetail(selected.key, signals)}</Text>
             {evidence.length > 0 ? (
@@ -290,17 +339,30 @@ export function DaySegment() {
                   ))}
                 </View>
               </View>
+            ) : selected.key === 'ciclo' && signals != null ? (
+              // CICLO with "Fuera del periodo" is a FACT, not a missing
+              // signal — showing "Aún no hay señal aquí. Stelar espera,
+              // no inventa." here contradicted the factual detail line
+              // ("la app no me lee" / "reproche disfrazado" per UX audit).
+              // Skip the silence block entirely; the detail line carries
+              // the truth. No CTA either — outside-of-period is not
+              // actionable.
+              null
             ) : (
               <View style={styles.silence}>
                 <Text style={styles.evidenceQuiet}>
-                  Aún no hay señal aquí. Stelar espera, no inventa.
+                  {QUIET_LINE_FOR[selected.key] ??
+                    'Aún no hay señal aquí. Stelar espera, no inventa.'}
                 </Text>
                 {AFFORD_TEXT[selected.key] ? (
                   <Pressable
-                    onPress={() =>
-                      router.push(selected.key === 'alimento' ? '/(tabs)/meals' : '/(tabs)')
-                    }
-                    hitSlop={8}
+                    onPress={() => {
+                      const slide = SLIDE_FOR_DIM[selected.key]
+                      router.push(
+                        slide ? `/(tabs)?slide=${slide}` : '/(tabs)',
+                      )
+                    }}
+                    hitSlop={12}
                     accessibilityRole="button"
                     accessibilityLabel={AFFORD_TEXT[selected.key]}
                     style={styles.afford}
@@ -314,7 +376,13 @@ export function DaySegment() {
         ) : null}
       </View>
 
-      {!selected ? <Text style={styles.hint}>Toca una dimensión para leerla.</Text> : null}
+      {/* Affordance microcopy — moved from the imperative "Toca una
+          dimensión para leerla" (read as tutorial instructions for a
+          child) to Cormorant italic ambient copy that names what the
+          stars hold, leaving the action to be discovered by tap.
+          The visible breathing pulse on en-luz stars carries the
+          tappability signal; this line is mood, not direction. */}
+      {!selected ? <Text style={styles.hint}>cada estrella guarda tu día</Text> : null}
 
       {/* Hoy en vivo — today's live, goal-aware readings. Real + always
           on (independent of the mock engine). */}
@@ -397,18 +465,19 @@ const styles = StyleSheet.create({
   // Readout overlay — translucent panel anchored to the bottom of
   // the orbital container. Replaces the old below-the-hero card so
   // the info lands within the same eyeline as the focus cinematic.
-  // Bg is dark + slightly translucent so the orbital reads as a
-  // soft texture underneath. Bronze hairline top edge to feel like
-  // a stelar artifact emerging from the system.
+  //
+  // Bg lowered 0.82 → 0.62 alpha + bronze hairline top REMOVED
+  // (user-reported visible "line" where the card began). The card
+  // now reads as a soft pool of wine emerging FROM the sky rather
+  // than a panel pasted ON it. The orbital + heroFade gradient
+  // beneath blend through cleanly with no edge break.
   readoutOverlay: {
     position: 'absolute',
     left: 20,
     right: 20,
     bottom: 18,
-    backgroundColor: 'rgba(20, 8, 18, 0.82)',
+    backgroundColor: 'rgba(20, 8, 18, 0.62)',
     borderRadius: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(217, 174, 111, 0.22)',
     padding: 16,
     gap: 10,
   },
@@ -446,9 +515,14 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 4,
     textAlign: 'center',
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
+    // Coach voice register (Cormorant italic) — names what the
+    // stars hold without imperative "toca / haz X" language. Tone
+    // is mood, not direction.
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    opacity: 0.78,
   },
   // The one-time first-reading reveal, above the Voz de Stelar card.
   revealIntro: {
@@ -494,21 +568,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.bodyLarge,
     color: colors.magenta,
-  },
-  readoutState: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-  },
-  toneBrillante: {
-    color: colors.magenta,
-  },
-  toneFormacion: {
-    color: colors.bone,
-  },
-  toneSilencio: {
-    color: colors.niebla,
   },
   readoutDetail: {
     marginTop: 7,
@@ -602,14 +661,41 @@ const styles = StyleSheet.create({
   silence: {
     gap: 8,
   },
+  // CTA pill — was a bare text link that lost weight under the halo's
+  // visual mass. Outlined pill with the oro hue ties it back to the
+  // coach-warm palette without becoming a loud filled button (manifesto:
+  // calm, not gym-app). hitSlop 12 lifts the touch target above 44 pt.
   afford: {
     alignSelf: 'flex-start',
-    paddingVertical: 2,
+    marginTop: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.oro,
   },
   affordText: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     color: colors.oro,
     letterSpacing: 0.2,
+  },
+  // Exit affordance for the focused state — absolute top-right of the
+  // readout overlay so it never crowds the readoutTop label/state row.
+  // Cream colour at low opacity so it reads as a gentle "out" cue,
+  // not a destructive close.
+  closeBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    padding: 8,
+    zIndex: 2,
+  },
+  closeGlyph: {
+    fontFamily: typography.ui,
+    fontSize: 18,
+    color: colors.leche,
+    opacity: 0.55,
+    lineHeight: 18,
   },
 })

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import LottieView from 'lottie-react-native'
@@ -136,6 +136,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const qc = useQueryClient()
   const router = useRouter()
   const { pattern, dismiss: dismissPattern } = usePatternDetection()
+  // The `slide` query param tells StatSlider which slide to land on.
+  // Set by the Órbita focus CTA (DaySegment) so tapping "Marca tu
+  // energía" lands the user directly on the wellbeing card instead
+  // of at the top of Hoy.
+  const { slide: slideParam } = useLocalSearchParams<{ slide?: string }>()
 
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()
@@ -346,7 +351,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
 
           <Animated.View entering={enter(600)}>
-            <StatSlider ctx={ctx} />
+            <StatSlider ctx={ctx} targetSlide={slideParam ?? null} />
           </Animated.View>
 
           <Animated.View entering={enter(740)}>

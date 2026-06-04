@@ -92,7 +92,7 @@ describe('buildMonthSatellites', () => {
     expect(buildMonthSatellites(buildMonthSummary([]), 0)).toEqual([])
   })
 
-  test('a logged month surfaces the four bodies: brillo, pausa, ancla, te observa', () => {
+  test('a logged month surfaces the four bodies: brillo, pausa, ancla, señal naciente', () => {
     const h = buildHistory(BASE, 20, () => STRONG)
     const ids = idsOf(h, 20)
     expect(ids).toEqual(expect.arrayContaining(['shine', 'rest', 'anchor', 'watch']))
@@ -109,12 +109,12 @@ describe('buildMonthSatellites', () => {
     expect(new Set(captions).size).toBe(captions.length)
   })
 
-  test('stelar te observa is tentative and never claims a verdict', () => {
+  test('tu señal naciente is tentative and never claims a verdict', () => {
     const h = buildHistory(BASE, 20, () => STRONG)
     const observa = buildMonthSatellites(buildMonthSummary(h), 20).find((s) => s.id === 'watch')
     expect(observa?.kind).toBe('tentative')
     expect(observa?.tentative).toBe(true)
-    expect(observa?.label).toBe('stelar te observa')
+    expect(observa?.label).toBe('tu señal naciente')
   })
 
   test('a young month (< 8 days) shows brillo at most — the rest need a month', () => {

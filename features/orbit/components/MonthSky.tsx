@@ -40,24 +40,30 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg'
 
-import AnchorArt from '@/assets/orbits-art/anchor.svg'
-// `orbit-anchor-tint.svg` is a `currentColor` variant of the anchor emblem —
-// the REVEAL figure shown BEHIND the `tu ancla` star figure, tinted to the
-// dimension colour.
-import AnchorTintArt from '@/assets/orbits-art/orbit-anchor-tint.svg'
-// `orbit-shine-tint.svg` is a `currentColor` variant of the shine emblem —
-// the REVEAL figure shown BEHIND the `tu brillo` star figure.
-import ShineFigureArt from '@/assets/orbits-art/orbit-shine-tint.svg'
-// `orbit-moon-tint.svg` is a `currentColor` variant of `orbit-moon.svg`
-// (hard-blue) — shown as the REVEAL figure for `tu pausa`, tinted to the
-// dimension colour.
-import MoonArt from '@/assets/orbits-art/orbit-moon-tint.svg'
-import RestArt from '@/assets/orbits-art/rest.svg'
+// Medallion glyphs — ALL four now share ONE régime: `currentColor` filled
+// silhouettes tinted gold (like `shine-tint`), so the chain reads as one
+// family. `rest-tint`/`anchor-tint` are the currentColor variants of the old
+// multi-colour amber illustrations; `tentative` is drawn inline as a
+// telescope reticle (so "observa" isn't just another star).
+import AnchorArt from '@/assets/orbits-art/anchor-tint.svg'
+// The four REVEAL emblems all use OUTLINE (stroke-only, fill:none) variants
+// so every reveal speaks ONE drawing language — a uniform "observatory-ink"
+// engraving behind the constellation (homogenization: the PAGE is constant,
+// the dimension colour lives only in the constellation on top). All four are
+// rendered in `EMBLEM_INK` (gold-cream) at the same opacity, NOT tinted by
+// dimension.
+import AnchorLineArt from '@/assets/orbits-art/orbit-anchor-line.svg'
+// Radial star (sparkle) outline — the emblem behind the `tu brillo` BURST
+// constellation. Centred + symmetric, matching the radial burst (the old
+// vertical orbit-shine figure mismatched the new burst).
+import ShineFigureArt from '@/assets/orbits-art/shine-tint-line.svg'
+import WatchFigureArt from '@/assets/orbits-art/orbit-watch-line.svg'
+import MoonArt from '@/assets/orbits-art/orbit-moon-line.svg'
+import RestArt from '@/assets/orbits-art/rest-tint.svg'
 // `shine-tint.svg` is a `currentColor` variant of `shine.svg` (whose 14
 // paths are hard `fill="#000"`, invisible on the dark sky). The tint
 // variant lets us paint it gold via the `color` prop on the component.
 import ShineArt from '@/assets/orbits-art/shine-tint.svg'
-import WatchArt from '@/assets/orbits-art/watch.svg'
 import { colors, typography } from '@/theme'
 
 import { type DimensionKey } from '../logic'
@@ -101,30 +107,38 @@ const CONSTELLATION_SHAPES: Record<
     route: number[]
   }
 > = {
-  // PEAK (tu brillo) — a VERTICAL RADIANT SYMBOL (per the reference): a
-  // bright apex at the top, two wings flaring up-and-out just below it, and a
-  // luminous SPINE of stars descending the centre to a bright base. Centred
-  // (symmetric), aligned over the shine emblem (ShineReveal) behind it. The
-  // light paints apex → down the spine; the wings ignite in its wake.
+  // PEAK (tu brillo) — a RADIAL BURST / sparkle: one bright HERO at the centre
+  // and 8 rays exploding outward (4 long cardinals + 4 short diagonals), so the
+  // brightest dimension of the month reads as light RADIATING, not a figure
+  // draining downward. Centred on (143,184). The route lights the core first,
+  // then SWEEPS the tips in angular order (N→NE→E→…); each ray draws just as
+  // the light reaches its tip (the EnergyLine window-cap makes the long rays
+  // draw just-in-time instead of from frame 0), so the burst is TRACED ray by
+  // ray, not flashed. The ShineReveal emblem behind is the matching radial
+  // star (shine-tint-line), centred.
   peak: {
     nodes: [
-      { x: 134, y: 76, hero: true, mag: 1 }, // 0 · apex (hero — the brilliant point)
-      { x: 134, y: 122, mag: 3 }, // 1 · upper junction (where the wings spring)
-      { x: 94, y: 100, mag: 3 }, // 2 · left wing (flares up-out)
-      { x: 174, y: 100, mag: 3 }, // 3 · right wing (flares up-out)
-      { x: 134, y: 170, mag: 2 }, // 4 · spine, bright centre
-      { x: 134, y: 220, mag: 2 }, // 5 · spine, lower bright
-      { x: 134, y: 270, mag: 2 }, // 6 · base (bright, bottom — near the text)
+      { x: 132, y: 168, hero: true, mag: 1 }, // 0 · centre — the radiant core (hero)
+      { x: 132, y: 84, mag: 2 }, // 1 · N (long)
+      { x: 168, y: 132, mag: 3 }, // 2 · NE (short)
+      { x: 216, y: 168, mag: 2 }, // 3 · E (long)
+      { x: 168, y: 204, mag: 3 }, // 4 · SE (short)
+      { x: 132, y: 252, mag: 2 }, // 5 · S (long)
+      { x: 96, y: 204, mag: 3 }, // 6 · SW (short)
+      { x: 48, y: 168, mag: 2 }, // 7 · W (long)
+      { x: 96, y: 132, mag: 3 }, // 8 · NW (short)
     ],
     edges: [
-      [0, 1], // apex → junction
-      [1, 2], // junction → left wing
-      [1, 3], // junction → right wing
-      [1, 4], // spine descending
-      [4, 5], // spine
-      [5, 6], // spine → base
+      [0, 1], // 8 rays from the core — the burst
+      [0, 2],
+      [0, 3],
+      [0, 4],
+      [0, 5],
+      [0, 6],
+      [0, 7],
+      [0, 8],
     ],
-    route: [0, 1, 4, 5, 6],
+    route: [0, 1, 2, 3, 4, 5, 6, 7, 8],
   },
   // VALLEY (tu pausa) — a CRESCENT MOON RING: ~8 bright stars seated on the
   // moon's limb. The thick/bright outer arc is on the RIGHT (stars 0-1-2-3-4,
@@ -137,14 +151,17 @@ const CONSTELLATION_SHAPES: Record<
   // centre chords); [7,0] faintly closes the ring.
   valley: {
     nodes: [
-      { x: 154, y: 78, hero: true, mag: 1 }, // 0 · upper horn (hero — brightest tip, upper-right)
-      { x: 202, y: 116, mag: 2 }, // 1 · right-upper, descending the bright arc
-      { x: 216, y: 167, mag: 2 }, // 2 · right flank (3 o'clock — outermost point)
-      { x: 195, y: 222, mag: 2 }, // 3 · right-lower, the arc curving back in
-      { x: 142, y: 253, mag: 2 }, // 4 · lower horn (bottom-centre)
-      { x: 77, y: 227, mag: 3 }, // 5 · lower-left, the inner edge begins
-      { x: 44, y: 171, mag: 3 }, // 6 · left flank (9 o'clock, inner/fainter)
-      { x: 60, y: 112, mag: 3 }, // 7 · upper-left (route lands here, near the text)
+      { x: 156, y: 90, hero: true, mag: 1 }, // 0 · upper horn (hero — brightest tip, upper-right)
+      { x: 201, y: 125, mag: 2 }, // 1 · right-upper, descending the bright arc
+      { x: 214, y: 172, mag: 2 }, // 2 · right flank (3 o'clock — outermost point)
+      { x: 194, y: 223, mag: 2 }, // 3 · right-lower, the arc curving back in
+      { x: 145, y: 252, mag: 2 }, // 4 · lower horn (bottom-centre)
+      { x: 85, y: 228, mag: 3 }, // 5 · lower-left, the inner edge begins
+      { x: 54, y: 176, mag: 3 }, // 6 · left flank (9 o'clock, inner/fainter)
+      { x: 69, y: 121, mag: 3 }, // 7 · upper-left
+      { x: 50, y: 153, mag: 2 }, // 8 · LEFT TIP — extra bright star on the moon's left point
+      { x: 78, y: 93, mag: 2 }, // 9 · PEAK — the chain ends here
+      { x: 134, y: 84, mag: 2 }, // 10 · LONE STAR — free bright point, no line (sits near the top horn)
     ],
     edges: [
       [0, 1], // upper horn → bright right arc
@@ -153,73 +170,78 @@ const CONSTELLATION_SHAPES: Record<
       [3, 4], // → lower horn (closes the bright limb)
       [4, 5], // crossing to the inner/left edge
       [5, 6], // up the left flank
-      [6, 7], // → upper-left
-      [7, 0], // faint closing arc — almost completes the ring
+      [6, 8], // → out to the left tip
+      [8, 7], // left tip → upper-left
+      [7, 9], // → up to the left peak (chain ends here — node 10 is a free star)
     ],
-    route: [0, 1, 2, 3, 4, 5, 6, 7],
+    route: [0, 1, 2, 3, 4, 5, 6, 8, 7, 9],
   },
-  // STABLE (tu ancla) — a compact, centred figure (per the reference image):
-  // a two-star apex (the "roof"), two open mid-height stars, and a 3-star
-  // horizontal base row. The edges trace a pentagon-with-a-flat-base; the
-  // light paints the right side then the base, landing lower-left near the
-  // text. A faint ANCHOR emblem glows BEHIND it (AnchorReveal, opacity ~0.4).
+  // STABLE (tu ancla) — a CURVE that fits the emblem: the 6 stars chain along
+  // the LEFT flank of the anchor emblem's ring (orbit-anchor.svg, ring cx≈735
+  // cy≈800 r≈430 in SVG space) — a smooth "C" arc bulging left, head at top →
+  // base at bottom. OPEN chain (no closing edge) so it reads as a curve, not
+  // straight lines crossing the emblem. Light paints the curve top → bottom.
   stable: {
     nodes: [
-      { x: 168, y: 92, hero: true, mag: 1 }, // 0 · apex right (hero — brightest, upper-right of the roof)
-      { x: 112, y: 100, mag: 2 }, // 1 · apex left (the other roof tip)
-      { x: 212, y: 168, mag: 2 }, // 2 · mid-height right (open)
-      { x: 66, y: 176, mag: 3 }, // 3 · mid-height left (open)
-      { x: 196, y: 262, mag: 3 }, // 4 · base row, right
-      { x: 138, y: 278, mag: 2 }, // 5 · base row, centre
-      { x: 80, y: 264, mag: 3 }, // 6 · base row, left (route lands here, near the text)
+      { x: 140, y: 84, hero: true, mag: 1 }, // 0 · head / volute (top) — hero
+      { x: 90, y: 101, mag: 3 }, // 1 · entering the ring, descending left
+      { x: 60, y: 142, mag: 2 }, // 2 · upper-left flank
+      { x: 60, y: 195, mag: 4 }, // 3 · left bulge (leftmost point)
+      { x: 90, y: 236, mag: 2 }, // 4 · closing the flank, back toward centre
+      { x: 140, y: 252, mag: 3 }, // 5 · base (bottom-centre)
+      { x: 204, y: 150, mag: 2 }, // 6 · RIGHT POINT — star on the anchor's right side
+      { x: 190, y: 250, mag: 2 }, // 7 · BOTTOM-RIGHT — the lower-right fluke tip
     ],
     edges: [
-      [0, 1], // the roof / apex
-      [0, 2], // right slope → mid-height right
-      [1, 3], // left slope → mid-height left
-      [2, 4], // right side descending to the base
-      [3, 6], // left side descending to the base
-      [4, 5], // base row (right → centre)
-      [5, 6], // base row (centre → left)
+      [0, 1], // chain along the ring's left arc → reads as a curve
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [0, 6], // head → right point
+      [5, 7], // base → bottom-right fluke
+      [6, 7], // right point → bottom-right fluke (second connection on the last star)
     ],
-    route: [0, 2, 4, 5, 6],
+    // node 7 sits at the END of the route so it stays the LAST star to ignite
+    // even with its new [6,7] edge (a branch would otherwise inherit node 6's
+    // early time). The light finishes by tracing base → fluke → up the arm.
+    route: [0, 1, 2, 3, 4, 5, 7],
   },
-  // TENTATIVE (stelar te observa) — a FRAGMENTED field with a gap. The core
-  // (0-1-2) is confirmed + dense; two distant stars hang, and the HYPOTHESIS
-  // link (edge index 4, [2,4]) is the dashed bridge the cosmos hasn't
-  // confirmed. Deliberately incomplete.
+  // TENTATIVE (stelar te observa) — a DIAMOND (per the reference): 4 bright
+  // stars at top / right / bottom / left forming a closed rhombus, seated on
+  // the inner diamond of the watch emblem (WatchReveal) behind it. Symmetric,
+  // upright, centred on (140,188), R=78. Right + bottom are the brightest
+  // (mag 1), top + left medium. The light paints right → top → left → bottom
+  // (landing lower-centre near the text); the closing edge completes the
+  // rhombus. No dashed/hypothesis link — the figure is whole.
   tentative: {
     nodes: [
-      { x: 210, y: 98, hero: true, mag: 1 }, // 0 · confirmed hero
-      { x: 178, y: 140, mag: 2 }, // 1 · confirmed core (close)
-      { x: 212, y: 168, mag: 3 }, // 2 · confirmed core (close)
-      { x: 150, y: 206, mag: 3 }, // 3 · star peeling away
-      { x: 96, y: 188, mag: 3 }, // 4 · distant star (across the gap)
-      { x: 110, y: 250, mag: 4 }, // 5 · faint loose spark
+      { x: 216, y: 168, hero: true, mag: 1 }, // 0 · right point (hero — brightest)
+      { x: 132, y: 84, mag: 2 }, // 1 · top point (medium)
+      { x: 48, y: 168, mag: 2 }, // 2 · left point (medium)
+      { x: 132, y: 252, mag: 1 }, // 3 · bottom point (bright; route lands near the text)
     ],
     edges: [
-      [0, 1],
-      [1, 2], // dense confirmed core
-      [1, 3],
-      [3, 5], // confirmed branch descending
-      [2, 4], // index 4 · HYPOTHESIS — dashed (crosses the gap)
-      [4, 5], // closes from the other side
+      [0, 1], // right → top
+      [1, 2], // top → left
+      [2, 3], // left → bottom
+      [3, 0], // bottom → right (closes the diamond)
     ],
-    route: [0, 1, 3, 5],
+    route: [0, 1, 2, 3],
   },
   // RISING — a clear ascending STAIRCASE: short, fairly even steps from
   // lower-left to upper-right, with a spark leaping off the middle tread.
   // Legible momentum, not a lone diagonal.
   rising: {
     nodes: [
-      { x: 222, y: 88, hero: true, mag: 1 }, // 0 · summit (hero)
-      { x: 198, y: 116, mag: 2 }, // 1 · high step
-      { x: 168, y: 138, mag: 3 }, // 2 · (tread: horizontal)
-      { x: 158, y: 178, mag: 2 }, // 3 · mid step
-      { x: 126, y: 200, mag: 3 }, // 4 · (tread: horizontal)
-      { x: 116, y: 242, mag: 2 }, // 5 · low step
-      { x: 80, y: 264, mag: 3 }, // 6 · base (lower-left)
-      { x: 206, y: 168, mag: 4 }, // 7 · spark leaping to the right
+      { x: 200, y: 84, hero: true, mag: 1 }, // 0 · summit (hero)
+      { x: 177, y: 111, mag: 2 }, // 1 · high step
+      { x: 148, y: 132, mag: 3 }, // 2 · (tread: horizontal)
+      { x: 139, y: 170, mag: 2 }, // 3 · mid step
+      { x: 108, y: 191, mag: 3 }, // 4 · (tread: horizontal)
+      { x: 99, y: 231, mag: 2 }, // 5 · low step
+      { x: 64, y: 252, mag: 3 }, // 6 · base (lower-left)
+      { x: 184, y: 160, mag: 4 }, // 7 · spark leaping to the right
     ],
     edges: [
       [0, 1],
@@ -284,10 +306,19 @@ const HIT = 56
 // WeekConstellation flare layer.
 const FLARE_PAD = 72
 
-// The chain column lives on the right side of the canvas. The
+// The chain column lives on the right-CENTRE of the canvas. The
 // axis-haze + nebula counterweight key off this so the cosmos
-// gravity points at the chain, not the empty middle.
-const AXIS_X = 311
+// gravity follows the chain (now pulled inward), not the bare edge.
+const AXIS_X = 301
+
+// CANONICAL "REVEAL FRAME" — { cx: 132, cy: 168, size: 168 } in the W=372
+// viewBox. Every (emblem + constellation) unit is normalized to this single box
+// (baked into the node coords + emblem wraps below) so the 4 reveals are the
+// SAME size and sit in the SAME place — no jump when switching satellites. Each
+// unit was scaled by 168 / (its larger bbox dimension) about its centre, then
+// translated to (132,168), preserving the internal emblem↔stars fit. The right
+// edge (x=216) clears the chain; the bottom (y=252) clears the annotation
+// (top 70% ≈ y260). Spec from the uxui audit.
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -339,11 +370,13 @@ const DEEP_STARS_BASE: readonly DeepStar[] = Array.from({ length: 80 }, (_, i) =
   } as DeepStar
 }).filter((s): s is DeepStar => s !== null)
 
-/** Centre-band fill — ~12 faint stars in x∈[120,240] so the middle
- *  has depth texture instead of looking like a removed layer. Dimmer
- *  than the base field so they whisper, not compete with the chain. */
-const CENTRE_STARS: readonly DeepStar[] = Array.from({ length: 12 }, (_, i) => ({
-  x: 120 + rand(41, i) * 120,
+/** Centre-band fill — ~16 faint stars spanning x∈[60,240] so the LEFT
+ *  half + middle carry deep-sky grain instead of reading as flat magenta
+ *  void (the chain pulled inward, so the left needs its own texture to
+ *  feel like cosmos, not dead space). Dimmer than the base field so they
+ *  whisper, not compete with the chain. */
+const CENTRE_STARS: readonly DeepStar[] = Array.from({ length: 16 }, (_, i) => ({
+  x: 60 + rand(41, i) * 180,
   y: 40 + rand(42, i) * 292,
   r: 0.14 + rand(43, i) * 0.3,
   op: 0.07 + rand(44, i) * 0.16,
@@ -402,9 +435,12 @@ const NEBULA_CLOUDS: readonly {
   color: string
   opacity: number
 }[] = [
-  // Left anchor — the reinforced fog mass (weight without detail).
-  { cx: 78, cy: 150, r: 150, color: SKY.nebulaPurple, opacity: 0.32 },
-  { cx: 60, cy: 290, r: 120, color: SKY.nebulaDeep, opacity: 0.22 },
+  // Left anchor — split into two OFFSET lobes (instead of one flat disc)
+  // so the fog reads as a nebula with volume, not a wash. They breathe
+  // out of phase (NebulaCloud keys drift off idx).
+  { cx: 64, cy: 128, r: 122, color: SKY.nebulaPurple, opacity: 0.34 },
+  { cx: 96, cy: 212, r: 106, color: SKY.nebulaPurple, opacity: 0.22 },
+  { cx: 58, cy: 300, r: 116, color: SKY.nebulaDeep, opacity: 0.2 },
   // Right — faded so it no longer fights the chain.
   { cx: 284, cy: 248, r: 142, color: SKY.nebulaMagenta, opacity: 0.18 },
   { cx: 312, cy: 76, r: 100, color: SKY.nebulaDark, opacity: 0.16 },
@@ -423,16 +459,19 @@ const NODES: readonly { x: number; y: number; size: number }[] = [
   { x: 140, y: 50, size: 0.85 }, // upper-left (11 o'clock, small)
 ]
 
-/** Pattern-chain positions — a "(" arc on the right of the canvas: the
- *  ends bow right, the middle bows left, so the chain reads as a curved
- *  parenthesis cradling the cosmos. Constraints: x < W - 28 (badge +
- *  frame half-width) so the medallions never clip the right edge, and the
- *  left-most (middle) stays clear of the reveal constellation (x ≤ 245). */
+/** Pattern-chain positions — a "(" arc on the right-CENTRE of the canvas:
+ *  the ends bow right, the middle bows left, so the chain reads as a curved
+ *  parenthesis whose concavity CRADLES the cosmos (opens toward the empty
+ *  left, turning negative space intentional). The frame + cardinal spikes
+ *  overscan to ~r+28.5, so with the ends at x=300 the talisman edge lands at
+ *  ~328 — ~44px of breathing room before the W=372 edge + vignette, no clip.
+ *  Y∈[70,312] keeps the top/bottom medallions inside the vignette too. The
+ *  left-most (middle) at x=262 stays clear of the reveal constellation. */
 const SAT_POS: readonly { x: number; y: number }[] = [
-  { x: 334, y: 54 },
-  { x: 306, y: 142 },
-  { x: 306, y: 230 },
-  { x: 334, y: 318 },
+  { x: 322, y: 78 },
+  { x: 300, y: 152 },
+  { x: 300, y: 228 },
+  { x: 322, y: 302 },
 ]
 
 /** Constellation spine — a smooth asymmetric Bézier threading the
@@ -629,42 +668,55 @@ function SatFrame({ cx, cy, r, active }: { cx: number; cy: number; r: number; ac
   const metalSoft = active ? colors.oroLeche : colors.oroSoft
   const bevel = active ? '#FFFFFF' : colors.oroLight
 
-  const TEETH = 16
-  const teeth: React.ReactElement[] = []
-  for (let k = 0; k < TEETH; k++) {
-    const ang = (360 / TEETH) * k
-    if (ang % 90 === 0) continue // skip cardinals — spikes live there
-    const a = pol(cx, cy, r + 3.6, ang)
-    const b = pol(cx, cy, r + 6, ang)
-    teeth.push(
+  // Gear teeth → INSTRUMENT GRADUATION. The old radial teeth read as a
+  // machine gear (dashboard sci-fi); a graduated dial (long cardinal marks +
+  // short minor marks, hair-thin) reads as a sextant/astrolabe face — the
+  // "intimate observatory" the brief wants. Whispered at rest (0.22) so the
+  // ring is essentially clean; it lights up (0.9) only when the node ignites.
+  const TICKS = 12
+  const ticks: React.ReactElement[] = []
+  for (let k = 0; k < TICKS; k++) {
+    const ang = (360 / TICKS) * k
+    const isCardinal = ang % 90 === 0
+    if (isCardinal && active) continue // the spike replaces the cardinal mark when lit
+    const inner = r + 3.2
+    const outer = isCardinal ? r + 7.4 : r + 5.4
+    const a = pol(cx, cy, inner, ang)
+    const b = pol(cx, cy, outer, ang)
+    ticks.push(
       <Line
-        key={`tooth-${k}`}
+        key={`tick-${k}`}
         x1={a.x}
         y1={a.y}
         x2={b.x}
         y2={b.y}
         stroke={metalSoft}
-        strokeWidth={0.9}
-        strokeOpacity={active ? 1 : 0.55}
+        strokeWidth={isCardinal ? 0.8 : 0.6}
+        strokeOpacity={active ? 0.9 : 0.22}
         strokeLinecap="round"
       />,
     )
   }
 
-  const spikes = [0, 90, 180, 270].map((ang) => {
-    const tip = pol(cx, cy, r + 8.6, ang)
-    const base = pol(cx, cy, r + 3.8, ang)
-    const wl = pol(cx, cy, r + 5.7, ang - 7)
-    const wr = pol(cx, cy, r + 5.7, ang + 7)
-    return (
-      <Path
-        key={`spike-${ang}`}
-        d={`M ${tip.x} ${tip.y} L ${wr.x} ${wr.y} L ${base.x} ${base.y} L ${wl.x} ${wl.y} Z`}
-        fill={metalSoft}
-        fillOpacity={active ? 1 : 0.7}
-      />
-    )
-  })
+  // Cardinal spikes are reserved for the ACTIVE node — at rest the talisman
+  // is a clean ring + faint teeth ("the quietude is the luxury"); igniting a
+  // body grows its four compass spikes, giving the selection real contrast.
+  const spikes = active
+    ? [0, 90, 180, 270].map((ang) => {
+        const tip = pol(cx, cy, r + 8.6, ang)
+        const base = pol(cx, cy, r + 3.8, ang)
+        const wl = pol(cx, cy, r + 5.7, ang - 7)
+        const wr = pol(cx, cy, r + 5.7, ang + 7)
+        return (
+          <Path
+            key={`spike-${ang}`}
+            d={`M ${tip.x} ${tip.y} L ${wr.x} ${wr.y} L ${base.x} ${base.y} L ${wl.x} ${wl.y} Z`}
+            fill={metalSoft}
+            fillOpacity={1}
+          />
+        )
+      })
+    : null
 
   return (
     <G>
@@ -678,22 +730,26 @@ function SatFrame({ cx, cy, r, active }: { cx: number; cy: number; r: number; ac
         stroke={metal}
         strokeWidth={active ? 1.7 : 1.4}
       />
-      {/* Highlight bevel — a thin polished catch-light just inside. */}
+      {/* Highlight bevel — the polished catch-light. ACTIVE-ONLY now: at rest
+          the talisman is just outer ring + inner ring + faint graduation (one
+          concentric line fewer = quieter dial); igniting adds the catch-light. */}
+      {active ? (
+        <Circle cx={cx} cy={cy} r={r + 2.4} fill="none" stroke={bevel} strokeWidth={0.5} />
+      ) : null}
+      {/* Graduation marks — long cardinals + short minors (instrument dial). */}
+      {ticks}
+      {/* 4 cardinal spikes — compass read, ACTIVE only. */}
+      {spikes}
+      {/* Thin inner ring hugging the medallion field. */}
       <Circle
         cx={cx}
         cy={cy}
-        r={r + 2.4}
+        r={r + 0.6}
         fill="none"
         stroke={bevel}
-        strokeWidth={0.5}
-        strokeOpacity={active ? 1 : 0.6}
+        strokeWidth={0.6}
+        strokeOpacity={active ? 1 : 0.55}
       />
-      {/* 16 gear teeth (cardinals skipped). */}
-      {teeth}
-      {/* 4 cardinal spikes — compass/jewel read. */}
-      {spikes}
-      {/* Thin inner ring hugging the medallion field. */}
-      <Circle cx={cx} cy={cy} r={r + 0.6} fill="none" stroke={bevel} strokeWidth={0.6} />
     </G>
   )
 }
@@ -878,20 +934,20 @@ const ICON_PCT = 23
 // at ICON_PCT 17.5) so growing ICON_PCT enlarges only the glyph.
 const MEDALLION_R = (((17.5 / 100) * W) / 2) * 0.62
 
-/* Pattern glyph art — the orbit-art illustration drawn by `kind`:
- *   peak      → shine  (gold star / brilliance, high energy)
- *   valley    → rest   (low energy, quiet)
- *   stable    → anchor (steady)
- *   tentative → watch  (in observation)
- *   rising    → shine  (fallback — momentum, no dedicated art yet)
+/* Pattern glyph art — the orbit-art glyph drawn by `kind`:
+ *   peak      → shine   (gold star / brilliance, high energy)
+ *   valley    → rest    (low energy, quiet)
+ *   stable    → anchor  (steady)
+ *   tentative → reticle (telescope crosshair — "in observation")
+ *   rising    → shine   (fallback — momentum, no dedicated art yet)
  *
- * rest / anchor / watch are full multi-colour amber illustrations —
- * rendered AS-IS (no tint). shine ships as a black silhouette, so we
- * use the `currentColor` variant (`shine-tint.svg`) and paint it via
- * `color` so it reads as a gold star on the dark sky — brighter
- * (`oroLeche`) on the active node, soft (`oroLight`) at rest. The
- * viewBoxes differ a lot in size, so we fix width/height and let
- * `preserveAspectRatio="xMidYMid meet"` centre + scale each one. */
+ * ONE régime for all four: `currentColor` gold silhouettes (shine/rest/anchor
+ * via their `-tint` variants) and an inline reticle for tentative — so the
+ * chain reads as a single family, brighter (`oroLeche`) on the active node,
+ * soft (`oroLight`) at rest. (The old code drew rest/anchor/watch as
+ * multi-colour amber AS-IS while only shine was tinted → 3 glyphs spoke a
+ * different language and turned to blobs when dimmed.) The viewBoxes differ a
+ * lot, so we fix width/height and let `meet` centre + scale each one. */
 function PatternArt({ kind, active }: { kind: SatelliteKind | undefined; active?: boolean }) {
   // Fill the badge wrapper (which is sized to the glow); the wrapper, not
   // a fixed px, controls the size so the art tracks the halo on any screen.
@@ -900,20 +956,31 @@ function PatternArt({ kind, active }: { kind: SatelliteKind | undefined; active?
     height: '100%',
     preserveAspectRatio: 'xMidYMid meet',
   } as const
+  const ink = active ? colors.oroLeche : colors.oroLight
   switch (kind) {
     case 'peak':
-    case 'rising': {
-      const shine = active ? colors.oroLeche : colors.oroLight
-      return <ShineArt {...common} color={shine} fill={shine} />
-    }
+    case 'rising':
+      return <ShineArt {...common} color={ink} fill={ink} />
     case 'valley':
-      // rest / anchor / watch stay multi-colour amber AS-IS. (The moon is
-      // the REVEAL figure for pausa, not the medallion glyph.)
-      return <RestArt {...common} opacity={1} />
+      return <RestArt {...common} color={ink} fill={ink} />
     case 'stable':
-      return <AnchorArt {...common} opacity={1} />
+      return <AnchorArt {...common} color={ink} fill={ink} />
     case 'tentative':
-      return <WatchArt {...common} opacity={1} />
+      // Telescope reticle — a SMALL scope ring + crosshair + centre pip,
+      // drawn inline. Critical: the medallion's own frame ring lands at
+      // ~radius 23.6 in this viewBox (≈ spans 26–74), so the reticle ring is
+      // kept well INSIDE it (r15 → spans 35–65). When the ring was r26 it sat
+      // right on top of the frame, reading as a bold double gold ring = looked
+      // permanently SELECTED at rest. Small + thin now → a calm scope like the
+      // other glyphs, clear of the frame.
+      return (
+        <Svg {...common} viewBox="0 0 100 100">
+          <Circle cx={50} cy={50} r={15} fill="none" stroke={ink} strokeWidth={2} />
+          <Line x1={50} y1={30} x2={50} y2={70} stroke={ink} strokeWidth={1.8} strokeLinecap="round" />
+          <Line x1={30} y1={50} x2={70} y2={50} stroke={ink} strokeWidth={1.8} strokeLinecap="round" />
+          <Circle cx={50} cy={50} r={3} fill={ink} />
+        </Svg>
+      )
     default:
       return null
   }
@@ -952,7 +1019,10 @@ function PatternChainIcon({
     // satellite is selected.
     if (!affordance) return { transform: [{ scale: 1 }] }
     const cue = 0.5 + 0.5 * Math.sin((clock.value * 1.6 + phase) * 2 * Math.PI)
-    return { transform: [{ scale: 1 + cue * 0.055 }] }
+    // ±0.09 (was 0.055, imperceptible) — the chain now visibly breathes
+    // "tap me". This is the only signal that the medallions are tappable,
+    // and reaching the reveal is the whole point of the tab.
+    return { transform: [{ scale: 1 + cue * 0.09 }] }
   })
   return (
     <Animated.View
@@ -963,7 +1033,11 @@ function PatternChainIcon({
         {
           left: `${(pos.x / W) * 100}%`,
           top: `${(pos.y / W) * 100}%`,
-          opacity: (dimmed ? 0.35 : 1) * (isTentative ? 0.7 : 1),
+          // Inactive during a reveal → 0.30 (was 0.18, which read as a render
+          // glitch, not a latent node). The tentative ×0.7 is NOT compounded
+          // onto the dimmed floor (0.18×0.7 = 0.126 was invisible) — it only
+          // softens the tentative node when it's the visible/active one.
+          opacity: dimmed ? 0.3 : isTentative ? 0.7 : 1,
         },
       ]}
     >
@@ -992,8 +1066,18 @@ const MS_BG = monthRgb(colors.bg)
 /** "Observatory tint": mix a dimension hex ~22 % toward gold so the six
  *  dimension colours share a warm substrate and none (warm magenta nor cold
  *  sage/indigo) clashes with the warm-dark field. Returns "#RRGGBB". */
+/** Uniform "observatory ink" for the reveal emblems — every emblem (moon,
+ *  shine, anchor, watch) is drawn in this single gold-cream at the same
+ *  opacity, regardless of dimension. This is the homogenization spine: the
+ *  emblem is the constant PAGE; colour lives only in the constellation. */
+const EMBLEM_INK = colors.oroSoft
+const EMBLEM_OPACITY = 0.5
+
 function harmonizeDim(hex: string): string {
-  const MIX = 0.22
+  // 0.50 (was 0.22) — pull every dimension HALFWAY to observatory gold so the
+  // cool dimensions (sueño indigo, ciclo silver-blue) stop reading cold and
+  // all four constellations sit in one warm family.
+  const MIX = 0.5
   const a = parseInt(hex.replace('#', ''), 16)
   const g = parseInt(colors.oro.replace('#', ''), 16) // observatory gold
   const ch = (shift: number) => {
@@ -1340,7 +1424,9 @@ function EnergyCurrent({
   lit: SharedValue<number>
   settle: SharedValue<number>
 }) {
-  const headR = Math.max(2.4, 3.8 * k)
+  // A touch bigger (3.8→4.6) so the travelling light reads clearly as the
+  // thing DRAWING the constellation, now that the trace is slow enough to watch.
+  const headR = Math.max(3, 4.6 * k)
   const head = useDerivedValue(() => {
     const p = posAlongRoute(lit.value, wpX, wpY, cumLen, totalLen)
     return vec(p.x, p.y)
@@ -1442,11 +1528,13 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
       }
     }
     // The light travels the whole route, painting the figure in its wake.
-    lit.value = withDelay(100, withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.quad) }))
+    // Slower (1800 vs 1000 ms) so you can WATCH the constellation being drawn
+    // line by line — the trace IS the moment, not a quick flourish.
+    lit.value = withDelay(120, withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.quad) }))
     // Once the figure is fully drawn, the bloom calms so the text reads.
     settle.value = withDelay(
-      1140,
-      withTiming(1, { duration: 380, easing: Easing.inOut(Easing.cubic) }),
+      2000,
+      withTiming(1, { duration: 420, easing: Easing.inOut(Easing.cubic) }),
     )
     return () => {
       cancelAnimation(lit)
@@ -1520,8 +1608,16 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
           const aIsSource = fa <= fc
           const src = aIsSource ? shape.nodes[a]! : shape.nodes[c]!
           const tgt = aIsSource ? shape.nodes[c]! : shape.nodes[a]!
-          const sFrac = Math.min(fa, fc)
-          const eFrac = Math.max(Math.max(fa, fc), sFrac + 0.05)
+          const lo = Math.min(fa, fc)
+          const hi = Math.max(fa, fc)
+          // Cap the draw window so a LONG edge doesn't draw across the whole
+          // traversal: it starts at most DRAW_WINDOW before its far endpoint
+          // ignites. Normal chain edges (endpoints <0.25 apart) are unaffected
+          // — only the burst's rays (centre→tip, far apart) get pulled to
+          // "just-in-time" so they trace one by one as the light sweeps.
+          const DRAW_WINDOW = 0.25
+          const sFrac = Math.max(lo, hi - DRAW_WINDOW)
+          const eFrac = Math.max(hi, sFrac + 0.05)
           // tentative edge index 4 ([2,4]) is the hypothesis link → dashed.
           const dashed = kind === 'tentative' && i === 4
           return (
@@ -1560,8 +1656,9 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
           />
         ))}
         {/* The painting light's head + wake riding the route. Skipped under
-          reduced motion (no travelling light). */}
-        {reduced ? null : (
+          reduced motion AND when the route is a single point (a radial burst
+          like `peak` has no travelling head — it flashes outward at once). */}
+        {reduced || wpX.length < 2 ? null : (
           <EnergyCurrent
             wpX={wpX}
             wpY={wpY}
@@ -1587,20 +1684,30 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
 function AnnotationOverlay({ eyebrow, body }: { eyebrow: string; body: string }) {
   const eyebrowT = useSharedValue(0)
   const bodyT = useSharedValue(0)
+  const hintT = useSharedValue(0)
   useEffect(() => {
+    // Text lands AFTER the (now slower) trace finishes (~1.9 s) so it never
+    // appears over a constellation still being drawn.
     eyebrowT.value = withDelay(
-      1120,
+      2050,
       withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic) }),
     )
     bodyT.value = withDelay(
-      1240,
+      2200,
       withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) }),
+    )
+    // The way back arrives last and quietest — once the page has fully
+    // settled, a faint line tells you the cosmos closes with a tap.
+    hintT.value = withDelay(
+      3000,
+      withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }),
     )
     return () => {
       cancelAnimation(eyebrowT)
       cancelAnimation(bodyT)
+      cancelAnimation(hintT)
     }
-  }, [eyebrowT, bodyT])
+  }, [eyebrowT, bodyT, hintT])
 
   const eyebrowStyle = useAnimatedStyle(() => {
     'worklet'
@@ -1610,6 +1717,10 @@ function AnnotationOverlay({ eyebrow, body }: { eyebrow: string; body: string })
     'worklet'
     return { opacity: bodyT.value, transform: [{ translateY: (1 - bodyT.value) * 6 }] }
   })
+  const hintStyle = useAnimatedStyle(() => {
+    'worklet'
+    return { opacity: hintT.value * 0.6 }
+  })
 
   return (
     <View style={annotationStyles.block} pointerEvents="none">
@@ -1618,6 +1729,9 @@ function AnnotationOverlay({ eyebrow, body }: { eyebrow: string; body: string })
       </Animated.Text>
       <Animated.Text style={[annotationStyles.bodyText, bodyStyle]} numberOfLines={3}>
         {body}
+      </Animated.Text>
+      <Animated.Text style={[annotationStyles.hintText, hintStyle]} numberOfLines={1}>
+        toca fuera para volver
       </Animated.Text>
     </View>
   )
@@ -1652,13 +1766,24 @@ const annotationStyles = StyleSheet.create({
     color: colors.leche,
     textAlign: 'center',
   },
+  // Whispered way back — niebla, tracked-out, last to arrive.
+  hintText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    textAlign: 'center',
+    marginTop: 14,
+  },
 })
 
 /* GhostConstellation — a faint, static LATENT figure drawn in the cosmos
  * when nothing is selected: thin cream lines + small dots tracing the
- * brillo satellite's constellation at low opacity. Fills the empty centre
- * and foreshadows what ignites (in dimension colour) on tap. Plain SVG, no
- * bloom — the resting state is calm; the reveal is the spectacle. */
+ * brillo satellite's constellation at low opacity. REMOVED from the resting
+ * render (it read as orphaned noise disconnected from the chain); kept here
+ * for an easy revert if the "foreshadow" idea returns. Plain SVG, no bloom. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function GhostConstellation({ kind }: { kind: SatelliteKind }) {
   const shape = CONSTELLATION_SHAPES[kind]
   return (
@@ -1687,10 +1812,10 @@ function GhostConstellation({ kind }: { kind: SatelliteKind }) {
   )
 }
 
-/* MoonReveal — the figure shown on the LEFT when `tu pausa` is selected,
- * INSTEAD of a star constellation: the orbit-moon art, tinted to the
- * dimension colour (never blue), easing in with a soft rise. */
-function MoonReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean }) {
+/* MoonReveal — the observatory-ink moon engraving shown behind the `tu pausa`
+ * star ring. Uniform EMBLEM_INK at EMBLEM_OPACITY (homogenized: same page as
+ * the other three), easing in with a soft rise. */
+function MoonReveal({ reduced }: { reduced: boolean }) {
   const t = useSharedValue(0)
   useEffect(() => {
     t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
@@ -1698,7 +1823,7 @@ function MoonReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean 
   }, [t, reduced])
   const style = useAnimatedStyle(() => ({
     // Whispers behind the star ring (the stars are the protagonist).
-    opacity: t.value * 0.4,
+    opacity: t.value * EMBLEM_OPACITY,
     // rotate -25° (left/CCW, matches the constellation's spinDeg) applied
     // OUTERMOST; scaleX:-1 mirrors the moon so its bright limb opens LEFT.
     transform: [{ rotate: '-25deg' }, { scaleX: -1 }, { scale: 0.9 + t.value * 0.1 }],
@@ -1709,8 +1834,8 @@ function MoonReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean 
         width="100%"
         height="100%"
         preserveAspectRatio="xMidYMid meet"
-        color={dimColor}
-        fill={dimColor}
+        color={EMBLEM_INK}
+        fill={EMBLEM_INK}
       />
     </Animated.View>
   )
@@ -1721,63 +1846,63 @@ const moonRevealStyles = StyleSheet.create({
   // under the star ring, clear of the chain on the right.
   wrap: {
     position: 'absolute',
-    left: '8%',
-    top: '14%',
-    width: '52%',
-    height: '60%',
+    left: '11%',
+    top: '17.6%',
+    width: '48.3%',
+    height: '55.7%',
   },
 })
 
-/* AnchorReveal — the figure shown BEHIND the `tu ancla` star figure (same
- * pattern as MoonReveal): the orbit-anchor emblem, tinted to the dimension
- * colour, whisper-faint (0.4) so the stars stay the protagonist. Mirrored so
- * its ornamented volute leans left, under the cluster; no rotation. */
-function AnchorReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean }) {
+/* AnchorReveal — the observatory-ink anchor engraving behind the `tu ancla`
+ * star figure. Now matches the other three: uniform EMBLEM_INK at
+ * EMBLEM_OPACITY (it previously rendered at full opacity, which made it
+ * dominate — the homogenization bug this pass fixes). */
+function AnchorReveal({ reduced }: { reduced: boolean }) {
   const t = useSharedValue(0)
   useEffect(() => {
     t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
     return () => cancelAnimation(t)
   }, [t, reduced])
   const style = useAnimatedStyle(() => ({
-    opacity: t.value * 0.4,
-    transform: [{ scaleX: -1 }, { scale: 0.9 + t.value * 0.1 }],
+    opacity: t.value * EMBLEM_OPACITY,
+    transform: [{ scale: 0.9 + t.value * 0.1 }],
   }))
   return (
     <Animated.View pointerEvents="none" style={[anchorRevealStyles.wrap, style]}>
-      <AnchorTintArt
+      <AnchorLineArt
         width="100%"
         height="100%"
         preserveAspectRatio="xMidYMid meet"
-        color={dimColor}
-        fill={dimColor}
+        color={EMBLEM_INK}
+        fill={EMBLEM_INK}
       />
     </Animated.View>
   )
 }
 
 const anchorRevealStyles = StyleSheet.create({
-  // Centred so the emblem lands under the star figure at viewBox (≈139, 185),
-  // clear of the chain. Near-square wrap (the anchor viewBox is ~1:1).
+  // Slightly BIGGER (56→60), nudged LEFT (9→3) and UP (22→15) so the emblem
+  // lifts clear of the annotation text below it. Near-square (anchor vb ~1:1).
   wrap: {
     position: 'absolute',
-    left: '9%',
-    top: '22%',
-    width: '56%',
-    height: '56%',
+    left: '-1.4%',
+    top: '6.1%',
+    width: '74.7%',
+    height: '74.7%',
   },
 })
 
-/* ShineReveal — the figure shown BEHIND the `tu brillo` star figure: the
- * orbit-shine emblem (a vertical radiant symbol), tinted to the dimension
- * colour, whisper-faint (0.4). Symmetric, so no mirror — just a soft rise. */
-function ShineReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean }) {
+/* ShineReveal — the observatory-ink RADIAL STAR behind the `tu brillo` burst.
+ * Centred + symmetric (no scaleY stretch now — the figure is a radial sparkle,
+ * not a vertical figure), uniform EMBLEM_INK at EMBLEM_OPACITY. */
+function ShineReveal({ reduced }: { reduced: boolean }) {
   const t = useSharedValue(0)
   useEffect(() => {
     t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
     return () => cancelAnimation(t)
   }, [t, reduced])
   const style = useAnimatedStyle(() => ({
-    opacity: t.value * 0.4,
+    opacity: t.value * EMBLEM_OPACITY,
     transform: [{ scale: 0.9 + t.value * 0.1 }],
   }))
   return (
@@ -1786,22 +1911,62 @@ function ShineReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean
         width="100%"
         height="100%"
         preserveAspectRatio="xMidYMid meet"
-        color={dimColor}
-        fill={dimColor}
+        color={EMBLEM_INK}
+        fill={EMBLEM_INK}
       />
     </Animated.View>
   )
 }
 
 const shineRevealStyles = StyleSheet.create({
-  // Centred (≈x134) and tall under the vertical star figure, clear of the
-  // chain. The shine viewBox is ~square so width drives the fit.
+  // SQUARE box behind the burst — BIGGER again (66→72) and re-centred on the
+  // burst, which moved left (centroid ≈128 ≈ 34.4% of W). left/top set so the
+  // emblem centre tracks the burst.
   wrap: {
     position: 'absolute',
-    left: '12%',
-    top: '12%',
-    width: '46%',
-    height: '64%',
+    left: '-0.9%',
+    top: '8.3%',
+    width: '73.8%',
+    height: '73.8%',
+  },
+})
+
+/* WatchReveal — the observatory-ink watch engraving (ornate floral ring +
+ * inner diamond) behind the `stelar te observa` diamond. Uniform EMBLEM_INK
+ * at EMBLEM_OPACITY (it used to read cool-blue via the dimension tint — the
+ * worst break in the old palette; now it's gold like the rest). */
+function WatchReveal({ reduced }: { reduced: boolean }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(t)
+  }, [t, reduced])
+  const style = useAnimatedStyle(() => ({
+    opacity: t.value * EMBLEM_OPACITY,
+    transform: [{ scale: 0.9 + t.value * 0.1 }],
+  }))
+  return (
+    <Animated.View pointerEvents="none" style={[watchRevealStyles.wrap, style]}>
+      <WatchFigureArt
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        color={EMBLEM_INK}
+        fill={EMBLEM_INK}
+      />
+    </Animated.View>
+  )
+}
+
+const watchRevealStyles = StyleSheet.create({
+  // Slightly BIGGER (60→63) and moved LEFT (4.5→0.5) + UP (14→9.5) to travel
+  // WITH the constellation (its diamond stars also shifted −14,−14).
+  wrap: {
+    position: 'absolute',
+    left: '1.3%',
+    top: '11.4%',
+    width: '67.8%',
+    height: '67.8%',
   },
 })
 
@@ -2088,7 +2253,10 @@ export function MonthSky({
             {sats.map((s, i) => {
               // Beads near the selected node stay bright; the rest dim
               // so the eye follows the thread toward the active body.
-              const beadOp = activeSat ? (activeSat.id === s.id ? 0.7 : 0.15) : 0.5
+              // Non-active beads stay at 0.32 (was 0.15) so the gold thread
+              // keeps anchoring the inactive nodes — the chain reads as "a
+              // constellation traced, nodes not yet lit", not four loose dots.
+              const beadOp = activeSat ? (activeSat.id === s.id ? 0.7 : 0.32) : 0.5
               return (
                 <Circle
                   key={`spine-${i}`}
@@ -2103,6 +2271,32 @@ export function MonthSky({
           </G>
         ) : null}
 
+        {/* BRIDGE — a faint dotted thread of light from the lit medallion to
+            the heart of its constellation, tying WHAT YOU TAPPED (the chain on
+            the right) to WHAT IGNITED (the constellation on the left), which
+            otherwise float disconnected. Bows up a touch so it reads as a
+            gesture, not a ruler. Only while a body is active. */}
+        {activeSat
+          ? (() => {
+              const shape = CONSTELLATION_SHAPES[activeSat.kind ?? 'peak']
+              const ccx = shape.nodes.reduce((s, n) => s + n.x, 0) / shape.nodes.length
+              const ccy = shape.nodes.reduce((s, n) => s + n.y, 0) / shape.nodes.length
+              const midX = (activeSat.x + ccx) / 2
+              const midY = (activeSat.y + ccy) / 2 - 22
+              return (
+                <Path
+                  d={`M ${activeSat.x} ${activeSat.y} Q ${midX} ${midY} ${ccx} ${ccy}`}
+                  fill="none"
+                  stroke={colors.oroLight}
+                  strokeWidth={0.7}
+                  strokeOpacity={0.22}
+                  strokeDasharray="0.5 6"
+                  strokeLinecap="round"
+                />
+              )
+            })()
+          : null}
+
         {/* Bright pin-point nodes — the NEAR layer; parallax-drifts ~2× the
             deep starfield so the depth between them reads. */}
         <AnimatedG animatedProps={nodesDrift}>
@@ -2111,12 +2305,12 @@ export function MonthSky({
           ))}
         </AnimatedG>
 
-        {/* Ghost constellation — when nothing is selected, a faint latent
-            figure (the first/ brillo satellite's shape) fills the empty
-            centre and foreshadows the reveal. Hidden during a reveal. */}
-        {activeSat == null && sats.length > 0 ? (
-          <GhostConstellation kind={sats[0]!.kind ?? 'peak'} />
-        ) : null}
+        {/* Ghost constellation REMOVED at rest — the latent figure made
+            the resting canvas feel pre-populated with shapes the user
+            hadn't earned yet. Empty centre stays empty until the user
+            taps a satellite; the reveal then has full surprise. The
+            `GhostConstellation` component is kept below for an easy
+            revert if this decision is reversed. */}
 
         {/* Pattern satellites + labels. When a chain item is active,
             the others dim to 35 % so the focus stays on the selected
@@ -2134,8 +2328,12 @@ export function MonthSky({
           const labelY = sat.y + 3
           const active = sat.selected || activeSat?.id === sat.id
           const dimmed = activeSat != null && activeSat.id !== sat.id
+          // During a reveal the ACTIVE node's label is hidden: the annotation
+          // overlay already names the pattern in large type, so repeating it on
+          // the medallion was a duplicate that also collided with the frame.
+          const showLabel = !(active && activeSat != null)
           return (
-            <G key={sat.id} opacity={dimmed ? 0.35 : 1}>
+            <G key={sat.id} opacity={dimmed ? 0.3 : 1}>
               <SatBody
                 key={active ? `body-active-${sat.id}` : `body-${sat.id}`}
                 x={sat.x}
@@ -2143,18 +2341,20 @@ export function MonthSky({
                 active={active}
                 gid={sat.id}
               />
-              <SvgText
-                x={labelX}
-                y={labelY}
-                textAnchor="end"
-                fontFamily={typography.uiBold}
-                fontSize={9.5}
-                letterSpacing={1.2}
-                fill={active ? colors.oroLeche : colors.leche}
-                opacity={active ? 1 : sat.kind === 'tentative' ? 0.55 : 0.85}
-              >
-                {sat.label}
-              </SvgText>
+              {showLabel ? (
+                <SvgText
+                  x={labelX}
+                  y={labelY}
+                  textAnchor="end"
+                  fontFamily={typography.uiBold}
+                  fontSize={11.5}
+                  letterSpacing={1.2}
+                  fill={active ? colors.oroLeche : colors.leche}
+                  opacity={active ? 1 : sat.kind === 'tentative' ? 0.7 : 0.9}
+                >
+                  {sat.label}
+                </SvgText>
+              ) : null}
             </G>
           )
         })}
@@ -2199,26 +2399,13 @@ export function MonthSky({
           {/* tu pausa also paints the MOON figure BEHIND its star ring (the
               stars sit on the moon's limb); every other body shows only its
               constellation. Moon first (behind), constellation on top. */}
-          {activeSat.kind === 'valley' ? (
-            <MoonReveal
-              dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
-              reduced={reduced}
-            />
-          ) : null}
+          {activeSat.kind === 'valley' ? <MoonReveal reduced={reduced} /> : null}
           {/* tu ancla paints the ANCHOR emblem behind its star figure. */}
-          {activeSat.kind === 'stable' ? (
-            <AnchorReveal
-              dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
-              reduced={reduced}
-            />
-          ) : null}
+          {activeSat.kind === 'stable' ? <AnchorReveal reduced={reduced} /> : null}
           {/* tu brillo paints the SHINE emblem behind its vertical figure. */}
-          {activeSat.kind === 'peak' ? (
-            <ShineReveal
-              dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
-              reduced={reduced}
-            />
-          ) : null}
+          {activeSat.kind === 'peak' ? <ShineReveal reduced={reduced} /> : null}
+          {/* stelar te observa paints the WATCH emblem behind its diamond. */}
+          {activeSat.kind === 'tentative' ? <WatchReveal reduced={reduced} /> : null}
           {/* Skia constellation overlay — bloom stars + energy lines, inside
               the FLARE_PAD-overscan wrapper so edge blooms bleed into the
               margin. pointerEvents off so taps fall through to the backdrop.

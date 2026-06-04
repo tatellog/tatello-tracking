@@ -173,7 +173,7 @@ const noun = (d: DimensionMonth): string => d.label.toLowerCase()
 /** Build the month's satellites — the named bodies orbiting MonthSky. Up to
  *  four, each a distinct dimension: `tu brillo` (the brightest, a state fact
  *  shown at any confidence), then once a month is logged `tu pausa` (the
- *  quietest), `tu ancla` (the steadiest) and `stelar te observa` (the one
+ *  quietest), `tu ancla` (the steadiest) and `tu señal naciente` (the one
  *  still moving, named tentatively). A thin month surfaces fewer. */
 export function buildMonthSatellites(
   summary: readonly DimensionMonth[],
@@ -191,7 +191,7 @@ export function buildMonthSatellites(
       dimensionKey: brightest.key,
       label: 'tu brillo',
       caption: `tu ${noun(brightest)}`,
-      detail: `Tu ${noun(brightest)} fue lo más en luz del mes.`,
+      detail: `Tu ${noun(brightest)} fue lo más brillante del mes.`,
       tentative: false,
     })
     used.add(brightest.key)
@@ -239,9 +239,10 @@ export function buildMonthSatellites(
       used.add(ancla.key)
     }
 
-    // stelar te observa — the read Stelar is still watching: the remaining
-    // dimension that moved the most, named tentatively (a hypothesis, never
-    // a verdict). Closes the chain once a month has been logged.
+    // tu señal naciente — a read still taking shape: the remaining dimension
+    // that moved the most, named tentatively (a hypothesis Stelar is still
+    // forming, never a verdict — and never "watching you"). Closes the chain
+    // once a month has been logged.
     const observe = avail().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0]
     if (observe) {
       const moved = observe.trend !== 'flat'
@@ -249,11 +250,14 @@ export function buildMonthSatellites(
         id: 'watch',
         kind: 'tentative',
         dimensionKey: observe.key,
-        label: 'stelar te observa',
+        label: 'tu señal naciente',
         caption: `tu ${noun(observe)}`,
+        // You are the subject, not Stelar — "Stelar lo va leyendo" reread as
+        // surveillance (the very thing the rename fixed). Tentative + no
+        // verdict + gender-safe (the noun's gender is dynamic).
         detail: moved
-          ? `Algo se mueve en tu ${noun(observe)}. Stelar lo sigue mirando.`
-          : `Stelar sigue leyendo tu ${noun(observe)}.`,
+          ? `Algo nace en tu ${noun(observe)}. Todavía sin nombre.`
+          : `Tu ${noun(observe)} aún no dice nada claro.`,
         tentative: true,
       })
       used.add(observe.key)

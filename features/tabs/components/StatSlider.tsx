@@ -47,7 +47,15 @@ import { RingCard } from './RingCard'
 // (✦); registering it here too would duplicate that.
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-type Props = { ctx: BriefContext }
+type Props = {
+  ctx: BriefContext
+  /** Slide id to auto-scroll to when set (e.g. 'sleep', 'wellbeing',
+   *  'macros'). Set by query param when the user lands on Hoy from the
+   *  Órbita focus CTA — the slider jumps to the relevant card instead
+   *  of staying on macros and forcing them to swipe. `null` = no
+   *  override; the user's current position stays. */
+  targetSlide?: string | null
+}
 
 /**
  * The Hoy-tab stat slider — a paged carousel whose section title
@@ -57,7 +65,7 @@ type Props = { ctx: BriefContext }
  * weight are read-only views. Pagination dots track the position;
  * the title cross-fades as the slider pages.
  */
-export function StatSlider({ ctx }: Props) {
+export function StatSlider({ ctx, targetSlide }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
   const reduceMotion = useReducedMotion()
@@ -69,6 +77,12 @@ export function StatSlider({ ctx }: Props) {
   // True after the first auto-peek has fired so we never re-fire
   // (rare but possible if `width` re-measures mid-session).
   const peekedRef = useRef(false)
+
+  // Tracks the last `targetSlide` we honoured, so the deep-link
+  // scroll fires ONCE per param change and never re-snaps when the
+  // user manually pages away. Without this guard, every re-render
+  // would re-scroll the user back to the deep-linked slide.
+  const honouredTargetRef = useRef<string | null>(null)
 
   // Live scroll offset — drives the per-slide enter/leave animation.
   const scrollX = useSharedValue(0)
@@ -133,6 +147,33 @@ export function StatSlider({ ctx }: Props) {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width)
     if (idx !== active && idx >= 0 && idx < slides.length) setActive(idx)
   }
+
+  // DEEP-LINK SCROLL — when `targetSlide` arrives (set by the Órbita
+  // focus CTA via query param), jump the carousel to the matching
+  // slide. Fires ONCE per distinct `targetSlide` value via
+  // honouredTargetRef; subsequent renders (with the param still
+  // sticky on the route) don't re-snap the user.
+  //
+  // `animated: false` — the user must land EXACTLY on the target
+  // slide as a deep-link, not see an auto-tour scroll-by. The tab
+  // switch animation is already playing; layering an animated scroll
+  // on top reads as the screen jittering. Instant snap = the slider
+  // is "just there" when the tab paints, the same way a hash anchor
+  // works on the web.
+  //
+  // Cancels the auto-peek by marking peekedRef so the demo doesn't
+  // fight the explicit deep-link.
+  useEffect(() => {
+    if (!targetSlide || width === 0) return
+    if (honouredTargetRef.current === targetSlide) return
+    const idx = slides.findIndex((s) => s.id === targetSlide)
+    if (idx < 0) return
+    honouredTargetRef.current = targetSlide
+    peekedRef.current = true
+    scrollRef.current?.scrollTo({ x: idx * width, animated: false })
+    setActive(idx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSlide, width])
 
   return (
     <View onLayout={onLayout}>
