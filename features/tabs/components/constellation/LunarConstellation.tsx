@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
@@ -15,7 +15,11 @@ import { useConstellationClocks } from './animation/use-clocks'
 import { useIgnitionEngine } from './animation/use-ignition-engine'
 import { H, PAD, TARGET_DAYS, W } from './constants'
 import { deriveProgress } from './data/derive-progress'
-import { SIGN_CONSTELLATION_TRANSFORM, SIGN_ENGRAVINGS } from './data/sign-maps'
+import {
+  SIGN_CONSTELLATION_TRANSFORM,
+  SIGN_CONSTELLATION_TRANSFORM_PARAMS,
+  SIGN_ENGRAVINGS,
+} from './data/sign-maps'
 import { useFigureGeometry } from './data/use-figure-geometry'
 import { useLitMaps } from './data/use-lit-maps'
 import {
@@ -29,10 +33,10 @@ import {
 import { StarBurst } from './rendering/burst'
 import { FieldStars } from './rendering/field'
 import { BaseLayer } from './rendering/figure-base'
-import { IgnitingOverlay } from './rendering/ignition'
+import { IgnitingOverlay, LottieIgnitionBurst } from './rendering/ignition'
 import { LitClusterAura, LitClusterMotes } from './rendering/lit-cluster'
 import { LitLines } from './rendering/lit-lines'
-import { StarsLayer } from './rendering/lit-stars'
+import { SkiaLitFlareLayer, StarsLayer, type SkiaLit } from './rendering/lit-stars'
 import { AnticipationCrown, CenterNumberOverlay, CompletionRings } from './rendering/overlay'
 import { CanvasSkeleton } from './rendering/skeleton'
 import { AmbientGlow, SvgGradients } from './rendering/static'
@@ -105,9 +109,55 @@ export function LunarConstellation({
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence })
 
+  // Measured canvas size — drives the Skia flare layer + Lottie ignition
+  // burst position math. 0 until first layout (both overlays withhold).
+  // `k` = pixels per viewBox unit (svg is square, W = H = 290).
+  const [canvasPx, setCanvasPx] = useState(0)
+  const onCanvasLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width
+    if (w !== canvasPx) setCanvasPx(w)
+  }
+  const k = canvasPx / W
+
+  // Apply SIGN_CONSTELLATION_TRANSFORM in JS so the Skia overlay (which
+  // can't read the SVG <G transform="...">) can position each star at
+  // the same pixel as the SVG-rendered body.
+  const transform = SIGN_CONSTELLATION_TRANSFORM_PARAMS[sign]
+  const toScreen = (xVb: number, yVb: number) => ({
+    x: (transform.tx + transform.sx * xVb) * k,
+    y: (transform.ty + transform.sy * yVb) * k,
+  })
+
+  // Lit stars in pixel-space → fed to the Skia flare layer. Stripped
+  // down to {x, y, mag} so the worklet only re-renders on actual layout
+  // changes, not on the broader stars/litKeys identity churn.
+  const skiaLit: SkiaLit[] = useMemo(() => {
+    if (k <= 0) return []
+    return stars.flatMap((s, i) => {
+      if (!litKeys.has(`star-${i}`)) return []
+      const p = toScreen(s.x, s.y)
+      return [{ x: p.x, y: p.y, mag: s.mag }]
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stars, litKeys, k, transform.tx, transform.ty, transform.sx, transform.sy])
+
+  // Pixel position of the currently igniting star (if any). Used to
+  // place the scoped Lottie burst. Lines don't get a Lottie — the SVG
+  // stroke-trace already reads as a meteor draw, no fireworks needed.
+  const ignitionPos = useMemo(() => {
+    if (!ignitingKey || k <= 0) return null
+    const [kind, idxStr] = ignitingKey.split('-')
+    if (kind !== 'star') return null
+    const idx = Number(idxStr)
+    const s = stars[idx]
+    if (!s) return null
+    return toScreen(s.x, s.y)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ignitingKey, stars, k, transform.tx, transform.ty, transform.sx, transform.sy])
+
   return (
     <View style={styles.wrap}>
-      <View style={styles.svgWrap}>
+      <View style={styles.svgWrap} onLayout={onCanvasLayout}>
         {/* Skeleton wrapped in Animated.View with `exiting` so it
             stays alive (fading out over 320 ms) while the real Svg
             below fades in (260 ms). Their opacities overlap — the
@@ -279,6 +329,26 @@ export function LunarConstellation({
               ) : null}
               {figureComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
             </Svg>
+            {/* Skia volumetric flare crown — sits on top of the SVG so
+                each lit star gets a real Gaussian-blurred magenta+cream
+                bloom + additive diffraction cross. The SVG body below
+                stays the crisp anchor; this layer just adds the lens
+                halo SVG can't fake (BlurMask, blendMode=screen/plus). */}
+            {canvasPx > 0 ? (
+              <SkiaLitFlareLayer lit={skiaLit} breathT={breathT} reduce={reduceMotion} />
+            ) : null}
+            {/* Lottie one-shot — the same gold-fireworks the Home commit
+                reward uses, but SCOPED to the igniting star instead of
+                covering the whole canvas. Backs the SVG ignition burst
+                with gold particle warmth. Suppressed under reduce-motion
+                (Lottie can't park at a static frame from a frozen clock). */}
+            {!reduceMotion && ignitionPos && ignitingKey ? (
+              <LottieIgnitionBurst
+                pos={ignitionPos}
+                size={canvasPx * 0.32}
+                igniteKey={ignitingKey}
+              />
+            ) : null}
             {/* Rack-focus blur. Born at intensity 18 (matching the
                 skeleton's BlurView) so the cross-fade reads as a single
                 image dissolving; wrapper opacity fades to 0 over 700 ms

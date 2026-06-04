@@ -1,33 +1,43 @@
-import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
+import { type ComponentType } from 'react'
 import { View } from 'react-native'
+import { type SvgProps } from 'react-native-svg'
 
+import FoodVect from '@/assets/icons/food-vect.svg'
+import Orbits from '@/assets/icons/orbits.svg'
+import Progress from '@/assets/icons/progress.svg'
+import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
 import { IgnitionToast } from '@/features/orbit/components/IgnitionToast'
 import { AppTabBar } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
-/* Tab glyphs. Library icons from `@expo/vector-icons`:
- *   • Feather (today, progress)
- *   • Ionicons (orbit)
- *   • MaterialIcons (meals)
+/* Tab glyphs. Custom vector illustrations from `assets/icons/`:
+ *   • sunset       → Hoy
+ *   • food-vect    → Comidas
+ *   • progress     → Progreso
+ *   • orbits       → Órbita
  *
- * Each set has its own helper so the `name` prop stays strongly typed
- * to that set's glyph map. Shared focused-state treatment across all:
+ * Each SVG was authored with `fill="currentColor"` so the `color` prop
+ * tints every stroke to leche. Shared focused-state treatment:
  *   • inactive  → opacity 0.45 + no scale     (recedes)
  *   • active    → opacity 1.0  + scale 1.08   (pops)
  *
- * Earlier iterations used custom SVGs from assets/icons (sol2 for Hoy,
- * progress-1 for Progreso, food-vect / orbit-vect for the rest). They
- * read too thin / pixel-noisy at tab scale; the library glyphs carry
- * weight out of the box. The legacy SVGs are no longer referenced from
- * this file — safe to delete if not used elsewhere. */
-function FeatherTabIcon({
-  name,
-  size = 26,
+ * Earlier iterations used `@expo/vector-icons` (Feather sun/activity,
+ * Ionicons planet-outline, MaterialIcons dinner-dining); replaced with
+ * the in-house glyphs so the tab bar reads as one family with the rest
+ * of Stelar's visual system. */
+/* `strokeWidth` is in viewBox units, not screen px — the source SVGs have
+ * viewBoxes ~800–1220 wide. A value of ~18 there reads as a noticeable
+ * outline around each `currentColor` fill at 32px screen size, which is
+ * what gives the glyphs their extra weight (the source paths are too
+ * delicate to read as "tab icons" at native scale).  */
+function SvgTabIcon({
+  Icon,
+  size = 38,
   focused = false,
 }: {
-  name: React.ComponentProps<typeof Feather>['name']
+  Icon: ComponentType<SvgProps>
   size?: number
   focused?: boolean
 }) {
@@ -38,57 +48,15 @@ function FeatherTabIcon({
         transform: [{ scale: focused ? 1.08 : 1 }],
       }}
     >
-      <Feather name={name} size={size} color={colors.leche} />
-    </View>
-  )
-}
-
-/* Same shell, Ionicons set — used for Órbita (`planet-outline`).
- * The outline variants match Feather's stroke weight closely enough
- * that the two read as the same icon family inside the pill. */
-function IoniconsTabIcon({
-  name,
-  size = 26,
-  focused = false,
-}: {
-  name: React.ComponentProps<typeof Ionicons>['name']
-  size?: number
-  focused?: boolean
-}) {
-  return (
-    <View
-      style={{
-        opacity: focused ? 1 : 0.45,
-        transform: [{ scale: focused ? 1.08 : 1 }],
-      }}
-    >
-      <Ionicons name={name} size={size} color={colors.leche} />
-    </View>
-  )
-}
-
-/* Same shell, MaterialIcons set — used for Comidas (`dinner-dining`).
- * MaterialIcons carries Google's Material balance; the `dinner-dining`
- * glyph is a bowl with three steam lines — clean and unambiguous as
- * "meals". Feather has no food icon and Ionicons' food glyphs are
- * plates/burgers/etc., not bowls. */
-function MaterialIconsTabIcon({
-  name,
-  size = 26,
-  focused = false,
-}: {
-  name: React.ComponentProps<typeof MaterialIcons>['name']
-  size?: number
-  focused?: boolean
-}) {
-  return (
-    <View
-      style={{
-        opacity: focused ? 1 : 0.45,
-        transform: [{ scale: focused ? 1.08 : 1 }],
-      }}
-    >
-      <MaterialIcons name={name} size={size} color={colors.leche} />
+      <Icon
+        width={size}
+        height={size}
+        color={colors.leche}
+        stroke={colors.leche}
+        strokeWidth={18}
+        strokeLinejoin="round"
+        preserveAspectRatio="xMidYMid meet"
+      />
     </View>
   )
 }
@@ -112,32 +80,28 @@ export default function TabsLayout() {
           name="index"
           options={{
             title: 'Hoy',
-            tabBarIcon: ({ focused }) => <FeatherTabIcon name="sun" focused={focused} />,
+            tabBarIcon: ({ focused }) => <SvgTabIcon Icon={Sunset} focused={focused} />,
           }}
         />
         <Tabs.Screen
           name="meals"
           options={{
             title: 'Comidas',
-            tabBarIcon: ({ focused }) => (
-              <MaterialIconsTabIcon name="dinner-dining" focused={focused} />
-            ),
+            tabBarIcon: ({ focused }) => <SvgTabIcon Icon={FoodVect} focused={focused} />,
           }}
         />
         <Tabs.Screen
           name="progress"
           options={{
             title: 'Progreso',
-            tabBarIcon: ({ focused }) => <FeatherTabIcon name="activity" focused={focused} />,
+            tabBarIcon: ({ focused }) => <SvgTabIcon Icon={Progress} focused={focused} />,
           }}
         />
         <Tabs.Screen
           name="orbit"
           options={{
             title: 'Órbita',
-            tabBarIcon: ({ focused }) => (
-              <IoniconsTabIcon name="planet-outline" focused={focused} />
-            ),
+            tabBarIcon: ({ focused }) => <SvgTabIcon Icon={Orbits} focused={focused} />,
           }}
         />
         <Tabs.Screen

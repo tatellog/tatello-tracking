@@ -1,0 +1,15 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- MENTE · a constellation of thought — a central star-node radiating
+       fine connections to satellite nodes, like a synaptic star map.
+       Abstract neural cartography, never a head/figure. -->
+  <circle cx="100" cy="100" r="16" stroke="currentColor" stroke-width="14" />
+  <path d="M100 84 L70 44 M116 92 L164 70 M118 110 L160 142
+           M96 116 L66 158 M82 96 L34 88"
+        stroke="currentColor" stroke-width="12" stroke-linecap="round"
+        opacity="0.7" />
+  <circle cx="70" cy="44" r="9" stroke="currentColor" stroke-width="11" opacity="0.7" />
+  <circle cx="164" cy="70" r="8" stroke="currentColor" stroke-width="11" opacity="0.7" />
+  <circle cx="160" cy="142" r="9" stroke="currentColor" stroke-width="11" opacity="0.7" />
+  <circle cx="66" cy="158" r="8" stroke="currentColor" stroke-width="11" opacity="0.7" />
+  <circle cx="34" cy="88" r="7" stroke="currentColor" stroke-width="11" opacity="0.7" />
+</svg>

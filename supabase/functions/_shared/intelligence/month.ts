@@ -156,6 +156,9 @@ export type MonthSatelliteKind = 'peak' | 'valley' | 'stable' | 'tentative' | 'r
 export type MonthSatellite = {
   id: string
   kind: MonthSatelliteKind
+  /** The real dimension behind this body — drives the per-dimension glow
+   *  color in MonthSky (same palette as the month bars). */
+  dimensionKey: DimensionKey
   /** Poetic name shown on the satellite — never a number. */
   label: string
   /** The real dimension, revealed on tap (e.g. "tu sueño"). */
@@ -167,10 +170,11 @@ export type MonthSatellite = {
 
 const noun = (d: DimensionMonth): string => d.label.toLowerCase()
 
-/** Build the month's satellites from the summary. Confidence-gated: a
- *  TREND read is confirmed ("tu calma") only with a full month; below
- *  that it appears as a humble "stelar observa". The brightest dimension
- *  is a current-state fact, so it shows at any confidence. */
+/** Build the month's satellites — the named bodies orbiting MonthSky. Up to
+ *  four, each a distinct dimension: `tu brillo` (the brightest, a state fact
+ *  shown at any confidence), then once a month is logged `tu pausa` (the
+ *  quietest), `tu ancla` (the steadiest) and `stelar te observa` (the one
+ *  still moving, named tentatively). A thin month surfaces fewer. */
 export function buildMonthSatellites(
   summary: readonly DimensionMonth[],
   daysLogged: number,
@@ -182,8 +186,9 @@ export function buildMonthSatellites(
   const brightest = [...summary].sort((a, b) => b.avg - a.avg)[0]
   if (brightest && brightest.avg >= 0.5) {
     out.push({
-      id: 'brillo',
+      id: 'shine',
       kind: 'peak',
+      dimensionKey: brightest.key,
       label: 'tu brillo',
       caption: `tu ${noun(brightest)}`,
       detail: `Tu ${noun(brightest)} fue lo más en luz del mes.`,
@@ -192,69 +197,66 @@ export function buildMonthSatellites(
     used.add(brightest.key)
   }
 
-  // tu ancla — a high, steady dimension (needs some month to claim).
+  // The remaining three reads need some month behind them. Ciclo is left
+  // out of these — at the floor it isn't "in pause" or "moving", it just
+  // wasn't a period month; it only earns a body as `brillo` (above) when
+  // the period actually made it the brightest.
+  const avail = (): DimensionMonth[] => summary.filter((d) => !used.has(d.key) && d.key !== 'ciclo')
   if (daysLogged >= 8) {
-    const stable = summary
-      .filter((d) => !used.has(d.key) && d.trend === 'flat' && d.avg >= 0.45)
-      .sort((a, b) => b.avg - a.avg)[0]
-    if (stable) {
+    // tu pausa — the quietest dimension that still carries signal: the one
+    // most at rest this month.
+    const pausa = avail()
+      .filter((d) => d.avg >= 0.2)
+      .sort((a, b) => a.avg - b.avg)[0]
+    if (pausa) {
       out.push({
-        id: 'ancla',
-        kind: 'stable',
-        label: 'tu ancla',
-        caption: `tu ${noun(stable)}`,
-        detail: `Tu ${noun(stable)} se mantuvo firme todo el mes.`,
-        tentative: false,
-      })
-      used.add(stable.key)
-    }
-  }
-
-  // The trend reads — confirmed with a full month, tentative below it.
-  // With confidence, surface BOTH the strongest rise ("tu impulso", the
-  // good pattern) AND the strongest fall ("tu calma", the rough one), so
-  // the month shows what's gaining and what's easing — not just one side.
-  if (daysLogged >= 18) {
-    const up = summary
-      .filter((d) => !used.has(d.key) && d.trend === 'up')
-      .sort((a, b) => b.delta - a.delta)[0]
-    if (up) {
-      out.push({
-        id: 'impulso',
-        kind: 'rising',
-        label: 'tu impulso',
-        caption: `tu ${noun(up)}`,
-        detail: `Tu ${noun(up)} viene creciendo este mes. Va ganando fuerza.`,
-        tentative: false,
-      })
-      used.add(up.key)
-    }
-    const down = summary
-      .filter((d) => !used.has(d.key) && d.trend === 'down')
-      .sort((a, b) => a.delta - b.delta)[0]
-    if (down) {
-      out.push({
-        id: 'calma',
+        id: 'rest',
         kind: 'valley',
-        label: 'tu calma',
-        caption: `tu ${noun(down)}`,
-        detail: `Tu ${noun(down)} vino aflojando este mes. Un repliegue, nada más.`,
+        dimensionKey: pausa.key,
+        label: 'tu pausa',
+        caption: `tu ${noun(pausa)}`,
+        detail: `Tu ${noun(pausa)} fue lo más en calma del mes.`,
         tentative: false,
       })
+      used.add(pausa.key)
     }
-  } else {
-    const moved = summary
-      .filter((d) => !used.has(d.key) && d.trend !== 'flat')
-      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0]
-    if (moved) {
+
+    // tu ancla — the steadiest dimension with real presence: smallest
+    // movement, decent level.
+    const ancla = avail()
+      .filter((d) => d.avg >= 0.4)
+      .sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta))[0]
+    if (ancla) {
       out.push({
-        id: 'observa',
+        id: 'anchor',
+        kind: 'stable',
+        dimensionKey: ancla.key,
+        label: 'tu ancla',
+        caption: `tu ${noun(ancla)}`,
+        detail: `Tu ${noun(ancla)} se mantuvo firme todo el mes.`,
+        tentative: false,
+      })
+      used.add(ancla.key)
+    }
+
+    // stelar te observa — the read Stelar is still watching: the remaining
+    // dimension that moved the most, named tentatively (a hypothesis, never
+    // a verdict). Closes the chain once a month has been logged.
+    const observe = avail().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0]
+    if (observe) {
+      const moved = observe.trend !== 'flat'
+      out.push({
+        id: 'watch',
         kind: 'tentative',
-        label: 'stelar observa',
-        caption: `tu ${noun(moved)}`,
-        detail: `Algo se mueve en tu ${noun(moved)}. Todavía es pronto para decir hacia dónde.`,
+        dimensionKey: observe.key,
+        label: 'stelar te observa',
+        caption: `tu ${noun(observe)}`,
+        detail: moved
+          ? `Algo se mueve en tu ${noun(observe)}. Stelar lo sigue mirando.`
+          : `Stelar sigue leyendo tu ${noun(observe)}.`,
         tentative: true,
       })
+      used.add(observe.key)
     }
   }
 

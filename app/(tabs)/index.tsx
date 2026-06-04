@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { BriefContext } from '@/features/brief/api'
-import { HomeError } from '@/features/home/components'
+import { CelebrateShockwave, HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
@@ -129,47 +129,28 @@ function TodayBody() {
 type ContentProps = {
   ctx: BriefContext
   cadence: Cadence
-  // Already resolved by the parent gate — may still be null if the
-  // user has no profile row, but never an unresolved Loading state.
   profile: Profile | null
 }
 
 function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const qc = useQueryClient()
   const router = useRouter()
-  // Empathic observation card (Stelar's differentiator). Fires at
-  // most one detected pattern per day; null when nothing to surface.
   const { pattern, dismiss: dismissPattern } = usePatternDetection()
 
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()
 
-  // Rest day — logged separately from workouts; it never touches the
-  // constellation or the count, it only swaps the guilt-CTA for a
-  // supportive message on a day the user didn't train.
   const restQuery = useRestToday(ctx.date)
   const setRest = useSetRestToday(ctx.date)
   const restedToday = restQuery.data ?? false
 
-  // The commit reward — a native Lottie firework played over the
-  // constellation's centre. `celebrateKey` bumps on every upward commit
-  // (Entrené, or marking a calendar day); the keyed LottieView remounts
-  // and plays once. Native render = no per-particle RN nodes (the old
-  // hand-coded SVG burst crashed). Suppressed under reduce-motion.
   const reducedMotion = useReducedMotion()
   const [celebrateKey, setCelebrateKey] = useState(0)
 
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
-  // The 28-day strip is the constellation's data twin — collapsed by
-  // default so it doesn't compete with the hero constellation above.
   const [weekOpen, setWeekOpen] = useState(false)
   const todayIsoLocal = ctx.date
 
-  // The constellation now fills against the CURRENT CALENDAR MONTH
-  // (28..31 days) instead of a rolling 28-day cycle. We build the month
-  // grid from this month's workout dates; the today cell is OR'd with the
-  // live `today_workout_completed` so a fresh check-in shows instantly,
-  // before the workouts query refetches.
   const monthWorkouts = useMonthWorkoutDates()
   const month = useMemo(() => {
     const m = buildMonthGrid(todayIsoLocal, monthWorkouts.data ?? [])
@@ -181,17 +162,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return m
   }, [todayIsoLocal, monthWorkouts.data, ctx.today_workout_completed])
 
-  // The day strip is a TRAILING window ending today (today is the lead,
-  // rightmost) — you scroll back through the last 30 days, never into the
-  // future. It spans the month boundary, so it reads from a 45-day
-  // workout window (covers the whole strip + the current month grid).
   const stripWorkouts = useRecentWorkoutDates(45)
   const allDays: WeekDayCell[] = useMemo(() => {
     const cells = buildTrailingDays(todayIsoLocal, stripWorkouts.data ?? [], 30)
     return cells.map((cell) => ({
       date: cell.date,
-      // OR today's cell with the live check-in so a fresh log lights up
-      // before the workouts query refetches.
       trained: cell.trained || (cell.isToday && ctx.today_workout_completed),
       dayNum: dayNumOf(cell.date),
       weekdayIdx: dayOfWeekOf(cell.date),
@@ -218,44 +193,25 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const sign = useMemo(() => zodiacFromDate(profile?.date_of_birth), [profile?.date_of_birth])
   const signLabel = ZODIAC[sign].label
-  // The figure's completion goal = its stars + connecting lines. The
-  // constellation rewards completing THIS (achievable, rest-friendly),
-  // not filling the whole month; days beyond are "luz extra".
   const figureCount = ZODIAC[sign].stars.length + ZODIAC[sign].lines.length
 
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
-  // Today's state, derived for the persistent check-in toggle. Trained
-  // wins over rested if both somehow exist (a stale rest row).
   const dayState: DayState = ctx.today_workout_completed
     ? 'trained'
     : restedToday
       ? 'rested'
       : 'undecided'
 
-  // One handler for the whole toggle. Each branch only runs on a real
-  // transition (the toggle never re-fires the state it's already in),
-  // so e.g. the 'trained' branch always means "newly trained".
   const handleDayChange = (next: DayState) => {
     if (next === 'trained') {
       const wasFirstDay = isFirstDay
       if (restedToday) setRest.mutate(false)
       toggleToday.mutate(true)
       playCommitHaptic('trained')
-      // Fire the Lottie firework reward (centred on the constellation).
       setCelebrateKey((k) => k + 1)
-      // The commit reward is the native Lottie firework above (bumped via
-      // celebrateKey); the constellation suppresses its own in-SVG burst.
-      //
-      // On the first-ever workout the DB trigger stamps
-      // profiles.first_workout_at; invalidate the profile query so a
-      // later same-session paint reads the real value (the same-day
-      // transition out of "Día 1" is already covered optimistically
-      // by ctx.today_workout_completed flipping true). This used to
-      // live in the celebration's dismissal timer — moved here so it
-      // fires with the commit, not on a now-deleted overlay's timeout.
       if (wasFirstDay) {
         qc.invalidateQueries({ queryKey: queryKeys.profile.all })
       }
@@ -279,13 +235,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       setJustMarkedIdx(idx)
       setTimeout(() => setJustMarkedIdx(null), 800)
     }
-    // Marking a past day fires the same constellation burst (which
-    // re-animates on its own once the trained count rises). Undo
-    // toggles stay silent — matching the constellation, which never
-    // animates downward.
-    // NO fireworks on calendar backfill — the Lottie reward is reserved
-    // for marking TODAY ("Entrené"). Backfilling a past day just fills the
-    // constellation (its star lights via the normal commit flow) + a haptic.
     if (willComplete) {
       playCommitHaptic('backfill')
     }
@@ -303,36 +252,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
           </Animated.View>
 
-          {/* The daily check-in — a persistent toggle. It always
-              shows today's state (entrené / descansé / sin decidir)
-              and stays editable; the constellation burst + filled HOY
-              star still confirm a trained day alongside it. */}
           <Animated.View entering={enter(120)}>
             <DayCheckIn state={dayState} onChange={handleDayChange} />
           </Animated.View>
 
-          {/* The streak — what the check-in puts at stake. Pops +1 on
-              each commit; hides itself under 2 days. */}
           <Animated.View entering={enter(160)}>
             <StreakLine streak={ctx.streak_days} />
           </Animated.View>
 
-          {/* Constellation header — serif italic lowercase 'tu leo'
-              centred above the figure. Replaces the previous
-              EyebrowLabel-tracking-caps treatment so the section
-              lands in STELAR's poetic register (matching the coach
-              line that follows below the figure) instead of a
-              clinical stat label. */}
           <Animated.View entering={enter(220)} style={styles.constellationHeader}>
             <Text style={styles.constellationHeaderText}>Tu {signLabel}</Text>
           </Animated.View>
 
           <Animated.View entering={enter(320)} style={styles.constellationWrap}>
-            {/* The Home suppresses the constellation's in-SVG commit burst
-                (suppressBurst) — its commit reward is the native Lottie
-                firework rendered below. Every other LunarConstellation call
-                site (Órbita tab, dev, refactor-test) keeps the magenta
-                StarBurst. */}
             <LunarConstellation
               trained={month.grid}
               todayIdx={month.todayIdx}
@@ -341,11 +273,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               committed={ctx.today_workout_completed}
               suppressBurst
             />
-            {/* The reward firework — a native Lottie played over the
-                constellation's centre on each upward commit. Replaces the
-                hand-coded SVG burst (which crashed mounting ~60 animated
-                nodes). Keyed so it remounts + plays once per commit; the
-                animation ends fully faded, so it rests invisible. */}
+
             {!reducedMotion && celebrateKey > 0 ? (
               <View pointerEvents="none" style={styles.celebration}>
                 <LottieView
@@ -353,7 +281,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   source={require('../../assets/lottie/gold-fireworks.json')}
                   autoPlay
                   loop={false}
-                  speed={0.7}
+                  speed={0.6}
                   resizeMode="contain"
                   style={styles.celebrationLottie}
                 />
@@ -368,8 +296,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             />
             {(() => {
               if (dayState !== 'trained') return null
-              // Figure already complete — every further day is luz extra,
-              // not another figure star. No debt, just bonus light.
               if (trainedThisMonth >= figureCount) {
                 return (
                   <Text style={styles.tomorrowHint}>
@@ -395,9 +321,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             })()}
           </Animated.View>
 
-          {/* "Tus 28 días" — the editable calendar twin of the
-              constellation, collapsed by default. The header doubles
-              as the toggle; the strip + hint reveal on tap. */}
           <Animated.View entering={enter(520)}>
             <Pressable
               onPress={() => setWeekOpen((v) => !v)}
@@ -437,6 +360,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+      {!reducedMotion && celebrateKey > 0 ? (
+        <CelebrateShockwave celebrateKey={celebrateKey} />
+      ) : null}
       {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
           the root (it's a Modal) so it floats over Hoy. */}
       <PatternReveal pattern={pattern} onClose={dismissPattern} />
@@ -444,22 +370,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   )
 }
 
-/* Editorial copy that follows the user through the 28-day cycle.
- * Milestone counts (1, 2, 5, 7, 10, 14, 21, 28) get unique
- * sentences; once today is marked a past-tense "done" line closes
- * the day; other in-between days draw from a per-phase POOL so two
- * consecutive logs never get the same line — a sentence that repeats verbatim every
- * day in a phase reads as a frozen screen, and a flat reward
- * habituates. The line is picked by `count % pool.length`, so it's
- * stable for a given day but rotates as the count climbs.
- *
- * The constellation centre already shows the numeric count — the
- * copy here doesn't repeat it. Sentences are capitalised so the
- * voice reads mature/editorial rather than chat-style. */
 type CoachCopy = { before: string; emphasis: string; after: string }
 
-// Phase pools — each in-between phase has several lines; consecutive
-// days draw consecutive entries, so the copy keeps moving.
 const COACH_PHASE_POOLS: { min: number; lines: CoachCopy[] }[] = [
   {
     min: 22,
@@ -499,10 +411,6 @@ const COACH_PHASE_POOLS: { min: number; lines: CoachCopy[] }[] = [
   },
 ]
 
-// Cycle through the sign's named stars deterministically by count
-// so the day-end subtitle calls out a different anatomical part
-// each time the user trains. Returns null when the sign's figure
-// has no named stars (signs other than Leo for now).
 function pickStarForCount(sign: ZodiacSign, count: number): { name: string; role: string } | null {
   if (count <= 0) return null
   const named = ZODIAC[sign].stars.filter(
@@ -522,10 +430,6 @@ function getCoachCopy(
 ): CoachCopy {
   const lower = signLabel.toLowerCase()
 
-  // Milestone counts — landmark lines, shown whenever the count lands
-  // on them. They read as achievement/closure already, so they
-  // override everything below. 2 / 5 / 10 are the early-window
-  // mini-milestones that flatten the post-day-1 cliff (#5).
   if (count === 28) {
     return { before: `Completaste tu ${lower}. `, emphasis: 'Brillas', after: '.' }
   }
@@ -551,11 +455,6 @@ function getCoachCopy(
     return { before: 'Hoy ', emphasis: 'empieza', after: ' algo. Tu cuerpo lo registra.' }
   }
 
-  // Today already marked — a past-tense closing line so the screen
-  // rests on "done", not "pending" (peak-end rule, #6). When the
-  // sign's figure data names the stars, prefer the day-specific
-  // line that calls out which star lit today; otherwise rotate
-  // through the generic done lines.
   if (trainedToday) {
     const namedStar = pickStarForCount(sign, count)
     if (namedStar) {
@@ -574,8 +473,6 @@ function getCoachCopy(
     return done[count % done.length]!
   }
 
-  // Today still open — rotate through the matching in-progress phase
-  // pool (reads as invitation, not closure).
   const phase = COACH_PHASE_POOLS.find((p) => count >= p.min)
   if (phase) {
     return phase.lines[count % phase.lines.length] ?? phase.lines[0]!
@@ -603,24 +500,14 @@ const styles = StyleSheet.create({
     marginTop: -4,
     marginBottom: 4,
   },
-  // Constellation header — serif italic 'tu leo' centred above the
-  // figure, matching the coach voice that follows below it.
   constellationHeader: {
     alignItems: 'center',
     marginTop: 10,
-    // Title-case "Tu Leo" carries more visual weight than the
-    // previous all-lowercase, so it needs proper air to the card
-    // below instead of negative margin pulling it down.
     marginBottom: 8,
   },
-  // Full-bleed — pulls the constellation card to the very edges
-  // of the screen so the ornate ring + lion art use 100 % of the
-  // available width. `-20` exactly cancels the content padding.
   constellationWrap: {
     marginHorizontal: -20,
   },
-  // Lottie reward overlay — fills the constellation card, centred on its
-  // circle so the firework blooms from the centre outward. Non-interactive.
   celebration: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -637,14 +524,10 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: 1.0,
   },
-  // Breathing room around the coach line so it doesn't get clipped
-  // by the section header below ("TUS 28 DÍAS").
   coachLineWrap: {
     marginTop: 6,
     marginBottom: 14,
   },
-  // Microcopy below the coach line — preview of tomorrow's star
-  // so each day connects to the next narratively.
   tomorrowHint: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',

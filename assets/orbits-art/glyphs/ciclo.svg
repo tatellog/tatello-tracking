@@ -1,0 +1,12 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- CICLO · three nested arcs reading as lunar phases on an orbit —
+       the recurring rhythm. An open ring (return), a half arc, a sliver.
+       Phases of one cycle, drawn as cartography. -->
+  <path d="M158 56 A68 68 0 1 1 100 32"
+        stroke="currentColor" stroke-width="14" stroke-linecap="round" />
+  <path d="M100 60 A40 40 0 0 1 100 140"
+        stroke="currentColor" stroke-width="13" stroke-linecap="round"
+        opacity="0.7" />
+  <circle cx="100" cy="100" r="11" stroke="currentColor" stroke-width="12"
+          opacity="0.55" />
+</svg>

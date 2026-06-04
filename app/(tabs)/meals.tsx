@@ -19,23 +19,12 @@ import {
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-/* Copy for the coach line under the protein sky. Keyed on meal count
- * — never on a percentage-to-target — so the line *witnesses* the
- * day rather than pushing toward a finish line. Food logging is
- * psychologically fragile: the voice here observes, never races.
- *
- * When the cycle phase is known, luteal and menstrual days swap in a
- * normalising line: appetite genuinely shifts across the cycle, and
- * the tab names that as biology, not as drift to correct.
- * The shared <CoachLine> renders it; this just picks the sentence. */
 type SkyCopy = { before: string; emphasis: string; after: string }
 
 function skyCopy(mealCount: number, phase: CyclePhase | null): SkyCopy {
   if (mealCount === 0) {
     return { before: 'Tu cielo de hoy está por ', emphasis: 'escribirse', after: '.' }
   }
-  // Cycle-aware reassurance — only once the day has at least one meal
-  // (a "your body asks for more" line makes no sense at zero).
   if (phase === 'lutea') {
     return {
       before: 'La semana antes de tu período tu cuerpo pide más. Y ',
@@ -109,9 +98,6 @@ function MealsBody() {
         >
           <TabHeader title="Tus comidas" titleEmphasis="Tus" />
 
-          {/* The sky always renders — logging a meal and seeing it
-              never requires setting a number first. Targets are an
-              optional reference, offered (not demanded) below. */}
           <DaySky
             meals={meals}
             proteinValue={summary.protein}
@@ -167,8 +153,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 48,
   },
-  // Optional-target invite — a quiet line, not a wall. The tab is
-  // fully usable without ever tapping it.
   targetInvite: {
     flexDirection: 'row',
     alignItems: 'center',

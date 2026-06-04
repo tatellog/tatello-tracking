@@ -13,13 +13,6 @@ import { buildWeekObservations, WEEKDAY_NAMES_FULL } from '@/features/orbit/week
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
-/*
- * Within-week observation detail — what an "Lo que noté esta semana" card
- * opens. Recomputes this week's observations from the SAME signals the
- * Semana list used (React Query serves from cache) and finds the tapped one
- * by key. Shows: the week with its days marked, the real numbers per day,
- * and a short Voz de Stelar. Honest, never a verdict.
- */
 const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 export default function ObservationDetailScreen() {

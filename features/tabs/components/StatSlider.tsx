@@ -14,12 +14,15 @@ import Animated, {
   Easing,
   Extrapolation,
   FadeIn,
+  FadeInDown,
   interpolate,
   type SharedValue,
   useAnimatedProps,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle, Path } from 'react-native-svg'
@@ -178,27 +181,97 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
         : `de ${caloriesTarget} kcal · llegaste`
   return (
     <View style={[styles.slide, styles.macroRow]}>
-      <RingCard
-        label="Proteína"
-        value={ctx.today_macros.protein_g}
-        target={ctx.targets.protein_g}
-        formatted={Math.round(ctx.today_macros.protein_g).toString()}
-        unitSuffix={`/ ${ctx.targets.protein_g} g`}
-        ringColor={colors.magenta}
-        ringDelay={400}
-      />
-      <RingCard
-        speedometer
-        label="Calorías"
-        value={caloriesConsumed}
-        target={caloriesTarget}
-        formatted={Math.round(caloriesConsumed).toString()}
-        unitSuffix={calSubtitle}
-        ringColor={colors.magenta}
-        ringDelay={600}
-        small
-      />
+      {/* Each card cascades in (FadeInDown staggered) on first paint
+          and then breathes continuously with an out-of-phase 3.4 s
+          drift so the row never feels statically pinned. The rings
+          inside still draw via their own `ringDelay` timeline —
+          these animations sit on the card wrapper, not the ring. */}
+      <MacroCardWrap enterDelay={120} phase={0}>
+        <RingCard
+          label="Proteína"
+          value={ctx.today_macros.protein_g}
+          target={ctx.targets.protein_g}
+          formatted={Math.round(ctx.today_macros.protein_g).toString()}
+          unitSuffix={`/ ${ctx.targets.protein_g} g`}
+          ringColor={colors.magenta}
+          ringDelay={400}
+        />
+      </MacroCardWrap>
+      <MacroCardWrap enterDelay={280} phase={0.5}>
+        <RingCard
+          speedometer
+          label="Calorías"
+          value={caloriesConsumed}
+          target={caloriesTarget}
+          formatted={Math.round(caloriesConsumed).toString()}
+          unitSuffix={calSubtitle}
+          ringColor={colors.magenta}
+          ringDelay={600}
+          small
+        />
+      </MacroCardWrap>
     </View>
+  )
+}
+
+/* Per-card wrapper for the macros slide. Two animations:
+ *
+ *   1. ONE-SHOT ENTRANCE — a staggered `FadeInDown.springify().damping(13)`
+ *      so the two cards cascade in (Proteína first, Calorías ~160 ms
+ *      behind). Fires on mount; the cards never unmount inside the
+ *      carousel so this is a one-time reveal per session.
+ *
+ *   2. CONTINUOUS BREATH — a slow Y-drift (±2 px) on a 3.4 s sine
+ *      cycle, one card +phase ahead of the other so the row feels
+ *      alive instead of statically pinned. Suppressed under
+ *      reduce-motion: the drift parks at 0 and the entrance falls
+ *      back to a plain fade (no spring overshoot).
+ *
+ * Wraps `RingCard` instead of modifying it so other consumers
+ * (anywhere else `RingCard` shows up) keep their static behaviour.
+ */
+function MacroCardWrap({
+  enterDelay,
+  phase,
+  children,
+}: {
+  enterDelay: number
+  /** 0..1 phase offset on the shared 3.4 s breath cycle. */
+  phase: number
+  children: ReactNode
+}) {
+  const reduce = useReducedMotion()
+  const breath = useSharedValue(0)
+
+  useEffect(() => {
+    if (reduce) return
+    breath.value = withRepeat(
+      withTiming(1, { duration: 3400, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+  }, [breath, reduce])
+
+  const driftStyle = useAnimatedStyle(() => {
+    'worklet'
+    if (reduce) return { transform: [{ translateY: 0 }] }
+    // `breath` ramps 0→1→0 (reversed) every 3.4 s. Phased sine for
+    // smoother arrival than the raw triangular ramp.
+    const wave = 0.5 + 0.5 * Math.sin((breath.value + phase) * 2 * Math.PI)
+    return { transform: [{ translateY: -2 + wave * 4 }] }
+  })
+
+  return (
+    <Animated.View
+      style={[styles.macroCardWrap, driftStyle]}
+      entering={
+        reduce
+          ? FadeIn.duration(220).delay(enterDelay)
+          : FadeInDown.delay(enterDelay).springify().damping(13).mass(0.7)
+      }
+    >
+      {children}
+    </Animated.View>
   )
 }
 
@@ -788,6 +861,14 @@ const styles = StyleSheet.create({
   macroRow: {
     flexDirection: 'row',
     gap: 14,
+  },
+  // Per-card wrapper inside the macros slide. `flex: 1` so the two
+  // wrapped cards still share the row evenly (RingCard's own column
+  // is `flex: 1`; we mirror that here so wrapping doesn't collapse
+  // the cards to their intrinsic width).
+  macroCardWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   // Weight card — same chrome as the macro RingCards so the slides
   // read as one family.

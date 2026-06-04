@@ -78,6 +78,9 @@ export type MonthSatelliteKind = 'peak' | 'valley' | 'stable' | 'tentative' | 'r
 export type MonthSatellite = {
   id: string
   kind: MonthSatelliteKind
+  /** The real dimension behind this body — drives the per-dimension glow
+   *  color in MonthSky (the same palette the month bars use). */
+  dimensionKey: DimensionKey
   label: string
   caption: string
   detail: string

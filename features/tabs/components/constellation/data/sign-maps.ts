@@ -64,10 +64,35 @@ export const SIGN_CONSTELLATION_TRANSFORM: Record<ZodiacSign, string> = {
   // canvas centre in the art).
   escorpio: 'translate(40 22) scale(0.72 0.82)',
   geminis: 'translate(52 43) scale(0.68)',
-  leo: 'translate(56 64) scale(0.68)',
+  // Pulled left+up + slightly tighter (0.68 → 0.64) so the Sickle
+  // rides over the lion's head/mane instead of sitting low-right
+  // of it. Paired with the retuned star coords in figures.ts.
+  leo: 'translate(46 56) scale(0.64)',
   libra: 'translate(48 33) scale(0.68)',
   piscis: 'translate(42 52) scale(0.68)',
   sagitario: 'translate(16 14) scale(0.68)',
   tauro: 'translate(29 44) scale(0.68)',
   virgo: 'translate(48 46) scale(0.68)',
+}
+
+/** Numeric parallel of SIGN_CONSTELLATION_TRANSFORM. Skia / Lottie
+ *  overlay layers can't parse the SVG `transform` string at runtime
+ *  inside a worklet, so we mirror the same values here for JS-side
+ *  position math. Keep both in sync. */
+export const SIGN_CONSTELLATION_TRANSFORM_PARAMS: Record<
+  ZodiacSign,
+  { tx: number; ty: number; sx: number; sy: number }
+> = {
+  acuario: { tx: 47, ty: 41, sx: 0.68, sy: 0.68 },
+  aries: { tx: 46, ty: 37, sx: 0.68, sy: 0.68 },
+  cancer: { tx: 45, ty: 40, sx: 0.68, sy: 0.68 },
+  capricornio: { tx: 33, ty: 46, sx: 0.68, sy: 0.68 },
+  escorpio: { tx: 40, ty: 22, sx: 0.72, sy: 0.82 },
+  geminis: { tx: 52, ty: 43, sx: 0.68, sy: 0.68 },
+  leo: { tx: 46, ty: 56, sx: 0.64, sy: 0.64 },
+  libra: { tx: 48, ty: 33, sx: 0.68, sy: 0.68 },
+  piscis: { tx: 42, ty: 52, sx: 0.68, sy: 0.68 },
+  sagitario: { tx: 16, ty: 14, sx: 0.68, sy: 0.68 },
+  tauro: { tx: 29, ty: 44, sx: 0.68, sy: 0.68 },
+  virgo: { tx: 48, ty: 46, sx: 0.68, sy: 0.68 },
 }

@@ -92,51 +92,42 @@ describe('buildMonthSatellites', () => {
     expect(buildMonthSatellites(buildMonthSummary([]), 0)).toEqual([])
   })
 
-  test('a bright steady month surfaces brillo (peak) + ancla (stable)', () => {
+  test('a logged month surfaces the four bodies: brillo, pausa, ancla, te observa', () => {
     const h = buildHistory(BASE, 20, () => STRONG)
-    const sats = buildMonthSatellites(buildMonthSummary(h), 20)
-    const brillo = sats.find((s) => s.id === 'brillo')
-    expect(brillo?.kind).toBe('peak')
-    expect(sats.some((s) => s.id === 'ancla')).toBe(true)
-    // No trend, full month → no calma, no tentative observa.
-    expect(sats.some((s) => s.id === 'calma' || s.id === 'observa')).toBe(false)
-  })
-
-  test('a full month with a downward dimension (separate from the brightest) surfaces a confirmed calma', () => {
-    // alimento steady-high (the brillo), energía declining (the calma).
-    const h = buildHistory(BASE, 20, (_m, i) => ({ meal_count: 3, energy: i < 10 ? 5 : 2 }))
     const ids = idsOf(h, 20)
-    expect(ids).toContain('calma')
-    expect(ids).not.toContain('observa')
+    expect(ids).toEqual(expect.arrayContaining(['shine', 'rest', 'anchor', 'watch']))
+    expect(ids).toHaveLength(4)
   })
 
-  test('a rising dimension (separate from the brightest) surfaces tu impulso', () => {
-    // alimento steady-high (brillo), energía climbing (impulso).
-    const h = buildHistory(BASE, 20, (_m, i) => ({ meal_count: 3, energy: i < 10 ? 2 : 5 }))
-    const sats = buildMonthSatellites(buildMonthSummary(h), 20)
-    const impulso = sats.find((s) => s.id === 'impulso')
-    expect(impulso?.kind).toBe('rising')
-    expect(sats.some((s) => s.id === 'calma')).toBe(false)
-  })
-
-  test('a month with both a rise and a fall surfaces impulso AND calma', () => {
+  test('each satellite names a DISTINCT dimension', () => {
     const h = buildHistory(BASE, 20, (_m, i) => ({
+      energy: i < 10 ? 2 : 5,
+      sleep_minutes: 400,
       meal_count: 3,
-      energy: i < 10 ? 2 : 5, // up
-      sleep_minutes: i < 10 ? 450 : 300, // down
     }))
-    const ids = buildMonthSatellites(buildMonthSummary(h), 20).map((s) => s.id)
-    expect(ids).toContain('impulso')
-    expect(ids).toContain('calma')
+    const captions = buildMonthSatellites(buildMonthSummary(h), 20).map((s) => s.caption)
+    expect(new Set(captions).size).toBe(captions.length)
   })
 
-  test('low confidence makes a movement TENTATIVE (stelar observa, not calma)', () => {
-    const h = buildHistory(BASE, 10, (_m, i) => ({ meal_count: 3, energy: i < 5 ? 2 : 5 }))
-    const sats = buildMonthSatellites(buildMonthSummary(h), 10)
-    const observa = sats.find((s) => s.id === 'observa')
+  test('stelar te observa is tentative and never claims a verdict', () => {
+    const h = buildHistory(BASE, 20, () => STRONG)
+    const observa = buildMonthSatellites(buildMonthSummary(h), 20).find((s) => s.id === 'watch')
     expect(observa?.kind).toBe('tentative')
     expect(observa?.tentative).toBe(true)
-    expect(sats.some((s) => s.id === 'calma')).toBe(false)
+    expect(observa?.label).toBe('stelar te observa')
+  })
+
+  test('a young month (< 8 days) shows brillo at most — the rest need a month', () => {
+    const sats = buildMonthSatellites(buildMonthSummary(buildHistory(BASE, 6, () => STRONG)), 6)
+    expect(sats.every((s) => s.id === 'shine')).toBe(true)
+  })
+
+  test('ciclo is never a pausa/ancla/observa body (it is event-based)', () => {
+    const h = buildHistory(BASE, 20, () => STRONG) // no period → ciclo at floor
+    const sats = buildMonthSatellites(buildMonthSummary(h), 20)
+    for (const s of sats.filter((x) => x.id !== 'shine')) {
+      expect(s.caption).not.toBe('tu ciclo')
+    }
   })
 
   test('a satellite never carries a raw number in its label', () => {

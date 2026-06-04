@@ -58,12 +58,15 @@ import { EN_LUZ_THRESHOLD, TONE_BRILLANTE, type Dimension, type DimensionKey } f
 
 import { GLYPHS } from './dimensionGlyphs'
 
-// The Día galaxy art — the PHOTOGRAPHIC raster (day-orb.png). A vector
+// The Día centerpiece art — the PHOTOGRAPHIC raster (orbit-month-bh.png,
+// a black hole). Swapped from the earlier spiral galaxy (day-orb.png):
+// the BH's denser core + tight accretion glow reads as a stronger
+// gravitational anchor for the dimension stars orbiting it. A vector
 // (galaxy-day.svg) was tried but read as a flat illustration; a real
 // photo carries the grain + glow + soft gradients a vector can't fake.
-// Authored 1254×1254; rendered into the scaled <G> so its on-screen size
-// + centre keep the StarNode positions aligned.
-const DAY_ORB_PNG = require('@/assets/orbits-art/day-orb.png')
+// Rendered into the scaled <G> so its on-screen size + centre keep the
+// StarNode positions aligned.
+const DAY_ORB_PNG = require('@/assets/orbits-art/orbit-month-bh.png')
 
 /** Star + halo palette for the Día orbital diagram. Same intent as
  *  `SKY` in MonthSky.tsx — art colours that don't belong in the
@@ -183,17 +186,15 @@ const ORNAMENT_TY = -23
 // rings + per-star Saturn rings + galaxy-bulge gradient) was
 // removed because it would duplicate what the PNG already paints.
 const ART_SRC = 1254
-// Bumped 0.297 → 0.4 so the galaxy reads big enough to dominate
-// the (narrow) orbital container next to the right-side
-// DimensionNodeList. The painted halos in day-orb.png sit at
-// source radius ≈ 370 (measured by scanning bright-pixel
-// clusters); at S = 0.4 they land at viewBox radius ≈ 148. We
-// rescale STAR_POS by the matching DIM_SCALE = 1.35 below so the
-// programmatic StarNodes still drop directly onto the painted
-// halos. PNG corners now extend a bit past the viewBox edges,
-// but that area is transparent in the asset so the clipping is
-// invisible.
-const ART_S = 0.4
+// Originally 0.4 to match the painted dimension halos in day-orb.png
+// (source radius ≈ 370 → viewBox radius ≈ 148, paired with
+// DIM_SCALE = 1.35). The swap to orbit-month-bh.png dropped that
+// constraint — the BH carries no painted star halos, so the
+// programmatic StarNodes are the sole representation and the
+// centerpiece can shrink freely. Pulled back to 0.28 so the BH
+// sits as a denser gravitational anchor without crowding the
+// orbital ring.
+const ART_S = 0.28
 const ART_CENTER_X = ORNAMENT_TX + (1024 * ORNAMENT_S) / 2
 const ART_CENTER_Y = ORNAMENT_TY + (1024 * ORNAMENT_S) / 2
 const ART_TX = ART_CENTER_X - (ART_SRC * ART_S) / 2

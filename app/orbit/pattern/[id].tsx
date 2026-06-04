@@ -17,24 +17,9 @@ import { detectWeekPatterns } from '@/features/orbit/week-patterns'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
-/*
- * Pattern detail — what a "Patrones detectados" card opens. A pattern
- * is a detected órbita, so this screen does four things: proves it
- * (the evidence, drawn as a constellation of the recurrence), explains
- * it (Voz de Stelar — systemic, never moral), and turns it into
- * something to hold in mind (no surveillance, no policing). Visually
- * it's the sister of the observation detail: oro is the observatory
- * light for all chrome; magenta is reserved for the two legitimate
- * "the dimension speaking" beats — the hero emphasis and the focus day
- * of the chart (the cuerpo dimension, which IS magenta). Content is MOCK.
- */
 export default function PatronDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
-  // Resolve the pattern from the SAME real detections the Semana list
-  // built, then fall back to the mock catalogue (cycle patterns from Mes
-  // still live there). Same history hook → React Query serves it from
-  // cache, no refetch.
   const { data: history } = useSignalsHistory()
   const { data: histMeals } = useHistoryMeals()
   const macros = useMacroTargets()
@@ -42,10 +27,6 @@ export default function PatronDetailScreen() {
     calorieTarget: macros.data?.calories ?? null,
     proteinTarget: macros.data?.protein_g ?? null,
   }
-  // Resolve from every real detector (same 35-day inputs + same detectors
-  // the Mes list uses → React Query serves from cache, so the pattern the
-  // user tapped is reproduced here). NO mock fallback: with real data the
-  // Mes is real end-to-end; an unknown id shows the honest empty state.
   const detected = history
     ? [
         ...detectWeekPatterns(history, dimCtx),
@@ -56,9 +37,6 @@ export default function PatronDetailScreen() {
   const night = histMeals ? detectNightPattern(histMeals) : null
   const patron = (night && night.id === id ? night : undefined) ?? detected.find((p) => p.id === id)
 
-  // The one magenta on this screen = the dimension/datum speaking. Used
-  // by the hero emphasis and the chart's focus day. Everything else
-  // (chrome, chart axes, confidence, voice, CTA) is oro = observatory light.
   const accent = colors.magenta
 
   if (!patron) {

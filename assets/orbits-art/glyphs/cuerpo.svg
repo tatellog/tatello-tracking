@@ -1,0 +1,12 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- CUERPO · vitruvian-orbit: a single circumscribing ring crossed by a
+       four-pointed cardinal axis — the body as a centred, balanced system.
+       Abstract cartography, never a figure. -->
+  <circle cx="100" cy="100" r="62" stroke="currentColor" stroke-width="14"
+          stroke-linecap="round" />
+  <path d="M100 26 L100 174 M26 100 L174 100"
+        stroke="currentColor" stroke-width="14" stroke-linecap="round" />
+  <path d="M100 100 L150 50 M100 100 L50 50 M100 100 L150 150 M100 100 L50 150"
+        stroke="currentColor" stroke-width="12" stroke-linecap="round"
+        opacity="0.55" />
+</svg>

@@ -1,0 +1,12 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- ALIMENTO · a single leaf with its midrib — nourishment as growth.
+       One contour, one central vein. Botanical cartography, not an icon. -->
+  <path d="M100 34 C156 56 168 124 124 166 C80 124 48 90 100 34 Z"
+        stroke="currentColor" stroke-width="14" stroke-linecap="round"
+        stroke-linejoin="round" />
+  <path d="M112 58 L112 162"
+        stroke="currentColor" stroke-width="12" stroke-linecap="round" />
+  <path d="M112 92 L142 78 M112 116 L138 108 M112 140 L130 136"
+        stroke="currentColor" stroke-width="11" stroke-linecap="round"
+        opacity="0.55" />
+</svg>

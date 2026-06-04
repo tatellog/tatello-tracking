@@ -1,0 +1,10 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- SUEÑO · crescent moon cradling a single star — the night dimension.
+       One open curve, one small spark. Quiet, not decorative. -->
+  <path d="M138 38 A66 66 0 1 0 138 162 A52 52 0 1 1 138 38 Z"
+        stroke="currentColor" stroke-width="14" stroke-linecap="round"
+        stroke-linejoin="round" />
+  <path d="M150 86 L156 100 L170 106 L156 112 L150 126 L144 112 L130 106 L144 100 Z"
+        stroke="currentColor" stroke-width="11" stroke-linecap="round"
+        stroke-linejoin="round" opacity="0.7" />
+</svg>

@@ -83,6 +83,34 @@ export async function readSeenStelarReveal(): Promise<boolean> {
   return (await AsyncStorage.getItem(STELAR_REVEAL_KEY)) === 'true'
 }
 
+// Whether the user has already tapped a Mes satellite (so the one-time
+// "toca un astro" hint stops showing once they discover the interaction).
+const MES_TAP_HINT_KEY = '@app:seen_mes_tap_hint'
+
+export async function markSeenMesTapHint(): Promise<void> {
+  await AsyncStorage.setItem(MES_TAP_HINT_KEY, 'true')
+}
+
+export async function readSeenMesTapHint(): Promise<boolean> {
+  return (await AsyncStorage.getItem(MES_TAP_HINT_KEY)) === 'true'
+}
+
+/** Returns `[seen, markSeen]`. Defaults to `true` until the async read
+ *  resolves so the hint never flashes before we know the user's history. */
+export function useSeenMesTapHint(): [boolean, () => void] {
+  const [seen, setSeen] = useState(true)
+  useEffect(() => {
+    readSeenMesTapHint()
+      .then(setSeen)
+      .catch(() => setSeen(true))
+  }, [])
+  const mark = () => {
+    setSeen(true)
+    markSeenMesTapHint().catch(() => {})
+  }
+  return [seen, mark]
+}
+
 export function useVisitedDayOne(): boolean | null {
   const [visited, setVisited] = useState<boolean | null>(cachedValue)
 

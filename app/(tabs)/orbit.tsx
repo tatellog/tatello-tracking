@@ -46,8 +46,6 @@ function OrbitBody() {
   )
   const [segment, setSegment] = useState<OrbitSegment>('dia')
 
-  // Deep-link: a pattern reveal ("Verlo en mi órbita") drops a desired
-  // segment in the mailbox + navigates here; we consume it on focus.
   useFocusEffect(
     useCallback(() => {
       const pending = consumeOrbitSegment()
@@ -55,9 +53,6 @@ function OrbitBody() {
     }, []),
   )
 
-  // Fires on initial render + every segment change. The default
-  // 'dia' is meaningful — beta data should reflect that Día is
-  // the landing surface.
   useEffect(() => {
     track('orbit_viewed', { segment })
   }, [segment])
@@ -65,18 +60,8 @@ function OrbitBody() {
   return (
     <View style={styles.screen}>
       <SkyBackground />
-
-      {/* Full-screen cosmic backdrop — nebulae + starfield + shooting
-          star. Sits BEHIND everything (just above the SkyBackground)
-          so the constellation, the dimension list, and the readout
-          below all live in the same cosmic space. No more visible
-          "diagram rectangle". */}
       <ScreenCosmos width={SCREEN_W} height={SCREEN_H} />
 
-      {/* Wide ambient warm glow — a magenta radial wash on top of
-          the cosmos. Bigger radius than the previous version
-          (75% × 70%) so the warmth reaches the bottom + right
-          regions of the screen, not just behind the diagram. */}
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
           <RadialGradient id="orbit-ambient" cx="50%" cy="48%" rx="75%" ry="70%">

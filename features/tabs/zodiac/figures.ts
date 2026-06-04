@@ -187,20 +187,25 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     label: 'LEO',
     glyph: '♌',
     stars: [
-      // The Sickle — the lion's head & mane: positioned so each
-      // star lands on a visible part of the leo-art portrait.
-      { x: 0.18, y: 0.68, mag: 1.5, name: 'Regulus', role: 'el corazón del león' },
-      { x: 0.24, y: 0.52, mag: 3.5, name: 'Eta', role: 'su cuello' },
-      { x: 0.3, y: 0.38, mag: 2.3, name: 'Algieba', role: 'la curva de su melena' },
-      { x: 0.3, y: 0.22, mag: 3.5, name: 'Adhafera', role: 'la trenza de su melena' },
-      { x: 0.4, y: 0.14, mag: 3.9, name: 'Rasalas', role: 'la corona de su cabeza' },
-      { x: 0.5, y: 0.22, mag: 3.0, name: 'Epsilon', role: 'su mirada' },
-      // The hindquarters — compacted so the triangle stays inside
-      // the visible lion area instead of stretching past the
-      // ornate mane decorations.
-      { x: 0.52, y: 0.55, mag: 3.3, name: 'Chort', role: 'el inicio de su rugido' },
-      { x: 0.58, y: 0.4, mag: 2.6, name: 'Zosma', role: 'la fuerza de su andar' },
-      { x: 0.72, y: 0.5, mag: 2.0, name: 'Denebola', role: 'el último resplandor' },
+      // The Sickle — the lion's head & mane. Coords retuned (audit:
+      // the constellation sat too far right, dropping Algieba on the
+      // eye instead of the mane curve and pushing the hindquarters
+      // over the floral border). New layout traces the head clockwise:
+      // Regulus at the throat → Eta along the jawline → Algieba at the
+      // mane-shoulder shelf → Adhafera near the mane crown → Rasalas
+      // at the top of the crown → Epsilon out over the snout/gaze.
+      { x: 0.22, y: 0.62, mag: 1.5, name: 'Regulus', role: 'el corazón del león' },
+      { x: 0.28, y: 0.44, mag: 3.5, name: 'Eta', role: 'su cuello' },
+      { x: 0.34, y: 0.26, mag: 2.3, name: 'Algieba', role: 'la curva de su melena' },
+      { x: 0.44, y: 0.14, mag: 3.5, name: 'Adhafera', role: 'la trenza de su melena' },
+      { x: 0.56, y: 0.1, mag: 3.9, name: 'Rasalas', role: 'la corona de su cabeza' },
+      { x: 0.62, y: 0.22, mag: 3.0, name: 'Epsilon', role: 'su mirada' },
+      // The hindquarters — pulled further down-right so the triangle
+      // lands on the lion's back/loin/tail line instead of the leafy
+      // ornament beneath. Denebola at the tail tip.
+      { x: 0.6, y: 0.5, mag: 3.3, name: 'Chort', role: 'el inicio de su rugido' },
+      { x: 0.7, y: 0.4, mag: 2.6, name: 'Zosma', role: 'la fuerza de su andar' },
+      { x: 0.84, y: 0.56, mag: 2.0, name: 'Denebola', role: 'el último resplandor' },
     ],
     lines: [
       [0, 1], // sickle hook

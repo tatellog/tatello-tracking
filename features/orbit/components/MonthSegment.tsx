@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
+import { useSeenMesTapHint } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
 import { useMacroTargets } from '@/features/macros/hooks'
@@ -62,12 +63,19 @@ export function MonthSegment() {
   // tapping one reveals the real dimension behind the poetic name.
   const monthSats = useMemo(() => buildMonthSatellites(summary, daysLogged), [summary, daysLogged])
   const [selectedSatId, setSelectedSatId] = useState<string | null>(null)
+  // One-time "toca un astro" hint — shown until the user taps a satellite.
+  const [seenTapHint, markTapHint] = useSeenMesTapHint()
+  const handleSelectSat = (id: string) => {
+    setSelectedSatId(id)
+    if (!seenTapHint) markTapHint()
+  }
   const satellites = useMemo<Satellite[]>(
     () =>
       monthSats.map((s) => ({
         id: s.id,
         label: s.label,
         kind: s.kind,
+        dimensionKey: s.dimensionKey,
         selected: s.id === selectedSatId,
       })),
     [monthSats, selectedSatId],
@@ -127,7 +135,7 @@ export function MonthSegment() {
       <View style={styles.diagram}>
         <MonthSky
           satellites={satellites}
-          onSatellitePress={setSelectedSatId}
+          onSatellitePress={handleSelectSat}
           selectedSatelliteId={selectedSatId}
           evidence={
             selectedSat
@@ -142,6 +150,14 @@ export function MonthSegment() {
           onCloseSatellite={() => setSelectedSatId(null)}
         />
       </View>
+
+      {/* One-time discovery hint — the chain isn't obviously tappable, so
+          a discreet cue invites the first tap, then never shows again. */}
+      {!seenTapHint && !selectedSatId && satellites.length > 0 ? (
+        <Animated.Text entering={FadeIn.duration(600).delay(400)} style={styles.tapHint}>
+          Toca un astro para ver su lectura
+        </Animated.Text>
+      ) : null}
 
       {/* The arc of the month — how each dimension moved. The heart of
           this altitude. */}
@@ -256,6 +272,18 @@ const styles = StyleSheet.create({
     width: '88%',
     alignSelf: 'center',
     marginTop: 8,
+  },
+  // Discreet discovery cue under the cosmos — observatory chrome (niebla,
+  // uppercase), never magenta, fades out for good after the first tap.
+  tapHint: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: typography.uiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    opacity: 0.85,
   },
   section: {
     marginTop: 22,
