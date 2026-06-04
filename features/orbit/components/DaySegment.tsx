@@ -189,20 +189,19 @@ export function DaySegment() {
         />
         <View style={styles.metaRow}>
           <LiveDot />
-          {/* The count names what the orbital already shows, so it drops the
-              "dimensiones" jargon — the number carries it. At zero we never
-              show a "0" (a magenta cero reads as a score in the red); the
-              line becomes a soft, no-pressure invitation instead (docs §8). */}
-          {dayHeader.enLuz === 0 ? (
-            <Text style={styles.metaB} numberOfLines={1}>
-              Aún sin registrar hoy
-            </Text>
-          ) : (
-            <Text style={styles.metaB} numberOfLines={1}>
-              <Text style={styles.metaCount}>{dayHeader.enLuz}</Text>
-              <Text> en luz hoy</Text>
-            </Text>
-          )}
+          {/* A QUALITATIVE state of today's sky — never a raw count. A bare
+              number with no denominator reads as a score ("5, me falta 1"),
+              which the manifesto forbids; the orbital already shows how many
+              shine. So we name the mood by range, no magenta, no number. */}
+          <Text style={styles.metaB} numberOfLines={1}>
+            {dayHeader.enLuz === 0
+              ? 'Aún sin registrar hoy'
+              : dayHeader.enLuz <= 2
+                ? 'Tu día empieza a tomar forma'
+                : dayHeader.enLuz <= 4
+                  ? 'Tu día va tomando forma'
+                  : 'Un día con mucha señal'}
+          </Text>
         </View>
       </View>
       {reading ? <Text style={styles.reading}>{reading}</Text> : null}
@@ -443,12 +442,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     color: colors.niebla,
-  },
-  // The en-luz count — a datum, so it stays in the UI sans (Hanken),
-  // never serif italic (that weight is the coach's voice). Magenta to
-  // lift the number out of the chrome label.
-  metaCount: {
-    color: colors.magenta,
   },
   hint: {
     marginTop: 4,

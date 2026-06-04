@@ -41,6 +41,17 @@ import Svg, {
 } from 'react-native-svg'
 
 import AnchorArt from '@/assets/orbits-art/anchor.svg'
+// `orbit-anchor-tint.svg` is a `currentColor` variant of the anchor emblem —
+// the REVEAL figure shown BEHIND the `tu ancla` star figure, tinted to the
+// dimension colour.
+import AnchorTintArt from '@/assets/orbits-art/orbit-anchor-tint.svg'
+// `orbit-shine-tint.svg` is a `currentColor` variant of the shine emblem —
+// the REVEAL figure shown BEHIND the `tu brillo` star figure.
+import ShineFigureArt from '@/assets/orbits-art/orbit-shine-tint.svg'
+// `orbit-moon-tint.svg` is a `currentColor` variant of `orbit-moon.svg`
+// (hard-blue) — shown as the REVEAL figure for `tu pausa`, tinted to the
+// dimension colour.
+import MoonArt from '@/assets/orbits-art/orbit-moon-tint.svg'
 import RestArt from '@/assets/orbits-art/rest.svg'
 // `shine-tint.svg` is a `currentColor` variant of `shine.svg` (whose 14
 // paths are hard `fill="#000"`, invisible on the dark sky). The tint
@@ -90,79 +101,88 @@ const CONSTELLATION_SHAPES: Record<
     route: number[]
   }
 > = {
-  // PEAK (tu brillo) — A CROWN / summit: a tight bright triangle upper-right
-  // (the crown, 3 close stars) from which a short ridge of light descends.
-  // Reads as a luminous peak, not a random diagonal.
+  // PEAK (tu brillo) — a VERTICAL RADIANT SYMBOL (per the reference): a
+  // bright apex at the top, two wings flaring up-and-out just below it, and a
+  // luminous SPINE of stars descending the centre to a bright base. Centred
+  // (symmetric), aligned over the shine emblem (ShineReveal) behind it. The
+  // light paints apex → down the spine; the wings ignite in its wake.
   peak: {
     nodes: [
-      { x: 214, y: 84, hero: true, mag: 1 }, // 0 · crown apex (hero)
-      { x: 186, y: 110, mag: 2 }, // 1 · left shoulder of crown
-      { x: 232, y: 122, mag: 2 }, // 2 · right shoulder of crown
-      { x: 200, y: 138, mag: 3 }, // 3 · crown base (closes the triangle)
-      { x: 176, y: 178, mag: 2 }, // 4 · first ridge step
-      { x: 150, y: 224, mag: 3 }, // 5 · mid ridge step
-      { x: 124, y: 262, mag: 3 }, // 6 · tail (fades lower-left)
-      { x: 250, y: 168, mag: 4 }, // 7 · loose spark (right)
+      { x: 134, y: 76, hero: true, mag: 1 }, // 0 · apex (hero — the brilliant point)
+      { x: 134, y: 122, mag: 3 }, // 1 · upper junction (where the wings spring)
+      { x: 94, y: 100, mag: 3 }, // 2 · left wing (flares up-out)
+      { x: 174, y: 100, mag: 3 }, // 3 · right wing (flares up-out)
+      { x: 134, y: 170, mag: 2 }, // 4 · spine, bright centre
+      { x: 134, y: 220, mag: 2 }, // 5 · spine, lower bright
+      { x: 134, y: 270, mag: 2 }, // 6 · base (bright, bottom — near the text)
     ],
     edges: [
-      [0, 1],
-      [0, 2],
-      [1, 3],
-      [2, 3], // crown (closed triangle)
-      [3, 4],
-      [4, 5],
-      [5, 6], // descending ridge
-      [2, 7], // short side spark
+      [0, 1], // apex → junction
+      [1, 2], // junction → left wing
+      [1, 3], // junction → right wing
+      [1, 4], // spine descending
+      [4, 5], // spine
+      [5, 6], // spine → base
     ],
-    route: [0, 1, 3, 4, 5, 6],
+    route: [0, 1, 4, 5, 6],
   },
-  // VALLEY (tu pausa) — a CRADLE / bowl: two high lips and a dense bottom
-  // (3 close stars) that rocks. Clear, asymmetric concavity. Reads as rest.
+  // VALLEY (tu pausa) — a CRESCENT MOON RING: ~8 bright stars seated on the
+  // moon's limb. The thick/bright outer arc is on the RIGHT (stars 0-1-2-3-4,
+  // convex right), the crescent OPENS to the LEFT, and the inner/left edge
+  // (5-6-7) climbs back up so the stars almost close a ring. Centred on the
+  // MoonReveal figure (cx≈126, cy≈164, R≈90 in viewBox px) so the stars sit
+  // on the moon's glowing edge. The light paints the crescent of a corrido:
+  // hero (upper horn) → down the right arc → lower horn → up the left,
+  // landing upper-left (7) near the text. Edges follow the CONTOUR (no
+  // centre chords); [7,0] faintly closes the ring.
   valley: {
     nodes: [
-      { x: 224, y: 110, hero: true, mag: 1 }, // 0 · high-right lip (hero)
-      { x: 198, y: 168, mag: 3 }, // 1 · down the right wall
-      { x: 168, y: 218, mag: 2 }, // 2 · into the bottom (right)
-      { x: 132, y: 240, mag: 2 }, // 3 · bowl bottom (centre)
-      { x: 96, y: 232, mag: 3 }, // 4 · bowl bottom (left, dense)
-      { x: 70, y: 184, mag: 2 }, // 5 · up the left wall
-      { x: 58, y: 132, mag: 3 }, // 6 · high-left lip
+      { x: 154, y: 78, hero: true, mag: 1 }, // 0 · upper horn (hero — brightest tip, upper-right)
+      { x: 202, y: 116, mag: 2 }, // 1 · right-upper, descending the bright arc
+      { x: 216, y: 167, mag: 2 }, // 2 · right flank (3 o'clock — outermost point)
+      { x: 195, y: 222, mag: 2 }, // 3 · right-lower, the arc curving back in
+      { x: 142, y: 253, mag: 2 }, // 4 · lower horn (bottom-centre)
+      { x: 77, y: 227, mag: 3 }, // 5 · lower-left, the inner edge begins
+      { x: 44, y: 171, mag: 3 }, // 6 · left flank (9 o'clock, inner/fainter)
+      { x: 60, y: 112, mag: 3 }, // 7 · upper-left (route lands here, near the text)
     ],
     edges: [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 4],
-      [4, 5],
-      [5, 6], // the bowl curve
-      [2, 4], // short chord across the bottom (denser)
+      [0, 1], // upper horn → bright right arc
+      [1, 2], // outer arc descending
+      [2, 3], // around the right flank
+      [3, 4], // → lower horn (closes the bright limb)
+      [4, 5], // crossing to the inner/left edge
+      [5, 6], // up the left flank
+      [6, 7], // → upper-left
+      [7, 0], // faint closing arc — almost completes the ring
     ],
-    route: [0, 1, 2, 3, 4, 5, 6],
+    route: [0, 1, 2, 3, 4, 5, 6, 7],
   },
-  // STABLE (tu ancla) — a recognizable ANCHOR: horizontal crossbar up top,
-  // a descending shank, and a two-fluke arc below. Firm but with one loose
-  // spark to save it from being perfect.
+  // STABLE (tu ancla) — a compact, centred figure (per the reference image):
+  // a two-star apex (the "roof"), two open mid-height stars, and a 3-star
+  // horizontal base row. The edges trace a pentagon-with-a-flat-base; the
+  // light paints the right side then the base, landing lower-left near the
+  // text. A faint ANCHOR emblem glows BEHIND it (AnchorReveal, opacity ~0.4).
   stable: {
     nodes: [
-      { x: 200, y: 102, hero: true, mag: 1 }, // 0 · anchor eye (hero, top)
-      { x: 160, y: 122, mag: 3 }, // 1 · crossbar left
-      { x: 238, y: 120, mag: 3 }, // 2 · crossbar right
-      { x: 198, y: 150, mag: 2 }, // 3 · neck (shank crossing)
-      { x: 194, y: 214, mag: 2 }, // 4 · foot of the shank
-      { x: 150, y: 250, mag: 3 }, // 5 · left fluke (arc)
-      { x: 240, y: 248, mag: 3 }, // 6 · right fluke (arc)
-      { x: 104, y: 196, mag: 4 }, // 7 · loose spark (breaks the symmetry)
+      { x: 168, y: 92, hero: true, mag: 1 }, // 0 · apex right (hero — brightest, upper-right of the roof)
+      { x: 112, y: 100, mag: 2 }, // 1 · apex left (the other roof tip)
+      { x: 212, y: 168, mag: 2 }, // 2 · mid-height right (open)
+      { x: 66, y: 176, mag: 3 }, // 3 · mid-height left (open)
+      { x: 196, y: 262, mag: 3 }, // 4 · base row, right
+      { x: 138, y: 278, mag: 2 }, // 5 · base row, centre
+      { x: 80, y: 264, mag: 3 }, // 6 · base row, left (route lands here, near the text)
     ],
     edges: [
-      [0, 3], // eye → neck (upper shank)
-      [1, 3],
-      [2, 3], // the crossbar (anchor cross)
-      [3, 4], // shank
-      [4, 5],
-      [4, 6], // the two flukes (arc)
-      [5, 7], // loose spark hanging off the left fluke
+      [0, 1], // the roof / apex
+      [0, 2], // right slope → mid-height right
+      [1, 3], // left slope → mid-height left
+      [2, 4], // right side descending to the base
+      [3, 6], // left side descending to the base
+      [4, 5], // base row (right → centre)
+      [5, 6], // base row (centre → left)
     ],
-    route: [0, 3, 4, 6],
+    route: [0, 2, 4, 5, 6],
   },
   // TENTATIVE (stelar te observa) — a FRAGMENTED field with a gap. The core
   // (0-1-2) is confirmed + dense; two distant stars hang, and the HYPOTHESIS
@@ -403,15 +423,16 @@ const NODES: readonly { x: number; y: number; size: number }[] = [
   { x: 140, y: 50, size: 0.85 }, // upper-left (11 o'clock, small)
 ]
 
-/** Pattern-chain positions — vertical S-curve on the right side
- *  of the canvas. Constraints: x must be > 250 (clear of the left
- *  fog) and < W - 28 (chain badge half-width) so labels read
- *  clean. Adjust the spacing if the SatBody halo radius changes. */
+/** Pattern-chain positions — a "(" arc on the right of the canvas: the
+ *  ends bow right, the middle bows left, so the chain reads as a curved
+ *  parenthesis cradling the cosmos. Constraints: x < W - 28 (badge +
+ *  frame half-width) so the medallions never clip the right edge, and the
+ *  left-most (middle) stays clear of the reveal constellation (x ≤ 245). */
 const SAT_POS: readonly { x: number; y: number }[] = [
-  { x: 332, y: 54 },
-  { x: 320, y: 142 },
-  { x: 320, y: 230 },
-  { x: 332, y: 318 },
+  { x: 334, y: 54 },
+  { x: 306, y: 142 },
+  { x: 306, y: 230 },
+  { x: 334, y: 318 },
 ]
 
 /** Constellation spine — a smooth asymmetric Bézier threading the
@@ -848,18 +869,14 @@ function SatBody({
   )
 }
 
-// Chain badge geometry. The ornamented talisman IS the body now (medallion
-// field + faceted SatFrame). The overlay glyph is a % of the (square)
-// canvas; the SVG medallion radius derives from that same size so the
-// field, frame and gold glyph all share one circle on every screen.
-const ICON_PCT = 17.5
-// Icon-box radius in viewBox units (W = 372) — the overlay glyph's box.
-const ICON_R = ((ICON_PCT / 100) * W) / 2
-// The medallion / frame / aura hug the GLYPH, which — with its viewBox
-// padding + a `meet` fit of a tall art box — renders well inside ICON_R.
-// So the talisman uses a fraction of ICON_R, sized to fit the art rather
-// than float around it. Tune this factor to tighten/loosen the frame.
-const MEDALLION_R = ICON_R * 0.62
+// Chain badge geometry. The glyph box (ICON_PCT, a % of the square canvas)
+// and the container medallion (MEDALLION_R) are now DECOUPLED: the glyph can
+// grow to fill more of the medallion without enlarging the container circle
+// or its frame (per the owner's ask — bigger icons, same-size container).
+const ICON_PCT = 23
+// Container circle / frame radius — kept at the prior size (was ICON_R*0.62
+// at ICON_PCT 17.5) so growing ICON_PCT enlarges only the glyph.
+const MEDALLION_R = (((17.5 / 100) * W) / 2) * 0.62
 
 /* Pattern glyph art — the orbit-art illustration drawn by `kind`:
  *   peak      → shine  (gold star / brilliance, high energy)
@@ -890,8 +907,8 @@ function PatternArt({ kind, active }: { kind: SatelliteKind | undefined; active?
       return <ShineArt {...common} color={shine} fill={shine} />
     }
     case 'valley':
-      // rest / anchor / watch stay multi-colour amber AS-IS for now. We
-      // only lift opacity to full so they pop on the dark medallion.
+      // rest / anchor / watch stay multi-colour amber AS-IS. (The moon is
+      // the REVEAL figure for pausa, not the medallion glyph.)
       return <RestArt {...common} opacity={1} />
     case 'stable':
       return <AnchorArt {...common} opacity={1} />
@@ -971,7 +988,27 @@ function monthRgb(hex: string): string {
   return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`
 }
 const MS_BG = monthRgb(colors.bg)
-const MS_OROLIGHT = monthRgb(colors.oroLight)
+
+/** "Observatory tint": mix a dimension hex ~22 % toward gold so the six
+ *  dimension colours share a warm substrate and none (warm magenta nor cold
+ *  sage/indigo) clashes with the warm-dark field. Returns "#RRGGBB". */
+function harmonizeDim(hex: string): string {
+  const MIX = 0.22
+  const a = parseInt(hex.replace('#', ''), 16)
+  const g = parseInt(colors.oro.replace('#', ''), 16) // observatory gold
+  const ch = (shift: number) => {
+    const av = (a >> shift) & 255
+    const gv = (g >> shift) & 255
+    return Math.round(av + (gv - av) * MIX)
+  }
+  const r = ch(16)
+  const gn = ch(8)
+  const b = ch(0)
+  return `#${((r << 16) | (gn << 8) | b).toString(16).padStart(6, '0')}`
+}
+// Line filament reads as light (cream), not a second gold thread — oro is
+// reserved for the chain/chrome (homogenization: 2 protagonists + neutrals).
+const MS_LECHE = monthRgb(colors.leche)
 
 /* A single bloom star — ported almost verbatim from WeekConstellation's
  * `WeekFlareNode`. The magenta bloom is swapped for the per-dimension
@@ -1041,8 +1078,17 @@ function MonthBloomStar({
     return [{ scale: inn * (0.93 + wave * 0.12) }]
   })
   // After the show settles, drop the whole node's bloom opacity ~40 %
-  // (and fade in via `appear`) so the text reads over a calm glow.
-  const groupOpacity = useDerivedValue(() => appear.value * (1 - settle.value * 0.42))
+  // (and fade in via `appear`) so the text reads over a calm glow. A subtle
+  // TWINKLE rides on top — a per-star brightness shimmer (desynced by phase,
+  // faster than the breath) so the lit stars sparkle like a real sky. Fainter
+  // stars twinkle more, the hero least.
+  const twAmp = hero ? 0.07 : 0.1 + ((mag ?? 2) - 1) * 0.03
+  const groupOpacity = useDerivedValue(() => {
+    const base = appear.value * (1 - settle.value * 0.42)
+    if (reduced) return base
+    const tw = 0.5 + 0.5 * Math.sin((t.value * 4.2 + phase * 5) * 2 * Math.PI)
+    return base * (1 - twAmp + twAmp * tw)
+  })
   const hueBloomR = R * (hero ? 6 : 5)
   const whiteBloomR = R * (hero ? 3 : 2.6)
   const spikeCount = hero ? 6 : 4
@@ -1239,7 +1285,7 @@ function EnergyLine({
           style="stroke"
           strokeWidth={1.2 * k * Math.max(0.6, wFactor)}
           strokeCap="round"
-          color={`rgba(${MS_OROLIGHT},0.9)`}
+          color={`rgba(${MS_LECHE},0.85)`}
         >
           <BlurMask blur={1 * k} style="normal" />
         </SkiaPath>
@@ -1361,6 +1407,7 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
   k,
   t,
   reduced,
+  spinDeg = 0,
 }: {
   kind: SatelliteKind
   /** The active satellite's dimension hex (e.g. cuerpo #FF4886). */
@@ -1369,6 +1416,9 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
   /** Shared breathing clock (the layer's 8 s loop). */
   t: SharedValue<number>
   reduced: boolean
+  /** Static rotation (deg, negative = left/CCW) around the figure's
+   *  centroid — used so `tu pausa`'s crescent tilts with its moon. */
+  spinDeg?: number
 }) {
   const shape = CONSTELLATION_SHAPES[kind]
   const rgbHue = monthRgb(dimColor)
@@ -1392,11 +1442,11 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
       }
     }
     // The light travels the whole route, painting the figure in its wake.
-    lit.value = withDelay(160, withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }))
+    lit.value = withDelay(100, withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.quad) }))
     // Once the figure is fully drawn, the bloom calms so the text reads.
     settle.value = withDelay(
-      1900,
-      withTiming(1, { duration: 460, easing: Easing.inOut(Easing.cubic) }),
+      1140,
+      withTiming(1, { duration: 380, easing: Easing.inOut(Easing.cubic) }),
     )
     return () => {
       cancelAnimation(lit)
@@ -1444,70 +1494,86 @@ const MonthConstellationLayer = memo(function MonthConstellationLayer({
     nodeFrac[i] = Math.min(1, isFinite(nodeFrac[i]!) ? nodeFrac[i]! : 0.5)
   }
 
+  // Optional static rotation around the figure's centroid (canvas px) — so
+  // the whole constellation (stars + lines + light) can tilt as one.
+  const cxPx = (shape.nodes.reduce((s, n) => s + n.x, 0) / shape.nodes.length) * k + FLARE_PAD
+  const cyPx = (shape.nodes.reduce((s, n) => s + n.y, 0) / shape.nodes.length) * k + FLARE_PAD
+  const spinT = spinDeg
+    ? [
+        { translateX: cxPx },
+        { translateY: cyPx },
+        { rotate: (spinDeg * Math.PI) / 180 },
+        { translateX: -cxPx },
+        { translateY: -cyPx },
+      ]
+    : []
+
   return (
     <Canvas style={StyleSheet.absoluteFill}>
-      {/* Energy lines — each draws as the light crosses it. Source = the
+      <SkiaGroup transform={spinT}>
+        {/* Energy lines — each draws as the light crosses it. Source = the
           endpoint the light reaches first (lower route fraction). */}
-      {shape.edges.map((edge, i) => {
-        const [a, c] = edge
-        const fa = nodeFrac[a]!
-        const fc = nodeFrac[c]!
-        const aIsSource = fa <= fc
-        const src = aIsSource ? shape.nodes[a]! : shape.nodes[c]!
-        const tgt = aIsSource ? shape.nodes[c]! : shape.nodes[a]!
-        const sFrac = Math.min(fa, fc)
-        const eFrac = Math.max(Math.max(fa, fc), sFrac + 0.05)
-        // tentative edge index 4 ([2,4]) is the hypothesis link → dashed.
-        const dashed = kind === 'tentative' && i === 4
-        return (
-          <EnergyLine
-            key={`edge-${i}`}
-            sx={src.x}
-            sy={src.y}
-            tx={tgt.x}
-            ty={tgt.y}
+        {shape.edges.map((edge, i) => {
+          const [a, c] = edge
+          const fa = nodeFrac[a]!
+          const fc = nodeFrac[c]!
+          const aIsSource = fa <= fc
+          const src = aIsSource ? shape.nodes[a]! : shape.nodes[c]!
+          const tgt = aIsSource ? shape.nodes[c]! : shape.nodes[a]!
+          const sFrac = Math.min(fa, fc)
+          const eFrac = Math.max(Math.max(fa, fc), sFrac + 0.05)
+          // tentative edge index 4 ([2,4]) is the hypothesis link → dashed.
+          const dashed = kind === 'tentative' && i === 4
+          return (
+            <EnergyLine
+              key={`edge-${i}`}
+              sx={src.x}
+              sy={src.y}
+              tx={tgt.x}
+              ty={tgt.y}
+              k={k}
+              rgbHue={rgbHue}
+              lit={lit}
+              sFrac={sFrac}
+              eFrac={eFrac}
+              settle={settle}
+              dashed={dashed}
+            />
+          )
+        })}
+        {/* Bloom stars — each ignites when the light reaches its fraction. */}
+        {shape.nodes.map((n, i) => (
+          <MonthBloomStar
+            key={`node-${i}`}
+            vbX={n.x}
+            vbY={n.y}
+            hero={!!n.hero}
+            mag={n.mag}
             k={k}
+            t={t}
+            phase={(i * 0.19) % 1}
             rgbHue={rgbHue}
             lit={lit}
-            sFrac={sFrac}
-            eFrac={eFrac}
+            frac={nodeFrac[i]!}
             settle={settle}
-            dashed={dashed}
+            reduced={reduced}
           />
-        )
-      })}
-      {/* Bloom stars — each ignites when the light reaches its fraction. */}
-      {shape.nodes.map((n, i) => (
-        <MonthBloomStar
-          key={`node-${i}`}
-          vbX={n.x}
-          vbY={n.y}
-          hero={!!n.hero}
-          mag={n.mag}
-          k={k}
-          t={t}
-          phase={(i * 0.19) % 1}
-          rgbHue={rgbHue}
-          lit={lit}
-          frac={nodeFrac[i]!}
-          settle={settle}
-          reduced={reduced}
-        />
-      ))}
-      {/* The painting light's head + wake riding the route. Skipped under
+        ))}
+        {/* The painting light's head + wake riding the route. Skipped under
           reduced motion (no travelling light). */}
-      {reduced ? null : (
-        <EnergyCurrent
-          wpX={wpX}
-          wpY={wpY}
-          cumLen={cumLen}
-          totalLen={totalLen}
-          rgbHue={rgbHue}
-          k={k}
-          lit={lit}
-          settle={settle}
-        />
-      )}
+        {reduced ? null : (
+          <EnergyCurrent
+            wpX={wpX}
+            wpY={wpY}
+            cumLen={cumLen}
+            totalLen={totalLen}
+            rgbHue={rgbHue}
+            k={k}
+            lit={lit}
+            settle={settle}
+          />
+        )}
+      </SkiaGroup>
     </Canvas>
   )
 })
@@ -1523,12 +1589,12 @@ function AnnotationOverlay({ eyebrow, body }: { eyebrow: string; body: string })
   const bodyT = useSharedValue(0)
   useEffect(() => {
     eyebrowT.value = withDelay(
-      1820,
-      withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }),
+      1120,
+      withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic) }),
     )
     bodyT.value = withDelay(
-      1940,
-      withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) }),
+      1240,
+      withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) }),
     )
     return () => {
       cancelAnimation(eyebrowT)
@@ -1620,6 +1686,124 @@ function GhostConstellation({ kind }: { kind: SatelliteKind }) {
     </G>
   )
 }
+
+/* MoonReveal — the figure shown on the LEFT when `tu pausa` is selected,
+ * INSTEAD of a star constellation: the orbit-moon art, tinted to the
+ * dimension colour (never blue), easing in with a soft rise. */
+function MoonReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(t)
+  }, [t, reduced])
+  const style = useAnimatedStyle(() => ({
+    // Whispers behind the star ring (the stars are the protagonist).
+    opacity: t.value * 0.4,
+    // rotate -25° (left/CCW, matches the constellation's spinDeg) applied
+    // OUTERMOST; scaleX:-1 mirrors the moon so its bright limb opens LEFT.
+    transform: [{ rotate: '-25deg' }, { scaleX: -1 }, { scale: 0.9 + t.value * 0.1 }],
+  }))
+  return (
+    <Animated.View pointerEvents="none" style={[moonRevealStyles.wrap, style]}>
+      <MoonArt
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        color={dimColor}
+        fill={dimColor}
+      />
+    </Animated.View>
+  )
+}
+
+const moonRevealStyles = StyleSheet.create({
+  // Centred so the moon disc lands at viewBox (≈126, 164) R≈96 — exactly
+  // under the star ring, clear of the chain on the right.
+  wrap: {
+    position: 'absolute',
+    left: '8%',
+    top: '14%',
+    width: '52%',
+    height: '60%',
+  },
+})
+
+/* AnchorReveal — the figure shown BEHIND the `tu ancla` star figure (same
+ * pattern as MoonReveal): the orbit-anchor emblem, tinted to the dimension
+ * colour, whisper-faint (0.4) so the stars stay the protagonist. Mirrored so
+ * its ornamented volute leans left, under the cluster; no rotation. */
+function AnchorReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(t)
+  }, [t, reduced])
+  const style = useAnimatedStyle(() => ({
+    opacity: t.value * 0.4,
+    transform: [{ scaleX: -1 }, { scale: 0.9 + t.value * 0.1 }],
+  }))
+  return (
+    <Animated.View pointerEvents="none" style={[anchorRevealStyles.wrap, style]}>
+      <AnchorTintArt
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        color={dimColor}
+        fill={dimColor}
+      />
+    </Animated.View>
+  )
+}
+
+const anchorRevealStyles = StyleSheet.create({
+  // Centred so the emblem lands under the star figure at viewBox (≈139, 185),
+  // clear of the chain. Near-square wrap (the anchor viewBox is ~1:1).
+  wrap: {
+    position: 'absolute',
+    left: '9%',
+    top: '22%',
+    width: '56%',
+    height: '56%',
+  },
+})
+
+/* ShineReveal — the figure shown BEHIND the `tu brillo` star figure: the
+ * orbit-shine emblem (a vertical radiant symbol), tinted to the dimension
+ * colour, whisper-faint (0.4). Symmetric, so no mirror — just a soft rise. */
+function ShineReveal({ dimColor, reduced }: { dimColor: string; reduced: boolean }) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    t.value = withTiming(1, { duration: reduced ? 250 : 760, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(t)
+  }, [t, reduced])
+  const style = useAnimatedStyle(() => ({
+    opacity: t.value * 0.4,
+    transform: [{ scale: 0.9 + t.value * 0.1 }],
+  }))
+  return (
+    <Animated.View pointerEvents="none" style={[shineRevealStyles.wrap, style]}>
+      <ShineFigureArt
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        color={dimColor}
+        fill={dimColor}
+      />
+    </Animated.View>
+  )
+}
+
+const shineRevealStyles = StyleSheet.create({
+  // Centred (≈x134) and tall under the vertical star figure, clear of the
+  // chain. The shine viewBox is ~square so width drives the fit.
+  wrap: {
+    position: 'absolute',
+    left: '12%',
+    top: '12%',
+    width: '46%',
+    height: '64%',
+  },
+})
 
 export function MonthSky({
   satellites,
@@ -1731,6 +1915,23 @@ export function MonthSky({
     ? (sats.find((s) => s.id === selectedSatelliteId) ?? null)
     : null
 
+  // During a reveal, fade the central MAGENTA washes (m-nebula + axis-haze)
+  // toward neutral so the dimension-coloured constellation has a calm field
+  // to glow against instead of a same-hue wash it dissolves into.
+  const revealFade = useSharedValue(0)
+  const revealActive = activeSat != null
+  useEffect(() => {
+    revealFade.value = withTiming(revealActive ? 1 : 0, {
+      duration: revealActive ? 520 : 360,
+      easing: Easing.inOut(Easing.cubic),
+    })
+    return () => cancelAnimation(revealFade)
+  }, [revealActive, revealFade])
+  const warmFadeProps = useAnimatedProps(() => {
+    'worklet'
+    return { opacity: 1 - revealFade.value * 0.82 }
+  })
+
   return (
     <View
       style={styles.wrap}
@@ -1819,9 +2020,11 @@ export function MonthSky({
           <DustField clock={dustDrift} reduced={reduced} />
 
           {/* DEPTH LAYER C — axis-haze. A tall, narrow magenta glow
-              aligned with the chain column (NOT the centre): pulls the
-              cosmos gravity to the right where the satellites live. */}
-          <Ellipse rx={105} ry={158} cx={AXIS_X} cy={179} fill="url(#axis-haze)" />
+              aligned with the chain column. Fades toward neutral during a
+              reveal so it doesn't tint the dimension constellation. */}
+          <AnimatedG animatedProps={warmFadeProps}>
+            <Ellipse rx={105} ry={158} cx={AXIS_X} cy={179} fill="url(#axis-haze)" />
+          </AnimatedG>
 
           {/* Foreground starfield — twinkles asynchronously (desynced speeds). */}
           <G>
@@ -1833,8 +2036,11 @@ export function MonthSky({
           {/* Occasional shooting star — the upper-area sparkle. */}
           <ShootingStar reduced={reduced} />
 
-          {/* Inner nebula wash — closer-in centre warmth. */}
-          <Circle cx={CX} cy={CY} r={W * 0.5} fill="url(#m-nebula)" />
+          {/* Inner nebula wash — closer-in centre warmth. Fades during a
+              reveal so the magenta doesn't bleed into the constellation. */}
+          <AnimatedG animatedProps={warmFadeProps}>
+            <Circle cx={CX} cy={CY} r={W * 0.5} fill="url(#m-nebula)" />
+          </AnimatedG>
         </G>
       </Svg>
 
@@ -1990,10 +2196,33 @@ export function MonthSky({
           pattern switch. */}
       {activeSat && evidence ? (
         <React.Fragment key={`ignite-${activeSat.id}`}>
-          {/* Skia constellation overlay — bloom stars + energy lines,
-              inside the FLARE_PAD-overscan wrapper so edge blooms bleed
-              into the margin. pointerEvents off so taps fall through to
-              the backdrop. Mounts once the wrap has measured (k>0). */}
+          {/* tu pausa also paints the MOON figure BEHIND its star ring (the
+              stars sit on the moon's limb); every other body shows only its
+              constellation. Moon first (behind), constellation on top. */}
+          {activeSat.kind === 'valley' ? (
+            <MoonReveal
+              dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
+              reduced={reduced}
+            />
+          ) : null}
+          {/* tu ancla paints the ANCHOR emblem behind its star figure. */}
+          {activeSat.kind === 'stable' ? (
+            <AnchorReveal
+              dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
+              reduced={reduced}
+            />
+          ) : null}
+          {/* tu brillo paints the SHINE emblem behind its vertical figure. */}
+          {activeSat.kind === 'peak' ? (
+            <ShineReveal
+              dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
+              reduced={reduced}
+            />
+          ) : null}
+          {/* Skia constellation overlay — bloom stars + energy lines, inside
+              the FLARE_PAD-overscan wrapper so edge blooms bleed into the
+              margin. pointerEvents off so taps fall through to the backdrop.
+              Mounts once the wrap has measured (k>0). */}
           {flareK > 0 ? (
             <View
               style={{
@@ -2007,10 +2236,11 @@ export function MonthSky({
             >
               <MonthConstellationLayer
                 kind={activeSat.kind ?? 'stable'}
-                dimColor={colors.dimension[activeSat.dimensionKey]}
+                dimColor={harmonizeDim(colors.dimension[activeSat.dimensionKey])}
                 k={flareK}
                 t={revealT}
                 reduced={reduced}
+                spinDeg={activeSat.kind === 'valley' ? -25 : 0}
               />
             </View>
           ) : null}

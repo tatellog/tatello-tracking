@@ -248,7 +248,7 @@ export const DAILY_READING_VARIANTS: Record<DailyReadingCategory, readonly strin
   proteinCared: [
     'Vas cuidando tu proteína. Tu cuerpo lo nota.',
     'Buena proteína hoy. Se nota en cómo te sostiene.',
-    'Le diste a tu cuerpo lo que necesita hoy.',
+    'Tu proteína estuvo presente hoy.',
   ],
   stressShortSleep: [
     'Vienes con tensión y poco descanso. Hoy basta con lo suave.',
@@ -263,7 +263,7 @@ export const DAILY_READING_VARIANTS: Record<DailyReadingCategory, readonly strin
   goodDay: [
     'Buena noche, buena energía. El cuerpo viene con impulso hoy.',
     'Dormiste bien y se nota. Hoy hay con qué.',
-    'Energía en alto hoy. Para disfrutarla si quieres.',
+    'Hoy hay energía. ¿En qué la pones?',
   ],
   aligned: [
     'Tu día va tomando forma.',
@@ -271,8 +271,9 @@ export const DAILY_READING_VARIANTS: Record<DailyReadingCategory, readonly strin
     'Vas dejando señal. Sigue tu ritmo.',
   ],
   noSignal: [
-    'Tu día está por escribirse. En cuanto registres algo, empiezo a leerte.',
-    'Aún no hay señal de hoy. Cuando registres, te leo.',
+    'Tu cielo está en calma, listo para encenderse.',
+    'Tu día apenas empieza. En cuanto registres algo, te leo.',
+    'Un cielo quieto antes del primer destello. Cuando quieras, empieza.',
   ],
 }
 

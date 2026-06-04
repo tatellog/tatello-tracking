@@ -360,9 +360,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
-      {!reducedMotion && celebrateKey > 0 ? (
-        <CelebrateShockwave celebrateKey={celebrateKey} />
-      ) : null}
+      {/* Pre-mounted (no `celebrateKey > 0` gate) so the Skia Canvas
+          + layout pass happen ONCE on first paint, not on every
+          commit. Without pre-mount the wash fired visibly later than
+          the Lottie particles. Inside, the wash is invisible until
+          `celebrateKey` bumps and the timeline animates u → 1. */}
+      {!reducedMotion ? <CelebrateShockwave celebrateKey={celebrateKey} /> : null}
       {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
           the root (it's a Modal) so it floats over Hoy. */}
       <PatternReveal pattern={pattern} onClose={dismissPattern} />

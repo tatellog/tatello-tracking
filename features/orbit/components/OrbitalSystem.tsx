@@ -58,15 +58,10 @@ import { EN_LUZ_THRESHOLD, TONE_BRILLANTE, type Dimension, type DimensionKey } f
 
 import { GLYPHS } from './dimensionGlyphs'
 
-// The Día centerpiece art — the PHOTOGRAPHIC raster (orbit-month-bh.png,
-// a black hole). Swapped from the earlier spiral galaxy (day-orb.png):
-// the BH's denser core + tight accretion glow reads as a stronger
-// gravitational anchor for the dimension stars orbiting it. A vector
-// (galaxy-day.svg) was tried but read as a flat illustration; a real
-// photo carries the grain + glow + soft gradients a vector can't fake.
-// Rendered into the scaled <G> so its on-screen size + centre keep the
-// StarNode positions aligned.
-const DAY_ORB_PNG = require('@/assets/orbits-art/orbit-month-bh.png')
+// The Día centerpiece — the m-day raster, the new central anchor for
+// the Día segment. Same wiring as before (rendered into the scaled
+// <G> at ART_S so it sits centred + scales with the constellation).
+const DAY_ORB_PNG = require('@/assets/orbits-art/m-day.png')
 
 /** Star + halo palette for the Día orbital diagram. Same intent as
  *  `SKY` in MonthSky.tsx — art colours that don't belong in the
@@ -181,25 +176,31 @@ const ORNAMENT_TY = -23
 // galaxy + the 6 dimension star halos + the orbital ring baked in.
 // We project it to the same 372 px on-screen extent + (216, 163)
 // figure centre the original AnimatedConstellation used so the
-// programmatic StarNode positions (STAR_POS) land on top of the
-// painted halos. Programmatic orbital scaffolding (the 7 dashed
-// rings + per-star Saturn rings + galaxy-bulge gradient) was
-// removed because it would duplicate what the PNG already paints.
-const ART_SRC = 1254
-// Originally 0.4 to match the painted dimension halos in day-orb.png
-// (source radius ≈ 370 → viewBox radius ≈ 148, paired with
-// DIM_SCALE = 1.35). The swap to orbit-month-bh.png dropped that
-// constraint — the BH carries no painted star halos, so the
-// programmatic StarNodes are the sole representation and the
-// centerpiece can shrink freely. Pulled back to 0.28 so the BH
-// sits as a denser gravitational anchor without crowding the
-// orbital ring.
-const ART_S = 0.28
+// programmatic StarNode positions (STAR_POS) land on the orbital ring.
+// ART_CENTER is the gravity centre — home of the small black hole + its
+// warm glow.
 const ART_CENTER_X = ORNAMENT_TX + (1024 * ORNAMENT_S) / 2
 const ART_CENTER_Y = ORNAMENT_TY + (1024 * ORNAMENT_S) / 2
+// m-day raster placement. Bumped 0.16 → 0.42 so the sphere has presence
+// as the gravitational anchor instead of reading as a small decoration.
+// The PNG has its visual mass HIGH (sphere centred at ~42 % of source
+// height) with mist as a decorative tail below — anchoring by the
+// geometric centre dropped the sphere below the dimension hex's centre,
+// so we anchor by the sphere's visual centre instead.
+const ART_SRC = 1254
+const ART_S = 0.42
+const ART_SPHERE_Y_NORM = 0.42
 const ART_TX = ART_CENTER_X - (ART_SRC * ART_S) / 2
-const ART_TY = ART_CENTER_Y - (ART_SRC * ART_S) / 2
-const DIM_SCALE = 1.35
+const ART_TY = ART_CENTER_Y - ART_SRC * ART_S * ART_SPHERE_Y_NORM
+// Visible radius of the sphere in viewBox units — its mask + glow key off
+// it. Tightened from /2 (full PNG halfwidth) to a ~30 % portion of source
+// width because the actual sphere occupies less than the full canvas; the
+// mist tail below is decorative and shouldn't drive halo geometry.
+const ART_R = ART_SRC * ART_S * 0.18
+// Was 1.35 (pushed the six stars out toward the edges — read as scattered,
+// disconnected). Pulled to 1.0 so they ring tightly just outside the warm
+// core's glow and read as one system, not loose specks.
+const DIM_SCALE = 1.0
 
 // The Y coordinate that the focus zoom should land the selected
 // star on. Shifted ~35 px above the figure centre because the
@@ -449,17 +450,6 @@ export function OrbitalSystem({
     return { opacity: z * z * 0.95 }
   })
 
-  // Echo of the galaxy painted OUTSIDE the zoom transform so it
-  // stays put while the main figure scales out during focus.
-  // Fades in 0 → 0.22 as zoomT climbs, so:
-  //   • at rest: invisible (only the main galaxy renders)
-  //   • during zoom: a ghost of the system stays visible behind
-  //     the focused star, preserving the context the cinematic
-  //     would otherwise erase
-  const echoProps = useAnimatedProps(() => {
-    'worklet'
-    return { opacity: zoomT.value * 0.22 }
-  })
   // Dust drift — the ambient dust motes scattered between bulge
   // and dimension hexagon orbit slowly around the galaxy centre,
   // like a slow gravitational current. The galaxy itself, the
@@ -514,6 +504,27 @@ export function OrbitalSystem({
   // doesn't reconcile its whole canvas on every parent render — only
   // when the dimensions actually change.
   const placed = useMemo(() => dimensions.map((d) => ({ d, pos: place(d) })), [dimensions])
+
+  // The day's average light — drives the warm central core: the more
+  // dimensions are awake, the warmer/wider the centre glows (the manifesto
+  // loop). 0 = a waiting ember, 1 = a full warm sun. Never goes dark.
+  const litAvg = useMemo(
+    () =>
+      dimensions.length ? dimensions.reduce((s, d) => s + d.brightness, 0) / dimensions.length : 0,
+    [dimensions],
+  )
+  // Animate the warm core glow toward the new average so logging a dimension
+  // makes the centre brighten smoothly rather than jump.
+  const litAvgSV = useSharedValue(litAvg)
+  useEffect(() => {
+    litAvgSV.value = withTiming(litAvg, { duration: 900, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(litAvgSV)
+  }, [litAvg, litAvgSV])
+  const coreGlowProps = useAnimatedProps(() => {
+    'worklet'
+    // A warm ember even at 0 (never a dead void); brighter as more wake.
+    return { opacity: 0.35 + 0.55 * litAvgSV.value }
+  })
 
   // viewBox → pixel factor for the Skia flare overlay. Measured from the
   // wrap (which fills the orbital container at the viewBox aspect ratio),
@@ -627,30 +638,25 @@ export function OrbitalSystem({
             <Stop offset="75%" stopColor={colors.dimension.energia} stopOpacity={0.14} />
             <Stop offset="100%" stopColor={colors.dimension.energia} stopOpacity={0} />
           </RadialGradient>
-          {/* Galactic bulge halo — a warm magenta glow painted UNDER the
-              vector galaxy so its hard SVG edge fuses into the field
-              instead of being cut against the dark. Magenta, never white:
-              the bulge is "the place", the hero star is "the event" —
-              keeping the bulge hueless-of-white means it never competes
-              with the single pure-white core. */}
-          <RadialGradient id="galaxy-bulb" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#7A2A60" stopOpacity={0.13} />
-            <Stop offset="55%" stopColor="#7A2A60" stopOpacity={0.06} />
-            <Stop offset="100%" stopColor="#7A2A60" stopOpacity={0} />
+          {/* Warm core glow — an oro halo painted BEHIND the small black
+              hole so the centre EMITS instead of only absorbing. Its opacity
+              grows with the day's average light (litAvg) via coreGlowProps.
+              Oro, never magenta (the header keeps the lone magenta accent). */}
+          <RadialGradient id="core-glow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.oroLight} stopOpacity={0.6} />
+            <Stop offset="55%" stopColor={colors.oro} stopOpacity={0.22} />
+            <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
           </RadialGradient>
-          {/* Galaxy edge-fade — a radial alpha that's fully opaque over
-              the bright disk and dissolves to nothing toward the rim, so
-              the photographic galaxy melts into the field instead of
-              showing the boxy halo edge of a pasted image. Used as a mask
-              on both galaxy renders. */}
-          <RadialGradient id="galaxy-fade" cx="50%" cy="50%" r="50%">
+          {/* Edge-fade mask so the BH raster melts into the field instead of
+              showing a boxy/hard rim. Sized to the BH's visible radius. */}
+          <RadialGradient id="bh-fade" cx="50%" cy="50%" r="50%">
             <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="48%" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="78%" stopColor="#FFFFFF" stopOpacity={0.5} />
+            <Stop offset="55%" stopColor="#FFFFFF" stopOpacity={1} />
+            <Stop offset="82%" stopColor="#FFFFFF" stopOpacity={0.55} />
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
           </RadialGradient>
-          <Mask id="galaxy-mask" maskUnits="userSpaceOnUse">
-            <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={190} fill="url(#galaxy-fade)" />
+          <Mask id="bh-mask" maskUnits="userSpaceOnUse">
+            <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={ART_R * 1.12} fill="url(#bh-fade)" />
           </Mask>
           {/* Glyph glow — one filter per dimension. Recolours the rose
               constellation to the dimension's hue (FeColorMatrix) then
@@ -678,26 +684,6 @@ export function OrbitalSystem({
           ))}
         </Defs>
 
-        {/* Galaxy echo — sits OUTSIDE the zoom transform so it
-            never moves when the cinematic pushes the main galaxy
-            off-screen. Driven by echoProps: invisible at rest,
-            fades to ~22 % during focus. Stays static; orbit motion
-            is on the stars layer above, not the galaxy itself. */}
-        <AnimatedG animatedProps={echoProps}>
-          <G mask="url(#galaxy-mask)">
-            <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
-              <SvgImage
-                href={DAY_ORB_PNG}
-                x={0}
-                y={0}
-                width={ART_SRC}
-                height={ART_SRC}
-                preserveAspectRatio="xMidYMid meet"
-              />
-            </G>
-          </G>
-        </AnimatedG>
-
         {/* Ambient dust — 120 cream specks orbiting the bulge in
             shifting spiral arms. SITS OUTSIDE the zoom transform
             so the motion stays visible throughout the focus
@@ -724,15 +710,17 @@ export function OrbitalSystem({
               more. OrbitalSystem only renders the constellation +
               live stars now. */}
 
-          {/* Galactic bulge halo — fuses the vector galaxy's edge into
-              the field. Sits UNDER the galaxy + the orbital traces. */}
-          <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={150} fill="url(#galaxy-bulb)" />
+          {/* Warm core glow — BEHIND the black hole, so the centre emits a
+              warm halo that GROWS with the day's light (coreGlowProps drives
+              its opacity from litAvg). The BH sits on top and keeps its dark
+              centre + accretion disk. */}
+          <AnimatedG animatedProps={coreGlowProps}>
+            <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={ART_R * 0.85} fill="url(#core-glow)" />
+          </AnimatedG>
 
-          {/* The ornamental backdrop — the photographic Day galaxy
-              (day-orb.png). Static, edge-faded via galaxy-mask so it
-              melts into the field. The orbital motion lives on the stars
-              layer below, not on the galaxy itself. */}
-          <G mask="url(#galaxy-mask)" opacity={0.62}>
+          {/* The small black hole — the central object the dimensions ring.
+              Edge-faded via bh-mask so it melts into the field. */}
+          <G mask="url(#bh-mask)">
             <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
               <SvgImage
                 href={DAY_ORB_PNG}

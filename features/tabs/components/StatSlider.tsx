@@ -60,12 +60,49 @@ type Props = { ctx: BriefContext }
 export function StatSlider({ ctx }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
+  const reduceMotion = useReducedMotion()
+
+  // Imperative ScrollView ref for the auto-peek demo (see effect
+  // below) — Animated.ScrollView exposes a real `scrollTo` via ref.
+  const scrollRef = useRef<Animated.ScrollView>(null)
+
+  // True after the first auto-peek has fired so we never re-fire
+  // (rare but possible if `width` re-measures mid-session).
+  const peekedRef = useRef(false)
 
   // Live scroll offset — drives the per-slide enter/leave animation.
   const scrollX = useSharedValue(0)
   const scrollHandler = useAnimatedScrollHandler((e) => {
     scrollX.value = e.contentOffset.x
   })
+
+  // AUTO-PEEK — once the carousel has measured its width, do a
+  // short scripted scrollTo(34) → scrollTo(0) over ~1 s so the user
+  // visually sees a sliver of the second slide appear and recede.
+  // The bouncing `›` hint is a continuous affordance; this one-shot
+  // peek is the unmistakable "esto se desliza" demo.
+  //
+  // Guarded so it fires exactly ONCE per mount (peekedRef) and
+  // never under reduce-motion (a scripted scrollTo + the smooth
+  // return read as "the screen is moving on its own", which the
+  // reduce-motion contract explicitly forbids).
+  useEffect(() => {
+    if (width === 0 || peekedRef.current || reduceMotion) return
+    peekedRef.current = true
+    // Delay so the page's enter animation has time to settle before
+    // we hijack the scroll position — a peek that fires mid-fade-in
+    // reads as a glitch, not as a designed nudge.
+    const peekOut = setTimeout(() => {
+      scrollRef.current?.scrollTo({ x: 34, animated: true })
+    }, 900)
+    const peekBack = setTimeout(() => {
+      scrollRef.current?.scrollTo({ x: 0, animated: true })
+    }, 1500)
+    return () => {
+      clearTimeout(peekOut)
+      clearTimeout(peekBack)
+    }
+  }, [width, reduceMotion])
 
   // Real cycle phase (null when the user has no active/anchored cycle).
   const cycle = useCyclePhase()
@@ -108,6 +145,7 @@ export function StatSlider({ ctx }: Props) {
 
       {width > 0 ? (
         <Animated.ScrollView
+          ref={scrollRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
@@ -125,7 +163,12 @@ export function StatSlider({ ctx }: Props) {
         <View style={styles.measurePlaceholder} />
       )}
 
-      <Dots count={slides.length} active={safeActive} />
+      {/* Pagination + swipe affordance. `showHint=true` until the user
+          has paged at least once (active > 0 at some point); after
+          that the hint hides permanently for this session. The hint
+          itself is a bouncing `›` to the right of the dots — discreet
+          but clear that there's more content to the side. */}
+      <Dots count={slides.length} active={safeActive} showHint={active === 0} />
     </View>
   )
 }
@@ -186,7 +229,7 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
           drift so the row never feels statically pinned. The rings
           inside still draw via their own `ringDelay` timeline —
           these animations sit on the card wrapper, not the ring. */}
-      <MacroCardWrap enterDelay={120} phase={0}>
+      <MacroCardWrap enterDelay={120}>
         <RingCard
           label="Proteína"
           value={ctx.today_macros.protein_g}
@@ -197,7 +240,7 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
           ringDelay={400}
         />
       </MacroCardWrap>
-      <MacroCardWrap enterDelay={280} phase={0.5}>
+      <MacroCardWrap enterDelay={280}>
         <RingCard
           speedometer
           label="Calorías"
@@ -214,56 +257,26 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
   )
 }
 
-/* Per-card wrapper for the macros slide. Two animations:
+/* Per-card wrapper for the macros slide. ONE-SHOT ENTRANCE only —
+ * a staggered `FadeInDown.springify().damping(13)` so the two cards
+ * cascade in (Proteína first, Calorías ~160 ms behind). Fires on
+ * mount; the cards never unmount inside the carousel so this is a
+ * one-time reveal per session.
  *
- *   1. ONE-SHOT ENTRANCE — a staggered `FadeInDown.springify().damping(13)`
- *      so the two cards cascade in (Proteína first, Calorías ~160 ms
- *      behind). Fires on mount; the cards never unmount inside the
- *      carousel so this is a one-time reveal per session.
- *
- *   2. CONTINUOUS BREATH — a slow Y-drift (±2 px) on a 3.4 s sine
- *      cycle, one card +phase ahead of the other so the row feels
- *      alive instead of statically pinned. Suppressed under
- *      reduce-motion: the drift parks at 0 and the entrance falls
- *      back to a plain fade (no spring overshoot).
+ * The continuous "breath" Y-drift that used to live here was removed
+ * — the cards staying still reads as more legible / less restless.
+ * The aliveness now lives INSIDE the ring (see MacroRing's glow
+ * breath), so the metric feels animated without the card itself
+ * floating.
  *
  * Wraps `RingCard` instead of modifying it so other consumers
  * (anywhere else `RingCard` shows up) keep their static behaviour.
  */
-function MacroCardWrap({
-  enterDelay,
-  phase,
-  children,
-}: {
-  enterDelay: number
-  /** 0..1 phase offset on the shared 3.4 s breath cycle. */
-  phase: number
-  children: ReactNode
-}) {
+function MacroCardWrap({ enterDelay, children }: { enterDelay: number; children: ReactNode }) {
   const reduce = useReducedMotion()
-  const breath = useSharedValue(0)
-
-  useEffect(() => {
-    if (reduce) return
-    breath.value = withRepeat(
-      withTiming(1, { duration: 3400, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-  }, [breath, reduce])
-
-  const driftStyle = useAnimatedStyle(() => {
-    'worklet'
-    if (reduce) return { transform: [{ translateY: 0 }] }
-    // `breath` ramps 0→1→0 (reversed) every 3.4 s. Phased sine for
-    // smoother arrival than the raw triangular ramp.
-    const wave = 0.5 + 0.5 * Math.sin((breath.value + phase) * 2 * Math.PI)
-    return { transform: [{ translateY: -2 + wave * 4 }] }
-  })
-
   return (
     <Animated.View
-      style={[styles.macroCardWrap, driftStyle]}
+      style={styles.macroCardWrap}
       entering={
         reduce
           ? FadeIn.duration(220).delay(enterDelay)
@@ -825,12 +838,24 @@ function CycleSlide({
 
 /* ─── Pagination dots ──────────────────────────────────────────────── */
 
-function Dots({ count, active }: { count: number; active: number }) {
+function Dots({
+  count,
+  active,
+  showHint,
+}: {
+  count: number
+  active: number
+  /** When true, a bouncing `›` is rendered to the right of the dots
+   *  as a "swipe more" affordance. Hidden once the user has paged
+   *  past the first slide. */
+  showHint: boolean
+}) {
   return (
     <View style={styles.dots}>
       {Array.from({ length: count }).map((_, i) => (
         <Dot key={i} on={i === active} />
       ))}
+      {showHint ? <SwipeHint /> : null}
     </View>
   )
 }
@@ -845,6 +870,38 @@ function Dot({ on }: { on: boolean }) {
     opacity: 0.32 + p.value * 0.68,
   }))
   return <Animated.View style={[styles.dot, style]} />
+}
+
+/* Bouncing `›` glyph that signals "more slides to the right" without
+ * adding chrome. Loops `translateX` 0 → 4 → 0 over 1.2 s on an
+ * inOut sine — the bounce is what catches the eye; a static chevron
+ * would read as decoration. Reduce-motion rests it at the midpoint
+ * (still visible, just not moving). Color matches the dots' magenta
+ * but at lower opacity so it doesn't compete with the active dot.
+ */
+function SwipeHint() {
+  const reduce = useReducedMotion()
+  const x = useSharedValue(reduce ? 0.5 : 0)
+
+  useEffect(() => {
+    if (reduce) return
+    x.value = withRepeat(
+      withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+  }, [x, reduce])
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value * 4 }],
+    opacity: 0.55 + x.value * 0.35,
+  }))
+
+  return (
+    <Animated.Text style={[styles.hint, style]} accessibilityElementsHidden>
+      ›
+    </Animated.Text>
+  )
 }
 
 const styles = StyleSheet.create({
@@ -1111,5 +1168,18 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: colors.magenta,
+  },
+  // Swipe affordance — sits to the right of the dots, marginLeft 4
+  // so it reads as part of the pagination cluster, not detached.
+  // Magenta to tie to the dots; opacity is animated in JS-side.
+  hint: {
+    fontFamily: typography.uiBold,
+    fontSize: 20,
+    lineHeight: 20,
+    color: colors.magenta,
+    marginLeft: 6,
+    // Glyph metrics push it slightly low; nudge up so it lines up
+    // with the dot vertical centre.
+    marginTop: -8,
   },
 })

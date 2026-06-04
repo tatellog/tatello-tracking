@@ -3,8 +3,10 @@ import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedProps,
+  useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle } from 'react-native-svg'
@@ -32,6 +34,15 @@ export function MacroRing({
   const c = 2 * Math.PI * r
   const pct = Math.min(1, target > 0 ? value / target : 0)
   const progress = useSharedValue(0)
+  const reduce = useReducedMotion()
+
+  // Glow breath — 0 → 1 → 0 over 2.8 s, looping. Drives the three
+  // inner halo discs' opacity so the ring feels alive without the
+  // CARD itself moving (an earlier attempt at a Y-drift on the card
+  // read as restless; this contains the motion inside the ring).
+  // Suppressed under reduce-motion → glow parks at high end so the
+  // halo stays visible, just stops pulsing.
+  const glow = useSharedValue(reduce ? 1 : 0)
 
   useEffect(() => {
     progress.value = withDelay(
@@ -40,8 +51,30 @@ export function MacroRing({
     )
   }, [progress, pct, delay])
 
+  useEffect(() => {
+    if (reduce) return
+    glow.value = withRepeat(
+      withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+  }, [glow, reduce])
+
   const animatedProps = useAnimatedProps(() => ({
     strokeDasharray: [c * progress.value, c],
+  }))
+
+  // Each halo's opacity envelope — base + breath amplitude. Inner
+  // disc breathes the widest because it's the hot core; outer disc
+  // barely shifts so the ring edge doesn't visibly pulse.
+  const halo1Props = useAnimatedProps(() => ({
+    opacity: 0.04 + glow.value * 0.05,
+  }))
+  const halo2Props = useAnimatedProps(() => ({
+    opacity: 0.07 + glow.value * 0.08,
+  }))
+  const halo3Props = useAnimatedProps(() => ({
+    opacity: 0.12 + glow.value * 0.12,
   }))
 
   return (
@@ -53,11 +86,29 @@ export function MacroRing({
         style={{ transform: [{ rotate: '-90deg' }] }}
       >
         {/* Inner halo — three stacked low-alpha discs approximate a
-            soft radial glow inside the ring. Reads as "this ring has
-            life inside it" rather than just an arc on a void. */}
-        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 2)} fill={color} opacity={0.04} />
-        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 8)} fill={color} opacity={0.07} />
-        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 16)} fill={color} opacity={0.12} />
+            soft radial glow inside the ring, now BREATHING in unison
+            so the metric feels alive (the heartbeat of the macro). */}
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={Math.max(0, r - 2)}
+          fill={color}
+          animatedProps={halo1Props}
+        />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={Math.max(0, r - 8)}
+          fill={color}
+          animatedProps={halo2Props}
+        />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={Math.max(0, r - 16)}
+          fill={color}
+          animatedProps={halo3Props}
+        />
         <Circle
           cx={size / 2}
           cy={size / 2}

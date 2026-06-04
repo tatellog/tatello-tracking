@@ -3,8 +3,10 @@ import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedProps,
+  useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle } from 'react-native-svg'
@@ -61,6 +63,12 @@ export function SpeedometerRing({
 
   const progress = useSharedValue(0)
   const overflow = useSharedValue(0)
+  const reduce = useReducedMotion()
+  // Glow breath — same 2.8 s sine cycle as MacroRing so both cards
+  // on the macros slide pulse in unison (one shared heartbeat). The
+  // motion lives INSIDE the ring instead of on the card wrapper so
+  // the card stays still and legible.
+  const glow = useSharedValue(reduce ? 1 : 0)
 
   useEffect(() => {
     progress.value = withDelay(
@@ -73,6 +81,15 @@ export function SpeedometerRing({
     )
   }, [progress, overflow, mainPct, overPct, delay])
 
+  useEffect(() => {
+    if (reduce) return
+    glow.value = withRepeat(
+      withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+  }, [glow, reduce])
+
   const mainProps = useAnimatedProps(() => ({
     strokeDasharray: [arcLen * progress.value, c],
   }))
@@ -84,6 +101,11 @@ export function SpeedometerRing({
     strokeDasharray: [gapLen * overflow.value, c],
   }))
 
+  // Inner-halo breath envelopes (mirror MacroRing).
+  const halo1Props = useAnimatedProps(() => ({ opacity: 0.04 + glow.value * 0.05 }))
+  const halo2Props = useAnimatedProps(() => ({ opacity: 0.07 + glow.value * 0.08 }))
+  const halo3Props = useAnimatedProps(() => ({ opacity: 0.12 + glow.value * 0.12 }))
+
   return (
     <View style={[styles.glow, { width: size, height: size, shadowColor: color }]}>
       <Svg
@@ -94,11 +116,29 @@ export function SpeedometerRing({
         // arc sweeps bottom-left → left → top → right → bottom-right.
         style={{ transform: [{ rotate: '135deg' }] }}
       >
-        {/* Inner halo — same vocabulary as MacroRing, so the two
-            cards on the Hoy slider feel related. */}
-        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 2)} fill={color} opacity={0.04} />
-        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 8)} fill={color} opacity={0.07} />
-        <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 16)} fill={color} opacity={0.12} />
+        {/* Inner halo — same breathing vocabulary as MacroRing so
+            the two cards on the Hoy slider pulse in unison. */}
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={Math.max(0, r - 2)}
+          fill={color}
+          animatedProps={halo1Props}
+        />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={Math.max(0, r - 8)}
+          fill={color}
+          animatedProps={halo2Props}
+        />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={Math.max(0, r - 16)}
+          fill={color}
+          animatedProps={halo3Props}
+        />
 
         {/* Track — the 270° quiet arc. */}
         <Circle

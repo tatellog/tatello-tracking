@@ -12,10 +12,22 @@ import type {
   DimensionLayout,
 } from './types'
 
-/* The six dimensions of the system — see docs/tu-orbita-design.md §3. */
+/* The six dimensions of the system — see docs/tu-orbita-design.md §3.
+ *
+ * Layout retuned for the m-day centerpiece:
+ *
+ *   1. CUERPO (magenta hot) swapped 312° → 196° (upper-left → south)
+ *      so the brand-magenta star no longer sits adjacent to the warm
+ *      coral sphere at the top of the canvas — the two pinks were
+ *      reading as one cluster.
+ *   2. CICLO (cool silver-blue) swapped 196° → 312° (south → upper-left)
+ *      AND its radiusFrac pulled 0.95 → 0.82 so it INTEGRATES into the
+ *      hex instead of floating alone at the bottom. Its silver tone
+ *      complements the warm centerpiece without competing.
+ */
 export const DIMENSIONS: readonly DimensionLayout[] = [
-  { key: 'cuerpo', label: 'CUERPO', angleDeg: 312, radiusFrac: 0.82 },
-  { key: 'ciclo', label: 'CICLO', angleDeg: 196, radiusFrac: 0.95 },
+  { key: 'cuerpo', label: 'CUERPO', angleDeg: 196, radiusFrac: 0.82 },
+  { key: 'ciclo', label: 'CICLO', angleDeg: 312, radiusFrac: 0.82 },
   { key: 'mente', label: 'MENTE', angleDeg: 8, radiusFrac: 1.0 },
   { key: 'energia', label: 'ENERGÍA', angleDeg: 250, radiusFrac: 0.72 },
   { key: 'sueno', label: 'SUEÑO', angleDeg: 64, radiusFrac: 0.78 },
