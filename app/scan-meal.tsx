@@ -507,11 +507,14 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  */
 export default function ScanMealScreen() {
   const router = useRouter()
-  const { uri, editId, manual, describe } = useLocalSearchParams<{
+  const { uri, editId, manual, describe, photoPath } = useLocalSearchParams<{
     uri?: string
     editId?: string
     manual?: string
     describe?: string
+    /** Foto representativa del platillo (storage path) — fallback cuando la
+     *  instancia editada no tiene foto propia (p.ej. un re-log sin foto). */
+    photoPath?: string
   }>()
   const isEdit = !!editId
   // Manual log — no scan, no ingredient breakdown; the user types the
@@ -616,8 +619,12 @@ export default function ScanMealScreen() {
             },
           ],
     )
-    if (m.photo_storage_path) setPhotoUri(mealPhotoUrl(m.photo_storage_path))
-  }, [isEdit, editMeal.data])
+    // La foto de esta comida; si la instancia no tiene (un re-log sin
+    // foto), cae a la foto representativa del platillo que llegó por
+    // navegación — la misma que muestra la estela.
+    const storedPhoto = m.photo_storage_path ?? photoPath
+    if (storedPhoto) setPhotoUri(mealPhotoUrl(storedPhoto))
+  }, [isEdit, editMeal.data, photoPath])
 
   // The reveal auto-dismisses after the star has settled — the user can
   // also tap the checkmark to leave sooner. With a screen reader or

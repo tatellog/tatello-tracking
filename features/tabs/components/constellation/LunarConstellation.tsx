@@ -28,7 +28,6 @@ import {
   DeepField,
   NebulaPatches,
   ShootingStar,
-  StarWinks,
 } from './rendering/ambient'
 import { StarBurst } from './rendering/burst'
 import { FieldStars } from './rendering/field'
@@ -195,13 +194,10 @@ export function LunarConstellation({
               <SvgGradients zodiac={zodiac} stars={stars} />
               <DeepField drift={driftT} />
               <AmbientField t={t} drift={driftT} />
-              {/* Random star winks — brief flashes that read as "the
-              sky is alive". Rendered with the background field so
-              they share the atmospheric layer. Pure ambient: with
-              reduce-motion ON they're suppressed (a frozen wink would
-              freeze mid-flash) — the figure's legibility doesn't
-              depend on them. */}
-              {reduceMotion ? null : <StarWinks t={t} />}
+              {/* StarWinks (random 4-point flashes) retiradas: su destello
+              blanco de 4 puntas se leía como una estrella de la figura
+              suelta. El "cielo vivo" lo dan ahora el campo de puntos, el
+              polvo y las shooting stars. */}
               {/* Three shooting stars staggered in phase and crossing
               the canvas at different heights — the field feels
               alive without any single streak being constant. Pure

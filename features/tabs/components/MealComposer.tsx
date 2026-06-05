@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { memo, useEffect, useMemo, useState } from 'react'
@@ -25,6 +26,8 @@ import { MealCard } from './MealCard'
 import { SectionHeader } from './SectionHeader'
 
 const HISTORY_LIMIT = 24
+// Estela compacta por defecto · muestra estas y "Ver todas" para el resto.
+const COLLAPSED_COUNT = 4
 const CONFIRM_MS = 1000
 // 4-point star — the shared glyph.
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
@@ -65,6 +68,21 @@ function CameraIcon({ color, size = 18 }: { color: string; size?: number }) {
         strokeLinejoin="round"
       />
       <Circle cx={12} cy={13.4} r={3.4} stroke={color} strokeWidth={1.8} />
+    </Svg>
+  )
+}
+
+// A keyboard — the "registrar con texto" affordance (AI describe mode).
+function KeyboardIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={2} y={6} width={20} height={12} rx={2.5} stroke={color} strokeWidth={1.8} />
+      <Path
+        d="M6 10 H6.01 M10 10 H10.01 M14 10 H14.01 M18 10 H18.01 M8 14 H16"
+        stroke={color}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+      />
     </Svg>
   )
 }
@@ -161,8 +179,10 @@ function StarPreview({ progress, valid }: { progress: number; valid: boolean }) 
 
 type Props = {
   /** Open a history entry in the meal editor (same screen as the Hoy
-   *  tab's "Comidas de hoy" — edits the most recent meal of that name). */
-  onOpenMeal: (id: string) => void
+   *  tab's "Comidas de hoy" — edits the most recent meal of that name).
+   *  photoPath: la foto representativa del platillo, para que el editor la
+   *  muestre aunque la instancia abierta no tenga foto propia. */
+  onOpenMeal: (id: string, photoPath?: string) => void
 }
 
 /*
@@ -179,6 +199,7 @@ type Props = {
 export function MealComposer({ onOpenMeal }: Props) {
   const { data: foods } = useFrequentMeals(HISTORY_LIMIT)
   const createMeal = useCreateMeal()
+  const router = useRouter()
 
   const [name, setName] = useState('')
   const [protein, setProtein] = useState('')
@@ -186,6 +207,7 @@ export function MealComposer({ onOpenMeal }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   const q = name.trim().toLowerCase()
   const composing = q.length > 0
@@ -222,9 +244,15 @@ export function MealComposer({ onOpenMeal }: Props) {
     if (!composing || exactMatch) setPhotoUri(null)
   }, [composing, exactMatch])
 
+  // Compactada por defecto; al buscar se muestran todas las coincidencias.
+  // Las magnitudes de estrella siguen calculándose sobre la lista completa
+  // (escala estable aunque compactes).
+  const collapsible = !composing && history.length > COLLAPSED_COUNT
+  const visible = collapsible && !expanded ? history.slice(0, COLLAPSED_COUNT) : history
+
   // Trail magnitudes — each star's size maps the meal's log frequency
   // onto [MIN_STAR, MAX_STAR] relative to the rest of the estela.
-  const n = history.length
+  const n = visible.length
   const { minFreq, freqSpan } = useMemo(() => {
     const freqs = history.map((h) => h.freq)
     const min = freqs.length ? Math.min(...freqs) : 0
@@ -241,7 +269,12 @@ export function MealComposer({ onOpenMeal }: Props) {
 
   // Re-log a known meal — fast path, no photo step (it keeps whatever
   // photo the original logged instance had via the frequent-meal row).
-  const log = (meal: { name: string; protein_g: number; calories: number }) => {
+  const log = (meal: {
+    name: string
+    protein_g: number
+    calories: number
+    photo_storage_path?: string | null
+  }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     igniteDimension('alimento')
     createMeal.mutate({
@@ -250,14 +283,62 @@ export function MealComposer({ onOpenMeal }: Props) {
       calories: meal.calories,
       consumed_at: new Date(),
       meal_type: currentMealType(),
+      // Conserva la foto del platillo en el re-log, igual que el quick-log
+      // de Hoy · evita que la instancia nueva quede sin foto.
+      photo_storage_path: meal.photo_storage_path ?? undefined,
     })
   }
 
   const handleLogRow = (item: FrequentMeal) => {
     if (confirmed) return
-    log({ name: item.name, protein_g: item.protein_g, calories: item.calories })
+    log({
+      name: item.name,
+      protein_g: item.protein_g,
+      calories: item.calories,
+      photo_storage_path: item.photo_storage_path,
+    })
     setConfirmed(item.name)
     setTimeout(() => setConfirmed((c) => (c === item.name ? null : c)), CONFIRM_MS)
+  }
+
+  // ── Registro rápido con IA — hand off to the /scan-meal flow (the
+  //    same entry points the Hoy tab's QuickLog uses). Distinct from the
+  //    manual-editor photo below (which only attaches an image). ──
+
+  // Con foto: shoot/pick, then let scan-meal read the plate and log it.
+  const openScanPhoto = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
+        return
+      }
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
+    if (result.canceled || !result.assets[0]) return
+    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri } })
+  }
+
+  const handleScanPhoto = () => {
+    showActionSheet(
+      {
+        title: 'Registrar comida con foto',
+        options: ['Tomar foto', 'Elegir de la galería', 'Cancelar'],
+        cancelButtonIndex: 2,
+      },
+      (i) => {
+        if (i === 0) void openScanPhoto('camera')
+        else if (i === 1) void openScanPhoto('library')
+      },
+    )
+  }
+
+  // Con texto: scan-meal in describe mode — type what you ate, AI parses it.
+  const handleScanText = () => {
+    router.push({ pathname: '/scan-meal', params: { describe: '1' } })
   }
 
   const pickImage = async (source: 'camera' | 'library') => {
@@ -335,6 +416,33 @@ export function MealComposer({ onOpenMeal }: Props) {
     <View>
       {/* ── Sumar comida — the search / create field. ── */}
       <SectionHeader label="Sumar comida" />
+
+      {/* AI quick-log — foto + texto entry points (hand off to scan-meal),
+          sitting above the search so they're the headline way to register. */}
+      <View style={styles.methods}>
+        <Pressable
+          onPress={handleScanPhoto}
+          style={[styles.method, styles.methodTile]}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar una comida con foto"
+        >
+          <View style={styles.methodIcon}>
+            <CameraIcon color={colors.magenta} size={20} />
+          </View>
+          <Text style={styles.methodLabel}>Con foto</Text>
+        </Pressable>
+        <Pressable
+          onPress={handleScanText}
+          style={[styles.method, styles.methodTile]}
+          accessibilityRole="button"
+          accessibilityLabel="Registrar una comida escribiéndola"
+        >
+          <View style={styles.methodIcon}>
+            <KeyboardIcon color={colors.magenta} />
+          </View>
+          <Text style={styles.methodLabel}>Con texto</Text>
+        </Pressable>
+      </View>
 
       <TextInput
         style={styles.searchField}
@@ -451,7 +559,7 @@ export function MealComposer({ onOpenMeal }: Props) {
       </View>
 
       <View style={styles.list}>
-        {history.map((item, i) => {
+        {visible.map((item, i) => {
           const isConfirmed = confirmed === item.name
           const norm = freqSpan === 0 ? 1 : (item.freq - minFreq) / freqSpan
           const starSize = MIN_STAR + norm * (MAX_STAR - MIN_STAR)
@@ -484,9 +592,11 @@ export function MealComposer({ onOpenMeal }: Props) {
                 name={item.name}
                 protein={item.protein_g}
                 calories={item.calories}
+                freq={item.freq}
+                photoPath={item.photo_storage_path}
                 state={isConfirmed ? 'confirmed' : 'idle'}
                 onPress={() => handleLogRow(item)}
-                onCardPress={() => onOpenMeal(item.id)}
+                onCardPress={() => onOpenMeal(item.id, item.photo_storage_path ?? undefined)}
               />
             </View>
           )
@@ -500,11 +610,58 @@ export function MealComposer({ onOpenMeal }: Props) {
           </Text>
         ) : null}
       </View>
+
+      {collapsible ? (
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          style={styles.showMore}
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Mostrar menos comidas' : 'Mostrar todas tus comidas'}
+        >
+          <Text style={styles.showMoreText}>
+            {expanded ? 'Ver menos' : `Ver todas · ${history.length}`}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  // AI quick-log tiles — the two headline entry points above the search.
+  methods: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  method: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 15,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  methodTile: {
+    borderColor: colors.magentaTint2,
+    backgroundColor: colors.magentaTint,
+  },
+  methodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.magentaTint2,
+  },
+  methodLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+    letterSpacing: 0.3,
+  },
   searchField: {
     height: 46,
     backgroundColor: colors.bgCard,
@@ -579,6 +736,19 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
     paddingVertical: 10,
+  },
+  // "Ver todas / Ver menos" — expande la estela compactada.
+  showMore: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  showMoreText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+    letterSpacing: 0.3,
   },
   // The new-meal form — a contained card so the mode-shift (search →
   // create) reads as a distinct, deliberate step.

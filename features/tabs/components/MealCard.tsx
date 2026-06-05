@@ -1,14 +1,45 @@
 import type { StyleProp, ViewStyle } from 'react-native'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import Svg, { Path } from 'react-native-svg'
 
+import { mealPhotoUrl } from '@/features/macros/api'
 import { colors, typography } from '@/theme'
 
 export type MealCardState = 'idle' | 'confirmed' | 'dimmed'
+
+// A bowl with a wisp of steam — the placeholder when a meal has no photo.
+function BowlIcon({ color, size = 22 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 11 H21" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path
+        d="M4.2 11 C 4.6 16.6 7.8 20 12 20 C 16.2 20 19.4 16.6 19.8 11"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M9.4 4.6 c1.1 1.3 1.1 2 0 3.3 M14 4.6 c1.1 1.3 1.1 2 0 3.3"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
 
 type Props = {
   name: string
   protein: number
   calories: number
+  /** Veces que la comida aparece en la estela (recurrencia). Se muestra
+   *  solo si > 1 — una comida registrada una vez no es "repetida". */
+  freq?: number
+  /** Storage path de la foto del platillo. Si se pasa la prop (aunque sea
+   *  null) se reserva el thumbnail; null → monograma. Sin la prop, no hay
+   *  thumbnail (p.ej. el quick-log de Hoy). */
+  photoPath?: string | null
   state?: MealCardState
   /** The "+" circle action — and the whole card when onCardPress is absent. */
   onPress: () => void
@@ -37,6 +68,8 @@ export function MealCard({
   name,
   protein,
   calories,
+  freq,
+  photoPath,
   state = 'idle',
   onPress,
   onCardPress,
@@ -67,6 +100,9 @@ export function MealCard({
         style={[styles.macros, compact && styles.macrosCompact, confirmed && styles.textOnStamp]}
       >
         {Math.round(protein)} g · {calories} kcal
+        {freq != null && freq > 1 ? (
+          <Text style={[styles.freq, confirmed && styles.textOnStamp]}>{`  ·  ${freq} veces`}</Text>
+        ) : null}
       </Text>
     </>
   )
@@ -76,6 +112,20 @@ export function MealCard({
       {confirmed ? '✓' : '+'}
     </Text>
   )
+
+  // Dish thumbnail — only when the caller opts in (passes photoPath, even
+  // null). The photo if there is one; otherwise a monogram so the row
+  // keeps its alignment instead of leaving a hole.
+  const thumb =
+    photoPath !== undefined ? (
+      photoPath ? (
+        <Image source={{ uri: mealPhotoUrl(photoPath) }} style={styles.thumb} resizeMode="cover" />
+      ) : (
+        <View style={[styles.thumb, styles.thumbEmpty]}>
+          <BowlIcon color={colors.niebla} />
+        </View>
+      )
+    ) : null
 
   // Estela — one card surface, two tap targets inside it: the body
   // opens the editor, the "+" circle logs the meal.
@@ -91,7 +141,8 @@ export function MealCard({
           accessibilityLabel={`Editar ${name}`}
           accessibilityHint="Abre la comida en el editor"
         >
-          {content}
+          {thumb}
+          <View style={styles.bodyText}>{content}</View>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -122,7 +173,10 @@ export function MealCard({
       accessibilityRole="button"
       accessibilityLabel={`Sumar ${name}`}
     >
-      <View style={styles.body}>{content}</View>
+      <View style={styles.body}>
+        {thumb}
+        <View style={styles.bodyText}>{content}</View>
+      </View>
       <View
         style={[
           styles.circle,
@@ -163,10 +217,31 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 12,
   },
-  // The body — name + macros; on the estela it's the editor's target.
+  // The body — thumb + name/macros; on the estela it's the editor's target.
   body: {
     flex: 1,
     minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  bodyText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  // Dish thumbnail — circular. The plate's photo, or a bowl icon when
+  // none, so the estela reads as a gallery of what you actually eat.
+  thumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  thumbEmpty: {
+    backgroundColor: colors.bgCard2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // One surface step up — for cards sitting on a bgCard surface.
   cardElevated: {
@@ -193,6 +268,12 @@ const styles = StyleSheet.create({
   macrosCompact: {
     marginTop: 1,
     fontSize: typography.sizes.caption,
+  },
+  // Recurrencia — el dato que da sentido a la estela. Brilla un punto
+  // más que los macros para leerse como la señal, no como ruido.
+  freq: {
+    fontFamily: typography.uiBold,
+    color: colors.leche,
   },
   textOnStamp: {
     color: colors.leche,

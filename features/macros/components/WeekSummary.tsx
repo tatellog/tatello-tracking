@@ -1,83 +1,102 @@
+import { type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { WeekRing } from '@/features/macros/components/WeekRing'
 import type { WeeklyMealStats } from '@/features/macros/logic'
 import { colors, typography } from '@/theme'
 
 /*
- * "Esta semana" — a calm, collapsible weekly read of food, living in the
- * Comidas tab (its natural home; NOT a stats tab, NOT Progreso — that's
- * the body). Manifesto-safe by construction: it surfaces PROTEIN (the
- * cared metric) and logging CONSISTENCY, in coach voice, opening with a
+ * "Esta semana" — a calm weekly read of food, living in the Comidas tab
+ * (its natural home; NOT a stats tab, NOT Progreso — that's the body).
+ * Manifesto-safe by construction: it surfaces PROTEIN (the cared metric)
+ * and logging CONSISTENCY as plain counts, in coach voice, opening with a
  * warm line before any number. It never counts "good/bad" foods, never
- * shows a %-to-goal, never a calorie headline.
+ * shows a %-to-goal, never a calorie headline, never a "/7" quota.
  *
- * Collapsed by default — the day's sky stays the tab's focus; the week is
- * a layer the user opens, not one that asks for attention.
+ * Three stats in a row — comidas · días con registro · proteína/día — in
+ * a NEUTRAL data language (line icons, not moon/star glyphs): the Cielo's
+ * moon and the Estela's stars already carry meaning, so this module reads
+ * as the observatory's instrument panel, not a third constellation. It
+ * REGISTERS, it does not interpret — the weekly reading lives in Órbita.
  */
 
-// A weekly claim ("esta semana cuidaste tu proteína") needs enough days
-// to be honest — 1-2 logged days isn't a week. Below this we use a gentler
-// "still drawing" line so the card never over-claims from thin data.
-const MIN_DAYS_FOR_WEEKLY_CLAIM = 3
+// Comidas RECUENTA, no interpreta — un encabezado FIJO que abre el recuento
+// sin calificar el volumen ni afirmar efectos en el cuerpo (eso es la Lectura
+// Semanal de Órbita). Agnóstico al número de días para no "premiar" cierto
+// conteo: deja que los tres stats hablen.
+const WEEK_HEADER = 'Esto es lo que sumaste esta semana.'
 
-/** The warm opening line — picks the sentence from the shape of the week,
- *  always observing, never racing or scolding. */
-function coachLine(stats: WeeklyMealStats): string {
-  const { daysLogged, daysHitProtein } = stats
-  if (
-    daysHitProtein != null &&
-    daysLogged >= MIN_DAYS_FOR_WEEKLY_CLAIM &&
-    daysHitProtein * 2 >= daysLogged
-  ) {
-    return 'Esta semana cuidaste tu proteína. Tu cuerpo lo nota.'
-  }
-  if (daysLogged >= 4) {
-    return 'Vas dejando rastro. Cada registro te ayuda a verte.'
-  }
-  return 'Tu semana se está dibujando, día a día.'
-}
+// ── Íconos de dato · estilo de línea neutro, hermanos de CameraIcon /
+//    BowlIcon. Tintados por prop (niebla), NO glifos celestes. ──
 
-function ConsistencyLine({ stats }: { stats: WeeklyMealStats }) {
-  // No fixed "/7" denominator — a count, never a streak/quota (which the
-  // manifesto forbids). "Registraste · N días" observes, doesn't grade.
+// Bowl — réplica del glifo canónico de comida (MealCard).
+function BowlIcon({ color, size = 20 }: { color: string; size?: number }) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>Registraste</Text>
-      <Text style={styles.rowValue}>
-        <Text style={styles.rowNum}>{stats.daysLogged}</Text>
-        <Text style={styles.rowUnit}> días</Text>
-      </Text>
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 11 H21" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path
+        d="M4.2 11 C 4.6 16.6 7.8 20 12 20 C 16.2 20 19.4 16.6 19.8 11"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M9.4 4.6 c1.1 1.3 1.1 2 0 3.3 M14 4.6 c1.1 1.3 1.1 2 0 3.3"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </Svg>
   )
 }
 
-function ProteinLine({ stats }: { stats: WeeklyMealStats }) {
-  if (stats.proteinTarget != null && stats.daysHitProtein != null) {
-    return (
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>Proteína en tu referencia</Text>
-        <Text style={styles.rowValue}>
-          <Text style={styles.rowNum}>{stats.daysHitProtein}</Text>
-          <Text style={styles.rowUnit}> de {stats.daysLogged} días</Text>
-        </Text>
-      </View>
-    )
-  }
-  if (stats.proteinAvgPerLoggedDay != null) {
-    return (
-      <View style={styles.row}>
-        <Text style={styles.rowLabel}>Proteína promedio</Text>
-        <Text style={styles.rowValue}>
-          <Text style={styles.rowNum}>{Math.round(stats.proteinAvgPerLoggedDay)}</Text>
-          <Text style={styles.rowUnit}> g por día</Text>
-        </Text>
-      </View>
-    )
-  }
-  return null
+// Calendario — días con registro. Sin números dentro; el dato vive afuera.
+function DaysIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={3.5} y={5} width={17} height={15.5} rx={2.6} stroke={color} strokeWidth={1.8} />
+      <Path d="M3.5 9.5 H20.5" stroke={color} strokeWidth={1.8} />
+      <Path d="M8 3.2 V6.4 M16 3.2 V6.4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Circle cx={8.4} cy={14.4} r={1.05} fill={color} />
+    </Svg>
+  )
+}
+
+// Diana calma — proteína. Anillos concéntricos, sin flecha ni cruz: lee
+// como "referencia", no como blanco de tiro / cuota.
+function TargetIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={8.2} stroke={color} strokeWidth={1.8} />
+      <Circle cx={12} cy={12} r={4.3} stroke={color} strokeWidth={1.8} />
+      <Circle cx={12} cy={12} r={1.5} fill={color} />
+    </Svg>
+  )
+}
+
+function Stat({
+  icon,
+  value,
+  label,
+  a11y,
+}: {
+  icon: ReactNode
+  value: string
+  label: string
+  a11y: string
+}) {
+  return (
+    <View style={styles.stat} accessible accessibilityLabel={a11y}>
+      <View style={styles.statIcon}>{icon}</View>
+      <Text style={styles.statNum}>{value}</Text>
+      <Text style={styles.statLabel} numberOfLines={2}>
+        {label}
+      </Text>
+    </View>
+  )
 }
 
 export function WeekSummary({
@@ -94,9 +113,8 @@ export function WeekSummary({
   if (isLoading || isError || !stats) return null
 
   const hasData = stats.daysLogged > 0
+  const proteinPerDay = Math.round(stats.proteinAvgPerLoggedDay ?? 0)
 
-  // Always visible (not collapsible) — the owner wants the week present,
-  // not behind a tap.
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
@@ -108,14 +126,34 @@ export function WeekSummary({
       <Animated.View entering={FadeIn.duration(260)} style={styles.body}>
         {hasData ? (
           <>
-            <Text style={styles.coach}>{coachLine(stats)}</Text>
-            <WeekRing stats={stats} />
-            <ConsistencyLine stats={stats} />
-            <ProteinLine stats={stats} />
+            <Text style={styles.coach}>{WEEK_HEADER}</Text>
+
+            <View style={styles.statsRow}>
+              <Stat
+                icon={<BowlIcon color={colors.niebla} />}
+                value={`${stats.totalMeals}`}
+                label="comidas"
+                a11y={`${stats.totalMeals} comidas sumadas esta semana`}
+              />
+              <View style={styles.divider} />
+              <Stat
+                icon={<DaysIcon color={colors.niebla} />}
+                value={`${stats.daysLogged}`}
+                label="días con registro"
+                a11y={`${stats.daysLogged} días con registro esta semana`}
+              />
+              <View style={styles.divider} />
+              <Stat
+                icon={<TargetIcon color={colors.niebla} />}
+                value={`${proteinPerDay}`}
+                label="g proteína/día"
+                a11y={`${proteinPerDay} gramos de proteína promedio por día`}
+              />
+            </View>
           </>
         ) : (
           <Text style={styles.empty}>
-            Tu semana apenas comienza. Con unos días de registro aparece tu patrón.
+            Tu semana apenas comienza. Con unos días de registro aparece tu rastro.
           </Text>
         )}
       </Animated.View>
@@ -138,7 +176,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 8,
+    paddingBottom: 18,
   },
   // The warm line opens the card, before any number.
   coach: {
@@ -147,35 +185,44 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     lineHeight: 21,
     color: colors.bone,
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  row: {
+  // Three instruments in a row — icon, number, label.
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'flex-start',
   },
-  rowLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+  stat: {
     flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
   },
-  rowValue: {
-    marginLeft: 12,
+  statIcon: {
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rowNum: {
+  // Present, not protagonist — 20px Hanken, not the 30/48 of hero numbers.
+  statNum: {
     fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.heading,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: -0.3,
   },
-  rowUnit: {
+  statLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
+    fontSize: typography.sizes.caption,
     color: colors.niebla,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  // Partial hairline between instruments — breathes, doesn't reach the edges.
+  divider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'center',
+    height: 42,
+    backgroundColor: colors.hairline,
   },
   empty: {
     fontFamily: typography.serif,

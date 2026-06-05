@@ -1,11 +1,10 @@
 import { memo, useMemo } from 'react'
 import { useAnimatedProps, type SharedValue } from 'react-native-reanimated'
-import { Circle, G, Path } from 'react-native-svg'
+import { Circle, G } from 'react-native-svg'
 
 import { AnimatedG } from '../../animation/animated-components'
 import { AMBIENT_BUCKET_COUNT } from '../../constants'
 import { BUCKET_DRIFT, buildAmbientField } from '../../data/scatter'
-import { fourPointStarPath } from '../../geometry'
 import type { AmbientStar } from '../../types'
 
 export const AmbientField = memo(function AmbientField({
@@ -47,20 +46,15 @@ function AmbientBucket({
       transform: [{ translateX: Math.sin(a) * b.ax }, { translateY: Math.cos(a) * b.ay }],
     }
   })
+  // Campo ambiental = SOLO puntos redondos. Las 4 puntas (sparkle) se
+  // retiraron: leían como estrellas de la figura sueltas. El fondo es polvo
+  // de luz, nunca constelación. Brillo bajado un punto para que ni el dot
+  // más brillante compita con las estrellas encendidas.
   return (
     <AnimatedG animatedProps={animatedProps}>
-      {stars.map((s, i) =>
-        s.sparkle ? (
-          <Path
-            key={i}
-            d={fourPointStarPath(s.x, s.y, s.r * 2.4)}
-            fill="#F4ECDE"
-            opacity={s.baseOp * 4}
-          />
-        ) : (
-          <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.baseOp * 4} />
-        ),
-      )}
+      {stars.map((s, i) => (
+        <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F4ECDE" opacity={s.baseOp * 3} />
+      ))}
     </AnimatedG>
   )
 }
