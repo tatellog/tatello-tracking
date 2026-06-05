@@ -16,6 +16,22 @@ export async function getWaterGlasses(date: string): Promise<number> {
   return data?.glasses ?? 0
 }
 
+/** Glasses logged per day across an inclusive [startDate, endDate]
+ *  range — feeds the water-consistency row in Comidas. Days with no
+ *  row are simply absent (= 0). RLS scopes rows to the caller. */
+export async function getWaterInRange(
+  startDate: string,
+  endDate: string,
+): Promise<{ intake_date: string; glasses: number }[]> {
+  const { data, error } = await supabase
+    .from('water_intake')
+    .select('intake_date, glasses')
+    .gte('intake_date', startDate)
+    .lte('intake_date', endDate)
+  if (error) throw error
+  return data ?? []
+}
+
 export async function setWaterGlasses(date: string, glasses: number): Promise<void> {
   const userId = await requireUserId()
   const { error } = await supabase.from('water_intake').upsert(

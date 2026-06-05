@@ -4,49 +4,16 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { type CyclePhase } from '@/features/cycle/phase'
 import { track } from '@/lib/analytics'
-import { useCyclePhase } from '@/features/cycle/useCyclePhase'
-import { useMacroTargets, useMealsForDate, useWeeklyMealStats } from '@/features/macros/hooks'
-import { WeekSummary } from '@/features/macros/components/WeekSummary'
 import {
-  CoachLine,
-  DaySky,
-  MealComposer,
-  SkyBackground,
-  TabHeader,
-} from '@/features/tabs/components'
+  useMacroTargets,
+  useMealsForDate,
+  useNourishmentConsistency,
+} from '@/features/macros/hooks'
+import { NourishmentConsistency, NutritionMoon } from '@/features/macros/components'
+import { MealComposer, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
-
-type SkyCopy = { before: string; emphasis: string; after: string }
-
-function skyCopy(mealCount: number, phase: CyclePhase | null): SkyCopy {
-  if (mealCount === 0) {
-    return { before: 'Tu cielo de hoy está por ', emphasis: 'escribirse', after: '.' }
-  }
-  if (phase === 'lutea') {
-    return {
-      before: 'La semana antes de tu período tu cuerpo pide más. Y ',
-      emphasis: 'está bien',
-      after: '.',
-    }
-  }
-  if (phase === 'menstrual') {
-    return {
-      before: 'Estás menstruando. Comer con ',
-      emphasis: 'suavidad',
-      after: ' hoy es cuidarte.',
-    }
-  }
-  if (mealCount === 1) {
-    return { before: 'Una estrella. El día empieza a ', emphasis: 'nutrirse', after: '.' }
-  }
-  if (mealCount <= 3) {
-    return { before: 'Tu cielo se va ', emphasis: 'poblando', after: '.' }
-  }
-  return { before: 'Un cielo lleno. Hoy te ', emphasis: 'nutriste', after: '.' }
-}
 
 export default function MealsScreen() {
   return (
@@ -82,9 +49,7 @@ function MealsBody() {
     [meals],
   )
 
-  const cycle = useCyclePhase()
-  const coachCopy = skyCopy(meals.length, cycle?.phase ?? null)
-  const week = useWeeklyMealStats()
+  const nourish = useNourishmentConsistency()
 
   return (
     <View style={styles.screen}>
@@ -96,18 +61,19 @@ function MealsBody() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
-          <TabHeader title="Tus comidas" titleEmphasis="Tus" />
+          <TabHeader title="Comidas" />
+          <Text style={styles.subtitle}>Alimenta tu transformación.</Text>
 
-          <DaySky
-            meals={meals}
+          <NutritionMoon
             proteinValue={summary.protein}
             proteinTarget={targets?.protein_g}
             caloriesValue={summary.calories}
           />
-          <CoachLine
-            before={coachCopy.before}
-            emphasis={coachCopy.emphasis}
-            after={coachCopy.after}
+
+          <NourishmentConsistency
+            data={nourish.data}
+            isLoading={nourish.isLoading}
+            isError={nourish.isError}
           />
 
           {targets ? null : (
@@ -118,16 +84,11 @@ function MealsBody() {
               accessibilityLabel="Añadir una referencia de proteína"
             >
               <Text style={styles.targetInviteText}>
-                Las metas son opcionales. Añade una referencia de proteína cuando quieras.
+                La referencia de proteína es opcional. Añádela cuando quieras.
               </Text>
               <Text style={styles.targetInviteChevron}>›</Text>
             </Pressable>
           )}
-
-          {/* Esta semana — a calm, collapsible weekly read (protein +
-              logging consistency), in coach voice. Lives here, not in a
-              stats tab and not in Progreso (which is the body). */}
-          <WeekSummary stats={week.stats} isLoading={week.isLoading} isError={week.isError} />
 
           {/* Sumar comida (search / create) + Tu estela (the food
               history) — two sections, both owned by MealComposer. */}
@@ -152,6 +113,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 48,
+  },
+  // Sits tucked under the "Comidas" title (TabHeader owns its own bottom
+  // margin, so we pull the subtitle up to read as one header block).
+  subtitle: {
+    marginTop: -10,
+    marginBottom: 4,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   targetInvite: {
     flexDirection: 'row',

@@ -33,6 +33,9 @@ export const queryKeys = {
     // Under the 'macros','meals' prefix so meal mutations that invalidate
     // ['macros','meals'] also refresh the weekly aggregate for free.
     weeklyStats: (today: string) => ['macros', 'meals', 'weekly', today] as const,
+    // Under 'macros','meals' so a meal mutation that invalidates
+    // ['macros','meals'] also refreshes the 10-day consistency window.
+    nourishment: (today: string) => ['macros', 'meals', 'nourishment', today] as const,
     meal: (id: string) => ['macros', 'meal', id] as const,
     frequentMeals: () => ['macros', 'frequentMeals'] as const,
     suggestions: (mealType: string) => ['mealSuggestions', mealType] as const,
@@ -54,6 +57,7 @@ export const queryKeys = {
   water: {
     all: ['water'] as const,
     day: (date: string) => ['water', date] as const,
+    range: (start: string, end: string) => ['water', 'range', start, end] as const,
   },
   rest: {
     all: ['rest'] as const,
