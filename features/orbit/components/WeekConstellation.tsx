@@ -46,6 +46,7 @@ import Svg, {
 import { colors, typography } from '@/theme'
 
 import type { DiaSemana } from '../mock'
+import { useScreenActive } from '../useScreenActive'
 
 const WEEK_ART_PNG = require('@/assets/orbits-art/orbit-week-art.png')
 
@@ -1117,6 +1118,8 @@ export function WeekConstellation({
   onOpenDia: () => void
 }) {
   const reduced = useReducedMotion() ?? false
+  // Pause ambient loops when the Órbita tab isn't focused (see useScreenActive).
+  const screenActive = useScreenActive()
   // viewBox → pixel factor for the Skia flare overlay, from the wrap's
   // measured width. 0 until first layout (Canvas withheld until then).
   const [flareK, setFlareK] = useState(0)
@@ -1136,6 +1139,7 @@ export function WeekConstellation({
   const [tapCount, setTapCount] = useState(0)
 
   useEffect(() => {
+    if (!screenActive) return
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     drift.value = withRepeat(withTiming(1, { duration: 44000, easing: Easing.linear }), -1, false)
     spin.value = withRepeat(withTiming(1, { duration: 180000, easing: Easing.linear }), -1, false)
@@ -1150,7 +1154,7 @@ export function WeekConstellation({
       cancelAnimation(spin)
       cancelAnimation(todayPulse)
     }
-  }, [t, drift, spin, todayPulse])
+  }, [screenActive, t, drift, spin, todayPulse])
 
   const popT = useSharedValue(0)
   useEffect(() => {

@@ -74,6 +74,12 @@ export default function TabsLayout() {
         tabBar={(props) => <AppTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          // Suspend a tab's React renders when it's not focused (reduces commit
+          // + draw cost off-screen). NOTE: this does NOT stop the UI-thread
+          // `withRepeat` loops — Órbita's ambient clocks are gated separately on
+          // `useScreenActive()` (see features/orbit/useScreenActive.ts), which is
+          // what actually pauses the cosmos animation off-tab.
+          freezeOnBlur: true,
         }}
       >
         <Tabs.Screen

@@ -27,6 +27,8 @@ import {
   vec,
 } from '@shopify/react-native-skia'
 
+import { useScreenActive } from '../useScreenActive'
+
 /*
  * Cosmos — the deep field behind the orbital system. Drifting nebula
  * clouds plus a three-tier starfield (far / mid / near). The layers
@@ -491,9 +493,12 @@ export function ScreenCosmos({
   style?: StyleProp<ViewStyle>
 }) {
   const reduced = useReducedMotion() ?? false
+  // Pause the full-screen cosmos loops when the Órbita tab isn't focused.
+  const screenActive = useScreenActive()
   const t = useSharedValue(0)
   const drift = useSharedValue(0)
   useEffect(() => {
+    if (!screenActive) return
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     // Slow nebula drift — ~60 s/cycle, subliminal. (Was 44 s.)
     drift.value = withRepeat(withTiming(1, { duration: 60000, easing: Easing.linear }), -1, false)
@@ -501,7 +506,7 @@ export function ScreenCosmos({
       cancelAnimation(t)
       cancelAnimation(drift)
     }
-  }, [t, drift])
+  }, [screenActive, t, drift])
   // Scale star count with screen area — full-screen cosmos should
   // feel denser than the legacy diagram-bounded version.
   const starCount = Math.round(80 * (Math.min(width, height) / 393))

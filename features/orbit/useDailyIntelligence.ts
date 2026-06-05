@@ -22,6 +22,15 @@ import { getWeekSignals } from './api'
  */
 type Params = { today: string; todayGetDay: number; waterGoalGlasses: number }
 
+/*
+ * Whether to call the `daily-intelligence` Edge Function. While false we
+ * compute locally from the SAME shared lib — identical payload, but without a
+ * network round-trip that (until the function is reliably deployed) times out
+ * and falls back to local anyway, delaying the órbita's pattern sections. Flip
+ * to true once the function is live + verified in this environment.
+ */
+const INTELLIGENCE_VIA_EDGE_FN = false
+
 function shiftDate(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + days)
@@ -47,6 +56,9 @@ async function computeLocally(p: Params): Promise<Intelligence> {
 }
 
 async function fetchIntelligence(p: Params): Promise<Intelligence> {
+  // Skip the round-trip entirely while the Edge Function isn't the source of
+  // truth here — go straight to the identical local compute.
+  if (!INTELLIGENCE_VIA_EDGE_FN) return computeLocally(p)
   try {
     const { data, error } = await supabase.functions.invoke('daily-intelligence', { body: p })
     if (error) throw error

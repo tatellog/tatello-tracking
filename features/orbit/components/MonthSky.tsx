@@ -67,6 +67,7 @@ import ShineArt from '@/assets/orbits-art/shine-tint.svg'
 import { colors, typography } from '@/theme'
 
 import { type DimensionKey } from '../logic'
+import { useScreenActive } from '../useScreenActive'
 
 // NOTE: the BH hero PNG (orbit-month-bh.png) is temporarily removed so the
 // satellite chain is the protagonist. To restore: re-add `Image as SvgImage`
@@ -332,10 +333,11 @@ function rand(seed: number, i: number): number {
 }
 
 /** Background starfield — a sparse sprinkle so the eye reads
- *  "deep cosmic void", not "Milky Way". 70 candidates, ~55
- *  survive the central skip-zone around the centre. */
+ *  "deep cosmic void", not "Milky Way". 44 candidates, ~34 survive the
+ *  central skip-zone (was 70 — lowered for perf; they twinkle in shared
+ *  buckets, not one worklet per star). */
 type Star = { x: number; y: number; r: number; op: number; phase: number; speed: number }
-const STARS: readonly Star[] = Array.from({ length: 70 }, (_, i) => {
+const STARS: readonly Star[] = Array.from({ length: 44 }, (_, i) => {
   const x = rand(11, i) * W
   const y = rand(12, i) * W
   if (Math.hypot(x - CX, y - CY) < 60) return null
@@ -358,7 +360,7 @@ const STARS: readonly Star[] = Array.from({ length: 70 }, (_, i) => {
  *  re-seeds ~12 faint specks INTO the middle band so the empty centre
  *  reads as deep textured sky, not an erased layer. */
 type DeepStar = { x: number; y: number; r: number; op: number }
-const DEEP_STARS_BASE: readonly DeepStar[] = Array.from({ length: 80 }, (_, i) => {
+const DEEP_STARS_BASE: readonly DeepStar[] = Array.from({ length: 44 }, (_, i) => {
   const x = rand(31, i) * W
   const y = rand(32, i) * W
   if (Math.hypot(x - CX, y - CY) < 50) return null
@@ -383,6 +385,15 @@ const CENTRE_STARS: readonly DeepStar[] = Array.from({ length: 16 }, (_, i) => (
 }))
 
 const DEEP_STARS: readonly DeepStar[] = [...DEEP_STARS_BASE, ...CENTRE_STARS]
+
+// Foreground stars split into a few buckets that share ONE twinkle worklet
+// each (instead of one useAnimatedProps per star — ~34 worklets committing SVG
+// props every frame was a top perf cost). Each bucket pulses at a slightly
+// different phase so the field still doesn't shimmer in unison.
+const STAR_BUCKET_COUNT = 5
+const STAR_BUCKETS: readonly (readonly Star[])[] = Array.from({ length: STAR_BUCKET_COUNT }, (_, b) =>
+  STARS.filter((_, i) => i % STAR_BUCKET_COUNT === b),
+)
 
 /** Cosmic dust — a few large, very faint motes (not stars) that drift
  *  diagonally over the fog, biased to the left half (over the nebula
@@ -503,21 +514,29 @@ const SPINE_D = (() => {
 /* A single background star — twinkles asynchronously via its
  * `phase`. Bright at the peak of its wave, ~40 % of base at the
  * trough. */
-function TwinkleStar({ star, clock }: { star: Star; clock: SharedValue<number> }) {
+/* One bucket of foreground stars sharing a SINGLE twinkle worklet (group
+ * opacity wave), phased by `index`. Static (no worklet) under reduced motion. */
+function MonthStarBucket({
+  stars,
+  index,
+  clock,
+  reduced,
+}: {
+  stars: readonly Star[]
+  index: number
+  clock: SharedValue<number>
+  reduced: boolean
+}) {
   const animatedProps = useAnimatedProps(() => {
     'worklet'
-    const wave = 0.5 + 0.5 * Math.sin((clock.value * star.speed + star.phase) * 2 * Math.PI)
-    return { opacity: star.op * (0.4 + 0.6 * wave) }
+    const wave = 0.5 + 0.5 * Math.sin((clock.value * 1.1 + index / STAR_BUCKET_COUNT) * 2 * Math.PI)
+    return { opacity: 0.45 + 0.55 * wave }
   })
-  return (
-    <AnimatedCircle
-      cx={star.x}
-      cy={star.y}
-      r={star.r}
-      fill={SKY.starCore}
-      animatedProps={animatedProps}
-    />
-  )
+  const body = stars.map((s, i) => (
+    <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={SKY.starCore} opacity={s.op} />
+  ))
+  if (reduced) return <G>{body}</G>
+  return <AnimatedG animatedProps={animatedProps}>{body}</AnimatedG>
 }
 
 /* A nebula cloud that BREATHES — opacity ±22 % and scale ±4 % on a slow
@@ -588,10 +607,10 @@ function DustField({ clock, reduced }: { clock: SharedValue<number>; reduced: bo
  * sky. One only, never a meteor shower. Off under reduced motion. */
 const SHOOT_A = { x: 286, y: 28 }
 const SHOOT_B = { x: 196, y: 92 }
-function ShootingStar({ reduced }: { reduced: boolean }) {
+function ShootingStar({ reduced, screenActive }: { reduced: boolean; screenActive: boolean }) {
   const p = useSharedValue(0)
   useEffect(() => {
-    if (reduced) return
+    if (reduced || !screenActive) return
     p.value = withRepeat(
       withSequence(
         withTiming(0, { duration: 5000 }), // initial wait (invisible at t=0)
@@ -602,7 +621,7 @@ function ShootingStar({ reduced }: { reduced: boolean }) {
       false,
     )
     return () => cancelAnimation(p)
-  }, [reduced, p])
+  }, [reduced, screenActive, p])
   const animatedProps = useAnimatedProps(() => {
     'worklet'
     const t = p.value
@@ -1970,7 +1989,7 @@ const watchRevealStyles = StyleSheet.create({
   },
 })
 
-export function MonthSky({
+function MonthSkyImpl({
   satellites,
   onSatellitePress,
   selectedSatelliteId,
@@ -1998,6 +2017,9 @@ export function MonthSky({
   onCloseSatellite?: () => void
 }) {
   const reduced = useReducedMotion() ?? false
+  // Pause every ambient loop when the Órbita tab isn't focused (Freeze/
+  // freezeOnBlur don't stop the UI-thread withRepeat timers — this does).
+  const screenActive = useScreenActive()
   // One clock: `twinkle` (6 s) drives the starfield shimmer (and the
   // optional first-item "tap me" affordance pulse). The active node's
   // breathing aura + pulsing core run on their OWN clocks, owned by the
@@ -2019,6 +2041,7 @@ export function MonthSky({
   const [flareK, setFlareK] = useState(0)
 
   useEffect(() => {
+    if (!screenActive) return // off-tab → don't run the cosmos; cleanup paused it
     twinkle.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.linear }), -1, false)
     revealT.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     if (!reduced) {
@@ -2051,7 +2074,7 @@ export function MonthSky({
       cancelAnimation(nebulaBreath)
       cancelAnimation(dustDrift)
     }
-  }, [twinkle, revealT, driftSlow, driftFast, nebulaBreath, dustDrift, reduced])
+  }, [screenActive, twinkle, revealT, driftSlow, driftFast, nebulaBreath, dustDrift, reduced])
 
   // Parallax transforms — the deep starfield drifts a little, the near
   // NODES drift roughly double, so the eye infers depth between the layers.
@@ -2191,15 +2214,15 @@ export function MonthSky({
             <Ellipse rx={105} ry={158} cx={AXIS_X} cy={179} fill="url(#axis-haze)" />
           </AnimatedG>
 
-          {/* Foreground starfield — twinkles asynchronously (desynced speeds). */}
+          {/* Foreground starfield — bucketed twinkle (one worklet per bucket). */}
           <G>
-            {STARS.map((s, i) => (
-              <TwinkleStar key={`star-${i}`} star={s} clock={twinkle} />
+            {STAR_BUCKETS.map((group, b) => (
+              <MonthStarBucket key={`sb-${b}`} stars={group} index={b} clock={twinkle} reduced={reduced} />
             ))}
           </G>
 
           {/* Occasional shooting star — the upper-area sparkle. */}
-          <ShootingStar reduced={reduced} />
+          <ShootingStar reduced={reduced} screenActive={screenActive} />
 
           {/* Inner nebula wash — closer-in centre warmth. Fades during a
               reveal so the magenta doesn't bleed into the constellation. */}
@@ -2468,6 +2491,11 @@ export function MonthSky({
     </View>
   )
 }
+
+// Memoized: MonthSegment re-renders on every state tick, but the Skia/SVG
+// constellation tree is costly — only re-render when props actually change
+// (callbacks + evidence are now stabilized upstream).
+export const MonthSky = memo(MonthSkyImpl)
 
 const styles = StyleSheet.create({
   wrap: {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -71,10 +71,16 @@ export function MonthSegment() {
   const [selectedSatId, setSelectedSatId] = useState<string | null>(null)
   // One-time "toca un astro" hint — shown until the user taps a satellite.
   const [seenTapHint, markTapHint] = useSeenMesTapHint()
-  const handleSelectSat = (id: string) => {
-    setSelectedSatId(id)
-    if (!seenTapHint) markTapHint()
-  }
+  // Stable callbacks so MonthSky (memoized) doesn't re-render on every state
+  // change of this component — the constellation/Skia tree is expensive.
+  const handleSelectSat = useCallback(
+    (id: string) => {
+      setSelectedSatId(id)
+      if (!seenTapHint) markTapHint()
+    },
+    [seenTapHint, markTapHint],
+  )
+  const handleCloseSat = useCallback(() => setSelectedSatId(null), [])
   const satellites = useMemo<Satellite[]>(
     () =>
       monthSats.map((s) => ({
@@ -86,7 +92,25 @@ export function MonthSegment() {
       })),
     [monthSats, selectedSatId],
   )
-  const selectedSat = selectedSatId ? monthSats.find((s) => s.id === selectedSatId) : null
+  // Memoized so `evidence` (and thus MonthSky's memo) only changes on a real
+  // selection change — not on every incidental re-render of this component.
+  const selectedSat = useMemo(
+    () => (selectedSatId ? (monthSats.find((s) => s.id === selectedSatId) ?? null) : null),
+    [monthSats, selectedSatId],
+  )
+  // Stable evidence object (a new inline object each render defeats MonthSky's memo).
+  const evidence = useMemo(
+    () =>
+      selectedSat
+        ? {
+            label: selectedSat.label,
+            caption: selectedSat.caption,
+            detail: selectedSat.detail,
+            tentative: selectedSat.tentative,
+          }
+        : null,
+    [selectedSat],
+  )
 
   // During a reveal the header recedes so the constellation is the sole
   // protagonist (the chain dims inside MonthSky, the bg magenta fades too).
@@ -154,17 +178,8 @@ export function MonthSegment() {
           satellites={satellites}
           onSatellitePress={handleSelectSat}
           selectedSatelliteId={selectedSatId}
-          evidence={
-            selectedSat
-              ? {
-                  label: selectedSat.label,
-                  caption: selectedSat.caption,
-                  detail: selectedSat.detail,
-                  tentative: selectedSat.tentative,
-                }
-              : null
-          }
-          onCloseSatellite={() => setSelectedSatId(null)}
+          evidence={evidence}
+          onCloseSatellite={handleCloseSat}
         />
       </View>
 

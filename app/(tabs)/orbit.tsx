@@ -83,9 +83,13 @@ function OrbitBody() {
             <OrbitSegments value={segment} onChange={setSegment} />
           </Animated.View>
 
-          {/* key re-mounts on switch so the fade-in replays per segment.
-              Semana hands the segment switch back so its "Abrir Día"
-              CTA can swap us into Día. */}
+          {/* Only the active segment is mounted — so only ONE constellation's
+              Reanimated loops + Skia canvas exist at a time. (Keeping all three
+              mounted + frozen does NOT pause Reanimated loops — react-freeze
+              only suspends React renders, the withRepeat timers keep running on
+              the UI thread — so it would TRIPLE the animation load. Conditional
+              mount is the cheaper baseline.) The `key` replays the fade-in.
+              Semana hands the segment switch back for its "Abrir Día" CTA. */}
           {segment === 'dia' ? (
             <DaySegment key="dia" />
           ) : segment === 'semana' ? (

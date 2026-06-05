@@ -55,6 +55,7 @@ import {
   type ConstellationProfile,
 } from '../constants/constellationTheme'
 import { EN_LUZ_THRESHOLD, TONE_BRILLANTE, type Dimension, type DimensionKey } from '../logic'
+import { useScreenActive } from '../useScreenActive'
 
 import { GLYPHS } from './dimensionGlyphs'
 
@@ -361,7 +362,10 @@ export function OrbitalSystem({
   // to ScreenCosmos, which now owns the full-screen cosmic backdrop.
   const t = useSharedValue(0)
   const slowClock = useSharedValue(0)
+  // Pause ambient loops when the Órbita tab isn't focused (see useScreenActive).
+  const screenActive = useScreenActive()
   useEffect(() => {
+    if (!screenActive) return
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     slowClock.value = withRepeat(
       withTiming(1, { duration: profile.glowDurationMs, easing: Easing.linear }),
@@ -372,7 +376,7 @@ export function OrbitalSystem({
       cancelAnimation(t)
       cancelAnimation(slowClock)
     }
-  }, [t, slowClock, profile.glowDurationMs])
+  }, [screenActive, t, slowClock, profile.glowDurationMs])
 
   // Tap feedback: popT amplifies the selected star; rippleT drives
   // a shockwave ring out of it.
@@ -468,13 +472,14 @@ export function OrbitalSystem({
   // fixed. 180 s/cycle (2°/s) — visible but not distracting.
   const dustOrbit = useSharedValue(0)
   useEffect(() => {
+    if (!screenActive) return
     dustOrbit.value = withRepeat(
       withTiming(360, { duration: 180000, easing: Easing.linear }),
       -1,
       false,
     )
     return () => cancelAnimation(dustOrbit)
-  }, [dustOrbit])
+  }, [screenActive, dustOrbit])
   // Rest-state mini labels — visible at zoomT = 0 (no selection)
   // so a new user can read "mente / sueño / alimento / …" right
   // next to each star without needing a side panel. Fade aggressively
