@@ -1,5 +1,5 @@
+import Constants from 'expo-constants'
 import { LinearGradient } from 'expo-linear-gradient'
-import * as Notifications from 'expo-notifications'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -29,6 +29,14 @@ import { colors, typography } from '@/theme'
 
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
+
+// Expo Go (SDK 53+) stripped expo-notifications' native module, and merely
+// IMPORTING it at module scope throws a console error on Android. So we keep
+// the import DYNAMIC (loaded inside handleContinue) and skip the native
+// permission call entirely when running in Expo Go — the window preference is
+// still saved, and the real OS prompt fires in a dev/preview build. The
+// runtime scheduler (a later deliverable) reads the permission anyway.
+const isExpoGo = Constants.executionEnvironment === 'storeClient'
 
 /** One reading-window option. `description` is the tagline below the
  *  label so each card carries weight — not a flat one-word row. */
@@ -174,8 +182,13 @@ export default function NotificationsScreen() {
     try {
       // Only fire the OS prompt when the user actually wants notifications.
       // 'not_yet' saves the preference + skips the ask — Stelar surfaces a
-      // soft re-ask later, not now.
-      if (window !== 'not_yet') {
+      // soft re-ask later, not now. In Expo Go there is no native module to
+      // ask, so we skip straight to saving the window (the OS prompt fires in
+      // a dev/preview build).
+      if (window !== 'not_yet' && !isExpoGo) {
+        // Dynamic import: keeps expo-notifications off the module-eval path so
+        // it never throws on screen mount in Expo Go (see isExpoGo note).
+        const Notifications = await import('expo-notifications')
         const settings = await Notifications.getPermissionsAsync()
         if (settings.status !== 'granted' && settings.canAskAgain) {
           const result = await Notifications.requestPermissionsAsync({

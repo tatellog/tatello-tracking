@@ -348,7 +348,7 @@ export function TodayMealLog({ date, onOpenMeal }: Props) {
   if (!meals || meals.length === 0) {
     return (
       <View style={styles.emptyWrap}>
-        <Text style={styles.emptyTitle}>Aún no enciendes ninguna estrella hoy.</Text>
+        <Text style={styles.emptyTitle}>Aún no sumas comida hoy.</Text>
         <Text style={styles.emptyHint}>Cada comida que sumes aparece aquí, en orden.</Text>
       </View>
     )

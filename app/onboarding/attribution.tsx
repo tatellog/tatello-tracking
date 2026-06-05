@@ -285,7 +285,7 @@ function NebulaWash({ clock }: { clock: SharedValue<number> }) {
 
         {/* Painted galaxy — rotated, descentred, breathing opacity only. */}
         <AnimatedG animatedProps={imgProps}>
-          <G transform={`rotate(-18 ${PIVOT_X} ${PIVOT_Y})`}>
+          <G transform={[{ translateX: PIVOT_X }, { translateY: PIVOT_Y }, { rotate: '-18deg' }, { translateX: -PIVOT_X }, { translateY: -PIVOT_Y }]}>
             <SvgImage
               href={NEBULA_ART}
               x={IMG_X}

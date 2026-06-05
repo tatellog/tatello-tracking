@@ -761,7 +761,13 @@ export function OrbitalSystem({
               and the dimensions rise/fall together as one system (see
               `orbBreathProps` notes above). */}
           <AnimatedG mask="url(#bh-mask)" animatedProps={orbBreathProps}>
-            <G transform={`translate(${ART_TX} ${ART_TY}) scale(${ART_S})`}>
+            {/* Array-form transform — string SVG transforms crash
+                RNSVGGroup on Fabric Android with ClassCastException. */}
+            <G transform={[
+              { translateX: ART_TX },
+              { translateY: ART_TY },
+              { scale: ART_S },
+            ]}>
               <SvgImage
                 href={DAY_ORB_PNG}
                 x={0}
@@ -1096,7 +1102,16 @@ function DiffractionSpikes({
           its angle; the whole set rides the parent's single animated
           group, never animated individually. */}
       {corona.map((c, i) => (
-        <G key={`corona-${i}`} transform={`rotate(${c.angle} ${x} ${y})`}>
+        <G
+          key={`corona-${i}`}
+          transform={[
+            { translateX: x },
+            { translateY: y },
+            { rotate: `${c.angle}deg` },
+            { translateX: -x },
+            { translateY: -y },
+          ]}
+        >
           <Ellipse
             cx={x + c.rx}
             cy={y}
@@ -1121,14 +1136,38 @@ function DiffractionSpikes({
           rotation attribute. */}
       {dOp > 0 ? (
         <>
-          <G transform={`rotate(45 ${x} ${y})`}>
+          <G
+            transform={[
+              { translateX: x },
+              { translateY: y },
+              { rotate: '45deg' },
+              { translateX: -x },
+              { translateY: -y },
+            ]}
+          >
             <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
           </G>
-          <G transform={`rotate(-45 ${x} ${y})`}>
+          <G
+            transform={[
+              { translateX: x },
+              { translateY: y },
+              { rotate: '-45deg' },
+              { translateX: -x },
+              { translateY: -y },
+            ]}
+          >
             <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
           </G>
           {/* Asymmetric extra rays — slightly shorter + dimmer. */}
-          <G transform={`rotate(22 ${x} ${y})`}>
+          <G
+            transform={[
+              { translateX: x },
+              { translateY: y },
+              { rotate: '22deg' },
+              { translateX: -x },
+              { translateY: -y },
+            ]}
+          >
             <Ellipse
               cx={x}
               cy={y}
@@ -1138,7 +1177,15 @@ function DiffractionSpikes({
               opacity={dOp * 0.7}
             />
           </G>
-          <G transform={`rotate(-68 ${x} ${y})`}>
+          <G
+            transform={[
+              { translateX: x },
+              { translateY: y },
+              { rotate: '-68deg' },
+              { translateX: -x },
+              { translateY: -y },
+            ]}
+          >
             <Ellipse
               cx={x}
               cy={y}

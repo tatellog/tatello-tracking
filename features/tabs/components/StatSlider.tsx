@@ -833,7 +833,13 @@ function CycleDial({ day, cycleLength }: { day: number; cycleLength: number }) {
         fill="none"
         strokeLinecap="round"
         strokeDasharray={`${filled} ${DIAL_CIRC}`}
-        transform={`rotate(-90 ${DIAL_CX} ${DIAL_CY})`}
+        transform={[
+          { translateX: DIAL_CX },
+          { translateY: DIAL_CY },
+          { rotate: '-90deg' },
+          { translateX: -DIAL_CX },
+          { translateY: -DIAL_CY },
+        ]}
       />
       <Circle cx={markerX} cy={markerY} r={3.6} fill={colors.magenta} />
     </Svg>

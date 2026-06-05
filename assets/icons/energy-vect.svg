@@ -26,7 +26,8 @@
   <!-- Dust dots: bottom-left -->
   <circle cx="146" cy="654" r="7" fill="#EEDD91" fill-opacity="0.6"/>
   <circle cx="186" cy="690" r="4" fill="#EEDD91" fill-opacity="0.4"/>
-  <!-- Comet-trail dabs -->
-  <ellipse cx="704" cy="624" rx="22" ry="3" fill="#EEDD91" fill-opacity="0.3" transform="rotate(-28 704 624)"/>
-  <ellipse cx="132" cy="252" rx="18" ry="2.5" fill="#DCCC7B" fill-opacity="0.3" transform="rotate(34 132 252)"/>
+  <!-- Comet-trail dabs (paths instead of ellipses + transform —
+       transformer-generated string transforms crash RNSVG on Fabric Android) -->
+  <path fill="#EEDD91" fill-opacity="0.3" d="M723.6 634.3 a22 3 -28 1 1 -39.2 -20.6 a22 3 -28 1 1 39.2 20.6 Z"/>
+  <path fill="#DCCC7B" fill-opacity="0.3" d="M147.1 261.6 a18 2.5 34 1 1 -30.2 -19.2 a18 2.5 34 1 1 30.2 19.2 Z"/>
 </svg>

@@ -18,9 +18,11 @@ import { colors, typography } from '@/theme'
 
 import { QuickLogSheet } from './QuickLogSheet'
 
-// 4-point star — the shared "enciende una estrella" glyph, matching
-// MealComposer and TodayMealLog. The FAB is that action made global.
-const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
+// A 4-point star with WIDE arms — reads as a "+" (add) AND keeps the
+// "enciende una estrella" brand glyph (the deep-concave sparkle didn't say
+// "create" to a first-time user; widening the waist toward a plus does,
+// without throwing away the star). Same family as MealComposer/TodayMealLog.
+const STAR_PATH = 'M12 2 L15.3 8.7 L21.5 12 L15.3 15.3 L12 22 L8.7 15.3 L2.5 12 L8.7 8.7 Z'
 const PILL_HEIGHT = 62
 const FAB_SIZE = 56
 
@@ -81,8 +83,9 @@ function QuickLogFab({ onPress }: { onPress: () => void }) {
         onPress()
       }}
       accessibilityRole="button"
-      accessibilityLabel="Sumar comida"
-      accessibilityHint="Abre el registro rápido de comida"
+      accessibilityLabel="Registro rápido"
+      accessibilityHint="Registra una comida, tu peso o tu agua"
+      style={styles.fabColumn}
     >
       <View style={styles.fabWrap}>
         <Animated.View style={[styles.fabHalo, haloStyle]} pointerEvents="none" />
@@ -90,6 +93,10 @@ function QuickLogFab({ onPress }: { onPress: () => void }) {
           <StarGlyph size={23} />
         </Animated.View>
       </View>
+      {/* Micro-label: the FAB was the only unnamed element in a bar where
+          every tab is labelled — the word is what makes the ✦ legible as
+          "create" to a first-time user. */}
+      <Text style={styles.fabLabel}>Registrar</Text>
     </Pressable>
   )
 }
@@ -224,6 +231,21 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
+  },
+  // FAB column = disc + its micro-label, centred against the pill.
+  fabColumn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  // Micro-label under the FAB — same rhythm as the tab labels but magenta,
+  // because it names the primary action (not a destination).
+  fabLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.magenta,
   },
   // Layout box for the FAB — sized to the disc; the halo overflows it.
   fabWrap: {

@@ -233,7 +233,7 @@ function RescanIcon({ color }: { color: string }) {
 // Reviewed with voice-and-copy (v3.0): no judgement, no guilt, no push.
 const REVEAL_LINES = [
   'Registrado. Tu día va tomando forma.',
-  'Una estrella más en tu cielo.',
+  'Una comida más en tu cielo.',
   'Tu cielo te acompaña.',
   'Cada registro deja luz.',
   'Aquí sigues.',

@@ -128,6 +128,18 @@ export function LunarConstellation({
     y: (transform.ty + transform.sy * yVb) * k,
   })
 
+  // Array-form transform for the SVG <G>. We can't use the string
+  // form `"translate(tx ty) scale(sx sy)"` because on Fabric Android
+  // the RNSVGGroup ViewManager expects a ReadableArray, not a String,
+  // and crashes with ClassCastException at mount. The array form is
+  // accepted on both arch types in react-native-svg 15+.
+  const signTransform = [
+    { translateX: transform.tx },
+    { translateY: transform.ty },
+    { scaleX: transform.sx },
+    { scaleY: transform.sy },
+  ]
+
   // Lit stars in pixel-space → fed to the Skia flare layer. Stripped
   // down to {x, y, mag} so the worklet only re-renders on actual layout
   // changes, not on the broader stars/litKeys identity churn.
@@ -172,7 +184,7 @@ export function LunarConstellation({
             <CanvasSkeleton
               stars={stars}
               lines={zodiac.lines}
-              transform={SIGN_CONSTELLATION_TRANSFORM[sign]}
+              transform={signTransform}
               reduce={reduceMotion}
             />
           </Animated.View>
@@ -250,7 +262,7 @@ export function LunarConstellation({
               native bbox to [28..183, 24..150]; the leading
               translate(69, 57) brings the result back centred on
               the lion's body at canvas (174, 144). */}
-              <G transform={SIGN_CONSTELLATION_TRANSFORM[sign]}>
+              <G transform={signTransform}>
                 {litCluster ? (
                   <>
                     <LitClusterAura

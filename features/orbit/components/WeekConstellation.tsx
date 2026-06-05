@@ -34,7 +34,6 @@ import Animated, {
 import Svg, {
   Circle,
   Defs,
-  Ellipse,
   G,
   Image as SvgImage,
   Path,
@@ -91,39 +90,6 @@ const DAY_POS: readonly { x: number; y: number }[] = [
 // MAR and MIE — the inner emblem must uniquely identify the day.
 const DAY_LABELS: readonly string[] = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB']
 const DAY_LETTERS: readonly string[] = ['D', 'L', 'Ma', 'Mi', 'J', 'V', 'S']
-
-// Orbital ellipses — overlapping dashed paths at different
-// inclinations + radii. Suggests a 3D orbital web (the painted PNG
-// has its own ring, these add programmatic layers + motion on top).
-const ORBIT_ELLIPSES: readonly {
-  rx: number
-  ry: number
-  rotation: number
-  strokeWidth: number
-  dash: string
-  opacity: number
-}[] = [
-  { rx: 145, ry: 138, rotation: 0, strokeWidth: 0.6, dash: '1.5 5', opacity: 0.55 },
-  { rx: 152, ry: 122, rotation: 18, strokeWidth: 0.5, dash: '1 6', opacity: 0.42 },
-  { rx: 138, ry: 148, rotation: -20, strokeWidth: 0.5, dash: '1.2 5', opacity: 0.45 },
-  { rx: 158, ry: 110, rotation: 38, strokeWidth: 0.45, dash: '1 7', opacity: 0.35 },
-  { rx: 122, ry: 152, rotation: -42, strokeWidth: 0.45, dash: '0.8 6', opacity: 0.32 },
-]
-
-// Inner orbital ellipses around the galactic bulge — cream stroke
-// (magenta-on-pink vanished on the bright nucleus), pushed outward
-// off the brightest pixels so they read instead of washing out.
-const CENTER_ELLIPSES: readonly {
-  rx: number
-  ry: number
-  rotation: number
-  strokeWidth: number
-  dash: string
-  opacity: number
-}[] = [
-  { rx: 80, ry: 66, rotation: 12, strokeWidth: 0.5, dash: '1.5 4', opacity: 0.7 },
-  { rx: 58, ry: 46, rotation: 55, strokeWidth: 0.4, dash: '1 4', opacity: 0.55 },
-]
 
 // Depth dust — sparse cream specks scattered between the galaxy
 // and the orbital ring. Adds parallax + "system" feel beyond the
@@ -1168,33 +1134,6 @@ export function WeekConstellation({
   const todayIdx = days.findIndex((d) => d.today)
   const exploring = selectedIdx !== todayIdx
 
-  const dustSpin = useAnimatedProps(() => {
-    'worklet'
-    const deg = spin.value * 360
-    return {
-      transform: [
-        { translateX: CX },
-        { translateY: CY },
-        { rotate: `${deg}deg` },
-        { translateX: -CX },
-        { translateY: -CY },
-      ],
-    }
-  })
-  const centerSpin = useAnimatedProps(() => {
-    'worklet'
-    const deg = -spin.value * 360 * 1.6
-    return {
-      transform: [
-        { translateX: CX },
-        { translateY: CY },
-        { rotate: `${deg}deg` },
-        { translateX: -CX },
-        { translateY: -CY },
-      ],
-    }
-  })
-
   return (
     <View
       style={styles.wrap}
@@ -1233,45 +1172,7 @@ export function WeekConstellation({
           ))}
         </G>
 
-        <AnimatedG animatedProps={dustSpin}>
-          {ORBIT_ELLIPSES.map((e, i) => (
-            <Ellipse
-              key={`orbit-${i}`}
-              cx={CX}
-              cy={CY}
-              rx={e.rx}
-              ry={e.ry}
-              fill="none"
-              stroke={colors.magentaHot}
-              strokeWidth={e.strokeWidth}
-              strokeDasharray={e.dash}
-              strokeLinecap="round"
-              opacity={e.opacity}
-              transform={`rotate(${e.rotation} ${CX} ${CY})`}
-            />
-          ))}
-        </AnimatedG>
-
         <ProgressArc todayIdx={todayIdx} />
-
-        <AnimatedG animatedProps={centerSpin}>
-          {CENTER_ELLIPSES.map((e, i) => (
-            <Ellipse
-              key={`center-${i}`}
-              cx={CX}
-              cy={CY}
-              rx={e.rx}
-              ry={e.ry}
-              fill="none"
-              stroke={colors.leche}
-              strokeWidth={e.strokeWidth}
-              strokeDasharray={e.dash}
-              strokeLinecap="round"
-              opacity={e.opacity}
-              transform={`rotate(${e.rotation} ${CX} ${CY})`}
-            />
-          ))}
-        </AnimatedG>
 
         {todayIdx >= 0 ? (
           <TodayPulseRing
