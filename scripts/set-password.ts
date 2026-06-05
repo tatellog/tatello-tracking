@@ -17,16 +17,21 @@ config({ path: '.env.local' })
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-const [email, password] = process.argv.slice(2)
+const [emailArg, passwordArg] = process.argv.slice(2)
 
 if (!url || !serviceKey) {
   console.error('Faltan EXPO_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local')
   process.exit(1)
 }
-if (!email || !password) {
+if (!emailArg || !passwordArg) {
   console.error('Uso: pnpm tsx scripts/set-password.ts <email> <nuevo-password>')
   process.exit(1)
 }
+
+// Narrowing a `string` tras el guard · TS no conserva el narrowing del
+// argv dentro de closures (main), así que lo fijamos en consts tipadas.
+const email = emailArg
+const password = passwordArg
 
 const supabase = createClient(url, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },

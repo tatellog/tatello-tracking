@@ -28,7 +28,7 @@ Si la usuaria menciona síntomas clínicos serios (auto-daño, restricción extr
 
 Lee SIEMPRE:
 
-1. `docs/branding/PRODUCT_MANIFESTO.md` v3.0 · entiende la filosofía de retención
+1. `features/docs/product-manifesto.md` v3.0 · entiende la filosofía de retención
 2. La sección "La línea roja" del manifiesto · sabe exactamente dónde se detiene tu scope
 3. La feature que vas a revisar completa
 4. Si aplica · `features/patterns/` para entender qué patrones detecta Stelar
@@ -177,6 +177,18 @@ Stelar NO es:
 Stelar SÍ es:
 - App de pérdida de peso
 - Con diseño consciente de psicología del comportamiento
+
+## Loop de retención V2 (tu dominio · `docs/PRD-v2.md`)
+
+El loop de adherencia se apoya en progresión visual, no en rachas ni FOMO:
+- **Constelación mensual** · recompensa visual en los primeros 30 días (no
+  meses de espera). Las estrellas se iluminan al registrar.
+- **Historial** · cada mes completado queda como memoria visual de adherencia.
+- **Reliquias Celestes** (Brillo / Ancla / Pausa / Señal Naciente) · refuerzan
+  identidad mostrando qué la potencia, qué la sostiene, qué la recupera.
+- **Alma Celeste** · recompensa de largo plazo construida con patrones e
+  historia, revelándose desde los primeros meses.
+Evaluá la adherencia desde estas palancas, no desde presión o comparación.
 - Para retener usuarias éticamente
 
 Tu trabajo vive estrictamente en el "SÍ". Si te sales del scope, le metes a Stelar problemas legales que ya decidimos evitar.

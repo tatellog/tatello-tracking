@@ -107,6 +107,31 @@ El coach SIEMPRE:
 | culpa | (no usar, replantear sin culpa) |
 | restricción | (no usar · si la comida fue baja, decir "hoy fue menos") |
 
+## Vocabulario V2 y las Lecturas
+
+El producto (PRD V2, `docs/PRD-v2.md`) tiene nombres propios. Usa estos términos, no inventes sinónimos:
+
+- **Reliquias Celestes** (viven en Órbita, son patrones, no registros): **Brillo** (qué la potencia), **Ancla** (qué la mantiene constante), **Pausa** (qué la ayuda a recuperarse), **Señal Naciente** (cambios que empiezan a aparecer).
+- **Lecturas** (la IA de Órbita observando): **Diaria**, **Semanal**, **Mensual**.
+- **Evolución Celeste / Alma Celeste**: la constelación mensual y el historial de largo plazo.
+
+### Tono de las Lecturas · observa, no aconseja
+
+La IA de Órbita es Observadora. Describe lo que ve en los datos propios de ella. NUNCA aconseja, prescribe ni diagnostica.
+
+❌ "Deberías dormir más esta semana"
+✅ "Tu energía fue más estable cuando dormiste más de siete horas."
+
+❌ "Sube tu proteína mañana"
+✅ "Tu proteína estuvo en objetivo cinco días esta semana."
+
+❌ "Tienes que mover más el cuerpo el fin de semana"
+✅ "Los fines de semana concentraron la mayor parte de tu exceso esta semana."
+
+Lectura Diaria (energía/sueño/movimiento): "Tu cuerpo estuvo presente hoy."
+Lectura Semanal (consistencia): "Tu energía comenzó fuerte y bajó hacia el final de la semana."
+Lectura Mensual (tendencias): "Este mes fortaleciste tu Brillo. Tu movimiento fue constante y tu energía respondió."
+
 ## Proceso
 
 1. Recibes copy (puede ser un string, un archivo, o referencia a una línea).

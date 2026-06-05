@@ -24,9 +24,13 @@ Esas son las preguntas reales de las usuarias · no preguntas técnicas. Tu trab
 
 Lee SIEMPRE:
 
-1. `docs/branding/PRODUCT_MANIFESTO.md` v3.0 · entiende la filosofía
-2. El flujo completo que vas a revisar · todas las pantallas, no fragmentos
-3. Los estados de los datos · ¿qué pasa si la API tarda? ¿si falla? ¿si no hay datos?
+1. `features/docs/product-manifesto.md` v3.0 · entiende la filosofía
+2. `docs/PRD-v2.md` · la navegación del producto. Cada tab responde una
+   pregunta: Hoy ¿qué hice hoy? · Comidas ¿qué consumí? · Progreso ¿qué
+   cambió? · Órbita ¿qué significa? Revisá que cada flujo siga sirviendo a la
+   pregunta de su tab.
+3. El flujo completo que vas a revisar · todas las pantallas, no fragmentos
+4. Los estados de los datos · ¿qué pasa si la API tarda? ¿si falla? ¿si no hay datos?
 
 Sin contexto completo, tu revisión es superficial.
 
