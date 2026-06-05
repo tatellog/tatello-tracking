@@ -9,8 +9,9 @@ import {
   useMacroTargets,
   useMealsForDate,
   useNourishmentConsistency,
+  useWeeklyMealStats,
 } from '@/features/macros/hooks'
-import { NourishmentConsistency, NutritionMoon } from '@/features/macros/components'
+import { NourishmentConsistency, NutritionMoon, WeekSummary } from '@/features/macros/components'
 import { MealComposer, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -50,6 +51,7 @@ function MealsBody() {
   )
 
   const nourish = useNourishmentConsistency()
+  const week = useWeeklyMealStats()
 
   return (
     <View style={styles.screen}>
@@ -62,18 +64,19 @@ function MealsBody() {
           keyboardDismissMode="interactive"
         >
           <TabHeader title="Comidas" />
-          <Text style={styles.subtitle}>Alimenta tu transformación.</Text>
 
           <NutritionMoon
             proteinValue={summary.protein}
             proteinTarget={targets?.protein_g}
             caloriesValue={summary.calories}
+            isLoading={mealsQuery.isLoading}
           />
 
           <NourishmentConsistency
             data={nourish.data}
             isLoading={nourish.isLoading}
             isError={nourish.isError}
+            onAddReference={() => router.push('/onboarding/macro-targets?source=banner')}
           />
 
           {targets ? null : (
@@ -93,8 +96,18 @@ function MealsBody() {
           {/* Sumar comida (search / create) + Tu estela (the food
               history) — two sections, both owned by MealComposer. */}
           <MealComposer
-            onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+            onOpenMeal={(id, photoPath) =>
+              router.push({
+                pathname: '/scan-meal',
+                params: { editId: id, ...(photoPath ? { photoPath } : {}) },
+              })
+            }
           />
+
+          {/* Esta semana — resumen de actividad (comidas · días · proteína/día),
+              debajo de Tu Estela. Volumen semanal, distinto de la adherencia
+              por-día de "Lo que alimenta tu transformación". */}
+          <WeekSummary stats={week.stats} isLoading={week.isLoading} isError={week.isError} />
         </ScrollView>
       </SafeAreaView>
     </View>

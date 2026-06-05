@@ -1,5 +1,5 @@
 import { type ReactElement } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Path } from 'react-native-svg'
 
 import type {
@@ -12,55 +12,97 @@ type Props = {
   data: NourishmentConsistencyData | null
   isLoading: boolean
   isError: boolean
+  /** Tapped on the protein-invite row when no reference is set. */
+  onAddReference?: () => void
 }
 
 /*
  * "Lo que alimenta tu transformación" — the consistency band in Comidas.
  *
- * Three read-only rows (Proteína / Registro / Agua) over the last 10
- * days, each a row of dots filled to the days fulfilled. Reinforces
- * CONSISTENCY, never scores it: an unmet day is just an unlit dot, never
- * red, never a verdict. The protein row is hidden entirely when no
- * reference is set (showing "0 de 10" would read as failure).
+ * Two read-only rows (Proteína + Agua — both real nutrients) over the
+ * last 10 days, each a row of dots filled to the days fulfilled.
+ * Reinforces CONSISTENCY, never scores it: an unmet day is just an unlit
+ * dot, never red, never a verdict.
+ *
+ * When no protein reference is set, the protein row becomes a gentle
+ * INVITE (not "0 de 10", which would read as failure, and not a single
+ * lonely Agua row, which reads as a broken card). On error the card
+ * stays put with a warm line — it never vanishes silently.
  */
-export function NourishmentConsistency({ data, isLoading, isError }: Props) {
-  if (isError) return null
-
-  const rows = data
-    ? [
-        data.protein
-          ? { key: 'protein', label: 'Proteína', score: data.protein, glyph: <ProteinGlyph /> }
-          : null,
-        { key: 'agua', label: 'Agua', score: data.agua, glyph: <AguaGlyph /> },
-      ].filter(
-        (r): r is { key: string; label: string; score: ConsistencyScore; glyph: ReactElement } =>
-          Boolean(r),
-      )
-    : []
+export function NourishmentConsistency({ data, isLoading, isError, onAddReference }: Props) {
+  let body: ReactElement
+  if (isError) {
+    body = (
+      <Text style={styles.empty}>
+        No pudimos reunir tus últimos días. Lo intentamos de nuevo en un momento.
+      </Text>
+    )
+  } else if (data == null) {
+    body = (
+      <Text style={styles.empty}>
+        {isLoading ? 'Reuniendo tus últimos días…' : 'Tus primeros días se irán dibujando aquí.'}
+      </Text>
+    )
+  } else {
+    body = (
+      <View style={styles.rows}>
+        {data.protein ? (
+          <ScoreRow label="Proteína" score={data.protein} glyph={<ProteinGlyph />} />
+        ) : (
+          <InviteRow onPress={onAddReference} />
+        )}
+        <ScoreRow label="Agua" score={data.agua} glyph={<AguaGlyph />} />
+      </View>
+    )
+  }
 
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>Lo que alimenta tu transformación</Text>
-
-      {data == null ? (
-        <Text style={styles.empty}>
-          {isLoading ? 'Reuniendo tus últimos días…' : 'Aún no hay días que mostrar.'}
-        </Text>
-      ) : (
-        <View style={styles.rows}>
-          {rows.map((row) => (
-            <View key={row.key} style={styles.row}>
-              <View style={styles.glyphBox}>{row.glyph}</View>
-              <Text style={styles.label}>{row.label}</Text>
-              <Dots score={row.score} />
-              <Text style={styles.count}>
-                {row.score.hit} <Text style={styles.countOf}>de {row.score.total}</Text>
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
+      {body}
     </View>
+  )
+}
+
+/* One fulfilled-days row: glyph · label · dots · "X de N". */
+function ScoreRow({
+  label,
+  score,
+  glyph,
+}: {
+  label: string
+  score: ConsistencyScore
+  glyph: ReactElement
+}) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.glyphBox}>{glyph}</View>
+      <Text style={styles.label}>{label}</Text>
+      <Dots score={score} />
+      <Text style={styles.count}>
+        {score.hit} <Text style={styles.countOf}>de {score.total}</Text>
+      </Text>
+    </View>
+  )
+}
+
+/* The protein row when there's no reference yet — a soft invite that
+ * keeps the card balanced (two rows) without ever showing "0 de 10". */
+function InviteRow({ onPress }: { onPress?: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={styles.row}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel="Añadir una referencia de proteína"
+    >
+      <View style={styles.glyphBox}>
+        <ProteinGlyph />
+      </View>
+      <Text style={styles.label}>Proteína</Text>
+      <Text style={styles.invite}>Añade una referencia{onPress ? ' ›' : ''}</Text>
+    </Pressable>
   )
 }
 
@@ -105,10 +147,14 @@ function AguaGlyph() {
 
 const styles = StyleSheet.create({
   card: {
-    marginTop: 16,
+    // Slightly less air than before: the hero's bottom fade is now a soft
+    // 0.78 wash (not a hard black cut), so it already eases into the card —
+    // 22 read as a gap. Softer hairline so it reads as a panel condensing
+    // out of the sky, not a foreign box.
+    marginTop: 18,
     borderRadius: 18,
     backgroundColor: colors.bgCard,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.hairline,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -163,6 +209,13 @@ const styles = StyleSheet.create({
   },
   dotOff: {
     backgroundColor: colors.hairline,
+  },
+  invite: {
+    flex: 1,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   count: {
     width: 58,

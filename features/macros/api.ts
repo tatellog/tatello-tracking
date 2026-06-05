@@ -153,6 +153,23 @@ export async function getMealsInRange(startDate: string, endDate: string): Promi
   return data
 }
 
+/** Thin projection for macro aggregates (the 10-day consistency window):
+ *  only the columns the pure logic needs, so the heavy `ai_raw_response`
+ *  jsonb never travels for a request that just sums protein. Keep
+ *  getMealsInRange for callers that paint the full meal (history, edit). */
+export async function getMealMacrosInRange(
+  startDate: string,
+  endDate: string,
+): Promise<{ meal_date: string | null; protein_g: number }[]> {
+  const { data, error } = await supabase
+    .from('meals')
+    .select('meal_date, protein_g')
+    .gte('meal_date', startDate)
+    .lte('meal_date', endDate)
+  if (error) throw error
+  return data ?? []
+}
+
 export async function getMealById(id: string): Promise<Meal | null> {
   const { data, error } = await supabase.from('meals').select('*').eq('id', id).maybeSingle()
   if (error) throw error

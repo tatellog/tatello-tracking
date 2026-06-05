@@ -17,7 +17,7 @@ export type MoonPhaseKey = 'nueva' | 'creciente' | 'cuarto' | 'gibosa' | 'llena'
 export type MoonPhase = {
   key: MoonPhaseKey
   /** Canonical phase emoji — kept for completeness/tests; the UI shows
-   *  the painted moon (moon.png + mask), not the glyph. */
+   *  the real crossfaded moon-phase images, not the glyph. */
   emoji: string
   label: string
   /** Coach voice (serif italic in the UI). Growth-framed, never guilt. */

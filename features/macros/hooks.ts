@@ -11,6 +11,7 @@ import {
   deleteMeal,
   getFrequentMeals,
   getMealById,
+  getMealMacrosInRange,
   getMealsForDate,
   getMealsInRange,
   updateMeal,
@@ -139,7 +140,8 @@ export function useNourishmentConsistency(): {
 
   const mealsQuery = useQuery({
     queryKey: queryKeys.macros.nourishment(today),
-    queryFn: () => getMealsInRange(start, today),
+    // Thin projection — only meal_date + protein_g (no heavy jsonb).
+    queryFn: () => getMealMacrosInRange(start, today),
     staleTime: 5 * 60_000,
     refetchOnMount: 'always',
   })
