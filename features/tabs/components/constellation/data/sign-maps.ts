@@ -64,10 +64,12 @@ export const SIGN_CONSTELLATION_TRANSFORM: Record<ZodiacSign, string> = {
   // canvas centre in the art).
   escorpio: 'translate(40 22) scale(0.72 0.82)',
   geminis: 'translate(52 43) scale(0.68)',
-  // Pulled left+up + slightly tighter (0.68 → 0.64) so the Sickle
-  // rides over the lion's head/mane instead of sitting low-right
-  // of it. Paired with the retuned star coords in figures.ts.
-  leo: 'translate(46 56) scale(0.64)',
+  // Busto cabeza+melena de perfil a la IZQUIERDA. La figura abarca casi
+  // todo el león: escala grande (0.82) para llenar cara + melena, corrida
+  // a la izquierda-arriba para que la Hoz caiga sobre la cara/corona. Las
+  // estrellas derechas (Zosma/Denebola) están metidas en figures.ts para
+  // que al crecer no toquen la ramita floral ni la luna. Sync con figures.ts.
+  leo: 'translate(38 42) scale(0.82)',
   libra: 'translate(48 33) scale(0.68)',
   piscis: 'translate(42 52) scale(0.68)',
   sagitario: 'translate(16 14) scale(0.68)',
@@ -89,7 +91,7 @@ export const SIGN_CONSTELLATION_TRANSFORM_PARAMS: Record<
   capricornio: { tx: 33, ty: 46, sx: 0.68, sy: 0.68 },
   escorpio: { tx: 40, ty: 22, sx: 0.72, sy: 0.82 },
   geminis: { tx: 52, ty: 43, sx: 0.68, sy: 0.68 },
-  leo: { tx: 46, ty: 56, sx: 0.64, sy: 0.64 },
+  leo: { tx: 38, ty: 42, sx: 0.82, sy: 0.82 },
   libra: { tx: 48, ty: 33, sx: 0.68, sy: 0.68 },
   piscis: { tx: 42, ty: 52, sx: 0.68, sy: 0.68 },
   sagitario: { tx: 16, ty: 14, sx: 0.68, sy: 0.68 },

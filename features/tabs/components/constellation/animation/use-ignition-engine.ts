@@ -32,6 +32,11 @@ export function useIgnitionEngine(opts: {
   trainedCount: number
   elementsLit: number
   sequence: SequenceEl[]
+  /** Grid de días entrenados del mes + índice de hoy. La celebración es
+   *  EXCLUSIVA de "entrené hoy" (la celda de hoy se enciende). Rellenar
+   *  días pasados desde el calendario llena en silencio. */
+  trained: readonly boolean[]
+  todayIdx: number
 }): {
   ignitingKey: string | null
   igniteT: SharedValue<number>
@@ -41,10 +46,11 @@ export function useIgnitionEngine(opts: {
   radialPulse: SharedValue<number>
   plusOne: SharedValue<number>
 } {
-  const { trainedCount, elementsLit, sequence } = opts
+  const { trainedCount, elementsLit, sequence, trained, todayIdx } = opts
 
   const prevLitRef = useRef(elementsLit)
   const prevCountRef = useRef(trainedCount)
+  const prevTrainedTodayRef = useRef(!!trained[todayIdx])
 
   const [ignitionQueue, setIgnitionQueue] = useState<SequenceEl[]>([])
   const [ignitingKey, setIgnitingKey] = useState<string | null>(null)
@@ -74,12 +80,25 @@ export function useIgnitionEngine(opts: {
   useEffect(() => {
     const prevLit = prevLitRef.current
     const prevCount = prevCountRef.current
+    const wasTrainedToday = prevTrainedTodayRef.current
     prevLitRef.current = elementsLit
     prevCountRef.current = trainedCount
+    prevTrainedTodayRef.current = !!trained[todayIdx]
 
     if (trainedCount === prevCount) return
 
     if (trainedCount < prevCount) {
+      displayedCount.value = trainedCount
+      return
+    }
+
+    // El reward (count-up, "+1", pulsos, flash de ignición) es EXCLUSIVO de
+    // "entrené hoy": solo cuando la celda de HOY se acaba de encender. Un
+    // backfill de día pasado desde el calendario llena en SILENCIO — las
+    // estrellas se prenden vía litKeys (fuera de este hook), sin celebración;
+    // el número solo salta al nuevo valor.
+    const isTodayCommit = !!trained[todayIdx] && !wasTrainedToday
+    if (!isTodayCommit) {
       displayedCount.value = trainedCount
       return
     }
@@ -118,6 +137,8 @@ export function useIgnitionEngine(opts: {
     trainedCount,
     elementsLit,
     sequence,
+    trained,
+    todayIdx,
     displayedCount,
     numberPulse,
     litPulse,

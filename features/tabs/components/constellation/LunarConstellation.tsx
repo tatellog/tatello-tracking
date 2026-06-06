@@ -106,7 +106,7 @@ export function LunarConstellation({
   const { t, breathT, driftT } = useConstellationClocks(reduceMotion)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
-    useIgnitionEngine({ trainedCount, elementsLit, sequence })
+    useIgnitionEngine({ trainedCount, elementsLit, sequence, trained, todayIdx })
 
   // Measured canvas size — drives the Skia flare layer + Lottie ignition
   // burst position math. 0 until first layout (both overlays withhold).
