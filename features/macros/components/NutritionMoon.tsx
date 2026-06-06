@@ -2,6 +2,7 @@ import {
   BlurMask,
   Canvas,
   Circle,
+  FractalNoise,
   Group,
   LinearGradient as SkiaLinearGradient,
   RadialGradient as SkiaRadialGradient,
@@ -30,6 +31,7 @@ import Svg, {
 } from 'react-native-svg'
 
 import { moonIllumination, moonPhase } from '../moonPhase'
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors, typography } from '@/theme'
 
 const MOON_PHASES = [
@@ -66,23 +68,44 @@ const rgba = (hex: string, a: number) => {
  */
 
 // ── Atmosphere — self-contained Skia (own loop, no images) ──
-function Sky({ W, cx, cy, reduced }: { W: number; cx: number; cy: number; reduced: boolean }) {
+function Sky({
+  W,
+  cx,
+  cy,
+  p,
+  reduced,
+}: {
+  W: number
+  cx: number
+  cy: number
+  p: SharedValue<number>
+  reduced: boolean
+}) {
+  const screenActive = useScreenActive()
   const breath = useSharedValue(0)
   const drift = useSharedValue(0)
   useEffect(() => {
+    if (!screenActive) return // pause the loops off-tab (battery)
     breath.value = withRepeat(withTiming(1, { duration: 3800, easing: Easing.linear }), -1, false)
     drift.value = withRepeat(withTiming(1, { duration: 26000, easing: Easing.linear }), -1, false)
     return () => {
       cancelAnimation(breath)
       cancelAnimation(drift)
     }
-  }, [breath, drift])
+  }, [screenActive, breath, drift])
 
   const Am = reduced ? 0 : 1
-  // The glow lives mostly BEHIND the opaque moon; the visible halo ring is
-  // what breathes — so the amplitude is generous enough to read in that ring.
-  const glowO = useDerivedValue(() => 0.16 + 0.28 * (0.5 + 0.5 * Math.sin(breath.value * TAU)))
-  const haloO = useDerivedValue(() => 0.12 + 0.24 * (0.5 + 0.5 * Math.sin(breath.value * TAU + 2)))
+  // The sky WARMS with the moon: glow + gold halo bloom as protein climbs.
+  // Manifesto-safe reward — the cielo gets warmer/golden when you fill the
+  // moon, never a "100%!" badge. Low protein = a quieter, cooler sky.
+  const glowO = useDerivedValue(() => {
+    const w = 0.5 + 0.5 * (p.value / PHASE_MAX)
+    return (0.14 + 0.28 * (0.5 + 0.5 * Math.sin(breath.value * TAU))) * w
+  })
+  const haloO = useDerivedValue(() => {
+    const w = 0.28 + 0.72 * (p.value / PHASE_MAX)
+    return (0.12 + 0.24 * (0.5 + 0.5 * Math.sin(breath.value * TAU + 2))) * w
+  })
   const nebTransform = useDerivedValue(() => [
     { translateX: Math.sin(drift.value * TAU) * 9 * Am },
     { translateY: Math.cos(drift.value * TAU) * 6 * Am },
@@ -107,24 +130,49 @@ function Sky({ W, cx, cy, reduced }: { W: number; cx: number; cy: number; reduce
         </Circle>
       </Group>
 
-      {/* Breathing magenta glow hugging the moon. */}
-      <Group opacity={glowO}>
-        <Circle cx={cx} cy={cy} r={R_MOON * 1.75}>
+      {/* Nebula filaments — fractal noise gives the flat gradient real
+          materia (very subtle; drifts with the nebula). */}
+      <Group transform={nebTransform} opacity={0.05} blendMode="overlay">
+        <SkiaRect x={0} y={0} width={W} height={HERO_H}>
+          <FractalNoise freqX={0.02} freqY={0.03} octaves={3} seed={7} />
+        </SkiaRect>
+      </Group>
+
+      {/* Additive bloom — the breathing magenta glow + a small warm core at
+          the lit limb, where the moon's light spills onto the nebula.
+          blendMode "plus" = light SUMS (physically right, reads premium). */}
+      <Group blendMode="plus">
+        <Group opacity={glowO}>
+          <Circle cx={cx} cy={cy} r={R_MOON * 1.75}>
+            <SkiaRadialGradient
+              c={vec(cx, cy)}
+              r={R_MOON * 1.75}
+              colors={[
+                rgba(colors.magentaHot, 0.95),
+                rgba(colors.magenta, 0.32),
+                rgba(colors.magenta, 0),
+              ]}
+              positions={[0, 0.5, 1]}
+            />
+            <BlurMask blur={22} style="normal" />
+          </Circle>
+        </Group>
+        <Circle cx={cx - R_MOON * 0.32} cy={cy - R_MOON * 0.2} r={R_MOON * 0.9}>
           <SkiaRadialGradient
-            c={vec(cx, cy)}
-            r={R_MOON * 1.75}
+            c={vec(cx - R_MOON * 0.32, cy - R_MOON * 0.2)}
+            r={R_MOON * 0.9}
             colors={[
-              rgba(colors.magentaHot, 0.95),
-              rgba(colors.magenta, 0.32),
+              rgba(colors.oroLight, 0.3),
+              rgba(colors.magentaHot, 0.12),
               rgba(colors.magenta, 0),
             ]}
             positions={[0, 0.5, 1]}
           />
-          <BlurMask blur={22} style="normal" />
+          <BlurMask blur={18} style="normal" />
         </Circle>
       </Group>
 
-      {/* Warm gold halo, breathing out of phase. */}
+      {/* Warm gold halo — breathes out of phase, blooms with the phase. */}
       <Group opacity={haloO}>
         <Circle cx={cx} cy={cy} r={R_MOON * 1.3}>
           <SkiaRadialGradient
@@ -196,16 +244,17 @@ function Moon({
   moonDim: boolean
   reduced: boolean
 }) {
+  const screenActive = useScreenActive()
   const s = useSharedValue(0)
   useEffect(() => {
-    if (reduced) return
+    if (reduced || !screenActive) return
     s.value = withRepeat(
       withTiming(1, { duration: 4500, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     )
     return () => cancelAnimation(s)
-  }, [reduced, s])
+  }, [reduced, screenActive, s])
   const wrapStyle = useAnimatedStyle(
     () => ({ transform: [{ scaleX: -1 }, { scale: 1 + (moonDim ? 0.008 : 0.018) * s.value }] }),
     [moonDim],
@@ -289,7 +338,7 @@ export function NutritionMoon({
 
   return (
     <View style={styles.hero}>
-      <Sky W={W} cx={cx} cy={cy} reduced={reduced} />
+      <Sky W={W} cx={cx} cy={cy} p={p} reduced={reduced} />
       <Moon
         left={cx - MOON_BOX / 2}
         top={cy - MOON_BOX / 2}
