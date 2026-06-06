@@ -33,7 +33,8 @@ import { useLastPeriodStart } from '../hooks'
 const PHASE_NOTE: Record<CyclePhase, string> = {
   menstrual:
     'Estos días tu cuerpo retiene más agua. Si la balanza sube, no es grasa: es tu ciclo. No dejes que el número te diga cómo vas.',
-  folicular: 'A algunas les vuelve algo de energía por acá. Si lo sientes, es tuyo. Si no, también está bien.',
+  folicular:
+    'A algunas les vuelve algo de energía por acá. Si lo sientes, es tuyo. Si no, también está bien.',
   ovulatoria: 'Es el punto medio de tu ciclo. Muchas notan más energía por estos días.',
   lutea:
     'Tu cuerpo puede retener algo de agua estos días. Es normal y se va. No dejes que el número te diga cómo vas.',
@@ -62,7 +63,10 @@ export function CycleCard() {
   const { data: lastPeriod } = useLastPeriodStart()
 
   const cycleSituation = profile?.cycle_situation as CycleSituation | null | undefined
-  const isActive = !!cycleSituation && ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
+  const isActive =
+    profile?.biological_sex !== 'male' &&
+    !!cycleSituation &&
+    ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
   const cycleLength = profile?.cycle_length_days ?? DEFAULT_CYCLE_LENGTH
 
   const state = useMemo(() => {
@@ -107,8 +111,7 @@ export function CycleCard() {
   const phaseNote = PHASE_NOTE[state.phaseKey]
   // Estimate, never a deterministic forecast: "alrededor de" keeps it as
   // context, not a fertility/calendar countdown (cycle-voice-spec §2.1, §8).
-  const nextPeriod =
-    state.daysToNext <= 1 ? 'pronto' : `alrededor de ${state.daysToNext} días`
+  const nextPeriod = state.daysToNext <= 1 ? 'pronto' : `alrededor de ${state.daysToNext} días`
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(320)}>

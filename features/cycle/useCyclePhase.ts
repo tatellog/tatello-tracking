@@ -27,6 +27,10 @@ export function useCyclePhase(): {
   const { data: profile } = useProfile()
   const { data: lastPeriod } = useLastPeriodStart()
 
+  // Cycle is for people who menstruate — never surface it for men, even if a
+  // cycle_situation somehow got persisted (defence for legacy/edge profiles).
+  if (profile?.biological_sex === 'male') return null
+
   const situation = profile?.cycle_situation as CycleSituation | null | undefined
   if (!situation || !ACTIVE_CYCLE_SITUATIONS.includes(situation)) return null
 

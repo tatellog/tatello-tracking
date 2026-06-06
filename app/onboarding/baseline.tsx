@@ -119,12 +119,18 @@ export default function BaseScreen() {
     return weightKg / (meters * meters)
   }, [heightCm, weightKg])
 
+  // Men skip the menstrual-cycle question entirely — the cycle dimension is
+  // for people who menstruate. Routing past it leaves cycle_situation null,
+  // which is what every cycle surface already gates on (hidden when null).
+  const afterBaseHref =
+    profile?.biological_sex === 'male' ? '/onboarding/rhythm' : '/onboarding/cycle'
+
   useEffect(() => {
     if (bmi == null && !auto) {
       setAuto(true)
-      router.replace('/onboarding/cycle')
+      router.replace(afterBaseHref)
     }
-  }, [bmi, auto, router])
+  }, [bmi, auto, router, afterBaseHref])
 
   // Shared clocks for the whole step — created ONCE here so every atmosphere
   // layer breathes on the SAME values, mirroring weight:
@@ -155,7 +161,7 @@ export default function BaseScreen() {
       step={7}
       totalSteps={9}
       canContinue
-      onContinue={() => router.push('/onboarding/cycle')}
+      onContinue={() => router.push(afterBaseHref)}
       continueLabel="Continuar"
       ctaVariant="soft"
       ctaTransform="none"
@@ -639,7 +645,15 @@ const BaseNebulaWash = memo(function BaseNebulaWash({ clock }: { clock: SharedVa
 
         {/* Painted galaxy — rotation 0° (straightened), centred low, breathing. */}
         <AnimatedG animatedProps={imgProps}>
-          <G transform={[{ translateX: PIVOT_X }, { translateY: PIVOT_Y }, { rotate: '0deg' }, { translateX: -PIVOT_X }, { translateY: -PIVOT_Y }]}>
+          <G
+            transform={[
+              { translateX: PIVOT_X },
+              { translateY: PIVOT_Y },
+              { rotate: '0deg' },
+              { translateX: -PIVOT_X },
+              { translateY: -PIVOT_Y },
+            ]}
+          >
             <SvgImage
               href={NEBULA_ART}
               x={IMG_X}

@@ -315,7 +315,10 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // the daily strip.
   const { data: profile } = useProfile()
   const cycleSituation = profile?.cycle_situation as CycleSituation | null | undefined
-  const cycleActive = !!cycleSituation && ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
+  const cycleActive =
+    profile?.biological_sex !== 'male' &&
+    !!cycleSituation &&
+    ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
   const { data: lastPeriod } = useLastPeriodStart()
   const recordPeriod = useRecordLastPeriodStart()
   const periodRecordedToday = lastPeriod === today

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
-import { type LayoutChangeEvent, StyleSheet, Text, View } from 'react-native'
+import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -117,6 +117,18 @@ export function HeightSlider({
     }
   }
 
+  // Fine ±1 cm recalibration — the slider is great to approximate, the
+  // steppers are for landing exactly (e.g. 173 vs 172/174).
+  const nudge = (delta: number) => {
+    const next = Math.max(min, Math.min(max, value + delta))
+    if (next !== value) {
+      Haptics.selectionAsync().catch(() => {})
+      onChange(next)
+    }
+  }
+  const atMin = value <= min
+  const atMax = value >= max
+
   const thumbStyle = useAnimatedStyle(() => ({
     left: progress.value * trackWidth - THUMB_BOX / 2,
   }))
@@ -154,69 +166,98 @@ export function HeightSlider({
         <Text style={styles.unit}>cm</Text>
       </View>
 
-      <View
-        style={styles.trackHit}
-        onLayout={onLayout}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onResponderGrant={(e) => {
-          onDragChange(true)
-          handleTouch(e.nativeEvent.locationX)
-        }}
-        onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
-        onResponderRelease={() => onDragChange(false)}
-        onResponderTerminate={() => onDragChange(false)}
-        accessibilityRole="adjustable"
-        accessibilityValue={{ min, max, now: value }}
-      >
-        <View style={styles.track} />
-        {/* Track-fill: gradient from faint magenta → saturated, so
+      <View style={styles.sliderRow}>
+        {/* − fine step (left). Discrete niebla, never competes with the
+            magenta thumb; dims at the lower bound. */}
+        <Pressable
+          onPress={() => nudge(-1)}
+          disabled={atMin}
+          hitSlop={8}
+          style={styles.stepBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Restar un centímetro"
+        >
+          <Text style={[styles.stepGlyph, atMin && styles.stepGlyphDisabled]}>−</Text>
+        </Pressable>
+
+        <View style={styles.sliderCol}>
+          <View
+            style={styles.trackHit}
+            onLayout={onLayout}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(e) => {
+              onDragChange(true)
+              handleTouch(e.nativeEvent.locationX)
+            }}
+            onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
+            onResponderRelease={() => onDragChange(false)}
+            onResponderTerminate={() => onDragChange(false)}
+            accessibilityRole="adjustable"
+            accessibilityValue={{ min, max, now: value }}
+          >
+            <View style={styles.track} />
+            {/* Track-fill: gradient from faint magenta → saturated, so
             the filled portion reads as warming up. */}
-        <Animated.View style={[styles.trackFillWrap, fillStyle]}>
-          <LinearGradient
-            colors={['rgba(217,39,102,0.45)', colors.magenta]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.trackFillGradient}
-          />
-        </Animated.View>
+            <Animated.View style={[styles.trackFillWrap, fillStyle]}>
+              <LinearGradient
+                colors={['rgba(217,39,102,0.45)', colors.magenta]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.trackFillGradient}
+              />
+            </Animated.View>
 
-        {/* Thumb-orb — single bloom + core. No cross (the track is the
+            {/* Thumb-orb — single bloom + core. No cross (the track is the
             slider affordance; the orb only marks position). */}
-        <Animated.View style={[styles.thumbWrap, thumbStyle]} pointerEvents="none">
-          <Svg width={THUMB_BOX} height={THUMB_BOX}>
-            <Defs>
-              <RadialGradient id="thumb-bloom" cx="50%" cy="50%" r="50%">
-                <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.85} />
-                <Stop offset="55%" stopColor={colors.magenta} stopOpacity={0.3} />
-                <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
-              </RadialGradient>
-              <RadialGradient id="thumb-core" cx="50%" cy="50%" r="60%">
-                <Stop offset="0%" stopColor="#FFFFFF" />
-                <Stop offset="50%" stopColor="#FBD7E3" />
-                <Stop offset="100%" stopColor={colors.magenta} />
-              </RadialGradient>
-            </Defs>
-            <AnimatedCircle
-              cx={THUMB_BOX / 2}
-              cy={THUMB_BOX / 2}
-              fill="url(#thumb-bloom)"
-              animatedProps={bloomProps}
-            />
-            <AnimatedCircle
-              cx={THUMB_BOX / 2}
-              cy={THUMB_BOX / 2}
-              fill="url(#thumb-core)"
-              animatedProps={coreProps}
-            />
-            <Circle cx={THUMB_BOX / 2} cy={THUMB_BOX / 2} r={STAR_R * 0.35} fill="#FFFFFF" />
-          </Svg>
-        </Animated.View>
-      </View>
+            <Animated.View style={[styles.thumbWrap, thumbStyle]} pointerEvents="none">
+              <Svg width={THUMB_BOX} height={THUMB_BOX}>
+                <Defs>
+                  <RadialGradient id="thumb-bloom" cx="50%" cy="50%" r="50%">
+                    <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.85} />
+                    <Stop offset="55%" stopColor={colors.magenta} stopOpacity={0.3} />
+                    <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
+                  </RadialGradient>
+                  <RadialGradient id="thumb-core" cx="50%" cy="50%" r="60%">
+                    <Stop offset="0%" stopColor="#FFFFFF" />
+                    <Stop offset="50%" stopColor="#FBD7E3" />
+                    <Stop offset="100%" stopColor={colors.magenta} />
+                  </RadialGradient>
+                </Defs>
+                <AnimatedCircle
+                  cx={THUMB_BOX / 2}
+                  cy={THUMB_BOX / 2}
+                  fill="url(#thumb-bloom)"
+                  animatedProps={bloomProps}
+                />
+                <AnimatedCircle
+                  cx={THUMB_BOX / 2}
+                  cy={THUMB_BOX / 2}
+                  fill="url(#thumb-core)"
+                  animatedProps={coreProps}
+                />
+                <Circle cx={THUMB_BOX / 2} cy={THUMB_BOX / 2} r={STAR_R * 0.35} fill="#FFFFFF" />
+              </Svg>
+            </Animated.View>
+          </View>
 
-      <View style={styles.ticks}>
-        <Text style={styles.tick}>{min}</Text>
-        <Text style={styles.tick}>{max}</Text>
+          <View style={styles.ticks}>
+            <Text style={styles.tick}>{min}</Text>
+            <Text style={styles.tick}>{max}</Text>
+          </View>
+        </View>
+
+        {/* + fine step (right). */}
+        <Pressable
+          onPress={() => nudge(1)}
+          disabled={atMax}
+          hitSlop={8}
+          style={styles.stepBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Sumar un centímetro"
+        >
+          <Text style={[styles.stepGlyph, atMax && styles.stepGlyphDisabled]}>+</Text>
+        </Pressable>
       </View>
     </View>
   )
@@ -252,6 +293,35 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.headingLg,
     color: colors.magenta,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sliderCol: {
+    flex: 1,
+  },
+  // Discrete recalibration steppers — a faint hairline circle + niebla
+  // glyph so they read as available but never compete with the magenta
+  // thumb. 44 hit target via hitSlop.
+  stepBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepGlyph: {
+    fontFamily: typography.uiMedium,
+    fontSize: 22,
+    lineHeight: 24,
+    color: colors.niebla,
+  },
+  stepGlyphDisabled: {
+    color: colors.hairlineStrong,
   },
   trackHit: {
     height: 44,
