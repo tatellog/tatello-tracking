@@ -321,7 +321,23 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
   const { data: lastPeriod } = useLastPeriodStart()
   const recordPeriod = useRecordLastPeriodStart()
-  const periodRecordedToday = lastPeriod === today
+  // A period spans several days. Once marked, keep the chip in its "anotado /
+  // en curso" state through the menstrual window instead of resetting to the
+  // "mark it" prompt the next day — which would also let the user overwrite
+  // period_start mid-period and corrupt the cycle math.
+  const PERIOD_WINDOW_DAYS = 5
+  const daysSincePeriod = (() => {
+    if (!lastPeriod) return null
+    const [fy, fm, fd] = lastPeriod.split('-').map(Number)
+    const [ty, tm, td] = today.split('-').map(Number)
+    return Math.round(
+      (Date.UTC(ty ?? 1970, (tm ?? 1) - 1, td ?? 1) -
+        Date.UTC(fy ?? 1970, (fm ?? 1) - 1, fd ?? 1)) /
+        86_400_000,
+    )
+  })()
+  const periodOngoing =
+    daysSincePeriod != null && daysSincePeriod >= 0 && daysSincePeriod < PERIOD_WINDOW_DAYS
 
   const [mode, setMode] = useState<Mode>('home')
   const [mealType, setMealType] = useState<MealType>(defaultMealType)
@@ -332,6 +348,21 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const [waterTick, setWaterTick] = useState(0)
 
   const items = frequent ?? []
+
+  // "Lo de siempre" — show the first 3, then a "Ver N más / Ver menos"
+  // toggle so the long re-log list doesn't bury the meal-type segment +
+  // manual log below. The chevron flips down (más) ↔ up (menos).
+  const FREQUENT_PREVIEW = 3
+  const [showAllFrequent, setShowAllFrequent] = useState(false)
+  const chev = useSharedValue(0)
+  const chevStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${90 + chev.value * 180}deg` }],
+  }))
+  const toggleShowAllFrequent = () => {
+    chev.value = withTiming(showAllFrequent ? 0 : 1, { duration: 200 })
+    setShowAllFrequent((v) => !v)
+  }
+  const hiddenFrequent = Math.max(0, items.length - FREQUENT_PREVIEW)
 
   // Glasses are a fixed 250 ml; the count = goal ÷ 250 (2 L → 8, 3 L → 12).
   const waterTarget = Math.max(1, Math.round(goalMl / GLASS_ML))
@@ -381,7 +412,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // Marking the period start re-anchors the cycle to today — confirm so
   // an accidental tap can't reset a cycle that's mid-way.
   const onMarkPeriod = () => {
-    if (periodRecordedToday) return
+    if (periodOngoing) return
     showActionSheet(
       {
         title: '¿Tu período empezó hoy?',
@@ -660,7 +691,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                   </View>
 
                   <Text style={styles.frequentLabel}>Lo de siempre</Text>
-                  {items.map((item) => {
+
+                  {items.slice(0, FREQUENT_PREVIEW).map((item) => {
                     const confirming = confirmingName === item.name
                     const dimmed = confirmingName != null && !confirming
                     return (
@@ -678,16 +710,55 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       />
                     )
                   })}
+
+                  {showAllFrequent ? (
+                    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
+                      {items.slice(FREQUENT_PREVIEW).map((item) => {
+                        const confirming = confirmingName === item.name
+                        const dimmed = confirmingName != null && !confirming
+                        return (
+                          <MealCard
+                            key={item.name}
+                            style={styles.cardGap}
+                            elevated
+                            compact
+                            name={item.name}
+                            protein={item.protein_g}
+                            calories={item.calories}
+                            state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
+                            onPress={() => handleLogMeal(item)}
+                            disabled={confirmingName != null}
+                          />
+                        )
+                      })}
+                    </Animated.View>
+                  ) : null}
+
+                  {hiddenFrequent > 0 ? (
+                    <Pressable
+                      onPress={toggleShowAllFrequent}
+                      style={styles.showMore}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: showAllFrequent }}
+                    >
+                      <Text style={styles.showMoreText}>
+                        {showAllFrequent ? 'Ver menos' : `Ver ${hiddenFrequent} más`}
+                      </Text>
+                      <Animated.Text style={[styles.showMoreChevron, chevStyle]}>›</Animated.Text>
+                    </Pressable>
+                  ) : null}
                 </>
               )}
 
               {/* Cycle — eventual (~1×/month), so it sits last, quiet. Only
                * for users who track a cycle. Oro/luna, never clinical. */}
               {cycleActive ? (
-                periodRecordedToday ? (
+                periodOngoing ? (
                   <View style={[styles.cycleChip, styles.cycleChipDone]}>
                     <MoonAnchor lit={1} />
-                    <Text style={styles.cycleLabel}>Período anotado hoy</Text>
+                    <Text style={styles.cycleLabel}>
+                      {daysSincePeriod === 0 ? 'Período anotado hoy' : 'Período en curso'}
+                    </Text>
                     <Text style={styles.cycleCheck}>✓</Text>
                   </View>
                 ) : (
@@ -956,6 +1027,28 @@ const styles = StyleSheet.create({
     color: colors.bone,
     marginTop: 14,
     marginBottom: 10,
+  },
+  // "Ver N más / Ver menos" — a quiet magenta action below the preview.
+  showMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginTop: 2,
+  },
+  showMoreText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.magenta,
+  },
+  showMoreChevron: {
+    // chevStyle: 90° (down → "ver más") ↔ 270° (up → "ver menos").
+    fontFamily: typography.uiMedium,
+    fontSize: 18,
+    lineHeight: 18,
+    color: colors.magenta,
   },
   // Quieter eyebrow than "Lo de siempre" — marks the AI methods as the
   // secondary path. Upright (the italic serif is reserved for the
