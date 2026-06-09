@@ -36,8 +36,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# claude code (user-local)
-.claude/
+# claude code — la config de equipo (CLAUDE.md, agents/, commands/) SÍ se
+# versiona para que todo el equipo comparta los mismos agentes y reglas.
+# Solo lo personal de cada máquina queda fuera.
+.claude/settings.local.json
 
 # JetBrains IDEs (user-local)
 .idea/
