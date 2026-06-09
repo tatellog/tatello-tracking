@@ -13,6 +13,7 @@ import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg'
 
 import type { CyclePhase } from '@/features/cycle/phase'
 import { arcPath, dayToAngle, phaseBounds, pointOnRing } from '@/features/cycle/ring-geometry'
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors, typography } from '@/theme'
 
 // Created ONCE at module scope — re-creating animated components on every
@@ -69,17 +70,24 @@ export function CycleRing({
   phaseLabel: string
   reduce: boolean
 }) {
-  // One shared clock for the whole ring (8 s linear loop). Reduced motion
-  // parks it at a pleasant mid-glow instead of repeating.
+  // Pause the ring's loops when the Progreso tab isn't focused. The clock
+  // drives AnimatedCircle/AnimatedPath INSIDE the <Svg>, so every frame
+  // repaints the whole 200px ring tree — and it used to run forever, even
+  // off-tab. Gating on `useScreenActive()` drops the off-tab cost to zero
+  // (and pauses during scroll where a ScrollPauseContext is provided).
+  const active = useScreenActive()
+
+  // One shared clock for the whole ring (8 s linear loop). Reduced motion OR
+  // off-tab parks it at a pleasant mid-glow instead of repeating.
   const t = useSharedValue(0)
   useEffect(() => {
-    if (reduce) {
+    if (reduce || !active) {
       t.value = 0.25
       return () => cancelAnimation(t)
     }
     t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
     return () => cancelAnimation(t)
-  }, [t, reduce])
+  }, [t, reduce, active])
 
   const accent = accentFor(phaseKey)
   const bounds = phaseBounds(length)
@@ -112,9 +120,11 @@ export function CycleRing({
   return (
     <View style={styles.wrap}>
       {/* Ambient Genshin glow BEHIND the ring — drifting cool dust + faint
-          halo + slow gold glints. Pure decoration: pointerEvents none, and
-          suppressed under reduced motion (the SVG ring still renders). */}
-      {reduce ? null : (
+          halo + slow gold glints. Pure decoration: pointerEvents none.
+          Suppressed under reduced motion AND off-tab (`!active`): a looping
+          Lottie keeps decoding frames forever otherwise; unmounting it stops
+          that off-tab and it just restarts on return (imperceptible glow). */}
+      {reduce || !active ? null : (
         <View style={styles.glow} pointerEvents="none">
           <LottieView
             source={require('../../../assets/lottie/cycle-ring-glow.json')}
@@ -143,8 +153,24 @@ export function CycleRing({
 
         {/* 1 · Ambient cool wash — concentric faint rings (layered strokes,
             not a RadialGradient: alpha gradients render unreliably on iOS). */}
-        <Circle cx={C} cy={C} r={R + 14} stroke={colors.dimension.ciclo} strokeWidth={1} strokeOpacity={0.04} fill="none" />
-        <Circle cx={C} cy={C} r={R + 6} stroke={colors.dimension.ciclo} strokeWidth={1} strokeOpacity={0.06} fill="none" />
+        <Circle
+          cx={C}
+          cy={C}
+          r={R + 14}
+          stroke={colors.dimension.ciclo}
+          strokeWidth={1}
+          strokeOpacity={0.04}
+          fill="none"
+        />
+        <Circle
+          cx={C}
+          cy={C}
+          r={R + 6}
+          stroke={colors.dimension.ciclo}
+          strokeWidth={1}
+          strokeOpacity={0.06}
+          fill="none"
+        />
 
         {/* 2 · Four base phase arcs — cool family, oro at the cenit. */}
         {PHASE_ORDER.map((k) => {
