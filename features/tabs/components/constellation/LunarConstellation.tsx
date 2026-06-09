@@ -1,14 +1,24 @@
 import { useIsFocused } from '@react-navigation/native'
 import { useMemo, useState } from 'react'
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
-import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated'
+import {
+  Image,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+  type LayoutChangeEvent,
+} from 'react-native'
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useReducedMotion,
+} from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 import { ZODIAC } from '../../zodiac/data'
-
-import { ZodiacEngraving } from '../ZodiacEngraving'
 
 import { AnimatedBlurView } from './animation/animated-components'
 import { useCanvasReveal } from './animation/use-canvas-reveal'
@@ -184,9 +194,43 @@ export function LunarConstellation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ignitingKey, stars, k, transform.tx, transform.ty, transform.sx, transform.sy])
 
+  // Atmospheric sign art driven OUTSIDE the <Svg> as a real RN view so it
+  // scrolls in lockstep on Android — the in-SVG PNG re-rasterised and jumped
+  // left on every scroll frame (Skia stars stayed locked; only this RNSVG
+  // layer moved). Same opacity ramp (0.28→0.60 over progress) and same ±2%
+  // breath as ZodiacEngraving, driven by the shared breathT so it pauses with
+  // the rest. artScale is 1.0 for all signs today; applied as a static
+  // centre-scale to stay pixel-identical if a sign ever overrides it.
+  const artScale = SIGN_ENGRAVINGS[sign].artScale ?? 1
+  const artProgress = Math.min(1, trainedCount / target)
+  const artStyle = useAnimatedStyle(() => {
+    'worklet'
+    const wave = breathT ? 0.5 + 0.5 * Math.sin(breathT.value * 2 * Math.PI) : 0
+    const breath = 1 + wave * 0.02
+    return {
+      opacity: 0.28 + 0.32 * artProgress,
+      transform: [{ scale: artScale * breath }],
+    }
+  })
+
   return (
     <View style={styles.wrap}>
       <View style={styles.svgWrap} onLayout={onCanvasLayout}>
+        {/* Sign art backdrop — a real RN Image OUTSIDE the <Svg>. On Android
+            the PNG inside RNSVG re-rasterised and jumped left on every scroll
+            frame; as a plain view it translates in lockstep. Sits behind the
+            transparent <Svg> so the vignette + edge-fade Rects still darken it
+            exactly as before. Breath + progress-opacity via artStyle. */}
+        <Animated.View style={[StyleSheet.absoluteFill, artStyle]} pointerEvents="none">
+          <Image
+            // Always a PNG bitmap source at runtime (ART_BY_SIGN is rasterised);
+            // the ZodiacAsset union just also allows the legacy SVG-component form.
+            source={SIGN_ENGRAVINGS[sign].art as ImageSourcePropType}
+            style={styles.artImage}
+            resizeMode="contain"
+            fadeDuration={0}
+          />
+        </Animated.View>
         {/* Skeleton wrapped in Animated.View with `exiting` so it
             stays alive (fading out over 320 ms) while the real Svg
             below fades in (260 ms). Their opacities overlap — the
@@ -242,17 +286,11 @@ export function LunarConstellation({
               Ambient → suppressed under reduce-motion (motes parked
               at a static t would freeze mid-rise). */}
               {reduceMotion ? null : <CosmicDust t={t} />}
-              {/* Atmospheric sign art — sits BEHIND the field stars and
-              the animated constellation system. The strong card
-              vignette below + the lion's already-faded opacity do
-              the blending; a feathered SVG <Mask> wrapping this
-              was tried but react-native-svg's Mask doesn't compose
-              cleanly over nested SVGs (the lion disappeared). */}
-              <ZodiacEngraving
-                {...SIGN_ENGRAVINGS[sign]}
-                progress={Math.min(1, trainedCount / target)}
-                breathT={breathT}
-              />
+              {/* Sign art moved OUT of the <Svg> to a sibling RN Image (see the
+              top of svgWrap) — on Android the in-SVG PNG re-rasterised and
+              jumped left on every scroll frame. The vignette + edgeFade Rects
+              below still darken it through the transparent SVG, so the blend is
+              identical. ZodiacEngraving stays for the Órbita/reveal callers. */}
               {/* BalanceSwirls removed — the zodiac-art SVGs come with
               their own ornate decorative rings that balance the
               composition. The added Bézier strokes conflicted
@@ -486,6 +524,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(217, 174, 111, 0.32)',
   },
   svg: {
+    width: '100%',
+    height: '100%',
+  },
+  // The sign-art Image fills the square svgWrap; resizeMode="contain" matches
+  // the old preserveAspectRatio="xMidYMid meet" so placement is pixel-identical.
+  artImage: {
     width: '100%',
     height: '100%',
   },
