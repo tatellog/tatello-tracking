@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur'
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Rect, Text as SvgText } from 'react-native-svg'
@@ -78,7 +77,11 @@ export function ObservationCard({ obs }: { obs: WeekObservation }) {
       accessibilityRole="button"
       accessibilityLabel={obs.title}
     >
-      <BlurView intensity={22} tint="dark" style={styles.glass}>
+      {/* Skylight pane — a solid warm-dark fill, NOT a native BlurView.
+          expo-blur recomposes a full gaussian per frame on Android and
+          renders the galaxy behind as a muddy/hard box; a confident warm
+          fill reads clean on both platforms and is far cheaper. */}
+      <View style={styles.glass}>
         <View style={styles.tint} pointerEvents="none" />
         <View style={styles.left}>
           <ObsWeekGlyph days={obs.days} color={accent} />
@@ -93,7 +96,7 @@ export function ObservationCard({ obs }: { obs: WeekObservation }) {
           />
           <Text style={styles.detail}>{obs.detail}</Text>
         </View>
-      </BlurView>
+      </View>
     </Pressable>
   )
 }
@@ -117,10 +120,14 @@ const styles = StyleSheet.create({
     gap: 18,
     borderWidth: 1,
     borderColor: colors.oroHairline,
+    // Solid warm-dark base (replaces the BlurView's real blur; without it
+    // the translucent tint over a busy galaxy read muddy/illegible).
+    backgroundColor: 'rgba(14,6,9,0.9)',
   },
+  // Faint warm wash so the pane keeps a magenta-warm depth, not flat black.
   tint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(18,7,11,0.42)',
+    backgroundColor: 'rgba(34,12,20,0.3)',
   },
   left: {
     width: 140,

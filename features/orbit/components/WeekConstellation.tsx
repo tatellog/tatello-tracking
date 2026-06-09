@@ -8,7 +8,6 @@ import {
   Rect as SkiaRect,
   vec,
 } from '@shopify/react-native-skia'
-import { BlurView } from 'expo-blur'
 import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { memo, useEffect, useState } from 'react'
@@ -549,11 +548,12 @@ function HaloBubble({
       ]}
       pointerEvents="auto"
     >
-      {/* Frosted-glass body — real blur of the cosmos behind, a warm
-          translucent tint for legibility, a hairline glass edge. No
-          solid card / hard border any more: the bubble reads as a pane
-          of skylight, not a UI tooltip. */}
-      <BlurView intensity={26} tint="dark" style={bubbleStyles.glass}>
+      {/* Skylight pane — a warm translucent wash, NOT a native BlurView.
+          expo-blur renders inconsistently on Android (the cosmos behind
+          shows through as a muddy/hard box → "se ve raro"); a confident
+          warm-dark fill reads as a clean pane of skylight on both
+          platforms and is far cheaper than a per-frame gaussian. */}
+      <View style={bubbleStyles.glass}>
         <View style={bubbleStyles.glassTint} pointerEvents="none" />
         {/* Premium glint — a slow diagonal light sweep across the pane. */}
         <GlassSheen reduced={reduced} />
@@ -636,7 +636,7 @@ function HaloBubble({
             </>
           )}
         </Pressable>
-      </BlurView>
+      </View>
       {/* Arrow extends out toward the halo AFTER the bubble has
           settled — a tiny "kick" that visually completes the
           connection from bubble to star. */}
@@ -675,17 +675,21 @@ const bubbleStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  // The frosted pane — rounds + clips the blur. Borderless (no hairline
-  // edge, no corner brackets) so it reads as a clean pane of skylight.
+  // The skylight pane — rounds + clips its contents. Borderless (no
+  // hairline edge, no corner brackets) so it reads as a clean pane of
+  // skylight. Carries the warm-dark fill itself now that the BlurView is
+  // gone (its translucent glassTint sat ON TOP of a real blur; without
+  // the blur it needs an opaque-enough base of its own to stay legible).
   glass: {
     borderRadius: 14,
     overflow: 'hidden',
+    backgroundColor: 'rgba(14,6,9,0.9)',
   },
-  // Warm translucent wash over the blur so cream/serif text stays legible
-  // against whatever (galaxy, nebula, dark) sits behind the pane.
+  // Warm tint wash so cream/serif text stays legible and the pane keeps a
+  // faint magenta-warm depth instead of reading as flat black.
   glassTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(18,7,11,0.46)',
+    backgroundColor: 'rgba(34,12,20,0.32)',
   },
   body: {
     paddingHorizontal: 13,

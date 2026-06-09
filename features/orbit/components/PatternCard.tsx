@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur'
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Rect, Text as SvgText } from 'react-native-svg'
@@ -206,8 +205,10 @@ export function PatternCard({ patron }: { patron: Patron }) {
       accessibilityRole="button"
       accessibilityLabel={patron.title}
     >
-      {/* Frosted-glass pane — same skylight read as the week tooltip. */}
-      <BlurView intensity={22} tint="dark" style={styles.glass}>
+      {/* Skylight pane — a solid warm-dark fill (same as the week tooltip,
+          which dropped its BlurView): expo-blur is a per-frame gaussian that
+          renders muddy on Android. A confident warm fill reads clean. */}
+      <View style={styles.glass}>
         <View style={styles.tint} pointerEvents="none" />
         <View style={styles.left}>
           <View style={styles.glyphBox}>
@@ -224,7 +225,7 @@ export function PatternCard({ patron }: { patron: Patron }) {
           />
           <Text style={styles.detail}>{patron.detail}</Text>
         </View>
-      </BlurView>
+      </View>
     </Pressable>
   )
 }
@@ -250,11 +251,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 18,
     gap: 18,
+    // Solid warm-dark base (replaces the BlurView's real blur).
+    backgroundColor: 'rgba(14,6,9,0.9)',
   },
-  // Warm translucent wash over the blur so the text stays legible.
+  // Faint warm wash so the pane keeps a magenta-warm depth, not flat black.
   tint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(18,7,11,0.42)',
+    backgroundColor: 'rgba(34,12,20,0.3)',
   },
   // Left column — the glyph, with the soft category tag underneath.
   left: {
