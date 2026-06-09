@@ -208,13 +208,9 @@ const RevealNode = memo(function RevealNode({
             ry={0.9}
             fill="url(#pr-streak)"
             opacity={0.32}
-            transform={[
-              { translateX: x },
-              { translateY: y },
-              { rotate: '45deg' },
-              { translateX: -x },
-              { translateY: -y },
-            ]}
+            rotation={45}
+            originX={x}
+            originY={y}
           />
           <Ellipse
             cx={x}
@@ -223,13 +219,9 @@ const RevealNode = memo(function RevealNode({
             ry={0.9}
             fill="url(#pr-streak)"
             opacity={0.32}
-            transform={[
-              { translateX: x },
-              { translateY: y },
-              { rotate: '-45deg' },
-              { translateX: -x },
-              { translateY: -y },
-            ]}
+            rotation={-45}
+            originX={x}
+            originY={y}
           />
         </>
       ) : null}

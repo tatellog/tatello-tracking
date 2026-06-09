@@ -1851,15 +1851,12 @@ function EnergyRing({
       strokeDasharray={ring.dash}
       strokeLinecap="round"
       // rotate the dashed ring so its gaps sit at an irregular angle (the
-      // gaps of the three rings never align into a cross). Numeric degrees
-      // about the live centre — static prop, UI-thread safe.
-      transform={[
-        { translateX: cx },
-        { translateY: cy },
-        { rotate: `${ring.rotate}deg` },
-        { translateX: -cx },
-        { translateY: -cy },
-      ]}
+      // gaps of the three rings never align into a cross). Native rotation
+      // props (NOT a transform array) — the array rotate-about-centre
+      // mis-renders on Android release.
+      rotation={ring.rotate}
+      originX={cx}
+      originY={cy}
       animatedProps={props}
     />
   )

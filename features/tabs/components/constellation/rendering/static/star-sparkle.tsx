@@ -79,13 +79,9 @@ export function StarSparkle({
         <Path
           d={fourPointStarPath(cx, cy, r * 0.6)}
           fill={fill}
-          transform={[
-            { translateX: cx },
-            { translateY: cy },
-            { rotate: '45deg' },
-            { translateX: -cx },
-            { translateY: -cy },
-          ]}
+          rotation={45}
+          originX={cx}
+          originY={cy}
         />
       ) : null}
       {/* White-hot pinpoint — lit heroes only. */}

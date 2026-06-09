@@ -648,15 +648,7 @@ const BaseNebulaWash = memo(function BaseNebulaWash({ clock }: { clock: SharedVa
 
         {/* Painted galaxy — rotation 0° (straightened), centred low, breathing. */}
         <AnimatedG animatedProps={imgProps}>
-          <G
-            transform={[
-              { translateX: PIVOT_X },
-              { translateY: PIVOT_Y },
-              { rotate: '0deg' },
-              { translateX: -PIVOT_X },
-              { translateY: -PIVOT_Y },
-            ]}
-          >
+          <G rotation={0} originX={PIVOT_X} originY={PIVOT_Y}>
             <SvgImage
               href={NEBULA_ART}
               x={IMG_X}

@@ -214,10 +214,10 @@ export function WarmBloomField({
                 wbf-nebula gradient, so the deepest warm mass has an
                 organic wisp border instead of a clean circle. Centred
                 left-low (cx 34% / cy 72%). */}
-            <G transform={[{ translateX: 122 }, { translateY: 547 }, { rotate: '-20deg' }, { translateX: -122 }, { translateY: -547 }]}>
+            <G rotation={-20} originX={122} originY={547}>
               <Ellipse cx="34%" cy="72%" rx="80%" ry="40%" fill="url(#wbf-nebula)" />
             </G>
-            <G transform={[{ translateX: 122 }, { translateY: 547 }, { rotate: '35deg' }, { translateX: -122 }, { translateY: -547 }]}>
+            <G rotation={35} originX={122} originY={547}>
               <Ellipse cx="34%" cy="72%" rx="55%" ry="50%" fill="url(#wbf-nebula)" />
             </G>
 
@@ -263,10 +263,10 @@ export function WarmBloomField({
                 (rotate 35) is opened OUT to cx14%/cy86% so the wisp
                 fans diagonally into the corner instead of stacking
                 coaxially over the first. Both share wbf-nebula. */}
-            <G transform={[{ translateX: 79 }, { translateY: 608 }, { rotate: '-20deg' }, { translateX: -79 }, { translateY: -608 }]}>
+            <G rotation={-20} originX={79} originY={608}>
               <Ellipse cx="22%" cy="80%" rx="74%" ry="38%" fill="url(#wbf-nebula)" />
             </G>
-            <G transform={[{ translateX: 79 }, { translateY: 608 }, { rotate: '35deg' }, { translateX: -79 }, { translateY: -608 }]}>
+            <G rotation={35} originX={79} originY={608}>
               <Ellipse cx="14%" cy="86%" rx="50%" ry="48%" fill="url(#wbf-nebula)" />
             </G>
 
@@ -314,10 +314,10 @@ export function WarmBloomField({
                 low-left pair. First (rotate +20) at cx78%/cy80%; second
                 (rotate -35) opened OUT to cx86%/cy86% so the wisp fans
                 diagonally into the RIGHT corner. Both share wbf-nebula. */}
-            <G transform={[{ translateX: 281 }, { translateY: 608 }, { rotate: '20deg' }, { translateX: -281 }, { translateY: -608 }]}>
+            <G rotation={20} originX={281} originY={608}>
               <Ellipse cx="78%" cy="80%" rx="74%" ry="38%" fill="url(#wbf-nebula)" />
             </G>
-            <G transform={[{ translateX: 281 }, { translateY: 608 }, { rotate: '-35deg' }, { translateX: -281 }, { translateY: -608 }]}>
+            <G rotation={-35} originX={281} originY={608}>
               <Ellipse cx="86%" cy="86%" rx="50%" ry="48%" fill="url(#wbf-nebula)" />
             </G>
 

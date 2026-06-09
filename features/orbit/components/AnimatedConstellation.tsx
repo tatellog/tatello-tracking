@@ -325,15 +325,7 @@ function StaticEllipseOrbit({
   // not in its TS types yet — spread through a Record cast.
   const runtimeProps = { pathLength: 1 } as Record<string, unknown>
   return (
-    <G
-      transform={[
-        { translateX: orbit.cx },
-        { translateY: orbit.cy },
-        { rotate: `${orbit.baseRotation}deg` },
-        { translateX: -orbit.cx },
-        { translateY: -orbit.cy },
-      ]}
-    >
+    <G rotation={orbit.baseRotation} originX={orbit.cx} originY={orbit.cy}>
       <AnimatedEllipse
         cx={orbit.cx}
         cy={orbit.cy}
