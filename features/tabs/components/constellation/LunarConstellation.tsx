@@ -37,10 +37,17 @@ import { IgnitingOverlay, LottieIgnitionBurst } from './rendering/ignition'
 import { LitClusterAura, LitClusterMotes } from './rendering/lit-cluster'
 import { LitLines } from './rendering/lit-lines'
 import { SkiaLitFlareLayer, StarsLayer, type SkiaLit } from './rendering/lit-stars'
+import { SkiaFigure } from './rendering/skia-figure/skia-figure'
 import { AnticipationCrown, CenterNumberOverlay, CompletionRings } from './rendering/overlay'
 import { CanvasSkeleton } from './rendering/skeleton'
 import { AmbientGlow, SvgGradients } from './rendering/static'
 import type { Props, Resolved, SequenceEl } from './types'
+
+// FASE 3 (en progreso): render de la FIGURA en Skia en vez de react-native-svg.
+// Flag de migración — APAGADO mientras se portan las rebanadas (líneas + cuerpos
+// → halos → flares → ignición). Con `false` la figura SVG actual se usa tal cual
+// (cero cambio). Prender solo para validar la versión Skia en Expo Go.
+const USE_SKIA_FIGURE = false
 
 export function LunarConstellation({
   trained,
@@ -132,6 +139,9 @@ export function LunarConstellation({
     x: (transform.tx + transform.sx * xVb) * k,
     y: (transform.ty + transform.sy * yVb) * k,
   })
+  // Pixel scale for radii / stroke widths in the Skia figure (the SVG <G>
+  // scaled the whole group by sx, then the viewBox→canvas mapping by k).
+  const sScale = transform.sx * k
 
   // Array-form transform for the SVG <G>. We can't use the string
   // form `"translate(tx ty) scale(sx sy)"` because on Fabric Android
@@ -264,56 +274,63 @@ export function LunarConstellation({
               native bbox to [28..183, 24..150]; the leading
               translate(69, 57) brings the result back centred on
               the lion's body at canvas (174, 144). */}
-              <G transform={signTransform}>
-                {litCluster ? (
-                  <>
-                    <LitClusterAura
-                      cx={litCluster.cx}
-                      cy={litCluster.cy}
-                      r={litCluster.r}
-                      breathT={breathT}
-                    />
-                    <LitClusterMotes cx={litCluster.cx} cy={litCluster.cy} r={litCluster.r} t={t} />
-                  </>
-                ) : null}
-                <BaseLayer
-                  zodiac={zodiac}
-                  stars={stars}
-                  radialPulse={radialPulse}
-                  t={t}
-                  litKeys={litKeys}
-                />
-                <LitLines
-                  zodiac={zodiac}
-                  stars={stars}
-                  litKeys={litKeys}
-                  nextEl={nextEl}
-                  ignitingKey={ignitingKey}
-                  litPulse={litPulse}
-                  breathT={breathT}
-                  lineDepth={lineDepth}
-                  t={t}
-                />
-                <StarsLayer
-                  stars={stars}
-                  litKeys={litKeys}
-                  nextEl={nextEl}
-                  t={t}
-                  ignitingKey={ignitingKey}
-                  intensity={intensity}
-                  litPulse={litPulse}
-                  starRecency={starRecency}
-                  breathT={breathT}
-                  starDepth={starDepth}
-                  reduce={reduceMotion}
-                />
-                <IgnitingOverlay
-                  zodiac={zodiac}
-                  stars={stars}
-                  ignitingKey={ignitingKey}
-                  igniteT={igniteT}
-                />
-              </G>
+              {USE_SKIA_FIGURE ? null : (
+                <G transform={signTransform}>
+                  {litCluster ? (
+                    <>
+                      <LitClusterAura
+                        cx={litCluster.cx}
+                        cy={litCluster.cy}
+                        r={litCluster.r}
+                        breathT={breathT}
+                      />
+                      <LitClusterMotes
+                        cx={litCluster.cx}
+                        cy={litCluster.cy}
+                        r={litCluster.r}
+                        t={t}
+                      />
+                    </>
+                  ) : null}
+                  <BaseLayer
+                    zodiac={zodiac}
+                    stars={stars}
+                    radialPulse={radialPulse}
+                    t={t}
+                    litKeys={litKeys}
+                  />
+                  <LitLines
+                    zodiac={zodiac}
+                    stars={stars}
+                    litKeys={litKeys}
+                    nextEl={nextEl}
+                    ignitingKey={ignitingKey}
+                    litPulse={litPulse}
+                    breathT={breathT}
+                    lineDepth={lineDepth}
+                    t={t}
+                  />
+                  <StarsLayer
+                    stars={stars}
+                    litKeys={litKeys}
+                    nextEl={nextEl}
+                    t={t}
+                    ignitingKey={ignitingKey}
+                    intensity={intensity}
+                    litPulse={litPulse}
+                    starRecency={starRecency}
+                    breathT={breathT}
+                    starDepth={starDepth}
+                    reduce={reduceMotion}
+                  />
+                  <IgnitingOverlay
+                    zodiac={zodiac}
+                    stars={stars}
+                    ignitingKey={ignitingKey}
+                    igniteT={igniteT}
+                  />
+                </G>
+              )}
               {/* CenterOrb + CenterScrim removed — they were the
               luminous well behind the giant centre number. With
               the count now living as a small chip at the canvas
@@ -343,6 +360,20 @@ export function LunarConstellation({
               ) : null}
               {figureComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
             </Svg>
+            {/* FASE 3: figura en Skia (líneas + cuerpos). Reemplaza el <G>
+                figura del SVG de arriba cuando el flag está prendido. */}
+            {USE_SKIA_FIGURE && canvasPx > 0 ? (
+              <SkiaFigure
+                stars={stars}
+                lines={zodiac.lines}
+                litKeys={litKeys}
+                nextEl={nextEl}
+                toScreen={toScreen}
+                sScale={sScale}
+                t={t}
+                reduce={reduceMotion}
+              />
+            ) : null}
             {/* Skia volumetric flare crown — sits on top of the SVG so
                 each lit star gets a real Gaussian-blurred magenta+cream
                 bloom + additive diffraction cross. The SVG body below
