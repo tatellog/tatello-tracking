@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native'
 import { useMemo, useState } from 'react'
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated'
@@ -103,7 +104,12 @@ export function LunarConstellation({
   // again and the next affordance reappears.
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
-  const { t, breathT, driftT } = useConstellationClocks(reduceMotion)
+  // Pause every animation loop when the Hoy tab loses focus (the UI-thread
+  // withRepeat clocks don't stop on their own → they'd tax the whole app
+  // forever after a single visit). INVISIBLE on-tab: while focused the
+  // constellation animates exactly as before.
+  const screenActive = useIsFocused()
+  const { t, breathT, driftT } = useConstellationClocks(reduceMotion, screenActive)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence, trained, todayIdx })

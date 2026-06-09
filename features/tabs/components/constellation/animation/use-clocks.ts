@@ -59,7 +59,17 @@ const REST_T = 0.25
 const REST_BREATH_T = 0.5
 const REST_DRIFT_T = 0
 
-export function useConstellationClocks(reduce: boolean): {
+export function useConstellationClocks(
+  reduce: boolean,
+  /** False while the Hoy tab isn't focused. The `withRepeat` loops run on
+   *  the UI thread and DON'T stop when React stops rendering off-tab — every
+   *  derived worklet keeps recomputing 60×/s forever, so visiting Hoy once
+   *  permanently taxes the whole app. Gating the loops on focus (park when
+   *  inactive, restart when active) drops the off-tab cost to zero. INVISIBLE
+   *  on-tab: while focused nothing changes. Defaults to true so callers/tests
+   *  that don't pass it are unaffected. */
+  active: boolean = true,
+): {
   t: SharedValue<number>
   breathT: SharedValue<number>
   driftT: SharedValue<number>
@@ -69,9 +79,10 @@ export function useConstellationClocks(reduce: boolean): {
   const driftT = useSharedValue(0)
 
   useEffect(() => {
-    if (reduce) {
-      // Park each clock at its static rest value; no loops are started.
-      // The figure stays lit + legible, simply not moving.
+    // Reduce-motion OR off-tab → no loops. Reduce parks at a lit, legible
+    // rest; off-tab parks too (the screen isn't visible) and the loops
+    // restart when `active` flips back on.
+    if (reduce || !active) {
       t.value = REST_T
       breathT.value = REST_BREATH_T
       driftT.value = REST_DRIFT_T
@@ -90,7 +101,7 @@ export function useConstellationClocks(reduce: boolean): {
       cancelAnimation(breathT)
       cancelAnimation(driftT)
     }
-  }, [t, breathT, driftT, reduce])
+  }, [t, breathT, driftT, reduce, active])
 
   return { t, breathT, driftT }
 }
