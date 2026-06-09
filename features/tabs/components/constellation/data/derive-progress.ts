@@ -2,9 +2,17 @@ import type { ZodiacDef } from '../../../zodiac/types'
 import { TARGET_DAYS } from '../constants'
 import type { SequenceEl } from '../types'
 
-/* Deterministic scatter of `count` unconnected "field" stars across
- * the canvas, kept clear of the centre counter and of the figure's
- * own stars. Same positions every render (seeded by index). */
+/* Deterministic scatter of `count` unconnected "field" stars in a ring
+ * around the figure: kept clear of the centre counter (inner radius) AND
+ * of the canvas corners/edges (outer radius). The figure itself lives
+ * inside a ~0.7-scaled, centred transform, so it occupies only the inner
+ * ~70% of the card; field stars scattered to the raw canvas corners read
+ * as detached orphans "outside" the constellation. Confining them to a
+ * donut (RING_INNER..RING_OUTER from centre) keeps the bonus light haloing
+ * the figure instead of stranded in a corner. Same positions every render
+ * (seeded by index). */
+const RING_INNER = 0.21
+const RING_OUTER = 0.42
 export function buildFieldStars(
   figureStars: readonly { x: number; y: number }[],
   count: number,
@@ -17,10 +25,12 @@ export function buildFieldStars(
     i++
     const x = 0.06 + ((Math.abs(a) * 1000) % 1) * 0.88
     const y = 0.06 + ((Math.abs(b) * 1000) % 1) * 0.88
-    // Skip the centre — that's where the day counter sits.
+    // Confine to the ring around the figure: skip the centre (day counter
+    // sits there) and skip the corners/edges (read as orphans outside).
     const dcx = x - 0.5
     const dcy = y - 0.5
-    if (dcx * dcx + dcy * dcy < 0.21 * 0.21) continue
+    const d2 = dcx * dcx + dcy * dcy
+    if (d2 < RING_INNER * RING_INNER || d2 > RING_OUTER * RING_OUTER) continue
     // Skip anything sitting on top of a figure star.
     let collides = false
     for (const fs of figureStars) {
