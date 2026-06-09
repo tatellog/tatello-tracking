@@ -187,6 +187,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
   }, [])
+  // Same pause, but driven by the macros slider's HORIZONTAL drag — the
+  // vertical-scroll handler above never fires for a sideways swipe, so the
+  // cosmos kept animating and competed with the swipe (felt slow). Hold the
+  // pause for the whole drag; release ~140 ms after it settles.
+  const handleSlideSwipe = useCallback((active: boolean) => {
+    if (scrollIdle.current) clearTimeout(scrollIdle.current)
+    if (active) {
+      setIsScrolling((s) => (s ? s : true))
+    } else {
+      scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
+    }
+  }, [])
   // The constellation's pause is driven as a SharedValue, NOT the `paused`
   // boolean it used to take: a boolean prop re-rendered the whole heavy
   // constellation on every scroll start/stop and every reward, and that
@@ -413,7 +425,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             </Animated.View>
 
             <Animated.View entering={enter(600)}>
-              <StatSlider ctx={ctx} targetSlide={slideParam ?? null} />
+              <StatSlider
+                ctx={ctx}
+                targetSlide={slideParam ?? null}
+                onSwipeStateChange={handleSlideSwipe}
+              />
             </Animated.View>
 
             <Animated.View entering={enter(740)}>

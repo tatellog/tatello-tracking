@@ -55,6 +55,12 @@ type Props = {
    *  of staying on macros and forcing them to swipe. `null` = no
    *  override; the user's current position stays. */
   targetSlide?: string | null
+  /** Called true while the user is actively dragging the carousel, false when
+   *  it settles. Hoy uses it to PAUSE the heavy background animations (the
+   *  constellation + the SkyBackground starfield) during a horizontal swipe —
+   *  the vertical-scroll pause doesn't fire for a sideways drag, so without
+   *  this the swipe competed with all the cosmos animation and felt slow. */
+  onSwipeStateChange?: (active: boolean) => void
 }
 
 /**
@@ -65,7 +71,7 @@ type Props = {
  * weight are read-only views. Pagination dots track the position;
  * the title cross-fades as the slider pages.
  */
-export function StatSlider({ ctx, targetSlide }: Props) {
+export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
   const reduceMotion = useReducedMotion()
@@ -143,6 +149,7 @@ export function StatSlider({ ctx, targetSlide }: Props) {
   }
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    onSwipeStateChange?.(false)
     if (width === 0) return
     const idx = Math.round(e.nativeEvent.contentOffset.x / width)
     if (idx !== active && idx >= 0 && idx < slides.length) setActive(idx)
@@ -190,6 +197,8 @@ export function StatSlider({ ctx, targetSlide }: Props) {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          onScrollBeginDrag={() => onSwipeStateChange?.(true)}
+          onScrollEndDrag={() => onSwipeStateChange?.(false)}
           onMomentumScrollEnd={onScrollEnd}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
