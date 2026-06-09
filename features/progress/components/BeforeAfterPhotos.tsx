@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Image,
@@ -23,6 +22,7 @@ import {
   formatTrendCopy,
   toWeightPoints,
 } from '@/features/progress/logic'
+import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
 import { ProgressShareCard, SHARE_VARIANTS } from './ProgressShareCard'
@@ -127,11 +127,38 @@ function formatAfterDate(after: ProgressPhoto, before: ProgressPhoto | null): st
 function RecaptureGlyph() {
   return (
     <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
-      <Path d="M6.5 8.2 A7 7 0 0 1 17.8 7.3" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
-      <Path d="M17.5 15.8 A7 7 0 0 1 6.2 16.7" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
-      <Path d="M17.8 7.3 L17.0 4.9 M17.8 7.3 L20.2 6.8" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
-      <Path d="M6.2 16.7 L7.0 19.1 M6.2 16.7 L3.8 17.2" stroke={colors.oro} strokeWidth={1.1} strokeLinecap="round" opacity={0.7} />
-      <Path d="M12 8 L12.9 11.1 L16 12 L12.9 12.9 L12 16 L11.1 12.9 L8 12 L11.1 11.1 Z" fill={colors.oro} />
+      <Path
+        d="M6.5 8.2 A7 7 0 0 1 17.8 7.3"
+        stroke={colors.oro}
+        strokeWidth={1.1}
+        strokeLinecap="round"
+        opacity={0.7}
+      />
+      <Path
+        d="M17.5 15.8 A7 7 0 0 1 6.2 16.7"
+        stroke={colors.oro}
+        strokeWidth={1.1}
+        strokeLinecap="round"
+        opacity={0.7}
+      />
+      <Path
+        d="M17.8 7.3 L17.0 4.9 M17.8 7.3 L20.2 6.8"
+        stroke={colors.oro}
+        strokeWidth={1.1}
+        strokeLinecap="round"
+        opacity={0.7}
+      />
+      <Path
+        d="M6.2 16.7 L7.0 19.1 M6.2 16.7 L3.8 17.2"
+        stroke={colors.oro}
+        strokeWidth={1.1}
+        strokeLinecap="round"
+        opacity={0.7}
+      />
+      <Path
+        d="M12 8 L12.9 11.1 L16 12 L12.9 12.9 L12 16 L11.1 12.9 L8 12 L11.1 11.1 Z"
+        fill={colors.oro}
+      />
     </Svg>
   )
 }
@@ -208,7 +235,9 @@ function PhotoColumn({
           onPress={onPress}
           accessibilityRole="button"
           accessibilityLabel={
-            filled ? `Gestionar foto de ${label.toLowerCase()}` : `Subir foto de ${label.toLowerCase()}`
+            filled
+              ? `Gestionar foto de ${label.toLowerCase()}`
+              : `Subir foto de ${label.toLowerCase()}`
           }
         >
           {frame}
@@ -292,22 +321,16 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     try {
       await takePhoto.mutateAsync({ uri: result.assets[0].uri, angle: 'front' })
     } catch (err) {
-      Alert.alert(
-        'No se pudo subir',
-        err instanceof Error ? err.message : 'Intenta de nuevo.',
-      )
+      Alert.alert('No se pudo subir', err instanceof Error ? err.message : 'Intenta de nuevo.')
     }
   }
 
   const choosePhoto = () => {
     const options = ['Tomar foto', 'Elegir de galería', 'Cancelar']
-    ActionSheetIOS.showActionSheetWithOptions(
-      { title: 'Foto de progreso', options, cancelButtonIndex: 2 },
-      (i) => {
-        if (i === 0) void pickAndUpload('camera')
-        else if (i === 1) void pickAndUpload('library')
-      },
-    )
+    showActionSheet({ title: 'Foto de progreso', options, cancelButtonIndex: 2 }, (i) => {
+      if (i === 0) void pickAndUpload('camera')
+      else if (i === 1) void pickAndUpload('library')
+    })
   }
 
   const canShare = data.count >= 2
@@ -318,24 +341,28 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   // Soft, reversible-tone confirm before removing a photo (irreversible,
   // emotionally costly). "Conservar" reads warmer than "Cancelar".
   const confirmDelete = (photo: ProgressPhoto) => {
-    Alert.alert('Eliminar esta foto', 'Esta foto se quita de tu comparación. No se puede recuperar.', [
-      { text: 'Conservar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: () =>
-          deletePhoto.mutate(
-            { id: photo.id, storagePath: photo.storage_path },
-            {
-              onError: (err) =>
-                Alert.alert(
-                  'No se pudo eliminar',
-                  err instanceof Error ? err.message : 'Intenta de nuevo.',
-                ),
-            },
-          ),
-      },
-    ])
+    Alert.alert(
+      'Eliminar esta foto',
+      'Esta foto se quita de tu comparación. No se puede recuperar.',
+      [
+        { text: 'Conservar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () =>
+            deletePhoto.mutate(
+              { id: photo.id, storagePath: photo.storage_path },
+              {
+                onError: (err) =>
+                  Alert.alert(
+                    'No se pudo eliminar',
+                    err instanceof Error ? err.message : 'Intenta de nuevo.',
+                  ),
+              },
+            ),
+        },
+      ],
+    )
   }
 
   // Manage a FILLED frame. "Ahora" (the latest) can be replaced — a new
@@ -344,7 +371,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   // "replace the antes" is meaningless. Deleting recomputes the pair.
   const manage = (slot: 'before' | 'after', photo: ProgressPhoto) => {
     if (slot === 'after') {
-      ActionSheetIOS.showActionSheetWithOptions(
+      showActionSheet(
         {
           title: 'Tu foto de ahora',
           options: ['Reemplazar foto', 'Eliminar foto', 'Cancelar'],
@@ -357,7 +384,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         },
       )
     } else {
-      ActionSheetIOS.showActionSheetWithOptions(
+      showActionSheet(
         {
           title: 'Tu foto de antes',
           options: ['Eliminar foto', 'Cancelar'],
@@ -431,9 +458,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
               photo={data.after}
               accent
               onPress={onColumnPress('after', data.after)}
-              uploading={
-                (takePhoto.isPending && data.count >= 1) || deletingId === data.after?.id
-              }
+              uploading={(takePhoto.isPending && data.count >= 1) || deletingId === data.after?.id}
               dateOverride={data.after ? formatAfterDate(data.after, data.before) : undefined}
             />
           </View>

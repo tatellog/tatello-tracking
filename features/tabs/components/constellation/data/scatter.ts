@@ -42,17 +42,6 @@ export const DUST: readonly DustParticle[] = [
   { x: 0.08, sway: 7, period: 1.95, phase: 0.84, r: 0.75, opacity: 0.45 },
 ] as const
 
-// Winks viven en los MÁRGENES, fuera de donde se asienta la figura del
-// signo (centro del lienzo). El destello blanco de 4 puntas se lee como una
-// estrella de la constelación suelta si cae arriba-izquierda, así que ahí no
-// hay ninguno: el wink superior-izquierdo se retiró.
-export const WINK_POSITIONS = [
-  { x: 0.84, y: 0.24, period: 5.2, phase: 0.27, size: 2.8 },
-  { x: 0.78, y: 0.78, period: 4.7, phase: 0.51, size: 3.2 },
-  { x: 0.09, y: 0.88, period: 5.6, phase: 0.73, size: 2.6 },
-  { x: 0.52, y: 0.08, period: 4.9, phase: 0.39, size: 3.0 },
-] as const
-
 // Magenta-family hues — the per-spark micro-shift stays inside the
 // brand. The burst never changes *kind*, only texture.
 export const SPARK_HUES = [colors.magenta, colors.magentaHot, '#FF8FC0']

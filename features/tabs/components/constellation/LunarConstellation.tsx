@@ -26,11 +26,7 @@ import { useConstellationClocks } from './animation/use-clocks'
 import { useIgnitionEngine } from './animation/use-ignition-engine'
 import { H, PAD, TARGET_DAYS, W } from './constants'
 import { deriveProgress } from './data/derive-progress'
-import {
-  SIGN_CONSTELLATION_TRANSFORM,
-  SIGN_CONSTELLATION_TRANSFORM_PARAMS,
-  SIGN_ENGRAVINGS,
-} from './data/sign-maps'
+import { SIGN_CONSTELLATION_TRANSFORM_PARAMS, SIGN_ENGRAVINGS } from './data/sign-maps'
 import { useFigureGeometry } from './data/use-figure-geometry'
 import { useLitMaps } from './data/use-lit-maps'
 import {

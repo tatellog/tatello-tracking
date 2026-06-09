@@ -125,7 +125,6 @@ export function CanvasSkeleton({
   // RNSVGGroupManagerDelegate on Fabric Android with a
   // ClassCastException (String vs ReadableArray). Each element is a
   // single-property object like `{ translateX: 56 }` or `{ scaleY: 0.68 }`.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transform: any[]
   /** iOS "Reducir movimiento". When ON the build ping-pong never
    *  starts — `build` is parked at 1 AND each SkeletonStar/Line clamps

@@ -1,14 +1,6 @@
 import * as ImagePicker from 'expo-image-picker'
 import { useMemo, useState } from 'react'
-import {
-  ActionSheetIOS,
-  Alert,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
@@ -16,6 +8,7 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useProfile } from '@/features/profile/hooks'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
+import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
 import { ProgressShareSheet, type ShareVariant } from './ProgressShareSheet'
@@ -163,13 +156,10 @@ export function TrainingShareCTA() {
 
   const choosePhoto = () => {
     const options = ['Tomar foto', 'Elegir de galería', 'Cancelar']
-    ActionSheetIOS.showActionSheetWithOptions(
-      { title: 'Tu entreno de hoy', options, cancelButtonIndex: 2 },
-      (i) => {
-        if (i === 0) void pickAndOpen('camera')
-        else if (i === 1) void pickAndOpen('library')
-      },
-    )
+    showActionSheet({ title: 'Tu entreno de hoy', options, cancelButtonIndex: 2 }, (i) => {
+      if (i === 0) void pickAndOpen('camera')
+      else if (i === 1) void pickAndOpen('library')
+    })
   }
 
   // Empty-state chip tap → pick a source. Photo state has its own
