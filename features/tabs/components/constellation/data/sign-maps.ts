@@ -1,18 +1,23 @@
 import type { ZodiacEngravingProps } from '../../ZodiacEngraving'
 import type { ZodiacSign } from '../../../zodiac/types'
 
-import AcuarioArt from '@/assets/zodiac-art/acuario-art.svg'
-import AriesArt from '@/assets/zodiac-art/aries-art.svg'
-import CancerArt from '@/assets/zodiac-art/cancer-art.svg'
-import CapricornioArt from '@/assets/zodiac-art/capricornio-art.svg'
-import EscorpioArt from '@/assets/zodiac-art/escorpio-art.svg'
-import GeminisArt from '@/assets/zodiac-art/geminis-art.svg'
-import LeoArt from '@/assets/zodiac-art/leo-art.svg'
-import LibraArt from '@/assets/zodiac-art/libra-art.svg'
-import PiscisArt from '@/assets/zodiac-art/piscis-art.svg'
-import SagitarioArt from '@/assets/zodiac-art/sagitario-art.svg'
-import TauroArt from '@/assets/zodiac-art/tauro-art.svg'
-import VirgoArt from '@/assets/zodiac-art/virgo-art.svg'
+// PNG rasterizado (no el .svg de ~500 KB con miles de paths). El arte se
+// muestra a tamaño fijo en la card, así que un PNG a 3x (1024 px) se ve
+// idéntico pero renderiza como UNA textura GPU en vez de re-rasterizar miles
+// de paths por frame — el cuello de botella real de la constelación en Android.
+// Regenerar con: node scripts/gen-zodiac-png.mjs
+import AcuarioArt from '@/assets/zodiac-art/acuario-art.png'
+import AriesArt from '@/assets/zodiac-art/aries-art.png'
+import CancerArt from '@/assets/zodiac-art/cancer-art.png'
+import CapricornioArt from '@/assets/zodiac-art/capricornio-art.png'
+import EscorpioArt from '@/assets/zodiac-art/escorpio-art.png'
+import GeminisArt from '@/assets/zodiac-art/geminis-art.png'
+import LeoArt from '@/assets/zodiac-art/leo-art.png'
+import LibraArt from '@/assets/zodiac-art/libra-art.png'
+import PiscisArt from '@/assets/zodiac-art/piscis-art.png'
+import SagitarioArt from '@/assets/zodiac-art/sagitario-art.png'
+import TauroArt from '@/assets/zodiac-art/tauro-art.png'
+import VirgoArt from '@/assets/zodiac-art/virgo-art.png'
 
 // Per-sign art asset map — keyed by ZodiacSign so each of the 12
 // signs gets its own illustrative backdrop. New signs added here
