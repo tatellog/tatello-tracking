@@ -47,7 +47,7 @@ import type { Props, Resolved, SequenceEl } from './types'
 // Flag de migración — APAGADO mientras se portan las rebanadas (líneas + cuerpos
 // → halos → flares → ignición). Con `false` la figura SVG actual se usa tal cual
 // (cero cambio). Prender solo para validar la versión Skia en Expo Go.
-const USE_SKIA_FIGURE = false
+const USE_SKIA_FIGURE = true
 
 export function LunarConstellation({
   trained,

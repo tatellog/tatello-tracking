@@ -1,4 +1,4 @@
-import { BlurMask, Canvas, Circle, Group, Path } from '@shopify/react-native-skia'
+import { BlurMask, Canvas, Circle, DashPathEffect, Group, Path } from '@shopify/react-native-skia'
 import { memo } from 'react'
 import { StyleSheet } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
@@ -36,6 +36,21 @@ const MAGENTA = colors.magenta
 const WHITE_HOT = '#FFF1D6'
 
 type Px = { x: number; y: number; r: number; mag: number }
+
+/** Scale-about-(cx,cy) transform array for a Skia <Group>. Marked `worklet`
+ *  because it's called from useDerivedValue worklets — in a release build the
+ *  worklet runs on the UI thread and a plain JS function isn't available there
+ *  ("Object is not a function"); dev/Expo Go tolerated it, release crashes. */
+function scaleAbout(cx: number, cy: number, scale: number) {
+  'worklet'
+  return [
+    { translateX: cx },
+    { translateY: cy },
+    { scale },
+    { translateX: -cx },
+    { translateY: -cy },
+  ]
+}
 
 export const SkiaFigure = memo(function SkiaFigure({
   stars,
@@ -173,10 +188,16 @@ function SkiaPlaceholderStar({
     const o = (0.32 + 0.1 * wave) * tk
     return o > 1 ? 1 : o
   })
+  // Body breath — softer ±7 % size pulse than lit stars.
+  const bodyTransform = useDerivedValue(() => {
+    const w = reduce ? 0.5 : 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI)
+    const scale = 1 + w * 0.07
+    return scaleAbout(p.x, p.y, scale)
+  })
   return (
     <>
       {isHero ? <HeroGlow p={p} phase={phase} t={t} reduce={reduce} /> : null}
-      <Group opacity={opacity}>
+      <Group opacity={opacity} transform={bodyTransform}>
         <Path path={fourPointStarPath(p.x, p.y, p.r)} color={CREAM} />
       </Group>
     </>
@@ -227,7 +248,7 @@ function SkiaLitStar({
   const coreOpacity = useDerivedValue(() => (0.35 + 0.2 * wave.value) * haloMult)
   const coreR = useDerivedValue(() => p.r + 2 * sScale + wave.value * 1.2 * sScale)
 
-  // Body twinkle (cream sparkle).
+  // Body twinkle (cream sparkle) + ±10 % breath scale.
   const bodyOpacity = useDerivedValue(() => {
     if (reduce) return 0.95
     const w = wave.value
@@ -238,6 +259,7 @@ function SkiaLitStar({
     const o = (0.85 + 0.15 * w) * tk
     return o > 1 ? 1 : o
   })
+  const bodyTransform = useDerivedValue(() => scaleAbout(p.x, p.y, 1 + wave.value * 0.1))
 
   return (
     <>
@@ -249,12 +271,59 @@ function SkiaLitStar({
       {/* Hot core */}
       <Circle cx={p.x} cy={p.y} r={coreR} color={CREAM_HOT} opacity={coreOpacity} />
       {/* Body sparkle */}
-      <Group opacity={bodyOpacity}>
+      <Group opacity={bodyOpacity} transform={bodyTransform}>
         <Path path={fourPointStarPath(p.x, p.y, p.r)} color={CREAM_HOT} />
       </Group>
       {/* White-hot pinpoint */}
       <Circle cx={p.x} cy={p.y} r={Math.max(0.5, p.r * 0.16)} color={WHITE_HOT} opacity={0.75} />
+      {/* Today's star — dashed cream orbital ring (only on the day-0 star) */}
+      {recency === 0 ? <SkiaTodayRing p={p} sScale={sScale} t={t} reduce={reduce} /> : null}
     </>
+  )
+}
+
+/* Today's star ring — thin dashed cream ring that slowly rotates + breathes.
+ * Matches lit-stars/today-ring.tsx. */
+function SkiaTodayRing({
+  p,
+  sScale,
+  t,
+  reduce,
+}: {
+  p: Px
+  sScale: number
+  t: SharedValue<number>
+  reduce: boolean
+}) {
+  const ringR = p.r + 11 * sScale
+  const opacity = useDerivedValue(() => {
+    const wave = reduce ? 1 : 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * 0.6)
+    return 0.18 + 0.18 * wave
+  })
+  const transform = useDerivedValue(() => {
+    const deg = reduce ? 0 : (t.value * (360 / 12)) % 360
+    const rot = (deg * Math.PI) / 180
+    return [
+      { translateX: p.x },
+      { translateY: p.y },
+      { rotate: rot },
+      { translateX: -p.x },
+      { translateY: -p.y },
+    ]
+  })
+  return (
+    <Group transform={transform} opacity={opacity}>
+      <Circle
+        cx={p.x}
+        cy={p.y}
+        r={ringR}
+        color={CREAM_HOT}
+        style="stroke"
+        strokeWidth={0.7 * sScale}
+      >
+        <DashPathEffect intervals={[3 * sScale, 5 * sScale]} />
+      </Circle>
+    </Group>
   )
 }
 
