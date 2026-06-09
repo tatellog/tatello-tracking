@@ -391,8 +391,9 @@ const DEEP_STARS: readonly DeepStar[] = [...DEEP_STARS_BASE, ...CENTRE_STARS]
 // props every frame was a top perf cost). Each bucket pulses at a slightly
 // different phase so the field still doesn't shimmer in unison.
 const STAR_BUCKET_COUNT = 5
-const STAR_BUCKETS: readonly (readonly Star[])[] = Array.from({ length: STAR_BUCKET_COUNT }, (_, b) =>
-  STARS.filter((_, i) => i % STAR_BUCKET_COUNT === b),
+const STAR_BUCKETS: readonly (readonly Star[])[] = Array.from(
+  { length: STAR_BUCKET_COUNT },
+  (_, b) => STARS.filter((_, i) => i % STAR_BUCKET_COUNT === b),
 )
 
 /** Cosmic dust — a few large, very faint motes (not stars) that drift
@@ -798,21 +799,29 @@ function ActiveAura({
 }) {
   const breath = useSharedValue(0)
   const ignite = useSharedValue(0)
+  // Gate the breath loop off-tab — otherwise this active node keeps repainting
+  // the MonthSky <Svg> forever if you leave Mes with a pattern selected.
+  const screenActive = useScreenActive()
 
+  // Ignition flash — fires once when this node becomes active (on mount).
   useEffect(() => {
-    // Breathing yo-yo — gentle, organic, never resting on a hard edge.
+    ignite.value = withSequence(withTiming(1, { duration: 180 }), withTiming(0, { duration: 520 }))
+    return () => cancelAnimation(ignite)
+  }, [ignite])
+
+  // Breathing yo-yo — gentle, organic; paused when the tab isn't focused.
+  useEffect(() => {
+    if (!screenActive) {
+      cancelAnimation(breath)
+      return
+    }
     breath.value = withRepeat(
       withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.ease) }),
       -1,
       true,
     )
-    // Ignition flash — fires once when this node becomes active.
-    ignite.value = withSequence(withTiming(1, { duration: 180 }), withTiming(0, { duration: 520 }))
-    return () => {
-      cancelAnimation(breath)
-      cancelAnimation(ignite)
-    }
-  }, [breath, ignite])
+    return () => cancelAnimation(breath)
+  }, [breath, screenActive])
 
   const animatedProps = useAnimatedProps(() => {
     'worklet'
@@ -833,15 +842,20 @@ function ActiveAura({
  * active node; non-active nodes get a static low-opacity Circle. */
 function ActiveCore({ x, y, r }: { x: number; y: number; r: number }) {
   const breath = useSharedValue(0)
+  const screenActive = useScreenActive()
 
   useEffect(() => {
+    if (!screenActive) {
+      cancelAnimation(breath)
+      return
+    }
     breath.value = withRepeat(
       withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.ease) }),
       -1,
       true,
     )
     return () => cancelAnimation(breath)
-  }, [breath])
+  }, [breath, screenActive])
 
   const animatedProps = useAnimatedProps(() => {
     'worklet'
@@ -995,8 +1009,24 @@ function PatternArt({ kind, active }: { kind: SatelliteKind | undefined; active?
       return (
         <Svg {...common} viewBox="0 0 100 100">
           <Circle cx={50} cy={50} r={15} fill="none" stroke={ink} strokeWidth={2} />
-          <Line x1={50} y1={30} x2={50} y2={70} stroke={ink} strokeWidth={1.8} strokeLinecap="round" />
-          <Line x1={30} y1={50} x2={70} y2={50} stroke={ink} strokeWidth={1.8} strokeLinecap="round" />
+          <Line
+            x1={50}
+            y1={30}
+            x2={50}
+            y2={70}
+            stroke={ink}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+          />
+          <Line
+            x1={30}
+            y1={50}
+            x2={70}
+            y2={50}
+            stroke={ink}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+          />
           <Circle cx={50} cy={50} r={3} fill={ink} />
         </Svg>
       )
@@ -2217,7 +2247,13 @@ function MonthSkyImpl({
           {/* Foreground starfield — bucketed twinkle (one worklet per bucket). */}
           <G>
             {STAR_BUCKETS.map((group, b) => (
-              <MonthStarBucket key={`sb-${b}`} stars={group} index={b} clock={twinkle} reduced={reduced} />
+              <MonthStarBucket
+                key={`sb-${b}`}
+                stars={group}
+                index={b}
+                clock={twinkle}
+                reduced={reduced}
+              />
             ))}
           </G>
 

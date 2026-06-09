@@ -4,14 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   CormorantGaramond_500Medium_Italic,
   CormorantGaramond_600SemiBold_Italic,
-  CormorantGaramond_700Bold_Italic,
 } from '@expo-google-fonts/cormorant-garamond'
 import {
   HankenGrotesk_400Regular,
   HankenGrotesk_500Medium,
   HankenGrotesk_600SemiBold,
   HankenGrotesk_700Bold,
-  HankenGrotesk_800ExtraBold,
   HankenGrotesk_900Black,
   useFonts,
 } from '@expo-google-fonts/hanken-grotesk'
@@ -67,16 +65,17 @@ export default function RootLayout() {
   // destacada y frases poéticas cortas. Sin Inter, sin Inter Tight —
   // la paleta cambió de Pearl Mauve a Norte y los tokens del theme
   // ya apuntan a las nuevas familias.
+  // Only the weights actually mapped in theme/typography.ts (or hardcoded
+  // somewhere). 800ExtraBold + Cormorant 700Bold_Italic were loaded here but
+  // referenced nowhere — they blocked the splash for nothing. Removed.
   const [fontsLoaded, fontError] = useFonts({
     HankenGrotesk_400Regular,
     HankenGrotesk_500Medium,
     HankenGrotesk_600SemiBold,
     HankenGrotesk_700Bold,
-    HankenGrotesk_800ExtraBold,
     HankenGrotesk_900Black,
     CormorantGaramond_500Medium_Italic,
     CormorantGaramond_600SemiBold_Italic,
-    CormorantGaramond_700Bold_Italic,
   })
 
   const { session, loading: sessionLoading } = useSession()
