@@ -8,12 +8,17 @@ type Props = {
 }
 
 /*
- * Single task row of the Día 1 list. Numbered chip on the left, body
- * copy on the right. The chip carries the observatory GOLD (oro) so it
- * reads as the sky's light landing on the task, not as a magenta CTA —
+ * Single task row of the Día 1 list. Numbered marker on the left, body
+ * copy on the right. The marker carries the observatory GOLD (oro) so it
+ * reads as the sky's light landing on the step, not as a magenta CTA —
  * magenta stays reserved for the screen's voice (title emphasis + CTA).
- * The surface is bgCard2 with a gold hairline so it sits in the same
- * warm register as the recap card above it (matching radius 16).
+ *
+ * NO card surface / border / radius: this is an INFORMATIONAL step, not an
+ * action. A boxed row with a circular chip read as a tappable button (the
+ * user can't press it — the real action is logging a meal in the app). So
+ * it's flattened to a plain numbered instruction line; only the gold marker
+ * disc remains, and even it loses its hard border so it scans as an index,
+ * not a control.
  */
 export function DayOneTask({ num, text }: Props) {
   return (
@@ -31,20 +36,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: colors.bgCard2,
-    borderWidth: 1,
-    borderColor: colors.oroHairline,
-    borderRadius: 16,
+    paddingVertical: 4,
   },
   numChip: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.oroTint,
-    borderWidth: 1,
-    borderColor: colors.oroHairline,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
