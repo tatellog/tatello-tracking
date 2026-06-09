@@ -2,10 +2,10 @@ import { type ReactNode } from 'react'
 
 import BodyVect from '@/assets/icons/body-vect.svg'
 import CycleVect from '@/assets/icons/cycle-vect.svg'
-import EnergyVect from '@/assets/icons/energy-vect.svg'
 import FoodVect from '@/assets/icons/food-vect.svg'
 import MindVect from '@/assets/icons/mind-vect.svg'
 import MoonVect from '@/assets/icons/moon-vect.svg'
+import Anchor from '@/assets/orbits-art/anchor.svg'
 import { colors } from '@/theme'
 
 import { type DimensionKey } from '../logic'
@@ -29,7 +29,7 @@ import { type DimensionKey } from '../logic'
 export const GLYPHS: Record<DimensionKey, ReactNode> = {
   cuerpo: <BodyVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
   mente: <MindVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
-  energia: <EnergyVect width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
+  energia: <Anchor width={24} height={24} preserveAspectRatio="xMidYMid meet" />,
   alimento: (
     <FoodVect width={24} height={24} color={colors.leche} preserveAspectRatio="xMidYMid meet" />
   ),
