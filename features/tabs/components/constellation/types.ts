@@ -1,3 +1,5 @@
+import type { SharedValue } from 'react-native-reanimated'
+
 import type { ZodiacSign } from '../../zodiac/types'
 
 export type Resolved = {
@@ -40,10 +42,16 @@ export type Props = {
    *  central particle burst is omitted. */
   suppressBurst?: boolean
   /** Pause the animation loops (in addition to the internal off-tab gate)
-   *  while the Hoy ScrollView is actively scrolling — frees the UI thread so
-   *  the scroll stays smooth; the constellation freezes for the drag and
-   *  resumes on release (imperceptible mid-scroll). */
-  paused?: boolean
+   *  while the Hoy ScrollView is actively scrolling OR the reward plays —
+   *  frees the UI thread; the constellation freezes for the drag and resumes
+   *  on release (imperceptible mid-scroll).
+   *
+   *  Passed as a SharedValue (1 = paused), NOT a boolean, ON PURPOSE: a
+   *  boolean re-rendered the whole constellation on every scroll start/stop
+   *  and every reward, and that re-render repainted the SVG + Skia layers for
+   *  a frame → "el emblema brinca". The SharedValue keeps the prop reference
+   *  stable (no re-render) and the loops pause/resume on the UI thread. */
+  pausedSV?: SharedValue<number>
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

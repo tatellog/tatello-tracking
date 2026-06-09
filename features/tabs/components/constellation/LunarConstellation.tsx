@@ -57,7 +57,7 @@ export function LunarConstellation({
   committed = false,
   showCount = true,
   suppressBurst = false,
-  paused = false,
+  pausedSV,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -112,12 +112,13 @@ export function LunarConstellation({
   // again and the next affordance reappears.
   const nextEl: SequenceEl | null = committed ? null : (sequence[elementsLit] ?? null)
 
-  // Pause every animation loop when the Hoy tab loses focus (the UI-thread
-  // withRepeat clocks don't stop on their own → they'd tax the whole app
-  // forever after a single visit). INVISIBLE on-tab: while focused the
-  // constellation animates exactly as before.
-  const screenActive = useIsFocused() && !paused
-  const { t, breathT, driftT } = useConstellationClocks(reduceMotion, screenActive)
+  // Off-tab gate (React): the UI-thread withRepeat clocks don't stop on their
+  // own → they'd tax the whole app forever after a single visit, so we cancel
+  // them when the tab loses focus. The scroll/reward pause is handled SEPARATELY
+  // by `pausedSV` (a SharedValue) so it never re-renders this component — see
+  // useConstellationClocks. INVISIBLE on-tab: while focused nothing changes.
+  const focused = useIsFocused()
+  const { t, breathT, driftT } = useConstellationClocks(reduceMotion, focused, pausedSV)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence, trained, todayIdx })
@@ -415,6 +416,11 @@ export function LunarConstellation({
             ) : null}
           </Animated.View>
         ) : null}
+        {/* Portrait frame — a sibling overlay, NOT a wrapper clip. Draws the
+            rounded bronze hairline on top of the SVG + Skia layers without
+            forcing a rounded `overflow:hidden` clip over the separate Skia
+            surfaces (the Android scroll-swim cause). Non-interactive. */}
+        <View style={styles.frameOverlay} pointerEvents="none" />
       </View>
 
       {/* Chip footer — count + denominator rendered as a proper
@@ -460,15 +466,22 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     position: 'relative',
-    // Intentional frame — rounded corners + a thin warm bronze
-    // hairline border that ties to the constellation's cream-gold
-    // (`#D9AE6F`) palette. Converts the previously visible "card
-    // boundary" into a deliberate "celestial portrait frame".
-    // overflow: hidden so the rounded corners clip the lion's
-    // ornate ring cleanly (the ring is circular so the corners
-    // are empty anyway — no meaningful content lost).
+    // The rounded border + `overflow:'hidden'` used to live HERE — but on
+    // Android a rounded overflow-clip over the nested Skia <Canvas> surfaces
+    // (each its own TextureView) desynced from the RN view tree on EVERY
+    // scroll frame → the figure "swam"/jumped relative to the SVG backdrop
+    // ("el emblema se mueve al scrollear"). Órbita's Skia wrap is unclipped
+    // and never jumped — that was the decisive difference. The frame is now a
+    // sibling overlay (`frameOverlay`) that does NOT clip the surfaces.
     borderRadius: 22,
-    overflow: 'hidden',
+  },
+  // The portrait frame drawn as a non-clipping overlay ON TOP of the SVG +
+  // Skia layers: the rounded bronze hairline reads exactly as before, but with
+  // no children and no `overflow:'hidden'` it imposes no clip mask on the Skia
+  // surfaces below — so they translate in lockstep with the scroll.
+  frameOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
     borderWidth: 1.2,
     borderColor: 'rgba(217, 174, 111, 0.32)',
   },

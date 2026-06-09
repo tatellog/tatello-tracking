@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import {
   Easing,
   cancelAnimation,
+  useAnimatedReaction,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -59,6 +60,34 @@ const REST_T = 0.25
 const REST_BREATH_T = 0.5
 const REST_DRIFT_T = 0
 
+/* Resume a linear 0→1 wrap-clock WITHOUT a jump. A plain
+ * `withRepeat(withTiming(1, dur))` started from a frozen fractional value
+ * (e.g. 0.6 after a scroll-pause) wraps 1→0.6 each cycle — a discontinuity
+ * that snapped the figure's breath/drift ("el emblema brinca al frenar el
+ * scroll"). Instead: finish the CURRENT cycle from the frozen value to 1 at
+ * the same speed (duration ∝ remaining), then reset to 0 and loop cleanly —
+ * the 1→0 wrap is seamless because every consumer reads sin(v·2π), and
+ * sin(2π)=sin(0). On a fresh mount (v=0) this is identical to the old loop. */
+function resumeWrapClock(sv: SharedValue<number>, dur: number) {
+  // 'worklet' so it's callable from BOTH the JS effect (runs on JS) and the
+  // useAnimatedReaction worklet (runs on UI) without the release-APK
+  // "Object is not a function" crash a plain JS helper hits inside a worklet.
+  'worklet'
+  const remaining = Math.max(1, (1 - sv.value) * dur)
+  sv.value = withTiming(1, { duration: remaining, easing: Easing.linear }, (finished) => {
+    // OWN 'worklet' directive: this completion callback runs on the UI thread
+    // when the segment finishes. When resumeWrapClock is called from the JS
+    // effect, Reanimated does NOT auto-serialize this nested anonymous callback
+    // → in a RELEASE APK it crashes "Object is not a function" the moment the
+    // segment completes (dev tolerates it). The directive serializes it.
+    'worklet'
+    if (finished) {
+      sv.value = 0
+      sv.value = withRepeat(withTiming(1, { duration: dur, easing: Easing.linear }), -1, false)
+    }
+  })
+}
+
 export function useConstellationClocks(
   reduce: boolean,
   /** False while the Hoy tab isn't focused. The `withRepeat` loops run on
@@ -69,6 +98,14 @@ export function useConstellationClocks(
    *  on-tab: while focused nothing changes. Defaults to true so callers/tests
    *  that don't pass it are unaffected. */
   active: boolean = true,
+  /** SCROLL / REWARD pause, as a SharedValue (1 = paused). Driven this way —
+   *  NOT as a React prop — so toggling it NEVER re-renders the constellation.
+   *  A boolean prop did: every scroll start/stop and every reward re-rendered
+   *  LunarConstellation, and that re-render repainted the SVG + Skia layers for
+   *  a frame → "el emblema se mueve / brinca". A SharedValue keeps the prop
+   *  reference stable (the memoized component doesn't re-render) and the loops
+   *  pause/resume on the UI thread via the reaction below. */
+  pausedSV?: SharedValue<number>,
 ): {
   t: SharedValue<number>
   breathT: SharedValue<number>
@@ -79,10 +116,10 @@ export function useConstellationClocks(
   const driftT = useSharedValue(0)
 
   useEffect(() => {
-    // Reduce-motion OR off-tab → no loops. Reduce parks at a lit, legible
-    // rest; off-tab parks too (the screen isn't visible) and the loops
-    // restart when `active` flips back on.
-    if (reduce || !active) {
+    // REDUCE-MOTION → park at a lit, legible STATIC rest (the figure must read
+    // encendida while perfectly still). This is the only case that WRITES the
+    // REST values.
+    if (reduce) {
       t.value = REST_T
       breathT.value = REST_BREATH_T
       driftT.value = REST_DRIFT_T
@@ -93,15 +130,53 @@ export function useConstellationClocks(
       }
     }
 
-    t.value = withRepeat(withTiming(1, { duration: 8000, easing: Easing.linear }), -1, false)
-    breathT.value = withRepeat(withTiming(1, { duration: 16000, easing: Easing.linear }), -1, false)
-    driftT.value = withRepeat(withTiming(1, { duration: 42000, easing: Easing.linear }), -1, false)
+    // OFF-TAB (`!active`) → FREEZE the clocks at their CURRENT value (cancel,
+    // no REST reset). A frozen clock is a constant → its derived worklets stop
+    // recomputing (off-tab cost → 0) and it resumes seamlessly on return.
+    if (!active) {
+      cancelAnimation(t)
+      cancelAnimation(breathT)
+      cancelAnimation(driftT)
+      return
+    }
+
+    // On-tab. Start the loops UNLESS a scroll/reward pause is already active
+    // (the reaction below owns the dynamic pause/resume). Resume from the
+    // frozen value, no wrap-jump (see resumeWrapClock).
+    if (!pausedSV || pausedSV.value <= 0.5) {
+      resumeWrapClock(t, 8000)
+      resumeWrapClock(breathT, 16000)
+      resumeWrapClock(driftT, 42000)
+    }
     return () => {
       cancelAnimation(t)
       cancelAnimation(breathT)
       cancelAnimation(driftT)
     }
-  }, [t, breathT, driftT, reduce, active])
+  }, [t, breathT, driftT, reduce, active, pausedSV])
+
+  // Dynamic scroll/reward pause — runs ENTIRELY on the UI thread (no React
+  // re-render). Freeze the clocks the instant pausedSV crosses to 1, resume
+  // (no wrap-jump) when it drops back to 0. Off-tab / reduce-motion are owned
+  // by the effect above, so this no-ops there.
+  useAnimatedReaction(
+    () => (pausedSV ? pausedSV.value > 0.5 : false),
+    (paused, prev) => {
+      if (reduce || !active || prev === null || paused === prev) return
+      if (paused) {
+        cancelAnimation(t)
+        cancelAnimation(breathT)
+        cancelAnimation(driftT)
+      } else {
+        resumeWrapClock(t, 8000)
+        resumeWrapClock(breathT, 16000)
+        resumeWrapClock(driftT, 42000)
+      }
+    },
+    // pausedSV included so a future render that swaps the SharedValue ref
+    // re-registers the reaction (today it's always the same stable ref).
+    [reduce, active, pausedSV],
+  )
 
   return { t, breathT, driftT }
 }

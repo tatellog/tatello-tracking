@@ -1,10 +1,15 @@
 import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import LottieView from 'lottie-react-native'
-import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated'
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useReducedMotion,
+  useSharedValue,
+} from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
@@ -19,6 +24,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal, usePatternDetection } from '@/features/patterns'
 import { useMonthWorkoutDates, useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
+import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
@@ -151,6 +157,20 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const reducedMotion = useReducedMotion()
   const [celebrateKey, setCelebrateKey] = useState(0)
+  // True for the duration of the reward animation. Pauses the constellation's
+  // AMBIENT loops (twinkle/drift/breath) so the UI thread is free for the
+  // star ignition + the fireworks Lottie + the Skia flash that all fire at
+  // once on commit — without it they competed and the reward played janky.
+  // The ignition itself is independent of `paused`, so the star still lights.
+  const [celebrating, setCelebrating] = useState(false)
+  // Safety backstop — if onAnimationFinish never arrives (unmount mid-play,
+  // a Lottie that silently stalls), un-pause the constellation anyway so it
+  // can't get stuck frozen. The fireworks run well under 4 s at speed 0.6.
+  useEffect(() => {
+    if (!celebrating) return
+    const id = setTimeout(() => setCelebrating(false), 4000)
+    return () => clearTimeout(id)
+  }, [celebrating])
 
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
   const [weekOpen, setWeekOpen] = useState(false)
@@ -167,6 +187,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
   }, [])
+  // The constellation's pause is driven as a SharedValue, NOT the `paused`
+  // boolean it used to take: a boolean prop re-rendered the whole heavy
+  // constellation on every scroll start/stop and every reward, and that
+  // re-render repainted its SVG + Skia layers for a frame → "el emblema
+  // brinca". Mirroring the JS flags into a SharedValue keeps the prop ref
+  // stable (no re-render) while the loops still pause on the UI thread.
+  // INVARIANT: this ref must stay stable (same object) for the lifetime of
+  // TodayContent — useConstellationClocks cancels + restarts all 3 clocks if it
+  // changes, which would flash the figure. useSharedValue guarantees that.
+  const constellationPaused = useSharedValue(0)
+  useEffect(() => {
+    constellationPaused.value = isScrolling || celebrating ? 1 : 0
+  }, [isScrolling, celebrating, constellationPaused])
   const todayIsoLocal = ctx.date
 
   const monthWorkouts = useMonthWorkoutDates()
@@ -229,6 +262,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       if (restedToday) setRest.mutate(false)
       toggleToday.mutate(true)
       playCommitHaptic('trained')
+      // Only gate on the reward when it actually plays (reduced motion shows
+      // no Lottie → onAnimationFinish would never fire → stuck paused).
+      if (!reducedMotion) setCelebrating(true)
       setCelebrateKey((k) => k + 1)
       if (wasFirstDay) {
         qc.invalidateQueries({ queryKey: queryKeys.profile.all })
@@ -262,138 +298,146 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const enter = makeEnter(cadence)
 
   return (
-    <View style={styles.screen}>
-      <SkyBackground />
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
-          <Animated.View entering={enter(40)}>
-            <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
-          </Animated.View>
+    // Provide the scroll-pause flag to every useScreenActive() consumer on
+    // Hoy — notably SkyBackground's 108-node starfield <Svg>, which otherwise
+    // kept twinkling (full SVG repaint 60×/s) DURING the scroll and fought the
+    // gesture. Now it freezes while scrolling, like it already does on Órbita.
+    <ScrollPauseContext.Provider value={isScrolling}>
+      <View style={styles.screen}>
+        <SkyBackground />
+        <SafeAreaView style={styles.safe} edges={['top']}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
+            <Animated.View entering={enter(40)}>
+              <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
+            </Animated.View>
 
-          <Animated.View entering={enter(120)}>
-            <DayCheckIn state={dayState} onChange={handleDayChange} />
-          </Animated.View>
+            <Animated.View entering={enter(120)}>
+              <DayCheckIn state={dayState} onChange={handleDayChange} />
+            </Animated.View>
 
-          <Animated.View entering={enter(160)}>
-            <StreakLine streak={ctx.streak_days} />
-          </Animated.View>
+            <Animated.View entering={enter(160)}>
+              <StreakLine streak={ctx.streak_days} />
+            </Animated.View>
 
-          <Animated.View entering={enter(220)} style={styles.constellationHeader}>
-            <Text style={styles.constellationHeaderText}>Tu {signLabel}</Text>
-          </Animated.View>
+            <Animated.View entering={enter(220)} style={styles.constellationHeader}>
+              <Text style={styles.constellationHeaderText}>Tu {signLabel}</Text>
+            </Animated.View>
 
-          <Animated.View entering={enter(320)} style={styles.constellationWrap}>
-            <LunarConstellation
-              trained={month.grid}
-              todayIdx={month.todayIdx}
-              target={month.daysInMonth}
-              sign={sign}
-              committed={ctx.today_workout_completed}
-              suppressBurst
-              paused={isScrolling}
-            />
-
-            {!reducedMotion && celebrateKey > 0 ? (
-              <View pointerEvents="none" style={styles.celebration}>
-                <LottieView
-                  key={celebrateKey}
-                  source={require('../../assets/lottie/gold-fireworks.json')}
-                  autoPlay
-                  loop={false}
-                  speed={0.6}
-                  resizeMode="contain"
-                  style={styles.celebrationLottie}
-                />
-              </View>
-            ) : null}
-          </Animated.View>
-
-          <Animated.View entering={enter(420)} style={styles.coachLineWrap}>
-            <CoachLine
-              align="center"
-              {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
-            />
-            {(() => {
-              if (dayState !== 'trained') return null
-              if (trainedThisMonth >= figureCount) {
-                return (
-                  <Text style={styles.tomorrowHint}>
-                    Mañana sumas <Text style={styles.tomorrowHintEmphasis}>luz extra</Text>.
-                  </Text>
-                )
-              }
-              // Last star before the asterism is whole.
-              if (trainedThisMonth + 1 >= figureCount) {
-                return (
-                  <Text style={styles.tomorrowHint}>
-                    Mañana <Text style={styles.tomorrowHintEmphasis}>completas tu figura</Text>.
-                  </Text>
-                )
-              }
-              const next = pickStarForCount(sign, trainedThisMonth + 1)
-              if (!next) return null
-              return (
-                <Text style={styles.tomorrowHint}>
-                  Mañana: <Text style={styles.tomorrowHintEmphasis}>{next.name}</Text>, {next.role}
-                </Text>
-              )
-            })()}
-          </Animated.View>
-
-          <Animated.View entering={enter(520)}>
-            <Pressable
-              onPress={() => setWeekOpen((v) => !v)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: weekOpen }}
-            >
-              <SectionHeader
-                label={monthLabel}
-                meta={weekOpen ? 'Ocultar' : 'Ver detalle'}
-                metaEmphasis={weekOpen ? 'Ocultar' : 'Ver detalle'}
+            <Animated.View entering={enter(320)} style={styles.constellationWrap}>
+              <LunarConstellation
+                trained={month.grid}
+                todayIdx={month.todayIdx}
+                target={month.daysInMonth}
+                sign={sign}
+                committed={ctx.today_workout_completed}
+                suppressBurst
+                pausedSV={constellationPaused}
               />
-            </Pressable>
-            {weekOpen ? (
-              <Animated.View entering={FadeIn.duration(220)}>
-                <Text style={styles.weekHint}>Desliza y toca un día para registrarlo.</Text>
-                <WeekStrip
-                  days={allDays}
-                  onToggle={handleToggleDay}
-                  justMarkedIdx={justMarkedIdx}
+
+              {!reducedMotion && celebrateKey > 0 ? (
+                <View pointerEvents="none" style={styles.celebration}>
+                  <LottieView
+                    key={celebrateKey}
+                    source={require('../../assets/lottie/gold-fireworks.json')}
+                    autoPlay
+                    loop={false}
+                    speed={0.6}
+                    resizeMode="contain"
+                    style={styles.celebrationLottie}
+                    onAnimationFinish={() => setCelebrating(false)}
+                  />
+                </View>
+              ) : null}
+            </Animated.View>
+
+            <Animated.View entering={enter(420)} style={styles.coachLineWrap}>
+              <CoachLine
+                align="center"
+                {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
+              />
+              {(() => {
+                if (dayState !== 'trained') return null
+                if (trainedThisMonth >= figureCount) {
+                  return (
+                    <Text style={styles.tomorrowHint}>
+                      Mañana sumas <Text style={styles.tomorrowHintEmphasis}>luz extra</Text>.
+                    </Text>
+                  )
+                }
+                // Last star before the asterism is whole.
+                if (trainedThisMonth + 1 >= figureCount) {
+                  return (
+                    <Text style={styles.tomorrowHint}>
+                      Mañana <Text style={styles.tomorrowHintEmphasis}>completas tu figura</Text>.
+                    </Text>
+                  )
+                }
+                const next = pickStarForCount(sign, trainedThisMonth + 1)
+                if (!next) return null
+                return (
+                  <Text style={styles.tomorrowHint}>
+                    Mañana: <Text style={styles.tomorrowHintEmphasis}>{next.name}</Text>,{' '}
+                    {next.role}
+                  </Text>
+                )
+              })()}
+            </Animated.View>
+
+            <Animated.View entering={enter(520)}>
+              <Pressable
+                onPress={() => setWeekOpen((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: weekOpen }}
+              >
+                <SectionHeader
+                  label={monthLabel}
+                  meta={weekOpen ? 'Ocultar' : 'Ver detalle'}
+                  metaEmphasis={weekOpen ? 'Ocultar' : 'Ver detalle'}
                 />
-              </Animated.View>
-            ) : null}
-          </Animated.View>
+              </Pressable>
+              {weekOpen ? (
+                <Animated.View entering={FadeIn.duration(220)}>
+                  <Text style={styles.weekHint}>Desliza y toca un día para registrarlo.</Text>
+                  <WeekStrip
+                    days={allDays}
+                    onToggle={handleToggleDay}
+                    justMarkedIdx={justMarkedIdx}
+                  />
+                </Animated.View>
+              ) : null}
+            </Animated.View>
 
-          <Animated.View entering={enter(600)}>
-            <StatSlider ctx={ctx} targetSlide={slideParam ?? null} />
-          </Animated.View>
+            <Animated.View entering={enter(600)}>
+              <StatSlider ctx={ctx} targetSlide={slideParam ?? null} />
+            </Animated.View>
 
-          <Animated.View entering={enter(740)}>
-            <SectionHeader label="Comidas de hoy" />
-          </Animated.View>
-          <Animated.View entering={enter(800)}>
-            <TodayMealLog
-              date={ctx.date}
-              onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
-            />
-          </Animated.View>
-        </ScrollView>
-      </SafeAreaView>
-      {/* Pre-mounted (no `celebrateKey > 0` gate) so the Skia Canvas
+            <Animated.View entering={enter(740)}>
+              <SectionHeader label="Comidas de hoy" />
+            </Animated.View>
+            <Animated.View entering={enter(800)}>
+              <TodayMealLog
+                date={ctx.date}
+                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+              />
+            </Animated.View>
+          </ScrollView>
+        </SafeAreaView>
+        {/* Pre-mounted (no `celebrateKey > 0` gate) so the Skia Canvas
           + layout pass happen ONCE on first paint, not on every
           commit. Without pre-mount the wash fired visibly later than
           the Lottie particles. Inside, the wash is invisible until
           `celebrateKey` bumps and the timeline animates u → 1. */}
-      {!reducedMotion ? <CelebrateShockwave celebrateKey={celebrateKey} /> : null}
-      {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
+        {!reducedMotion ? <CelebrateShockwave celebrateKey={celebrateKey} /> : null}
+        {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
           the root (it's a Modal) so it floats over Hoy. */}
-      <PatternReveal pattern={pattern} onClose={dismissPattern} />
-    </View>
+        <PatternReveal pattern={pattern} onClose={dismissPattern} />
+      </View>
+    </ScrollPauseContext.Provider>
   )
 }
 
