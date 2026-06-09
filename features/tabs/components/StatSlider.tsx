@@ -250,19 +250,17 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
     )
   }
   // Calories — a speedometer gauge that exceeds when consumed > target.
-  // The big number is what you've eaten today; the subtitle adapts to
-  // under / at / over the target. Going over is informational (warm
-  // amber, not red), so it's visible without being a verdict.
+  // The big number is what you've eaten today. The subtitle mirrors the
+  // protein card's compact "/ target unit" form ("380 / 1835 kcal") instead
+  // of a wordy "de 1835 kcal · faltan 1455" sentence — that ran to 4 cramped
+  // lines in the half-width card on Android. Dropping the "faltan" countdown
+  // read is also more manifiesto-aligned (calories as context, not a budget
+  // to spend down). Over-target stays a short, informational +N (the amber
+  // overflow arc already carries the "you went over" without a verdict).
   const caloriesConsumed = ctx.today_macros.calories
   const caloriesTarget = ctx.targets.calories
   const calOver = Math.max(0, Math.round(caloriesConsumed - caloriesTarget))
-  const calRemaining = Math.max(0, Math.round(caloriesTarget - caloriesConsumed))
-  const calSubtitle =
-    calOver > 0
-      ? `+${calOver} kcal sobre tu meta`
-      : calRemaining > 0
-        ? `de ${caloriesTarget} kcal · faltan ${calRemaining}`
-        : `de ${caloriesTarget} kcal · llegaste`
+  const calSubtitle = calOver > 0 ? `+${calOver} kcal` : `/ ${caloriesTarget} kcal`
   return (
     <View style={[styles.slide, styles.macroRow]}>
       {/* Each card cascades in (FadeInDown staggered) on first paint

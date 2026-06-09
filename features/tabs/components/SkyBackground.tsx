@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle } from 'react-native-svg'
 
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors } from '@/theme'
 
 // ── The app's sky ───────────────────────────────────────────────────
@@ -58,16 +59,31 @@ const SCREEN_STARS: Star[] = (() => {
 })()
 
 /* A bright star that breathes — slow, desynced, so the sky reads as
- * alive rather than printed. */
-function TwinkleStar({ star }: { star: Star }) {
-  const tw = useSharedValue(0)
+ * alive rather than printed.
+ *
+ * The twinkle loop is GATED on `active` (screen focused + not mid-scroll).
+ * This starfield <Svg> is mounted behind EVERY tab, and any animated SVG
+ * child repaints the whole 108-node <Svg> 60×/s on Android — so an ungated
+ * loop taxed the UI thread app-wide, forever, even off-tab and during every
+ * scroll. While inactive the star eases to a still rest brightness (no blink,
+ * no SVG repaint); when active it resumes its breath exactly as before — so
+ * it looks identical whenever you're actually looking at it. */
+function TwinkleStar({ star, active }: { star: Star; active: boolean }) {
+  // Rest at the breath's mid-point so a paused star sits at a natural,
+  // non-blinking brightness rather than its trough.
+  const tw = useSharedValue(0.5)
   useEffect(() => {
+    if (!active) {
+      cancelAnimation(tw)
+      tw.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
+      return
+    }
     tw.value = withDelay(
       star.delay,
       withRepeat(withTiming(1, { duration: star.dur, easing: Easing.inOut(Easing.sin) }), -1, true),
     )
     return () => cancelAnimation(tw)
-  }, [star, tw])
+  }, [star, tw, active])
 
   const animatedProps = useAnimatedProps(() => ({
     opacity: star.o * (0.42 + tw.value * 0.72),
@@ -90,6 +106,10 @@ function TwinkleStar({ star }: { star: Star }) {
  * so the sky shows through.
  */
 export function SkyBackground() {
+  // Pauses the twinkle when the host screen is off-tab or mid-scroll (see
+  // TwinkleStar). Where no ScrollPauseContext is provided (settings, auth,
+  // …) this is simply focus-gating — the loop stops when you leave the tab.
+  const active = useScreenActive()
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {/* A soft magenta haze at the top — atmospheric depth. Low start
@@ -99,7 +119,7 @@ export function SkyBackground() {
       <Svg style={styles.starfield} width={SCREEN_W} height={SCREEN_H}>
         {SCREEN_STARS.map((st, i) =>
           st.twinkle ? (
-            <TwinkleStar key={i} star={st} />
+            <TwinkleStar key={i} star={st} active={active} />
           ) : (
             <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
           ),

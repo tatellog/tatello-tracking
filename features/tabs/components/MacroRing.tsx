@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedProps,
+  useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
@@ -64,51 +65,34 @@ export function MacroRing({
     strokeDasharray: [c * progress.value, c],
   }))
 
-  // Each halo's opacity envelope — base + breath amplitude. Inner
-  // disc breathes the widest because it's the hot core; outer disc
-  // barely shifts so the ring edge doesn't visibly pulse.
-  const halo1Props = useAnimatedProps(() => ({
-    opacity: 0.04 + glow.value * 0.05,
-  }))
-  const halo2Props = useAnimatedProps(() => ({
-    opacity: 0.07 + glow.value * 0.08,
-  }))
-  const halo3Props = useAnimatedProps(() => ({
-    opacity: 0.12 + glow.value * 0.12,
-  }))
+  // Breath lives on the GLOW LAYER's wrapper opacity, NOT on per-disc
+  // animatedProps inside the ring's <Svg>. On Android any animated SVG
+  // child invalidates the WHOLE <Svg> and redraws every node 60×/s — and
+  // this glow loops forever, so the ring's SVG never stopped repainting,
+  // splitting the UI thread with the scroll (the macros-slider jank).
+  // Now the glow discs are a separate STATIC svg whose Animated.View
+  // wrapper pulses opacity (a compositor-only op), and the ring's own
+  // <Svg> only animates during the one-shot draw-in → static at rest.
+  const glowStyle = useAnimatedStyle(() => ({ opacity: 0.45 + glow.value * 0.55 }))
 
   return (
     <View style={[styles.glow, { width: size, height: size, shadowColor: color }]}>
+      {/* Inner halo — three stacked low-alpha discs approximate a soft
+          radial glow. Fixed opacities (the peak of the old breath); the
+          wrapper's opacity does the breathing so the SVG stays static. */}
+      <Animated.View style={[StyleSheet.absoluteFill, glowStyle]} pointerEvents="none">
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 2)} fill={color} opacity={0.09} />
+          <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 8)} fill={color} opacity={0.15} />
+          <Circle cx={size / 2} cy={size / 2} r={Math.max(0, r - 16)} fill={color} opacity={0.24} />
+        </Svg>
+      </Animated.View>
       <Svg
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         style={{ transform: [{ rotate: '-90deg' }] }}
       >
-        {/* Inner halo — three stacked low-alpha discs approximate a
-            soft radial glow inside the ring, now BREATHING in unison
-            so the metric feels alive (the heartbeat of the macro). */}
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={Math.max(0, r - 2)}
-          fill={color}
-          animatedProps={halo1Props}
-        />
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={Math.max(0, r - 8)}
-          fill={color}
-          animatedProps={halo2Props}
-        />
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={Math.max(0, r - 16)}
-          fill={color}
-          animatedProps={halo3Props}
-        />
         <Circle
           cx={size / 2}
           cy={size / 2}
