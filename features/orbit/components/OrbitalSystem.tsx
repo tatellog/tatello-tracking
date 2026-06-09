@@ -763,11 +763,7 @@ export function OrbitalSystem({
           <AnimatedG mask="url(#bh-mask)" animatedProps={orbBreathProps}>
             {/* Array-form transform — string SVG transforms crash
                 RNSVGGroup on Fabric Android with ClassCastException. */}
-            <G transform={[
-              { translateX: ART_TX },
-              { translateY: ART_TY },
-              { scale: ART_S },
-            ]}>
+            <G transform={[{ translateX: ART_TX }, { translateY: ART_TY }, { scale: ART_S }]}>
               <SvgImage
                 href={DAY_ORB_PNG}
                 x={0}
@@ -820,9 +816,7 @@ export function OrbitalSystem({
               bone level so no fake "lead" is fabricated. */}
           <AnimatedG animatedProps={restLabelsProps}>
             {(() => {
-              const enLuzDims = placed.filter(
-                ({ d }) => d.brightness >= EN_LUZ_THRESHOLD,
-              )
+              const enLuzDims = placed.filter(({ d }) => d.brightness >= EN_LUZ_THRESHOLD)
               const heroKey =
                 enLuzDims.length > 0
                   ? enLuzDims.reduce((best, cur) =>
@@ -1102,25 +1096,20 @@ function DiffractionSpikes({
           its angle; the whole set rides the parent's single animated
           group, never animated individually. */}
       {corona.map((c, i) => (
-        <G
+        // Native rotation about (x,y) — the transform-array rotate-about-centre
+        // mis-rendered on Android release (see the diagonal streaks below).
+        <Ellipse
           key={`corona-${i}`}
-          transform={[
-            { translateX: x },
-            { translateY: y },
-            { rotate: `${c.angle}deg` },
-            { translateX: -x },
-            { translateY: -y },
-          ]}
-        >
-          <Ellipse
-            cx={x + c.rx}
-            cy={y}
-            rx={c.rx}
-            ry={coronaRy}
-            fill="url(#flare-soft)"
-            opacity={coronaOp}
-          />
-        </G>
+          cx={x + c.rx}
+          cy={y}
+          rx={c.rx}
+          ry={coronaRy}
+          fill="url(#flare-soft)"
+          opacity={coronaOp}
+          rotation={c.angle}
+          originX={x}
+          originY={y}
+        />
       ))}
       {/* Horizontal streak — wide ellipse, radial-gradient fill
           gives a feathered tapered shape no line can match. */}
@@ -1136,65 +1125,56 @@ function DiffractionSpikes({
           rotation attribute. */}
       {dOp > 0 ? (
         <>
-          <G
-            transform={[
-              { translateX: x },
-              { translateY: y },
-              { rotate: '45deg' },
-              { translateX: -x },
-              { translateY: -y },
-            ]}
-          >
-            <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
-          </G>
-          <G
-            transform={[
-              { translateX: x },
-              { translateY: y },
-              { rotate: '-45deg' },
-              { translateX: -x },
-              { translateY: -y },
-            ]}
-          >
-            <Ellipse cx={x} cy={y} rx={dLen} ry={dRy} fill="url(#flare-soft)" opacity={dOp} />
-          </G>
+          {/* Native rotation props (NOT a <G transform> array): rotate each
+              streak ellipse about (x,y). On Android release the transform-array
+              rotate-about-centre mis-rendered — the ellipse displaced off the
+              core and its radial-gradient fill read as a SOLID tilted blob
+              (the "stray olive ellipse"). rotation/originX/originY is reliable. */}
+          <Ellipse
+            cx={x}
+            cy={y}
+            rx={dLen}
+            ry={dRy}
+            fill="url(#flare-soft)"
+            opacity={dOp}
+            rotation={45}
+            originX={x}
+            originY={y}
+          />
+          <Ellipse
+            cx={x}
+            cy={y}
+            rx={dLen}
+            ry={dRy}
+            fill="url(#flare-soft)"
+            opacity={dOp}
+            rotation={-45}
+            originX={x}
+            originY={y}
+          />
           {/* Asymmetric extra rays — slightly shorter + dimmer. */}
-          <G
-            transform={[
-              { translateX: x },
-              { translateY: y },
-              { rotate: '22deg' },
-              { translateX: -x },
-              { translateY: -y },
-            ]}
-          >
-            <Ellipse
-              cx={x}
-              cy={y}
-              rx={dLen * 0.78}
-              ry={dRy * 0.85}
-              fill="url(#flare-soft)"
-              opacity={dOp * 0.7}
-            />
-          </G>
-          <G
-            transform={[
-              { translateX: x },
-              { translateY: y },
-              { rotate: '-68deg' },
-              { translateX: -x },
-              { translateY: -y },
-            ]}
-          >
-            <Ellipse
-              cx={x}
-              cy={y}
-              rx={dLen * 0.65}
-              ry={dRy * 0.8}
-              fill="url(#flare-soft)"
-              opacity={dOp * 0.62}
-            />
-          </G>
+          <Ellipse
+            cx={x}
+            cy={y}
+            rx={dLen * 0.78}
+            ry={dRy * 0.85}
+            fill="url(#flare-soft)"
+            opacity={dOp * 0.7}
+            rotation={22}
+            originX={x}
+            originY={y}
+          />
+          <Ellipse
+            cx={x}
+            cy={y}
+            rx={dLen * 0.65}
+            ry={dRy * 0.8}
+            fill="url(#flare-soft)"
+            opacity={dOp * 0.62}
+            rotation={-68}
+            originX={x}
+            originY={y}
+          />
         </>
       ) : null}
       {/* Sparkles — a handful of tiny offset twinkles. They sit at
