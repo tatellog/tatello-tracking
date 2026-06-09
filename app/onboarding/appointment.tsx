@@ -51,10 +51,10 @@ import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
 // 0 < pulse < 1) so it stays inert outside the climax.
 import { ParticleBurst } from '@/features/tabs/components/constellation/rendering/burst/particle-burst'
 // The pictorial zodiac art map — the SAME mechanism the Órbita tab uses.
-// CRITICAL: these `.svg` assets are imported by react-native-svg-transformer
-// as COMPONENTS (FC<SvgProps>), NOT as image sources. We reuse ART_BY_SIGN
-// verbatim and render it through the same `renderAsset` runtime check the
-// tab's ZodiacEngraving uses — never as an <Image href>.
+// NOTE: the art is now RASTERISED PNG (the ~500 KB .svg originals were the
+// heaviest cost — see sign-maps.ts), so ART_BY_SIGN entries are bitmap sources
+// (require() numbers), not SVG components. `renderArt` below handles BOTH via a
+// `typeof === 'function'` check; in practice the bitmap (<RNImage>) branch runs.
 import { ART_BY_SIGN } from '@/features/tabs/components/constellation/data/sign-maps'
 // The asset union (FC<SvgProps> | ImageSourcePropType) + render contract
 // shared with the Órbita tab. ART_BY_SIGN is typed Record<ZodiacSign,

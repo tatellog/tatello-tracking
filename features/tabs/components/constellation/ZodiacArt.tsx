@@ -1,3 +1,4 @@
+import { Image } from 'react-native'
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { type ZodiacSign } from '@/features/tabs/zodiac'
@@ -14,11 +15,12 @@ import { ART_BY_SIGN } from './data/sign-maps'
  * Everything is STATIC — no Reanimated, no coin-spin, no opacity ramp,
  * no stars. Just the painted creature and a soft gold glow behind it.
  *
- * The art is rendered via the SAME pattern as the reveal's `renderArt`:
- * our `.svg` assets are transformer-generated `FC<SvgProps>`, so we mount
- * the component directly with width/height = size. (Bitmap fallback isn't
- * needed here — all 12 ART_BY_SIGN entries are SVG components — but we keep
- * the runtime check to stay faithful to the shared contract.)
+ * The art assets are now RASTERISED PNGs (the .svg originals were ~500 KB of
+ * paths — see sign-maps.ts), so `ART_BY_SIGN[sign]` is a bitmap source (a
+ * `require()` number), not an SVG component. We render it with a plain RN
+ * `<Image>` (this art floats OUTSIDE any <Svg>, so SvgImage can't be used
+ * here). The `typeof === 'function'` branch stays for the legacy SVG-component
+ * contract, but in practice the bitmap branch is what runs.
  */
 
 // Canonical reveal gold stops, inline (NOT a theme token — these are the
@@ -35,7 +37,9 @@ function renderArt(asset: ZodiacAsset, size: number) {
     const Component = asset
     return <Component width={size} height={size} />
   }
-  return null
+  // Bitmap (PNG) — the rasterised art. Plain RN <Image>; this art is not
+  // nested in an <Svg>, so SvgImage isn't available.
+  return <Image source={asset} style={{ width: size, height: size }} resizeMode="contain" />
 }
 
 export function ZodiacArt({ sign, size }: { sign: ZodiacSign; size: number }) {
