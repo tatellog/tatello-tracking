@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 // Aliased — react-native-svg also exports a LinearGradient.
 import { LinearGradient as FadeGradient } from 'expo-linear-gradient'
 import { memo, useEffect, useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -322,6 +322,14 @@ function DustMote({
 // cero cambio. Prender solo para validar la rebanada en Expo Go.
 const USE_SKIA_ORBIT = true
 
+// SLICE 3 — el orbe central (amanecer + core glow) fuera del <Svg>. Su breath
+// perpetuo (orbBreathProps en `t`) era el último hijo animado del <Svg> grande
+// de Día → lo repintaba 60fps al mirarlo. Como el arte es un amanecer suave (no
+// el "black hole" que decían los comentarios viejos), no necesita máscara: se
+// renderiza como un <Image> de RN con el breath en opacidad de View. Mismo
+// patrón que el arte de Hoy. Con `false`: render SVG actual, cero cambio.
+const USE_VIEW_ORB = true
+
 /* SLICE 1 — el polvo cósmico (16 motes) en Skia en vez de SVG. Valida el mapeo
  * de coordenadas viewBox→canvas: px = (vx·flareK, (vy − VB_TOP)·flareK). Mismas
  * posiciones (ART_CENTER + ángulo Keplerian) y opacidad (slowClock wave). */
@@ -464,6 +472,112 @@ function SkiaSilencioBody({
  *  triple-star reference photo. */
 function place(d: Dimension): { x: number; y: number } {
   return STAR_POS[d.key]
+}
+
+/* ViewOrb (SLICE 3) — the Día centerpiece drawn OUTSIDE the <Svg> as RN views
+ * so its perpetual breath stops repainting the big Día <Svg>. The sunrise art
+ * has soft transparent edges (no mask needed) and fades out during the focus
+ * zoom (zoomFade), so an approximate scale-about-centre zoom is invisible. The
+ * warm core glow rides behind it (its own static <Svg> radial, opacity on the
+ * wrapper). Positioned absolutely to the exact pixel rect the SVG used:
+ * centred on ART_CENTER, side = ART_SRC·ART_S, all × flareK. */
+function ViewOrb({
+  flareK,
+  t,
+  zoomT,
+  targetX,
+  targetY,
+  litAvgSV,
+}: {
+  flareK: number
+  t: SharedValue<number>
+  zoomT: SharedValue<number>
+  targetX: SharedValue<number>
+  targetY: SharedValue<number>
+  litAvgSV: SharedValue<number>
+}) {
+  const side = ART_SRC * ART_S * flareK
+  const left = ART_TX * flareK
+  const top = (ART_TY - VB_TOP) * flareK
+
+  const glowSide = ART_R * 0.85 * 2 * flareK
+  const glowLeft = (ART_CENTER_X - ART_R * 0.85) * flareK
+  const glowTop = (ART_CENTER_Y - ART_R * 0.85 - VB_TOP) * flareK
+
+  // Zoom (inlined in both worklets — NOT a shared helper, which can crash the
+  // release APK when called across worklets). The SVG zoom group did
+  // `p → (tx + s·p)` (scale about origin, then pan so the selected star
+  // centres). As a View transform: scale `s` about the View's own centre (which
+  // sits on ART_CENTER) + translate that centre to (tx + s·ART_CENTER). A
+  // uniform scale is the same size about any pivot, so matching the centre
+  // position is identical to the SVG — the orb pans + scales WITH everything
+  // instead of ballooning in place ("forzado").
+  const orbStyle = useAnimatedStyle(() => {
+    'worklet'
+    const tz = zoomT.value
+    const s = 1 + tz * (ZOOM_SCALE - 1)
+    const mix = Math.min(tz, 1)
+    const dx = (mix * (ART_CENTER_X - s * targetX.value) + (s - 1) * ART_CENTER_X) * flareK
+    const dy = (mix * (FOCUS_CENTER_Y - s * targetY.value) + (s - 1) * ART_CENTER_Y) * flareK
+    const wave = 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI)
+    const zoomFade = Math.max(0, 1 - tz * 1.8)
+    return {
+      opacity: ART_OPACITY * (0.88 + wave * 0.24) * zoomFade,
+      transform: [{ translateX: dx }, { translateY: dy }, { scale: s }],
+    }
+  })
+  const glowStyle = useAnimatedStyle(() => {
+    'worklet'
+    const tz = zoomT.value
+    const s = 1 + tz * (ZOOM_SCALE - 1)
+    const mix = Math.min(tz, 1)
+    const dx = (mix * (ART_CENTER_X - s * targetX.value) + (s - 1) * ART_CENTER_X) * flareK
+    const dy = (mix * (FOCUS_CENTER_Y - s * targetY.value) + (s - 1) * ART_CENTER_Y) * flareK
+    const zoomFade = Math.max(0, 1 - tz * 1.8)
+    return {
+      opacity: (0.35 + 0.55 * litAvgSV.value) * zoomFade,
+      transform: [{ translateX: dx }, { translateY: dy }, { scale: s }],
+    }
+  })
+
+  return (
+    <>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          { position: 'absolute', left: glowLeft, top: glowTop, width: glowSide, height: glowSide },
+          glowStyle,
+        ]}
+      >
+        <Svg width={glowSide} height={glowSide}>
+          <Defs>
+            <RadialGradient id="vieworb-core-glow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor={colors.oroLight} stopOpacity={0.6} />
+              <Stop offset="55%" stopColor={colors.oro} stopOpacity={0.22} />
+              <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle
+            cx={glowSide / 2}
+            cy={glowSide / 2}
+            r={glowSide / 2}
+            fill="url(#vieworb-core-glow)"
+          />
+        </Svg>
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[{ position: 'absolute', left, top, width: side, height: side }, orbStyle]}
+      >
+        <Image
+          source={DAY_ORB_PNG}
+          style={styles.viewOrbImg}
+          resizeMode="contain"
+          fadeDuration={0}
+        />
+      </Animated.View>
+    </>
+  )
 }
 
 export function OrbitalSystem({
@@ -701,6 +815,20 @@ export function OrbitalSystem({
         if (w > 0) setFlareK(w / W)
       }}
     >
+      {/* SLICE 3: the centerpiece orb + core glow as RN views BEHIND the <Svg>
+          (so the SVG stars/labels stay on top), removing the last perpetual
+          breath from the big Día <Svg>. */}
+      {USE_VIEW_ORB && flareK > 0 ? (
+        <ViewOrb
+          flareK={flareK}
+          t={t}
+          zoomT={zoomT}
+          targetX={targetXVal}
+          targetY={targetYVal}
+          litAvgSV={litAvgSV}
+        />
+      ) : null}
+
       <Svg viewBox={`0 ${VB_TOP} ${W} ${VB_H}`} style={styles.svg}>
         <Defs>
           {/* A dimension star — warm white core fading to magenta. */}
@@ -858,29 +986,38 @@ export function OrbitalSystem({
               warm halo that GROWS with the day's light (coreGlowProps drives
               its opacity from litAvg). The BH sits on top and keeps its dark
               centre + accretion disk. */}
-          <AnimatedG animatedProps={coreGlowProps}>
-            <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={ART_R * 0.85} fill="url(#core-glow)" />
-          </AnimatedG>
-
-          {/* The centerpiece — the central anchor the dimensions ring.
-              Edge-faded via bh-mask so it melts into the field. Opacity
-              breathes on the same `t` clock the stars use, so the orb
-              and the dimensions rise/fall together as one system (see
-              `orbBreathProps` notes above). */}
-          <AnimatedG mask="url(#bh-mask)" animatedProps={orbBreathProps}>
-            {/* Array-form transform — string SVG transforms crash
-                RNSVGGroup on Fabric Android with ClassCastException. */}
-            <G transform={[{ translateX: ART_TX }, { translateY: ART_TY }, { scale: ART_S }]}>
-              <SvgImage
-                href={DAY_ORB_PNG}
-                x={0}
-                y={0}
-                width={ART_SRC}
-                height={ART_SRC}
-                preserveAspectRatio="xMidYMid meet"
-              />
-            </G>
-          </AnimatedG>
+          {/* coreGlow + orb live in the SVG only when the ViewOrb slice is OFF.
+              With USE_VIEW_ORB they're RN views BEHIND the <Svg> (see ViewOrb)
+              so the orb's perpetual breath no longer repaints the big <Svg>. */}
+          {USE_VIEW_ORB ? null : (
+            <>
+              <AnimatedG animatedProps={coreGlowProps}>
+                <Circle
+                  cx={ART_CENTER_X}
+                  cy={ART_CENTER_Y}
+                  r={ART_R * 0.85}
+                  fill="url(#core-glow)"
+                />
+              </AnimatedG>
+              {/* The centerpiece — the central anchor the dimensions ring.
+                  Edge-faded via bh-mask so it melts into the field. Opacity
+                  breathes on the same `t` clock the stars use. */}
+              <AnimatedG mask="url(#bh-mask)" animatedProps={orbBreathProps}>
+                {/* Array-form transform — string SVG transforms crash
+                    RNSVGGroup on Fabric Android with ClassCastException. */}
+                <G transform={[{ translateX: ART_TX }, { translateY: ART_TY }, { scale: ART_S }]}>
+                  <SvgImage
+                    href={DAY_ORB_PNG}
+                    x={0}
+                    y={0}
+                    width={ART_SRC}
+                    height={ART_SRC}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                </G>
+              </AnimatedG>
+            </>
+          )}
 
           {/* Orbital traces (thin magenta ellipses centre→star) were
               tried for the vector galaxy but read as a geometric CAD
@@ -2330,6 +2467,12 @@ const styles = StyleSheet.create({
     aspectRatio: W / VB_H,
   },
   svg: {
+    width: '100%',
+    height: '100%',
+  },
+  // ViewOrb (slice 3) — the orb Image fills its absolute box; resizeMode
+  // contain matches the SVG's preserveAspectRatio="xMidYMid meet".
+  viewOrbImg: {
     width: '100%',
     height: '100%',
   },
