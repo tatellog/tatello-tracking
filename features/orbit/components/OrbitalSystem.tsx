@@ -315,6 +315,68 @@ function DustMote({
   return <AnimatedCircle r={mote.r} animatedProps={animated} />
 }
 
+// FASE: migración del diagrama de Órbita a Skia (en progreso, multi-sesión).
+// Flag — APAGADO mientras se portan las capas animadas (polvo → halos/breath de
+// estrellas → glow). El win de perf llega cuando TODAS las animaciones continuas
+// estén en Skia y el <Svg> grande quede estático. Con `false`: render SVG actual,
+// cero cambio. Prender solo para validar la rebanada en Expo Go.
+const USE_SKIA_ORBIT = false
+
+/* SLICE 1 — el polvo cósmico (16 motes) en Skia en vez de SVG. Valida el mapeo
+ * de coordenadas viewBox→canvas: px = (vx·flareK, (vy − VB_TOP)·flareK). Mismas
+ * posiciones (ART_CENTER + ángulo Keplerian) y opacidad (slowClock wave). */
+function SkiaOrbitDust({
+  flareK,
+  slowClock,
+  dustOrbit,
+}: {
+  flareK: number
+  slowClock: SharedValue<number>
+  dustOrbit: SharedValue<number>
+}) {
+  return (
+    <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+      {DUST_MOTES.map((m, i) => (
+        <SkiaDustMote
+          key={`sd-${i}`}
+          mote={m}
+          flareK={flareK}
+          slowClock={slowClock}
+          dustOrbit={dustOrbit}
+        />
+      ))}
+    </Canvas>
+  )
+}
+
+function SkiaDustMote({
+  mote,
+  flareK,
+  slowClock,
+  dustOrbit,
+}: {
+  mote: (typeof DUST_MOTES)[number]
+  flareK: number
+  slowClock: SharedValue<number>
+  dustOrbit: SharedValue<number>
+}) {
+  const transform = useDerivedValue(() => {
+    const angle = ((mote.initialAngle + dustOrbit.value * mote.speed) * Math.PI) / 180
+    const cx = (ART_CENTER_X + Math.cos(angle) * mote.radius) * flareK
+    const cy = (ART_CENTER_Y + Math.sin(angle) * mote.radius - VB_TOP) * flareK
+    return [{ translateX: cx }, { translateY: cy }]
+  })
+  const opacity = useDerivedValue(() => {
+    const wave = 0.5 + 0.5 * Math.sin((slowClock.value + mote.phase) * 2 * Math.PI)
+    return mote.op * (0.55 + 0.45 * wave)
+  })
+  return (
+    <SkiaGroup transform={transform} opacity={opacity}>
+      <SkiaCircle cx={0} cy={0} r={mote.r * flareK} color={SKY.starGlow} />
+    </SkiaGroup>
+  )
+}
+
 /** Canvas position of a dimension's star — hand-placed so the three
  *  orbital tips and the three peripheral stars compose like the
  *  triple-star reference photo. */
@@ -689,11 +751,13 @@ export function OrbitalSystem({
             and most particles flew off-screen, making the motion
             read as "frozen"). Each mote computes its own (cx, cy)
             from dustOrbit + an inverse-radius speed factor. */}
-        <G fill={SKY.starGlow}>
-          {DUST_MOTES.map((m, i) => (
-            <DustMote key={`dust-${i}`} mote={m} slowClock={slowClock} dustOrbit={dustOrbit} />
-          ))}
-        </G>
+        {USE_SKIA_ORBIT ? null : (
+          <G fill={SKY.starGlow}>
+            {DUST_MOTES.map((m, i) => (
+              <DustMote key={`dust-${i}`} mote={m} slowClock={slowClock} dustOrbit={dustOrbit} />
+            ))}
+          </G>
+        )}
 
         {/* Everything below sits inside the zoom transform — when a
             dimension is selected, this whole group translates+scales
@@ -825,6 +889,13 @@ export function OrbitalSystem({
             reduced={reducedMotion ?? false}
           />
         </View>
+      ) : null}
+
+      {/* FASE Skia (slice 1): polvo cósmico en Skia en vez de SVG. Valida el
+          mapeo de coordenadas; las demás capas animadas siguen en SVG por ahora
+          (sin win de perf hasta migrarlas todas). Gated en el flag + flareK. */}
+      {USE_SKIA_ORBIT && flareK > 0 ? (
+        <SkiaOrbitDust flareK={flareK} slowClock={slowClock} dustOrbit={dustOrbit} />
       ) : null}
 
       {/* Focus label — "tu cuerpo / tu sueño / …" rendered as an
