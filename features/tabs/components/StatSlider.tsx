@@ -833,13 +833,13 @@ function CycleDial({ day, cycleLength }: { day: number; cycleLength: number }) {
         fill="none"
         strokeLinecap="round"
         strokeDasharray={`${filled} ${DIAL_CIRC}`}
-        transform={[
-          { translateX: DIAL_CX },
-          { translateY: DIAL_CY },
-          { rotate: '-90deg' },
-          { translateX: -DIAL_CX },
-          { translateY: -DIAL_CY },
-        ]}
+        // Native rotation props (NOT a transform array): start the dash at the
+        // top by rotating −90° about the dial centre. On Android release the
+        // `transform` array + strokeDasharray combo mis-rendered (arc shifted
+        // left); rotation/originX/originY is the reliable path.
+        rotation={-90}
+        originX={DIAL_CX}
+        originY={DIAL_CY}
       />
       <Circle cx={markerX} cy={markerY} r={3.6} fill={colors.magenta} />
     </Svg>
