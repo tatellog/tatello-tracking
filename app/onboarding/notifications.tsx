@@ -547,18 +547,21 @@ function NotificationsSky({
   const farDriftProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
-    return { transform: `translate(${Math.sin(u) * 2} ${Math.cos(u) * 2})` }
+    return { transform: [{ translateX: Math.sin(u) * 2 }, { translateY: Math.cos(u) * 2 }] }
   })
   const midDriftProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
-    return { transform: `translate(${Math.sin(u) * 5} ${Math.cos(u) * 5})` }
+    return { transform: [{ translateX: Math.sin(u) * 5 }, { translateY: Math.cos(u) * 5 }] }
   })
   const microGroupProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
     const flicker = 0.85 + 0.15 * Math.sin(orbit.value * 2 * Math.PI * 3)
-    return { transform: `translate(${Math.sin(u) * 9} ${Math.cos(u) * 9})`, opacity: flicker }
+    return {
+      transform: [{ translateX: Math.sin(u) * 9 }, { translateY: Math.cos(u) * 9 }],
+      opacity: flicker,
+    }
   })
 
   // ── Warm wisp breath — wide, low ellipse at cy 0.70. Opacity only,

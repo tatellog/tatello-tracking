@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -501,13 +501,17 @@ function IntentCard({
   const checkProps = useAnimatedProps(() => {
     'worklet'
     const s = 0.6 + glow.value * 0.4
-    // SVG transform as a STRING (react-native-svg's convention for SVG nodes,
-    // same as the drift props below) — NOT the RN array form, which svg may
-    // ignore on a <Path>, silently dropping the micro-scale. scale-about-(10,10)
-    // in the 20×20 viewBox. Numeric interpolation, never a "%" string.
+    // Array form (not a string): Android New Arch (Fabric) crashes casting a
+    // transform string to ReadableArray. scale-about-(10,10) in the 20×20 viewBox.
     return {
       opacity: glow.value,
-      transform: `translate(10 10) scale(${s}) translate(-10 -10)`,
+      transform: [
+        { translateX: 10 },
+        { translateY: 10 },
+        { scale: s },
+        { translateX: -10 },
+        { translateY: -10 },
+      ],
     }
   })
 
@@ -887,24 +891,32 @@ const DUST: {
  * cannot collide with step 9's `ritmo-*` / step 8's `ciclo-*` defs.
  */
 function IntentionSky({ dust, orbit }: { dust: SharedValue<number>; orbit: SharedValue<number> }) {
+  // Explicit pixel dims for the root <Svg>. On Android New Arch (Fabric)
+  // a percentage-sized root RNSVGSvgView resolves its layer bounds wrong
+  // and the emulator's software GL paints the uninitialised edge as garbage
+  // (a green strip + a dark top band). Real window pixels avoid it.
+  const { width: winW, height: winH } = useWindowDimensions()
   const SKY_W = 360
   const SKY_H = 760
 
   const farDriftProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
-    return { transform: `translate(${Math.sin(u) * 2} ${Math.cos(u) * 2})` }
+    return { transform: [{ translateX: Math.sin(u) * 2 }, { translateY: Math.cos(u) * 2 }] }
   })
   const midDriftProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
-    return { transform: `translate(${Math.sin(u) * 5} ${Math.cos(u) * 5})` }
+    return { transform: [{ translateX: Math.sin(u) * 5 }, { translateY: Math.cos(u) * 5 }] }
   })
   const microGroupProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
     const flicker = 0.85 + 0.15 * Math.sin(orbit.value * 2 * Math.PI * 3)
-    return { transform: `translate(${Math.sin(u) * 9} ${Math.cos(u) * 9})`, opacity: flicker }
+    return {
+      transform: [{ translateX: Math.sin(u) * 9 }, { translateY: Math.cos(u) * 9 }],
+      opacity: flicker,
+    }
   })
 
   // ── Warm wisp breath ─────────────────────────────────────────────
@@ -938,11 +950,10 @@ function IntentionSky({ dust, orbit }: { dust: SharedValue<number>; orbit: Share
       importantForAccessibility="no-hide-descendants"
     >
       <Svg
-        width="100%"
-        height="100%"
+        width={winW}
+        height={winH}
         viewBox={`0 0 ${SKY_W} ${SKY_H}`}
         preserveAspectRatio="xMidYMid slice"
-        style={StyleSheet.absoluteFill}
         pointerEvents="none"
       >
         <Defs>

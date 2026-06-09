@@ -1383,8 +1383,15 @@ function GoldenAura({
     const opacity = settled ? 0.5 + 0.12 * breath.value : h
     return {
       opacity,
-      // scale about the optical centre (acx, acy).
-      transform: `translate(${acx} ${acy}) scale(${s}) translate(${-acx} ${-acy})`,
+      // scale about the optical centre (acx, acy). Array form (not a string):
+      // Android New Arch (Fabric) crashes casting a transform string to ReadableArray.
+      transform: [
+        { translateX: acx },
+        { translateY: acy },
+        { scale: s },
+        { translateX: -acx },
+        { translateY: -acy },
+      ],
     }
   })
   return (
@@ -1846,7 +1853,13 @@ function EnergyRing({
       // rotate the dashed ring so its gaps sit at an irregular angle (the
       // gaps of the three rings never align into a cross). Numeric degrees
       // about the live centre — static prop, UI-thread safe.
-      transform={[{ translateX: cx }, { translateY: cy }, { rotate: `${ring.rotate}deg` }, { translateX: -cx }, { translateY: -cy }]}
+      transform={[
+        { translateX: cx },
+        { translateY: cy },
+        { rotate: `${ring.rotate}deg` },
+        { translateX: -cx },
+        { translateY: -cy },
+      ]}
       animatedProps={props}
     />
   )
@@ -1919,7 +1932,19 @@ function CeremonialHalo({
     // rotate — all numeric, UI-thread safe.
     return {
       opacity: 0.5 * clock.value,
-      transform: `translate(${cx - 180 * scale} ${cy - 180 * scale}) scale(${scale}) rotate(${deg} 180 180)`,
+      // Array form (not a string): Android New Arch crashes casting a transform
+      // string to ReadableArray. rotate-about-(180,180) is expressed as
+      // translate→rotate→translate since the array `rotate` pivots on the origin.
+      transform: [
+        { translateX: cx - 180 * scale },
+        { translateY: cy - 180 * scale },
+        { scale },
+        { translateX: 180 },
+        { translateY: 180 },
+        { rotate: `${deg}deg` },
+        { translateX: -180 },
+        { translateY: -180 },
+      ],
     }
   })
   return (
@@ -2389,13 +2414,16 @@ const RevealSky = memo(function RevealSky({
   const deepDriftProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
-    return { transform: `translate(${Math.sin(u) * 2} ${Math.cos(u) * 2})` }
+    return { transform: [{ translateX: Math.sin(u) * 2 }, { translateY: Math.cos(u) * 2 }] }
   })
   const midDriftProps = useAnimatedProps(() => {
     'worklet'
     const u = orbit.value * 2 * Math.PI
     const flicker = 0.85 + 0.15 * Math.sin(orbit.value * 2 * Math.PI * 3)
-    return { transform: `translate(${Math.sin(u) * 5} ${Math.cos(u) * 5})`, opacity: flicker }
+    return {
+      transform: [{ translateX: Math.sin(u) * 5 }, { translateY: Math.cos(u) * 5 }],
+      opacity: flicker,
+    }
   })
 
   return (

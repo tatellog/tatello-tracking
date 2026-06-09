@@ -55,10 +55,14 @@ export type ZodiacEngravingProps = {
 // native-svg-transformer's generated component renders a root
 // <Svg> whose `x`/`y` props are unreliably honoured when nested
 // inside another <Svg> — the child ends up in the upper-left
-// corner. `translate(...) scale(...)` is the robust path.
-function centeredScale(scale: number): string {
+// corner. translate→scale is the robust path.
+//
+// Array form (NOT the string `"translate(t t) scale(s)"`): on Android's
+// New Architecture (Fabric) the RNSVGGroup ViewManager casts `transform`
+// to a ReadableArray and a String crashes with ClassCastException at mount.
+function centeredScale(scale: number) {
   const t = CENTRE * (1 - scale)
-  return `translate(${t} ${t}) scale(${scale})`
+  return [{ translateX: t }, { translateY: t }, { scale }]
 }
 
 function renderAsset(asset: ZodiacAsset) {
