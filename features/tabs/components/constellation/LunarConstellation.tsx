@@ -57,6 +57,7 @@ export function LunarConstellation({
   committed = false,
   showCount = true,
   suppressBurst = false,
+  paused = false,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -115,7 +116,7 @@ export function LunarConstellation({
   // withRepeat clocks don't stop on their own → they'd tax the whole app
   // forever after a single visit). INVISIBLE on-tab: while focused the
   // constellation animates exactly as before.
-  const screenActive = useIsFocused()
+  const screenActive = useIsFocused() && !paused
   const { t, breathT, driftT } = useConstellationClocks(reduceMotion, screenActive)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =

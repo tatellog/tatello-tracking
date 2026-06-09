@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import LottieView from 'lottie-react-native'
 import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated'
@@ -154,6 +154,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
   const [weekOpen, setWeekOpen] = useState(false)
+
+  // Pause the constellation's animation loops while the page is actively
+  // scrolling so the UI thread isn't split between scroll frames and the
+  // SVG/Skia repaint — kills the scroll jank. A debounced idle timer flips it
+  // back on ~140 ms after the last scroll event (covers drag + momentum), so
+  // the figure freezes for the drag and resumes on release (imperceptible).
+  const [isScrolling, setIsScrolling] = useState(false)
+  const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleScroll = useCallback(() => {
+    setIsScrolling((s) => (s ? s : true))
+    if (scrollIdle.current) clearTimeout(scrollIdle.current)
+    scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
+  }, [])
   const todayIsoLocal = ctx.date
 
   const monthWorkouts = useMonthWorkoutDates()
@@ -252,7 +265,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     <View style={styles.screen}>
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
           <Animated.View entering={enter(40)}>
             <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
           </Animated.View>
@@ -277,6 +295,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               sign={sign}
               committed={ctx.today_workout_completed}
               suppressBurst
+              paused={isScrolling}
             />
 
             {!reducedMotion && celebrateKey > 0 ? (

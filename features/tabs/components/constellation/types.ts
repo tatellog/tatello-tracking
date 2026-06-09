@@ -39,6 +39,11 @@ export type Props = {
    *  constellation still flashes its figure on radialPulse — only the
    *  central particle burst is omitted. */
   suppressBurst?: boolean
+  /** Pause the animation loops (in addition to the internal off-tab gate)
+   *  while the Hoy ScrollView is actively scrolling — frees the UI thread so
+   *  the scroll stays smooth; the constellation freezes for the drag and
+   *  resumes on release (imperceptible mid-scroll). */
+  paused?: boolean
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }
