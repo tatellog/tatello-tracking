@@ -15,6 +15,7 @@ import {
   HankenGrotesk_900Black,
   useFonts,
 } from '@expo-google-fonts/hanken-grotesk'
+import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
@@ -37,6 +38,18 @@ import {
   queryClient,
   queryPersister,
 } from '@/lib/queryClient'
+import { colors } from '@/theme'
+
+// react-navigation defaults to a LIGHT theme whose `background` is WHITE.
+// Every navigator container (Stack + Tabs) paints that white, so on any
+// transition / before a heavy screen paints its dark SkyBackground, the whole
+// content area flashed (and lingered) WHITE — see the all-white Hoy capture.
+// A dark nav theme makes every container our bg colour → the gap is dark-on-
+// dark, invisible.
+const navTheme: Theme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg },
+}
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Ignore — on fast refresh the splash is already hidden.
@@ -157,14 +170,23 @@ export default function RootLayout() {
           persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
         >
           <SafeAreaProvider>
-            <ConfirmProvider>
-              <RouteGuard />
-              <Stack screenOptions={{ headerShown: false }}>
-                {/* Slide-up sheet for logging a measurement. Other routes
+            <ThemeProvider value={navTheme}>
+              <ConfirmProvider>
+                <RouteGuard />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    // Dark scene background so a navigating-in screen never
+                    // shows the white default before its content paints.
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                >
+                  {/* Slide-up sheet for logging a measurement. Other routes
                     inherit the default fullscreen push. */}
-                <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
-              </Stack>
-            </ConfirmProvider>
+                  <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
+                </Stack>
+              </ConfirmProvider>
+            </ThemeProvider>
           </SafeAreaProvider>
         </PersistQueryClientProvider>
       </ErrorBoundary>

@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur'
 import { StyleSheet, View } from 'react-native'
 
 import { colors } from '@/theme'
@@ -6,15 +5,18 @@ import { colors } from '@/theme'
 import { StarLoader } from './StarLoader'
 
 /*
- * Full-page loading — a silhouette of the screen's layout, blurred so
- * it reads as the app itself out of focus, with the loader resolving
- * into focus on top. Drop it inside a screen's content area.
+ * Full-page loading — a silhouette of the screen's layout with the loader
+ * resolving on top. The softening used to be an expo-blur BlurView over the
+ * skeleton, but on Android that renders as a SOLID BLACK pane (intensity 38) —
+ * it hid the whole skeleton, so the loading state read as "negro total". Now a
+ * light translucent wash softens the silhouette instead (cheaper, and shows on
+ * both platforms). Drop it inside a screen's content area.
  */
 export function LoadingView() {
   return (
     <View style={styles.root}>
-      {/* A rough silhouette of the page — surfaces, not faint ghosts;
-          the blur is what softens it. */}
+      {/* A rough silhouette of the page — soft surfaces under a translucent
+          wash so they read as the app out of focus, not hard cards. */}
       <View style={styles.skeleton}>
         <View style={[styles.block, styles.header]} />
         <View style={[styles.block, styles.cta]} />
@@ -23,7 +25,7 @@ export function LoadingView() {
         <View style={[styles.block, styles.line]} />
         <View style={[styles.block, styles.strip]} />
       </View>
-      <BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, styles.wash]} pointerEvents="none" />
       <View style={styles.center} pointerEvents="none">
         <StarLoader size={48} />
       </View>
@@ -34,6 +36,12 @@ export function LoadingView() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  // Light translucent wash over the skeleton — softens the silhouette so it
+  // reads as the app out of focus, WITHOUT hiding it the way the old Android
+  // BlurView (solid black) did. Low alpha keeps the blocks legible.
+  wash: {
+    backgroundColor: 'rgba(10,6,8,0.35)',
   },
   skeleton: {
     paddingHorizontal: 20,

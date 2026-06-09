@@ -72,14 +72,26 @@ export default function TabsLayout() {
     <View style={{ flex: 1 }}>
       <Tabs
         tabBar={(props) => <AppTabBar {...props} />}
+        // Keep inactive tab screens ATTACHED to the native view hierarchy.
+        // By default react-native-screens detaches a blurred tab's native
+        // screen and re-attaches it on return — for the heavy Skia tabs
+        // (Órbita, Hoy) that re-attach repaints the canvases from scratch and
+        // flashed BLACK on every tab switch. Staying attached keeps them
+        // painted → instant, no black. (Costs some memory holding all screens.)
+        detachInactiveScreens={false}
         screenOptions={{
           headerShown: false,
-          // Suspend a tab's React renders when it's not focused (reduces commit
-          // + draw cost off-screen). NOTE: this does NOT stop the UI-thread
-          // `withRepeat` loops — Órbita's ambient clocks are gated separately on
-          // `useScreenActive()` (see features/orbit/useScreenActive.ts), which is
-          // what actually pauses the cosmos animation off-tab.
-          freezeOnBlur: true,
+          // Dark scene container so no white shows before a tab's content
+          // paints (the root nav theme is dark too — belt + suspenders).
+          sceneStyle: { backgroundColor: colors.bg },
+          // freezeOnBlur OFF: it suspended off-tab renders, but on return it had
+          // to THAW + repaint the whole heavy screen (Skia + constellation),
+          // which lingered BLANK for long enough to screenshot. Staying rendered
+          // means the screen is already painted on return → no thaw blank. The
+          // off-tab cost is low: the animation loops are gated separately on
+          // `useScreenActive()`/focus (they don't run off-tab regardless), so
+          // the only extra work is React reconciliation on a rare data change.
+          freezeOnBlur: false,
         }}
       >
         <Tabs.Screen

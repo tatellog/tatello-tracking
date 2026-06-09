@@ -16,6 +16,7 @@ import {
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { LoadingView } from '@/components/LoadingView'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { track } from '@/lib/analytics'
 import { colors } from '@/theme'
@@ -69,6 +70,30 @@ function OrbitBody() {
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
   }, [])
+
+  // Deferred mount — Órbita is the heaviest tab (ScreenCosmos Skia nebula +
+  // the orbital diagram's Skia canvases + big SVG). On the FIRST tap its slow
+  // first paint left the screen black. Paint the LIGHT chrome first (dark sky +
+  // the skeleton) so the tab shows something immediately, then mount the heavy
+  // content one frame later (it fades in over the skeleton). freezeOnBlur is
+  // off, so OrbitBody stays mounted after the first visit → no re-flash on
+  // return; the skeleton only ever shows once.
+  const [heavyMounted, setHeavyMounted] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setHeavyMounted(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  if (!heavyMounted) {
+    return (
+      <View style={styles.screen}>
+        <SkyBackground />
+        <SafeAreaView style={styles.flex} edges={['top']}>
+          <LoadingView />
+        </SafeAreaView>
+      </View>
+    )
+  }
 
   return (
     <ScrollPauseContext.Provider value={isScrolling}>
