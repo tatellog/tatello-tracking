@@ -368,9 +368,12 @@ export function LunarConstellation({
                 lines={zodiac.lines}
                 litKeys={litKeys}
                 nextEl={nextEl}
+                starRecency={starRecency}
+                starDepth={starDepth}
                 toScreen={toScreen}
                 sScale={sScale}
                 t={t}
+                breathT={breathT}
                 reduce={reduceMotion}
               />
             ) : null}
