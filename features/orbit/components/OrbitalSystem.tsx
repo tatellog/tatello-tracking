@@ -20,9 +20,6 @@ import Svg, {
   Circle,
   Defs,
   Ellipse,
-  FeColorMatrix,
-  FeGaussianBlur,
-  Filter,
   G,
   Image as SvgImage,
   Mask,
@@ -90,22 +87,6 @@ const SKY = {
 // becomes the unambiguous emblem of the zoomed dimension.
 const GLYPH_SCALE = 2.6
 const GLYPH_HALF = 12
-
-// The six dimension keys, in a fixed order — used to emit one glyph-glow
-// SVG filter per dimension (each recolours the rose constellation to its
-// own hue, then blurs it into a bloom).
-const DIM_KEYS: DimensionKey[] = ['cuerpo', 'mente', 'energia', 'alimento', 'sueno', 'ciclo']
-
-/** FeColorMatrix `values` that flattens any input to a SOLID hue (keeping
- *  the source alpha) — so the rose glyph becomes a single-colour
- *  silhouette in the dimension's hue, ready to blur into a shaped glow. */
-function glowMatrix(hex: string): string {
-  const n = parseInt(hex.replace('#', ''), 16)
-  const r = ((n >> 16) & 255) / 255
-  const g = ((n >> 8) & 255) / 255
-  const b = (n & 255) / 255
-  return `0 0 0 0 ${r} 0 0 0 0 ${g} 0 0 0 0 ${b} 0 0 0 1 0`
-}
 
 /*
  * The orbital diagram — the hero of the Día segment. Inspired by
@@ -695,30 +676,10 @@ export function OrbitalSystem({
           <Mask id="bh-mask" maskUnits="userSpaceOnUse">
             <Circle cx={ART_CENTER_X} cy={ART_CENTER_Y} r={ART_R * 1.12} fill="url(#bh-fade)" />
           </Mask>
-          {/* Glyph glow — one filter per dimension. Recolours the rose
-              constellation to the dimension's hue (FeColorMatrix) then
-              blurs it (FeGaussianBlur), so a soft shaped bloom in the
-              dimension colour sits behind the crisp glyph and bleeds its
-              light into the halo. The constellation stops reading as a
-              flat sticker and starts EMITTING. Generous filter region so
-              the blur isn't clipped. */}
-          {DIM_KEYS.map((key) => (
-            <Filter
-              key={`glow-${key}`}
-              id={`glyph-glow-${key}`}
-              x="-60%"
-              y="-60%"
-              width="220%"
-              height="220%"
-            >
-              <FeColorMatrix
-                type="matrix"
-                values={glowMatrix(colors.dimension[key])}
-                result="tint"
-              />
-              <FeGaussianBlur in="tint" stdDeviation={1.8} />
-            </Filter>
-          ))}
+          {/* Glyph-glow SVG filters (FeColorMatrix + FeGaussianBlur) removed:
+              SVG filters software-render on Android and were the Órbita tab's
+              heaviest cost. The emission is now a scaled glyph copy (see the
+              glyph render below) + the dimension-hued halo circle. */}
         </Defs>
 
         {/* Ambient dust — 120 cream specks orbiting the bulge in
@@ -2159,7 +2120,13 @@ function StarNode({
           the halo, instead of reading as a flat rose sticker on a disc. */}
       {showGlyph ? (
         <AnimatedG animatedProps={glyphAnim}>
-          <G filter={`url(#glyph-glow-${dim.key})`} opacity={0.85}>
+          {/* Emission glow — a scaled-up copy of the glyph behind the crisp
+              one. Was `filter={glyph-glow}` (FeColorMatrix + FeGaussianBlur),
+              but an SVG filter falls back to SOFTWARE rendering on Android →
+              the heaviest cost on the Órbita tab. A 1.18× scale at low opacity
+              gives the soft outward bloom on the GPU; the dimension-hued halo
+              circle behind already carries the colour. */}
+          <G scale={1.18} originX={GLYPH_HALF} originY={GLYPH_HALF} opacity={0.5}>
             {GLYPHS[dim.key]}
           </G>
           {/* Crisp glyph layer — tinted to the DIMENSION's brand hue
