@@ -518,6 +518,26 @@ function clampDuration(n: number): number {
   return n < SLEEP_MIN ? SLEEP_MIN : n > SLEEP_MAX ? SLEEP_MAX : n
 }
 
+/*
+ * Evaluación derivada de las horas — la usuaria solo registra cuánto
+ * durmió y las lunas se encienden solas, según la distancia a la
+ * franja 7–9 h (la referencia de descanso adulto). Es simétrica:
+ * dormir bastante de más también baja lunas. El número se guarda en
+ * `quality` igual que antes, así el motor de patrones de Órbita sigue
+ * leyendo la misma columna sin cambios.
+ */
+function qualityFromDuration(minutes: number): number {
+  const SWEET_LO = 420 // 7 h
+  const SWEET_HI = 540 // 9 h
+  const distance =
+    minutes < SWEET_LO ? SWEET_LO - minutes : minutes > SWEET_HI ? minutes - SWEET_HI : 0
+  if (distance === 0) return 5
+  if (distance <= 30) return 4 // a media hora de la franja
+  if (distance <= 90) return 3
+  if (distance <= 150) return 2
+  return 1
+}
+
 const AnimatedPath = Animated.createAnimatedComponent(Path)
 
 /* The hours arc — a faint full track with a coloured progress arc on
@@ -585,9 +605,11 @@ function StepButton({
  * Last night's sleep — the only slide that registers, not just
  * displays. Sleep is a once-a-day morning ritual, so its home is
  * here on Hoy rather than the meal-centric QuickLog. Duration steps
- * in 15-min increments; quality is five tappable moons. The slide
- * owns the edited values in local state — the query only seeds them
- * — so the UI is instant and each change upserts in the background.
+ * in 15-min increments; the five moons are a READ-OUT, not an input —
+ * they light up from the hours via qualityFromDuration, so logging is
+ * one gesture (− / +), not two. The slide owns the edited values in
+ * local state — the query only seeds them — so the UI is instant and
+ * each change upserts in the background.
  */
 function SleepSlide({ date }: { date: string }) {
   const { data: log, isLoading } = useSleepLog(date)
@@ -596,14 +618,19 @@ function SleepSlide({ date }: { date: string }) {
   const [draft, setDraft] = useState<SleepDraft | null>(null)
   const [touched, setTouched] = useState(false)
 
-  // Seed the editable draft once the night's row (or its absence) loads.
+  // Seed the editable draft from the night's row — and RE-seed if the
+  // row changes afterwards. Seeding only once dejaba un hueco: la cache
+  // persistida hidrata `null` primero, el fetch real trae la fila
+  // después, y el slide se quedaba mostrando el default apagado (lunas
+  // sin encender) aunque la noche YA estaba registrada. Mientras la
+  // usuaria no haya tocado − / + en esta sesión, la fila manda.
   useEffect(() => {
-    if (isLoading || draft != null) return
+    if (isLoading || touched) return
     setDraft({
       durationMinutes: log?.duration_minutes ?? SLEEP_DEFAULT_MIN,
       quality: log?.quality ?? null,
     })
-  }, [isLoading, log, draft])
+  }, [isLoading, log, touched])
 
   if (draft == null) {
     return <View style={[styles.slide, styles.card]} />
@@ -613,24 +640,18 @@ function SleepSlide({ date }: { date: string }) {
   const hasEntry = log != null || touched
   const h = Math.floor(draft.durationMinutes / 60)
   const m = draft.durationMinutes % 60
+  const quality = qualityFromDuration(draft.durationMinutes)
 
-  const commit = (next: SleepDraft) => {
-    setDraft(next)
-    setTouched(true)
-    upsert.mutate(next)
-  }
   const step = (delta: number) => {
     const minutes = clampDuration(draft.durationMinutes + delta)
     if (minutes === draft.durationMinutes) return
     Haptics.selectionAsync().catch(() => {})
-    commit({ ...draft, durationMinutes: minutes })
-  }
-  const rate = (i: number) => {
-    Haptics.selectionAsync().catch(() => {})
-    // Tap a moon to set the quality; tap the current top moon to
-    // step one back down — mirrors the water glasses' behaviour.
-    const next = draft.quality === i + 1 ? (i === 0 ? null : i) : i + 1
-    commit({ ...draft, quality: next })
+    // La calidad viaja derivada de las horas — un solo gesto registra
+    // duración y evaluación juntas.
+    const next: SleepDraft = { durationMinutes: minutes, quality: qualityFromDuration(minutes) }
+    setDraft(next)
+    setTouched(true)
+    upsert.mutate(next)
   }
 
   return (
@@ -664,29 +685,30 @@ function SleepSlide({ date }: { date: string }) {
           <StepButton label="+" hint="Sumar 15 minutos" onPress={() => step(SLEEP_STEP)} />
         </View>
 
-        <View style={styles.sleepQualityRow}>
+        {/* Las lunas son una lectura, no un input — se encienden solas
+            según las horas mostradas, desde el primer render. Con la
+            noche registrada van en magenta; antes de registrar, en
+            niebla (la misma señal "aún no es tuyo" del arco y el
+            número), pero la evaluación SIEMPRE se ve. */}
+        <View
+          style={styles.sleepQualityRow}
+          accessibilityLabel={`Sueño ${QUALITY_WORDS[quality - 1]}, ${quality} de 5 lunas`}
+        >
           {[0, 1, 2, 3, 4].map((i) => (
-            <Pressable
-              key={i}
-              onPress={() => rate(i)}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`Calidad ${i + 1} de 5`}
-            >
-              <Svg width={26} height={26} viewBox="0 0 24 24">
-                <Path d={MOON} fill={(draft.quality ?? 0) > i ? colors.magenta : colors.bruma} />
-              </Svg>
-            </Pressable>
+            <Svg key={i} width={26} height={26} viewBox="0 0 24 24">
+              <Path
+                d={MOON}
+                fill={quality > i ? (hasEntry ? colors.magenta : colors.niebla) : colors.bruma}
+              />
+            </Svg>
           ))}
         </View>
 
         {!hasEntry ? (
           <Text style={styles.captionLine}>¿Cuánto dormiste anoche?</Text>
-        ) : draft.quality == null ? (
-          <Text style={styles.captionLine}>Toca las lunas para la calidad</Text>
         ) : (
           <Text style={styles.captionLine}>
-            Sueño <Text style={styles.captionEm}>{QUALITY_WORDS[draft.quality - 1]}</Text>
+            Sueño <Text style={styles.captionEm}>{QUALITY_WORDS[quality - 1]}</Text>
           </Text>
         )}
       </View>
