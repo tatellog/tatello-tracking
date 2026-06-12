@@ -35,6 +35,23 @@ jest.mock('expo-blur', () => {
   }
 })
 
+// El barrel de emblem re-exporta api.ts → lib/supabase → AsyncStorage
+// nativo, que no existe en jest. Se reemplaza el barrel completo: la
+// lógica pura es la real y el hook queda en progreso 0 (emblema en
+// calma) — estos snapshots cubren la estructura de la constelación,
+// no el arco del Emblema Celeste (eso vive en features/emblem).
+jest.mock('@/features/emblem', () => {
+  const logic = jest.requireActual('@/features/emblem/logic')
+  return {
+    ...logic,
+    useTransformProgress: () => ({
+      progress: 0,
+      stage: logic.stageForProgress(0),
+      isLoading: false,
+    }),
+  }
+})
+
 // Hold the canvas-ready timer + ignition queue setTimeouts under our
 // control so snapshots capture the post-reveal state (the live SVG,
 // not the skeleton) deterministically.

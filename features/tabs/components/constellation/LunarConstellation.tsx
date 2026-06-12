@@ -2,6 +2,7 @@ import { useIsFocused } from '@react-navigation/native'
 import { useMemo, useState } from 'react'
 import {
   Image,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -16,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
+import { useTransformProgress } from '@/features/emblem'
 import { colors, typography } from '@/theme'
 
 import { ZODIAC } from '../../zodiac/data'
@@ -47,6 +49,7 @@ import { SkiaFigure } from './rendering/skia-figure/skia-figure'
 import { AnticipationCrown, CenterNumberOverlay, CompletionRings } from './rendering/overlay'
 import { CanvasSkeleton } from './rendering/skeleton'
 import { AmbientGlow, SvgGradients } from './rendering/static'
+import { RevealedLeoEmblem } from './RevealedLeoEmblem'
 import type { Props, Resolved, SequenceEl } from './types'
 
 // FASE 3 (en progreso): render de la FIGURA en Skia en vez de react-native-svg.
@@ -54,6 +57,13 @@ import type { Props, Resolved, SequenceEl } from './types'
 // → halos → flares → ignición). Con `false` la figura SVG actual se usa tal cual
 // (cero cambio). Prender solo para validar la versión Skia en Expo Go.
 const USE_SKIA_FIGURE = true
+
+// Emblema Celeste (transformación personal, sistema independiente de la
+// constelación natal). El progreso REAL viene de useTransformProgress
+// (RPC retroactiva sobre daily_signals); el chip DEV de la esquina
+// permite forzar estos pasos para validar el reveal (real → 0 → 25 →
+// 50 → 75 → 100 → real). El número jamás se muestra al usuario.
+const TRANSFORM_STEPS = [0, 25, 50, 75, 100] as const
 
 export function LunarConstellation({
   trained,
@@ -139,6 +149,16 @@ export function LunarConstellation({
   }
   const k = canvasPx / W
 
+  // Emblema Celeste: progreso real (hábitos acumulados, retroactivo) +
+  // override DEV opcional. null = real; un índice = paso mockeado.
+  // Solo Leo tiene emblema hoy; en Leo el emblema REEMPLAZA al engraving
+  // PNG (dos artes de león encimadas se leían como doble exposición).
+  // Los demás signos conservan su engraving hasta tener emblema propio.
+  const hasEmblem = sign === 'leo'
+  const emblem = useTransformProgress()
+  const [mockStep, setMockStep] = useState<number | null>(null)
+  const transformProgress = mockStep == null ? emblem.progress : (TRANSFORM_STEPS[mockStep] ?? 0)
+
   // Apply SIGN_CONSTELLATION_TRANSFORM in JS so the Skia overlay (which
   // can't read the SVG <G transform="...">) can position each star at
   // the same pixel as the SVG-rendered body.
@@ -216,17 +236,30 @@ export function LunarConstellation({
             the PNG inside RNSVG re-rasterised and jumped left on every scroll
             frame; as a plain view it translates in lockstep. Sits behind the
             transparent <Svg> so the vignette + edge-fade Rects still darken it
-            exactly as before. Breath + progress-opacity via artStyle. */}
-        <Animated.View style={[StyleSheet.absoluteFill, artStyle]} pointerEvents="none">
-          <Image
-            // Always a PNG bitmap source at runtime (ART_BY_SIGN is rasterised);
-            // the ZodiacAsset union just also allows the legacy SVG-component form.
-            source={SIGN_ENGRAVINGS[sign].art as ImageSourcePropType}
-            style={styles.artImage}
-            resizeMode="contain"
-            fadeDuration={0}
-          />
-        </Animated.View>
+            exactly as before. Breath + progress-opacity via artStyle.
+            SOLO para signos sin emblema: en Leo lo reemplaza el Emblema
+            Celeste (dos artes de león apiladas → doble exposición). */}
+        {hasEmblem ? null : (
+          <Animated.View style={[StyleSheet.absoluteFill, artStyle]} pointerEvents="none">
+            <Image
+              // Always a PNG bitmap source at runtime (ART_BY_SIGN is rasterised);
+              // the ZodiacAsset union just also allows the legacy SVG-component form.
+              source={SIGN_ENGRAVINGS[sign].art as ImageSourcePropType}
+              style={styles.artImage}
+              resizeMode="contain"
+              fadeDuration={0}
+            />
+          </Animated.View>
+        )}
+        {/* Emblema Celeste (leo-2.svg): capa de TRANSFORMACIÓN, el ÚNICO
+            arte de fondo en Leo. Sistema independiente: la constelación
+            de arriba sigue respondiendo SOLO a "Entrené"; el emblema, a
+            los hábitos acumulados. El reveal materializa una capa
+            anatómica por etapa (marco → jardín → cabeza → melena) y es
+            DISCRETO: dentro de una etapa nada se mueve; cruzarla anima
+            la entrada de la capa nueva. Z-order: bajo el <Svg> de la
+            figura — la viñeta + edge-fade lo oscurecen igual que al PNG. */}
+        {hasEmblem ? <RevealedLeoEmblem transformProgress={transformProgress} /> : null}
         {/* Skeleton wrapped in Animated.View with `exiting` so it
             stays alive (fading out over 320 ms) while the real Svg
             below fades in (260 ms). Their opacities overlap — the
@@ -455,6 +488,25 @@ export function LunarConstellation({
             forcing a rounded `overflow:hidden` clip over the separate Skia
             surfaces (the Android scroll-swim cause). Non-interactive. */}
         <View style={styles.frameOverlay} pointerEvents="none" />
+        {/* Chip DEV del emblema: muestra el progreso vigente y cada tap
+            cicla real → 0 → 25 → 50 → 75 → 100 → real. Solo __DEV__:
+            el porcentaje es debug, nunca producto. */}
+        {__DEV__ && hasEmblem ? (
+          <Pressable
+            style={styles.devTransformChip}
+            hitSlop={8}
+            onPress={() =>
+              setMockStep((s) => {
+                const next = s == null ? 0 : s + 1
+                return next >= TRANSFORM_STEPS.length ? null : next
+              })
+            }
+          >
+            <Text style={styles.devTransformText}>
+              emblema {transformProgress}% · {mockStep == null ? 'real' : 'mock'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Chip footer — count + denominator rendered as a proper
@@ -528,6 +580,24 @@ const styles = StyleSheet.create({
   artImage: {
     width: '100%',
     height: '100%',
+  },
+  // PRUEBA — chip DEV del emblema: esquina superior derecha, sobre el frame.
+  devTransformChip: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(10, 6, 8, 0.6)',
+  },
+  devTransformText: {
+    fontFamily: typography.uiMedium,
+    fontSize: 10,
+    color: colors.oro,
+    letterSpacing: 0.4,
   },
   // Visible only once the user completes the 28-day cycle — a single
   // small magenta caps stamp announcing the achievement. Replaces the

@@ -638,6 +638,10 @@ export type Database = {
           table_name: string
         }[]
       }
+      fn_transform_points: {
+        Args: { p_water_goal_glasses?: number }
+        Returns: number
+      }
       get_brief_context: {
         Args: { p_date?: string; p_user_id?: string }
         Returns: Json

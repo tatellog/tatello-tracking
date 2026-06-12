@@ -71,6 +71,12 @@ export const queryKeys = {
     all: ['wellbeing'] as const,
     day: (date: string) => ['wellbeing', date] as const,
   },
+  emblem: {
+    all: ['emblem'] as const,
+    // La meta de agua entra en la key: cambiarla recalcula el acumulado
+    // (los días "agua completa" dependen de la vara).
+    points: (waterGoalGlasses: number) => ['emblem', 'points', waterGoalGlasses] as const,
+  },
   orbit: {
     all: ['orbit'] as const,
     today: () => ['orbit', 'today'] as const,
