@@ -140,13 +140,21 @@ function dimensionWord(key: DimensionKey, s: DailySignals): string | null {
   }
 }
 
-/** Resolve the six dimensions with today's brightness. `null` signals →
- *  every dimension at the floor. */
+/** The dimensions that exist for this user — `ciclo` only when the cycle
+ *  gate allows it (ctx.cycleEnabled !== false). Single filter point so
+ *  derive/summary/notes all agree on the dimension set. */
+export function dimensionsFor(ctx?: DimensionContext): readonly DimensionLayout[] {
+  return ctx?.cycleEnabled === false ? DIMENSIONS.filter((d) => d.key !== 'ciclo') : DIMENSIONS
+}
+
+/** Resolve the user's dimensions with today's brightness. `null` signals →
+ *  every dimension at the floor. Six dims, or five sin `ciclo` cuando el
+ *  gate de ciclo está cerrado (ctx.cycleEnabled === false). */
 export function deriveDimensions(
   signals: DailySignals | null,
   ctx?: DimensionContext,
 ): Dimension[] {
-  return DIMENSIONS.map((d) => ({
+  return dimensionsFor(ctx).map((d) => ({
     ...d,
     brightness: signals == null ? DIM_FLOOR : brightnessFor(d.key, signals, ctx),
     word: signals == null ? null : dimensionWord(d.key, signals),

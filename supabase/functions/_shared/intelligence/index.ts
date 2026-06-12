@@ -42,6 +42,11 @@ export type IntelligenceInput = {
   calorieTarget: number | null
   proteinTarget: number | null
   waterGoalGlasses: number
+  /** Regla de negocio (cycle-gate.ts): false → el usuario no tiene ciclo
+   *  (hombre, o mujer sin menstruación activa); la dimensión `ciclo` y el
+   *  chip de periodo se omiten de TODO el payload. undefined → se incluye
+   *  (back-compat). */
+  cycleEnabled?: boolean
 }
 
 type Voz = {
@@ -70,9 +75,17 @@ function shiftDate(iso: string, days: number): string {
 }
 
 export function computeIntelligence(input: IntelligenceInput): Intelligence {
-  const { history, meals, today, todayGetDay, calorieTarget, proteinTarget, waterGoalGlasses } =
-    input
-  const dimCtx = { calorieTarget, proteinTarget }
+  const {
+    history,
+    meals,
+    today,
+    todayGetDay,
+    calorieTarget,
+    proteinTarget,
+    waterGoalGlasses,
+    cycleEnabled,
+  } = input
+  const dimCtx = { calorieTarget, proteinTarget, cycleEnabled }
 
   const todaySignal = history.find((s) => s.day === today) ?? null
   const dimensions = deriveDimensions(todaySignal, dimCtx)
@@ -101,7 +114,12 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
     day: {
       dimensions,
       header: buildDayIdentity(dimensions),
-      readings: buildDayReadings(todaySignal, { calorieTarget, proteinTarget, waterGoalGlasses }),
+      readings: buildDayReadings(todaySignal, {
+        calorieTarget,
+        proteinTarget,
+        waterGoalGlasses,
+        cycleEnabled,
+      }),
     },
     week: {
       days,

@@ -56,6 +56,11 @@ export type DayReadingContext = {
   proteinTarget: number | null
   /** Daily water goal in 250 ml glasses (from useWaterGoal). */
   waterGoalGlasses: number
+  /** Regla de negocio (cycle-gate.ts): false → nunca mostrar el chip de
+   *  ciclo, aunque queden cycle_events viejos en la data (p. ej. la
+   *  usuaria cambió su situación a "no tengo ciclo" después de haber
+   *  marcado periodos). */
+  cycleEnabled?: boolean
 }
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
@@ -197,7 +202,7 @@ function cuerpo(s: DailySignals): DayCard | null {
 }
 
 /* ── Bienestar — energy (dots) + cycle (chip) ─────────────────────── */
-function bienestar(s: DailySignals): DayCard | null {
+function bienestar(s: DailySignals, ctx: DayReadingContext): DayCard | null {
   const metrics: DayMetric[] = []
   let energyLow = false
   let energyHigh = false
@@ -213,7 +218,7 @@ function bienestar(s: DailySignals): DayCard | null {
       tone: energyLow ? 'soft' : 'context',
     })
   }
-  if (s.on_period)
+  if (s.on_period && ctx.cycleEnabled !== false)
     metrics.push({
       key: 'cycle',
       label: 'Ciclo',
@@ -245,7 +250,7 @@ function bienestar(s: DailySignals): DayCard | null {
  *  quiet day with nothing logged returns []. */
 export function buildDayReadings(today: DailySignals | null, ctx: DayReadingContext): DayCard[] {
   if (!today) return []
-  return [comida(today, ctx), agua(today, ctx), cuerpo(today), bienestar(today)].filter(
+  return [comida(today, ctx), agua(today, ctx), cuerpo(today), bienestar(today, ctx)].filter(
     (c): c is DayCard => c != null,
   )
 }

@@ -6,13 +6,12 @@ import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { CycleRing } from '@/features/progress/components/CycleRing'
 import {
-  ACTIVE_CYCLE_SITUATIONS,
   cyclePhaseFromPeriod,
   type CyclePhase,
   DEFAULT_CYCLE_LENGTH,
+  isCycleActive,
   PHASE_LABEL,
 } from '@/features/cycle/phase'
-import { type CycleSituation } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { colors, typography } from '@/theme'
 
@@ -62,11 +61,7 @@ export function CycleCard() {
   const { data: profile } = useProfile()
   const { data: lastPeriod } = useLastPeriodStart()
 
-  const cycleSituation = profile?.cycle_situation as CycleSituation | null | undefined
-  const isActive =
-    profile?.biological_sex !== 'male' &&
-    !!cycleSituation &&
-    ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
+  const isActive = isCycleActive(profile?.biological_sex, profile?.cycle_situation)
   const cycleLength = profile?.cycle_length_days ?? DEFAULT_CYCLE_LENGTH
 
   const state = useMemo(() => {

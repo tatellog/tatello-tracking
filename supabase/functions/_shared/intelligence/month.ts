@@ -9,7 +9,7 @@
  * Mirrors the shape of week-logic.ts so MonthSegment can swap mock → real
  * the same way the Semana did.
  */
-import { deriveDimensions, DIMENSIONS } from './dimensions'
+import { deriveDimensions, dimensionsFor } from './dimensions'
 import type { DailySignals, DimensionContext, DimensionKey, VozParte } from './types'
 
 /** A trend needs at least this much half-over-half change to be named. */
@@ -41,9 +41,12 @@ export function buildMonthSummary(
   ctx?: DimensionContext,
 ): DimensionMonth[] {
   const sorted = [...signals].filter((s) => s.day).sort((a, b) => (a.day! < b.day! ? -1 : 1))
+  // The user's dimension set — sin `ciclo` cuando el gate está cerrado, so
+  // the month arc never lists a CICLO row for users who don't have one.
+  const dims = dimensionsFor(ctx)
 
   if (sorted.length === 0) {
-    return DIMENSIONS.map((d) => ({
+    return dims.map((d) => ({
       key: d.key,
       label: d.label,
       avg: FLOOR,
@@ -60,7 +63,7 @@ export function buildMonthSummary(
   })
   const mid = Math.floor(perDay.length / 2)
 
-  return DIMENSIONS.map((d) => {
+  return dims.map((d) => {
     const series = perDay.map((m) => m.get(d.key) ?? FLOOR)
     const delta = mean(series.slice(mid)) - mean(series.slice(0, mid))
     const trend: DimensionMonth['trend'] =

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
+import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { getMealsInRange } from '@/features/macros/api'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { supabase } from '@/lib/supabase'
@@ -20,7 +21,14 @@ import { getWeekSignals } from './api'
  * we compute the SAME payload locally from the SAME shared lib, so the app
  * never breaks. Once the function is live, it transparently takes over.
  */
-type Params = { today: string; todayGetDay: number; waterGoalGlasses: number }
+type Params = {
+  today: string
+  todayGetDay: number
+  waterGoalGlasses: number
+  /** Gate de ciclo (cycle-gate.ts) leído del perfil — false omite la
+   *  dimensión `ciclo` y el chip de periodo de todo el payload. */
+  cycleEnabled: boolean
+}
 
 /*
  * Whether to call the `daily-intelligence` Edge Function. While false we
@@ -52,6 +60,7 @@ async function computeLocally(p: Params): Promise<Intelligence> {
     calorieTarget: macros.data?.calories ?? null,
     proteinTarget: macros.data?.protein_g ?? null,
     waterGoalGlasses: p.waterGoalGlasses,
+    cycleEnabled: p.cycleEnabled,
   })
 }
 
@@ -77,10 +86,18 @@ export function useDailyIntelligence() {
   const todayGetDay = new Date(`${today}T00:00:00Z`).getUTCDay()
   const { goalMl } = useWaterGoal()
   const waterGoalGlasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+  const cycleEnabled = useCycleEnabled()
 
   return useQuery({
-    queryKey: ['orbit', 'intelligence', today, todayGetDay, waterGoalGlasses] as const,
-    queryFn: () => fetchIntelligence({ today, todayGetDay, waterGoalGlasses }),
+    queryKey: [
+      'orbit',
+      'intelligence',
+      today,
+      todayGetDay,
+      waterGoalGlasses,
+      cycleEnabled,
+    ] as const,
+    queryFn: () => fetchIntelligence({ today, todayGetDay, waterGoalGlasses, cycleEnabled }),
     staleTime: 60_000,
   })
 }

@@ -20,6 +20,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
+import { isCycleActive } from '../_shared/intelligence/cycle-gate'
 import { computeIntelligence } from '../_shared/intelligence/index'
 
 const corsHeaders: Record<string, string> = {
@@ -72,7 +73,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // 35-day rolling window ending today — feeds patterns + month arc.
     const from = shiftDate(today, -34)
-    const [signalsRes, mealsRes, macrosRes] = await Promise.all([
+    const [signalsRes, mealsRes, macrosRes, profileRes] = await Promise.all([
       supabase
         .from('daily_signals')
         .select('*')
@@ -81,6 +82,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .order('day', { ascending: true }),
       supabase.from('meals').select('consumed_at').gte('meal_date', from).lte('meal_date', today),
       supabase.from('macro_targets').select('calories, protein_g').maybeSingle(),
+      // Gate de ciclo (cycle-gate.ts): derivado del perfil server-side, no
+      // del request — el cliente no decide si tiene ciclo.
+      supabase.from('profiles').select('biological_sex, cycle_situation').maybeSingle(),
     ])
     if (signalsRes.error) throw signalsRes.error
 
@@ -92,6 +96,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       calorieTarget: macrosRes.data?.calories ?? null,
       proteinTarget: macrosRes.data?.protein_g ?? null,
       waterGoalGlasses,
+      cycleEnabled: isCycleActive(
+        profileRes.data?.biological_sex,
+        profileRes.data?.cycle_situation,
+      ),
     })
 
     return json(intelligence)

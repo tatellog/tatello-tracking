@@ -64,6 +64,11 @@ export type DiaSemana = {
 export type DimensionContext = {
   calorieTarget?: number | null
   proteinTarget?: number | null
+  /** Regla de negocio (cycle-gate.ts): false → la dimensión `ciclo` no
+   *  existe para este usuario (hombre, o mujer sin menstruación activa) y
+   *  se omite de todo lo derivado. undefined/true → comportamiento de
+   *  siempre (seis dimensiones). */
+  cycleEnabled?: boolean
 }
 
 export type DimensionMonth = {

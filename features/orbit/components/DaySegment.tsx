@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
+import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { EmText } from '@/components/EmText'
@@ -112,7 +113,10 @@ export function DaySegment() {
   const targets = useMacroTargets()
   const calorieTarget = targets.data?.calories ?? null
   const proteinTarget = targets.data?.protein_g ?? null
-  const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget })
+  // Gate de ciclo (cycle-gate.ts): sin ciclo activo, la dimensión `ciclo`
+  // no existe en el orbital ni en ninguna lectura.
+  const cycleEnabled = useCycleEnabled()
+  const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget, cycleEnabled })
   // The Día header identity — a real, one-word state for TODAY from the same
   // live dimensions the orbital draws (shared lib; the BE returns the same
   // value in intel.day.header). Replaces the old mock archetype + headline.
@@ -122,7 +126,15 @@ export function DaySegment() {
   // BACKEND engine (daily-intelligence Edge Function); the hook falls back
   // to the same local rules if it's unreachable.
   const intel = useDailyIntelligence()
-  const dayReadings = intel.data?.day.readings ?? []
+  // Defensa extra sobre el payload (puede venir cacheado del BE de antes
+  // del gate, o con cycle_events viejos): sin ciclo, fuera el chip de
+  // periodo — y si la tarjeta queda vacía, fuera la tarjeta.
+  const rawReadings = intel.data?.day.readings ?? []
+  const dayReadings = cycleEnabled
+    ? rawReadings
+    : rawReadings
+        .map((c) => ({ ...c, metrics: c.metrics.filter((m) => m.key !== 'cycle') }))
+        .filter((c) => c.metrics.length > 0 || c.coach != null)
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
   const [ignited, setIgnited] = useState<DimensionKey[]>([])
 
@@ -142,7 +154,7 @@ export function DaySegment() {
   // new snapshot so the same lighting doesn't re-celebrate next visit.
   useEffect(() => {
     if (!signals) return
-    const dims = deriveDimensions(signals, { calorieTarget, proteinTarget })
+    const dims = deriveDimensions(signals, { calorieTarget, proteinTarget, cycleEnabled })
     const current: Record<string, boolean> = {}
     dims.forEach((d) => {
       current[d.key] = dimensionTone(d.brightness) === 'brillante'
@@ -162,7 +174,7 @@ export function DaySegment() {
     return () => {
       alive = false
     }
-  }, [signals, calorieTarget, proteinTarget])
+  }, [signals, calorieTarget, proteinTarget, cycleEnabled])
 
   const selected = selectedKey ? (dimensions.find((d) => d.key === selectedKey) ?? null) : null
   const selectedTone = selected ? dimensionTone(selected.brightness) : null
@@ -339,16 +351,14 @@ export function DaySegment() {
                   ))}
                 </View>
               </View>
-            ) : selected.key === 'ciclo' && signals != null ? (
-              // CICLO with "Fuera del periodo" is a FACT, not a missing
-              // signal — showing "Aún no hay señal aquí. Stelar espera,
-              // no inventa." here contradicted the factual detail line
-              // ("la app no me lee" / "reproche disfrazado" per UX audit).
-              // Skip the silence block entirely; the detail line carries
-              // the truth. No CTA either — outside-of-period is not
-              // actionable.
-              null
-            ) : (
+            ) : selected.key === 'ciclo' &&
+              signals != null ? // signal — showing "Aún no hay señal aquí. Stelar espera, // CICLO with "Fuera del periodo" is a FACT, not a missing
+            // no inventa." here contradicted the factual detail line
+            // ("la app no me lee" / "reproche disfrazado" per UX audit).
+            // Skip the silence block entirely; the detail line carries
+            // the truth. No CTA either — outside-of-period is not
+            // actionable.
+            null : (
               <View style={styles.silence}>
                 <Text style={styles.evidenceQuiet}>
                   {QUIET_LINE_FOR[selected.key] ??
@@ -358,9 +368,7 @@ export function DaySegment() {
                   <Pressable
                     onPress={() => {
                       const slide = SLIDE_FOR_DIM[selected.key]
-                      router.push(
-                        slide ? `/(tabs)?slide=${slide}` : '/(tabs)',
-                      )
+                      router.push(slide ? `/(tabs)?slide=${slide}` : '/(tabs)')
                     }}
                     hitSlop={12}
                     accessibilityRole="button"

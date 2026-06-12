@@ -5,6 +5,7 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import { EmText } from '@/components/EmText'
 import { colors, typography } from '@/theme'
 
+import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useMacroTargets } from '@/features/macros/hooks'
 
 import { useHasAnySignals, useWeekSignals } from '../hooks'
@@ -47,7 +48,13 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
   const macros = useMacroTargets()
   const calorieTarget = macros.data?.calories ?? null
   const proteinTarget = macros.data?.protein_g ?? null
-  const dimCtx = useMemo(() => ({ calorieTarget, proteinTarget }), [calorieTarget, proteinTarget])
+  // Gate de ciclo: sin ciclo activo, la dimensión `ciclo` no entra a las
+  // notas ni a los conteos de la semana.
+  const cycleEnabled = useCycleEnabled()
+  const dimCtx = useMemo(
+    () => ({ calorieTarget, proteinTarget, cycleEnabled }),
+    [calorieTarget, proteinTarget, cycleEnabled],
+  )
   const hasRealData = (weekSignals?.length ?? 0) > 0
   const days = useMemo(
     () => buildWeekDaysReal(weekSignals ?? [], todayIdx, dimCtx),

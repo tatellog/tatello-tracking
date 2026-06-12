@@ -1,5 +1,15 @@
 import { type CycleSituation } from '@/features/profile/api'
 
+import {
+  ACTIVE_CYCLE_SITUATIONS as SHARED_ACTIVE_CYCLE_SITUATIONS,
+  isCycleActive,
+} from '../../supabase/functions/_shared/intelligence/cycle-gate'
+
+/** La regla de negocio de visibilidad del ciclo vive en la lib compartida
+ *  (cycle-gate.ts — el engine de Órbita y la Edge Function aplican la
+ *  misma). Re-exportada aquí tipada para la capa app. */
+export { isCycleActive }
+
 export type CyclePhase = 'menstrual' | 'folicular' | 'ovulatoria' | 'lutea'
 
 /** Visible phase labels in lenguaje de EXPERIENCIA — never the clinical
@@ -15,12 +25,9 @@ export const PHASE_LABEL: Record<CyclePhase, string> = {
 }
 
 // Cycle situations that have an active monthly cycle. Pregnant /
-// postmenopause / not-tracking have no phase.
-export const ACTIVE_CYCLE_SITUATIONS: readonly CycleSituation[] = [
-  'menstruates',
-  'contraception',
-  'irregular',
-]
+// postmenopause / not-tracking have no phase. Tipado para la capa app
+// sobre la lista canónica compartida.
+export const ACTIVE_CYCLE_SITUATIONS = SHARED_ACTIVE_CYCLE_SITUATIONS as readonly CycleSituation[]
 
 export const DEFAULT_CYCLE_LENGTH = 28
 const DAY_MS = 24 * 60 * 60 * 1000

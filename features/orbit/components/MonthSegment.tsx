@@ -12,6 +12,7 @@ import { EmText } from '@/components/EmText'
 import { useSeenMesTapHint } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
+import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useMacroTargets } from '@/features/macros/hooks'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
@@ -43,12 +44,16 @@ export function MonthSegment() {
   const { data: history } = useSignalsHistory(30)
   // Macro targets make `alimento` deficit-aware (see deriveDimensions).
   const macros = useMacroTargets()
+  // Gate de ciclo: sin ciclo activo, el resumen del mes no lista la fila
+  // CICLO (cinco dimensiones, no seis).
+  const cycleEnabled = useCycleEnabled()
   const dimCtx = useMemo(
     () => ({
       calorieTarget: macros.data?.calories ?? null,
       proteinTarget: macros.data?.protein_g ?? null,
+      cycleEnabled,
     }),
-    [macros.data?.calories, macros.data?.protein_g],
+    [macros.data?.calories, macros.data?.protein_g, cycleEnabled],
   )
 
   const signals = useMemo(() => history ?? [], [history])

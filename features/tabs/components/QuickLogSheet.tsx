@@ -28,10 +28,9 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
-import { ACTIVE_CYCLE_SITUATIONS } from '@/features/cycle/phase'
+import { isCycleActive } from '@/features/cycle/phase'
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
-import { type CycleSituation } from '@/features/profile/api'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
 import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
 import { igniteDimension } from '@/features/orbit/ignitionBus'
@@ -314,11 +313,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // an eventual action (~1×/month), so it lives at the bottom, away from
   // the daily strip.
   const { data: profile } = useProfile()
-  const cycleSituation = profile?.cycle_situation as CycleSituation | null | undefined
-  const cycleActive =
-    profile?.biological_sex !== 'male' &&
-    !!cycleSituation &&
-    ACTIVE_CYCLE_SITUATIONS.includes(cycleSituation)
+  const cycleActive = isCycleActive(profile?.biological_sex, profile?.cycle_situation)
   const { data: lastPeriod } = useLastPeriodStart()
   const recordPeriod = useRecordLastPeriodStart()
   // A period spans several days. Once marked, keep the chip in its "anotado /
