@@ -22,6 +22,7 @@ import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal, usePatternDetection } from '@/features/patterns'
+import { ReturnMoment } from '@/features/rewards'
 import { useMonthWorkoutDates, useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -38,6 +39,7 @@ import {
   StreakLine,
   TabHeader,
   TodayMealLog,
+  TodayUniverseRewards,
   WeekStrip,
   type WeekDayCell,
 } from '@/features/tabs/components'
@@ -328,6 +330,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
             </Animated.View>
 
+            {/* Capa 1 — momento de Regreso (3+ días fuera). Se anima y
+                despide solo; null en el uso diario. */}
+            <ReturnMoment today={ctx.date} />
+
             <Animated.View entering={enter(120)}>
               <DayCheckIn state={dayState} onChange={handleDayChange} />
             </Animated.View>
@@ -398,6 +404,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   </Text>
                 )
               })()}
+            </Animated.View>
+
+            {/* "Tu universo hoy" — capa de recompensa para los registros
+                que NO encienden estrellas (comida/agua/sueño/check-in).
+                Autónoma: sus re-renders no tocan la constelación. */}
+            <Animated.View entering={enter(470)}>
+              <TodayUniverseRewards ctx={ctx} date={ctx.date} restedToday={restedToday} />
             </Animated.View>
 
             <Animated.View entering={enter(520)}>

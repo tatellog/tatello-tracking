@@ -33,7 +33,6 @@ import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
 import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
-import { igniteDimension } from '@/features/orbit/ignitionBus'
 import { toWeightPoints } from '@/features/progress/logic'
 import { useSetWater, useWaterToday } from '@/features/water/hooks'
 import {
@@ -392,8 +391,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       ingredients: item.ingredients ?? undefined,
     })
     setConfirmingName(item.name)
-    // Celestial payoff — shows on the screen behind once the sheet closes.
-    igniteDimension('alimento')
+    // El payoff ("+N Energía" + vuelo hacia Leo) lo emite la detección
+    // de deltas de TodayUniverseRewards al subir el atributo.
     setTimeout(onClose, CONFIRM_HOLD_MS)
   }
 
@@ -401,6 +400,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     Haptics.selectionAsync().catch(() => {})
     setWaterTick((t) => t + 1)
     // Tap a droplet to fill up to it; tap the current top one to step back.
+    // Cada vaso paga "+N Claridad" vía la detección de deltas (acumula
+    // en el toast si tapeas seguido); un step-back no celebra.
     setWater.mutate(glasses === index + 1 ? index : index + 1)
   }
 
