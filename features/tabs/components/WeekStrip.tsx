@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors, typography } from '@/theme'
 
 // weekdayIdx is 0..6 (0=Sun). Wednesday is written "X" — the Spanish
@@ -84,7 +85,12 @@ function StarGlow() {
  *
  * Trained stars breathe (opacity + slight scale) on a slow loop so a
  * marked day reads as alive, matching the lit stars in the Hoy-tab
- * constellation. Per-index delay desynchronises the row. */
+ * constellation. Per-index delay desynchronises the row.
+ *
+ * GATED on `active`: Hoy stays mounted forever (detachInactiveScreens=
+ * false), so up to 7 ungated loops ticked off-tab and through every
+ * scroll. Inactive → ease each star to its breath midpoint (a natural
+ * lit rest); active → resume the identical desynced breath. */
 function DayStar({
   trained,
   isToday,
@@ -94,13 +100,19 @@ function DayStar({
   isToday: boolean
   index: number
 }) {
+  const active = useScreenActive()
   const fill = trained ? (isToday ? colors.magenta : colors.leche) : 'none'
   const stroke = trained ? 'none' : isToday ? colors.magenta : colors.niebla
 
-  const breath = useSharedValue(0)
+  const breath = useSharedValue(0.5)
   useEffect(() => {
     if (!trained) {
       breath.value = 0
+      return
+    }
+    if (!active) {
+      cancelAnimation(breath)
+      breath.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
       return
     }
     breath.value = withDelay(
@@ -108,7 +120,7 @@ function DayStar({
       withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true),
     )
     return () => cancelAnimation(breath)
-  }, [trained, index, breath])
+  }, [trained, index, breath, active])
 
   const animStyle = useAnimatedStyle(() => {
     if (!trained) return { opacity: 1, transform: [{ scale: 1 }] }

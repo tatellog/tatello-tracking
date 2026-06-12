@@ -18,6 +18,7 @@ import { PrimaryCta } from '@/components/PrimaryCta'
 import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { igniteDimension } from '@/features/orbit/ignitionBus'
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
 import { colors, typography } from '@/theme'
@@ -104,16 +105,25 @@ const TrailStar = memo(function TrailStar({
   glow: number
   isHead: boolean
 }) {
+  // Gated on screen-active: Comidas never unmounts (detachInactiveScreens=
+  // false), so the comet-head breath ticked forever off-tab. Inactive →
+  // settle at mid-breath; active → resume the identical loop.
+  const active = useScreenActive()
   const breath = useSharedValue(0)
   useEffect(() => {
     if (!isHead) return
+    if (!active) {
+      cancelAnimation(breath)
+      breath.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
+      return
+    }
     breath.value = withRepeat(
       withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     )
     return () => cancelAnimation(breath)
-  }, [isHead, breath])
+  }, [isHead, breath, active])
 
   const starStyle = useAnimatedStyle(() => ({
     opacity: (isHead ? 0.9 : glow) + breath.value * 0.1,
@@ -136,6 +146,9 @@ const TrailStar = memo(function TrailStar({
  * already typed, so progress tracks the two macro fields) and, once
  * the meal is valid, twinkles. A quiet promise of "sumar al cielo". */
 function StarPreview({ progress, valid }: { progress: number; valid: boolean }) {
+  // Gated on screen-active: a half-filled form left behind kept this
+  // twinkle looping off-tab forever. Inactive → settle at mid-twinkle.
+  const active = useScreenActive()
   const lit = useSharedValue(0)
   const tw = useSharedValue(0)
 
@@ -144,18 +157,21 @@ function StarPreview({ progress, valid }: { progress: number; valid: boolean }) 
   }, [progress, lit])
 
   useEffect(() => {
-    if (valid) {
+    if (valid && active) {
       tw.value = withRepeat(
         withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.sin) }),
         -1,
         true,
       )
+    } else if (valid) {
+      cancelAnimation(tw)
+      tw.value = withTiming(0.5, { duration: 300 })
     } else {
       cancelAnimation(tw)
       tw.value = withTiming(0, { duration: 300 })
     }
     return () => cancelAnimation(tw)
-  }, [valid, tw])
+  }, [valid, tw, active])
 
   const starStyle = useAnimatedStyle(() => ({
     opacity: 0.2 + lit.value * 0.52 + tw.value * 0.28,

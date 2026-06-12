@@ -30,6 +30,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 import { mealPhotoUrl, type Meal } from '@/features/macros/api'
 import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { SAMPLE_MEAL_PHOTOS } from '@/features/macros/sampleMealPhotos'
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors, typography } from '@/theme'
 
 const THUMB = 48
@@ -184,10 +185,18 @@ function TrashIcon({ color }: { color: string }) {
  * placeholder when it has none. The most recent meal — the comet
  * head — wears a glowing magenta ring and breathes. */
 function MealThumb({ photo, isRecent }: { photo: ImageSourcePropType | null; isRecent: boolean }) {
+  // Gated on screen-active: Hoy never unmounts, so the comet-head breath
+  // used to tick forever, even off-tab. Inactive → settle at mid-breath.
+  const active = useScreenActive()
   const breath = useSharedValue(0)
   useEffect(() => {
     if (!isRecent) {
       breath.value = 0
+      return
+    }
+    if (!active) {
+      cancelAnimation(breath)
+      breath.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
       return
     }
     breath.value = withRepeat(
@@ -196,7 +205,7 @@ function MealThumb({ photo, isRecent }: { photo: ImageSourcePropType | null; isR
       true,
     )
     return () => cancelAnimation(breath)
-  }, [isRecent, breath])
+  }, [isRecent, breath, active])
 
   const breathStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + breath.value * 0.05 }],
@@ -240,10 +249,17 @@ function PileCircle({
   first: boolean
   isRecent: boolean
 }) {
+  // Same screen-active gate as MealThumb — see comment there.
+  const active = useScreenActive()
   const breath = useSharedValue(0)
   useEffect(() => {
     if (!isRecent) {
       breath.value = 0
+      return
+    }
+    if (!active) {
+      cancelAnimation(breath)
+      breath.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
       return
     }
     breath.value = withRepeat(
@@ -252,7 +268,7 @@ function PileCircle({
       true,
     )
     return () => cancelAnimation(breath)
-  }, [isRecent, breath])
+  }, [isRecent, breath, active])
 
   const breathStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + breath.value * 0.05 }],

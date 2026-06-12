@@ -369,6 +369,9 @@ function AnimatedGem({
   mr?: number
   reduced: boolean
 }) {
+  // The idle wobble is gated on screen-active (the bubble can stay
+  // mounted while the user is on another tab — Órbita never unmounts).
+  const screenActive = useScreenActive()
   const birth = useSharedValue(reduced ? 1 : 0)
   const idle = useSharedValue(0)
   useEffect(() => {
@@ -377,7 +380,16 @@ function AnimatedGem({
       idle.value = 0
       return
     }
-    birth.value = withDelay(260, withTiming(1, { duration: 340, easing: SETTLE }))
+    // Solo armar el bloom una vez — si birth ya llegó a 1, re-dispararlo en
+    // cada flip de screenActive sería un timer no-op de ~600ms en UI thread.
+    if (birth.value !== 1) {
+      birth.value = withDelay(260, withTiming(1, { duration: 340, easing: SETTLE }))
+    }
+    if (!screenActive) {
+      cancelAnimation(idle)
+      idle.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
+      return () => cancelAnimation(birth)
+    }
     idle.value = withDelay(
       700,
       withRepeat(withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }), -1, true),
@@ -386,7 +398,7 @@ function AnimatedGem({
       cancelAnimation(birth)
       cancelAnimation(idle)
     }
-  }, [reduced, birth, idle])
+  }, [reduced, birth, idle, screenActive])
   const gemStyle = useAnimatedStyle(() => {
     const bloom = interpolate(birth.value, [0, 0.6, 1], [0, 1.25, 1])
     const rot =
@@ -433,9 +445,18 @@ function AnimatedGem({
  * pause, so it reads as an occasional glint, never a loop. Clipped to the
  * rounded pane by the glass's overflow:hidden. */
 function GlassSheen({ reduced }: { reduced: boolean }) {
+  // Gated on screen-active — the sweep parks at 0 (invisible: the sheen's
+  // opacity is sin(x·π), so x=0 → fully transparent) and resumes off the
+  // same 7 s cadence when the tab is looked at again.
+  const screenActive = useScreenActive()
   const x = useSharedValue(0)
   useEffect(() => {
     if (reduced) return
+    if (!screenActive) {
+      cancelAnimation(x)
+      x.value = 0
+      return
+    }
     x.value = withDelay(
       900,
       withRepeat(
@@ -449,7 +470,7 @@ function GlassSheen({ reduced }: { reduced: boolean }) {
       ),
     )
     return () => cancelAnimation(x)
-  }, [reduced, x])
+  }, [reduced, x, screenActive])
   const style = useAnimatedStyle(() => {
     const tx = interpolate(x.value, [0, 1], [-BUBBLE_W * 0.7, BUBBLE_W * 1.1])
     const op = Math.sin(Math.min(1, x.value) * Math.PI)

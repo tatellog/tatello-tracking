@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
@@ -12,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle } from 'react-native-svg'
 
+import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors } from '@/theme'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
@@ -52,14 +54,23 @@ export function MacroRing({
     )
   }, [progress, pct, delay])
 
+  // Also gated on screen-active: Hoy never unmounts, so this loop used to
+  // pulse forever (off-tab and mid-scroll). Inactive → settle at mid-glow.
+  const screenActive = useScreenActive()
   useEffect(() => {
     if (reduce) return
+    if (!screenActive) {
+      cancelAnimation(glow)
+      glow.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
+      return
+    }
     glow.value = withRepeat(
       withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     )
-  }, [glow, reduce])
+    return () => cancelAnimation(glow)
+  }, [glow, reduce, screenActive])
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDasharray: [c * progress.value, c],
