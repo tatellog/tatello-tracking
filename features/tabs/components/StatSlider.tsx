@@ -16,8 +16,10 @@ import Animated, {
   FadeIn,
   FadeInDown,
   interpolate,
+  runOnJS,
   type SharedValue,
   useAnimatedProps,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useReducedMotion,
@@ -95,6 +97,25 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const scrollHandler = useAnimatedScrollHandler((e) => {
     scrollX.value = e.contentOffset.x
   })
+
+  // LIVE page index — flips the moment the drag crosses a page midpoint,
+  // not when the momentum dies. The old flow updated `active` only in
+  // onMomentumScrollEnd, so the title + dots lagged ~half a second behind
+  // the finger — that lag is what read as "the slider is slow". A
+  // selection haptic on each flip gives the page-turn a physical click.
+  const livePageChange = (idx: number) => {
+    if (idx < 0) return
+    Haptics.selectionAsync().catch(() => {})
+    setActive(idx)
+  }
+  useAnimatedReaction(
+    () => (width > 0 ? Math.round(scrollX.value / width) : 0),
+    (idx, prev) => {
+      if (prev === null || idx === prev) return
+      runOnJS(livePageChange)(idx)
+    },
+    [width],
+  )
 
   // AUTO-PEEK — once the carousel has measured its width, do a
   // short scripted scrollTo(34) → scrollTo(0) over ~1 s so the user
@@ -195,7 +216,16 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
         <Animated.ScrollView
           ref={scrollRef}
           horizontal
-          pagingEnabled
+          // snapToInterval + decelerationRate="fast" en lugar de
+          // pagingEnabled: el paging nativo deja correr el momentum y la
+          // página "flota" antes de asentarse (sobre todo en Android).
+          // Con esto cada flick avanza exactamente una página y asienta
+          // de inmediato — el gesto se siente directo, no perezoso.
+          snapToInterval={width}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          overScrollMode="never"
           showsHorizontalScrollIndicator={false}
           onScrollBeginDrag={() => onSwipeStateChange?.(true)}
           onScrollEndDrag={() => onSwipeStateChange?.(false)}
@@ -217,8 +247,14 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
           has paged at least once (active > 0 at some point); after
           that the hint hides permanently for this session. The hint
           itself is a bouncing `›` to the right of the dots — discreet
-          but clear that there's more content to the side. */}
-      <Dots count={slides.length} active={safeActive} showHint={active === 0} />
+          but clear that there's more content to the side. Each dot is
+          tappable como atajo directo a su slide. */}
+      <Dots
+        count={slides.length}
+        active={safeActive}
+        showHint={active === 0}
+        onDotPress={(i) => scrollRef.current?.scrollTo({ x: i * width, animated: true })}
+      />
     </View>
   )
 }
@@ -896,6 +932,7 @@ function Dots({
   count,
   active,
   showHint,
+  onDotPress,
 }: {
   count: number
   active: number
@@ -903,11 +940,21 @@ function Dots({
    *  as a "swipe more" affordance. Hidden once the user has paged
    *  past the first slide. */
   showHint: boolean
+  /** Tap-to-jump: cada dot scrollea directo a su slide. */
+  onDotPress: (index: number) => void
 }) {
   return (
     <View style={styles.dots}>
       {Array.from({ length: count }).map((_, i) => (
-        <Dot key={i} on={i === active} />
+        <Pressable
+          key={i}
+          hitSlop={10}
+          onPress={() => onDotPress(i)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ir a la tarjeta ${i + 1} de ${count}`}
+        >
+          <Dot on={i === active} />
+        </Pressable>
       ))}
       {showHint ? <SwipeHint /> : null}
     </View>
