@@ -100,8 +100,11 @@ export function useWeeklyMealStats(): {
   const mealsQuery = useQuery({
     queryKey: queryKeys.macros.weeklyStats(today),
     queryFn: () => getMealsInRange(start, today),
+    // No refetchOnMount:'always' — tabs never unmount, so it only fired on
+    // cold start where the persisted cache is either fresh (<5 min, no
+    // refetch needed) or day-keyed stale (new key → fetches anyway). Meal
+    // mutations invalidate this key, which is the real freshness path.
     staleTime: 5 * 60_000,
-    refetchOnMount: 'always',
   })
 
   const proteinTarget = targetsQuery.data?.protein_g ?? null
@@ -142,8 +145,9 @@ export function useNourishmentConsistency(): {
     queryKey: queryKeys.macros.nourishment(today),
     // Thin projection — only meal_date + protein_g (no heavy jsonb).
     queryFn: () => getMealMacrosInRange(start, today),
+    // Same as weeklyStats above: 'always' was redundant (day-keyed key +
+    // mutation invalidation) and cost an extra request per cold start.
     staleTime: 5 * 60_000,
-    refetchOnMount: 'always',
   })
   const waterQuery = useQuery({
     queryKey: queryKeys.water.range(start, today),

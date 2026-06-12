@@ -44,15 +44,18 @@ export function useMeasurements(rangeDays: number | null, enabled = true) {
 
 /*
  * Lectura: useBeforeAfterPhotos — el par antes/ahora (frontal) para la
- * página de Progreso. Refresca al volver al tab + al recuperar foco
- * para que una foto recién subida desde otra surface (onboarding /
- * settings) aparezca sin esperar el invalidate.
+ * página de Progreso. Una foto recién subida desde otra surface
+ * (onboarding / settings) aparece vía el invalidate de useTakePhoto;
+ * el foco de la app cubre el caso de volver desde background.
  */
 export function useBeforeAfterPhotos() {
   return useQuery({
     queryKey: queryKeys.photos.beforeAfter(),
     queryFn: getBeforeAfterPhotos,
-    refetchOnMount: 'always',
+    // No refetchOnMount:'always' — tabs never unmount, so it only fired on
+    // cold start. In-app uploads (useTakePhoto) invalidate photos.all with
+    // refetchType:'all', which is what actually makes a fresh photo appear.
+    // refetchOnWindowFocus covers the app-foreground case.
     refetchOnWindowFocus: true,
     staleTime: 30_000,
   })
