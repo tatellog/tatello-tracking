@@ -49,7 +49,7 @@ import { SkiaFigure } from './rendering/skia-figure/skia-figure'
 import { AnticipationCrown, CenterNumberOverlay, CompletionRings } from './rendering/overlay'
 import { CanvasSkeleton } from './rendering/skeleton'
 import { AmbientGlow, SvgGradients } from './rendering/static'
-import { RevealedLeoEmblem } from './RevealedLeoEmblem'
+import { RevealedEmblem } from './RevealedEmblem'
 import type { Props, Resolved, SequenceEl } from './types'
 
 // FASE 3 (en progreso): render de la FIGURA en Skia en vez de react-native-svg.
@@ -74,6 +74,7 @@ export function LunarConstellation({
   showCount = true,
   suppressBurst = false,
   pausedSV,
+  transformProgressOverride,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -157,7 +158,19 @@ export function LunarConstellation({
   const hasEmblem = sign === 'leo'
   const emblem = useTransformProgress()
   const [mockStep, setMockStep] = useState<number | null>(null)
-  const transformProgress = mockStep == null ? emblem.progress : (TRANSFORM_STEPS[mockStep] ?? 0)
+  // Prioridad: override DEV (catálogo de estados) > chip DEV > dato real.
+  const transformProgress =
+    transformProgressOverride != null
+      ? transformProgressOverride
+      : mockStep == null
+        ? emblem.progress
+        : (TRANSFORM_STEPS[mockStep] ?? 0)
+
+  // Mientras el emblema se está REVELANDO (bajo %), la constelación se
+  // atenúa un poco para que el león dorado respire — comparten el mismo
+  // centro y las estrellas blancas le ganaban la atención. Vuelve a pleno
+  // al ~55 %. Solo aplica donde hay emblema (Leo hoy); resto = 1.
+  const emblemDim = hasEmblem ? 0.6 + 0.4 * Math.min(1, transformProgress / 55) : 1
 
   // Apply SIGN_CONSTELLATION_TRANSFORM in JS so the Skia overlay (which
   // can't read the SVG <G transform="...">) can position each star at
@@ -251,15 +264,16 @@ export function LunarConstellation({
             />
           </Animated.View>
         )}
-        {/* Emblema Celeste (leo-2.svg): capa de TRANSFORMACIÓN, el ÚNICO
-            arte de fondo en Leo. Sistema independiente: la constelación
-            de arriba sigue respondiendo SOLO a "Entrené"; el emblema, a
-            los hábitos acumulados. El reveal materializa una capa
-            anatómica por etapa (marco → jardín → cabeza → melena) y es
-            DISCRETO: dentro de una etapa nada se mueve; cruzarla anima
-            la entrada de la capa nueva. Z-order: bajo el <Svg> de la
-            figura — la viñeta + edge-fade lo oscurecen igual que al PNG. */}
-        {hasEmblem ? <RevealedLeoEmblem transformProgress={transformProgress} /> : null}
+        {/* Emblema Celeste: capa de TRANSFORMACIÓN, el ÚNICO arte de
+            fondo en Leo. Sistema independiente: la constelación de arriba
+            sigue respondiendo SOLO a "Entrené"; el emblema, a los hábitos
+            acumulados. Arte RASTER (arch.png + <sign>-c.png) revelado por
+            luminancia: se "va formando" con el progreso. Z-order: bajo el
+            <Svg> de la figura — la viñeta + edge-fade lo oscurecen igual
+            que al PNG. */}
+        {hasEmblem ? (
+          <RevealedEmblem sign={sign} transformProgress={transformProgress} size={canvasPx} />
+        ) : null}
         {/* Skeleton wrapped in Animated.View with `exiting` so it
             stays alive (fading out over 320 ms) while the real Svg
             below fades in (260 ms). Their opacities overlap — the
@@ -344,7 +358,7 @@ export function LunarConstellation({
               translate(69, 57) brings the result back centred on
               the lion's body at canvas (174, 144). */}
               {USE_SKIA_FIGURE ? null : (
-                <G transform={signTransform}>
+                <G transform={signTransform} opacity={emblemDim}>
                   {litCluster ? (
                     <>
                       <LitClusterAura
@@ -452,7 +466,12 @@ export function LunarConstellation({
                 stays the crisp anchor; this layer just adds the lens
                 halo SVG can't fake (BlurMask, blendMode=screen/plus). */}
             {canvasPx > 0 ? (
-              <SkiaLitFlareLayer lit={skiaLit} breathT={breathT} reduce={reduceMotion} />
+              <SkiaLitFlareLayer
+                lit={skiaLit}
+                breathT={breathT}
+                reduce={reduceMotion}
+                opacity={emblemDim}
+              />
             ) : null}
             {/* Lottie one-shot — the same gold-fireworks the Home commit
                 reward uses, but SCOPED to the igniting star instead of

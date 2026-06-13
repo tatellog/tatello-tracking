@@ -52,6 +52,10 @@ export type Props = {
    *  a frame → "el emblema brinca". The SharedValue keeps the prop reference
    *  stable (no re-render) and the loops pause/resume on the UI thread. */
   pausedSV?: SharedValue<number>
+  /** DEV-only: fuerza el progreso del Emblema Celeste (0–100), ignorando
+   *  el dato real y el chip DEV. Lo usa el catálogo de estados de Leo
+   *  (/dev-emblem-stages) para renderizar el reveal a un % exacto. */
+  transformProgressOverride?: number
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

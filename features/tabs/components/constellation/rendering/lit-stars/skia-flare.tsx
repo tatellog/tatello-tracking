@@ -53,25 +53,31 @@ export const SkiaLitFlareLayer = memo(function SkiaLitFlareLayer({
   lit,
   breathT,
   reduce,
+  opacity = 1,
 }: {
   lit: SkiaLit[]
   breathT: SharedValue<number>
   reduce: boolean
+  /** Atenúa los halos (1 = pleno). El hero lo baja mientras el emblema
+   *  se revela, para que el león dorado no compita con el bloom magenta. */
+  opacity?: number
 }) {
   if (lit.length === 0) return null
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-      {lit.map((s, i) => (
-        <SkiaFlareNode
-          key={`flare-${i}`}
-          x={s.x}
-          y={s.y}
-          mag={s.mag}
-          breathT={breathT}
-          phase={(i * 0.21) % 1}
-          reduce={reduce}
-        />
-      ))}
+      <SkiaGroup opacity={opacity}>
+        {lit.map((s, i) => (
+          <SkiaFlareNode
+            key={`flare-${i}`}
+            x={s.x}
+            y={s.y}
+            mag={s.mag}
+            breathT={breathT}
+            phase={(i * 0.21) % 1}
+            reduce={reduce}
+          />
+        ))}
+      </SkiaGroup>
     </Canvas>
   )
 })

@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { DevBackButton } from '@/components/DevBackButton'
 import { LunarConstellation, SkyBackground } from '@/features/tabs/components'
 import { ZODIAC } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -50,6 +51,7 @@ export default function DevConstellationsScreen() {
     <View style={styles.screen}>
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top']}>
+        <DevBackButton />
         <View style={styles.header}>
           <Text style={styles.title}>Test · todas las constelaciones</Text>
           <Text style={styles.subtitle}>28/28 cada signo</Text>
