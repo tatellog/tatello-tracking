@@ -416,6 +416,18 @@ describe('calculateTodayUniverseRewards — estructura y orden', () => {
     expect(result.map((a) => a.key)).toEqual(['energia', 'claridad', 'estabilidad', 'brillo'])
     expect(result.map((a) => a.label)).toEqual(['Energía', 'Claridad', 'Estabilidad', 'Brillo'])
   })
+
+  it('solo Brillo es gesto (encendido/en calma); el resto es esfuerzo proporcional', () => {
+    const byKey = Object.fromEntries(
+      calculateTodayUniverseRewards(base).map((a) => [a.key, a.kind]),
+    )
+    expect(byKey).toEqual({
+      energia: 'progress',
+      claridad: 'progress',
+      estabilidad: 'progress',
+      brillo: 'gesture',
+    })
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -430,8 +442,11 @@ describe('detailForAttribute', () => {
       proteinTarget: 135,
       mealCount: 3,
     })
+    // El hecho primero ("X g hoy"), el objetivo como referencia secundaria
+    // — nunca "X de Y", que enmarca déficit / countdown.
     expect(d.lines).toEqual([
-      { label: 'Proteína', value: '87 g de 135 g' },
+      { label: 'Proteína', value: '87 g hoy' },
+      { label: 'Tu objetivo', value: '135 g' },
       { label: 'Comidas', value: '3 registradas' },
     ])
   })
@@ -443,17 +458,20 @@ describe('detailForAttribute', () => {
       proteinTarget: 135,
       mealCount: 1,
     })
-    expect(d.lines[1]).toEqual({ label: 'Comidas', value: '1 registrada' })
+    expect(d.lines[2]).toEqual({ label: 'Comidas', value: '1 registrada' })
   })
 
-  it('energia sin objetivo: comidas de 3', () => {
+  it('energia sin objetivo: solo comidas registradas, sin "de 3"', () => {
     const d = detailForAttribute('energia', { ...base, mealCount: 2 })
-    expect(d.lines).toEqual([{ label: 'Comidas', value: '2 de 3' }])
+    expect(d.lines).toEqual([{ label: 'Comidas', value: '2 registradas' }])
   })
 
-  it('claridad: vasos contra la meta', () => {
+  it('claridad: vasos hoy + meta secundaria, sin "de"', () => {
     const d = detailForAttribute('claridad', { ...base, waterGlasses: 6, waterGoalGlasses: 8 })
-    expect(d.lines).toEqual([{ label: 'Vasos', value: '6 de 8' }])
+    expect(d.lines).toEqual([
+      { label: 'Vasos', value: '6 hoy' },
+      { label: 'Tu meta', value: '8' },
+    ])
   })
 
   it('estabilidad con sueño: horas y minutos', () => {

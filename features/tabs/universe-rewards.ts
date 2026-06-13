@@ -42,6 +42,14 @@ export type UniverseAttribute = {
   state: UniverseState
   /** La línea bajo la barra — voz cálida, nunca de juicio. */
   microcopy: string
+  /** Cómo se LEE el atributo, no solo cómo se calcula:
+   *   · 'progress' — esfuerzo gradual y proporcional (proteína, agua,
+   *     sueño). El astro orbita y la órbita se va llenando.
+   *   · 'gesture'  — un acto, no una barra a llenar (escucharte = el
+   *     check-in). Encendido / en calma; sin arco proporcional, para no
+   *     ponerlo a competir en la misma métrica que un esfuerzo continuo
+   *     (un tap no debe leerse "igual de difícil" que 135 g de proteína). */
+  kind: 'progress' | 'gesture'
 }
 
 export type UniverseInput = {
@@ -124,7 +132,7 @@ function energia(input: UniverseInput): UniverseAttribute {
       microcopy = `${missing} g y tu Energía llega.`
     }
   }
-  return { key: 'energia', label: ATTRIBUTE_LABEL.energia, pct, state, microcopy }
+  return { key: 'energia', label: ATTRIBUTE_LABEL.energia, pct, state, microcopy, kind: 'progress' }
 }
 
 /* ── Claridad ← agua ──────────────────────────────────────────────── */
@@ -139,7 +147,14 @@ function claridad(input: UniverseInput): UniverseAttribute {
     // "se alinea" y repetirlo leía doble (voice-and-copy).
     microcopy = missing === 1 ? 'Un vaso y llega.' : `${missing} vasos y llega.`
   }
-  return { key: 'claridad', label: ATTRIBUTE_LABEL.claridad, pct, state, microcopy }
+  return {
+    key: 'claridad',
+    label: ATTRIBUTE_LABEL.claridad,
+    pct,
+    state,
+    microcopy,
+    kind: 'progress',
+  }
 }
 
 /* ── Estabilidad ← sueño (+ descanso) ─────────────────────────────── */
@@ -162,6 +177,7 @@ function estabilidad(input: UniverseInput): UniverseAttribute {
     pct,
     state,
     microcopy: STATE_COPY[state],
+    kind: 'progress',
   }
 }
 
@@ -174,7 +190,14 @@ function brillo(input: UniverseInput): UniverseAttribute {
   // energía, que es la señal que más alimenta el motor de patrones.
   const pct = input.energy != null ? 100 : input.hasWellbeingSignal ? 70 : 0
   const state = stateForPct(pct)
-  return { key: 'brillo', label: ATTRIBUTE_LABEL.brillo, pct, state, microcopy: STATE_COPY[state] }
+  return {
+    key: 'brillo',
+    label: ATTRIBUTE_LABEL.brillo,
+    pct,
+    state,
+    microcopy: STATE_COPY[state],
+    kind: 'gesture',
+  }
 }
 
 /** Los cuatro atributos del universo de hoy, en orden de render. */
@@ -218,24 +241,28 @@ export function detailForAttribute(
   const essence = ESSENCE[key]
   switch (key) {
     case 'energia': {
+      // El hecho primero ("X g hoy"), el objetivo como referencia
+      // secundaria — nunca "X de Y", que enmarca déficit / countdown.
+      const meals = (n: number) => (n === 1 ? '1 registrada' : `${n} registradas`)
       const lines: UniverseDetailLine[] =
         input.proteinTarget && input.proteinTarget > 0
           ? [
-              {
-                label: 'Proteína',
-                value: `${Math.round(input.proteinG)} g de ${Math.round(input.proteinTarget)} g`,
-              },
-              {
-                label: 'Comidas',
-                value: input.mealCount === 1 ? '1 registrada' : `${input.mealCount} registradas`,
-              },
+              { label: 'Proteína', value: `${Math.round(input.proteinG)} g hoy` },
+              { label: 'Tu objetivo', value: `${Math.round(input.proteinTarget)} g` },
+              { label: 'Comidas', value: meals(input.mealCount) },
             ]
-          : [{ label: 'Comidas', value: `${input.mealCount} de 3` }]
+          : [{ label: 'Comidas', value: meals(input.mealCount) }]
       return { essence, lines }
     }
     case 'claridad': {
       const goal = Math.max(1, input.waterGoalGlasses)
-      return { essence, lines: [{ label: 'Vasos', value: `${input.waterGlasses} de ${goal}` }] }
+      return {
+        essence,
+        lines: [
+          { label: 'Vasos', value: `${input.waterGlasses} hoy` },
+          { label: 'Tu meta', value: `${goal}` },
+        ],
+      }
     }
     case 'estabilidad': {
       const lines: UniverseDetailLine[] = [

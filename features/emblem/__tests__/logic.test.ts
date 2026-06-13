@@ -1,4 +1,5 @@
 import {
+  dailyCoachLine,
   EMBLEM_STAGES,
   stageForProgress,
   stageIndexForProgress,
@@ -6,6 +7,8 @@ import {
   TRANSFORM_WEIGHTS,
   transformProgressForPoints,
 } from '../logic'
+
+const FORBIDDEN = /falta|debes|deberías|atrás|incompleto|atracón|trastorno/i
 
 describe('TRANSFORM_WEIGHTS', () => {
   it('un día perfecto suma 30 puntos', () => {
@@ -94,10 +97,39 @@ describe('stageForProgress', () => {
     }
   })
 
-  it('ningún mensaje castiga ni usa lenguaje clínico', () => {
+  it('ningún mensaje ni línea del pool castiga ni usa lenguaje clínico', () => {
     for (const s of EMBLEM_STAGES) {
-      expect(s.message).not.toMatch(/falta|debes|deberías|atrás|incompleto|atracón|trastorno/i)
+      expect(s.message).not.toMatch(FORBIDDEN)
+      for (const line of s.lines) expect(line).not.toMatch(FORBIDDEN)
     }
+  })
+
+  it('la canónica (message) es la primera del pool', () => {
+    for (const s of EMBLEM_STAGES) expect(s.lines[0]).toBe(s.message)
+  })
+})
+
+describe('dailyCoachLine', () => {
+  it('siempre devuelve una línea del pool de la etapa vigente', () => {
+    for (let seed = 0; seed < 10; seed++) {
+      const line = dailyCoachLine(60, seed) // "revela"
+      expect(stageForProgress(60).lines).toContain(line)
+    }
+  })
+
+  it('es determinista por día: misma semilla → misma línea', () => {
+    expect(dailyCoachLine(40, 12345)).toBe(dailyCoachLine(40, 12345))
+  })
+
+  it('rota dentro de la etapa: días consecutivos no repiten en un pool de 3', () => {
+    const a = dailyCoachLine(40, 0)
+    const b = dailyCoachLine(40, 1)
+    expect(a).not.toBe(b)
+  })
+
+  it('semilla no finita o negativa cae a una línea válida, sin reventar', () => {
+    expect(stageForProgress(40).lines).toContain(dailyCoachLine(40, NaN))
+    expect(stageForProgress(40).lines).toContain(dailyCoachLine(40, -7))
   })
 })
 

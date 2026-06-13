@@ -1,6 +1,8 @@
 export { fetchTransformPoints } from './api'
+export { TransformationCard } from './components/TransformationCard'
 export { useTransformProgress } from './hooks'
 export {
+  dailyCoachLine,
   EMBLEM_STAGES,
   stageForProgress,
   stageIndexForProgress,

@@ -11,9 +11,11 @@
  *   constelación pero revela el emblema solo moderadamente; un mes de
  *   hábitos completos lo revela más. Intencional.
  *
- * Los PUNTOS son internos — la usuaria jamás ve un número, ve etapas:
- * algo apareció, algo cambió, algo se reveló. La transformación se
- * siente visual, no matemática (por eso etapas discretas, no %).
+ * Los PUNTOS son internos — la usuaria nunca ve puntos. SÍ ve el
+ * porcentaje de reveal y la etapa (decisión 2026-06-12: la tarjeta
+ * "Tu transformación" los muestra para que el sistema sea legible).
+ * El % solo crece — nunca castiga — y el emblema sigue revelándose
+ * por etapas discretas: la transformación se siente visual.
  *
  * El total viene de fn_transform_points (Postgres, retroactivo sobre
  * daily_signals). Aquí solo se mapea puntos → progreso → etapa.
@@ -43,8 +45,13 @@ export type EmblemStageKey = 'despierta' | 'forma' | 'revela' | 'casi' | 'comple
 export type EmblemStage = {
   key: EmblemStageKey
   label: string
-  /** Voz del coach — observa la transformación, nunca exige. */
+  /** Voz del coach — observa la transformación, nunca exige. Es la
+   *  línea CANÓNICA de la etapa (= lines[0]); úsala para a11y/fallback. */
   message: string
+  /** Pool de la etapa: una etapa puede durar ~2 semanas, así que la voz
+   *  rota día a día para no repetir la misma frase. Todas en positivo,
+   *  todas observan — nunca exigen, nunca culpan. */
+  lines: readonly [string, ...string[]]
   /** Progreso (0–100) desde el que esta etapa aplica. */
   minPct: number
 }
@@ -60,30 +67,54 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
     key: 'despierta',
     label: 'Despierta',
     message: 'Tu Leo está despertando.',
+    lines: [
+      'Tu Leo está despertando.',
+      'Algo tuyo empieza a encenderse.',
+      'Cada cuidado deja una luz.',
+    ],
     minPct: 0, // anillo + glifo + estrellas, en brasa
   },
   {
     key: 'forma',
     label: 'Toma forma',
     message: 'Tu Leo empieza a tomar forma.',
+    lines: [
+      'Tu Leo empieza a tomar forma.',
+      'Lo que repites te está dando forma.',
+      'Día a día, algo se dibuja.',
+    ],
     minPct: 26, // + luna y ramas · + la cabeza del león
   },
   {
     key: 'revela',
     label: 'Se revela',
-    message: 'Tu disciplina revela quién eres.',
+    message: 'Lo que haces cada día te está revelando.',
+    lines: [
+      'Lo que haces cada día te está revelando.',
+      'Tu Leo se reconoce más.',
+      'Lo que sostienes, se nota.',
+    ],
     minPct: 51, // + melena — el león entero, el momento "ah"
   },
   {
     key: 'casi',
     label: 'Casi completo',
     message: 'Tu Leo ya puede verse.',
+    lines: [
+      'Tu Leo ya puede verse.',
+      'Casi entero, y es tuyo.',
+      'Lo que construiste casi resplandece.',
+    ],
     minPct: 76, // todo gana presencia, el glow despierta
   },
   {
     key: 'completo',
     label: 'Completo',
     message: 'Tu Leo está completo. Has despertado algo propio.',
+    lines: [
+      'Tu Leo está completo. Has despertado algo propio.',
+      'Completo — y nada de esto se reinicia.',
+    ],
     minPct: 100, // oro pleno + halo
   },
 ] as const
@@ -104,6 +135,20 @@ export function stageForProgress(progress: number): EmblemStage {
     if (pct >= stage.minPct) current = stage
   }
   return current
+}
+
+/** La línea del coach para HOY: ancla en la etapa vigente (la identidad
+ *  estable) y rota dentro del pool de esa etapa según el día. Determinista
+ *  por día — la misma todo el día, distinta mañana — para que una etapa
+ *  larga (~2 semanas) no muestre la frase idéntica día tras día. `daySeed`
+ *  es cualquier entero estable-por-día (p. ej. días desde epoch). Sin
+ *  etapa válida (progress 0) cae a la canónica de "despierta". */
+export function dailyCoachLine(progress: number, daySeed: number): string {
+  const stage = stageForProgress(progress)
+  const pool = stage.lines
+  if (!Number.isFinite(daySeed)) return pool[0]
+  const i = ((Math.trunc(daySeed) % pool.length) + pool.length) % pool.length
+  return pool[i] ?? pool[0]
 }
 
 /** Progreso → índice DISCRETO de etapa para la capa visual:

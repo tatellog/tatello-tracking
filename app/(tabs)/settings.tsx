@@ -17,6 +17,7 @@ import { avatarUrl } from '@/features/profile/api'
 import { useDeleteAccount, useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
+import { GLASS_ML, mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
@@ -413,6 +414,7 @@ function SettingsBody() {
               }
               last
             />
+            <WaterRitualCard />
           </Animated.View>
 
           {/* ── Cómo te lee Stelar — one line naming what the intelligence
@@ -551,6 +553,62 @@ function SettingsBody() {
             ) : null}
             {profile?.is_dev ? (
               <Pressable
+                onPress={() => router.push('/dev-emblem-stages')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV — Leo: todos los estados
+                </Text>
+              </Pressable>
+            ) : null}
+            {profile?.is_dev ? (
+              <Pressable
+                onPress={() => router.push('/dev-rewards')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV — sistema de recompensas
+                </Text>
+              </Pressable>
+            ) : null}
+            {profile?.is_dev ? (
+              <Pressable
                 onPress={() => router.push('/refactor-test')}
                 accessibilityRole="button"
                 style={{
@@ -586,6 +644,56 @@ function SettingsBody() {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+    </View>
+  )
+}
+
+/* "Tu ritual de agua" — la palanca de cuánta agua tomar al día, aquí
+ * donde la usuaria busca configurar (el QuickLog es donde BEBE). Presets
+ * en litros (un tap), con el conteo de vasos al lado para cerrar el loop
+ * con cómo se bebe (vasos de 250 ml). Local-first vía useWaterGoal; el
+ * stepper del QuickLog cubre los valores fuera de los presets. "Ritual",
+ * no "meta": el agua es contexto, no un objetivo que se persigue. */
+const WATER_PRESETS_ML = [1500, 2000, 2500, 3000] as const
+
+function WaterRitualCard() {
+  const { goalMl, updateGoal } = useWaterGoal()
+  const glasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+  return (
+    <View style={styles.waterCard}>
+      <View style={styles.waterHead}>
+        <Text style={styles.metaLabel}>Tu ritual de agua</Text>
+        <Text style={styles.waterValue}>
+          {mlToLitresLabel(goalMl)} L · {glasses} vasos al día
+        </Text>
+      </View>
+      <View style={styles.waterPresets}>
+        {WATER_PRESETS_ML.map((ml) => {
+          const active = goalMl === ml
+          return (
+            <Pressable
+              key={ml}
+              onPress={() => {
+                if (active) return
+                Haptics.selectionAsync().catch(() => {})
+                updateGoal(ml)
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${mlToLitresLabel(ml)} litros al día`}
+              style={({ pressed }) => [
+                styles.waterChip,
+                active && styles.waterChipActive,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <Text style={[styles.waterChipText, active && styles.waterChipTextActive]}>
+                {mlToLitresLabel(ml)} L
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
     </View>
   )
 }
@@ -935,6 +1043,52 @@ const styles = StyleSheet.create({
   // Whole-card press feedback — used by every tappable surface.
   rowPressed: {
     opacity: 0.6,
+  },
+  // ── Tu ritual de agua ──────────────────────────────────────────
+  waterCard: {
+    marginTop: 10,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+  },
+  waterHead: {
+    marginBottom: 14,
+  },
+  waterValue: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+    marginTop: 4,
+  },
+  waterPresets: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  waterChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard2,
+  },
+  waterChipActive: {
+    borderColor: colors.magentaGlow,
+    backgroundColor: colors.magentaTint,
+  },
+  waterChipText: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: -0.2,
+  },
+  waterChipTextActive: {
+    color: colors.magenta,
   },
   metaMain: {
     flex: 1,

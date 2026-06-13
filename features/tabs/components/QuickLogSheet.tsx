@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Dimensions,
+  type GestureResponderEvent,
   Modal,
   Pressable,
   ScrollView,
@@ -47,7 +48,9 @@ import { showActionSheet } from '@/lib/actionSheet'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
+import { IgnitionBurst, IGNITION_LIFETIME_MS } from './IgnitionBurst'
 import { MealCard } from './MealCard'
+import { UniverseDeltaToast } from './UniverseDeltaToast'
 import { WeightWheel } from './WeightWheel'
 
 type MealType = MealInput['meal_type']
@@ -129,7 +132,7 @@ function WaterGlass({
 }: {
   filled: boolean
   size?: number
-  onPress: () => void
+  onPress: (e: GestureResponderEvent) => void
   accessibilityLabel?: string
   /** Bumped by the parent on each tap. The pop fires only on a tap-driven
    *  fill — never when the day's count loads from the server on open. */
@@ -180,12 +183,38 @@ function WaterGlass({
 }
 
 const SCREEN_W = Dimensions.get('window').width
+const SCREEN_H = Dimensions.get('window').height
 
-/* A faint, STATIC celestial field behind the top of the sheet — a soft
- * warm gradient + a few oro/leche stars, so the sheet reads as part of
- * the observatory, not a flat card. Top band only (never over the
- * tappable content), no animation, pointer-transparent. */
-function SheetSky() {
+/* A faint celestial field behind the top of the sheet — a soft warm
+ * gradient + a few oro/leche stars, so the sheet reads as part of the
+ * observatory, not a flat card. Top band only (never over the tappable
+ * content), pointer-transparent.
+ *
+ * `pulseKey` cierra el loop del registro: cuando una chispa del
+ * IgnitionBurst "llega" al cielo (el padre bumpea la key ~480 ms tras el
+ * tap), una estrella RESPIRA una vez — "tu registro alimentó tu cielo".
+ * El pulso vive en un Animated.View plano SOBRE el <Svg> estático: nunca
+ * animamos dentro del SVG (lección MacroRing / scroll-swim en Android). */
+function SheetSky({ pulseKey = 0 }: { pulseKey?: number }) {
+  const reduce = useReducedMotion() ?? false
+  const pulse = useSharedValue(0)
+  const mounted = useRef(false)
+  useEffect(() => {
+    // No pulses on mount — solo cuando llega una chispa (key cambia).
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    if (reduce) return
+    pulse.value = withSequence(
+      withTiming(1, { duration: 340, easing: Easing.out(Easing.quad) }),
+      withTiming(0, { duration: 720, easing: Easing.inOut(Easing.sin) }),
+    )
+  }, [pulseKey, reduce, pulse])
+  const pulseStar = useAnimatedStyle(() => ({
+    opacity: 0.15 + pulse.value * 0.7,
+    transform: [{ scale: 1 + pulse.value * 0.7 }],
+  }))
   return (
     <View style={styles.sky} pointerEvents="none">
       <LinearGradient colors={['#1E0C12', 'rgba(20,8,11,0)']} style={StyleSheet.absoluteFill} />
@@ -198,6 +227,8 @@ function SheetSky() {
         <Circle cx={SCREEN_W * 0.93} cy={66} r={0.8} fill={colors.leche} opacity={0.1} />
         <Circle cx={SCREEN_W * 0.45} cy={28} r={0.7} fill={colors.leche} opacity={0.1} />
       </Svg>
+      {/* La estrella que respira al llegar la chispa — plana, sobre el SVG. */}
+      <Animated.View style={[styles.skyPulseStar, pulseStar]} />
     </View>
   )
 }
@@ -341,6 +372,25 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // Bumped on each water tap so a glass pops only on a tap, not on load.
   const [waterTick, setWaterTick] = useState(0)
 
+  // La recompensa inmediata DENTRO del modal: la ignición nace en el
+  // punto de toque (el toast global vive bajo el Modal y no se veía). Se
+  // dispara optimista en el handler del tap — no espera a que la query
+  // asiente — para que la luz responda al instante; el "+N" del atributo
+  // llega por el bus poco después, en el toast de arriba.
+  const reduceMotion = useReducedMotion() ?? false
+  const burstSeq = useRef(0)
+  const [bursts, setBursts] = useState<{ id: number; x: number; y: number; color: string }[]>([])
+  // Sube cuando una chispa "llega" al SheetSky — cierra el loop visual.
+  const [skyPulse, setSkyPulse] = useState(0)
+  const fireBurst = (x: number, y: number, color: string) => {
+    if (reduceMotion) return
+    const id = ++burstSeq.current
+    setBursts((b) => [...b, { id, x, y, color }])
+    setTimeout(() => setBursts((b) => b.filter((it) => it.id !== id)), IGNITION_LIFETIME_MS)
+    // La chispa tarda ~480 ms en subir; ahí el cielo respira.
+    setTimeout(() => setSkyPulse((k) => k + 1), 480)
+  }
+
   const items = frequent ?? []
 
   // "Lo de siempre" — show the first 3, then a "Ver N más / Ver menos"
@@ -391,18 +441,28 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       ingredients: item.ingredients ?? undefined,
     })
     setConfirmingName(item.name)
-    // El payoff ("+N Energía" + vuelo hacia Leo) lo emite la detección
+    // Ignición inmediata cerca de las tarjetas de comida (Energía =
+    // magentaHot). El "+N Energía" + vuelo a Leo los emite la detección
     // de deltas de TodayUniverseRewards al subir el atributo.
+    fireBurst(SCREEN_W / 2, SCREEN_H * 0.62, colors.magentaHot)
     setTimeout(onClose, CONFIRM_HOLD_MS)
   }
 
-  const tapDroplet = (index: number) => {
-    Haptics.selectionAsync().catch(() => {})
+  const tapDroplet = (index: number, e: GestureResponderEvent) => {
     setWaterTick((t) => t + 1)
     // Tap a droplet to fill up to it; tap the current top one to step back.
-    // Cada vaso paga "+N Claridad" vía la detección de deltas (acumula
-    // en el toast si tapeas seguido); un step-back no celebra.
+    const filling = glasses !== index + 1
     setWater.mutate(glasses === index + 1 ? index : index + 1)
+    if (filling) {
+      // Llenar VIBRA — un impact (no el tick de selection): la recompensa
+      // se siente. La ignición nace en la yema del dedo (Claridad =
+      // sueno/indigo); el "+N Claridad" llega por el delta-bus.
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+      fireBurst(e.nativeEvent.pageX, e.nativeEvent.pageY, colors.dimension.sueno)
+    } else {
+      // Step-back: solo un tick discreto, sin recompensa.
+      Haptics.selectionAsync().catch(() => {})
+    }
   }
 
   // Marking the period start re-anchors the cycle to today — confirm so
@@ -525,7 +585,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
           exiting={SlideOutDown.duration(220)}
           style={styles.sheet}
         >
-          <SheetSky />
+          <SheetSky pulseKey={skyPulse} />
           <View style={styles.grabber} />
 
           <View style={styles.header}>
@@ -597,11 +657,16 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                     onPress={() => setEditingGoal((v) => !v)}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="Ajustar tu meta de agua"
+                    accessibilityState={{ expanded: editingGoal }}
+                    accessibilityLabel="Ajustar tu ritual de agua"
+                    style={styles.waterCaptionRow}
                   >
                     <Text style={styles.stripCaption}>
                       Agua · {mlToLitresLabel(glasses * GLASS_ML)} / {mlToLitresLabel(goalMl)} L
                     </Text>
+                    {/* Chevron = "toca para ajustar tu ritual" (mismo lenguaje
+                        de chevron que el resto de la app). Se va al editar. */}
+                    {!editingGoal ? <Text style={styles.waterCaptionEdit}>›</Text> : null}
                   </Pressable>
                   {editingGoal ? (
                     <View style={styles.goalStepper}>
@@ -615,7 +680,10 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       >
                         <Text style={styles.goalStepSign}>−</Text>
                       </Pressable>
-                      <Text style={styles.goalValue}>{mlToLitresLabel(goalMl)} L</Text>
+                      <Text style={styles.goalValue}>
+                        {mlToLitresLabel(goalMl)} L
+                        <Text style={styles.goalValueGlasses}> · {waterTarget}</Text>
+                      </Text>
                       <Pressable
                         onPress={() => updateGoal(goalMl + GOAL_STEP_ML)}
                         disabled={goalMl >= MAX_GOAL_ML}
@@ -644,7 +712,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                           size={glassSize}
                           filled={i < glasses}
                           tick={waterTick}
-                          onPress={() => tapDroplet(i)}
+                          onPress={(e) => tapDroplet(i, e)}
                           accessibilityLabel={`Agua, ${i + 1} de ${waterTarget} vasos`}
                         />
                       ))}
@@ -773,6 +841,16 @@ export function QuickLogSheet({ visible, onClose }: Props) {
             </ScrollView>
           )}
         </Animated.View>
+
+        {/* Capa de recompensa — sobre la hoja, pointer-transparente. La
+            ignición nace en {x,y} del tap; el toast "+N Atributo" aparece
+            arriba (placement="top", sin haptic propio: el tap ya vibró).
+            Ambos viven DENTRO del Modal para verse — el toast global del
+            tabs layout queda debajo del Modal. */}
+        {bursts.map((b) => (
+          <IgnitionBurst key={b.id} x={b.x} y={b.y} color={b.color} />
+        ))}
+        <UniverseDeltaToast placement="top" haptics={false} />
       </View>
     </Modal>
   )
@@ -849,6 +927,21 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     overflow: 'hidden',
+  },
+  // La estrella que respira cuando una chispa del registro llega al
+  // cielo. Punto oro con glow (iOS); en Android lee por opacidad/escala.
+  skyPulseStar: {
+    position: 'absolute',
+    top: 30,
+    left: SCREEN_W * 0.5 - 2.5,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: colors.oroLight,
+    shadowColor: colors.oro,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
   },
   grabber: {
     alignSelf: 'center',
@@ -927,6 +1020,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
+  // Caption de agua + chevron → señala que la meta es editable.
+  waterCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  waterCaptionEdit: {
+    fontFamily: typography.ui,
+    fontSize: 15,
+    lineHeight: 15,
+    color: colors.magenta,
+  },
   stripWeightRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -952,7 +1057,7 @@ const styles = StyleSheet.create({
   goalStepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   goalStep: {
     width: 26,
@@ -974,12 +1079,19 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
   goalValue: {
-    minWidth: 52,
+    minWidth: 64,
     textAlign: 'center',
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
     letterSpacing: -0.3,
+  },
+  // El conteo de vasos junto a los litros — cierra el loop entre lo que
+  // configuras (L) y lo que vas a tocar abajo (vasos de 250 ml).
+  goalValueGlasses: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
   },
   goalDoneText: {
     fontFamily: typography.uiBold,

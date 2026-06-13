@@ -45,6 +45,9 @@ import {
   type StoredIngredient,
 } from '@/features/macros/api'
 import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
+import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
+import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
+import { UNIVERSE_ACCENT } from '@/features/tabs/universe-visuals'
 import {
   ingredientKcal,
   ingredientProtein,
@@ -537,6 +540,19 @@ export default function ScanMealScreen() {
   // Warm in-app note when the scan can't read the plate/text (replaces a
   // cold system Alert). Cleared once the user adds an ingredient.
   const [scanError, setScanError] = useState<string | null>(null)
+
+  // El delta de Energía que el universo emitió por ESTA comida. El
+  // optimistic patch de useCreateMeal lo dispara desde Hoy (montado bajo
+  // esta ruta), y lo mostramos en el reveal: cierra la cadena comida →
+  // universo en el flujo principal, donde el toast global queda detrás de
+  // esta pantalla y no se ve. Una comida = una subida de Energía, así que
+  // acumular el único delta de la sesión basta (no hay re-log aquí).
+  const [energiaDelta, setEnergiaDelta] = useState(0)
+  useEffect(() => {
+    return subscribeUniverseDelta(({ key, delta }) => {
+      if (key === 'energia' && delta > 0) setEnergiaDelta((d) => d + delta)
+    })
+  }, [])
   const [description, setDescription] = useState('')
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
@@ -977,6 +993,16 @@ export default function ScanMealScreen() {
               <Text style={styles.revealMacroLabel}>Proteína · </Text>
               <Text style={styles.revealMacroValue}>{revealProtein}g</Text>
             </Animated.View>
+            {/* "✦ +N Energía" — ata esta comida a tu universo, aquí donde
+                el toast global queda detrás de la pantalla del reveal. */}
+            {energiaDelta > 0 ? (
+              <Animated.Text
+                entering={FadeInUp.duration(520).delay(1000)}
+                style={[styles.revealEnergia, { color: UNIVERSE_ACCENT.energia }]}
+              >
+                ✦ +{energiaDelta} {ATTRIBUTE_LABEL.energia}
+              </Animated.Text>
+            ) : null}
             <Animated.View entering={FadeInUp.duration(520).delay(1100)}>
               <Pressable
                 onPress={() => router.back()}
@@ -1321,6 +1347,15 @@ const styles = StyleSheet.create({
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.title,
     color: colors.leche,
+  },
+  // El delta del universo — "✦ +N Energía", tintado del atributo.
+  revealEnergia: {
+    marginTop: 8,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.3,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
   },
   // A round gold "done" stamp — reads as confirmed, not as a nav/tab
   // button (a circle + checkmark, no stadium pill).

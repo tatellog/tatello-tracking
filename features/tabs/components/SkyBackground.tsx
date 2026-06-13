@@ -4,7 +4,7 @@ import { Dimensions, StyleSheet, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
-  useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -20,9 +20,20 @@ import { colors } from '@/theme'
 // motif. Fixed (it doesn't scroll); content drifts over a still sky.
 // Three brightness tiers; the bright tier twinkles. Seeded so it never
 // reshuffles.
+//
+// PERFORMANCE (este fondo vive en ~21 pantallas, así que su costo es
+// app-wide):
+//   - Las estrellas ESTÁTICAS viven en UN solo <Svg>. Sin hijos animados,
+//     RNSVG lo rasteriza UNA vez y no lo vuelve a tocar.
+//   - Las que respiran NO van en ese <Svg>: van como Animated.View (un
+//     punto con borderRadius) cuya OPACIDAD se anima — propiedad de
+//     compositor (GPU), sin re-rasterizar nada. Antes eran AnimatedCircle
+//     dentro del <Svg> de 108 nodos, y cualquier hijo animado obligaba a
+//     RNSVG a repintar los 108 nodos 60×/s (sobre todo en Android) — un
+//     impuesto perpetuo en cada pantalla. Ahora el SVG es estático y solo
+//     ~11 opacidades de View se actualizan en el UI thread: prácticamente
+//     gratis. El twinkle sigue gateado en foco (pausa fuera de tab/scroll).
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 type Star = {
   x: number
@@ -58,17 +69,21 @@ const SCREEN_STARS: Star[] = (() => {
   return arr
 })()
 
-/* A bright star that breathes — slow, desynced, so the sky reads as
- * alive rather than printed.
+// Split ONCE at module load: the still field (one static <Svg>) vs the
+// breathing stars (compositor-only Animated.View dots).
+const STATIC_STARS = SCREEN_STARS.filter((st) => !st.twinkle)
+const TWINKLE_STARS = SCREEN_STARS.filter((st) => st.twinkle)
+
+/* A bright star that breathes — slow, desynced, so the sky reads as alive
+ * rather than printed. Renders as a plain View (a tiny round dot), NOT an
+ * SVG node: animating its opacity is a compositor op on the UI thread, so
+ * it never forces the static starfield <Svg> to re-rasterize.
  *
- * The twinkle loop is GATED on `active` (screen focused + not mid-scroll).
- * This starfield <Svg> is mounted behind EVERY tab, and any animated SVG
- * child repaints the whole 108-node <Svg> 60×/s on Android — so an ungated
- * loop taxed the UI thread app-wide, forever, even off-tab and during every
- * scroll. While inactive the star eases to a still rest brightness (no blink,
- * no SVG repaint); when active it resumes its breath exactly as before — so
- * it looks identical whenever you're actually looking at it. */
-function TwinkleStar({ star, active }: { star: Star; active: boolean }) {
+ * The twinkle loop is GATED on `active` (screen focused + not mid-scroll):
+ * while inactive the dot eases to a still rest brightness and the loop is
+ * cancelled (zero work off-tab / mid-scroll); when active it resumes its
+ * breath exactly as before — identical whenever you're actually looking. */
+function TwinkleDot({ star, active }: { star: Star; active: boolean }) {
   // Rest at the breath's mid-point so a paused star sits at a natural,
   // non-blinking brightness rather than its trough.
   const tw = useSharedValue(0.5)
@@ -85,17 +100,25 @@ function TwinkleStar({ star, active }: { star: Star; active: boolean }) {
     return () => cancelAnimation(tw)
   }, [star, tw, active])
 
-  const animatedProps = useAnimatedProps(() => ({
+  const style = useAnimatedStyle(() => ({
     opacity: star.o * (0.42 + tw.value * 0.72),
   }))
 
+  const d = star.r * 2
   return (
-    <AnimatedCircle
-      cx={star.x}
-      cy={star.y}
-      r={star.r}
-      fill={colors.leche}
-      animatedProps={animatedProps}
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: star.x - star.r,
+          top: star.y - star.r,
+          width: d,
+          height: d,
+          borderRadius: star.r,
+          backgroundColor: colors.leche,
+        },
+        style,
+      ]}
     />
   )
 }
@@ -107,7 +130,7 @@ function TwinkleStar({ star, active }: { star: Star; active: boolean }) {
  */
 export function SkyBackground() {
   // Pauses the twinkle when the host screen is off-tab or mid-scroll (see
-  // TwinkleStar). Where no ScrollPauseContext is provided (settings, auth,
+  // TwinkleDot). Where no ScrollPauseContext is provided (settings, auth,
   // …) this is simply focus-gating — the loop stops when you leave the tab.
   const active = useScreenActive()
   return (
@@ -116,15 +139,16 @@ export function SkyBackground() {
           opacity + a tall, gradual fade so it never reads as a hard band
           where it meets the darker page. */}
       <LinearGradient colors={[colors.magentaTint, 'transparent']} style={styles.nebula} />
+      {/* STATIC field — one <Svg>, rasterized once, no per-frame repaint. */}
       <Svg style={styles.starfield} width={SCREEN_W} height={SCREEN_H}>
-        {SCREEN_STARS.map((st, i) =>
-          st.twinkle ? (
-            <TwinkleStar key={i} star={st} active={active} />
-          ) : (
-            <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
-          ),
-        )}
+        {STATIC_STARS.map((st, i) => (
+          <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
+        ))}
       </Svg>
+      {/* Breathing stars — compositor-only opacity, outside the <Svg>. */}
+      {TWINKLE_STARS.map((st, i) => (
+        <TwinkleDot key={i} star={st} active={active} />
+      ))}
     </View>
   )
 }

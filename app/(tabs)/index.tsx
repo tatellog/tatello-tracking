@@ -22,6 +22,7 @@ import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal, usePatternDetection } from '@/features/patterns'
+import { TransformationCard } from '@/features/emblem'
 import { ReturnMoment } from '@/features/rewards'
 import { useMonthWorkoutDates, useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
@@ -404,6 +405,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   </Text>
                 )
               })()}
+            </Animated.View>
+
+            {/* "Tu transformación" (compacta) — cuánto se reveló el
+                emblema y en qué etapa va; tap → Órbita · Mes. Solo Leo
+                con primer hábito (la tarjeta se gatea sola). */}
+            <Animated.View entering={enter(450)}>
+              <TransformationCard compact />
             </Animated.View>
 
             {/* "Tu universo hoy" — capa de recompensa para los registros

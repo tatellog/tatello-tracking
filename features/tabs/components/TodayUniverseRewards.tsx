@@ -27,7 +27,12 @@ import {
   type UniverseInput,
   type UniverseState,
 } from '@/features/tabs/universe-rewards'
-import { tint, UNIVERSE_ACCENT, UNIVERSE_ICON_PATH } from '@/features/tabs/universe-visuals'
+import {
+  tint,
+  UNIVERSE_ACCENT,
+  UNIVERSE_ACCENT_MUTED,
+  UNIVERSE_ICON_PATH,
+} from '@/features/tabs/universe-visuals'
 import { useWaterToday } from '@/features/water/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { useTodayWellbeing } from '@/features/wellbeing/hooks'
@@ -144,7 +149,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   // Unmount the flight layer once the rise is over.
   useEffect(() => {
     if (!flight) return
-    const id = setTimeout(() => setFlight(null), 1300)
+    const id = setTimeout(() => setFlight(null), 1550)
     return () => clearTimeout(id)
   }, [flight])
 
@@ -157,9 +162,8 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
 
   return (
     <View style={styles.section}>
-      <EyebrowLabel tone="magenta" style={styles.eyebrow}>
-        Tu universo hoy
-      </EyebrowLabel>
+      <EyebrowLabel tone="magenta">Tu universo hoy</EyebrowLabel>
+      <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
       <View style={styles.gridWrap}>
         <View style={styles.grid}>
           {attributes.map((attr) => (
@@ -197,22 +201,18 @@ const STATE_RANK: Record<UniverseState, number> = {
   complete: 3,
 }
 
-// Chip de "complete" — Nivel 2 del sistema de recompensas: cada
-// atributo se nombra alineado (copy del spec, concordancia por género:
-// tres femeninos + Brillo masculino). El glifo abre, como en el spec.
-const ALIGNED_COPY: Record<UniverseAttributeKey, string> = {
-  energia: '✦ Energía alineada.',
-  claridad: '✦ Claridad alineada.',
-  estabilidad: '✦ Estabilidad alineada.',
-  brillo: '✦ Brillo alineado.',
-}
-
 /* ── One attribute card ────────────────────────────────────────────── */
 
 const RING_SIZE = 64
 const RING_STROKE = 4
 const RING_R = RING_SIZE / 2 - RING_STROKE
 const RING_C = 2 * Math.PI * RING_R
+const RING_MID = RING_SIZE / 2
+
+// Destellos de cruz del astro encendido — 4 ticks cardinales cortos
+// alrededor de la corona (radio ~8–14 px). Simétrico en los 4 ejes: la
+// rotación -90° del <Svg> no lo altera. Coords en el viewBox de 64.
+const ASTRO_CROSS = 'M32 18 V24 M32 40 V46 M18 32 H24 M40 32 H46'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
@@ -266,11 +266,11 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
     setBurstKey((k) => k + 1)
   }, [attr.state, reducedMotion, glow])
 
-  // Unmount the particle layer once the drift is over (~800 ms + delays)
+  // Unmount the particle layer once the drift is over (~1150 ms + delays)
   // so absolute views aren't kept alive per completed card.
   useEffect(() => {
     if (burstKey === 0) return
-    const id = setTimeout(() => setBurstKey(0), 1100)
+    const id = setTimeout(() => setBurstKey(0), 1450)
     return () => clearTimeout(id)
   }, [burstKey])
 
@@ -281,21 +281,19 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
     opacity: glow.value,
   }))
 
+  const accentMuted = UNIVERSE_ACCENT_MUTED[attr.key]
   const complete = attr.state === 'complete'
-  const chip = complete
-    ? ALIGNED_COPY[attr.key]
-    : attr.state === 'almost'
-      ? 'Casi se alinea ✦'
-      : null
-  // The line under the ring: quiet state copy for empty/partial; the
-  // concrete faltante (coach voice) in almost. When the microcopy is
-  // just the generic state line AND a chip already says it, the chip
-  // carries it alone — never the same words twice on one card.
+  // La línea bajo el astro: copy de estado quieto (empty/partial/complete)
+  // o el faltante concreto (almost) en voz del coach. Sin chips: el
+  // "completo" se dice con el astro encendido, no con una palomita — así
+  // el grid deja de leerse como un checklist de cuatro casillas.
   const isGenericCopy = attr.microcopy === STATE_COPY[attr.state]
-  const showLine = !chip || !isGenericCopy
-  // Serif italic is reserved for coach voice — the faltante IS a coach
-  // line; empty/partial stay in quiet upright Hanken.
+  // Serif italic se reserva para la voz del coach — el faltante ES una
+  // línea de coach; empty/partial/complete quedan en Hanken quieto.
   const coachVoice = attr.state === 'almost' && !isGenericCopy
+  // El glifo es el astro: pleno al encenderse, atenuado mientras orbita,
+  // apenas niebla en calma.
+  const astroColor = complete ? accent : attr.pct > 0 ? accentMuted : colors.niebla
 
   return (
     <Pressable
@@ -307,7 +305,7 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
       ]}
       accessibilityRole="button"
       accessibilityState={{ expanded: selected }}
-      accessibilityLabel={`${attr.label}, ${attr.pct} por ciento. ${attr.microcopy}`}
+      accessibilityLabel={`${attr.label}. ${attr.microcopy}`}
       accessibilityHint="Muestra de dónde viene"
     >
       <Animated.View
@@ -315,10 +313,7 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
         style={[styles.cardGlow, { backgroundColor: tint(accent, '1F') }, glowStyle]}
       />
 
-      <View style={styles.cardHeader}>
-        <AttributeIcon attrKey={attr.key} color={accent} />
-        <Text style={[styles.label, { color: accent }]}>{attr.label}</Text>
-      </View>
+      <Text style={[styles.label, { color: complete ? accent : colors.bone }]}>{attr.label}</Text>
 
       <View style={styles.ringZone}>
         <Svg
@@ -327,54 +322,79 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
           viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
           style={styles.ringSvg}
         >
+          {/* el campo: track fino, no una barra a llenar */}
           <Circle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
+            cx={RING_MID}
+            cy={RING_MID}
             r={RING_R}
             fill="none"
             stroke={colors.hairline}
-            strokeWidth={RING_STROKE}
+            strokeWidth={1}
           />
-          <AnimatedCircle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
-            r={RING_R}
-            fill="none"
-            stroke={accent}
-            strokeWidth={RING_STROKE}
-            strokeLinecap="round"
-            animatedProps={ringProps}
-          />
+
+          {complete ? (
+            <>
+              {/* anillo de luz exterior — la corona de la órbita */}
+              <Circle
+                cx={RING_MID}
+                cy={RING_MID}
+                r={RING_R + 3}
+                fill="none"
+                stroke={tint(accent, '26')}
+                strokeWidth={1}
+              />
+              {/* órbita cerrada, color pleno */}
+              <Circle
+                cx={RING_MID}
+                cy={RING_MID}
+                r={RING_R}
+                fill="none"
+                stroke={accent}
+                strokeWidth={2.5}
+              />
+              {/* corona difusa detrás del astro — halo dibujado, no blur */}
+              <Circle cx={RING_MID} cy={RING_MID} r={9} fill={tint(accent, '1A')} />
+              <Circle cx={RING_MID} cy={RING_MID} r={5.5} fill={tint(accent, '33')} />
+              {/* puntas de estrella */}
+              <Path
+                d={ASTRO_CROSS}
+                stroke={tint(accent, '80')}
+                strokeWidth={1}
+                strokeLinecap="round"
+              />
+            </>
+          ) : attr.kind === 'progress' ? (
+            /* órbita en progreso — arco atenuado, one-shot al subir */
+            <AnimatedCircle
+              cx={RING_MID}
+              cy={RING_MID}
+              r={RING_R}
+              fill="none"
+              stroke={accentMuted}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              animatedProps={ringProps}
+            />
+          ) : attr.pct > 0 ? (
+            /* gesto con una señal, aún no encendido: chispa tenue del
+               astro, sin arco proporcional — un tap no es una barra. */
+            <Circle cx={RING_MID} cy={RING_MID} r={6} fill={tint(accent, '1A')} />
+          ) : null}
         </Svg>
         <View style={styles.ringCenter} pointerEvents="none">
-          <Text style={styles.pct}>
-            {attr.pct}
-            <Text style={styles.pctSign}>%</Text>
-          </Text>
+          <AttributeIcon attrKey={attr.key} color={astroColor} size={24} />
         </View>
         {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
       </View>
 
       <View style={styles.cardFooter}>
-        {showLine ? (
-          <Text
-            style={coachVoice ? styles.microCoach : styles.microQuiet}
-            numberOfLines={2}
-            adjustsFontSizeToFit
-          >
-            {attr.microcopy}
-          </Text>
-        ) : null}
-        {chip ? (
-          <View
-            style={[
-              styles.chip,
-              { borderColor: tint(accent, '59'), backgroundColor: tint(accent, '14') },
-            ]}
-          >
-            <Text style={[styles.chipText, { color: accent }]}>{chip}</Text>
-          </View>
-        ) : null}
+        <Text
+          style={coachVoice ? styles.microCoach : styles.microQuiet}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+        >
+          {attr.microcopy}
+        </Text>
       </View>
     </Pressable>
   )
@@ -415,9 +435,17 @@ function AttributeDetail({ attr, input }: { attr: UniverseAttribute; input: Univ
 
 /* ── Attribute icons ───────────────────────────────────────────────── */
 
-function AttributeIcon({ attrKey, color }: { attrKey: UniverseAttributeKey; color: string }) {
+function AttributeIcon({
+  attrKey,
+  color,
+  size = 13,
+}: {
+  attrKey: UniverseAttributeKey
+  color: string
+  size?: number
+}) {
   return (
-    <Svg width={13} height={13} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
         d={UNIVERSE_ICON_PATH[attrKey]}
         fill="none"
@@ -443,7 +471,7 @@ const PARTICLES = [
   { leftPct: 80, delay: 170, rise: 30 },
 ] as const
 
-function ParticleBurst({ color }: { color: string }) {
+export function ParticleBurst({ color }: { color: string }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {PARTICLES.map((p) => (
@@ -473,7 +501,7 @@ const FLIGHT_SPARKS = [
   { dxPct: 9, delay: 60, rise: 135 },
 ] as const
 
-function FlightToConstellation({
+export function FlightToConstellation({
   attrKey,
   index,
 }: {
@@ -524,7 +552,7 @@ function Particle({
   const t = useSharedValue(0)
 
   useEffect(() => {
-    t.value = withDelay(delay, withTiming(1, { duration: 800, easing: easing.out }))
+    t.value = withDelay(delay, withTiming(1, { duration: 1150, easing: easing.out }))
   }, [t, delay])
 
   const style = useAnimatedStyle(() => ({
@@ -556,10 +584,19 @@ function Particle({
 
 const styles = StyleSheet.create({
   section: {
-    marginTop: spacing.s5,
+    // s6 (no s5) para separar este bloque de "Tu transformación" de
+    // arriba: son dos cosas distintas y antes se leían como una pila.
+    marginTop: spacing.s6,
     marginBottom: spacing.s3,
   },
-  eyebrow: {
+  // Una línea callada que nombra qué es la sección — la conexión
+  // registro → atributo no siempre se ve (si entras a media tarde, los
+  // astros ya están encendidos sin causa visible).
+  sectionCaption: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    marginTop: spacing.s1,
     marginBottom: spacing.s4,
   },
   gridWrap: {
@@ -591,16 +628,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     opacity: 0,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s1,
-    marginBottom: spacing.s3,
-  },
   label: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     letterSpacing: typography.letterSpacing.bodyLoose,
+    textAlign: 'center',
+    marginBottom: spacing.s3,
   },
   ringZone: {
     width: RING_SIZE,
@@ -615,12 +648,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pct: {
-    fontFamily: typography.uiSemi,
-    fontSize: 17,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
   pctSign: {
     fontSize: 11,
     color: colors.niebla,
@@ -633,17 +660,6 @@ const styles = StyleSheet.create({
   },
   particle: {
     position: 'absolute',
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: spacing.s3,
-    paddingVertical: 3,
-  },
-  chipText: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.3,
   },
   microQuiet: {
     fontFamily: typography.ui,

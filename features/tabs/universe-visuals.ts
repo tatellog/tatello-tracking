@@ -21,6 +21,18 @@ export const UNIVERSE_ACCENT: Record<UniverseAttributeKey, string> = {
 /** 8-digit-hex alpha over an accent — RN parses #RRGGBBAA. */
 export const tint = (hex: string, alpha: string) => `${hex}${alpha}`
 
+// El acento, atenuado hacia el campo: el color vive como LUZ, no como
+// superficie. Lo usan la órbita en progreso y el astro dormido; el color
+// PLENO se reserva para el "completo" — así el grid lee como un cielo
+// (crema sobre negro con cuatro temperaturas tenues) y no como un
+// dashboard de cuatro semáforos saturados compitiendo al mismo peso.
+export const UNIVERSE_ACCENT_MUTED: Record<UniverseAttributeKey, string> = {
+  energia: tint(colors.magentaHot, 'B3'),
+  claridad: tint(colors.dimension.sueno, 'B3'),
+  estabilidad: tint(colors.dimension.mente, 'B3'),
+  brillo: tint(colors.dimension.energia, 'B3'),
+}
+
 // Tiny inline SVG paths (repo pattern: tintable, stroke-based, no icon lib).
 export const UNIVERSE_ICON_PATH: Record<UniverseAttributeKey, string> = {
   // flame

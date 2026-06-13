@@ -13,6 +13,7 @@ import { useSeenMesTapHint } from '@/lib/onboardingFlags'
 import { colors, typography } from '@/theme'
 
 import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
+import { TransformationCard } from '@/features/emblem'
 import { useMacroTargets } from '@/features/macros/hooks'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
@@ -208,6 +209,11 @@ export function MonthSegment() {
         tag="Este mes"
         signature={hasRealData ? voz.signature : undefined}
       />
+
+      {/* Tu transformación — el arco largo: cuánto se reveló el emblema,
+          en qué etapa va, y el ⓘ con las reglas del universo. Se gatea
+          sola (solo Leo + primer hábito). */}
+      <TransformationCard />
 
       {/* Tus patrones del mes — the recurrences that need several weeks to
           be real ("todos los lunes…", "los sábados…") + the month-shape
