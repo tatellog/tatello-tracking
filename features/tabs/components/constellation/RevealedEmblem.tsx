@@ -37,8 +37,63 @@ import { colors } from '@/theme'
  * frame es swap de imagen, sin repintar por frame en reposo.
  */
 
-// 11 frames del reveal radial (0 %, 10 %, …, 100 %). Índice = round(%/10).
-const FRAMES = [
+// Frames del reveal radial por signo (11 c/u: 0%,10%,…,100%). El arco,
+// el laurel y los glifos son compartidos.
+const FRAME_COUNT = 11
+
+const FRAMES_ARIES = [
+  require('@/assets/zodiac-art/aries-reveal/f00.png'),
+  require('@/assets/zodiac-art/aries-reveal/f01.png'),
+  require('@/assets/zodiac-art/aries-reveal/f02.png'),
+  require('@/assets/zodiac-art/aries-reveal/f03.png'),
+  require('@/assets/zodiac-art/aries-reveal/f04.png'),
+  require('@/assets/zodiac-art/aries-reveal/f05.png'),
+  require('@/assets/zodiac-art/aries-reveal/f06.png'),
+  require('@/assets/zodiac-art/aries-reveal/f07.png'),
+  require('@/assets/zodiac-art/aries-reveal/f08.png'),
+  require('@/assets/zodiac-art/aries-reveal/f09.png'),
+  require('@/assets/zodiac-art/aries-reveal/f10.png'),
+]
+const FRAMES_TAURO = [
+  require('@/assets/zodiac-art/tauro-reveal/f00.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f01.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f02.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f03.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f04.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f05.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f06.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f07.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f08.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f09.png'),
+  require('@/assets/zodiac-art/tauro-reveal/f10.png'),
+]
+const FRAMES_GEMINIS = [
+  require('@/assets/zodiac-art/geminis-reveal/f00.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f01.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f02.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f03.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f04.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f05.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f06.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f07.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f08.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f09.png'),
+  require('@/assets/zodiac-art/geminis-reveal/f10.png'),
+]
+const FRAMES_CANCER = [
+  require('@/assets/zodiac-art/cancer-reveal/f00.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f01.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f02.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f03.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f04.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f05.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f06.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f07.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f08.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f09.png'),
+  require('@/assets/zodiac-art/cancer-reveal/f10.png'),
+]
+const FRAMES_LEO = [
   require('@/assets/zodiac-art/leo-reveal/f00.png'),
   require('@/assets/zodiac-art/leo-reveal/f01.png'),
   require('@/assets/zodiac-art/leo-reveal/f02.png'),
@@ -51,24 +106,126 @@ const FRAMES = [
   require('@/assets/zodiac-art/leo-reveal/f09.png'),
   require('@/assets/zodiac-art/leo-reveal/f10.png'),
 ]
-// Frames del animal por signo (arch.png es compartido). Solo Leo hoy.
-const FRAMES_BY_SIGN: Partial<Record<ZodiacSign, readonly number[]>> = {
-  leo: FRAMES,
+const FRAMES_VIRGO = [
+  require('@/assets/zodiac-art/virgo-reveal/f00.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f01.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f02.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f03.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f04.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f05.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f06.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f07.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f08.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f09.png'),
+  require('@/assets/zodiac-art/virgo-reveal/f10.png'),
+]
+const FRAMES_LIBRA = [
+  require('@/assets/zodiac-art/libra-reveal/f00.png'),
+  require('@/assets/zodiac-art/libra-reveal/f01.png'),
+  require('@/assets/zodiac-art/libra-reveal/f02.png'),
+  require('@/assets/zodiac-art/libra-reveal/f03.png'),
+  require('@/assets/zodiac-art/libra-reveal/f04.png'),
+  require('@/assets/zodiac-art/libra-reveal/f05.png'),
+  require('@/assets/zodiac-art/libra-reveal/f06.png'),
+  require('@/assets/zodiac-art/libra-reveal/f07.png'),
+  require('@/assets/zodiac-art/libra-reveal/f08.png'),
+  require('@/assets/zodiac-art/libra-reveal/f09.png'),
+  require('@/assets/zodiac-art/libra-reveal/f10.png'),
+]
+const FRAMES_ESCORPIO = [
+  require('@/assets/zodiac-art/escorpio-reveal/f00.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f01.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f02.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f03.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f04.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f05.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f06.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f07.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f08.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f09.png'),
+  require('@/assets/zodiac-art/escorpio-reveal/f10.png'),
+]
+const FRAMES_SAGITARIO = [
+  require('@/assets/zodiac-art/sagitario-reveal/f00.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f01.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f02.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f03.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f04.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f05.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f06.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f07.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f08.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f09.png'),
+  require('@/assets/zodiac-art/sagitario-reveal/f10.png'),
+]
+const FRAMES_CAPRICORNIO = [
+  require('@/assets/zodiac-art/capricornio-reveal/f00.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f01.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f02.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f03.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f04.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f05.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f06.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f07.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f08.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f09.png'),
+  require('@/assets/zodiac-art/capricornio-reveal/f10.png'),
+]
+const FRAMES_ACUARIO = [
+  require('@/assets/zodiac-art/acuario-reveal/f00.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f01.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f02.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f03.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f04.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f05.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f06.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f07.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f08.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f09.png'),
+  require('@/assets/zodiac-art/acuario-reveal/f10.png'),
+]
+const FRAMES_PISCIS = [
+  require('@/assets/zodiac-art/piscis-reveal/f00.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f01.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f02.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f03.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f04.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f05.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f06.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f07.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f08.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f09.png'),
+  require('@/assets/zodiac-art/piscis-reveal/f10.png'),
+]
+
+const FRAMES_BY_SIGN: Record<ZodiacSign, readonly number[]> = {
+  aries: FRAMES_ARIES,
+  tauro: FRAMES_TAURO,
+  geminis: FRAMES_GEMINIS,
+  cancer: FRAMES_CANCER,
+  leo: FRAMES_LEO,
+  virgo: FRAMES_VIRGO,
+  libra: FRAMES_LIBRA,
+  escorpio: FRAMES_ESCORPIO,
+  sagitario: FRAMES_SAGITARIO,
+  capricornio: FRAMES_CAPRICORNIO,
+  acuario: FRAMES_ACUARIO,
+  piscis: FRAMES_PISCIS,
 }
 const ARCH_SRC = require('@/assets/zodiac-art/arch.png')
 
-// Encaje. El arco llena el cuadrado en altura (enmarca); el animal va
-// centrado dentro del aro a LION_WFRAC del ancho.
+// Encaje. El arco llena el cuadrado en altura (enmarca).
 const ARCH_HFRAC = 0.98
 // El aro se ve ligeramente ancho → se estira en alto (sin tocar el ancho)
 // para que quede un poco más largo/alto y deje de verse achatado.
 const ARCH_VSTRETCH = 1.07
-const LION_WFRAC = 0.64
-// Centro VISUAL del león (no el geométrico): la melena densa pesa a la
-// izquierda y las patas abajo, así que se corre un pelín a la derecha y
-// arriba para que quede balanceado dentro del aro.
-const LION_CX = 0.515
-const LION_CY = 0.475
+// Los frames son CUADRADOS con el animal centrado ÓPTICAMENTE (centroide
+// de luminancia, en el generador), así que la colocación es uniforme
+// para los 12. El animal ocupa ~0.58 del lienzo para que RESPIRE dentro
+// del aro (estética sello/lujo: figura ~55-60% del marco, no 90%).
+const LION_WFRAC = 0.63
+const LION_CX = 0.5
+const LION_CY = 0.46
 const GLYPH_FRAC = 0.11
 const GLYPH_CY = 0.085
 // Laurel (hojas-23.svg) dentro del aro, en la parte INFERIOR: las ramas
@@ -85,9 +242,17 @@ const HOJAS_CY = 0.866 // pegado a la última línea, contenido en el círculo
 const HOJAS_CC_X = 0.497 // centro del contenido dentro del frame del SVG
 const HOJAS_CC_Y = 0.631
 const HOJAS_LEAF_WFRAC = 0.85 // las hojas ocupan esta fracción del frame
-const MASTER_OPACITY = 0.95
-// Glifo: sello sutil, no tercer foco (el foco es el león revelándose).
-const GLYPH_OPACITY = 0.7
+// La constelación natal (el dato real de la usuaria) GANA sobre el emblema,
+// que es el marco/atmósfera poética → el emblema cede a fondo (más tenue +
+// más difuso) para que las dos capas se lean como planos distintos.
+const MASTER_OPACITY = 0.72
+// Marco (aro + laurel): el elemento MÁS tenue — ancla estructural, no
+// foco. Más bajo que el animal a propósito (su línea continua de alto
+// contraste pesa más a igual opacidad). Por debajo de ~0.35 el oro se
+// vuelve gris sucio sobre el fondo y el marco "se rompe".
+const FRAME_OPACITY = 0.42
+// Glifo: acompaña al marco, no al animal.
+const GLYPH_OPACITY = 0.5
 
 // Bloom: un halo (copia borrosa del animal) que crece hacia el 100 %.
 // Arranca temprano (~30 %) para que se sienta "algo se enciende" pronto;
@@ -97,7 +262,7 @@ const BLOOM_MAX_OPACITY = 0.6
 
 function frameIndexFor(progress: number): number {
   const p = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0))
-  return Math.max(0, Math.min(FRAMES.length - 1, Math.round((p / 100) * (FRAMES.length - 1))))
+  return Math.max(0, Math.min(FRAME_COUNT - 1, Math.round((p / 100) * (FRAME_COUNT - 1))))
 }
 
 function bloomTFor(progress: number): number {
@@ -145,16 +310,23 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
   const hojasTop = HOJAS_CY * size - HOJAS_CC_Y * hojasFrame
 
   const bloomT = bloomTFor(transformProgress)
-  const bloomRadius = size * (0.012 + bloomT * 0.03)
+  // Halo más difuso → el emblema lee como atmósfera de fondo, no como
+  // line-art nítido compitiendo con las líneas de la constelación.
+  const bloomRadius = size * (0.02 + bloomT * 0.045)
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Canvas style={StyleSheet.absoluteFill}>
-        <Group opacity={MASTER_OPACITY}>
-          {/* Arco — marco fijo, siempre completo. */}
-          {arch ? (
+        {/* Arco — el MARCO: línea continua de alto contraste, así que va
+            a su propia opacidad MÁS BAJA que el animal (a igual opacidad
+            "gritaría" más por sus bordes nítidos). Es el susurro que
+            contiene el cuadro, no un foco. */}
+        {arch ? (
+          <Group opacity={FRAME_OPACITY}>
             <SkiaImage image={arch} x={archX} y={archY} width={archW} height={archH} fit="fill" />
-          ) : null}
+          </Group>
+        ) : null}
+        <Group opacity={MASTER_OPACITY}>
           {/* Animal — el frame del % vigente (reveal radial pre-horneado). */}
           {animal ? (
             <SkiaImage image={animal} x={lionX} y={lionY} width={lionW} height={lionH} fit="fill" />
@@ -188,7 +360,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           { top: hojasTop, left: hojasLeft, width: hojasFrame, height: hojasFrame },
         ]}
       >
-        <Hojas width="100%" height="100%" opacity={MASTER_OPACITY} />
+        <Hojas width="100%" height="100%" opacity={FRAME_OPACITY} />
       </View>
       {Glyph ? (
         <View

@@ -1,5 +1,7 @@
 import type { DimensionKey } from '../logic'
 import {
+  buildEnLuzMes,
+  buildMonthEvidence,
   buildMonthSatellites,
   buildMonthSummary,
   buildVozMes,
@@ -65,22 +67,59 @@ describe('monthTheme', () => {
 })
 
 describe('buildVozMes', () => {
-  test('a forming month → "se forma" + low confidence', () => {
+  test('pocos días → "se forma" + confianza baja', () => {
     const h = buildHistory(BASE, 2, () => ({ energy: 4 }))
-    const v = buildVozMes(buildMonthSummary(h), 2)
+    const v = buildVozMes(h, undefined, 2)
     const text = v.parts.map((p) => p.text).join('')
     expect(text).toContain('se forma')
     expect(v.signature.confidence).toBe('baja')
   })
 
-  test('a full month names a movement + high confidence', () => {
-    const h = buildHistory(BASE, 20, (_m, i) =>
-      i < 10 ? { energy: 2 } : { energy: 5, mood: 'good', stress: 1, motivation: 5 },
-    )
-    const v = buildVozMes(buildMonthSummary(h), 20)
+  test('un mes consistente narra EVIDENCIA (días) + confianza alta', () => {
+    const h = buildHistory(BASE, 20, () => ({ trained: true, energy: 4 }))
+    const v = buildVozMes(h, undefined, 20)
     const text = v.parts.map((p) => p.text).join('')
-    expect(text).toMatch(/viene (creciendo|aflojando)/)
+    expect(text).toMatch(/movimiento apareció en \d+ días/i)
     expect(v.signature.confidence).toBe('alta')
+  })
+
+  test('nunca usa tendencia ni causa (PRD)', () => {
+    const h = buildHistory(BASE, 20, () => ({ trained: true, energy: 4, sleep_minutes: 450 }))
+    const text = buildVozMes(h, undefined, 20)
+      .parts.map((p) => p.text)
+      .join('')
+    expect(text).not.toMatch(/ascenso|aflojando|creciendo|porque|debido a|causó|cuando|mejora por/i)
+  })
+})
+
+describe('buildEnLuzMes', () => {
+  test('el comportamiento más consistente con ≥8 días', () => {
+    const h = buildHistory(BASE, 20, (_m, i) => (i < 12 ? { trained: true } : { energy: 3 }))
+    const enLuz = buildEnLuzMes(h)
+    expect(enLuz).not.toBeNull()
+    expect(enLuz!.key).toBe('cuerpo')
+    expect(enLuz!.count).toBe(12)
+  })
+
+  test('menos de 8 días con cualquier señal → null', () => {
+    const h = buildHistory(BASE, 5, () => ({ trained: true }))
+    expect(buildEnLuzMes(h)).toBeNull()
+  })
+})
+
+describe('buildMonthEvidence', () => {
+  test('cuenta acumulados: entrenos, comidas, promedios', () => {
+    const h = buildHistory(BASE, 10, (_m, i) => ({
+      trained: i % 2 === 0,
+      meal_count: 3,
+      sleep_minutes: 420,
+    }))
+    const ev = buildMonthEvidence(h)
+    expect(ev.daysLogged).toBe(10)
+    expect(ev.entrenos).toBe(5) // i par: 0,2,4,6,8
+    expect(ev.comidas).toBe(30) // 3 × 10
+    expect(ev.sleepAvgMin).toBe(420)
+    expect(ev.waterAvg).toBeNull() // nunca se registró agua
   })
 })
 

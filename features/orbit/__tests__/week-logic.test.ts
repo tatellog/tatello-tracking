@@ -1,5 +1,11 @@
 import { deriveDimensions } from '../logic'
-import { buildVozSemanaReal, buildWeekDaysReal, buildWeekRecap, dayBrightness } from '../week-logic'
+import {
+  buildEnLuzSemana,
+  buildVozSemanaReal,
+  buildWeekDaysReal,
+  buildWeekRecap,
+  dayBrightness,
+} from '../week-logic'
 import { LOW, mkSig, STRONG } from './signals.fixture'
 
 describe('dayBrightness', () => {
@@ -60,27 +66,65 @@ describe('buildWeekDaysReal', () => {
 })
 
 describe('buildVozSemanaReal', () => {
-  test('empty week → forming voice with today + future closer', () => {
-    const days = buildWeekDaysReal([], 3) // Wednesday
-    const voz = buildVozSemanaReal(days, 3)
-    const text = voz.parts.map((p) => p.text).join('')
-    expect(text).toContain('La semana')
-    expect(text).toContain('Hoy, ')
-    expect(text).toContain('quieta')
-    expect(text).toContain('aún se escribe')
+  // Tres entrenos en días distintos (Dom/Lun/Mar) → una repetición real.
+  const threeTrained = [
+    mkSig('2026-05-31', { trained: true }),
+    mkSig('2026-06-01', { trained: true }),
+    mkSig('2026-06-02', { trained: true }),
+  ]
+
+  test('sin repeticiones → línea serena, sin patrón inventado', () => {
+    const text = buildVozSemanaReal([], 3)
+      .parts.map((p) => p.text)
+      .join('')
+    expect(text).toContain('Aún no se repite nada')
+    expect(text).toContain('sigue escribiéndose')
+  })
+
+  test('describe la repetición principal en pasado factual', () => {
+    const text = buildVozSemanaReal(threeTrained, 6)
+      .parts.map((p) => p.text)
+      .join('')
+    expect(text).toContain('Te moviste')
+    expect(text).toContain('3 veces')
   })
 
   test('confidence grows with days read', () => {
-    expect(buildVozSemanaReal(buildWeekDaysReal([], 0), 0).signature.confidence).toBe('baja')
-    expect(buildVozSemanaReal(buildWeekDaysReal([], 3), 3).signature.confidence).toBe('media')
-    expect(buildVozSemanaReal(buildWeekDaysReal([], 6), 6).signature.confidence).toBe('alta')
+    expect(buildVozSemanaReal([], 0).signature.confidence).toBe('baja')
+    expect(buildVozSemanaReal([], 3).signature.confidence).toBe('media')
+    expect(buildVozSemanaReal([], 6).signature.confidence).toBe('alta')
   })
 
-  test('the future closer drops on the last day of the week', () => {
-    const text = buildVozSemanaReal(buildWeekDaysReal([], 6), 6)
+  test('nunca usa causas ni predicciones prohibidas (PRD)', () => {
+    const text = buildVozSemanaReal(threeTrained, 6)
       .parts.map((p) => p.text)
       .join('')
-    expect(text).not.toContain('aún se escribe')
+    expect(text).not.toMatch(/porque|debido a|causó|suele|mañana/i)
+  })
+})
+
+describe('buildEnLuzSemana', () => {
+  test('elige el comportamiento más repetido (≥3 días)', () => {
+    const enLuz = buildEnLuzSemana(
+      [
+        mkSig('2026-05-31', { trained: true }), // Dom (0)
+        mkSig('2026-06-01', { trained: true }), // Lun (1)
+        mkSig('2026-06-02', { trained: true }), // Mar (2)
+      ],
+      6,
+    )
+    expect(enLuz).not.toBeNull()
+    expect(enLuz!.key).toBe('cuerpo')
+    expect(enLuz!.count).toBe(3)
+    expect(enLuz!.days).toEqual([0, 1, 2])
+  })
+
+  test('menos de 3 ocurrencias → null (no se inventa patrón)', () => {
+    const enLuz = buildEnLuzSemana(
+      [mkSig('2026-05-31', { trained: true }), mkSig('2026-06-01', { trained: true })],
+      6,
+    )
+    expect(enLuz).toBeNull()
   })
 })
 

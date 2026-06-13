@@ -10,12 +10,13 @@ import { useMacroTargets } from '@/features/macros/hooks'
 
 import { useHasAnySignals, useWeekSignals } from '../hooks'
 import { buildArquetipoSemana } from '../mock'
-import { useDailyIntelligence } from '../useDailyIntelligence'
 import {
+  buildEnLuzSemana,
   buildVozSemanaReal,
   buildWeekDaysReal,
   buildWeekObservations,
   buildWeekRecap,
+  enLuzSentence,
 } from '../week-logic'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { LiveDot } from './LiveDot'
@@ -61,17 +62,22 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
     [weekSignals, todayIdx, dimCtx],
   )
   const arquetipo = useMemo(() => buildArquetipoSemana(days, todayIdx), [days, todayIdx])
-  const voz = useMemo(() => buildVozSemanaReal(days, todayIdx), [days, todayIdx])
+  // Voz + "En Luz" — ambos describen REPETICIONES de los días reales (PRD V1).
+  const voz = useMemo(
+    () => buildVozSemanaReal(weekSignals ?? [], todayIdx, dimCtx),
+    [weekSignals, todayIdx, dimCtx],
+  )
+  const enLuz = useMemo(
+    () => buildEnLuzSemana(weekSignals ?? [], todayIdx, dimCtx),
+    [weekSignals, todayIdx, dimCtx],
+  )
 
   const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
   const { data: hasAny } = useHasAnySignals()
 
-  // Derive the state counts from the lived days so the header tells
-  // the truth: in-luz today and before; lejos today and before; the
-  // rest are still ahead.
+  // Conteo de calidad para el recap ("N de tus M días, con buena señal").
   const livedCount = arquetipo.daysRead
   const daysEnLuz = arquetipo.daysEnLuz
-  const porVenir = days.length - livedCount
 
   // "Esta semana, en números" — this week's log totals, computed locally
   // from the same shared rules (the Día/Mes engine lives in the BE; this
@@ -84,25 +90,14 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
     [weekSignals, todayIdx, dimCtx],
   )
 
-  // The "lo que viene" nudge comes from the BACKEND engine (daily-intelligence
-  // Edge Function); the hook falls back to the same local rules if it's
-  // unreachable. The month-shape patterns moved to Mes (they read the month).
-  const intel = useDailyIntelligence()
-  const remaining = 6 - todayIdx // days still ahead this Sunday-first week
-  const weekAhead = intel.data?.week.ahead ?? null
+  // "Lo que viene" se RETIRÓ: predecía el futuro ("el viernes suele pedir
+  // más de ti") — viola el PRD de Semana ("no predicciones") y roza la
+  // línea roja (anticipar fallo). Semana responde "¿qué se repitió?"
+  // (pasado), no "¿qué viene?".
 
-  // Empty-state branch: hide the templated archetype + meta + voz +
-  // pattern hint; render the galaxy hero with all 7 days as ghosts
-  // (the WeekConstellation handles brightness=0 gracefully).
+  // Empty-state branch: el mapa con los 7 días en silencio (signalCount 0
+  // → anillos punteados), sin patrón ni voz hasta que haya registros.
   if (hasAny === false) {
-    const ghostDays = days.map((d) => ({
-      ...d,
-      brightness: 0,
-      archetype: '',
-      dimEnLuz: 0,
-      drift: 0,
-      note: 'Aún no hay registros.',
-    }))
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         <View style={styles.header}>
@@ -115,7 +110,7 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
         </View>
         <View style={styles.diagram}>
           <WeekConstellation
-            days={ghostDays}
+            days={days.map((d) => ({ ...d, brightness: 0, archetype: '', dimEnLuz: 0, drift: 0 }))}
             selectedIdx={todayIdx}
             onSelect={() => {}}
             onOpenDia={onOpenDia}
@@ -124,7 +119,7 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
         <EmptySegmentCard
           eyebrow="La galaxia se enciende con la data"
           body="Por ahora todos los días están en silencio. Registra desde Hoy y los días brillan según lo que pasó."
-          hint="Stelar arma la prosa de la semana cuando tenga al menos un día con señales."
+          hint="Cuando algo se repita tres días, aparece aquí lo que más repites."
         />
       </Animated.View>
     )
@@ -132,46 +127,25 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Compressed header — archetype as the only hero, then a single
-          dense meta block that names the week's state, who read it
-          and the insight. No eyebrow on top: the tab pill already
-          says "Semana". */}
-      <View style={styles.header}>
-        {/* Frames the week's archetype as a lens, not an identity. */}
-        <Text style={styles.lensEyebrow}>Tu lente de la semana</Text>
-        <EmText
-          text={arquetipo.name}
-          emphasis={arquetipo.emphasis}
-          style={styles.archetype}
-          emStyle={styles.archetypeEm}
-        />
-        <View style={styles.metaRow}>
-          <LiveDot />
-          <Text style={styles.meta} numberOfLines={hasRealData ? 2 : 1}>
-            {/* Leads with the light — days "lejos" aren't tallied. */}
-            <Text style={styles.metaNum}>{daysEnLuz}</Text>
-            <Text> en luz · </Text>
-            <Text style={styles.metaNum}>{porVenir}</Text>
-            <Text> por venir</Text>
-            {/* "leído por Stelar · N días" — shown once the week is read
-                from real signals (Stelar reads them deterministically). */}
-            {hasRealData ? (
-              <>
-                <Text style={styles.metaSep}>{'\n'}</Text>
-                <Text>leído por </Text>
-                <Text style={styles.metaStelar}>Stelar</Text>
-                <Text>{` · ${arquetipo.daysRead} días`}</Text>
-              </>
-            ) : null}
-          </Text>
+      {/* Header — solo el crédito honesto "leído por Stelar · N días". El
+          arquetipo poético ("la semana de vaivén") se retiró: describía la
+          FORMA del brillo, no respondía "¿qué se repite?" — atmósfera, no
+          información. La respuesta vive en "En Luz" + la Voz, abajo. */}
+      {hasRealData ? (
+        <View style={styles.header}>
+          <View style={styles.metaRow}>
+            <LiveDot />
+            <Text style={styles.meta}>
+              <Text>leído por </Text>
+              <Text style={styles.metaStelar}>Stelar</Text>
+              <Text>{` · ${arquetipo.daysRead} días`}</Text>
+            </Text>
+          </View>
         </View>
-      </View>
+      ) : null}
 
-      {/* Compact week-at-a-glance — the seven-day constellation,
-          demoted from full-bleed hero to a smaller glance up top.
-          The week's REAL subject (the patterns) lives below; this
-          diagram now just sets the scene. Tapping a halo still opens
-          its HaloBubble with the day's info. */}
+      {/* Hero — la constelación de los 7 días (la galaxia). Tap a un halo
+          abre su HaloBubble con la info del día. */}
       <View style={styles.diagram}>
         <WeekConstellation
           days={days}
@@ -181,14 +155,27 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
         />
       </View>
 
-      {/* Stelar's reading of the week so far. The tag flips to
-          "Cierre de semana" once the week is done; mid-week it
-          stays "Hasta ahora". */}
+      {/* En Luz — la RESPUESTA del PRD: el comportamiento más repetido de la
+          semana (≥3 días). Solo se muestra si hay repetición real; si no,
+          la Voz de abajo dice "aún no se repite nada con fuerza". */}
+      {enLuz ? (
+        <View style={styles.enLuz}>
+          <Text style={styles.enLuzEyebrow}>Lo que más se repitió</Text>
+          <View style={styles.enLuzRow}>
+            <View style={[styles.enLuzDot, { backgroundColor: colors.dimension[enLuz.key] }]} />
+            <Text style={[styles.enLuzLabel, { color: colors.dimension[enLuz.key] }]}>
+              {enLuz.label}
+            </Text>
+          </View>
+          <Text style={styles.enLuzCount}>{enLuzSentence(enLuz, 'semana')}</Text>
+        </View>
+      ) : null}
+
+      {/* Voz de Stelar — describe REPETICIONES (PRD): "Te moviste 4 veces",
+          "incluso en días sin entreno", "el registro bajó el finde". */}
       <StelarVoice
         parts={voz.parts}
         tag={todayIdx === 6 ? 'Cierre de semana' : 'Hasta ahora'}
-        // The confidence signature ("Confianza alta · N días") rides the
-        // real reading only — never shown over the mock example prose.
         signature={hasRealData ? voz.signature : undefined}
       />
 
@@ -219,12 +206,13 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
               empty={recap.waterAvg == null}
             />
           </View>
-          {/* Días en luz — a quality read, the recap's one selective glow. */}
+          {/* Días con buena señal — lectura de calidad (NO "en luz", para
+              no chocar con el comportamiento "En Luz" de arriba). */}
           <View style={styles.luzRow}>
             <LuzStar />
             <Text style={styles.luzText}>
               <Text style={styles.luzNum}>{daysEnLuz}</Text>
-              <Text>{` de tus ${livedCount} ${livedCount === 1 ? 'día' : 'días'}, en luz`}</Text>
+              <Text>{` de tus ${livedCount} ${livedCount === 1 ? 'día' : 'días'}, con buena señal`}</Text>
             </Text>
           </View>
         </View>
@@ -247,22 +235,6 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
           </View>
         </>
       ) : null}
-
-      <SectionDivider />
-
-      {/* Lo que viene — the days still ahead this week + a knowing nudge
-          from the Mes patterns (only when a patterned day is still ahead). */}
-      <View style={styles.ahead}>
-        <Text style={styles.aheadEyebrow}>Lo que viene</Text>
-        <Text style={styles.aheadDays}>
-          {remaining <= 0
-            ? 'Tu semana cierra hoy.'
-            : remaining === 1
-              ? 'Te queda 1 día esta semana.'
-              : `Te quedan ${remaining} días esta semana.`}
-        </Text>
-        {weekAhead ? <Text style={styles.aheadHint}>{weekAhead}</Text> : null}
-      </View>
     </Animated.View>
   )
 }
@@ -302,20 +274,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
   },
-  // Frames the archetype as a passing lens, not an identity.
-  lensEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 8,
-  },
   archetype: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 27,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     color: colors.leche,
     textAlign: 'center',
   },
@@ -323,22 +286,18 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
   metaRow: {
-    marginTop: 14,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 7,
   },
   meta: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
-    lineHeight: 16,
     textTransform: 'uppercase',
     color: colors.niebla,
-    textAlign: 'center',
-  },
-  metaNum: {
-    color: colors.magenta,
   },
   metaStelar: {
     fontFamily: typography.serifSemi,
@@ -346,10 +305,46 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: colors.magenta,
   },
-  metaSep: {
-    fontSize: 4,
+  // ── En Luz — el comportamiento más repetido (hero del PRD) ───────
+  enLuz: {
+    alignItems: 'center',
+    marginTop: 22,
   },
-  // ── Diagram — compact glance, centred (was full-bleed hero) ───
+  enLuzEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 10,
+  },
+  enLuzRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  enLuzDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  enLuzLabel: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 26,
+    lineHeight: 30,
+  },
+  enLuzCount: {
+    marginTop: 6,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  enLuzNum: {
+    fontFamily: typography.uiBold,
+    color: colors.bone,
+  },
+  // ── Diagram — la galaxia de 7 días, centrada ──────────────────
   diagram: {
     width: '72%',
     alignSelf: 'center',
@@ -440,28 +435,5 @@ const styles = StyleSheet.create({
     color: colors.oro,
     marginBottom: 14,
     marginLeft: 2,
-  },
-  // ── Lo que viene — a quiet footnote, separated by a cosmic divider. ──
-  ahead: {},
-  aheadEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 11,
-    letterSpacing: 1.8,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 8,
-  },
-  aheadDays: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-  },
-  aheadHint: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-    marginTop: 6,
   },
 })

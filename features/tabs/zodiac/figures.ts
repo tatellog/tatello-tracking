@@ -33,7 +33,7 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     stars: [
       { x: 0.18, y: 0.42, mag: 2.6 }, // 0 snout (ram facing left)
       { x: 0.32, y: 0.5, mag: 3.4 }, // 1 lower jaw
-      { x: 0.45, y: 0.32, mag: 1.5 }, // 2 Hamal — horn peak (anchor) ★
+      { x: 0.51, y: 0.24, mag: 1.5 }, // 2 Hamal — horn peak (anchor) ★
       { x: 0.62, y: 0.45, mag: 2.9 }, // 3 shoulder / back ridge
       { x: 0.72, y: 0.62, mag: 3.0 }, // 4 hip
       { x: 0.82, y: 0.78, mag: 3.3 }, // 5 rear leg / tail
@@ -156,11 +156,11 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     // composition. Same Y topology, repositioned for the
     // two-crab symmetry.
     stars: [
-      { x: 0.1, y: 0.4, mag: 2.8 }, // 0 left arm tip — on left crab
+      { x: 0.12, y: 0.4, mag: 2.8 }, // 0 left arm tip — on left crab
       { x: 0.3, y: 0.46, mag: 3.2 }, // 1 left arm mid
       { x: 0.5, y: 0.5, mag: 1.5 }, // 2 junction (anchor) ★ — dead centre
       { x: 0.7, y: 0.46, mag: 3.2 }, // 3 right arm mid
-      { x: 0.9, y: 0.4, mag: 2.8 }, // 4 right arm tip — on right crab
+      { x: 0.88, y: 0.4, mag: 2.8 }, // 4 right arm tip — on right crab
       { x: 0.5, y: 0.7, mag: 3.2 }, // 5 stem mid
       { x: 0.4, y: 0.88, mag: 3.0 }, // 6 left claw
       { x: 0.6, y: 0.88, mag: 3.0 }, // 7 right claw
@@ -194,9 +194,9 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
       // Regulus at the throat → Eta along the jawline → Algieba at the
       // mane-shoulder shelf → Adhafera near the mane crown → Rasalas
       // at the top of the crown → Epsilon out over the snout/gaze.
-      { x: 0.18, y: 0.6, mag: 1.5, name: 'Regulus', role: 'el corazón del león' },
-      { x: 0.24, y: 0.45, mag: 3.5, name: 'Eta', role: 'su cuello' },
-      { x: 0.3, y: 0.29, mag: 2.3, name: 'Algieba', role: 'la curva de su melena' },
+      { x: 0.13, y: 0.65, mag: 1.5, name: 'Regulus', role: 'el corazón del león' },
+      { x: 0.14, y: 0.37, mag: 3.5, name: 'Eta', role: 'su cuello' },
+      { x: 0.42, y: 0.29, mag: 2.3, name: 'Algieba', role: 'la curva de su melena' },
       { x: 0.44, y: 0.14, mag: 3.5, name: 'Adhafera', role: 'la trenza de su melena' },
       { x: 0.56, y: 0.1, mag: 3.9, name: 'Rasalas', role: 'la corona de su cabeza' },
       { x: 0.62, y: 0.22, mag: 3.0, name: 'Epsilon', role: 'su mirada' },
@@ -204,9 +204,9 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
       // cola. El triángulo descansa sobre el CUERPO DE LA MELENA (centro-
       // derecha). Denebola se mantiene dentro de la melena, lejos de la
       // ramita floral y la luna del borde derecho.
-      { x: 0.6, y: 0.5, mag: 3.3, name: 'Chort', role: 'el inicio de su rugido' },
-      { x: 0.6, y: 0.42, mag: 2.6, name: 'Zosma', role: 'la fuerza de su andar' },
-      { x: 0.66, y: 0.6, mag: 2.0, name: 'Denebola', role: 'el último resplandor' },
+      { x: 0.31, y: 0.45, mag: 3.3, name: 'Chort', role: 'el inicio de su rugido' },
+      { x: 0.6, y: 0.37, mag: 2.6, name: 'Zosma', role: 'la fuerza de su andar' },
+      { x: 0.5, y: 0.65, mag: 2.0, name: 'Denebola', role: 'el último resplandor' },
     ],
     lines: [
       [0, 1], // sickle hook
@@ -235,39 +235,38 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   virgo: {
     label: 'VIRGO',
     glyph: '♍',
-    // Pentagon + branches kept as the canonical Virgo topology
-    // but compacted so the whole figure fits inside the visible
-    // woman silhouette in virgo-art.svg — antenna over the hair,
-    // pentagon on the torso, legs descending through the dress.
+    // Mapeado al Emblema (doncella sentada, mira a la derecha): cabeza
+    // arriba, el brazo alza la ESPIGA (Spica = la estrella ★) en su mano
+    // derecha, el torso baja al centro y el vestido se abre en la base.
+    // Sin flip (frame directo) — overlay: scripts/overlay-virgo.mjs.
     stars: [
-      { x: 0.28, y: 0.12, mag: 3.4 }, // 0 H — antenna tip (hair flourish)
-      { x: 0.4, y: 0.22, mag: 1.5 }, // 1 C — pentagon top-left (anchor) ★
-      { x: 0.55, y: 0.3, mag: 3.0 }, // 2 D — pentagon top-right (shoulder)
-      { x: 0.65, y: 0.18, mag: 3.2 }, // 3 B — arm bend
-      { x: 0.78, y: 0.1, mag: 3.4 }, // 4 A — arm tip (reaching up)
-      { x: 0.6, y: 0.46, mag: 3.4 }, // 5 F — right hip / knee
-      { x: 0.62, y: 0.68, mag: 1.9 }, // 6 G — pentagon bottom-right ★
-      { x: 0.34, y: 0.58, mag: 2.6 }, // 7 E — pentagon bottom-left (node)
-      { x: 0.28, y: 0.74, mag: 3.2 }, // 8 I — left leg
-      { x: 0.2, y: 0.88, mag: 3.2 }, // 9 J — left foot
-      { x: 0.54, y: 0.82, mag: 3.2 }, // 10 L — right leg fork
-      { x: 0.64, y: 0.9, mag: 3.2 }, // 11 K — right foot
-      { x: 0.44, y: 0.9, mag: 3.4 }, // 12 M — lower dangle
+      { x: 0.46, y: 0.16, mag: 3.4 }, // 0 cabeza/corona
+      { x: 0.72, y: 0.31, mag: 1.5 }, // 1 Spica — la espiga en su mano ★
+      { x: 0.46, y: 0.31, mag: 3.0 }, // 2 hombro
+      { x: 0.43, y: 0.43, mag: 3.2 }, // 3 pecho
+      { x: 0.58, y: 0.46, mag: 3.4 }, // 4 brazo hacia la espiga
+      { x: 0.42, y: 0.53, mag: 3.4 }, // 5 cintura
+      { x: 0.58, y: 0.67, mag: 1.9 }, // 6 regazo derecho ★
+      { x: 0.34, y: 0.63, mag: 2.6 }, // 7 cadera izquierda
+      { x: 0.31, y: 0.76, mag: 3.2 }, // 8 rodilla izquierda
+      { x: 0.27, y: 0.9, mag: 3.2 }, // 9 base izquierda del vestido
+      { x: 0.56, y: 0.8, mag: 3.2 }, // 10 rodilla derecha
+      { x: 0.62, y: 0.9, mag: 3.2 }, // 11 base derecha del vestido
+      { x: 0.46, y: 0.92, mag: 3.4 }, // 12 base central
     ],
     lines: [
-      [1, 0], // antenna — C to H
-      [1, 2], // pentagon — top edge C-D
-      [2, 5], // pentagon — right side upper D-F
-      [5, 6], // pentagon — right side lower F-G (the knee)
-      [6, 7], // pentagon — bottom edge G-E
-      [7, 1], // pentagon — left edge E-C
-      [2, 3], // arm — D up to the corner
-      [3, 4],
-      [7, 8], // left leg off the node E
-      [8, 9],
-      [6, 10], // lower-right leg off G
-      [10, 11],
-      [10, 12], // lower dangle
+      [0, 2], // cabeza → hombro
+      [2, 4], // hombro → brazo
+      [4, 1], // brazo → espiga (Spica)
+      [2, 3], // hombro → pecho
+      [3, 5], // pecho → cintura
+      [5, 7], // cintura → cadera izq
+      [5, 6], // cintura → regazo der
+      [7, 8], // cadera → rodilla izq
+      [8, 9], // → base izq
+      [6, 10], // regazo → rodilla der
+      [10, 11], // → base der
+      [10, 12], // → base central
     ],
   },
 
@@ -284,14 +283,14 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     // C where the woman holds it; the two TAILS are the chains
     // descending to the pans on each side. 8 stars + 8 lines = 16.
     stars: [
-      { x: 0.22, y: 0.3, mag: 1.5 }, // 0 A — left beam end (anchor) ★
-      { x: 0.72, y: 0.3, mag: 1.9 }, // 1 B — right beam end
-      { x: 0.5, y: 0.58, mag: 1.9 }, // 2 C — woman's hands (lower vertex)
-      { x: 0.18, y: 0.48, mag: 3.2 }, // 3 D — left chain upper
-      { x: 0.16, y: 0.66, mag: 3.2 }, // 4 E — left chain mid
-      { x: 0.18, y: 0.84, mag: 3.0 }, // 5 F — left pan
-      { x: 0.78, y: 0.66, mag: 3.2 }, // 6 G — right chain
-      { x: 0.82, y: 0.84, mag: 3.0 }, // 7 H — right pan
+      { x: 0.06, y: 0.27, mag: 1.5 }, // 0 A — beam end (anchor) ★ — extremo viga
+      { x: 0.74, y: 0.27, mag: 1.9 }, // 1 B — beam end opuesto
+      { x: 0.4, y: 0.56, mag: 1.9 }, // 2 C — manos / vértice bajo la columna
+      { x: 0.05, y: 0.44, mag: 3.2 }, // 3 D — cadena lado-0 superior
+      { x: 0.05, y: 0.62, mag: 3.2 }, // 4 E — cadena lado-0 media
+      { x: 0.05, y: 0.82, mag: 3.0 }, // 5 F — plato lado-0
+      { x: 0.73, y: 0.62, mag: 3.2 }, // 6 G — cadena lado-1
+      { x: 0.73, y: 0.82, mag: 3.0 }, // 7 H — plato lado-1
     ],
     lines: [
       [0, 1], // beam — horizontal top
@@ -310,33 +309,32 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
   escorpio: {
     label: 'ESCORPIO',
     glyph: '♏',
-    // Realigned to the escorpio-art.svg silhouette: scorpion body
-    // is vertical with the head + claws at the top, body running
-    // down the centre, and the tail wrapping to the lower-right
-    // with the stinger curling back up. Coordinates trace that
-    // anatomy so each lit star lands on a recognisable body part.
+    // Mapeado al Emblema Celeste (escorpio-art2): cuerpo al centro, las
+    // pinzas/cabeza abajo, y la COLA subiendo y enroscándose hasta el
+    // aguijón arriba. Sin flips/rotación (frame directo) — overlay:
+    // scripts/overlay-scorpio.mjs.
     stars: [
-      { x: 0.32, y: 0.22, mag: 2.7 }, // 0 left claw — upper-left horn tip
-      { x: 0.5, y: 0.3, mag: 2.3 }, // 1 head — between the horns
-      { x: 0.68, y: 0.22, mag: 2.7 }, // 2 right claw — upper-right horn tip
-      { x: 0.5, y: 0.42, mag: 2.9 }, // 3 body high — upper torso
-      { x: 0.5, y: 0.55, mag: 1.5 }, // 4 Antares — the heart, anchor
-      { x: 0.52, y: 0.68, mag: 3.0 }, // 5 body mid — lower torso
-      { x: 0.58, y: 0.78, mag: 2.8 }, // 6 body bend — where tail starts curving
-      { x: 0.72, y: 0.84, mag: 2.4 }, // 7 tail curl — tail extending right
-      { x: 0.82, y: 0.72, mag: 2.6 }, // 8 tail — curving back up
-      { x: 0.78, y: 0.55, mag: 1.9 }, // 9 stinger tip — pointing up
+      { x: 0.54, y: 0.6, mag: 2.7 }, // 0 pinza derecha
+      { x: 0.18, y: 0.48, mag: 2.3 }, // 1 pinza izquierda
+      { x: 0.38, y: 0.53, mag: 2.7 }, // 2 cabeza (junta de las pinzas)
+      { x: 0.45, y: 0.45, mag: 2.9 }, // 3 cuerpo alto
+      { x: 0.51, y: 0.38, mag: 1.5 }, // 4 Antares — el corazón
+      { x: 0.59, y: 0.27, mag: 3.0 }, // 5 cuerpo → cola
+      { x: 0.63, y: 0.17, mag: 2.8 }, // 6 cola
+      { x: 0.64, y: 0.07, mag: 2.4 }, // 7 cola arriba
+      { x: 0.51, y: 0.0, mag: 2.6 }, // 8 curva del aguijón
+      { x: 0.4, y: 0.08, mag: 1.9 }, // 9 aguijón — la punta
     ],
     lines: [
-      [0, 1],
-      [2, 1],
-      [1, 3],
+      [2, 1], // pinza izquierda
+      [2, 0], // pinza derecha
+      [2, 3], // cabeza → cuerpo
       [3, 4],
       [4, 5],
       [5, 6],
       [6, 7],
       [7, 8],
-      [8, 9],
+      [8, 9], // cola → aguijón
     ],
   },
 
@@ -357,13 +355,13 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     // cycle exactly so every element lights by day 28.
     stars: [
       // Bow (right side — three stars arcing along the bow's curve)
-      { x: 0.82, y: 0.38, mag: 2.8 }, // 0 bow upper tip
-      { x: 0.95, y: 0.55, mag: 2.0 }, // 1 bow apex (rightmost) ★
-      { x: 0.82, y: 0.72, mag: 2.8 }, // 2 bow lower tip
+      { x: 0.82, y: 0.3, mag: 2.8 }, // 0 bow upper tip
+      { x: 0.95, y: 0.47, mag: 2.0 }, // 1 bow apex (rightmost) ★
+      { x: 0.82, y: 0.64, mag: 2.8 }, // 2 bow lower tip
       // Arrow (horizontal — nocked on bow string, shaft going left
       // toward the archer's hand)
-      { x: 0.86, y: 0.55, mag: 3.2 }, // 3 arrow nock (on bow string)
-      { x: 0.68, y: 0.55, mag: 3.0 }, // 4 arrow shaft mid
+      { x: 0.86, y: 0.47, mag: 3.2 }, // 3 arrow nock (on bow string)
+      { x: 0.68, y: 0.47, mag: 3.0 }, // 4 arrow shaft mid
       { x: 0.55, y: 0.52, mag: 2.6 }, // 5 arrow tip (front hand)
       // Archer body — torso compact rectangle on the figure
       { x: 0.44, y: 0.4, mag: 2.4 }, // 6 head / shoulder line ★

@@ -100,7 +100,9 @@ function SkiaFlareNode({
   const hero = mag <= HERO_MAG
   // Base radius mirrors the geometry.starRadius curve — brighter star
   // (lower mag) → bigger flare. Tuned by eye to read at ~290 px canvas.
-  const R = hero ? 6 : Math.max(2.4, 4.6 - mag * 0.55)
+  // Hero un poco más chico (5) para que el halo no se derrame sobre el
+  // cuerpo del emblema dorado de fondo.
+  const R = hero ? 5 : Math.max(2.4, 4.6 - mag * 0.55)
   const m = hero ? 1 : 0.6
   const translate = useDerivedValue(() => [{ translateX: x }, { translateY: y }])
   const breathe = useDerivedValue(() => {
@@ -109,7 +111,7 @@ function SkiaFlareNode({
     return [{ scale: 0.92 + w * 0.14 }]
   })
 
-  const hueBloomR = R * (hero ? 7.5 : 5)
+  const hueBloomR = R * (hero ? 8.5 : 5)
   const whiteBloomR = R * (hero ? 3.8 : 2.7)
 
   // Diffraction rays — 6 spokes for hero, 4 for ambient. Alternating
@@ -137,8 +139,8 @@ function SkiaFlareNode({
             c={vec(0, 0)}
             r={hueBloomR}
             colors={[
-              `rgba(${MAGENTA},${0.42 * m})`,
-              `rgba(${MAGENTA},${0.14 * m})`,
+              `rgba(${MAGENTA},${0.5 * m})`,
+              `rgba(${MAGENTA},${0.16 * m})`,
               `rgba(${MAGENTA},0)`,
             ]}
           />
@@ -181,11 +183,11 @@ function SkiaFlareNode({
           <SkiaRadialGradient
             c={vec(0, 0)}
             r={R * 1.8}
-            colors={['rgba(255,255,255,0.78)', 'rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']}
+            colors={['rgba(255,255,255,0.48)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0)']}
           />
           <BlurMask blur={R * 0.85} style="normal" />
         </SkiaCircle>
-        <SkiaCircle c={vec(0, 0)} r={R * 0.55} color="white">
+        <SkiaCircle c={vec(0, 0)} r={R * 0.42} color={colors.leche}>
           <BlurMask blur={R * 0.22} style="normal" />
         </SkiaCircle>
       </SkiaGroup>

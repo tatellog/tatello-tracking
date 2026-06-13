@@ -6,18 +6,18 @@ import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
 import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
-import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { EmText } from '@/components/EmText'
 import { markSeenStelarReveal, readSeenStelarReveal } from '@/lib/onboardingFlags'
+import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 import { ENGINE_ACTIVE } from '../engine'
 import { useHasAnySignals, useTodaySignals } from '../hooks'
 import { useDailyIntelligence } from '../useDailyIntelligence'
-import { useDailyReading } from '../useDailyReading'
 import {
   buildDayIdentity,
+  buildDayVoice,
   deriveDimensions,
   dimensionDetail,
   dimensionEvidence,
@@ -38,16 +38,16 @@ import { StelarVoice } from './StelarVoice'
  * surrounding flow is structured so the AI never feels hidden:
  *
  *   header           ← REAL day identity (one-word state + en-luz count)
- *   reading          ← deterministic lede, above the orbital
- *   orbital diagram  ← the visual system
+ *   orbital diagram  ← the visual system (6 stars brighten with signal)
  *   readout          ← tap a dimension; shows verdict + evidence
+ *   Voz de Stelar    ← REAL factual reading of TODAY (qué registré / qué
+ *                      falta) — deterministic, always on (PRD V1)
  *   DayLiveReadings  ← "Cómo va tu día" — real, goal-aware readings
- *   DayAction     ← the one move the IA recommends today (gated)
- *   Voz de Stelar    ← the full prose reading (gated)
+ *   DayAction        ← the one move the IA recommends today (gated, MOCK)
  *
- * Header + reading + live readings are REAL (shared intelligence lib).
- * Only DayAction + Voz de Stelar stay MOCK behind ENGINE_ACTIVE — the
- * AI engine will write them from daily_signals.
+ * Header + Voz de Stelar + live readings are REAL (shared intelligence
+ * lib). Only DayAction (+ the richer engine prose) stays behind
+ * ENGINE_ACTIVE — the AI will enrich the same Voz from daily_signals.
  */
 // When a dimension is in silence, invite the user to register the signal
 // that lights it — instead of a dead-end. Oro afford, tappable. Ciclo has
@@ -105,7 +105,7 @@ const LIT_PHRASE: Partial<Record<DimensionKey, string>> = {
 
 export function DaySegment() {
   const router = useRouter()
-  const { data, isLoading } = useTodaySignals()
+  const { data } = useTodaySignals()
   const { data: hasAny } = useHasAnySignals()
   const signals = data ?? null
   // Macro targets make the `alimento` dimension deficit-aware (protein +
@@ -138,22 +138,21 @@ export function DaySegment() {
   const [selectedKey, setSelectedKey] = useState<DimensionKey | null>(null)
   const [ignited, setIgnited] = useState<DimensionKey[]>([])
 
-  // The deterministic daily reading — the real, honest voice of the Día
-  // while the AI engine is mock. Crosses today's signals + cycle phase.
-  const cycle = useCyclePhase()
-  const reading = useDailyReading({
-    signals,
-    ready: !isLoading,
-    isPrePeriod: cycle?.phase === 'lutea',
-    proteinTarget,
-    calorieTarget,
-  })
+  // Voz de Stelar (PRD V1) — la traducción humana y FACTUAL de hoy: qué
+  // registraste + qué sigue en calma. Determinista (sin IA, sin gate);
+  // lee las mismas dimensiones que el hero. Reemplaza el viejo lede
+  // poético rotado: el PRD pide observación de los datos, no estado de
+  // ánimo. NUNCA se silencia (siempre hay un "qué registré" que decir).
+  const voz = buildDayVoice(signals, { cycleEnabled })
 
-  // On arrival, compare today's lit dimensions to the last snapshot and
-  // celebrate the ones that newly crossed into "brillante". Persist the
-  // new snapshot so the same lighting doesn't re-celebrate next visit.
+  // On arrival, celebrate the dimensions that newly crossed into
+  // "brillante" TODAY. Snapshot is date-stamped: a snapshot from another
+  // day doesn't count (el Día nunca compara jornadas — PRD). So we only
+  // ever celebrate lighting that happened HOY — from an empty sky on the
+  // day's first visit, or from earlier-today on a re-visit (intra-día, ok).
   useEffect(() => {
     if (!signals) return
+    const today = todayInTimezone()
     const dims = deriveDimensions(signals, { calorieTarget, proteinTarget, cycleEnabled })
     const current: Record<string, boolean> = {}
     dims.forEach((d) => {
@@ -163,12 +162,15 @@ export function DaySegment() {
     AsyncStorage.getItem(LIT_SNAPSHOT_KEY)
       .then((raw) => {
         if (!alive) return
-        const prev = raw ? (JSON.parse(raw) as Record<string, boolean>) : {}
+        const snap = raw
+          ? (JSON.parse(raw) as { date: string; lit: Record<string, boolean> })
+          : null
+        const prev = snap && snap.date === today ? snap.lit : {}
         const newly = dims
           .filter((d) => d.key !== 'ciclo' && current[d.key] && !prev[d.key])
           .map((d) => d.key)
         if (newly.length) setIgnited(newly)
-        void AsyncStorage.setItem(LIT_SNAPSHOT_KEY, JSON.stringify(current))
+        void AsyncStorage.setItem(LIT_SNAPSHOT_KEY, JSON.stringify({ date: today, lit: current }))
       })
       .catch(() => {})
     return () => {
@@ -245,9 +247,9 @@ export function DaySegment() {
           </Text>
         </View>
       </View>
-      {reading ? <Text style={styles.reading}>{reading}</Text> : null}
 
-      {/* Arrival payoff — what newly lit since the last visit (P2A). */}
+      {/* Arrival payoff — what newly lit TODAY (P2A). Snapshot resets at
+          midnight (today-pure): el Día nunca compara con otra jornada. */}
       {ignited.length > 0 ? (
         <Animated.Text entering={FadeIn.duration(600)} style={styles.ignited}>
           {ignited.length === 1
@@ -280,16 +282,17 @@ export function DaySegment() {
           selectedKey={selectedKey}
           onSelect={(k) => setSelectedKey((cur) => (cur === k ? null : k))}
         />
-        {/* Bottom fade — the previous gradient faded to
-            `colors.bg` (#0A0608), but below heroRow the
-            SkyBackground composites magentaTint2 over the page bg
-            → about #1A0810. The mismatch produced a visible band.
-            Now the gradient fades to that composited wine tone
-            (matched to the pill bg) so the transition reads as a
-            continuous sky, not a step. */}
+        {/* Bottom fade — el fondo (SkyBackground + ScreenCosmos) es
+            CONTINUO a pantalla completa, así que el orbital ya se asienta
+            sobre él sin discontinuidad. El gradiente anterior terminaba en
+            `#1A0810` OPACO en su borde inferior y chocaba de golpe con ese
+            fondo continuo → una línea horizontal dura. Ahora difumina a
+            transparente en AMBOS extremos: una bruma vino suave en el
+            tercio bajo del orbital, sin borde duro — el fondo retoma sin
+            escalón. */}
         <LinearGradient
-          colors={['transparent', '#1A0810']}
-          locations={[0, 1]}
+          colors={['transparent', '#1A0810', 'transparent']}
+          locations={[0, 0.5, 1]}
           pointerEvents="none"
           style={styles.heroFade}
         />
@@ -351,14 +354,7 @@ export function DaySegment() {
                   ))}
                 </View>
               </View>
-            ) : selected.key === 'ciclo' &&
-              signals != null ? // signal — showing "Aún no hay señal aquí. Stelar espera, // CICLO with "Fuera del periodo" is a FACT, not a missing
-            // no inventa." here contradicted the factual detail line
-            // ("la app no me lee" / "reproche disfrazado" per UX audit).
-            // Skip the silence block entirely; the detail line carries
-            // the truth. No CTA either — outside-of-period is not
-            // actionable.
-            null : (
+            ) : selected.key === 'ciclo' && signals != null ? null : ( // actionable. // the truth. No CTA either — outside-of-period is not // Skip the silence block entirely; the detail line carries // ("la app no me lee" / "reproche disfrazado" per UX audit). // no inventa." here contradicted the factual detail line // signal — showing "Aún no hay señal aquí. Stelar espera, // CICLO with "Fuera del periodo" is a FACT, not a missing
               <View style={styles.silence}>
                 <Text style={styles.evidenceQuiet}>
                   {QUIET_LINE_FOR[selected.key] ??
@@ -384,13 +380,15 @@ export function DaySegment() {
         ) : null}
       </View>
 
-      {/* Affordance microcopy — moved from the imperative "Toca una
-          dimensión para leerla" (read as tutorial instructions for a
-          child) to Cormorant italic ambient copy that names what the
-          stars hold, leaving the action to be discovered by tap.
-          The visible breathing pulse on en-luz stars carries the
-          tappability signal; this line is mood, not direction. */}
-      {!selected ? <Text style={styles.hint}>cada estrella guarda tu día</Text> : null}
+      {/* Voz de Stelar (PRD V1) — la traducción humana de los datos de
+          HOY: frase 1 = qué registraste; frase 2 = qué sigue en calma.
+          Factual, sin tendencias, siempre visible (responde "qué me
+          falta" sin tocar una estrella). */}
+      <View style={styles.voz}>
+        <Text style={styles.vozEyebrow}>Voz de Stelar</Text>
+        <Text style={styles.vozRegistered}>{voz.registered}</Text>
+        {voz.missing ? <Text style={styles.vozMissing}>{voz.missing}</Text> : null}
+      </View>
 
       {/* Hoy en vivo — today's live, goal-aware readings. Real + always
           on (independent of the mock engine). */}
@@ -468,7 +466,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 140,
+    // Más alto + difuminado a ambos lados → pendiente suave, sin borde.
+    height: 200,
   },
   // Readout overlay — translucent panel anchored to the bottom of
   // the orbital container. Replaces the old below-the-hero card so
@@ -520,17 +519,37 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.niebla,
   },
-  hint: {
-    marginTop: 4,
-    textAlign: 'center',
-    // Coach voice register (Cormorant italic) — names what the
-    // stars hold without imperative "toca / haz X" language. Tone
-    // is mood, not direction.
+  // Voz de Stelar — la lectura factual de hoy. Centrada como el resto de
+  // la voz del coach. Registrado en leche; faltante en niebla (más callado).
+  voz: {
+    marginTop: 22,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  vozEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 10,
+  },
+  vozRegistered: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-    opacity: 0.78,
+    fontSize: 19,
+    lineHeight: 27,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  vozMissing: {
+    marginTop: 7,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 15.5,
+    lineHeight: 22,
+    color: colors.niebla,
+    textAlign: 'center',
   },
   // The one-time first-reading reveal, above the Voz de Stelar card.
   revealIntro: {
@@ -641,18 +660,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
-  },
-  // The deterministic daily reading — the real lede while the engine is
-  // mock. Serif italic, centered, calm; a sentence, not a name.
-  reading: {
-    marginTop: 6,
-    paddingHorizontal: 8,
-    textAlign: 'center',
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 19,
-    lineHeight: 27,
-    color: colors.leche,
   },
   // Arrival payoff — the line that celebrates a newly-lit dimension.
   ignited: {

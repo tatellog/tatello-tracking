@@ -124,13 +124,13 @@ export function computeIntelligence(input: IntelligenceInput): Intelligence {
     week: {
       days,
       arquetipo: buildArquetipoSemana(days, todayGetDay),
-      voz: buildVozSemanaReal(days, todayGetDay),
+      voz: buildVozSemanaReal(weekSignals, todayGetDay, dimCtx),
       ahead: buildWeekAhead(recurrences, todayGetDay),
     },
     month: {
       summary,
       theme: monthTheme(summary, daysLogged),
-      voz: buildVozMes(summary, daysLogged),
+      voz: buildVozMes(m30, dimCtx, daysLogged),
       satellites: buildMonthSatellites(summary, daysLogged),
       patterns: [...monthShape, ...recurrences],
       daysLogged,

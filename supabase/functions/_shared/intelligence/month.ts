@@ -10,7 +10,7 @@
  * the same way the Semana did.
  */
 import { deriveDimensions, dimensionsFor } from './dimensions'
-import type { DailySignals, DimensionContext, DimensionKey, VozParte } from './types'
+import type { DailySignals, DimensionContext, DimensionKey, EnLuz, VozParte } from './types'
 
 /** A trend needs at least this much half-over-half change to be named. */
 const TREND_GAP = 0.08
@@ -88,64 +88,198 @@ export function monthTheme(summary: readonly DimensionMonth[], daysLogged: numbe
   return 'movimiento'
 }
 
-// Warm, consistent gerunds — "aflojando" (never "cayendo", which reads as
-// decline/alarm) matches the month theme's own word.
-const TREND_WORD: Record<'up' | 'down', string> = {
-  up: 'creciendo',
-  down: 'aflojando',
+/* ── Evidencia acumulada (PRD Mes §Evidencia) ────────────────────────
+ * SOLO datos contables del mes — "18 entrenamientos", no "% de brillo".
+ * El conteo absoluto es la prueba tangible de "esto lo construí yo"; un
+ * promedio de brillo se leería como score/meta (prohibido). */
+export type MonthEvidence = {
+  entrenos: number
+  comidas: number
+  sleepAvgMin: number | null
+  waterAvg: number | null
+  daysLogged: number
 }
 
-/** The written month reading — opener by theme, the brightest dimension,
- *  and the single clearest movement. Driven entirely by the numbers. */
+export function buildMonthEvidence(signals: readonly DailySignals[]): MonthEvidence {
+  let entrenos = 0
+  let comidas = 0
+  let sleepSum = 0
+  let sleepN = 0
+  let waterSum = 0
+  let waterN = 0
+  let daysLogged = 0
+  for (const s of signals) {
+    if (!s.day) continue
+    daysLogged += 1
+    if (s.trained) entrenos += 1
+    if (s.meal_count) comidas += s.meal_count
+    if (s.sleep_minutes != null) {
+      sleepSum += s.sleep_minutes
+      sleepN += 1
+    }
+    if (s.water_glasses != null) {
+      waterSum += s.water_glasses
+      waterN += 1
+    }
+  }
+  return {
+    entrenos,
+    comidas,
+    sleepAvgMin: sleepN ? Math.round(sleepSum / sleepN) : null,
+    waterAvg: waterN ? Math.round((waterSum / waterN) * 10) / 10 : null,
+    daysLogged,
+  }
+}
+
+/* ── En Luz del Mes (PRD) — el comportamiento más consistente en 30 días ─
+ * Cuenta por PRESENCIA (consistencia), no por calidad. Umbral 8 días: a
+ * un mes, 8 días con la misma señal ya es constancia (Semana usa 3 de 7). */
+const EN_LUZ_MES_MIN = 8
+
+type MonthBehavior = {
+  key: DimensionKey
+  label: string
+  unit: string
+  priority: number
+  count: number
+}
+
+function monthBehaviorCounts(
+  signals: readonly DailySignals[],
+  ctx?: DimensionContext,
+): MonthBehavior[] {
+  const protTarget = ctx?.proteinTarget ?? null
+  const count = (fn: (s: DailySignals) => boolean): number =>
+    signals.filter((s) => s.day != null && fn(s)).length
+  const list: MonthBehavior[] = [
+    {
+      key: 'cuerpo',
+      label: 'Movimiento',
+      unit: 'registrados',
+      priority: 3,
+      count: count((s) => s.trained === true),
+    },
+    ...(protTarget != null
+      ? [
+          {
+            key: 'alimento' as DimensionKey,
+            label: 'Proteína',
+            unit: 'alcanzada',
+            priority: 3,
+            count: count((s) => s.protein_g != null && s.protein_g >= protTarget),
+          },
+        ]
+      : []),
+    {
+      key: 'sueno',
+      label: 'Sueño',
+      unit: 'registrados',
+      priority: 2,
+      count: count((s) => s.sleep_minutes != null),
+    },
+    {
+      key: 'energia',
+      label: 'Energía',
+      unit: 'registrados',
+      priority: 1,
+      count: count((s) => s.energy != null),
+    },
+    {
+      key: 'alimento',
+      label: 'Comida',
+      unit: 'registrados',
+      priority: 1,
+      count: count((s) => (s.meal_count ?? 0) > 0),
+    },
+  ]
+  return list.sort((a, b) => b.count - a.count || b.priority - a.priority)
+}
+
+export function buildEnLuzMes(
+  signals: readonly DailySignals[],
+  ctx?: DimensionContext,
+): EnLuz | null {
+  const top = monthBehaviorCounts(signals, ctx)[0]
+  if (!top || top.count < EN_LUZ_MES_MIN) return null
+  return { key: top.key, label: top.label, days: [], count: top.count, unit: top.unit }
+}
+
+/** La frase principal de la Voz — la consistencia más fuerte, factual. */
+function vozMesLead(b: MonthBehavior): VozParte[] {
+  switch (b.label) {
+    case 'Movimiento':
+      return [
+        { text: 'El movimiento apareció en ' },
+        { text: `${b.count} días`, tone: 'accent' },
+        { text: ' del mes.' },
+      ]
+    case 'Proteína':
+      return [
+        { text: 'La proteína se alcanzó ' },
+        { text: `${b.count} días`, tone: 'accent' },
+        { text: '.' },
+      ]
+    case 'Sueño':
+      return [
+        { text: 'Tu sueño se registró ' },
+        { text: `${b.count} días`, tone: 'accent' },
+        { text: '.' },
+      ]
+    case 'Energía':
+      return [
+        { text: 'Registraste tu energía ' },
+        { text: `${b.count} días`, tone: 'accent' },
+        { text: '.' },
+      ]
+    default:
+      return [
+        { text: 'Registraste comida ' },
+        { text: `${b.count} días`, tone: 'accent' },
+        { text: '.' },
+      ]
+  }
+}
+
+/** Voz de Mes (PRD V1) — narrativa de EVIDENCIA acumulada. Describe
+ *  CONSISTENCIA (cuántos días apareció cada comportamiento), nunca
+ *  tendencia ("ascenso/aflojando") ni causa ("porque/cuando/mejora por").
+ *  Lidera con lo más constante + una segunda señal constante si la hay. */
 export function buildVozMes(
-  summary: readonly DimensionMonth[],
+  signals: readonly DailySignals[],
+  ctx: DimensionContext | undefined,
   daysLogged: number,
 ): {
   parts: readonly VozParte[]
   signature: { confidence: 'alta' | 'media' | 'baja'; scope: string }
 } {
-  const theme = monthTheme(summary, daysLogged)
-  const parts: VozParte[] = []
-
-  if (theme === 'formación') {
-    parts.push({ text: 'El mes apenas ' }, { text: 'se forma', tone: 'accent' }, { text: '. ' })
-  } else if (theme === 'ascenso') {
-    parts.push({ text: 'Tu mes viene en ' }, { text: 'ascenso', tone: 'accent' }, { text: '. ' })
-  } else if (theme === 'descenso') {
-    parts.push({ text: 'Tu mes viene ' }, { text: 'aflojando', tone: 'accent' }, { text: '. ' })
-  } else {
-    parts.push({ text: 'Tu mes se mueve, ' }, { text: 'parejo', tone: 'accent' }, { text: '. ' })
-  }
-
-  // Brightest dimension of the month.
-  const brightest = [...summary].sort((a, b) => b.avg - a.avg)[0]
-  if (brightest && brightest.avg >= 0.5) {
-    parts.push({ text: 'Lo más en luz: ' })
-    parts.push({ text: brightest.label.toLowerCase(), tone: 'accent' })
-    parts.push({ text: '. ' })
-  }
-
-  // The clearest single movement (largest |delta| that isn't flat).
-  const moved = [...summary]
-    .filter((d) => d.trend !== 'flat')
-    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0] as
-    | (DimensionMonth & { trend: 'up' | 'down' })
-    | undefined
-  if (moved) {
-    parts.push({ text: 'Tu ' })
-    parts.push({ text: moved.label.toLowerCase(), tone: 'accent' })
-    parts.push({ text: ` viene ${TREND_WORD[moved.trend]}.` })
-  }
-
   const confidence: 'alta' | 'media' | 'baja' =
     daysLogged >= 18 ? 'alta' : daysLogged >= 8 ? 'media' : 'baja'
-  return {
-    parts,
-    signature: {
-      confidence,
-      scope: `${daysLogged} ${daysLogged === 1 ? 'día leído' : 'días leídos'}`,
-    },
+  const signature = {
+    confidence,
+    scope: `${daysLogged} ${daysLogged === 1 ? 'día leído' : 'días leídos'}`,
   }
+
+  const consistent = monthBehaviorCounts(signals, ctx).filter((b) => b.count >= EN_LUZ_MES_MIN)
+  if (consistent.length === 0) {
+    return {
+      parts: [
+        { text: 'El mes apenas ' },
+        { text: 'se forma', tone: 'accent' },
+        { text: '. Aún no hay suficiente para ver constancia.' },
+      ],
+      signature,
+    }
+  }
+
+  const parts: VozParte[] = [...vozMesLead(consistent[0]!)]
+  if (consistent[1]) {
+    parts.push(
+      { text: ' También ' },
+      { text: consistent[1]!.label.toLowerCase(), tone: 'accent' },
+      { text: ` apareció ${consistent[1]!.count} días.` },
+    )
+  }
+  return { parts, signature }
 }
 
 // ── The month's satellites — the editorial headline over the bars ───

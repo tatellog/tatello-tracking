@@ -43,8 +43,14 @@ export type DimensionLayout = {
 }
 
 export type Dimension = DimensionLayout & {
-  /** 0 (lejos) … 1 (en luz). */
+  /** 0 (lejos) … 1 (en luz). QUALITY signal (deficit-aware for alimento,
+   *  reported level for energía/mente/sueño), NOT mere presence. */
   brightness: number
+  /** Whether the user REGISTERED this dimension today — presence of
+   *  signal, independent of brightness. A registered-but-low dimension
+   *  (energía baja, comida sin déficit) lights faintly; an unregistered
+   *  one waits. Drives the hero's "te espera" vs "naciente" render. */
+  registered: boolean
   /** One-word state caption ("clara", "corto") or null when quiet. */
   word: string | null
 }
@@ -59,6 +65,26 @@ export type DiaSemana = {
   dimEnLuz: number
   drift: number
   note: string
+  /** Cuántas de las 6 dimensiones tienen señal registrada ese día (0–6).
+   *  Es la "cantidad de registros" que el Mapa Semanal del PRD V1 usa para
+   *  iluminar cada día — presencia, no calidad (distinto de `brightness`). */
+  signalCount: number
+}
+
+/* "En Luz" (Semana V1) — el comportamiento MÁS CONSISTENTE de la semana:
+ * la dimensión que se repitió más días (mínimo 3). Es la respuesta directa
+ * a "¿qué se está repitiendo?". `null` cuando nada llega a 3 (no se inventa
+ * un patrón). */
+export type EnLuz = {
+  key: DimensionKey
+  /** Etiqueta corta del comportamiento ("Movimiento", "Proteína", "Sueño"). */
+  label: string
+  /** Días en que ocurrió (Sunday-first 0..6). */
+  days: number[]
+  /** Conteo = days.length (≥ 3). */
+  count: number
+  /** Completa "N días ___" — "registrados", "alcanzada", etc. */
+  unit: string
 }
 
 export type DimensionContext = {

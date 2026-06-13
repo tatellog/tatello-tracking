@@ -8,13 +8,14 @@
  *
  * Pattern detection lives in week-patterns.ts.
  */
-import { deriveDimensions, TONE_BRILLANTE, TONE_FORMACION } from './dimensions'
-import { buildArquetipoSemana } from './arquetipo'
+import { deriveDimensions, dimensionRegistered, TONE_BRILLANTE, TONE_FORMACION } from './dimensions'
 import type {
   DailySignals,
   DiaSemana,
   Dimension,
   DimensionContext,
+  DimensionKey,
+  EnLuz,
   Patron,
   VozParte,
   WeekObservation,
@@ -53,6 +54,31 @@ function weekdayOf(day: string): number {
  *  not "dead" (docs §8). */
 export function dayBrightness(dims: Dimension[]): number {
   return dims.reduce((s, d) => s + d.brightness, 0) / dims.length
+}
+
+/** Las 6 dimensiones, orden fijo. */
+const DIM_KEYS: readonly DimensionKey[] = [
+  'cuerpo',
+  'alimento',
+  'sueno',
+  'energia',
+  'mente',
+  'ciclo',
+]
+
+/** "Cantidad de registros" de un día (PRD Semana §Mapa): cuántas de las 6
+ *  dimensiones tienen señal — presencia, NO calidad. 0..6. */
+export function signalCount(sig: DailySignals | null): number {
+  if (sig == null) return 0
+  return DIM_KEYS.reduce((n, k) => (dimensionRegistered(k, sig) ? n + 1 : n), 0)
+}
+
+/** Conteo de registros → brillo 0..1 para el Mapa Semanal. Curva raíz:
+ *  sube rápido al primer registro ("encendiste algo") y se aplana arriba
+ *  (3+ se ven plenos — el mapa no es un ranking de quién registró más). */
+export function logBrightness(count: number): number {
+  if (count <= 0) return 0
+  return Math.min(1, Math.sqrt(count / 5))
 }
 
 /** One-word identity for a day, by overall brightness. Deterministic
@@ -111,6 +137,7 @@ export function buildWeekDaysReal(
         dimEnLuz: 0,
         drift: 0,
         note: 'Aún no llega.',
+        signalCount: 0,
       }
     }
     const sig = byIdx.get(i) ?? null
@@ -126,70 +153,241 @@ export function buildWeekDaysReal(
       dimEnLuz: dims.filter((d) => d.brightness >= TONE_BRILLANTE).length,
       drift: dims.filter((d) => d.brightness < TONE_FORMACION).length,
       note: dayNote(sig, dims, isToday),
+      signalCount: signalCount(sig),
     }
   })
 }
 
-/** The opener part-list keyed by the week's rhythm (the same emphasis
- *  word `buildArquetipoSemana` derives from the real brightness shape). */
-function vozOpener(emphasis: string): VozParte[] {
-  switch (emphasis) {
-    case 'sube':
-      return [{ text: 'La semana viene ' }, { text: 'subiendo', tone: 'accent' }, { text: '. ' }]
-    case 'afloja':
-      return [{ text: 'La semana viene ' }, { text: 'aflojando', tone: 'accent' }, { text: '. ' }]
-    case 'pareja':
-      return [
-        { text: 'La semana se mantiene ' },
-        { text: 'pareja', tone: 'accent' },
-        { text: '. ' },
-      ]
-    case 'vaivén':
-      return [{ text: 'La semana va y ' }, { text: 'viene', tone: 'accent' }, { text: '. ' }]
+/* ── En Luz — el comportamiento más consistente de la semana (PRD V1) ─
+ * La dimensión que se repitió MÁS días (mínimo 3). Es la respuesta directa
+ * a "¿qué se está repitiendo?". Cuenta por PRESENCIA de señal (registro),
+ * no por calidad. Si nada llega a 3 → null (no se inventa un patrón). */
+const EN_LUZ_MIN = 3
+
+type EnLuzCandidate = {
+  key: DimensionKey
+  label: string
+  /** Completa "N días ___". */
+  unit: string
+  /** Desempate cuando hay igual conteo — los comportamientos que el
+   *  manifiesto cuida (movimiento, proteína) ganan a los de registro pasivo. */
+  priority: number
+  match: (s: DailySignals) => boolean
+}
+
+export function buildEnLuzSemana(
+  signals: readonly DailySignals[],
+  todayIdx: number,
+  ctx?: DimensionContext,
+): EnLuz | null {
+  const byIdx = new Map<number, DailySignals>()
+  for (const s of signals) if (s.day) byIdx.set(weekdayOf(s.day), s)
+  const protTarget = ctx?.proteinTarget ?? null
+
+  const candidates: EnLuzCandidate[] = [
+    {
+      key: 'cuerpo',
+      label: 'Movimiento',
+      unit: 'registrados',
+      priority: 3,
+      match: (s) => s.trained === true,
+    },
+    ...(protTarget != null
+      ? [
+          {
+            key: 'alimento' as DimensionKey,
+            label: 'Proteína',
+            unit: 'alcanzada',
+            priority: 3,
+            match: (s: DailySignals) => s.protein_g != null && s.protein_g >= protTarget,
+          },
+        ]
+      : []),
+    {
+      key: 'sueno',
+      label: 'Sueño',
+      unit: 'registrados',
+      priority: 2,
+      match: (s) => s.sleep_minutes != null,
+    },
+    {
+      key: 'energia',
+      label: 'Energía',
+      unit: 'registrados',
+      priority: 1,
+      match: (s) => s.energy != null,
+    },
+    {
+      key: 'alimento',
+      label: 'Comida',
+      unit: 'registrados',
+      priority: 1,
+      match: (s) => (s.meal_count ?? 0) > 0,
+    },
+  ]
+
+  let best: EnLuz | null = null
+  let bestScore = -1
+  for (const c of candidates) {
+    const days: number[] = []
+    for (let i = 0; i <= todayIdx && i < 7; i++) {
+      const s = byIdx.get(i)
+      if (s && c.match(s)) days.push(i)
+    }
+    if (days.length < EN_LUZ_MIN) continue
+    const score = days.length * 10 + c.priority // conteo manda; prioridad desempata
+    if (score > bestScore) {
+      bestScore = score
+      best = { key: c.key, label: c.label, days, count: days.length, unit: c.unit }
+    }
+  }
+  return best
+}
+
+/** Frase CLARA del "En Luz" para la UI — en cristiano, qué hiciste y
+ *  cuántos días, en vez del ambiguo "N días registrados". Compartida por
+ *  Semana y Mes (el `scope` ajusta "esta semana" / "este mes"). */
+export function enLuzSentence(e: EnLuz, scope: 'semana' | 'mes'): string {
+  const periodo = scope === 'mes' ? 'este mes' : 'esta semana'
+  switch (e.label) {
+    case 'Movimiento':
+      return `Te moviste ${e.count} días ${periodo}.`
+    case 'Proteína':
+      return `Alcanzaste tu proteína ${e.count} días ${periodo}.`
+    case 'Sueño':
+      return `Registraste tu sueño ${e.count} días ${periodo}.`
+    case 'Energía':
+      return `Registraste tu energía ${e.count} días ${periodo}.`
     default:
-      return [{ text: 'La semana apenas ' }, { text: 'arranca', tone: 'accent' }, { text: '. ' }]
+      return `Registraste comida ${e.count} días ${periodo}.`
   }
 }
 
-/** Assemble the Voz de Semana from the REAL days — opener by rhythm,
- *  an honest en-luz count, today's word, and a future-closer. All driven
- *  by the numbers; no templates per weekday. */
-export function buildVozSemanaReal(
-  days: readonly DiaSemana[],
+/** La frase principal de la Voz — la repetición más fuerte, en pasado factual. */
+function enLuzLead(e: EnLuz): VozParte[] {
+  const n = `${e.count}`
+  switch (e.label) {
+    case 'Movimiento':
+      return [
+        { text: 'Te moviste ' },
+        { text: `${n} veces`, tone: 'accent' },
+        { text: ' esta semana.' },
+      ]
+    case 'Proteína':
+      return [
+        { text: 'La proteína apareció ' },
+        { text: `${n} días`, tone: 'accent' },
+        { text: '.' },
+      ]
+    case 'Sueño':
+      return [{ text: 'Tu sueño apareció ' }, { text: `${n} días`, tone: 'accent' }, { text: '.' }]
+    case 'Energía':
+      return [
+        { text: 'Registraste tu energía ' },
+        { text: `${n} días`, tone: 'accent' },
+        { text: '.' },
+      ]
+    default: // Comida
+      return [{ text: 'Registraste comida ' }, { text: `${n} días`, tone: 'accent' }, { text: '.' }]
+  }
+}
+
+/** Una segunda repetición factual (co-ocurrencia observada, NUNCA causa ni
+ *  predicción): "incluso en días sin entrenamiento" o "bajó el fin de
+ *  semana". Devuelve null si ninguna aplica con claridad. */
+function secondRepetition(
+  signals: readonly DailySignals[],
   todayIdx: number,
+  ctx: DimensionContext | undefined,
+  enLuz: EnLuz,
+): VozParte[] | null {
+  const byIdx = new Map<number, DailySignals>()
+  for (const s of signals) if (s.day) byIdx.set(weekdayOf(s.day), s)
+  const protTarget = ctx?.proteinTarget ?? null
+
+  // Proteína presente incluso en días sin entreno — co-ocurrencia, no causa.
+  if (protTarget != null) {
+    let proteinNoTrain = 0
+    for (let i = 0; i <= todayIdx && i < 7; i++) {
+      const s = byIdx.get(i)
+      if (s && s.protein_g != null && s.protein_g >= protTarget && s.trained !== true)
+        proteinNoTrain += 1
+    }
+    if (proteinNoTrain >= 2) {
+      const prefix = enLuz.label === 'Proteína' ? 'Apareció ' : 'La proteína apareció '
+      return [
+        { text: prefix },
+        { text: 'incluso en días sin entrenamiento', tone: 'accent' },
+        { text: '.' },
+      ]
+    }
+  }
+
+  // El registro bajó el fin de semana — hecho del registro, no predicción.
+  let weekendSum = 0
+  let weekendN = 0
+  let weekdaySum = 0
+  let weekdayN = 0
+  for (let i = 0; i <= todayIdx && i < 7; i++) {
+    const c = signalCount(byIdx.get(i) ?? null)
+    if (i === 0 || i === 6) {
+      weekendSum += c
+      weekendN += 1
+    } else {
+      weekdaySum += c
+      weekdayN += 1
+    }
+  }
+  if (weekendN > 0 && weekdayN > 0) {
+    const wend = weekendSum / weekendN
+    const wday = weekdaySum / weekdayN
+    if (wend < wday - 0.5) {
+      return [
+        { text: 'El registro ' },
+        { text: 'bajó el fin de semana', tone: 'accent' },
+        { text: '.' },
+      ]
+    }
+  }
+  return null
+}
+
+/** Voz de Semana (PRD V1) — describe REPETICIONES de los días reales. Lidera
+ *  con la repetición más fuerte (el "En Luz"), suma una co-ocurrencia
+ *  factual si la hay. Sin causas ("porque/debido a/causó"), sin predicciones,
+ *  sin relaciones. Si nada se repite ≥3 → una línea serena, sin patrón. */
+export function buildVozSemanaReal(
+  signals: readonly DailySignals[],
+  todayIdx: number,
+  ctx?: DimensionContext,
 ): {
   parts: readonly VozParte[]
   signature: { confidence: 'alta' | 'media' | 'baja'; scope: string }
 } {
-  const arq = buildArquetipoSemana(days, todayIdx)
-  const parts: VozParte[] = [...vozOpener(arq.emphasis)]
-
-  if (arq.daysEnLuz > 0) {
-    parts.push({ text: `${arq.daysEnLuz} de tus ${arq.daysRead} días ` })
-    parts.push({ text: 'en luz', tone: 'accent' })
-    parts.push({ text: '. ' })
-  }
-
-  const todayWord = days[todayIdx]?.archetype
-  if (todayWord) {
-    parts.push({ text: 'Hoy, ' })
-    parts.push({ text: todayWord, tone: 'accent' })
-    parts.push({ text: '. ' })
-  }
-
-  if (todayIdx < 6) {
-    parts.push({ text: 'El resto ' })
-    parts.push({ text: 'aún se escribe', tone: 'accent' })
-    parts.push({ text: '.' })
-  }
-
   const daysRead = todayIdx + 1
   const confidence: 'alta' | 'media' | 'baja' =
     daysRead >= 5 ? 'alta' : daysRead >= 3 ? 'media' : 'baja'
-  return {
-    parts,
-    signature: { confidence, scope: `${daysRead} ${daysRead === 1 ? 'día leído' : 'días leídos'}` },
+  const signature = {
+    confidence,
+    scope: `${daysRead} ${daysRead === 1 ? 'día leído' : 'días leídos'}`,
   }
+
+  const enLuz = buildEnLuzSemana(signals, todayIdx, ctx)
+  if (!enLuz) {
+    return {
+      parts: [
+        { text: 'Aún no se repite nada con fuerza. ' },
+        { text: 'La semana sigue escribiéndose', tone: 'accent' },
+        { text: '.' },
+      ],
+      signature,
+    }
+  }
+
+  const parts: VozParte[] = [...enLuzLead(enLuz)]
+  const second = secondRepetition(signals, todayIdx, ctx, enLuz)
+  if (second) parts.push({ text: ' ' }, ...second)
+  return { parts, signature }
 }
 
 /* ── Esta semana, en números — the Semana "registros" recap ──────────
@@ -357,7 +555,7 @@ export function buildWeekObservations(
     detail: `${dCount(energyLow.length)} tu energía estuvo baja.`,
     days: energyLow.map((d) => d.idx),
     entries: energyLow.map((d) => ({ dayIdx: d.idx, value: `${d.s.energy}/5` })),
-    voz: 'Tu energía bajó algunos días. ¿Algo te pesó esta semana?',
+    voz: 'Tu energía estuvo baja algunos de tus días registrados.',
   })
 
   return [...wins, ...watches.slice(0, MAX_WATCHES)].slice(0, OBS_MAX)
@@ -367,7 +565,7 @@ export function buildWeekObservations(
  *  observation card + detail can label days from an observation's `days`. */
 export const WEEKDAY_NAMES_FULL = WEEKDAY_NAMES
 
-export type { WeekObservation, WeekObservationEntry } from './types'
+export type { DiaSemana, EnLuz, WeekObservation, WeekObservationEntry } from './types'
 
 /* ── Lo que viene — Semana's bridge to the Mes patterns ──────────────
  * A gentle heads-up for the SOONEST upcoming day this week that carries

@@ -412,7 +412,15 @@ function SkiaStarBodies({
     <>
       {placed.map(({ d, pos }) =>
         d.brightness < EN_LUZ_THRESHOLD && d.key !== selectedKey ? (
-          <SkiaSilencioBody key={d.key} pos={pos} angleDeg={d.angleDeg} flareK={flareK} t={t} />
+          <SkiaSilencioBody
+            key={d.key}
+            dimKey={d.key}
+            registered={d.registered}
+            pos={pos}
+            angleDeg={d.angleDeg}
+            flareK={flareK}
+            t={t}
+          />
         ) : null,
       )}
     </>
@@ -424,15 +432,23 @@ function SkiaSilencioBody({
   angleDeg,
   flareK,
   t,
+  dimKey,
+  registered,
 }: {
   pos: { x: number; y: number }
   angleDeg: number
   flareK: number
   t: SharedValue<number>
+  dimKey: DimensionKey
+  /** ¿Hay señal hoy? Decide "naciente" (encendida tenue) vs "te espera"
+   *  (anillo hueco) — NO el brillo: una comida sin déficit o una energía
+   *  baja están REGISTRADAS aunque su brillo quede bajo. */
+  registered: boolean
 }) {
   const px = pos.x * flareK
   const py = (pos.y - VB_TOP) * flareK
   const R = 2 * flareK // silencio R = 2 (viewBox) → canvas px
+  const dimColor = colors.dimension[dimKey]
   const phase = (angleDeg / 360) % 1
   // Breath — silencio gets a soft ±5 % scale (opacity stays 1, matching the SVG).
   const transform = useDerivedValue(() => {
@@ -446,23 +462,37 @@ function SkiaSilencioBody({
       { translateY: -py },
     ]
   })
+  // El campo estelar de fondo es crema y SIN anillos. Por eso:
+  //  · NO registrada → un anillo HUECO tintado de la dimensión: lee al
+  //    instante como "soy una de las 6, te espero" (ni mota ni falla).
+  //  · Registrada pero de brillo bajo → una estrella tenue ENCENDIDA
+  //    (núcleo lleno): "está, pero suave" — nunca el anillo de "te espera"
+  //    (sería decirle "regístrame" algo que ya registró).
   return (
     <SkiaGroup transform={transform}>
-      {/* 3-layer cream bloom (faint) */}
-      <SkiaCircle cx={px} cy={py} r={R * 1.4} color={SKY.starGlow} opacity={0.05} />
-      <SkiaCircle cx={px} cy={py} r={R * 1.2} color={SKY.starGlow} opacity={0.06} />
-      <SkiaCircle cx={px} cy={py} r={R * 1.05} color={SKY.starGlow} opacity={0.1} />
-      {/* Gradient core (orb-star: warm-white → glow → magenta) */}
-      <SkiaCircle cx={px} cy={py} r={R}>
-        <SkiaRadialGradient
-          c={vec(px, py)}
-          r={R}
-          colors={[SKY.starCore, SKY.starGlow, colors.magenta]}
-          positions={[0, 0.35, 1]}
-        />
-      </SkiaCircle>
-      {/* White-hot disc */}
-      <SkiaCircle cx={px} cy={py} r={R * 0.4} color={SKY.starCore} />
+      {registered ? (
+        <>
+          {/* NACIENTE — encendida, tenue */}
+          <SkiaCircle cx={px} cy={py} r={R * 1.7} color={dimColor} opacity={0.12} />
+          <SkiaCircle cx={px} cy={py} r={R} color={dimColor} opacity={0.5} />
+          <SkiaCircle cx={px} cy={py} r={R * 0.45} color={SKY.starCore} opacity={0.85} />
+        </>
+      ) : (
+        <>
+          {/* ESPERANDO — anillo hueco en brasa */}
+          <SkiaCircle cx={px} cy={py} r={R * 2.2} color={dimColor} opacity={0.06} />
+          <SkiaCircle
+            cx={px}
+            cy={py}
+            r={R * 1.5}
+            color={dimColor}
+            style="stroke"
+            strokeWidth={Math.max(1, flareK)}
+            opacity={0.5}
+          />
+          <SkiaCircle cx={px} cy={py} r={R * 0.5} color={dimColor} opacity={0.6} />
+        </>
+      )}
     </SkiaGroup>
   )
 }
@@ -952,7 +982,27 @@ export function OrbitalSystem({
               SVG filters software-render on Android and were the Órbita tab's
               heaviest cost. The emission is now a scaled glyph copy (see the
               glyph render below) + the dimension-hued halo circle. */}
+          {/* Arco diurno — una banda de luz oro tamizada tras el hexágono,
+              que ancla "este es el cielo de HOY" sin una palabra. Estática
+              y muy tenue (oro, nunca magenta — ese acento es del header). */}
+          <RadialGradient id="day-arc" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.oroLight} stopOpacity={0.08} />
+            <Stop offset="55%" stopColor={colors.oro} stopOpacity={0.05} />
+            <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
+          </RadialGradient>
         </Defs>
+
+        {/* El arco diurno se pinta PRIMERO (detrás de todo) y FUERA del
+            grupo de zoom: es el cielo del día, no se mueve al enfocar una
+            estrella. Una elipse ancha y plana = horizonte/arco del día. */}
+        <Ellipse
+          cx={ART_CENTER_X}
+          cy={ART_CENTER_Y}
+          rx={W * 0.52}
+          ry={62}
+          fill="url(#day-arc)"
+          pointerEvents="none"
+        />
 
         {/* Ambient dust — 120 cream specks orbiting the bulge in
             shifting spiral arms. SITS OUTSIDE the zoom transform

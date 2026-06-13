@@ -21,6 +21,7 @@ import { useTransformProgress } from '@/features/emblem'
 import { colors, typography } from '@/theme'
 
 import { ZODIAC } from '../../zodiac/data'
+import type { ZodiacSign } from '../../zodiac/types'
 
 import { AnimatedBlurView } from './animation/animated-components'
 import { useCanvasReveal } from './animation/use-canvas-reveal'
@@ -65,6 +66,49 @@ const USE_SKIA_FIGURE = true
 // 50 → 75 → 100 → real). El número jamás se muestra al usuario.
 const TRANSFORM_STEPS = [0, 25, 50, 75, 100] as const
 
+// Factor de tamaño de la constelación (< 1 = más pequeña) respecto a su
+// transform por signo. Se aplica sobre el centroide para no descentrar.
+const CONSTELLATION_SCALE = 0.9
+// Espejo horizontal (eje Y) de la constelación para que mire al mismo
+// lado que el animal del emblema. Activo por default…
+const CONSTELLATION_FLIP_X = true
+// …salvo estos signos, que NO se espejan en horizontal. Escorpio se mapea
+// directo a la anatomía (sin espejo), por eso va aquí.
+const NO_FLIP_SIGNS = new Set<ZodiacSign>([
+  'tauro',
+  'cancer',
+  'escorpio',
+  'virgo',
+  'capricornio',
+  'sagitario',
+])
+// Signos que TAMBIÉN se espejan en vertical (flip eje X).
+const FLIP_Y_SIGNS = new Set<ZodiacSign>([])
+// Rotación por signo en grados (sobre el centroide). Para alinear el
+// asterismo con su animal cuando hace falta inclinarlo. Default 0.
+const CONSTELLATION_ROTATION: Partial<Record<ZodiacSign, number>> = {
+  tauro: -15,
+  piscis: -24,
+}
+// Nudge vertical por signo en unidades de viewBox (negativo = arriba).
+const CONSTELLATION_NUDGE_Y: Partial<Record<ZodiacSign, number>> = {
+  tauro: -16,
+  cancer: -16,
+  escorpio: -10,
+  virgo: -16,
+  libra: -12,
+  capricornio: -12,
+  sagitario: -10,
+  piscis: 12,
+}
+// Nudge horizontal por signo (negativo = izquierda). Translate puro, no lo
+// afecta el espejo.
+const CONSTELLATION_NUDGE_X: Partial<Record<ZodiacSign, number>> = {
+  libra: 30,
+  sagitario: 20,
+  piscis: 12,
+}
+
 export function LunarConstellation({
   trained,
   todayIdx,
@@ -75,6 +119,7 @@ export function LunarConstellation({
   suppressBurst = false,
   pausedSV,
   transformProgressOverride,
+  showStarLabels = false,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -104,15 +149,27 @@ export function LunarConstellation({
     [trained, todayIdx, zodiac, target],
   )
 
-  const stars: Resolved[] = useMemo(
-    () =>
-      zodiac.stars.map((s) => ({
-        x: PAD + s.x * (W - 2 * PAD),
-        y: PAD + s.y * (H - 2 * PAD),
-        mag: s.mag,
-      })),
-    [zodiac],
-  )
+  const stars: Resolved[] = useMemo(() => {
+    const base = zodiac.stars.map((s) => ({
+      x: PAD + s.x * (W - 2 * PAD),
+      y: PAD + s.y * (H - 2 * PAD),
+      mag: s.mag,
+    }))
+    // Rotación por signo (sobre el centroide → no descentra). Alimenta a
+    // todas las capas (SVG + Skia) porque todas leen `stars`.
+    const deg = CONSTELLATION_ROTATION[sign] ?? 0
+    if (!deg) return base
+    const cx = base.reduce((a, s) => a + s.x, 0) / base.length
+    const cy = base.reduce((a, s) => a + s.y, 0) / base.length
+    const rad = (deg * Math.PI) / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+    return base.map((s) => ({
+      x: cx + (s.x - cx) * cos - (s.y - cy) * sin,
+      y: cy + (s.x - cx) * sin + (s.y - cy) * cos,
+      mag: s.mag,
+    }))
+  }, [zodiac, sign])
 
   const { alphaPos, starDepth, lineDepth } = useFigureGeometry(zodiac, stars)
   const { litKeys, litCluster, starRecency } = useLitMaps({
@@ -152,10 +209,9 @@ export function LunarConstellation({
 
   // Emblema Celeste: progreso real (hábitos acumulados, retroactivo) +
   // override DEV opcional. null = real; un índice = paso mockeado.
-  // Solo Leo tiene emblema hoy; en Leo el emblema REEMPLAZA al engraving
-  // PNG (dos artes de león encimadas se leían como doble exposición).
-  // Los demás signos conservan su engraving hasta tener emblema propio.
-  const hasEmblem = sign === 'leo'
+  // Los 12 signos tienen emblema (RevealedEmblem); REEMPLAZA al engraving
+  // PNG viejo (dos artes encimadas se leían como doble exposición).
+  const hasEmblem = true
   const emblem = useTransformProgress()
   const [mockStep, setMockStep] = useState<number | null>(null)
   // Prioridad: override DEV (catálogo de estados) > chip DEV > dato real.
@@ -166,23 +222,49 @@ export function LunarConstellation({
         ? emblem.progress
         : (TRANSFORM_STEPS[mockStep] ?? 0)
 
-  // Mientras el emblema se está REVELANDO (bajo %), la constelación se
-  // atenúa un poco para que el león dorado respire — comparten el mismo
-  // centro y las estrellas blancas le ganaban la atención. Vuelve a pleno
-  // al ~55 %. Solo aplica donde hay emblema (Leo hoy); resto = 1.
-  const emblemDim = hasEmblem ? 0.6 + 0.4 * Math.min(1, transformProgress / 55) : 1
+  // La constelación es el DATO y debe ganar — apenas cede al emblema. Se
+  // atenúa un pelín mientras el emblema se revela (bajo %) pero nunca baja
+  // de 0.82, así nunca queda tapada por el marco dorado.
+  const emblemDim = hasEmblem ? 0.82 + 0.18 * Math.min(1, transformProgress / 55) : 1
 
   // Apply SIGN_CONSTELLATION_TRANSFORM in JS so the Skia overlay (which
   // can't read the SVG <G transform="...">) can position each star at
   // the same pixel as the SVG-rendered body.
-  const transform = SIGN_CONSTELLATION_TRANSFORM_PARAMS[sign]
+  // Constelación un poco MÁS PEQUEÑA respecto al emblema: se encoge sobre
+  // su propio centroide (uniforme para los 12) sin descentrarse. El
+  // emblema (RevealedEmblem) es un poco más grande; juntos respiran mejor.
+  const rawTransform = SIGN_CONSTELLATION_TRANSFORM_PARAMS[sign]
+  const bcx = stars.length ? stars.reduce((a, s) => a + s.x, 0) / stars.length : 0
+  const bcy = stars.length ? stars.reduce((a, s) => a + s.y, 0) / stars.length : 0
+  // Encoge sobre el centroide…
+  const sx0 = rawTransform.sx * CONSTELLATION_SCALE
+  const sy0 = rawTransform.sy * CONSTELLATION_SCALE
+  const tx0 =
+    rawTransform.tx +
+    rawTransform.sx * bcx * (1 - CONSTELLATION_SCALE) +
+    (CONSTELLATION_NUDGE_X[sign] ?? 0)
+  const ty0 =
+    rawTransform.ty +
+    rawTransform.sy * bcy * (1 - CONSTELLATION_SCALE) +
+    (CONSTELLATION_NUDGE_Y[sign] ?? 0)
+  // …y ESPEJOS sobre el centroide (scale negativo + re-translate), por eje
+  // independiente. Horizontal (eje Y) = mira al mismo lado que el emblema;
+  // vertical (eje X) = signos que lo necesitan (p. ej. escorpio).
+  const flipX = CONSTELLATION_FLIP_X && !NO_FLIP_SIGNS.has(sign)
+  const flipY = FLIP_Y_SIGNS.has(sign)
+  const transform = {
+    sx: flipX ? -sx0 : sx0,
+    sy: flipY ? -sy0 : sy0,
+    tx: flipX ? tx0 + 2 * sx0 * bcx : tx0,
+    ty: flipY ? ty0 + 2 * sy0 * bcy : ty0,
+  }
   const toScreen = (xVb: number, yVb: number) => ({
     x: (transform.tx + transform.sx * xVb) * k,
     y: (transform.ty + transform.sy * yVb) * k,
   })
-  // Pixel scale for radii / stroke widths in the Skia figure (the SVG <G>
-  // scaled the whole group by sx, then the viewBox→canvas mapping by k).
-  const sScale = transform.sx * k
+  // Pixel scale para radios / grosores en la figura Skia. ABS porque sx
+  // puede ser negativo (espejo) y un radio negativo rompería el render.
+  const sScale = Math.abs(transform.sx) * k
 
   // Array-form transform for the SVG <G>. We can't use the string
   // form `"translate(tx ty) scale(sx sy)"` because on Fabric Android
@@ -271,7 +353,13 @@ export function LunarConstellation({
             luminancia: se "va formando" con el progreso. Z-order: bajo el
             <Svg> de la figura — la viñeta + edge-fade lo oscurecen igual
             que al PNG. */}
-        {hasEmblem ? (
+        {/* SOLO se monta el Canvas Skia del emblema cuando Hoy está
+            enfocado. Dos RevealedEmblem (este + el del hero de Órbita Mes)
+            montados a la vez en pantallas distintas se borran mutuamente
+            (cada TextureView Skia pelea por el contexto). Al desmontar el
+            de la pantalla sin foco, nunca coexisten dos → ninguno se borra.
+            useImage cachea las texturas: el remount al volver es inmediato. */}
+        {hasEmblem && focused ? (
           <RevealedEmblem sign={sign} transformProgress={transformProgress} size={canvasPx} />
         ) : null}
         {/* Skeleton wrapped in Animated.View with `exiting` so it
@@ -473,6 +561,22 @@ export function LunarConstellation({
                 opacity={emblemDim}
               />
             ) : null}
+            {/* DEV — etiquetas de estrellas para identificarlas al afinar.
+                Fuera del <G> espejado: usan toScreen (ya considera el
+                espejo) y se dibujan derechas, no al revés. */}
+            {showStarLabels && canvasPx > 0
+              ? stars.map((s, i) => {
+                  const p = toScreen(s.x, s.y)
+                  return (
+                    <Text
+                      key={`lbl-${i}`}
+                      style={[styles.starLabel, { left: p.x + 5, top: p.y - 7 }]}
+                    >
+                      {zodiac.stars[i]?.name ?? String(i)}
+                    </Text>
+                  )
+                })
+              : null}
             {/* Lottie one-shot — the same gold-fireworks the Home commit
                 reward uses, but SCOPED to the igniting star instead of
                 covering the whole canvas. Backs the SVG ignition burst
@@ -562,6 +666,15 @@ export function LunarConstellation({
 }
 
 const styles = StyleSheet.create({
+  // DEV — etiqueta de estrella (nombre o índice) para identificar al afinar.
+  starLabel: {
+    position: 'absolute',
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#7BE0FF',
+    textShadowColor: '#000',
+    textShadowRadius: 2,
+  },
   wrap: {
     width: '100%',
     alignItems: 'center',

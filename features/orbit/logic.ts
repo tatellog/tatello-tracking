@@ -6,6 +6,7 @@ import {
   deriveDimensions,
   DIM_FLOOR,
   DIMENSIONS,
+  dimensionRegistered,
   EN_LUZ_THRESHOLD,
   TONE_BRILLANTE,
   TONE_FORMACION,
@@ -28,6 +29,7 @@ export {
   deriveDimensions,
   DIM_FLOOR,
   DIMENSIONS,
+  dimensionRegistered,
   EN_LUZ_THRESHOLD,
   TONE_BRILLANTE,
   TONE_FORMACION,
@@ -313,3 +315,112 @@ export const REPEATABLE_READINGS: readonly DailyReadingCategory[] = [
   'stressShortSleep',
   'noSignal',
 ]
+
+/* ── Voz de Stelar (Día) ────────────────────────────────────────────
+ *
+ * La traducción HUMANA y FACTUAL del PRD V1: una observación de HOY que
+ * responde "¿qué registré?" (frase 1) y "¿qué me falta?" (frase 2).
+ *
+ * Determinista — NO necesita IA. La detección es por PRESENCIA DE SEÑAL,
+ * no por brillo: "qué registré" es una pregunta de registro, no de
+ * intensidad (registrar energía baja SÍ es registrar, aunque su estrella
+ * quede tenue). Reglas del PRD respetadas por construcción:
+ *   - Solo observa HOY. Nunca tendencias, nunca semanas/meses.
+ *   - PROHIBIDO "suele / normalmente / generalmente" (piden historial).
+ *   - Lo registrado en pasado factual (describe, no felicita ni regaña).
+ *   - Lo faltante en calma ("aún no aparece", "sigue en calma"), nunca
+ *     "te falta / olvidaste" (manifiesto: apagada = en calma, no falla).
+ *   - Si todo está registrado, no se inventa un faltante.
+ *   - Ciclo se EXCLUYE de los faltantes: se ancla cuando el período
+ *     empieza, no es algo que "registrar hoy".
+ */
+export type DayVoice = { registered: string; missing: string | null }
+
+function energyWord(e: number): string {
+  return e <= 2 ? 'baja' : e === 3 ? 'media' : 'alta'
+}
+
+// El sustantivo cálido de cada dimensión para la frase de faltantes.
+const MISSING_NOUN: Partial<Record<DimensionKey, string>> = {
+  cuerpo: 'tu movimiento',
+  alimento: 'tu comida',
+  sueno: 'tu sueño',
+  energia: 'tu energía',
+  mente: 'tu mente',
+}
+
+// Fragmento factual de lo registrado, en pasado, con su valor cuando lo hay.
+function registeredFragment(key: DimensionKey, s: DailySignals): string | null {
+  switch (key) {
+    case 'cuerpo':
+      return s.trained ? 'te moviste' : s.rested ? 'descansaste' : null
+    case 'alimento':
+      return s.meal_count
+        ? `registraste ${s.meal_count === 1 ? 'una comida' : `${s.meal_count} comidas`}`
+        : null
+    case 'sueno':
+      return s.sleep_minutes != null ? `dormiste ${formatSleep(s.sleep_minutes)}` : null
+    case 'energia':
+      return s.energy != null ? `registraste energía ${energyWord(s.energy)}` : null
+    case 'mente':
+      return 'anotaste cómo te sentiste'
+    case 'ciclo':
+      return s.on_period ? 'anotaste tu período' : null
+    default:
+      return null
+  }
+}
+
+function joinHuman(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? ''
+  return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`
+}
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** Construye la Voz de Stelar del Día a partir de las señales de hoy.
+ *  Ciclo solo entra si está activo; nunca se nombra como faltante (se
+ *  ancla cuando el período empieza, no es algo que "registrar hoy"). */
+export function buildDayVoice(
+  signals: DailySignals | null,
+  opts?: { cycleEnabled?: boolean },
+): DayVoice {
+  if (!signals) return { registered: 'Tu cielo de hoy aún está en calma.', missing: null }
+
+  const order: DimensionKey[] = ['cuerpo', 'alimento', 'sueno', 'energia', 'mente']
+  if (opts?.cycleEnabled) order.push('ciclo')
+
+  const registeredParts: string[] = []
+  const missingKeys: DimensionKey[] = []
+  for (const key of order) {
+    if (dimensionRegistered(key, signals)) {
+      const frag = registeredFragment(key, signals)
+      if (frag) registeredParts.push(frag)
+    } else if (key !== 'ciclo') {
+      missingKeys.push(key)
+    }
+  }
+
+  // Nada encendido → una sola línea en calma; no se nombra faltante (el
+  // empty-state mayor lo cubre la EmptySegmentCard arriba).
+  if (registeredParts.length === 0) {
+    return { registered: 'Tu cielo de hoy aún está en calma.', missing: null }
+  }
+
+  const registered = `${capitalize(joinHuman(registeredParts))}.`
+
+  let missing: string | null = null
+  if (missingKeys.length >= 1 && missingKeys.length <= 3) {
+    const nouns = missingKeys.map((k) => MISSING_NOUN[k]).filter((n): n is string => Boolean(n))
+    if (nouns.length > 0) {
+      const verb = nouns.length === 1 ? 'aún no aparece hoy' : 'aún no aparecen hoy'
+      missing = `${capitalize(joinHuman(nouns))} ${verb}.`
+    }
+  } else if (missingKeys.length >= 4) {
+    missing = 'El resto de tu cielo sigue en calma, listo cuando quieras.'
+  }
+
+  return { registered, missing }
+}

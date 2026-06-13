@@ -56,6 +56,9 @@ export type Props = {
    *  el dato real y el chip DEV. Lo usa el catálogo de estados de Leo
    *  (/dev-emblem-stages) para renderizar el reveal a un % exacto. */
   transformProgressOverride?: number
+  /** DEV-only: dibuja una etiqueta junto a cada estrella (su nombre si lo
+   *  tiene, si no su índice) para identificarlas al afinar posiciones. */
+  showStarLabels?: boolean
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

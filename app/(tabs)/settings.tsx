@@ -581,6 +581,34 @@ function SettingsBody() {
             ) : null}
             {profile?.is_dev ? (
               <Pressable
+                onPress={() => router.push('/dev-emblem-signs')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV — signos por porcentaje
+                </Text>
+              </Pressable>
+            ) : null}
+            {profile?.is_dev ? (
+              <Pressable
                 onPress={() => router.push('/dev-rewards')}
                 accessibilityRole="button"
                 style={{
@@ -604,34 +632,6 @@ function SettingsBody() {
                   }}
                 >
                   ✦ DEV — sistema de recompensas
-                </Text>
-              </Pressable>
-            ) : null}
-            {profile?.is_dev ? (
-              <Pressable
-                onPress={() => router.push('/refactor-test')}
-                accessibilityRole="button"
-                style={{
-                  marginTop: 10,
-                  paddingVertical: 14,
-                  paddingHorizontal: 18,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: 'rgba(217, 174, 111, 0.4)',
-                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
-                  alignSelf: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: typography.serifSemi,
-                    fontStyle: 'italic',
-                    fontSize: typography.sizes.bodyLarge,
-                    color: colors.bone,
-                    letterSpacing: 0.6,
-                  }}
-                >
-                  ✦ DEV — refactor-test (constellation strangler)
                 </Text>
               </Pressable>
             ) : null}

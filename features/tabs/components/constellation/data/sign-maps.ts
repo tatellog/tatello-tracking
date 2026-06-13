@@ -70,7 +70,7 @@ export const SIGN_CONSTELLATION_TRANSFORM_PARAMS: Record<
   // Escorpio: escala no-uniforme (0.72×0.82) para estirar la figura
   // vertical (el escorpión es alargado); translate (40 22) la corre a su
   // eje, ~5% a la derecha del centro del lienzo.
-  escorpio: { tx: 40, ty: 22, sx: 0.72, sy: 0.82 },
+  escorpio: { tx: 46, ty: 46, sx: 0.76, sy: 0.76 },
   geminis: { tx: 52, ty: 43, sx: 0.68, sy: 0.68 },
   // Leo: busto cabeza+melena de perfil a la izquierda. Escala grande (0.82)
   // para llenar cara+melena; las estrellas derechas (Zosma/Denebola) están
@@ -80,5 +80,5 @@ export const SIGN_CONSTELLATION_TRANSFORM_PARAMS: Record<
   piscis: { tx: 42, ty: 52, sx: 0.68, sy: 0.68 },
   sagitario: { tx: 16, ty: 14, sx: 0.68, sy: 0.68 },
   tauro: { tx: 29, ty: 44, sx: 0.68, sy: 0.68 },
-  virgo: { tx: 48, ty: 46, sx: 0.68, sy: 0.68 },
+  virgo: { tx: 44, ty: 42, sx: 0.76, sy: 0.76 },
 }

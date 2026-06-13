@@ -114,6 +114,28 @@ function brightnessFor(key: DimensionKey, s: DailySignals, ctx?: DimensionContex
   }
 }
 
+/* ¿Registró el usuario esta dimensión HOY? Presencia de señal, NO brillo
+ * (registrar energía baja, o comida sin déficit, SÍ es registrar aunque
+ * la estrella quede tenue). Fuente única: la Voz de Stelar y el hero
+ * comparten este predicado para nunca contradecirse. */
+export function dimensionRegistered(key: DimensionKey, s: DailySignals | null): boolean {
+  if (s == null) return false
+  switch (key) {
+    case 'cuerpo':
+      return s.trained === true || s.rested === true
+    case 'alimento':
+      return (s.meal_count ?? 0) > 0
+    case 'sueno':
+      return s.sleep_minutes != null
+    case 'energia':
+      return s.energy != null
+    case 'mente':
+      return s.motivation != null || s.stress != null || s.mood != null
+    case 'ciclo':
+      return s.on_period === true
+  }
+}
+
 /* A one-word state caption for a dimension. `null` means stay quiet. */
 function dimensionWord(key: DimensionKey, s: DailySignals): string | null {
   switch (key) {
@@ -157,6 +179,7 @@ export function deriveDimensions(
   return dimensionsFor(ctx).map((d) => ({
     ...d,
     brightness: signals == null ? DIM_FLOOR : brightnessFor(d.key, signals, ctx),
+    registered: dimensionRegistered(d.key, signals),
     word: signals == null ? null : dimensionWord(d.key, signals),
   }))
 }

@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, Text } from 'react-native'
 import { colors, typography } from '@/theme'
 
 /*
- * Barra de regreso a Ajustes para las vistas /dev-*. Absoluta
- * arriba-izquierda para no descentrar el título de cada catálogo. Vuelve
- * con el historial; si la vista se abrió en frío (deep link), cae a
- * Ajustes.
+ * Barra de regreso para las vistas /dev-*. Absoluta arriba-izquierda para
+ * no descentrar el título de cada catálogo. Vuelve con el historial (un
+ * nivel); si la vista se abrió en frío (deep link), cae a Ajustes. El
+ * `label` indica a dónde se vuelve (default "Ajustes"; en un detalle
+ * anidado pásale el nombre del padre, p. ej. "Signos").
  */
-export function DevBackButton() {
+export function DevBackButton({ label = 'Ajustes' }: { label?: string }) {
   const router = useRouter()
   return (
     <Pressable
@@ -19,10 +20,10 @@ export function DevBackButton() {
       }}
       hitSlop={12}
       accessibilityRole="button"
-      accessibilityLabel="Volver a Ajustes"
+      accessibilityLabel={`Volver a ${label}`}
       style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
     >
-      <Text style={styles.text}>‹ Ajustes</Text>
+      <Text style={styles.text}>‹ {label}</Text>
     </Pressable>
   )
 }
