@@ -5,6 +5,7 @@ import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { DevBackButton } from '@/components/DevBackButton'
+import { withDevGuard } from '@/components/withDevGuard'
 import { IgnitionBurst, IGNITION_LIFETIME_MS } from '@/features/tabs/components/IgnitionBurst'
 import { SkyBackground, UniverseDeltaToast } from '@/features/tabs/components'
 import {
@@ -70,7 +71,9 @@ function AttrChips({ onPick }: { onPick: (a: Attr) => void }) {
   )
 }
 
-export default function DevRewardsScreen() {
+export default withDevGuard(DevRewardsScreen)
+
+function DevRewardsScreen() {
   const router = useRouter()
   const seq = useRef(0)
 

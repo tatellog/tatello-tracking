@@ -1,5 +1,6 @@
-import { Stack } from 'expo-router'
+import { Redirect, Stack } from 'expo-router'
 
+import { useDevAllowed } from '@/components/withDevGuard'
 import { colors, typography } from '@/theme'
 
 /*
@@ -11,6 +12,10 @@ import { colors, typography } from '@/theme'
  * Lifetime: removed when /refactor-test is deleted at F24.
  */
 export default function RefactorTestLayout() {
+  // Solo dev / is_dev — esta subárbol no debe ser navegable en producción.
+  const allowed = useDevAllowed()
+  if (allowed === null) return null
+  if (!allowed) return <Redirect href="/" />
   return (
     <Stack
       screenOptions={{

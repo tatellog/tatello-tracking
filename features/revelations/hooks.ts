@@ -37,13 +37,23 @@ export function useRevelationOrchestrator(signLabel: string): {
   const qc = useQueryClient()
   const { progress, isLoading } = useTransformProgress()
 
+  // Las revelaciones son momentos RAROS — la detección (≈10 lecturas a
+  // Supabase) no necesita correr en el primer paint, donde compite con los
+  // ~15 hooks del arranque de Hoy. Se difiere a idle (~2 s): para entonces la
+  // constelación y lo crítico ya pintaron, y el reveal (si toca) aparece igual.
+  const [detectReady, setDetectReady] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setDetectReady(true), 2000)
+    return () => clearTimeout(id)
+  }, [])
+
   const detection = useQuery({
     // El progreso entra en la key (entero) para re-evaluar cuando el emblema
     // cruza un umbral; staleTime largo + sin refetch al montar evita correr
     // la detección en cada render.
     queryKey: [...queryKeys.revelations.pending(), Math.floor(progress), signLabel],
     queryFn: () => detectPendingRevelation({ transformProgress: progress, signLabel }),
-    enabled: !isLoading && signLabel.length > 0,
+    enabled: detectReady && !isLoading && signLabel.length > 0,
     staleTime: 30 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,

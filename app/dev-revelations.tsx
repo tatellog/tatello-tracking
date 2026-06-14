@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { DevBackButton } from '@/components/DevBackButton'
+import { withDevGuard } from '@/components/withDevGuard'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { useProfile } from '@/features/profile/hooks'
@@ -39,7 +40,9 @@ type Active =
     }
   | { mode: 'pattern'; type: PatternType; message: string }
 
-export default function DevRevelations() {
+export default withDevGuard(DevRevelations)
+
+function DevRevelations() {
   const { data: profile } = useProfile()
   const sign = zodiacFromDate(profile?.date_of_birth)
   const signLabel = ZODIAC[sign].label

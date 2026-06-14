@@ -2,6 +2,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { DevBackButton } from '@/components/DevBackButton'
+import { withDevGuard } from '@/components/withDevGuard'
 import { LunarConstellation, SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
@@ -119,7 +120,9 @@ function renderState({ item }: { item: LeoState }) {
   )
 }
 
-export default function DevEmblemStagesScreen() {
+export default withDevGuard(DevEmblemStagesScreen)
+
+function DevEmblemStagesScreen() {
   return (
     <View style={styles.screen}>
       <SkyBackground />

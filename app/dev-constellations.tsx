@@ -2,6 +2,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { DevBackButton } from '@/components/DevBackButton'
+import { withDevGuard } from '@/components/withDevGuard'
 import { LunarConstellation, SkyBackground } from '@/features/tabs/components'
 import { ZODIAC } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -46,7 +47,9 @@ function renderSignCard({ item: sign }: { item: ZodiacSign }) {
   )
 }
 
-export default function DevConstellationsScreen() {
+export default withDevGuard(DevConstellationsScreen)
+
+function DevConstellationsScreen() {
   return (
     <View style={styles.screen}>
       <SkyBackground />
