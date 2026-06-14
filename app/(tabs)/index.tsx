@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
@@ -26,15 +26,18 @@ import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
 import { TransformationCard } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
-import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
+import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
+  type CalendarDay,
   CoachLine,
   DayCheckIn,
+  DayDetailPanel,
   type DayState,
+  type DayStatus,
   LunarConstellation,
   SectionHeader,
   SkyBackground,
@@ -43,13 +46,10 @@ import {
   TabHeader,
   TodayMealLog,
   TodayUniverseRewards,
+  useCalendarDays,
   WeekStrip,
-  type WeekDayCell,
 } from '@/features/tabs/components'
-import {
-  buildMonthGrid,
-  buildTrailingDays,
-} from '@/features/tabs/components/constellation/data/month-grid'
+import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
@@ -82,17 +82,6 @@ function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
 function makeEnter(cadence: Cadence) {
   if (cadence === 'reduced') return (_d: number) => FadeIn.duration(220)
   return (d: number) => FadeInDown.duration(380).delay(d).springify().damping(18)
-}
-
-// Local-zoned day-of-week from 'YYYY-MM-DD'. Avoids the UTC-midnight
-// drift west of UTC that `new Date('YYYY-MM-DD')` introduces.
-function dayOfWeekOf(iso: string): number {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  return new Date(y, m - 1, d).getDay()
-}
-
-function dayNumOf(iso: string): number {
-  return Number(iso.split('-')[2]) || 1
 }
 
 export default function TodayScreen() {
@@ -157,6 +146,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const restQuery = useRestToday(ctx.date)
   const setRest = useSetRestToday(ctx.date)
+  const setRestForDate = useSetRestForDate()
   const restedToday = restQuery.data ?? false
 
   const reducedMotion = useReducedMotion()
@@ -189,8 +179,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return () => clearTimeout(id)
   }, [])
 
-  const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
-  const [weekOpen, setWeekOpen] = useState(false)
+  // Calendario "editor oficial": día seleccionado (abre el panel de detalle)
+  // + overrides locales optimistas por fecha (status que se aplica al instante
+  // mientras la mutación viaja; convergen al refetch, se limpian en onError).
+  const [selectedDate, setSelectedDate] = useState<string>(ctx.date)
+  const [dayOverrides, setDayOverrides] = useState<Record<string, DayStatus>>({})
 
   // Pause the constellation's animation loops while the page is actively
   // scrolling so the UI thread isn't split between scroll frames and the
@@ -263,16 +256,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return m
   }, [todayIsoLocal, monthWorkoutDates, ctx.today_workout_completed])
 
-  const allDays: WeekDayCell[] = useMemo(() => {
-    const cells = buildTrailingDays(todayIsoLocal, stripWorkouts.data ?? [], 30)
-    return cells.map((cell) => ({
-      date: cell.date,
-      trained: cell.trained || (cell.isToday && ctx.today_workout_completed),
-      dayNum: dayNumOf(cell.date),
-      weekdayIdx: dayOfWeekOf(cell.date),
-      isToday: cell.isToday,
-    }))
-  }, [todayIsoLocal, stripWorkouts.data, ctx.today_workout_completed])
+  // El calendario "editor oficial": fusiona workouts + daily_signals (descanso
+  // + qué registró) + revelations (eventos). Reusa stripWorkouts internamente.
+  const { days: calendarDays } = useCalendarDays({
+    span: 30,
+    today: todayIsoLocal,
+    todayWorkoutCompleted: ctx.today_workout_completed,
+    overrides: dayOverrides,
+  })
+  const selectedDay: CalendarDay | null = useMemo(
+    () => calendarDays.find((d) => d.date === selectedDate) ?? null,
+    [calendarDays, selectedDate],
+  )
 
   const trainedThisMonth = month.trainedThisMonth
   const MONTHS_ES = [
@@ -334,20 +329,106 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     }
   }
 
-  const handleToggleDay = (date: string) => {
-    const cell = ctx.grid_28_days.find((c) => c.date === date)
-    if (!cell) return
-    const willComplete = !cell.completed
-    const idx = ctx.grid_28_days.findIndex((c) => c.date === date)
-    if (idx >= 0) {
-      setJustMarkedIdx(idx)
-      setTimeout(() => setJustMarkedIdx(null), 800)
-    }
-    if (willComplete) {
+  // Acciones del calendario sobre un día seleccionado. NUNCA celebran
+  // (sin fireworks/shockwave/reward) — solo haptic suave + override optimista
+  // para que el strip cambie al instante mientras la mutación viaja.
+  const setOverride = useCallback((date: string, status: DayStatus) => {
+    setDayOverrides((prev) => ({ ...prev, [date]: status }))
+  }, [])
+  const clearOverride = useCallback((date: string) => {
+    setDayOverrides((prev) => {
+      if (!(date in prev)) return prev
+      const next = { ...prev }
+      delete next[date]
+      return next
+    })
+  }, [])
+
+  const handleSelectDay = useCallback(
+    (date: string) => {
+      setSelectedDate(date)
+      const d = calendarDays.find((c) => c.date === date)
+      track('calendar_day_selected', {
+        date,
+        status: d?.status ?? 'empty',
+        has_event: (d?.events.length ?? 0) > 0,
+      })
+    },
+    [calendarDays],
+  )
+
+  const isToday = useCallback((date: string) => date === todayIsoLocal, [todayIsoLocal])
+
+  const markTrained = useCallback(
+    (date: string) => {
+      setOverride(date, 'trained')
+      // Si ese día estaba marcado como descanso, lo retiramos (mutuamente
+      // excluyentes: la constelación se llena solo con entreno).
+      setRestForDate.mutate({ date, rested: false }, { onError: () => clearOverride(date) })
+      if (isToday(date)) {
+        toggleToday.mutate(true, { onError: () => clearOverride(date) })
+      } else {
+        toggleForDate.mutate({ date, complete: true }, { onError: () => clearOverride(date) })
+      }
       playCommitHaptic('backfill')
-    }
-    toggleForDate.mutate({ date, complete: willComplete })
-  }
+      track('calendar_day_marked', { date, status: 'trained', source: 'calendar' })
+    },
+    [setOverride, clearOverride, setRestForDate, isToday, toggleToday, toggleForDate],
+  )
+
+  const clearTrained = useCallback(
+    (date: string) => {
+      setOverride(date, 'empty')
+      if (isToday(date)) {
+        toggleToday.mutate(false, { onError: () => clearOverride(date) })
+      } else {
+        toggleForDate.mutate({ date, complete: false }, { onError: () => clearOverride(date) })
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+      track('calendar_day_cleared', { date, was: 'trained' })
+    },
+    [setOverride, clearOverride, isToday, toggleToday, toggleForDate],
+  )
+
+  const markRested = useCallback(
+    (date: string) => {
+      setOverride(date, 'rested')
+      // Descanso no llena estrella; si estaba entrenado lo quitamos.
+      if (isToday(date)) {
+        if (ctx.today_workout_completed) toggleToday.mutate(false)
+        setRest.mutate(true, { onError: () => clearOverride(date) })
+      } else {
+        toggleForDate.mutate({ date, complete: false })
+        setRestForDate.mutate({ date, rested: true }, { onError: () => clearOverride(date) })
+      }
+      playCommitHaptic('rested')
+      track('calendar_day_marked', { date, status: 'rested', source: 'calendar' })
+    },
+    [
+      setOverride,
+      clearOverride,
+      isToday,
+      ctx.today_workout_completed,
+      toggleToday,
+      toggleForDate,
+      setRest,
+      setRestForDate,
+    ],
+  )
+
+  const clearRested = useCallback(
+    (date: string) => {
+      setOverride(date, 'empty')
+      if (isToday(date)) {
+        setRest.mutate(false, { onError: () => clearOverride(date) })
+      } else {
+        setRestForDate.mutate({ date, rested: false }, { onError: () => clearOverride(date) })
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+      track('calendar_day_cleared', { date, was: 'rested' })
+    },
+    [setOverride, clearOverride, isToday, setRest, setRestForDate],
+  )
 
   const enter = makeEnter(cadence)
 
@@ -472,27 +553,26 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <TodayUniverseRewards ctx={ctx} date={ctx.date} restedToday={restedToday} />
             </Animated.View>
 
+            {/* Calendario — el editor oficial de la constelación + puente a
+                Historia. Siempre visible. Tocar un día lo selecciona y abre el
+                panel de detalle; marcar/quitar se hace desde sus botones (sin
+                celebración). */}
             <Animated.View entering={enter(520)}>
-              <Pressable
-                onPress={() => setWeekOpen((v) => !v)}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: weekOpen }}
-              >
-                <SectionHeader
-                  label={monthLabel}
-                  meta={weekOpen ? 'Ocultar' : 'Ver detalle'}
-                  metaEmphasis={weekOpen ? 'Ocultar' : 'Ver detalle'}
+              <SectionHeader label={monthLabel} />
+              <Text style={styles.weekHint}>Desliza y toca un día para ver el detalle.</Text>
+              <WeekStrip
+                days={calendarDays}
+                selectedDate={selectedDate}
+                onSelect={handleSelectDay}
+              />
+              {selectedDay ? (
+                <DayDetailPanel
+                  day={selectedDay}
+                  onMarkTrained={markTrained}
+                  onMarkRested={markRested}
+                  onClearTrained={clearTrained}
+                  onClearRested={clearRested}
                 />
-              </Pressable>
-              {weekOpen ? (
-                <Animated.View entering={FadeIn.duration(220)}>
-                  <Text style={styles.weekHint}>Desliza y toca un día para registrarlo.</Text>
-                  <WeekStrip
-                    days={allDays}
-                    onToggle={handleToggleDay}
-                    justMarkedIdx={justMarkedIdx}
-                  />
-                </Animated.View>
               ) : null}
             </Animated.View>
 

@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
+import type { CalendarDay, DayStatus } from '@/features/tabs/components/calendar/logic'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors, typography } from '@/theme'
 
@@ -29,6 +30,9 @@ const SPANISH_DAY_INITIAL = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
 // r≈3.2 — same iconography as the Hoy-tab constellation so a marked
 // day reads as "another lit star in your figure".
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
+// Crescent moon (Feather "moon"), viewBox 24×24 — a RESTED day. Filled
+// faint so rest reads as a quiet, valid choice (never a missed star).
+const MOON_PATH = 'M21 12.79 A9 9 0 1 1 11.21 3 A7 7 0 0 0 21 12.79 Z'
 
 const CELL_W = 46
 const GAP = 4
@@ -47,26 +51,16 @@ const GLOW_SIZE = 40
 const FADE_IN = -16
 const FADE_OUT = 92
 
-export type WeekDayCell = {
-  /** ISO 'YYYY-MM-DD'. */
-  date: string
-  trained: boolean
-  dayNum: number
-  /** 0..6 (0=Sun) — drives the initial letter. */
-  weekdayIdx: number
-  isToday: boolean
-}
-
 type Props = {
-  days: readonly WeekDayCell[]
-  onToggle: (date: string) => void
-  /** Cell index that received a fresh toggle — drives the burst pulse. */
-  justMarkedIdx?: number | null
+  days: readonly CalendarDay[]
+  /** Currently selected day (drives the ring); null = none. */
+  selectedDate: string | null
+  /** Tap a day → select it (opens the detail panel). Never toggles. */
+  onSelect: (date: string) => void
 }
 
-/* Soft magenta halo behind a star — rendered for today (always) and
- * for any day inside its just-marked window, so toggling a past day
- * blooms it alive. */
+/* Soft magenta halo behind a star — rendered for trained days so a lit
+ * day pops against the dim untrained outlines. */
 function StarGlow() {
   return (
     <Animated.View
@@ -78,31 +72,26 @@ function StarGlow() {
   )
 }
 
-/* Per-day star. Three states:
- *   trained          → filled star (cream for past days, magenta today)
- *   today, untrained → magenta outline — "this is the spot to light"
- *   past, untrained  → dim niebla outline — quiet, waiting
+/* Per-day glyph. Three states:
+ *   trained → filled star (cream for past days, magenta today) — breathes
+ *   rested  → faint crescent moon (rest is valid, not a missed star)
+ *   empty   → dim outline star (quiet, waiting)
  *
  * Trained stars breathe (opacity + slight scale) on a slow loop so a
- * marked day reads as alive, matching the lit stars in the Hoy-tab
- * constellation. Per-index delay desynchronises the row.
- *
+ * marked day reads as alive, matching the lit stars in the constellation.
  * GATED on `active`: Hoy stays mounted forever (detachInactiveScreens=
- * false), so up to 7 ungated loops ticked off-tab and through every
- * scroll. Inactive → ease each star to its breath midpoint (a natural
- * lit rest); active → resume the identical desynced breath. */
-function DayStar({
-  trained,
+ * false), so ungated loops would tick off-tab + through every scroll. */
+function DayGlyph({
+  status,
   isToday,
   index,
 }: {
-  trained: boolean
+  status: DayStatus
   isToday: boolean
   index: number
 }) {
   const active = useScreenActive()
-  const fill = trained ? (isToday ? colors.magenta : colors.leche) : 'none'
-  const stroke = trained ? 'none' : isToday ? colors.magenta : colors.niebla
+  const trained = status === 'trained'
 
   const breath = useSharedValue(0.5)
   useEffect(() => {
@@ -130,18 +119,41 @@ function DayStar({
     }
   })
 
+  // Resolve the path + paint per status.
+  let path = STAR_PATH
+  let fill: string = 'none'
+  let stroke: string = 'none'
+  let strokeW = 0
+  if (status === 'trained') {
+    fill = isToday ? colors.magenta : colors.leche
+  } else if (status === 'rested') {
+    path = MOON_PATH
+    fill = colors.niebla
+  } else {
+    // empty
+    stroke = isToday ? colors.magenta : colors.niebla
+    strokeW = 1.6
+  }
+
   return (
-    <Animated.View style={[styles.starGlyph, animStyle]}>
+    <Animated.View style={[styles.starGlyph, animStyle, status === 'rested' && styles.moonGlyph]}>
       <Svg width={STAR_SIZE} height={STAR_SIZE} viewBox="0 0 24 24">
-        <Path
-          d={STAR_PATH}
-          fill={fill}
-          stroke={stroke}
-          strokeWidth={trained ? 0 : 1.6}
-          strokeLinejoin="round"
-        />
+        <Path d={path} fill={fill} stroke={stroke} strokeWidth={strokeW} strokeLinejoin="round" />
       </Svg>
     </Animated.View>
+  )
+}
+
+/* Small gold marker for a day that carries an event/revelation; shows a
+ * "+N" counter when more than one landed that day. */
+function EventDot({ count }: { count: number }) {
+  // Always reserve the row so columns with/without events stay the same
+  // height; only paint the marker when an event landed that day.
+  return (
+    <View style={styles.eventRow} pointerEvents="none">
+      {count > 0 ? <View style={styles.eventDot} /> : null}
+      {count > 1 ? <Text style={styles.eventCount}>+{count - 1}</Text> : null}
+    </View>
   )
 }
 
@@ -152,14 +164,14 @@ function DayColumn({
   day,
   index,
   scrollX,
-  justMarked,
-  onToggle,
+  selected,
+  onSelect,
 }: {
-  day: WeekDayCell
+  day: CalendarDay
   index: number
   scrollX: SharedValue<number>
-  justMarked: boolean
-  onToggle: (date: string) => void
+  selected: boolean
+  onSelect: (date: string) => void
 }) {
   const animStyle = useAnimatedStyle(() => {
     const centreX = ROW_PAD + index * PITCH + CELL_W / 2
@@ -171,28 +183,35 @@ function DayColumn({
     }
   })
 
-  // Halo behind EVERY trained day (not just today/just-marked) so a
-  // marked day pops against the dim untrained outlines — otherwise the
-  // cream fill is too subtle to read "this day is lit" at a glance.
-  const glow = day.isToday || justMarked || day.trained
+  const glow = day.status === 'trained'
+  const a11yStatus =
+    day.status === 'trained'
+      ? 'entrenaste'
+      : day.status === 'rested'
+        ? 'descansaste'
+        : 'sin registro'
 
   return (
     <Animated.View style={[styles.colBox, animStyle]}>
       <Pressable
         onPress={() => {
           Haptics.selectionAsync().catch(() => {})
-          onToggle(day.date)
+          onSelect(day.date)
         }}
-        style={({ pressed }) => [styles.col, pressed && styles.colPressed]}
+        style={({ pressed }) => [
+          styles.col,
+          selected && styles.colSelected,
+          pressed && styles.colPressed,
+        ]}
         accessibilityRole="button"
-        accessibilityLabel={`${day.date}, ${day.trained ? 'entrenado' : 'no entrenado'}`}
-        accessibilityHint={day.trained ? 'Toca para desmarcar' : 'Toca para registrar'}
-        accessibilityState={{ selected: day.trained }}
+        accessibilityLabel={`${day.date}, ${a11yStatus}`}
+        accessibilityHint="Toca para ver el detalle del día"
+        accessibilityState={{ selected }}
       >
         <Text
           style={[
             styles.dayLetter,
-            day.trained && styles.dayLetterTrained,
+            day.status !== 'empty' && styles.dayLetterMarked,
             day.isToday && styles.dayLetterToday,
           ]}
         >
@@ -201,7 +220,7 @@ function DayColumn({
         <Text
           style={[
             styles.dayNum,
-            day.trained && styles.dayNumTrained,
+            day.status !== 'empty' && styles.dayNumMarked,
             day.isToday && styles.dayNumToday,
           ]}
         >
@@ -209,24 +228,25 @@ function DayColumn({
         </Text>
         <View style={styles.starWrap}>
           {glow ? <StarGlow /> : null}
-          <DayStar trained={day.trained} isToday={day.isToday} index={index} />
+          <DayGlyph status={day.status} isToday={day.isToday} index={index} />
         </View>
+        <EventDot count={day.events.length} />
       </Pressable>
     </Animated.View>
   )
 }
 
 /**
- * A horizontally scrollable strip of the last 28 days — the editable
- * history surface. Each day is a bare column (weekday letter, number,
- * star) with no card chrome, so the strip reads in the same airy,
- * editorial language as the constellation above it. Today is the
- * rightmost column — labelled "HOY", drawn in magenta, haloed — and
- * the strip opens scrolled to it; the user swipes left for older
- * days. Columns dim and shrink as they scroll off the left edge.
- * Tapping a column toggles that day to backfill a past workout.
+ * A horizontally scrollable strip of the last 30 days — the editable
+ * history surface + the constellation's official editor. Each day is a
+ * bare column (weekday letter, number, status glyph, optional gold event
+ * dot) with no card chrome, so the strip reads in the same airy language
+ * as the constellation above it. Today is the rightmost column —
+ * labelled "HOY", magenta, haloed — and the strip opens scrolled to it.
+ * Tapping a column SELECTS that day (opening the detail panel below);
+ * marking entrenó/descansó happens from the panel's buttons.
  */
-export function WeekStrip({ days, onToggle, justMarkedIdx = null }: Props) {
+export function WeekStrip({ days, selectedDate, onSelect }: Props) {
   const scrollRef = useRef<ElementRef<typeof Animated.ScrollView>>(null)
   const scrollX = useSharedValue(0)
 
@@ -253,8 +273,8 @@ export function WeekStrip({ days, onToggle, justMarkedIdx = null }: Props) {
           day={d}
           index={i}
           scrollX={scrollX}
-          justMarked={justMarkedIdx === i}
-          onToggle={onToggle}
+          selected={selectedDate === d.date}
+          onSelect={onSelect}
         />
       ))}
     </Animated.ScrollView>
@@ -278,12 +298,19 @@ const styles = StyleSheet.create({
   colBox: {
     width: CELL_W,
   },
-  // No card, no border — each day is just letter / number / star in
-  // an airy column, the same visual language as the constellation.
+  // No card, no border — each day is just letter / number / glyph in an
+  // airy column. The selected day gets a soft magenta ring.
   col: {
     alignSelf: 'stretch',
     alignItems: 'center',
     paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  colSelected: {
+    borderColor: colors.magenta,
+    backgroundColor: colors.magentaTint,
   },
   colPressed: {
     opacity: 0.55,
@@ -296,7 +323,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     lineHeight: 12,
   },
-  dayLetterTrained: {
+  dayLetterMarked: {
     color: colors.bone,
   },
   dayLetterToday: {
@@ -310,7 +337,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     lineHeight: 20,
   },
-  dayNumTrained: {
+  dayNumMarked: {
     color: colors.leche,
   },
   dayNumToday: {
@@ -329,6 +356,11 @@ const styles = StyleSheet.create({
   starGlyph: {
     zIndex: 1,
   },
+  // The crescent reads better a hair smaller than the 4-point star.
+  moonGlyph: {
+    opacity: 0.9,
+    transform: [{ scale: 0.92 }],
+  },
   glow: {
     position: 'absolute',
     width: GLOW_SIZE,
@@ -343,5 +375,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 9,
     elevation: 3,
+  },
+  // Gold event marker under the glyph.
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 10,
+    marginTop: 5,
+  },
+  eventDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.oro,
+  },
+  eventCount: {
+    fontFamily: typography.uiBold,
+    fontSize: 8,
+    color: colors.oroSoft,
+    letterSpacing: 0.2,
   },
 })

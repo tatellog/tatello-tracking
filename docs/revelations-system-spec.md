@@ -148,6 +148,24 @@ de tier o desaparecer**.
    CLAUDE.md "patrón severo"). Definir el umbral-techo de escalado. MVP: el
    reveal de night-eating se cap­ea; el flujo severo se fasea.
 
+## Celebración ("la fiesta") — quién celebra y con qué intensidad
+
+> uxui + illustrator (2026-06-14). Regla física: la luz NACE y ASCIENDE desde
+> el emblema, NUNCA cae como confeti. Solo oro/leche, magenta como acento.
+> Partículas nativas (`RevealParticles`), graduadas por tier. reduce-motion
+> apaga la fiesta. **El noticing (comida nocturna) NUNCA celebra** — es
+> observación, no logro (línea roja).
+
+| Momento              | Celebra            | Tier    | Intensidad                              |
+| -------------------- | ------------------ | ------- | --------------------------------------- |
+| T1 · 25%             | sí, leve           | whisper | susurro de polvo dorado                 |
+| T1 · 50%             | sí                 | stream  | corriente de chispas                    |
+| T1 · 75%             | sí                 | rise    | ascenso + destellos                     |
+| T1 · 100%            | sí, máxima         | bloom   | estallido + 8-puntas + onda + 2º haptic |
+| T2 · Regreso         | cálido, NO festivo | return  | envuelve (lento, leche), no estalla     |
+| T3 · Positivos       | sí, media          | stream  | constancia merece brillo                |
+| T3 · Comida nocturna | **NUNCA**          | —       | cero fiesta, cero haptic de éxito       |
+
 ## Conflictos conocidos con lo ya construido
 
 > Los ejemplos de copy del PRD con conteos de frecuencia chocan con

@@ -31,6 +31,11 @@ import { useRouter } from 'expo-router'
 
 import { ScreenCosmos } from '@/features/orbit/components/Cosmos'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
+// Import directo (no por el barrel) para no crear ciclo patterns↔revelations.
+import {
+  RevealParticles,
+  type CelebrationTier,
+} from '@/features/revelations/components/RevealParticles'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
@@ -279,6 +284,22 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
 
   const [cardSize, setCardSize] = useState<{ w: number; h: number } | null>(null)
 
+  // La fiesta: SOLO en momentos positivos + el Regreso (que ENVUELVE, no
+  // estalla). El noticing (night_eating) NUNCA celebra — es observación, no
+  // logro (línea roja del manifiesto). Se dispara tras encenderse la figura.
+  const celebrate: CelebrationTier | null =
+    pattern.type === 'night_eating' ? null : pattern.type === 'abandonment' ? 'return' : 'stream'
+  const [party, setParty] = useState(false)
+  useEffect(() => {
+    if (reduced || !celebrate) return
+    const start = setTimeout(() => setParty(true), 1900)
+    const stop = setTimeout(() => setParty(false), 4600)
+    return () => {
+      clearTimeout(start)
+      clearTimeout(stop)
+    }
+  }, [reduced, celebrate])
+
   const blurT = useSharedValue(0)
   const scrimOp = useSharedValue(0)
   const bloomT = useSharedValue(0)
@@ -452,6 +473,10 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
         <ScreenCosmos width={width} height={height} />
       </Animated.View>
 
+      {/* La fiesta — DETRÁS del card, solo en positivos + Regreso (nunca el
+          noticing). Irradia desde el centro, no toca el texto. */}
+      {party && celebrate ? <RevealParticles tier={celebrate} size={cardW * 0.62} /> : null}
+
       {/* The backdrop IS the centering container: tapping the blurred sky
           closes. Leaving without "accepting" the observation is a
           first-class exit (te veo, no te vigilo). */}
@@ -504,6 +529,18 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
             }}
             accessibilityViewIsModal
           >
+            {/* Cerrar explícito — mismo afford que TransformationReveal, para
+                que todas las revelaciones se cierren igual (uxui-specialist). */}
+            <Pressable
+              onPress={close}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
+              style={styles.closeBtn}
+            >
+              <Text style={styles.closeIcon}>✕</Text>
+            </Pressable>
+
             {/* Corona — a broken gold ring, the signature of a rooted
               pattern (an old star in your sky). */}
             {tier.corona && cardSize ? (
@@ -844,15 +881,39 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.3,
   },
+  // Pill outline — la salida emocional debe leerse y tocarse dignamente
+  // (uxui-specialist), no un texto-tenue que se pierde sobre el cosmos.
   ctaSecondary: {
     marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 34,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(244,236,222,0.24)',
   },
   ctaSecondaryText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.niebla,
+    color: colors.leche,
+    opacity: 0.85,
   },
   pressed: { opacity: 0.6 },
+  closeBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  closeIcon: {
+    fontFamily: typography.ui,
+    fontSize: 15,
+    color: colors.leche,
+    opacity: 0.7,
+  },
 })

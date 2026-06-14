@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
   Easing,
@@ -18,6 +18,8 @@ import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
+
+import { RevealParticles, tierForThreshold } from './RevealParticles'
 
 /*
  * Ceremonia de Transformación (T1) — el momento full-screen cuando el
@@ -43,23 +45,42 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
   const router = useRouter()
 
   const emblemSize = Math.min(width - 96, 300)
+  const tier = tierForThreshold(threshold)
 
   const enter = useSharedValue(0)
   const emblem = useSharedValue(0)
+  // La fiesta entra DESPUÉS de que el emblema se materializa (~1 s) y vive
+  // detrás del card; se desmonta sola al terminar. Apagada en reduce-motion.
+  const [party, setParty] = useState(false)
 
   useEffect(() => {
     if (reduced) {
       enter.value = withTiming(1, { duration: 320 })
       emblem.value = withTiming(1, { duration: 360 })
-    } else {
-      enter.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) })
-      emblem.value = withDelay(
-        240,
-        withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }),
-      )
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+      return
     }
-  }, [reduced, enter, emblem])
+    enter.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) })
+    emblem.value = withDelay(
+      240,
+      withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }),
+    )
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+
+    const start = setTimeout(() => setParty(true), 1000)
+    const stop = setTimeout(() => setParty(false), 4000)
+    // El 100% pesa más: un segundo beat (Light) al florecer el estallido.
+    const bloomBeat =
+      tier === 'bloom'
+        ? setTimeout(() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+          }, 1450)
+        : undefined
+    return () => {
+      clearTimeout(start)
+      clearTimeout(stop)
+      if (bloomBeat) clearTimeout(bloomBeat)
+    }
+  }, [reduced, enter, emblem, tier])
 
   const scrimStyle = useAnimatedStyle(() => ({ opacity: enter.value }))
   const cardStyle = useAnimatedStyle(() => ({
@@ -89,10 +110,17 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
         <ScreenCosmos width={width} height={height} />
       </Animated.View>
 
+      {/* La fiesta — DETRÁS del card, irradia desde el centro (≈ el emblema),
+          nunca sobre el texto. pointerEvents none (no bloquea el tap-fondo). */}
+      {party ? <RevealParticles tier={tier} size={emblemSize} /> : null}
+
       <Pressable style={[StyleSheet.absoluteFill, styles.center]} onPress={close}>
         {/* El card absorbe sus taps (no cierra al tocar el contenido). */}
         <Pressable onPress={() => {}}>
-          <Animated.View style={[styles.card, { width: Math.min(width - 56, 360) }, cardStyle]}>
+          <Animated.View
+            style={[styles.card, { width: Math.min(width - 56, 360) }, cardStyle]}
+            accessibilityViewIsModal
+          >
             {/* Cerrar explícito — además del tap en el fondo, un afford claro
                 para no perder el momento por un toque accidental. */}
             <Pressable
@@ -105,8 +133,9 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
               <Text style={styles.closeIcon}>✕</Text>
             </Pressable>
 
-            <Text style={styles.eyebrow}>TU TRANSFORMACIÓN</Text>
-            <Text style={styles.threshold}>{threshold}%</Text>
+            {/* El % vive EN el eyebrow (no como número grande arriba del
+                emblema): el héroe visual es el emblema, no un dato frío. */}
+            <Text style={styles.eyebrow}>TU TRANSFORMACIÓN · {threshold}%</Text>
 
             {/* El contenedor DEBE tener tamaño explícito: RevealedEmblem se
                 pinta con absoluteFill, así que sin width/height quedaría 0×0
@@ -114,6 +143,8 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
             <Animated.View
               style={[styles.emblemWrap, { width: emblemSize, height: emblemSize }, emblemStyle]}
               pointerEvents="none"
+              accessibilityRole="image"
+              accessibilityLabel={`Tu emblema al ${threshold} por ciento`}
             >
               <RevealedEmblem sign={sign} transformProgress={threshold} size={emblemSize} />
             </Animated.View>
@@ -180,13 +211,6 @@ const styles = StyleSheet.create({
     color: colors.oro,
     textAlign: 'center',
   },
-  threshold: {
-    fontFamily: typography.uiSemi,
-    fontSize: 13,
-    color: colors.niebla,
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
-  },
   emblemWrap: {
     marginVertical: 10,
     alignItems: 'center',
@@ -195,17 +219,20 @@ const styles = StyleSheet.create({
   closeBtn: {
     position: 'absolute',
     top: 12,
-    right: 14,
+    right: 12,
     width: 28,
     height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
   },
   closeIcon: {
     fontFamily: typography.ui,
-    fontSize: 16,
-    color: colors.niebla,
+    fontSize: 15,
+    color: colors.leche,
+    opacity: 0.7,
   },
   message: {
     fontFamily: typography.serifSemi,
@@ -236,15 +263,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     color: colors.bg,
   },
+  // Pill outline (no texto-tenue): la salida emocional debe leerse y tocarse
+  // tan dignamente como el CTA primario (uxui-specialist).
   ctaSecondary: {
     marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 34,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(244,236,222,0.24)',
   },
   ctaSecondaryText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.niebla,
+    color: colors.leche,
+    opacity: 0.85,
   },
   pressed: { opacity: 0.6 },
 })
