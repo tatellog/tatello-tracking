@@ -110,10 +110,6 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
         <ScreenCosmos width={width} height={height} />
       </Animated.View>
 
-      {/* La fiesta — DETRÁS del card, irradia desde el centro (≈ el emblema),
-          nunca sobre el texto. pointerEvents none (no bloquea el tap-fondo). */}
-      {party ? <RevealParticles tier={tier} size={emblemSize} /> : null}
-
       <Pressable style={[StyleSheet.absoluteFill, styles.center]} onPress={close}>
         {/* El card absorbe sus taps (no cierra al tocar el contenido). */}
         <Pressable onPress={() => {}}>
@@ -177,6 +173,11 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
           </Animated.View>
         </Pressable>
       </Pressable>
+
+      {/* La fiesta — POR DELANTE del card (es opaco; detrás quedaba tapada).
+          Irradia desde el hero hacia arriba/afuera contra el cosmos, lejos de
+          la zona de texto. pointerEvents none → no bloquea el tap-fondo. */}
+      {party ? <RevealParticles tier={tier} size={width} /> : null}
     </View>
   )
 }

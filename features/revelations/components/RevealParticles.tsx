@@ -50,71 +50,75 @@ type TierCfg = {
   descend: boolean // Regreso: envuelve hacia adentro/abajo, no asciende
 }
 
+// Magnitudes pensadas para VERSE (la capa va por DELANTE del card y rebasa
+// sus bordes contra el cosmos). El rise es generoso para que las chispas
+// suban más allá del card; los sparkles son grandes (estrellas, no puntos).
 const TIER: Record<CelebrationTier, TierCfg> = {
   whisper: {
-    sparks: 7,
-    riseMin: 60,
-    riseMax: 95,
-    peak: 0.7,
-    sparkle4: 1,
+    sparks: 16,
+    riseMin: 120,
+    riseMax: 220,
+    peak: 0.85,
+    sparkle4: 3,
     sparkle8: false,
     ring: false,
-    durationMs: 1400,
+    durationMs: 1600,
     warm: false,
     magenta: 0,
     descend: false,
   },
   stream: {
-    sparks: 11,
-    riseMin: 100,
-    riseMax: 150,
-    peak: 0.85,
-    sparkle4: 3,
+    sparks: 24,
+    riseMin: 160,
+    riseMax: 300,
+    peak: 0.9,
+    sparkle4: 5,
     sparkle8: false,
     ring: false,
-    durationMs: 1800,
+    durationMs: 1900,
     warm: false,
     magenta: 0,
     descend: false,
   },
   rise: {
-    sparks: 15,
-    riseMin: 140,
-    riseMax: 200,
-    peak: 0.88,
-    sparkle4: 4,
-    sparkle8: false,
+    sparks: 30,
+    riseMin: 200,
+    riseMax: 360,
+    peak: 0.92,
+    sparkle4: 6,
+    sparkle8: true,
     ring: false,
-    durationMs: 2100,
+    durationMs: 2200,
     warm: false,
     magenta: 0,
     descend: false,
   },
   bloom: {
-    sparks: 22,
-    riseMin: 90,
-    riseMax: 230,
-    peak: 0.92,
-    sparkle4: 2,
+    sparks: 44,
+    riseMin: 160,
+    riseMax: 440,
+    peak: 0.96,
+    sparkle4: 7,
     sparkle8: true,
     ring: true,
-    durationMs: 2600,
+    durationMs: 2700,
     warm: false,
-    magenta: 3,
+    magenta: 5,
     descend: false,
   },
   return: {
-    sparks: 8,
-    riseMin: 28,
-    riseMax: 64,
-    peak: 0.5,
-    sparkle4: 1,
+    // Regreso: cálido y envolvente, PERO visible (antes casi no se veía).
+    sparks: 18,
+    riseMin: 60,
+    riseMax: 150,
+    peak: 0.75,
+    sparkle4: 3,
     sparkle8: false,
     ring: false,
-    durationMs: 2400,
+    durationMs: 2600,
     warm: true,
     magenta: 0,
-    descend: true,
+    descend: false, // no cae sobre el texto; envuelve por lentitud + tono leche
   },
 }
 
@@ -278,17 +282,18 @@ export function RevealParticles({ tier, size }: Props) {
       const goldTone = rand(i + 11) > 0.5 ? colors.oroLeche : colors.oro
       const color = isMagenta ? colors.magentaHot : cfg.warm ? colors.bone : goldTone
       out.push({
-        // Abanico sesgado hacia arriba (o radial 360° en bloom).
+        // Abanico ancho hacia arriba+afuera (radial 360° sesgado-arriba en
+        // bloom): las chispas rebasan el card y se ven contra el cosmos.
         angle:
           tier === 'bloom'
-            ? rand(i + 1) * Math.PI * 2
-            : -Math.PI / 2 + (rand(i + 1) - 0.5) * (tier === 'rise' ? 1.4 : 0.9),
-        spread: size * 0.18 * (0.4 + rand(i + 3)),
+            ? -Math.PI / 2 + (rand(i + 1) - 0.5) * 2.6
+            : -Math.PI / 2 + (rand(i + 1) - 0.5) * (tier === 'rise' ? 1.7 : 1.2),
+        spread: size * 0.34 * (0.4 + rand(i + 3)),
         rise: cfg.riseMin + rand(i + 5) * (cfg.riseMax - cfg.riseMin),
-        size: 2 + rand(i + 7) * 2.2,
+        size: 3 + rand(i + 7) * 4,
         color,
-        delay: rand(i + 9) * 220,
-        peak: cfg.peak * (0.7 + rand(i + 13) * 0.3),
+        delay: rand(i + 9) * 260,
+        peak: cfg.peak * (0.75 + rand(i + 13) * 0.25),
       })
     }
     return out
@@ -297,11 +302,13 @@ export function RevealParticles({ tier, size }: Props) {
   const sparkles = useMemo(() => {
     const out: { x: number; y: number; size: number; delay: number }[] = []
     for (let i = 0; i < cfg.sparkle4; i++) {
+      // Esparcidos en la mitad superior del campo (cerca del hero) y a los
+      // lados, GRANDES: leen como estrellas que estallan, no puntitos.
       out.push({
-        x: size * (0.3 + rand(i + 21) * 0.4),
-        y: size * (0.18 + rand(i + 23) * 0.34),
-        size: 14 + rand(i + 25) * 8,
-        delay: 120 + rand(i + 27) * 360,
+        x: size * (0.14 + rand(i + 21) * 0.72),
+        y: size * (0.1 + rand(i + 23) * 0.42),
+        size: 26 + rand(i + 25) * 26,
+        delay: 80 + rand(i + 27) * 420,
       })
     }
     return out
@@ -309,7 +316,14 @@ export function RevealParticles({ tier, size }: Props) {
 
   return (
     <View style={styles.wrap} pointerEvents="none">
-      <View style={[styles.field, { width: size, height: size }]}>
+      {/* Campo sesgado HACIA ARRIBA (≈ el hero): las chispas suben y rebasan
+          el card por arriba, lejos de la zona de texto (abajo). */}
+      <View
+        style={[
+          styles.field,
+          { width: size, height: size, transform: [{ translateY: -size * 0.18 }] },
+        ]}
+      >
         {cfg.sparkle8 ? <Bloom8 size={size * 0.5} delay={140} /> : null}
         <View style={styles.center}>
           {sparks.map((spec, i) => (

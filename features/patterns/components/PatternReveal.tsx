@@ -473,10 +473,6 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
         <ScreenCosmos width={width} height={height} />
       </Animated.View>
 
-      {/* La fiesta — DETRÁS del card, solo en positivos + Regreso (nunca el
-          noticing). Irradia desde el centro, no toca el texto. */}
-      {party && celebrate ? <RevealParticles tier={celebrate} size={cardW * 0.62} /> : null}
-
       {/* The backdrop IS the centering container: tapping the blurred sky
           closes. Leaving without "accepting" the observation is a
           first-class exit (te veo, no te vigilo). */}
@@ -746,6 +742,11 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
           </Animated.View>
         </Pressable>
       </Pressable>
+
+      {/* La fiesta — POR DELANTE del card (es opaco; detrás quedaba tapada).
+          Solo positivos + Regreso, NUNCA el noticing. Irradia hacia arriba/
+          afuera, lejos del texto. pointerEvents none. */}
+      {party && celebrate ? <RevealParticles tier={celebrate} size={width} /> : null}
     </View>
   )
 }
