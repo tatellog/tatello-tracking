@@ -21,6 +21,8 @@ export {
 export { useRevelationHistory, useRevelationOrchestrator } from './hooks'
 export {
   PATTERN_RATE_LIMIT_MS,
+  patternRevelationCopy,
+  RETURN_COPY,
   selectRevelation,
   TRANSFORMATION_THRESHOLDS,
   transformationCopy,
