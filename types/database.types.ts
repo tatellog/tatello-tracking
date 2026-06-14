@@ -480,6 +480,39 @@ export type Database = {
         }
         Relationships: []
       }
+      revelations: {
+        Row: {
+          dismissed_at: string | null
+          id: string
+          kind: string
+          metadata: Json
+          shown_at: string
+          tier: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string | null
+          id?: string
+          kind: string
+          metadata?: Json
+          shown_at?: string
+          tier: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          shown_at?: string
+          tier?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sleep_logs: {
         Row: {
           bedtime: string

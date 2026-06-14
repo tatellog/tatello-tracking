@@ -140,6 +140,11 @@ barreras, el PRD describe el producto. Estas specs dicen **CÓMO**:
   patrones, sin predecir ni diagnosticar). Cycle sprint.
 - `docs/tu-orbita-design.md` — el tab core (Día / Semana / Mes).
 - `docs/constellation-art-brief.md` — dirección de arte de la constelación.
+- `docs/revelations-system-spec.md` — Sistema de Revelaciones (V1 sin IA):
+  3 tiers (Transformación 25/50/75/100 · Regreso 3+ días · Patrones 1/7d) +
+  Historia. Consultá al construir momentos full-screen, retorno o patrones.
+  OJO: sus ejemplos de copy con conteos chocan con `features/patterns/CLAUDE.md`
+  (prohíbe contar frecuencia) — ver "Conflictos conocidos" en la spec.
 
 ---
 

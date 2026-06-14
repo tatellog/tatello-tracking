@@ -77,6 +77,13 @@ export const queryKeys = {
     // esta key para no re-correr los detectores + inserts en cada focus de Hoy.
     detection: () => ['patterns', 'detection'] as const,
   },
+  revelations: {
+    all: ['revelations'] as const,
+    // El orquestador (T1/T2/T3) que decide qué revelación mostrar al abrir Hoy.
+    pending: () => ['revelations', 'pending'] as const,
+    // El timeline de Historia (todas las revelaciones mostradas).
+    history: () => ['revelations', 'history'] as const,
+  },
   emblem: {
     all: ['emblem'] as const,
     // La meta de agua entra en la key: cambiarla recalcula el acumulado
