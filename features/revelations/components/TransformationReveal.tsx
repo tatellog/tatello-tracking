@@ -93,10 +93,28 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
         {/* El card absorbe sus taps (no cierra al tocar el contenido). */}
         <Pressable onPress={() => {}}>
           <Animated.View style={[styles.card, { width: Math.min(width - 56, 360) }, cardStyle]}>
+            {/* Cerrar explícito — además del tap en el fondo, un afford claro
+                para no perder el momento por un toque accidental. */}
+            <Pressable
+              onPress={close}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
+              style={styles.closeBtn}
+            >
+              <Text style={styles.closeIcon}>✕</Text>
+            </Pressable>
+
             <Text style={styles.eyebrow}>TU TRANSFORMACIÓN</Text>
             <Text style={styles.threshold}>{threshold}%</Text>
 
-            <Animated.View style={[styles.emblemWrap, emblemStyle]} pointerEvents="none">
+            {/* El contenedor DEBE tener tamaño explícito: RevealedEmblem se
+                pinta con absoluteFill, así que sin width/height quedaría 0×0
+                (solo se vería el glifo, que va posicionado absoluto). */}
+            <Animated.View
+              style={[styles.emblemWrap, { width: emblemSize, height: emblemSize }, emblemStyle]}
+              pointerEvents="none"
+            >
               <RevealedEmblem sign={sign} transformProgress={threshold} size={emblemSize} />
             </Animated.View>
 
@@ -173,6 +191,21 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  closeIcon: {
+    fontFamily: typography.ui,
+    fontSize: 16,
+    color: colors.niebla,
   },
   message: {
     fontFamily: typography.serifSemi,
