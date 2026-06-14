@@ -25,7 +25,6 @@ import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
 import { TransformationCard } from '@/features/emblem'
-import { ReturnMoment } from '@/features/rewards'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -372,9 +371,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
             </Animated.View>
 
-            {/* Capa 1 — momento de Regreso (3+ días fuera). Se anima y
-                despide solo; null en el uso diario. */}
-            <ReturnMoment today={ctx.date} />
+            {/* El momento de Regreso (3+ días fuera) ahora es la Revelación
+                de Regreso full-screen del orquestador (T2) — el ReturnMoment
+                inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
               <DayCheckIn state={dayState} onChange={handleDayChange} />
