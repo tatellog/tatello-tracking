@@ -3,9 +3,11 @@ import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   interpolate,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle, Path } from 'react-native-svg'
@@ -108,11 +110,11 @@ const TIER: Record<CelebrationTier, TierCfg> = {
   },
   return: {
     // Regreso: cálido y envolvente, PERO visible (antes casi no se veía).
-    sparks: 18,
-    riseMin: 60,
-    riseMax: 150,
-    peak: 0.75,
-    sparkle4: 3,
+    sparks: 26,
+    riseMin: 80,
+    riseMax: 220,
+    peak: 0.8,
+    sparkle4: 8,
     sparkle8: false,
     ring: false,
     durationMs: 2600,
@@ -136,16 +138,20 @@ type SparkSpec = {
   color: string
   delay: number
   peak: number
+  phase: number
 }
 
 function Spark({
   spec,
   durationMs,
   descend,
+  vib,
 }: {
   spec: SparkSpec
   durationMs: number
   descend: boolean
+  /** Clock de vibración compartido (titileo continuo). */
+  vib: SharedValue<number>
 }) {
   const t = useSharedValue(0)
   // Arranca una vez al montar (NUNCA en el cuerpo del render — Reanimated lo
@@ -159,8 +165,11 @@ function Spark({
 
   const style = useAnimatedStyle(() => {
     const dir = descend ? 1 : -1
+    // Titileo: la opacidad VIBRA con un seno rápido (cada chispa con su fase)
+    // → la celebración "late" en vez de solo subir y apagarse.
+    const shimmer = 0.6 + 0.4 * Math.sin(vib.value + spec.phase)
     return {
-      opacity: interpolate(t.value, [0, 0.15, 1], [0, spec.peak, 0]),
+      opacity: interpolate(t.value, [0, 0.15, 1], [0, spec.peak, 0]) * shimmer,
       transform: [
         { translateX: Math.cos(spec.angle) * spec.spread * t.value },
         { translateY: dir * spec.rise * t.value },
@@ -194,12 +203,16 @@ function Sparkle4({
   size,
   delay,
   durationMs,
+  vib,
+  phase,
 }: {
   x: number
   y: number
   size: number
   delay: number
   durationMs: number
+  vib: SharedValue<number>
+  phase: number
 }) {
   const t = useSharedValue(0)
   useEffect(() => {
@@ -208,10 +221,15 @@ function Sparkle4({
       withTiming(1, { duration: durationMs, easing: Easing.out(Easing.cubic) }),
     )
   }, [t, delay, durationMs])
-  const style = useAnimatedStyle(() => ({
-    opacity: interpolate(t.value, [0, 0.2, 1], [0, 0.85, 0]),
-    transform: [{ scale: 0.3 + t.value * 0.9 }],
-  }))
+  const style = useAnimatedStyle(() => {
+    // Vibra: titileo de opacidad + un pulso de escala → la estrella "late".
+    const shimmer = 0.62 + 0.38 * Math.sin(vib.value + phase)
+    const pulse = 1 + 0.12 * Math.sin(vib.value * 1.6 + phase)
+    return {
+      opacity: interpolate(t.value, [0, 0.2, 1], [0, 0.9, 0]) * shimmer,
+      transform: [{ scale: (0.3 + t.value * 0.9) * pulse }],
+    }
+  })
   return (
     <Animated.View style={[styles.abs, { left: x - size / 2, top: y - size / 2 }, style]}>
       <Svg width={size} height={size} viewBox="0 0 24 24">
@@ -284,6 +302,17 @@ export function RevealParticles({ tier, width, height }: Props) {
   const originX = width * 0.5
   const originY = height * 0.4
 
+  // Clock de VIBRACIÓN compartido: un seno rápido (~700 ms) que hace titilar
+  // todas las partículas → la celebración "late" en vez de solo subir/apagar.
+  const vib = useSharedValue(0)
+  useEffect(() => {
+    vib.value = withRepeat(
+      withTiming(Math.PI * 2, { duration: 700, easing: Easing.linear }),
+      -1,
+      false,
+    )
+  }, [vib])
+
   const sparks = useMemo<SparkSpec[]>(() => {
     const out: SparkSpec[] = []
     for (let i = 0; i < cfg.sparks; i++) {
@@ -299,10 +328,11 @@ export function RevealParticles({ tier, width, height }: Props) {
         // Recorrido en proporción a la PANTALLA → cruzan todo.
         spread: width * 0.5 * (0.3 + rand(i + 3)),
         rise: (cfg.riseMin + rand(i + 5) * (cfg.riseMax - cfg.riseMin)) * 1.9,
-        size: 4 + rand(i + 7) * 6,
+        size: 7 + rand(i + 7) * 13, // chispas más grandes (7–20 px)
         color,
         delay: rand(i + 9) * 280,
         peak: cfg.peak * (0.78 + rand(i + 13) * 0.22),
+        phase: rand(i + 17) * Math.PI * 2,
       })
     }
     return out
@@ -334,13 +364,21 @@ export function RevealParticles({ tier, width, height }: Props) {
           size={s.size}
           delay={s.delay}
           durationMs={cfg.durationMs}
+          vib={vib}
+          phase={i * 1.7}
         />
       ))}
       {/* Estallido desde el hero — las chispas vuelan a los bordes. */}
       <View style={[styles.origin, { left: originX, top: originY }]}>
         {cfg.sparkle8 ? <Bloom8 size={Math.min(width, height) * 0.55} delay={140} /> : null}
         {sparks.map((spec, i) => (
-          <Spark key={`p${i}`} spec={spec} durationMs={cfg.durationMs} descend={cfg.descend} />
+          <Spark
+            key={`p${i}`}
+            spec={spec}
+            durationMs={cfg.durationMs}
+            descend={cfg.descend}
+            vib={vib}
+          />
         ))}
       </View>
     </View>

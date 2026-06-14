@@ -10,8 +10,10 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { ScreenCosmos } from '@/features/orbit/components/Cosmos'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
@@ -114,6 +116,22 @@ export function TransformationReveal({
     transform: [{ scale: 0.7 + emblem.value * 0.3 }],
   }))
 
+  // Halo de luz que RESPIRA detrás de la tarjeta — presencia en la zona del
+  // hero (sobre todo en el Regreso, que no tiene figura). Loop suave.
+  const halo = useSharedValue(0)
+  useEffect(() => {
+    if (reduced) return
+    halo.value = withRepeat(
+      withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+  }, [reduced, halo])
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.45 + 0.45 * halo.value,
+    transform: [{ scale: 0.9 + 0.14 * halo.value }],
+  }))
+
   const close = (): void => {
     Haptics.selectionAsync().catch(() => {})
     onClose()
@@ -133,6 +151,26 @@ export function TransformationReveal({
       </Animated.View>
 
       <Pressable style={[StyleSheet.absoluteFill, styles.center]} onPress={close}>
+        {/* Halo de luz que respira detrás de la tarjeta — presencia en la zona
+            del hero (el Regreso no tiene figura). Detrás del card, no bloquea. */}
+        {isReturn ? (
+          <Animated.View
+            style={[StyleSheet.absoluteFill, styles.centerAbs, haloStyle]}
+            pointerEvents="none"
+          >
+            <Svg width={width * 0.95} height={width * 0.95} viewBox="0 0 100 100">
+              <Defs>
+                <RadialGradient id="tr-halo" cx="50%" cy="50%" r="50%">
+                  <Stop offset="0%" stopColor={colors.oroLeche} stopOpacity={0.24} />
+                  <Stop offset="45%" stopColor={colors.oro} stopOpacity={0.1} />
+                  <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Circle cx={50} cy={50} r={50} fill="url(#tr-halo)" />
+            </Svg>
+          </Animated.View>
+        ) : null}
+
         {/* El card absorbe sus taps (no cierra al tocar el contenido). */}
         <Pressable onPress={() => {}}>
           <Animated.View
@@ -233,6 +271,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: '-4%',
   },
+  centerAbs: { alignItems: 'center', justifyContent: 'center' },
   card: {
     backgroundColor: '#1A0C11',
     borderRadius: 28,
