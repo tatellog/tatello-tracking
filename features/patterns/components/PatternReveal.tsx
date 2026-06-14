@@ -86,22 +86,42 @@ type RevealConfig = {
   ghost: boolean
 }
 
+// Figura ascendente compartida — el patrón "se eleva" del origen tenue al
+// destino radiante. La usan el noticing y los positivos (todos "algo que
+// emerge esta semana"); el tono lo da el eyebrow, no la forma.
+const ASCENDING_NODES: Node[] = [
+  { x: 34, y: 124, s: 0.72 }, // the origin is a whisper
+  { x: 98, y: 100, s: 0.9 },
+  { x: 160, y: 74, s: 1.0 },
+  { x: 222, y: 48, s: 1.15 },
+  { x: 276, y: 26, s: 1.35 }, // the header — radiant destination
+]
+
+// Patrones positivos (T3) — celebran constancia. Mismo tier weekly (magenta)
+// y figura ascendente; eyebrow "ALGO CONSTANTE" en vez de "ALGO QUE NOTÉ".
+const POSITIVE_CONFIG: RevealConfig = {
+  tier: 'weekly',
+  eyebrow: 'ALGO CONSTANTE',
+  cadence: 'ESTA SEMANA',
+  anchor: 'Esto viene de ti',
+  nodes: ASCENDING_NODES,
+  closed: false,
+  ghost: false,
+}
+
 const CONFIG: Record<PatternType, RevealConfig> = {
   night_eating: {
     tier: 'weekly',
     eyebrow: 'ALGO QUE NOTÉ',
     cadence: 'ESTA SEMANA',
     anchor: 'Esto viene de ti',
-    nodes: [
-      { x: 34, y: 124, s: 0.72 }, // the origin is a whisper
-      { x: 98, y: 100, s: 0.9 },
-      { x: 160, y: 74, s: 1.0 },
-      { x: 222, y: 48, s: 1.15 },
-      { x: 276, y: 26, s: 1.35 }, // the header — radiant destination
-    ],
+    nodes: ASCENDING_NODES,
     closed: false,
     ghost: false,
   },
+  protein_consistent: POSITIVE_CONFIG,
+  training_consistent: POSITIVE_CONFIG,
+  sleep_consistent: POSITIVE_CONFIG,
   abandonment: {
     // A return after an absence is the deepest, tenderest moment — it
     // earns the rooted ceremony (gold + ghost stars that waited).

@@ -122,6 +122,32 @@ de tier o desaparecer**.
    escriben ahí). La **UI de Historia se fasea** (semilla: el detalle de
    patrón de Órbita `app/orbit/pattern/[id].tsx`).
 
+## Decisiones de Stage C (behavioral-specialist, 2026-06-14)
+
+5. **Prioridad entre patrones — los POSITIVOS ganan al noticing.** Si en una
+   ventana califica ≥1 patrón positivo (proteína/entreno/sueño) Y la comida
+   nocturna, gana el positivo. El noticing (comida nocturna) solo emerge
+   cuando NO hay ningún positivo. Razón: el sesgo de negatividad hace que un
+   "te vi cenar tarde" pese 2-3× un elogio; que un buen día no se gaste la
+   cuota en lo que falló. Entre positivos, desempate por volición:
+   **entreno > proteína > sueño**.
+6. **Umbrales:** proteína 4/7 · entreno 3/7 · sueño **6.5h** (390 min, NO 7h —
+   7h casi nunca dispara y el copy promete "estabilidad", no estándar médico)
+   en 4/7 · comida nocturna 5/7 **días distintos** (no comidas) después de
+   las 22:00. 5/7 es el TECHO sano del noticing.
+7. **Cadencia del noticing ≥ 14 días** (propia, además del 1/7 global): la
+   repetición del noticing en ventanas seguidas roza "me cuenta las noches"
+   (verbo de observación sostenida, prohibido). El silencio es feature: no se
+   fuerza una revelación semanal para llenar cuota.
+8. **Conteos por tono:** en positivos el número va al frente y enmarca "hacia
+   arriba" (5/7 = constancia; NUNCA "te faltaron 2"). En el noticing el número
+   va al PIE como contexto del dato, nunca al titular; sujeto = "las noches".
+9. **Línea roja (pendiente de construir):** comida nocturna ~diaria sostenida
+   (7/7 en varias ventanas) NO es un reveal con conteo → debe enrutar a
+   `severe_signals` + mensaje suave de derivación (ver features/patterns/
+   CLAUDE.md "patrón severo"). Definir el umbral-techo de escalado. MVP: el
+   reveal de night-eating se cap­ea; el flujo severo se fasea.
+
 ## Conflictos conocidos con lo ya construido
 
 > Los ejemplos de copy del PRD con conteos de frecuencia chocan con

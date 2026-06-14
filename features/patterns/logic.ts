@@ -14,7 +14,15 @@
  *     line in this file. This MVP intentionally has none.
  */
 
-export const PATTERN_TYPES = ['night_eating', 'abandonment'] as const
+export const PATTERN_TYPES = [
+  'night_eating',
+  'abandonment',
+  // Patrones positivos (T3) — celebran constancia. El conteo va al frente,
+  // enmarcado "hacia arriba" (behavioral-specialist + spec Decisión #8).
+  'protein_consistent',
+  'training_consistent',
+  'sleep_consistent',
+] as const
 export type PatternType = (typeof PATTERN_TYPES)[number]
 
 /** Slim meal shape the night-eating detector needs. */
@@ -22,27 +30,43 @@ export type MealForDetect = { consumed_at: string }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SEVEN_DAYS_MS = 7 * DAY_MS
-const NIGHT_HOUR = 21
-const NIGHT_THRESHOLD = 2
+// 22:00 (no 21:00) y 5 DÍAS distintos (no 2 comidas): el PRD sube el listón
+// para que deje de marcar ruido normal (dos cenas tardías le pasan a
+// cualquiera) y solo dispare ante un patrón genuino. 5/7 es el techo sano del
+// noticing (behavioral-specialist) — más allá de eso es señal de derivación.
+const NIGHT_HOUR = 22
+const NIGHT_THRESHOLD_DAYS = 5
+
+/** Clave de día local YYYY-MM-DD (los componentes locales, como getHours). */
+function localDayKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
 const ABANDONMENT_GAP_DAYS = 3
 
-/** Fires if the user logged ≥ 2 meals after 21:00 (local hour, per
- *  the timestamp's local components) in the last 7 days. */
+/** Días DISTINTOS (últimos 7) con al menos una comida registrada a las 22:00
+ *  o más tarde (hora local). Cuenta días, no comidas — dos snacks una misma
+ *  noche no inflan el conteo. El número alimenta el copy con conteos. */
+export function nightEatingDayCount(
+  meals: readonly MealForDetect[],
+  now: Date = new Date(),
+): number {
+  const cutoff = now.getTime() - SEVEN_DAYS_MS
+  const days = new Set<string>()
+  for (const m of meals) {
+    const d = new Date(m.consumed_at)
+    if (d.getTime() < cutoff) continue
+    if (d.getHours() >= NIGHT_HOUR) days.add(localDayKey(d))
+  }
+  return days.size
+}
+
+/** Fires si hubo comida después de las 22:00 en ≥ 5 días distintos (de 7). */
 export function detectNightEating(
   meals: readonly MealForDetect[],
   now: Date = new Date(),
 ): boolean {
-  const cutoff = now.getTime() - SEVEN_DAYS_MS
-  let count = 0
-  for (const m of meals) {
-    const d = new Date(m.consumed_at)
-    if (d.getTime() < cutoff) continue
-    if (d.getHours() >= NIGHT_HOUR) {
-      count += 1
-      if (count >= NIGHT_THRESHOLD) return true
-    }
-  }
-  return false
+  return nightEatingDayCount(meals, now) >= NIGHT_THRESHOLD_DAYS
 }
 
 /** Fires the day the user returns after a ≥ 3-day gap. Input is a

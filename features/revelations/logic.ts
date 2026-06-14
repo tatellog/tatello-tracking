@@ -78,6 +78,45 @@ export const RETURN_COPY = {
   title: 'Volviste a tu cielo.',
 } as const
 
+/**
+ * Copy CON CONTEO de las Revelaciones de Patrones (T3). Enmarcado por tono
+ * (behavioral + spec Decisión #8): en positivos el conteo va al frente y
+ * "hacia arriba" (X/N = constancia, nunca "te faltaron 2"); en el noticing
+ * la observación cálida va primero y el número al PIE como contexto, con el
+ * sujeto en "las noches". (Borrador; pasa por voice-and-copy.)
+ */
+export function patternRevelationCopy(
+  kind: string,
+  count: number,
+  windowDays: number,
+): { message: string; title: string } {
+  switch (kind) {
+    case 'protein_consistent':
+      return {
+        message: `${count} de los últimos ${windowDays} días tu proteína estuvo presente. Ya tiene forma.`,
+        title: 'Proteína constante.',
+      }
+    case 'training_consistent':
+      return {
+        // Sujeto = el dato (el movimiento), no la usuaria ("te moviste"),
+        // parejo con las otras cadenas (regla de sujeto de patterns).
+        message: `${count} de los últimos ${windowDays} días el movimiento estuvo ahí. Ya es un ritmo.`,
+        title: 'Un ritmo de movimiento.',
+      }
+    case 'sleep_consistent':
+      return {
+        message: `${count} de los últimos ${windowDays} días tu descanso fue sólido. Tu cuerpo tuvo eso.`,
+        title: 'Descanso más estable.',
+      }
+    case 'night_eating':
+    default:
+      return {
+        message: `Las noches pidieron más esta semana. Registraste algo tarde en ${count} de los últimos ${windowDays} días.`,
+        title: 'Un patrón en tus noches.',
+      }
+  }
+}
+
 export type OrchestratorPattern = {
   kind: string
   message: string
