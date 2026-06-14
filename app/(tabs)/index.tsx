@@ -24,7 +24,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
-import { TransformationCard } from '@/features/emblem'
+import { TransformationCard, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -293,6 +293,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // (Regreso > Transformación > Patrón). Reemplaza al usePatternDetection
   // suelto: ahora T2/T3 + el nuevo T1 viven en un solo sistema.
   const { revelation, dismiss: dismissRevelation } = useRevelationOrchestrator(signLabel)
+  // El % actual del emblema — la Revelación de Regreso lo muestra "donde lo
+  // dejaste" (cacheado por useTransformProgress; misma fuente que el hero).
+  const { progress: emblemProgress } = useTransformProgress()
   const figureCount = ZODIAC[sign].stars.length + ZODIAC[sign].lines.length
 
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
@@ -534,9 +537,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               })()}
             </Animated.View>
 
-            {/* "Tu transformación" (compacta) — cuánto se reveló el
-                emblema y en qué etapa va; tap → Órbita · Mes. Solo Leo
-                con primer hábito (la tarjeta se gatea sola). */}
+            {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
+                "Tu transformación" + "Tu universo hoy": lo que el esfuerzo
+                reveló. No mutan datos ni navegan de sorpresa. */}
+
+            {/* "Tu transformación" (compacta) — cuánto se reveló el emblema y
+                en qué etapa va; el detalle del mes vive tras un link explícito.
+                Solo Leo con primer hábito (la tarjeta se gatea sola). */}
             <Animated.View entering={enter(450)}>
               <TransformationCard compact />
             </Animated.View>
@@ -553,13 +560,39 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <TodayUniverseRewards ctx={ctx} date={ctx.date} restedToday={restedToday} />
             </Animated.View>
 
-            {/* Calendario — el editor oficial de la constelación + puente a
-                Historia. Siempre visible. Tocar un día lo selecciona y abre el
-                panel de detalle; marcar/quitar se hace desde sus botones (sin
-                celebración). */}
+            {/* ── Nivel 3 · Contexto del día e historia ────────────────────
+                Lo que la usuaria consulta cuando ya hizo lo principal:
+                macros, comidas, y el calendario (historia/editor) al final. */}
+
             <Animated.View entering={enter(520)}>
+              <StatSlider
+                ctx={ctx}
+                targetSlide={slideParam ?? null}
+                onSwipeStateChange={handleSlideSwipe}
+              />
+            </Animated.View>
+
+            <Animated.View entering={enter(560)}>
+              <SectionHeader label="Comidas de hoy" />
+            </Animated.View>
+            <Animated.View entering={enter(600)}>
+              <TodayMealLog
+                date={ctx.date}
+                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+                onAddMeal={() => router.push({ pathname: '/capture-meal' })}
+              />
+            </Animated.View>
+
+            {/* Calendario — el editor oficial de la constelación + puente a
+                Historia. Va al FINAL: es contexto/historia ("así va tu mes"),
+                no la acción del día (esa es el toggle de arriba). Tocar un día
+                lo selecciona y abre su detalle; el día de HOY solo se lee
+                (se marca arriba), los pasados se pueden editar sin celebración. */}
+            <Animated.View entering={enter(680)}>
               <SectionHeader label={monthLabel} />
-              <Text style={styles.weekHint}>Desliza y toca un día para ver el detalle.</Text>
+              <Text style={styles.weekHint}>
+                Tu mes hasta hoy · toca un día para ver el detalle.
+              </Text>
               <WeekStrip
                 days={calendarDays}
                 selectedDate={selectedDate}
@@ -575,24 +608,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 />
               ) : null}
             </Animated.View>
-
-            <Animated.View entering={enter(600)}>
-              <StatSlider
-                ctx={ctx}
-                targetSlide={slideParam ?? null}
-                onSwipeStateChange={handleSlideSwipe}
-              />
-            </Animated.View>
-
-            <Animated.View entering={enter(740)}>
-              <SectionHeader label="Comidas de hoy" />
-            </Animated.View>
-            <Animated.View entering={enter(800)}>
-              <TodayMealLog
-                date={ctx.date}
-                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
-              />
-            </Animated.View>
           </ScrollView>
         </SafeAreaView>
         {/* Montaje DIFERIDO (no en el primer paint): el Canvas Skia + su
@@ -606,9 +621,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           <CelebrateShockwave celebrateKey={celebrateKey} />
         ) : null}
         {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
-          El orquestador elige UNA (Regreso > Transformación > Patrón); aquí
-          solo se pinta según su tier: el emblema para Transformación, la
-          constelación de PatternReveal para Regreso ('abandonment') y Patrón. */}
+          El orquestador elige UNA (Regreso > Transformación > Patrón); se
+          pinta según su tier: el EMBLEMA para Transformación Y para Regreso
+          ("tu cielo te esperó" con tu emblema, no una figura anónima); la
+          constelación de PatternReveal solo para los Patrones. */}
         {revelation?.tier === 'transformation' ? (
           <TransformationReveal
             sign={sign}
@@ -616,11 +632,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             message={revelation.message}
             onClose={dismissRevelation}
           />
+        ) : revelation?.tier === 'return' ? (
+          <TransformationReveal
+            sign={sign}
+            variant="return"
+            threshold={emblemProgress}
+            message={revelation.message}
+            onClose={dismissRevelation}
+          />
         ) : revelation ? (
           <PatternReveal
             pattern={{
               id: 'revelation',
-              type: revelation.tier === 'return' ? 'abandonment' : (revelation.kind as PatternType),
+              type: revelation.kind as PatternType,
               message: revelation.message,
             }}
             onClose={dismissRevelation}

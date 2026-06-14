@@ -182,43 +182,57 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const openAttr = openKey ? (attributes.find((a) => a.key === openKey) ?? null) : null
   const flightIdx = flight ? attributes.findIndex((a) => a.key === flight.key) : -1
 
+  // Estado durmiente: nada registrado aún hoy → la rejilla 2×2 mostraría
+  // cuatro "0%", que lee como "examen diario en ceros" (contra el manifiesto).
+  // En su lugar, UNA línea cálida que invita sin exigir; la rejilla aparece
+  // sola en cuanto un registro la enciende.
+  const allDormant = attributes.every((a) => a.pct <= 0)
+
   return (
     <View style={styles.section}>
       <EyebrowLabel tone="magenta">Tu universo hoy</EyebrowLabel>
-      {/* Los primeros 3 días el susurro de bienvenida REEMPLAZA al caption
-          (introduce "solo suma" en voz del coach y se desvanece solo);
-          después queda el caption quieto de siempre — nunca se apilan. */}
-      {showIntro ? (
-        <Animated.Text entering={FadeIn.duration(400)} style={styles.introWhisper}>
-          Cada registro enciende algo. Tu universo solo crece.
-        </Animated.Text>
+      {allDormant ? (
+        <Text style={styles.dormantLine}>
+          Aún no enciendes nada hoy. En cuanto registres algo, tu universo aparece aquí.
+        </Text>
       ) : (
-        <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
+        <>
+          {/* Los primeros 3 días el susurro de bienvenida REEMPLAZA al caption
+              (introduce "solo suma" en voz del coach y se desvanece solo);
+              después queda el caption quieto de siempre — nunca se apilan. */}
+          {showIntro ? (
+            <Animated.Text entering={FadeIn.duration(400)} style={styles.introWhisper}>
+              Cada registro enciende algo. Tu universo solo crece.
+            </Animated.Text>
+          ) : (
+            <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
+          )}
+          <View style={styles.gridWrap}>
+            <View style={styles.grid}>
+              {attributes.map((attr) => (
+                <AttributeCard
+                  key={attr.key}
+                  attr={attr}
+                  reducedMotion={reducedMotion}
+                  selected={openKey === attr.key}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {})
+                    setOpenKey((k) => (k === attr.key ? null : attr.key))
+                  }}
+                />
+              ))}
+            </View>
+            {/* El vuelo hacia Leo — partículas que salen del card que subió
+                y suben más allá de la sección, hacia la constelación. Vive
+                FUERA de los cards (tienen overflow hidden) en una capa
+                absoluta pointer-transparente. */}
+            {flight && flightIdx >= 0 ? (
+              <FlightToConstellation key={flight.id} attrKey={flight.key} index={flightIdx} />
+            ) : null}
+          </View>
+          {openAttr ? <AttributeDetail key={openAttr.key} attr={openAttr} input={input} /> : null}
+        </>
       )}
-      <View style={styles.gridWrap}>
-        <View style={styles.grid}>
-          {attributes.map((attr) => (
-            <AttributeCard
-              key={attr.key}
-              attr={attr}
-              reducedMotion={reducedMotion}
-              selected={openKey === attr.key}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {})
-                setOpenKey((k) => (k === attr.key ? null : attr.key))
-              }}
-            />
-          ))}
-        </View>
-        {/* El vuelo hacia Leo — partículas que salen del card que subió
-            y suben más allá de la sección, hacia la constelación. Vive
-            FUERA de los cards (tienen overflow hidden) en una capa
-            absoluta pointer-transparente. */}
-        {flight && flightIdx >= 0 ? (
-          <FlightToConstellation key={flight.id} attrKey={flight.key} index={flightIdx} />
-        ) : null}
-      </View>
-      {openAttr ? <AttributeDetail key={openAttr.key} attr={openAttr} input={input} /> : null}
     </View>
   )
 }
@@ -636,6 +650,15 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginTop: spacing.s1,
     marginBottom: spacing.s4,
+  },
+  // Estado durmiente — una sola línea cálida en vez de 4 tarjetas en 0%.
+  // Voz del coach (serif italic), invita sin exigir.
+  dormantLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    marginTop: spacing.s1,
   },
   // Susurro de bienvenida (≤3 días) — voz del coach, cálido, introduce
   // "nada se resta" sin enseñarlo. Se va solo cuando cierra la ventana.

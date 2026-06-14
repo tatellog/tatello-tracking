@@ -98,17 +98,22 @@ export function TransformationCard({ compact = false }: Props) {
             <Text style={[styles.infoGlyph, open && styles.infoGlyphOpen]}>ⓘ</Text>
           </Pressable>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Tu transformación. ${line}`}
-          accessibilityHint="Abre tu Órbita del mes"
-          onPress={openOrbita}
-        >
-          <Text style={styles.compactMessage}>{line}</Text>
-        </Pressable>
+        {/* La voz es LECTURA, no un hot-zone que navega de sorpresa: tocar
+            toda la tarjeta sacaba a la usuaria de Hoy sin avisar. El detalle
+            del mes ahora vive tras un link explícito abajo. */}
+        <Text style={styles.compactMessage}>{line}</Text>
         {/* Garantía persistente — quita la lectura de castigo: nada de lo
             revelado se pierde. Voz del coach (italic). */}
         <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
+        <Pressable
+          hitSlop={8}
+          accessibilityRole="link"
+          accessibilityLabel="Ver tu transformación en Órbita"
+          onPress={openOrbita}
+          style={({ pressed }) => [styles.orbitLink, pressed && styles.orbitLinkPressed]}
+        >
+          <Text style={styles.orbitLinkText}>Ver en Órbita →</Text>
+        </Pressable>
         {open ? <Explainer /> : null}
       </View>
     )
@@ -306,6 +311,21 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.micro,
     color: colors.niebla,
     marginTop: spacing.s1,
+  },
+  // Link explícito a Órbita·Mes — la ÚNICA navegación de la tarjeta, ahora
+  // visible (no toda la tarjeta como hot-zone silenciosa).
+  orbitLink: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.s2,
+  },
+  orbitLinkPressed: {
+    opacity: 0.6,
+  },
+  orbitLinkText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.4,
+    color: colors.magenta,
   },
 
   /* la barra */

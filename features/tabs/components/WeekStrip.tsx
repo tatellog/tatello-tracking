@@ -144,15 +144,15 @@ function DayGlyph({
   )
 }
 
-/* Small gold marker for a day that carries an event/revelation; shows a
- * "+N" counter when more than one landed that day. */
+/* Small gold marker for a day that carries an event/revelation. Solo un
+ * punto de presencia — el detalle (cuáles y cuántos) vive en el panel, no
+ * en un "+N" críptico en la tira. */
 function EventDot({ count }: { count: number }) {
   // Always reserve the row so columns with/without events stay the same
   // height; only paint the marker when an event landed that day.
   return (
     <View style={styles.eventRow} pointerEvents="none">
       {count > 0 ? <View style={styles.eventDot} /> : null}
-      {count > 1 ? <Text style={styles.eventCount}>+{count - 1}</Text> : null}
     </View>
   )
 }
@@ -389,11 +389,5 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.oro,
-  },
-  eventCount: {
-    fontFamily: typography.uiBold,
-    fontSize: 8,
-    color: colors.oroSoft,
-    letterSpacing: 0.2,
   },
 })

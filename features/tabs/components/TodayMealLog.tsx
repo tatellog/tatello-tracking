@@ -159,6 +159,21 @@ function DishGlyph({ size, color }: { size: number; color: string }) {
   )
 }
 
+/* El + del botón "Agregar" — dos trazos centrados en el viewBox, así queda
+ * perfectamente centrado en el disco (un glifo de texto trae offset de baseline). */
+function PlusIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M12 4.5 V19.5 M4.5 12 H19.5"
+        stroke={color}
+        strokeWidth={2.6}
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
+
 function TrashIcon({ color }: { color: string }) {
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
@@ -329,6 +344,35 @@ type Props = {
   date: string
   /** Open a meal to edit it. */
   onOpenMeal: (id: string) => void
+  /** Start the flow to add a new meal. */
+  onAddMeal: () => void
+}
+
+/* "Agregar comida" — el PRIMER círculo del pile: mismo tamaño/forma que los
+ * discos de comida, diferenciado como BOTÓN (anillo magenta + un + al centro).
+ * El disco visible es un <View> (mismo patrón que pileCircle, que SÍ renderiza
+ * su caja); el Pressable solo gestiona el tap + el zIndex (al frente). Al
+ * tocarlo abre el obturador (cámara con scan / galería / texto). */
+function AddPileCircle({ onPress, overlap }: { onPress: () => void; overlap?: boolean }) {
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {})
+        onPress()
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Agregar comida"
+      style={({ pressed }) => [
+        styles.addPilePress,
+        overlap && styles.addPileOverlap,
+        pressed && styles.addPilePressed,
+      ]}
+    >
+      <View style={styles.addPile}>
+        <PlusIcon size={26} color={colors.magenta} />
+      </View>
+    </Pressable>
+  )
 }
 
 /* "Comidas de hoy" — la estela del día.
@@ -339,7 +383,7 @@ type Props = {
  * most recent meal — the comet head — glows and breathes.
  *
  * Tap a card → edit. Swipe a card left past the threshold → delete. */
-export function TodayMealLog({ date, onOpenMeal }: Props) {
+export function TodayMealLog({ date, onOpenMeal, onAddMeal }: Props) {
   const { data: meals } = useMealsForDate(date)
   const deleteMeal = useDeleteMeal()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -361,41 +405,62 @@ export function TodayMealLog({ date, onOpenMeal }: Props) {
     ])
   }
 
-  if (!meals || meals.length === 0) {
-    return (
-      <View style={styles.emptyWrap}>
-        <Text style={styles.emptyTitle}>Aún no sumas comida hoy.</Text>
-        <Text style={styles.emptyHint}>Cada comida que sumes aparece aquí, en orden.</Text>
-      </View>
-    )
+  const list = meals ?? []
+  const hasMeals = list.length > 0
+  const totalKcal = list.reduce((sum, m) => sum + m.calories, 0)
+
+  const openSheet = () => {
+    Haptics.selectionAsync().catch(() => {})
+    setSheetOpen(true)
   }
 
-  const n = meals.length
-  const totalKcal = meals.reduce((sum, m) => sum + m.calories, 0)
-
+  // UN solo layout para vacío y poblado: el círculo "Agregar" (+) vive SIEMPRE
+  // en el mismo lugar (izquierda) y nunca se mueve ni desaparece. Vacío →
+  // solo el + con su leyenda al lado. Con comidas → cada disco se forma DETRÁS
+  // del +, asomándose a la derecha (el + queda al frente, zIndex alto).
   return (
     <View>
-      {/* The whole pile + summary is one tap target. It cascades in and
-       * dips on press, so the overlapping circles read as a button. */}
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {})
-          setSheetOpen(true)
-        }}
-        style={({ pressed }) => [styles.summaryBlock, pressed && styles.summaryBlockPressed]}
-        accessibilityRole="button"
-        accessibilityLabel="Ver todas las comidas de hoy"
-      >
-        <MealPhotoCluster meals={meals} />
-        <Text style={styles.summary}>
-          <Text style={styles.summaryStrong}>{totalKcal.toLocaleString('es-MX')}</Text> kcal ·{' '}
-          <Text style={styles.summaryStrong}>{n}</Text> {n === 1 ? 'comida' : 'comidas'} en tu cielo
-        </Text>
-      </Pressable>
+      {!hasMeals ? (
+        <>
+          <Text style={styles.emptyTitle}>Aún no sumas comida hoy.</Text>
+          <Text style={styles.emptyHint}>Cada comida que sumes aparece aquí, en orden.</Text>
+        </>
+      ) : null}
+
+      {/* El + va SIEMPRE a la derecha (la fila se alinea a la derecha). Los
+          platillos se forman a su izquierda; el + es el último elemento y se
+          solapa encima del más reciente (al frente). */}
+      <View style={styles.pileRow}>
+        {hasMeals ? (
+          <Pressable
+            onPress={openSheet}
+            style={({ pressed }) => [styles.pileTap, pressed && styles.summaryBlockPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Ver todas las comidas de hoy"
+          >
+            <MealPhotoCluster meals={list} />
+          </Pressable>
+        ) : null}
+        <AddPileCircle onPress={onAddMeal} overlap={hasMeals} />
+      </View>
+
+      {hasMeals ? (
+        <Pressable
+          onPress={openSheet}
+          accessibilityRole="button"
+          accessibilityLabel="Ver el resumen"
+        >
+          <Text style={styles.summary}>
+            <Text style={styles.summaryStrong}>{totalKcal.toLocaleString('es-MX')}</Text> kcal ·{' '}
+            <Text style={styles.summaryStrong}>{list.length}</Text>{' '}
+            {list.length === 1 ? 'comida' : 'comidas'} en tu cielo
+          </Text>
+        </Pressable>
+      ) : null}
 
       <TodayMealsSheet
         visible={sheetOpen}
-        meals={meals}
+        meals={list}
         onClose={() => setSheetOpen(false)}
         onOpenMeal={(id) => {
           setSheetOpen(false)
@@ -608,25 +673,60 @@ function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
 }
 
 const styles = StyleSheet.create({
-  emptyWrap: {
-    marginTop: 12,
-    marginBottom: 4,
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
+  // Estado vacío: texto alineado a la izquierda, igual que el pile (el +
+  // vive a la izquierda en ambos estados, así nunca "salta" al centro).
   emptyTitle: {
     fontFamily: typography.displaySemi,
     fontSize: 15.5,
     color: colors.bone,
     letterSpacing: -0.2,
-    textAlign: 'center',
   },
   emptyHint: {
     marginTop: 4,
     fontFamily: typography.ui,
     fontSize: 12.5,
     color: colors.niebla,
-    textAlign: 'center',
+  },
+  // Fila del pile: justificada a la IZQUIERDA (el grupo pega al borde izq). El
+  // + es el último elemento → queda a la derecha de los platillos, que se
+  // forman a su izquierda. Altura = un disco, así el estado vacío mantiene caja.
+  pileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    height: PILE_SIZE,
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  pileTap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Pressable contenedor — solo tap + stacking (al frente). La caja visible
+  // vive en el <View> interno (addPile), que es el patrón que SÍ pinta.
+  addPilePress: {
+    zIndex: 2,
+  },
+  // Cuando hay platillos, el + se solapa encima del más reciente (a su izq).
+  addPileOverlap: {
+    marginLeft: -PILE_OVERLAP,
+  },
+  // El disco "Agregar" — mismo tamaño/forma que un disco del pile (mismo
+  // estilo de card), diferenciado como BOTÓN: fill opaco oscuro + anillo
+  // magenta + un + al centro. Opaco → tapa limpio los platillos de atrás.
+  addPile: {
+    width: PILE_SIZE,
+    height: PILE_SIZE,
+    borderRadius: PILE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgCard2,
+    borderWidth: 2,
+    borderColor: colors.magenta,
+  },
+  addPilePressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
   },
   actionHint: {
     fontFamily: typography.ui,
@@ -639,12 +739,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   // ── Photo pile — overlapping meal circles, the section's hero. ──
+  // El espaciado vertical lo da `pileRow`; aquí solo la fila de discos.
   pile: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 14,
-    paddingVertical: 4,
   },
   pileOverlap: {
     marginLeft: -PILE_OVERLAP,
@@ -683,9 +781,6 @@ const styles = StyleSheet.create({
   },
   // The pile + summary, as one tappable button. It dips slightly on
   // press so the overlapping circles respond like a control.
-  summaryBlock: {
-    alignSelf: 'flex-start',
-  },
   summaryBlockPressed: {
     opacity: 0.7,
     transform: [{ scale: 0.97 }],

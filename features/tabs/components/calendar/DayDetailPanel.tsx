@@ -125,41 +125,58 @@ export function DayDetailPanel({
         </View>
       ) : null}
 
-      {/* Evento — solo si hay revelaciones ese día */}
+      {/* Evento(s) — revelaciones de ese día. Se listan TODAS (cada una en
+          su línea): así no hay "+N" críptico y se ve qué pasó realmente. */}
       {hasEvents ? (
         <View style={styles.section}>
-          <Text style={styles.eyebrow}>Evento</Text>
-          <View style={styles.eventRow}>
-            <View style={styles.eventDot} />
-            <Text style={styles.eventTitle}>{day.events[0]!.title}</Text>
-            {day.events.length > 1 ? (
-              <Text style={styles.eventMore}>+{day.events.length - 1}</Text>
-            ) : null}
+          <Text style={styles.eyebrow}>{day.events.length > 1 ? 'Eventos' : 'Evento'}</Text>
+          <View style={styles.eventList}>
+            {day.events.map((ev) => (
+              <View key={ev.id} style={styles.eventRow}>
+                <View style={styles.eventDot} />
+                <Text style={styles.eventTitle}>{ev.title}</Text>
+              </View>
+            ))}
           </View>
         </View>
       ) : null}
 
-      {/* Acciones contextuales — nunca celebran */}
-      <View style={styles.actions}>
-        {day.status === 'empty' ? (
-          <>
-            <ActionButton label="Marcar entrené" primary onPress={() => onMarkTrained(day.date)} />
-            <ActionButton label="Marcar descansé" onPress={() => onMarkRested(day.date)} />
-          </>
-        ) : null}
-        {day.status === 'trained' ? (
-          <>
-            <ActionButton label="Quitar entrenamiento" onPress={() => onClearTrained(day.date)} />
-            <ActionButton label="Marcar descansé" onPress={() => onMarkRested(day.date)} />
-          </>
-        ) : null}
-        {day.status === 'rested' ? (
-          <>
-            <ActionButton label="Marcar entrené" primary onPress={() => onMarkTrained(day.date)} />
-            <ActionButton label="Quitar descanso" onPress={() => onClearRested(day.date)} />
-          </>
-        ) : null}
-      </View>
+      {/* Hoy tiene UNA sola casa: el toggle Entrené/Descansé de arriba (el
+          que celebra). Aquí el día de hoy solo se LEE — sin botones que
+          dupliquen esa decisión con feedback distinto. Las acciones son solo
+          para backfill de días pasados, y nunca celebran. */}
+      {day.isToday ? (
+        <Text style={styles.todayHint}>El día de hoy se marca arriba, con tu constelación.</Text>
+      ) : (
+        <View style={styles.actions}>
+          {day.status === 'empty' ? (
+            <>
+              <ActionButton
+                label="Marcar entrené"
+                primary
+                onPress={() => onMarkTrained(day.date)}
+              />
+              <ActionButton label="Marcar descansé" onPress={() => onMarkRested(day.date)} />
+            </>
+          ) : null}
+          {day.status === 'trained' ? (
+            <>
+              <ActionButton label="Quitar entrenamiento" onPress={() => onClearTrained(day.date)} />
+              <ActionButton label="Marcar descansé" onPress={() => onMarkRested(day.date)} />
+            </>
+          ) : null}
+          {day.status === 'rested' ? (
+            <>
+              <ActionButton
+                label="Marcar entrené"
+                primary
+                onPress={() => onMarkTrained(day.date)}
+              />
+              <ActionButton label="Quitar descanso" onPress={() => onClearRested(day.date)} />
+            </>
+          ) : null}
+        </View>
+      )}
     </Animated.View>
   )
 }
@@ -223,7 +240,10 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: colors.bone,
   },
-  // Evento
+  // Evento(s)
+  eventList: {
+    gap: 7,
+  },
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -242,10 +262,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.oroLight,
   },
-  eventMore: {
-    fontFamily: typography.uiBold,
-    fontSize: 11,
-    color: colors.oroSoft,
+  // Hoy: solo lectura (la acción vive arriba).
+  todayHint: {
+    marginTop: 18,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: colors.niebla,
   },
   // Acciones
   actions: {
