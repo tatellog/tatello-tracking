@@ -17,8 +17,13 @@ import Svg, { Circle, Path } from 'react-native-svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
 import { useSleepLog } from '@/features/sleep/hooks'
+import {
+  consumeUniverseDetail,
+  subscribeUniverseDetailRequest,
+} from '@/features/tabs/pending-universe-detail'
 import { emitUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import {
+  ATTRIBUTE_GROWS,
   calculateTodayUniverseRewards,
   detailForAttribute,
   STATE_COPY,
@@ -33,10 +38,16 @@ import {
   UNIVERSE_ACCENT_MUTED,
   UNIVERSE_ICON_PATH,
 } from '@/features/tabs/universe-visuals'
+import { useFirstSeenWindow } from '@/features/tabs/useFirstSeenWindow'
 import { useWaterToday } from '@/features/water/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { colors, duration, easing, radius, spacing, typography } from '@/theme'
+
+// El susurro de bienvenida de "Tu universo hoy" se muestra los primeros 3
+// días desde que la sección aparece por primera vez, luego se desvanece.
+const UNIVERSE_INTRO_KEY = 'stelar.universe.first_seen'
+const UNIVERSE_INTRO_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
 
 /*
  * "Tu universo hoy" — the visible reward layer for the registros that
@@ -92,6 +103,17 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const [openKey, setOpenKey] = useState<UniverseAttributeKey | null>(null)
   const [flight, setFlight] = useState<{ key: UniverseAttributeKey; id: number } | null>(null)
   const prevPcts = useRef<Record<UniverseAttributeKey, number> | null>(null)
+  const showIntro = useFirstSeenWindow(UNIVERSE_INTRO_KEY, UNIVERSE_INTRO_WINDOW_MS)
+
+  // Tap del toast de delta ("+13 Claridad") → abre el detalle de ESE
+  // atributo aquí (reusa el panel, sin UI duplicada). Hoy queda montado
+  // (detachInactiveScreens=false), así que la suscripción reacciona al
+  // instante; consume() cubre la petición que llegó antes del montaje.
+  useEffect(() => {
+    const pendingKey = consumeUniverseDetail()
+    if (pendingKey) setOpenKey(pendingKey)
+    return subscribeUniverseDetailRequest((key) => setOpenKey(key))
+  }, [])
 
   const checkin = wellbeing.data ?? null
   const input: UniverseInput | null = ctx
@@ -163,7 +185,16 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   return (
     <View style={styles.section}>
       <EyebrowLabel tone="magenta">Tu universo hoy</EyebrowLabel>
-      <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
+      {/* Los primeros 3 días el susurro de bienvenida REEMPLAZA al caption
+          (introduce "solo suma" en voz del coach y se desvanece solo);
+          después queda el caption quieto de siempre — nunca se apilan. */}
+      {showIntro ? (
+        <Animated.Text entering={FadeIn.duration(400)} style={styles.introWhisper}>
+          Cada registro enciende algo. Tu universo solo crece.
+        </Animated.Text>
+      ) : (
+        <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
+      )}
       <View style={styles.gridWrap}>
         <View style={styles.grid}>
           {attributes.map((attr) => (
@@ -283,14 +314,18 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
 
   const accentMuted = UNIVERSE_ACCENT_MUTED[attr.key]
   const complete = attr.state === 'complete'
-  // La línea bajo el astro: copy de estado quieto (empty/partial/complete)
-  // o el faltante concreto (almost) en voz del coach. Sin chips: el
-  // "completo" se dice con el astro encendido, no con una palomita — así
-  // el grid deja de leerse como un checklist de cuatro casillas.
+  // La línea bajo el astro (híbrido "evidencia sí, % no"): por defecto
+  // muestra la EVIDENCIA — qué alimenta el atributo ("Crece con el agua
+  // que registras") — para que el símbolo sea información a simple vista,
+  // sin el número crudo (el % vive en el detalle). El ESTADO lo dice el
+  // anillo + el color del astro, no un texto. EXCEPCIÓN: en `almost` con
+  // faltante concreto, ese hint accionable ("Un vaso y llega") gana — es
+  // más útil cuando estás a un paso, y sigue siendo evidencia.
   const isGenericCopy = attr.microcopy === STATE_COPY[attr.state]
   // Serif italic se reserva para la voz del coach — el faltante ES una
-  // línea de coach; empty/partial/complete quedan en Hanken quieto.
+  // línea de coach; la evidencia va en Hanken quieto.
   const coachVoice = attr.state === 'almost' && !isGenericCopy
+  const cardLine = coachVoice ? attr.microcopy : ATTRIBUTE_GROWS[attr.key]
   // El glifo es el astro: pleno al encenderse, atenuado mientras orbita,
   // apenas niebla en calma.
   const astroColor = complete ? accent : attr.pct > 0 ? accentMuted : colors.niebla
@@ -393,7 +428,7 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
           numberOfLines={2}
           adjustsFontSizeToFit
         >
-          {attr.microcopy}
+          {cardLine}
         </Text>
       </View>
     </Pressable>
@@ -429,6 +464,9 @@ function AttributeDetail({ attr, input }: { attr: UniverseAttribute; input: Univ
           <Text style={styles.detailValue}>{line.value}</Text>
         </View>
       ))}
+      {/* La evidencia ("cómo crece") ya vive en la cara del card como
+          subtítulo persistente — aquí no se repite; el detalle aporta la
+          esencia (italic) + las cifras reales + el %. */}
     </Animated.View>
   )
 }
@@ -596,6 +634,16 @@ const styles = StyleSheet.create({
     fontFamily: typography.ui,
     fontSize: typography.sizes.micro,
     color: colors.niebla,
+    marginTop: spacing.s1,
+    marginBottom: spacing.s4,
+  },
+  // Susurro de bienvenida (≤3 días) — voz del coach, cálido, introduce
+  // "nada se resta" sin enseñarlo. Se va solo cuando cierra la ventana.
+  introWhisper: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
     marginTop: spacing.s1,
     marginBottom: spacing.s4,
   },

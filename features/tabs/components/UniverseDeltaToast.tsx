@@ -1,9 +1,11 @@
+import { useRouter } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
+import { requestUniverseDetail } from '@/features/tabs/pending-universe-detail'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import { ATTRIBUTE_LABEL, type UniverseAttributeKey } from '@/features/tabs/universe-rewards'
 import { tint, UNIVERSE_ACCENT, UNIVERSE_ICON_PATH } from '@/features/tabs/universe-visuals'
@@ -77,14 +79,26 @@ function AttributeGlyph({ attrKey, color }: { attrKey: UniverseAttributeKey; col
 // así el `exiting` FadeOut corre de verdad: si el componente entero
 // hiciera `return null`, React desmontaría el árbol antes de que
 // Reanimated capture el nodo y la salida se cortaría en seco.
-function DeltaPill({ moment }: { moment: Moment }) {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
+
+function DeltaPill({ moment, onPress }: { moment: Moment; onPress?: () => void }) {
   const accent = UNIVERSE_ACCENT[moment.key]
+  const interactive = onPress != null
+  // El pill FLOTA iluminado — el glow del acento lo separa del negro warm.
+  // Tappable solo en el toast global (bottom): lleva al detalle del
+  // atributo en "Tu universo hoy". El de la hoja (top) queda inerte.
+  const Container = interactive ? AnimatedPressable : Animated.View
   return (
-    <Animated.View
+    <Container
       entering={FadeIn.duration(240)}
       exiting={FadeOut.duration(220)}
-      // El pill FLOTA iluminado — el glow del acento lo separa del negro
-      // warm en vez de fundirse con él (bgCard ≈ bg).
+      onPress={onPress}
+      accessibilityRole={interactive ? 'button' : undefined}
+      accessibilityLabel={
+        interactive
+          ? `+${moment.delta} ${ATTRIBUTE_LABEL[moment.key]}. Ver de dónde viene`
+          : undefined
+      }
       style={[styles.toast, { borderColor: tint(accent, '80'), shadowColor: accent }]}
     >
       <StarSeal />
@@ -99,12 +113,26 @@ function DeltaPill({ moment }: { moment: Moment }) {
         +{moment.delta}
       </Animated.Text>
       <Text style={styles.label}>{ATTRIBUTE_LABEL[moment.key]}</Text>
-    </Animated.View>
+    </Container>
   )
 }
 
 export function UniverseDeltaToast({ placement = 'bottom', haptics = true }: Props) {
+  const router = useRouter()
   const [moment, setMoment] = useState<Moment | null>(null)
+  // Solo el toast global (bottom) es tappable: lleva a Hoy y abre el
+  // detalle de ese atributo (reusa el panel de "Tu universo hoy"). El de
+  // la hoja (top) vive sobre un Modal y debe quedar inerte para no robar
+  // taps al registro.
+  const handlePress =
+    placement === 'bottom' && moment
+      ? () => {
+          const key = moment.key
+          Haptics.selectionAsync().catch(() => {})
+          requestUniverseDetail(key)
+          router.navigate('/')
+        }
+      : undefined
   // El haptic solo al APARECER el toast — visible.current evita que cada
   // vaso acumulado vuelva a vibrar encima del selection del tap.
   const visible = useRef(false)
@@ -138,9 +166,11 @@ export function UniverseDeltaToast({ placement = 'bottom', haptics = true }: Pro
   return (
     <View
       style={[styles.wrap, placement === 'top' ? styles.wrapTop : styles.wrapBottom]}
-      pointerEvents="none"
+      // box-none en el global: el área vacía deja pasar el toque, pero el
+      // pill (Pressable) sí lo recibe. En la hoja queda 'none' (inerte).
+      pointerEvents={placement === 'bottom' ? 'box-none' : 'none'}
     >
-      {moment ? <DeltaPill moment={moment} /> : null}
+      {moment ? <DeltaPill moment={moment} onPress={handlePress} /> : null}
     </View>
   )
 }

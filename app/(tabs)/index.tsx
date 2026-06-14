@@ -24,9 +24,10 @@ import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal, usePatternDetection } from '@/features/patterns'
 import { TransformationCard } from '@/features/emblem'
 import { ReturnMoment } from '@/features/rewards'
-import { useMonthWorkoutDates, useRecentWorkoutDates } from '@/features/progress/hooks'
+import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
+import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
@@ -175,6 +176,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return () => clearTimeout(id)
   }, [celebrating])
 
+  // Defer the fullscreen CelebrateShockwave Skia Canvas off the first-paint
+  // + entering-stagger critical path (Hoy ya monta varias superficies Skia +
+  // dos SVG animados; sumar una 4ª pesa en la primera impresión). Se calienta
+  // en idle ~1.2 s después (su layout + Canvas pasan UNA vez, igual que antes,
+  // solo más tarde) — para entonces ya está listo antes de cualquier commit
+  // realista. Si la usuaria marca "Entrené" antes (celebrateKey > 0), se monta
+  // al instante, así el wash nunca llega tarde.
+  const [shockwaveReady, setShockwaveReady] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setShockwaveReady(true), 1200)
+    return () => clearTimeout(id)
+  }, [])
+
   const [justMarkedIdx, setJustMarkedIdx] = useState<number | null>(null)
   const [weekOpen, setWeekOpen] = useState(false)
 
@@ -189,6 +203,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     setIsScrolling((s) => (s ? s : true))
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
+  }, [])
+
+  // Tap del toast de delta → además de abrir el detalle del atributo
+  // (lo hace TodayUniverseRewards), llevamos el scroll a "Tu universo
+  // hoy" para que el panel quede a la vista al aterrizar desde otra tab.
+  // El offset de la sección se captura por onLayout en su wrapper.
+  const scrollRef = useRef<ScrollView>(null)
+  const universeY = useRef(0)
+  useEffect(() => {
+    return subscribeUniverseDetailRequest(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
+    })
   }, [])
   // Same pause, but driven by the macros slider's HORIZONTAL drag — the
   // vertical-scroll handler above never fires for a sideways swipe, so the
@@ -217,18 +243,26 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   }, [isScrolling, celebrating, constellationPaused])
   const todayIsoLocal = ctx.date
 
-  const monthWorkouts = useMonthWorkoutDates()
+  // Una sola lectura de workouts (45 días) alimenta tanto el grid del mes
+  // como la tira de días: los 45 días SIEMPRE contienen el mes actual
+  // completo (45 ≥ 31), así que el mes se deriva client-side filtrando por
+  // prefijo YYYY-MM en vez de pegarle una segunda vez a Supabase.
+  const stripWorkouts = useRecentWorkoutDates(45)
+  const monthPrefix = todayIsoLocal.slice(0, 7)
+  const monthWorkoutDates = useMemo(
+    () => (stripWorkouts.data ?? []).filter((d) => d.startsWith(monthPrefix)),
+    [stripWorkouts.data, monthPrefix],
+  )
   const month = useMemo(() => {
-    const m = buildMonthGrid(todayIsoLocal, monthWorkouts.data ?? [])
+    const m = buildMonthGrid(todayIsoLocal, monthWorkoutDates)
     if (ctx.today_workout_completed && m.todayIdx >= 0 && !m.grid[m.todayIdx]) {
       m.grid[m.todayIdx] = true
       m.cells[m.todayIdx]!.trained = true
       m.trainedThisMonth += 1
     }
     return m
-  }, [todayIsoLocal, monthWorkouts.data, ctx.today_workout_completed])
+  }, [todayIsoLocal, monthWorkoutDates, ctx.today_workout_completed])
 
-  const stripWorkouts = useRecentWorkoutDates(45)
   const allDays: WeekDayCell[] = useMemo(() => {
     const cells = buildTrailingDays(todayIsoLocal, stripWorkouts.data ?? [], 30)
     return cells.map((cell) => ({
@@ -322,6 +356,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         <SkyBackground />
         <SafeAreaView style={styles.safe} edges={['top']}>
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             onScroll={handleScroll}
@@ -345,6 +380,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
             <Animated.View entering={enter(220)} style={styles.constellationHeader}>
               <Text style={styles.constellationHeaderText}>Tu {signLabel}</Text>
+              {/* La regla principal como DESCRIPCIÓN del mecanismo (no
+                  prescripción): referencia el marcador «Entrené» que la
+                  usuaria ya toca, en vez de "cuando entrenas" (imperativo
+                  encubierto). La constelación responde SOLO a ese marcador;
+                  comida/agua/sueño alimentan el universo, no las estrellas. */}
+              <Text style={styles.constellationRule}>Cada «Entrené» enciende una estrella.</Text>
             </Animated.View>
 
             <Animated.View entering={enter(320)} style={styles.constellationWrap}>
@@ -417,7 +458,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             {/* "Tu universo hoy" — capa de recompensa para los registros
                 que NO encienden estrellas (comida/agua/sueño/check-in).
                 Autónoma: sus re-renders no tocan la constelación. */}
-            <Animated.View entering={enter(470)}>
+            <Animated.View
+              entering={enter(470)}
+              onLayout={(e) => {
+                universeY.current = e.nativeEvent.layout.y
+              }}
+            >
               <TodayUniverseRewards ctx={ctx} date={ctx.date} restedToday={restedToday} />
             </Animated.View>
 
@@ -464,12 +510,16 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             </Animated.View>
           </ScrollView>
         </SafeAreaView>
-        {/* Pre-mounted (no `celebrateKey > 0` gate) so the Skia Canvas
-          + layout pass happen ONCE on first paint, not on every
-          commit. Without pre-mount the wash fired visibly later than
-          the Lottie particles. Inside, the wash is invisible until
-          `celebrateKey` bumps and the timeline animates u → 1. */}
-        {!reducedMotion ? <CelebrateShockwave celebrateKey={celebrateKey} /> : null}
+        {/* Montaje DIFERIDO (no en el primer paint): el Canvas Skia + su
+          layout pasan UNA vez, pero ~1.2 s después (en idle) en vez de
+          competir con la primera impresión + el stagger de entrada. Para
+          entonces ya está caliente antes de cualquier commit; y si la
+          usuaria marca "Entrené" antes (celebrateKey > 0) se monta al
+          instante, así el wash nunca llega tarde. Invisible hasta que
+          `celebrateKey` sube y la timeline anima u → 1. */}
+        {!reducedMotion && (shockwaveReady || celebrateKey > 0) ? (
+          <CelebrateShockwave celebrateKey={celebrateKey} />
+        ) : null}
         {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
           the root (it's a Modal) so it floats over Hoy. */}
         <PatternReveal pattern={pattern} onClose={dismissPattern} />
@@ -631,6 +681,14 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: colors.leche,
     letterSpacing: 1.0,
+  },
+  // La regla de la constelación — UI quieta (niebla), bajo el título.
+  constellationRule: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    marginTop: 3,
+    textAlign: 'center',
   },
   coachLineWrap: {
     marginTop: 6,

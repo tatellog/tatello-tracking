@@ -6,7 +6,7 @@
  *
  *   Energía     ← comida (proteína vs objetivo; el macro más cuidado)
  *   Claridad    ← agua (vasos vs meta diaria)
- *   Estabilidad ← sueño (duración vs 8 h) + un toque por descansar
+ *   Estabilidad ← sueño (duración vs 7 h, ver SLEEP_FULL_MIN) + descanso
  *   Brillo      ← check-in de bienestar (energía registrada)
  *
  * PURO y determinístico — la UI anima lo que esto calcula. Manifiesto:
@@ -212,6 +212,10 @@ export type UniverseDetailLine = { label: string; value: string }
 export type UniverseDetail = {
   /** Qué representa el atributo — una línea en voz del coach. */
   essence: string
+  /** Cómo CRECE el atributo — línea instructiva (UI), conecta la acción
+   *  con la recompensa. Va al pie del detalle, por debajo de la esencia,
+   *  para no chocar el registro poético con el instructivo. */
+  grows: string
   /** Las cifras reales de hoy detrás del porcentaje. */
   lines: UniverseDetailLine[]
 }
@@ -221,6 +225,20 @@ const ESSENCE: Record<UniverseAttributeKey, string> = {
   claridad: 'El agua que acompañó tu día.',
   estabilidad: 'Cómo te sostuvo la noche.',
   brillo: 'El gesto de escucharte.',
+}
+
+// "Cómo crece" — la regla mecánica de cada atributo, en voz UI (no coach):
+// el puente acción → recompensa que faltaba para que el símbolo se vuelva
+// información. Mapeo REAL diario (Energía←comida · Claridad←agua ·
+// Estabilidad←sueño de anoche · Brillo←check-in). Sin prescribir ("la
+// proteína" se omite para no leer como consejo nutricional).
+// Exportado: lo usan tanto la cara del card (subtítulo persistente) como
+// el detalle al tocar — una sola fuente para la evidencia.
+export const ATTRIBUTE_GROWS: Record<UniverseAttributeKey, string> = {
+  energia: 'Crece con cada comida que registras.',
+  claridad: 'Crece con el agua que registras.',
+  estabilidad: 'Crece con cómo dormiste anoche.',
+  brillo: 'Crece cuando registras cómo estás.',
 }
 
 const fmtSleep = (min: number): string => {
@@ -252,12 +270,13 @@ export function detailForAttribute(
               { label: 'Comidas', value: meals(input.mealCount) },
             ]
           : [{ label: 'Comidas', value: meals(input.mealCount) }]
-      return { essence, lines }
+      return { essence, grows: ATTRIBUTE_GROWS.energia, lines }
     }
     case 'claridad': {
       const goal = Math.max(1, input.waterGoalGlasses)
       return {
         essence,
+        grows: ATTRIBUTE_GROWS.claridad,
         lines: [
           { label: 'Vasos', value: `${input.waterGlasses} hoy` },
           { label: 'Tu meta', value: `${goal}` },
@@ -272,7 +291,7 @@ export function detailForAttribute(
         },
       ]
       if (input.restedToday) lines.push({ label: 'Descanso', value: 'Hoy ✓' })
-      return { essence, lines }
+      return { essence, grows: ATTRIBUTE_GROWS.estabilidad, lines }
     }
     case 'brillo': {
       const value =
@@ -281,7 +300,7 @@ export function detailForAttribute(
           : input.hasWellbeingSignal
             ? 'Una señal tuya ✓'
             : 'Te espera'
-      return { essence, lines: [{ label: 'Check-in', value }] }
+      return { essence, grows: ATTRIBUTE_GROWS.brillo, lines: [{ label: 'Check-in', value }] }
     }
   }
 }

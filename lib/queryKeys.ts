@@ -71,6 +71,12 @@ export const queryKeys = {
     all: ['wellbeing'] as const,
     day: (date: string) => ['wellbeing', date] as const,
   },
+  patterns: {
+    all: ['patterns'] as const,
+    // La detección (rate-limited a ~1 revelación / 7 días) se cachea bajo
+    // esta key para no re-correr los detectores + inserts en cada focus de Hoy.
+    detection: () => ['patterns', 'detection'] as const,
+  },
   emblem: {
     all: ['emblem'] as const,
     // La meta de agua entra en la key: cambiarla recalcula el acumulado

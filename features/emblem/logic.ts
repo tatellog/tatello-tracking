@@ -58,10 +58,10 @@ export type EmblemStage = {
 
 // Las cinco etapas del reveal. El cerebro no percibe 34%→35%; percibe
 // "algo apareció". Los rangos: 0–25 / 26–50 / 51–75 / 76–99 / 100.
-// Cada etapa MATERIALIZA capas anatómicas nuevas del emblema (ver
-// RevealedLeoEmblem: marco → jardín+cabeza → melena → oro pleno); el
-// león aparece desde "forma" — desde temprano se ve QUÉ se construye —
-// y lo ya revelado nunca se esconde.
+// Cada etapa MATERIALIZA capas anatómicas nuevas del emblema (marco →
+// jardín+cabeza → melena → oro pleno); el león aparece desde "forma"
+// — desde temprano se ve QUÉ se construye — y lo ya revelado nunca se
+// esconde.
 export const EMBLEM_STAGES: readonly EmblemStage[] = [
   {
     key: 'despierta',

@@ -71,22 +71,46 @@ export function TransformationCard({ compact = false }: Props) {
   )
   const line = dailyCoachLine(progress, daySeed)
 
+  const openOrbita = () => {
+    Haptics.selectionAsync().catch(() => {})
+    requestOrbitSegment('mes')
+    router.navigate({ pathname: '/orbit' })
+  }
+  const toggleExplainer = () => {
+    Haptics.selectionAsync().catch(() => {})
+    setOpen((v) => !v)
+  }
+
   if (compact) {
     return (
-      <Pressable
-        style={styles.compact}
-        accessibilityRole="button"
-        accessibilityLabel={`Tu transformación. ${line}`}
-        accessibilityHint="Abre tu Órbita del mes"
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {})
-          requestOrbitSegment('mes')
-          router.navigate({ pathname: '/orbit' })
-        }}
-      >
-        <EyebrowLabel tone="magenta">Tu transformación</EyebrowLabel>
-        <Text style={styles.compactMessage}>{line}</Text>
-      </Pressable>
+      <View style={styles.compact}>
+        <View style={styles.header}>
+          <EyebrowLabel tone="magenta">Tu transformación</EyebrowLabel>
+          {/* El MISMO ⓘ del full, ahora donde vive la recompensa (Hoy):
+              la explicación del sistema deja de estar escondida en Órbita. */}
+          <Pressable
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Cómo funciona tu transformación"
+            accessibilityState={{ expanded: open }}
+            onPress={toggleExplainer}
+          >
+            <Text style={[styles.infoGlyph, open && styles.infoGlyphOpen]}>ⓘ</Text>
+          </Pressable>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Tu transformación. ${line}`}
+          accessibilityHint="Abre tu Órbita del mes"
+          onPress={openOrbita}
+        >
+          <Text style={styles.compactMessage}>{line}</Text>
+        </Pressable>
+        {/* Garantía persistente — quita la lectura de castigo: nada de lo
+            revelado se pierde. Voz del coach (italic). */}
+        <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
+        {open ? <Explainer /> : null}
+      </View>
     )
   }
 
@@ -99,10 +123,7 @@ export function TransformationCard({ compact = false }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Cómo funciona tu transformación"
           accessibilityState={{ expanded: open }}
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {})
-            setOpen((v) => !v)
-          }}
+          onPress={toggleExplainer}
         >
           <Text style={[styles.infoGlyph, open && styles.infoGlyphOpen]}>ⓘ</Text>
         </Pressable>
@@ -125,6 +146,7 @@ export function TransformationCard({ compact = false }: Props) {
       </View>
 
       <Text style={styles.message}>{line}</Text>
+      <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
 
       {open ? <Explainer /> : null}
     </View>
@@ -275,6 +297,15 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: 15,
     color: colors.bone,
+  },
+  // Garantía anti-castigo — voz del coach, callada (niebla), un escalón
+  // por debajo del mensaje: una promesa de pie, no un titular.
+  guarantee: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    marginTop: spacing.s1,
   },
 
   /* la barra */

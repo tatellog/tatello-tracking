@@ -7,9 +7,12 @@
  *   1. RECORTA el art a su contenido (cuadrado centrado en el animal),
  *      así todos los signos quedan con el animal centrado y del mismo
  *      tamaño relativo → el componente los coloca uniforme.
- *   2. Reveal ESPACIAL RADIAL: el animal se materializa del centro hacia
- *      afuera (el line-art tiene brillo uniforme, así que un reveal por
- *      luminancia lo mostraría de golpe).
+ *   2. Reveal ESPACIAL RADIAL del centro hacia afuera, pero PROPORCIONAL
+ *      A LA TINTA: el frame al p% descubre el radio donde la tinta dorada
+ *      acumulada (CDF de luminancia por radio) llega al p% del total. Así
+ *      "42%" muestra ~42% de la tinta — no 42% del radio, que para una
+ *      figura con la masa al centro (cuerpo+melena) revelaría casi todo de
+ *      golpe y dejaría "sólo una pata" al 40%.
  *   3. Recolor a ORO por intensidad + gate que mata el fondo negro.
  *
  * Salida: assets/zodiac-art/<sign>-reveal/fNN.png  (NN = 00..10, cuadrado)
@@ -89,38 +92,84 @@ function distNorm(x, y) {
   return Math.hypot(x / OUT_W - 0.5, y / OUT_W - 0.5) / HALF
 }
 
+// 2 · Pre-cálculo por pixel de salida: gate (tinta visible), distancia al
+// centro, e intensidad t (para el recolor). Una sola pasada que además
+// arma el HISTOGRAMA de tinta por radio → CDF para el reveal proporcional.
+const N = OUT_W * OUT_W
+const gateArr = new Float32Array(N)
+const distArr = new Float32Array(N)
+const tArr = new Float32Array(N)
+const NBINS = 512
+const inkByBin = new Float64Array(NBINS)
+for (let y = 0; y < OUT_W; y++) {
+  for (let x = 0; x < OUT_W; x++) {
+    const idx = y * OUT_W + x
+    const fx = Math.round(cropX + (x / OUT_W) * side)
+    const fy = Math.round(cropY + (y / OUT_W) * side)
+    if (fx < 0 || fx >= SW || fy < 0 || fy >= SH) continue
+    const si = (fy * SW + fx) * 4
+    const sa = SD[si + 3] / 255
+    const r = SD[si] * sa
+    const g = SD[si + 1] * sa
+    const b = SD[si + 2] * sa
+    const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255
+    const gate = smoothstep(0.06, 0.14, lum) // mata el fondo negro
+    if (gate <= 0) continue
+    const d = distNorm(x, y)
+    gateArr[idx] = gate
+    distArr[idx] = d
+    tArr[idx] = Math.max(0, Math.min(1, (lum - 0.06) / (0.55 - 0.06)))
+    const bin = Math.min(NBINS - 1, Math.floor(d * NBINS))
+    inkByBin[bin] += gate
+  }
+}
+// CDF acumulada de tinta por radio.
+const cum = new Float64Array(NBINS)
+let running = 0
+for (let k = 0; k < NBINS; k++) {
+  running += inkByBin[k]
+  cum[k] = running
+}
+const totalInk = running
+// Radio donde la tinta acumulada llega al p% del total (inverso de la CDF,
+// con interpolación lineal dentro del bin para que el frente avance suave).
+function frontForP(p) {
+  if (p <= 0) return 0
+  if (p >= 1 || totalInk <= 0) return 1 + RADIAL_FEATHER
+  const target = p * totalInk
+  for (let k = 0; k < NBINS; k++) {
+    if (cum[k] >= target) {
+      const prev = k > 0 ? cum[k - 1] : 0
+      const frac = cum[k] > prev ? (target - prev) / (cum[k] - prev) : 0
+      return (k + frac) / NBINS
+    }
+  }
+  return 1
+}
+
 for (let s = 0; s < STEPS; s++) {
   const p = s / (STEPS - 1)
-  const pe = Math.pow(p, 0.6) // ease-out: el centro emerge rápido al inicio
-  const front = -RADIAL_FEATHER + (1 + 2 * RADIAL_FEATHER) * pe
+  const front = frontForP(p) // radio del frente = p% de la tinta total
   const fb = FB_LO + (FB_HI - FB_LO) * p
   const png = new PNG({ width: OUT_W, height: OUT_W })
-  for (let y = 0; y < OUT_W; y++) {
-    for (let x = 0; x < OUT_W; x++) {
-      const oi = (y * OUT_W + x) * 4
-      // pixel de salida → coord en el recorte → fuente
-      const fx = Math.round(cropX + (x / OUT_W) * side)
-      const fy = Math.round(cropY + (y / OUT_W) * side)
-      if (fx < 0 || fx >= SW || fy < 0 || fy >= SH) {
-        png.data[oi] = png.data[oi + 1] = png.data[oi + 2] = png.data[oi + 3] = 0
-        continue
-      }
-      const si = (fy * SW + fx) * 4
-      const sa = SD[si + 3] / 255
-      const r = SD[si] * sa
-      const g = SD[si + 1] * sa
-      const b = SD[si + 2] * sa
-      const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255
-      const gate = smoothstep(0.06, 0.14, lum) // mata el fondo negro
-      const radial = smoothstep(front + RADIAL_FEATHER, front - RADIAL_FEATHER, distNorm(x, y))
-      const a = gate * radial
-      const av = Math.round(a * 255)
-      const t = Math.max(0, Math.min(1, (lum - 0.06) / (0.55 - 0.06)))
-      png.data[oi] = av === 0 ? 0 : Math.min(255, (ORO_DEEP[0] + (ORO_LECHE[0] - ORO_DEEP[0]) * t) * fb)
-      png.data[oi + 1] = av === 0 ? 0 : Math.min(255, (ORO_DEEP[1] + (ORO_LECHE[1] - ORO_DEEP[1]) * t) * fb)
-      png.data[oi + 2] = av === 0 ? 0 : Math.min(255, (ORO_DEEP[2] + (ORO_LECHE[2] - ORO_DEEP[2]) * t) * fb)
-      png.data[oi + 3] = av
+  for (let i = 0; i < N; i++) {
+    const oi = i * 4
+    const gate = gateArr[i]
+    if (gate <= 0) {
+      png.data[oi] = png.data[oi + 1] = png.data[oi + 2] = png.data[oi + 3] = 0
+      continue
     }
+    const radial = smoothstep(front + RADIAL_FEATHER, front - RADIAL_FEATHER, distArr[i])
+    const av = Math.round(gate * radial * 255)
+    if (av === 0) {
+      png.data[oi] = png.data[oi + 1] = png.data[oi + 2] = png.data[oi + 3] = 0
+      continue
+    }
+    const t = tArr[i]
+    png.data[oi] = Math.min(255, (ORO_DEEP[0] + (ORO_LECHE[0] - ORO_DEEP[0]) * t) * fb)
+    png.data[oi + 1] = Math.min(255, (ORO_DEEP[1] + (ORO_LECHE[1] - ORO_DEEP[1]) * t) * fb)
+    png.data[oi + 2] = Math.min(255, (ORO_DEEP[2] + (ORO_LECHE[2] - ORO_DEEP[2]) * t) * fb)
+    png.data[oi + 3] = av
   }
   writeFileSync(new URL(`f${String(s).padStart(2, '0')}.png`, outDir), Buffer.from(PNG.sync.write(png)))
 }
