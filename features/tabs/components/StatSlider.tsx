@@ -5,6 +5,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -216,15 +217,20 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
         <Animated.ScrollView
           ref={scrollRef}
           horizontal
-          // snapToInterval + decelerationRate="fast" en lugar de
-          // pagingEnabled: el paging nativo deja correr el momentum y la
-          // página "flota" antes de asentarse (sobre todo en Android).
-          // Con esto cada flick avanza exactamente una página y asienta
-          // de inmediato — el gesto se siente directo, no perezoso.
-          snapToInterval={width}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          disableIntervalMomentum
+          // Paginado POR PLATAFORMA: en iOS el `pagingEnabled` nativo se
+          // siente snappy y directo; el combo snapToInterval +
+          // disableIntervalMomentum (sin momentum) glidea LENTO en iOS con un
+          // swipe suave → "se siente pesado". En Android sí usamos ese combo
+          // porque ahí el paging nativo deja "flotar" la página antes de
+          // asentarse. Cada plataforma con el que se siente directo.
+          {...(Platform.OS === 'ios'
+            ? { pagingEnabled: true }
+            : {
+                snapToInterval: width,
+                snapToAlignment: 'start' as const,
+                decelerationRate: 'fast' as const,
+                disableIntervalMomentum: true,
+              })}
           overScrollMode="never"
           showsHorizontalScrollIndicator={false}
           onScrollBeginDrag={() => onSwipeStateChange?.(true)}
