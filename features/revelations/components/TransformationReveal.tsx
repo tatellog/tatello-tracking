@@ -19,7 +19,7 @@ import { RevealedEmblem } from '@/features/tabs/components/constellation/Reveale
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
-import { RevealParticles, tierForThreshold } from './RevealParticles'
+import { type CelebrationTier, RevealParticles, tierForThreshold } from './RevealParticles'
 
 /*
  * Ceremonia de Transformación (T1) — el momento full-screen cuando el
@@ -32,20 +32,34 @@ import { RevealParticles, tierForThreshold } from './RevealParticles'
 
 type Props = {
   sign: ZodiacSign
-  /** El umbral cruzado (25/50/75/100) — el emblema se muestra a ese %. */
+  /** % al que se materializa el emblema: el umbral cruzado (25/50/75/100)
+   *  para T1, o el PROGRESO ACTUAL para el Regreso ("tu cielo te esperó"
+   *  donde lo dejaste). */
   threshold: number
   /** Copy de la etapa (voz del coach), provisto por el orquestador. */
   message: string
   onClose: () => void
+  /** 'transformation' (default) = hito del emblema · 'return' = bienvenida
+   *  tras una ausencia. El hero es el MISMO emblema; cambian eyebrow, CTA,
+   *  haptic y la intensidad de la fiesta (return = cálida, no estallido). */
+  variant?: 'transformation' | 'return'
 }
 
-export function TransformationReveal({ sign, threshold, message, onClose }: Props) {
+export function TransformationReveal({
+  sign,
+  threshold,
+  message,
+  onClose,
+  variant = 'transformation',
+}: Props) {
   const { width, height } = useWindowDimensions()
   const reduced = useReducedMotion() ?? false
   const router = useRouter()
 
   const emblemSize = Math.min(width - 96, 300)
-  const tier = tierForThreshold(threshold)
+  const isReturn = variant === 'return'
+  const tier: CelebrationTier = isReturn ? 'return' : tierForThreshold(threshold)
+  const eyebrow = isReturn ? 'TU CIELO' : `TU TRANSFORMACIÓN · ${threshold}%`
 
   const enter = useSharedValue(0)
   const emblem = useSharedValue(0)
@@ -64,7 +78,13 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
       240,
       withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }),
     )
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    // Regreso: un solo Light suave (alivio, no fanfarria). Hitos: Success
+    // (+ un 2º Light en el 100%, abajo).
+    if (isReturn) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    }
 
     const start = setTimeout(() => setParty(true), 1000)
     const stop = setTimeout(() => setParty(false), 4000)
@@ -80,7 +100,7 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
       clearTimeout(stop)
       if (bloomBeat) clearTimeout(bloomBeat)
     }
-  }, [reduced, enter, emblem, tier])
+  }, [reduced, enter, emblem, tier, isReturn])
 
   const scrimStyle = useAnimatedStyle(() => ({ opacity: enter.value }))
   const cardStyle = useAnimatedStyle(() => ({
@@ -130,8 +150,9 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
             </Pressable>
 
             {/* El % vive EN el eyebrow (no como número grande arriba del
-                emblema): el héroe visual es el emblema, no un dato frío. */}
-            <Text style={styles.eyebrow}>TU TRANSFORMACIÓN · {threshold}%</Text>
+                emblema): el héroe visual es el emblema, no un dato frío.
+                En Regreso el eyebrow es "TU CIELO" (sin número). */}
+            <Text style={styles.eyebrow}>{eyebrow}</Text>
 
             {/* El contenedor DEBE tener tamaño explícito: RevealedEmblem se
                 pinta con absoluteFill, así que sin width/height quedaría 0×0
@@ -140,7 +161,9 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
               style={[styles.emblemWrap, { width: emblemSize, height: emblemSize }, emblemStyle]}
               pointerEvents="none"
               accessibilityRole="image"
-              accessibilityLabel={`Tu emblema al ${threshold} por ciento`}
+              accessibilityLabel={
+                isReturn ? 'Tu cielo, esperándote' : `Tu emblema al ${threshold} por ciento`
+              }
             >
               <RevealedEmblem sign={sign} transformProgress={threshold} size={emblemSize} />
             </Animated.View>
@@ -156,19 +179,32 @@ export function TransformationReveal({ sign, threshold, message, onClose }: Prop
               entering={FadeIn.duration(360).delay(reduced ? 300 : 1200)}
               style={styles.ctaWrap}
             >
-              <Pressable
-                onPress={goToOrbit}
-                style={({ pressed }) => [styles.ctaPrimary, pressed && styles.pressed]}
-              >
-                <Text style={styles.ctaPrimaryText}>Verlo en mi órbita</Text>
-              </Pressable>
-              <Pressable
-                onPress={close}
-                hitSlop={10}
-                style={({ pressed }) => [styles.ctaSecondary, pressed && styles.pressed]}
-              >
-                <Text style={styles.ctaSecondaryText}>Lo veo</Text>
-              </Pressable>
+              {isReturn ? (
+                // Regreso: una sola salida cálida — no se "va a ver" nada,
+                // solo se reafirma la presencia.
+                <Pressable
+                  onPress={close}
+                  style={({ pressed }) => [styles.ctaPrimary, pressed && styles.pressed]}
+                >
+                  <Text style={styles.ctaPrimaryText}>Aquí sigo</Text>
+                </Pressable>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={goToOrbit}
+                    style={({ pressed }) => [styles.ctaPrimary, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.ctaPrimaryText}>Verlo en mi órbita</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={close}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.ctaSecondary, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.ctaSecondaryText}>Lo veo</Text>
+                  </Pressable>
+                </>
+              )}
             </Animated.View>
           </Animated.View>
         </Pressable>

@@ -31,7 +31,12 @@ import { colors, typography } from '@/theme'
 const SAMPLE = { protein: 5, training: 4, sleep: 5, night: 5, window: 7 } as const
 
 type Active =
-  | { mode: 'transformation'; threshold: number; message: string }
+  | {
+      mode: 'transformation'
+      threshold: number
+      message: string
+      variant?: 'transformation' | 'return'
+    }
   | { mode: 'pattern'; type: PatternType; message: string }
 
 export default function DevRevelations() {
@@ -75,7 +80,14 @@ export default function DevRevelations() {
           <Section label="T2 · Regreso" />
           <DevButton
             label="Regreso (3+ días fuera)"
-            onPress={() => showPattern('abandonment', RETURN_COPY.message)}
+            onPress={() =>
+              setActive({
+                mode: 'transformation',
+                variant: 'return',
+                threshold: 60, // muestra el emblema al progreso (muestra) actual
+                message: RETURN_COPY.message,
+              })
+            }
           />
 
           <Section label="T3 · Patrones positivos" />
@@ -127,6 +139,7 @@ export default function DevRevelations() {
           sign={sign}
           threshold={active.threshold}
           message={active.message}
+          variant={active.variant}
           onClose={close}
         />
       ) : active ? (
