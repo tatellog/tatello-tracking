@@ -18,4 +18,13 @@ export {
   type RevelationRow,
   type RevelationTier,
 } from './api'
-export { useRevelationHistory } from './hooks'
+export { useRevelationHistory, useRevelationOrchestrator } from './hooks'
+export {
+  PATTERN_RATE_LIMIT_MS,
+  selectRevelation,
+  TRANSFORMATION_THRESHOLDS,
+  transformationCopy,
+  type OrchestratorInput,
+  type PendingRevelation,
+} from './logic'
+export { TransformationReveal } from './components/TransformationReveal'

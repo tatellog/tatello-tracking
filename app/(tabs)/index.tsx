@@ -21,7 +21,9 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
-import { PatternReveal, usePatternDetection } from '@/features/patterns'
+import { PatternReveal } from '@/features/patterns'
+import type { PatternType } from '@/features/patterns/logic'
+import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
 import { TransformationCard } from '@/features/emblem'
 import { ReturnMoment } from '@/features/rewards'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
@@ -145,7 +147,6 @@ type ContentProps = {
 function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const qc = useQueryClient()
   const router = useRouter()
-  const { pattern, dismiss: dismissPattern } = usePatternDetection()
   // The `slide` query param tells StatSlider which slide to land on.
   // Set by the Órbita focus CTA (DaySegment) so tapping "Marca tu
   // energía" lands the user directly on the wellbeing card instead
@@ -293,6 +294,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const sign = useMemo(() => zodiacFromDate(profile?.date_of_birth), [profile?.date_of_birth])
   const signLabel = ZODIAC[sign].label
+
+  // Orquestador de Revelaciones — única fuente de momentos full-screen en Hoy
+  // (Regreso > Transformación > Patrón). Reemplaza al usePatternDetection
+  // suelto: ahora T2/T3 + el nuevo T1 viven en un solo sistema.
+  const { revelation, dismiss: dismissRevelation } = useRevelationOrchestrator(signLabel)
   const figureCount = ZODIAC[sign].stars.length + ZODIAC[sign].lines.length
 
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
@@ -520,9 +526,27 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         {!reducedMotion && (shockwaveReady || celebrateKey > 0) ? (
           <CelebrateShockwave celebrateKey={celebrateKey} />
         ) : null}
-        {/* The pattern reveal — Stelar's core moment, full-screen. Lives at
-          the root (it's a Modal) so it floats over Hoy. */}
-        <PatternReveal pattern={pattern} onClose={dismissPattern} />
+        {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
+          El orquestador elige UNA (Regreso > Transformación > Patrón); aquí
+          solo se pinta según su tier: el emblema para Transformación, la
+          constelación de PatternReveal para Regreso ('abandonment') y Patrón. */}
+        {revelation?.tier === 'transformation' ? (
+          <TransformationReveal
+            sign={sign}
+            threshold={Number(revelation.kind)}
+            message={revelation.message}
+            onClose={dismissRevelation}
+          />
+        ) : revelation ? (
+          <PatternReveal
+            pattern={{
+              id: 'revelation',
+              type: revelation.tier === 'return' ? 'abandonment' : (revelation.kind as PatternType),
+              message: revelation.message,
+            }}
+            onClose={dismissRevelation}
+          />
+        ) : null}
       </View>
     </ScrollPauseContext.Provider>
   )

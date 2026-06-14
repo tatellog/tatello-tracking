@@ -57,7 +57,9 @@ export type EmblemStage = {
 }
 
 // Las cinco etapas del reveal. El cerebro no percibe 34%→35%; percibe
-// "algo apareció". Los rangos: 0–25 / 26–50 / 51–75 / 76–99 / 100.
+// "algo apareció". Los rangos: 0–24 / 25–49 / 50–74 / 75–99 / 100 —
+// alineados a los umbrales de las ceremonias T1 (25/50/75/100) para que la
+// línea de etapa cambie EXACTO cuando se dispara la revelación full-screen.
 // Cada etapa MATERIALIZA capas anatómicas nuevas del emblema (marco →
 // jardín+cabeza → melena → oro pleno); el león aparece desde "forma"
 // — desde temprano se ve QUÉ se construye — y lo ya revelado nunca se
@@ -83,7 +85,7 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
       'Lo que repites te está dando forma.',
       'Día a día, algo se dibuja.',
     ],
-    minPct: 26, // + luna y ramas · + la cabeza del león
+    minPct: 25, // + luna y ramas · + la cabeza del león
   },
   {
     key: 'revela',
@@ -94,7 +96,7 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
       'Tu Leo se reconoce más.',
       'Lo que sostienes, se nota.',
     ],
-    minPct: 51, // + melena — el león entero, el momento "ah"
+    minPct: 50, // + melena — el león entero, el momento "ah"
   },
   {
     key: 'casi',
@@ -105,7 +107,7 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
       'Casi entero, y es tuyo.',
       'Lo que construiste casi resplandece.',
     ],
-    minPct: 76, // todo gana presencia, el glow despierta
+    minPct: 75, // todo gana presencia, el glow despierta
   },
   {
     key: 'completo',
