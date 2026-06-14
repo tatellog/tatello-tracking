@@ -84,7 +84,7 @@ export default function DevRevelations() {
               setActive({
                 mode: 'transformation',
                 variant: 'return',
-                threshold: 60, // muestra el emblema al progreso (muestra) actual
+                threshold: 0, // Regreso no tiene hero/emblema; threshold se ignora
                 message: RETURN_COPY.message,
               })
             }

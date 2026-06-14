@@ -86,8 +86,10 @@ export function TransformationReveal({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     }
 
-    const start = setTimeout(() => setParty(true), 1000)
-    const stop = setTimeout(() => setParty(false), 4000)
+    // Regreso (sin emblema): la lluvia de estrellas cálida entra pronto, así
+    // el "cielo que te esperó" se siente vivo de inmediato.
+    const start = setTimeout(() => setParty(true), isReturn ? 400 : 1000)
+    const stop = setTimeout(() => setParty(false), isReturn ? 3600 : 4000)
     // El 100% pesa más: un segundo beat (Light) al florecer el estallido.
     const bloomBeat =
       tier === 'bloom'
@@ -154,22 +156,27 @@ export function TransformationReveal({
                 En Regreso el eyebrow es "TU CIELO" (sin número). */}
             <Text style={styles.eyebrow}>{eyebrow}</Text>
 
-            {/* El contenedor DEBE tener tamaño explícito: RevealedEmblem se
-                pinta con absoluteFill, así que sin width/height quedaría 0×0
-                (solo se vería el glifo, que va posicionado absoluto). */}
-            <Animated.View
-              style={[styles.emblemWrap, { width: emblemSize, height: emblemSize }, emblemStyle]}
-              pointerEvents="none"
-              accessibilityRole="image"
-              accessibilityLabel={
-                isReturn ? 'Tu cielo, esperándote' : `Tu emblema al ${threshold} por ciento`
-              }
-            >
-              <RevealedEmblem sign={sign} transformProgress={threshold} size={emblemSize} />
-            </Animated.View>
+            {/* El emblema es el hero SOLO de la Transformación. El Regreso NO
+                tiene hero (decisión del owner): el cosmos vivo + la lluvia de
+                estrellas cálida son el "cielo que te esperó"; la tarjeta queda
+                mínima (eyebrow + frase + "Aquí sigo"). El contenedor del
+                emblema lleva tamaño explícito porque RevealedEmblem usa
+                absoluteFill (sin width/height quedaría 0×0). */}
+            {isReturn ? (
+              <View style={styles.returnGap} />
+            ) : (
+              <Animated.View
+                style={[styles.emblemWrap, { width: emblemSize, height: emblemSize }, emblemStyle]}
+                pointerEvents="none"
+                accessibilityRole="image"
+                accessibilityLabel={`Tu emblema al ${threshold} por ciento`}
+              >
+                <RevealedEmblem sign={sign} transformProgress={threshold} size={emblemSize} />
+              </Animated.View>
+            )}
 
             <Animated.Text
-              entering={FadeIn.duration(420).delay(reduced ? 200 : 900)}
+              entering={FadeIn.duration(420).delay(reduced ? 200 : isReturn ? 500 : 900)}
               style={styles.message}
             >
               {message}
@@ -252,6 +259,11 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Regreso sin hero: un respiro entre el eyebrow y la frase (la tarjeta es
+  // mínima; el cosmos + la lluvia de estrellas hacen el trabajo visual).
+  returnGap: {
+    height: 14,
   },
   closeBtn: {
     position: 'absolute',
