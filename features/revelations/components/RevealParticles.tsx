@@ -178,6 +178,8 @@ function Spark({
           height: spec.size,
           borderRadius: spec.size / 2,
           backgroundColor: spec.color,
+          marginLeft: -spec.size / 2,
+          marginTop: -spec.size / 2,
         },
         style,
       ]}
@@ -236,9 +238,11 @@ function Bloom8({ size, delay }: { size: number; delay: number }) {
     opacity: interpolate(t.value, [0, 0.2, 1], [0, 0.5, 0]),
     transform: [{ scale: 0.3 + t.value * 1.5 }],
   }))
+  // Centrados en el origen (padre 0×0): offset -mitad para que el centro de
+  // cada Svg caiga en el punto de origen, no su esquina.
   return (
-    <View style={styles.center} pointerEvents="none">
-      <Animated.View style={[styles.abs, ring]}>
+    <View pointerEvents="none">
+      <Animated.View style={[styles.abs, { left: -size * 0.7, top: -size * 0.7 }, ring]}>
         <Svg width={size * 1.4} height={size * 1.4} viewBox="0 0 64 64">
           <Circle
             cx={32}
@@ -251,7 +255,7 @@ function Bloom8({ size, delay }: { size: number; delay: number }) {
           />
         </Svg>
       </Animated.View>
-      <Animated.View style={[styles.abs, star]}>
+      <Animated.View style={[styles.abs, { left: -size / 2, top: -size / 2 }, star]}>
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path
             d="M12 0 C12.4 8 12.6 8.4 16 11 C13.4 11.5 12.5 11.6 12 12 C12.5 12.4 13.4 12.5 16 13 C12.6 15.6 12.4 16 12 24 C11.6 16 11.4 15.6 8 13 C10.6 12.5 11.5 12.4 12 12 C11.5 11.6 10.6 11.5 8 11 C11.4 8.4 11.6 8 12 0 Z"
@@ -267,13 +271,18 @@ function Bloom8({ size, delay }: { size: number; delay: number }) {
 
 type Props = {
   tier: CelebrationTier
-  /** Lado de referencia (≈ ancho del emblema/card) sobre el que se dispersan. */
-  size: number
+  /** Dimensiones de la PANTALLA: la fiesta abarca todo, no solo el card. */
+  width: number
+  height: number
 }
 
 /** Se monta cuando la ceremonia "estalla"; el padre lo desmonta al terminar. */
-export function RevealParticles({ tier, size }: Props) {
+export function RevealParticles({ tier, width, height }: Props) {
   const cfg = TIER[tier]
+  // Origen del estallido: la zona del hero (centro-arriba). Las chispas vuelan
+  // desde aquí hasta los BORDES de la pantalla.
+  const originX = width * 0.5
+  const originY = height * 0.4
 
   const sparks = useMemo<SparkSpec[]>(() => {
     const out: SparkSpec[] = []
@@ -282,63 +291,56 @@ export function RevealParticles({ tier, size }: Props) {
       const goldTone = rand(i + 11) > 0.5 ? colors.oroLeche : colors.oro
       const color = isMagenta ? colors.magentaHot : cfg.warm ? colors.bone : goldTone
       out.push({
-        // Abanico ancho hacia arriba+afuera (radial 360° sesgado-arriba en
-        // bloom): las chispas rebasan el card y se ven contra el cosmos.
+        // Abanico ancho hacia arriba+afuera (radial 360° sesgado-arriba en bloom).
         angle:
           tier === 'bloom'
-            ? -Math.PI / 2 + (rand(i + 1) - 0.5) * 2.6
-            : -Math.PI / 2 + (rand(i + 1) - 0.5) * (tier === 'rise' ? 1.7 : 1.2),
-        spread: size * 0.34 * (0.4 + rand(i + 3)),
-        rise: cfg.riseMin + rand(i + 5) * (cfg.riseMax - cfg.riseMin),
-        size: 3 + rand(i + 7) * 4,
+            ? -Math.PI / 2 + (rand(i + 1) - 0.5) * 3.0
+            : -Math.PI / 2 + (rand(i + 1) - 0.5) * (tier === 'rise' ? 2.0 : 1.5),
+        // Recorrido en proporción a la PANTALLA → cruzan todo.
+        spread: width * 0.5 * (0.3 + rand(i + 3)),
+        rise: (cfg.riseMin + rand(i + 5) * (cfg.riseMax - cfg.riseMin)) * 1.9,
+        size: 4 + rand(i + 7) * 6,
         color,
-        delay: rand(i + 9) * 260,
-        peak: cfg.peak * (0.75 + rand(i + 13) * 0.25),
+        delay: rand(i + 9) * 280,
+        peak: cfg.peak * (0.78 + rand(i + 13) * 0.22),
       })
     }
     return out
-  }, [cfg, size, tier])
+  }, [cfg, width, tier])
 
   const sparkles = useMemo(() => {
     const out: { x: number; y: number; size: number; delay: number }[] = []
     for (let i = 0; i < cfg.sparkle4; i++) {
-      // Esparcidos en la mitad superior del campo (cerca del hero) y a los
-      // lados, GRANDES: leen como estrellas que estallan, no puntitos.
+      // Estrellas GRANDES esparcidas por TODA la pantalla (mitad superior +
+      // laterales), no puntitos junto al card.
       out.push({
-        x: size * (0.14 + rand(i + 21) * 0.72),
-        y: size * (0.1 + rand(i + 23) * 0.42),
-        size: 26 + rand(i + 25) * 26,
-        delay: 80 + rand(i + 27) * 420,
+        x: width * (0.04 + rand(i + 21) * 0.92),
+        y: height * (0.06 + rand(i + 23) * 0.58),
+        size: 42 + rand(i + 25) * 66,
+        delay: 80 + rand(i + 27) * 460,
       })
     }
     return out
-  }, [cfg.sparkle4, size])
+  }, [cfg.sparkle4, width, height])
 
   return (
-    <View style={styles.wrap} pointerEvents="none">
-      {/* Campo sesgado HACIA ARRIBA (≈ el hero): las chispas suben y rebasan
-          el card por arriba, lejos de la zona de texto (abajo). */}
-      <View
-        style={[
-          styles.field,
-          { width: size, height: size, transform: [{ translateY: -size * 0.18 }] },
-        ]}
-      >
-        {cfg.sparkle8 ? <Bloom8 size={size * 0.5} delay={140} /> : null}
-        <View style={styles.center}>
-          {sparks.map((spec, i) => (
-            <Spark key={i} spec={spec} durationMs={cfg.durationMs} descend={cfg.descend} />
-          ))}
-        </View>
-        {sparkles.map((s, i) => (
-          <Sparkle4
-            key={i}
-            x={s.x}
-            y={s.y}
-            size={s.size}
-            delay={s.delay}
-            durationMs={cfg.durationMs}
-          />
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Estrellas grandes por toda la pantalla (coords absolutas de pantalla). */}
+      {sparkles.map((s, i) => (
+        <Sparkle4
+          key={`s${i}`}
+          x={s.x}
+          y={s.y}
+          size={s.size}
+          delay={s.delay}
+          durationMs={cfg.durationMs}
+        />
+      ))}
+      {/* Estallido desde el hero — las chispas vuelan a los bordes. */}
+      <View style={[styles.origin, { left: originX, top: originY }]}>
+        {cfg.sparkle8 ? <Bloom8 size={Math.min(width, height) * 0.55} delay={140} /> : null}
+        {sparks.map((spec, i) => (
+          <Spark key={`p${i}`} spec={spec} durationMs={cfg.durationMs} descend={cfg.descend} />
         ))}
       </View>
     </View>
@@ -346,9 +348,7 @@ export function RevealParticles({ tier, size }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  field: { alignItems: 'center', justifyContent: 'center' },
-  center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  origin: { position: 'absolute', width: 0, height: 0 },
   abs: { position: 'absolute' },
   spark: { position: 'absolute' },
 })

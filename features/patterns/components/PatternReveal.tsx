@@ -746,7 +746,9 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
       {/* La fiesta — POR DELANTE del card (es opaco; detrás quedaba tapada).
           Solo positivos + Regreso, NUNCA el noticing. Irradia hacia arriba/
           afuera, lejos del texto. pointerEvents none. */}
-      {party && celebrate ? <RevealParticles tier={celebrate} size={width} /> : null}
+      {party && celebrate ? (
+        <RevealParticles tier={celebrate} width={width} height={height} />
+      ) : null}
     </View>
   )
 }

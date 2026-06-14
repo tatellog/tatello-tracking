@@ -213,7 +213,7 @@ export function TransformationReveal({
       {/* La fiesta — POR DELANTE del card (es opaco; detrás quedaba tapada).
           Irradia desde el hero hacia arriba/afuera contra el cosmos, lejos de
           la zona de texto. pointerEvents none → no bloquea el tap-fondo. */}
-      {party ? <RevealParticles tier={tier} size={width} /> : null}
+      {party ? <RevealParticles tier={tier} width={width} height={height} /> : null}
     </View>
   )
 }
