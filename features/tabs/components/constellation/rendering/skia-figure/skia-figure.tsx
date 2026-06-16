@@ -96,6 +96,7 @@ export const SkiaFigure = memo(function SkiaFigure({
     const litIndex = lit ? litSeen++ : 0
     return { idx, A, B, ok, lit, litIndex }
   })
+  const litLineCount = litSeen
 
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -107,6 +108,7 @@ export const SkiaFigure = memo(function SkiaFigure({
             B={l.B!}
             lit={l.lit}
             litIndex={l.litIndex}
+            litCount={litLineCount}
             reveal={reveal}
             t={t}
             sScale={sScale}
@@ -144,7 +146,6 @@ export const SkiaFigure = memo(function SkiaFigure({
  * `reveal`, con stagger por orden de encendido + una chispa que viaja en la
  * punta (la "pluma"). Las apagadas quedan como guía tenue, completas. Cero
  * reconstrucción de path por frame — solo escalares en worklets (GPU). */
-const LINE_STAGGER = 0.07
 const LINE_WINDOW = 0.62 // ventana de trazado por línea (más ancha = más lento)
 // Pulso de energía CONTINUO que recorre cada línea encendida (sobre `t`, el
 // reloj de 8 s). Traversales por ciclo: < 1 = lento, lee como "energía
@@ -156,6 +157,7 @@ function SkiaConstellationLine({
   B,
   lit,
   litIndex,
+  litCount,
   reveal,
   t,
   sScale,
@@ -165,13 +167,18 @@ function SkiaConstellationLine({
   B: Px
   lit: boolean
   litIndex: number
+  litCount: number
   reveal: SharedValue<number>
   t: SharedValue<number>
   sScale: number
   reduce: boolean
 }) {
   const path = `M${A.x.toFixed(1)},${A.y.toFixed(1)}L${B.x.toFixed(1)},${B.y.toFixed(1)}`
-  const start = litIndex * LINE_STAGGER
+  // Stagger normalizado: la última línea encendida arranca en (1 - WINDOW) y
+  // TODAS terminan exactamente en reveal=1 (antes el stagger fijo se pasaba de
+  // 1 con muchas líneas → las últimas quedaban a medio dibujar, con la chispa
+  // clavada → "estrella rara").
+  const start = litCount > 1 ? (litIndex / (litCount - 1)) * (1 - LINE_WINDOW) : 0
   const phase = (litIndex * 0.37) % 1
   const dx = B.x - A.x
   const dy = B.y - A.y
