@@ -200,20 +200,20 @@ function SkiaConstellationLine({
   })
   return (
     <>
-      {/* Glow underlay — un trazo ancho y borroso bajo la línea nítida, para
-          que lea como conducto de luz, no como raya geométrica dura. */}
+      {/* Glow underlay — trazo ancho y TENUE bajo la línea nítida (sin
+          BlurMask: el blur por línea se recomputaba cada frame y pesaba). El
+          stroke ancho con cap redondo + baja opacidad ya suaviza el borde y la
+          aleja del "raya CAD". */}
       {lit ? (
         <Path
           path={path}
           color={CREAM_HOT}
           style="stroke"
-          strokeWidth={3.4 * sScale}
+          strokeWidth={3.2 * sScale}
           strokeCap="round"
-          opacity={0.16}
+          opacity={0.14}
           end={end}
-        >
-          <BlurMask blur={2.2 * sScale} style="normal" />
-        </Path>
+        />
       ) : null}
       <Path
         path={path}
@@ -226,17 +226,16 @@ function SkiaConstellationLine({
       />
       {lit ? (
         <>
-          {/* Chispa que dibuja (one-shot del reveal). */}
+          {/* Chispa que dibuja (one-shot del reveal). Glow fakeado con dos
+              círculos apilados, sin BlurMask (cheap, igual que las estrellas). */}
           <Group transform={tipTransform} opacity={tipOpacity}>
-            <Circle cx={0} cy={0} r={2 * sScale} color={CREAM_HOT}>
-              <BlurMask blur={2.5 * sScale} style="normal" />
-            </Circle>
+            <Circle cx={0} cy={0} r={3.4 * sScale} color={CREAM_HOT} opacity={0.28} />
+            <Circle cx={0} cy={0} r={1.5 * sScale} color={CREAM_HOT} />
           </Group>
-          {/* Energía viajando (continuo) — un poco más grande + difuso. */}
+          {/* Energía viajando (continuo) — mismo glow apilado, un poco mayor. */}
           <Group transform={energyTransform} opacity={energyOpacity}>
-            <Circle cx={0} cy={0} r={2.6 * sScale} color={CREAM_HOT}>
-              <BlurMask blur={3.6 * sScale} style="normal" />
-            </Circle>
+            <Circle cx={0} cy={0} r={4.2 * sScale} color={CREAM_HOT} opacity={0.26} />
+            <Circle cx={0} cy={0} r={1.7 * sScale} color={CREAM_HOT} />
           </Group>
         </>
       ) : null}
