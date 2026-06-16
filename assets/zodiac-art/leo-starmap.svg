@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ════════════════════════════════════════════════════════════════════
+  Leo · mapa celeste para el modal "Tu Leo"
+  ════════════════════════════════════════════════════════════════════
+
+  La pieza central de la propuesta de enriquecimiento: convierte la
+  lista de estrellas de texto plano en un MAPA. Es el asterismo real de
+  Leo (mismas 9 estrellas y 10 líneas que features/tabs/zodiac/figures.ts,
+  el "busto" sickle + triángulo de la melena) posicionado a escala, listo
+  para colgar las etiquetas de la lista debajo o al lado.
+
+  viewBox 280 x 210. Las estrellas se mapean desde las coords normalizadas
+  [0..1] de figures.ts con padding 12% (x = 34 + x·212, y = 26 + y·158)
+  para que ninguna toque el borde.
+
+  ── Estados (ESTÁTICO, sin filtros) ────────────────────────────────
+  Este SVG dibuja el estado "TODO ENCENDIDO" (51%+, las 9 ya despiertas).
+  El lenguaje de luz copia el de las lit-lines del proyecto: oro en tres
+  capas (bloom ancho 0.14 → cuerpo 0.32 → spine cream fino) y estrellas
+  con halo oro + núcleo cream. SIN <filter>/<feGaussianBlur> (igual que
+  el resto del sistema — el blur se finge por capas, evita el bug de
+  react-native-svg en alpha-stops de gradientes).
+
+  ── Cómo lo querrás en producción (nota a frontend-specialist) ──────
+  Lo ideal NO es este SVG fijo, sino un componente <LeoStarMap litStars>
+  que reciba el set de estrellas encendidas y dibuje las apagadas en
+  "brasa" (oro @0.18, sin spine) y las encendidas con el filamento
+  completo — igual que la constelación viva, pero en miniatura y estático.
+  Este archivo sirve como (a) referencia de coordenadas/escala exactas y
+  (b) fallback estático si no se construye el componente.
+
+  Tintable: cambia currentColor para el oro de las líneas; las estrellas
+  llevan oro inline (#D9AE6F / #FFF6E5) para que el núcleo no se pierda.
+-->
+<svg viewBox="0 0 280 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ── Capa 0 · wash ambiental ──────────────────────────────────
+       Imita AmbientGlow: elipses concéntricas de oro a baja alfa para
+       fingir un radial sin <RadialGradient>. Centrado en la melena. -->
+  <g>
+    <ellipse cx="150" cy="95" rx="120" ry="84" fill="#D9AE6F" opacity="0.03" />
+    <ellipse cx="150" cy="95" rx="95"  ry="66" fill="#D9AE6F" opacity="0.03" />
+    <ellipse cx="150" cy="95" rx="70"  ry="49" fill="#D9AE6F" opacity="0.04" />
+    <ellipse cx="150" cy="95" rx="46"  ry="32" fill="#D9AE6F" opacity="0.05" />
+  </g>
+
+  <!-- ── Capa 1 · líneas (filamentos de oro, 3 sub-capas) ─────────
+       Orden de líneas = orden de figures.ts. Coords (resueltas):
+         0 Regulus  ( 61,129)   5 Epsilon  (165, 61)
+         1 Eta      ( 64, 84)   6 Chort    ( 99, 97)
+         2 Algieba  (123, 72)   7 Zosma    (161, 84)
+         3 Adhafera (127, 48)   8 Denebola (140,129)
+         4 Rasalas  (153, 42)
+       Líneas: hook 0-1-2-3-4-5 · triángulo melena 6-7-8-6 · 0-6 · 2-7 -->
+  <g stroke-linecap="round">
+    <!-- bloom ancho (oro, muy suave) -->
+    <g stroke="#D9AE6F" stroke-opacity="0.10" stroke-width="7">
+      <path d="M61 129 L64 84 L123 72 L127 48 L153 42 L165 61" />
+      <path d="M99 97 L161 84 L140 129 L99 97" />
+      <path d="M61 129 L99 97" />
+      <path d="M123 72 L161 84" />
+    </g>
+    <!-- cuerpo (oro) -->
+    <g stroke="#D9AE6F" stroke-opacity="0.34" stroke-width="2">
+      <path d="M61 129 L64 84 L123 72 L127 48 L153 42 L165 61" />
+      <path d="M99 97 L161 84 L140 129 L99 97" />
+      <path d="M61 129 L99 97" />
+      <path d="M123 72 L161 84" />
+    </g>
+    <!-- spine cream (hilo fino, lo que lo vuelve "luz" y no "tinta") -->
+    <g stroke="#FFF6E5" stroke-opacity="0.5" stroke-width="0.6">
+      <path d="M61 129 L64 84 L123 72 L127 48 L153 42 L165 61" />
+      <path d="M99 97 L161 84 L140 129 L99 97" />
+      <path d="M61 129 L99 97" />
+      <path d="M123 72 L161 84" />
+    </g>
+  </g>
+
+  <!-- ── Capa 2 · estrellas ───────────────────────────────────────
+       Cada estrella: halo oro suave + anillo + núcleo cream. El radio
+       del núcleo escala con la "magnitud" iconográfica (mag 1.5 = anchor
+       más grande; 3.9 = punto tenue). Regulus (el corazón) y Denebola
+       (el último resplandor) son los anchors. -->
+  <g>
+    <!-- helper visual: anchor = r 2.6 · secundaria = 2.0 · tenue = 1.5 -->
+
+    <!-- Regulus · anchor ★ (el corazón del león) -->
+    <circle cx="61" cy="129" r="7" fill="#D9AE6F" opacity="0.12" />
+    <circle cx="61" cy="129" r="3.4" fill="#D9AE6F" opacity="0.5" />
+    <circle cx="61" cy="129" r="2.4" fill="#FFF6E5" />
+
+    <!-- Denebola · anchor ★ (el último resplandor) -->
+    <circle cx="140" cy="129" r="6.5" fill="#D9AE6F" opacity="0.12" />
+    <circle cx="140" cy="129" r="3.1" fill="#D9AE6F" opacity="0.5" />
+    <circle cx="140" cy="129" r="2.1" fill="#FFF6E5" />
+
+    <!-- Algieba · secundaria (la curva de su melena) -->
+    <circle cx="123" cy="72" r="3" fill="#D9AE6F" opacity="0.4" />
+    <circle cx="123" cy="72" r="1.9" fill="#FFF6E5" />
+
+    <!-- Zosma · secundaria (la fuerza de su andar) -->
+    <circle cx="161" cy="84" r="3" fill="#D9AE6F" opacity="0.4" />
+    <circle cx="161" cy="84" r="1.9" fill="#FFF6E5" />
+
+    <!-- Chort · media (el inicio de su rugido) -->
+    <circle cx="99" cy="97" r="2.6" fill="#D9AE6F" opacity="0.36" />
+    <circle cx="99" cy="97" r="1.6" fill="#FFF6E5" />
+
+    <!-- Epsilon · media (su mirada) -->
+    <circle cx="165" cy="61" r="2.6" fill="#D9AE6F" opacity="0.36" />
+    <circle cx="165" cy="61" r="1.5" fill="#FFF6E5" />
+
+    <!-- Eta · tenue (su cuello) -->
+    <circle cx="64" cy="84" r="2.2" fill="#D9AE6F" opacity="0.32" />
+    <circle cx="64" cy="84" r="1.3" fill="#FFF6E5" />
+
+    <!-- Adhafera · tenue (la trenza de su melena) -->
+    <circle cx="127" cy="48" r="2.2" fill="#D9AE6F" opacity="0.32" />
+    <circle cx="127" cy="48" r="1.3" fill="#FFF6E5" />
+
+    <!-- Rasalas · la más tenue (la corona de su cabeza) -->
+    <circle cx="153" cy="42" r="2" fill="#D9AE6F" opacity="0.3" />
+    <circle cx="153" cy="42" r="1.2" fill="#FFF6E5" />
+  </g>
+</svg>

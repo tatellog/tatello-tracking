@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
   interpolateColor,
@@ -26,7 +26,7 @@ import { colors, typography } from '@/theme'
  * the user commits. Hidden under 2 days — a "1 día" / "0 días" line
  * would nag more than it rewards.
  */
-export function StreakLine({ streak }: { streak: number }) {
+export function StreakLine({ streak, onPress }: { streak: number; onPress?: () => void }) {
   const pop = useSharedValue(0)
   const prev = useRef(streak)
 
@@ -51,12 +51,31 @@ export function StreakLine({ streak }: { streak: number }) {
 
   if (streak < 2) return null
 
-  return (
-    <View style={styles.row}>
+  const inner = (
+    <>
       <Text style={styles.star}>✦</Text>
       <Animated.Text style={[styles.num, numStyle]}>{streak}</Animated.Text>
       <Text style={styles.label}>días en órbita</Text>
-    </View>
+      {/* Persistent affordance: the chevron marks the chip as tappable
+          (it opens the month calendar — the streak's own history). */}
+      {onPress ? <Text style={styles.chevron}>›</Text> : null}
+    </>
+  )
+
+  if (!onPress) return <View style={styles.row}>{inner}</View>
+
+  // The flex row lives on the inner View — applying flexDirection straight to
+  // a Pressable doesn't render reliably in this RN setup (it stacked the items
+  // vertically); same workaround as PlanRow / AccountRow.
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${streak} días en órbita. Ver tu mes.`}
+      style={({ pressed }) => pressed && styles.rowPressed}
+    >
+      <View style={styles.row}>{inner}</View>
+    </Pressable>
   )
 }
 
@@ -78,6 +97,17 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderBottomWidth: 0.8,
     borderColor: 'rgba(217, 174, 111, 0.28)',
+  },
+  rowPressed: {
+    opacity: 0.6,
+  },
+  // Trailing chevron — the "this opens something" token, in niebla so it
+  // stays quiet next to the magenta streak number.
+  chevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    marginLeft: 1,
   },
   star: {
     fontSize: typography.sizes.smallLabel,

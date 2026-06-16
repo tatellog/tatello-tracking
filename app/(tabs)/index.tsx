@@ -192,8 +192,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // the figure freezes for the drag and resumes on release (imperceptible).
   const [isScrolling, setIsScrolling] = useState(false)
   const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const handleScroll = useCallback(() => {
+  // Pausa la constelación SOLO en los límites del gesto (inicio de drag /
+  // fin de momentum), no en un callback de 60 Hz. Un `onScroll` con
+  // scrollEventThrottle=16 obligaba al JS thread a recibir ~60 eventos/s
+  // durante el scroll — justo cuando más lo necesitas libre — y solo se
+  // usaba para detectar inicio/fin. Los eventos de límite dan eso con cero
+  // trabajo por frame. (begin: drag o momentum; end: drag o momentum,
+  // debounced 140 ms para cubrir el hand-off drag→momentum.)
+  const beginScroll = useCallback(() => {
+    if (scrollIdle.current) clearTimeout(scrollIdle.current)
     setIsScrolling((s) => (s ? s : true))
+  }, [])
+  const endScroll = useCallback(() => {
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
   }, [])
@@ -204,6 +214,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // El offset de la sección se captura por onLayout en su wrapper.
   const scrollRef = useRef<ScrollView>(null)
   const universeY = useRef(0)
+  // Captured by onLayout on the month section so the streak chip can scroll
+  // to its own history (the calendar) when tapped.
+  const monthY = useRef(0)
+  const scrollToY = useCallback((y: number) => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true })
+  }, [])
   useEffect(() => {
     return subscribeUniverseDetailRequest(() => {
       scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
@@ -448,8 +464,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             ref={scrollRef}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
+            onScrollBeginDrag={beginScroll}
+            onMomentumScrollBegin={beginScroll}
+            onScrollEndDrag={endScroll}
+            onMomentumScrollEnd={endScroll}
           >
             <Animated.View entering={enter(40)}>
               <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
@@ -464,7 +482,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             </Animated.View>
 
             <Animated.View entering={enter(160)}>
-              <StreakLine streak={ctx.streak_days} />
+              <StreakLine streak={ctx.streak_days} onPress={() => scrollToY(monthY.current)} />
             </Animated.View>
 
             <Animated.View entering={enter(220)} style={styles.constellationHeader}>
@@ -588,11 +606,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 no la acción del día (esa es el toggle de arriba). Tocar un día
                 lo selecciona y abre su detalle; el día de HOY solo se lee
                 (se marca arriba), los pasados se pueden editar sin celebración. */}
-            <Animated.View entering={enter(680)}>
+            <Animated.View
+              entering={enter(680)}
+              onLayout={(e) => {
+                monthY.current = e.nativeEvent.layout.y
+              }}
+            >
               <SectionHeader label={monthLabel} />
-              <Text style={styles.weekHint}>
-                Tu mes hasta hoy · toca un día para ver el detalle.
-              </Text>
+              <Text style={styles.weekHint}>Tu mes hasta hoy · toca un día para ver o editar.</Text>
               <WeekStrip
                 days={calendarDays}
                 selectedDate={selectedDate}

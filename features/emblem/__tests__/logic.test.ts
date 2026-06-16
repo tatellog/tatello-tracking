@@ -6,7 +6,12 @@ import {
   TRANSFORM_TOTAL_POINTS,
   TRANSFORM_WEIGHTS,
   transformProgressForPoints,
+  withSign,
 } from '../logic'
+
+const SIGN = 'Tauro'
+const expanded = (progress: number) =>
+  stageForProgress(progress).lines.map((l) => withSign(l, SIGN))
 
 const FORBIDDEN = /falta|debes|deberías|atrás|incompleto|atracón|trastorno/i
 
@@ -110,26 +115,33 @@ describe('stageForProgress', () => {
 })
 
 describe('dailyCoachLine', () => {
-  it('siempre devuelve una línea del pool de la etapa vigente', () => {
+  it('siempre devuelve una línea (ya con el signo) del pool de la etapa vigente', () => {
     for (let seed = 0; seed < 10; seed++) {
-      const line = dailyCoachLine(60, seed) // "revela"
-      expect(stageForProgress(60).lines).toContain(line)
+      const line = dailyCoachLine(60, seed, SIGN) // "revela"
+      expect(expanded(60)).toContain(line)
     }
   })
 
+  it('resuelve el token {sign} con el signo de la usuaria (nunca "Leo" hardcodeado)', () => {
+    const line = dailyCoachLine(0, 0, SIGN) // "Tu {sign} está despertando."
+    expect(line).toBe('Tu Tauro está despertando.')
+    expect(line).not.toMatch(/\{sign\}/)
+    expect(line).not.toMatch(/Leo/)
+  })
+
   it('es determinista por día: misma semilla → misma línea', () => {
-    expect(dailyCoachLine(40, 12345)).toBe(dailyCoachLine(40, 12345))
+    expect(dailyCoachLine(40, 12345, SIGN)).toBe(dailyCoachLine(40, 12345, SIGN))
   })
 
   it('rota dentro de la etapa: días consecutivos no repiten en un pool de 3', () => {
-    const a = dailyCoachLine(40, 0)
-    const b = dailyCoachLine(40, 1)
+    const a = dailyCoachLine(40, 0, SIGN)
+    const b = dailyCoachLine(40, 1, SIGN)
     expect(a).not.toBe(b)
   })
 
   it('semilla no finita o negativa cae a una línea válida, sin reventar', () => {
-    expect(stageForProgress(40).lines).toContain(dailyCoachLine(40, NaN))
-    expect(stageForProgress(40).lines).toContain(dailyCoachLine(40, -7))
+    expect(expanded(40)).toContain(dailyCoachLine(40, NaN, SIGN))
+    expect(expanded(40)).toContain(dailyCoachLine(40, -7, SIGN))
   })
 })
 

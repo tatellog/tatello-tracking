@@ -10,6 +10,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
+import { usePressFeedback } from '@/components/ui/interaction'
 import { colors, typography } from '@/theme'
 
 import type { CalendarDay, DayRegistered } from './logic'
@@ -67,22 +68,29 @@ function ActionButton({
   primary?: boolean
   onPress: () => void
 }) {
+  // Scale on press from the interaction system (haptic off — the parent fires
+  // the backfill haptic). The Pressable carries only the flex sizing; the
+  // chrome + scale live on the inner Animated.View (border/bg/flex don't render
+  // reliably straight on a Pressable in this RN setup).
+  const { onPressIn, onPressOut, animatedStyle } = usePressFeedback({ haptic: false })
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.action,
-        primary ? styles.actionPrimary : styles.actionGhost,
-        pressed && styles.actionPressed,
-      ]}
+      style={styles.actionHit}
     >
-      <Text
-        style={[styles.actionText, primary ? styles.actionTextPrimary : styles.actionTextGhost]}
+      <Animated.View
+        style={[styles.action, primary ? styles.actionPrimary : styles.actionGhost, animatedStyle]}
       >
-        {label}
-      </Text>
+        <Text
+          style={[styles.actionText, primary ? styles.actionTextPrimary : styles.actionTextGhost]}
+        >
+          {label}
+        </Text>
+      </Animated.View>
     </Pressable>
   )
 }
@@ -277,8 +285,10 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 18,
   },
-  action: {
+  actionHit: {
     flex: 1,
+  },
+  action: {
     paddingVertical: 11,
     borderRadius: 13,
     alignItems: 'center',
@@ -291,9 +301,6 @@ const styles = StyleSheet.create({
   actionGhost: {
     backgroundColor: 'transparent',
     borderColor: colors.oroHairline,
-  },
-  actionPressed: {
-    opacity: 0.6,
   },
   actionText: {
     fontFamily: typography.uiBold,

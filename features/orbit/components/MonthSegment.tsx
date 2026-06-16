@@ -17,11 +17,11 @@ import { colors, typography } from '@/theme'
 
 import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
-import { useTransformProgress } from '@/features/emblem'
+import { useTransformProgress, withSign } from '@/features/emblem'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
-import { zodiacFromDate } from '@/features/tabs/zodiac'
+import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { GLASS_ML, mlToLitresLabel } from '@/features/water/useWaterGoal'
 
@@ -115,7 +115,13 @@ export function MonthSegment() {
 
       {/* 1 · Tu Transformación — el emblema revelándose es la respuesta a
           "¿qué estoy construyendo?". Hero del Mes. */}
-      {sign ? <EmblemHero sign={sign} progress={progress} message={stage.message} /> : null}
+      {sign ? (
+        <EmblemHero
+          sign={sign}
+          progress={progress}
+          message={withSign(stage.message, signName(sign))}
+        />
+      ) : null}
 
       {/* 2 · Lo que más se repitió — el comportamiento más consistente del
           mes (≥8 días). Solo si hay constancia real. */}

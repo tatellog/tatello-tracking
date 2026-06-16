@@ -40,6 +40,7 @@ import type { SleepDraft } from '@/features/sleep/api'
 import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
 import type { WellbeingDraft } from '@/features/wellbeing/api'
 import { useSaveWellbeing, useTodayWellbeing } from '@/features/wellbeing/hooks'
+import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
 import { RingCard } from './RingCard'
@@ -87,6 +88,10 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // (rare but possible if `width` re-measures mid-session).
   const peekedRef = useRef(false)
 
+  // True once the user has paged at least once — the swipe hint then hides
+  // permanently for the session (acceptance: "el primer swipe oculta el hint").
+  const hasSwipedRef = useRef(false)
+
   // Tracks the last `targetSlide` we honoured, so the deep-link
   // scroll fires ONCE per param change and never re-snaps when the
   // user manually pages away. Without this guard, every re-render
@@ -107,6 +112,9 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const livePageChange = (idx: number) => {
     if (idx < 0) return
     Haptics.selectionAsync().catch(() => {})
+    // First swipe hides the "Desliza para ver más" hint permanently (session).
+    if (idx > 0 && !hasSwipedRef.current) hasSwipedRef.current = true
+    track('stat_slider_swiped', { slide: idx })
     setActive(idx)
   }
   useAnimatedReaction(
@@ -258,8 +266,11 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
       <Dots
         count={slides.length}
         active={safeActive}
-        showHint={active === 0}
-        onDotPress={(i) => scrollRef.current?.scrollTo({ x: i * width, animated: true })}
+        showHint={active === 0 && !hasSwipedRef.current}
+        onDotPress={(i) => {
+          track('stat_slider_dot_pressed', { slide: i })
+          scrollRef.current?.scrollTo({ x: i * width, animated: true })
+        }}
       />
     </View>
   )
@@ -598,7 +609,7 @@ function StepButton({
     <Pressable
       onPress={onPress}
       hitSlop={10}
-      style={styles.stepButton}
+      style={({ pressed }) => [styles.stepButton, pressed && styles.stepButtonPressed]}
       accessibilityRole="button"
       accessibilityLabel={hint}
     >
@@ -765,7 +776,7 @@ function AxisStars({ value, onRate }: { value: number | null; onRate: (i: number
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={`${i + 1} de 5`}
-          style={styles.starSlot}
+          style={({ pressed }) => [styles.starSlot, pressed && styles.starSlotPressed]}
         >
           {lit > i ? (
             <View style={styles.starGlow}>
@@ -774,7 +785,19 @@ function AxisStars({ value, onRate }: { value: number | null; onRate: (i: number
               </Svg>
             </View>
           ) : (
-            <View style={styles.ember} />
+            // Empty level = a HOLLOW star outline (not a dim dot). Brighter
+            // bone stroke (not faint niebla) so the row reads as a present,
+            // interactive control rather than decoration — a non-text cue on
+            // top of the "Toca las estrellas…" line.
+            <Svg width={18} height={18} viewBox="0 0 24 24">
+              <Path
+                d={STAR}
+                fill="none"
+                stroke={colors.bone}
+                strokeWidth={1.7}
+                strokeLinejoin="round"
+              />
+            </Svg>
           )}
         </Pressable>
       ))}
@@ -852,7 +875,12 @@ function WellbeingSlide({ date }: { date: string }) {
         ))}
 
         {!hasEntry ? (
-          <Text style={styles.captionLine}>¿Cómo te sientes hoy?</Text>
+          // Empty state = the moment to teach tappability. An explicit "toca"
+          // instruction (Hanken, not the serif coach line) — the same pattern
+          // as the universe ("Toca un astro…") and the calendar. The stars
+          // can't read as a button (they're a rating control), so the words
+          // carry it; magenta is too overloaded in Stelar to be the signal.
+          <Text style={styles.tapHint}>Toca las estrellas para marcar cómo amaneciste.</Text>
         ) : draft.energy != null ? (
           <Text style={styles.captionLine}>
             Energía <Text style={styles.captionEm}>{ENERGY_WORDS[draft.energy - 1]}</Text>
@@ -972,19 +1000,23 @@ function Dots({
   onDotPress: (index: number) => void
 }) {
   return (
-    <View style={styles.dots}>
-      {Array.from({ length: count }).map((_, i) => (
-        <Pressable
-          key={i}
-          hitSlop={10}
-          onPress={() => onDotPress(i)}
-          accessibilityRole="button"
-          accessibilityLabel={`Ir a la tarjeta ${i + 1} de ${count}`}
-        >
-          <Dot on={i === active} />
-        </Pressable>
-      ))}
-      {showHint ? <SwipeHint /> : null}
+    <View style={styles.dotsWrap}>
+      <View style={styles.dots}>
+        {Array.from({ length: count }).map((_, i) => (
+          <Pressable
+            key={i}
+            hitSlop={10}
+            onPress={() => onDotPress(i)}
+            accessibilityRole="button"
+            accessibilityLabel={`Ir a la tarjeta ${i + 1} de ${count}`}
+          >
+            <Dot on={i === active} />
+          </Pressable>
+        ))}
+        {showHint ? <SwipeHint /> : null}
+      </View>
+      {/* Temporary text hint — hides for good after the first swipe. */}
+      {showHint ? <Text style={styles.swipeHintText}>Desliza para ver más</Text> : null}
     </View>
   )
 }
@@ -995,8 +1027,9 @@ function Dot({ on }: { on: boolean }) {
     p.value = withTiming(on ? 1 : 0, { duration: 260 })
   }, [on, p])
   const style = useAnimatedStyle(() => ({
-    width: 6 + p.value * 12,
-    opacity: 0.32 + p.value * 0.68,
+    width: 7 + p.value * 13,
+    // Higher floor so inactive dots read clearly as "more pages here".
+    opacity: 0.45 + p.value * 0.55,
   }))
   return <Animated.View style={[styles.dot, style]} />
 }
@@ -1172,22 +1205,29 @@ const styles = StyleSheet.create({
   sleepValueMuted: {
     color: colors.niebla,
   },
-  // − / + chip — same bordered surface as the header gear button.
+  // − / + button — clearer button chrome (elevated fill + stronger border +
+  // leche glyph) so it reads as a control, not decoration. Magenta-tint flash
+  // on press confirms the tap.
   stepButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.bgCard,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.bgCard2,
     borderWidth: 1,
-    borderColor: colors.bruma,
+    borderColor: colors.hairlineStrong,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stepButtonPressed: {
+    opacity: 0.7,
+    backgroundColor: colors.magentaTint,
+    borderColor: colors.magenta,
   },
   stepButtonLabel: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.segmentTitle,
     lineHeight: 24,
-    color: colors.bone,
+    color: colors.leche,
   },
   sleepQualityRow: {
     flexDirection: 'row',
@@ -1216,12 +1256,15 @@ const styles = StyleSheet.create({
   starsRow: {
     flexDirection: 'row',
   },
-  // Fixed slot so a lit star and a dim ember occupy the same box.
+  // Fixed slot so a lit star and a hollow outline occupy the same box.
   starSlot: {
     width: 26,
     height: 26,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  starSlotPressed: {
+    opacity: 0.55,
   },
   // A rated level — the star sits on a soft magenta glow.
   starGlow: {
@@ -1230,13 +1273,6 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     shadowOpacity: 0.75,
     elevation: 4,
-  },
-  // An unrated level — a dim ember.
-  ember: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: colors.bruma,
   },
   // ── Cycle slide ────────────────────────────────────────────────
   // The dial holds the day number stacked at its centre.
@@ -1282,21 +1318,39 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.ui,
     color: colors.niebla,
   },
+  // Explicit tap instruction (Hanken, not serif) — teaches that the stars are
+  // tappable when the check-in is still empty.
+  tapHint: {
+    textAlign: 'center',
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+  },
   captionEm: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
     color: colors.magenta,
   },
-  dots: {
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'center',
+  dotsWrap: {
+    alignItems: 'center',
     marginTop: 14,
   },
+  dots: {
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+  },
   dot: {
-    height: 6,
-    borderRadius: 3,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: colors.magenta,
+  },
+  swipeHintText: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
   // Swipe affordance — sits to the right of the dots, marginLeft 4
   // so it reads as part of the pagination cluster, not detached.

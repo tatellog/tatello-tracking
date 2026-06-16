@@ -68,9 +68,9 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
   {
     key: 'despierta',
     label: 'Despierta',
-    message: 'Tu Leo está despertando.',
+    message: 'Tu {sign} está despertando.',
     lines: [
-      'Tu Leo está despertando.',
+      'Tu {sign} está despertando.',
       'Algo tuyo empieza a encenderse.',
       'Cada cuidado deja una luz.',
     ],
@@ -79,9 +79,9 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
   {
     key: 'forma',
     label: 'Toma forma',
-    message: 'Tu Leo empieza a tomar forma.',
+    message: 'Tu {sign} empieza a tomar forma.',
     lines: [
-      'Tu Leo empieza a tomar forma.',
+      'Tu {sign} empieza a tomar forma.',
       'Lo que repites te está dando forma.',
       'Día a día, algo se dibuja.',
     ],
@@ -93,7 +93,7 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
     message: 'Lo que haces cada día te está revelando.',
     lines: [
       'Lo que haces cada día te está revelando.',
-      'Tu Leo se reconoce más.',
+      'Tu {sign} se reconoce más.',
       'Lo que sostienes, se nota.',
     ],
     minPct: 50, // + melena — el león entero, el momento "ah"
@@ -101,9 +101,9 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
   {
     key: 'casi',
     label: 'Casi completo',
-    message: 'Tu Leo ya puede verse.',
+    message: 'Tu {sign} ya puede verse.',
     lines: [
-      'Tu Leo ya puede verse.',
+      'Tu {sign} ya puede verse.',
       'Casi entero, y es tuyo.',
       'Lo que construiste casi resplandece.',
     ],
@@ -112,14 +112,21 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
   {
     key: 'completo',
     label: 'Completo',
-    message: 'Tu Leo está completo. Has despertado algo propio.',
+    message: 'Tu {sign} está completo. Has despertado algo propio.',
     lines: [
-      'Tu Leo está completo. Has despertado algo propio.',
+      'Tu {sign} está completo. Has despertado algo propio.',
       'Completo — y nada de esto se reinicia.',
     ],
     minPct: 100, // oro pleno + halo
   },
 ] as const
+
+/** Reemplaza el token `{sign}` por el nombre del signo de la usuaria. El
+ *  copy del emblema se guarda con `{sign}` (no "Leo") para servir a los 12
+ *  signos — el arte ya es del signo real, el texto debe acompañarlo. */
+export function withSign(text: string, signLabel: string): string {
+  return text.replace(/\{sign\}/g, signLabel)
+}
 
 /** Puntos acumulados → progreso 0–100. Floor a propósito: 599/600 es
  *  99 — "completo" solo cuando de verdad se completó. Clamp en ambos
@@ -144,13 +151,14 @@ export function stageForProgress(progress: number): EmblemStage {
  *  por día — la misma todo el día, distinta mañana — para que una etapa
  *  larga (~2 semanas) no muestre la frase idéntica día tras día. `daySeed`
  *  es cualquier entero estable-por-día (p. ej. días desde epoch). Sin
- *  etapa válida (progress 0) cae a la canónica de "despierta". */
-export function dailyCoachLine(progress: number, daySeed: number): string {
+ *  etapa válida (progress 0) cae a la canónica de "despierta". El copy
+ *  trae el token `{sign}`; se resuelve con `signLabel` antes de devolver. */
+export function dailyCoachLine(progress: number, daySeed: number, signLabel: string): string {
   const stage = stageForProgress(progress)
   const pool = stage.lines
-  if (!Number.isFinite(daySeed)) return pool[0]
+  if (!Number.isFinite(daySeed)) return withSign(pool[0], signLabel)
   const i = ((Math.trunc(daySeed) % pool.length) + pool.length) % pool.length
-  return pool[i] ?? pool[0]
+  return withSign(pool[i] ?? pool[0], signLabel)
 }
 
 /** Progreso → índice DISCRETO de etapa para la capa visual:

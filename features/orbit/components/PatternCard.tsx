@@ -200,7 +200,7 @@ export function PatternCard({ patron }: { patron: Patron }) {
   const router = useRouter()
   return (
     <Pressable
-      style={styles.card}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={() => router.push(`/orbit/pattern/${patron.id}`)}
       accessibilityRole="button"
       accessibilityLabel={patron.title}
@@ -225,6 +225,12 @@ export function PatternCard({ patron }: { patron: Patron }) {
           />
           <Text style={styles.detail}>{patron.detail}</Text>
         </View>
+        {/* Navigate chevron — the spec's "this opens a screen" token. Marks
+            the pattern as explorable (it pushes /orbit/pattern/:id), unlike
+            the read-only stat/voice cards beside it. */}
+        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+          ›
+        </Text>
       </View>
     </Pressable>
   )
@@ -241,6 +247,16 @@ const styles = StyleSheet.create({
     shadowRadius: 13,
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
+  },
+  cardPressed: {
+    opacity: 0.7,
+  },
+  // Navigate chevron — niebla, vertically centered at the trailing edge.
+  chevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.heading,
+    color: colors.niebla,
+    marginLeft: -6,
   },
   // The frosted pane — rounds + clips the blur; holds the two columns.
   glass: {

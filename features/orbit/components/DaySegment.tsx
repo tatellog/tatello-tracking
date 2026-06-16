@@ -258,6 +258,14 @@ export function DaySegment() {
         </Animated.Text>
       ) : null}
 
+      {/* Persistent affordance — the stars carry no "tap me" chrome (their
+          rings already mean state), so a quiet instruction makes them
+          discoverable. Same pattern as the calendar's "toca un día…" hint.
+          Hidden once a star is open (the readout is the payoff). */}
+      {selectedKey == null ? (
+        <Text style={styles.tapHint}>Toca una estrella para leer su señal.</Text>
+      ) : null}
+
       {/* Hero — the orbital diagram takes the full bleed. The
           right-side six-dimension node list was retired: with each
           star now carrying its own colors.dimension halo + an on-orbital
@@ -670,6 +678,15 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     lineHeight: 21,
     color: colors.oro,
+  },
+  // Quiet tappability hint for the stars — niebla, centered, small. Mirrors
+  // the calendar's "toca un día…" line.
+  tapHint: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   // Silence block — the honest line + the oro afford that invites the
   // user to register the signal that lights this dimension.

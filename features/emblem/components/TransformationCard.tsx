@@ -6,9 +6,10 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 
 import LeoEmblemArt from '@/assets/zodiac-art/leo-emblem.svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useProfile } from '@/features/profile/hooks'
-import { zodiacFromDate } from '@/features/tabs/zodiac'
+import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import { colors, radius, spacing, typography } from '@/theme'
 
 import { useTransformProgress } from '../hooks'
@@ -56,6 +57,9 @@ export function TransformationCard({ compact = false }: Props) {
   const { data: profile } = useProfile()
   const { progress } = useTransformProgress()
   const [open, setOpen] = useState(false)
+  // Press feedback for the "Ver en Órbita" link (haptic off — openOrbita
+  // already fires a selection tick).
+  const orbitPress = usePressFeedback({ haptic: false })
 
   // Espejo de hasEmblem (LunarConstellation): solo Leo tiene arte de
   // emblema por ahora. Sin perfil aún → nada (capa de recompensa: jamás
@@ -69,7 +73,7 @@ export function TransformationCard({ compact = false }: Props) {
   const daySeed = Math.floor(
     new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 86_400_000,
   )
-  const line = dailyCoachLine(progress, daySeed)
+  const line = dailyCoachLine(progress, daySeed, signName(sign))
 
   const openOrbita = () => {
     Haptics.selectionAsync().catch(() => {})
@@ -105,14 +109,23 @@ export function TransformationCard({ compact = false }: Props) {
         {/* Garantía persistente — quita la lectura de castigo: nada de lo
             revelado se pierde. Voz del coach (italic). */}
         <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
+        {/* The ONE navigation of the card — a magenta link with the interaction
+            system: scale on press + a clean Feather chevron (›). Two signals,
+            no "horrible" pill. The card stays read-only on purpose. */}
         <Pressable
           hitSlop={8}
           accessibilityRole="link"
           accessibilityLabel="Ver tu transformación en Órbita"
+          accessibilityHint="Abre detalle"
           onPress={openOrbita}
-          style={({ pressed }) => [styles.orbitLink, pressed && styles.orbitLinkPressed]}
+          onPressIn={orbitPress.onPressIn}
+          onPressOut={orbitPress.onPressOut}
+          style={styles.orbitLink}
         >
-          <Text style={styles.orbitLinkText}>Ver en Órbita →</Text>
+          <Animated.View style={[styles.orbitLinkRow, orbitPress.animatedStyle]}>
+            <Text style={styles.orbitLinkText}>Ver en Órbita</Text>
+            <ChevronHint direction="right" size={16} color={colors.magenta} />
+          </Animated.View>
         </Pressable>
         {open ? <Explainer /> : null}
       </View>
@@ -317,13 +330,16 @@ const styles = StyleSheet.create({
   orbitLink: {
     alignSelf: 'flex-start',
     marginTop: spacing.s2,
+    paddingVertical: 4,
   },
-  orbitLinkPressed: {
-    opacity: 0.6,
+  orbitLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   orbitLinkText: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
+    fontSize: typography.sizes.body,
     letterSpacing: 0.4,
     color: colors.magenta,
   },

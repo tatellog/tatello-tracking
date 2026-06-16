@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Marco-halo para el emblema (Tu Leo)
+  ───────────────────────────────────────────────────────────────────
+  Un anillo ornamental fino de oro que rodea el león, con un QUIEBRE
+  decorativo asimétrico (la regla del art-brief: "al menos un corte para
+  que no lea como círculo plano") y un halo radial suave detrás, en el
+  lenguaje Genshin-glow del proyecto. Pensado para ir DETRÁS del
+  <LeoEmblemArt>, llenando un cuadro mayor que el emblema (p.ej. 160 con
+  el emblema a 116 centrado encima).
+
+  viewBox 160 x 160, centro 80,80.
+  El halo (elipses concéntricas) finge el radial sin <RadialGradient>.
+  Tintable con currentColor en el anillo; el halo lleva oro inline.
+
+  Uso en RN (detrás del emblema, en un View con position relative):
+    <EmblemHaloFrame width={168} height={168} style={StyleSheet.absoluteFill} />
+    <LeoEmblemArt width={116} height={116} />
+-->
+<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ── Halo radial (oro), capas concéntricas ────────────────────── -->
+  <g>
+    <circle cx="80" cy="80" r="64" fill="#D9AE6F" opacity="0.03" />
+    <circle cx="80" cy="80" r="52" fill="#D9AE6F" opacity="0.035" />
+    <circle cx="80" cy="80" r="40" fill="#D9AE6F" opacity="0.045" />
+    <circle cx="80" cy="80" r="28" fill="#E8B872" opacity="0.05" />
+  </g>
+
+  <!-- ── Anillo ornamental con quiebre asimétrico ─────────────────── -->
+  <!-- Arco principal: deja un hueco arriba-derecha (de ~50° a ~95° NO
+       se dibuja) para el quiebre. Dos trazos: el grueso del arco y un
+       segundo arco interior más corto que rompe la simetría. -->
+  <path d="M 80 8
+           A 72 72 0 1 1 122.9 22.5"
+        stroke="currentColor" stroke-width="0.75"
+        stroke-linecap="round" opacity="0.5" />
+  <!-- Arco interior parcial (solo abajo-izquierda) — densidad asimétrica -->
+  <path d="M 30 130
+           A 64 64 0 0 1 18 70"
+        stroke="currentColor" stroke-width="0.5"
+        stroke-linecap="round" opacity="0.3" />
+
+  <!-- Nodos-estrella en el quiebre (donde el anillo "se abre") -->
+  <circle cx="80" cy="8" r="1.4" fill="#FFF6E5" opacity="0.85" />
+  <circle cx="122.9" cy="22.5" r="1.1" fill="#D9AE6F" opacity="0.7" />
+
+  <!-- Tres motas de polvo cósmico suspendidas en el quiebre (atmósfera) -->
+  <circle cx="110" cy="14" r="0.7" fill="#FFE9C2" opacity="0.55" />
+  <circle cx="132" cy="34" r="0.6" fill="#FFE9C2" opacity="0.4" />
+  <circle cx="100" cy="9" r="0.5" fill="#FFE9C2" opacity="0.45" />
+</svg>

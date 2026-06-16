@@ -15,6 +15,7 @@ import Animated, {
 import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
 import { useSleepLog } from '@/features/sleep/hooks'
 import {
@@ -207,6 +208,11 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
           ) : (
             <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
           )}
+          {/* Group-level affordance — the app's proven, on-brand pattern (same
+              as the calendar's "toca un día…"). One quiet line teaches the
+              whole grid is tappable, so the cards stay clean (no per-card
+              chrome that fights the cosmos). */}
+          <Text style={styles.tapHint}>Toca un astro para ver de dónde viene.</Text>
           <View style={styles.gridWrap}>
             <View style={styles.grid}>
               {attributes.map((attr) => (
@@ -278,6 +284,12 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
   const prevStateRef = useRef(attr.state)
   const [burstKey, setBurstKey] = useState(0)
 
+  // ── Affordance: interaction system (expand). Scale-on-press from the
+  // shared usePressFeedback; the ⌄/⌃ chevron + the active border (when
+  // selected) are the other signals. Haptic off here — the parent already
+  // fires a selection tick on press, so we don't double up.
+  const { onPressIn, onPressOut, animatedStyle } = usePressFeedback({ haptic: false })
+
   // Ring fill — one-shot withTiming toward the new pct when it changes
   // post-mount; the <Svg> is static at rest.
   useEffect(() => {
@@ -347,104 +359,119 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={[
-        styles.card,
-        complete && { borderColor: tint(accent, '4D') },
-        selected && { borderColor: tint(accent, '8C') },
-      ]}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={styles.cardHit}
       accessibilityRole="button"
       accessibilityState={{ expanded: selected }}
       accessibilityLabel={`${attr.label}. ${attr.microcopy}`}
-      accessibilityHint="Muestra de dónde viene"
+      accessibilityHint="Expande sección"
     >
       <Animated.View
-        pointerEvents="none"
-        style={[styles.cardGlow, { backgroundColor: tint(accent, '1F') }, glowStyle]}
-      />
+        style={[
+          styles.card,
+          complete && { borderColor: tint(accent, '4D') },
+          selected && { borderColor: tint(accent, '8C') },
+          animatedStyle,
+        ]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.cardGlow, { backgroundColor: tint(accent, '1F') }, glowStyle]}
+        />
 
-      <Text style={[styles.label, { color: complete ? accent : colors.bone }]}>{attr.label}</Text>
+        <Text style={[styles.label, { color: complete ? accent : colors.bone }]}>{attr.label}</Text>
 
-      <View style={styles.ringZone}>
-        <Svg
-          width={RING_SIZE}
-          height={RING_SIZE}
-          viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
-          style={styles.ringSvg}
-        >
-          {/* el campo: track fino, no una barra a llenar */}
-          <Circle
-            cx={RING_MID}
-            cy={RING_MID}
-            r={RING_R}
-            fill="none"
-            stroke={colors.hairline}
-            strokeWidth={1}
-          />
-
-          {complete ? (
-            <>
-              {/* anillo de luz exterior — la corona de la órbita */}
-              <Circle
-                cx={RING_MID}
-                cy={RING_MID}
-                r={RING_R + 3}
-                fill="none"
-                stroke={tint(accent, '26')}
-                strokeWidth={1}
-              />
-              {/* órbita cerrada, color pleno */}
-              <Circle
-                cx={RING_MID}
-                cy={RING_MID}
-                r={RING_R}
-                fill="none"
-                stroke={accent}
-                strokeWidth={2.5}
-              />
-              {/* corona difusa detrás del astro — halo dibujado, no blur */}
-              <Circle cx={RING_MID} cy={RING_MID} r={9} fill={tint(accent, '1A')} />
-              <Circle cx={RING_MID} cy={RING_MID} r={5.5} fill={tint(accent, '33')} />
-              {/* puntas de estrella */}
-              <Path
-                d={ASTRO_CROSS}
-                stroke={tint(accent, '80')}
-                strokeWidth={1}
-                strokeLinecap="round"
-              />
-            </>
-          ) : attr.kind === 'progress' ? (
-            /* órbita en progreso — arco atenuado, one-shot al subir */
-            <AnimatedCircle
+        <View style={styles.ringZone}>
+          <Svg
+            width={RING_SIZE}
+            height={RING_SIZE}
+            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+            style={styles.ringSvg}
+          >
+            {/* el campo: track fino, no una barra a llenar */}
+            <Circle
               cx={RING_MID}
               cy={RING_MID}
               r={RING_R}
               fill="none"
-              stroke={accentMuted}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              animatedProps={ringProps}
+              stroke={colors.hairline}
+              strokeWidth={1}
             />
-          ) : attr.pct > 0 ? (
-            /* gesto con una señal, aún no encendido: chispa tenue del
-               astro, sin arco proporcional — un tap no es una barra. */
-            <Circle cx={RING_MID} cy={RING_MID} r={6} fill={tint(accent, '1A')} />
-          ) : null}
-        </Svg>
-        <View style={styles.ringCenter} pointerEvents="none">
-          <AttributeIcon attrKey={attr.key} color={astroColor} size={24} />
-        </View>
-        {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
-      </View>
 
-      <View style={styles.cardFooter}>
-        <Text
-          style={coachVoice ? styles.microCoach : styles.microQuiet}
-          numberOfLines={2}
-          adjustsFontSizeToFit
-        >
-          {cardLine}
-        </Text>
-      </View>
+            {complete ? (
+              <>
+                {/* anillo de luz exterior — la corona de la órbita */}
+                <Circle
+                  cx={RING_MID}
+                  cy={RING_MID}
+                  r={RING_R + 3}
+                  fill="none"
+                  stroke={tint(accent, '26')}
+                  strokeWidth={1}
+                />
+                {/* órbita cerrada, color pleno */}
+                <Circle
+                  cx={RING_MID}
+                  cy={RING_MID}
+                  r={RING_R}
+                  fill="none"
+                  stroke={accent}
+                  strokeWidth={2.5}
+                />
+                {/* corona difusa detrás del astro — halo dibujado, no blur */}
+                <Circle cx={RING_MID} cy={RING_MID} r={9} fill={tint(accent, '1A')} />
+                <Circle cx={RING_MID} cy={RING_MID} r={5.5} fill={tint(accent, '33')} />
+                {/* puntas de estrella */}
+                <Path
+                  d={ASTRO_CROSS}
+                  stroke={tint(accent, '80')}
+                  strokeWidth={1}
+                  strokeLinecap="round"
+                />
+              </>
+            ) : attr.kind === 'progress' ? (
+              /* órbita en progreso — arco atenuado, one-shot al subir */
+              <AnimatedCircle
+                cx={RING_MID}
+                cy={RING_MID}
+                r={RING_R}
+                fill="none"
+                stroke={accentMuted}
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                animatedProps={ringProps}
+              />
+            ) : attr.pct > 0 ? (
+              /* gesto con una señal, aún no encendido: chispa tenue del
+               astro, sin arco proporcional — un tap no es una barra. */
+              <Circle cx={RING_MID} cy={RING_MID} r={6} fill={tint(accent, '1A')} />
+            ) : null}
+          </Svg>
+          <View style={styles.ringCenter} pointerEvents="none">
+            <AttributeIcon attrKey={attr.key} color={astroColor} size={24} />
+          </View>
+          {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
+        </View>
+
+        <View style={styles.cardFooter}>
+          <Text
+            style={coachVoice ? styles.microCoach : styles.microQuiet}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+          >
+            {cardLine}
+          </Text>
+        </View>
+
+        {/* Expand signifier — ⌄ closed, ⌃ open. One of ≥2 signals (with the
+            press scale + the active border when selected). */}
+        <ChevronHint
+          direction={selected ? 'up' : 'down'}
+          size={typography.sizes.bodyLarge}
+          style={styles.expandChevron}
+        />
+      </Animated.View>
     </Pressable>
   )
 }
@@ -651,6 +678,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.s1,
     marginBottom: spacing.s4,
   },
+  // Group-level tap hint — sits just under the caption, close to the grid it
+  // describes. Quiet niebla, same register as the calendar's "toca un día…".
+  tapHint: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    marginTop: -spacing.s3,
+    marginBottom: spacing.s4,
+  },
   // Estado durmiente — una sola línea cálida en vez de 4 tarjetas en 0%.
   // Voz del coach (serif italic), invita sin exigir.
   dormantLine: {
@@ -679,10 +715,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.s3,
   },
-  card: {
-    // Two per row: half the width minus half the gap.
+  // The Pressable is the flex item (two per row: half the width minus half
+  // the gap); the inner Animated card carries the visual + the press squish.
+  cardHit: {
     flexBasis: '47%',
     flexGrow: 1,
+  },
+  card: {
     alignItems: 'center',
     backgroundColor: colors.bgCard,
     borderRadius: radius.card,
@@ -728,6 +767,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: spacing.s2,
+  },
+  // Expand chevron — pinned bottom-centre, quiet niebla (ChevronHint default).
+  expandChevron: {
+    position: 'absolute',
+    bottom: 4,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
   },
   particle: {
     position: 'absolute',

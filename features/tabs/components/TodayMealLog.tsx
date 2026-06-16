@@ -31,6 +31,7 @@ import { mealPhotoUrl, type Meal } from '@/features/macros/api'
 import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { SAMPLE_MEAL_PHOTOS } from '@/features/macros/sampleMealPhotos'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
+import { InteractiveGlow } from '@/components/ui/interaction'
 import { colors, typography } from '@/theme'
 
 const THUMB = 48
@@ -368,8 +369,13 @@ function AddPileCircle({ onPress, overlap }: { onPress: () => void; overlap?: bo
         pressed && styles.addPilePressed,
       ]}
     >
-      <View style={styles.addPile}>
-        <PlusIcon size={26} color={colors.magenta} />
+      <View style={styles.addPileWrap}>
+        {/* Subtle magenta halo — marks the + as THE pressable action of the
+            row (the photo pile opens the sheet; only this looks like a button). */}
+        <InteractiveGlow color={colors.magenta} style={styles.addPileGlow} />
+        <View style={styles.addPile}>
+          <PlusIcon size={26} color={colors.magenta} />
+        </View>
       </View>
     </Pressable>
   )
@@ -454,6 +460,8 @@ export function TodayMealLog({ date, onOpenMeal, onAddMeal }: Props) {
             <Text style={styles.summaryStrong}>{totalKcal.toLocaleString('es-MX')}</Text> kcal ·{' '}
             <Text style={styles.summaryStrong}>{list.length}</Text>{' '}
             {list.length === 1 ? 'comida' : 'comidas'} en tu cielo
+            {/* Chevron marks the line as tappable (opens the full list). */}
+            <Text style={styles.summaryChevron}> ›</Text>
           </Text>
         </Pressable>
       ) : null}
@@ -714,6 +722,19 @@ const styles = StyleSheet.create({
   // El disco "Agregar" — mismo tamaño/forma que un disco del pile (mismo
   // estilo de card), diferenciado como BOTÓN: fill opaco oscuro + anillo
   // magenta + un + al centro. Opaco → tapa limpio los platillos de atrás.
+  addPileWrap: {
+    width: PILE_SIZE,
+    height: PILE_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The magenta halo blooms ~7px beyond the + circle.
+  addPileGlow: {
+    top: -7,
+    left: -7,
+    right: -7,
+    bottom: -7,
+  },
   addPile: {
     width: PILE_SIZE,
     height: PILE_SIZE,
@@ -794,6 +815,10 @@ const styles = StyleSheet.create({
   summaryStrong: {
     fontFamily: typography.displaySemi,
     color: colors.bone,
+  },
+  summaryChevron: {
+    fontFamily: typography.uiMedium,
+    color: colors.niebla,
   },
   // ── Detail sheet — slides up from the bottom on a pile tap. ─────
   sheetRoot: {
