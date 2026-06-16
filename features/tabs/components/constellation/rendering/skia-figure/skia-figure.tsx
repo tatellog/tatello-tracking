@@ -108,6 +108,16 @@ export const SkiaFigure = memo(function SkiaFigure({
   })
   const litLineCount = litSeen
 
+  // Orden de encendido por ESTRELLA (stagger del "despertar"), pre-computado.
+  let litStarSeen = 0
+  const starDefs = px.map((p, i) => {
+    const isLit = litKeys.has(`star-${i}`)
+    const isNext = nextEl?.type === 'star' && nextEl.idx === i
+    const litStarIndex = isLit ? litStarSeen++ : 0
+    return { p, i, isLit, isNext, litStarIndex }
+  })
+  const litStarCount = litStarSeen
+
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
       {lineDefs.map((l) =>
@@ -126,9 +136,7 @@ export const SkiaFigure = memo(function SkiaFigure({
           />
         ) : null,
       )}
-      {px.map((p, i) => {
-        const isLit = litKeys.has(`star-${i}`)
-        const isNext = nextEl?.type === 'star' && nextEl.idx === i
+      {starDefs.map(({ p, i, isLit, isNext, litStarIndex }) => {
         if (isNext)
           return <SkiaNextStar key={`s-${i}`} p={p} sScale={sScale} t={t} reduce={reduce} />
         if (isLit)
@@ -139,6 +147,9 @@ export const SkiaFigure = memo(function SkiaFigure({
               i={i}
               recency={starRecency.get(i) ?? 0}
               depth={starDepth.get(i) ?? 0}
+              litStarIndex={litStarIndex}
+              litStarCount={litStarCount}
+              reveal={reveal}
               sScale={sScale}
               t={t}
               breathT={breathT}
@@ -156,6 +167,12 @@ export const SkiaFigure = memo(function SkiaFigure({
  * `reveal`, con stagger por orden de encendido + una chispa que viaja en la
  * punta (la "pluma"). Las apagadas quedan como guía tenue, completas. Cero
  * reconstrucción de path por frame — solo escalares en worklets (GPU). */
+// Coreografía del reveal (slice 3): primero DESPIERTAN las estrellas en la
+// fase temprana, luego se CONECTAN las líneas en la tardía. Ventanas sobre el
+// mismo timeline `reveal` 0→1, con un solapado suave para que fluya.
+const STAR_PHASE_END = 0.6 // las estrellas terminan de despertar acá
+const STAR_WAKE_WINDOW = 0.24 // cuánto tarda CADA estrella en nacer
+const LINE_PHASE_START = 0.45 // las líneas empiezan a dibujarse acá
 const LINE_WINDOW = 0.62 // ventana de trazado por línea (más ancha = más lento)
 // Pulso de energía CONTINUO que recorre cada línea encendida (sobre `t`, el
 // reloj de 8 s). Traversales por ciclo: < 1 = lento, lee como "energía
@@ -194,7 +211,11 @@ function SkiaConstellationLine({
   const dy = B.y - A.y
   const end = useDerivedValue(() => {
     if (!lit || reduce) return 1
-    const p = (reveal.value - start) / LINE_WINDOW
+    // Las líneas viven en la fase TARDÍA: remapeo el reveal a [LINE_PHASE_START,
+    // 1] → así empiezan a dibujarse recién cuando las estrellas ya despertaron.
+    const lr = (reveal.value - LINE_PHASE_START) / (1 - LINE_PHASE_START)
+    const lineReveal = lr < 0 ? 0 : lr
+    const p = (lineReveal - start) / LINE_WINDOW
     return p < 0 ? 0 : p > 1 ? 1 : p
   })
   // La chispa que DIBUJA — en el extremo del trazo mientras 0<end<1.
@@ -360,6 +381,9 @@ function SkiaLitStar({
   i,
   recency,
   depth,
+  litStarIndex,
+  litStarCount,
+  reveal,
   sScale,
   t,
   breathT,
@@ -369,6 +393,9 @@ function SkiaLitStar({
   i: number
   recency: number
   depth: number
+  litStarIndex: number
+  litStarCount: number
+  reveal: SharedValue<number>
   sScale: number
   t: SharedValue<number>
   breathT: SharedValue<number>
@@ -378,6 +405,22 @@ function SkiaLitStar({
   const phase = (i * 0.137) % 1
   const haloMult = recencyHaloMultiplier(recency)
   const breathStart = 0.85 + depth * 0.02
+
+  // DESPERTAR (slice 3): la estrella "nace" sobre el reveal en la fase TEMPRANA
+  // [0, STAR_PHASE_END], escalonada por orden de encendido — pop con overshoot
+  // (escala 0.4→1.25→1) + fade. Las líneas vienen después (ver LINE_PHASE_START).
+  const wakeStart =
+    litStarCount > 1 ? (litStarIndex / (litStarCount - 1)) * (STAR_PHASE_END - STAR_WAKE_WINDOW) : 0
+  const wake = useDerivedValue(() => {
+    if (reduce) return 1
+    const w = (reveal.value - wakeStart) / STAR_WAKE_WINDOW
+    return w < 0 ? 0 : w > 1 ? 1 : w
+  })
+  const wakeScale = useDerivedValue(() => {
+    const w = wake.value
+    const s = w < 0.7 ? 0.4 + (w / 0.7) * 0.85 : 1.25 - ((w - 0.7) / 0.3) * 0.25
+    return scaleAbout(p.x, p.y, s)
+  })
 
   // Cascade breath pulse shared by the halos — alpha first, each shell ~320 ms
   // later, radiating outward (matches lit-star.tsx).
@@ -414,8 +457,10 @@ function SkiaLitStar({
   })
   const bodyTransform = useDerivedValue(() => scaleAbout(p.x, p.y, 1 + wave.value * 0.1))
 
+  // Todo el contenido de la estrella envuelto en el "despertar": pop + fade
+  // sobre `wake`. Al completarse (reveal=1) queda en escala/opacidad plenas.
   return (
-    <>
+    <Group opacity={wake} transform={wakeScale}>
       {isHero ? <HeroGlow p={p} phase={phase} t={t} reduce={reduce} /> : null}
       {/* Glow suave (RadialGradient → se desvanece a transparente, sin el borde
           duro de los círculos planos). El flare encima añade el bloom magenta. */}
@@ -435,10 +480,7 @@ function SkiaLitStar({
       </Group>
       {/* White-hot pinpoint */}
       <Circle cx={p.x} cy={p.y} r={Math.max(0.5, p.r * 0.16)} color={WHITE_HOT} opacity={0.75} />
-      {/* El anillo PUNTEADO de "estrella de hoy" se retiró: leía como clip-art
-          (no celestial) y su borde competía con el flare. La estrella de hoy ya
-          es la más fresca (mayor halo por recency 0) + su flare la distingue. */}
-    </>
+    </Group>
   )
 }
 

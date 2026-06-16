@@ -579,6 +579,7 @@ export function LunarConstellation({
               <SkiaLitFlareLayer
                 lit={skiaLit}
                 breathT={breathT}
+                reveal={figureReveal}
                 reduce={reduceMotion}
                 opacity={emblemDim}
               />

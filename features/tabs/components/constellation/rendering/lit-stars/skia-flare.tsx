@@ -52,20 +52,32 @@ export type SkiaLit = {
 export const SkiaLitFlareLayer = memo(function SkiaLitFlareLayer({
   lit,
   breathT,
+  reveal,
   reduce,
   opacity = 1,
 }: {
   lit: SkiaLit[]
   breathT: SharedValue<number>
+  /** Reveal 0→1 — el bloom de cada estrella entra junto al "despertar" de la
+   *  figura (no antes), durante la fase temprana del reveal. */
+  reveal: SharedValue<number>
   reduce: boolean
   /** Atenúa los halos (1 = pleno). El hero lo baja mientras el emblema
    *  se revela, para que el león dorado no compita con el bloom magenta. */
   opacity?: number
 }) {
+  // El bloom acompaña el despertar de las estrellas: rampa de opacidad sobre
+  // [0.1, 0.6] del reveal (≈ fase de "despiertan estrellas"), así no aparece el
+  // halo antes que el cuerpo de la estrella.
+  const groupOpacity = useDerivedValue(() => {
+    if (reduce) return opacity
+    const r = (reveal.value - 0.1) / 0.5
+    return opacity * (r < 0 ? 0 : r > 1 ? 1 : r)
+  })
   if (lit.length === 0) return null
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-      <SkiaGroup opacity={opacity}>
+      <SkiaGroup opacity={groupOpacity}>
         {lit.map((s, i) => (
           <SkiaFlareNode
             key={`flare-${i}`}
