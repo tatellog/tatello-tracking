@@ -589,8 +589,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                     ) : null}
                   </View>
 
-                  {/* Progreso explícito — conteo, barra plana y % + el link a
-                      "Ver {signo}" con chevron (la segunda señal de tappable). */}
+                  {/* Progreso explícito — un solo dato: el conteo ✦ 10/19 (con
+                      chevron) y la barra que lo dibuja. Sin % aparte (era el
+                      mismo número dos veces). */}
                   <View style={styles.heroProgress}>
                     <View style={styles.heroTopRow}>
                       <Text style={styles.heroCount}>
@@ -606,9 +607,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                     <View style={styles.heroBarTrack}>
                       <View style={[styles.heroBarFill, { width: `${heroPct}%` }]} />
                     </View>
-                    <Text style={styles.heroPctLine}>
-                      <Text style={styles.heroPctNum}>{heroPct}%</Text> de tu figura este mes
-                    </Text>
                   </View>
                 </Animated.View>
               </Pressable>
@@ -982,16 +980,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.oro,
-  },
-  heroPctLine: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-    marginTop: 7,
-  },
-  heroPctNum: {
-    fontFamily: typography.uiBold,
-    color: colors.bone,
   },
   celebration: {
     ...StyleSheet.absoluteFillObject,
