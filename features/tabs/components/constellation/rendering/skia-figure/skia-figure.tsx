@@ -118,6 +118,19 @@ export const SkiaFigure = memo(function SkiaFigure({
   })
   const litStarCount = litStarSeen
 
+  // SLICE 4 — el brillo VIAJERO recorre la figura en orden de ENCENDIDO. La
+  // polilínea = estrellas encendidas ordenadas por recency (la más vieja
+  // primero → la más nueva), así el spark traza cómo la construiste. Centroide
+  // + radio para el bloom final.
+  const litStarPoints = starDefs
+    .filter((s) => s.isLit)
+    .map((s) => ({ x: s.p.x, y: s.p.y, rec: starRecency.get(s.i) ?? 0 }))
+    .sort((a, b) => b.rec - a.rec)
+    .map((s) => ({ x: s.x, y: s.y }))
+  const cx = px.length ? px.reduce((a, p) => a + p.x, 0) / px.length : 0
+  const cy = px.length ? px.reduce((a, p) => a + p.y, 0) / px.length : 0
+  const bloomR = px.reduce((m, p) => Math.max(m, Math.hypot(p.x - cx, p.y - cy)), 0) * 1.25 || 1
+
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
       {lineDefs.map((l) =>
@@ -158,9 +171,105 @@ export const SkiaFigure = memo(function SkiaFigure({
           )
         return <SkiaPlaceholderStar key={`s-${i}`} p={p} i={i} t={t} reduce={reduce} />
       })}
+      {/* SLICE 4 — el "desbloqueo": el brillo recorre la figura y un bloom
+          radial destella al cierre. Solo viven durante la cola del reveal. */}
+      {litStarPoints.length >= 2 ? (
+        <TravelingGlow points={litStarPoints} reveal={reveal} sScale={sScale} reduce={reduce} />
+      ) : null}
+      <FinalBloom cx={cx} cy={cy} r={bloomR} reveal={reveal} reduce={reduce} />
     </Canvas>
   )
 })
+
+/* SLICE 4 · El brillo viajero — un spark recorre la polilínea de estrellas (en
+ * orden de encendido) durante la fase final [0.78, 1] del reveal, dejando una
+ * estela corta. Lerp por longitud acumulada en un worklet (cero PathMeasure por
+ * frame). Solo visible en esa ventana → cero costo en reposo. */
+const GLOW_PHASE_START = 0.78
+
+function TravelingGlow({
+  points,
+  reveal,
+  sScale,
+  reduce,
+}: {
+  points: { x: number; y: number }[]
+  reveal: SharedValue<number>
+  sScale: number
+  reduce: boolean
+}) {
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const seg: number[] = []
+  const cum: number[] = [0]
+  let total = 0
+  for (let k = 0; k < points.length - 1; k++) {
+    const l = Math.hypot(xs[k + 1]! - xs[k]!, ys[k + 1]! - ys[k]!)
+    seg.push(l)
+    total += l
+    cum.push(total)
+  }
+  const transform = useDerivedValue(() => {
+    const u = (reveal.value - GLOW_PHASE_START) / (1 - GLOW_PHASE_START)
+    if (reduce || u <= 0 || u >= 1) return [{ translateX: -9999 }, { translateY: -9999 }]
+    const d = u * total
+    let k = 0
+    while (k < seg.length - 1 && cum[k + 1]! < d) k++
+    const f = seg[k]! > 0 ? (d - cum[k]!) / seg[k]! : 0
+    return [
+      { translateX: xs[k]! + (xs[k + 1]! - xs[k]!) * f },
+      { translateY: ys[k]! + (ys[k + 1]! - ys[k]!) * f },
+    ]
+  })
+  const opacity = useDerivedValue(() => {
+    const u = (reveal.value - GLOW_PHASE_START) / (1 - GLOW_PHASE_START)
+    if (reduce || u <= 0 || u >= 1) return 0
+    return Math.sin(u * Math.PI)
+  })
+  return (
+    <Group transform={transform} opacity={opacity}>
+      <Circle cx={0} cy={0} r={6 * sScale} color={CREAM_HOT} opacity={0.25} />
+      <Circle cx={0} cy={0} r={3 * sScale} color={CREAM_HOT} opacity={0.6} />
+      <Circle cx={0} cy={0} r={1.4 * sScale} color={WHITE_HOT} />
+    </Group>
+  )
+}
+
+/* SLICE 4 · El bloom final — un wash radial cream→magenta que DESTELLA (sube y
+ * baja) en la cola del reveal [0.85, 1], la puntuación del "desbloqueo". En
+ * reposo (reveal=1) queda en 0. */
+function FinalBloom({
+  cx,
+  cy,
+  r,
+  reveal,
+  reduce,
+}: {
+  cx: number
+  cy: number
+  r: number
+  reveal: SharedValue<number>
+  reduce: boolean
+}) {
+  const opacity = useDerivedValue(() => {
+    if (reduce) return 0
+    const u = (reveal.value - 0.85) / 0.15
+    if (u <= 0 || u >= 1) return 0
+    return Math.sin(u * Math.PI) * 0.26
+  })
+  return (
+    <Group opacity={opacity}>
+      <Circle cx={cx} cy={cy} r={r}>
+        <RadialGradient
+          c={vec(cx, cy)}
+          r={r}
+          colors={['rgba(255,246,229,0.85)', 'rgba(233,30,99,0.28)', 'rgba(233,30,99,0)']}
+          positions={[0, 0.5, 1]}
+        />
+      </Circle>
+    </Group>
+  )
+}
 
 /* Una línea de la constelación. Las ENCENDIDAS se dibujan solas: el path-trim
  * de Skia (`end` 0→1) traza el stroke desde la estrella A hacia la B sobre el
