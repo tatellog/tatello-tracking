@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
 import { useTransformProgress } from '@/features/emblem'
@@ -64,6 +65,20 @@ export function TuLeoModal({
         <Pressable style={styles.scrim} onPress={onClose}>
           {/* Inner press swallows taps so they don't close via the backdrop. */}
           <Pressable style={styles.card} onPress={() => {}}>
+            {/* Atmósfera — glow radial oro→magenta detrás del emblema, para que
+                emerja del cosmos y el card deje de ser un panel plano. */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Svg width="100%" height="100%">
+                <Defs>
+                  <RadialGradient id="emblemGlow" cx="50%" cy="32%" r="58%">
+                    <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.16} />
+                    <Stop offset="42%" stopColor={colors.magenta} stopOpacity={0.1} />
+                    <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
+                  </RadialGradient>
+                </Defs>
+                <Rect x="0" y="0" width="100%" height="100%" fill="url(#emblemGlow)" />
+              </Svg>
+            </View>
             <Pressable
               style={styles.close}
               onPress={onClose}
@@ -81,37 +96,43 @@ export function TuLeoModal({
             >
               <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
 
+              {/* El emblema REINA (el león del Tab Hoy, no el medallón viejo). */}
               <View style={styles.emblemWrap}>
                 <EmblemHalo
-                  width={200}
-                  height={200}
+                  width={216}
+                  height={216}
                   style={[styles.halo, { opacity: haloOpacity }]}
                 />
-                {/* El león del Tab Hoy (frame de revelado), no el medallón
-                    ornamentado viejo. */}
-                <Image source={lionFrame} style={styles.lion} resizeMode="contain" />
+                <Image
+                  source={lionFrame}
+                  style={styles.lion}
+                  resizeMode="contain"
+                  accessibilityLabel={`Tu ${signLabel}. ${trained} de ${total} estrellas encendidas.`}
+                />
               </View>
 
-              {/* Explicit progress — the number, big. */}
-              <Text style={styles.pct}>
-                {pct}
-                <Text style={styles.pctSign}>%</Text>
+              {/* Titular CÁLIDO: el conteo de LUCES (no el %). El % vive chico
+                  bajo la barra — el progreso se siente, no se examina. */}
+              <Text style={styles.headline}>
+                <Text style={styles.headlineNum}>{trained}</Text> de{' '}
+                <Text style={styles.headlineNum}>{total}</Text> luces encendidas
               </Text>
-              <Text style={styles.pctCaption}>de tu figura este mes</Text>
 
               <View style={styles.barTrack}>
                 <View style={[styles.barFill, { width: `${pct}%` }]} />
-                <Text style={[styles.barSpark, { left: `${pct}%` }]}>✦</Text>
+                {/* Spark clampeado para no salirse del track al 100 %. */}
+                <Text style={[styles.barSpark, { left: `${Math.min(pct, 96)}%` }]}>✦</Text>
               </View>
-              <Text style={styles.countLine}>
-                {trained} de {total} luces encendidas
-              </Text>
+              <Text style={styles.pctCaption}>{pct}% de tu figura este mes</Text>
 
               {litStars.length > 0 ? (
                 <View style={styles.section}>
                   <Text style={styles.sectionEyebrow}>Lo que ya despertó</Text>
-                  {litStars.map((s) => (
-                    <View key={s.name} style={styles.starRow}>
+                  {litStars.map((s, idx) => (
+                    <View
+                      key={s.name}
+                      style={[styles.starRow, idx > 0 ? styles.starRowDivider : null]}
+                    >
                       <Text style={styles.starDot}>✦</Text>
                       <Text style={styles.starName}>{s.name}</Text>
                       <Text style={styles.starRole} numberOfLines={1}>
@@ -185,35 +206,38 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.magenta,
   },
+  // El emblema REINA — más grande, con aire debajo (es el héroe del card).
   emblemWrap: {
-    width: 200,
-    height: 200,
+    width: 216,
+    height: 216,
     marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   halo: { position: 'absolute' },
-  // El león ocupa ~0.72 del halo (estética sello: respira dentro del aro).
-  lion: { width: 150, height: 150 },
-  pct: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.streakNum,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-    letterSpacing: -1,
-  },
-  pctSign: {
+  // El león ocupa ~0.76 del halo (estética sello: respira dentro del aro).
+  lion: { width: 164, height: 164 },
+  // Titular cálido — el conteo de luces, no el %. Números en oro.
+  headline: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.heading,
-    color: colors.niebla,
+    fontSize: typography.sizes.title,
+    color: colors.bone,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
+  headlineNum: {
+    fontFamily: typography.uiBold,
+    color: colors.oroLeche,
+    fontVariant: ['tabular-nums'],
+  },
+  // El % — subordinado, chiquito, bajo la barra (se siente, no se examina).
   pctCaption: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
-    marginTop: -spacing.xs,
-    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   // Progress bar — flat views (rail + fill + spark), like the RevealBar.
   barTrack: {
@@ -233,13 +257,7 @@ const styles = StyleSheet.create({
     textShadowColor: colors.magentaGlow,
     textShadowRadius: 6,
   },
-  countLine: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-    marginTop: spacing.sm,
-  },
-  section: { alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.sm },
+  section: { alignSelf: 'stretch', marginTop: spacing.xl },
   sectionEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -248,7 +266,17 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: spacing.xs,
   },
-  starRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  starRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.s2,
+  },
+  // Divisor hairline oro entre filas — convierte la lista en "carta astral".
+  starRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.oroHairlineSoft,
+  },
   starDot: { fontSize: typography.sizes.smallLabel, color: colors.oro },
   starName: { fontFamily: typography.uiSemi, fontSize: typography.sizes.body, color: colors.leche },
   starRole: {
