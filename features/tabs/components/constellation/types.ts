@@ -35,10 +35,6 @@ export type Props = {
    *  manifiesto prohibits. There the visual loop (first star lit +
    *  next star pulsing) carries the meaning instead of a number. */
   showCount?: boolean
-  /** El bloque es tappable (abre un detalle): dibuja un chevron sutil junto
-   *  al contador central como señal de "hay más detrás". Solo el hero de Hoy
-   *  lo pasa true; el resto (Órbita, cards, dev) queda sin chevron. */
-  tappable?: boolean
   /** Suppress the in-canvas commit burst (StarBurst) entirely. The Home
    *  passes this: its commit reward is a native Lottie firework overlay
    *  rendered above the card, so the in-SVG burst would double up. The

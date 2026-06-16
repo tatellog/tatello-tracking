@@ -524,16 +524,15 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 <Animated.View style={[styles.heroInner, heroPress.animatedStyle]}>
                   <View style={styles.constellationBox}>
                     {/* El progreso lo lleva el contador NATIVO de la
-                        constelación ("10 / 19 días", animado con el commit);
-                        `tappable` le añade el chevron sutil de "abre detalle".
-                        Ya no hay barra/conteo duplicado aquí abajo. */}
+                        constelación ("10 / 19 días", animado con el commit).
+                        Ya no hay barra/conteo duplicado aquí abajo; tocar la
+                        figura (press-scale) abre el modal Tu {signo}. */}
                     <LunarConstellation
                       trained={month.grid}
                       todayIdx={month.todayIdx}
                       target={month.daysInMonth}
                       sign={sign}
                       committed={ctx.today_workout_completed}
-                      tappable
                       suppressBurst
                       pausedSV={constellationPaused}
                     />
