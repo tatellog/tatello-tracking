@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
+import { usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
 import { CelebrateShockwave, HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
@@ -523,12 +523,17 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               >
                 <Animated.View style={[styles.heroInner, heroPress.animatedStyle]}>
                   <View style={styles.constellationBox}>
+                    {/* El progreso lo lleva el contador NATIVO de la
+                        constelación ("10 / 19 días", animado con el commit);
+                        `tappable` le añade el chevron sutil de "abre detalle".
+                        Ya no hay barra/conteo duplicado aquí abajo. */}
                     <LunarConstellation
                       trained={month.grid}
                       todayIdx={month.todayIdx}
                       target={month.daysInMonth}
                       sign={sign}
                       committed={ctx.today_workout_completed}
+                      tappable
                       suppressBurst
                       pausedSV={constellationPaused}
                     />
@@ -547,26 +552,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                         />
                       </View>
                     ) : null}
-                  </View>
-
-                  {/* Progreso explícito — un solo dato: el conteo ✦ 10/19 (con
-                      chevron) y la barra que lo dibuja. Sin % aparte (era el
-                      mismo número dos veces). */}
-                  <View style={styles.heroProgress}>
-                    <View style={styles.heroTopRow}>
-                      <Text style={styles.heroCount}>
-                        <Text style={styles.heroSpark}>✦ </Text>
-                        {trainedThisMonth}
-                        <Text style={styles.heroCountTotal}>/{figureCount}</Text>
-                      </Text>
-                      {/* El chevron pegado al conteo es la señal de tappable
-                          (junto al press-scale del bloque) — sin el link largo
-                          que se amontonaba con el número. */}
-                      <ChevronHint direction="right" size={18} color={colors.niebla} />
-                    </View>
-                    <View style={styles.heroBarTrack}>
-                      <View style={[styles.heroBarFill, { width: `${heroPct}%` }]} />
-                    </View>
                   </View>
                 </Animated.View>
               </Pressable>
@@ -888,41 +873,6 @@ const styles = StyleSheet.create({
     // forzar aspectRatio en el wrapper medía mal la altura y los elementos de
     // abajo (progreso, coach) se metían DENTRO de la figura.
     marginHorizontal: -20,
-  },
-  heroProgress: {
-    width: '100%',
-    maxWidth: 300,
-    alignSelf: 'center',
-    marginTop: 4,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 7,
-  },
-  heroCount: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
-  heroSpark: {
-    color: colors.oro,
-  },
-  heroCountTotal: {
-    color: colors.niebla,
-  },
-  heroBarTrack: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: colors.hairline,
-    overflow: 'hidden',
-  },
-  heroBarFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: colors.oro,
   },
   celebration: {
     ...StyleSheet.absoluteFillObject,

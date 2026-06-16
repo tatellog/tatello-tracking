@@ -8,6 +8,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated'
 
+import { ChevronHint } from '@/components/ui/interaction'
 import { colors, typography } from '@/theme'
 
 import { AnimatedTextInput } from '../../animation/animated-components'
@@ -27,11 +28,15 @@ export function CenterNumberOverlay({
   urgent = false,
   remaining = 0,
   target = TARGET_DAYS,
+  tappable = false,
 }: {
   displayedCount: SharedValue<number>
   numberPulse: SharedValue<number>
   plusOne: SharedValue<number>
   initialCount: number
+  /** El bloque abre un detalle al tocar → un chevron sutil tras el contador
+   *  como señal de "hay más". Decorativo: el tap lo maneja el padre. */
+  tappable?: boolean
   /** Final-stretch flag — last 3 days before completion. Switches
    *  the chip to a celebratory state (extra microcopy + warmer
    *  tone) so the user sees they're almost there. */
@@ -82,6 +87,14 @@ export function CenterNumberOverlay({
         <Text style={styles.numberDenominator}>/ {target} días</Text>
         <View style={styles.chipFrameLine} />
         <View style={styles.chipFrameDot} />
+        {tappable ? (
+          <ChevronHint
+            direction="right"
+            size={14}
+            color={colors.niebla}
+            style={styles.tapChevron}
+          />
+        ) : null}
       </Animated.View>
       {urgent && remaining > 0 ? (
         <Text style={styles.urgencyHint}>
@@ -151,6 +164,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bone,
     opacity: 0.85,
     alignSelf: 'center',
+  },
+  // Chevron sutil de "abre detalle" — mismo peso que los dots decorativos.
+  tapChevron: {
+    alignSelf: 'center',
+    marginLeft: 6,
+    opacity: 0.7,
   },
   // Urgency microcopy — appears only in the final 3 days. Tiny
   // italic warm tag below the count chip ("una más" / "faltan 2").

@@ -103,6 +103,7 @@ export function LunarConstellation({
   sign = 'acuario',
   committed = false,
   showCount = true,
+  tappable = false,
   suppressBurst = false,
   pausedSV,
   transformProgressOverride,
@@ -600,6 +601,7 @@ export function LunarConstellation({
           urgent={trainedCount >= figureCount - 3 && !figureComplete}
           remaining={Math.max(0, figureCount - trainedCount)}
           target={figureCount}
+          tappable={tappable}
         />
       ) : null}
 
