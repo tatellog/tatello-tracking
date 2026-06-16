@@ -538,31 +538,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <DayCheckIn state={dayState} onChange={handleDayChange} />
             </Animated.View>
 
-            {/* "Tu día" — la capa que ORIENTA: de un vistazo, qué registré y
-                qué espera todavía (sin culpa: lo no-registrado es una estrella
-                por encender, no una tarea fallida). Va sobre la constelación
-                para mover el foco al registro; el león queda como consecuencia
-                visible justo debajo. Tocar un ritual lleva a su sección. */}
-            <Animated.View entering={enter(160)}>
-              <TodayChecklist state={checklistState} onJump={handleChecklistJump} />
-            </Animated.View>
-
-            {/* El título serif "Tu {signo}" se retiró: el hero ya es la unidad
-                de la constelación (figura + progreso + nombre tras el tap), y
-                la crítica pidió BAJAR el protagonismo del nombre y SUBIR el del
-                progreso. Queda solo la regla — DESCRIPCIÓN del mecanismo (no
-                prescripción): referencia el marcador «Entrené» que la usuaria
-                ya toca. La constelación responde SOLO a ese marcador;
-                comida/agua/sueño alimentan el universo, no las estrellas. */}
-            <Animated.View entering={enter(220)} style={styles.constellationHeader}>
-              <Text style={styles.constellationRule}>Cada «Entrené» enciende una estrella.</Text>
-            </Animated.View>
-
-            {/* Hero compacto + tappable — el león dejó de ocupar media pantalla;
-                ahora es una consecuencia visible con progreso explícito. Tocarlo
-                abre "Tu {signo}" (modal de progreso). ≥2 señales: link «Ver mis
-                estrellas ›» (chevron) + barra/% explícitos + press-scale. */}
-            <Animated.View entering={enter(320)} style={styles.heroWrap}>
+            {/* La constelación va DIRECTO tras el toggle — nada de texto entre
+                la acción del día y su consecuencia visible (el cielo crece). El
+                título serif "Tu {signo}" y la regla flotante se retiraron: el
+                hero es la unidad (figura + progreso + nombre tras el tap), y la
+                regla del mecanismo vive en el modal. Hero compacto + tappable:
+                abre "Tu {signo}". ≥2 señales: chevron junto al conteo +
+                barra/% + press-scale. */}
+            <Animated.View entering={enter(200)} style={styles.heroWrap}>
               <Pressable
                 onPress={() => {
                   heroPress.triggerHaptic()
@@ -631,7 +614,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               </Pressable>
             </Animated.View>
 
-            <Animated.View entering={enter(420)} style={styles.coachLineWrap}>
+            <Animated.View entering={enter(300)} style={styles.coachLineWrap}>
               <CoachLine
                 align="center"
                 {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
@@ -664,12 +647,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               })()}
             </Animated.View>
 
-            {/* La tira de racha vive AQUÍ (bajo el hero), no entre el checklist
-                y la constelación: así la cadena "oriento (Tu día) → consecuencia
-                (el león)" queda junta. Es navegación al calendario, no la acción
-                del día. */}
-            <Animated.View entering={enter(440)}>
+            {/* Racha — navegación al calendario, secundaria. Bajo el hero. */}
+            <Animated.View entering={enter(360)}>
               <StreakLine streak={ctx.streak_days} onPress={() => scrollToY(monthY.current)} />
+            </Animated.View>
+
+            {/* "Tu día" — la capa que ORIENTA al registro: de un vistazo, qué
+                registré y qué espera todavía (sin culpa: lo no-registrado es una
+                estrella por encender, no una tarea fallida). Va DESPUÉS del hero
+                (primero veo mi cielo crecer; luego "¿qué más registré hoy?"),
+                así no corta la cadena toggle→constelación. Tocar un ritual lleva
+                a su registro. */}
+            <Animated.View entering={enter(420)}>
+              <TodayChecklist state={checklistState} onJump={handleChecklistJump} />
             </Animated.View>
 
             {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
@@ -944,11 +934,6 @@ const styles = StyleSheet.create({
     marginTop: -4,
     marginBottom: 4,
   },
-  constellationHeader: {
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 8,
-  },
   // Hero compacto: el bloque entero (figura + barra) centrado y acotado, ya
   // no full-bleed. El león es ahora ~240px, no ~450 — deja de dominar Hoy.
   heroWrap: {
@@ -1016,14 +1001,6 @@ const styles = StyleSheet.create({
   celebrationLottie: {
     width: '100%',
     height: '100%',
-  },
-  // La regla de la constelación — UI quieta (niebla), sobre el hero.
-  constellationRule: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    marginTop: 3,
-    textAlign: 'center',
   },
   coachLineWrap: {
     marginTop: 6,
