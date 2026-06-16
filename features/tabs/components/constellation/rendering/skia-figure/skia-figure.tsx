@@ -1,4 +1,13 @@
-import { BlurMask, Canvas, Circle, DashPathEffect, Group, Path } from '@shopify/react-native-skia'
+import {
+  BlurMask,
+  Canvas,
+  Circle,
+  DashPathEffect,
+  Group,
+  LinearGradient,
+  Path,
+  vec,
+} from '@shopify/react-native-skia'
 import { memo } from 'react'
 import { StyleSheet } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
@@ -207,30 +216,36 @@ function SkiaConstellationLine({
   })
   return (
     <>
-      {/* Glow underlay — trazo ancho y TENUE bajo la línea nítida (sin
-          BlurMask: el blur por línea se recomputaba cada frame y pesaba). El
-          stroke ancho con cap redondo + baja opacidad ya suaviza el borde y la
-          aleja del "raya CAD". */}
       {lit ? (
+        // Línea ENCENDIDA con gradiente longitudinal: cream brillante en las
+        // dos estrellas, oro tenue al medio → "dos estrellas unidas por su
+        // propia luz" (Genshin), no una raya pareja. El trim `end` la dibuja.
+        <Path path={path} style="stroke" strokeWidth={1.3 * sScale} strokeCap="round" end={end}>
+          <LinearGradient
+            start={vec(A.x, A.y)}
+            end={vec(B.x, B.y)}
+            colors={[
+              'rgba(255,246,229,0.9)',
+              'rgba(217,174,111,0.78)',
+              'rgba(217,174,111,0.34)',
+              'rgba(217,174,111,0.78)',
+              'rgba(255,246,229,0.9)',
+            ]}
+            positions={[0, 0.16, 0.5, 0.84, 1]}
+          />
+        </Path>
+      ) : (
+        // Línea APAGADA — guía muy tenue del contorno futuro (recede para que
+        // no lea como wireframe geométrico).
         <Path
           path={path}
-          color={CREAM_HOT}
+          color={CREAM}
           style="stroke"
-          strokeWidth={3.2 * sScale}
+          strokeWidth={2 * sScale}
           strokeCap="round"
-          opacity={0.14}
-          end={end}
+          opacity={0.13}
         />
-      ) : null}
-      <Path
-        path={path}
-        color={CREAM}
-        style="stroke"
-        strokeWidth={(lit ? 1.4 : 2.6) * sScale}
-        strokeCap="round"
-        opacity={lit ? 0.7 : 0.28}
-        end={end}
-      />
+      )}
       {lit ? (
         <>
           {/* Chispa que dibuja (one-shot del reveal). Glow fakeado con dos
