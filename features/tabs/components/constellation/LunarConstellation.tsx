@@ -373,57 +373,68 @@ export function LunarConstellation({
             />
           </Animated.View>
         ) : null}
-        {canvasReady && mountSvg ? (
+        {canvasReady ? (
           <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(260)}>
-            <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
-              <SvgGradients zodiac={zodiac} stars={stars} />
-              {USE_SKIA_ATMOSPHERE ? null : <DeepField drift={driftT} />}
-              {USE_SKIA_ATMOSPHERE ? null : <AmbientField t={t} drift={driftT} />}
-              {/* StarWinks (random 4-point flashes) retiradas: su destello
+            {/* El <Svg> solo aloja los overlays raros (StarBurst/crown/rings);
+                se monta SOLO cuando alguno está activo. La figura Skia + el
+                flare (abajo) viven en el MISMO Animated.View y SIEMPRE se
+                renderizan con canvasReady — NO dependen de mountSvg. */}
+            {mountSvg ? (
+              <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
+                <SvgGradients zodiac={zodiac} stars={stars} />
+                {USE_SKIA_ATMOSPHERE ? null : <DeepField drift={driftT} />}
+                {USE_SKIA_ATMOSPHERE ? null : <AmbientField t={t} drift={driftT} />}
+                {/* StarWinks (random 4-point flashes) retiradas: su destello
               blanco de 4 puntas se leía como una estrella de la figura
               suelta. El "cielo vivo" lo dan ahora el campo de puntos, el
               polvo y las shooting stars. */}
-              {/* Three shooting stars staggered in phase and crossing
+                {/* Three shooting stars staggered in phase and crossing
               the canvas at different heights — the field feels
               alive without any single streak being constant. Pure
               ambient → suppressed under reduce-motion (a static t
               would freeze a streak mid-canvas). */}
-              {USE_SKIA_ATMOSPHERE || reduceMotion ? null : (
-                <>
-                  <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
-                  <ShootingStar
-                    t={t}
-                    cycleDiv={1.6}
-                    phase={0.42}
-                    startY={H * 0.15}
-                    endY={H * 0.85}
-                  />
-                  <ShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
-                </>
-              )}
-              {USE_SKIA_ATMOSPHERE ? null : <AmbientGlow cx={cx} cy={cy} />}
-              {USE_SKIA_ATMOSPHERE ? null : (
-                <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
-              )}
-              {/* Cosmic dust — drifting motes catching ambient light.
+                {USE_SKIA_ATMOSPHERE || reduceMotion ? null : (
+                  <>
+                    <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
+                    <ShootingStar
+                      t={t}
+                      cycleDiv={1.6}
+                      phase={0.42}
+                      startY={H * 0.15}
+                      endY={H * 0.85}
+                    />
+                    <ShootingStar
+                      t={t}
+                      cycleDiv={1.6}
+                      phase={0.74}
+                      startY={H * 0.7}
+                      endY={H * 0.3}
+                    />
+                  </>
+                )}
+                {USE_SKIA_ATMOSPHERE ? null : <AmbientGlow cx={cx} cy={cy} />}
+                {USE_SKIA_ATMOSPHERE ? null : (
+                  <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
+                )}
+                {/* Cosmic dust — drifting motes catching ambient light.
               Sits between the nebula and the lion engraving so it
               feels like atmosphere passing through the foreground.
               Ambient → suppressed under reduce-motion (motes parked
               at a static t would freeze mid-rise). */}
-              {USE_SKIA_ATMOSPHERE || reduceMotion ? null : <CosmicDust t={t} />}
-              {/* La viñeta (cardVignette + cardEdgeFade) se movió a
+                {USE_SKIA_ATMOSPHERE || reduceMotion ? null : <CosmicDust t={t} />}
+                {/* La viñeta (cardVignette + cardEdgeFade) se movió a
                   SkiaAtmosphere cuando USE_SKIA_ATMOSPHERE — ahí oscurece el
                   backdrop + el emblema por composición alfa, en su z-order
                   original (después del backdrop, antes de las field stars).
                   Con el flag apagado, vuelven aquí como Rects del SVG. */}
-              {USE_SKIA_ATMOSPHERE ? null : (
-                <>
-                  <Rect x={0} y={0} width={W} height={H} fill="url(#cardVignette)" />
-                  <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
-                  <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
-                </>
-              )}
-              {/* Animated constellation — stars + connecting lines that
+                {USE_SKIA_ATMOSPHERE ? null : (
+                  <>
+                    <Rect x={0} y={0} width={W} height={H} fill="url(#cardVignette)" />
+                    <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
+                    <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+                  </>
+                )}
+                {/* Animated constellation — stars + connecting lines that
               ignite day-by-day with progress. Now scaled 0.7 about
               the asterism's own centre + shifted so the figure
               sits INSIDE the ornate ring of the leo-new-art.svg
@@ -432,92 +443,93 @@ export function LunarConstellation({
               native bbox to [28..183, 24..150]; the leading
               translate(69, 57) brings the result back centred on
               the lion's body at canvas (174, 144). */}
-              {USE_SKIA_FIGURE ? null : (
-                <G transform={signTransform} opacity={emblemDim}>
-                  {litCluster ? (
-                    <>
-                      <LitClusterAura
-                        cx={litCluster.cx}
-                        cy={litCluster.cy}
-                        r={litCluster.r}
-                        breathT={breathT}
-                      />
-                      <LitClusterMotes
-                        cx={litCluster.cx}
-                        cy={litCluster.cy}
-                        r={litCluster.r}
-                        t={t}
-                      />
-                    </>
-                  ) : null}
-                  <BaseLayer
-                    zodiac={zodiac}
-                    stars={stars}
-                    radialPulse={radialPulse}
-                    t={t}
-                    litKeys={litKeys}
-                  />
-                  <LitLines
-                    zodiac={zodiac}
-                    stars={stars}
-                    litKeys={litKeys}
-                    nextEl={nextEl}
-                    ignitingKey={ignitingKey}
-                    litPulse={litPulse}
-                    breathT={breathT}
-                    lineDepth={lineDepth}
-                    t={t}
-                  />
-                  <StarsLayer
-                    stars={stars}
-                    litKeys={litKeys}
-                    nextEl={nextEl}
-                    t={t}
-                    ignitingKey={ignitingKey}
-                    intensity={intensity}
-                    litPulse={litPulse}
-                    starRecency={starRecency}
-                    breathT={breathT}
-                    starDepth={starDepth}
-                    reduce={reduceMotion}
-                  />
-                  <IgnitingOverlay
-                    zodiac={zodiac}
-                    stars={stars}
-                    ignitingKey={ignitingKey}
-                    igniteT={igniteT}
-                  />
-                </G>
-              )}
-              {/* CenterOrb + CenterScrim removed — they were the
+                {USE_SKIA_FIGURE ? null : (
+                  <G transform={signTransform} opacity={emblemDim}>
+                    {litCluster ? (
+                      <>
+                        <LitClusterAura
+                          cx={litCluster.cx}
+                          cy={litCluster.cy}
+                          r={litCluster.r}
+                          breathT={breathT}
+                        />
+                        <LitClusterMotes
+                          cx={litCluster.cx}
+                          cy={litCluster.cy}
+                          r={litCluster.r}
+                          t={t}
+                        />
+                      </>
+                    ) : null}
+                    <BaseLayer
+                      zodiac={zodiac}
+                      stars={stars}
+                      radialPulse={radialPulse}
+                      t={t}
+                      litKeys={litKeys}
+                    />
+                    <LitLines
+                      zodiac={zodiac}
+                      stars={stars}
+                      litKeys={litKeys}
+                      nextEl={nextEl}
+                      ignitingKey={ignitingKey}
+                      litPulse={litPulse}
+                      breathT={breathT}
+                      lineDepth={lineDepth}
+                      t={t}
+                    />
+                    <StarsLayer
+                      stars={stars}
+                      litKeys={litKeys}
+                      nextEl={nextEl}
+                      t={t}
+                      ignitingKey={ignitingKey}
+                      intensity={intensity}
+                      litPulse={litPulse}
+                      starRecency={starRecency}
+                      breathT={breathT}
+                      starDepth={starDepth}
+                      reduce={reduceMotion}
+                    />
+                    <IgnitingOverlay
+                      zodiac={zodiac}
+                      stars={stars}
+                      ignitingKey={ignitingKey}
+                      igniteT={igniteT}
+                    />
+                  </G>
+                )}
+                {/* CenterOrb + CenterScrim removed — they were the
               luminous well behind the giant centre number. With
               the count now living as a small chip at the canvas
               floor (numberRow.marginTop 122), the orb was an
               orphan magenta wash competing with the asterism. */}
-              {/* The commit firework — a magenta StarBurst that blooms
+                {/* The commit firework — a magenta StarBurst that blooms
                   from the canvas centre (cx,cy) and grows outward on
                   radialPulse (Órbita, dev, refactor-test). The Home
                   suppresses it (suppressBurst) and uses a native Lottie
                   firework overlay instead — its in-SVG burst would
                   otherwise double up with the Lottie. */}
-              {suppressBurst ? null : (
-                <StarBurst cx={cx} cy={cy} pulse={radialPulse} trainedCount={trainedCount} />
-              )}
-              {/* Anticipation crown — appears in the last few elements
+                {suppressBurst ? null : (
+                  <StarBurst cx={cx} cy={cy} pulse={radialPulse} trainedCount={trainedCount} />
+                )}
+                {/* Anticipation crown — appears in the last few elements
               before the FIGURE completes, a tenue cream ring around the
               canvas centre that grows + brightens approaching the
               asterism's last star. Builds psychological tension for the
               final stretch toward "tu figura brilla entera". */}
-              {figureCount > 6 && trainedCount >= figureCount - 4 && !figureComplete ? (
-                <AnticipationCrown
-                  cx={cx}
-                  cy={cy}
-                  proximity={Math.min(1, (trainedCount - (figureCount - 5)) / 4)}
-                  breathT={breathT}
-                />
-              ) : null}
-              {figureComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
-            </Svg>
+                {figureCount > 6 && trainedCount >= figureCount - 4 && !figureComplete ? (
+                  <AnticipationCrown
+                    cx={cx}
+                    cy={cy}
+                    proximity={Math.min(1, (trainedCount - (figureCount - 5)) / 4)}
+                    breathT={breathT}
+                  />
+                ) : null}
+                {figureComplete ? <CompletionRings cx={cx} cy={cy} t={t} /> : null}
+              </Svg>
+            ) : null}
             {/* FASE 3: figura en Skia (líneas + cuerpos). Reemplaza el <G>
                 figura del SVG de arriba cuando el flag está prendido. */}
             {USE_SKIA_FIGURE && canvasPx > 0 ? (
