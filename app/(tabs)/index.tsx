@@ -28,12 +28,8 @@ import { TransformationReveal, useRevelationOrchestrator } from '@/features/reve
 import { TransformationCard, TuLeoModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
-import { useSleepLog } from '@/features/sleep/hooks'
-import { useWaterToday } from '@/features/water/hooks'
-import { useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
-import { requestQuickLog } from '@/features/tabs/pending-quicklog'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
@@ -49,8 +45,6 @@ import {
   StatSlider,
   StreakLine,
   TabHeader,
-  TodayChecklist,
-  type ChecklistTarget,
   TodayMealLog,
   TodayUniverseRewards,
   useCalendarDays,
@@ -157,22 +151,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const setRestForDate = useSetRestForDate()
   const restedToday = restQuery.data ?? false
 
-  // "Tu día" — estado de los 5 rituales registrables hoy. Reusa el MISMO
-  // caché de React Query que "Tu universo hoy" (mismas query keys), así no
-  // hay lecturas extra a Supabase.
-  const waterToday = useWaterToday(ctx.date)
-  const sleepToday = useSleepLog(ctx.date)
-  const wellbeingToday = useTodayWellbeing(ctx.date)
-  const checklistState = useMemo(
-    () => ({
-      comida: ctx.meal_count_today > 0,
-      agua: (waterToday.data ?? 0) > 0,
-      sueno: sleepToday.data?.duration_minutes != null,
-      animo: wellbeingToday.data != null,
-    }),
-    [ctx.meal_count_today, waterToday.data, sleepToday.data, wellbeingToday.data],
-  )
-
   const reducedMotion = useReducedMotion()
   const [celebrateKey, setCelebrateKey] = useState(0)
   // True for the duration of the reward animation. Pauses the constellation's
@@ -241,27 +219,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // Captured by onLayout on the month section so the streak chip can scroll
   // to its own history (the calendar) when tapped.
   const monthY = useRef(0)
-  // Section offsets for the "Tu día" checklist jumps (registro a un tap).
-  const mealsY = useRef(0)
-  const sliderY = useRef(0)
   const scrollToY = useCallback((y: number) => {
     scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true })
   }, [])
-  // "Tu día" → lleva (scroll) a la sección donde se registra ese ritual. Solo
-  // navega a secciones que YA existen en Hoy (nunca abre hojas), así el salto
-  // no puede "romperse" — a lo más, aproxima.
-  const handleChecklistJump = useCallback(
-    (target: ChecklistTarget) => {
-      track('hoy_checklist_jump', { target })
-      if (target === 'water') {
-        // El agua solo se registra en la hoja ✦ — la abrimos directo.
-        requestQuickLog()
-        return
-      }
-      scrollToY(target === 'meals' ? mealsY.current : sliderY.current)
-    },
-    [scrollToY],
-  )
   useEffect(() => {
     return subscribeUniverseDetailRequest(() => {
       scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
@@ -650,16 +610,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <StreakLine streak={ctx.streak_days} onPress={() => scrollToY(monthY.current)} />
             </Animated.View>
 
-            {/* "Tu día" — la capa que ORIENTA al registro: de un vistazo, qué
-                registré y qué espera todavía (sin culpa: lo no-registrado es una
-                estrella por encender, no una tarea fallida). Va DESPUÉS del hero
-                (primero veo mi cielo crecer; luego "¿qué más registré hoy?"),
-                así no corta la cadena toggle→constelación. Tocar un ritual lleva
-                a su registro. */}
-            <Animated.View entering={enter(420)}>
-              <TodayChecklist state={checklistState} onJump={handleChecklistJump} />
-            </Animated.View>
-
             {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
                 "Tu transformación" + "Tu universo hoy": lo que el esfuerzo
                 reveló. No mutan datos ni navegan de sorpresa. */}
@@ -687,12 +637,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 Lo que la usuaria consulta cuando ya hizo lo principal:
                 macros, comidas, y el calendario (historia/editor) al final. */}
 
-            <Animated.View
-              entering={enter(520)}
-              onLayout={(e) => {
-                sliderY.current = e.nativeEvent.layout.y
-              }}
-            >
+            <Animated.View entering={enter(520)}>
               <StatSlider
                 ctx={ctx}
                 targetSlide={slideParam ?? null}
@@ -700,12 +645,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               />
             </Animated.View>
 
-            <Animated.View
-              entering={enter(560)}
-              onLayout={(e) => {
-                mealsY.current = e.nativeEvent.layout.y
-              }}
-            >
+            <Animated.View entering={enter(560)}>
               <SectionHeader label="Comidas de hoy" />
             </Animated.View>
             <Animated.View entering={enter(600)}>

@@ -24,6 +24,8 @@ import {
 } from '@/features/tabs/pending-universe-detail'
 import { emitUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import {
+  ACTION_LABEL,
+  ATTRIBUTE_LABEL,
   calculateTodayUniverseRewards,
   detailForAttribute,
   type UniverseAttribute,
@@ -119,6 +121,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
     ? {
         proteinG: ctx.today_macros.protein_g,
         proteinTarget: ctx.targets?.protein_g ?? null,
+        caloriesToday: ctx.today_macros.calories,
         mealCount: ctx.meal_count_today,
         // useWaterToday already returns GLASSES (water_intake.glasses).
         waterGlasses: water.data ?? 0,
@@ -210,7 +213,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
               as the calendar's "toca un día…"). One quiet line teaches the
               whole grid is tappable, so the cards stay clean (no per-card
               chrome that fights the cosmos). */}
-          <Text style={styles.tapHint}>Toca un astro para ver de dónde viene.</Text>
+          <Text style={styles.tapHint}>Toca una categoría para ver cómo progresa.</Text>
           <View style={styles.gridWrap}>
             <View style={styles.grid}>
               {attributes.map((attr) => (
@@ -276,7 +279,7 @@ function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string 
         ? 'Aún sin comidas hoy'
         : `${input.mealCount} ${input.mealCount === 1 ? 'comida' : 'comidas'} hoy`
     case 'claridad':
-      return `${input.waterGlasses} de ${Math.max(1, input.waterGoalGlasses)} vasos`
+      return `${input.waterGlasses} / ${Math.max(1, input.waterGoalGlasses)} vasos`
     case 'estabilidad':
       if (input.sleepMinutes != null) {
         const h = Math.floor(input.sleepMinutes / 60)
@@ -304,6 +307,10 @@ type CardProps = {
 
 function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardProps) {
   const accent = UNIVERSE_ACCENT[attr.key]
+  // La card LIDERA con la acción (Comida/Agua/…) — concreta, sin traducir.
+  // La recompensa (Energía/…) se descubre como secundaria, "Contribuye a".
+  const action = ACTION_LABEL[attr.key]
+  const reward = ATTRIBUTE_LABEL[attr.key]
 
   // Seeded at the CURRENT pct — no mount sweep; only changes animate.
   const progress = useSharedValue(attr.pct)
@@ -380,8 +387,8 @@ function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardP
       style={styles.cardHit}
       accessibilityRole="button"
       accessibilityState={{ expanded: selected }}
-      accessibilityLabel={`${attr.label}. ${attr.microcopy}`}
-      accessibilityHint="Expande sección"
+      accessibilityLabel={`${action}, ${attr.pct} por ciento. Contribuye a ${reward}. ${source}`}
+      accessibilityHint="Expande para ver el detalle"
     >
       <Animated.View
         style={[
@@ -396,7 +403,7 @@ function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardP
           style={[styles.cardGlow, { backgroundColor: tint(accent, '1F') }, glowStyle]}
         />
 
-        <Text style={[styles.label, { color: complete ? accent : colors.bone }]}>{attr.label}</Text>
+        <Text style={[styles.label, { color: complete ? accent : colors.bone }]}>{action}</Text>
 
         <View style={styles.ringZone}>
           <Svg
@@ -470,8 +477,8 @@ function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardP
           {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
         </View>
 
-        {/* Explicit progress — the % (number, not just the ring) + the
-            concrete source, so the card answers "¿cuánto tengo y de qué?". */}
+        {/* Acción visible: el % (número, no solo el anillo) + el estado real
+            ("2 comidas", "3 / 8 vasos") — responde "¿cuánto llevo?". */}
         <View style={styles.cardFooter}>
           <Text style={[styles.pctNum, { color: complete ? accent : colors.leche }]}>
             {attr.pct}
@@ -482,13 +489,18 @@ function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardP
           </Text>
         </View>
 
-        {/* Expand signifier — ⌄ closed, ⌃ open. One of ≥2 signals (with the
-            press scale + the active border when selected). */}
-        <ChevronHint
-          direction={selected ? 'up' : 'down'}
-          size={typography.sizes.bodyLarge}
-          style={styles.expandChevron}
-        />
+        {/* Recompensa DESCUBIERTA: la acción contribuye a un atributo del
+            universo. Secundaria (no compite con la acción) y es a la vez la
+            fila de expandir — lleva el chevron (⌄ cerrado / ⌃ abierto). */}
+        <View style={styles.rewardRow}>
+          <Text style={styles.rewardPre}>Contribuye a </Text>
+          <Text style={[styles.rewardName, { color: accent }]}>{reward}</Text>
+          <ChevronHint
+            direction={selected ? 'up' : 'down'}
+            size={typography.sizes.body}
+            style={styles.rewardChevron}
+          />
+        </View>
       </Animated.View>
     </Pressable>
   )
@@ -501,8 +513,11 @@ function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardP
 // detailForAttribute (pura); esto solo la pinta.
 function AttributeDetail({ attr, input }: { attr: UniverseAttribute; input: UniverseInput }) {
   const accent = UNIVERSE_ACCENT[attr.key]
+  const action = ACTION_LABEL[attr.key]
+  const reward = ATTRIBUTE_LABEL[attr.key]
   const detail = detailForAttribute(attr.key, input)
 
+  // Detalle CLARO, sin lore: qué acción, cuánto llevo, qué recompensa genera.
   return (
     <Animated.View
       entering={FadeIn.duration(180)}
@@ -510,22 +525,26 @@ function AttributeDetail({ attr, input }: { attr: UniverseAttribute; input: Univ
     >
       <View style={styles.detailHeader}>
         <AttributeIcon attrKey={attr.key} color={accent} />
-        <Text style={[styles.detailTitle, { color: accent }]}>{attr.label}</Text>
+        <Text style={[styles.detailTitle, { color: accent }]}>{action}</Text>
         <Text style={styles.detailPct}>
           {attr.pct}
           <Text style={styles.pctSign}>%</Text>
         </Text>
       </View>
-      <Text style={styles.detailEssence}>{detail.essence}</Text>
+      {/* Impacto — la recompensa concreta que genera la acción. */}
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Impacto</Text>
+        <Text style={[styles.detailValue, { color: accent }]}>
+          +{attr.pct} {reward}
+        </Text>
+      </View>
+      {/* Cifras reales de hoy — "cuánto llevo". */}
       {detail.lines.map((line) => (
         <View key={line.label} style={styles.detailRow}>
           <Text style={styles.detailLabel}>{line.label}</Text>
           <Text style={styles.detailValue}>{line.value}</Text>
         </View>
       ))}
-      {/* La evidencia ("cómo crece") ya vive en la cara del card como
-          subtítulo persistente — aquí no se repite; el detalle aporta la
-          esencia (italic) + las cifras reales + el %. */}
     </Animated.View>
   )
 }
@@ -800,13 +819,25 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     textAlign: 'center',
   },
-  // Expand chevron — pinned bottom-centre, quiet niebla (ChevronHint default).
-  expandChevron: {
-    position: 'absolute',
-    bottom: 4,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
+  // "Contribuye a {recompensa}" — fila secundaria al pie del card; la
+  // recompensa va en su acento y arrastra el chevron de expandir.
+  rewardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.s2,
+  },
+  rewardPre: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+  },
+  rewardName: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.micro,
+  },
+  rewardChevron: {
+    marginLeft: 1,
   },
   particle: {
     position: 'absolute',
@@ -849,12 +880,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.title,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
-  },
-  detailEssence: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
   },
   detailRow: {
     flexDirection: 'row',

@@ -24,12 +24,24 @@
 
 export type UniverseAttributeKey = 'energia' | 'claridad' | 'estabilidad' | 'brillo'
 
-/** Nombre visible de cada atributo — compartido por cards, toast y detalle. */
+/** Nombre del ATRIBUTO (la recompensa) — toast + "contribuye a" + detalle. */
 export const ATTRIBUTE_LABEL: Record<UniverseAttributeKey, string> = {
   energia: 'Energía',
   claridad: 'Claridad',
   estabilidad: 'Estabilidad',
   brillo: 'Brillo',
+}
+
+/** Nombre de la ACCIÓN que alimenta cada atributo — lo que la card MUESTRA
+ *  como título. La acción es concreta (la usuaria la entiende sin aprender
+ *  vocabulario); la recompensa (ATTRIBUTE_LABEL) se descubre como secundaria.
+ *  Mapeo oficial: Comida→Energía · Agua→Claridad · Sueño→Estabilidad ·
+ *  Check-in→Brillo. */
+export const ACTION_LABEL: Record<UniverseAttributeKey, string> = {
+  energia: 'Comida',
+  claridad: 'Agua',
+  estabilidad: 'Sueño',
+  brillo: 'Check-in',
 }
 
 export type UniverseState = 'empty' | 'partial' | 'almost' | 'complete'
@@ -56,6 +68,8 @@ export type UniverseInput = {
   /** Proteína de hoy + objetivo (ctx.today_macros / ctx.targets). */
   proteinG: number
   proteinTarget: number | null
+  /** Calorías de hoy (ctx.today_macros) — el "aporte" concreto del detalle. */
+  caloriesToday: number
   /** Comidas registradas hoy — fallback cuando no hay objetivo. */
   mealCount: number
   /** Vasos tomados + meta en vasos (250 ml c/u). */
@@ -262,14 +276,17 @@ export function detailForAttribute(
       // El hecho primero ("X g hoy"), el objetivo como referencia
       // secundaria — nunca "X de Y", que enmarca déficit / countdown.
       const meals = (n: number) => (n === 1 ? '1 registrada' : `${n} registradas`)
-      const lines: UniverseDetailLine[] =
-        input.proteinTarget && input.proteinTarget > 0
-          ? [
-              { label: 'Proteína', value: `${Math.round(input.proteinG)} g hoy` },
-              { label: 'Tu objetivo', value: `${Math.round(input.proteinTarget)} g` },
-              { label: 'Comidas', value: meals(input.mealCount) },
-            ]
-          : [{ label: 'Comidas', value: meals(input.mealCount) }]
+      // Comidas primero (lo más concreto), calorías como aporte real, y la
+      // proteína con su framing manifiesto-safe: el hecho ("X g hoy") + el
+      // objetivo como referencia SEPARADA — nunca "X de Y" (déficit/countdown).
+      const lines: UniverseDetailLine[] = [{ label: 'Comidas', value: meals(input.mealCount) }]
+      if (input.caloriesToday > 0) {
+        lines.push({ label: 'Calorías', value: `${Math.round(input.caloriesToday)} kcal` })
+      }
+      if (input.proteinTarget && input.proteinTarget > 0) {
+        lines.push({ label: 'Proteína', value: `${Math.round(input.proteinG)} g hoy` })
+        lines.push({ label: 'Tu objetivo', value: `${Math.round(input.proteinTarget)} g` })
+      }
       return { essence, grows: ATTRIBUTE_GROWS.energia, lines }
     }
     case 'claridad': {

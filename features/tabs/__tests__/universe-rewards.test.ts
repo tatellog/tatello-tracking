@@ -5,6 +5,7 @@ import type { UniverseInput } from '../universe-rewards'
 const base: UniverseInput = {
   proteinG: 0,
   proteinTarget: null,
+  caloriesToday: 0,
   mealCount: 0,
   waterGlasses: 0,
   waterGoalGlasses: 8,
@@ -442,12 +443,13 @@ describe('detailForAttribute', () => {
       proteinTarget: 135,
       mealCount: 3,
     })
-    // El hecho primero ("X g hoy"), el objetivo como referencia secundaria
-    // — nunca "X de Y", que enmarca déficit / countdown.
+    // Comidas primero (acción concreta); la proteína mantiene su framing
+    // manifiesto-safe: el hecho ("X g hoy") + el objetivo SEPARADO — nunca
+    // "X de Y", que enmarca déficit / countdown.
     expect(d.lines).toEqual([
+      { label: 'Comidas', value: '3 registradas' },
       { label: 'Proteína', value: '87 g hoy' },
       { label: 'Tu objetivo', value: '135 g' },
-      { label: 'Comidas', value: '3 registradas' },
     ])
   })
 
@@ -458,7 +460,7 @@ describe('detailForAttribute', () => {
       proteinTarget: 135,
       mealCount: 1,
     })
-    expect(d.lines[2]).toEqual({ label: 'Comidas', value: '1 registrada' })
+    expect(d.lines[0]).toEqual({ label: 'Comidas', value: '1 registrada' })
   })
 
   it('energia sin objetivo: solo comidas registradas, sin "de 3"', () => {
