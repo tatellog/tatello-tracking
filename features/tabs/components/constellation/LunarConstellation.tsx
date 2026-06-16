@@ -33,6 +33,7 @@ import { IgnitingOverlay, LottieIgnitionBurst } from './rendering/ignition'
 import { LitClusterAura, LitClusterMotes } from './rendering/lit-cluster'
 import { LitLines } from './rendering/lit-lines'
 import { SkiaLitFlareLayer, StarsLayer, type SkiaLit } from './rendering/lit-stars'
+import { SkiaAtmosphere } from './rendering/skia-atmosphere/skia-atmosphere'
 import { SkiaFigure } from './rendering/skia-figure/skia-figure'
 import { AnticipationCrown, CenterNumberOverlay, CompletionRings } from './rendering/overlay'
 import { CanvasSkeleton } from './rendering/skeleton'
@@ -45,6 +46,13 @@ import type { Props, Resolved, SequenceEl } from './types'
 // → halos → flares → ignición). Con `false` la figura SVG actual se usa tal cual
 // (cero cambio). Prender solo para validar la versión Skia en Expo Go.
 const USE_SKIA_FIGURE = true
+
+// Migración de la ATMÓSFERA (campo de estrellas + nebulosa + polvo + fugaces +
+// glow + field stars) de SVG a un solo <Canvas> Skia. Con `true`, esas capas
+// salen del <Svg> → el árbol SVG queda SOLO con defs + viñeta estáticas y deja
+// de re-rasterizarse por frame (el costo #1 del hero). La viñeta (Rect estático
+// del SVG) sigue oscureciendo el backdrop Skia por composición alfa.
+const USE_SKIA_ATMOSPHERE = true
 
 // Emblema Celeste (transformación personal, sistema independiente de la
 // constelación natal). El progreso REAL viene de useTransformProgress
@@ -336,12 +344,29 @@ export function LunarConstellation({
             />
           </Animated.View>
         )}
+        {/* Atmósfera en Skia — BAJO el <Svg>. Saca las capas animadas del SVG
+            (que entonces queda estático). La viñeta estática del SVG, montada
+            encima, la oscurece por composición alfa. */}
+        {USE_SKIA_ATMOSPHERE && canvasReady && canvasPx > 0 ? (
+          <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(260)}>
+            <SkiaAtmosphere
+              t={t}
+              drift={driftT}
+              k={k}
+              ax={alphaPos.x}
+              ay={alphaPos.y}
+              fieldStars={fieldStars}
+              litKeys={litKeys}
+              reduce={reduceMotion}
+            />
+          </Animated.View>
+        ) : null}
         {canvasReady ? (
           <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(260)}>
             <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
               <SvgGradients zodiac={zodiac} stars={stars} />
-              <DeepField drift={driftT} />
-              <AmbientField t={t} drift={driftT} />
+              {USE_SKIA_ATMOSPHERE ? null : <DeepField drift={driftT} />}
+              {USE_SKIA_ATMOSPHERE ? null : <AmbientField t={t} drift={driftT} />}
               {/* StarWinks (random 4-point flashes) retiradas: su destello
               blanco de 4 puntas se leía como una estrella de la figura
               suelta. El "cielo vivo" lo dan ahora el campo de puntos, el
@@ -351,7 +376,7 @@ export function LunarConstellation({
               alive without any single streak being constant. Pure
               ambient → suppressed under reduce-motion (a static t
               would freeze a streak mid-canvas). */}
-              {reduceMotion ? null : (
+              {USE_SKIA_ATMOSPHERE || reduceMotion ? null : (
                 <>
                   <ShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
                   <ShootingStar
@@ -364,14 +389,16 @@ export function LunarConstellation({
                   <ShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
                 </>
               )}
-              <AmbientGlow cx={cx} cy={cy} />
-              <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
+              {USE_SKIA_ATMOSPHERE ? null : <AmbientGlow cx={cx} cy={cy} />}
+              {USE_SKIA_ATMOSPHERE ? null : (
+                <NebulaPatches ax={alphaPos.x} ay={alphaPos.y} drift={driftT} />
+              )}
               {/* Cosmic dust — drifting motes catching ambient light.
               Sits between the nebula and the lion engraving so it
               feels like atmosphere passing through the foreground.
               Ambient → suppressed under reduce-motion (motes parked
               at a static t would freeze mid-rise). */}
-              {reduceMotion ? null : <CosmicDust t={t} />}
+              {USE_SKIA_ATMOSPHERE || reduceMotion ? null : <CosmicDust t={t} />}
               {/* Sign art moved OUT of the <Svg> to a sibling RN Image (see the
               top of svgWrap) — on Android the in-SVG PNG re-rasterised and
               jumped left on every scroll frame. The vignette + edgeFade Rects
@@ -390,7 +417,9 @@ export function LunarConstellation({
               of the card into the page background so the art
               doesn't start/end on a hard horizontal line. */}
               <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
-              <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+              {USE_SKIA_ATMOSPHERE ? null : (
+                <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+              )}
               {/* Animated constellation — stars + connecting lines that
               ignite day-by-day with progress. Now scaled 0.7 about
               the asterism's own centre + shifted so the figure
