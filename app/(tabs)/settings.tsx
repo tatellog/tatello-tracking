@@ -22,7 +22,7 @@ import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
-import { colors, typography } from '@/theme'
+import { colors, radius, typography } from '@/theme'
 
 const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
 
@@ -1238,12 +1238,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   // ── Cuenta — sign out ──────────────────────────────────────────
+  // Ghost PILL — the shape is the signal: cards are never pill-shaped, so a
+  // pill can't be mistaken for a container. Transparent fill + hairline
+  // border reads as a low-stakes action, subordinate to the magenta voice.
   signOut: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 14,
+    marginTop: 4,
+    backgroundColor: 'transparent',
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
     paddingVertical: 15,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1265,16 +1270,20 @@ const styles = StyleSheet.create({
   // button (bordered, faint red tint) — same silhouette as Cerrar sesión so
   // it doesn't float as bare text — but in muted red so it stays subordinate
   // to the magenta voice rather than competing with it.
+  // Destructive PILL — same pill silhouette as Cerrar sesión so the two
+  // account-zone actions read as a matched pair of buttons (not cards), but
+  // in muted red so it stays subordinate to the magenta voice.
   deleteRow: {
     marginTop: 12,
     minHeight: 52,
-    borderRadius: 14,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.feedbackErrorHairline,
     backgroundColor: colors.feedbackErrorTint,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
+    paddingHorizontal: 24,
   },
   deleteLabel: {
     fontFamily: typography.uiBold,
