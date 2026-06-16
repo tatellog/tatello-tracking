@@ -46,13 +46,14 @@ export const DUST: readonly DustParticle[] = [
 // brand. The burst never changes *kind*, only texture.
 export const SPARK_HUES = [colors.magenta, colors.magentaHot, '#FF8FC0']
 
-// Ultra-far depth layer — 30 micro-stars at very low opacity that
-// drift 6× slower than the ambient field. Pure parallax cue: you
-// rarely notice them, but their slow shift behind the ambient field
-// adds real depth to the cosmos.
+// Ultra-far depth layer — micro-stars at very low opacity that drift
+// 6× slower than the ambient field. Pure parallax cue: you rarely
+// notice them, but their slow shift behind the ambient field adds real
+// depth. PERF: bajado 30 → 16 seeds — son nodos del <Svg> animado y
+// "casi no se notan", así que es el recorte de menor costo visual.
 export const DEEP_STARS: DeepStar[] = (() => {
   const out: DeepStar[] = []
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 16; i++) {
     const a = Math.sin(i * 53.3 + 7.1)
     const b = Math.sin(i * 71.9 + 2.7)
     const x = ((((a * 9301 + 49297) % 1) + 1) % 1) * W

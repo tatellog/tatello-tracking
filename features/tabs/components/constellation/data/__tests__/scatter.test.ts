@@ -36,9 +36,9 @@ describe('buildAmbientField', () => {
 
 describe('DEEP_STARS', () => {
   it('has more than half the seeds surviving the centre filter', () => {
-    // 30 seeds in the IIFE; the centre exclusion drops some.
-    expect(DEEP_STARS.length).toBeGreaterThan(15)
-    expect(DEEP_STARS.length).toBeLessThanOrEqual(30)
+    // 16 seeds in the IIFE; the centre exclusion drops some.
+    expect(DEEP_STARS.length).toBeGreaterThan(8)
+    expect(DEEP_STARS.length).toBeLessThanOrEqual(16)
   })
 
   it('every entry matches the DeepStar shape', () => {

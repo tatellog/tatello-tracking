@@ -12,7 +12,11 @@ export const TARGET_DAYS = 28
 // nebula reference where the sky is generously populated, not
 // sparse). Five buckets stagger the twinkle so the render cost
 // stays one worklet per bucket regardless of star count.
-export const AMBIENT_STAR_COUNT = 60
+// PERF: bajado 60 → 30. Cada estrella es un nodo del <Svg> que RNSVG
+// re-rasteriza en CADA frame (titilan sobre `t`); 30 mantiene un cielo
+// poblado a ~mitad del costo de repaint. El cuello de botella del hero
+// es el tamaño del árbol SVG animado, no el número de worklets.
+export const AMBIENT_STAR_COUNT = 30
 export const AMBIENT_BUCKET_COUNT = 5
 
 // Per-element ignition duration. Stars take longer (flash+settle vs.
@@ -28,12 +32,11 @@ export const AMBIENT_RX_MAX = W * 0.6
 export const AMBIENT_RX_MIN = W * 0.08
 export const AMBIENT_ASPECT = 1.45
 
-// Lowered from 13 → 8 (audit #9). Each nebula patch stacks
+// Lowered 13 → 8 (audit #9) → 5 (perf). Each nebula patch stacks
 // NEBULA_LAYERS ellipses to fake a radial gradient (avoiding the iOS
-// alpha-stop bug in <RadialGradient>); 8 keeps the falloff smooth
-// enough not to band while cutting paint cost from 4 × 13 = 52 nodes
-// to 4 × 8 = 32 nodes per nebula refresh.
-export const NEBULA_LAYERS = 8
+// alpha-stop bug in <RadialGradient>). 5 sigue sin bandear y baja el
+// paint de 4 × 8 = 32 a 4 × 5 = 20 nodos por refresh del <Svg> animado.
+export const NEBULA_LAYERS = 5
 
 export const PARTICLE_BASE = 28 // spark count varies ±~20% around this
 export const PARTICLE_REACH = 120 // baseline radial reach (px)
