@@ -102,8 +102,8 @@ function SkiaFlareNode({
   // (lower mag) → bigger flare. Tuned by eye to read at ~290 px canvas.
   // Hero un poco más chico (5) para que el halo no se derrame sobre el
   // cuerpo del emblema dorado de fondo.
-  const R = hero ? 5 : Math.max(2.4, 4.6 - mag * 0.55)
-  const m = hero ? 1 : 0.6
+  const R = hero ? 5.4 : Math.max(2.6, 4.9 - mag * 0.55)
+  const m = hero ? 1 : 0.62
   const translate = useDerivedValue(() => [{ translateX: x }, { translateY: y }])
   const breathe = useDerivedValue(() => {
     if (reduce) return [{ scale: 1 }]
@@ -111,21 +111,22 @@ function SkiaFlareNode({
     return [{ scale: 0.92 + w * 0.14 }]
   })
 
-  const hueBloomR = R * (hero ? 8.5 : 5)
+  const hueBloomR = R * (hero ? 9.5 : 6)
   const whiteBloomR = R * (hero ? 3.8 : 2.7)
 
-  // Diffraction rays — 6 spokes for hero, 4 for ambient. Alternating
-  // long/short so the cross reads as the dominant axis with finer
-  // fill spokes between.
+  // Diffraction rays — estilo Genshin: cruces de difracción LARGAS y finas que
+  // dominan, con spokes cortos de relleno entre ellas. Subidas en largo +
+  // brillo (y un pelín más finas) para que las estrellas sean el foco y las
+  // líneas lean como energía sutil entre ellas.
   const spikeCount = hero ? 6 : 4
   const rays = Array.from({ length: spikeCount }, (_, i) => {
     const ang = (i * Math.PI * 2) / spikeCount + (((i * 13) % 5) - 2) * 0.04
     const long = i % 2 === 0
     return {
       ang,
-      len: R * (long ? (hero ? 7.5 : 4.8) : hero ? 4 : 2.6),
-      th: R * 0.22,
-      op: (long ? 0.7 : 0.42) * m,
+      len: R * (long ? (hero ? 10.5 : 7) : hero ? 5.5 : 3.8),
+      th: R * 0.2,
+      op: (long ? 0.82 : 0.5) * m,
     }
   })
 
