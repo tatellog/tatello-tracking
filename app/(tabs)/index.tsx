@@ -872,8 +872,9 @@ const styles = StyleSheet.create({
     marginTop: -4,
     marginBottom: 4,
   },
-  // Hero compacto: el bloque entero (figura + barra) centrado y acotado, ya
-  // no full-bleed. El león es ahora ~240px, no ~450 — deja de dominar Hoy.
+  // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
+  // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,
+  // centrada. Sigue siendo tappable (abre el modal).
   heroWrap: {
     alignItems: 'center',
     marginTop: 2,
@@ -883,14 +884,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   constellationBox: {
-    width: 240,
+    // Sangra a los bordes de la pantalla: cuadrada y a todo lo ancho.
+    marginHorizontal: -20,
+    alignSelf: 'stretch',
     aspectRatio: 1,
-    alignSelf: 'center',
   },
   heroProgress: {
     width: '100%',
     maxWidth: 300,
-    marginTop: 10,
+    // La figura grande ya casi toca la barra; un respiro las separa.
+    marginTop: 4,
   },
   heroTopRow: {
     flexDirection: 'row',
