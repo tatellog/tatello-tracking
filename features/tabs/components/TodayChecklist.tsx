@@ -23,9 +23,9 @@ import { colors, typography } from '@/theme'
  * un ritual lleva (scroll) a donde se registra.
  */
 
-export type ChecklistTarget = 'top' | 'meals' | 'slider' | 'universe' | 'water'
+export type ChecklistTarget = 'meals' | 'slider' | 'water'
 
-type RitualKey = 'dia' | 'comida' | 'agua' | 'sueno' | 'animo'
+type RitualKey = 'comida' | 'agua' | 'sueno' | 'animo'
 
 type RitualDef = {
   key: RitualKey
@@ -38,11 +38,9 @@ type RitualDef = {
   target: ChecklistTarget
 }
 
-// El cuatro-puntas de la constelación — "Día" es la estrella raíz del cielo.
-const DIA_STAR = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
-
+// Nota: "Día" (entrené/descansé) NO es un ritual aquí — ya lo decide el toggle
+// grande de arriba y lo refleja la constelación; un chip espejo confundía.
 const RITUALS: readonly RitualDef[] = [
-  { key: 'dia', label: 'Día', path: DIA_STAR, accent: colors.magenta, target: 'top' },
   {
     key: 'comida',
     label: 'Comida',
@@ -85,7 +83,6 @@ type Props = {
  *  de interacción: el cambio de estado del glifo + el press-scale. */
 function RitualChip({ def, done, onJump }: { def: RitualDef; done: boolean; onJump: () => void }) {
   const press = usePressFeedback()
-  const isStar = def.key === 'dia'
 
   return (
     <Pressable
@@ -114,9 +111,9 @@ function RitualChip({ def, done, onJump }: { def: RitualDef; done: boolean; onJu
         <Svg width={24} height={24} viewBox="0 0 24 24">
           <Path
             d={def.path}
-            // Encendido: trazo (o relleno, la estrella) en el acento, vivo.
-            // Esperando: trazo niebla con cuerpo — una luz por encender, legible.
-            fill={done && isStar ? def.accent : 'none'}
+            // Encendido: trazo en el acento, vivo. Esperando: trazo niebla con
+            // cuerpo — una luz por encender, legible.
+            fill="none"
             stroke={done ? def.accent : colors.niebla}
             strokeWidth={done ? 1.9 : 2}
             strokeLinecap="round"

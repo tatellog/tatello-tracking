@@ -165,20 +165,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const wellbeingToday = useTodayWellbeing(ctx.date)
   const checklistState = useMemo(
     () => ({
-      dia: ctx.today_workout_completed || restedToday,
       comida: ctx.meal_count_today > 0,
       agua: (waterToday.data ?? 0) > 0,
       sueno: sleepToday.data?.duration_minutes != null,
       animo: wellbeingToday.data != null,
     }),
-    [
-      ctx.today_workout_completed,
-      ctx.meal_count_today,
-      restedToday,
-      waterToday.data,
-      sleepToday.data,
-      wellbeingToday.data,
-    ],
+    [ctx.meal_count_today, waterToday.data, sleepToday.data, wellbeingToday.data],
   )
 
   const reducedMotion = useReducedMotion()
@@ -266,17 +258,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         requestQuickLog()
         return
       }
-      if (target === 'top') {
-        scrollRef.current?.scrollTo({ y: 0, animated: true })
-        return
-      }
-      const y =
-        target === 'meals'
-          ? mealsY.current
-          : target === 'slider'
-            ? sliderY.current
-            : universeY.current
-      scrollToY(y)
+      scrollToY(target === 'meals' ? mealsY.current : sliderY.current)
     },
     [scrollToY],
   )
@@ -633,10 +615,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                         {trainedThisMonth}
                         <Text style={styles.heroCountTotal}>/{figureCount}</Text>
                       </Text>
-                      <View style={styles.heroLink}>
-                        <Text style={styles.heroLinkText}>Ver mis estrellas</Text>
-                        <ChevronHint direction="right" size={16} color={colors.bone} />
-                      </View>
+                      {/* El chevron pegado al conteo es la señal de tappable
+                          (junto al press-scale del bloque) — sin el link largo
+                          que se amontonaba con el número. */}
+                      <ChevronHint direction="right" size={18} color={colors.niebla} />
                     </View>
                     <View style={styles.heroBarTrack}>
                       <View style={[styles.heroBarFill, { width: `${heroPct}%` }]} />
@@ -990,7 +972,7 @@ const styles = StyleSheet.create({
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 4,
     marginBottom: 7,
   },
   heroCount: {
@@ -1004,17 +986,6 @@ const styles = StyleSheet.create({
   },
   heroCountTotal: {
     color: colors.niebla,
-  },
-  heroLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 1,
-  },
-  heroLinkText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    color: colors.bone,
-    letterSpacing: 0.2,
   },
   heroBarTrack: {
     height: 6,
