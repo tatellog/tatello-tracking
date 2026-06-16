@@ -154,6 +154,9 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
           onOpenDia={onOpenDia}
         />
       </View>
+      {/* The week stars carry no "tap me" chrome (their halos mean state), so
+          a quiet line makes them discoverable — same pattern as Día. */}
+      <Text style={styles.tapHint}>Toca una estrella para ver ese día.</Text>
 
       {/* En Luz — la RESPUESTA del PRD: el comportamiento más repetido de la
           semana (≥3 días). Solo se muestra si hay repetición real; si no,
@@ -349,6 +352,13 @@ const styles = StyleSheet.create({
     width: '72%',
     alignSelf: 'center',
     marginTop: 10,
+  },
+  tapHint: {
+    marginTop: 6,
+    textAlign: 'center',
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   // ── Esta semana, en números — the recap stat grid ──────────────
   recap: {

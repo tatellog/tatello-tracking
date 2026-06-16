@@ -259,7 +259,9 @@ function ProgressBody() {
           <Pressable
             onPress={() => setPhotosOpen((v) => !v)}
             accessibilityRole="button"
+            accessibilityHint="Expande sección"
             accessibilityState={{ expanded: photosOpen }}
+            style={({ pressed }) => pressed && styles.photoTogglePressed}
           >
             <SectionHeader
               label="Tu cambio visual"
@@ -597,6 +599,9 @@ const styles = StyleSheet.create({
   },
   periodSegOn: {
     backgroundColor: colors.magentaTint2,
+  },
+  photoTogglePressed: {
+    opacity: 0.6,
   },
   periodLabel: {
     fontFamily: typography.uiBold,

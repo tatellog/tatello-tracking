@@ -51,6 +51,10 @@ import { RingCard } from './RingCard'
 // (✦); registering it here too would duplicate that.
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
+// How much of the NEXT slide peeks on the right edge — a persistent "hay más"
+// affordance. Slides are this much narrower than the viewport.
+const SLIDE_PEEK = 22
+
 type Props = {
   ctx: BriefContext
   /** Slide id to auto-scroll to when set (e.g. 'sleep', 'wellbeing',
@@ -78,15 +82,14 @@ type Props = {
 export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
-  const reduceMotion = useReducedMotion()
+
+  // Slide width = viewport minus the peek, so the next slide shows on the
+  // right. This is also the snap pitch (replaces page-width paging).
+  const slideW = width > 0 ? width - SLIDE_PEEK : width
 
   // Imperative ScrollView ref for the auto-peek demo (see effect
   // below) — Animated.ScrollView exposes a real `scrollTo` via ref.
   const scrollRef = useRef<Animated.ScrollView>(null)
-
-  // True after the first auto-peek has fired so we never re-fire
-  // (rare but possible if `width` re-measures mid-session).
-  const peekedRef = useRef(false)
 
   // True once the user has paged at least once — the swipe hint then hides
   // permanently for the session (acceptance: "el primer swipe oculta el hint").
@@ -118,41 +121,17 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
     setActive(idx)
   }
   useAnimatedReaction(
-    () => (width > 0 ? Math.round(scrollX.value / width) : 0),
+    () => (slideW > 0 ? Math.round(scrollX.value / slideW) : 0),
     (idx, prev) => {
       if (prev === null || idx === prev) return
       runOnJS(livePageChange)(idx)
     },
-    [width],
+    [slideW],
   )
 
-  // AUTO-PEEK — once the carousel has measured its width, do a
-  // short scripted scrollTo(34) → scrollTo(0) over ~1 s so the user
-  // visually sees a sliver of the second slide appear and recede.
-  // The bouncing `›` hint is a continuous affordance; this one-shot
-  // peek is the unmistakable "esto se desliza" demo.
-  //
-  // Guarded so it fires exactly ONCE per mount (peekedRef) and
-  // never under reduce-motion (a scripted scrollTo + the smooth
-  // return read as "the screen is moving on its own", which the
-  // reduce-motion contract explicitly forbids).
-  useEffect(() => {
-    if (width === 0 || peekedRef.current || reduceMotion) return
-    peekedRef.current = true
-    // Delay so the page's enter animation has time to settle before
-    // we hijack the scroll position — a peek that fires mid-fade-in
-    // reads as a glitch, not as a designed nudge.
-    const peekOut = setTimeout(() => {
-      scrollRef.current?.scrollTo({ x: 34, animated: true })
-    }, 900)
-    const peekBack = setTimeout(() => {
-      scrollRef.current?.scrollTo({ x: 0, animated: true })
-    }, 1500)
-    return () => {
-      clearTimeout(peekOut)
-      clearTimeout(peekBack)
-    }
-  }, [width, reduceMotion])
+  // (The old one-shot auto-peek demo was removed: the next slide now peeks
+  // permanently on the right edge, so the "esto se desliza" cue is always
+  // there — no scripted scroll needed.)
 
   // Real cycle phase (null when the user has no active/anchored cycle).
   const cycle = useCyclePhase()
@@ -180,8 +159,8 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     onSwipeStateChange?.(false)
-    if (width === 0) return
-    const idx = Math.round(e.nativeEvent.contentOffset.x / width)
+    if (slideW === 0) return
+    const idx = Math.round(e.nativeEvent.contentOffset.x / slideW)
     if (idx !== active && idx >= 0 && idx < slides.length) setActive(idx)
   }
 
@@ -198,19 +177,16 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // is "just there" when the tab paints, the same way a hash anchor
   // works on the web.
   //
-  // Cancels the auto-peek by marking peekedRef so the demo doesn't
-  // fight the explicit deep-link.
   useEffect(() => {
-    if (!targetSlide || width === 0) return
+    if (!targetSlide || slideW === 0) return
     if (honouredTargetRef.current === targetSlide) return
     const idx = slides.findIndex((s) => s.id === targetSlide)
     if (idx < 0) return
     honouredTargetRef.current = targetSlide
-    peekedRef.current = true
-    scrollRef.current?.scrollTo({ x: idx * width, animated: false })
+    scrollRef.current?.scrollTo({ x: idx * slideW, animated: false })
     setActive(idx)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetSlide, width])
+  }, [targetSlide, slideW])
 
   return (
     <View onLayout={onLayout}>
@@ -225,22 +201,19 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
         <Animated.ScrollView
           ref={scrollRef}
           horizontal
-          // Paginado POR PLATAFORMA: en iOS el `pagingEnabled` nativo se
-          // siente snappy y directo; el combo snapToInterval +
-          // disableIntervalMomentum (sin momentum) glidea LENTO en iOS con un
-          // swipe suave → "se siente pesado". En Android sí usamos ese combo
-          // porque ahí el paging nativo deja "flotar" la página antes de
-          // asentarse. Cada plataforma con el que se siente directo.
-          {...(Platform.OS === 'ios'
-            ? { pagingEnabled: true }
-            : {
-                snapToInterval: width,
-                snapToAlignment: 'start' as const,
-                decelerationRate: 'fast' as const,
-                disableIntervalMomentum: true,
-              })}
+          // Peek carousel: each slide is `slideW` wide (viewport − peek) so the
+          // next slide shows on the right. That requires snapToInterval (NOT
+          // pagingEnabled, which forces a full-viewport snap and would hide the
+          // peek) on BOTH platforms. `decelerationRate: fast` keeps it snappy;
+          // Android adds disableIntervalMomentum so it doesn't float past.
+          snapToInterval={slideW}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          {...(Platform.OS === 'android' ? { disableIntervalMomentum: true } : {})}
           overScrollMode="never"
           showsHorizontalScrollIndicator={false}
+          // Trailing pad so the LAST slide can settle flush (no orphan peek gap).
+          contentContainerStyle={{ paddingRight: SLIDE_PEEK }}
           onScrollBeginDrag={() => onSwipeStateChange?.(true)}
           onScrollEndDrag={() => onSwipeStateChange?.(false)}
           onMomentumScrollEnd={onScrollEnd}
@@ -248,7 +221,7 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
           scrollEventThrottle={16}
         >
           {slides.map((s, i) => (
-            <Slide key={s.id} index={i} width={width} scrollX={scrollX}>
+            <Slide key={s.id} index={i} width={slideW} scrollX={scrollX}>
               {s.node}
             </Slide>
           ))}
@@ -269,7 +242,7 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
         showHint={active === 0 && !hasSwipedRef.current}
         onDotPress={(i) => {
           track('stat_slider_dot_pressed', { slide: i })
-          scrollRef.current?.scrollTo({ x: i * width, animated: true })
+          scrollRef.current?.scrollTo({ x: i * slideW, animated: true })
         }}
       />
     </View>

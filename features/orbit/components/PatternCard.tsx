@@ -1,9 +1,12 @@
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import Svg, { Circle, Rect, Text as SvgText } from 'react-native-svg'
 
 import { EmText } from '@/components/EmText'
+import { usePressFeedback } from '@/components/ui/interaction'
 import { colors, typography } from '@/theme'
+import { track } from '@/lib/analytics'
 
 import type { CycleData, PairedData, Patron, PatronCategory, WeekdayData } from '../mock'
 
@@ -198,40 +201,50 @@ function PatternGlyph({ patron }: { patron: Patron }) {
  */
 export function PatternCard({ patron }: { patron: Patron }) {
   const router = useRouter()
+  const { onPressIn, onPressOut, animatedStyle } = usePressFeedback()
+  const open = () => {
+    track('orbit_pattern_opened', { pattern_id: patron.id, category: patron.category })
+    router.push(`/orbit/pattern/${patron.id}`)
+  }
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={() => router.push(`/orbit/pattern/${patron.id}`)}
+      onPress={open}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       accessibilityRole="button"
       accessibilityLabel={patron.title}
+      accessibilityHint="Abre detalle"
     >
       {/* Skylight pane — a solid warm-dark fill (same as the week tooltip,
           which dropped its BlurView): expo-blur is a per-frame gaussian that
-          renders muddy on Android. A confident warm fill reads clean. */}
-      <View style={styles.glass}>
-        <View style={styles.tint} pointerEvents="none" />
-        <View style={styles.left}>
-          <View style={styles.glyphBox}>
-            <PatternGlyph patron={patron} />
+          renders muddy on Android. A confident warm fill reads clean. The
+          press scale lives on this Animated.View; the Pressable is the hit. */}
+      <Animated.View style={[styles.card, animatedStyle]}>
+        <View style={styles.glass}>
+          <View style={styles.tint} pointerEvents="none" />
+          <View style={styles.left}>
+            <View style={styles.glyphBox}>
+              <PatternGlyph patron={patron} />
+            </View>
+            <Text style={styles.tag}>{CATEGORY_TAG[patron.category]}</Text>
           </View>
-          <Text style={styles.tag}>{CATEGORY_TAG[patron.category]}</Text>
-        </View>
-        <View style={styles.right}>
-          <EmText
-            text={patron.title}
-            emphasis={patron.emphasis}
-            style={styles.title}
-            emStyle={styles.em}
-          />
-          <Text style={styles.detail}>{patron.detail}</Text>
-        </View>
-        {/* Navigate chevron — the spec's "this opens a screen" token. Marks
+          <View style={styles.right}>
+            <EmText
+              text={patron.title}
+              emphasis={patron.emphasis}
+              style={styles.title}
+              emStyle={styles.em}
+            />
+            <Text style={styles.detail}>{patron.detail}</Text>
+          </View>
+          {/* Navigate chevron — the spec's "this opens a screen" token. Marks
             the pattern as explorable (it pushes /orbit/pattern/:id), unlike
             the read-only stat/voice cards beside it. */}
-        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
-          ›
-        </Text>
-      </View>
+          <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+            ›
+          </Text>
+        </View>
+      </Animated.View>
     </Pressable>
   )
 }
@@ -248,15 +261,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
-  cardPressed: {
-    opacity: 0.7,
-  },
-  // Navigate chevron — niebla, vertically centered at the trailing edge.
+  // Navigate chevron — bone (not faint niebla) + larger so it's clearly
+  // visible against the card's warm fill, vertically centered at the edge.
   chevron: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.heading,
-    color: colors.niebla,
-    marginLeft: -6,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.bone,
+    marginLeft: -4,
   },
   // The frosted pane — rounds + clips the blur; holds the two columns.
   glass: {

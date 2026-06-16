@@ -1,9 +1,12 @@
 import { useRouter } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import Svg, { Rect, Text as SvgText } from 'react-native-svg'
 
 import { EmText } from '@/components/EmText'
+import { usePressFeedback } from '@/components/ui/interaction'
 import { colors, typography } from '@/theme'
+import { track } from '@/lib/analytics'
 
 import type { WeekObservation } from '../week-logic'
 
@@ -70,33 +73,45 @@ function ObsWeekGlyph({ days, color }: { days: number[]; color: string }) {
 export function ObservationCard({ obs }: { obs: WeekObservation }) {
   const router = useRouter()
   const accent = obs.state === 'win' ? colors.dimension[obs.dimension] : colors.oro
+  const { onPressIn, onPressOut, animatedStyle } = usePressFeedback()
+  const open = () => {
+    track('orbit_pattern_opened', { observation: obs.key })
+    router.push(`/orbit/observation/${obs.key}`)
+  }
   return (
     <Pressable
-      style={[styles.card, { shadowColor: accent }]}
-      onPress={() => router.push(`/orbit/observation/${obs.key}`)}
+      onPress={open}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       accessibilityRole="button"
       accessibilityLabel={obs.title}
+      accessibilityHint="Abre detalle"
     >
       {/* Skylight pane — a solid warm-dark fill, NOT a native BlurView.
-          expo-blur recomposes a full gaussian per frame on Android and
-          renders the galaxy behind as a muddy/hard box; a confident warm
-          fill reads clean on both platforms and is far cheaper. */}
-      <View style={styles.glass}>
-        <View style={styles.tint} pointerEvents="none" />
-        <View style={styles.left}>
-          <ObsWeekGlyph days={obs.days} color={accent} />
-          <Text style={styles.tag}>{obs.tag}</Text>
+          The press scale lives on this Animated.View; the Pressable is the
+          hit layer. */}
+      <Animated.View style={[styles.card, { shadowColor: accent }, animatedStyle]}>
+        <View style={styles.glass}>
+          <View style={styles.tint} pointerEvents="none" />
+          <View style={styles.left}>
+            <ObsWeekGlyph days={obs.days} color={accent} />
+            <Text style={styles.tag}>{obs.tag}</Text>
+          </View>
+          <View style={styles.right}>
+            <EmText
+              text={obs.title}
+              emphasis={obs.emphasis}
+              style={styles.title}
+              emStyle={[styles.em, { color: accent }]}
+            />
+            <Text style={styles.detail}>{obs.detail}</Text>
+          </View>
+          {/* Navigate chevron — marks the card as explorable (opens detail). */}
+          <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
+            ›
+          </Text>
         </View>
-        <View style={styles.right}>
-          <EmText
-            text={obs.title}
-            emphasis={obs.emphasis}
-            style={styles.title}
-            emStyle={[styles.em, { color: accent }]}
-          />
-          <Text style={styles.detail}>{obs.detail}</Text>
-        </View>
-      </View>
+      </Animated.View>
     </Pressable>
   )
 }
@@ -143,6 +158,13 @@ const styles = StyleSheet.create({
   right: {
     flex: 1,
     minWidth: 0,
+  },
+  // Navigate chevron — bone + sizeable so it clearly reads as "opens detail".
+  chevron: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.bone,
+    marginLeft: -4,
   },
   title: {
     fontFamily: typography.displaySemi,

@@ -96,12 +96,13 @@ function MealsBody() {
           {/* Sumar comida (search / create) + Tu estela (the food
               history) — two sections, both owned by MealComposer. */}
           <MealComposer
-            onOpenMeal={(id, photoPath) =>
+            onOpenMeal={(id, photoPath) => {
+              track('food_card_opened', { meal_id: id })
               router.push({
                 pathname: '/scan-meal',
                 params: { editId: id, ...(photoPath ? { photoPath } : {}) },
               })
-            }
+            }}
           />
 
           {/* Esta semana — resumen de actividad (comidas · días · proteína/día),

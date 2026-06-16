@@ -15,6 +15,8 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
+import { usePressFeedback } from '@/components/ui/interaction'
+import { track } from '@/lib/analytics'
 import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
@@ -84,6 +86,38 @@ function KeyboardIcon({ color, size = 20 }: { color: string; size?: number }) {
         strokeLinecap="round"
       />
     </Svg>
+  )
+}
+
+/* A "Con foto" / "Con texto" register tile — the headline way to log a meal.
+ * Scale + haptic from the interaction system; the chrome lives on the inner
+ * Animated.View (the Pressable carries only the flex sizing). */
+function ScanButton({
+  label,
+  icon,
+  onPress,
+  accessibilityLabel,
+}: {
+  label: string
+  icon: React.ReactNode
+  onPress: () => void
+  accessibilityLabel: string
+}) {
+  const { onPressIn, onPressOut, animatedStyle } = usePressFeedback()
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={styles.methodHit}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Animated.View style={[styles.method, styles.methodTile, animatedStyle]}>
+        <View style={styles.methodIcon}>{icon}</View>
+        <Text style={styles.methodLabel}>{label}</Text>
+      </Animated.View>
+    </Pressable>
   )
 }
 
@@ -337,6 +371,7 @@ export function MealComposer({ onOpenMeal }: Props) {
   }
 
   const handleScanPhoto = () => {
+    track('quick_add_pressed', { method: 'photo' })
     showActionSheet(
       {
         title: 'Registrar comida con foto',
@@ -352,6 +387,7 @@ export function MealComposer({ onOpenMeal }: Props) {
 
   // Con texto: scan-meal in describe mode — type what you ate, AI parses it.
   const handleScanText = () => {
+    track('quick_add_pressed', { method: 'text' })
     router.push({ pathname: '/scan-meal', params: { describe: '1' } })
   }
 
@@ -433,28 +469,18 @@ export function MealComposer({ onOpenMeal }: Props) {
       {/* AI quick-log — foto + texto entry points (hand off to scan-meal),
           sitting above the search so they're the headline way to register. */}
       <View style={styles.methods}>
-        <Pressable
+        <ScanButton
+          label="Con foto"
+          icon={<CameraIcon color={colors.magenta} size={20} />}
           onPress={handleScanPhoto}
-          style={[styles.method, styles.methodTile]}
-          accessibilityRole="button"
           accessibilityLabel="Registrar una comida con foto"
-        >
-          <View style={styles.methodIcon}>
-            <CameraIcon color={colors.magenta} size={20} />
-          </View>
-          <Text style={styles.methodLabel}>Con foto</Text>
-        </Pressable>
-        <Pressable
+        />
+        <ScanButton
+          label="Con texto"
+          icon={<KeyboardIcon color={colors.magenta} />}
           onPress={handleScanText}
-          style={[styles.method, styles.methodTile]}
-          accessibilityRole="button"
           accessibilityLabel="Registrar una comida escribiéndola"
-        >
-          <View style={styles.methodIcon}>
-            <KeyboardIcon color={colors.magenta} />
-          </View>
-          <Text style={styles.methodLabel}>Con texto</Text>
-        </Pressable>
+        />
       </View>
 
       <TextInput
@@ -648,8 +674,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 12,
   },
-  method: {
+  methodHit: {
     flex: 1,
+  },
+  method: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
