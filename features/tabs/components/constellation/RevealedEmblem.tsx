@@ -198,7 +198,10 @@ const FRAMES_PISCIS = [
   require('@/assets/zodiac-art/piscis-reveal/f10.png'),
 ]
 
-const FRAMES_BY_SIGN: Record<ZodiacSign, readonly number[]> = {
+// Exportado: el modal "Tu {signo}" reusa el MISMO frame del animal (como
+// <Image> plano, no Skia → sin chocar TextureViews con el del hero) para que
+// el emblema del modal sea EL MISMO que el del Tab Hoy.
+export const FRAMES_BY_SIGN: Record<ZodiacSign, readonly number[]> = {
   aries: FRAMES_ARIES,
   tauro: FRAMES_TAURO,
   geminis: FRAMES_GEMINIS,
@@ -248,7 +251,7 @@ const GLYPH_OPACITY = 0.42
 const BLOOM_START = 32
 const BLOOM_MAX_OPACITY = 0.6
 
-function frameIndexFor(progress: number): number {
+export function frameIndexFor(progress: number): number {
   const p = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0))
   return Math.max(0, Math.min(FRAME_COUNT - 1, Math.round((p / 100) * (FRAME_COUNT - 1))))
 }

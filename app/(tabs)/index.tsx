@@ -692,6 +692,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         <TuLeoModal
           visible={tuLeoOpen}
           onClose={() => setTuLeoOpen(false)}
+          sign={sign}
           signLabel={signLabel}
           trained={trainedThisMonth}
           total={figureCount}

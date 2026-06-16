@@ -1,9 +1,14 @@
 import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
-import LeoEmblemArt from '@/assets/zodiac-art/leo-emblem.svg'
+import { useTransformProgress } from '@/features/emblem'
+import {
+  FRAMES_BY_SIGN,
+  frameIndexFor,
+} from '@/features/tabs/components/constellation/RevealedEmblem'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, radius, spacing, typography } from '@/theme'
 
 export type LeoStar = { name: string; role: string }
@@ -11,7 +16,9 @@ export type LeoStar = { name: string; role: string }
 type TuLeoModalProps = {
   visible: boolean
   onClose: () => void
-  /** "Leo" — the sign label. */
+  /** Clave del signo — para el emblema correcto (el MISMO león del Tab Hoy). */
+  sign: ZodiacSign
+  /** "Leo" — la etiqueta del signo. */
   signLabel: string
   /** Figure stars lit THIS MONTH (via «Entrené») + the figure total. */
   trained: number
@@ -33,6 +40,7 @@ type TuLeoModalProps = {
 export function TuLeoModal({
   visible,
   onClose,
+  sign,
   signLabel,
   trained,
   total,
@@ -42,6 +50,11 @@ export function TuLeoModal({
   const pct = total > 0 ? Math.round((trained / total) * 100) : 0
   // Halo brightens with progress — light grows as the figure fills.
   const haloOpacity = 0.3 + (pct / 100) * 0.6
+  // EL MISMO león del Tab Hoy (el frame del % de revelado vigente), como
+  // <Image> plano — no Skia, así no choca TextureViews con el del hero detrás.
+  const { progress: emblemProgress } = useTransformProgress()
+  const frames = FRAMES_BY_SIGN[sign]
+  const lionFrame = frames[frameIndexFor(emblemProgress)] ?? frames[frames.length - 1]
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -70,11 +83,13 @@ export function TuLeoModal({
 
               <View style={styles.emblemWrap}>
                 <EmblemHalo
-                  width={196}
-                  height={196}
+                  width={200}
+                  height={200}
                   style={[styles.halo, { opacity: haloOpacity }]}
                 />
-                <LeoEmblemArt width={128} height={128} />
+                {/* El león del Tab Hoy (frame de revelado), no el medallón
+                    ornamentado viejo. */}
+                <Image source={lionFrame} style={styles.lion} resizeMode="contain" />
               </View>
 
               {/* Explicit progress — the number, big. */}
@@ -171,14 +186,16 @@ const styles = StyleSheet.create({
     color: colors.magenta,
   },
   emblemWrap: {
-    width: 196,
-    height: 196,
+    width: 200,
+    height: 200,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },
   halo: { position: 'absolute' },
+  // El león ocupa ~0.72 del halo (estética sello: respira dentro del aro).
+  lion: { width: 150, height: 150 },
   pct: {
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.streakNum,
