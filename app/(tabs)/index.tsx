@@ -25,7 +25,12 @@ import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
-import { TransformationCard, TuLeoModal, useTransformProgress } from '@/features/emblem'
+import {
+  LionFramePreloader,
+  TransformationCard,
+  TuLeoModal,
+  useTransformProgress,
+} from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -689,6 +694,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         ) : null}
         {/* "Tu {signo}" — el modal de progreso de la constelación, abierto desde
             el hero. Lenguaje de Revelaciones (blur + emblema correcto de Hoy). */}
+        {/* Calienta el caché de RN Image del león para que el modal no se
+            tarde en su primera apertura (el hero lo pinta en Skia, otro caché). */}
+        <LionFramePreloader sign={sign} />
         <TuLeoModal
           visible={tuLeoOpen}
           onClose={() => setTuLeoOpen(false)}

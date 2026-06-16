@@ -1,7 +1,14 @@
 import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
+import { useEffect } from 'react'
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated'
+import Svg, { Circle, Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
 import { useTransformProgress } from '@/features/emblem'
@@ -12,7 +19,23 @@ import {
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, radius, spacing, typography } from '@/theme'
 
+import { MilestoneStar } from './MilestoneStar'
+
 export type LeoStar = { name: string; role: string }
+
+// Polvo de estrellas quieto del fondo del modal — posiciones fijas (no
+// random, para que no parpadee entre renders) en el tercio superior, lejos
+// del emblema. Distintos radios/brillos para dar profundidad sin competir.
+const STAR_DUST = [
+  { x: 14, y: 12, r: 1.1, o: 0.5 },
+  { x: 82, y: 9, r: 0.9, o: 0.42 },
+  { x: 68, y: 19, r: 1.4, o: 0.6 },
+  { x: 28, y: 24, r: 0.8, o: 0.34 },
+  { x: 90, y: 28, r: 1.1, o: 0.46 },
+  { x: 8, y: 33, r: 1.2, o: 0.4 },
+  { x: 50, y: 7, r: 0.7, o: 0.3 },
+  { x: 40, y: 16, r: 0.9, o: 0.38 },
+] as const
 
 type TuLeoModalProps = {
   visible: boolean
@@ -28,6 +51,27 @@ type TuLeoModalProps = {
   litStars: LeoStar[]
   /** The next star to light (named, anticipation — not a countdown). */
   nextStar: LeoStar | null
+}
+
+/**
+ * Calienta el caché de RN Image con el frame del león ANTES de abrir el modal.
+ * El hero pinta el león en Skia (otro caché), así que sin esto la primera
+ * apertura del modal decodifica el PNG en frío y se nota el retraso. Render
+ * persistente y oculto en Hoy: decodifica una vez y queda caliente.
+ */
+export function LionFramePreloader({ sign }: { sign: ZodiacSign }) {
+  const { progress } = useTransformProgress()
+  const frames = FRAMES_BY_SIGN[sign]
+  const frame = frames[frameIndexFor(progress)] ?? frames[frames.length - 1]
+  return (
+    <Image
+      source={frame}
+      style={styles.preloader}
+      fadeDuration={0}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    />
+  )
 }
 
 /**
@@ -57,116 +101,197 @@ export function TuLeoModal({
   const frames = FRAMES_BY_SIGN[sign]
   const lionFrame = frames[frameIndexFor(emblemProgress)] ?? frames[frames.length - 1]
 
+  // La lista se capa a las 3 MÁS RECIENTES (más recientes arriba: "lo que
+  // acabo de despertar") + un pie tenue con el resto. Altura fija sin importar
+  // si vas en 6 o en 19 luces — la usuaria vino a sentir el avance, no a
+  // auditar el catálogo entero.
+  const RECENT_LIMIT = 3
+  const recentStars = litStars.slice(-RECENT_LIMIT).reverse()
+  const olderCount = litStars.length - recentStars.length
+
+  // Entrada con CRAFT: el card no aparece de golpe — emerge del cosmos con un
+  // resorte suave (sube + escala + funde). Hace que se sienta "revelado", no
+  // un diálogo del sistema. Reduce-motion lo deja en su sitio al instante.
+  const reduce = useReducedMotion()
+  const enter = useSharedValue(0)
+  useEffect(() => {
+    // Solo al ABRIR: reseteo a 0 y disparo el resorte. Al cerrar dejo el valor
+    // quieto y la salida la funde el animationType="fade" del Modal (sin snap).
+    if (!visible) return
+    enter.value = 0
+    enter.value = reduce ? 1 : withSpring(1, { damping: 19, stiffness: 190, mass: 0.7 })
+  }, [visible, reduce, enter])
+  const cardAnim = useAnimatedStyle(() => ({
+    // La opacidad funde más rápido que asienta el resorte (sin parpadeo por
+    // el overshoot del spring).
+    opacity: Math.min(1, enter.value * 1.5),
+    transform: [{ translateY: (1 - enter.value) * 18 }, { scale: 0.94 + enter.value * 0.06 }],
+  }))
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.root}>
         {/* Blurred, dimmed Hoy behind — same language as the revelations. */}
         <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
         <Pressable style={styles.scrim} onPress={onClose}>
-          {/* Inner press swallows taps so they don't close via the backdrop. */}
-          <Pressable style={styles.card} onPress={() => {}}>
-            {/* Atmósfera — glow radial oro→magenta detrás del emblema, para que
-                emerja del cosmos y el card deje de ser un panel plano. */}
-            <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              <Svg width="100%" height="100%">
-                <Defs>
-                  <RadialGradient id="emblemGlow" cx="50%" cy="32%" r="58%">
-                    <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.16} />
-                    <Stop offset="42%" stopColor={colors.magenta} stopOpacity={0.1} />
-                    <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
-                  </RadialGradient>
-                </Defs>
-                <Rect x="0" y="0" width="100%" height="100%" fill="url(#emblemGlow)" />
-              </Svg>
-            </View>
-            <Pressable
-              style={styles.close}
-              onPress={onClose}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Cerrar"
-            >
-              <Feather name="x" size={20} color={colors.niebla} />
-            </Pressable>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scroll}
-              bounces={false}
-            >
-              <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
-
-              {/* El emblema REINA (el león del Tab Hoy, no el medallón viejo). */}
-              <View style={styles.emblemWrap}>
-                <EmblemHalo
-                  width={216}
-                  height={216}
-                  style={[styles.halo, { opacity: haloOpacity }]}
-                />
-                <Image
-                  source={lionFrame}
-                  style={styles.lion}
-                  resizeMode="contain"
-                  accessibilityLabel={`Tu ${signLabel}. ${trained} de ${total} estrellas encendidas.`}
-                />
-              </View>
-
-              {/* Titular CÁLIDO: el conteo de LUCES (no el %). El % vive chico
-                  bajo la barra — el progreso se siente, no se examina. */}
-              <Text style={styles.headline}>
-                <Text style={styles.headlineNum}>{trained}</Text> de{' '}
-                <Text style={styles.headlineNum}>{total}</Text> luces encendidas
-              </Text>
-
-              <View style={styles.barTrack}>
-                <View style={[styles.barFill, { width: `${pct}%` }]} />
-                {/* Spark clampeado para no salirse del track al 100 %. */}
-                <Text style={[styles.barSpark, { left: `${Math.min(pct, 96)}%` }]}>✦</Text>
-              </View>
-              <Text style={styles.pctCaption}>{pct}% de tu figura este mes</Text>
-
-              {litStars.length > 0 ? (
-                <View style={styles.section}>
-                  <Text style={styles.sectionEyebrow}>Lo que ya despertó</Text>
-                  {litStars.map((s, idx) => (
-                    <View
-                      key={s.name}
-                      style={[styles.starRow, idx > 0 ? styles.starRowDivider : null]}
-                    >
-                      <Text style={styles.starDot}>✦</Text>
-                      <Text style={styles.starName}>{s.name}</Text>
-                      <Text style={styles.starRole} numberOfLines={1}>
-                        {s.role}
-                      </Text>
-                    </View>
+          {/* Wrapper animado: lleva el tamaño + la elevación (sombra fuera del
+              overflow:hidden del card) y la entrada con resorte. */}
+          <Animated.View style={[styles.cardWrap, cardAnim]}>
+            {/* Inner press swallows taps so they don't close via the backdrop. */}
+            <Pressable style={styles.card} onPress={() => {}}>
+              {/* Atmósfera — el card deja de ser un panel plano: glow radial
+                oro→magenta detrás del emblema + polvo de estrellas arriba +
+                viñeta inferior que hunde el card en el cosmos. */}
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <Svg width="100%" height="100%">
+                  <Defs>
+                    <RadialGradient id="emblemGlow" cx="50%" cy="30%" r="62%">
+                      <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.26} />
+                      <Stop offset="38%" stopColor={colors.magenta} stopOpacity={0.15} />
+                      <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
+                    </RadialGradient>
+                    <LinearGradient id="emblemVignette" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%" stopColor={colors.bg} stopOpacity={0} />
+                      <Stop offset="68%" stopColor={colors.bg} stopOpacity={0} />
+                      <Stop offset="100%" stopColor={colors.bg} stopOpacity={0.55} />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect x="0" y="0" width="100%" height="100%" fill="url(#emblemGlow)" />
+                  {/* Polvo de estrellas — quietas, distintos brillos (no compite
+                    con el emblema, solo da profundidad). */}
+                  {STAR_DUST.map((s, i) => (
+                    <Circle
+                      key={i}
+                      cx={`${s.x}%`}
+                      cy={`${s.y}%`}
+                      r={s.r}
+                      fill={colors.leche}
+                      opacity={s.o}
+                    />
                   ))}
-                </View>
-              ) : null}
+                  <Rect x="0" y="0" width="100%" height="100%" fill="url(#emblemVignette)" />
+                </Svg>
+              </View>
+              <Pressable
+                style={styles.close}
+                onPress={onClose}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+              >
+                <Feather name="x" size={20} color={colors.niebla} />
+              </Pressable>
 
-              {/* Anticipación, no countdown. Tres estados:
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scroll}
+                bounces={false}
+              >
+                <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
+
+                {/* El emblema REINA (el león del Tab Hoy, no el medallón viejo). */}
+                <View style={styles.emblemWrap}>
+                  <EmblemHalo
+                    width={152}
+                    height={152}
+                    style={[styles.halo, { opacity: haloOpacity }]}
+                  />
+                  <Image
+                    source={lionFrame}
+                    style={styles.lion}
+                    resizeMode="contain"
+                    accessibilityLabel={`Tu ${signLabel}. ${trained} de ${total} estrellas encendidas.`}
+                  />
+                </View>
+
+                {/* Titular CÁLIDO: el conteo de LUCES (no el %). El % vive chico
+                  bajo la barra — el progreso se siente, no se examina. */}
+                <Text style={styles.headline}>
+                  <Text style={styles.headlineNum}>{trained}</Text> de{' '}
+                  <Text style={styles.headlineNum}>{total}</Text> luces encendidas
+                </Text>
+
+                {/* La barra ES la lectura del %: sin caption numérico aparte (el
+                  headline ya cuenta las luces). Se siente, no se examina. */}
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pct}%` }]} />
+                  {/* Spark clampeado para no salirse del track al 100 %. */}
+                  <Text style={[styles.barSpark, { left: `${Math.min(pct, 96)}%` }]}>✦</Text>
+                </View>
+
+                {recentStars.length > 0 ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionEyebrow}>Lo que ya despertó</Text>
+                    {recentStars.map((s, idx) => (
+                      <View
+                        key={s.name}
+                        style={[styles.starRow, idx > 0 ? styles.starRowDivider : null]}
+                      >
+                        <Text style={styles.starDot}>✦</Text>
+                        <Text style={styles.starName}>{s.name}</Text>
+                        <Text style={styles.starRole} numberOfLines={1}>
+                          {s.role}
+                        </Text>
+                      </View>
+                    ))}
+                    {olderCount > 0 ? (
+                      <Text style={styles.olderLine}>
+                        y {olderCount} {olderCount === 1 ? 'más encendida' : 'más encendidas'}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Anticipación, no countdown. Tres estados:
                   · queda una estrella con nombre → la nombramos (lo más rico)
                   · ya no quedan nombres pero la figura sigue → "se sigue tejiendo"
                     (las líneas que conectan no llevan nombre)
                   · figura completa → la luz extra de cada «Entrené». */}
-              {nextStar ? (
-                <Text style={styles.comingLine}>
-                  La que sigue: <Text style={styles.comingEm}>{nextStar.name}</Text> —{' '}
-                  {nextStar.role}.
-                </Text>
-              ) : trained < total ? (
-                <Text style={styles.comingLine}>
-                  Tu figura se sigue <Text style={styles.comingEm}>tejiendo</Text>.
-                </Text>
-              ) : (
-                <Text style={styles.comingLine}>
-                  Tu figura está <Text style={styles.comingEm}>completa</Text>. Cada «Entrené» suma
-                  luz extra.
-                </Text>
-              )}
+                {nextStar ? (
+                  /* "La que sigue" como un panel con su astro a la derecha — la
+                   anticipación se ve como un hito a punto de encenderse, no
+                   como una línea más de texto. */
+                  <View style={styles.comingPanel}>
+                    <View style={styles.comingTextCol}>
+                      <Text style={styles.comingEyebrow}>La que sigue</Text>
+                      <Text style={styles.comingName}>{nextStar.name}</Text>
+                      <Text style={styles.comingRole}>{nextStar.role}</Text>
+                    </View>
+                    <MilestoneStar size={66} />
+                  </View>
+                ) : trained < total ? (
+                  <Text style={styles.comingLine}>
+                    Tu figura se sigue <Text style={styles.comingEm}>tejiendo</Text>.
+                  </Text>
+                ) : (
+                  <Text style={styles.comingLine}>
+                    Tu figura está <Text style={styles.comingEm}>completa</Text>. Cada «Entrené»
+                    suma luz extra.
+                  </Text>
+                )}
 
-              <Text style={styles.rule}>Cada «Entrené» enciende una estrella de tu figura.</Text>
-            </ScrollView>
-          </Pressable>
+                {/* Cómo se lee — distingue las dos capas que la usuaria veía
+                  mezcladas: las estrellas (este mes) y el león (el largo
+                  plazo). Resuelve "¿y qué hay del emblema?". */}
+                <View style={styles.legend}>
+                  <View style={styles.legendRow}>
+                    <Text style={styles.legendMark}>✦</Text>
+                    <Text style={styles.legendText}>
+                      Cada «Entrené» enciende una <Text style={styles.legendKey}>estrella</Text> de
+                      tu figura este mes.
+                    </Text>
+                  </View>
+                  <View style={styles.legendRow}>
+                    <Text style={styles.legendMark}>☉</Text>
+                    <Text style={styles.legendText}>
+                      Tu <Text style={styles.legendKey}>león</Text> se revela despacio, con todo lo
+                      que sostienes a lo largo del tiempo.
+                    </Text>
+                  </View>
+                </View>
+              </ScrollView>
+            </Pressable>
+          </Animated.View>
         </Pressable>
       </View>
     </Modal>
@@ -183,9 +308,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
   },
-  card: {
+  // Wrapper: tamaño + elevación. La sombra vive AQUÍ (no en el card) porque el
+  // card tiene overflow:hidden y recortaría su propia sombra. Una caída warm
+  // honda lo despega del cosmos difuminado del fondo.
+  cardWrap: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: '100%',
+    borderRadius: radius.card,
+    shadowColor: '#000',
+    shadowOpacity: 0.55,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 24,
+  },
+  card: {
+    width: '100%',
     maxHeight: '100%',
     backgroundColor: colors.bgCard2,
     borderRadius: radius.card,
@@ -194,12 +332,26 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scroll: {
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
-  close: { position: 'absolute', top: spacing.md, right: spacing.md, zIndex: 2 },
+  // Botón cerrar — disco translúcido para una zona de toque clara sin gritar.
+  close: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(244, 236, 222, 0.06)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairlineSoft,
+  },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.micro,
@@ -208,16 +360,16 @@ const styles = StyleSheet.create({
   },
   // El emblema REINA — más grande, con aire debajo (es el héroe del card).
   emblemWrap: {
-    width: 216,
-    height: 216,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    width: 152,
+    height: 152,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   halo: { position: 'absolute' },
   // El león ocupa ~0.76 del halo (estética sello: respira dentro del aro).
-  lion: { width: 164, height: 164 },
+  lion: { width: 116, height: 116 },
   // Titular cálido — el conteo de luces, no el %. Números en oro.
   headline: {
     fontFamily: typography.uiMedium,
@@ -231,13 +383,15 @@ const styles = StyleSheet.create({
     color: colors.oroLeche,
     fontVariant: ['tabular-nums'],
   },
-  // El % — subordinado, chiquito, bajo la barra (se siente, no se examina).
-  pctCaption: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
+  // Pie de la lista capada — "y N más encendidas", callado (no es una fila
+  // más, es un resumen del resto). Alineado con los nombres (sangría del ✦).
+  olderLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
     color: colors.niebla,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.s2,
+    marginLeft: spacing.lg,
   },
   // Progress bar — flat views (rail + fill + spark), like the RevealBar.
   barTrack: {
@@ -257,7 +411,7 @@ const styles = StyleSheet.create({
     textShadowColor: colors.magentaGlow,
     textShadowRadius: 6,
   },
-  section: { alignSelf: 'stretch', marginTop: spacing.xl },
+  section: { alignSelf: 'stretch', marginTop: spacing.md },
   sectionEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -270,7 +424,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.s2,
+    paddingVertical: spacing.s1 + 1,
   },
   // Divisor hairline oro entre filas — convierte la lista en "carta astral".
   starRowDivider: {
@@ -295,12 +449,65 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   comingEm: { fontFamily: typography.uiBold, color: colors.magenta },
-  rule: {
+  // Panel "La que sigue" — texto a la izquierda, astro a la derecha (eco del
+  // hito del screenshot). Fondo tenue + hairline oro para que destaque sin gritar.
+  comingPanel: {
+    alignSelf: 'stretch',
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.sm,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.bgCard,
+  },
+  comingTextCol: { flex: 1, gap: 2 },
+  comingEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: typography.letterSpacing.uppercaseTight,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  comingName: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.oroLeche,
+  },
+  comingRole: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.body,
     color: colors.bone,
-    textAlign: 'center',
-    marginTop: spacing.xl,
   },
+  // "Cómo se lee" — bloque que separa estrella (mes) de león (largo plazo).
+  legend: {
+    alignSelf: 'stretch',
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.oroHairlineSoft,
+    gap: spacing.sm,
+  },
+  legendRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  legendMark: {
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+    lineHeight: typography.sizes.body * typography.lineHeight.body,
+  },
+  legendText: {
+    flex: 1,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: typography.sizes.body * typography.lineHeight.body,
+    color: colors.bone,
+  },
+  legendKey: { fontFamily: typography.uiSemi, fontStyle: 'normal', color: colors.oroLeche },
+  // Preloader invisible — 1×1, fuera de layout, solo para calentar el caché.
+  preloader: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 })
