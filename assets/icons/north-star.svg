@@ -1,34 +1,41 @@
 <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <!-- Body gradient: a single GOLD point of light. oroLeche core →
+         oroLight midtone → oro edge. No magenta anywhere — the only
+         saturated accent in the auth sky is the CTA. -->
     <radialGradient id="starBody" cx="50%" cy="50%" r="62%">
-      <stop offset="0"    stop-color="#FFF6EC" stop-opacity="1" />
-      <stop offset="0.22" stop-color="#F4ECDE" stop-opacity="0.95" />
-      <stop offset="0.6"  stop-color="#FBD7E3" stop-opacity="0.85" />
-      <stop offset="1"    stop-color="#E91E63" stop-opacity="0.7" />
+      <stop offset="0"    stop-color="#FFF6E5" stop-opacity="1" />
+      <stop offset="0.24" stop-color="#FFE9C2" stop-opacity="0.95" />
+      <stop offset="0.62" stop-color="#E8B872" stop-opacity="0.85" />
+      <stop offset="1"    stop-color="#D9AE6F" stop-opacity="0.72" />
     </radialGradient>
+    <!-- Core glow: warm white → oroLeche → fade. The central highlight is
+         warm, never rosy. -->
     <radialGradient id="starCore" cx="50%" cy="50%" r="50%">
-      <stop offset="0"   stop-color="#FFFFFF" stop-opacity="1" />
-      <stop offset="0.5" stop-color="#FFF6EC" stop-opacity="0.9" />
-      <stop offset="1"   stop-color="#FBD7E3" stop-opacity="0" />
+      <stop offset="0"   stop-color="#FFFDF6" stop-opacity="1" />
+      <stop offset="0.5" stop-color="#FFF6E5" stop-opacity="0.9" />
+      <stop offset="1"   stop-color="#FFE9C2" stop-opacity="0" />
     </radialGradient>
     <linearGradient id="glintV" x1="60" y1="0" x2="60" y2="120" gradientUnits="userSpaceOnUse">
       <stop offset="0"    stop-color="#FFF6E5" stop-opacity="0" />
       <stop offset="0.5"  stop-color="#FFF6E5" stop-opacity="0.55" />
       <stop offset="1"    stop-color="#FFF6E5" stop-opacity="0" />
     </linearGradient>
-    <linearGradient id="glintH" x1="0" y1="60" x2="120" y2="60" gradientUnits="userSpaceOnUse">
+    <linearGradient id="glintH" x1="0" y1="56" x2="120" y2="56" gradientUnits="userSpaceOnUse">
       <stop offset="0"    stop-color="#FFF6E5" stop-opacity="0" />
-      <stop offset="0.5"  stop-color="#FFF6E5" stop-opacity="0.4" />
+      <stop offset="0.5"  stop-color="#FFF6E5" stop-opacity="0.26" />
       <stop offset="1"    stop-color="#FFF6E5" stop-opacity="0" />
     </linearGradient>
   </defs>
   <!-- Long, hair-thin glint rays — the celestial "twinkle" of a bright
        star catching light. Drawn UNDER the body so the solid spurs sit on
        top; the vertical glint is longer than the horizontal to echo the
-       asymmetry of the body rays. These read as light flare, not as a
-       drawn cross, because they fade to alpha 0 at both tips. -->
+       asymmetry of the body rays. The horizontal glint is dimmer (0.26 vs
+       0.55) AND offset to y=56 — 4px above the body centre (60) — so the
+       two rays never cross at the bloom. Decoupling the crossing kills the
+       medical/religious "plus" reading; it stays a flare from one source. -->
   <rect x="59.2" y="2"  width="1.6" height="116" fill="url(#glintV)" />
-  <rect x="2" y="59.4" width="116" height="1.2" fill="url(#glintH)" />
+  <rect x="2" y="55.4" width="116" height="1.0" fill="url(#glintH)" />
   <!-- Four primary rays — curved spurs (Q control points pull the flanks
        inward), so the tips read as soft, organic light rather than the
        sharp medical/religious cross. Vertical pair longer than the
@@ -47,14 +54,23 @@
     <path d="M60 60 Q46 74 33 88 Q48 74 58 62 Z" fill="url(#starBody)" opacity="0.28" />
   </g>
   <!-- Soft inner facets — keep the dimensional glint without redrawing the
-       hard cross diagonals. -->
+       hard cross diagonals. currentColor → tints with oro from BrandAnchor. -->
   <g>
     <path d="M60 60 L77 39 L62 58 Z" fill="currentColor" opacity="0.18" />
     <path d="M60 60 L41 79 L58 62 Z" fill="currentColor" opacity="0.14" />
   </g>
   <circle cx="60" cy="60" r="11" fill="url(#starCore)" />
-  <circle cx="60" cy="60" r="3.2" fill="#FFFFFF" />
-  <path d="M60 26 A34 34 0 0 1 94 60 A34 34 0 0 1 60 94 A34 34 0 0 1 30 74"
+  <circle cx="60" cy="60" r="3.2" fill="#FFFDF6" />
+  <!-- Asymmetric frame: NOT a closed ring. An open arc sweeps ~250° from
+       the top cardinal clockwise and stops short on the lower-left, leaving
+       a real decorative BREAK in the lower-left quadrant (the art-brief
+       asymmetry rule — perfection with one elegant rupture). currentColor. -->
+  <path d="M60 26 A34 34 0 1 1 32.6 39.6"
         stroke="currentColor" stroke-width="0.6" opacity="0.3" stroke-linecap="round" />
+  <!-- The cardinal dot at the top reads as where the broken frame line
+       BEGINS — a fragment of the arc continuing, not an orphan satellite.
+       A second, fainter tick sits just inside the break on the lower-left
+       so the rupture reads as intentional cartography, not a missing piece. -->
   <circle cx="60" cy="26" r="1.4" fill="currentColor" opacity="0.7" />
+  <circle cx="29.4" cy="44.4" r="0.9" fill="currentColor" opacity="0.34" />
 </svg>

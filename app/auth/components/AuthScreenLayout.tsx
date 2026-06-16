@@ -1,4 +1,11 @@
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type ViewStyle } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { SkyBackground } from '@/features/tabs/components/SkyBackground'
@@ -43,18 +50,24 @@ export function AuthScreenLayout({
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View
-          style={[
+        {/* ScrollView so a short device with the keyboard up can still
+            reach the CTA and any error/helper below it. */}
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[
             styles.content,
             { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.lg },
             contentStyle,
           ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
           <View style={styles.anchor}>
             <BrandAnchor pulseOnce={anchorPulseOnce} />
           </View>
           {children}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   )
@@ -67,7 +80,9 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
   content: {
-    flex: 1,
+    // flexGrow (not flex:1) so content fills the viewport but can grow
+    // past it and scroll when the keyboard shrinks the visible area.
+    flexGrow: 1,
     paddingHorizontal: spacing.xl,
     gap: spacing.xl,
   },

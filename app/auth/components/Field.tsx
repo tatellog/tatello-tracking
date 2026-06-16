@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import { useEffect, useState } from 'react'
+import { forwardRef, useEffect, useState } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -36,24 +36,30 @@ type FieldProps = {
  * The auth text field. Focus interpolates the border + icon + glow to
  * oro (the sky's light) — deliberately NOT magenta, so the screen's
  * only magenta stays the CTA (caret is the second, permitted accent).
+ *
+ * Forwards a ref to the inner TextInput so the screens can chain focus
+ * (email → password → confirm) on returnKeyType="next".
  */
-export function Field({
-  value,
-  onChangeText,
-  placeholder,
-  icon,
-  accessibilityLabel,
-  disabled,
-  secureTextEntry,
-  keyboardType,
-  autoCapitalize,
-  autoComplete,
-  textContentType,
-  returnKeyType,
-  onSubmitEditing,
-  onBlur,
-  trailing,
-}: FieldProps) {
+export const Field = forwardRef<TextInput, FieldProps>(function Field(
+  {
+    value,
+    onChangeText,
+    placeholder,
+    icon,
+    accessibilityLabel,
+    disabled,
+    secureTextEntry,
+    keyboardType,
+    autoCapitalize,
+    autoComplete,
+    textContentType,
+    returnKeyType,
+    onSubmitEditing,
+    onBlur,
+    trailing,
+  }: FieldProps,
+  ref,
+) {
   const [focused, setFocused] = useState(false)
   const focusProgress = useSharedValue(0)
   const reduceMotion = useReducedMotion()
@@ -71,11 +77,7 @@ export function Field({
   }, [focusProgress, focused, reduceMotion])
 
   const animatedContainer = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(
-      focusProgress.value,
-      [0, 1],
-      [colors.hairlineStrong, colors.oro],
-    ),
+    borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.hairlineStrong, colors.oro]),
     shadowOpacity: focusProgress.value * 0.5,
   }))
 
@@ -83,6 +85,7 @@ export function Field({
     <Animated.View style={[styles.inputContainer, animatedContainer]}>
       <Feather name={icon} size={18} color={focused ? colors.oro : colors.niebla} />
       <TextInput
+        ref={ref}
         value={value}
         onChangeText={onChangeText}
         onFocus={() => setFocused(true)}
@@ -92,7 +95,9 @@ export function Field({
         }}
         onSubmitEditing={onSubmitEditing}
         placeholder={placeholder}
-        placeholderTextColor={colors.niebla}
+        // bone (not niebla) clears AA contrast over bgCard so the
+        // placeholder is legible at low brightness.
+        placeholderTextColor={colors.bone}
         selectionColor={colors.magenta}
         cursorColor={colors.magenta}
         accessibilityLabel={accessibilityLabel}
@@ -109,7 +114,7 @@ export function Field({
       {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
     </Animated.View>
   )
-}
+})
 
 const styles = StyleSheet.create({
   inputContainer: {

@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 
 import { signUp } from '@/features/auth/api'
@@ -23,13 +23,24 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState(params.email ?? '')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
+  const [passwordTouched, setPasswordTouched] = useState(false)
   const [confirmTouched, setConfirmTouched] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [emailExists, setEmailExists] = useState(false)
+  const [confirmSent, setConfirmSent] = useState(false)
+
+  // Chain focus on returnKeyType="next": email → password → confirm.
+  const passwordRef = useRef<TextInput>(null)
+  const confirmRef = useRef<TextInput>(null)
 
   const trimmedEmail = email.trim()
+  // Inline hints appear only after the user has left the field (blur),
+  // so we never nag mid-typing.
+  const emailError = emailTouched && trimmedEmail.length > 0 && !isEmailValid(trimmedEmail)
+  const passwordError = passwordTouched && password.length > 0 && password.length < MIN_PASSWORD
   const passwordsMatch = confirm.length > 0 && password === confirm
   const canSubmit =
     isEmailValid(trimmedEmail) && password.length >= MIN_PASSWORD && passwordsMatch && !submitting
@@ -42,26 +53,61 @@ export default function SignUpScreen() {
     setSubmitting(true)
     setErrorMessage(null)
     setEmailExists(false)
-    // On ok:true we do NOT navigate — RouteGuard reacts to the session.
     const result = await signUp(trimmedEmail, password)
-    if (!result.ok) {
-      setErrorMessage(result.message)
-      setEmailExists(result.code === 'email_exists')
-      setSubmitting(false)
+    if (result.ok) {
+      // pending confirm-email → the account exists but there's no session
+      // yet, so RouteGuard won't move us. Show the warm "check your inbox"
+      // state. A live-session success navigates on its own — nothing to do.
+      if (result.pending === 'confirm_email') {
+        setConfirmSent(true)
+        setSubmitting(false)
+      }
+      return
     }
+    setErrorMessage(result.message)
+    setEmailExists(result.code === 'email_exists')
+    setSubmitting(false)
+  }
+
+  // Success without a live session: the account was created and a
+  // confirmation email is on its way. Warm, never an error red.
+  if (confirmSent) {
+    return (
+      <AuthScreenLayout anchorPulseOnce>
+        <Animated.View entering={enter(80)} style={styles.headerBlock}>
+          <Text style={styles.headline}>Casi lista</Text>
+        </Animated.View>
+
+        <Animated.View entering={enter(160)} style={styles.sentBody}>
+          {/* Voice moment — Cormorant italic is allowed here. */}
+          <Text style={styles.serifBody}>
+            Creé tu cuenta. Te mandé un correo para confirmarla — ábrelo y volvemos a empezar
+            juntas.
+          </Text>
+        </Animated.View>
+
+        <Animated.View entering={enter(240)} style={styles.form}>
+          <SubmitButton
+            label="Volver a iniciar sesión"
+            submittingLabel="Volver a iniciar sesión"
+            canSubmit
+            isSubmitting={false}
+            onPress={() => router.replace({ pathname: '/auth', params: { email: trimmedEmail } })}
+          />
+        </Animated.View>
+      </AuthScreenLayout>
+    )
   }
 
   return (
     <AuthScreenLayout>
       <Animated.View entering={enter(80)} style={styles.headerBlock}>
         <Text style={styles.headline}>Crea tu cuenta</Text>
-        <Text style={styles.editorial}>
-          Solo tu cuenta por ahora. Lo demás lo vemos juntas.
-        </Text>
+        <Text style={styles.editorial}>Solo tu cuenta por ahora. Lo demás lo vemos juntas.</Text>
       </Animated.View>
 
       <View style={styles.form}>
-        <Animated.View entering={enter(160)}>
+        <Animated.View entering={enter(160)} style={styles.fieldBlock}>
           <Field
             value={email}
             onChangeText={setEmail}
@@ -74,11 +120,17 @@ export default function SignUpScreen() {
             autoComplete="email"
             textContentType="emailAddress"
             returnKeyType="next"
+            onBlur={() => setEmailTouched(true)}
+            onSubmitEditing={() => passwordRef.current?.focus()}
           />
+          {emailError ? (
+            <Text style={styles.helper}>Revisa tu correo, parece incompleto.</Text>
+          ) : null}
         </Animated.View>
 
-        <Animated.View entering={enter(220)}>
+        <Animated.View entering={enter(220)} style={styles.fieldBlock}>
           <Field
+            ref={passwordRef}
             value={password}
             onChangeText={setPassword}
             placeholder="Mínimo 6 caracteres"
@@ -90,21 +142,27 @@ export default function SignUpScreen() {
             autoComplete="password-new"
             textContentType="newPassword"
             returnKeyType="next"
+            onBlur={() => setPasswordTouched(true)}
+            onSubmitEditing={() => confirmRef.current?.focus()}
             trailing={
               <Pressable
                 onPress={() => setShowPassword((v) => !v)}
-                hitSlop={12}
+                hitSlop={16}
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.niebla} />
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.niebla} />
               </Pressable>
             }
           />
+          {passwordError ? (
+            <Text style={styles.helper}>Te faltan caracteres — mínimo 6.</Text>
+          ) : null}
         </Animated.View>
 
-        <Animated.View entering={enter(280)} style={styles.confirmBlock}>
+        <Animated.View entering={enter(280)} style={styles.fieldBlock}>
           <Field
+            ref={confirmRef}
             value={confirm}
             onChangeText={setConfirm}
             placeholder="Confirma tu contraseña"
@@ -145,9 +203,7 @@ export default function SignUpScreen() {
                 hitSlop={12}
                 style={styles.linkTap}
                 accessibilityRole="link"
-                onPress={() =>
-                  router.push({ pathname: '/auth', params: { email: trimmedEmail } })
-                }
+                onPress={() => router.push({ pathname: '/auth', params: { email: trimmedEmail } })}
               >
                 <Text style={styles.link}>Iniciar sesión</Text>
               </Pressable>
@@ -170,7 +226,8 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   headerBlock: { gap: spacing.sm },
   form: { gap: spacing.md },
-  confirmBlock: { gap: spacing.xs },
+  fieldBlock: { gap: spacing.xs },
+  sentBody: { gap: spacing.md },
   errorBlock: { gap: spacing.xs },
   headline: {
     fontFamily: typography.displayMedium,
@@ -183,6 +240,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
+  },
+  serifBody: {
+    fontFamily: typography.serif,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+    lineHeight: typography.sizes.headingLg * typography.lineHeight.statement,
+  },
+  helper: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    paddingLeft: spacing.xs,
   },
   matchOk: {
     fontFamily: typography.uiMedium,

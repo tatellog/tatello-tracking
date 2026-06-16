@@ -14,16 +14,14 @@ import { supabase } from '@/lib/supabase'
  */
 
 export type AuthResult =
-  | { ok: true }
-  | { ok: false; message: string; code?: 'email_exists' }
+  // `pending: 'confirm_email'` is a SUCCESS without a live session yet:
+  // the account was created but the user must confirm via email before a
+  // session exists. The screen shows a warm "check your inbox" state, not
+  // an error.
+  { ok: true; pending?: 'confirm_email' } | { ok: false; message: string; code?: 'email_exists' }
 
 /** Warm Spanish copy already signed off by voice-and-copy. */
-const EMAIL_EXISTS_MESSAGE =
-  'Ya existe una cuenta con este correo. ¿Quieres iniciar sesión?'
-
-/** Confirm-email is ON: the user must check their inbox before signing in. */
-const CONFIRM_EMAIL_MESSAGE =
-  'Casi listo. Revisa tu correo para confirmar tu cuenta.'
+const EMAIL_EXISTS_MESSAGE = 'Ya existe una cuenta con este correo. ¿Quieres iniciar sesión?'
 
 /*
  * Maps a raw supabase-js error message to warm Spanish copy. We match
@@ -86,8 +84,9 @@ export async function signUp(email: string, password: string): Promise<AuthResul
   if (data.session) return { ok: true }
 
   // No session and not an existing email → confirm-email is ON. The
-  // user needs to verify before the session exists.
-  return { ok: false, message: CONFIRM_EMAIL_MESSAGE }
+  // account WAS created — it's a success awaiting verification, not a
+  // failure. The screen renders a warm "check your inbox" state.
+  return { ok: true, pending: 'confirm_email' }
 }
 
 export async function requestPasswordReset(email: string): Promise<AuthResult> {

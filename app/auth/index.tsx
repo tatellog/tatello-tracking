@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 
 import { signIn } from '@/features/auth/api'
@@ -21,11 +21,17 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{ email?: string }>()
   const [email, setEmail] = useState(params.email ?? '')
   const [password, setPassword] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // Chain focus on returnKeyType="next": email → password.
+  const passwordRef = useRef<TextInput>(null)
+
   const trimmedEmail = email.trim()
+  // Inline hint appears only after blur so we never nag mid-typing.
+  const emailError = emailTouched && trimmedEmail.length > 0 && !isEmailValid(trimmedEmail)
   // Login: any non-empty password (don't enforce length on an existing
   // account — that's a sign-up rule).
   const canSubmit = isEmailValid(trimmedEmail) && password.length > 0 && !submitting
@@ -50,7 +56,7 @@ export default function LoginScreen() {
       </Animated.View>
 
       <View style={styles.form}>
-        <Animated.View entering={enter(160)}>
+        <Animated.View entering={enter(160)} style={styles.fieldBlock}>
           <Field
             value={email}
             onChangeText={setEmail}
@@ -63,11 +69,17 @@ export default function LoginScreen() {
             autoComplete="email"
             textContentType="emailAddress"
             returnKeyType="next"
+            onBlur={() => setEmailTouched(true)}
+            onSubmitEditing={() => passwordRef.current?.focus()}
           />
+          {emailError ? (
+            <Text style={styles.helper}>Revisa tu correo, parece incompleto.</Text>
+          ) : null}
         </Animated.View>
 
         <Animated.View entering={enter(220)}>
           <Field
+            ref={passwordRef}
             value={password}
             onChangeText={setPassword}
             placeholder="Tu contraseña"
@@ -87,7 +99,7 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={colors.niebla} />
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.niebla} />
               </Pressable>
             }
           />
@@ -113,11 +125,7 @@ export default function LoginScreen() {
       </View>
 
       <Animated.View entering={enter(340)} style={styles.links}>
-        <Link
-          href={{ pathname: '/auth/sign-up', params: { email: trimmedEmail } }}
-          asChild
-          push
-        >
+        <Link href={{ pathname: '/auth/sign-up', params: { email: trimmedEmail } }} asChild push>
           <Pressable hitSlop={12} style={styles.linkTap} accessibilityRole="link">
             <Text style={styles.link}>¿Primera vez? Crear cuenta</Text>
           </Pressable>
@@ -126,9 +134,7 @@ export default function LoginScreen() {
           hitSlop={12}
           style={styles.linkTap}
           accessibilityRole="link"
-          onPress={() =>
-            router.push({ pathname: '/auth/reset', params: { email: trimmedEmail } })
-          }
+          onPress={() => router.push({ pathname: '/auth/reset', params: { email: trimmedEmail } })}
         >
           <Text style={styles.linkMuted}>¿Olvidaste tu contraseña?</Text>
         </Pressable>
@@ -140,6 +146,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   headerBlock: { gap: spacing.sm },
   form: { gap: spacing.md },
+  fieldBlock: { gap: spacing.xs },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.displaySm,
@@ -151,6 +158,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
+  },
+  helper: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    paddingLeft: spacing.xs,
   },
   error: {
     fontFamily: typography.ui,
