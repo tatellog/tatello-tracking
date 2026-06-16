@@ -300,6 +300,18 @@ export function LunarConstellation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ignitingKey, stars, k, transform.tx, transform.ty, transform.sx, transform.sy])
 
+  // Con la atmósfera + figura + viñeta ya en Skia, el <Svg> solo aloja los
+  // overlays raros (StarBurst, AnticipationCrown, CompletionRings). Lo
+  // montamos SOLO cuando alguno está activo — en el caso común de Hoy
+  // (suppressBurst, mes a medias) no hay <Svg> en absoluto, una superficie
+  // menos. Con el flag de atmósfera apagado, el SVG se monta siempre (lleva
+  // el backdrop + viñeta).
+  const svgOverlaysActive =
+    !suppressBurst ||
+    (figureCount > 6 && trainedCount >= figureCount - 4 && !figureComplete) ||
+    figureComplete
+  const mountSvg = !USE_SKIA_ATMOSPHERE || svgOverlaysActive
+
   return (
     <View style={styles.wrap}>
       <View style={styles.svgWrap} onLayout={onCanvasLayout}>
@@ -361,7 +373,7 @@ export function LunarConstellation({
             />
           </Animated.View>
         ) : null}
-        {canvasReady ? (
+        {canvasReady && mountSvg ? (
           <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(260)}>
             <Svg viewBox={`0 0 ${W} ${H}`} style={styles.svg}>
               <SvgGradients zodiac={zodiac} stars={stars} />
@@ -399,26 +411,17 @@ export function LunarConstellation({
               Ambient → suppressed under reduce-motion (motes parked
               at a static t would freeze mid-rise). */}
               {USE_SKIA_ATMOSPHERE || reduceMotion ? null : <CosmicDust t={t} />}
-              {/* Sign art moved OUT of the <Svg> to a sibling RN Image (see the
-              top of svgWrap) — on Android the in-SVG PNG re-rasterised and
-              jumped left on every scroll frame. The vignette + edgeFade Rects
-              below still darken it through the transparent SVG, so the blend is
-              identical. ZodiacEngraving stays for the Órbita/reveal callers. */}
-              {/* BalanceSwirls removed — the zodiac-art SVGs come with
-              their own ornate decorative rings that balance the
-              composition. The added Bézier strokes conflicted
-              with the assets' hand-drawn ornaments. */}
-              {/* Card vignette — frames the composition by darkening
-              the corners, ties the atmospheric backdrop (nebula +
-              lion) into a single body before the focal layer
-              renders on top. */}
-              <Rect x={0} y={0} width={W} height={H} fill="url(#cardVignette)" />
-              {/* Vertical edge fade — separately dissolves top + bottom
-              of the card into the page background so the art
-              doesn't start/end on a hard horizontal line. */}
-              <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
+              {/* La viñeta (cardVignette + cardEdgeFade) se movió a
+                  SkiaAtmosphere cuando USE_SKIA_ATMOSPHERE — ahí oscurece el
+                  backdrop + el emblema por composición alfa, en su z-order
+                  original (después del backdrop, antes de las field stars).
+                  Con el flag apagado, vuelven aquí como Rects del SVG. */}
               {USE_SKIA_ATMOSPHERE ? null : (
-                <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+                <>
+                  <Rect x={0} y={0} width={W} height={H} fill="url(#cardVignette)" />
+                  <Rect x={0} y={0} width={W} height={H} fill="url(#cardEdgeFade)" />
+                  <FieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
+                </>
               )}
               {/* Animated constellation — stars + connecting lines that
               ignite day-by-day with progress. Now scaled 0.7 about

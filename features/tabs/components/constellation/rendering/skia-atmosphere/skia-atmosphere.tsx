@@ -1,4 +1,14 @@
-import { Canvas, Circle, Group, Oval, Path } from '@shopify/react-native-skia'
+import {
+  Canvas,
+  Circle,
+  Group,
+  LinearGradient,
+  Oval,
+  Path,
+  RadialGradient,
+  Rect,
+  vec,
+} from '@shopify/react-native-skia'
 import { memo, useMemo } from 'react'
 import { StyleSheet } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
@@ -94,11 +104,55 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
         <SkiaAmbientGlow cx={W / 2} cy={H / 2} />
         <SkiaNebula ax={ax} ay={ay} drift={drift} />
         {reduce ? null : <SkiaCosmicDust t={t} />}
+        {/* Viñeta — antes era un <Rect> del SVG montado encima de toda la
+            atmósfera; ahora vive aquí, DESPUÉS del backdrop pero ANTES de las
+            field stars (su z-order original). Oscurece el backdrop + el
+            emblema de abajo por composición alfa; las field stars quedan
+            encima, sin atenuar. Mover la viñeta acá deja al <Svg> sin trabajo
+            visible → se desmonta en el caso común. */}
+        <SkiaVignette />
         <SkiaFieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
       </Group>
     </Canvas>
   )
 })
+
+/* ── Viñeta — radial (esquinas) + edge-fade vertical (bordes sup/inf) ── */
+const BG = '10,6,8' // colors.bg #0A0608
+
+function SkiaVignette() {
+  return (
+    <>
+      {/* cardVignette — radial, transparente al centro, oscuro a los bordes. */}
+      <Rect x={0} y={0} width={W} height={H}>
+        <RadialGradient
+          c={vec(W / 2, H / 2)}
+          r={W * 0.75}
+          colors={[`rgba(${BG},0)`, `rgba(${BG},0.14)`, `rgba(${BG},0.45)`, `rgba(${BG},0.85)`]}
+          positions={[0, 0.4, 0.7, 1]}
+        />
+      </Rect>
+      {/* cardEdgeFade — lineal vertical, disuelve sup/inf en el fondo. */}
+      <Rect x={0} y={0} width={W} height={H}>
+        <LinearGradient
+          start={vec(0, 0)}
+          end={vec(0, H)}
+          colors={[
+            `rgba(${BG},1)`,
+            `rgba(${BG},0.85)`,
+            `rgba(${BG},0.45)`,
+            `rgba(${BG},0)`,
+            `rgba(${BG},0)`,
+            `rgba(${BG},0.45)`,
+            `rgba(${BG},0.85)`,
+            `rgba(${BG},1)`,
+          ]}
+          positions={[0, 0.06, 0.14, 0.24, 0.76, 0.86, 0.94, 1]}
+        />
+      </Rect>
+    </>
+  )
+}
 
 /* ── Deep field — 16 micro-stars, drift 6× lento (parallax) ──────────── */
 function SkiaDeepField({ drift }: { drift: SharedValue<number> }) {
