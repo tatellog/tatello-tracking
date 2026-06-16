@@ -52,7 +52,9 @@ export default function LoginScreen() {
     <AuthScreenLayout>
       <Animated.View entering={enter(80)} style={styles.headerBlock}>
         <Text style={styles.headline}>Bienvenida de vuelta</Text>
-        <Text style={styles.editorial}>Entra con tu correo y contraseña.</Text>
+        {/* Voice moment — Cormorant italic, the coach. Replaces the cold
+            instruction; the fields are self-evident. */}
+        <Text style={styles.voice}>Tu cielo siguió girando.</Text>
       </Animated.View>
 
       <View style={styles.form}>
@@ -153,11 +155,11 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
-  editorial: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
-    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
+  voice: {
+    fontFamily: typography.serif,
+    fontSize: typography.sizes.heading,
+    color: colors.bone,
+    lineHeight: typography.sizes.heading * typography.lineHeight.statement,
   },
   helper: {
     fontFamily: typography.uiMedium,

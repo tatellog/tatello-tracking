@@ -56,6 +56,14 @@ export function SubmitButton({
   const animatedContainer = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     backgroundColor: interpolateColor(ready.value, [0, 1], [colors.bgCard2, colors.magenta]),
+    // Disabled, the pill is barely darker than the sky and reads as a dead
+    // gap. A hairline (the same one the fields rest at) gives it the shape
+    // of a button WAITING to fill; it fades to nothing as magenta arrives.
+    borderColor: interpolateColor(
+      ready.value,
+      [0, 1],
+      [colors.hairlineStrong, 'rgba(244, 236, 222, 0)'],
+    ),
   }))
 
   const onPressIn = () => {
@@ -96,6 +104,9 @@ export function SubmitButton({
 const styles = StyleSheet.create({
   submitWrap: {
     borderRadius: radius.pill,
+    // Width is constant across states (border fades to transparent when
+    // filled) so the pill never resizes between disabled and enabled.
+    borderWidth: 1,
   },
   submitPressable: {
     flexDirection: 'row',

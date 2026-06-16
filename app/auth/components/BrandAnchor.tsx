@@ -140,6 +140,8 @@ const styles = StyleSheet.create({
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.headingLg,
     color: colors.leche,
-    letterSpacing: typography.letterSpacing.uppercaseMed,
+    // Wider tracking gives the wordmark "quiet luxury" presence under the
+    // hero without adding font weight (display-heavy is off-brand here).
+    letterSpacing: typography.letterSpacing.uppercaseWide,
   },
 })
