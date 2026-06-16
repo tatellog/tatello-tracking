@@ -40,7 +40,8 @@ import type { Resolved, SequenceEl } from '../../types'
 
 const CREAM = colors.leche // #F4ECDE
 const CREAM_HOT = colors.oroLeche // #FFF6E5
-const GOLD = colors.oro // #D9AE6F
+// GOLD (#D9AE6F) ahora vive como rgba(217,174,111,..) dentro de los gradientes
+// del glow — sin const dedicada.
 const MAGENTA = colors.magenta
 const WHITE_HOT = '#FFF1D6'
 
@@ -389,14 +390,16 @@ function SkiaLitStar({
     reduce ? 1 : 0.5 + 0.5 * Math.sin((t.value + phase) * 2 * Math.PI),
   )
 
-  const outerHaloOpacity = useDerivedValue(() => (0.025 + 0.02 * wave.value) * haloMult)
-  const outerHaloR = useDerivedValue(() => p.r + 9 * haloMult * sScale)
-  const mainHaloOpacity = useDerivedValue(
-    () => (0.08 + 0.08 * wave.value) * haloMult + cascade.value * 0.12 * haloMult,
+  // Glow suave ÚNICO (RadialGradient, sin borde). Respira por SCALE de grupo +
+  // opacidad — el radio del gradiente queda ESTÁTICO (no se reconstruye por
+  // frame = performante). Reemplaza los 3 halos planos que leían "dos círculos".
+  const glowBaseR = p.r + 8 * haloMult * sScale
+  const glowOpacity = useDerivedValue(
+    () => (0.2 + 0.12 * wave.value) * haloMult + cascade.value * 0.12 * haloMult,
   )
-  const mainHaloR = useDerivedValue(() => p.r + 7 * haloMult * sScale + cascade.value * 12 * sScale)
-  const coreOpacity = useDerivedValue(() => (0.35 + 0.2 * wave.value) * haloMult)
-  const coreR = useDerivedValue(() => p.r + 2 * sScale + wave.value * 1.2 * sScale)
+  const glowScale = useDerivedValue(() =>
+    scaleAbout(p.x, p.y, 1 + wave.value * 0.08 + cascade.value * 0.3),
+  )
 
   // Body twinkle (cream sparkle) + ±10 % breath scale.
   const bodyOpacity = useDerivedValue(() => {
@@ -414,12 +417,18 @@ function SkiaLitStar({
   return (
     <>
       {isHero ? <HeroGlow p={p} phase={phase} t={t} reduce={reduce} /> : null}
-      {/* Outer diffuse gold halo */}
-      <Circle cx={p.x} cy={p.y} r={outerHaloR} color={GOLD} opacity={outerHaloOpacity} />
-      {/* Main cream halo (the Skia flare layer adds the magenta bloom) */}
-      <Circle cx={p.x} cy={p.y} r={mainHaloR} color={CREAM_HOT} opacity={mainHaloOpacity} />
-      {/* Hot core */}
-      <Circle cx={p.x} cy={p.y} r={coreR} color={CREAM_HOT} opacity={coreOpacity} />
+      {/* Glow suave (RadialGradient → se desvanece a transparente, sin el borde
+          duro de los círculos planos). El flare encima añade el bloom magenta. */}
+      <Group opacity={glowOpacity} transform={glowScale}>
+        <Circle cx={p.x} cy={p.y} r={glowBaseR}>
+          <RadialGradient
+            c={vec(p.x, p.y)}
+            r={glowBaseR}
+            colors={['rgba(255,246,229,0.85)', 'rgba(217,174,111,0.4)', 'rgba(217,174,111,0)']}
+            positions={[0, 0.45, 1]}
+          />
+        </Circle>
+      </Group>
       {/* Body sparkle */}
       <Group opacity={bodyOpacity} transform={bodyTransform}>
         <Path path={fourPointStarPath(p.x, p.y, p.r)} color={CREAM_HOT} />
