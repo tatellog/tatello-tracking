@@ -63,6 +63,7 @@ export const SkiaFigure = memo(function SkiaFigure({
   sScale,
   t,
   breathT,
+  reveal,
   reduce,
 }: {
   stars: Resolved[]
@@ -75,6 +76,8 @@ export const SkiaFigure = memo(function SkiaFigure({
   sScale: number
   t: SharedValue<number>
   breathT: SharedValue<number>
+  /** Reveal 0→1 de aparición — las líneas encendidas se DIBUJAN sobre él. */
+  reveal: SharedValue<number>
   reduce: boolean
 }) {
   const px: Px[] = stars.map((s) => {
@@ -82,25 +85,34 @@ export const SkiaFigure = memo(function SkiaFigure({
     return { x: p.x, y: p.y, r: starRadius(s.mag) * sScale, mag: s.mag }
   })
 
+  // Pre-computa el índice de encendido por línea (stagger del trazo) fuera del
+  // JSX, sin efectos en render.
+  let litSeen = 0
+  const lineDefs = lines.map(([a, b], idx) => {
+    const A = px[a]
+    const B = px[b]
+    const ok = !!A && !!B
+    const lit = ok && litKeys.has(`line-${idx}`)
+    const litIndex = lit ? litSeen++ : 0
+    return { idx, A, B, ok, lit, litIndex }
+  })
+
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-      {lines.map(([a, b], idx) => {
-        const A = px[a]
-        const B = px[b]
-        if (!A || !B) return null
-        const lit = litKeys.has(`line-${idx}`)
-        return (
-          <Path
-            key={`l-${idx}`}
-            path={`M${A.x.toFixed(1)},${A.y.toFixed(1)}L${B.x.toFixed(1)},${B.y.toFixed(1)}`}
-            color={CREAM}
-            style="stroke"
-            strokeWidth={(lit ? 1.4 : 2.6) * sScale}
-            strokeCap="round"
-            opacity={lit ? 0.7 : 0.28}
+      {lineDefs.map((l) =>
+        l.ok ? (
+          <SkiaConstellationLine
+            key={`l-${l.idx}`}
+            A={l.A!}
+            B={l.B!}
+            lit={l.lit}
+            litIndex={l.litIndex}
+            reveal={reveal}
+            sScale={sScale}
+            reduce={reduce}
           />
-        )
-      })}
+        ) : null,
+      )}
       {px.map((p, i) => {
         const isLit = litKeys.has(`star-${i}`)
         const isNext = nextEl?.type === 'star' && nextEl.idx === i
@@ -125,6 +137,66 @@ export const SkiaFigure = memo(function SkiaFigure({
     </Canvas>
   )
 })
+
+/* Una línea de la constelación. Las ENCENDIDAS se dibujan solas: el path-trim
+ * de Skia (`end` 0→1) traza el stroke desde la estrella A hacia la B sobre el
+ * `reveal`, con stagger por orden de encendido + una chispa que viaja en la
+ * punta (la "pluma"). Las apagadas quedan como guía tenue, completas. Cero
+ * reconstrucción de path por frame — solo escalares en worklets (GPU). */
+const LINE_STAGGER = 0.07
+const LINE_WINDOW = 0.5
+
+function SkiaConstellationLine({
+  A,
+  B,
+  lit,
+  litIndex,
+  reveal,
+  sScale,
+  reduce,
+}: {
+  A: Px
+  B: Px
+  lit: boolean
+  litIndex: number
+  reveal: SharedValue<number>
+  sScale: number
+  reduce: boolean
+}) {
+  const path = `M${A.x.toFixed(1)},${A.y.toFixed(1)}L${B.x.toFixed(1)},${B.y.toFixed(1)}`
+  const start = litIndex * LINE_STAGGER
+  const end = useDerivedValue(() => {
+    if (!lit || reduce) return 1
+    const p = (reveal.value - start) / LINE_WINDOW
+    return p < 0 ? 0 : p > 1 ? 1 : p
+  })
+  // La chispa que dibuja — en el extremo del trazo mientras 0<end<1.
+  const tipTransform = useDerivedValue(() => {
+    const e = end.value
+    return [{ translateX: A.x + (B.x - A.x) * e }, { translateY: A.y + (B.y - A.y) * e }]
+  })
+  const tipOpacity = useDerivedValue(() => (end.value > 0.02 && end.value < 0.98 ? 1 : 0))
+  return (
+    <>
+      <Path
+        path={path}
+        color={CREAM}
+        style="stroke"
+        strokeWidth={(lit ? 1.4 : 2.6) * sScale}
+        strokeCap="round"
+        opacity={lit ? 0.7 : 0.28}
+        end={end}
+      />
+      {lit ? (
+        <Group transform={tipTransform} opacity={tipOpacity}>
+          <Circle cx={0} cy={0} r={2 * sScale} color={CREAM_HOT}>
+            <BlurMask blur={2.5 * sScale} style="normal" />
+          </Circle>
+        </Group>
+      ) : null}
+    </>
+  )
+}
 
 /* Soft multi-layer bloom for the alpha (hero) stars — 4 stacked discs that
  * breathe scale + opacity. Matches figure-base/HeroGlow. */

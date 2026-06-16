@@ -1,7 +1,14 @@
 import { useIsFocused } from '@react-navigation/native'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
-import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 import Svg, { G, Rect } from 'react-native-svg'
 
 import { useTransformProgress } from '@/features/emblem'
@@ -189,6 +196,21 @@ export function LunarConstellation({
   const focused = useIsFocused()
   const { t, breathT, driftT } = useConstellationClocks(reduceMotion, focused, pausedSV)
   const { canvasReady, blurMounted, blurStyle } = useCanvasReveal()
+
+  // Reveal "celestial" de la figura — un one-shot 0→1 que toca al aparecer /
+  // re-enfocar. Las líneas se DIBUJAN solas sobre él (path-trim en SkiaFigure):
+  // se siente desbloqueo cada vez que abrís, no un gráfico estático. Replay en
+  // cada focus. Reduce-motion: salta a 1 (figura completa, sin animar).
+  const figureReveal = useSharedValue(0)
+  useEffect(() => {
+    if (!canvasReady || !focused) return
+    if (reduceMotion) {
+      figureReveal.value = 1
+      return
+    }
+    figureReveal.value = 0
+    figureReveal.value = withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.cubic) })
+  }, [canvasReady, focused, reduceMotion, figureReveal])
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence, trained, todayIdx })
 
@@ -544,6 +566,7 @@ export function LunarConstellation({
                 sScale={sScale}
                 t={t}
                 breathT={breathT}
+                reveal={figureReveal}
                 reduce={reduceMotion}
               />
             ) : null}
