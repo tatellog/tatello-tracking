@@ -8,7 +8,6 @@ import {
 } from '@shopify/react-native-skia'
 import { StyleSheet, View } from 'react-native'
 
-import Hojas from '@/assets/zodiac-art/hojas-23.svg'
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors } from '@/theme'
@@ -228,20 +227,8 @@ const LION_CX = 0.5
 const LION_CY = 0.46
 const GLYPH_FRAC = 0.11
 const GLYPH_CY = 0.085
-// Laurel (hojas-23.svg) dentro del aro, en la parte INFERIOR: las ramas
-// abren hacia arriba y cradlean al león como una base, integradas con el
-// borde inferior del anillo. Posición = dónde va el CENTRO de las hojas;
-// el contenido del SVG vive en (0.497, 0.631) de su frame y las hojas
-// ocupan ~0.85 del ancho del frame.
-// Ancho calibrado para que el ARCO del laurel calce con la curva del
-// anillo: al ensancharlo su curva se aplana y queda paralela a la última
-// línea, por dentro del círculo.
-const HOJAS_WFRAC = 0.74
-const HOJAS_CX = 0.5
-const HOJAS_CY = 0.866 // pegado a la última línea, contenido en el círculo
-const HOJAS_CC_X = 0.497 // centro del contenido dentro del frame del SVG
-const HOJAS_CC_Y = 0.631
-const HOJAS_LEAF_WFRAC = 0.85 // las hojas ocupan esta fracción del frame
+// (Las constantes HOJAS_* del laurel se retiraron junto con la capa — el
+// laurel sobrecargaba la composición. Viven en git si se quiere reponer.)
 // La constelación natal (el dato real de la usuaria) GANA sobre el emblema,
 // que es el marco/atmósfera poética → el emblema cede a fondo (más tenue +
 // más difuso) para que las dos capas se lean como planos distintos.
@@ -303,12 +290,6 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
   const lionY = LION_CY * size - lionH / 2
   const glyphSize = size * GLYPH_FRAC
 
-  // Laurel: el frame del SVG colocado de modo que el CENTRO de las hojas
-  // caiga en (HOJAS_CX, HOJAS_CY) del lienzo.
-  const hojasFrame = (HOJAS_WFRAC / HOJAS_LEAF_WFRAC) * size
-  const hojasLeft = HOJAS_CX * size - HOJAS_CC_X * hojasFrame
-  const hojasTop = HOJAS_CY * size - HOJAS_CC_Y * hojasFrame
-
   const bloomT = bloomTFor(transformProgress)
   // Halo más difuso → el emblema lee como atmósfera de fondo, no como
   // line-art nítido compitiendo con las líneas de la constelación.
@@ -353,15 +334,9 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           ) : null}
         </Group>
       </Canvas>
-      {/* Laurel ornamental dentro del aro, en la base (cradlea al león). */}
-      <View
-        style={[
-          styles.hojas,
-          { top: hojasTop, left: hojasLeft, width: hojasFrame, height: hojasFrame },
-        ]}
-      >
-        <Hojas width="100%" height="100%" opacity={FRAME_OPACITY} />
-      </View>
+      {/* El laurel (hojas-23.svg) se retiró — sobrecargaba la composición y
+          le peleaba el foco al asterismo (review de arte). El anillo + el león
+          quedan; volver a montarlo es un <Hojas> en git. */}
       {Glyph ? (
         <View
           style={[
@@ -383,5 +358,4 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
 
 const styles = StyleSheet.create({
   glyph: { position: 'absolute' },
-  hojas: { position: 'absolute' },
 })
