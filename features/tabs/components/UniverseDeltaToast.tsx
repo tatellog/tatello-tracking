@@ -34,6 +34,15 @@ import { colors, typography } from '@/theme'
 
 const VISIBLE_MS = 3000
 
+// El PORQUÉ del toast — qué registro alimentó el atributo. Crea aprendizaje:
+// la usuaria conecta "+27 Energía" con la acción que lo causó.
+const REASON: Record<UniverseAttributeKey, string> = {
+  energia: 'por tu comida',
+  claridad: 'por tu agua',
+  estabilidad: 'por tu sueño',
+  brillo: 'por tu check-in',
+}
+
 type Moment = {
   key: UniverseAttributeKey
   delta: number
@@ -101,18 +110,22 @@ function DeltaPill({ moment, onPress }: { moment: Moment; onPress?: () => void }
       }
       style={[styles.toast, { borderColor: tint(accent, '80'), shadowColor: accent }]}
     >
-      <StarSeal />
-      <AttributeGlyph attrKey={moment.key} color={accent} />
-      {/* key=seq re-monta el número en cada acumulación — un pop suave,
-          suficiente para sentir que el tap sumó. */}
-      <Animated.Text
-        key={moment.seq}
-        entering={FadeIn.duration(140)}
-        style={[styles.delta, { color: accent }]}
-      >
-        +{moment.delta}
-      </Animated.Text>
-      <Text style={styles.label}>{ATTRIBUTE_LABEL[moment.key]}</Text>
+      <View style={styles.toastRow}>
+        <StarSeal />
+        <AttributeGlyph attrKey={moment.key} color={accent} />
+        {/* key=seq re-monta el número en cada acumulación — un pop suave,
+            suficiente para sentir que el tap sumó. */}
+        <Animated.Text
+          key={moment.seq}
+          entering={FadeIn.duration(140)}
+          style={[styles.delta, { color: accent }]}
+        >
+          +{moment.delta}
+        </Animated.Text>
+        <Text style={styles.label}>{ATTRIBUTE_LABEL[moment.key]}</Text>
+      </View>
+      {/* El porqué — convierte la recompensa en aprendizaje. */}
+      <Text style={styles.reason}>{REASON[moment.key]}</Text>
     </Container>
   )
 }
@@ -192,18 +205,28 @@ const styles = StyleSheet.create({
     top: 64,
   },
   toast: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    paddingVertical: 11,
+    gap: 1,
+    paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
     backgroundColor: colors.bgCard2,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.55,
     shadowRadius: 16,
     elevation: 8,
+  },
+  toastRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  reason: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
   delta: {
     fontFamily: typography.uiBold,
