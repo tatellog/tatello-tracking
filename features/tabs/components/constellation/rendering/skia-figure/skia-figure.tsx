@@ -2,10 +2,10 @@ import {
   BlurMask,
   Canvas,
   Circle,
-  DashPathEffect,
   Group,
   LinearGradient,
   Path,
+  RadialGradient,
   vec,
 } from '@shopify/react-native-skia'
 import { memo } from 'react'
@@ -294,12 +294,23 @@ function HeroGlow({
       { translateY: -p.y },
     ]
   })
+  // Glow con RadialGradient (NO círculos planos apilados): se desvanece suave
+  // a transparente, sin el borde duro del círculo que se veía "sin difuminar".
   return (
     <Group opacity={groupOpacity} transform={transform}>
-      <Circle cx={p.x} cy={p.y} r={p.r * 3.6} color={GOLD} opacity={0.04} />
-      <Circle cx={p.x} cy={p.y} r={p.r * 2.6} color={GOLD} opacity={0.07} />
-      <Circle cx={p.x} cy={p.y} r={p.r * 1.8} color={CREAM} opacity={0.12} />
-      <Circle cx={p.x} cy={p.y} r={p.r * 1.2} color={CREAM_HOT} opacity={0.22} />
+      <Circle cx={p.x} cy={p.y} r={p.r * 3.6}>
+        <RadialGradient
+          c={vec(p.x, p.y)}
+          r={p.r * 3.6}
+          colors={[
+            'rgba(255,246,229,0.32)',
+            'rgba(244,236,222,0.14)',
+            'rgba(217,174,111,0.05)',
+            'rgba(217,174,111,0)',
+          ]}
+          positions={[0, 0.4, 0.72, 1]}
+        />
+      </Circle>
     </Group>
   )
 }
@@ -415,54 +426,10 @@ function SkiaLitStar({
       </Group>
       {/* White-hot pinpoint */}
       <Circle cx={p.x} cy={p.y} r={Math.max(0.5, p.r * 0.16)} color={WHITE_HOT} opacity={0.75} />
-      {/* Today's star — dashed cream orbital ring (only on the day-0 star) */}
-      {recency === 0 ? <SkiaTodayRing p={p} sScale={sScale} t={t} reduce={reduce} /> : null}
+      {/* El anillo PUNTEADO de "estrella de hoy" se retiró: leía como clip-art
+          (no celestial) y su borde competía con el flare. La estrella de hoy ya
+          es la más fresca (mayor halo por recency 0) + su flare la distingue. */}
     </>
-  )
-}
-
-/* Today's star ring — thin dashed cream ring that slowly rotates + breathes.
- * Matches lit-stars/today-ring.tsx. */
-function SkiaTodayRing({
-  p,
-  sScale,
-  t,
-  reduce,
-}: {
-  p: Px
-  sScale: number
-  t: SharedValue<number>
-  reduce: boolean
-}) {
-  const ringR = p.r + 11 * sScale
-  const opacity = useDerivedValue(() => {
-    const wave = reduce ? 1 : 0.5 + 0.5 * Math.sin(t.value * 2 * Math.PI * 0.6)
-    return 0.18 + 0.18 * wave
-  })
-  const transform = useDerivedValue(() => {
-    const deg = reduce ? 0 : (t.value * (360 / 12)) % 360
-    const rot = (deg * Math.PI) / 180
-    return [
-      { translateX: p.x },
-      { translateY: p.y },
-      { rotate: rot },
-      { translateX: -p.x },
-      { translateY: -p.y },
-    ]
-  })
-  return (
-    <Group transform={transform} opacity={opacity}>
-      <Circle
-        cx={p.x}
-        cy={p.y}
-        r={ringR}
-        color={CREAM_HOT}
-        style="stroke"
-        strokeWidth={0.7 * sScale}
-      >
-        <DashPathEffect intervals={[3 * sScale, 5 * sScale]} />
-      </Circle>
-    </Group>
   )
 }
 
