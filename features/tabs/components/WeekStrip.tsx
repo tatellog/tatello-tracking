@@ -213,6 +213,7 @@ function DayColumn({
             styles.dayLetter,
             day.status !== 'empty' && styles.dayLetterMarked,
             day.isToday && styles.dayLetterToday,
+            selected && styles.dayLetterSelected,
           ]}
         >
           {day.isToday ? 'HOY' : (SPANISH_DAY_INITIAL[day.weekdayIdx] ?? '?')}
@@ -222,6 +223,7 @@ function DayColumn({
             styles.dayNum,
             day.status !== 'empty' && styles.dayNumMarked,
             day.isToday && styles.dayNumToday,
+            selected && styles.dayNumSelected,
           ]}
         >
           {day.dayNum}
@@ -232,6 +234,17 @@ function DayColumn({
         </View>
         <EventDot count={day.events.length} />
       </Pressable>
+      {/* "Tail" de día seleccionado — conecta la columna con el panel de
+          detalle de abajo (estilo GitHub contribution graph). Viaja con la
+          columna: deja claro CUÁL día abrió la tarjeta. */}
+      {selected ? (
+        <Animated.View
+          pointerEvents="none"
+          entering={FadeIn.duration(160)}
+          exiting={FadeOut.duration(120)}
+          style={styles.selectedCaret}
+        />
+      ) : null}
     </Animated.View>
   )
 }
@@ -297,6 +310,8 @@ const styles = StyleSheet.create({
   },
   colBox: {
     width: CELL_W,
+    // Deja respirar el caret del día seleccionado bajo la columna.
+    paddingBottom: 7,
   },
   // No card, no border — each day is just letter / number / glyph in an
   // airy column. The selected day gets a soft magenta ring.
@@ -311,9 +326,30 @@ const styles = StyleSheet.create({
   colSelected: {
     borderColor: colors.magenta,
     backgroundColor: colors.magentaTint,
+    // Halo suave para que el día abierto se separe del resto de la tira.
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 4,
   },
   colPressed: {
     opacity: 0.55,
+  },
+  // Caret hacia abajo (triángulo por bordes) — la "cola" que ata la columna
+  // seleccionada con su panel de detalle. Centrado bajo la columna.
+  selectedCaret: {
+    position: 'absolute',
+    bottom: 0,
+    left: CELL_W / 2 - 6,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: colors.magenta,
   },
   dayLetter: {
     fontFamily: typography.uiBold,
@@ -329,6 +365,9 @@ const styles = StyleSheet.create({
   dayLetterToday: {
     color: colors.magenta,
   },
+  dayLetterSelected: {
+    color: colors.leche,
+  },
   dayNum: {
     marginTop: 3,
     fontFamily: typography.displayHeavy,
@@ -341,6 +380,9 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   dayNumToday: {
+    color: colors.leche,
+  },
+  dayNumSelected: {
     color: colors.leche,
   },
   // Square box sized to the star; `position: relative` makes it the
