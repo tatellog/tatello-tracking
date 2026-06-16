@@ -880,19 +880,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   heroInner: {
-    alignItems: 'center',
     width: '100%',
   },
   constellationBox: {
-    // Sangra a los bordes de la pantalla: cuadrada y a todo lo ancho.
+    // Sangra a los bordes (como estaba). SIN aspectRatio/alignSelf aquí: la
+    // altura la define LunarConstellation por su propio svgWrap cuadrado —
+    // forzar aspectRatio en el wrapper medía mal la altura y los elementos de
+    // abajo (progreso, coach) se metían DENTRO de la figura.
     marginHorizontal: -20,
-    alignSelf: 'stretch',
-    aspectRatio: 1,
   },
   heroProgress: {
     width: '100%',
     maxWidth: 300,
-    // La figura grande ya casi toca la barra; un respiro las separa.
+    alignSelf: 'center',
     marginTop: 4,
   },
   heroTopRow: {
