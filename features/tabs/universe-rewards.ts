@@ -41,7 +41,7 @@ export const ACTION_LABEL: Record<UniverseAttributeKey, string> = {
   energia: 'Comida',
   claridad: 'Agua',
   estabilidad: 'Sueño',
-  brillo: 'Check-in',
+  brillo: 'Ánimo',
 }
 
 export type UniverseState = 'empty' | 'partial' | 'almost' | 'complete'
@@ -197,12 +197,13 @@ function estabilidad(input: UniverseInput): UniverseAttribute {
 
 /* ── Brillo ← check-in de bienestar ───────────────────────────────── */
 function brillo(input: UniverseInput): UniverseAttribute {
-  // Registrar la energía completa el Brillo — el atributo premia el
-  // gesto de escucharse, no el nivel reportado (energía 1 vale igual
-  // que 5: contarlo ES el ritual). Otra señal (ánimo/estrés) deja el
-  // atributo en 70 — "casi", un pull suave hacia el check-in de
-  // energía, que es la señal que más alimenta el motor de patrones.
-  const pct = input.energy != null ? 100 : input.hasWellbeingSignal ? 70 : 0
+  // El Ánimo premia el GESTO de escucharte, no el nivel ni una dimensión
+  // en particular: registrar cómo amaneciste —energía, motivación o calma,
+  // cualquiera de las tres cuenta IGUAL— completa el Brillo. (Antes exigía
+  // la energía y dejaba en 70 si solo registrabas las otras dos: un
+  // privilegio arbitrario que confundía y castigaba un check-in válido.)
+  const done = input.energy != null || input.hasWellbeingSignal
+  const pct = done ? 100 : 0
   const state = stateForPct(pct)
   return {
     key: 'brillo',
@@ -311,13 +312,12 @@ export function detailForAttribute(
       return { essence, grows: ATTRIBUTE_GROWS.estabilidad, lines }
     }
     case 'brillo': {
-      const value =
-        input.energy != null
-          ? 'Hecho ✓'
-          : input.hasWellbeingSignal
-            ? 'Una señal tuya ✓'
-            : 'Te espera'
-      return { essence, grows: ATTRIBUTE_GROWS.brillo, lines: [{ label: 'Check-in', value }] }
+      const done = input.energy != null || input.hasWellbeingSignal
+      return {
+        essence,
+        grows: ATTRIBUTE_GROWS.brillo,
+        lines: [{ label: 'Ánimo', value: done ? 'Hecho ✓' : 'Te espera' }],
+      }
     }
   }
 }

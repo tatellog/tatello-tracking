@@ -288,11 +288,8 @@ function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string 
       }
       return input.restedToday ? 'Descanso hoy' : 'Aún sin sueño'
     case 'brillo':
-      return input.energy != null
-        ? 'Check-in hecho'
-        : input.hasWellbeingSignal
-          ? 'Una señal tuya'
-          : 'Te espera'
+      // Cualquier dimensión del check-in (energía/motivación/calma) cuenta.
+      return input.energy != null || input.hasWellbeingSignal ? 'Hecho ✓' : 'Te espera'
   }
 }
 

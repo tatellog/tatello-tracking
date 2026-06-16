@@ -379,7 +379,7 @@ describe('Brillo — check-in de bienestar', () => {
     expect(brillo.state).toBe('complete')
   })
 
-  it('energy null + hasWellbeingSignal → 70 pct almost (pull suave hacia el check-in de energía)', () => {
+  it('energy null + otra señal (motivación/calma) → 100 pct complete (las 3 cuentan igual)', () => {
     const result = calculateTodayUniverseRewards({
       ...base,
       energy: null,
@@ -387,9 +387,8 @@ describe('Brillo — check-in de bienestar', () => {
     })
     const brillo = result.find((a) => a.key === 'brillo')!
 
-    expect(brillo.pct).toBe(70)
-    expect(brillo.state).toBe('almost')
-    expect(brillo.microcopy).toBe('Casi se alinea.')
+    expect(brillo.pct).toBe(100)
+    expect(brillo.state).toBe('complete')
   })
 
   it('sin ninguna señal de bienestar → 0 pct empty', () => {
@@ -494,12 +493,13 @@ describe('detailForAttribute', () => {
     ])
   })
 
-  it('brillo: hecho / una señal / te espera', () => {
+  it('brillo (Ánimo): hecho con cualquier señal / te espera', () => {
     expect(detailForAttribute('brillo', { ...base, energy: 3 }).lines[0]?.value).toBe('Hecho ✓')
     expect(
       detailForAttribute('brillo', { ...base, hasWellbeingSignal: true }).lines[0]?.value,
-    ).toBe('Una señal tuya ✓')
+    ).toBe('Hecho ✓')
     expect(detailForAttribute('brillo', base).lines[0]?.value).toBe('Te espera')
+    expect(detailForAttribute('brillo', { ...base, energy: 3 }).lines[0]?.label).toBe('Ánimo')
   })
 
   it('cada atributo trae su esencia en voz del coach', () => {
