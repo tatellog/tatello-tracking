@@ -209,7 +209,7 @@ export function LunarConstellation({
       return
     }
     figureReveal.value = 0
-    figureReveal.value = withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.cubic) })
+    figureReveal.value = withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.cubic) })
   }, [canvasReady, focused, reduceMotion, figureReveal])
   const { ignitingKey, igniteT, numberPulse, displayedCount, litPulse, radialPulse, plusOne } =
     useIgnitionEngine({ trainedCount, elementsLit, sequence, trained, todayIdx })

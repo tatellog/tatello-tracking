@@ -108,6 +108,7 @@ export const SkiaFigure = memo(function SkiaFigure({
             lit={l.lit}
             litIndex={l.litIndex}
             reveal={reveal}
+            t={t}
             sScale={sScale}
             reduce={reduce}
           />
@@ -144,7 +145,11 @@ export const SkiaFigure = memo(function SkiaFigure({
  * punta (la "pluma"). Las apagadas quedan como guía tenue, completas. Cero
  * reconstrucción de path por frame — solo escalares en worklets (GPU). */
 const LINE_STAGGER = 0.07
-const LINE_WINDOW = 0.5
+const LINE_WINDOW = 0.62 // ventana de trazado por línea (más ancha = más lento)
+// Pulso de energía CONTINUO que recorre cada línea encendida (sobre `t`, el
+// reloj de 8 s). Traversales por ciclo: < 1 = lento, lee como "energía
+// fluyendo" en vez de un dibujo rápido. La fase por línea las desincroniza.
+const ENERGY_TRAVERSALS = 0.85
 
 function SkiaConstellationLine({
   A,
@@ -152,6 +157,7 @@ function SkiaConstellationLine({
   lit,
   litIndex,
   reveal,
+  t,
   sScale,
   reduce,
 }: {
@@ -160,24 +166,55 @@ function SkiaConstellationLine({
   lit: boolean
   litIndex: number
   reveal: SharedValue<number>
+  t: SharedValue<number>
   sScale: number
   reduce: boolean
 }) {
   const path = `M${A.x.toFixed(1)},${A.y.toFixed(1)}L${B.x.toFixed(1)},${B.y.toFixed(1)}`
   const start = litIndex * LINE_STAGGER
+  const phase = (litIndex * 0.37) % 1
+  const dx = B.x - A.x
+  const dy = B.y - A.y
   const end = useDerivedValue(() => {
     if (!lit || reduce) return 1
     const p = (reveal.value - start) / LINE_WINDOW
     return p < 0 ? 0 : p > 1 ? 1 : p
   })
-  // La chispa que dibuja — en el extremo del trazo mientras 0<end<1.
+  // La chispa que DIBUJA — en el extremo del trazo mientras 0<end<1.
   const tipTransform = useDerivedValue(() => {
     const e = end.value
-    return [{ translateX: A.x + (B.x - A.x) * e }, { translateY: A.y + (B.y - A.y) * e }]
+    return [{ translateX: A.x + dx * e }, { translateY: A.y + dy * e }]
   })
   const tipOpacity = useDerivedValue(() => (end.value > 0.02 && end.value < 0.98 ? 1 : 0))
+  // El pulso de ENERGÍA continuo — recorre la línea en loop lento una vez que
+  // ya está dibujada. Posición = lerp(A,B,u); brilla al medio y se apaga en
+  // los extremos (Math.sin), así "entra y sale" sin pop.
+  const energyTransform = useDerivedValue(() => {
+    const u = (t.value * ENERGY_TRAVERSALS + phase) % 1
+    return [{ translateX: A.x + dx * u }, { translateY: A.y + dy * u }]
+  })
+  const energyOpacity = useDerivedValue(() => {
+    if (!lit || reduce || end.value < 0.85) return 0
+    const u = (t.value * ENERGY_TRAVERSALS + phase) % 1
+    return 0.5 * Math.sin(u * Math.PI)
+  })
   return (
     <>
+      {/* Glow underlay — un trazo ancho y borroso bajo la línea nítida, para
+          que lea como conducto de luz, no como raya geométrica dura. */}
+      {lit ? (
+        <Path
+          path={path}
+          color={CREAM_HOT}
+          style="stroke"
+          strokeWidth={3.4 * sScale}
+          strokeCap="round"
+          opacity={0.16}
+          end={end}
+        >
+          <BlurMask blur={2.2 * sScale} style="normal" />
+        </Path>
+      ) : null}
       <Path
         path={path}
         color={CREAM}
@@ -188,11 +225,20 @@ function SkiaConstellationLine({
         end={end}
       />
       {lit ? (
-        <Group transform={tipTransform} opacity={tipOpacity}>
-          <Circle cx={0} cy={0} r={2 * sScale} color={CREAM_HOT}>
-            <BlurMask blur={2.5 * sScale} style="normal" />
-          </Circle>
-        </Group>
+        <>
+          {/* Chispa que dibuja (one-shot del reveal). */}
+          <Group transform={tipTransform} opacity={tipOpacity}>
+            <Circle cx={0} cy={0} r={2 * sScale} color={CREAM_HOT}>
+              <BlurMask blur={2.5 * sScale} style="normal" />
+            </Circle>
+          </Group>
+          {/* Energía viajando (continuo) — un poco más grande + difuso. */}
+          <Group transform={energyTransform} opacity={energyOpacity}>
+            <Circle cx={0} cy={0} r={2.6 * sScale} color={CREAM_HOT}>
+              <BlurMask blur={3.6 * sScale} style="normal" />
+            </Circle>
+          </Group>
+        </>
       ) : null}
     </>
   )
