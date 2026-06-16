@@ -135,3 +135,67 @@ contenido principal de la pantalla.
 3. Diseño nuevo / illustrator → **sequential thinking** para auto-validar
    (lo más cercano a Genshin Impact, visualmente atractivo) + **uxui** para que
    sea intuitivo y explicativo.
+
+---
+
+## Estado de implementación (rama `polish-tab-hoy`, 2026-06-16)
+
+Trabajo nocturno autónomo. Cada pieza validada (sequential-thinking +
+uxui/manifesto donde aplica) y commiteada por separado.
+
+### ✅ Hecho
+
+- **Hero compacto de constelación** (`d958b14`). León ~450px → **240px**,
+  centrado. Debajo, progreso explícito: `✦ {trained}/{figura}`, barra oro,
+  `{pct}% de tu figura este mes`. Todo el bloque es tappable (link «Ver mis
+  estrellas ›» + barra + press-scale = ≥2 señales) → abre el modal.
+- **Modal "Tu {signo}"** (`d958b14`). Lenguaje de Revelaciones (blur +
+  emblema correcto de Hoy). %, barra, estrellas con nombre ya encendidas y la
+  que sigue. Coherencia de datos arreglada: las estrellas encendidas se
+  derivan de la secuencia REAL de la figura (`namedStarProgress`, +4 tests),
+  ya no de un slice ingenuo que se contradecía con la animación.
+- **Quité el título serif "Tu {signo}"** de Hoy (bajó protagonismo del
+  nombre, subió el del progreso). Queda solo la regla del mecanismo.
+- **Toasts con porqué** (sesión previa): "+27 Energía · por tu comida".
+- **Cards de "Tu universo hoy" con % + fuente** (sesión previa): "66% · 2
+  comidas hoy".
+- **Día seleccionado del calendario MUY evidente** (`63c72da`): halo magenta
+  - número/inicial en leche + **caret conectado** (estilo GitHub graph) que
+    ata la columna con su panel de detalle.
+- **"Tu día" — checklist emocional** (`fec905f`). Fila de 5 rituales (Día ·
+  Comida · Agua · Sueño · Ánimo) sobre la constelación: de un vistazo, qué
+  registré. Mueve el foco al registro (modelo Duolingo) sin volverse otra
+  recompensa. Manifiesto-safe (lo no-registrado = estrella por encender, no
+  tarea fallida; frase de cierre solo al completar). Tocar un ritual lleva a
+  su registro (Agua abre la hoja ✦).
+
+### 🔁 Decisiones que tomé con criterio (no al pie de la letra)
+
+- **No reordené Leo DEBAJO de Comidas/Macros.** La compactación del hero ya
+  resuelve la dominancia, y mover el león abajo rompía la cadena
+  acción→consecuencia (marco arriba → el cielo crece). En su lugar puse "Tu
+  día" ENCIMA del hero para mover el foco al registro sin perder esa cadena.
+- **Conservé la voz poética del coach** ("Diez. Ya no es casualidad…") en vez
+  de cambiarla por "10 entrenamientos registrados / 9 restantes". Ahora el
+  progreso explícito YA vive en la barra del hero (10/19 · 53%), así la frase
+  poética es claramente la voz del coach, no el dato. (Si prefieres el cambio
+  literal, es un ajuste de una línea en `getCoachCopy`.)
+
+### ⚠️ Para tu decisión (no lo toqué solo)
+
+- **`StreakLine` ("X días en órbita")**: el manifesto-reviewer la marcó como
+  mecánica de racha rígida (principio 3) — contador prominente que desaparece
+  al caer. La **moví bajo el hero** para alejarla de la capa que orienta, pero
+  **no la quité**: retirar una feature existente es decisión tuya. Si quieres,
+  la suavizo (sin número de días consecutivos) o la retiro.
+- **Color de los chips Agua/Sueño**: reusan `UNIVERSE_ACCENT` (cohesión con
+  las cards del universo). El uxui notó que ese mapeo arrastra colores cuyos
+  nombres no calzan con el atributo. Lo dejé consistente con el universo; si
+  quieres colores "canónicos" por dimensión, hay que tocar `universe-visuals`.
+
+### 🧪 Nota de tests
+
+4 suites fallan en la rama pero son **pre-existentes y ajenas** a este trabajo
+(snapshot de field-stars, umbrales de etapa del emblema, regex de copy de
+tendencia, y `require` de Skia en jest). Mi cambio testeado
+(`derive-progress`) suma 4 tests que pasan.
