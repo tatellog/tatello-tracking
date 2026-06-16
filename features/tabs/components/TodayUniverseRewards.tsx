@@ -24,10 +24,8 @@ import {
 } from '@/features/tabs/pending-universe-detail'
 import { emitUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import {
-  ATTRIBUTE_GROWS,
   calculateTodayUniverseRewards,
   detailForAttribute,
-  STATE_COPY,
   type UniverseAttribute,
   type UniverseAttributeKey,
   type UniverseInput,
@@ -219,6 +217,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
                 <AttributeCard
                   key={attr.key}
                   attr={attr}
+                  source={input ? sourceLineFor(attr.key, input) : ''}
                   reducedMotion={reducedMotion}
                   selected={openKey === attr.key}
                   onPress={() => {
@@ -267,14 +266,43 @@ const ASTRO_CROSS = 'M32 18 V24 M32 40 V46 M18 32 H24 M40 32 H46'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
+// The concrete source behind each attribute's % — what you registered today,
+// in plain numbers (food count, water glasses, sleep, check-in). Replaces the
+// vague "Crece con…" copy so the card answers "¿cuánto y de qué?".
+function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string {
+  switch (key) {
+    case 'energia':
+      return input.mealCount === 0
+        ? 'Aún sin comidas hoy'
+        : `${input.mealCount} ${input.mealCount === 1 ? 'comida' : 'comidas'} hoy`
+    case 'claridad':
+      return `${input.waterGlasses} de ${Math.max(1, input.waterGoalGlasses)} vasos`
+    case 'estabilidad':
+      if (input.sleepMinutes != null) {
+        const h = Math.floor(input.sleepMinutes / 60)
+        const m = input.sleepMinutes % 60
+        return m > 0 ? `${h} h ${m} min de sueño` : `${h} h de sueño`
+      }
+      return input.restedToday ? 'Descanso hoy' : 'Aún sin sueño'
+    case 'brillo':
+      return input.energy != null
+        ? 'Check-in hecho'
+        : input.hasWellbeingSignal
+          ? 'Una señal tuya'
+          : 'Te espera'
+  }
+}
+
 type CardProps = {
   attr: UniverseAttribute
+  /** Concrete source line for the closed card ("2 comidas hoy", "3 de 8 vasos"). */
+  source: string
   reducedMotion: boolean
   selected: boolean
   onPress: () => void
 }
 
-function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
+function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardProps) {
   const accent = UNIVERSE_ACCENT[attr.key]
 
   // Seeded at the CURRENT pct — no mount sweep; only changes animate.
@@ -340,18 +368,6 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
 
   const accentMuted = UNIVERSE_ACCENT_MUTED[attr.key]
   const complete = attr.state === 'complete'
-  // La línea bajo el astro (híbrido "evidencia sí, % no"): por defecto
-  // muestra la EVIDENCIA — qué alimenta el atributo ("Crece con el agua
-  // que registras") — para que el símbolo sea información a simple vista,
-  // sin el número crudo (el % vive en el detalle). El ESTADO lo dice el
-  // anillo + el color del astro, no un texto. EXCEPCIÓN: en `almost` con
-  // faltante concreto, ese hint accionable ("Un vaso y llega") gana — es
-  // más útil cuando estás a un paso, y sigue siendo evidencia.
-  const isGenericCopy = attr.microcopy === STATE_COPY[attr.state]
-  // Serif italic se reserva para la voz del coach — el faltante ES una
-  // línea de coach; la evidencia va en Hanken quieto.
-  const coachVoice = attr.state === 'almost' && !isGenericCopy
-  const cardLine = coachVoice ? attr.microcopy : ATTRIBUTE_GROWS[attr.key]
   // El glifo es el astro: pleno al encenderse, atenuado mientras orbita,
   // apenas niebla en calma.
   const astroColor = complete ? accent : attr.pct > 0 ? accentMuted : colors.niebla
@@ -454,13 +470,15 @@ function AttributeCard({ attr, reducedMotion, selected, onPress }: CardProps) {
           {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
         </View>
 
+        {/* Explicit progress — the % (number, not just the ring) + the
+            concrete source, so the card answers "¿cuánto tengo y de qué?". */}
         <View style={styles.cardFooter}>
-          <Text
-            style={coachVoice ? styles.microCoach : styles.microQuiet}
-            numberOfLines={2}
-            adjustsFontSizeToFit
-          >
-            {cardLine}
+          <Text style={[styles.pctNum, { color: complete ? accent : colors.leche }]}>
+            {attr.pct}
+            <Text style={styles.pctSign}>%</Text>
+          </Text>
+          <Text style={styles.sourceLine} numberOfLines={2} adjustsFontSizeToFit>
+            {source}
           </Text>
         </View>
 
@@ -766,7 +784,21 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    gap: spacing.s2,
+    gap: 1,
+  },
+  // The explicit % — a number, not just the ring. Earned progress in leche /
+  // accent when complete.
+  pctNum: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.deltaNum,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.5,
+  },
+  sourceLine: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    textAlign: 'center',
   },
   // Expand chevron — pinned bottom-centre, quiet niebla (ChevronHint default).
   expandChevron: {
