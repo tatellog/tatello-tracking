@@ -229,17 +229,17 @@ const GLYPH_FRAC = 0.11
 const GLYPH_CY = 0.085
 // (Las constantes HOJAS_* del laurel se retiraron junto con la capa — el
 // laurel sobrecargaba la composición. Viven en git si se quiere reponer.)
-// La constelación natal (el dato real de la usuaria) GANA sobre el emblema,
-// que es el marco/atmósfera poética → el emblema cede a fondo (más tenue +
-// más difuso) para que las dos capas se lean como planos distintos.
-const MASTER_OPACITY = 0.72
-// Marco (aro + laurel): el elemento MÁS tenue — ancla estructural, no
-// foco. Más bajo que el animal a propósito (su línea continua de alto
-// contraste pesa más a igual opacidad). Por debajo de ~0.35 el oro se
-// vuelve gris sucio sobre el fondo y el marco "se rompe".
-const FRAME_OPACITY = 0.42
+// La constelación natal (el dato real de la usuaria) GANA sobre el emblema.
+// SLICE 1 (motion premium / Genshin): el emblema RECEDE a near-void para que
+// las estrellas tengan el contraste y no compitan dos figuras de Leo. Bajado
+// 0.72 → 0.45; el león queda como textura-memoria de fondo, no co-protagonista.
+const MASTER_OPACITY = 0.45
+// Marco (aro): el elemento MÁS tenue — ancla estructural, no foco. Por debajo
+// de ~0.35 el oro se vuelve gris sucio sobre el fondo y el marco "se rompe",
+// así que lo bajo solo a 0.36 (justo arriba del piso).
+const FRAME_OPACITY = 0.36
 // Glifo: acompaña al marco, no al animal.
-const GLYPH_OPACITY = 0.5
+const GLYPH_OPACITY = 0.42
 
 // Bloom: un halo (copia borrosa del animal) que crece hacia el 100 %.
 // Arranca temprano (~30 %) para que se sienta "algo se enciende" pronto;
