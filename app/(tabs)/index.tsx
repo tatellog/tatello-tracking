@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
 import { CelebrateShockwave, HomeError } from '@/features/home/components'
 import { useDayRollover } from '@/features/home/useDayRollover'
@@ -24,7 +25,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
-import { TransformationCard, useTransformProgress } from '@/features/emblem'
+import { TransformationCard, TuLeoModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -50,6 +51,7 @@ import {
   WeekStrip,
 } from '@/features/tabs/components'
 import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
+import { namedStarProgress } from '@/features/tabs/components/constellation/data/derive-progress'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
@@ -314,6 +316,21 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const { progress: emblemProgress } = useTransformProgress()
   const figureCount = ZODIAC[sign].stars.length + ZODIAC[sign].lines.length
 
+  // "Tu {signo}" — el modal de progreso de la constelación, abierto desde el
+  // hero compacto. % y conteo salen de la MISMA fuente (trained/figureCount)
+  // que pinta el hero, así nunca se contradicen.
+  const [tuLeoOpen, setTuLeoOpen] = useState(false)
+  const heroPct = figureCount > 0 ? Math.round((trainedThisMonth / figureCount) * 100) : 0
+  const heroPress = usePressFeedback()
+  // Estrellas con nombre ya encendidas + la que sigue — derivadas de la
+  // secuencia REAL de la constelación (las líneas se intercalan), así el modal
+  // nunca se contradice con la figura animada. Alimentan "lo que ya despertó"
+  // y "la que sigue".
+  const { lit: litStars, next: nextStar } = useMemo(
+    () => namedStarProgress(ZODIAC[sign], trainedThisMonth),
+    [sign, trainedThisMonth],
+  )
+
   const isFirstDay = !profile?.first_workout_at && !ctx.today_workout_completed
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
@@ -485,41 +502,88 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <StreakLine streak={ctx.streak_days} onPress={() => scrollToY(monthY.current)} />
             </Animated.View>
 
+            {/* El título serif "Tu {signo}" se retiró: el hero ya es la unidad
+                de la constelación (figura + progreso + nombre tras el tap), y
+                la crítica pidió BAJAR el protagonismo del nombre y SUBIR el del
+                progreso. Queda solo la regla — DESCRIPCIÓN del mecanismo (no
+                prescripción): referencia el marcador «Entrené» que la usuaria
+                ya toca. La constelación responde SOLO a ese marcador;
+                comida/agua/sueño alimentan el universo, no las estrellas. */}
             <Animated.View entering={enter(220)} style={styles.constellationHeader}>
-              <Text style={styles.constellationHeaderText}>Tu {signLabel}</Text>
-              {/* La regla principal como DESCRIPCIÓN del mecanismo (no
-                  prescripción): referencia el marcador «Entrené» que la
-                  usuaria ya toca, en vez de "cuando entrenas" (imperativo
-                  encubierto). La constelación responde SOLO a ese marcador;
-                  comida/agua/sueño alimentan el universo, no las estrellas. */}
               <Text style={styles.constellationRule}>Cada «Entrené» enciende una estrella.</Text>
             </Animated.View>
 
-            <Animated.View entering={enter(320)} style={styles.constellationWrap}>
-              <LunarConstellation
-                trained={month.grid}
-                todayIdx={month.todayIdx}
-                target={month.daysInMonth}
-                sign={sign}
-                committed={ctx.today_workout_completed}
-                suppressBurst
-                pausedSV={constellationPaused}
-              />
+            {/* Hero compacto + tappable — el león dejó de ocupar media pantalla;
+                ahora es una consecuencia visible con progreso explícito. Tocarlo
+                abre "Tu {signo}" (modal de progreso). ≥2 señales: link «Ver mis
+                estrellas ›» (chevron) + barra/% explícitos + press-scale. */}
+            <Animated.View entering={enter(320)} style={styles.heroWrap}>
+              <Pressable
+                onPress={() => {
+                  heroPress.triggerHaptic()
+                  setTuLeoOpen(true)
+                  track('hoy_constellation_opened', {
+                    trained: trainedThisMonth,
+                    total: figureCount,
+                    pct: heroPct,
+                  })
+                }}
+                onPressIn={heroPress.onPressIn}
+                onPressOut={heroPress.onPressOut}
+                accessibilityRole="button"
+                accessibilityLabel={`Tu ${signLabel}. ${heroPct} por ciento de tu figura, ${trainedThisMonth} de ${figureCount}. Ver tus estrellas`}
+              >
+                <Animated.View style={[styles.heroInner, heroPress.animatedStyle]}>
+                  <View style={styles.constellationBox}>
+                    <LunarConstellation
+                      trained={month.grid}
+                      todayIdx={month.todayIdx}
+                      target={month.daysInMonth}
+                      sign={sign}
+                      committed={ctx.today_workout_completed}
+                      suppressBurst
+                      pausedSV={constellationPaused}
+                    />
 
-              {!reducedMotion && celebrateKey > 0 ? (
-                <View pointerEvents="none" style={styles.celebration}>
-                  <LottieView
-                    key={celebrateKey}
-                    source={require('../../assets/lottie/gold-fireworks.json')}
-                    autoPlay
-                    loop={false}
-                    speed={0.6}
-                    resizeMode="contain"
-                    style={styles.celebrationLottie}
-                    onAnimationFinish={() => setCelebrating(false)}
-                  />
-                </View>
-              ) : null}
+                    {!reducedMotion && celebrateKey > 0 ? (
+                      <View pointerEvents="none" style={styles.celebration}>
+                        <LottieView
+                          key={celebrateKey}
+                          source={require('../../assets/lottie/gold-fireworks.json')}
+                          autoPlay
+                          loop={false}
+                          speed={0.6}
+                          resizeMode="contain"
+                          style={styles.celebrationLottie}
+                          onAnimationFinish={() => setCelebrating(false)}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Progreso explícito — conteo, barra plana y % + el link a
+                      "Ver {signo}" con chevron (la segunda señal de tappable). */}
+                  <View style={styles.heroProgress}>
+                    <View style={styles.heroTopRow}>
+                      <Text style={styles.heroCount}>
+                        <Text style={styles.heroSpark}>✦ </Text>
+                        {trainedThisMonth}
+                        <Text style={styles.heroCountTotal}>/{figureCount}</Text>
+                      </Text>
+                      <View style={styles.heroLink}>
+                        <Text style={styles.heroLinkText}>Ver mis estrellas</Text>
+                        <ChevronHint direction="right" size={16} color={colors.bone} />
+                      </View>
+                    </View>
+                    <View style={styles.heroBarTrack}>
+                      <View style={[styles.heroBarFill, { width: `${heroPct}%` }]} />
+                    </View>
+                    <Text style={styles.heroPctLine}>
+                      <Text style={styles.heroPctNum}>{heroPct}%</Text> de tu figura este mes
+                    </Text>
+                  </View>
+                </Animated.View>
+              </Pressable>
             </Animated.View>
 
             <Animated.View entering={enter(420)} style={styles.coachLineWrap}>
@@ -641,6 +705,17 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         {!reducedMotion && (shockwaveReady || celebrateKey > 0) ? (
           <CelebrateShockwave celebrateKey={celebrateKey} />
         ) : null}
+        {/* "Tu {signo}" — el modal de progreso de la constelación, abierto desde
+            el hero. Lenguaje de Revelaciones (blur + emblema correcto de Hoy). */}
+        <TuLeoModal
+          visible={tuLeoOpen}
+          onClose={() => setTuLeoOpen(false)}
+          signLabel={signLabel}
+          trained={trainedThisMonth}
+          total={figureCount}
+          litStars={litStars}
+          nextStar={nextStar}
+        />
         {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
           El orquestador elige UNA (Regreso > Transformación > Patrón); se
           pinta según su tier: el EMBLEMA para Transformación Y para Regreso
@@ -811,8 +886,75 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
   },
-  constellationWrap: {
-    marginHorizontal: -20,
+  // Hero compacto: el bloque entero (figura + barra) centrado y acotado, ya
+  // no full-bleed. El león es ahora ~240px, no ~450 — deja de dominar Hoy.
+  heroWrap: {
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  heroInner: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  constellationBox: {
+    width: 240,
+    aspectRatio: 1,
+    alignSelf: 'center',
+  },
+  heroProgress: {
+    width: '100%',
+    maxWidth: 300,
+    marginTop: 10,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 7,
+  },
+  heroCount: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.title,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  heroSpark: {
+    color: colors.oro,
+  },
+  heroCountTotal: {
+    color: colors.niebla,
+  },
+  heroLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+  },
+  heroLinkText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.2,
+  },
+  heroBarTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.hairline,
+    overflow: 'hidden',
+  },
+  heroBarFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.oro,
+  },
+  heroPctLine: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    marginTop: 7,
+  },
+  heroPctNum: {
+    fontFamily: typography.uiBold,
+    color: colors.bone,
   },
   celebration: {
     ...StyleSheet.absoluteFillObject,
@@ -823,14 +965,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  constellationHeaderText: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: 26,
-    color: colors.leche,
-    letterSpacing: 1.0,
-  },
-  // La regla de la constelación — UI quieta (niebla), bajo el título.
+  // La regla de la constelación — UI quieta (niebla), sobre el hero.
   constellationRule: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.micro,

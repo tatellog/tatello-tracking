@@ -55,6 +55,61 @@ export function figureElementCount(zodiac: ZodiacDef): number {
   return zodiac.stars.length + zodiac.lines.length
 }
 
+/** The figure ignition order — stars + lines, each line preceded by both
+ *  its endpoint stars; leftover stars trail at the end. The single source
+ *  of truth for "what lights in which order", shared by deriveProgress (full
+ *  sequence + field stars) and namedStarProgress (the named-star view). */
+export function buildFigureSequence(zodiac: ZodiacDef): SequenceEl[] {
+  const figureSeq: SequenceEl[] = []
+  const seen = new Set<number>()
+  const nStars = zodiac.stars.length
+  if (nStars > 0) {
+    figureSeq.push({ type: 'star', idx: 0 })
+    seen.add(0)
+  }
+  zodiac.lines.forEach((ln, lineIdx) => {
+    const [a, b] = ln
+    if (!seen.has(a)) {
+      figureSeq.push({ type: 'star', idx: a })
+      seen.add(a)
+    }
+    if (!seen.has(b)) {
+      figureSeq.push({ type: 'star', idx: b })
+      seen.add(b)
+    }
+    figureSeq.push({ type: 'line', idx: lineIdx })
+  })
+  for (let i = 0; i < nStars; i++) {
+    if (!seen.has(i)) figureSeq.push({ type: 'star', idx: i })
+  }
+  return figureSeq
+}
+
+export type NamedStar = { name: string; role: string }
+
+/** Which NAMED figure stars have already lit (in ignition order) and which
+ *  named star lights next — derived from the REAL sequence, so it stays
+ *  coherent with the constellation animation. NOT a naive slice of the named
+ *  stars: lines interleave, so a named star at sequence position N only lights
+ *  when `trainedCount > N`, not at its index among the named stars. */
+export function namedStarProgress(
+  zodiac: ZodiacDef,
+  trainedCount: number,
+): { lit: NamedStar[]; next: NamedStar | null } {
+  const seq = buildFigureSequence(zodiac)
+  const lit: NamedStar[] = []
+  let next: NamedStar | null = null
+  seq.forEach((el, pos) => {
+    if (el.type !== 'star') return
+    const s = zodiac.stars[el.idx]
+    if (!s || typeof s.name !== 'string' || typeof s.role !== 'string') return
+    const named: NamedStar = { name: s.name, role: s.role }
+    if (pos < trainedCount) lit.push(named)
+    else if (next === null) next = named
+  })
+  return { lit, next }
+}
+
 export function deriveProgress(
   trained: readonly boolean[],
   todayIdx: number,
@@ -83,31 +138,10 @@ export function deriveProgress(
   intensity: number
 } {
   const count = trained.slice(0, todayIdx + 1).filter(Boolean).length
-  const nStars = zodiac.stars.length
 
   // ── Figure sequence — stars + lines, each line preceded by both
   //    its endpoint stars; leftover stars trail at the end. ──
-  const figureSeq: SequenceEl[] = []
-  const seen = new Set<number>()
-  if (nStars > 0) {
-    figureSeq.push({ type: 'star', idx: 0 })
-    seen.add(0)
-  }
-  zodiac.lines.forEach((ln, lineIdx) => {
-    const [a, b] = ln
-    if (!seen.has(a)) {
-      figureSeq.push({ type: 'star', idx: a })
-      seen.add(a)
-    }
-    if (!seen.has(b)) {
-      figureSeq.push({ type: 'star', idx: b })
-      seen.add(b)
-    }
-    figureSeq.push({ type: 'line', idx: lineIdx })
-  })
-  for (let i = 0; i < nStars; i++) {
-    if (!seen.has(i)) figureSeq.push({ type: 'star', idx: i })
-  }
+  const figureSeq = buildFigureSequence(zodiac)
 
   // ── The figure leads (front-loaded), then "luz extra" field stars
   //    fill the rest of the month. So the asterism completes at an

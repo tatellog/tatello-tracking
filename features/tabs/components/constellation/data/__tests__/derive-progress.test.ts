@@ -1,6 +1,11 @@
 import { ZODIAC } from '../../../../zodiac/data'
 import { TARGET_DAYS } from '../../constants'
-import { buildFieldStars, deriveProgress } from '../derive-progress'
+import {
+  buildFieldStars,
+  buildFigureSequence,
+  deriveProgress,
+  namedStarProgress,
+} from '../derive-progress'
 
 function trainedOf(count: number): boolean[] {
   return Array.from({ length: 28 }, (_, i) => i < count)
@@ -91,6 +96,67 @@ describe('deriveProgress', () => {
 
   it('snapshot — aries · 7 marked · todayIdx 7', () => {
     expect(deriveProgress(trainedOf(7), 7, ZODIAC.aries)).toMatchSnapshot()
+  })
+})
+
+describe('namedStarProgress', () => {
+  // A sign whose lit-star list the modal renders. Leo is the default sign and
+  // the one the critique called out by name.
+  const sign = 'leo' as const
+
+  it('lights named stars in the REAL sequence order, not their index among names', () => {
+    // The bug this guards: lines interleave with stars, so a named star at
+    // sequence position N only lights when trainedCount > N — never at its
+    // position in the names-only list. `lit` must be a prefix of the named
+    // stars ordered by sequence position.
+    const seq = buildFigureSequence(ZODIAC[sign])
+    const namedInSeqOrder = seq
+      .filter((el) => el.type === 'star')
+      .map((el) => ZODIAC[sign].stars[el.idx]!)
+      .filter((s) => typeof s.name === 'string')
+      .map((s) => s.name)
+
+    const trained = 5
+    const { lit } = namedStarProgress(ZODIAC[sign], trained)
+    // Every lit named star sits at a sequence position < trained.
+    for (const star of lit) {
+      const pos = seq.findIndex(
+        (el) => el.type === 'star' && ZODIAC[sign].stars[el.idx]!.name === star.name,
+      )
+      expect(pos).toBeLessThan(trained)
+    }
+    // …and they appear in sequence order (a prefix of the named-in-seq list).
+    expect(lit.map((s) => s.name)).toEqual(
+      namedInSeqOrder.filter((name) => {
+        const pos = seq.findIndex(
+          (el) => el.type === 'star' && ZODIAC[sign].stars[el.idx]!.name === name,
+        )
+        return pos < trained
+      }),
+    )
+  })
+
+  it('reports no lit stars and the first named star as next at zero', () => {
+    const { lit, next } = namedStarProgress(ZODIAC[sign], 0)
+    expect(lit).toHaveLength(0)
+    expect(next).not.toBeNull()
+  })
+
+  it('exposes a next star until the named stars run out', () => {
+    const { next } = namedStarProgress(ZODIAC[sign], 1)
+    expect(next).not.toBeNull()
+    expect(typeof next!.name).toBe('string')
+    expect(typeof next!.role).toBe('string')
+  })
+
+  it('returns next=null once every named star is lit', () => {
+    const seq = buildFigureSequence(ZODIAC[sign])
+    const { lit, next } = namedStarProgress(ZODIAC[sign], seq.length)
+    expect(next).toBeNull()
+    const totalNamed = seq.filter(
+      (el) => el.type === 'star' && typeof ZODIAC[sign].stars[el.idx]!.name === 'string',
+    ).length
+    expect(lit).toHaveLength(totalNamed)
   })
 })
 

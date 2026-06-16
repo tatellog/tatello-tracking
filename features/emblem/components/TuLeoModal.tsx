@@ -3,12 +3,8 @@ import { BlurView } from 'expo-blur'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
-import LeoConstellationOverlay from '@/assets/zodiac-art/leo-constellation-overlay.svg'
-import LeoMapDivider from '@/assets/zodiac-art/leo-map-divider.svg'
 import LeoEmblemArt from '@/assets/zodiac-art/leo-emblem.svg'
 import { colors, radius, spacing, typography } from '@/theme'
-
-import { EMBLEM_STAGES, type EmblemStage, withSign } from '../logic'
 
 export type LeoStar = { name: string; role: string }
 
@@ -17,62 +13,40 @@ type TuLeoModalProps = {
   onClose: () => void
   /** "Leo" — the sign label. */
   signLabel: string
-  /** Current emblem stage (drives the hero line + the journey marker). */
-  stage: EmblemStage
-  /** Emblem % revealed — kept as a quiet reference next to the stage label. */
-  progress: number
-  /** Named figure stars that movement has lit, in lighting order. */
+  /** Figure stars lit THIS MONTH (via «Entrené») + the figure total. */
+  trained: number
+  total: number
+  /** Named figure stars already lit, in lighting order. */
   litStars: LeoStar[]
-  /** The next figure star to light (named, no countdown), if any. */
+  /** The next star to light (named, anticipation — not a countdown). */
   nextStar: LeoStar | null
 }
 
-// The hero is a square: the gold lion (emblem) + the magenta constellation
-// overlaid on its anatomy share viewBox 1024² so they stack pixel-perfect at
-// the same size. The halo frame sits behind, slightly larger.
-const HERO_SIZE = 244
-const HALO_SIZE = 300
-
-// One-line qualitative gloss per emblem stage (from EMBLEM_STAGES' anatomical
-// reveal notes) — anticipation by quality, never %/locks.
-const STAGE_GLOSS: Record<string, string> = {
-  despierta: 'los primeros trazos',
-  forma: 'su forma se dibuja',
-  revela: 'su melena aparece',
-  casi: 'empieza a resplandecer',
-  completo: 'oro pleno',
-}
-
 /**
- * "Tu Leo" — the celestial reliquary behind the hero constellation. Opened by
- * tapping the figure on Hoy, over a blurred Hoy (like PatternReveal). A calm
- * read of your Leo: the HERO (the gold lion with Leo's asterism lit in magenta
- * over its anatomy — emblem + constellation as one rich image, like a luxury
- * star chart), its transformation stage, the JOURNEY of stages (qualitative,
- * no goal), and the map of figure stars your movement has lit. No countdowns,
- * no actions — only ✕. A space to look, not to do.
+ * "Tu Leo" — opened from the compact constellation hero on Hoy, over a blurred
+ * Hoy (revelaciones language). PROGRESS-FOCUSED per the product critique: the
+ * explicit % + count of the month's figure, the named stars lit so far, and
+ * what's next — so it answers "¿cuánto llevo y qué sigue?", not just "mira el
+ * arte". The gold lion is the representative art of your Leo; the data is the
+ * monthly constellation. No actions; the only control is ✕.
  */
 export function TuLeoModal({
   visible,
   onClose,
   signLabel,
-  stage,
-  progress,
+  trained,
+  total,
   litStars,
   nextStar,
 }: TuLeoModalProps) {
-  const heroLine = withSign(stage.message, signLabel)
-  const stageIndex = Math.max(
-    0,
-    EMBLEM_STAGES.findIndex((s) => s.key === stage.key),
-  )
-  // Halo brightens with the stage (brasa → pleno) — light grows with the arc.
-  const haloOpacity = 0.35 + (stageIndex / (EMBLEM_STAGES.length - 1)) * 0.55
+  const pct = total > 0 ? Math.round((trained / total) * 100) : 0
+  // Halo brightens with progress — light grows as the figure fills.
+  const haloOpacity = 0.3 + (pct / 100) * 0.6
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.root}>
-        {/* Blurred, dimmed Hoy behind — the reliquary floats over the cosmos. */}
+        {/* Blurred, dimmed Hoy behind — same language as the revelations. */}
         <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
         <Pressable style={styles.scrim} onPress={onClose}>
           {/* Inner press swallows taps so they don't close via the backdrop. */}
@@ -94,61 +68,33 @@ export function TuLeoModal({
             >
               <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
 
-              {/* HERO · the gold lion with Leo's constellation lit in magenta
-                  over its anatomy. Halo behind (stage-bright), then the emblem,
-                  then the constellation overlay — both at HERO_SIZE so the
-                  stars fall on chest / mane / haunches. One rich image. */}
-              <View style={styles.heroWrap}>
+              <View style={styles.emblemWrap}>
                 <EmblemHalo
-                  width={HALO_SIZE}
-                  height={HALO_SIZE}
+                  width={196}
+                  height={196}
                   style={[styles.halo, { opacity: haloOpacity }]}
                 />
-                <LeoEmblemArt width={HERO_SIZE} height={HERO_SIZE} />
-                <LeoConstellationOverlay
-                  width={HERO_SIZE}
-                  height={HERO_SIZE}
-                  color={colors.magenta}
-                  style={styles.overlay}
-                />
+                <LeoEmblemArt width={128} height={128} />
               </View>
 
-              {/* Stage as hero — coach voice. % kept small, as reference. */}
-              <Text style={styles.heroLine}>{heroLine}</Text>
-              <Text style={styles.stageMeta}>
-                {stage.label} · {progress}% revelado
+              {/* Explicit progress — the number, big. */}
+              <Text style={styles.pct}>
+                {pct}
+                <Text style={styles.pctSign}>%</Text>
               </Text>
+              <Text style={styles.pctCaption}>de tu figura este mes</Text>
 
-              {/* The journey of 5 stages — where you are, qualitatively. No
-                  bar, no locks: lived stages glow oro, those ahead are named
-                  in ember (anticipation, never a countdown). */}
-              <View style={styles.section}>
-                <Text style={styles.sectionEyebrow}>El viaje de tu {signLabel}</Text>
-                {EMBLEM_STAGES.map((s, i) => {
-                  const reached = i <= stageIndex
-                  const current = i === stageIndex
-                  return (
-                    <View key={s.key} style={styles.journeyRow}>
-                      <Text style={[styles.journeyDot, reached && styles.journeyDotOn]}>
-                        {reached ? '✦' : '·'}
-                      </Text>
-                      <Text style={[styles.journeyLabel, !reached && styles.journeyLabelFuture]}>
-                        {s.label}
-                      </Text>
-                      <Text style={styles.journeyGloss} numberOfLines={1}>
-                        {current ? 'aquí vas' : STAGE_GLOSS[s.key]}
-                      </Text>
-                    </View>
-                  )
-                })}
+              <View style={styles.barTrack}>
+                <View style={[styles.barFill, { width: `${pct}%` }]} />
+                <Text style={[styles.barSpark, { left: `${pct}%` }]}>✦</Text>
               </View>
+              <Text style={styles.countLine}>
+                {trained} de {total} luces encendidas
+              </Text>
 
               {litStars.length > 0 ? (
                 <View style={styles.section}>
-                  <LeoMapDivider width={260} height={15} style={styles.divider} />
-                  {/* Honest source: the figure's stars light from "Entrené"
-                      (movement), distinct from the emblem's all-habit reveal. */}
-                  <Text style={styles.sectionEyebrow}>Lo que tu movimiento ha encendido</Text>
+                  <Text style={styles.sectionEyebrow}>Lo que ya despertó</Text>
                   {litStars.map((s) => (
                     <View key={s.name} style={styles.starRow}>
                       <Text style={styles.starDot}>✦</Text>
@@ -158,16 +104,31 @@ export function TuLeoModal({
                       </Text>
                     </View>
                   ))}
-                  {nextStar ? (
-                    <Text style={styles.comingLine}>
-                      La que sigue: <Text style={styles.comingEm}>{nextStar.name}</Text> —{' '}
-                      {nextStar.role}.
-                    </Text>
-                  ) : null}
                 </View>
               ) : null}
 
-              <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
+              {/* Anticipación, no countdown. Tres estados:
+                  · queda una estrella con nombre → la nombramos (lo más rico)
+                  · ya no quedan nombres pero la figura sigue → "se sigue tejiendo"
+                    (las líneas que conectan no llevan nombre)
+                  · figura completa → la luz extra de cada «Entrené». */}
+              {nextStar ? (
+                <Text style={styles.comingLine}>
+                  La que sigue: <Text style={styles.comingEm}>{nextStar.name}</Text> —{' '}
+                  {nextStar.role}.
+                </Text>
+              ) : trained < total ? (
+                <Text style={styles.comingLine}>
+                  Tu figura se sigue <Text style={styles.comingEm}>tejiendo</Text>.
+                </Text>
+              ) : (
+                <Text style={styles.comingLine}>
+                  Tu figura está <Text style={styles.comingEm}>completa</Text>. Cada «Entrené» suma
+                  luz extra.
+                </Text>
+              )}
+
+              <Text style={styles.rule}>Cada «Entrené» enciende una estrella de tu figura.</Text>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -177,9 +138,7 @@ export function TuLeoModal({
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   scrim: {
     flex: 1,
     backgroundColor: 'rgba(10, 6, 8, 0.4)',
@@ -204,57 +163,66 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
-  close: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    zIndex: 2,
-  },
+  close: { position: 'absolute', top: spacing.md, right: spacing.md, zIndex: 2 },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.micro,
     letterSpacing: typography.letterSpacing.uppercaseMed,
     color: colors.magenta,
   },
-  // ── Hero (lion + constellation overlay) ───────────────────────────
-  heroWrap: {
-    width: HALO_SIZE,
-    height: HALO_SIZE,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+  emblemWrap: {
+    width: 196,
+    height: 196,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  halo: {
-    position: 'absolute',
-  },
-  // The overlay shares the emblem's viewBox + size, so absolute-centering it
-  // over the emblem lands every star on the lion's anatomy.
-  overlay: {
-    position: 'absolute',
-    width: HERO_SIZE,
-    height: HERO_SIZE,
-  },
-  heroLine: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.headingLg,
-    lineHeight: typography.sizes.headingLg * typography.lineHeight.statement,
+  halo: { position: 'absolute' },
+  pct: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.streakNum,
     color: colors.leche,
-    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -1,
   },
-  stageMeta: {
+  pctSign: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
+    fontSize: typography.sizes.heading,
     color: colors.niebla,
-    marginTop: spacing.sm,
-    letterSpacing: 0.3,
   },
-  section: {
+  pctCaption: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.md,
+  },
+  // Progress bar — flat views (rail + fill + spark), like the RevealBar.
+  barTrack: {
     alignSelf: 'stretch',
-    marginTop: spacing.xl,
-    gap: spacing.sm,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.hairline,
+    overflow: 'visible',
   },
+  barFill: { height: '100%', borderRadius: 999, backgroundColor: colors.oro },
+  barSpark: {
+    position: 'absolute',
+    top: -6,
+    marginLeft: -7,
+    fontSize: 13,
+    color: colors.oroLeche,
+    textShadowColor: colors.magentaGlow,
+    textShadowRadius: 6,
+  },
+  countLine: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    marginTop: spacing.sm,
+  },
+  section: { alignSelf: 'stretch', marginTop: spacing.xl, gap: spacing.sm },
   sectionEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -263,59 +231,9 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: spacing.xs,
   },
-  // ── Journey rows ──────────────────────────────────────────────────
-  journeyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  journeyDot: {
-    width: 14,
-    textAlign: 'center',
-    fontSize: typography.sizes.smallLabel,
-    color: colors.bruma,
-  },
-  journeyDotOn: {
-    color: colors.oro,
-  },
-  journeyLabel: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-  },
-  journeyLabelFuture: {
-    color: colors.niebla,
-  },
-  journeyGloss: {
-    flexShrink: 1,
-    marginLeft: 'auto',
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  divider: {
-    alignSelf: 'center',
-    marginBottom: spacing.sm,
-    opacity: 0.9,
-  },
-  // ── Figure star list ──────────────────────────────────────────────
-  starRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  // Oro dot (not magenta) — gold is earned progress; magenta stays reserved
-  // for "la que sigue".
-  starDot: {
-    fontSize: typography.sizes.smallLabel,
-    color: colors.oro,
-  },
-  starName: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-  },
+  starRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  starDot: { fontSize: typography.sizes.smallLabel, color: colors.oro },
+  starName: { fontFamily: typography.uiSemi, fontSize: typography.sizes.body, color: colors.leche },
   starRole: {
     flexShrink: 1,
     fontFamily: typography.serif,
@@ -324,17 +242,15 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   comingLine: {
+    alignSelf: 'stretch',
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     lineHeight: typography.sizes.body * typography.lineHeight.body,
     color: colors.bone,
-    marginTop: spacing.xs,
+    marginTop: spacing.lg,
   },
-  comingEm: {
-    fontFamily: typography.uiBold,
-    color: colors.magenta,
-  },
-  guarantee: {
+  comingEm: { fontFamily: typography.uiBold, color: colors.magenta },
+  rule: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.bodyLarge,
