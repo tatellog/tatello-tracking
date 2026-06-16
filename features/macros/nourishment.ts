@@ -14,7 +14,14 @@
  * a quiet context fact in the moon card instead.
  */
 
-export type ConsistencyScore = { hit: number; total: number }
+export type ConsistencyScore = {
+  hit: number
+  total: number
+  /** Cumplimiento por día en la ventana, MÁS VIEJO→MÁS NUEVO (hoy al final).
+   *  Cada punto de la fila se enciende en SU día real — con huecos donde no
+   *  estuvo presente, no apilados a la izquierda como una barra/streak. */
+  days: boolean[]
+}
 
 export type NourishmentConsistency = {
   /** `null` when no protein reference is set — the row is then hidden,
@@ -46,14 +53,19 @@ export function computeNourishmentConsistency(args: {
   const total = dates.length
   const goal = Math.max(1, waterGoalGlasses)
 
-  const aguaHit = dates.filter((d) => (waterByDate[d] ?? 0) >= goal).length
-  const proteinHit =
+  // Booleano por día (mismo orden que `dates`: viejo→nuevo) para encender
+  // cada punto en su día real; el conteo es la suma de los true.
+  const aguaDays = dates.map((d) => (waterByDate[d] ?? 0) >= goal)
+  const proteinDays =
     proteinTarget == null || proteinTarget <= 0
       ? null
-      : dates.filter((d) => (proteinByDate.get(d) ?? 0) >= proteinTarget).length
+      : dates.map((d) => (proteinByDate.get(d) ?? 0) >= proteinTarget)
 
   return {
-    protein: proteinHit == null ? null : { hit: proteinHit, total },
-    agua: { hit: aguaHit, total },
+    protein:
+      proteinDays == null
+        ? null
+        : { hit: proteinDays.filter(Boolean).length, total, days: proteinDays },
+    agua: { hit: aguaDays.filter(Boolean).length, total, days: aguaDays },
   }
 }

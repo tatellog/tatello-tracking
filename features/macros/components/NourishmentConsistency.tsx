@@ -45,14 +45,21 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
     )
   } else {
     body = (
-      <View style={styles.rows}>
-        {data.protein ? (
-          <ScoreRow label="Proteína" score={data.protein} glyph={<ProteinGlyph />} />
-        ) : (
-          <InviteRow onPress={onAddReference} />
-        )}
-        <ScoreRow label="Agua" score={data.agua} glyph={<AguaGlyph />} />
-      </View>
+      <>
+        {/* Qué son las cifras: "X de 10 días" + el punto = un día real. Sin
+            esto, "1 de 10" y los puntos leían como meta/streak. */}
+        <Text style={styles.subtitle}>
+          Tus últimos {data.agua.total} días. Cada punto se enciende el día que estuvo presente.
+        </Text>
+        <View style={styles.rows}>
+          {data.protein ? (
+            <ScoreRow label="Proteína" score={data.protein} glyph={<ProteinGlyph />} />
+          ) : (
+            <InviteRow onPress={onAddReference} />
+          )}
+          <ScoreRow label="Agua" score={data.agua} glyph={<AguaGlyph />} />
+        </View>
+      </>
     )
   }
 
@@ -106,14 +113,15 @@ function InviteRow({ onPress }: { onPress?: () => void }) {
   )
 }
 
-/* A row of `total` dots, the first `hit` lit. Lit = magenta, unlit =
- * hairline. No "missing" colour: an unlit dot is simply a day still
- * open, never a failure. */
+/* Un punto por día de la ventana (viejo→nuevo), encendido en SU día real.
+ * Lit = magenta, unlit = hairline. Sin color de "falla": un punto apagado
+ * es solo un día que no estuvo presente, nunca un veredicto. Mostrar el día
+ * real (con huecos) evita que se lea como barra-hacia-una-meta o streak. */
 function Dots({ score }: { score: ConsistencyScore }) {
   return (
     <View style={styles.dots}>
-      {Array.from({ length: score.total }, (_, i) => (
-        <View key={i} style={[styles.dot, i < score.hit ? styles.dotOn : styles.dotOff]} />
+      {score.days.map((on, i) => (
+        <View key={i} style={[styles.dot, on ? styles.dotOn : styles.dotOff]} />
       ))}
     </View>
   )
@@ -171,6 +179,15 @@ const styles = StyleSheet.create({
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  // Texto-ayuda (no voz del coach → Hanken upright, no serif italic):
+  // explica qué cuentan las filas para que "X de 10" no confunda.
+  subtitle: {
+    marginTop: 8,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    lineHeight: typography.sizes.label * 1.4,
     color: colors.niebla,
   },
   rows: {

@@ -28,7 +28,20 @@ describe('computeNourishmentConsistency', () => {
       proteinTarget: 112,
       waterGoalGlasses: 8,
     })
-    expect(res.protein).toEqual({ hit: 2, total: 10 })
+    expect(res.protein).toMatchObject({ hit: 2, total: 10 })
+    // Los días se encienden en SU posición real (06-01 y 06-03), no apilados.
+    expect(res.protein?.days).toEqual([
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ])
   })
 
   it('hides the protein row (null) when no reference is set', () => {
@@ -50,7 +63,8 @@ describe('computeNourishmentConsistency', () => {
       proteinTarget: null,
       waterGoalGlasses: 8,
     })
-    expect(res.agua).toEqual({ hit: 2, total: 10 })
+    expect(res.agua).toMatchObject({ hit: 2, total: 10 })
+    expect(res.agua.days.slice(0, 3)).toEqual([true, true, false])
   })
 
   it('ignores meals/water outside the window', () => {
@@ -61,7 +75,7 @@ describe('computeNourishmentConsistency', () => {
       proteinTarget: 100,
       waterGoalGlasses: 8,
     })
-    expect(res.protein).toEqual({ hit: 0, total: 10 })
+    expect(res.protein).toMatchObject({ hit: 0, total: 10 })
     expect(res.agua.hit).toBe(0)
   })
 })

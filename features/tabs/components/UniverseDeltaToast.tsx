@@ -56,22 +56,17 @@ type Props = {
   haptics?: boolean
 }
 
-// El sello ✦ — chispa de cuatro puntas en oro, la firma "esto alimentó
-// tu cielo". Estática.
-function StarSeal({ size = 13 }: { size?: number }) {
+function AttributeGlyph({
+  attrKey,
+  color,
+  size = 18,
+}: {
+  attrKey: UniverseAttributeKey
+  color: string
+  size?: number
+}) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
-        fill={colors.oro}
-      />
-    </Svg>
-  )
-}
-
-function AttributeGlyph({ attrKey, color }: { attrKey: UniverseAttributeKey; color: string }) {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
         d={UNIVERSE_ICON_PATH[attrKey]}
         fill="none"
@@ -81,6 +76,18 @@ function AttributeGlyph({ attrKey, color }: { attrKey: UniverseAttributeKey; col
         strokeLinejoin="round"
       />
     </Svg>
+  )
+}
+
+// El badge de la dimensión — ícono dentro de un aro de su color, ECO del
+// mismo badge de los cards de "Tu universo hoy". Es la respuesta a "¿qué
+// es esto?": el gota-azul = Claridad, la llama-magenta = Energía, etc.
+// Reconocimiento instantáneo y un solo idioma de color en todo el sistema.
+function DimensionBadge({ attrKey, color }: { attrKey: UniverseAttributeKey; color: string }) {
+  return (
+    <View style={[styles.badge, { borderColor: color, backgroundColor: tint(color, '1F') }]}>
+      <AttributeGlyph attrKey={attrKey} color={color} size={17} />
+    </View>
   )
 }
 
@@ -111,8 +118,8 @@ function DeltaPill({ moment, onPress }: { moment: Moment; onPress?: () => void }
       style={[styles.toast, { borderColor: tint(accent, '80'), shadowColor: accent }]}
     >
       <View style={styles.toastRow}>
-        <StarSeal />
-        <AttributeGlyph attrKey={moment.key} color={accent} />
+        {/* El badge de la dimensión LIDERA — color + ícono = "qué es esto". */}
+        <DimensionBadge attrKey={moment.key} color={accent} />
         {/* key=seq re-monta el número en cada acumulación — un pop suave,
             suficiente para sentir que el tap sumó. */}
         <Animated.Text
@@ -122,7 +129,8 @@ function DeltaPill({ moment, onPress }: { moment: Moment; onPress?: () => void }
         >
           +{moment.delta}
         </Animated.Text>
-        <Text style={styles.label}>{ATTRIBUTE_LABEL[moment.key]}</Text>
+        {/* La etiqueta en SU color (no crema): refuerza la identidad. */}
+        <Text style={[styles.label, { color: accent }]}>{ATTRIBUTE_LABEL[moment.key]}</Text>
       </View>
       {/* El porqué — convierte la recompensa en aprendizaje. */}
       <Text style={styles.reason}>{REASON[moment.key]}</Text>
@@ -221,6 +229,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
+  },
+  // El aro de la dimensión — mismo lenguaje que los cards de "Tu universo
+  // hoy": ícono tintado dentro de un círculo de su acento.
+  badge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reason: {
     fontFamily: typography.uiMedium,
