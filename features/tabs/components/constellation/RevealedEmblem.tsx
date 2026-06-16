@@ -7,6 +7,7 @@ import {
   useImage,
 } from '@shopify/react-native-skia'
 import { StyleSheet, View } from 'react-native'
+import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -273,6 +274,12 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
   const Glyph = GLYPH_BY_SIGN[sign]
 
   if (size <= 0) return null
+  // No pintar el emblema A MEDIAS mientras los PNGs (aro + animal, ~2 MB c/u)
+  // se decodifican en el cambio de tab — eso causaba el "glifo + arco a medias"
+  // apareciendo tarde. Esperamos a que AMBAS texturas estén listas y entonces
+  // fundimos todo el emblema de una (FadeIn abajo). El fade reencuadra la
+  // demora de carga como un "el emblema emerge", no como un pop tardío.
+  if (!arch || !animal) return null
 
   // Rects con aspect REAL de cada imagen (sin deformar). El arco llena en
   // altura y se centra; el animal va centrado dentro del aro.
@@ -296,7 +303,11 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
   const bloomRadius = size * (0.02 + bloomT * 0.045)
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <Animated.View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      entering={FadeIn.duration(420)}
+    >
       <Canvas style={StyleSheet.absoluteFill}>
         {/* Arco — el MARCO: línea continua de alto contraste, así que va
             a su propia opacidad MÁS BAJA que el animal (a igual opacidad
@@ -352,7 +363,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           <Glyph width="100%" height="100%" color={colors.oro} opacity={GLYPH_OPACITY} />
         </View>
       ) : null}
-    </View>
+    </Animated.View>
   )
 }
 
