@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
+import { subscribeQuickLogRequest } from '@/features/tabs/pending-quicklog'
 import { QuickLogSheet } from './QuickLogSheet'
 
 // A 4-point star with WIDE arms — reads as a "+" (add) AND keeps the
@@ -120,6 +121,10 @@ function QuickLogFab({ onPress }: { onPress: () => void }) {
 export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets()
   const [quickLogVisible, setQuickLogVisible] = useState(false)
+
+  // Permite abrir la hoja ✦ desde fuera — hoy, el chip "Agua" del checklist
+  // "Tu día" (el agua solo se registra aquí, no en una sección de Hoy).
+  useEffect(() => subscribeQuickLogRequest(() => setQuickLogVisible(true)), [])
 
   return (
     <>
