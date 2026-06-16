@@ -502,9 +502,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 la acción del día y su consecuencia visible (el cielo crece). El
                 título serif "Tu {signo}" y la regla flotante se retiraron: el
                 hero es la unidad (figura + progreso + nombre tras el tap), y la
-                regla del mecanismo vive en el modal. Hero compacto + tappable:
-                abre "Tu {signo}". ≥2 señales: chevron junto al conteo +
-                barra/% + press-scale. */}
+                regla del mecanismo vive en el modal. La figura es tappable:
+                abre "Tu {signo}" (press-scale + la pista "toca para ver tus
+                estrellas" debajo). */}
             <Animated.View entering={enter(200)} style={styles.heroWrap}>
               <Pressable
                 onPress={() => {
@@ -524,9 +524,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 <Animated.View style={[styles.heroInner, heroPress.animatedStyle]}>
                   <View style={styles.constellationBox}>
                     {/* El progreso lo lleva el contador NATIVO de la
-                        constelación ("10 / 19 días", animado con el commit).
+                        constelación ("10 / 19 luces", animado con el commit).
                         Ya no hay barra/conteo duplicado aquí abajo; tocar la
-                        figura (press-scale) abre el modal Tu {signo}. */}
+                        figura (press-scale + la pista de abajo) abre el modal. */}
                     <LunarConstellation
                       trained={month.grid}
                       todayIdx={month.todayIdx}
@@ -552,6 +552,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       </View>
                     ) : null}
                   </View>
+                  {/* Señal de tappable (el modal era invisible con solo
+                      press-scale). Texto sutil, NO el chevron flotante que se
+                      veía raro. Se oculta en el estado vacío — ahí el contador
+                      ya muestra su propia invitación. */}
+                  {trainedThisMonth > 0 ? (
+                    <Text style={styles.heroTapHint}>toca para ver tus estrellas ›</Text>
+                  ) : null}
                 </Animated.View>
               </Pressable>
             </Animated.View>
@@ -881,6 +888,15 @@ const styles = StyleSheet.create({
   celebrationLottie: {
     width: '100%',
     height: '100%',
+  },
+  // Pista sutil de que la figura abre el modal — niebla, minúscula.
+  heroTapHint: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginTop: 2,
   },
   coachLineWrap: {
     marginTop: 6,

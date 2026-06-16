@@ -67,6 +67,16 @@ export function CenterNumberOverlay({
     opacity: interpolate(plusOne.value, [0, 0.12, 0.6, 1], [0, 1, 1, 0]),
     transform: [{ translateY: -plusOne.value * 22 }],
   }))
+  // Estado vacío: con 0 encendidas, un "0 / 19" tenue se lee como roto/vacío.
+  // En su lugar, una invitación cálida que además conecta la acción («Entrené»
+  // del toggle de arriba) con la consecuencia (la primera estrella).
+  if (initialCount === 0) {
+    return (
+      <View style={styles.numberOverlay} pointerEvents="none">
+        <Text style={styles.emptyHint}>Tu primera estrella espera tu «Entrené».</Text>
+      </View>
+    )
+  }
   return (
     <View style={styles.numberOverlay} pointerEvents="none">
       <Animated.View style={[styles.numberRow, pulseStyle]}>
@@ -79,7 +89,7 @@ export function CenterNumberOverlay({
           defaultValue={String(initialCount)}
           style={[styles.numberOverlayText, colorStyle]}
         />
-        <Text style={styles.numberDenominator}>/ {target} días</Text>
+        <Text style={styles.numberDenominator}>/ {target} luces</Text>
         <View style={styles.chipFrameLine} />
         <View style={styles.chipFrameDot} />
       </Animated.View>
@@ -132,6 +142,15 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 1.0,
     marginLeft: 6,
+  },
+  // Estado vacío (0 encendidas) — voz del coach, invita sin presionar.
+  emptyHint: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   // Decorative chip frame — thin niebla hairlines + bullet dots
   // flanking the count, so the chip reads as a designed UI element
