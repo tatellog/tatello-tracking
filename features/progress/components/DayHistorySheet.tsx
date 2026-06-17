@@ -20,9 +20,12 @@ import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ChevronHint } from '@/components/ui/interaction'
+import { MilestoneStar } from '@/features/emblem/components/MilestoneStar'
 import { DayDetailContent } from '@/features/tabs/components/calendar/DayDetailContent'
 import type { CalendarDay } from '@/features/tabs/components/calendar/logic'
 import { colors, radius, spacing, typography } from '@/theme'
+
+import { DaySheetAtmosphere, GrabberAstro } from './DaySheetAtmosphere'
 
 type Props = {
   visible: boolean
@@ -41,6 +44,8 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
   // sobre todo tras "Editar día", que navega mientras el sheet se cierra.
   if (!day || !visible) return null
 
+  const hasEvent = day.events.length > 0
+
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <Animated.View entering={FadeIn.duration(160)} style={styles.backdrop}>
@@ -52,7 +57,24 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
           entering={SlideInDown.duration(260)}
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
         >
-          <View style={styles.grabber} />
+          {/* Atmósfera celeste: velo de estrellas + halo dorado tras la fecha.
+              Absolute, detrás del contenido, sin capturar toques. */}
+          <View style={styles.atmosphere} pointerEvents="none">
+            <DaySheetAtmosphere hasEvent={hasEvent} />
+          </View>
+
+          {/* Día con evento (revelación/hito) = día especial: el astro de 4
+              puntas lo distingue sin badge ni gamificación. Un solo astro por
+              sheet, anclado a la derecha junto a la fecha. */}
+          {hasEvent ? (
+            <View style={styles.eventAstro} pointerEvents="none">
+              <MilestoneStar size={56} />
+            </View>
+          ) : null}
+
+          <View style={styles.grabber}>
+            <GrabberAstro bright={hasEvent} />
+          </View>
 
           <Pressable
             style={styles.close}
@@ -66,6 +88,7 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
 
           <DayDetailContent
             day={day}
+            tone="observe"
             footer={
               editable ? (
                 <Pressable
@@ -74,8 +97,11 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
                   accessibilityRole="button"
                   accessibilityLabel="Editar este día en Hoy"
                 >
+                  {/* Modo observación: el acento NO vive en el botón de salir.
+                      La palabra va en bone; el magenta queda solo en el chevron
+                      (la única "puerta al presente"). */}
                   <Text style={styles.ctaText}>Editar día</Text>
-                  <ChevronHint direction="right" size={16} color={colors.magenta} />
+                  <ChevronHint direction="right" size={15} color={colors.magenta} />
                 </Pressable>
               ) : (
                 <Text style={styles.readOnlyHint}>
@@ -108,13 +134,28 @@ const styles = StyleSheet.create({
     borderColor: colors.oroHairline,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
+    overflow: 'hidden',
   },
+  // Capa celeste tras la cabecera: ocupa la franja superior del sheet (donde
+  // viven el grabber + la fecha + el estado). Recortada por overflow del sheet.
+  atmosphere: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 132,
+  },
+  // El astro del día con evento: arriba-derecha, junto a la fecha hero (que es
+  // izquierda). Bajo el botón X, sin taparlo.
+  eventAstro: {
+    position: 'absolute',
+    top: 34,
+    right: 8,
+    zIndex: 1,
+  },
+  // El grabber dejó de ser una barra gris: ahora aloja el micro-astro oro.
   grabber: {
     alignSelf: 'center',
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.hairline,
     marginBottom: spacing.sm,
   },
   close: { position: 'absolute', top: spacing.md, right: spacing.md, zIndex: 2 },
@@ -128,10 +169,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   ctaText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.4,
-    color: colors.magenta,
+    color: colors.bone,
   },
   readOnlyHint: {
     marginTop: spacing.xl,

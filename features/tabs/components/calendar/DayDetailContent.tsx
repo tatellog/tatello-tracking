@@ -15,10 +15,29 @@
 
 import { type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 import type { CalendarDay, DayRegistered, DayValues } from './logic'
+
+// Divisor estelar: un hairline que es una pequeña constelación (estrella al
+// centro + satélites asimétricos), no una línea recta. Solo en OBSERVACIÓN y
+// solo antes de los eventos del día (no decoramos el vacío). SVG estático.
+function StarDivider() {
+  return (
+    <Svg width="100%" height={12} viewBox="0 0 240 12" style={styles.divider}>
+      <Path d="M8 6 H104 M136 6 H232" stroke={colors.oro} strokeWidth={0.75} opacity={0.45} />
+      <Path
+        d="M120 1 C120.9 4.2 121.8 5.1 125 6 C121.8 6.9 120.9 7.8 120 11 C119.1 7.8 118.2 6.9 115 6 C118.2 5.1 119.1 4.2 120 1 Z"
+        fill={colors.oro}
+        opacity={0.9}
+      />
+      <Circle cx={150} cy={6} r={0.9} fill={colors.oro} opacity={0.55} />
+      <Circle cx={92} cy={6} r={0.7} fill={colors.oro} opacity={0.4} />
+    </Svg>
+  )
+}
 
 const MONTHS_ES = [
   'enero',
@@ -44,6 +63,15 @@ const STATUS_LABEL: Record<CalendarDay['status'], string> = {
   trained: 'Entrenaste',
   rested: 'Descansaste',
   empty: 'Sin registro',
+}
+
+// Voz cálida del estado para el modo OBSERVACIÓN (Progreso). El vacío deja de
+// ser "Sin registro" (hueco/deuda) y pasa a "Un día tranquilo" (pausa, sin
+// culpa) — la misma sensibilidad del cielo, que nunca pinta un hoyo.
+const STATUS_POETIC: Record<CalendarDay['status'], string> = {
+  trained: 'Entrenaste',
+  rested: 'Descansaste',
+  empty: 'Un día tranquilo',
 }
 
 // Orden + etiqueta de cada check de "Registraste".
@@ -95,6 +123,7 @@ export function DayDetailContent({
   showValues = false,
   meals,
   footer,
+  tone = 'operate',
 }: {
   day: CalendarDay
   /** Historia (Progreso): muestra VALORES reales. Hoy lo deja en false →
@@ -104,7 +133,13 @@ export function DayDetailContent({
    *  agregado "Comida · N comidas" por la lista real. */
   meals?: readonly DayMeal[]
   footer?: ReactNode
+  /** 'operate' (Hoy) = ficha funcional, sin cambios. 'observe' (Progreso) =
+   *  voz contemplativa: fecha como heroína, estado en serif italic, vacío sin
+   *  culpa, chips con más presencia. Gatea SOLO la capa visual; el contenido
+   *  es el mismo. */
+  tone?: 'operate' | 'observe'
 }) {
+  const observe = tone === 'observe'
   const checks = REGISTERED_ITEMS.filter((it) => day.registered[it.key])
   const showMeals = showValues && meals != null && meals.length > 0
   // Con la lista de platillos, el agregado "Comida · N comidas" sobra.
@@ -115,11 +150,19 @@ export function DayDetailContent({
 
   return (
     <View>
-      <Text style={styles.date}>{dateHeading(day.date)}</Text>
+      <Text style={[styles.date, observe && styles.dateHero]}>{dateHeading(day.date)}</Text>
 
-      {/* Estado */}
-      <Text style={styles.eyebrow}>Estado</Text>
-      <Text style={styles.statusLine}>{STATUS_LABEL[day.status]}</Text>
+      {/* Estado. En OBSERVACIÓN la fecha es la heroína y el estado baja a un
+          subtítulo serif italic (voz cálida, sin eyebrow). En OPERAR queda la
+          ficha de siempre: eyebrow + línea de UI. */}
+      {observe ? (
+        <Text style={styles.statusPoetic}>{STATUS_POETIC[day.status]}</Text>
+      ) : (
+        <>
+          <Text style={styles.eyebrow}>Estado</Text>
+          <Text style={styles.statusLine}>{STATUS_LABEL[day.status]}</Text>
+        </>
+      )}
 
       {/* Historia: VALORES reales de ese día (proteína, calorías, sueño…). */}
       {showValues && dataRows.length > 0 ? (
@@ -161,9 +204,11 @@ export function DayDetailContent({
           <Text style={styles.eyebrow}>Registraste</Text>
           <View style={styles.checkWrap}>
             {checks.map((it) => (
-              <View key={it.key} style={styles.checkChip}>
+              <View key={it.key} style={[styles.checkChip, observe && styles.checkChipObserve]}>
                 <Text style={styles.checkMark}>✓</Text>
-                <Text style={styles.checkLabel}>{it.label}</Text>
+                <Text style={[styles.checkLabel, observe && styles.checkLabelObserve]}>
+                  {it.label}
+                </Text>
               </View>
             ))}
           </View>
@@ -172,6 +217,7 @@ export function DayDetailContent({
 
       {/* Evento(s) — revelaciones de ese día. Se listan TODAS (cada una en
           su línea): así no hay "+N" críptico y se ve qué pasó realmente. */}
+      {observe && hasEvents ? <StarDivider /> : null}
       {hasEvents ? (
         <View style={styles.section}>
           <Text style={styles.eyebrow}>{day.events.length > 1 ? 'Eventos' : 'Evento'}</Text>
@@ -198,6 +244,23 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.4,
     textTransform: 'capitalize',
+  },
+  // OBSERVACIÓN: la fecha sube a heroína — domina el sheet como "este día,
+  // este recuerdo", no como un campo más.
+  dateHero: {
+    fontSize: 29,
+    letterSpacing: -0.8,
+    color: colors.oroLeche,
+  },
+  // OBSERVACIÓN: el estado como subtítulo serif italic (voz del coach), justo
+  // bajo la fecha. Oro tenue = memoria; el vacío ("Un día tranquilo") se lee
+  // sereno, nunca a reproche.
+  statusPoetic: {
+    marginTop: 4,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 17,
+    color: colors.oroLight,
   },
   eyebrow: {
     fontFamily: typography.uiBold,
@@ -273,6 +336,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.oroHairlineSoft,
   },
+  // OBSERVACIÓN: los chips se leen como "logros guardados" del recuerdo —
+  // borde oro más visible y más aire, no como pills deshabilitadas.
+  checkChipObserve: {
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+    borderRadius: 12,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.oroTint,
+  },
   checkMark: {
     fontFamily: typography.uiBold,
     fontSize: 11,
@@ -282,6 +354,15 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: 12.5,
     color: colors.bone,
+  },
+  checkLabelObserve: {
+    fontSize: 14,
+    color: colors.leche,
+  },
+  // Divisor estelar (solo OBSERVACIÓN, antes de los eventos).
+  divider: {
+    marginTop: 18,
+    marginBottom: 2,
   },
   // Evento(s)
   eventList: {
