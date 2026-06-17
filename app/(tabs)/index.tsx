@@ -44,6 +44,7 @@ import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
+  type CalendarDay,
   CoachLine,
   DayCheckIn,
   type DayState,
@@ -93,6 +94,24 @@ function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
 function makeEnter(cadence: Cadence) {
   if (cadence === 'reduced') return (_d: number) => FadeIn.duration(220)
   return (d: number) => FadeInDown.duration(380).delay(d).springify().damping(18)
+}
+
+// Día de la semana local (0=Dom) sin drift de medianoche UTC.
+function weekdayIdxLocal(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  return new Date(y, m - 1, d).getDay()
+}
+
+// Los 7 días (Dom→Sáb) de la semana que CONTIENE `iso`. Mismo convenio que la
+// constelación del mes (domingo primero).
+function weekDatesOf(iso: string): string[] {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  const dow = new Date(y, m - 1, d).getDay() // 0=Dom
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return Array.from({ length: 7 }, (_, i) => {
+    const dt = new Date(y, m - 1, d - dow + i)
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+  })
 }
 
 export default function TodayScreen() {
@@ -319,11 +338,51 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // El calendario "editor oficial": fusiona workouts + daily_signals (descanso
   // + qué registró) + revelations (eventos). Reusa stripWorkouts internamente.
   const { days: calendarDays } = useCalendarDays({
-    span: 30,
+    // 37 días: cubre la semana COMPLETA de un día visto de hasta 30d atrás
+    // (30 + 6 hacia atrás del domingo de esa semana).
+    span: 37,
     today: todayIsoLocal,
     todayWorkoutCompleted: ctx.today_workout_completed,
     overrides: dayOverrides,
   })
+
+  // El strip de Hoy se acota a UNA SEMANA: la del día VISTO (selectedDate). Por
+  // defecto la semana corriente; al llegar desde Progreso con el 2 de junio,
+  // muestra la semana del 2 de junio. (Explorar el mes entero es rol de
+  // Progreso — el strip de Hoy navega dentro de la semana, no es historial.)
+  const weekDays: CalendarDay[] = useMemo(() => {
+    const byDate = new Map(calendarDays.map((d) => [d.date, d]))
+    return weekDatesOf(selectedDate).map(
+      (date): CalendarDay =>
+        byDate.get(date) ?? {
+          date,
+          dayNum: Number(date.slice(8, 10)),
+          weekdayIdx: weekdayIdxLocal(date),
+          isToday: date === todayIsoLocal,
+          isFuture: date > todayIsoLocal,
+          status: 'empty',
+          registered: {
+            comida: false,
+            agua: false,
+            sueno: false,
+            energia: false,
+            peso: false,
+            ciclo: false,
+          },
+          values: {
+            mealCount: null,
+            proteinG: null,
+            calories: null,
+            waterGlasses: null,
+            sleepMinutes: null,
+            energy: null,
+            weightKg: null,
+            onPeriod: false,
+          },
+          events: [],
+        },
+    )
+  }, [calendarDays, selectedDate, todayIsoLocal])
 
   const trainedThisMonth = month.trainedThisMonth
   const MONTHS_ES = [
@@ -340,7 +399,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     'Noviembre',
     'Diciembre',
   ]
-  const monthLabel = MONTHS_ES[Number(todayIsoLocal.slice(5, 7)) - 1] ?? 'Tu mes'
+  // Etiqueta del strip de semana: el mes del día VISTO (la semana corriente por
+  // defecto; la del día visto al llegar desde Progreso).
+  const weekLabel = MONTHS_ES[Number(selectedDate.slice(5, 7)) - 1] ?? 'Tu semana'
   // "2 de junio" — para el banner de modo ver día.
   const viewingLabel = `${Number(selectedDate.slice(8, 10))} de ${MONTHS_ES[Number(selectedDate.slice(5, 7)) - 1] ?? ''}`
 
@@ -709,12 +770,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 monthY.current = e.nativeEvent.layout.y
               }}
             >
-              <SectionHeader label={monthLabel} />
-              <Text style={styles.weekHint}>
-                Tu mes hasta hoy · toca un día para verlo completo.
-              </Text>
+              <SectionHeader label={weekLabel} />
+              <Text style={styles.weekHint}>Tu semana · toca un día para verlo completo.</Text>
               <WeekStrip
-                days={calendarDays}
+                days={weekDays}
                 selectedDate={selectedDate}
                 onSelect={handleSelectViewedDay}
               />

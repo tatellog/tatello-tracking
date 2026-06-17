@@ -184,8 +184,10 @@ function DayColumn({
   })
 
   const glow = day.status === 'trained'
-  const a11yStatus =
-    day.status === 'trained'
+  const future = !!day.isFuture // días por venir de la semana: apagados, inertes
+  const a11yStatus = future
+    ? 'aún no llega'
+    : day.status === 'trained'
       ? 'entrenaste'
       : day.status === 'rested'
         ? 'descansaste'
@@ -194,19 +196,25 @@ function DayColumn({
   return (
     <Animated.View style={[styles.colBox, animStyle]}>
       <Pressable
-        onPress={() => {
-          Haptics.selectionAsync().catch(() => {})
-          onSelect(day.date)
-        }}
+        onPress={
+          future
+            ? undefined
+            : () => {
+                Haptics.selectionAsync().catch(() => {})
+                onSelect(day.date)
+              }
+        }
+        disabled={future}
         style={({ pressed }) => [
           styles.col,
+          future && styles.colFuture,
           selected && styles.colSelected,
           pressed && styles.colPressed,
         ]}
         accessibilityRole="button"
         accessibilityLabel={`${day.date}, ${a11yStatus}`}
-        accessibilityHint="Toca para ver el detalle del día"
-        accessibilityState={{ selected }}
+        accessibilityHint={future ? undefined : 'Toca para ver el detalle del día'}
+        accessibilityState={{ selected, disabled: future }}
       >
         <Text
           style={[
@@ -371,6 +379,10 @@ const styles = StyleSheet.create({
   },
   colPressed: {
     opacity: 0.55,
+  },
+  // Día futuro de la semana: apenas presente, no es deuda ni acción.
+  colFuture: {
+    opacity: 0.35,
   },
   // Caret hacia abajo (triángulo por bordes) — la "cola" que ata la columna
   // seleccionada con su panel de detalle. Centrado bajo la columna.

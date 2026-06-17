@@ -53,6 +53,10 @@ export type CalendarDay = {
   /** 0..6 (0=Dom) — letra inicial del día. */
   weekdayIdx: number
   isToday: boolean
+  /** El día aún no llega (date > hoy). Solo lo usa la vista de SEMANA de Hoy
+   *  para mostrar los días futuros de la semana corriente apagados y no
+   *  seleccionables. La ventana trailing nunca produce futuros. */
+  isFuture?: boolean
   status: DayStatus
   registered: DayRegistered
   /** Valores numéricos del día (para el detalle de Historia). */
