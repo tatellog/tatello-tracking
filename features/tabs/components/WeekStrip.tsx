@@ -253,8 +253,11 @@ export function WeekStrip({ days, selectedDate, onSelect }: Props) {
 
 const styles = StyleSheet.create({
   // Fila full-width: 7 columnas que reparten TODO el ancho (cada una flex 1).
+  // width 100% + alignSelf stretch = a prueba de contenedores que no estiren.
   row: {
     flexDirection: 'row',
+    width: '100%',
+    alignSelf: 'stretch',
     gap: GAP,
     marginTop: 2,
     paddingVertical: 10,
