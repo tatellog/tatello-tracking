@@ -58,7 +58,11 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n))
 const pick = (arr) => arr[Math.floor(rand() * arr.length)]
 
 // Base "today" anchored to the seed date so the dataset is reproducible.
-const BASE = Date.UTC(2026, 4, 18) // 2026-05-18 00:00 UTC
+// Override con SEED_BASE=YYYY-MM-DD para anclar a HOY (datos en la ventana
+// reciente): `SEED_BASE=2026-06-16 node scripts/seed-orbits.mjs`.
+const BASE = process.env.SEED_BASE
+  ? Date.parse(`${process.env.SEED_BASE}T00:00:00Z`)
+  : Date.UTC(2026, 4, 18) // 2026-05-18 00:00 UTC
 
 /** Local (Mexico City) calendar date `daysAgo` days before BASE. */
 function localDate(daysAgo) {
@@ -184,7 +188,7 @@ async function main() {
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId)
-  await admin.from('macro_targets').upsert({ user_id: userId, protein_g: 120, calories: 1900 })
+  await admin.from('macro_targets').upsert({ user_id: userId, protein_g: 105, calories: 1900 })
 
   const sleep = []
   const wellbeing = []
@@ -289,7 +293,7 @@ async function main() {
     water.push({
       user_id: userId,
       intake_date: date,
-      glasses: clamp(Math.round(5 + (trains ? 1.6 : 0) + rand() * 2.4), 3, 10),
+      glasses: clamp(Math.round(7 + (trains ? 1.2 : 0) + rand() * 2), 3, 10),
     })
 
     // ── body measurements — weekly, slow downward trend ──────────────
