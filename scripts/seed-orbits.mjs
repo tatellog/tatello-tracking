@@ -168,6 +168,8 @@ async function main() {
     'workouts',
     'water_intake',
     'body_measurements',
+    'rest_days',
+    'revelations',
   ]
   for (const t of tables) {
     const { error } = await admin.from(t).delete().eq('user_id', userId)
@@ -197,6 +199,7 @@ async function main() {
   const workouts = []
   const water = []
   const measurements = []
+  const rest = []
 
   for (let d = DAYS - 1; d >= 0; d--) {
     const date = localDate(d)
@@ -244,6 +247,10 @@ async function main() {
         type: pick(WORKOUT_TYPES),
         notes: null,
       })
+    } else if (rand() < 0.35) {
+      // Un día sin entreno a veces es descanso explícito (estrella gris en
+      // Historia) — el resto queda "sin registro".
+      rest.push({ user_id: userId, rest_date: date })
     }
 
     const motivation = clamp(
@@ -315,6 +322,33 @@ async function main() {
     { user_id: userId, event_type: 'period_end', event_date: p.end, flow: null },
   ])
 
+  // Revelaciones — una por tier, en días recientes, para que el calendario
+  // Historia muestre las tres marcas (dorado / azul / dorado-especial). Las
+  // `kind` deben respetar el check de la tabla; unicidad (user_id, kind).
+  const revelations = [
+    {
+      user_id: userId,
+      tier: 'transformation',
+      kind: '50',
+      title: 'Tu melena empieza a aparecer',
+      shown_at: ts(localDate(2), 18),
+    },
+    {
+      user_id: userId,
+      tier: 'return',
+      kind: 'return',
+      title: 'Volviste. Tu cielo te esperó',
+      shown_at: ts(localDate(5), 18),
+    },
+    {
+      user_id: userId,
+      tier: 'pattern',
+      kind: 'training_consistent',
+      title: 'Tu movimiento se está volviendo constante',
+      shown_at: ts(localDate(6), 18),
+    },
+  ]
+
   await insert('sleep_logs', sleep)
   await insert('wellbeing_checkins', wellbeing)
   await insert('cycle_events', cycle)
@@ -323,6 +357,8 @@ async function main() {
   await insert('workouts', workouts)
   await insert('water_intake', water)
   await insert('body_measurements', measurements)
+  await insert('rest_days', rest)
+  await insert('revelations', revelations)
 
   console.log('\nSeeded:')
   console.log(`  sleep_logs          ${sleep.length}`)
@@ -333,6 +369,8 @@ async function main() {
   console.log(`  workouts            ${workouts.length}`)
   console.log(`  water_intake        ${water.length}`)
   console.log(`  body_measurements   ${measurements.length}`)
+  console.log(`  rest_days           ${rest.length}`)
+  console.log(`  revelations         ${revelations.length}`)
   console.log(`\nSign in to see it: ${TEST_EMAIL} / ${TEST_PASSWORD}`)
 }
 

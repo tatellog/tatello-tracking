@@ -235,6 +235,8 @@ export function MovementConstellation({
                     width={CELL}
                     height={CELL}
                     fill="transparent"
+                    accessible
+                    accessibilityLabel={`Ver el día ${Number(cell.date.slice(8, 10))}`}
                     onPress={() => {
                       Haptics.selectionAsync().catch(() => {})
                       onDayPress(cell.date, cell.trained)
