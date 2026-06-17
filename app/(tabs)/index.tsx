@@ -282,7 +282,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   useEffect(() => {
     const handle = (date: string) => {
       setSelectedDate(date)
-      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }))
+      // Beat de ~140ms antes del salto: tu ultima imagen abajo es "elegi este dia"
+      // (el ring resaltado + la pill), y la primera arriba es "y aqui esta completo".
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 140)
     }
     const pendingDate = consumeCalendarDay()
     if (pendingDate) handle(pendingDate)
@@ -498,7 +500,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const handleSelectViewedDay = useCallback(
     (date: string) => {
       setSelectedDate(date)
-      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }))
+      // Beat de ~140ms antes del salto: tu ultima imagen abajo es "elegi este dia"
+      // (el ring resaltado + la pill), y la primera arriba es "y aqui esta completo".
+      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 140)
       const d = calendarDays.find((c) => c.date === date)
       track('calendar_day_selected', {
         date,
