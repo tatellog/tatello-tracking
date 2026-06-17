@@ -45,6 +45,7 @@ import {
   useWaterGoal,
 } from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
+import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -323,9 +324,31 @@ type Props = {
  *     Below them, the slot pill + "Lo de siempre" 1-tap re-log. Manual
  *     entry of macros lives in the Comidas tab (MealComposer), not here.
  */
+const BACKFILL_MONTHS = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+]
+
 export function QuickLogSheet({ visible, onClose }: Props) {
   const router = useRouter()
   const today = useMemo(() => todayInTimezone(), [])
+  // Modo backfill: si Hoy está viendo un día pasado, COMIDA + AGUA se escriben a
+  // ESE día (no a hoy). Periodo y peso se quedan en hoy (re-anclar el ciclo a un
+  // día pasado distorsiona la predicción; el peso es la última medición).
+  const activeLogDate = useActiveLogDate()
+  const logDate = activeLogDate ?? today
+  const backfilling = activeLogDate != null && activeLogDate !== today
+  const backfillLabel = `${Number(logDate.slice(8, 10))} de ${BACKFILL_MONTHS[Number(logDate.slice(5, 7)) - 1] ?? ''}`
 
   // The sheet lives permanently in the tab bar, so gate its reads on
   // `visible` — no fetching/subscribing while it's closed. Cached data
@@ -335,8 +358,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const createMeal = useCreateMeal()
   const { data: measurements } = useMeasurements(90, visible)
   const addMeasurement = useAddMeasurement()
-  const { data: glasses = 0 } = useWaterToday(today, visible)
-  const setWater = useSetWater(today)
+  const { data: glasses = 0 } = useWaterToday(logDate, visible)
+  const setWater = useSetWater(logDate)
   const { goalMl, updateGoal } = useWaterGoal()
 
   // Cycle — only shown for users who track it. The period-start chip is
@@ -435,7 +458,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       name: item.name,
       protein_g: item.protein_g,
       calories: item.calories,
-      consumed_at: new Date(),
+      // Backfill: mediodía del día visto; si es hoy, el momento real.
+      consumed_at: backfilling ? new Date(`${logDate}T12:00:00`) : new Date(),
       meal_type: mealType,
       photo_storage_path: item.photo_storage_path,
       ingredients: item.ingredients ?? undefined,
@@ -616,6 +640,15 @@ export function QuickLogSheet({ visible, onClose }: Props) {
               <Text style={styles.close}>✕</Text>
             </Pressable>
           </View>
+
+          {/* Aviso de backfill: comida + agua se registran en el día visto. */}
+          {backfilling ? (
+            <View style={styles.backfillNote}>
+              <Text style={styles.backfillText}>
+                Registrando en <Text style={styles.backfillDate}>{backfillLabel}</Text>
+              </Text>
+            </View>
+          ) : null}
 
           {mode === 'weight' ? (
             <View style={styles.weightPane}>
@@ -956,6 +989,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  // Aviso de backfill — comida/agua se registran en el día visto, no en hoy.
+  backfillNote: {
+    marginTop: -6,
+    marginBottom: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.bgCard,
+    alignItems: 'center',
+  },
+  backfillText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  backfillDate: {
+    fontFamily: typography.uiBold,
+    color: colors.oroLeche,
+    textTransform: 'capitalize',
   },
   back: {
     fontFamily: typography.uiBold,

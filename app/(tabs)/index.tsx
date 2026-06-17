@@ -35,6 +35,7 @@ import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { useBriefContext } from '@/features/brief/hooks'
+import { setActiveLogDate } from '@/features/tabs/active-log-date'
 import {
   consumeCalendarDay,
   subscribeCalendarDayRequest,
@@ -170,6 +171,16 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const setRest = useSetRestToday(selectedDate)
   const setRestForDate = useSetRestForDate()
   const restedToday = restQuery.data ?? false
+
+  // Mientras Hoy esté en foco y viendo un día PASADO, el botón Registrar
+  // (global, en el tab bar) escribe a ESE día (backfill de comida/agua). Al
+  // volver a hoy o salir de Hoy se limpia (null = hoy).
+  useFocusEffect(
+    useCallback(() => {
+      setActiveLogDate(viewingPast ? selectedDate : null)
+      return () => setActiveLogDate(null)
+    }, [viewingPast, selectedDate]),
+  )
 
   const reducedMotion = useReducedMotion()
   const [celebrateKey, setCelebrateKey] = useState(0)
