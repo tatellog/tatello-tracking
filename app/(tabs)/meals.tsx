@@ -12,9 +12,25 @@ import {
   useWeeklyMealStats,
 } from '@/features/macros/hooks'
 import { NourishmentConsistency, NutritionMoon, WeekSummary } from '@/features/macros/components'
+import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { MealComposer, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
+
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+]
 
 export default function MealsScreen() {
   return (
@@ -32,7 +48,13 @@ function MealsBody() {
   )
   const router = useRouter()
   const today = useMemo(() => todayInTimezone(), [])
-  const mealsQuery = useMealsForDate(today)
+  // Coherencia con el "modo ver día" (P1): si Hoy está anclado a un día pasado,
+  // el resumen de macros de Comidas refleja ESE día (el resto —consistencia,
+  // semana, estela— son rangos/historia y no cambian).
+  const activeLogDate = useActiveLogDate()
+  const viewDate = activeLogDate ?? today
+  const viewingPast = activeLogDate != null && activeLogDate !== today
+  const mealsQuery = useMealsForDate(viewDate)
   const targetsQuery = useMacroTargets()
 
   const meals = useMemo(() => mealsQuery.data ?? [], [mealsQuery.data])
@@ -64,6 +86,13 @@ function MealsBody() {
           keyboardDismissMode="interactive"
         >
           <TabHeader title="Comidas" />
+
+          {viewingPast ? (
+            <Text style={styles.subtitle}>
+              Macros del{' '}
+              {`${Number(viewDate.slice(8, 10))} de ${MONTHS_ES[Number(viewDate.slice(5, 7)) - 1] ?? ''}`}
+            </Text>
+          ) : null}
 
           <NutritionMoon
             proteinValue={summary.protein}
