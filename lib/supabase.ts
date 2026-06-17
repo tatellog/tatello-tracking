@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 
 import type { Database } from '@/types/database.types'
 
@@ -18,13 +18,24 @@ import type { Database } from '@/types/database.types'
  * The two paths share the same async getItem/setItem/removeItem
  * shape so supabase-js treats them interchangeably.
  */
+// AFTER_FIRST_UNLOCK: el default del keychain (WHEN_UNLOCKED) deja de
+// leerse con la pantalla bloqueada o la app en background — justo cuando
+// corre el auto-refresh de supabase-js → "User interaction is not
+// allowed". Tras el primer desbloqueo del día el token sigue legible,
+// que es lo único que el refresh necesita. (Aplica a escrituras nuevas:
+// el token viejo se reescribe solo en el siguiente refresh desbloqueado.)
+const secureStoreOptions: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+}
+
 const storage =
   Platform.OS === 'web'
     ? AsyncStorage
     : {
-        getItem: (key: string) => SecureStore.getItemAsync(key),
-        setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-        removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+        getItem: (key: string) => SecureStore.getItemAsync(key, secureStoreOptions),
+        setItem: (key: string, value: string) =>
+          SecureStore.setItemAsync(key, value, secureStoreOptions),
+        removeItem: (key: string) => SecureStore.deleteItemAsync(key, secureStoreOptions),
       }
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL
@@ -51,6 +62,21 @@ export const supabase = createClient<Database>(url, key, {
     detectSessionInUrl: Platform.OS === 'web',
   },
 })
+
+// supabase-js refresca el token en un intervalo fijo aunque la app esté
+// dormida. Atarlo a AppState evita que el tick corra con la pantalla
+// apagada (el origen del error de keychain "User interaction is not
+// allowed") y ahorra trabajo en segundo plano. Receta oficial de
+// Supabase para React Native.
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      supabase.auth.startAutoRefresh()
+    } else {
+      supabase.auth.stopAutoRefresh()
+    }
+  })
+}
 
 /*
  * Resolve the authenticated user's id for INSERT/UPDATE/DELETE paths
