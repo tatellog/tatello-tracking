@@ -34,20 +34,22 @@ type SegmentProps = {
   kind: 'star' | 'moon'
   active: boolean
   onPress: () => void
+  disabled?: boolean
 }
 
-function Segment({ label, kind, active, onPress }: SegmentProps) {
+function Segment({ label, kind, active, onPress, disabled }: SegmentProps) {
   const tint = active ? colors.magenta : colors.niebla
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       // Press-down tick only — the anticipation beat. The reward
       // "phrase" (impact + success) fires from the Hoy screen's
       // handleDayChange once the state actually commits.
-      onPressIn={() => Haptics.selectionAsync().catch(() => {})}
+      onPressIn={disabled ? undefined : () => Haptics.selectionAsync().catch(() => {})}
       style={[styles.seg, active && styles.segActive]}
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled: !!disabled }}
       accessibilityLabel={label}
     >
       <SegGlyph kind={kind} color={tint} />
@@ -79,18 +81,20 @@ export function DayCheckIn({ state, onChange, label = 'Hoy', locked = false }: P
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>{label}</Text>
-      <View style={styles.pill}>
+      <View style={[styles.pill, locked && styles.pillLocked]}>
         <Segment
           label="Entrené"
           kind="star"
           active={state === 'trained'}
           onPress={() => pick('trained')}
+          disabled={locked}
         />
         <Segment
           label="Descansé"
           kind="moon"
           active={state === 'rested'}
           onPress={() => pick('rested')}
+          disabled={locked}
         />
       </View>
       {/* Sellado — un entreno pasado ya encendió su estrella y no retrocede. */}
@@ -131,6 +135,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.hairline,
     padding: 4,
+  },
+  // Sellado: el toggle entero se atenúa para leerse como NO editable.
+  pillLocked: {
+    opacity: 0.55,
   },
   seg: {
     flex: 1,

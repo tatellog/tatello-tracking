@@ -172,15 +172,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const setRestForDate = useSetRestForDate()
   const restedToday = restQuery.data ?? false
 
-  // Mientras Hoy esté en foco y viendo un día PASADO, el botón Registrar
-  // (global, en el tab bar) escribe a ESE día (backfill de comida/agua). Al
-  // volver a hoy o salir de Hoy se limpia (null = hoy).
-  useFocusEffect(
-    useCallback(() => {
-      setActiveLogDate(viewingPast ? selectedDate : null)
-      return () => setActiveLogDate(null)
-    }, [viewingPast, selectedDate]),
-  )
+  // Mientras Hoy esté viendo un día PASADO, el botón Registrar (y las pantallas
+  // de captura de comida) escriben a ESE día. Es un effect PLANO, no de foco:
+  // navegar a capture-meal/scan-meal hace blur de Hoy, y un focus-effect lo
+  // limpiaría justo antes de que la captura lea la fecha. Al volver a hoy
+  // (viewingPast=false) se limpia a null.
+  useEffect(() => {
+    setActiveLogDate(viewingPast ? selectedDate : null)
+  }, [viewingPast, selectedDate])
 
   const reducedMotion = useReducedMotion()
   const [celebrateKey, setCelebrateKey] = useState(0)

@@ -45,6 +45,7 @@ import {
   type StoredIngredient,
 } from '@/features/macros/api'
 import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
+import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
 import { UNIVERSE_ACCENT } from '@/features/tabs/universe-visuals'
@@ -529,6 +530,11 @@ export default function ScanMealScreen() {
   const createMeal = useCreateMeal()
   const updateMeal = useUpdateMeal()
   const editMeal = useMealById(editId)
+  // Backfill: si Hoy está viendo un día pasado, la comida nueva se ancla a ESE
+  // día (mediodía local), no a ahora. null = hoy normal.
+  const activeLogDate = useActiveLogDate()
+  const newMealConsumedAt = () =>
+    activeLogDate ? new Date(`${activeLogDate}T12:00:00`) : new Date()
 
   const [phase, setPhase] = useState<'describe' | 'scanning' | 'confirm' | 'reveal'>(
     isEdit || isManual ? 'confirm' : isDescribe ? 'describe' : 'scanning',
@@ -815,7 +821,7 @@ export default function ScanMealScreen() {
           // the insert reject silently.
           protein_g: Math.min(500, Math.max(0, Number(proteinInput) || 0)),
           calories: Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0))),
-          consumed_at: new Date(),
+          consumed_at: newMealConsumedAt(),
           meal_type: mealType,
           photo_storage_path: manualPhoto,
         },
@@ -888,7 +894,7 @@ export default function ScanMealScreen() {
     createMeal.mutate(
       {
         ...macros,
-        consumed_at: new Date(),
+        consumed_at: newMealConsumedAt(),
         meal_type: mealType,
         photo_storage_path: photoPath,
         ingredients: storedIngredients,
@@ -1241,6 +1247,15 @@ export default function ScanMealScreen() {
                   </Text>
                 </View>
               )}
+              {!isEdit && activeLogDate ? (
+                <Text style={styles.backfillNote}>
+                  Se registrará en{' '}
+                  <Text style={styles.backfillDate}>
+                    {Number(activeLogDate.slice(8, 10))}/{activeLogDate.slice(5, 7)}
+                  </Text>{' '}
+                  (día anterior)
+                </Text>
+              ) : null}
               <PrimaryCta
                 label={isEdit ? 'Guardar' : 'Confirmar'}
                 onPress={handleConfirm}
@@ -1267,6 +1282,19 @@ const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
+  },
+  // Aviso de backfill — la comida cae en el día visto, no en hoy.
+  backfillNote: {
+    textAlign: 'center',
+    marginBottom: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  backfillDate: {
+    fontFamily: typography.uiBold,
+    color: colors.oroLeche,
+    fontVariant: ['tabular-nums'],
   },
   // ── scanning ───────────────────────────────────────────────────────
   scanning: {
