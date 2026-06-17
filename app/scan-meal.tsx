@@ -45,7 +45,7 @@ import {
   type StoredIngredient,
 } from '@/features/macros/api'
 import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
-import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { dayNoon, useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
 import { UNIVERSE_ACCENT } from '@/features/tabs/universe-visuals'
@@ -533,8 +533,7 @@ export default function ScanMealScreen() {
   // Backfill: si Hoy está viendo un día pasado, la comida nueva se ancla a ESE
   // día (mediodía local), no a ahora. null = hoy normal.
   const activeLogDate = useActiveLogDate()
-  const newMealConsumedAt = () =>
-    activeLogDate ? new Date(`${activeLogDate}T12:00:00`) : new Date()
+  const newMealConsumedAt = () => (activeLogDate ? dayNoon(activeLogDate) : new Date())
 
   const [phase, setPhase] = useState<'describe' | 'scanning' | 'confirm' | 'reveal'>(
     isEdit || isManual ? 'confirm' : isDescribe ? 'describe' : 'scanning',

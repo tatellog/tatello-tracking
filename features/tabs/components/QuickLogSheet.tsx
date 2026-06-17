@@ -45,7 +45,7 @@ import {
   useWaterGoal,
 } from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
-import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { dayNoon, useActiveLogDate } from '@/features/tabs/active-log-date'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -459,7 +459,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       protein_g: item.protein_g,
       calories: item.calories,
       // Backfill: mediodía del día visto; si es hoy, el momento real.
-      consumed_at: backfilling ? new Date(`${logDate}T12:00:00`) : new Date(),
+      consumed_at: backfilling ? dayNoon(logDate) : new Date(),
       meal_type: mealType,
       photo_storage_path: item.photo_storage_path,
       ingredients: item.ingredients ?? undefined,
