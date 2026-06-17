@@ -45,21 +45,24 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
     )
   } else {
     body = (
-      <>
-        {/* Qué son las cifras: "X de 10 días" + el punto = un día real. Sin
-            esto, "1 de 10" y los puntos leían como meta/streak. */}
-        <Text style={styles.subtitle}>
-          Tus últimos {data.agua.total} días. Cada punto se enciende el día que estuvo presente.
-        </Text>
-        <View style={styles.rows}>
-          {data.protein ? (
-            <ScoreRow label="Proteína" score={data.protein} glyph={<ProteinGlyph />} />
-          ) : (
-            <InviteRow onPress={onAddReference} />
-          )}
-          <ScoreRow label="Agua" score={data.agua} glyph={<AguaGlyph />} />
-        </View>
-      </>
+      <View style={styles.rows}>
+        {data.protein ? (
+          <ScoreRow
+            label="Proteína"
+            meaning="lo que sostiene tu músculo"
+            score={data.protein}
+            glyph={<ProteinGlyph />}
+          />
+        ) : (
+          <InviteRow onPress={onAddReference} />
+        )}
+        <ScoreRow
+          label="Agua"
+          meaning="lo que sostiene tu energía"
+          score={data.agua}
+          glyph={<AguaGlyph />}
+        />
+      </View>
     )
   }
 
@@ -71,24 +74,50 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
   )
 }
 
-/* One fulfilled-days row: glyph · label · dots · "X de N". */
+// Mínimo de días registrados para mostrar un conteo: con menos que esto aún
+// no hay señal de consistencia, solo una invitación a seguir registrando
+// (mostrar "0 de 2" desmotiva sin informar).
+const MIN_LOGGED = 4
+
+/* Un bloque por nutriente: cabecera (glifo · nombre), una línea cálida de
+ * POR QUÉ importa, la tira de días, y la frase de avance. El "avance de qué"
+ * se entiende: el denominador son los días que REGISTRASTE, no 10 de
+ * calendario, así que no castiga el no-registrar. */
 function ScoreRow({
   label,
+  meaning,
   score,
   glyph,
 }: {
   label: string
+  meaning: string
   score: ConsistencyScore
   glyph: ReactElement
 }) {
+  // Gateo: con pocos días de datos no hay consistencia que puntuar — invita
+  // a registrar en vez de mostrar un score frío. Con datos: la frase dice
+  // que el número son DÍAS, sobre los días REGISTRADOS (no de 10), y nunca
+  // un "0 de N" a secas (la línea de 0 mira hacia adelante).
+  let caption: string
+  if (score.logged < MIN_LOGGED) {
+    caption = 'Conforme registres, tus días se irán dibujando aquí.'
+  } else if (score.reached === 0) {
+    caption = `Aún ninguno de los ${score.logged} días que registraste — cada uno cuenta.`
+  } else {
+    caption = `La alcanzaste ${score.reached} de los ${score.logged} días que registraste.`
+  }
   return (
-    <View style={styles.row}>
-      <View style={styles.glyphBox}>{glyph}</View>
-      <Text style={styles.label}>{label}</Text>
-      <Dots score={score} />
-      <Text style={styles.count}>
-        {score.hit} <Text style={styles.countOf}>de {score.total}</Text>
-      </Text>
+    <View style={styles.scoreBlock}>
+      <View style={styles.scoreHeader}>
+        <View style={styles.glyphBox}>{glyph}</View>
+        <Text style={styles.label}>{label}</Text>
+      </View>
+      <View style={styles.scoreBody}>
+        {/* Por qué importa — voz cálida (serif italic), no clínica. */}
+        <Text style={styles.meaning}>{meaning}</Text>
+        <Dots score={score} />
+        <Text style={styles.caption}>{caption}</Text>
+      </View>
     </View>
   )
 }
@@ -113,15 +142,26 @@ function InviteRow({ onPress }: { onPress?: () => void }) {
   )
 }
 
-/* Un punto por día de la ventana (viejo→nuevo), encendido en SU día real.
- * Lit = magenta, unlit = hairline. Sin color de "falla": un punto apagado
- * es solo un día que no estuvo presente, nunca un veredicto. Mostrar el día
- * real (con huecos) evita que se lea como barra-hacia-una-meta o streak. */
+/* Un punto por día de la ventana (viejo→nuevo), en SU día real. Tres
+ * estados: 'reached' = lleno magenta (registraste y llegaste), 'short' =
+ * magenta tenue (registraste, aún no llegaste), 'empty' = hairline (sin
+ * registro — no es falla, es ausencia de datos). Distinguir 'short' de
+ * 'empty' es la clave: "no llegué" no se ve igual que "no registré". */
 function Dots({ score }: { score: ConsistencyScore }) {
   return (
     <View style={styles.dots}>
-      {score.days.map((on, i) => (
-        <View key={i} style={[styles.dot, on ? styles.dotOn : styles.dotOff]} />
+      {score.days.map((state, i) => (
+        <View
+          key={i}
+          style={[
+            styles.dot,
+            state === 'reached'
+              ? styles.dotReached
+              : state === 'short'
+                ? styles.dotShort
+                : styles.dotEmpty,
+          ]}
+        />
       ))}
     </View>
   )
@@ -181,19 +221,25 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  // Texto-ayuda (no voz del coach → Hanken upright, no serif italic):
-  // explica qué cuentan las filas para que "X de 10" no confunda.
-  subtitle: {
-    marginTop: 8,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    lineHeight: typography.sizes.label * 1.4,
-    color: colors.niebla,
-  },
   rows: {
     marginTop: 14,
-    gap: 14,
+    gap: 16,
   },
+  // Bloque por nutriente: cabecera + cuerpo (significado + tira de días).
+  scoreBlock: {
+    gap: 7,
+  },
+  scoreHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Cuerpo sangrado bajo el nombre (alineado tras el glifo): significado
+  // arriba, tira de días abajo.
+  scoreBody: {
+    paddingLeft: 26,
+    gap: 7,
+  },
+  // La fila del invite sigue siendo horizontal (glifo · nombre · invite).
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,14 +249,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    width: 74,
     marginLeft: 6,
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.leche,
   },
+  // Por qué importa el nutriente — voz cálida (serif italic), niebla.
+  meaning: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  // Tira de 10 días a todo lo ancho — segmentos parejos = "10 días" obvio.
   dots: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -219,12 +271,17 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 3,
-    maxWidth: 14,
   },
-  dotOn: {
+  // Llegaste — magenta pleno.
+  dotReached: {
     backgroundColor: colors.magenta,
   },
-  dotOff: {
+  // Registraste pero corto — magenta tenue (presente, aún no llegaste).
+  dotShort: {
+    backgroundColor: `${colors.magenta}59`,
+  },
+  // Sin registro — hairline, sin juicio.
+  dotEmpty: {
     backgroundColor: colors.hairline,
   },
   invite: {
@@ -234,15 +291,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  count: {
-    width: 58,
-    textAlign: 'right',
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-  },
-  countOf: {
-    fontFamily: typography.uiMedium,
+  // Qué es el número — frase completa bajo la tira: "La alcanzaste 3 de tus
+  // últimos 10 días". Texto-ayuda (Hanken upright, tenue): resuelve "1 qué".
+  caption: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    lineHeight: typography.sizes.label * 1.35,
     color: colors.niebla,
   },
 })
