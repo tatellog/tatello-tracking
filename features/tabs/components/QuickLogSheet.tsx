@@ -652,7 +652,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
           {backfilling ? (
             <View style={styles.backfillNote}>
               <Text style={styles.backfillText}>
-                Registrando en <Text style={styles.backfillDate}>{backfillLabel}</Text>
+                Esto se guarda en el <Text style={styles.backfillDate}>{backfillLabel}</Text>
               </Text>
             </View>
           ) : null}

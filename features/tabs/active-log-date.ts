@@ -33,3 +33,21 @@ function subscribe(fn: () => void): () => void {
 export function useActiveLogDate(): string | null {
   return useSyncExternalStore(subscribe, getActiveLogDate, getActiveLogDate)
 }
+
+/*
+ * Canal "volver a hoy": la pill global (en el tab bar, fuera de Hoy) pide salir
+ * del modo ver-día desde cualquier tab; Hoy escucha y resetea su día visto a
+ * hoy (lo que a su vez limpia la fecha activa). Mismo patrón que pending-*.
+ */
+const returnListeners = new Set<() => void>()
+
+export function requestReturnToToday(): void {
+  returnListeners.forEach((fn) => fn())
+}
+
+export function subscribeReturnToToday(fn: () => void): () => void {
+  returnListeners.add(fn)
+  return () => {
+    returnListeners.delete(fn)
+  }
+}

@@ -1271,11 +1271,10 @@ export default function ScanMealScreen() {
               )}
               {!isEdit && activeLogDate ? (
                 <Text style={styles.backfillNote}>
-                  Se registrará en{' '}
+                  Esto se guarda en el{' '}
                   <Text style={styles.backfillDate}>
                     {Number(activeLogDate.slice(8, 10))}/{activeLogDate.slice(5, 7)}
-                  </Text>{' '}
-                  (día anterior)
+                  </Text>
                 </Text>
               ) : null}
               <PrimaryCta

@@ -35,7 +35,7 @@ import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { useBriefContext } from '@/features/brief/hooks'
-import { setActiveLogDate } from '@/features/tabs/active-log-date'
+import { setActiveLogDate, subscribeReturnToToday } from '@/features/tabs/active-log-date'
 import {
   consumeCalendarDay,
   subscribeCalendarDayRequest,
@@ -180,6 +180,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   useEffect(() => {
     setActiveLogDate(viewingPast ? selectedDate : null)
   }, [viewingPast, selectedDate])
+  // La pill global (en el tab bar) pide "volver a hoy" desde cualquier tab.
+  useEffect(() => subscribeReturnToToday(() => setSelectedDate(ctx.date)), [ctx.date])
 
   const reducedMotion = useReducedMotion()
   const [celebrateKey, setCelebrateKey] = useState(0)
@@ -532,22 +534,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
             </Animated.View>
 
-            {/* Banner de "modo ver día": cuando Hoy muestra un día PASADO, todo
-                lo de abajo (universo, macros, comidas) es de ESE día. Un toque
-                vuelve a hoy. */}
-            {viewingPast ? (
-              <Pressable
-                style={styles.viewingBanner}
-                onPress={() => setSelectedDate(ctx.date)}
-                accessibilityRole="button"
-                accessibilityLabel="Volver a hoy"
-              >
-                <Text style={styles.viewingText}>
-                  Estás viendo el <Text style={styles.viewingDate}>{viewingLabel}</Text>
-                </Text>
-                <Text style={styles.viewingBack}>Volver a hoy ›</Text>
-              </Pressable>
-            ) : null}
+            {/* El indicador de "modo ver día" ya no vive aquí: es una pill
+                GLOBAL sobre el tab bar (ViewingDayPill), visible en todos los
+                tabs. */}
 
             {/* El momento de Regreso (3+ días fuera) ahora es la Revelación
                 de Regreso full-screen del orquestador (T2) — el ReturnMoment
@@ -921,34 +910,6 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginTop: -4,
     marginBottom: 4,
-  },
-  // Banner "modo ver día" — avisa que TODO Hoy es de un día pasado + volver.
-  viewingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.oroHairline,
-    backgroundColor: colors.bgCard,
-  },
-  viewingText: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-  },
-  viewingDate: {
-    fontFamily: typography.uiBold,
-    color: colors.oroLeche,
-    textTransform: 'capitalize',
-  },
-  viewingBack: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    color: colors.magenta,
   },
   // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
   // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,

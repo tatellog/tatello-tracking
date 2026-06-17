@@ -17,6 +17,7 @@ import Svg, { Path } from 'react-native-svg'
 import { colors, typography } from '@/theme'
 
 import { QuickLogSheet } from './QuickLogSheet'
+import { ViewingDayPill } from './ViewingDayPill'
 
 // A 4-point star with WIDE arms — reads as a "+" (add) AND keeps the
 // "enciende una estrella" brand glyph (the deep-concave sparkle didn't say
@@ -123,6 +124,11 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
 
   return (
     <>
+      {/* Indicador persistente de "modo ver día" — encima del tab bar, visible
+          desde cualquier tab. Se monta solo cuando hay un día pasado activo. */}
+      <View style={styles.aboveBar} pointerEvents="box-none">
+        <ViewingDayPill />
+      </View>
       <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.pill}>
           {state.routes.map((route, index) => {
@@ -181,6 +187,11 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
 }
 
 const styles = StyleSheet.create({
+  // Zona sobre el tab bar para la pill de "modo ver día" — solo ocupa alto
+  // cuando la pill está montada (si no, colapsa a 0).
+  aboveBar: {
+    alignItems: 'center',
+  },
   // Solid canvas-coloured bar; the pill + FAB float as elements
   // within it. Screens render above this, exactly as with the
   // default tab bar — no per-screen scroll-inset retuning needed.
