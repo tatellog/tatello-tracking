@@ -63,6 +63,16 @@ import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
 import { colors, typography } from '@/theme'
 
+// Mensaje legible de un error de registro: el primer issue de Zod (p.ej.
+// "Máximo 31 días atrás") o el mensaje del error; nada de JSON crudo.
+function mealErrorMessage(e: unknown): string {
+  if (e && typeof e === 'object' && 'issues' in e) {
+    const issues = (e as { issues?: { message?: string }[] }).issues
+    if (Array.isArray(issues) && issues[0]?.message) return issues[0].message
+  }
+  return e instanceof Error ? e.message : 'Intenta de nuevo.'
+}
+
 // A small sparkle — the "destello" that marks the AI-powered badge.
 function SparkleIcon({ color }: { color: string }) {
   return (
@@ -835,7 +845,7 @@ export default function ScanMealScreen() {
           onSuccess: () => goToReveal(Math.min(500, Math.max(0, Number(proteinInput) || 0))),
           onError: (e) => {
             setSaving(false)
-            Alert.alert('No se pudo registrar', String((e as Error)?.message ?? e))
+            Alert.alert('No pudimos registrar tu comida', mealErrorMessage(e))
           },
         },
       )
@@ -912,7 +922,7 @@ export default function ScanMealScreen() {
         onSuccess: () => goToReveal(macros.protein_g),
         onError: (e) => {
           setSaving(false)
-          Alert.alert('No se pudo registrar', String((e as Error)?.message ?? e))
+          Alert.alert('No pudimos registrar tu comida', mealErrorMessage(e))
         },
       },
     )

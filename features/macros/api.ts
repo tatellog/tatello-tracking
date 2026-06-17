@@ -19,7 +19,10 @@ export const MacroTargetsInputSchema = z.object({
 
 export type MacroTargetsInput = z.infer<typeof MacroTargetsInputSchema>
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+// Tope de antigüedad para registrar/editar una comida. 31 días para cubrir la
+// ventana de backfill del modo "ver día" en Hoy (calendario de 30 días) + buffer
+// de zona horaria. (Antes 7 días: bloqueaba el backfill intencional a días pasados.)
+const MAX_BACKDATE_MS = 31 * 24 * 60 * 60 * 1000
 
 export const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack'])
 
@@ -34,7 +37,7 @@ export const MealInputSchema = z.object({
   consumed_at: z
     .date()
     .refine((d) => d.getTime() <= Date.now() + 60_000, 'No puede ser en el futuro')
-    .refine((d) => d.getTime() >= Date.now() - SEVEN_DAYS_MS, 'Máximo 7 días atrás'),
+    .refine((d) => d.getTime() >= Date.now() - MAX_BACKDATE_MS, 'Máximo 31 días atrás'),
   meal_type: MealTypeSchema,
 })
 
