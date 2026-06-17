@@ -261,6 +261,8 @@ const styles = StyleSheet.create({
     gap: GAP,
     marginTop: 2,
     paddingVertical: 10,
+    // Empuje leve a la derecha (la fila ya ocupa todo el ancho).
+    paddingLeft: 10,
   },
   colBox: {
     flex: 1,
