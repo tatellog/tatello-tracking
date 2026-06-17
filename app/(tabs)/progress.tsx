@@ -182,9 +182,12 @@ function ProgressBody() {
   )
   const seeDayInHoy = useCallback(
     (date: string) => {
-      requestCalendarDay(date)
-      router.navigate('/(tabs)')
+      // Cierra el sheet PRIMERO (desmonta el Modal estando Progreso en foco),
+      // y navega en el siguiente frame — si navegas con el Modal aún montado
+      // queda huérfano y congela Progreso al volver.
       setSheetVisible(false)
+      requestCalendarDay(date)
+      requestAnimationFrame(() => router.navigate('/(tabs)'))
     },
     [router],
   )

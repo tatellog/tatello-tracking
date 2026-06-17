@@ -16,7 +16,7 @@
 
 import { Feather } from '@expo/vector-icons'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated'
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ChevronHint } from '@/components/ui/interaction'
@@ -41,22 +41,20 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
   // ese día tuvo comidas (gate en `enabled`).
   const mealCount = day?.values.mealCount ?? 0
   const mealsQuery = useMealsForDate(day?.date ?? null, { enabled: visible && mealCount > 0 })
-  if (!day) return null
+  // Cerrado = SIN Modal montado (no solo visible=false). Evita que un Modal
+  // transparente quede "huérfano" capturando toques al volver a Progreso —
+  // sobre todo tras "Editar día", que navega mientras el sheet se cierra.
+  if (!day || !visible) return null
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <Animated.View
-        entering={FadeIn.duration(160)}
-        exiting={FadeOut.duration(160)}
-        style={styles.backdrop}
-      >
+      <Animated.View entering={FadeIn.duration(160)} style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar" />
       </Animated.View>
 
       <View style={styles.anchor} pointerEvents="box-none">
         <Animated.View
           entering={SlideInDown.duration(260)}
-          exiting={SlideOutDown.duration(200)}
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
         >
           <View style={styles.grabber} />
