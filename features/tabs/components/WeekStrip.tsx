@@ -1,20 +1,16 @@
 import * as Haptics from 'expo-haptics'
-import { type ElementRef, useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
-  Extrapolation,
   FadeIn,
   FadeOut,
-  interpolate,
-  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
@@ -34,22 +30,9 @@ const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7
 // faint so rest reads as a quiet, valid choice (never a missed star).
 const MOON_PATH = 'M21 12.79 A9 9 0 1 1 11.21 3 A7 7 0 0 0 21 12.79 Z'
 
-const CELL_W = 46
 const GAP = 4
-const ROW_PAD = 20
-// Column pitch: width + gap. A column's content-space centre x is
-// `ROW_PAD + index*PITCH + CELL_W/2`.
-const PITCH = CELL_W + GAP
 const STAR_SIZE = 22
 const GLOW_SIZE = 40
-
-// Scroll-driven falloff: a column whose centre sits at or left of
-// FADE_IN (relative to the viewport's left edge) is fully dimmed; at
-// or right of FADE_OUT it is fully crisp. Only the left edge fades —
-// today and the recent days on the right stay sharp, so "the past
-// dims as it scrolls away" while the present never loses focus.
-const FADE_IN = -16
-const FADE_OUT = 92
 
 type Props = {
   days: readonly CalendarDay[]
@@ -163,26 +146,14 @@ function EventDot({ count }: { count: number }) {
 function DayColumn({
   day,
   index,
-  scrollX,
   selected,
   onSelect,
 }: {
   day: CalendarDay
   index: number
-  scrollX: SharedValue<number>
   selected: boolean
   onSelect: (date: string) => void
 }) {
-  const animStyle = useAnimatedStyle(() => {
-    const centreX = ROW_PAD + index * PITCH + CELL_W / 2
-    const posInViewport = centreX - scrollX.value
-    const t = interpolate(posInViewport, [FADE_IN, FADE_OUT], [0, 1], Extrapolation.CLAMP)
-    return {
-      opacity: 0.32 + t * 0.68,
-      transform: [{ scale: 0.85 + t * 0.15 }],
-    }
-  })
-
   const glow = day.status === 'trained'
   const future = !!day.isFuture // días por venir de la semana: apagados, inertes
   const a11yStatus = future
@@ -194,7 +165,7 @@ function DayColumn({
         : 'sin registro'
 
   return (
-    <Animated.View style={[styles.colBox, animStyle]}>
+    <View style={styles.colBox}>
       <Pressable
         onPress={
           future
@@ -253,107 +224,43 @@ function DayColumn({
           style={styles.selectedCaret}
         />
       ) : null}
-    </Animated.View>
+    </View>
   )
 }
 
 /**
- * A horizontally scrollable strip of the last 30 days — the editable
- * history surface + the constellation's official editor. Each day is a
- * bare column (weekday letter, number, status glyph, optional gold event
- * dot) with no card chrome, so the strip reads in the same airy language
- * as the constellation above it. Today is the rightmost column —
- * labelled "HOY", magenta, haloed — and the strip opens scrolled to it.
- * Tapping a column SELECTS that day (opening the detail panel below);
- * marking entrenó/descansó happens from the panel's buttons.
+ * La SEMANA del día visto — 7 columnas (Dom→Sáb) a TODO el ancho, sin scroll
+ * (siempre caben 7). Cada día es una columna sobria (letra, número, glifo de
+ * estado, punto de evento opcional). HOY va resaltado; los días por venir de la
+ * semana corriente quedan apagados e inertes. Tocar una columna SELECCIONA ese
+ * día → Hoy se llena con él (modo ver-día).
  */
 export function WeekStrip({ days, selectedDate, onSelect }: Props) {
-  const scrollRef = useRef<ElementRef<typeof Animated.ScrollView>>(null)
-  const scrollX = useSharedValue(0)
-  // Ancho del viewport (para centrar el día seleccionado) + bandera de "el
-  // usuario acaba de tocar" (un tap manual NO debe mover el strip bajo el dedo;
-  // solo una selección EXTERNA —deep-link "Ver día" desde Progreso— lo hace).
-  const viewW = useRef(0)
-  const justTapped = useRef(false)
-
-  const onScroll = useAnimatedScrollHandler((e) => {
-    scrollX.value = e.contentOffset.x
-  })
-
-  // Lleva el strip al día seleccionado: hoy (último) → al final, bajo el
-  // pulgar; cualquier otro → centrado, para que se VEA su selección.
-  const scrollToSelected = (animated: boolean) => {
-    const idx = days.findIndex((d) => d.date === selectedDate)
-    if (idx < 0 || idx === days.length - 1) {
-      scrollRef.current?.scrollToEnd({ animated })
-      return
-    }
-    const centreX = ROW_PAD + idx * PITCH + CELL_W / 2
-    scrollRef.current?.scrollTo({ x: Math.max(0, centreX - viewW.current / 2), animated })
-  }
-
-  // Selección EXTERNA (no un tap en el strip) → centra ese día. Un tap manual
-  // pone justTapped y se salta el scroll para no saltar bajo el dedo.
-  useEffect(() => {
-    if (justTapped.current) {
-      justTapped.current = false
-      return
-    }
-    scrollToSelected(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, days])
-
-  const handleSelect = (date: string) => {
-    justTapped.current = true
-    onSelect(date)
-  }
-
   return (
-    <Animated.ScrollView
-      ref={scrollRef}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.scroll}
-      contentContainerStyle={styles.row}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      onLayout={(e) => {
-        viewW.current = e.nativeEvent.layout.width
-      }}
-      // Content lays out oldest-first. En el primer layout (selección = hoy)
-      // abre al final; si ya hay un día externo seleccionado, lo respeta.
-      onContentSizeChange={() => scrollToSelected(false)}
-    >
+    <View style={styles.row}>
       {days.map((d, i) => (
         <DayColumn
           key={d.date}
           day={d}
           index={i}
-          scrollX={scrollX}
           selected={selectedDate === d.date}
-          onSelect={handleSelect}
+          onSelect={onSelect}
         />
       ))}
-    </Animated.ScrollView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  // Negative margin cancels the screen's 20px padding so the strip
-  // scrolls edge-to-edge; the contentContainer puts that 20px back as
-  // padding, so the first/last columns align to the screen gutter.
-  scroll: {
-    marginHorizontal: -ROW_PAD,
-    marginTop: 2,
-  },
+  // Fila full-width: 7 columnas que reparten TODO el ancho (cada una flex 1).
   row: {
     flexDirection: 'row',
     gap: GAP,
-    paddingHorizontal: ROW_PAD,
+    marginTop: 2,
     paddingVertical: 10,
   },
   colBox: {
-    width: CELL_W,
+    flex: 1,
     // Deja respirar el caret del día seleccionado bajo la columna.
     paddingBottom: 7,
   },
@@ -389,7 +296,8 @@ const styles = StyleSheet.create({
   selectedCaret: {
     position: 'absolute',
     bottom: 0,
-    left: CELL_W / 2 - 6,
+    left: '50%',
+    marginLeft: -6,
     width: 0,
     height: 0,
     borderLeftWidth: 6,
