@@ -262,10 +262,43 @@ function DayColumn({
 export function WeekStrip({ days, selectedDate, onSelect }: Props) {
   const scrollRef = useRef<ElementRef<typeof Animated.ScrollView>>(null)
   const scrollX = useSharedValue(0)
+  // Ancho del viewport (para centrar el día seleccionado) + bandera de "el
+  // usuario acaba de tocar" (un tap manual NO debe mover el strip bajo el dedo;
+  // solo una selección EXTERNA —deep-link "Ver día" desde Progreso— lo hace).
+  const viewW = useRef(0)
+  const justTapped = useRef(false)
 
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollX.value = e.contentOffset.x
   })
+
+  // Lleva el strip al día seleccionado: hoy (último) → al final, bajo el
+  // pulgar; cualquier otro → centrado, para que se VEA su selección.
+  const scrollToSelected = (animated: boolean) => {
+    const idx = days.findIndex((d) => d.date === selectedDate)
+    if (idx < 0 || idx === days.length - 1) {
+      scrollRef.current?.scrollToEnd({ animated })
+      return
+    }
+    const centreX = ROW_PAD + idx * PITCH + CELL_W / 2
+    scrollRef.current?.scrollTo({ x: Math.max(0, centreX - viewW.current / 2), animated })
+  }
+
+  // Selección EXTERNA (no un tap en el strip) → centra ese día. Un tap manual
+  // pone justTapped y se salta el scroll para no saltar bajo el dedo.
+  useEffect(() => {
+    if (justTapped.current) {
+      justTapped.current = false
+      return
+    }
+    scrollToSelected(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, days])
+
+  const handleSelect = (date: string) => {
+    justTapped.current = true
+    onSelect(date)
+  }
 
   return (
     <Animated.ScrollView
@@ -276,9 +309,12 @@ export function WeekStrip({ days, selectedDate, onSelect }: Props) {
       contentContainerStyle={styles.row}
       onScroll={onScroll}
       scrollEventThrottle={16}
-      // Content lays out oldest-first; opening at the end puts today
-      // under the user's thumb. Fires once on mount (size 0 → full).
-      onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+      onLayout={(e) => {
+        viewW.current = e.nativeEvent.layout.width
+      }}
+      // Content lays out oldest-first. En el primer layout (selección = hoy)
+      // abre al final; si ya hay un día externo seleccionado, lo respeta.
+      onContentSizeChange={() => scrollToSelected(false)}
     >
       {days.map((d, i) => (
         <DayColumn
@@ -287,7 +323,7 @@ export function WeekStrip({ days, selectedDate, onSelect }: Props) {
           index={i}
           scrollX={scrollX}
           selected={selectedDate === d.date}
-          onSelect={onSelect}
+          onSelect={handleSelect}
         />
       ))}
     </Animated.ScrollView>
