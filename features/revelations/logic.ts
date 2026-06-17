@@ -41,30 +41,33 @@ export function transformationCopy(
   threshold: TransformationThreshold,
   signLabel: string,
 ): { message: string; title: string } {
+  // El label llega en MAYÚSCULAS ("LEO"); en una frase gritaría. Title-case
+  // para que lea "Leo empezó a despertar.", no "LEO empezó a despertar.".
+  const sign = signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
   switch (threshold) {
     case 25:
       return {
-        message: `Tu ${signLabel} empieza a despertar. Sus primeros trazos son tuyos.`,
-        title: `${signLabel} empezó a despertar.`,
+        message: `Tu ${sign} empieza a despertar. Sus primeros trazos son tuyos.`,
+        title: `${sign} empezó a despertar.`,
       }
     case 50:
       return {
         // No "la mitad de TI" — el reveal es del emblema, no del cuerpo
         // (manifiesto: nada de transformación corporal visual).
-        message: `Tu ${signLabel} toma forma. Ya hay algo aquí que antes no estaba.`,
-        title: `${signLabel} tomó forma.`,
+        message: `Tu ${sign} toma forma. Ya hay algo aquí que antes no estaba.`,
+        title: `${sign} tomó forma.`,
       }
     case 75:
       return {
-        message: `Tu ${signLabel} casi resplandece. Lo que sostienes, se nota.`,
-        title: `${signLabel} casi resplandece.`,
+        message: `Tu ${sign} casi resplandece. Lo que sostienes, se nota.`,
+        title: `${sign} casi resplandece.`,
       }
     case 100:
       return {
         // No "está completo" (eco de tarea-checkeada); el centro es "lo
         // que construiste sigue aquí".
-        message: `Tu ${signLabel} despertó. Todo lo que construiste está aquí.`,
-        title: `${signLabel} despertó.`,
+        message: `Tu ${sign} despertó. Todo lo que construiste está aquí.`,
+        title: `${sign} despertó.`,
       }
   }
 }

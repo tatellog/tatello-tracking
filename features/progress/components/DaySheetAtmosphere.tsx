@@ -17,19 +17,18 @@ import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-nativ
 import { colors } from '@/theme'
 
 // Velo de estrellas: posiciones FIJAS (no random → no parpadean entre renders),
-// densidad hacia arriba-derecha y vacío abajo-izquierda → "el cielo entra por
-// una esquina". Coords en el viewBox 320×120 del header.
+// agrupadas en un RACIMO arriba-derecha que se desvanece hacia el centro y deja
+// VACÍO el abajo-izquierda → "el cielo entra por una esquina" y la fecha vive en
+// el silencio de la otra. Coords en el viewBox 320×104 del header.
 const VEIL_STARS = [
-  { x: 262, y: 22, r: 1.4, o: 0.34 },
-  { x: 290, y: 34, r: 0.9, o: 0.22 },
-  { x: 238, y: 15, r: 0.7, o: 0.18 },
-  { x: 300, y: 17, r: 1.1, o: 0.26 },
-  { x: 210, y: 30, r: 0.6, o: 0.14 },
-  { x: 276, y: 52, r: 0.7, o: 0.16 },
-  { x: 184, y: 19, r: 0.8, o: 0.15 },
-  { x: 312, y: 46, r: 0.6, o: 0.13 },
-  { x: 156, y: 26, r: 0.6, o: 0.11 },
-  { x: 250, y: 70, r: 0.8, o: 0.12 },
+  { x: 286, y: 18, r: 1.4, o: 0.36 },
+  { x: 302, y: 30, r: 0.9, o: 0.24 },
+  { x: 270, y: 13, r: 0.7, o: 0.2 },
+  { x: 294, y: 46, r: 0.8, o: 0.18 },
+  { x: 312, y: 22, r: 0.6, o: 0.16 },
+  { x: 258, y: 34, r: 0.6, o: 0.14 },
+  { x: 236, y: 22, r: 0.7, o: 0.13 },
+  { x: 248, y: 58, r: 0.6, o: 0.1 },
 ] as const
 
 /**
@@ -38,34 +37,38 @@ const VEIL_STARS = [
  * sube apenas — ese día "brilla" un poco más, sin badge.
  */
 export function DaySheetAtmosphere({ hasEvent = false }: { hasEvent?: boolean }) {
-  const haloPeak = hasEvent ? 0.24 : 0.16
+  const haloPeak = hasEvent ? 0.3 : 0.2
   return (
     <Svg
       width="100%"
       height="100%"
-      viewBox="0 0 320 120"
+      viewBox="0 0 320 240"
       preserveAspectRatio="xMidYMin slice"
       pointerEvents="none"
     >
       <Defs>
-        {/* Halo radial detrás de donde va la fecha (izquierda-centro). */}
-        <RadialGradient id="dhsHalo" cx="30%" cy="46%" r="52%">
+        {/* Halo bajo la FECHA: la fecha es la estrella y este halo la enciende.
+            CÍRCULO real (userSpaceOnUse, no elipse), que llega a TRANSPARENTE
+            dentro de la banda alta → su borde cae en zona invisible y nunca
+            deja una "raya" dorada cortada por el overflow del sheet. */}
+        <RadialGradient id="dhsHalo" cx={92} cy={50} r={118} gradientUnits="userSpaceOnUse">
           <Stop offset="0%" stopColor={colors.oro} stopOpacity={haloPeak} />
-          <Stop offset="58%" stopColor={colors.oro} stopOpacity={0.05} />
+          <Stop offset="32%" stopColor={colors.oro} stopOpacity={haloPeak * 0.34} />
+          <Stop offset="62%" stopColor={colors.oro} stopOpacity={0.045} />
           <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
         </RadialGradient>
       </Defs>
 
-      <Rect x={0} y={0} width={320} height={120} fill="url(#dhsHalo)" />
+      <Rect x={0} y={0} width={320} height={240} fill="url(#dhsHalo)" />
 
       {VEIL_STARS.map((s, i) => (
         <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill={colors.oroLight} opacity={s.o} />
       ))}
 
-      {/* El "ancla": una estrella un punto más viva, fuera de centro — la
-          imperfección elegante entre puntos quietos. */}
-      <Circle cx={226} cy={40} r={1.8} fill={colors.oroLight} opacity={0.4} />
-      <Circle cx={226} cy={40} r={3.6} fill={colors.oro} opacity={0.07} />
+      {/* El "ancla": una estrella un punto más viva, al borde del racimo —
+          la imperfección elegante entre puntos quietos. */}
+      <Circle cx={224} cy={40} r={1.7} fill={colors.oroLight} opacity={0.42} />
+      <Circle cx={224} cy={40} r={3.4} fill={colors.oro} opacity={0.07} />
     </Svg>
   )
 }

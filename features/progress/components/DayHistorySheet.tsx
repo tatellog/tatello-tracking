@@ -19,8 +19,8 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import ChoreStar from '@/assets/icons/choreStar.svg'
 import { ChevronHint } from '@/components/ui/interaction'
-import { MilestoneStar } from '@/features/emblem/components/MilestoneStar'
 import { DayDetailContent } from '@/features/tabs/components/calendar/DayDetailContent'
 import type { CalendarDay } from '@/features/tabs/components/calendar/logic'
 import { colors, radius, spacing, typography } from '@/theme'
@@ -63,15 +63,6 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
             <DaySheetAtmosphere hasEvent={hasEvent} />
           </View>
 
-          {/* Día con evento (revelación/hito) = día especial: el astro de 4
-              puntas lo distingue sin badge ni gamificación. Un solo astro por
-              sheet, anclado a la derecha junto a la fecha. */}
-          {hasEvent ? (
-            <View style={styles.eventAstro} pointerEvents="none">
-              <MilestoneStar size={56} />
-            </View>
-          ) : null}
-
           <View style={styles.grabber}>
             <GrabberAstro bright={hasEvent} />
           </View>
@@ -89,6 +80,10 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
           <DayDetailContent
             day={day}
             tone="observe"
+            // Día con evento = día especial: la estrella ornamental (oro,
+            // memoria) remata la fecha como una unidad. Sin magenta — ese
+            // queda para el CTA.
+            headerAccessory={hasEvent ? <ChoreStar width={50} height={66} /> : undefined}
             footer={
               editable ? (
                 <Pressable
@@ -143,15 +138,10 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 132,
-  },
-  // El astro del día con evento: arriba-derecha, junto a la fecha hero (que es
-  // izquierda). Bajo el botón X, sin taparlo.
-  eventAstro: {
-    position: 'absolute',
-    top: 34,
-    right: 8,
-    zIndex: 1,
+    // Banda alta a propósito: el halo (un círculo suave en la parte de arriba)
+    // se desvanece a transparente MUY por encima de este borde, así el corte
+    // del overflow del sheet cae en zona invisible — sin "raya" dorada.
+    height: 240,
   },
   // El grabber dejó de ser una barra gris: ahora aloja el micro-astro oro.
   grabber: {

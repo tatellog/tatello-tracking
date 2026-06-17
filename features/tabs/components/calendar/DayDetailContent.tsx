@@ -15,7 +15,7 @@
 
 import { type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
@@ -26,15 +26,15 @@ import type { CalendarDay, DayRegistered, DayValues } from './logic'
 // solo antes de los eventos del día (no decoramos el vacío). SVG estático.
 function StarDivider() {
   return (
-    <Svg width="100%" height={12} viewBox="0 0 240 12" style={styles.divider}>
-      <Path d="M8 6 H104 M136 6 H232" stroke={colors.oro} strokeWidth={0.75} opacity={0.45} />
+    <Svg width="100%" height={8} viewBox="0 0 320 8" style={styles.divider}>
+      {/* Susurro: dos tramos finísimos que paran antes de la estrella (la
+          estrellita "interrumpe" la línea, más elegante que un punto encima). */}
+      <Path d="M0 4 H146 M174 4 H320" stroke={colors.oro} strokeWidth={0.5} opacity={0.18} />
       <Path
-        d="M120 1 C120.9 4.2 121.8 5.1 125 6 C121.8 6.9 120.9 7.8 120 11 C119.1 7.8 118.2 6.9 115 6 C118.2 5.1 119.1 4.2 120 1 Z"
+        d="M160 1.6 C160.4 3.3 160.7 3.6 162.4 4 C160.7 4.4 160.4 4.7 160 6.4 C159.6 4.7 159.3 4.4 157.6 4 C159.3 3.6 159.6 3.3 160 1.6 Z"
         fill={colors.oro}
-        opacity={0.9}
+        opacity={0.5}
       />
-      <Circle cx={150} cy={6} r={0.9} fill={colors.oro} opacity={0.55} />
-      <Circle cx={92} cy={6} r={0.7} fill={colors.oro} opacity={0.4} />
     </Svg>
   )
 }
@@ -123,6 +123,7 @@ export function DayDetailContent({
   showValues = false,
   meals,
   footer,
+  headerAccessory,
   tone = 'operate',
 }: {
   day: CalendarDay
@@ -133,6 +134,9 @@ export function DayDetailContent({
    *  agregado "Comida · N comidas" por la lista real. */
   meals?: readonly DayMeal[]
   footer?: ReactNode
+  /** Remate a la derecha de la fecha (ej. el astro del día con evento). Se
+   *  alinea con la fecha como una unidad, no como un objeto suelto. */
+  headerAccessory?: ReactNode
   /** 'operate' (Hoy) = ficha funcional, sin cambios. 'observe' (Progreso) =
    *  voz contemplativa: fecha como heroína, estado en serif italic, vacío sin
    *  culpa, chips con más presencia. Gatea SOLO la capa visual; el contenido
@@ -150,7 +154,10 @@ export function DayDetailContent({
 
   return (
     <View>
-      <Text style={[styles.date, observe && styles.dateHero]}>{dateHeading(day.date)}</Text>
+      <View style={styles.dateRow}>
+        <Text style={[styles.date, observe && styles.dateHero]}>{dateHeading(day.date)}</Text>
+        {headerAccessory}
+      </View>
 
       {/* Estado. En OBSERVACIÓN la fecha es la heroína y el estado baja a un
           subtítulo serif italic (voz cálida, sin eyebrow). En OPERAR queda la
@@ -238,7 +245,16 @@ export function DayDetailContent({
 }
 
 const styles = StyleSheet.create({
+  // Fecha + remate (astro) como una sola fila: el día y su brillo se leen
+  // juntos, no como dos elementos sueltos.
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   date: {
+    flexShrink: 1,
     fontFamily: typography.displayHeavy,
     fontSize: 20,
     color: colors.leche,

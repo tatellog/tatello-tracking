@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg'
 
+import ChoreStar from '@/assets/icons/choreStar.svg'
 import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
 import { useTransformProgress } from '@/features/emblem'
 import {
@@ -19,9 +20,7 @@ import {
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, radius, spacing, typography } from '@/theme'
 
-import { MilestoneStar } from './MilestoneStar'
-
-export type LeoStar = { name: string; role: string }
+export type EmblemStar = { name: string; role: string }
 
 // Polvo de estrellas quieto del fondo del modal — posiciones fijas (no
 // random, para que no parpadee entre renders) en el tercio superior, lejos
@@ -37,29 +36,29 @@ const STAR_DUST = [
   { x: 40, y: 16, r: 0.9, o: 0.38 },
 ] as const
 
-type TuLeoModalProps = {
+type TuEmblemaModalProps = {
   visible: boolean
   onClose: () => void
-  /** Clave del signo — para el emblema correcto (el MISMO león del Tab Hoy). */
+  /** Clave del signo — para el emblema correcto (el MISMO emblema del Tab Hoy). */
   sign: ZodiacSign
-  /** "Leo" — la etiqueta del signo. */
+  /** La etiqueta del signo en MAYÚSCULAS ("LEO", "ARIES", …). */
   signLabel: string
   /** Figure stars lit THIS MONTH (via «Entrené») + the figure total. */
   trained: number
   total: number
   /** Named figure stars already lit, in lighting order. */
-  litStars: LeoStar[]
+  litStars: EmblemStar[]
   /** The next star to light (named, anticipation — not a countdown). */
-  nextStar: LeoStar | null
+  nextStar: EmblemStar | null
 }
 
 /**
- * Calienta el caché de RN Image con el frame del león ANTES de abrir el modal.
- * El hero pinta el león en Skia (otro caché), así que sin esto la primera
+ * Calienta el caché de RN Image con el frame del emblema ANTES de abrir el modal.
+ * El hero pinta el emblema en Skia (otro caché), así que sin esto la primera
  * apertura del modal decodifica el PNG en frío y se nota el retraso. Render
  * persistente y oculto en Hoy: decodifica una vez y queda caliente.
  */
-export function LionFramePreloader({ sign }: { sign: ZodiacSign }) {
+export function EmblemFramePreloader({ sign }: { sign: ZodiacSign }) {
   const { progress } = useTransformProgress()
   const frames = FRAMES_BY_SIGN[sign]
   const frame = frames[frameIndexFor(progress)] ?? frames[frames.length - 1]
@@ -75,14 +74,15 @@ export function LionFramePreloader({ sign }: { sign: ZodiacSign }) {
 }
 
 /**
- * "Tu Leo" — opened from the compact constellation hero on Hoy, over a blurred
- * Hoy (revelaciones language). PROGRESS-FOCUSED per the product critique: the
- * explicit % + count of the month's figure, the named stars lit so far, and
- * what's next — so it answers "¿cuánto llevo y qué sigue?", not just "mira el
- * arte". The gold lion is the representative art of your Leo; the data is the
- * monthly constellation. No actions; the only control is ✕.
+ * "Tu {signo}" — opened from the compact constellation hero on Hoy, over a
+ * blurred Hoy (revelaciones language). Sign-agnostic: emblem, label, count and
+ * named stars all derive from `sign`. PROGRESS-FOCUSED per the product
+ * critique: the explicit % + count of the month's figure, the named stars lit
+ * so far, and what's next — so it answers "¿cuánto llevo y qué sigue?", not
+ * just "mira el arte". The gold figure is the representative art of your sign;
+ * the data is the monthly constellation. No actions; the only control is ✕.
  */
-export function TuLeoModal({
+export function TuEmblemaModal({
   visible,
   onClose,
   sign,
@@ -91,15 +91,19 @@ export function TuLeoModal({
   total,
   litStars,
   nextStar,
-}: TuLeoModalProps) {
+}: TuEmblemaModalProps) {
   const pct = total > 0 ? Math.round((trained / total) * 100) : 0
+  // El signo en title-case para leerlo dentro de una frase ("Tu Leo se
+  // revela…"). `signLabel` llega en MAYÚSCULAS (ZODIAC[sign].label), que en
+  // medio de un texto gritaría. Dinámico: jamás "emblema" hardcodeado.
+  const signTitle = signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
   // Halo brightens with progress — light grows as the figure fills.
   const haloOpacity = 0.3 + (pct / 100) * 0.6
-  // EL MISMO león del Tab Hoy (el frame del % de revelado vigente), como
+  // EL MISMO emblema del Tab Hoy (el frame del % de revelado vigente), como
   // <Image> plano — no Skia, así no choca TextureViews con el del hero detrás.
   const { progress: emblemProgress } = useTransformProgress()
   const frames = FRAMES_BY_SIGN[sign]
-  const lionFrame = frames[frameIndexFor(emblemProgress)] ?? frames[frames.length - 1]
+  const emblemFrame = frames[frameIndexFor(emblemProgress)] ?? frames[frames.length - 1]
 
   // La lista se capa a las 3 MÁS RECIENTES (más recientes arriba: "lo que
   // acabo de despertar") + un pie tenue con el resto. Altura fija sin importar
@@ -189,7 +193,7 @@ export function TuLeoModal({
               >
                 <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
 
-                {/* El emblema REINA (el león del Tab Hoy, no el medallón viejo). */}
+                {/* El emblema REINA (el emblema del Tab Hoy, no el medallón viejo). */}
                 <View style={styles.emblemWrap}>
                   <EmblemHalo
                     width={152}
@@ -197,8 +201,8 @@ export function TuLeoModal({
                     style={[styles.halo, { opacity: haloOpacity }]}
                   />
                   <Image
-                    source={lionFrame}
-                    style={styles.lion}
+                    source={emblemFrame}
+                    style={styles.emblem}
                     resizeMode="contain"
                     accessibilityLabel={`Tu ${signLabel}. ${trained} de ${total} estrellas encendidas.`}
                   />
@@ -257,7 +261,22 @@ export function TuLeoModal({
                       <Text style={styles.comingName}>{nextStar.name}</Text>
                       <Text style={styles.comingRole}>{nextStar.role}</Text>
                     </View>
-                    <MilestoneStar size={66} />
+                    {/* Astro sobre un resplandor radial: lo difumina e integra
+                        al panel (igual que el halo del sheet) en vez de leerse
+                        como un icono pegado y crudo. */}
+                    <View style={styles.comingStar}>
+                      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+                        <Defs>
+                          <RadialGradient id="comingGlow" cx="50%" cy="50%" r="50%">
+                            <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.3} />
+                            <Stop offset="42%" stopColor={colors.oro} stopOpacity={0.09} />
+                            <Stop offset="100%" stopColor={colors.oro} stopOpacity={0} />
+                          </RadialGradient>
+                        </Defs>
+                        <Rect x="0" y="0" width="100%" height="100%" fill="url(#comingGlow)" />
+                      </Svg>
+                      <ChoreStar width={52} height={72} opacity={0.92} />
+                    </View>
                   </View>
                 ) : trained < total ? (
                   <Text style={styles.comingLine}>
@@ -271,7 +290,7 @@ export function TuLeoModal({
                 )}
 
                 {/* Cómo se lee — distingue las dos capas que la usuaria veía
-                  mezcladas: las estrellas (este mes) y el león (el largo
+                  mezcladas: las estrellas (este mes) y el emblema (el largo
                   plazo). Resuelve "¿y qué hay del emblema?". */}
                 <View style={styles.legend}>
                   <View style={styles.legendRow}>
@@ -284,8 +303,8 @@ export function TuLeoModal({
                   <View style={styles.legendRow}>
                     <Text style={styles.legendMark}>☉</Text>
                     <Text style={styles.legendText}>
-                      Tu <Text style={styles.legendKey}>león</Text> se revela despacio, con todo lo
-                      que sostienes a lo largo del tiempo.
+                      Tu <Text style={styles.legendKey}>{signTitle}</Text> se revela despacio, con
+                      todo lo que sostienes a lo largo del tiempo.
                     </Text>
                   </View>
                 </View>
@@ -368,8 +387,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   halo: { position: 'absolute' },
-  // El león ocupa ~0.76 del halo (estética sello: respira dentro del aro).
-  lion: { width: 116, height: 116 },
+  // El emblema ocupa ~0.76 del halo (estética sello: respira dentro del aro).
+  emblem: { width: 116, height: 116 },
   // Titular cálido — el conteo de luces, no el %. Números en oro.
   headline: {
     fontFamily: typography.uiMedium,
@@ -466,6 +485,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
   },
   comingTextCol: { flex: 1, gap: 2 },
+  // Contenedor del astro: aloja el resplandor (absoluto, detrás) + la estrella.
+  // Más ancho/alto que la estrella para que el glow respire alrededor.
+  comingStar: {
+    width: 84,
+    height: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   comingEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -484,7 +511,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.bone,
   },
-  // "Cómo se lee" — bloque que separa estrella (mes) de león (largo plazo).
+  // "Cómo se lee" — bloque que separa estrella (mes) de emblema (largo plazo).
   legend: {
     alignSelf: 'stretch',
     marginTop: spacing.lg,

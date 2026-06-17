@@ -137,6 +137,28 @@ describe('buildCalendarDays · events', () => {
     expect(dayOf(days, '2026-06-12').events[0]!.title).toBe('Leo despertó')
     expect(dayOf(days, '2026-06-11').events).toEqual([])
   })
+
+  test('colapsa títulos repetidos (case/espacios) — defensa ante data sucia', () => {
+    const ev: CalendarEvent[] = [
+      { id: 'a', title: 'Algo que noté en tus noches.' },
+      { id: 'b', title: '  algo que noté en tus noches.  ' },
+      { id: 'c', title: 'Leo empezó a despertar.' },
+    ]
+    const out = dayOf(buildCalendarDays(base({ eventsByDay: { '2026-06-12': ev } })), '2026-06-12')
+    expect(out.events).toHaveLength(2)
+    expect(out.events.map((e) => e.id)).toEqual(['a', 'c'])
+  })
+
+  test('limita a 3 eventos por día (un recuerdo no es inventario)', () => {
+    const ev: CalendarEvent[] = [
+      { id: 'a', title: 'uno' },
+      { id: 'b', title: 'dos' },
+      { id: 'c', title: 'tres' },
+      { id: 'd', title: 'cuatro' },
+    ]
+    const out = dayOf(buildCalendarDays(base({ eventsByDay: { '2026-06-12': ev } })), '2026-06-12')
+    expect(out.events).toHaveLength(3)
+  })
 })
 
 describe('buildCalendarDays · values (Historia)', () => {

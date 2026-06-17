@@ -26,9 +26,9 @@ import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
 import {
-  LionFramePreloader,
+  EmblemFramePreloader,
   TransformationCard,
-  TuLeoModal,
+  TuEmblemaModal,
   useTransformProgress,
 } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
@@ -422,7 +422,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // "Tu {signo}" — el modal de progreso de la constelación, abierto desde el
   // hero compacto. % y conteo salen de la MISMA fuente (trained/figureCount)
   // que pinta el hero, así nunca se contradicen.
-  const [tuLeoOpen, setTuLeoOpen] = useState(false)
+  const [tuEmblemaOpen, setTuEmblemaOpen] = useState(false)
   const heroPct = figureCount > 0 ? Math.round((trainedThisMonth / figureCount) * 100) : 0
   const heroPress = usePressFeedback()
   // Estrellas con nombre ya encendidas + la que sigue — derivadas de la
@@ -627,7 +627,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <Pressable
                 onPress={() => {
                   heroPress.triggerHaptic()
-                  setTuLeoOpen(true)
+                  setTuEmblemaOpen(true)
                   track('hoy_constellation_opened', {
                     trained: trainedThisMonth,
                     total: figureCount,
@@ -796,12 +796,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         ) : null}
         {/* "Tu {signo}" — el modal de progreso de la constelación, abierto desde
             el hero. Lenguaje de Revelaciones (blur + emblema correcto de Hoy). */}
-        {/* Calienta el caché de RN Image del león para que el modal no se
+        {/* Calienta el caché de RN Image del emblema para que el modal no se
             tarde en su primera apertura (el hero lo pinta en Skia, otro caché). */}
-        <LionFramePreloader sign={sign} />
-        <TuLeoModal
-          visible={tuLeoOpen}
-          onClose={() => setTuLeoOpen(false)}
+        <EmblemFramePreloader sign={sign} />
+        <TuEmblemaModal
+          visible={tuEmblemaOpen}
+          onClose={() => setTuEmblemaOpen(false)}
           sign={sign}
           signLabel={signLabel}
           trained={trainedThisMonth}

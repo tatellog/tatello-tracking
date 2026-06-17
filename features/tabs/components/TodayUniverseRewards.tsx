@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -17,6 +18,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
+import { todayInTimezone } from '@/lib/time'
 import { useSleepLog } from '@/features/sleep/hooks'
 import {
   consumeUniverseDetail,
@@ -101,6 +103,18 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const sleep = useSleepLog(date)
   const wellbeing = useTodayWellbeing(date)
   const reducedMotion = useReducedMotion()
+  // ¿Hoy está al frente? Un registro hecho FUERA de Hoy (escanear/crear comida
+  // abre /scan-meal full-screen; o registrar desde otro tab) parchea el brief
+  // al instante, mientras Hoy sigue montado DETRÁS. Sin este gate, el delta de
+  // Energía se emitía con scan-meal encima → el toast salía oculto y al volver
+  // ya no había nada que mostrar. Gateando en foco, el alza se preserva y el
+  // "+N Energía" se dispara al regresar a Hoy, visible.
+  const isFocused = useIsFocused()
+  // En "modo ver día" Hoy se llena con un día PASADO (vctx): el grid muestra
+  // sus pcts, pero eso NO es un registro de hoy. Sin este gate, aterrizar en
+  // un día anterior emitía un "+N Claridad" falso (su pct vs el baseline de
+  // hoy). Solo el día real dispara recompensa.
+  const isToday = date === todayInTimezone()
   const [openKey, setOpenKey] = useState<UniverseAttributeKey | null>(null)
   const [flight, setFlight] = useState<{ key: UniverseAttributeKey; id: number } | null>(null)
   const prevPcts = useRef<Record<UniverseAttributeKey, number> | null>(null)
@@ -152,7 +166,11 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   // It only acts when a pct actually ROSE since the last armed snapshot.
   // Decreases (step-back, day rollover) re-sync silently.
   useEffect(() => {
-    if (!ready || !pctSig) return
+    // Mientras Hoy NO está al frente, no tocamos el snapshot: el alza de un
+    // registro hecho fuera de Hoy queda pendiente y se emite al re-enfocar
+    // (isFocused es dep → el efecto re-corre al volver). Así el toast siempre
+    // sale visible, nunca detrás de scan-meal.
+    if (!ready || !pctSig || !isFocused || !isToday) return
     const current = {} as Record<UniverseAttributeKey, number>
     for (const pair of pctSig.split('|')) {
       const [key, pct] = pair.split(':') as [UniverseAttributeKey, string]
@@ -168,7 +186,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
         if (!reducedMotion) setFlight((f) => ({ key, id: (f?.id ?? 0) + 1 }))
       }
     }
-  }, [ready, pctSig, reducedMotion])
+  }, [ready, pctSig, reducedMotion, isFocused, isToday])
 
   // Unmount the flight layer once the rise is over.
   useEffect(() => {

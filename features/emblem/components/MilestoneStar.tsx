@@ -36,6 +36,13 @@ import { colors } from '@/theme'
  */
 type MilestoneStarProps = {
   size?: number
+  /**
+   * 'milestone' (default) = el astro de anticipación/hito: núcleo magenta vivo
+   * (presente). 'memory' = mismo astro y mismos flares, pero TODO en oro — para
+   * el sheet de un día pasado, donde el oro es la memoria y el magenta queda
+   * reservado al CTA del presente.
+   */
+  tone?: 'milestone' | 'memory'
 }
 
 // Estrella de 4 puntas con cintura cóncava (la "chispa" clásica): controles
@@ -59,8 +66,15 @@ const SPARKS = [
   { x: 92, y: 68, r: 1.8, o: 0.55 },
 ] as const
 
-export function MilestoneStar({ size = 88 }: MilestoneStarProps) {
+export function MilestoneStar({ size = 88, tone = 'milestone' }: MilestoneStarProps) {
   const reduce = useReducedMotion()
+  // Tono 'memory' → núcleo y halo en oro (sin magenta). Los brazos y flares ya
+  // son oro, así que solo cambian los dos gradientes que llevaban magenta.
+  const memory = tone === 'memory'
+  const haloMid = memory ? colors.oroSoft : colors.dimension.energia
+  const haloOuter = memory ? colors.oro : colors.magenta
+  const coreMid = memory ? colors.oroSoft : colors.magenta
+  const coreEnd = memory ? colors.oro : colors.magentaDeep
   // Respiración: una escala lenta del contenedor (transform de View, GPU —
   // no toca el SVG). Reduce-motion la deja en 1.
   const breath = useSharedValue(1)
@@ -93,9 +107,9 @@ export function MilestoneStar({ size = 88 }: MilestoneStarProps) {
             {/* Halo cálido detrás del astro — oro al centro que cede a magenta. */}
             <RadialGradient id="msHalo" cx="50%" cy="50%" r="50%">
               <Stop offset="0%" stopColor={colors.oro} stopOpacity={0.42} />
-              <Stop offset="34%" stopColor={colors.dimension.energia} stopOpacity={0.22} />
-              <Stop offset="64%" stopColor={colors.magenta} stopOpacity={0.12} />
-              <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
+              <Stop offset="34%" stopColor={haloMid} stopOpacity={0.22} />
+              <Stop offset="64%" stopColor={haloOuter} stopOpacity={0.12} />
+              <Stop offset="100%" stopColor={haloOuter} stopOpacity={0} />
             </RadialGradient>
             {/* Brazos del astro — luz arriba, oro al medio, ámbar abajo. */}
             <LinearGradient id="msArms" x1="0" y1="0" x2="0" y2="1">
@@ -106,8 +120,8 @@ export function MilestoneStar({ size = 88 }: MilestoneStarProps) {
             {/* Núcleo — magenta vivo que se apaga hacia su borde. */}
             <RadialGradient id="msCore" cx="50%" cy="50%" r="50%">
               <Stop offset="0%" stopColor={colors.oroLeche} stopOpacity={0.95} />
-              <Stop offset="42%" stopColor={colors.magenta} stopOpacity={1} />
-              <Stop offset="100%" stopColor={colors.magentaDeep} stopOpacity={0.9} />
+              <Stop offset="42%" stopColor={coreMid} stopOpacity={1} />
+              <Stop offset="100%" stopColor={coreEnd} stopOpacity={0.9} />
             </RadialGradient>
             {/* Bloom central — el destello blanco-cálido de donde nace la luz. */}
             <RadialGradient id="msBloom" cx="50%" cy="50%" r="50%">

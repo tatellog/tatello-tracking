@@ -106,6 +106,28 @@ export function dayNumOf(iso: string): number {
   return Number(iso.split('-')[2]) || 1
 }
 
+/** Máximo de eventos que un día muestra en su detalle. Un recuerdo no es un
+ *  inventario: con más, se corta (sin "+N" críptico). */
+const MAX_EVENTS_PER_DAY = 3
+
+/** Defensa de UI: colapsa eventos repetidos (mismo título, ignorando
+ *  mayúsculas/espacios) y limita el total. Evita que un día muestre la misma
+ *  frase dos veces (data sucia / seed) — leer la app contradecirse rompe la
+ *  confianza. Puro: lo aprovechan Hoy y Progreso por igual. */
+function dedupeEvents(events: readonly CalendarEvent[] | undefined): CalendarEvent[] {
+  if (!events || events.length === 0) return []
+  const seen = new Set<string>()
+  const out: CalendarEvent[] = []
+  for (const ev of events) {
+    const key = ev.title.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(ev)
+    if (out.length >= MAX_EVENTS_PER_DAY) break
+  }
+  return out
+}
+
 function registeredFor(sig: DaySignal | undefined): DayRegistered {
   return {
     comida: (sig?.meal_count ?? 0) > 0,
@@ -161,7 +183,7 @@ export function buildCalendarDays(args: BuildCalendarDaysArgs): CalendarDay[] {
       status,
       registered: registeredFor(sig),
       values: valuesFor(sig),
-      events: eventsByDay[cell.date] ?? [],
+      events: dedupeEvents(eventsByDay[cell.date]),
     }
   })
 }
