@@ -138,3 +138,43 @@ describe('buildCalendarDays · events', () => {
     expect(dayOf(days, '2026-06-11').events).toEqual([])
   })
 })
+
+describe('buildCalendarDays · values (Historia)', () => {
+  test('extrae los valores reales de daily_signals', () => {
+    const sig: DaySignal = {
+      meal_count: 4,
+      protein_g: 120,
+      calories: 1450,
+      water_glasses: 7,
+      sleep_minutes: 450,
+      energy: 4,
+      weight_kg: 68.5,
+      on_period: true,
+    }
+    const days = buildCalendarDays(base({ signalsByDay: { '2026-06-12': sig } }))
+    expect(dayOf(days, '2026-06-12').values).toEqual({
+      mealCount: 4,
+      proteinG: 120,
+      calories: 1450,
+      waterGlasses: 7,
+      sleepMinutes: 450,
+      energy: 4,
+      weightKg: 68.5,
+      onPeriod: true,
+    })
+  })
+
+  test('día sin señal → todo null (y onPeriod false)', () => {
+    const days = buildCalendarDays(base())
+    expect(dayOf(days, '2026-06-11').values).toEqual({
+      mealCount: null,
+      proteinG: null,
+      calories: null,
+      waterGlasses: null,
+      sleepMinutes: null,
+      energy: null,
+      weightKg: null,
+      onPeriod: false,
+    })
+  })
+})

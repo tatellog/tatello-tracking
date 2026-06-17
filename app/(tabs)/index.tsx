@@ -34,6 +34,10 @@ import {
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
+import {
+  consumeCalendarDay,
+  subscribeCalendarDayRequest,
+} from '@/features/tabs/pending-calendar-day'
 import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
@@ -232,6 +236,28 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
     })
   }, [])
+  // Llegada desde "Ver día →" (Historia de Progreso): selecciona la fecha y
+  // scrollea a su DayDetailPanel. `dayDetailY` es la y del panel DENTRO de la
+  // sección del mes (su onLayout); la absoluta = monthY + dayDetailY. El panel
+  // se monta al setear selectedDate, así que: si ya estaba montado, el rAF
+  // hace el scroll; si se monta nuevo, su onLayout lo dispara (wantScrollDay).
+  const dayDetailY = useRef(0)
+  const wantScrollDay = useRef(false)
+  useEffect(() => {
+    const handle = (date: string) => {
+      setSelectedDate(date)
+      wantScrollDay.current = true
+      requestAnimationFrame(() => {
+        if (wantScrollDay.current && dayDetailY.current) {
+          wantScrollDay.current = false
+          scrollToY(monthY.current + dayDetailY.current)
+        }
+      })
+    }
+    const pendingDate = consumeCalendarDay()
+    if (pendingDate) handle(pendingDate)
+    return subscribeCalendarDayRequest(handle)
+  }, [scrollToY])
   // Same pause, but driven by the macros slider's HORIZONTAL drag — the
   // vertical-scroll handler above never fires for a sideways swipe, so the
   // cosmos kept animating and competed with the swipe (felt slow). Hold the
@@ -671,13 +697,25 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 onSelect={handleSelectDay}
               />
               {selectedDay ? (
-                <DayDetailPanel
-                  day={selectedDay}
-                  onMarkTrained={markTrained}
-                  onMarkRested={markRested}
-                  onClearTrained={clearTrained}
-                  onClearRested={clearRested}
-                />
+                <View
+                  onLayout={(e) => {
+                    dayDetailY.current = e.nativeEvent.layout.y
+                    // Si veníamos de "Ver día →", el panel acaba de montar:
+                    // ahora sí conocemos su y y podemos aterrizar el scroll.
+                    if (wantScrollDay.current) {
+                      wantScrollDay.current = false
+                      scrollToY(monthY.current + dayDetailY.current)
+                    }
+                  }}
+                >
+                  <DayDetailPanel
+                    day={selectedDay}
+                    onMarkTrained={markTrained}
+                    onMarkRested={markRested}
+                    onClearTrained={clearTrained}
+                    onClearRested={clearRested}
+                  />
+                </View>
               ) : null}
             </Animated.View>
           </ScrollView>

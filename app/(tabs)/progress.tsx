@@ -22,9 +22,14 @@ import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
 import { CycleCard } from '@/features/progress/components/CycleCard'
+import { DayHistorySheet } from '@/features/progress/components/DayHistorySheet'
 import { MovementConstellation } from '@/features/progress/components/MovementConstellation'
 import { TrainingShareCTA } from '@/features/progress/components/TrainingShareCTA'
 import { useMeasurements } from '@/features/progress/hooks'
+import { dayNumOf, weekdayIdxOf, type CalendarDay } from '@/features/tabs/components/calendar/logic'
+import { useCalendarDays } from '@/features/tabs/components/calendar/useCalendarDays'
+import { requestCalendarDay } from '@/features/tabs/pending-calendar-day'
+import { todayInTimezone } from '@/lib/time'
 import {
   computeDelta,
   computeTrend,
@@ -127,6 +132,46 @@ function ProgressBody() {
   const goLogMeasurement = () => router.push('/log-measurement')
   const hasTrajectory = count >= 2
 
+  // ── Historia (Tab Progreso = observar). Tap en una estrella abre el detalle
+  // SOLO-LECTURA; el MISMO CalendarDay de Hoy para los días recientes, y uno
+  // sintetizado (entrenó/sin registro) para los más viejos. La única puerta a
+  // editar es el CTA "Ver día →" (lleva a Hoy). Nada se muta desde aquí.
+  const today = todayInTimezone()
+  const { days: calendarDays } = useCalendarDays({
+    span: 62,
+    today,
+    todayWorkoutCompleted: false,
+  })
+  const dayByDate = useMemo(() => {
+    const m = new Map<string, CalendarDay>()
+    for (const d of calendarDays) m.set(d.date, d)
+    return m
+  }, [calendarDays])
+  const [historyDay, setHistoryDay] = useState<CalendarDay | null>(null)
+  const [sheetVisible, setSheetVisible] = useState(false)
+  // Ventana editable de Hoy = últimos 30 días: solo ahí el CTA "Ver día" lleva
+  // a editar; lo más viejo es historia (lectura pura, sin CTA).
+  const editableFrom = useMemo(() => isoDaysAgo(today, 29), [today])
+  const sheetEditable = historyDay != null && historyDay.date >= editableFrom
+
+  const openHistoryDay = useCallback(
+    (date: string, trained: boolean) => {
+      const day = dayByDate.get(date) ?? synthDay(date, trained, today)
+      setHistoryDay(day)
+      setSheetVisible(true)
+      track('history_day_opened', { date, status: day.status })
+    },
+    [dayByDate, today],
+  )
+  const seeDayInHoy = useCallback(
+    (date: string) => {
+      requestCalendarDay(date)
+      router.navigate('/(tabs)')
+      setSheetVisible(false)
+    },
+    [router],
+  )
+
   return (
     <View style={styles.screen}>
       <SkyBackground />
@@ -141,7 +186,7 @@ function ProgressBody() {
               is an outcome (laggy, noisy, half outside their
               control); what the tab opens on is what they actually
               did. The movement constellation owns its own eyebrow. */}
-          <MovementConstellation />
+          <MovementConstellation onDayPress={openHistoryDay} />
 
           {/* ── Tu cuerpo — weight + measurements. Demoted out of the
               hero: one section among several, an outcome shown
@@ -288,8 +333,57 @@ function ProgressBody() {
           ) : null}
         </ScrollView>
       </SafeAreaView>
+
+      {/* Historia — detalle del día en modo observación (sin editar). */}
+      <DayHistorySheet
+        visible={sheetVisible}
+        day={historyDay}
+        editable={sheetEditable}
+        onClose={() => setSheetVisible(false)}
+        onSeeDay={seeDayInHoy}
+      />
     </View>
   )
+}
+
+// Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC).
+function isoDaysAgo(today: string, n: number): string {
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number]
+  const dt = new Date(y, m - 1, d - n)
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${dt.getFullYear()}-${mm}-${dd}`
+}
+
+// Día mínimo para fechas fuera de la ventana de señales recientes: solo
+// sabemos si entrenó (del grid all-time); el resto vacío (lectura honesta).
+function synthDay(date: string, trained: boolean, today: string): CalendarDay {
+  return {
+    date,
+    dayNum: dayNumOf(date),
+    weekdayIdx: weekdayIdxOf(date),
+    isToday: date === today,
+    status: trained ? 'trained' : 'empty',
+    registered: {
+      comida: false,
+      agua: false,
+      sueno: false,
+      energia: false,
+      peso: false,
+      ciclo: false,
+    },
+    values: {
+      mealCount: null,
+      proteinG: null,
+      calories: null,
+      waterGlasses: null,
+      sleepMinutes: null,
+      energy: null,
+      weightKg: null,
+      onPeriod: false,
+    },
+    events: [],
+  }
 }
 
 function formatDelta(kg: number | undefined): string {

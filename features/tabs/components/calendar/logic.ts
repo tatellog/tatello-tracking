@@ -26,6 +26,20 @@ export type DayRegistered = {
 
 export type CalendarEvent = { id: string; title: string }
 
+/** Valores REALES registrados ese día (no presencia). `null` = no registrado.
+ *  Solo los consume el detalle de Historia (Progreso); Hoy sigue mostrando
+ *  presencia, no métricas. */
+export type DayValues = {
+  mealCount: number | null
+  proteinG: number | null
+  calories: number | null
+  waterGlasses: number | null
+  sleepMinutes: number | null
+  energy: number | null
+  weightKg: number | null
+  onPeriod: boolean
+}
+
 export type CalendarDay = {
   /** ISO 'YYYY-MM-DD'. */
   date: string
@@ -35,6 +49,8 @@ export type CalendarDay = {
   isToday: boolean
   status: DayStatus
   registered: DayRegistered
+  /** Valores numéricos del día (para el detalle de Historia). */
+  values: DayValues
   /** [] si no hubo eventos ese día. */
   events: CalendarEvent[]
 }
@@ -43,6 +59,8 @@ export type CalendarDay = {
 export type DaySignal = {
   rested?: boolean | null
   meal_count?: number | null
+  protein_g?: number | null
+  calories?: number | null
   water_glasses?: number | null
   sleep_minutes?: number | null
   energy?: number | null
@@ -89,6 +107,19 @@ function registeredFor(sig: DaySignal | undefined): DayRegistered {
   }
 }
 
+function valuesFor(sig: DaySignal | undefined): DayValues {
+  return {
+    mealCount: sig?.meal_count ?? null,
+    proteinG: sig?.protein_g ?? null,
+    calories: sig?.calories ?? null,
+    waterGlasses: sig?.water_glasses ?? null,
+    sleepMinutes: sig?.sleep_minutes ?? null,
+    energy: sig?.energy ?? null,
+    weightKg: sig?.weight_kg ?? null,
+    onPeriod: sig?.on_period === true,
+  }
+}
+
 export function buildCalendarDays(args: BuildCalendarDaysArgs): CalendarDay[] {
   const { today, span, trainedDates, signalsByDay, eventsByDay, todayWorkoutCompleted, overrides } =
     args
@@ -119,6 +150,7 @@ export function buildCalendarDays(args: BuildCalendarDaysArgs): CalendarDay[] {
       isToday: cell.isToday,
       status,
       registered: registeredFor(sig),
+      values: valuesFor(sig),
       events: eventsByDay[cell.date] ?? [],
     }
   })

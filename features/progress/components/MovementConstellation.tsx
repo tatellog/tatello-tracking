@@ -44,7 +44,14 @@ const LECHE = '#F4ECDE'
  * are quiet dust. The ‹ › arrows step back through history. No streak, no
  * countdown (manifiesto): the counter only grows.
  */
-export function MovementConstellation() {
+export function MovementConstellation({
+  onDayPress,
+}: {
+  /** Tap en un día (no futuro) → abre el detalle de Historia (solo lectura).
+   *  `trained` viene del grid para poder sintetizar días fuera de la ventana
+   *  de señales recientes. */
+  onDayPress?: (date: string, trained: boolean) => void
+}) {
   const total = useTotalTrainedDays()
   const allWorkouts = useAllWorkoutDates()
   const today = todayInTimezone()
@@ -193,6 +200,32 @@ export function MovementConstellation() {
               />
             )
           })}
+
+          {/* Zonas de toque transparentes ENCIMA de las estrellas (orden del
+              documento = z-order). Una por día NO futuro: tap → detalle de
+              Historia (observación, no edición). El futuro no se toca. */}
+          {onDayPress
+            ? month.cells.map((cell, i) => {
+                if (cell.isFuture) return null
+                const k = firstWeekday + i
+                const col = k % COLS
+                const row = Math.floor(k / COLS)
+                return (
+                  <Rect
+                    key={`hit-${cell.date}`}
+                    x={col * CELL}
+                    y={row * CELL}
+                    width={CELL}
+                    height={CELL}
+                    fill="transparent"
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {})
+                      onDayPress(cell.date, cell.trained)
+                    }}
+                  />
+                )
+              })
+            : null}
         </Svg>
       </View>
     </Animated.View>
