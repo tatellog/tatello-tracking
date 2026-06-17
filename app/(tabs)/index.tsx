@@ -34,6 +34,7 @@ import {
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
+import { useBriefContext } from '@/features/brief/hooks'
 import {
   consumeCalendarDay,
   subscribeCalendarDayRequest,
@@ -42,10 +43,8 @@ import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
-  type CalendarDay,
   CoachLine,
   DayCheckIn,
-  DayDetailPanel,
   type DayState,
   type DayStatus,
   LunarConstellation,
@@ -155,8 +154,20 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()
 
-  const restQuery = useRestToday(ctx.date)
-  const setRest = useSetRestToday(ctx.date)
+  // ── Modo "ver día": Hoy puede mostrar CUALQUIER día, no solo hoy. El día
+  // visto es `selectedDate` (lo setean el strip y el "Editar día" de Progreso).
+  // Su contexto COMPLETO (macros/comidas/entrené/ánimo…) viene del mismo brief,
+  // ahora parametrizado por fecha; las secciones del día (universo, slides,
+  // comidas) leen `vctx`. La constelación/mes/racha siguen con `ctx` (hoy real),
+  // así nada de "hoy" se rompe al navegar al pasado.
+  const [selectedDate, setSelectedDate] = useState<string>(ctx.date)
+  const viewingPast = selectedDate !== ctx.date
+  const viewedBriefQ = useBriefContext(viewingPast ? selectedDate : undefined)
+  const vctx: BriefContext = viewingPast ? (viewedBriefQ.data ?? ctx) : ctx
+
+  // Rest + estado del día siguen al día VISTO (selectedDate), no a hoy.
+  const restQuery = useRestToday(selectedDate)
+  const setRest = useSetRestToday(selectedDate)
   const setRestForDate = useSetRestForDate()
   const restedToday = restQuery.data ?? false
 
@@ -190,10 +201,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return () => clearTimeout(id)
   }, [])
 
-  // Calendario "editor oficial": día seleccionado (abre el panel de detalle)
-  // + overrides locales optimistas por fecha (status que se aplica al instante
+  // Overrides locales optimistas por fecha (status que se aplica al instante
   // mientras la mutación viaja; convergen al refetch, se limpian en onError).
-  const [selectedDate, setSelectedDate] = useState<string>(ctx.date)
   const [dayOverrides, setDayOverrides] = useState<Record<string, DayStatus>>({})
 
   // Pause the constellation's animation loops while the page is actively
@@ -236,28 +245,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
     })
   }, [])
-  // Llegada desde "Ver día →" (Historia de Progreso): selecciona la fecha y
-  // scrollea a su DayDetailPanel. `dayDetailY` es la y del panel DENTRO de la
-  // sección del mes (su onLayout); la absoluta = monthY + dayDetailY. El panel
-  // se monta al setear selectedDate, así que: si ya estaba montado, el rAF
-  // hace el scroll; si se monta nuevo, su onLayout lo dispara (wantScrollDay).
-  const dayDetailY = useRef(0)
-  const wantScrollDay = useRef(false)
+  // Llegada desde "Editar día →" (Historia de Progreso): pone Hoy en modo "ver
+  // día" para esa fecha y sube al inicio, donde ahora vive TODO el día (universo,
+  // macros, comidas reflejan el día visto). El banner de arriba avisa.
   useEffect(() => {
     const handle = (date: string) => {
       setSelectedDate(date)
-      wantScrollDay.current = true
-      requestAnimationFrame(() => {
-        if (wantScrollDay.current && dayDetailY.current) {
-          wantScrollDay.current = false
-          scrollToY(monthY.current + dayDetailY.current)
-        }
-      })
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }))
     }
     const pendingDate = consumeCalendarDay()
     if (pendingDate) handle(pendingDate)
     return subscribeCalendarDayRequest(handle)
-  }, [scrollToY])
+  }, [])
   // Same pause, but driven by the macros slider's HORIZONTAL drag — the
   // vertical-scroll handler above never fires for a sideways swipe, so the
   // cosmos kept animating and competed with the swipe (felt slow). Hold the
@@ -313,10 +312,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     todayWorkoutCompleted: ctx.today_workout_completed,
     overrides: dayOverrides,
   })
-  const selectedDay: CalendarDay | null = useMemo(
-    () => calendarDays.find((d) => d.date === selectedDate) ?? null,
-    [calendarDays, selectedDate],
-  )
 
   const trainedThisMonth = month.trainedThisMonth
   const MONTHS_ES = [
@@ -334,6 +329,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     'Diciembre',
   ]
   const monthLabel = MONTHS_ES[Number(todayIsoLocal.slice(5, 7)) - 1] ?? 'Tu mes'
+  // "2 de junio" — para el banner de modo ver día.
+  const viewingLabel = `${Number(selectedDate.slice(8, 10))} de ${MONTHS_ES[Number(selectedDate.slice(5, 7)) - 1] ?? ''}`
 
   const sign = useMemo(() => zodiacFromDate(profile?.date_of_birth), [profile?.date_of_birth])
   const signLabel = ZODIAC[sign].label
@@ -366,13 +363,23 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
-  const dayState: DayState = ctx.today_workout_completed
+  // El estado del toggle es el del día VISTO (vctx), no el de hoy.
+  const dayState: DayState = vctx.today_workout_completed
     ? 'trained'
     : restedToday
       ? 'rested'
       : 'undecided'
 
   const handleDayChange = (next: DayState) => {
+    // Día PASADO: edición de backfill sin celebración (reutiliza las acciones
+    // por-fecha del calendario, con override optimista y haptic suave).
+    if (viewingPast) {
+      if (next === 'trained') markTrained(selectedDate)
+      else if (next === 'rested') markRested(selectedDate)
+      else if (vctx.today_workout_completed) clearTrained(selectedDate)
+      else if (restedToday) clearRested(selectedDate)
+      return
+    }
     if (next === 'trained') {
       const wasFirstDay = isFirstDay
       if (restedToday) setRest.mutate(false)
@@ -411,9 +418,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     })
   }, [])
 
-  const handleSelectDay = useCallback(
+  // Tocar un día en el strip → Hoy se llena con ESE día y sube al inicio, donde
+  // viven el universo/macros/comidas del día visto (+ el banner).
+  const handleSelectViewedDay = useCallback(
     (date: string) => {
       setSelectedDate(date)
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }))
       const d = calendarDays.find((c) => c.date === date)
       track('calendar_day_selected', {
         date,
@@ -521,12 +531,33 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
             </Animated.View>
 
+            {/* Banner de "modo ver día": cuando Hoy muestra un día PASADO, todo
+                lo de abajo (universo, macros, comidas) es de ESE día. Un toque
+                vuelve a hoy. */}
+            {viewingPast ? (
+              <Pressable
+                style={styles.viewingBanner}
+                onPress={() => setSelectedDate(ctx.date)}
+                accessibilityRole="button"
+                accessibilityLabel="Volver a hoy"
+              >
+                <Text style={styles.viewingText}>
+                  Estás viendo el <Text style={styles.viewingDate}>{viewingLabel}</Text>
+                </Text>
+                <Text style={styles.viewingBack}>Volver a hoy ›</Text>
+              </Pressable>
+            ) : null}
+
             {/* El momento de Regreso (3+ días fuera) ahora es la Revelación
                 de Regreso full-screen del orquestador (T2) — el ReturnMoment
                 inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
-              <DayCheckIn state={dayState} onChange={handleDayChange} />
+              <DayCheckIn
+                state={dayState}
+                onChange={handleDayChange}
+                label={viewingPast ? viewingLabel : 'Hoy'}
+              />
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre
@@ -652,7 +683,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 universeY.current = e.nativeEvent.layout.y
               }}
             >
-              <TodayUniverseRewards ctx={ctx} date={ctx.date} restedToday={restedToday} />
+              <TodayUniverseRewards ctx={vctx} date={vctx.date} restedToday={restedToday} />
             </Animated.View>
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
@@ -661,28 +692,26 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
             <Animated.View entering={enter(520)}>
               <StatSlider
-                ctx={ctx}
+                ctx={vctx}
                 targetSlide={slideParam ?? null}
                 onSwipeStateChange={handleSlideSwipe}
               />
             </Animated.View>
 
             <Animated.View entering={enter(560)}>
-              <SectionHeader label="Comidas de hoy" />
+              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas de hoy'} />
             </Animated.View>
             <Animated.View entering={enter(600)}>
               <TodayMealLog
-                date={ctx.date}
+                date={vctx.date}
                 onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
                 onAddMeal={() => router.push({ pathname: '/capture-meal' })}
               />
             </Animated.View>
 
-            {/* Calendario — el editor oficial de la constelación + puente a
-                Historia. Va al FINAL: es contexto/historia ("así va tu mes"),
-                no la acción del día (esa es el toggle de arriba). Tocar un día
-                lo selecciona y abre su detalle; el día de HOY solo se lee
-                (se marca arriba), los pasados se pueden editar sin celebración. */}
+            {/* Calendario — ahora SELECTOR del día visto: tocar un día llena
+                TODO Hoy (universo, macros, comidas) con ese día y sube al inicio
+                + el banner. El detalle ya no vive en un panel aparte. */}
             <Animated.View
               entering={enter(680)}
               onLayout={(e) => {
@@ -690,33 +719,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               }}
             >
               <SectionHeader label={monthLabel} />
-              <Text style={styles.weekHint}>Tu mes hasta hoy · toca un día para ver o editar.</Text>
+              <Text style={styles.weekHint}>
+                Tu mes hasta hoy · toca un día para verlo completo.
+              </Text>
               <WeekStrip
                 days={calendarDays}
                 selectedDate={selectedDate}
-                onSelect={handleSelectDay}
+                onSelect={handleSelectViewedDay}
               />
-              {selectedDay ? (
-                <View
-                  onLayout={(e) => {
-                    dayDetailY.current = e.nativeEvent.layout.y
-                    // Si veníamos de "Ver día →", el panel acaba de montar:
-                    // ahora sí conocemos su y y podemos aterrizar el scroll.
-                    if (wantScrollDay.current) {
-                      wantScrollDay.current = false
-                      scrollToY(monthY.current + dayDetailY.current)
-                    }
-                  }}
-                >
-                  <DayDetailPanel
-                    day={selectedDay}
-                    onMarkTrained={markTrained}
-                    onMarkRested={markRested}
-                    onClearTrained={clearTrained}
-                    onClearRested={clearRested}
-                  />
-                </View>
-              ) : null}
             </Animated.View>
           </ScrollView>
         </SafeAreaView>
@@ -909,6 +919,34 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginTop: -4,
     marginBottom: 4,
+  },
+  // Banner "modo ver día" — avisa que TODO Hoy es de un día pasado + volver.
+  viewingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.bgCard,
+  },
+  viewingText: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  viewingDate: {
+    fontFamily: typography.uiBold,
+    color: colors.oroLeche,
+    textTransform: 'capitalize',
+  },
+  viewingBack: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.magenta,
   },
   // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
   // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,

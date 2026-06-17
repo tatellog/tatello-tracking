@@ -25,8 +25,8 @@ type HomeBriefState = {
  * In production (SKIP_AUTH unset or false) this is a pass-through
  * and the mock file is tree-shaken out of the bundle.
  */
-export function useHomeBrief(): HomeBriefState {
-  const query = useBriefContext()
+export function useHomeBrief(date?: string): HomeBriefState {
+  const query = useBriefContext(date)
   if (SKIP_AUTH && query.isError) {
     return {
       data: MOCK_BRIEF_CONTEXT,

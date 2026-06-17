@@ -10,6 +10,8 @@ type Props = {
   state: DayState
   /** Next state — the parent maps it to the workout/rest mutations. */
   onChange: (next: DayState) => void
+  /** Eyebrow — "Hoy" por defecto; en modo "ver día" se pasa la fecha vista. */
+  label?: string
 }
 
 // Star = a trained day (the constellation's glyph); moon = a rest day.
@@ -64,7 +66,7 @@ function Segment({ label, kind, active, onPress }: SegmentProps) {
  * active a supportive, evidence-based line shows below — rest framed
  * as recovery, never guilt.
  */
-export function DayCheckIn({ state, onChange }: Props) {
+export function DayCheckIn({ state, onChange, label = 'Hoy' }: Props) {
   const pick = (seg: 'trained' | 'rested') => {
     // Tapping the active side clears it; tapping the other switches.
     onChange(state === seg ? 'undecided' : seg)
@@ -72,7 +74,7 @@ export function DayCheckIn({ state, onChange }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.eyebrow}>Hoy</Text>
+      <Text style={styles.eyebrow}>{label}</Text>
       <View style={styles.pill}>
         <Segment
           label="Entrené"
