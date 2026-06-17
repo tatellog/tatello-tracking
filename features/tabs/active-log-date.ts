@@ -33,14 +33,3 @@ function subscribe(fn: () => void): () => void {
 export function useActiveLogDate(): string | null {
   return useSyncExternalStore(subscribe, getActiveLogDate, getActiveLogDate)
 }
-
-/**
- * Date al mediodía local de un 'YYYY-MM-DD' — construida POR COMPONENTES, no
- * desde string. Hermes (motor JS de RN) devuelve Invalid Date para
- * `new Date('2026-06-02T12:00:00')`; el constructor numérico es fiable. Mediodía
- * para que el meal_date no cruce de día por la zona horaria.
- */
-export function dayNoon(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  return new Date(y, m - 1, d, 12, 0, 0)
-}

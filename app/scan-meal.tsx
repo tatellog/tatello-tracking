@@ -45,7 +45,7 @@ import {
   type StoredIngredient,
 } from '@/features/macros/api'
 import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
-import { dayNoon, useActiveLogDate } from '@/features/tabs/active-log-date'
+import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
 import { UNIVERSE_ACCENT } from '@/features/tabs/universe-visuals'
@@ -533,7 +533,14 @@ export default function ScanMealScreen() {
   // Backfill: si Hoy está viendo un día pasado, la comida nueva se ancla a ESE
   // día (mediodía local), no a ahora. null = hoy normal.
   const activeLogDate = useActiveLogDate()
-  const newMealConsumedAt = () => (activeLogDate ? dayNoon(activeLogDate) : new Date())
+  const newMealConsumedAt = () => {
+    if (!activeLogDate) return new Date()
+    // Mediodía local del día visto, construido POR COMPONENTES (Hermes da
+    // Invalid Date al parsear strings de fecha). Inline para no depender de un
+    // export nuevo cruzando módulos (Fast Refresh a veces no lo levanta).
+    const [y, m, d] = activeLogDate.split('-').map(Number) as [number, number, number]
+    return new Date(y, m - 1, d, 12, 0, 0)
+  }
 
   const [phase, setPhase] = useState<'describe' | 'scanning' | 'confirm' | 'reveal'>(
     isEdit || isManual ? 'confirm' : isDescribe ? 'describe' : 'scanning',
@@ -826,7 +833,10 @@ export default function ScanMealScreen() {
         },
         {
           onSuccess: () => goToReveal(Math.min(500, Math.max(0, Number(proteinInput) || 0))),
-          onError: () => setSaving(false),
+          onError: (e) => {
+            setSaving(false)
+            Alert.alert('No se pudo registrar', String((e as Error)?.message ?? e))
+          },
         },
       )
       return
@@ -900,7 +910,10 @@ export default function ScanMealScreen() {
       },
       {
         onSuccess: () => goToReveal(macros.protein_g),
-        onError: () => setSaving(false),
+        onError: (e) => {
+          setSaving(false)
+          Alert.alert('No se pudo registrar', String((e as Error)?.message ?? e))
+        },
       },
     )
   }

@@ -45,7 +45,7 @@ import {
   useWaterGoal,
 } from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
-import { dayNoon, useActiveLogDate } from '@/features/tabs/active-log-date'
+import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -348,6 +348,13 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const activeLogDate = useActiveLogDate()
   const logDate = activeLogDate ?? today
   const backfilling = activeLogDate != null && activeLogDate !== today
+  // Mediodía local del día visto, por COMPONENTES (Hermes da Invalid Date al
+  // parsear strings). Inline para no depender de un export cruzando módulos.
+  const logConsumedAt = (): Date => {
+    if (!backfilling) return new Date()
+    const [y, m, d] = logDate.split('-').map(Number) as [number, number, number]
+    return new Date(y, m - 1, d, 12, 0, 0)
+  }
   const backfillLabel = `${Number(logDate.slice(8, 10))} de ${BACKFILL_MONTHS[Number(logDate.slice(5, 7)) - 1] ?? ''}`
 
   // The sheet lives permanently in the tab bar, so gate its reads on
@@ -459,7 +466,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       protein_g: item.protein_g,
       calories: item.calories,
       // Backfill: mediodía del día visto; si es hoy, el momento real.
-      consumed_at: backfilling ? dayNoon(logDate) : new Date(),
+      consumed_at: logConsumedAt(),
       meal_type: mealType,
       photo_storage_path: item.photo_storage_path,
       ingredients: item.ingredients ?? undefined,
