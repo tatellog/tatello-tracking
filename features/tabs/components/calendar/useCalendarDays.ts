@@ -66,7 +66,7 @@ export function useCalendarDays(opts: UseCalendarDaysOpts): {
     const map: Record<string, CalendarEvent[]> = {}
     for (const r of revelations.data ?? []) {
       const day = localDayOf(r.shown_at)
-      ;(map[day] ??= []).push({ id: r.id, title: r.title })
+      ;(map[day] ??= []).push({ id: r.id, title: r.title, tier: r.tier })
     }
     return map
   }, [revelations.data])

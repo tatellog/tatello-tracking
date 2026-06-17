@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Circle, Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg'
@@ -35,6 +35,17 @@ const MONTHS = [
 // Scene colours (same palette as Día/Semana flares — not theme tokens).
 const MAGENTA = '#E91E63'
 const LECHE = '#F4ECDE'
+const GOLD = '#D9AE6F' // revelación / transformación
+const BLUE = '#7C8FFF' // patrón
+
+/** Indicador del día: revelación (dorado), patrón (azul), transformación
+ *  (dorado especial). Mapea los tiers de la tabla revelations. */
+export type DayMark = 'transformation' | 'revelation' | 'pattern'
+
+/** Estado extra del día que el grid de workouts no conoce: si fue descanso
+ *  (vs sin registro) y si tuvo un evento. Lo provee Progreso desde sus
+ *  CalendarDay (recientes); meses viejos quedan sin meta (degradación suave). */
+export type DayMeta = { rested: boolean; mark: DayMark | null }
 
 /*
  * Movement hero — the all-time trained-days counter PLUS a browsable
@@ -46,11 +57,14 @@ const LECHE = '#F4ECDE'
  */
 export function MovementConstellation({
   onDayPress,
+  metaByDate,
 }: {
   /** Tap en un día (no futuro) → abre el detalle de Historia (solo lectura).
    *  `trained` viene del grid para poder sintetizar días fuera de la ventana
    *  de señales recientes. */
   onDayPress?: (date: string, trained: boolean) => void
+  /** Estado extra por día (descanso + evento) para pintar las estrellas. */
+  metaByDate?: Map<string, DayMeta>
 }) {
   const total = useTotalTrainedDays()
   const allWorkouts = useAllWorkoutDates()
@@ -189,6 +203,7 @@ export function MovementConstellation({
             const row = Math.floor(k / COLS)
             const cx = col * CELL + CELL / 2
             const cy = row * CELL + CELL / 2
+            const meta = metaByDate?.get(cell.date)
             return (
               <DayDot
                 key={cell.date}
@@ -197,6 +212,8 @@ export function MovementConstellation({
                 lit={cell.trained}
                 isToday={cell.isToday}
                 isFuture={cell.isFuture}
+                rested={meta?.rested ?? false}
+                mark={meta?.mark ?? null}
               />
             )
           })}
@@ -227,8 +244,32 @@ export function MovementConstellation({
               })
             : null}
         </Svg>
+
+        {/* Leyenda — cómo se lee el cielo. Solo cuando hay tap (Historia). */}
+        {onDayPress ? <StarLegend /> : null}
       </View>
     </Animated.View>
+  )
+}
+
+/* Cómo se lee el calendario Historia: cada marca, una línea. Estática. */
+function StarLegend() {
+  return (
+    <View style={styles.legend}>
+      <LegendItem color={MAGENTA} label="Entrenaste" />
+      <LegendItem color={LECHE} faint label="Descansaste" />
+      <LegendItem color={GOLD} label="Revelación" />
+      <LegendItem color={BLUE} label="Patrón" />
+    </View>
+  )
+}
+
+function LegendItem({ color, label, faint }: { color: string; label: string; faint?: boolean }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color, opacity: faint ? 0.42 : 1 }]} />
+      <Text style={styles.legendLabel}>{label}</Text>
+    </View>
   )
 }
 
@@ -244,30 +285,76 @@ function DayDot({
   lit,
   isToday,
   isFuture,
+  rested,
+  mark,
 }: {
   cx: number
   cy: number
   lit: boolean
   isToday: boolean
   isFuture: boolean
+  rested: boolean
+  mark: DayMark | null
 }) {
-  if (lit) return <FlareStar cx={cx} cy={cy} hero={isToday} />
-  if (isToday) {
+  // Base — la estrella según el estado del día. El indicador (mark) se
+  // SUPERPONE encima, así un día entrenado puede además tener su revelación.
+  let base: ReactNode
+  if (lit) {
+    base = <FlareStar cx={cx} cy={cy} hero={isToday} />
+  } else if (isToday) {
     // Today, not yet trained — the chronological anchor, unmistakable
     // but neutral (no magenta = no false "done").
-    return (
+    base = (
       <>
         <Circle cx={cx} cy={cy} r={9} fill="none" stroke={LECHE} strokeWidth={0.9} opacity={0.7} />
         <Circle cx={cx} cy={cy} r={2.4} fill={LECHE} opacity={0.62} />
       </>
     )
-  }
-  if (isFuture) {
+  } else if (isFuture) {
     // Hasn't happened — barely there. The month is not pre-owed.
-    return <Circle cx={cx} cy={cy} r={1.4} fill={LECHE} opacity={0.06} />
+    base = <Circle cx={cx} cy={cy} r={1.4} fill={LECHE} opacity={0.06} />
+  } else if (rested) {
+    // Descansaste — una pausa con presencia: un punto gris suave con halo,
+    // claramente MÁS que "sin registro", nunca un hoyo. (Manifiesto: el
+    // descanso es parte del movimiento, no su ausencia.)
+    base = (
+      <>
+        <Circle cx={cx} cy={cy} r={5.5} fill={LECHE} opacity={0.05} />
+        <Circle cx={cx} cy={cy} r={2.6} fill={LECHE} opacity={0.42} />
+      </>
+    )
+  } else {
+    // Sin registro — polvo apenas visible, por debajo del descanso.
+    base = <Circle cx={cx} cy={cy} r={1.4} fill={LECHE} opacity={0.16} />
   }
-  // Past, rested — quiet dust, well below the lit stars.
-  return <Circle cx={cx} cy={cy} r={1.5} fill={LECHE} opacity={0.24} />
+  return (
+    <>
+      {base}
+      {mark ? <MarkDot cx={cx} cy={cy} mark={mark} /> : null}
+    </>
+  )
+}
+
+/* Indicador de evento — un punto en la esquina superior derecha de la celda,
+ * SOBRE la estrella base: revelación (dorado), patrón (azul), transformación
+ * (dorado con micro-aro, el hito mayor). Se lee sin tapar la estrella. */
+function MarkDot({ cx, cy, mark }: { cx: number; cy: number; mark: DayMark }) {
+  const mx = cx + 9.5
+  const my = cy - 9.5
+  if (mark === 'pattern') {
+    return <Circle cx={mx} cy={my} r={2} fill={BLUE} />
+  }
+  if (mark === 'transformation') {
+    return (
+      <>
+        <Circle cx={mx} cy={my} r={4} fill="none" stroke={GOLD} strokeWidth={0.8} opacity={0.7} />
+        <Circle cx={mx} cy={my} r={2.4} fill={GOLD} />
+        <Circle cx={mx} cy={my} r={0.9} fill={LECHE} opacity={0.9} />
+      </>
+    )
+  }
+  // revelación (regreso) — dorado simple.
+  return <Circle cx={mx} cy={my} r={2} fill={GOLD} />
 }
 
 /* A lit day = a star with a 4-point anamorphic flare + white-hot core.
@@ -450,5 +537,32 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     width: CELL,
     textAlign: 'center',
+  },
+  // Leyenda — fila envolvente de marcas, bajo el cielo.
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    columnGap: 14,
+    rowGap: 6,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  legendLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.tinyLabel,
+    color: colors.niebla,
   },
 })

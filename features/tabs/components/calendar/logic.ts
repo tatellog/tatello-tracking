@@ -24,7 +24,13 @@ export type DayRegistered = {
   ciclo: boolean
 }
 
-export type CalendarEvent = { id: string; title: string }
+export type CalendarEvent = {
+  id: string
+  title: string
+  /** Tier de la revelación ('transformation' | 'return' | 'pattern') — para
+   *  pintar el indicador del día en el calendario Historia. */
+  tier?: string
+}
 
 /** Valores REALES registrados ese día (no presencia). `null` = no registrado.
  *  Solo los consume el detalle de Historia (Progreso); Hoy sigue mostrando

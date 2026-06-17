@@ -71,10 +71,11 @@ export function useUpsertMacroTargets() {
 
 /* ─── meals queries ──────────────────────────────────────────────── */
 
-export function useMealsForDate(date: string) {
+export function useMealsForDate(date: string | null, opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: queryKeys.macros.meals(date),
-    queryFn: () => getMealsForDate(date),
+    queryKey: queryKeys.macros.meals(date ?? 'none'),
+    queryFn: () => getMealsForDate(date as string),
+    enabled: (opts?.enabled ?? true) && date != null,
   })
 }
 

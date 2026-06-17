@@ -23,7 +23,11 @@ import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPho
 import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { DayHistorySheet } from '@/features/progress/components/DayHistorySheet'
-import { MovementConstellation } from '@/features/progress/components/MovementConstellation'
+import {
+  MovementConstellation,
+  type DayMark,
+  type DayMeta,
+} from '@/features/progress/components/MovementConstellation'
 import { TrainingShareCTA } from '@/features/progress/components/TrainingShareCTA'
 import { useMeasurements } from '@/features/progress/hooks'
 import { dayNumOf, weekdayIdxOf, type CalendarDay } from '@/features/tabs/components/calendar/logic'
@@ -147,6 +151,19 @@ function ProgressBody() {
     for (const d of calendarDays) m.set(d.date, d)
     return m
   }, [calendarDays])
+  // Estado extra por día para las estrellas del calendario Historia: descanso
+  // (vs sin registro) y marca de evento (revelación/patrón/transformación).
+  // Solo de los días recientes (la ventana de señales); meses viejos quedan
+  // sin meta y caen al estado base (entrenó / sin registro).
+  const metaByDate = useMemo(() => {
+    const m = new Map<string, DayMeta>()
+    for (const d of calendarDays) {
+      const mark = markFromEvents(d.events)
+      const rested = d.status === 'rested'
+      if (rested || mark) m.set(d.date, { rested, mark })
+    }
+    return m
+  }, [calendarDays])
   const [historyDay, setHistoryDay] = useState<CalendarDay | null>(null)
   const [sheetVisible, setSheetVisible] = useState(false)
   // Ventana editable de Hoy = últimos 30 días: solo ahí el CTA "Ver día" lleva
@@ -186,7 +203,7 @@ function ProgressBody() {
               is an outcome (laggy, noisy, half outside their
               control); what the tab opens on is what they actually
               did. The movement constellation owns its own eyebrow. */}
-          <MovementConstellation onDayPress={openHistoryDay} />
+          <MovementConstellation onDayPress={openHistoryDay} metaByDate={metaByDate} />
 
           {/* ── Tu cuerpo — weight + measurements. Demoted out of the
               hero: one section among several, an outcome shown
@@ -344,6 +361,21 @@ function ProgressBody() {
       />
     </View>
   )
+}
+
+// Marca del día desde sus eventos (revelaciones). Precedencia: transformación
+// (hito mayor) > regreso (revelación) > patrón. Un día rara vez tiene varios.
+function markFromEvents(events: CalendarDay['events']): DayMark | null {
+  let hasReturn = false
+  let hasPattern = false
+  for (const e of events) {
+    if (e.tier === 'transformation') return 'transformation'
+    if (e.tier === 'return') hasReturn = true
+    if (e.tier === 'pattern') hasPattern = true
+  }
+  if (hasReturn) return 'revelation'
+  if (hasPattern) return 'pattern'
+  return null
 }
 
 // Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC).

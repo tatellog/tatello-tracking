@@ -87,19 +87,30 @@ function dataRowsFor(v: DayValues): { label: string; value: string }[] {
   return rows
 }
 
+/** Platillo individual del día (subconjunto de Meal) para la lista de Historia. */
+export type DayMeal = { id: string; name: string; calories: number | null }
+
 export function DayDetailContent({
   day,
   showValues = false,
+  meals,
   footer,
 }: {
   day: CalendarDay
   /** Historia (Progreso): muestra VALORES reales. Hoy lo deja en false →
    *  solo presencia (sin métricas, como decidió el manifiesto para Hoy). */
   showValues?: boolean
+  /** Platillos registrados ese día (solo Historia). Si vienen, reemplazan el
+   *  agregado "Comida · N comidas" por la lista real. */
+  meals?: readonly DayMeal[]
   footer?: ReactNode
 }) {
   const checks = REGISTERED_ITEMS.filter((it) => day.registered[it.key])
-  const dataRows = showValues ? dataRowsFor(day.values) : []
+  const showMeals = showValues && meals != null && meals.length > 0
+  // Con la lista de platillos, el agregado "Comida · N comidas" sobra.
+  const dataRows = (showValues ? dataRowsFor(day.values) : []).filter(
+    (r) => !(showMeals && r.label === 'Comida'),
+  )
   const hasEvents = day.events.length > 0
 
   return (
@@ -119,6 +130,25 @@ export function DayDetailContent({
               <View key={r.label} style={styles.dataRow}>
                 <Text style={styles.dataLabel}>{r.label}</Text>
                 <Text style={styles.dataValue}>{r.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Historia: los platillos reales del día (nombre + kcal). */}
+      {showMeals ? (
+        <View style={styles.section}>
+          <Text style={styles.eyebrow}>Comidas</Text>
+          <View style={styles.mealList}>
+            {meals!.map((m) => (
+              <View key={m.id} style={styles.mealRow}>
+                <Text style={styles.mealName} numberOfLines={1}>
+                  {m.name}
+                </Text>
+                {m.calories != null ? (
+                  <Text style={styles.mealKcal}>{Math.round(m.calories)} kcal</Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -202,6 +232,28 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: 14,
     color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  // "Comidas" — lista de platillos (nombre · kcal).
+  mealList: {
+    gap: 7,
+  },
+  mealRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  mealName: {
+    flexShrink: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: 14,
+    color: colors.bone,
+  },
+  mealKcal: {
+    fontFamily: typography.uiMedium,
+    fontSize: 13,
+    color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
   // Registraste — chips de presencia (✓ + etiqueta).

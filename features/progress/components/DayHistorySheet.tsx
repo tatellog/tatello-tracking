@@ -20,6 +20,7 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ChevronHint } from '@/components/ui/interaction'
+import { useMealsForDate } from '@/features/macros/hooks'
 import { DayDetailContent } from '@/features/tabs/components/calendar/DayDetailContent'
 import type { CalendarDay } from '@/features/tabs/components/calendar/logic'
 import { colors, radius, spacing, typography } from '@/theme'
@@ -36,6 +37,10 @@ type Props = {
 
 export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: Props) {
   const insets = useSafeAreaInsets()
+  // Los platillos del día — solo se fetchean cuando el sheet está abierto y
+  // ese día tuvo comidas (gate en `enabled`).
+  const mealCount = day?.values.mealCount ?? 0
+  const mealsQuery = useMealsForDate(day?.date ?? null, { enabled: visible && mealCount > 0 })
   if (!day) return null
 
   return (
@@ -69,6 +74,7 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
           <DayDetailContent
             day={day}
             showValues
+            meals={mealsQuery.data}
             footer={
               editable ? (
                 <Pressable
