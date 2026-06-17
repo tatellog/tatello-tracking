@@ -12,6 +12,9 @@ type Props = {
   onChange: (next: DayState) => void
   /** Eyebrow — "Hoy" por defecto; en modo "ver día" se pasa la fecha vista. */
   label?: string
+  /** Día pasado YA entrenado: la estrella está sellada (no retrocede). El
+   *  toggle queda inerte y muestra el mensaje de "permanece". */
+  locked?: boolean
 }
 
 // Star = a trained day (the constellation's glyph); moon = a rest day.
@@ -66,8 +69,9 @@ function Segment({ label, kind, active, onPress }: SegmentProps) {
  * active a supportive, evidence-based line shows below — rest framed
  * as recovery, never guilt.
  */
-export function DayCheckIn({ state, onChange, label = 'Hoy' }: Props) {
+export function DayCheckIn({ state, onChange, label = 'Hoy', locked = false }: Props) {
   const pick = (seg: 'trained' | 'rested') => {
+    if (locked) return
     // Tapping the active side clears it; tapping the other switches.
     onChange(state === seg ? 'undecided' : seg)
   }
@@ -89,7 +93,13 @@ export function DayCheckIn({ state, onChange, label = 'Hoy' }: Props) {
           onPress={() => pick('rested')}
         />
       </View>
-      {state === 'rested' ? (
+      {/* Sellado — un entreno pasado ya encendió su estrella y no retrocede. */}
+      {locked ? (
+        <Text style={styles.sealedMessage}>
+          Esta estrella ya está <Text style={styles.restEm}>encendida</Text>. Lo que enciendes,
+          permanece.
+        </Text>
+      ) : state === 'rested' ? (
         <Text style={styles.restMessage}>
           El músculo se reconstruye en el reposo. Mañana vuelves{' '}
           <Text style={styles.restEm}>más fuerte</Text>.
@@ -147,6 +157,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 20,
     color: colors.bone,
+    marginTop: 10,
+    marginLeft: 2,
+  },
+  sealedMessage: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.niebla,
     marginTop: 10,
     marginLeft: 2,
   },

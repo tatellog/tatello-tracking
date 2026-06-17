@@ -382,12 +382,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       : 'undecided'
 
   const handleDayChange = (next: DayState) => {
-    // Día PASADO: edición de backfill sin celebración (reutiliza las acciones
-    // por-fecha del calendario, con override optimista y haptic suave).
+    // Día PASADO: backfill sin celebración. GUARD — la constelación NO retrocede
+    // (memoria immutable-vs-recalculable): una estrella de entreno ya encendida
+    // queda SELLADA; el backfill solo puede ENCENDER (entreno/descanso en un día
+    // sin entreno) o limpiar un descanso (no apaga estrellas). Nunca des-entrena.
     if (viewingPast) {
+      if (vctx.today_workout_completed) return // sellado: nada lo apaga
       if (next === 'trained') markTrained(selectedDate)
       else if (next === 'rested') markRested(selectedDate)
-      else if (vctx.today_workout_completed) clearTrained(selectedDate)
       else if (restedToday) clearRested(selectedDate)
       return
     }
@@ -464,19 +466,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     [setOverride, clearOverride, setRestForDate, isToday, toggleToday, toggleForDate],
   )
 
-  const clearTrained = useCallback(
-    (date: string) => {
-      setOverride(date, 'empty')
-      if (isToday(date)) {
-        toggleToday.mutate(false, { onError: () => clearOverride(date) })
-      } else {
-        toggleForDate.mutate({ date, complete: false }, { onError: () => clearOverride(date) })
-      }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-      track('calendar_day_cleared', { date, was: 'trained' })
-    },
-    [setOverride, clearOverride, isToday, toggleToday, toggleForDate],
-  )
+  // (No hay clearTrained: la constelación no retrocede — una estrella de
+  // entreno ya encendida queda sellada, ni en hoy ni en backfill se apaga.)
 
   const markRested = useCallback(
     (date: string) => {
@@ -568,6 +559,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 state={dayState}
                 onChange={handleDayChange}
                 label={viewingPast ? viewingLabel : 'Hoy'}
+                locked={viewingPast && vctx.today_workout_completed}
               />
             </Animated.View>
 
