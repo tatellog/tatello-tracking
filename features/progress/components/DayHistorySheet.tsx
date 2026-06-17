@@ -81,9 +81,9 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
                   style={styles.cta}
                   onPress={() => onSeeDay(day.date)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Ver y editar el día en Hoy`}
+                  accessibilityLabel="Editar este día en Hoy"
                 >
-                  <Text style={styles.ctaText}>Ver día</Text>
+                  <Text style={styles.ctaText}>Editar día</Text>
                   <ChevronHint direction="right" size={16} color={colors.magenta} />
                 </Pressable>
               ) : (

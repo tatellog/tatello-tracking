@@ -14,6 +14,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { usePressFeedback } from '@/components/ui/interaction'
+import { useMealsForDate } from '@/features/macros/hooks'
 import { colors, typography } from '@/theme'
 
 import { DayDetailContent, dateHeading } from './DayDetailContent'
@@ -70,6 +71,15 @@ export function DayDetailPanel({
   onClearTrained,
   onClearRested,
 }: DayDetailPanelProps) {
+  // Días PASADOS: mostramos los VALORES reales de ese día (proteína, sueño…)
+  // + sus platillos — son los datos DE ESE DÍA, no los de hoy. El día de HOY
+  // se queda en presencia (sin métricas), por el manifiesto.
+  const past = !day.isToday
+  const mealCount = day.values.mealCount ?? 0
+  const mealsQuery = useMealsForDate(past ? day.date : null, {
+    enabled: past && mealCount > 0,
+  })
+
   // Hoy tiene UNA sola casa: el toggle Entrené/Descansé de arriba (el que
   // celebra). Aquí el día de hoy solo se LEE — sin botones que dupliquen esa
   // decisión con feedback distinto. Las acciones son solo para backfill de
@@ -106,7 +116,12 @@ export function DayDetailPanel({
       style={styles.panel}
       accessibilityLabel={`Detalle de ${dateHeading(day.date)}`}
     >
-      <DayDetailContent day={day} footer={footer} />
+      <DayDetailContent
+        day={day}
+        showValues={past}
+        meals={past ? mealsQuery.data : undefined}
+        footer={footer}
+      />
     </Animated.View>
   )
 }
