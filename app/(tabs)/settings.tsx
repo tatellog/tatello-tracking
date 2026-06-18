@@ -392,13 +392,6 @@ function SettingsBody() {
                 onPress={openPrivacy}
                 accessibilityLabel="Privacidad y tus datos"
               />
-              <View style={styles.accountDivider} />
-              <AccountRow
-                label="Exportar mis datos"
-                tagline="Pronto."
-                accessibilityLabel="Exportar mis datos, próximamente"
-                disabled
-              />
             </View>
 
             {/* Secundarias — soporte e info, más calladas. */}
@@ -409,13 +402,6 @@ function SettingsBody() {
                 tagline="Lo que sea, lo leemos."
                 onPress={() => setFeedbackVisible(true)}
                 accessibilityLabel="Danos tu feedback"
-              />
-              <View style={styles.accountDivider} />
-              <AccountRow
-                label="Términos y privacidad"
-                tagline="Pronto."
-                accessibilityLabel="Términos y privacidad, próximamente"
-                disabled
               />
             </View>
 

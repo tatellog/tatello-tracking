@@ -42,14 +42,42 @@ function PrivacyBody() {
             nadie más los lee.
           </Text>
 
-          {/* Qué lee Stelar — antes vivía suelto en Ajustes; aquí tiene su lugar
-              real (es información de privacidad, no del producto). */}
-          <Text style={styles.eyebrow}>Qué lee Stelar</Text>
+          <Text style={styles.eyebrow}>Qué datos guardamos</Text>
+          <View style={styles.card}>
+            <View style={styles.point}>
+              <Text style={styles.pointGlyph}>✦</Text>
+              <Text style={styles.pointText}>
+                <Text style={styles.accent}>Tu cuenta:</Text> tu correo y tu nombre.
+              </Text>
+            </View>
+            <View style={styles.point}>
+              <Text style={styles.pointGlyph}>✦</Text>
+              <Text style={styles.pointText}>
+                <Text style={styles.accent}>Tu seguimiento:</Text> peso y medidas, comidas y
+                nutrición, sueño, agua, movimiento, ánimo, energía y, si lo activas, tu ciclo.
+              </Text>
+            </View>
+            <View style={styles.point}>
+              <Text style={styles.pointGlyph}>✦</Text>
+              <Text style={styles.pointText}>
+                <Text style={styles.accent}>Tus fotos:</Text> de perfil, de comidas y de progreso,
+                si decides agregarlas.
+              </Text>
+            </View>
+            <View style={styles.point}>
+              <Text style={styles.pointGlyph}>✦</Text>
+              <Text style={styles.pointText}>
+                <Text style={styles.accent}>Uso de la app:</Text> eventos básicos para entender qué
+                funciona y corregir errores.
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.eyebrow}>Cómo los usamos</Text>
           <View style={styles.card}>
             <Text style={styles.body}>
-              Stelar lee{' '}
-              <Text style={styles.accent}>tu sueño, tus comidas, tu movimiento, tu ánimo</Text>,
-              encuentra tus patrones y escribe cada lectura de Tu Órbita.
+              Solo para darte Stelar: registrar tu día, encontrar tus patrones y escribir tus
+              lecturas de Tu Órbita. Nada más.
             </Text>
           </View>
 
@@ -73,9 +101,44 @@ function PrivacyBody() {
             </View>
           </View>
 
-          <Text style={styles.note}>
-            La política de privacidad completa estará disponible pronto.
-          </Text>
+          <Text style={styles.eyebrow}>Con quién se comparten</Text>
+          <View style={styles.card}>
+            <Text style={styles.body}>
+              Tus datos viven en <Text style={styles.accent}>Supabase</Text>, nuestra
+              infraestructura, cifrados y protegidos para que solo tú los veas.
+            </Text>
+            <Text style={styles.body}>
+              Cuando escaneas una comida con foto, esa foto se envía a{' '}
+              <Text style={styles.accent}>OpenAI</Text> solo para identificar el platillo y estimar
+              sus datos. No se usa para entrenar sus modelos ni queda asociada a ti.
+            </Text>
+            <Text style={styles.body}>Nadie más recibe tu información.</Text>
+          </View>
+
+          <Text style={styles.eyebrow}>Cuánto tiempo</Text>
+          <View style={styles.card}>
+            <Text style={styles.body}>
+              Mientras tengas tu cuenta. Cuando la eliminas (Ajustes → Eliminar cuenta), se borra
+              todo: tus datos y tus fotos, en todos nuestros sistemas. No hay vuelta atrás.
+            </Text>
+          </View>
+
+          <Text style={styles.eyebrow}>Tus derechos</Text>
+          <View style={styles.card}>
+            <Text style={styles.body}>
+              Puedes ver y editar tus datos dentro de la app, y borrarlos por completo cuando
+              quieras. Stelar es para personas adultas; no está pensada para menores de edad.
+            </Text>
+          </View>
+
+          <Text style={styles.eyebrow}>Contacto</Text>
+          <View style={styles.card}>
+            <Text style={styles.body}>
+              ¿Dudas sobre tus datos o esta política? Escríbenos desde Ajustes → Feedback.
+            </Text>
+          </View>
+
+          <Text style={styles.note}>Última actualización: junio 2026.</Text>
         </ScrollView>
       </SafeAreaView>
     </View>

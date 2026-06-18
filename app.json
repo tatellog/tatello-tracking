@@ -22,7 +22,7 @@
       }
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.tatello.stelar",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
