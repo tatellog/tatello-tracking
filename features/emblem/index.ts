@@ -2,7 +2,7 @@ export { fetchTransformPoints } from './api'
 export { TransformationCard } from './components/TransformationCard'
 export { MilestoneStar } from './components/MilestoneStar'
 export { TuEmblemaModal, EmblemFramePreloader, type EmblemStar } from './components/TuEmblemaModal'
-export { useTransformProgress } from './hooks'
+export { useTransformProgress, useTransformProgressAsOf } from './hooks'
 export {
   dailyCoachLine,
   EMBLEM_STAGES,

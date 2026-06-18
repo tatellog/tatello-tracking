@@ -473,14 +473,11 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
         <ScreenCosmos width={width} height={height} />
       </Animated.View>
 
-      {/* The backdrop IS the centering container: tapping the blurred sky
-          closes. Leaving without "accepting" the observation is a
-          first-class exit (te veo, no te vigilo). */}
-      <Pressable
-        style={[StyleSheet.absoluteFill, styles.center]}
-        onPress={close}
-        accessibilityLabel="Cerrar el mensaje"
-      >
+      {/* The backdrop centers the card and absorbs taps, but NO longer closes
+          on tap-outside — una revelación de patrón se cierra SOLO con la ✕
+          (decisión del dueño: no descartar la observación por un toque
+          accidental en el cielo). */}
+      <Pressable style={[StyleSheet.absoluteFill, styles.center]}>
         {/* The card's breathing halo — a slow magenta pulse behind it,
             so the card glows like it's alive in the sky. */}
         <Animated.View

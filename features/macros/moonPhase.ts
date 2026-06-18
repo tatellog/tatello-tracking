@@ -60,3 +60,34 @@ export function moonPhase(fraction: number): MoonPhase {
   }
   return { key: 'llena', emoji: '🌕', label: 'Luna Llena', caption: 'Tu luna está llena.' }
 }
+
+/**
+ * Copy del hero: una frase de fase (cómo se SIENTE el avance) + una línea
+ * HONESTA de progreso (cuánto falta, en gramos). El usuario pidió honestidad —
+ * no una frase poética vaga. La frase celebra crecimiento; la honesta da el
+ * número claro. Al alcanzar/pasar la referencia, la luna está llena (sin
+ * "faltan", sin "te pasaste").
+ */
+export function moonProgressCopy(
+  protein: number,
+  reference: number | null,
+): { phrase: string; honest: string | null } {
+  if (reference == null || reference <= 0) {
+    return { phrase: 'Tu luna de hoy se va dibujando.', honest: null }
+  }
+  const pct = Math.max(0, protein / reference)
+  const remaining = Math.max(0, Math.round(reference - protein))
+
+  let phrase: string
+  if (pct < 0.25) phrase = 'Tu luna apenas despierta.'
+  else if (pct < 0.5) phrase = 'Tu luna va tomando luz.'
+  else if (pct < 0.75) phrase = 'Ya puedes verla crecer.'
+  else if (pct < 1) phrase = 'Está casi completa.'
+  else phrase = 'Tu luna brilla completa.'
+
+  // Honestidad: el faltante exacto. Al completar (o pasar) → no hay faltante;
+  // la frase ya celebra la luna llena.
+  const honest = remaining > 0 ? `Faltan ${remaining} g para completar tu luna.` : null
+
+  return { phrase, honest }
+}

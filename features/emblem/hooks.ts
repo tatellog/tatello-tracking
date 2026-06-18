@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { queryKeys } from '@/lib/queryKeys'
 
-import { fetchTransformPoints } from './api'
+import { fetchTransformPoints, fetchTransformPointsAsOf } from './api'
 import { stageForProgress, transformProgressForPoints, type EmblemStage } from './logic'
 
 // High-water-mark del reveal: lo revelado NUNCA se esconde (regla del PRD +
@@ -70,4 +70,27 @@ export function useTransformProgress(): {
 
   const progress = Math.max(rawProgress, floor)
   return { progress, stage: stageForProgress(progress), isLoading: query.isLoading }
+}
+
+/*
+ * Progreso del emblema a una FECHA DE CORTE (el "antes" de Tu Historia). Sin
+ * high-water-mark: es un valor histórico puro (puntos acumulados hasta `asOf`,
+ * mapeados a %). `null` deshabilita la query.
+ */
+export function useTransformProgressAsOf(asOf: string | null): {
+  progress: number | null
+  isLoading: boolean
+} {
+  const { goalMl } = useWaterGoal()
+  const waterGoalGlasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+  const query = useQuery({
+    queryKey: ['emblem', 'pointsAsOf', asOf, waterGoalGlasses] as const,
+    queryFn: () => fetchTransformPointsAsOf(asOf as string, waterGoalGlasses),
+    enabled: asOf != null,
+    staleTime: 5 * 60 * 1000,
+  })
+  return {
+    progress: query.data != null ? transformProgressForPoints(query.data) : null,
+    isLoading: query.isLoading,
+  }
 }

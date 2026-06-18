@@ -9,11 +9,10 @@ import {
   useMacroTargets,
   useMealsForDate,
   useNourishmentConsistency,
-  useWeeklyMealStats,
 } from '@/features/macros/hooks'
-import { NourishmentConsistency, NutritionMoon, WeekSummary } from '@/features/macros/components'
+import { NourishmentConsistency, NutritionMoon } from '@/features/macros/components'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
-import { MealComposer, SkyBackground, TabHeader } from '@/features/tabs/components'
+import { MealComposer, MomentsToday, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -73,7 +72,6 @@ function MealsBody() {
   )
 
   const nourish = useNourishmentConsistency()
-  const week = useWeeklyMealStats()
 
   return (
     <View style={styles.screen}>
@@ -94,19 +92,16 @@ function MealsBody() {
             </Text>
           ) : null}
 
+          {/* §1 · Hero nutricional — proteína + luna + honestidad de avance. */}
           <NutritionMoon
             proteinValue={summary.protein}
             proteinTarget={targets?.protein_g}
-            caloriesValue={summary.calories}
             isLoading={mealsQuery.isLoading}
           />
 
-          <NourishmentConsistency
-            data={nourish.data}
-            isLoading={nourish.isLoading}
-            isError={nourish.isError}
-            onAddReference={() => router.push('/onboarding/macro-targets?source=banner')}
-          />
+          {/* Momentos del día — el lado práctico: qué falta capturar hoy.
+              Refleja el día visto (mismas comidas que el hero). */}
+          {mealsQuery.isLoading ? null : <MomentsToday meals={meals} viewingPast={viewingPast} />}
 
           {targets ? null : (
             <Pressable
@@ -122,8 +117,8 @@ function MealsBody() {
             </Pressable>
           )}
 
-          {/* Sumar comida (search / create) + Tu estela (the food
-              history) — two sections, both owned by MealComposer. */}
+          {/* §2 CTA + §4 Registro + §3 Tus Aliados — todo en MealComposer,
+              la acción más visible justo bajo el hero. */}
           <MealComposer
             onOpenMeal={(id, photoPath) => {
               track('food_card_opened', { meal_id: id })
@@ -134,10 +129,14 @@ function MealsBody() {
             }}
           />
 
-          {/* Esta semana — resumen de actividad (comidas · días · proteína/día),
-              debajo de Tu Estela. Volumen semanal, distinto de la adherencia
-              por-día de "Lo que alimenta tu transformación". */}
-          <WeekSummary stats={week.stats} isLoading={week.isLoading} isError={week.isError} />
+          {/* Adherencia por-día ("Lo que alimenta tu transformación") — abajo,
+              como contexto. ("Esta semana" se movió a Progreso: era análisis.) */}
+          <NourishmentConsistency
+            data={nourish.data}
+            isLoading={nourish.isLoading}
+            isError={nourish.isError}
+            onAddReference={() => router.push('/onboarding/macro-targets?source=banner')}
+          />
         </ScrollView>
       </SafeAreaView>
     </View>

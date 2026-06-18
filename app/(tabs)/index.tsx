@@ -25,12 +25,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
-import {
-  EmblemFramePreloader,
-  TransformationCard,
-  TuEmblemaModal,
-  useTransformProgress,
-} from '@/features/emblem'
+import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -720,15 +715,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             </Animated.View>
 
             {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
-                "Tu transformación" + "Tu universo hoy": lo que el esfuerzo
-                reveló. No mutan datos ni navegan de sorpresa. */}
-
-            {/* "Tu transformación" (compacta) — cuánto se reveló el emblema y
-                en qué etapa va; el detalle del mes vive tras un link explícito.
-                Solo Leo con primer hábito (la tarjeta se gatea sola). */}
-            <Animated.View entering={enter(450)}>
-              <TransformationCard compact />
-            </Animated.View>
+                "Tu universo hoy": lo que el esfuerzo reveló. No muta datos ni
+                navega de sorpresa. ("Tu transformación" se movió a Progreso,
+                bajo "Tu Historia".) */}
 
             {/* "Tu universo hoy" — capa de recompensa para los registros
                 que NO encienden estrellas (comida/agua/sueño/check-in).
@@ -914,7 +903,7 @@ function getCoachCopy(
     return { before: 'La ', emphasis: 'mitad atrás', after: '. Sigue.' }
   }
   if (count === 10) {
-    return { before: 'Diez. Ya no es casualidad, es ', emphasis: 'tuyo', after: '.' }
+    return { before: 'Diez. Ya no es casualidad, es ', emphasis: 'constancia', after: '.' }
   }
   if (count === 7) {
     return { before: 'Una semana. Tu cuerpo lo ', emphasis: 'recuerda', after: '.' }

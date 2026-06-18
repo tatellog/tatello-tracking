@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="820" fill="none" viewBox="0 0 820 820">
+  <!-- Droplet body: a single teardrop, point up, belly down. Base fill. -->
+  <path fill="#EEDD91" d="M410 168c8 0 13 7 19 16 26 39 64 86 92 132 26 43 41 84 41 124 0 84-69 152-152 152s-152-68-152-152c0-40 15-81 41-124 28-46 66-93 92-132 6-9 11-16 19-16Z"/>
+  <!-- Lit hemisphere (volume trick): warm highlight sweeping the upper-left
+       of the belly, where the light source sits — same logic as the sun's
+       lit crescent in energy-vect. -->
+  <path fill="#DCCC7B" fill-opacity="0.55" d="M356 322c-22 38-37 78-39 120-2 50 22 96 63 122-58-12-103-63-105-126-1-44 30-92 81-136Z"/>
+  <!-- Deep accent shading: the shadowed lower-right of the droplet gives it
+       weight without a gradient. -->
+  <path fill="#9A8F40" fill-opacity="0.32" d="M486 360c24 38 38 76 38 112 0 62-40 114-97 132 70-9 124-69 124-141 0-38-23-77-65-103Z"/>
+  <!-- Inner curved highlight — the classic specular glint on a water drop,
+       a thin crescent of bright gold catching the light on the upper-left
+       belly. This is what makes it read as WATER, not a flame or leaf. -->
+  <path fill="#EEDD91" fill-opacity="0.9" d="M372 392c-14 22-22 46-22 70 0 9 1 18 4 26-15-15-23-37-22-61 1-24 16-46 42-58-1 8-1 15 0 23Z"/>
+  <!-- Ripple arcs beneath the drop: two concentric crescents suggesting the
+       drop is about to meet a surface. Asymmetric (right arc longer) per the
+       art-brief asymmetry rule. -->
+  <path fill="#EEDD91" fill-opacity="0.5" d="M286 642c34 22 76 34 124 34s90-12 124-34c-30 30-74 48-124 48s-94-18-124-48Z"/>
+  <path fill="#DCCC7B" fill-opacity="0.32" d="M230 696c52 38 116 58 180 58 56 0 112-16 162-46-46 42-108 66-174 66-58 0-116-26-168-78Z"/>
+  <!-- Falling micro-droplets: dust-equivalent of the sun's gold dots, but
+       read as splashing water. Top cluster (point of the drop) + side spray. -->
+  <circle cx="410" cy="118" r="6" fill="#EEDD91" fill-opacity="0.85"/>
+  <circle cx="610" cy="266" r="7" fill="#EEDD91" fill-opacity="0.6"/>
+  <circle cx="646" cy="232" r="4" fill="#EEDD91" fill-opacity="0.4"/>
+  <circle cx="178" cy="286" r="6" fill="#DCCC7B" fill-opacity="0.55"/>
+  <circle cx="146" cy="322" r="4" fill="#DCCC7B" fill-opacity="0.38"/>
+  <!-- Comet-trail dab (paths, no transform — RNSVG Fabric Android safe) -->
+  <path fill="#EEDD91" fill-opacity="0.3" d="M664 706 a20 3 -30 1 1 -35.6 -18.7 a20 3 -30 1 1 35.6 18.7 Z"/>
+</svg>

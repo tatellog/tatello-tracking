@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -17,10 +17,13 @@ import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
+import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
-import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
+import { ConsistencyCard } from '@/features/progress/components/ConsistencyCard'
+import { TransformationCard } from '@/features/emblem'
+import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { DayHistorySheet } from '@/features/progress/components/DayHistorySheet'
 import {
@@ -43,13 +46,7 @@ import {
   type Trend,
   type WeightPoint,
 } from '@/features/progress/logic'
-import {
-  CoachLine,
-  PrimaryCta,
-  SectionHeader,
-  SkyBackground,
-  TabHeader,
-} from '@/features/tabs/components'
+import { CoachLine, PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
 // `ALL` (not `TODO`) for the "todo el historial" option — the all-caps
@@ -94,17 +91,7 @@ function ProgressBody() {
     }, []),
   )
   const router = useRouter()
-  // Arriving from the photo-capture flow (Ajustes → Seguimiento corporal →
-  // done) carries ?photos=open so the diptych is the payoff the user lands
-  // on, instead of having to hunt for it in a collapsed section.
-  const { photos: photosParam } = useLocalSearchParams<{ photos?: string }>()
   const [period, setPeriod] = useState<Period>('30D')
-  // The before/after diptych is collapsed by default — viewing it is
-  // a deliberate choice, not a passive daily exposure.
-  const [photosOpen, setPhotosOpen] = useState(false)
-  useEffect(() => {
-    if (photosParam === 'open') setPhotosOpen(true)
-  }, [photosParam])
   const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
   const { data: profile } = useProfile()
 
@@ -126,6 +113,10 @@ function ProgressBody() {
   // Cycle phase — used to caption the weight chart so a luteal
   // water-weight bump reads as biology, not regression.
   const cycle = useCyclePhase()
+  // Gate de ciclo (sexo/situación): para hombres y perfiles sin ciclo activo
+  // NO se muestra la sección — ni la card ni su divisor. CycleCard ya se
+  // auto-oculta, pero el divisor quedaba huérfano sin este gate.
+  const cycleEnabled = useCycleEnabled()
 
   // The user's declared focus for the month. When it isn't weight,
   // the "Tu cuerpo" section says so — the number is reference, not a
@@ -202,10 +193,28 @@ function ProgressBody() {
             <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
 
-          {/* Hero — the user's PROCESS: how much they moved. Weight
-              is an outcome (laggy, noisy, half outside their
-              control); what the tab opens on is what they actually
-              did. The movement constellation owns its own eyebrow. */}
+          {/* Hero — "Tu Historia": evidencia de transformación (Antes → Ahora)
+              en 5 métricas. Responde "¿qué ha cambiado desde que empecé?" antes
+              que nada. Reemplaza a Movimiento como primer elemento. */}
+          <TuHistoria />
+
+          {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
+              ahora en grande, con modo "Comparar" (slider de arrastrar).
+              Inmediatamente bajo Tu Historia. Responde "¿realmente cambio?". */}
+          <View style={styles.divider} />
+          <BeforeAfterPhotos />
+
+          {/* "Tu transformación" — el emblema como símbolo del crecimiento. */}
+          <View style={styles.divider} />
+          <TransformationCard compact />
+
+          {/* "Consistencia" — adherencia a HÁBITOS (proceso, no resultado) en los
+              últimos 30 días. Responde "¿qué tan constante he sido?". */}
+          <View style={styles.divider} />
+          <ConsistencyCard />
+
+          {/* Historia (el calendario-constelación) — ahora debajo del hero. */}
+          <View style={styles.divider} />
           <MovementConstellation onDayPress={openHistoryDay} metaByDate={metaByDate} />
 
           {/* ── Tu cuerpo — weight + measurements. Demoted out of the
@@ -220,21 +229,43 @@ function ProgressBody() {
             <Text style={styles.focusNote}>
               Tu enfoque este mes no es el peso — esto es solo una referencia, sin metas.
             </Text>
+          ) : hasTrajectory ? (
+            <Text style={styles.patientSub}>
+              El cuerpo cambia despacio. Mira la tendencia, no el número del día.
+            </Text>
           ) : null}
           {hasTrajectory ? (
             <>
-              <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.hero}>
-                <View style={styles.deltaRow}>
-                  <Text style={styles.deltaNum}>{formatDelta(delta?.abs)}</Text>
-                  {delta ? <Text style={styles.deltaUnit}>kg</Text> : null}
+              <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.weightHead}>
+                {/* Peso ACTUAL — calmo, no gigante: un indicador más, no la
+                    meta. El cambio total va como chip, la tendencia en la
+                    gráfica. */}
+                <View>
+                  <Text style={styles.weightLabel}>Peso actual</Text>
+                  <View style={styles.weightNowRow}>
+                    <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
+                    <Text style={styles.weightUnit}>kg</Text>
+                  </View>
                 </View>
-                {first && last ? (
-                  <Text style={styles.deltaRange}>
-                    <Text style={styles.deltaStrong}>{first.weight.toFixed(1)}</Text> →{' '}
-                    <Text style={styles.deltaStrong}>{last.weight.toFixed(1)} kg</Text>
-                  </Text>
+                {delta ? (
+                  <View style={styles.deltaChip}>
+                    <Text style={styles.deltaChipLabel}>Cambio total</Text>
+                    <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
+                  </View>
                 ) : null}
               </Animated.View>
+
+              {/* Comparación temporal — antes → ahora en el periodo elegido. */}
+              {first && last ? (
+                <Text style={styles.comparison}>
+                  <Text style={styles.compFrom}>{first.weight.toFixed(1)}</Text>
+                  <Text style={styles.compArrow}>{'  →  '}</Text>
+                  <Text style={styles.compTo}>{last.weight.toFixed(1)} kg</Text>
+                  <Text
+                    style={styles.compPeriod}
+                  >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
+                </Text>
+              ) : null}
 
               {/* Period filter — only meaningful once there are 2+ marks. */}
               <Animated.View entering={FadeIn.duration(320).delay(160)} style={styles.periodPill}>
@@ -308,37 +339,19 @@ function ProgressBody() {
             </Animated.View>
           )}
 
-          {/* ── Comparativa 30 días (silenciosa si no hay datos
-              pasados para comparar) ── */}
-          <View style={styles.divider} />
-          <ComparativaCard />
+          {/* (Comparativa 30 días se reemplazó por el hero "Tu Historia".) */}
 
-          {/* ── Ciclo (silenciosa si cycle_situation no es activa) ── */}
-          <View style={styles.divider} />
-          <CycleCard />
-
-          {/* ── Registro visual — antes/después. Collapsed by
-              default: a before/after diptych invites body-comparison,
-              so opening it is a deliberate choice. ── */}
-          <View style={styles.divider} />
-          <Pressable
-            onPress={() => setPhotosOpen((v) => !v)}
-            accessibilityRole="button"
-            accessibilityHint="Expande sección"
-            accessibilityState={{ expanded: photosOpen }}
-            style={({ pressed }) => pressed && styles.photoTogglePressed}
-          >
-            <SectionHeader
-              label="Tu cambio visual"
-              meta={photosOpen ? 'Ocultar' : 'Ver'}
-              metaEmphasis={photosOpen ? 'Ocultar' : 'Ver'}
-            />
-          </Pressable>
-          {photosOpen ? (
-            <Animated.View entering={FadeIn.duration(220)}>
-              <BeforeAfterPhotos hideEyebrow />
-            </Animated.View>
+          {/* ── Ciclo — solo si el perfil tiene ciclo activo (nunca hombres).
+              El divisor se gatea junto a la card para no dejar una línea
+              huérfana cuando CycleCard no se renderiza. ── */}
+          {cycleEnabled ? (
+            <>
+              <View style={styles.divider} />
+              <CycleCard />
+            </>
           ) : null}
+
+          {/* ("Tu cambio visual" se movió arriba, bajo "Tu Historia".) */}
 
           {/* ── Entreno de hoy (sólo si trainedToday) ── */}
           <View style={styles.divider} />
@@ -707,6 +720,97 @@ const styles = StyleSheet.create({
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.ui,
     color: colors.leche,
+  },
+  // Tono paciente / largo plazo — el peso es un indicador más.
+  patientSub: {
+    marginTop: 6,
+    marginBottom: 4,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
+  // Cabecera del peso: PESO ACTUAL (calmo) a la izquierda, "cambio total" como
+  // chip a la derecha — el número no domina, la tendencia vive en la gráfica.
+  weightHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  weightLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 2,
+  },
+  weightNowRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 5,
+  },
+  weightNow: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 34,
+    letterSpacing: -1,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  weightUnit: {
+    fontFamily: typography.displayMedium,
+    fontSize: 16,
+    color: colors.bone,
+  },
+  // "Cambio total" — chip callado en oro (sin rojo/verde: el peso no se juzga).
+  deltaChip: {
+    alignItems: 'flex-end',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.oroTint,
+  },
+  deltaChipLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  deltaChipNum: {
+    marginTop: 1,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.oroLight,
+    fontVariant: ['tabular-nums'],
+  },
+  // Comparación temporal — antes → ahora · periodo.
+  comparison: {
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+  },
+  compFrom: {
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  compArrow: {
+    color: colors.oro,
+  },
+  compTo: {
+    fontFamily: typography.uiBold,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  compPeriod: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   // Stadium pill — mirrors the quick-log meal-slot selector.
   periodPill: {

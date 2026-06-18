@@ -1,5 +1,5 @@
-import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
+import { useSegments } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
@@ -103,13 +103,19 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const sleep = useSleepLog(date)
   const wellbeing = useTodayWellbeing(date)
   const reducedMotion = useReducedMotion()
-  // ¿Hoy está al frente? Un registro hecho FUERA de Hoy (escanear/crear comida
-  // abre /scan-meal full-screen; o registrar desde otro tab) parchea el brief
-  // al instante, mientras Hoy sigue montado DETRÁS. Sin este gate, el delta de
-  // Energía se emitía con scan-meal encima → el toast salía oculto y al volver
-  // ya no había nada que mostrar. Gateando en foco, el alza se preserva y el
-  // "+N Energía" se dispara al regresar a Hoy, visible.
-  const isFocused = useIsFocused()
+  // ¿Estamos DENTRO del tabs layout? El toast de delta vive global en
+  // (tabs)/_layout, así que es visible desde CUALQUIER tab — registrar agua en
+  // Órbita debe mostrar el chip ahí mismo. Pero NO debe emitirse mientras una
+  // ruta full-screen cubre el tabs layout (scan-meal al crear/escanear comida,
+  // log-measurement modal): ahí el toast quedaría oculto y al volver ya no
+  // habría nada que mostrar. `useSegments` distingue ambos casos donde
+  // `useIsFocused()` (foco de Hoy) no podía: con isFocused, registrar desde
+  // OTRO tab también se bloqueaba (bug: chip solo aparecía al volver a Hoy).
+  // Dentro de (tabs) emitimos al instante — Hoy queda montado (detach=false),
+  // así que recalcula aunque no esté al frente; fuera de (tabs) diferimos y el
+  // alza se emite al volver (insideTabs es dep → el efecto re-corre al regresar).
+  const segments = useSegments()
+  const insideTabs = segments[0] === '(tabs)'
   // En "modo ver día" Hoy se llena con un día PASADO (vctx): el grid muestra
   // sus pcts, pero eso NO es un registro de hoy. Sin este gate, aterrizar en
   // un día anterior emitía un "+N Claridad" falso (su pct vs el baseline de
@@ -166,11 +172,12 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   // It only acts when a pct actually ROSE since the last armed snapshot.
   // Decreases (step-back, day rollover) re-sync silently.
   useEffect(() => {
-    // Mientras Hoy NO está al frente, no tocamos el snapshot: el alza de un
-    // registro hecho fuera de Hoy queda pendiente y se emite al re-enfocar
-    // (isFocused es dep → el efecto re-corre al volver). Así el toast siempre
-    // sale visible, nunca detrás de scan-meal.
-    if (!ready || !pctSig || !isFocused || !isToday) return
+    // Mientras una ruta full-screen cubre el tabs layout, no tocamos el
+    // snapshot: el alza queda pendiente y se emite al volver a (tabs)
+    // (insideTabs es dep → el efecto re-corre al regresar). Así el toast
+    // siempre sale visible, nunca detrás de scan-meal. Dentro de (tabs)
+    // —cualquier tab— emite al instante.
+    if (!ready || !pctSig || !insideTabs || !isToday) return
     const current = {} as Record<UniverseAttributeKey, number>
     for (const pair of pctSig.split('|')) {
       const [key, pct] = pair.split(':') as [UniverseAttributeKey, string]
@@ -186,7 +193,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
         if (!reducedMotion) setFlight((f) => ({ key, id: (f?.id ?? 0) + 1 }))
       }
     }
-  }, [ready, pctSig, reducedMotion, isFocused, isToday])
+  }, [ready, pctSig, reducedMotion, insideTabs, isToday])
 
   // Unmount the flight layer once the rise is over.
   useEffect(() => {

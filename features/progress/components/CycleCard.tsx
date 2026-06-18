@@ -10,6 +10,7 @@ import {
   type CyclePhase,
   DEFAULT_CYCLE_LENGTH,
   isCycleActive,
+  nextPhaseInfo,
   PHASE_LABEL,
 } from '@/features/cycle/phase'
 import { useProfile } from '@/features/profile/hooks'
@@ -72,7 +73,7 @@ export function CycleCard() {
       day: cp.day,
       length: cycleLength,
       phaseKey: cp.phase,
-      daysToNext: cycleLength - cp.day + 1,
+      next: nextPhaseInfo(cp.day, cycleLength),
     }
   }, [isActive, lastPeriod, cycleLength])
 
@@ -106,7 +107,10 @@ export function CycleCard() {
   const phaseNote = PHASE_NOTE[state.phaseKey]
   // Estimate, never a deterministic forecast: "alrededor de" keeps it as
   // context, not a fertility/calendar countdown (cycle-voice-spec §2.1, §8).
-  const nextPeriod = state.daysToNext <= 1 ? 'pronto' : `alrededor de ${state.daysToNext} días`
+  // Próxima FASE (no el período): un solo dato de "qué viene", relevante para
+  // planear hábitos sin saturar con info médica. Estimación, nunca pronóstico.
+  const nextLabel = PHASE_LABEL[state.next.phase]
+  const nextWhen = state.next.days <= 1 ? 'mañana' : `en ${state.next.days} días`
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(320)}>
@@ -121,7 +125,9 @@ export function CycleCard() {
           phaseLabel={PHASE_LABEL[state.phaseKey]}
           reduce={reduce}
         />
-        <Text style={styles.nextPeriod}>Próximo período · {nextPeriod}</Text>
+        <Text style={styles.nextPhase}>
+          Próxima fase · <Text style={styles.nextPhaseName}>{nextLabel}</Text> {nextWhen}
+        </Text>
         <Text style={styles.coachLine}>{phaseNote}</Text>
       </View>
     </Animated.View>
@@ -144,15 +150,19 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.6,
   },
-  // "Próximo período · en N días" — a quiet anchor below the ring, never
-  // the headline. Honest projection, never a fertility/ovulation forecast.
-  nextPeriod: {
+  // "Próxima fase · {nombre} en N días" — ancla callada bajo el anillo, nunca
+  // el titular. Estimación, nunca un pronóstico de fertilidad.
+  nextPhase: {
     marginTop: 4,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.niebla,
     textAlign: 'center',
     letterSpacing: 0.3,
+  },
+  nextPhaseName: {
+    fontFamily: typography.uiBold,
+    color: colors.bone,
   },
   // Coach line — the anti-culpa-de-balanza message. Cormorant italic (coach
   // voice), warm, only present in the two phases that move the scale.

@@ -50,6 +50,18 @@ export function phaseForDay(day: number, length: number): CyclePhase {
   return 'lutea'
 }
 
+/** Días hasta la PRÓXIMA fase (y cuál es), envolviendo al siguiente ciclo.
+ *  Puro: avanza día a día hasta que `phaseForDay` cambia. */
+export function nextPhaseInfo(day: number, length: number): { days: number; phase: CyclePhase } {
+  const current = phaseForDay(day, length)
+  for (let n = 1; n <= length; n += 1) {
+    const d = ((day - 1 + n) % length) + 1
+    const p = phaseForDay(d, length)
+    if (p !== current) return { days: n, phase: p }
+  }
+  return { days: 1, phase: current }
+}
+
 /*
  * Current day-in-cycle + phase, derived from the last period_start
  * date. Wraps into the current cycle in case several cycles passed

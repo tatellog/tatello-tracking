@@ -675,6 +675,10 @@ export type Database = {
         Args: { p_water_goal_glasses?: number }
         Returns: number
       }
+      fn_transform_points_as_of: {
+        Args: { p_as_of: string; p_water_goal_glasses?: number }
+        Returns: number
+      }
       get_brief_context: {
         Args: { p_date?: string; p_user_id?: string }
         Returns: Json

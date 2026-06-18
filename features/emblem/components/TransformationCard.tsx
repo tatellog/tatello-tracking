@@ -1,19 +1,57 @@
 import { useRouter } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
-import LeoEmblemArt from '@/assets/zodiac-art/leo-emblem.svg'
+import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useProfile } from '@/features/profile/hooks'
+import {
+  FRAMES_BY_SIGN,
+  frameIndexFor,
+} from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, radius, spacing, typography } from '@/theme'
 
 import { useTransformProgress } from '../hooks'
 import { dailyCoachLine } from '../logic'
+
+/* Emblema COMPACTO — el frame del % vigente (mismo arte que el hero y el modal
+ * "Tu {signo}"), brillante, sobre el aro/halo. No es la constelación gigante:
+ * es el símbolo legible del crecimiento. Sin Skia (RN <Image>), barato. */
+function CompactEmblem({
+  sign,
+  progress,
+  size,
+}: {
+  sign: ZodiacSign
+  progress: number
+  size: number
+}) {
+  const frames = FRAMES_BY_SIGN[sign]
+  const frame = frames[frameIndexFor(progress)] ?? frames[frames.length - 1]
+  // El halo crece con el avance: el emblema "gana luz" al transformarse.
+  const haloOpacity = 0.32 + (Math.min(100, Math.max(0, progress)) / 100) * 0.55
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <EmblemHalo
+        width={size}
+        height={size}
+        style={[styles.compactHalo, { opacity: haloOpacity }]}
+      />
+      <Image
+        source={frame}
+        style={{ width: size * 0.74, height: size * 0.74 }}
+        resizeMode="contain"
+        fadeDuration={0}
+      />
+    </View>
+  )
+}
 
 /*
  * "Tu transformación" — la cara LEGIBLE del Emblema Celeste.
@@ -61,11 +99,11 @@ export function TransformationCard({ compact = false }: Props) {
   // already fires a selection tick).
   const orbitPress = usePressFeedback({ haptic: false })
 
-  // Espejo de hasEmblem (LunarConstellation): solo Leo tiene arte de
-  // emblema por ahora. Sin perfil aún → nada (capa de recompensa: jamás
-  // un spinner, jamás un placeholder).
+  // Los 12 signos tienen emblema (FRAMES_BY_SIGN). Sin perfil aún → nada
+  // (capa de recompensa: jamás un spinner, jamás un placeholder); y la tarjeta
+  // no existe hasta el primer hábito (progress 0 → el despertar se descubre).
   const sign = profile ? zodiacFromDate(profile.date_of_birth) : null
-  if (sign !== 'leo' || progress <= 0) return null
+  if (sign == null || progress <= 0) return null
 
   // Semilla del día (medianoche local en días-epoch): estable todo el día,
   // distinta mañana — rota la línea del coach dentro de la etapa.
@@ -88,46 +126,43 @@ export function TransformationCard({ compact = false }: Props) {
   if (compact) {
     return (
       <View style={styles.compact}>
-        <View style={styles.header}>
-          <EyebrowLabel tone="magenta">Tu transformación</EyebrowLabel>
-          {/* El MISMO ⓘ del full, ahora donde vive la recompensa (Hoy):
-              la explicación del sistema deja de estar escondida en Órbita. */}
-          <Pressable
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Cómo funciona tu transformación"
-            accessibilityState={{ expanded: open }}
-            onPress={toggleExplainer}
-          >
-            <Text style={[styles.infoGlyph, open && styles.infoGlyphOpen]}>ⓘ</Text>
-          </Pressable>
+        <EyebrowLabel tone="magenta">Tu transformación</EyebrowLabel>
+
+        <View style={styles.compactRow}>
+          {/* Texto: identidad + avance (Leo · 53%) y la voz del estado. La
+              protagonista es la SENSACIÓN de avance, no el número. */}
+          <View style={styles.compactText}>
+            <Text style={styles.signPct}>
+              <Text style={styles.signName}>{signName(sign)}</Text>
+              <Text style={styles.dot}> · </Text>
+              <Text style={styles.pctInline}>{progress}%</Text>
+            </Text>
+            <Text style={styles.phrase}>{line}</Text>
+
+            <Pressable
+              hitSlop={8}
+              accessibilityRole="link"
+              accessibilityLabel="Ver tu evolución en Órbita"
+              accessibilityHint="Abre la línea de evolución"
+              onPress={openOrbita}
+              onPressIn={orbitPress.onPressIn}
+              onPressOut={orbitPress.onPressOut}
+              style={styles.orbitLink}
+            >
+              <Animated.View style={[styles.orbitLinkRow, orbitPress.animatedStyle]}>
+                <Text style={styles.orbitLinkText}>Ver evolución</Text>
+                <ChevronHint direction="right" size={16} color={colors.magenta} />
+              </Animated.View>
+            </Pressable>
+          </View>
+
+          {/* El emblema compacto — el símbolo visible del crecimiento, brillando
+              más conforme se revela. */}
+          <CompactEmblem sign={sign} progress={progress} size={88} />
         </View>
-        {/* La voz es LECTURA, no un hot-zone que navega de sorpresa: tocar
-            toda la tarjeta sacaba a la usuaria de Hoy sin avisar. El detalle
-            del mes ahora vive tras un link explícito abajo. */}
-        <Text style={styles.compactMessage}>{line}</Text>
-        {/* Garantía persistente — quita la lectura de castigo: nada de lo
-            revelado se pierde. Voz del coach (italic). */}
+
+        {/* Garantía anti-castigo: nada de lo revelado se pierde. */}
         <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
-        {/* The ONE navigation of the card — a magenta link with the interaction
-            system: scale on press + a clean Feather chevron (›). Two signals,
-            no "horrible" pill. The card stays read-only on purpose. */}
-        <Pressable
-          hitSlop={8}
-          accessibilityRole="link"
-          accessibilityLabel="Ver tu transformación en Órbita"
-          accessibilityHint="Abre detalle"
-          onPress={openOrbita}
-          onPressIn={orbitPress.onPressIn}
-          onPressOut={orbitPress.onPressOut}
-          style={styles.orbitLink}
-        >
-          <Animated.View style={[styles.orbitLinkRow, orbitPress.animatedStyle]}>
-            <Text style={styles.orbitLinkText}>Ver en Órbita</Text>
-            <ChevronHint direction="right" size={16} color={colors.magenta} />
-          </Animated.View>
-        </Pressable>
-        {open ? <Explainer /> : null}
       </View>
     )
   }
@@ -159,7 +194,7 @@ export function TransformationCard({ compact = false }: Props) {
           <RevealBar progress={progress} />
         </View>
         <View style={styles.emblemMini}>
-          <LeoEmblemArt width={52} height={52} />
+          <CompactEmblem sign={sign} progress={progress} size={56} />
         </View>
       </View>
 
@@ -308,12 +343,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.s4,
     gap: spacing.s2,
   },
-  // En compact la voz ES la tarjeta — un punto más de cuerpo que el
-  // message del full, donde la frase comparte aire con % y barra.
-  compactMessage: {
+  compactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s3,
+    marginTop: spacing.s2,
+  },
+  compactText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  compactHalo: {
+    position: 'absolute',
+  },
+  // Identidad + avance: "Leo · 53%". El signo es la heroína; el % acompaña.
+  signPct: {
+    marginBottom: 4,
+  },
+  signName: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 24,
+    letterSpacing: -0.5,
+    color: colors.leche,
+  },
+  dot: {
+    fontFamily: typography.uiMedium,
+    fontSize: 18,
+    color: colors.niebla,
+  },
+  pctInline: {
+    fontFamily: typography.uiBold,
+    fontSize: 19,
+    color: colors.oroLight,
+    fontVariant: ['tabular-nums'],
+  },
+  // La voz del estado de evolución — emocional, no técnica.
+  phrase: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: 15,
+    lineHeight: 20,
     color: colors.bone,
   },
   // Garantía anti-castigo — voz del coach, callada (niebla), un escalón

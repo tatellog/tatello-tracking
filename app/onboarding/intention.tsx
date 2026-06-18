@@ -307,6 +307,18 @@ export default function IntentionScreen() {
           </>
         }
       >
+        {/* StepHeader lives OUTSIDE the ScrollView — fixed at the top — so the
+            top edge fade (which darkens content scrolling under it) never falls
+            over the title. Earlier it sat inside the scroll and the fadeTop band
+            painted over "TU OBJETIVO", hiding the eyebrow. */}
+        <StepHeader
+          eyebrow={eyebrow}
+          eyebrowColor="magenta"
+          question="¿Qué quieres lograr?"
+          questionEmphasis="lograr"
+          hint="Elige una o varias. La primera es donde Stelar pone el foco."
+        />
+
         {/* Scroll stage — the ScrollView plus two bg-coloured edge fades so
             the card column emerges from the sky at the top and dissolves
             back into it at the bottom (over the CTA). The fades are absolute
@@ -319,14 +331,6 @@ export default function IntentionScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <StepHeader
-              eyebrow={eyebrow}
-              eyebrowColor="magenta"
-              question="¿Qué quieres lograr?"
-              questionEmphasis="lograr"
-              hint="Elige una o varias. La primera es donde Stelar pone el foco."
-            />
-
             {/* Multi-select group — the cards form a logical group of
                 CHECKBOXES (no longer a radiogroup: more than one can be
                 checked at once). VoiceOver reads each card's checked state;
@@ -347,7 +351,7 @@ export default function IntentionScreen() {
                     key={opt.value}
                     option={opt}
                     // index 1 ('energy') opens the block of "what SUSTAINS the
-                    // outcome" — it carries extra top breathing room so card 0
+                    // outcome" — one clean beat of extra top space so card 0
                     // ('Bajar de peso', the objective) reads as its own beat.
                     separated={index === 1}
                     selected={isSelected}
@@ -445,10 +449,10 @@ export default function IntentionScreen() {
  *  ANY option (it is not specific to "Bajar de peso"). The other selected
  *  cards get the magenta treatment WITHOUT the marker.
  *
- *  `separated` lifts the card with extra marginTop + a partial-width
- *  hairline above it, separating "el objetivo" (card 0) from "lo que lo
- *  sostiene" (cards 1+) by SPACE, not decoration (manifesto: no
- *  halo/badge around the weight option). */
+ *  `separated` lifts the card with a single clean beat of extra marginTop,
+ *  separating "el objetivo" (card 0) from "lo que lo sostiene" (cards 1+)
+ *  by SPACE, not decoration (manifesto: no halo/badge around the weight
+ *  option, and no hairline that reads as a broken list split). */
 function IntentCard({
   option,
   separated,
@@ -544,12 +548,6 @@ function IntentCard({
 
   return (
     <View style={separated ? styles.separatedGroup : undefined}>
-      {/* Breath — a partial-width, ultra-faint hairline that gives card 0
-          its own breathing room above the sustaining block. Spacing, not a
-          divider: ~40% width, centred, so it reads as breath, not a list
-          split. Only rendered for the separated card. */}
-      {separated ? <View style={styles.breath} /> : null}
-
       {/* TU PRIORIDAD — micro magenta eyebrow over whichever card is the
           priority (selected[0]). Text only — NO halo/badge — so it can sit
           over any option without dramatising it (manifesto-safe even on
@@ -1102,23 +1100,13 @@ const styles = StyleSheet.create({
     // room to project without being clipped by the ScrollView.
     paddingHorizontal: 14,
   },
-  // Card 1 ('energy') opens the "lo que sostiene" block — extra top room
-  // (18 vs the 10 normal cardOuter gap) sets the objective (card 0) apart
-  // by SPACE. Distinction without decoration (no halo around the weight
-  // option — manifesto).
+  // Card 1 ('energy') opens the "lo que sostiene" block. A SINGLE clean beat
+  // of extra space (vs the 12 normal cardOuter gap) sets the objective
+  // (card 0) apart by SPACE alone — no hairline, no decoration (a line read
+  // as a broken divider splitting the list in two). Distinction without
+  // dramatising the weight option (manifesto).
   separatedGroup: {
-    marginTop: 18,
-  },
-  // Breath — partial-width, ultra-faint hairline above the separated card.
-  // ~40% width, centred, half-strength hairline. Reads as breath, not a
-  // divider that splits the list in two.
-  breath: {
-    alignSelf: 'center',
-    width: '40%',
-    height: 1,
-    backgroundColor: colors.hairline,
-    opacity: 0.5,
-    marginVertical: 14,
+    marginTop: 14,
   },
   // TU PRIORIDAD — micro magenta eyebrow over the priority card. Uppercase,
   // tracked, tiny. Text only (no box/badge) so it marks the engine-driving
@@ -1132,7 +1120,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   cardOuter: {
-    marginBottom: 10,
+    marginBottom: 12,
   },
   cardPressed: {
     opacity: 0.92,

@@ -314,12 +314,12 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     // aguijón arriba. Sin flips/rotación (frame directo) — overlay:
     // scripts/overlay-scorpio.mjs.
     stars: [
-      { x: 0.54, y: 0.6, mag: 2.7 }, // 0 pinza derecha
-      { x: 0.18, y: 0.48, mag: 2.3 }, // 1 pinza izquierda
-      { x: 0.38, y: 0.53, mag: 2.7 }, // 2 cabeza (junta de las pinzas)
-      { x: 0.45, y: 0.45, mag: 2.9 }, // 3 cuerpo alto
-      { x: 0.51, y: 0.38, mag: 1.5 }, // 4 Antares — el corazón
-      { x: 0.59, y: 0.27, mag: 3.0 }, // 5 cuerpo → cola
+      { x: 0.43, y: 0.6, mag: 2.7 }, // 0 pinza derecha
+      { x: 0.07, y: 0.48, mag: 2.3 }, // 1 pinza izquierda
+      { x: 0.24, y: 0.53, mag: 2.7 }, // 2 cabeza (junta de las pinzas)
+      { x: 0.31, y: 0.45, mag: 2.9 }, // 3 cuerpo alto
+      { x: 0.42, y: 0.36, mag: 1.5 }, // 4 Antares — el corazón
+      { x: 0.5, y: 0.29, mag: 3.0 }, // 5 cuerpo → cola
       { x: 0.63, y: 0.17, mag: 2.8 }, // 6 cola
       { x: 0.64, y: 0.07, mag: 2.4 }, // 7 cola arriba
       { x: 0.51, y: 0.0, mag: 2.6 }, // 8 curva del aguijón

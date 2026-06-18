@@ -150,7 +150,10 @@ export function TransformationReveal({
         <ScreenCosmos width={width} height={height} />
       </Animated.View>
 
-      <Pressable style={[StyleSheet.absoluteFill, styles.center]} onPress={close}>
+      {/* Backdrop centra la tarjeta y absorbe el toque, pero NO cierra al
+          tocar afuera — la revelación se cierra SOLO con la ✕ (decisión del
+          dueño: no descartar el momento por un toque accidental). */}
+      <Pressable style={[StyleSheet.absoluteFill, styles.center]}>
         {/* Halo de luz que respira detrás de la tarjeta — presencia en la zona
             del hero (el Regreso no tiene figura). Detrás del card, no bloquea. */}
         {isReturn ? (

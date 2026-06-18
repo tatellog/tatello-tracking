@@ -137,12 +137,14 @@ export function TuEmblemaModal({
       <View style={styles.root}>
         {/* Blurred, dimmed Hoy behind — same language as the revelations. */}
         <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-        <Pressable style={styles.scrim} onPress={onClose}>
+        {/* Scrim SOLO atenúa — no cierra. El modal se cierra solo con la ✕ (o
+            el botón atrás de Android vía onRequestClose); un tap afuera lo
+            mantiene abierto. */}
+        <View style={styles.scrim}>
           {/* Wrapper animado: lleva el tamaño + la elevación (sombra fuera del
               overflow:hidden del card) y la entrada con resorte. */}
           <Animated.View style={[styles.cardWrap, cardAnim]}>
-            {/* Inner press swallows taps so they don't close via the backdrop. */}
-            <Pressable style={styles.card} onPress={() => {}}>
+            <View style={styles.card}>
               {/* Atmósfera — el card deja de ser un panel plano: glow radial
                 oro→magenta detrás del emblema + polvo de estrellas arriba +
                 viñeta inferior que hunde el card en el cosmos. */}
@@ -309,9 +311,9 @@ export function TuEmblemaModal({
                   </View>
                 </View>
               </ScrollView>
-            </Pressable>
+            </View>
           </Animated.View>
-        </Pressable>
+        </View>
       </View>
     </Modal>
   )

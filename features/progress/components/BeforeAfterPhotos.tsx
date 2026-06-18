@@ -25,6 +25,7 @@ import {
 import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
+import { BeforeAfterSlider } from './BeforeAfterSlider'
 import { ProgressShareCard, SHARE_VARIANTS } from './ProgressShareCard'
 import { ProgressShareSheet, type ShareVariant } from './ProgressShareSheet'
 
@@ -264,6 +265,8 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   const takePhoto = useTakePhoto()
   const deletePhoto = useDeletePhoto()
   const [shareOpen, setShareOpen] = useState(false)
+  // Modo "Comparar": diptico (default) vs slider de arrastrar-para-revelar.
+  const [mode, setMode] = useState<'diptych' | 'slider'>('diptych')
 
   // Build the card-config used to feed the generic share sheet. Lives
   // here (not in the sheet) because the data — photo URLs, dates,
@@ -333,7 +336,10 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     })
   }
 
-  const canShare = data.count >= 2
+  const beforeUrl = data.before?.signed_url ?? null
+  const afterUrl = data.after?.signed_url ?? null
+  // Comparar/compartir necesitan AMBAS fotos cargadas (URL firmada).
+  const canCompare = !!beforeUrl && !!afterUrl
   const busy = takePhoto.isPending || deletePhoto.isPending
   // Which slot is mid-delete, so only that column shows the spinner.
   const deletingId = deletePhoto.isPending ? deletePhoto.variables?.id : undefined
@@ -439,6 +445,16 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
             </View>
           ) : null}
         </TouchableOpacity>
+      ) : mode === 'slider' && canCompare ? (
+        <>
+          <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
+          <Text style={styles.sliderDates}>
+            {formatDate(data.before!.taken_at)}
+            <Text style={styles.sliderArrow}>{'  →  '}</Text>
+            {formatAfterDate(data.after!, data.before)}
+          </Text>
+          <Text style={styles.sliderHint}>Arrastra el divisor para revelar tu cambio.</Text>
+        </>
       ) : (
         <>
           <View style={styles.row}>
@@ -448,7 +464,8 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
               photo={data.before}
               onPress={onColumnPress('before', data.before)}
               uploading={
-                (takePhoto.isPending && data.count === 0) || deletingId === data.before?.id
+                (takePhoto.isPending && data.count === 0) ||
+                (deletingId != null && deletingId === data.before?.id)
               }
             />
             <Text style={styles.arrow}>→</Text>
@@ -458,7 +475,10 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
               photo={data.after}
               accent
               onPress={onColumnPress('after', data.after)}
-              uploading={(takePhoto.isPending && data.count >= 1) || deletingId === data.after?.id}
+              uploading={
+                (takePhoto.isPending && data.count >= 1) ||
+                (deletingId != null && deletingId === data.after?.id)
+              }
               dateOverride={data.after ? formatAfterDate(data.after, data.before) : undefined}
             />
           </View>
@@ -468,24 +488,36 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         </>
       )}
 
-      {/* Share — a quiet, right-aligned link, not a promoted pill.
-          A before/after diptych is private by default; sharing it
-          outward is an option the user can find, never the section's
-          headline call to action. */}
-      {canShare ? (
-        <TouchableOpacity
-          style={styles.shareBtn}
-          activeOpacity={0.6}
-          onPress={() => setShareOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Compartir mi cambio"
-        >
-          <ShareIcon />
-          <Text style={styles.shareLabel}>Compartir mi cambio</Text>
-        </TouchableOpacity>
+      {/* CTAs — "Comparar" (abre el slider de arrastrar) como acción principal
+          de la sección; "Compartir mi cambio" como secundaria, callada. */}
+      {canCompare ? (
+        <View style={styles.ctaRow}>
+          <TouchableOpacity
+            style={styles.compareBtn}
+            activeOpacity={0.85}
+            onPress={() => setMode((m) => (m === 'slider' ? 'diptych' : 'slider'))}
+            accessibilityRole="button"
+            accessibilityLabel={mode === 'slider' ? 'Ver lado a lado' : 'Comparar arrastrando'}
+          >
+            <Text style={styles.compareLabel}>
+              {mode === 'slider' ? 'Lado a lado' : 'Comparar'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shareBtn}
+            activeOpacity={0.6}
+            onPress={() => setShareOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Compartir mi cambio"
+          >
+            <ShareIcon />
+            <Text style={styles.shareLabel}>Compartir mi cambio</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
 
-      {canShare ? (
+      {canCompare ? (
         <ProgressShareSheet
           visible={shareOpen}
           onClose={() => setShareOpen(false)}
@@ -631,7 +663,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.anchor,
     color: colors.magenta,
-    marginHorizontal: 12,
+    marginHorizontal: 8,
   },
   caption: {
     marginTop: 12,
@@ -640,16 +672,53 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.bone,
   },
-  // Quiet, label-led, right-aligned — a discoverable option that
-  // never competes with the photos. Sharing a before/after outward
-  // is the most diet-culture-coded gesture in the app; it stays a
-  // calm link, not a promoted call to action.
+  // Fila de CTAs: "Comparar" (primaria) a la izquierda, "Compartir" (callada)
+  // a la derecha.
+  ctaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  // "Comparar" — pill magenta suave, la acción principal de la sección.
+  compareBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: colors.magentaTint,
+    borderWidth: 1,
+    borderColor: colors.magentaTint2,
+  },
+  compareLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.3,
+    color: colors.magenta,
+  },
+  // Fechas bajo el slider (inicial → actual).
+  sliderDates: {
+    marginTop: 12,
+    textAlign: 'center',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  sliderArrow: {
+    color: colors.oro,
+  },
+  sliderHint: {
+    marginTop: 4,
+    textAlign: 'center',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // Compartir — link callado; vive en la fila de CTAs.
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-end',
     gap: 7,
-    marginTop: 14,
     paddingVertical: 4,
   },
   shareLabel: {

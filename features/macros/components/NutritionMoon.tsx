@@ -9,7 +9,7 @@ import {
   Rect as SkiaRect,
   vec,
 } from '@shopify/react-native-skia'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -30,7 +30,8 @@ import Svg, {
   Stop as SvgStop,
 } from 'react-native-svg'
 
-import { moonIllumination, moonPhase } from '../moonPhase'
+import { subscribeMealLogged } from '../meal-logged-bus'
+import { moonIllumination, moonProgressCopy } from '../moonPhase'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { colors, typography } from '@/theme'
 
@@ -292,10 +293,90 @@ function Moon({
   )
 }
 
+// ── §6 · partículas que viajan hacia la luna al registrar una comida ──
+// Posiciones de salida deterministas (no random → estables entre renders);
+// nacen cerca del readout (izquierda) y suben en arco hacia la luna.
+const PARTICLES = Array.from({ length: 7 }, (_, i) => ({
+  dx: Math.sin(i * 1.7) * 24,
+  dy: Math.cos(i * 2.3) * 16,
+  delay: i * 0.05,
+  arc: (i % 2 === 0 ? -1 : 1) * (16 + (i % 3) * 9),
+}))
+
+function Particle({
+  t,
+  sx,
+  sy,
+  tx,
+  ty,
+  off,
+}: {
+  t: SharedValue<number>
+  sx: number
+  sy: number
+  tx: number
+  ty: number
+  off: (typeof PARTICLES)[number]
+}) {
+  const style = useAnimatedStyle(() => {
+    const local = Math.max(0, Math.min(1, (t.value - off.delay) / (1 - off.delay)))
+    const dx = (tx - sx) * local + off.arc * Math.sin(local * Math.PI)
+    const dy = (ty - sy) * local - 26 * Math.sin(local * Math.PI)
+    return {
+      opacity: Math.sin(local * Math.PI),
+      transform: [{ translateX: dx }, { translateY: dy }, { scale: 1 - 0.45 * local }],
+    }
+  })
+  return (
+    <Animated.View style={[styles.particle, { left: sx, top: sy }, style]} pointerEvents="none" />
+  )
+}
+
+function MoonParticles({
+  targetX,
+  targetY,
+  trigger,
+  reduced,
+}: {
+  targetX: number
+  targetY: number
+  trigger: number
+  reduced: boolean
+}) {
+  const t = useSharedValue(0)
+  useEffect(() => {
+    if (trigger === 0 || reduced) return
+    t.value = 0
+    t.value = withTiming(1, { duration: 1150, easing: Easing.out(Easing.cubic) })
+    return () => cancelAnimation(t)
+  }, [trigger, reduced, t])
+
+  if (trigger === 0) return null
+  const sx = GUTTER + 26
+  const sy = HERO_H * 0.5
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {PARTICLES.map((off, i) => (
+        <Particle
+          key={i}
+          t={t}
+          sx={sx + off.dx}
+          sy={sy + off.dy}
+          tx={targetX}
+          ty={targetY}
+          off={off}
+        />
+      ))}
+    </View>
+  )
+}
+
 type Props = {
   proteinValue: number
   proteinTarget?: number
-  caloriesValue: number
+  /** Calorías del día — ya no se muestran en el hero (el peso visual lo lleva
+   *  la proteína y la luna); se conserva por compatibilidad de la firma. */
+  caloriesValue?: number
   isLoading?: boolean
 }
 
@@ -306,25 +387,24 @@ type Props = {
  * the readout). Non-stellar depth only. Reaching/passing the reference is a
  * full moon — celebrated, never "te pasaste". Calorías = quiet fact.
  */
-export function NutritionMoon({
-  proteinValue,
-  proteinTarget,
-  caloriesValue,
-  isLoading = false,
-}: Props) {
+export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }: Props) {
   const { width: W } = useWindowDimensions()
   const reduced = useReducedMotion() ?? false
 
   const reference = proteinTarget != null && proteinTarget > 0 ? Math.round(proteinTarget) : null
   const illumination = moonIllumination(proteinValue, reference)
   const ambient = illumination == null
-  const phase = ambient ? null : moonPhase(illumination)
   const moonDim = isLoading || ambient
-  const pct =
-    reference != null ? Math.round(Math.max(0, Math.min(1, illumination ?? 0)) * 100) : null
+  // Copy honesto: frase de fase + cuánto falta (gramos). El usuario pidió saber
+  // CÓMO VA, no una frase vaga.
+  const copy = moonProgressCopy(proteinValue, reference)
 
   const cx = W - R_MOON - 14
   const cy = HERO_H * 0.5
+
+  // §6 · al registrar una comida en Comidas, la luna celebra (partículas).
+  const [logTrigger, setLogTrigger] = useState(0)
+  useEffect(() => subscribeMealLogged(() => setLogTrigger((n) => n + 1)), [])
 
   const phaseTarget = moonDim ? PHASE_MAX : Math.max(0, Math.min(1, illumination ?? 1)) * PHASE_MAX
   const p = useSharedValue(phaseTarget)
@@ -346,6 +426,7 @@ export function NutritionMoon({
         moonDim={moonDim}
         reduced={reduced}
       />
+      <MoonParticles targetX={cx} targetY={cy} trigger={logTrigger} reduced={reduced} />
 
       {/* ── Content (text), left column over the sky ── */}
       <View style={styles.content}>
@@ -376,23 +457,19 @@ export function NutritionMoon({
             </View>
             <Text style={styles.label}>proteína</Text>
 
-            <View style={styles.calRow}>
-              <Text style={styles.calLabel}>Calorías</Text>
-              <Text style={styles.calValue}>{Math.round(caloriesValue)} kcal</Text>
-            </View>
-
+            {/* La barra ES la lectura del progreso (sin "%": el peso lo lleva
+                la línea honesta de abajo). */}
             {reference != null ? (
               <View style={styles.barRow}>
                 <View style={styles.barTrack}>
                   <Animated.View style={[styles.barFill, barStyle]} />
                 </View>
-                <Text style={styles.barPct}>{pct}%</Text>
               </View>
             ) : null}
 
-            <Text style={styles.coach}>
-              {ambient ? 'Tu luna de hoy se va dibujando.' : phase!.caption}
-            </Text>
+            {/* Frase de fase (cómo se siente) + línea honesta (cuánto falta). */}
+            <Text style={styles.coach}>{copy.phrase}</Text>
+            {copy.honest ? <Text style={styles.honest}>{copy.honest}</Text> : null}
           </>
         )}
       </View>
@@ -451,28 +528,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 3,
   },
-  calRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    marginTop: 4,
-  },
-  calLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    color: colors.niebla,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
-  calValue: {
-    fontFamily: typography.uiSemi,
-    fontSize: 11.5,
-    color: colors.niebla,
-  },
   barRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     marginTop: 12,
   },
   barTrack: {
@@ -487,17 +545,35 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: colors.magenta,
   },
-  barPct: {
-    fontFamily: typography.uiSemi,
-    fontSize: 11,
-    color: colors.niebla,
-  },
+  // Frase de fase — voz del coach (serif italic).
   coach: {
-    marginTop: 14,
+    marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 18,
     color: colors.leche,
+  },
+  // Línea honesta — el dato claro (cuánto falta). UI upright, callada pero
+  // legible: el usuario quiere saber cómo va, sin que grite.
+  honest: {
+    marginTop: 4,
+    fontFamily: typography.uiMedium,
+    fontSize: 12.5,
+    letterSpacing: 0.2,
+    color: colors.bone,
+  },
+  // Partícula que viaja a la luna al registrar — punto cálido con glow.
+  particle: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.oroLight,
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 5,
+    elevation: 4,
   },
 })

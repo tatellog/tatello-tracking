@@ -6,7 +6,7 @@ import {
   Paint,
   useImage,
 } from '@shopify/react-native-skia'
-import { StyleSheet, View } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
@@ -272,28 +272,28 @@ export type RevealedEmblemProps = {
 
 export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblemProps) {
   const frames = FRAMES_BY_SIGN[sign]
-  const arch = useImage(ARCH_SRC)
-  const animal = useImage(frames ? frames[frameIndexFor(transformProgress)] : 0)
   const Glyph = GLYPH_BY_SIGN[sign]
+  const animalSrc = frames ? frames[frameIndexFor(transformProgress)] : null
 
-  if (size <= 0) return null
-  // No pintar el emblema A MEDIAS mientras los PNGs (aro + animal, ~2 MB c/u)
-  // se decodifican en el cambio de tab — eso causaba el "glifo + arco a medias"
-  // apareciendo tarde. Esperamos a que AMBAS texturas estén listas y entonces
-  // fundimos todo el emblema de una (FadeIn abajo). El fade reencuadra la
-  // demora de carga como un "el emblema emerge", no como un pop tardío.
-  if (!arch || !animal) return null
+  // Bloom (halo aditivo cerca del 100 %) sigue en Skia. Si la textura aún no
+  // decodifica, simplemente NO hay bloom — nunca blanquea el emblema.
+  const animalSkia = useImage(animalSrc ?? null)
 
-  // Rects con aspect REAL de cada imagen (sin deformar). El arco llena en
-  // altura y se centra; el animal va centrado dentro del aro.
-  const archAR = arch ? arch.width() / arch.height() : 1.5
+  if (size <= 0 || animalSrc == null) return null
+
+  // Aspecto REAL de cada PNG SIN decodificar (síncrono para assets bundleados),
+  // así no dependemos de que Skia ya tenga la textura para medir.
+  const archMeta = Image.resolveAssetSource(ARCH_SRC)
+  const animalMeta = Image.resolveAssetSource(animalSrc)
+  const archAR = archMeta ? archMeta.width / archMeta.height : 1.5
+  const lionAR = animalMeta ? animalMeta.width / animalMeta.height : 1.2
+
   const archBase = size * ARCH_HFRAC
-  const archW = archBase * archAR // ancho según el aspect real
-  const archH = archBase * ARCH_VSTRETCH // alto estirado → menos achatado
+  const archW = archBase * archAR
+  const archH = archBase * ARCH_VSTRETCH
   const archX = (size - archW) / 2
   const archY = (size - archH) / 2
 
-  const lionAR = animal ? animal.width() / animal.height() : 1.2
   const lionW = size * LION_WFRAC
   const lionH = lionW / lionAR
   const lionX = LION_CX * size - lionW / 2
@@ -301,8 +301,6 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
   const glyphSize = size * GLYPH_FRAC
 
   const bloomT = bloomTFor(transformProgress)
-  // Halo más difuso → el emblema lee como atmósfera de fondo, no como
-  // line-art nítido compitiendo con las líneas de la constelación.
   const bloomRadius = size * (0.02 + bloomT * 0.045)
 
   return (
@@ -311,24 +309,42 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
       pointerEvents="none"
       entering={FadeIn.duration(420)}
     >
-      <Canvas style={StyleSheet.absoluteFill}>
-        {/* Arco — el MARCO: línea continua de alto contraste, así que va
-            a su propia opacidad MÁS BAJA que el animal (a igual opacidad
-            "gritaría" más por sus bordes nítidos). Es el susurro que
-            contiene el cuadro, no un foco. */}
-        {arch ? (
-          <Group opacity={FRAME_OPACITY}>
-            <SkiaImage image={arch} x={archX} y={archY} width={archW} height={archH} fit="fill" />
-          </Group>
-        ) : null}
-        <Group opacity={MASTER_OPACITY}>
-          {/* Animal — el frame del % vigente (reveal radial pre-horneado). */}
-          {animal ? (
-            <SkiaImage image={animal} x={lionX} y={lionY} width={lionW} height={lionH} fit="fill" />
-          ) : null}
-          {/* Bloom — copia borrosa aditiva que crece hacia el 100 %: el
-              emblema gana luz al 80 % y resplandece al completarse. */}
-          {animal && bloomT > 0 ? (
+      {/* Aro + animal como RN <Image> (no Skia): la decodificación la maneja
+          RN con caché propio (calentado por LionFramePreloader), así el emblema
+          NUNCA queda en blanco al cambiar de tab —el bug que tenía el useImage
+          de Skia, que re-decodifica y devolvía null en la re-entrada—. */}
+      <Image
+        source={ARCH_SRC}
+        resizeMode="stretch"
+        fadeDuration={0}
+        style={{
+          position: 'absolute',
+          left: archX,
+          top: archY,
+          width: archW,
+          height: archH,
+          opacity: FRAME_OPACITY,
+        }}
+      />
+      <Image
+        source={animalSrc}
+        resizeMode="stretch"
+        fadeDuration={0}
+        style={{
+          position: 'absolute',
+          left: lionX,
+          top: lionY,
+          width: lionW,
+          height: lionH,
+          opacity: MASTER_OPACITY,
+        }}
+      />
+
+      {/* Bloom — copia borrosa aditiva que crece hacia el 100 %. Skia, opcional:
+          si aún no carga la textura, no hay bloom (jamás blanquea la figura). */}
+      {bloomT > 0 && animalSkia ? (
+        <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Group opacity={MASTER_OPACITY}>
             <Group
               layer={
                 <Paint opacity={bloomT * BLOOM_MAX_OPACITY} blendMode="screen">
@@ -337,7 +353,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
               }
             >
               <SkiaImage
-                image={animal}
+                image={animalSkia}
                 x={lionX}
                 y={lionY}
                 width={lionW}
@@ -345,9 +361,9 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
                 fit="fill"
               />
             </Group>
-          ) : null}
-        </Group>
-      </Canvas>
+          </Group>
+        </Canvas>
+      ) : null}
       {/* El laurel (hojas-23.svg) se retiró — sobrecargaba la composición y
           le peleaba el foco al asterismo (review de arte). El anillo + el león
           quedan; volver a montarlo es un <Hojas> en git. */}

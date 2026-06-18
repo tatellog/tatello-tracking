@@ -1,23 +1,28 @@
 import * as Haptics from 'expo-haptics'
-import * as ImagePicker from 'expo-image-picker'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { type ReactNode, useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import FoodVect from '@/assets/icons/food-vect.svg'
+import NorthStar from '@/assets/icons/north-star.svg'
+import Orbits from '@/assets/icons/orbits.svg'
+import WaterVect from '@/assets/icons/water-vect.svg'
 import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
+import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import { track } from '@/lib/analytics'
+import { useTransformProgress } from '@/features/emblem'
 import { useMacroTargets } from '@/features/macros/hooks'
-import { useLatestPhotoSet } from '@/features/onboarding/photos/hooks/useLatestPhotoSet'
 import { avatarUrl } from '@/features/profile/api'
-import { useDeleteAccount, useProfile, useUploadAvatar } from '@/features/profile/hooks'
+import { useDeleteAccount, useProfile } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
-import { GLASS_ML, mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
+import { mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
@@ -26,10 +31,11 @@ import { colors, radius, typography } from '@/theme'
 
 const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).springify().damping(18)
 
-const SEX_LABEL: Record<string, string> = {
-  female: 'Femenino',
-  male: 'Masculino',
-}
+// Oro base de la familia de glifos ilustrados (el mismo que las placas
+// horneadas energy/moon/water usan como `fill`). Los glifos `currentColor`
+// (orbits, food) se tintan a ESTE valor —no a oroSoft, más oscuro— para que
+// los cuatro iconos de "Tu camino" lean a una sola luminancia.
+const ICON_GOLD = '#EEDD91'
 
 // TODO: Términos y privacidad — la fila "Términos y privacidad" está
 // disabled hasta que estas páginas estén hospedadas. Cuando existan,
@@ -110,7 +116,10 @@ function SettingsBody() {
   // data / isLoading / isError / refetch (no isSuccess) — so we treat
   // "resolved" as "not loading".
   const { data: targets, isLoading: targetsLoading } = useMacroTargets()
-  const { data: lastPhotoSetAt, isLoading: photoLoading } = useLatestPhotoSet()
+  const { goalMl } = useWaterGoal()
+  // % de transformación del emblema — la identidad CONSTRUIDA en Stelar, el
+  // dato emocional de la card de perfil (no la ficha médica).
+  const { progress: transformPct } = useTransformProgress()
 
   const [signingOut, setSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -175,59 +184,27 @@ function SettingsBody() {
     router.push('/onboarding/macro-targets?source=settings')
   }
 
-  const editProfile = () => {
-    router.push('/onboarding/about-you?source=settings')
+  const openProfile = () => {
+    router.push('/profile')
   }
 
   const editIntention = () => {
     router.push('/onboarding/intention?source=settings')
   }
 
-  const openBodyTrack = () => {
-    // Body tracking lives in Progreso → Tu cambio visual. That section is
-    // both the payoff (view the before/after) and the capture surface: the
-    // "Ahora" column / empty card open a quick single-frontal capture. The
-    // 4-angle wizard stays the first-run onboarding flow only — for tracking
-    // it was effort with no payoff, since just the frontal feeds the
-    // comparison. So tapping here goes to "see", not "re-photograph".
-    router.push('/(tabs)/progress?photos=open')
+  const editWater = () => {
+    router.push('/water-goal')
   }
 
   const editNotifications = () => {
     router.push('/onboarding/notifications?source=settings')
   }
 
-  // Status line for the Track corporal card. While the query is in flight
-  // we hand back null so the row shows a neutral skeleton instead of
-  // "Aún sin fotos" (which would read as "your photos were deleted"). We
-  // only commit to the empty copy once the query has actually resolved.
-  const bodyTrackStatus = (() => {
-    if (photoLoading) return null
-    if (lastPhotoSetAt == null) return 'Aún sin fotos'
-    const days = Math.max(0, Math.floor((Date.now() - lastPhotoSetAt) / (1000 * 60 * 60 * 24)))
-    if (days === 0) return 'Capturado hoy'
-    if (days === 1) return 'Hace 1 día'
-    return `Hace ${days} días`
-  })()
-
-  const uploadAvatar = useUploadAvatar()
-
-  const pickAvatar = async () => {
-    if (uploadAvatar.isPending) return
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) return
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    })
-    const asset = result.canceled ? null : result.assets[0]
-    if (asset) uploadAvatar.mutate(asset.uri)
+  const openPrivacy = () => {
+    router.push('/privacy')
   }
 
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
-  const sexLabel = profile?.biological_sex ? (SEX_LABEL[profile.biological_sex] ?? null) : null
   const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
   // Secondary focuses (the picks AFTER the priority in the intention
   // wizard). Each one resolves to its label via FOCUS_LABEL; values we
@@ -257,6 +234,18 @@ function SettingsBody() {
   const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
   const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
 
+  // ── Tu camino — los valores de las 4 sub-secciones (route config). ──
+  const objetivoPrincipal = profileLoaded
+    ? (intention?.label ?? 'Aún sin definir')
+    : 'Tu objetivo del mes'
+  const objetivosSecundarios = secondaryLine ?? 'Añade objetivos que te acompañen'
+  const nutricion = targetsLoading
+    ? 'Cargando…'
+    : targets
+      ? `${targets.protein_g} g proteína   ·   ${targets.calories} kcal`
+      : 'Aún sin definir'
+  const agua = `${mlToLitresLabel(goalMl)} L diarios`
+
   return (
     <View style={styles.screen}>
       <SkyBackground />
@@ -273,184 +262,122 @@ function SettingsBody() {
               separate static list. The profile is the heart, so this block
               owns the loading / error states for the screen. ── */}
           <Animated.View entering={enter(100)}>
-            <SectionHeader label="Mi perfil" />
+            <SectionHeader label="Tu identidad" />
             {profileError ? (
               <ProfileErrorCard onRetry={() => void refetchProfile()} />
             ) : profileLoading ? (
               <ProfileSkeleton />
             ) : (
-              <Pressable
-                onPress={editProfile}
-                accessibilityRole="button"
-                accessibilityLabel="Editar mi perfil"
-                accessibilityHint="Abre el editor de perfil"
-                style={({ pressed }) => pressed && styles.rowPressed}
-              >
-                <View style={styles.profileCard}>
-                  <View style={styles.identity}>
-                    {/* Avatar — its own tap target: tap it to change the
-                        photo, tap the rest of the card to edit profile. */}
-                    <Pressable
-                      onPress={pickAvatar}
-                      disabled={uploadAvatar.isPending}
-                      accessibilityRole="button"
-                      accessibilityLabel="Cambiar foto de perfil"
-                    >
-                      <View style={styles.avatar}>
-                        {uploadAvatar.isPending ? (
-                          <StarLoader size={16} color={colors.magenta} />
-                        ) : avatarUri ? (
-                          <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
-                        ) : zodiacSign ? (
-                          <ZodiacFigure sign={zodiacSign} size={30} color={colors.magenta} />
-                        ) : (
-                          <Text style={styles.avatarInitial}>{initial}</Text>
-                        )}
-                      </View>
-                    </Pressable>
-                    <View style={styles.identityText}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {profile?.display_name ?? 'Aún sin nombre'}
-                      </Text>
-                      {identityLine ? <Text style={styles.signAge}>{identityLine}</Text> : null}
-                    </View>
-                    <Text
-                      style={styles.chevron}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    >
-                      ›
-                    </Text>
-                  </View>
-                  <View style={styles.cardDivider} />
-                  {/* Detail rows — read-only values that belong to the same
-                      "edit profile" gesture as the header. The hint line
-                      below them names the gesture so they don't read as an
-                      orphaned static list. */}
-                  <ProfileRow
-                    label="Altura"
-                    value={profile?.height_cm ? `${profile.height_cm} cm` : 'Aún sin definir'}
-                  />
-                  <ProfileRow label="Sexo biológico" value={sexLabel ?? 'Aún sin definir'} />
-                  <Text style={styles.cardHint}>Toca para editar tu perfil</Text>
-                </View>
-              </Pressable>
+              <IdentityCard
+                name={profile?.display_name ?? 'Aún sin nombre'}
+                signAge={identityLine}
+                transformPct={transformPct}
+                avatarUri={avatarUri}
+                zodiacSign={zodiacSign}
+                initial={initial}
+                onPress={openProfile}
+              />
             )}
-            {/* Avatar upload error — silent failure was the old behaviour;
-                now we name it warmly without blame. */}
-            {uploadAvatar.isError ? (
-              <Pressable
-                onPress={pickAvatar}
-                accessibilityRole="button"
-                accessibilityLabel="Reintentar cambiar la foto"
-              >
-                <Text style={styles.inlineError}>
-                  No pudimos cambiar tu foto. Toca para reintentar.
-                </Text>
-              </Pressable>
-            ) : null}
           </Animated.View>
 
           {/* ── Tu plan — the three levers the user controls. One section
               header over three distinct cards. Each row shows a neutral
               skeleton while its query is in flight; the empty copy only
               appears once the query has resolved. ── */}
+          {/* ── Tu camino — las preferencias de progreso como la CONFIGURACIÓN
+              de una ruta, no settings técnicos. Cada fila: card compacta +
+              glifo oro (familia ilustrada de Órbita) + valor + chevron + press
+              feedback. Toca → pantalla. Los emoji 3D rompían la paleta; ahora
+              cada glifo vive en un tile oro tenue (ver caminoIconBox). El
+              "Objetivo principal" usa north-star (el peso es el norte) y su
+              tile pesa un punto más (featured) para marcar jerarquía. ── */}
           <Animated.View entering={enter(150)}>
-            <SectionHeader label="Tu plan" />
-            <PlanRow
-              label={
-                profileLoaded ? (intention?.label ?? 'Aún sin definir') : 'Tu intención del mes'
-              }
-              onPress={editIntention}
-              accessibilityLabel="Editar tu intención"
-              valueNode={
-                !profileLoaded ? (
-                  <SkeletonLine width="62%" />
-                ) : (
-                  <>
-                    <Text style={styles.metaValue}>
-                      {intention?.tagline ?? 'Toca para elegir un foco'}
-                    </Text>
-                    {/* Secondary focuses — whispered as a dimmer line below
-                        the tagline so the priority stays the read. Truncated
-                        to 2 + "y N más", single line, no "También:" label. */}
-                    {secondaryLine ? (
-                      <Text style={styles.metaSecondary} numberOfLines={1}>
-                        {secondaryLine}
-                      </Text>
-                    ) : null}
-                  </>
-                )
-              }
-            />
-            <PlanRow
-              label="Macros diarios"
-              onPress={editTargets}
-              accessibilityLabel="Editar macros diarios"
-              valueNode={
-                targetsLoading ? (
-                  <SkeletonLine width="70%" />
-                ) : targets ? (
-                  <Text style={styles.metaValue}>
-                    <Text style={styles.metaNum}>{targets.protein_g}</Text> g proteína
-                    {'   ·   '}
-                    <Text style={styles.metaNum}>{targets.calories}</Text> kcal
-                  </Text>
-                ) : (
-                  <Text style={styles.metaValue}>Aún sin definir</Text>
-                )
-              }
-            />
-            <PlanRow
-              label="Seguimiento corporal"
-              onPress={openBodyTrack}
-              accessibilityLabel="Abrir seguimiento corporal"
-              valueNode={
-                bodyTrackStatus == null ? (
-                  <SkeletonLine width="48%" />
-                ) : (
-                  <Text style={styles.metaValue}>{bodyTrackStatus}</Text>
-                )
-              }
-              last
-            />
-            <WaterRitualCard />
-          </Animated.View>
-
-          {/* ── Cómo te lee Stelar — one line naming what the intelligence
-              reads. ── */}
-          <Animated.View entering={enter(200)}>
-            <SectionHeader label="Cómo te lee Stelar" />
-            <View style={styles.stelarCard}>
-              <Text style={styles.stelarBody}>
-                Stelar lee{' '}
-                <Text style={styles.stelarAccent}>
-                  tu sueño, tus comidas, tu movimiento, tu ánimo
-                </Text>
-                , encuentra tus patrones y escribe cada lectura de Tu Órbita.
-              </Text>
+            <SectionHeader label="Tu camino" />
+            <View style={styles.caminoList}>
+              <CaminoRow
+                icon={<NorthStar width={26} height={26} preserveAspectRatio="xMidYMid meet" />}
+                featured
+                label="Objetivo principal"
+                value={objetivoPrincipal}
+                onPress={editIntention}
+              />
+              <CaminoRow
+                icon={
+                  <Orbits
+                    width={32}
+                    height={32}
+                    color={ICON_GOLD}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                }
+                label="Objetivos secundarios"
+                value={objetivosSecundarios}
+                onPress={editIntention}
+              />
+              <CaminoRow
+                icon={
+                  <FoodVect
+                    width={32}
+                    height={32}
+                    color={ICON_GOLD}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                }
+                label="Nutrición"
+                value={nutricion}
+                onPress={editTargets}
+              />
+              <CaminoRow
+                icon={<WaterVect width={32} height={32} preserveAspectRatio="xMidYMid meet" />}
+                label="Agua"
+                value={agua}
+                onPress={editWater}
+              />
             </View>
           </Animated.View>
 
-          {/* ── Cuenta — the data-ownership promise + account actions +
-              the destructive zone (sign out, delete). ── */}
-          <Animated.View entering={enter(240)}>
+          {/* ── Acerca de Stelar — DOCUMENTACIÓN del producto, no ajustes.
+              Separada de Cuenta a propósito: la usuaria entiende que esto explica
+              Stelar, no que configura nada. ── */}
+          <Animated.View entering={enter(200)}>
+            <SectionHeader label="Acerca de Stelar" />
+            <View style={styles.caminoList}>
+              <AboutRow
+                label="Cómo funciona Stelar"
+                caption="La idea detrás de tu cielo."
+                onPress={() => router.push('/about/how-it-works')}
+              />
+              <AboutRow
+                label="Cómo se construye tu Órbita"
+                caption="Cómo se teje tu transformación."
+                onPress={() => router.push('/about/orbit')}
+              />
+              <AboutRow
+                label="Preguntas frecuentes"
+                caption="Lo que más nos preguntan."
+                onPress={() => router.push('/about/faq')}
+              />
+              <AboutRow
+                label="Versión"
+                caption="Stelar · v1.0.0"
+                onPress={() => router.push('/about/changelog')}
+              />
+            </View>
+          </Animated.View>
+
+          {/* ── Cuenta — configuraciones reales en JERARQUÍA: primarias →
+              secundarias → zona destructiva. Sin objetivos/macros (viven en "Tu
+              camino") ni info de producto (qué lee Stelar vive en Privacidad).
+              Así la usuaria encuentra ajustes reales rápido. ── */}
+          <Animated.View entering={enter(260)}>
             <SectionHeader label="Cuenta" />
-            <Text style={styles.privacyLine}>
-              <Text style={styles.privacyStrong}>Tus datos son tuyos.</Text> Viven en tu cuenta y
-              nadie más los lee.
-            </Text>
 
             <BetaFeedbackSheet
               visible={feedbackVisible}
               onClose={() => setFeedbackVisible(false)}
             />
 
-            {/* Account-action list — same tappable-row vocabulary as Tu plan,
-                grouped into one card with internal hairline dividers since
-                they're a related cluster. Feedback reuses the existing
-                BetaFeedbackSheet design. Términos stays disabled until the
-                pages are hosted (see the TODO near the top of the file). */}
+            {/* Primarias — lo más a mano. */}
             <View style={styles.accountCard}>
               <AccountRow
                 label="Notificaciones"
@@ -459,6 +386,24 @@ function SettingsBody() {
                 accessibilityLabel="Editar notificaciones"
               />
               <View style={styles.accountDivider} />
+              <AccountRow
+                label="Privacidad"
+                tagline="Tus datos son tuyos."
+                onPress={openPrivacy}
+                accessibilityLabel="Privacidad y tus datos"
+              />
+              <View style={styles.accountDivider} />
+              <AccountRow
+                label="Exportar mis datos"
+                tagline="Pronto."
+                accessibilityLabel="Exportar mis datos, próximamente"
+                disabled
+              />
+            </View>
+
+            {/* Secundarias — soporte e info, más calladas. */}
+            <Text style={styles.groupLabel}>Más</Text>
+            <View style={styles.accountCard}>
               <AccountRow
                 label="Feedback"
                 tagline="Lo que sea, lo leemos."
@@ -474,54 +419,51 @@ function SettingsBody() {
               />
             </View>
 
-            <Pressable
-              onPress={handleSignOut}
-              disabled={signingOut}
-              accessibilityRole="button"
-              accessibilityState={{ busy: signingOut }}
-            >
-              <View style={styles.signOut}>
-                {signingOut ? (
-                  <StarLoader size={18} color={colors.leche} />
-                ) : (
-                  <Text style={styles.signOutLabel}>Cerrar sesión</Text>
-                )}
-              </View>
-            </Pressable>
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+            {/* Destructivas — separadas del resto (hairline + aire), al fondo.
+                Cerrar sesión arriba; Eliminar cuenta en COLOR ERROR, con doble
+                confirmación (confirmBinary). */}
+            <View style={styles.dangerZone}>
+              <Pressable
+                onPress={handleSignOut}
+                disabled={signingOut}
+                accessibilityRole="button"
+                accessibilityState={{ busy: signingOut }}
+              >
+                <View style={styles.signOut}>
+                  {signingOut ? (
+                    <StarLoader size={18} color={colors.leche} />
+                  ) : (
+                    <Text style={styles.signOutLabel}>Cerrar sesión</Text>
+                  )}
+                </View>
+              </Pressable>
+              {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-            {/* Delete account — the most destructive action, kept last and
-                in muted red so it stays subordinate to the magenta voice, but
-                with button chrome (border + faint tint) so it reads as
-                tappable rather than floating text. Spinner while the hook's
-                teardown runs; a tappable retry line on error. */}
-            <Pressable
-              onPress={handleDeleteAccount}
-              disabled={deleteAccount.isPending}
-              accessibilityRole="button"
-              accessibilityLabel="Eliminar mi cuenta"
-              accessibilityState={{ busy: deleteAccount.isPending }}
-              style={({ pressed }) => pressed && styles.rowPressed}
-            >
-              {/* Button chrome (border + tint) lives on this inner View, not
-                  the Pressable — border/bg don't render straight on a
-                  Pressable in this RN setup (same as signOut / PlanRow). */}
-              <View style={styles.deleteRow}>
-                {deleteAccount.isPending ? (
-                  <View style={styles.deletePending}>
-                    <StarLoader size={14} color={colors.feedbackError} />
-                    <Text style={styles.deletePendingLabel}>Borrando tu cuenta...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.deleteLabel}>Eliminar mi cuenta</Text>
-                )}
-              </View>
-            </Pressable>
-            {deleteAccount.error ? (
-              <Text style={styles.errorText}>
-                No pudimos eliminar tu cuenta ahora. Toca para reintentar.
-              </Text>
-            ) : null}
+              <Pressable
+                onPress={handleDeleteAccount}
+                disabled={deleteAccount.isPending}
+                accessibilityRole="button"
+                accessibilityLabel="Eliminar mi cuenta"
+                accessibilityState={{ busy: deleteAccount.isPending }}
+                style={({ pressed }) => pressed && styles.rowPressed}
+              >
+                <View style={styles.deleteRow}>
+                  {deleteAccount.isPending ? (
+                    <View style={styles.deletePending}>
+                      <StarLoader size={14} color={colors.feedbackError} />
+                      <Text style={styles.deletePendingLabel}>Borrando tu cuenta...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.deleteLabel}>Eliminar mi cuenta</Text>
+                  )}
+                </View>
+              </Pressable>
+              {deleteAccount.error ? (
+                <Text style={styles.errorText}>
+                  No pudimos eliminar tu cuenta ahora. Toca para reintentar.
+                </Text>
+              ) : null}
+            </View>
 
             {profile?.is_dev ? (
               <Pressable
@@ -676,64 +618,64 @@ function SettingsBody() {
   )
 }
 
-/* "Tu ritual de agua" — la palanca de cuánta agua tomar al día, aquí
- * donde la usuaria busca configurar (el QuickLog es donde BEBE). Presets
- * en litros (un tap), con el conteo de vasos al lado para cerrar el loop
- * con cómo se bebe (vasos de 250 ml). Local-first vía useWaterGoal; el
- * stepper del QuickLog cubre los valores fuera de los presets. "Ritual",
- * no "meta": el agua es contexto, no un objetivo que se persigue. */
-const WATER_PRESETS_ML = [1500, 2000, 2500, 3000] as const
-
-function WaterRitualCard() {
-  const { goalMl, updateGoal } = useWaterGoal()
-  const glasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+/* "Tu identidad" — la card EMOCIONAL del perfil: no una ficha médica (sin
+ * altura ni sexo), sino "este es mi cielo": nombre + signo·edad + el % de
+ * transformación construido en Stelar. Toca → pantalla Perfil. Press: escala
+ * 0.98 (usePressFeedback) + glow magenta muy sutil + chevron visible. */
+function IdentityCard({
+  name,
+  signAge,
+  transformPct,
+  avatarUri,
+  zodiacSign,
+  initial,
+  onPress,
+}: {
+  name: string
+  signAge: string
+  transformPct: number
+  avatarUri: string | null
+  zodiacSign: ZodiacSign | null
+  initial: string
+  onPress: () => void
+}) {
+  const press = usePressFeedback()
   return (
-    <View style={styles.waterCard}>
-      <View style={styles.waterHead}>
-        <Text style={styles.metaLabel}>Tu ritual de agua</Text>
-        <Text style={styles.waterValue}>
-          {mlToLitresLabel(goalMl)} L · {glasses} vasos al día
-        </Text>
-      </View>
-      <View style={styles.waterPresets}>
-        {WATER_PRESETS_ML.map((ml) => {
-          const active = goalMl === ml
-          return (
-            <Pressable
-              key={ml}
-              onPress={() => {
-                if (active) return
-                Haptics.selectionAsync().catch(() => {})
-                updateGoal(ml)
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`${mlToLitresLabel(ml)} litros al día`}
-              style={({ pressed }) => [
-                styles.waterChip,
-                active && styles.waterChipActive,
-                pressed && styles.rowPressed,
-              ]}
-            >
-              <Text style={[styles.waterChipText, active && styles.waterChipTextActive]}>
-                {mlToLitresLabel(ml)} L
-              </Text>
-            </Pressable>
-          )
-        })}
-      </View>
-    </View>
-  )
-}
-
-function ProfileRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue} numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      accessibilityRole="button"
+      accessibilityLabel="Ver mi perfil"
+      accessibilityHint="Abre tu perfil"
+    >
+      <Animated.View style={[styles.identityCard, press.animatedStyle]}>
+        <View style={styles.identityRow}>
+          <View style={styles.identityAvatar}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.identityAvatarImg} />
+            ) : zodiacSign ? (
+              <ZodiacFigure sign={zodiacSign} size={38} color={colors.magenta} />
+            ) : (
+              <Text style={styles.identityInitial}>{initial}</Text>
+            )}
+          </View>
+          <View style={styles.identityTextCol}>
+            <Text style={styles.identityName} numberOfLines={1}>
+              {name}
+            </Text>
+            {signAge ? <Text style={styles.identitySignAge}>{signAge}</Text> : null}
+            {transformPct > 0 ? (
+              <Text style={styles.identityTransform}>{transformPct}% de transformación</Text>
+            ) : null}
+          </View>
+        </View>
+        <View style={styles.identityCta}>
+          <Text style={styles.identityCtaText}>Ver perfil</Text>
+          <ChevronHint direction="right" size={15} color={colors.magenta} />
+        </View>
+      </Animated.View>
+    </Pressable>
   )
 }
 
@@ -742,43 +684,88 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
  * macros / skeleton lines) and a chevron. Three of these stack under a
  * single section header. `last` drops the bottom margin so the section
  * doesn't over-pad before the next header. */
-function PlanRow({
+/* Una fila de "Tu camino" — card compacta: glifo oro en tile + etiqueta +
+ * valor + chevron, con press feedback (escala). Toca → pantalla específica
+ * (sin formularios inline). Se siente como configurar una ruta, no settings
+ * técnicos. `icon` es el glifo ya renderizado (familia oro de Órbita); el
+ * tile (caminoIconBox) lo ancla para que 4 siluetas irregulares no floten ni
+ * salten de altura. `featured` (solo "Objetivo principal") sube un punto el
+ * fill del tile para marcar jerarquía sin meter otro color. */
+function CaminoRow({
+  icon,
+  featured,
   label,
   value,
-  valueNode,
   onPress,
-  accessibilityLabel,
-  last,
 }: {
+  icon: ReactNode
+  featured?: boolean
   label: string
-  value?: string
-  valueNode?: ReactNode
+  value: string
   onPress: () => void
-  accessibilityLabel: string
-  last?: boolean
 }) {
+  const press = usePressFeedback()
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [
-        last ? styles.planWrapLast : styles.planWrap,
-        pressed && styles.rowPressed,
-      ]}
+      accessibilityLabel={`${label}: ${value}. Toca para editar.`}
     >
-      {/* The card's border + fill live on this inner View, not on the
-          Pressable — border/background don't render reliably when
-          applied straight to a Pressable in this RN setup. */}
-      <View style={styles.planCard}>
-        <View style={styles.metaMain}>
-          <Text style={styles.metaLabel}>{label}</Text>
-          {valueNode ?? <Text style={styles.metaValue}>{value}</Text>}
+      <Animated.View style={[styles.caminoCard, press.animatedStyle]}>
+        {/* El glifo es decorativo — el accessibilityLabel de la fila ya lo
+            cubre, así que se oculta de VoiceOver para no duplicar lectura. */}
+        <View
+          style={[styles.caminoIconBox, featured && styles.caminoIconBoxFeatured]}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
+          {icon}
         </View>
-        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
-          ›
-        </Text>
-      </View>
+        <View style={styles.caminoText}>
+          <Text style={styles.caminoLabel}>{label}</Text>
+          <Text style={styles.caminoValue} numberOfLines={2}>
+            {value}
+          </Text>
+        </View>
+        <ChevronHint direction="right" size={16} color={colors.niebla} />
+      </Animated.View>
+    </Pressable>
+  )
+}
+
+/* Una fila de "Acerca de Stelar" — card compacta de DOCUMENTACIÓN (sin emoji):
+ * etiqueta + descripción + chevron + press feedback. Toca → pantalla de doc.
+ * Misma forma que CaminoRow para que la sección se sienta hermana, pero su
+ * lenguaje (descripción, no valor configurable) dice "esto explica, no ajusta". */
+function AboutRow({
+  label,
+  caption,
+  onPress,
+}: {
+  label: string
+  caption: string
+  onPress: () => void
+}) {
+  const press = usePressFeedback()
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${caption}`}
+    >
+      <Animated.View style={[styles.caminoCard, press.animatedStyle]}>
+        <View style={styles.caminoText}>
+          <Text style={styles.caminoLabel}>{label}</Text>
+          <Text style={styles.caminoValue} numberOfLines={1}>
+            {caption}
+          </Text>
+        </View>
+        <ChevronHint direction="right" size={16} color={colors.niebla} />
+      </Animated.View>
     </Pressable>
   )
 }
@@ -831,14 +818,6 @@ function AccountRow({
       </View>
     </Pressable>
   )
-}
-
-/* Neutral placeholder bar — used inside PlanRow value slots while a query
- * is in flight, so the row reads as "loading" instead of "empty". A dim
- * hairline-filled pill; no shimmer animation (keeps it calm, no extra
- * reanimated surface to audit). */
-function SkeletonLine({ width }: { width: number | `${number}%` }) {
-  return <View style={[styles.skeletonLine, { width }]} accessibilityElementsHidden />
 }
 
 /* The Mi perfil card in its loading shape — same silhouette as the real
@@ -925,6 +904,139 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.hairline,
     overflow: 'hidden',
+  },
+  // ── "Tu identidad" — la card emocional (dark luxury, glow magenta sutil) ──
+  identityCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.magentaTint2,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  identityAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.magentaTint2,
+    borderWidth: 1,
+    borderColor: colors.magentaGlow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  identityAvatarImg: {
+    width: 60,
+    height: 60,
+  },
+  identityInitial: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 26,
+    color: colors.magenta,
+  },
+  identityTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  // Nombre — tipografía editorial, grande, la heroína de la card.
+  identityName: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 26,
+    letterSpacing: -0.8,
+    color: colors.leche,
+  },
+  identitySignAge: {
+    marginTop: 3,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+  },
+  // El dato emocional: la identidad CONSTRUIDA en Stelar.
+  identityTransform: {
+    marginTop: 5,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.2,
+    color: colors.magenta,
+  },
+  identityCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  identityCtaText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.4,
+    color: colors.magenta,
+  },
+  // ── "Tu camino" — cards compactas de configuración de ruta ──
+  caminoList: {
+    gap: 10,
+  },
+  caminoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  // Tile oro tenue que ancla el glifo — un squircle (no círculo, que leería
+  // como avatar/estado) con fill oro 8% + hairline oro suave. Sin él, una
+  // placa oro suelta flota sobre bgCard y cada silueta irregular salta de
+  // altura óptica. 40×40 con glifo de 32 (las placas tienen aire interno en
+  // su viewBox ~820, así que se renderizan más chicas que su tamaño nominal).
+  caminoIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.oroTint,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairlineSoft,
+  },
+  // "Objetivo principal" — el norte. Su tile pesa un punto más (fill ~0.14 +
+  // hairline oro pleno) para marcar jerarquía por MODULACIÓN de opacidad, no
+  // por cambio de color (magenta queda reservado a identidad/CTA).
+  caminoIconBoxFeatured: {
+    backgroundColor: 'rgba(217, 174, 111, 0.14)',
+    borderColor: colors.oroHairline,
+  },
+  caminoText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  caminoLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.bodyLarge,
+    letterSpacing: 0.2,
+    color: colors.leche,
+  },
+  caminoValue: {
+    marginTop: 2,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   // The identity block — name as title, sign + age beneath.
   identity: {
@@ -1205,6 +1317,23 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
     overflow: 'hidden',
     marginBottom: 18,
+  },
+  // Sub-encabezado de grupo (secundarias) — separa jerarquía sin gritar.
+  groupLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.bruma,
+    marginBottom: 8,
+  },
+  // Zona destructiva — separada del resto con un hairline + aire arriba, así
+  // "Cerrar sesión" y "Eliminar cuenta" no se confunden con la configuración.
+  dangerZone: {
+    marginTop: 10,
+    paddingTop: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
   },
   accountRow: {
     flexDirection: 'row',

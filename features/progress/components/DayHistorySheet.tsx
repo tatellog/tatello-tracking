@@ -48,9 +48,10 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(160)} style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Cerrar" />
-      </Animated.View>
+      {/* Backdrop SOLO atenúa — no cierra. El sheet se cierra solo con la ✕
+          (o el botón atrás de Android vía onRequestClose); un tap afuera lo
+          mantiene abierto. */}
+      <Animated.View entering={FadeIn.duration(160)} style={styles.backdrop} pointerEvents="none" />
 
       <View style={styles.anchor} pointerEvents="box-none">
         <Animated.View
