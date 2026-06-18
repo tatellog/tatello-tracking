@@ -15,7 +15,7 @@ import {
 } from '@expo-google-fonts/hanken-grotesk'
 import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { Stack, useRouter, useSegments } from 'expo-router'
+import { Stack, useGlobalSearchParams, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
 import { LogBox } from 'react-native'
@@ -215,6 +215,11 @@ function RouteGuard() {
   const visitedDayOne = useVisitedDayOne()
   const segments = useSegments()
   const router = useRouter()
+  // Las pantallas de onboarding abiertas DESDE Ajustes (?source=settings) son
+  // ediciones legítimas del perfil, no un re-corrido del wizard — el guard de
+  // abajo NO debe rebotarlas a Hoy.
+  const { source } = useGlobalSearchParams<{ source?: string }>()
+  const fromSettings = source === 'settings'
 
   // Dev escape hatch: with EXPO_PUBLIC_SKIP_AUTH=true in .env.local
   // the auth check is bypassed but onboarding/day-one gates still
@@ -276,7 +281,14 @@ function RouteGuard() {
     // typed-routes feature, so we cast to string[] for the depth-2
     // sniff. /onboarding/photos/* is the only nested wizard branch.
     const inPhotoWizard = inOnboarding && (segments as readonly string[])[1] === 'photos'
-    if (!__DEV__ && onboardingDone && visitedDayOne && inOnboarding && !inPhotoWizard) {
+    if (
+      !__DEV__ &&
+      onboardingDone &&
+      visitedDayOne &&
+      inOnboarding &&
+      !inPhotoWizard &&
+      !fromSettings
+    ) {
       router.replace('/(tabs)')
       return
     }
@@ -288,6 +300,7 @@ function RouteGuard() {
     segments,
     router,
     skipAuth,
+    fromSettings,
   ])
 
   return null
