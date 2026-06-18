@@ -5,6 +5,7 @@ export { SoulRevealSync } from './components/SoulRevealSync'
 export { SoulStageReveal } from './components/SoulStageReveal'
 export { SoulStageRevealHost } from './components/SoulStageRevealHost'
 export {
+  useCeremonySeen,
   useRevealSoulNode,
   useSoulProgress,
   useSoulRevealIds,

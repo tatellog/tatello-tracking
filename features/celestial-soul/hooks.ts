@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useBriefContext } from '@/features/brief/hooks'
 import { useTodaySignals } from '@/features/orbit/hooks'
@@ -11,6 +11,37 @@ import { getSoulRevealIds, getSoulRevealSourcesSince, revealSoulNode } from './a
 import { CONSISTENCY_MILESTONES, soulConfigForSign } from './config'
 import { computeSoulProgress, nextNodeForSource, sourcesToReveal, stageForPct } from './logic'
 import type { RevealSource, SoulStage } from './types'
+
+const CEREMONY_SEEN_KEY = 'stelar.constellation.ceremony_seen'
+
+/*
+ * Flag local "ceremonia de la constelación ya vista" — el UNLOCK del Alma
+ * Celeste. La secuencia es: emblema 100% → CEREMONIA → Alma Celeste. Hasta que
+ * la ceremonia se cierra (markSeen), el Alma Celeste NO se activa (ni reveals
+ * ni modal de etapa ni acceso a la pantalla). `seen` es null mientras carga →
+ * el gate no parpadea antes de saber.
+ */
+export function useCeremonySeen(): { seen: boolean | null; markSeen: () => void } {
+  const [seen, setSeen] = useState<boolean | null>(null)
+  useEffect(() => {
+    let active = true
+    AsyncStorage.getItem(CEREMONY_SEEN_KEY)
+      .then((v) => {
+        if (active) setSeen(v === '1')
+      })
+      .catch(() => {
+        if (active) setSeen(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+  const markSeen = useCallback(() => {
+    setSeen(true)
+    AsyncStorage.setItem(CEREMONY_SEEN_KEY, '1').catch(() => {})
+  }, [])
+  return { seen, markSeen }
+}
 
 /** Día local 'YYYY-MM-DD' (mismo criterio que useDayRollover). */
 function todayLocalIso(): string {

@@ -22,8 +22,10 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { useCeremonySeen } from '@/features/celestial-soul'
 import { SoulRevealSync } from '@/features/celestial-soul/components/SoulRevealSync'
 import { SoulStageRevealHost } from '@/features/celestial-soul/components/SoulStageRevealHost'
+import { ConstellationCompletionReveal } from '@/features/revelations/components/ConstellationCompletionReveal'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
@@ -411,6 +413,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // (Regreso > Transformación > Patrón). Reemplaza al usePatternDetection
   // suelto: ahora T2/T3 + el nuevo T1 viven en un solo sistema.
   const { revelation, dismiss: dismissRevelation } = useRevelationOrchestrator(signLabel)
+  // Unlock del Alma Celeste: la CEREMONIA de la constelación (al cerrarla,
+  // markSeen). Secuencia: emblema 100% → ceremonia → Alma Celeste.
+  const { seen: ceremonySeen, markSeen: markCeremonySeen } = useCeremonySeen()
+  const dismissCeremony = useCallback(() => {
+    markCeremonySeen()
+    dismissRevelation()
+  }, [markCeremonySeen, dismissRevelation])
   // El % actual del emblema — la Revelación de Regreso lo muestra "donde lo
   // dejaste" (cacheado por useTransformProgress; misma fuente que el hero).
   const { progress: emblemProgress } = useTransformProgress()
@@ -791,12 +800,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             tarde en su primera apertura (el hero lo pinta en Skia, otro caché). */}
         <EmblemFramePreloader sign={sign} />
         {/* El Alma Celeste es la evolución POST-natal: solo despierta una vez que
-            la figura del emblema está COMPLETA (emblema 100%). Antes de eso no se
-            revelan nodos ni salta el momento de etapa — la usuaria sigue formando
-            su constelación natal. Gate de fase + signo real (nunca el default de
+            se VIO LA CEREMONIA de completar la constelación (emblema 100% →
+            ceremonia → Alma Celeste). Antes no se revelan nodos ni salta el
+            momento de etapa. Gate de ceremonia + signo real (nunca el default de
             zodiacFromDate(undefined)). */}
-        {profile?.date_of_birth && emblemProgress >= 100 ? <SoulRevealSync sign={sign} /> : null}
-        {profile?.date_of_birth && emblemProgress >= 100 ? (
+        {profile?.date_of_birth && ceremonySeen === true ? <SoulRevealSync sign={sign} /> : null}
+        {profile?.date_of_birth && ceremonySeen === true ? (
           <SoulStageRevealHost sign={sign} />
         ) : null}
         <TuEmblemaModal
@@ -814,7 +823,16 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           pinta según su tier: el EMBLEMA para Transformación Y para Regreso
           ("tu cielo te esperó" con tu emblema, no una figura anónima); la
           constelación de PatternReveal solo para los Patrones. */}
-        {revelation?.tier === 'transformation' ? (
+        {revelation?.tier === 'transformation' && Number(revelation.kind) === 100 ? (
+          // 100% = constelación COMPLETA → la gran ceremonia (paso 2 del arco),
+          // que reemplaza a la TransformationReveal simple en este hito. Al
+          // cerrarla, markSeen desbloquea el Alma Celeste.
+          <ConstellationCompletionReveal
+            sign={sign}
+            onContinue={dismissCeremony}
+            onClose={dismissCeremony}
+          />
+        ) : revelation?.tier === 'transformation' ? (
           <TransformationReveal
             sign={sign}
             threshold={Number(revelation.kind)}
