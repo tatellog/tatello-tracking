@@ -32,7 +32,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
-import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
+import { nextPhaseInfo, PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
@@ -929,10 +929,15 @@ function CycleSlide({
 }: {
   cycle: { day: number; phase: CyclePhase; length: number; daysToNext: number }
 }) {
-  // Soft projection, never a deterministic forecast ("unos" = estimate),
-  // consistent with the Progreso card.
+  // Muestra qué FASE viene (no "la próxima regla"), igual que la card de
+  // Progreso: así nunca contradice al header. Estando en el período, lo que
+  // viene es "primera mitad"; el conteo a la regla aparece solo en la fase
+  // previa (lútea → "tu período, en unos X días"), nunca encima de ella.
+  // Proyección suave ("unos" = estimado), nunca pronóstico determinista.
+  const next = nextPhaseInfo(cycle.day, cycle.length)
+  const nextLabel = PHASE_LABEL[next.phase].toLowerCase()
   const nextLine =
-    cycle.daysToNext <= 1 ? 'tu regla, pronto' : `tu regla, en unos ${cycle.daysToNext} días`
+    next.days <= 1 ? `${nextLabel}, pronto` : `${nextLabel}, en unos ${next.days} días`
 
   return (
     <View style={styles.slide}>
