@@ -44,14 +44,12 @@ export function mealTotals(ingredients: ScannedIngredient[]): {
 }
 
 /*
- * MOCK vs REAL — env-driven so going live is a config flip, not a code
- * change. Defaults to MOCK (safe): a missing/empty env never points the
- * app at a non-deployed function. To go live, set
- *   EXPO_PUBLIC_USE_MOCK_SCAN=false
- * in .env.local AFTER deploying the `scan-meal` function + its
- * OPENAI_API_KEY secret, then restart Expo.
+ * MOCK vs REAL — env-driven. Default REAL: el escáner ya está en vivo
+ * (edge function `scan-meal` deployado con su OPENAI_API_KEY). El mock
+ * quedó como OPT-IN para dev: poné EXPO_PUBLIC_USE_MOCK_SCAN=true para
+ * iterar sin pegarle a la función real. En producción no hace falta env.
  */
-const USE_MOCK_SCAN = process.env.EXPO_PUBLIC_USE_MOCK_SCAN !== 'false'
+const USE_MOCK_SCAN = process.env.EXPO_PUBLIC_USE_MOCK_SCAN === 'true'
 
 const SCAN_ERROR = 'No pudimos leer tu plato. Intenta de nuevo.'
 const SCAN_DELAY_MS = 1500
