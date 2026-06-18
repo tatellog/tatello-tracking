@@ -35,7 +35,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Todo suma',
-        body: 'Cada registro (movimiento, comida, sueño, agua, cómo te sentiste) alimenta tu universo. El peso es el norte, pero no domina: vive en contexto, no en el centro.',
+        body: 'Cada registro (movimiento, comida, sueño, agua, cómo te sentiste) alimenta tu universo. El peso es el norte, pero no domina la pantalla. Vive en contexto.',
       },
       {
         kind: 'list',
@@ -59,7 +59,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Las dimensiones',
-        body: 'Sueño, energía, movimiento, ciclo y emociones alimentan el motor de patrones. No son metas independientes: son las señales que explican qué sostiene o rompe tu constancia.',
+        body: 'Sueño, energía, movimiento, ciclo y emociones alimentan el motor de patrones. No son metas aparte. Son las señales que explican qué sostiene tu constancia, y qué la rompe.',
       },
       {
         kind: 'section',

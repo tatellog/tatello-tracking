@@ -77,7 +77,7 @@ export function transformationCopy(
 export const RETURN_COPY = {
   // Nunca abandono/fracaso/pérdida; "qué bueno verte" leía corporativo →
   // "Volviste" es más íntimo y es el término canónico del manifiesto.
-  message: 'Volviste. Todo lo que construiste te esperó aquí.',
+  message: 'Volviste. Tu cielo te esperó.',
   title: 'Volviste a tu cielo.',
 } as const
 

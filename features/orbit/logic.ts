@@ -297,13 +297,13 @@ export const DAILY_READING_VARIANTS: Record<DailyReadingCategory, readonly strin
   ],
   aligned: [
     'Tu día va tomando forma.',
-    'Hoy tu sistema se está escribiendo.',
+    'Hoy tu cielo apenas empieza a escribirse.',
     'Vas dejando señal. Sigue tu ritmo.',
   ],
   noSignal: [
     'Tu cielo está en calma, listo para encenderse.',
-    'Tu día apenas empieza. En cuanto registres algo, te leo.',
-    'Un cielo quieto antes del primer destello. Cuando quieras, empieza.',
+    'Tu día apenas empieza. En cuanto registres algo, aparece aquí.',
+    'Un cielo quieto, antes del primer destello. Aparece en cuanto registres.',
   ],
 }
 
