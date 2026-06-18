@@ -22,6 +22,8 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { SoulRevealSync } from '@/features/celestial-soul/components/SoulRevealSync'
+import { SoulStageRevealHost } from '@/features/celestial-soul/components/SoulStageRevealHost'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
@@ -788,6 +790,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         {/* Calienta el caché de RN Image del emblema para que el modal no se
             tarde en su primera apertura (el hero lo pinta en Skia, otro caché). */}
         <EmblemFramePreloader sign={sign} />
+        {/* Reconcilia el Alma Celeste "por día sostenido" (sin UI). Solo con
+            signo real — nunca con el default de zodiacFromDate(undefined). */}
+        {profile?.date_of_birth ? <SoulRevealSync sign={sign} /> : null}
+        {/* Momento de revelación al cruzar de etapa (Nacimiento → Despertada). */}
+        {profile?.date_of_birth ? <SoulStageRevealHost sign={sign} /> : null}
         <TuEmblemaModal
           visible={tuEmblemaOpen}
           onClose={() => setTuEmblemaOpen(false)}

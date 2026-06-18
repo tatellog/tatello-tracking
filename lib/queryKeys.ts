@@ -97,4 +97,12 @@ export const queryKeys = {
     history: (fromDate: string, toDate: string) => ['orbit', 'history', fromDate, toDate] as const,
     hasAny: () => ['orbit', 'hasAny'] as const,
   },
+  celestialSoul: {
+    all: ['celestialSoul'] as const,
+    // Nodos revelados del Alma Celeste por signo (un arte/node-map por signo).
+    reveals: (sign: string) => ['celestialSoul', 'reveals', sign] as const,
+    // Fuentes ya reveladas HOY (día local) — para el límite de 1 nodo/fuente/día.
+    revealsToday: (sign: string, day: string) =>
+      ['celestialSoul', 'revealsToday', sign, day] as const,
+  },
 } as const

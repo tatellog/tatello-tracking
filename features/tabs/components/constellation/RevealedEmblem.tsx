@@ -268,9 +268,22 @@ export type RevealedEmblemProps = {
   transformProgress: number
   /** Lado del lienzo cuadrado en px (canvasPx del padre). */
   size: number
+  /** Aro ornamental (arch.png). Default true. La ceremonia lo apaga: quiere
+   *  el animal limpio, sin marco/círculo. */
+  showArch?: boolean
+  /** Opacidad del animal (+ bloom). Default MASTER_OPACITY (0.45) — en Hoy el
+   *  emblema cede a la constelación. La ceremonia lo sube a pleno: ahí el
+   *  emblema ES el hero. */
+  emblemOpacity?: number
 }
 
-export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblemProps) {
+export function RevealedEmblem({
+  sign,
+  transformProgress,
+  size,
+  showArch = true,
+  emblemOpacity = MASTER_OPACITY,
+}: RevealedEmblemProps) {
   const frames = FRAMES_BY_SIGN[sign]
   const Glyph = GLYPH_BY_SIGN[sign]
   const animalSrc = frames ? frames[frameIndexFor(transformProgress)] : null
@@ -313,19 +326,21 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           RN con caché propio (calentado por LionFramePreloader), así el emblema
           NUNCA queda en blanco al cambiar de tab —el bug que tenía el useImage
           de Skia, que re-decodifica y devolvía null en la re-entrada—. */}
-      <Image
-        source={ARCH_SRC}
-        resizeMode="stretch"
-        fadeDuration={0}
-        style={{
-          position: 'absolute',
-          left: archX,
-          top: archY,
-          width: archW,
-          height: archH,
-          opacity: FRAME_OPACITY,
-        }}
-      />
+      {showArch ? (
+        <Image
+          source={ARCH_SRC}
+          resizeMode="stretch"
+          fadeDuration={0}
+          style={{
+            position: 'absolute',
+            left: archX,
+            top: archY,
+            width: archW,
+            height: archH,
+            opacity: FRAME_OPACITY,
+          }}
+        />
+      ) : null}
       <Image
         source={animalSrc}
         resizeMode="stretch"
@@ -336,7 +351,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           top: lionY,
           width: lionW,
           height: lionH,
-          opacity: MASTER_OPACITY,
+          opacity: emblemOpacity,
         }}
       />
 
@@ -344,7 +359,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           si aún no carga la textura, no hay bloom (jamás blanquea la figura). */}
       {bloomT > 0 && animalSkia ? (
         <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Group opacity={MASTER_OPACITY}>
+          <Group opacity={emblemOpacity}>
             <Group
               layer={
                 <Paint opacity={bloomT * BLOOM_MAX_OPACITY} blendMode="screen">

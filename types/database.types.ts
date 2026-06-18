@@ -549,6 +549,36 @@ export type Database = {
         }
         Relationships: []
       }
+      soul_node_reveals: {
+        Row: {
+          config_version: number
+          id: string
+          node_id: string
+          revealed_at: string
+          sign: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          config_version?: number
+          id?: string
+          node_id: string
+          revealed_at?: string
+          sign: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          config_version?: number
+          id?: string
+          node_id?: string
+          revealed_at?: string
+          sign?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       water_intake: {
         Row: {
           glasses: number

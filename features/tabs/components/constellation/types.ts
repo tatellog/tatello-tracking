@@ -59,6 +59,10 @@ export type Props = {
   /** DEV-only: dibuja una etiqueta junto a cada estrella (su nombre si lo
    *  tiene, si no su índice) para identificarlas al afinar posiciones. */
   showStarLabels?: boolean
+  /** Modo ceremonia: render LIMPIO, solo la constelación + el animal. Oculta
+   *  todo el chrome (chip DEV, "FIGURA BRILLA ENTERA", frame overlay) y el aro
+   *  ornamental del emblema (arch). Default false → Hoy/Órbita intactos. */
+  ceremonial?: boolean
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

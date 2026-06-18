@@ -579,6 +579,90 @@ function SettingsBody() {
             ) : null}
             {profile?.is_dev ? (
               <Pressable
+                onPress={() => router.push('/dev-soul-reveal')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV — ceremonia constelación completa
+                </Text>
+              </Pressable>
+            ) : null}
+            {profile?.is_dev ? (
+              <Pressable
+                onPress={() => router.push('/dev-celestial-soul')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV — Alma Celeste (preview)
+                </Text>
+              </Pressable>
+            ) : null}
+            {profile?.is_dev ? (
+              <Pressable
+                onPress={() => router.push('/alma-celeste')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ Alma Celeste (pantalla)
+                </Text>
+              </Pressable>
+            ) : null}
+            {profile?.is_dev ? (
+              <Pressable
                 onPress={() => router.push('/dev-revelations')}
                 accessibilityRole="button"
                 style={{

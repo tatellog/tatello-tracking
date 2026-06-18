@@ -122,6 +122,7 @@ export function LunarConstellation({
   pausedSV,
   transformProgressOverride,
   showStarLabels = false,
+  ceremonial = false,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -357,7 +358,13 @@ export function LunarConstellation({
             de la pantalla sin foco, nunca coexisten dos → ninguno se borra.
             useImage cachea las texturas: el remount al volver es inmediato. */}
         {hasEmblem && focused ? (
-          <RevealedEmblem sign={sign} transformProgress={transformProgress} size={canvasPx} />
+          <RevealedEmblem
+            sign={sign}
+            transformProgress={transformProgress}
+            size={canvasPx}
+            showArch={!ceremonial}
+            emblemOpacity={ceremonial ? 1 : undefined}
+          />
         ) : null}
         {/* Skeleton wrapped in Animated.View with `exiting` so it
             stays alive (fading out over 320 ms) while the real Svg
@@ -633,11 +640,11 @@ export function LunarConstellation({
             rounded bronze hairline on top of the SVG + Skia layers without
             forcing a rounded `overflow:hidden` clip over the separate Skia
             surfaces (the Android scroll-swim cause). Non-interactive. */}
-        <View style={styles.frameOverlay} pointerEvents="none" />
+        {ceremonial ? null : <View style={styles.frameOverlay} pointerEvents="none" />}
         {/* Chip DEV del emblema: muestra el progreso vigente y cada tap
             cicla real → 0 → 25 → 50 → 75 → 100 → real. Solo __DEV__:
             el porcentaje es debug, nunca producto. */}
-        {__DEV__ && hasEmblem ? (
+        {__DEV__ && hasEmblem && !ceremonial ? (
           <Pressable
             style={styles.devTransformChip}
             hitSlop={8}
@@ -674,7 +681,7 @@ export function LunarConstellation({
       {/* The reward — once the asterism is fully lit. Manifesto-safe:
           completing the FIGURE (achievable, rest-friendly), not the
           whole month. Days beyond read as "luz extra", never debt. */}
-      {figureComplete ? (
+      {figureComplete && !ceremonial ? (
         <View style={styles.completionCap}>
           <Text style={styles.completionLabel}>TU FIGURA BRILLA ENTERA</Text>
           <Text style={styles.completionPoem}>
