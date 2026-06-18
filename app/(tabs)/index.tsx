@@ -790,11 +790,15 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         {/* Calienta el caché de RN Image del emblema para que el modal no se
             tarde en su primera apertura (el hero lo pinta en Skia, otro caché). */}
         <EmblemFramePreloader sign={sign} />
-        {/* Reconcilia el Alma Celeste "por día sostenido" (sin UI). Solo con
-            signo real — nunca con el default de zodiacFromDate(undefined). */}
-        {profile?.date_of_birth ? <SoulRevealSync sign={sign} /> : null}
-        {/* Momento de revelación al cruzar de etapa (Nacimiento → Despertada). */}
-        {profile?.date_of_birth ? <SoulStageRevealHost sign={sign} /> : null}
+        {/* El Alma Celeste es la evolución POST-natal: solo despierta una vez que
+            la figura del emblema está COMPLETA (emblema 100%). Antes de eso no se
+            revelan nodos ni salta el momento de etapa — la usuaria sigue formando
+            su constelación natal. Gate de fase + signo real (nunca el default de
+            zodiacFromDate(undefined)). */}
+        {profile?.date_of_birth && emblemProgress >= 100 ? <SoulRevealSync sign={sign} /> : null}
+        {profile?.date_of_birth && emblemProgress >= 100 ? (
+          <SoulStageRevealHost sign={sign} />
+        ) : null}
         <TuEmblemaModal
           visible={tuEmblemaOpen}
           onClose={() => setTuEmblemaOpen(false)}

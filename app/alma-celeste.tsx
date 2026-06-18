@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { CelestialSoulView } from '@/features/celestial-soul/components/CelestialSoulView'
+import { RegionIcon } from '@/features/celestial-soul/components/RegionIcon'
 import { useSoulProgress } from '@/features/celestial-soul/hooks'
 import { AWAKENING_LABEL, stageForPct } from '@/features/celestial-soul/logic'
 import type { SoulRegionKey } from '@/features/celestial-soul/types'
@@ -89,9 +90,9 @@ function AlmaCelesteBody() {
                       style={[styles.regionRow, open && styles.regionRowOpen]}
                     >
                       <View style={styles.regionHead}>
-                        <View
-                          style={[styles.regionDot, { opacity: 0.25 + 0.75 * (r.pct / 100) }]}
-                        />
+                        <View style={[styles.regionIcon, { opacity: 0.3 + 0.7 * (r.pct / 100) }]}>
+                          <RegionIcon region={r.key} size={22} color={colors.oro} />
+                        </View>
                         <View style={styles.regionText}>
                           <Text style={styles.regionName}>{r.label}</Text>
                           <Text style={styles.regionMeaning} numberOfLines={open ? undefined : 1}>
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
   },
   regionRowOpen: { borderColor: colors.oro },
   regionHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  regionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.oro },
+  regionIcon: { width: 24, alignItems: 'center', justifyContent: 'center' },
   regionText: { flex: 1, minWidth: 0, gap: 3 },
   regionName: {
     fontFamily: typography.uiSemi,

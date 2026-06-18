@@ -17,7 +17,7 @@ import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, radius, spacing, typography } from '@/theme'
 
-import { useTransformProgress } from '../hooks'
+import { useAlmaCelesteHeadline } from '../hooks'
 import { dailyCoachLine } from '../logic'
 
 /* Emblema COMPACTO — el frame del % vigente (mismo arte que el hero y el modal
@@ -93,7 +93,6 @@ type Props = {
 export function TransformationCard({ compact = false }: Props) {
   const router = useRouter()
   const { data: profile } = useProfile()
-  const { progress } = useTransformProgress()
   const [open, setOpen] = useState(false)
   // Press feedback for the "Ver en Órbita" link (haptic off — openOrbita
   // already fires a selection tick).
@@ -103,6 +102,10 @@ export function TransformationCard({ compact = false }: Props) {
   // (capa de recompensa: jamás un spinner, jamás un placeholder); y la tarjeta
   // no existe hasta el primer hábito (progress 0 → el despertar se descubre).
   const sign = profile ? zodiacFromDate(profile.date_of_birth) : null
+  // Headline UNIFICADO por fase: `progress` es el número visible (emblema
+  // mientras la figura se forma; Alma Celeste tras completarla); `emblemPct`
+  // siempre alimenta el VISUAL de la figura (su formación real).
+  const { pct: progress, emblemPct } = useAlmaCelesteHeadline(sign ?? 'leo')
   if (sign == null || progress <= 0) return null
 
   // Semilla del día (medianoche local en días-epoch): estable todo el día,
@@ -126,7 +129,7 @@ export function TransformationCard({ compact = false }: Props) {
   if (compact) {
     return (
       <View style={styles.compact}>
-        <EyebrowLabel tone="magenta">Tu transformación</EyebrowLabel>
+        <EyebrowLabel tone="magenta">Tu Alma Celeste</EyebrowLabel>
 
         <View style={styles.compactRow}>
           {/* Texto: identidad + avance (Leo · 53%) y la voz del estado. La
@@ -157,12 +160,13 @@ export function TransformationCard({ compact = false }: Props) {
           </View>
 
           {/* El emblema compacto — el símbolo visible del crecimiento, brillando
-              más conforme se revela. */}
-          <CompactEmblem sign={sign} progress={progress} size={88} />
+              más conforme se revela. Sigue al emblema (formación real de la
+              figura), no al número de la fase. */}
+          <CompactEmblem sign={sign} progress={emblemPct} size={88} />
         </View>
 
         {/* Garantía anti-castigo: nada de lo revelado se pierde. */}
-        <Text style={styles.guarantee}>Tu transformación nunca retrocede.</Text>
+        <Text style={styles.guarantee}>Tu Alma Celeste nunca retrocede.</Text>
       </View>
     )
   }
@@ -170,11 +174,11 @@ export function TransformationCard({ compact = false }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <EyebrowLabel tone="magenta">Tu transformación</EyebrowLabel>
+        <EyebrowLabel tone="magenta">Tu Alma Celeste</EyebrowLabel>
         <Pressable
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel="Cómo funciona tu transformación"
+          accessibilityLabel="Cómo funciona tu Alma Celeste"
           accessibilityState={{ expanded: open }}
           onPress={toggleExplainer}
         >
@@ -188,13 +192,13 @@ export function TransformationCard({ compact = false }: Props) {
             {progress}
             <Text style={styles.pctSign}>%</Text>
           </Text>
-          <Text style={styles.pctCaption}>transformación{'\n'}revelada</Text>
+          <Text style={styles.pctCaption}>Alma Celeste{'\n'}revelada</Text>
         </View>
         <View style={styles.barZone}>
           <RevealBar progress={progress} />
         </View>
         <View style={styles.emblemMini}>
-          <CompactEmblem sign={sign} progress={progress} size={56} />
+          <CompactEmblem sign={sign} progress={emblemPct} size={56} />
         </View>
       </View>
 

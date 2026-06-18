@@ -12,6 +12,7 @@ import {
   SoulStageReveal,
 } from '@/features/celestial-soul'
 import { CelestialSoulView } from '@/features/celestial-soul/components/CelestialSoulView'
+import { RegionIcon } from '@/features/celestial-soul/components/RegionIcon'
 import { nextNodeForSource, stageForPct } from '@/features/celestial-soul/logic'
 import type { RevealSource } from '@/features/celestial-soul/types'
 import { SkyBackground } from '@/features/tabs/components'
@@ -74,7 +75,9 @@ function DevCelestialSoulScreen() {
           <View style={styles.regionList}>
             {progress.regions.map((r) => (
               <View key={r.key} style={styles.regionRow}>
-                <View style={[styles.regionDot, { opacity: 0.25 + 0.75 * (r.pct / 100) }]} />
+                <View style={[styles.regionIcon, { opacity: 0.3 + 0.7 * (r.pct / 100) }]}>
+                  <RegionIcon region={r.key} size={22} color={colors.oro} />
+                </View>
                 <View style={styles.regionText}>
                   <Text style={styles.regionName}>{r.label}</Text>
                   <Text style={styles.regionMeaning} numberOfLines={1}>
@@ -201,7 +204,7 @@ const styles = StyleSheet.create({
     borderColor: colors.oroHairlineSoft,
     backgroundColor: colors.bgCard,
   },
-  regionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.oro },
+  regionIcon: { width: 24, alignItems: 'center', justifyContent: 'center' },
   regionText: { flex: 1, minWidth: 0, gap: 3 },
   regionName: {
     fontFamily: typography.uiSemi,

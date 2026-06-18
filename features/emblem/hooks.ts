@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
+import { useSoulProgress } from '@/features/celestial-soul'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -70,6 +72,26 @@ export function useTransformProgress(): {
 
   const progress = Math.max(rawProgress, floor)
   return { progress, stage: stageForProgress(progress), isLoading: query.isLoading }
+}
+
+/*
+ * Headline UNIFICADO "Tu Alma Celeste" — el % por FASE (decisión del owner):
+ *   · figura natal formándose (emblema < 100) → el número es el del EMBLEMA;
+ *     ahí están todas hoy, así nada se rompe (solo cambia la marca).
+ *   · figura completa (emblema 100) → pasa al % de reveals del ALMA CELESTE.
+ * El VISUAL de la figura sigue SIEMPRE al emblema (su formación real); solo el
+ * número sigue a la fase. Así un mismo headline cubre el arco entero.
+ */
+export function useAlmaCelesteHeadline(sign: ZodiacSign): {
+  pct: number
+  emblemPct: number
+  soulPct: number
+  awakening: boolean
+} {
+  const { progress: emblemPct } = useTransformProgress()
+  const { progress: soul } = useSoulProgress(sign)
+  const awakening = emblemPct >= 100
+  return { pct: awakening ? soul.pct : emblemPct, emblemPct, soulPct: soul.pct, awakening }
 }
 
 /*

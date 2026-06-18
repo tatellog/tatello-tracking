@@ -16,7 +16,7 @@ import Svg, { Circle, Line, Path } from 'react-native-svg'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
-import { useTransformProgress } from '@/features/emblem'
+import { useAlmaCelesteHeadline } from '@/features/emblem'
 import { avatarUrl } from '@/features/profile/api'
 import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SkyBackground } from '@/features/tabs/components'
@@ -64,9 +64,11 @@ function ProfileBody() {
   const router = useRouter()
   const { data: profile } = useProfile()
   const uploadAvatar = useUploadAvatar()
-  const { progress: transformPct } = useTransformProgress()
 
   const sign = profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null
+  // Headline unificado por fase (emblema mientras la figura se forma → Alma
+  // Celeste al completarla). Sin signo aún → 'leo' (no se muestra igual).
+  const { pct: transformPct } = useAlmaCelesteHeadline(sign ?? 'leo')
   const signLabel = sign ? ZODIAC[sign].label : null
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const kicker = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join(' · ')
@@ -159,7 +161,7 @@ function ProfileBody() {
 
             {transformPct > 0 ? (
               <Text style={styles.transform}>
-                <Text style={styles.transformNum}>{transformPct}%</Text> de transformación
+                <Text style={styles.transformNum}>{transformPct}%</Text> del Alma Celeste
               </Text>
             ) : null}
           </Animated.View>

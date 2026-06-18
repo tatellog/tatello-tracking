@@ -15,7 +15,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
 import { track } from '@/lib/analytics'
-import { useTransformProgress } from '@/features/emblem'
+import { useAlmaCelesteHeadline } from '@/features/emblem'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { avatarUrl } from '@/features/profile/api'
 import { useDeleteAccount, useProfile } from '@/features/profile/hooks'
@@ -117,9 +117,12 @@ function SettingsBody() {
   // "resolved" as "not loading".
   const { data: targets, isLoading: targetsLoading } = useMacroTargets()
   const { goalMl } = useWaterGoal()
-  // % de transformación del emblema — la identidad CONSTRUIDA en Stelar, el
-  // dato emocional de la card de perfil (no la ficha médica).
-  const { progress: transformPct } = useTransformProgress()
+  // % del Alma Celeste (headline unificado por fase: emblema mientras la figura
+  // se forma → Alma Celeste al completarla) — el dato emocional de la card de
+  // perfil (no la ficha médica).
+  const { pct: transformPct } = useAlmaCelesteHeadline(
+    profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : 'leo',
+  )
 
   const [signingOut, setSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -750,7 +753,7 @@ function IdentityCard({
             </Text>
             {signAge ? <Text style={styles.identitySignAge}>{signAge}</Text> : null}
             {transformPct > 0 ? (
-              <Text style={styles.identityTransform}>{transformPct}% de transformación</Text>
+              <Text style={styles.identityTransform}>{transformPct}% del Alma Celeste</Text>
             ) : null}
           </View>
         </View>
