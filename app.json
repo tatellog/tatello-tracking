@@ -36,7 +36,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"]
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "bundler": "metro",
@@ -51,6 +51,20 @@
         "expo-camera",
         {
           "cameraPermission": "Permite a Stelar usar la cámara para tomar tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite a Stelar acceder a tus fotos para elegir tu foto de perfil, registrar tus comidas y tus fotos de progreso. Solo se usan dentro de la app y quedan privadas en tu cuenta."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Permite a Stelar acceder a tus fotos para tu foto de perfil y tus fotos de progreso.",
+          "savePhotosPermission": "Permite a Stelar guardar tus tarjetas de progreso en tu galería.",
+          "isAccessMediaLocationEnabled": false
         }
       ],
       "expo-web-browser"
