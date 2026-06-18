@@ -35,7 +35,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Todo suma',
-        body: 'Cada registro —movimiento, comida, sueño, agua, cómo te sentiste— alimenta tu universo. El peso es el norte, pero no domina: vive en contexto, no en el centro.',
+        body: 'Cada registro (movimiento, comida, sueño, agua, cómo te sentiste) alimenta tu universo. El peso es el norte, pero no domina: vive en contexto, no en el centro.',
       },
       {
         kind: 'list',
@@ -59,7 +59,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Las dimensiones',
-        body: 'Sueño, energía, movimiento, ciclo y emociones alimentan el motor de patrones. No son metas independientes: son las señales que explican qué sostiene —o rompe— tu constancia.',
+        body: 'Sueño, energía, movimiento, ciclo y emociones alimentan el motor de patrones. No son metas independientes: son las señales que explican qué sostiene o rompe tu constancia.',
       },
       {
         kind: 'section',
@@ -85,7 +85,7 @@ const DOCS: Record<string, Doc> = {
           },
           {
             q: '¿Por qué casi no veo mi peso?',
-            a: 'El peso es el objetivo, pero no domina la pantalla. Vive en Progreso y en tu perfil, como un indicador más — nunca como un número que te juzga cada día.',
+            a: 'El peso es el objetivo, pero no domina la pantalla. Vive en Progreso y en tu perfil, como un indicador más, nunca como un número que te juzga cada día.',
           },
           {
             q: '¿Qué pasa si fallo un día?',

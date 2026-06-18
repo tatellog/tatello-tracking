@@ -102,7 +102,7 @@ function ScoreRow({
   if (score.logged < MIN_LOGGED) {
     caption = 'Conforme registres, tus días se irán dibujando aquí.'
   } else if (score.reached === 0) {
-    caption = `Aún ninguno de los ${score.logged} días que registraste — cada uno cuenta.`
+    caption = `Aún ninguno de los ${score.logged} días que registraste. Cada uno cuenta.`
   } else {
     caption = `La alcanzaste ${score.reached} de los ${score.logged} días que registraste.`
   }

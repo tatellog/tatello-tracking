@@ -115,7 +115,7 @@ export const EMBLEM_STAGES: readonly EmblemStage[] = [
     message: 'Tu {sign} está completo. Has despertado algo propio.',
     lines: [
       'Tu {sign} está completo. Has despertado algo propio.',
-      'Completo — y nada de esto se reinicia.',
+      'Completo. Nada de esto se reinicia.',
     ],
     minPct: 100, // oro pleno + halo
   },

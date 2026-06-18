@@ -156,7 +156,7 @@ export default function SignUpScreen() {
             }
           />
           {passwordError ? (
-            <Text style={styles.helper}>Te faltan caracteres — mínimo 6.</Text>
+            <Text style={styles.helper}>Te faltan caracteres, mínimo 6.</Text>
           ) : null}
         </Animated.View>
 
