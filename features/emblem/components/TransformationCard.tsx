@@ -105,7 +105,7 @@ export function TransformationCard({ compact = false }: Props) {
   // Headline UNIFICADO por fase: `progress` es el número visible (emblema
   // mientras la figura se forma; Alma Celeste tras completarla); `emblemPct`
   // siempre alimenta el VISUAL de la figura (su formación real).
-  const { pct: progress, emblemPct } = useAlmaCelesteHeadline(sign ?? 'leo')
+  const { pct: progress, emblemPct, awakening } = useAlmaCelesteHeadline(sign ?? 'leo')
   if (sign == null || progress <= 0) return null
 
   // Semilla del día (medianoche local en días-epoch): estable todo el día,
@@ -120,6 +120,12 @@ export function TransformationCard({ compact = false }: Props) {
     Haptics.selectionAsync().catch(() => {})
     requestOrbitSegment('mes')
     router.navigate({ pathname: '/orbit' })
+  }
+  // Tras despertar, el link lleva a la pantalla del Alma Celeste (su casa); antes
+  // (fase natal) lleva a Órbita·Mes a ver la evolución de la constelación.
+  const openAlmaCeleste = () => {
+    Haptics.selectionAsync().catch(() => {})
+    router.navigate({ pathname: '/alma-celeste' })
   }
   const toggleExplainer = () => {
     Haptics.selectionAsync().catch(() => {})
@@ -145,15 +151,17 @@ export function TransformationCard({ compact = false }: Props) {
             <Pressable
               hitSlop={8}
               accessibilityRole="link"
-              accessibilityLabel="Ver tu evolución en Órbita"
-              accessibilityHint="Abre la línea de evolución"
-              onPress={openOrbita}
+              accessibilityLabel={awakening ? 'Ver tu Alma Celeste' : 'Ver tu evolución en Órbita'}
+              accessibilityHint={awakening ? 'Abre tu Alma Celeste' : 'Abre la línea de evolución'}
+              onPress={awakening ? openAlmaCeleste : openOrbita}
               onPressIn={orbitPress.onPressIn}
               onPressOut={orbitPress.onPressOut}
               style={styles.orbitLink}
             >
               <Animated.View style={[styles.orbitLinkRow, orbitPress.animatedStyle]}>
-                <Text style={styles.orbitLinkText}>Ver evolución</Text>
+                <Text style={styles.orbitLinkText}>
+                  {awakening ? 'Ver tu Alma Celeste' : 'Ver evolución'}
+                </Text>
                 <ChevronHint direction="right" size={16} color={colors.magenta} />
               </Animated.View>
             </Pressable>
