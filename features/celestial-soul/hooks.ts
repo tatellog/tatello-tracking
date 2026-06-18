@@ -10,7 +10,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { getSoulRevealIds, getSoulRevealSourcesSince, revealSoulNode } from './api'
 import { CONSISTENCY_MILESTONES, soulConfigForSign } from './config'
 import { computeSoulProgress, nextNodeForSource, sourcesToReveal, stageForPct } from './logic'
-import type { RevealSource, SoulStage } from './types'
+import type { RevealSource, SoulRegionDef, SoulRegionKey, SoulStage } from './types'
 
 const CEREMONY_SEEN_KEY = 'stelar.constellation.ceremony_seen'
 
@@ -215,9 +215,130 @@ export function useSoulStageReveal(sign: ZodiacSign) {
     if (stage.minPct > seenRef.current) {
       seenRef.current = stage.minPct
       AsyncStorage.setItem(key, String(stage.minPct)).catch(() => {})
-      setPending(stage)
+      // El 100% ("Despertada") lo celebra el FINAL reveal (todas las regiones),
+      // no el de etapa — así no salen dos momentos en el mismo hito.
+      if (stage.minPct < 100) setPending(stage)
     }
   }, [loaded, pct, key])
 
   return { stage: pending, dismiss: () => setPending(null) }
+}
+
+/*
+ * Cola de revelaciones de REGIÓN al 100% (Núcleo Despierto, etc.). Cuando una
+ * región cruza a 100%, entra a la cola y se muestra su momento. Sello local por
+ * signo (regiones ya celebradas). La primera evaluación con datos SIEMBRA las
+ * regiones ya-100 (no festeja retroactivo); de ahí en más solo las nuevas.
+ */
+export function useSoulRegionReveal(sign: ZodiacSign): {
+  region: SoulRegionDef | null
+  dismiss: () => void
+} {
+  const { progress, config, isFetched } = useSoulProgress(sign)
+  const key = `soul-regions-seen:${sign}`
+  const [queue, setQueue] = useState<SoulRegionKey[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const seenRef = useRef<Set<SoulRegionKey> | null>(null)
+  const seededRef = useRef(false)
+
+  useEffect(() => {
+    let active = true
+    setLoaded(false)
+    seenRef.current = null
+    seededRef.current = false
+    AsyncStorage.getItem(key)
+      .then((v) => {
+        if (!active) return
+        const stored: SoulRegionKey[] = v ? JSON.parse(v) : []
+        seenRef.current = new Set(stored)
+        setLoaded(true)
+      })
+      .catch(() => {
+        if (active) {
+          seenRef.current = new Set()
+          setLoaded(true)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [key])
+
+  useEffect(() => {
+    if (!loaded || !isFetched || seenRef.current === null) return
+    const now100 = progress.regions.filter((r) => r.pct >= 100).map((r) => r.key)
+    const persist = () =>
+      AsyncStorage.setItem(key, JSON.stringify([...seenRef.current!])).catch(() => {})
+    if (!seededRef.current) {
+      // primera evaluación con datos: sembrar lo ya-100 sin festejar
+      now100.forEach((k) => seenRef.current!.add(k))
+      persist()
+      seededRef.current = true
+      return
+    }
+    const fresh = now100.filter((k) => !seenRef.current!.has(k))
+    if (fresh.length) {
+      fresh.forEach((k) => seenRef.current!.add(k))
+      persist()
+      setQueue((q) => [...q, ...fresh])
+    }
+  }, [loaded, isFetched, progress.regions, key])
+
+  const region = queue.length ? (config.regions.find((d) => d.key === queue[0]) ?? null) : null
+  return { region, dismiss: () => setQueue((q) => q.slice(1)) }
+}
+
+/*
+ * Momento FINAL — las 6 regiones al 100% ("Tu Alma Celeste ha despertado").
+ * Se muestra una vez; sello local. Si ya estaba completo en la primera
+ * evaluación con datos, se siembra en silencio (no festeja retroactivo).
+ */
+export function useSoulFinalReveal(sign: ZodiacSign): { show: boolean; dismiss: () => void } {
+  const { progress, isFetched } = useSoulProgress(sign)
+  const key = `soul-final-seen:${sign}`
+  const [show, setShow] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const seenRef = useRef<boolean | null>(null)
+  const seededRef = useRef(false)
+
+  useEffect(() => {
+    let active = true
+    setLoaded(false)
+    seenRef.current = null
+    seededRef.current = false
+    AsyncStorage.getItem(key)
+      .then((v) => {
+        if (!active) return
+        seenRef.current = v === '1'
+        setLoaded(true)
+      })
+      .catch(() => {
+        if (active) {
+          seenRef.current = false
+          setLoaded(true)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [key])
+
+  useEffect(() => {
+    if (!loaded || !isFetched || seenRef.current === null) return
+    if (!seededRef.current) {
+      if (progress.fullyAwake) {
+        seenRef.current = true
+        AsyncStorage.setItem(key, '1').catch(() => {})
+      }
+      seededRef.current = true
+      return
+    }
+    if (progress.fullyAwake && !seenRef.current) {
+      seenRef.current = true
+      AsyncStorage.setItem(key, '1').catch(() => {})
+      setShow(true)
+    }
+  }, [loaded, isFetched, progress.fullyAwake, key])
+
+  return { show, dismiss: () => setShow(false) }
 }

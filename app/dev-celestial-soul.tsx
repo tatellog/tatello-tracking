@@ -9,6 +9,7 @@ import {
   computeSoulProgress,
   soulConfigForSign,
   SOURCE_ACTION,
+  SoulMoment,
   SoulStageReveal,
 } from '@/features/celestial-soul'
 import { CelestialSoulView } from '@/features/celestial-soul/components/CelestialSoulView'
@@ -27,6 +28,7 @@ function DevCelestialSoulScreen() {
   const [sign, setSign] = useState<ZodiacSign>('leo')
   const [revealed, setRevealed] = useState<string[]>([])
   const [stageRevealOpen, setStageRevealOpen] = useState(false)
+  const [momentPreview, setMomentPreview] = useState<'region' | 'final' | null>(null)
 
   const config = useMemo(() => soulConfigForSign(sign), [sign])
   const progress = useMemo(() => computeSoulProgress(config, new Set(revealed)), [config, revealed])
@@ -125,13 +127,27 @@ function DevCelestialSoulScreen() {
             </Pressable>
           </View>
 
-          {/* Previsualiza el momento de revelación de la etapa actual. */}
+          {/* Previsualiza los momentos de revelación. */}
           <Pressable
             onPress={() => setStageRevealOpen(true)}
             style={[styles.bigBtn, styles.bigBtnGhost, { marginTop: 10 }]}
           >
-            <Text style={styles.bigBtnGhostText}>Ver revelación · {stage.name}</Text>
+            <Text style={styles.bigBtnGhostText}>Ver etapa · {stage.name}</Text>
           </Pressable>
+          <View style={styles.row}>
+            <Pressable
+              onPress={() => setMomentPreview('region')}
+              style={[styles.bigBtn, styles.bigBtnGhost]}
+            >
+              <Text style={styles.bigBtnGhostText}>Ver región</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMomentPreview('final')}
+              style={[styles.bigBtn, styles.bigBtnGhost]}
+            >
+              <Text style={styles.bigBtnGhostText}>Ver final</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </SafeAreaView>
 
@@ -141,6 +157,27 @@ function DevCelestialSoulScreen() {
           revealedIds={revealed}
           stage={stage}
           onClose={() => setStageRevealOpen(false)}
+        />
+      ) : null}
+
+      {momentPreview === 'region' ? (
+        <SoulMoment
+          sign={sign}
+          revealedIds={revealed}
+          icon={<RegionIcon region={config.regions[0]!.key} size={30} color={colors.oro} />}
+          eyebrow={config.regions[0]!.label.toUpperCase()}
+          line={config.regions[0]!.revelation.line}
+          onClose={() => setMomentPreview(null)}
+        />
+      ) : null}
+
+      {momentPreview === 'final' ? (
+        <SoulMoment
+          sign={sign}
+          revealedIds={revealed}
+          eyebrow="TU ALMA CELESTE"
+          line="Ha despertado."
+          onClose={() => setMomentPreview(null)}
         />
       ) : null}
     </View>

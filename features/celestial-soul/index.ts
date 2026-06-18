@@ -1,13 +1,16 @@
 // API pública del feature Alma Celeste.
 export { CONSISTENCY_MILESTONES, SOUL_REGIONS, SOURCE_ACTION, soulConfigForSign } from './config'
 export { RegionIcon } from './components/RegionIcon'
+export { SoulMoment } from './components/SoulMoment'
+export { SoulMomentHost } from './components/SoulMomentHost'
 export { SoulRevealSync } from './components/SoulRevealSync'
 export { SoulStageReveal } from './components/SoulStageReveal'
-export { SoulStageRevealHost } from './components/SoulStageRevealHost'
 export {
   useCeremonySeen,
   useRevealSoulNode,
+  useSoulFinalReveal,
   useSoulProgress,
+  useSoulRegionReveal,
   useSoulRevealIds,
   useSoulRevealSync,
   useSoulRevealsTodaySources,

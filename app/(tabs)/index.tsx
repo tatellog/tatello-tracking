@@ -24,7 +24,7 @@ import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useCeremonySeen } from '@/features/celestial-soul'
 import { SoulRevealSync } from '@/features/celestial-soul/components/SoulRevealSync'
-import { SoulStageRevealHost } from '@/features/celestial-soul/components/SoulStageRevealHost'
+import { SoulMomentHost } from '@/features/celestial-soul/components/SoulMomentHost'
 import { ConstellationCompletionReveal } from '@/features/revelations/components/ConstellationCompletionReveal'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
@@ -805,9 +805,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             momento de etapa. Gate de ceremonia + signo real (nunca el default de
             zodiacFromDate(undefined)). */}
         {profile?.date_of_birth && ceremonySeen === true ? <SoulRevealSync sign={sign} /> : null}
-        {profile?.date_of_birth && ceremonySeen === true ? (
-          <SoulStageRevealHost sign={sign} />
-        ) : null}
+        {profile?.date_of_birth && ceremonySeen === true ? <SoulMomentHost sign={sign} /> : null}
         <TuEmblemaModal
           visible={tuEmblemaOpen}
           onClose={() => setTuEmblemaOpen(false)}

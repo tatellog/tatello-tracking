@@ -7,6 +7,8 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import EmblemHalo from '@/assets/zodiac-art/emblem-halo-frame.svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
+import { useSoulRevealIds } from '@/features/celestial-soul'
+import { CelestialSoulView } from '@/features/celestial-soul/components/CelestialSoulView'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useProfile } from '@/features/profile/hooks'
 import {
@@ -23,6 +25,28 @@ import { dailyCoachLine } from '../logic'
 /* Emblema COMPACTO — el frame del % vigente (mismo arte que el hero y el modal
  * "Tu {signo}"), brillante, sobre el aro/halo. No es la constelación gigante:
  * es el símbolo legible del crecimiento. Sin Skia (RN <Image>), barato. */
+/* La figura de la card por FASE: en despertar es el Alma Celeste con sus
+ * sistemas (figura + lo que ya despertó); en natal, el frame del emblema que se
+ * va formando. */
+function HeadlineFigure({
+  sign,
+  emblemPct,
+  awakening,
+  revealedIds,
+  size,
+}: {
+  sign: ZodiacSign
+  emblemPct: number
+  awakening: boolean
+  revealedIds: readonly string[]
+  size: number
+}) {
+  if (awakening) {
+    return <CelestialSoulView sign={sign} revealedIds={revealedIds} size={size} />
+  }
+  return <CompactEmblem sign={sign} progress={emblemPct} size={size} />
+}
+
 function CompactEmblem({
   sign,
   progress,
@@ -106,6 +130,9 @@ export function TransformationCard({ compact = false }: Props) {
   // mientras la figura se forma; Alma Celeste tras completarla); `emblemPct`
   // siempre alimenta el VISUAL de la figura (su formación real).
   const { pct: progress, emblemPct, awakening } = useAlmaCelesteHeadline(sign ?? 'leo')
+  // Nodos revelados del Alma Celeste — alimentan la figura de la card en fase
+  // despertar (en natal no se usan).
+  const { data: soulRevealIds } = useSoulRevealIds(sign ?? 'leo')
   if (sign == null || progress <= 0) return null
 
   // Semilla del día (medianoche local en días-epoch): estable todo el día,
@@ -167,10 +194,15 @@ export function TransformationCard({ compact = false }: Props) {
             </Pressable>
           </View>
 
-          {/* El emblema compacto — el símbolo visible del crecimiento, brillando
-              más conforme se revela. Sigue al emblema (formación real de la
-              figura), no al número de la fase. */}
-          <CompactEmblem sign={sign} progress={emblemPct} size={88} />
+          {/* La figura — emblema formándose (natal) o Alma Celeste con sus
+              sistemas (despertar). El frame sigue al emblema, no al número. */}
+          <HeadlineFigure
+            sign={sign}
+            emblemPct={emblemPct}
+            awakening={awakening}
+            revealedIds={soulRevealIds ?? []}
+            size={88}
+          />
         </View>
 
         {/* Garantía anti-castigo: nada de lo revelado se pierde. */}
@@ -206,7 +238,13 @@ export function TransformationCard({ compact = false }: Props) {
           <RevealBar progress={progress} />
         </View>
         <View style={styles.emblemMini}>
-          <CompactEmblem sign={sign} progress={emblemPct} size={56} />
+          <HeadlineFigure
+            sign={sign}
+            emblemPct={emblemPct}
+            awakening={awakening}
+            revealedIds={soulRevealIds ?? []}
+            size={56}
+          />
         </View>
       </View>
 
@@ -241,7 +279,7 @@ const UNIVERSE_RULES = [
   'Cada cuidado te transforma.',
   'Nada se resta: aquí solo se suma.',
   'Lo revelado nunca se esconde.',
-  'Tu transformación no se reinicia: es tuya.',
+  'Tu Alma Celeste no se reinicia: es tuya.',
 ] as const
 
 function Explainer() {
@@ -258,7 +296,7 @@ function Explainer() {
       <View style={styles.expRow}>
         <Text style={styles.expGlyph}>♌</Text>
         <Text style={styles.expBody}>
-          <Text style={styles.expTerm}>Tu emblema</Text> es transformación: escucha todos tus
+          <Text style={styles.expTerm}>Tu Alma Celeste</Text> es transformación: escucha todos tus
           hábitos y nunca se reinicia. Responde “¿en quién me estoy convirtiendo?”.
         </Text>
       </View>
