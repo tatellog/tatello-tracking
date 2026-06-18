@@ -216,10 +216,10 @@ export function TuHistoria() {
               <Text style={styles.label}>{r.label}</Text>
 
               <View style={styles.values}>
-                <Text style={styles.before}>{r.before ?? '—'}</Text>
+                <Text style={styles.before}>{r.before ?? '·'}</Text>
                 <Text style={styles.arrow}>→</Text>
                 <Text style={styles.now} numberOfLines={1}>
-                  {r.now ?? '—'}
+                  {r.now ?? '·'}
                   {r.now != null && r.unit ? <Text style={styles.unit}> {r.unit}</Text> : null}
                   {r.now != null && r.suffix ? (
                     <Text style={styles.suffix}> {r.suffix}</Text>

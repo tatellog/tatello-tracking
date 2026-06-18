@@ -50,7 +50,7 @@ function formatDateForCard(iso: string): string {
 }
 
 function formatDeltaForCard(kg: number | undefined): string {
-  if (kg == null) return '—'
+  if (kg == null) return '·'
   if (kg === 0) return '0.0'
   return `${kg < 0 ? '−' : '+'}${Math.abs(kg).toFixed(1)}`
 }

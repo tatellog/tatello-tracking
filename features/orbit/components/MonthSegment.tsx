@@ -147,14 +147,14 @@ export function MonthSegment() {
             <EvTile value={String(evidence.entrenos)} label="Entrenamientos" />
             <EvTile value={String(evidence.comidas)} label="Comidas" />
             <EvTile
-              value={evidence.sleepAvgMin != null ? (evidence.sleepAvgMin / 60).toFixed(1) : '—'}
+              value={evidence.sleepAvgMin != null ? (evidence.sleepAvgMin / 60).toFixed(1) : '·'}
               unit={evidence.sleepAvgMin != null ? 'h prom.' : undefined}
               label="Sueño"
               empty={evidence.sleepAvgMin == null}
             />
             <EvTile
               value={
-                evidence.waterAvg != null ? mlToLitresLabel(evidence.waterAvg * GLASS_ML) : '—'
+                evidence.waterAvg != null ? mlToLitresLabel(evidence.waterAvg * GLASS_ML) : '·'
               }
               unit={evidence.waterAvg != null ? 'L prom.' : undefined}
               label="Agua"

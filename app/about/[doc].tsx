@@ -25,7 +25,7 @@ const DOCS: Record<string, Doc> = {
     blocks: [
       {
         kind: 'lead',
-        text: 'Stelar no es una app de calorías. Es un acompañante para sostener la constancia, sin presión ni culpa.',
+        text: 'Stelar cuenta calorías y macros, pero no se queda en el número. Acompaña tu constancia, sin presión ni culpa.',
       },
       {
         kind: 'section',

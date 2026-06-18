@@ -111,7 +111,7 @@ export function MacroRing({
           />
         </Svg>
         <View style={styles.centerWrap} pointerEvents="none">
-          <Text style={styles.number}>—</Text>
+          <Text style={styles.number}>·</Text>
           <Text style={styles.label}>{label.toUpperCase()}</Text>
         </View>
       </View>

@@ -214,7 +214,7 @@ export default function WeightScreen() {
       <View style={styles.body}>
         {skip ? (
           <View style={styles.skipState}>
-            <Text style={styles.skipNumber}>—</Text>
+            <Text style={styles.skipNumber}>·</Text>
             <Text style={styles.skipUnit}>kg</Text>
           </View>
         ) : (

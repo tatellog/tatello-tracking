@@ -195,7 +195,7 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
             <Stat index={0} value={String(recap.entrenos)} label="Entrenos" />
             <Stat
               index={1}
-              value={recap.sleepAvgMin != null ? (recap.sleepAvgMin / 60).toFixed(1) : '—'}
+              value={recap.sleepAvgMin != null ? (recap.sleepAvgMin / 60).toFixed(1) : '·'}
               unit={recap.sleepAvgMin != null ? 'h' : undefined}
               label="Sueño prom."
               empty={recap.sleepAvgMin == null}
@@ -203,7 +203,7 @@ export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
             <Stat index={2} value={String(recap.meals)} label="Comidas" />
             <Stat
               index={3}
-              value={recap.waterAvg != null ? String(recap.waterAvg) : '—'}
+              value={recap.waterAvg != null ? String(recap.waterAvg) : '·'}
               unit={recap.waterAvg != null ? 'vasos' : undefined}
               label="Agua prom."
               empty={recap.waterAvg == null}

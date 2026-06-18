@@ -435,7 +435,7 @@ function synthDay(date: string, trained: boolean, today: string): CalendarDay {
 }
 
 function formatDelta(kg: number | undefined): string {
-  if (kg == null) return '—'
+  if (kg == null) return '·'
   if (kg === 0) return '0.0'
   const sign = kg < 0 ? '−' : '+'
   return `${sign}${Math.abs(kg).toFixed(1)}`

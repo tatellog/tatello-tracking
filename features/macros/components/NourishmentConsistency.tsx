@@ -49,7 +49,7 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
         {data.protein ? (
           <ScoreRow
             label="Proteína"
-            meaning="lo que sostiene tu músculo"
+            meaning="lo que tu cuerpo construye"
             score={data.protein}
             glyph={<ProteinGlyph />}
           />
@@ -58,7 +58,7 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
         )}
         <ScoreRow
           label="Agua"
-          meaning="lo que sostiene tu energía"
+          meaning="lo que mantiene tu claridad"
           score={data.agua}
           glyph={<AguaGlyph />}
         />

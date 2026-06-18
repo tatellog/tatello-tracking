@@ -27,7 +27,7 @@ const FOCUS_RECAP: Record<MonthlyFocus, string> = {
   weight: 'quieres bajar de peso',
   energy: 'quieres más energía',
   sleep: 'quieres dormir mejor',
-  food: 'quieres cambiar tu relación con la comida',
+  food: 'quieres entender cómo comes',
   cycle: 'quieres conocer tu ciclo',
   patterns: 'quieres entender tus patrones',
   mind: 'quieres calmar la mente',

@@ -60,7 +60,7 @@ const FOCUS_OPTIONS: readonly IntentOption[] = [
   {
     value: 'weight',
     label: 'Bajar de peso',
-    tagline: 'Stelar trabaja para que se sostenga.',
+    tagline: 'Lo que hagas, que dure.',
   },
   {
     value: 'energy',
@@ -70,7 +70,7 @@ const FOCUS_OPTIONS: readonly IntentOption[] = [
   {
     value: 'food',
     label: 'Entender cómo me alimento',
-    tagline: 'Qué se repite alrededor de comer.',
+    tagline: 'Ver qué pasa antes, durante y después de cada comida.',
   },
   { value: 'patterns', label: 'Entender mis patrones', tagline: 'Qué hace los viernes distintos.' },
   { value: 'other', label: 'Algo más', tagline: 'La nombras tú.' },
