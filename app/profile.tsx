@@ -68,7 +68,7 @@ function ProfileBody() {
   const sign = profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null
   // Headline unificado por fase (emblema mientras la figura se forma → Alma
   // Celeste al completarla). Sin signo aún → 'leo' (no se muestra igual).
-  const { pct: transformPct } = useAlmaCelesteHeadline(sign ?? 'leo')
+  const { pct: transformPct, awakening } = useAlmaCelesteHeadline(sign ?? 'leo')
   const signLabel = sign ? ZODIAC[sign].label : null
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const kicker = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join(' · ')
@@ -161,7 +161,8 @@ function ProfileBody() {
 
             {transformPct > 0 ? (
               <Text style={styles.transform}>
-                <Text style={styles.transformNum}>{transformPct}%</Text> del Alma Celeste
+                <Text style={styles.transformNum}>{transformPct}%</Text>{' '}
+                {awakening ? 'del Alma Celeste' : 'de transformación'}
               </Text>
             ) : null}
           </Animated.View>

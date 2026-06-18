@@ -120,7 +120,7 @@ function SettingsBody() {
   // % del Alma Celeste (headline unificado por fase: emblema mientras la figura
   // se forma → Alma Celeste al completarla) — el dato emocional de la card de
   // perfil (no la ficha médica).
-  const { pct: transformPct } = useAlmaCelesteHeadline(
+  const { pct: transformPct, awakening: transformAwakening } = useAlmaCelesteHeadline(
     profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : 'leo',
   )
 
@@ -275,6 +275,7 @@ function SettingsBody() {
                 name={profile?.display_name ?? 'Aún sin nombre'}
                 signAge={identityLine}
                 transformPct={transformPct}
+                transformAwakening={transformAwakening}
                 avatarUri={avatarUri}
                 zodiacSign={zodiacSign}
                 initial={initial}
@@ -713,6 +714,7 @@ function IdentityCard({
   name,
   signAge,
   transformPct,
+  transformAwakening,
   avatarUri,
   zodiacSign,
   initial,
@@ -721,6 +723,7 @@ function IdentityCard({
   name: string
   signAge: string
   transformPct: number
+  transformAwakening: boolean
   avatarUri: string | null
   zodiacSign: ZodiacSign | null
   initial: string
@@ -753,7 +756,9 @@ function IdentityCard({
             </Text>
             {signAge ? <Text style={styles.identitySignAge}>{signAge}</Text> : null}
             {transformPct > 0 ? (
-              <Text style={styles.identityTransform}>{transformPct}% del Alma Celeste</Text>
+              <Text style={styles.identityTransform}>
+                {transformPct}% {transformAwakening ? 'del Alma Celeste' : 'de transformación'}
+              </Text>
             ) : null}
           </View>
         </View>

@@ -30,7 +30,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Dos cielos',
-        body: 'Tu constelación responde al movimiento: crece cuando entrenas y empieza de nuevo cada mes. Tu emblema es transformación: escucha todos tus hábitos y nunca se reinicia.',
+        body: 'Tu constelación responde al movimiento: crece cuando entrenas y empieza de nuevo cada mes. Tu emblema es transformación: escucha todos tus hábitos y nunca se reinicia. Al completarse, se convierte en tu Alma Celeste.',
       },
       {
         kind: 'section',
@@ -69,7 +69,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Tu transformación',
-        body: 'El emblema se revela por etapas con todo lo que sostienes a lo largo del tiempo. Despacio, sin retroceder. Lo que construyes, queda.',
+        body: 'El emblema se revela por etapas con todo lo que sostienes a lo largo del tiempo. Despacio, sin retroceder. Al completarse, se convierte en tu Alma Celeste. Lo que construyes, queda.',
       },
     ],
   },

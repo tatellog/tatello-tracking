@@ -22,9 +22,6 @@ import { colors, radius, spacing, typography } from '@/theme'
 import { useAlmaCelesteHeadline } from '../hooks'
 import { dailyCoachLine } from '../logic'
 
-/* Emblema COMPACTO — el frame del % vigente (mismo arte que el hero y el modal
- * "Tu {signo}"), brillante, sobre el aro/halo. No es la constelación gigante:
- * es el símbolo legible del crecimiento. Sin Skia (RN <Image>), barato. */
 /* La figura de la card por FASE: en despertar es el Alma Celeste con sus
  * sistemas (figura + lo que ya despertó); en natal, el frame del emblema que se
  * va formando. */
@@ -47,6 +44,9 @@ function HeadlineFigure({
   return <CompactEmblem sign={sign} progress={emblemPct} size={size} />
 }
 
+/* Emblema COMPACTO — el frame del % vigente (mismo arte que el hero y el modal
+ * "Tu {signo}"), brillante, sobre el aro/halo. No es la constelación gigante:
+ * es el símbolo legible del crecimiento. Sin Skia (RN <Image>), barato. */
 function CompactEmblem({
   sign,
   progress,
@@ -162,7 +162,9 @@ export function TransformationCard({ compact = false }: Props) {
   if (compact) {
     return (
       <View style={styles.compact}>
-        <EyebrowLabel tone="magenta">Tu Alma Celeste</EyebrowLabel>
+        <EyebrowLabel tone="magenta">
+          {awakening ? 'Tu Alma Celeste' : 'Tu transformación'}
+        </EyebrowLabel>
 
         <View style={styles.compactRow}>
           {/* Texto: identidad + avance (Leo · 53%) y la voz del estado. La
@@ -206,7 +208,9 @@ export function TransformationCard({ compact = false }: Props) {
         </View>
 
         {/* Garantía anti-castigo: nada de lo revelado se pierde. */}
-        <Text style={styles.guarantee}>Tu Alma Celeste nunca retrocede.</Text>
+        <Text style={styles.guarantee}>
+          {awakening ? 'Tu Alma Celeste' : 'Tu transformación'} nunca retrocede.
+        </Text>
       </View>
     )
   }
@@ -214,11 +218,15 @@ export function TransformationCard({ compact = false }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <EyebrowLabel tone="magenta">Tu Alma Celeste</EyebrowLabel>
+        <EyebrowLabel tone="magenta">
+          {awakening ? 'Tu Alma Celeste' : 'Tu transformación'}
+        </EyebrowLabel>
         <Pressable
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel="Cómo funciona tu Alma Celeste"
+          accessibilityLabel={
+            awakening ? 'Cómo funciona tu Alma Celeste' : 'Cómo funciona tu transformación'
+          }
           accessibilityState={{ expanded: open }}
           onPress={toggleExplainer}
         >
@@ -232,7 +240,10 @@ export function TransformationCard({ compact = false }: Props) {
             {progress}
             <Text style={styles.pctSign}>%</Text>
           </Text>
-          <Text style={styles.pctCaption}>Alma Celeste{'\n'}revelada</Text>
+          <Text style={styles.pctCaption}>
+            {awakening ? 'Alma Celeste' : 'transformación'}
+            {'\n'}revelada
+          </Text>
         </View>
         <View style={styles.barZone}>
           <RevealBar progress={progress} />
@@ -279,7 +290,7 @@ const UNIVERSE_RULES = [
   'Cada cuidado te transforma.',
   'Nada se resta: aquí solo se suma.',
   'Lo revelado nunca se esconde.',
-  'Tu Alma Celeste no se reinicia: es tuya.',
+  'Tu transformación no se reinicia: es tuya.',
 ] as const
 
 function Explainer() {
@@ -296,8 +307,9 @@ function Explainer() {
       <View style={styles.expRow}>
         <Text style={styles.expGlyph}>♌</Text>
         <Text style={styles.expBody}>
-          <Text style={styles.expTerm}>Tu Alma Celeste</Text> es transformación: escucha todos tus
-          hábitos y nunca se reinicia. Responde “¿en quién me estoy convirtiendo?”.
+          <Text style={styles.expTerm}>Tu emblema</Text> es transformación: escucha todos tus
+          hábitos y nunca se reinicia, y al completarse despierta como tu Alma Celeste. Responde
+          “¿en quién me estoy convirtiendo?”.
         </Text>
       </View>
 
