@@ -16,7 +16,8 @@ import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
-import { CelebrateShockwave, HomeError } from '@/features/home/components'
+import { HomeError } from '@/features/home/components'
+import { emitCelebrate } from '@/features/tabs/celebrate-bus'
 import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
@@ -214,18 +215,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return () => clearTimeout(id)
   }, [celebrating])
 
-  // Defer the fullscreen CelebrateShockwave Skia Canvas off the first-paint
-  // + entering-stagger critical path (Hoy ya monta varias superficies Skia +
-  // dos SVG animados; sumar una 4ª pesa en la primera impresión). Se calienta
-  // en idle ~1.2 s después (su layout + Canvas pasan UNA vez, igual que antes,
-  // solo más tarde) — para entonces ya está listo antes de cualquier commit
-  // realista. Si la usuaria marca "Entrené" antes (celebrateKey > 0), se monta
-  // al instante, así el wash nunca llega tarde.
-  const [shockwaveReady, setShockwaveReady] = useState(false)
-  useEffect(() => {
-    const id = setTimeout(() => setShockwaveReady(true), 1200)
-    return () => clearTimeout(id)
-  }, [])
+  // El flash dorado full-screen ahora vive GLOBAL en el (tabs) layout
+  // (CelebrationOverlay) para cubrir también la barra de tabs; Hoy solo lo
+  // dispara por el bus (emitCelebrate) al marcar "Entrené".
 
   // Overrides locales optimistas por fecha (status que se aplica al instante
   // mientras la mutación viaja; convergen al refetch, se limpian en onError).
@@ -461,6 +453,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       // no Lottie → onAnimationFinish would never fire → stuck paused).
       if (!reducedMotion) setCelebrating(true)
       setCelebrateKey((k) => k + 1)
+      // Flash dorado full-screen (global, cubre la tab bar). El celebrateKey
+      // local sigue manejando el Lottie de fuegos sobre la constelación.
+      if (!reducedMotion) emitCelebrate()
       if (wasFirstDay) {
         qc.invalidateQueries({ queryKey: queryKeys.profile.all })
       }
@@ -773,16 +768,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             </Animated.View>
           </ScrollView>
         </SafeAreaView>
-        {/* Montaje DIFERIDO (no en el primer paint): el Canvas Skia + su
-          layout pasan UNA vez, pero ~1.2 s después (en idle) en vez de
-          competir con la primera impresión + el stagger de entrada. Para
-          entonces ya está caliente antes de cualquier commit; y si la
-          usuaria marca "Entrené" antes (celebrateKey > 0) se monta al
-          instante, así el wash nunca llega tarde. Invisible hasta que
-          `celebrateKey` sube y la timeline anima u → 1. */}
-        {!reducedMotion && (shockwaveReady || celebrateKey > 0) ? (
-          <CelebrateShockwave celebrateKey={celebrateKey} />
-        ) : null}
+        {/* El flash dorado full-screen vive global en el (tabs) layout
+            (CelebrationOverlay) para cubrir también la tab bar. */}
         {/* "Tu {signo}" — el modal de progreso de la constelación, abierto desde
             el hero. Lenguaje de Revelaciones (blur + emblema correcto de Hoy). */}
         {/* Calienta el caché de RN Image del emblema para que el modal no se

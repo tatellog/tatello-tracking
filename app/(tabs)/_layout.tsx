@@ -8,7 +8,7 @@ import Orbits from '@/assets/icons/orbits.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
-import { AppTabBar, UniverseDeltaToast } from '@/features/tabs/components'
+import { AppTabBar, CelebrationOverlay, UniverseDeltaToast } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
 /* Tab glyphs. Custom vector illustrations from `assets/icons/`:
@@ -128,6 +128,9 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
+      {/* Celebración full-screen ("Entrené") — DESPUÉS de <Tabs> para que el
+          flash dorado cubra toda la pantalla, incluyendo la barra de tabs. */}
+      <CelebrationOverlay />
       <BetaFeedbackButton />
       <UniverseDeltaToast />
     </View>

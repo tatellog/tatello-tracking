@@ -1,4 +1,5 @@
 export { AppTabBar } from './AppTabBar'
+export { CelebrationOverlay } from './CelebrationOverlay'
 export { CoachLine } from './CoachLine'
 export { DayCheckIn, type DayState } from './DayCheckIn'
 export { DaySky } from './DaySky'
