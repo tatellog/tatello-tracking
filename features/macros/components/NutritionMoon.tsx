@@ -162,11 +162,7 @@ function Sky({
           <SkiaRadialGradient
             c={vec(cx - R_MOON * 0.32, cy - R_MOON * 0.2)}
             r={R_MOON * 0.9}
-            colors={[
-              rgba(colors.oroLight, 0.3),
-              rgba(colors.magentaHot, 0.12),
-              rgba(colors.magenta, 0),
-            ]}
+            colors={[rgba('#C7D2E8', 0.22), rgba(colors.magentaHot, 0.12), rgba(colors.magenta, 0)]}
             positions={[0, 0.5, 1]}
           />
           <BlurMask blur={18} style="normal" />
@@ -179,7 +175,11 @@ function Sky({
           <SkiaRadialGradient
             c={vec(cx, cy)}
             r={R_MOON * 1.3}
-            colors={[rgba(colors.oroLight, 0.85), rgba('#E8956F', 0.4), rgba('#C2566A', 0)]}
+            colors={[
+              rgba(colors.oroLight, 0.55),
+              rgba(colors.magenta, 0.28),
+              rgba(colors.magenta, 0),
+            ]}
             positions={[0, 0.55, 1]}
           />
           <BlurMask blur={16} style="normal" />
@@ -193,6 +193,18 @@ function Sky({
           r={W * 0.62}
           colors={[rgba(colors.bg, 0), rgba(colors.bg, 0), rgba(colors.bg, 0.5)]}
           positions={[0, 0.62, 1]}
+        />
+      </SkiaRect>
+
+      {/* Top fade — la nebula se RECORTA en el borde superior del hero (overflow
+          hidden), dejando una costura dura contra el fondo de arriba (debajo de
+          "Comidas"). Este degradado funde ese borde hacia bg para que la nebula
+          ENTRE suave en vez de cortarse de golpe. */}
+      <SkiaRect x={0} y={0} width={W} height={HERO_H}>
+        <SkiaLinearGradient
+          start={vec(0, 0)}
+          end={vec(0, HERO_H * 0.4)}
+          colors={[rgba(colors.bg, 0.85), rgba(colors.bg, 0)]}
         />
       </SkiaRect>
 
@@ -284,9 +296,27 @@ function Moon({
             <SvgStop offset="0.88" stopColor={colors.bg} stopOpacity={0.22} />
             <SvgStop offset="1" stopColor={colors.bg} stopOpacity={0.55} />
           </SvgRadialGradient>
+          {/* Enfría el sepia de la foto: lavado plata-azul, más frío al centro
+              y soltándose al borde (para no aplanar la textura). Es lo que
+              neutraliza el ámbar/marrón sin tocar el asset. */}
+          <SvgRadialGradient id="nm-moon-cool" cx="42%" cy="40%" r="62%">
+            <SvgStop offset="0" stopColor="#C7D2E8" stopOpacity={0.42} />
+            <SvgStop offset="0.6" stopColor="#9FB0D8" stopOpacity={0.3} />
+            <SvgStop offset="1" stopColor="#6F7BA8" stopOpacity={0.2} />
+          </SvgRadialGradient>
         </SvgDefs>
-        <SvgCircle cx={MOON_BOX / 2} cy={MOON_BOX / 2} r={R_MOON} fill={rgba('#A6164A', 0.2)} />
-        <SvgCircle cx={MOON_BOX / 2} cy={MOON_BOX / 2} r={R_MOON} fill={rgba(colors.bg, 0.1)} />
+        {/* 1) baja la saturación del ocre con el negro warm del fondo */}
+        <SvgCircle cx={MOON_BOX / 2} cy={MOON_BOX / 2} r={R_MOON} fill={rgba(colors.bg, 0.28)} />
+        {/* 2) lavado frío plata-azul — el que mata el amarillo */}
+        <SvgCircle cx={MOON_BOX / 2} cy={MOON_BOX / 2} r={R_MOON} fill="url(#nm-moon-cool)" />
+        {/* 3) beso magenta de marca, muy tenue (sobre disco ya frío lee malva, no barro) */}
+        <SvgCircle
+          cx={MOON_BOX / 2}
+          cy={MOON_BOX / 2}
+          r={R_MOON}
+          fill={rgba(colors.magenta, 0.1)}
+        />
+        {/* 4) feather del borde hacia la atmósfera */}
         <SvgCircle cx={MOON_BOX / 2} cy={MOON_BOX / 2} r={R_MOON} fill="url(#nm-moon-feather)" />
       </Svg>
     </Animated.View>

@@ -1,28 +1,26 @@
-import { useRef } from 'react'
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
+import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
+
+import StelarIcon from '@/assets/stelar-icon.png'
+import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
+
 // Same 9:16 frame as ProgressShareCard so the captured PNG lives in
-// the same visual language across the share-sheet carousel.
+// the same visual language across the share-sheet tabs.
 export const TRAINING_CARD_W = 320
 export const TRAINING_CARD_H = Math.round((TRAINING_CARD_W * 16) / 9)
 
-export type TrainingShareVariant = 'momento' | 'cifra' | 'sello'
-
-/** The carousel's variants for the entreno flow, in order. */
-export const TRAINING_SHARE_VARIANTS: { id: TrainingShareVariant; label: string }[] = [
-  { id: 'momento', label: 'Momento' },
-  { id: 'cifra', label: 'Cifra' },
-  { id: 'sello', label: 'Sello' },
-]
+export type TrainingShareVariant = 'constelacion' | 'momento' | 'progreso'
 
 // Seeded starfield with three brightness tiers — the celestial bed
-// that lives behind every shareable STELAR card. The brightest tier
-// (o > 0.36) gets a bloom halo, echoing the "today" moon of CycleRing.
+// behind every shareable STELAR card. The brightest tier (o > 0.36)
+// gets a bloom halo.
 const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
   const arr: { x: number; y: number; r: number; o: number }[] = []
   let s = 77119
@@ -44,52 +42,86 @@ const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
   return arr
 })()
 
-// Pre-split the brightest stars so the bloom layer only paints those.
 const BLOOM_STARS = CARD_STARS.filter((st) => st.o > 0.36)
+
+// Capa de grano para dithering — rompe los escalones de 8-bit de los glows
+// (la "línea"/banding) sin leerse como estrellas. Mismo truco que en las
+// tarjetas de cambio visual.
+const CARD_GRAIN: { x: number; y: number; r: number; o: number }[] = (() => {
+  const arr: { x: number; y: number; r: number; o: number }[] = []
+  let s = 51217
+  const rand = () => {
+    s = (s * 1664525 + 1013904223) % 4294967296
+    return s / 4294967296
+  }
+  for (let i = 0; i < 520; i += 1) {
+    arr.push({
+      x: rand() * TRAINING_CARD_W,
+      y: rand() * TRAINING_CARD_H,
+      r: 0.4 + rand() * 0.55,
+      o: 0.014 + rand() * 0.045,
+    })
+  }
+  return arr
+})()
 
 type Props = {
   variant: TrainingShareVariant
-  /** Local file URI of the just-captured workout photo. */
-  photoUri: string
-  /** Number of trained days within the current 28-day cycle. */
-  dayCount: number
+  /** Local file URI of the just-captured workout photo (Momento). */
+  photoUri: string | null
+  /** Abre el selector de foto desde el estado vacío de Momento. */
+  onAddPhoto?: () => void
   /** Sign key — drives the celestial glyph (GLYPH_BY_SIGN). */
   sign: ZodiacSign
-  /** "Tu Leo", "Tu Acuario"… — the user's sign label. */
+  /** "ESCORPIO" — el nombre del signo en mayúsculas. */
   signLabel: string
-  /** One short serif-italic line in the coach voice. */
+  /** Días encendidos en el ciclo (grid_28_days). */
+  dayCount: number
+  /** 0..100 — fracción de la constelación revelada. */
+  revealedPct: number
+  /** "Próxima estrella DÍA X" — null cuando la figura ya está completa. */
+  nextStarDay: number | null
+  /** "Junio 2026". */
+  monthLabel: string
+  /** Entrenos del mes civil. */
+  workoutsThisMonth: number
+  /** Días activos del ciclo (= dayCount). */
+  activeDays: number
+  /** Peso inicial / actual — null oculta la fila (sin datos falsos). */
+  weightFrom: number | null
+  weightTo: number | null
+  /** Una línea corta en voz de coach (serif italic). */
   coachCopy: string
-  /** Fires once the photo has settled — gates the capture. */
+  /** Fondo elegido en la fila "ESTILO". */
+  cardStyle?: ShareCardStyle
+  /** Fires once the card has settled — gates the capture. */
   onReady: () => void
 }
 
-/* The single workout-photo frame, shared across variants and always
- * 4:5 so the body is never cropped (manifesto: no body-cropping).
- *
- * The photo is shown in `contain` so nothing is clipped; to avoid dead
- * letterbox bars, the same photo sits behind it blurred + `cover` under
- * a dark scrim, so the bars read as a soft bokeh extension of the shot.
- *
- * The chip says "HOY" — the only timestamp the card needs, since the
- * entreno is by definition today's moment. `halo` adds the single soft
- * magenta glow that makes the photo the hero of its variant. */
+/* El marco de la foto del entreno, 4:5 para no recortar el cuerpo
+ * (manifiesto). La foto va en `contain`; detrás, la misma foto difuminada
+ * + scrim llena el letterbox para que no haya barras muertas. */
 function PhotoFrame({
   uri,
   halo,
+  accent,
   onSettled,
 }: {
   uri: string
-  /** When true, the frame carries a soft magenta halo (its variant's hero). */
   halo?: boolean
+  accent?: string
   onSettled: () => void
 }) {
   return (
-    <View style={[styles.frame, halo && styles.frameHalo]}>
-      {/* Blurred cover backdrop — fills the letterbox so contain has no
-          dead bars. */}
+    <View
+      style={[
+        styles.frame,
+        halo && styles.frameHalo,
+        halo && accent ? { shadowColor: accent } : null,
+      ]}
+    >
       <Image source={{ uri }} style={styles.imgBackdrop} resizeMode="cover" blurRadius={18} />
       <View style={styles.imgScrim} />
-      {/* The real, uncropped photo. */}
       <Image
         source={{ uri }}
         style={styles.img}
@@ -104,36 +136,84 @@ function PhotoFrame({
   )
 }
 
-/*
- * The shareable training card — a 9:16 Instagram-story image. Three
- * variants share the celestial bed + brand but rearrange the same
- * pieces (photo, day, sign, coach line). Each variant has ONE hero and
- * keeps magenta to ≤2 accents (brand ✦ + the hero's single touch):
- *
- *   momento — the photo is the hero: large 4:5 with a soft magenta halo.
- *             Sign in leche, day as a quiet gold eyebrow.
- *   cifra   — the count is the hero: magenta number, gold "DÍA" eyebrow.
- *             Photo is a smaller 4:5 with a gold (not magenta) frame.
- *   sello   — the sign is the hero, rendered in serif italic leche with a
- *             gold glow (no magenta on the sign). Photo medium 4:5 keeps
- *             the lone second magenta as a soft halo.
- */
-/* The sign's celestial glyph in oro — a small, delicate mark. The line
- * symbol is minimal, so it reads as an intentional crown at a small size
- * but looks crude blown up; keep it compact on every variant (the hero
- * is the photo / number / the big LEO text, not the glyph). */
 function SignGlyph({ sign, size }: { sign: ZodiacSign; size: number }) {
   const Glyph = GLYPH_BY_SIGN[sign]
   return <Glyph width={size} height={size} color={colors.oro} />
 }
 
+/* La cama celeste compartida — dos glows radiales suaves (2 stops, sin filo
+ * de disco) + grano + el campo de estrellas. El glow superior toma el color
+ * del estilo; el inferior es un oro tenue. Misma técnica anti-banding que
+ * las tarjetas de cambio visual. */
+function CelestialBed({ cardStyle }: { cardStyle: ShareCardStyle }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} width={TRAINING_CARD_W} height={TRAINING_CARD_H}>
+      <Defs>
+        <RadialGradient id="tsc-glow" cx="72%" cy="8%" r="100%">
+          <Stop offset="0" stopColor={cardStyle.nebulaColor} stopOpacity={cardStyle.nebulaAlpha} />
+          <Stop offset="1" stopColor={cardStyle.nebulaColor} stopOpacity={0} />
+        </RadialGradient>
+        <RadialGradient id="tsc-oro" cx="16%" cy="32%" r="85%">
+          <Stop offset="0" stopColor={colors.oro} stopOpacity={0.05} />
+          <Stop offset="1" stopColor={colors.oro} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect width={TRAINING_CARD_W} height={TRAINING_CARD_H} fill="url(#tsc-glow)" />
+      <Rect width={TRAINING_CARD_W} height={TRAINING_CARD_H} fill="url(#tsc-oro)" />
+      {CARD_GRAIN.map((g, i) => (
+        <Circle key={`g-${i}`} cx={g.x} cy={g.y} r={g.r} fill={colors.leche} opacity={g.o} />
+      ))}
+      {BLOOM_STARS.map((st, i) => (
+        <Circle
+          key={`bloom-${i}`}
+          cx={st.x}
+          cy={st.y}
+          r={st.r * 2.6}
+          fill={colors.leche}
+          opacity={st.o * 0.18}
+        />
+      ))}
+      {CARD_STARS.map((st, i) => (
+        <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
+      ))}
+    </Svg>
+  )
+}
+
+function Brand() {
+  return (
+    <View style={styles.brand}>
+      <Image source={StelarIcon} style={styles.brandIcon} resizeMode="contain" />
+      <Text style={styles.brandWord}>STELAR</Text>
+    </View>
+  )
+}
+
+/*
+ * La tarjeta compartible del entreno — una imagen 9:16 para Stories. Tres
+ * formatos comparten la cama celeste + la marca, pero reordenan las piezas:
+ *
+ *   constelacion — la constelación parcialmente revelada es la heroína:
+ *                  signo, % revelado y próxima estrella.
+ *   momento      — la foto del entreno es la heroína; signo, día y % al pie.
+ *   progreso     — las cifras del mes: días de movimiento, entrenos, peso.
+ */
 export function TrainingShareCard({
   variant,
   photoUri,
-  dayCount,
+  onAddPhoto,
   sign,
   signLabel,
+  dayCount,
+  revealedPct,
+  nextStarDay,
+  monthLabel,
+  workoutsThisMonth,
+  activeDays,
+  weightFrom,
+  weightTo,
   coachCopy,
+  cardStyle = DEFAULT_SHARE_STYLE,
   onReady,
 }: Props) {
   const settled = useRef(false)
@@ -143,102 +223,115 @@ export function TrainingShareCard({
     onReady()
   }
 
-  const signUpper = signLabel.toUpperCase()
-  // Public fraction removed — "N / 28" reads as a comparative goal /
-  // countdown, which the manifesto forbids. Day stands on its own.
-  const dayLine = `DÍA ${dayCount}`
+  // Las tarjetas sin contenido asíncrono (constelacion, progreso, y momento
+  // sin foto) asientan al montar; momento con foto asienta en onLoad.
+  const hasPhoto = !!photoUri
+  useEffect(() => {
+    if (variant !== 'momento' || !hasPhoto) handleSettled()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant, hasPhoto])
+
+  const hasConstellation = dayCount > 0
+
+  // El acento sigue el estilo: magenta por defecto, glow del estilo en
+  // Oro/Índigo para no chocar con el fondo.
+  const accent =
+    cardStyle.id === 'oro' || cardStyle.id === 'indigo' ? cardStyle.glow : colors.magenta
 
   return (
-    <View style={styles.card}>
-      {/* Celestial bed — two asymmetric radial glows for depth. */}
-      <Svg style={StyleSheet.absoluteFill} width={TRAINING_CARD_W} height={TRAINING_CARD_H}>
-        <Defs>
-          {/* Magenta wash, top-right. */}
-          <RadialGradient id="tsc-magenta" cx="72%" cy="16%" r="62%">
-            <Stop offset="0" stopColor={colors.magenta} stopOpacity="0.20" />
-            <Stop offset="0.6" stopColor={colors.magentaDeep} stopOpacity="0.06" />
-            <Stop offset="1" stopColor={colors.magentaDeep} stopOpacity="0" />
-          </RadialGradient>
-          {/* Gold wash, low-left — the observatory light. */}
-          <RadialGradient id="tsc-oro" cx="20%" cy="30%" r="60%">
-            <Stop offset="0" stopColor={colors.oro} stopOpacity="0.07" />
-            <Stop offset="1" stopColor={colors.oro} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Rect width={TRAINING_CARD_W} height={TRAINING_CARD_H} fill="url(#tsc-magenta)" />
-        <Rect width={TRAINING_CARD_W} height={TRAINING_CARD_H} fill="url(#tsc-oro)" />
+    <View style={[styles.card, { backgroundColor: cardStyle.bg }]}>
+      <CelestialBed cardStyle={cardStyle} />
+      <Brand />
 
-        {/* Bloom under the brightest stars (drawn first, below the body). */}
-        {BLOOM_STARS.map((st, i) => (
-          <Circle
-            key={`bloom-${i}`}
-            cx={st.x}
-            cy={st.y}
-            r={st.r * 2.6}
-            fill={colors.leche}
-            opacity={st.o * 0.18}
-          />
-        ))}
-        {CARD_STARS.map((st, i) => (
-          <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
-        ))}
-      </Svg>
+      {variant === 'constelacion' ? (
+        <View style={styles.middle}>
+          <Text style={styles.signTitle}>{signLabel}</Text>
+          {hasConstellation ? (
+            <Text style={[styles.revealLine, { color: accent }]}>{revealedPct}% REVELADO</Text>
+          ) : null}
 
-      <View style={styles.brand}>
-        <Text style={styles.brandStar}>✦</Text>
-        <Text style={styles.brandWord}>STELAR</Text>
-      </View>
-
-      {variant === 'momento' ? (
-        <>
-          <View style={styles.middle}>
-            {/* Capped width so the 4:5 photo's height leaves room for the
-                brand, meta and coach — at full width it overflowed up over
-                the STELAR title. */}
-            <View style={styles.momentoPhoto}>
-              <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
-            </View>
-            <View style={styles.meta}>
-              <SignGlyph sign={sign} size={30} />
-              <Text style={styles.dayEyebrow}>{dayLine}</Text>
-              <Text style={styles.signMd}>{signUpper}</Text>
+          <View style={styles.constellationWrap}>
+            <View style={styles.emblemBox}>
+              <ZodiacArt sign={sign} size={184} halo="soft" />
             </View>
           </View>
+          {!hasConstellation ? (
+            <Text style={styles.emptyConstellation}>
+              Tu constelación empieza con tu próximo entrenamiento.
+            </Text>
+          ) : null}
+
+          {hasConstellation && nextStarDay != null ? (
+            <View style={styles.nextStar}>
+              <Text style={styles.eyebrowGold}>Próxima estrella</Text>
+              <Text style={styles.nextStarDay}>DÍA {nextStarDay}</Text>
+            </View>
+          ) : null}
+
           <Text style={styles.coach}>{coachCopy}</Text>
-        </>
-      ) : variant === 'cifra' ? (
-        <>
-          <View style={styles.middle}>
-            <View style={styles.countBlock}>
-              <Text style={styles.dayEyebrow}>DÍA</Text>
-              <Text style={styles.countHuge}>{dayCount}</Text>
-            </View>
-            <View style={styles.cifraSign}>
-              <SignGlyph sign={sign} size={24} />
-              <Text style={styles.signEyebrow}>{signUpper}</Text>
-            </View>
-            <View style={styles.cifraPhoto}>
-              <PhotoFrame uri={photoUri} onSettled={handleSettled} />
-            </View>
-          </View>
-          <Text style={styles.coach}>{coachCopy}</Text>
-        </>
+        </View>
+      ) : variant === 'momento' ? (
+        <View style={styles.middle}>
+          {hasPhoto ? (
+            <>
+              <View style={styles.momentoPhoto}>
+                <PhotoFrame uri={photoUri!} halo accent={accent} onSettled={handleSettled} />
+              </View>
+              <View style={styles.meta}>
+                <SignGlyph sign={sign} size={28} />
+                <Text style={styles.eyebrowGold}>DÍA {dayCount}</Text>
+                <Text style={styles.signMd}>{signLabel}</Text>
+                {revealedPct > 0 ? (
+                  <Text style={[styles.revealSmall, { color: accent }]}>
+                    {revealedPct}% REVELADO
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.coach}>{coachCopy}</Text>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={styles.photoEmpty}
+              activeOpacity={0.8}
+              onPress={onAddPhoto}
+              accessibilityRole="button"
+              accessibilityLabel="Agregar una foto"
+            >
+              <Text style={styles.photoEmptyStar}>✦</Text>
+              <Text style={styles.photoEmptyText}>Agrega una foto para compartir tu momento.</Text>
+              {onAddPhoto ? <Text style={styles.photoEmptyCta}>Agregar foto</Text> : null}
+            </TouchableOpacity>
+          )}
+        </View>
       ) : (
-        <>
-          <View style={styles.middle}>
-            <View style={styles.sealHeader}>
-              <SignGlyph sign={sign} size={30} />
-              <Text style={styles.eyebrowMd}>TU</Text>
-              <Text style={styles.signHuge}>{signLabel.toUpperCase().replace('TU ', '')}</Text>
-              <Text style={styles.dayEyebrow}>{dayLine}</Text>
-            </View>
-            <View style={styles.sealPhoto}>
-              <PhotoFrame uri={photoUri} halo onSettled={handleSettled} />
-            </View>
+        <View style={styles.middle}>
+          <View style={styles.progressHero}>
+            <Text style={[styles.heroNum, { color: accent }]}>{activeDays}</Text>
+            <Text style={styles.heroLabel}>DÍAS DE MOVIMIENTO</Text>
           </View>
+
+          <Text style={styles.monthLine}>{monthLabel}</Text>
+
+          <View style={styles.statList}>
+            <StatRow label="Entrenos este mes" value={`${workoutsThisMonth}`} />
+            <StatRow label="Días activos" value={`+${activeDays}`} />
+            {weightFrom != null && weightTo != null ? (
+              <StatRow label="Peso" value={`${weightFrom} → ${weightTo} kg`} />
+            ) : null}
+          </View>
+
           <Text style={styles.coach}>{coachCopy}</Text>
-        </>
+        </View>
       )}
+    </View>
+  )
+}
+
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statRow}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
     </View>
   )
 }
@@ -252,27 +345,18 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 26,
     justifyContent: 'space-between',
-    // Clip any content to the card bounds (belt-and-suspenders against a
-    // tall photo bleeding past the edge).
     overflow: 'hidden',
-  },
-  // Momento's photo — capped width so its 4:5 height fits with room for
-  // the brand/meta/coach. The hero is still clearly the photo.
-  momentoPhoto: {
-    width: '80%',
-    alignSelf: 'center',
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
-    // Stay above the middle block so a tall photo never covers the title.
     zIndex: 2,
     justifyContent: 'center',
-    gap: 7,
+    gap: 8,
   },
-  brandStar: {
-    fontSize: typography.sizes.label,
-    color: colors.magenta,
+  brandIcon: {
+    width: 24,
+    height: 24,
   },
   brandWord: {
     fontFamily: typography.displayHeavy,
@@ -283,11 +367,160 @@ const styles = StyleSheet.create({
   middle: {
     flex: 1,
     justifyContent: 'center',
-    gap: 22,
+    alignItems: 'center',
   },
-  // The workout photo — a fixed 4:5 frame across variants so the body is
-  // never cropped. A gold hairline keeps the edge quiet; the magenta voice
-  // lives only in the optional halo (the hero's single accent).
+  // ── constelacion ───────────────────────────────────────────────────
+  signTitle: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.segmentTitle,
+    letterSpacing: 4,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  revealLine: {
+    marginTop: 6,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    letterSpacing: 2.2,
+    color: colors.magenta,
+  },
+  constellationWrap: {
+    marginVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emblemBox: {
+    width: 184,
+    height: 184,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  emptyConstellation: {
+    marginVertical: 40,
+    paddingHorizontal: 18,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.niebla,
+    textAlign: 'center',
+  },
+  nextStar: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  nextStarDay: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.title,
+    letterSpacing: 2,
+    color: colors.leche,
+  },
+  // ── momento ────────────────────────────────────────────────────────
+  momentoPhoto: {
+    width: '80%',
+    alignSelf: 'center',
+  },
+  meta: {
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 22,
+  },
+  signMd: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.deltaNum,
+    letterSpacing: 4,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  revealSmall: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 2,
+    color: colors.magenta,
+  },
+  photoEmpty: {
+    width: '86%',
+    aspectRatio: 4 / 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    borderStyle: 'dashed',
+    backgroundColor: colors.bgCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  photoEmptyStar: {
+    fontSize: 26,
+    color: colors.magenta,
+  },
+  photoEmptyText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
+    textAlign: 'center',
+  },
+  photoEmptyCta: {
+    marginTop: 4,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.4,
+    color: colors.magenta,
+  },
+  // ── progreso ───────────────────────────────────────────────────────
+  progressHero: {
+    alignItems: 'center',
+  },
+  heroNum: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 96,
+    paddingTop: 10,
+    paddingBottom: 4,
+    color: colors.magenta,
+    textAlign: 'center',
+  },
+  heroLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    letterSpacing: 2.4,
+    color: colors.leche,
+  },
+  monthLine: {
+    marginTop: 18,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    letterSpacing: 1,
+    color: colors.niebla,
+    textTransform: 'uppercase',
+  },
+  statList: {
+    marginTop: 18,
+    width: '100%',
+    paddingHorizontal: 8,
+    gap: 12,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.hairline,
+    paddingBottom: 10,
+  },
+  statLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+  },
+  statValue: {
+    fontFamily: typography.displayMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  // ── frame compartido ───────────────────────────────────────────────
   frame: {
     width: '100%',
     aspectRatio: 4 / 5,
@@ -297,7 +530,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard2,
     overflow: 'hidden',
   },
-  // The single soft magenta accent on the hero photo — an exterior glow.
   frameHalo: {
     shadowColor: colors.magenta,
     shadowOpacity: 0.5,
@@ -334,8 +566,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     color: colors.oroLight,
   },
-  // Shared gold eyebrow — the quiet day / label tier (no magenta).
-  dayEyebrow: {
+  // ── eyebrow dorado + coach ─────────────────────────────────────────
+  eyebrowGold: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 2.2,
@@ -343,81 +575,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     textAlign: 'center',
   },
-  signEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 2.2,
-    color: colors.niebla,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  // ── cifra: glyph + sign label, stacked and centred ──
-  cifraSign: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  // ── momento ────────────────────────────────────────────────────────
-  meta: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  signMd: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.deltaNum,
-    letterSpacing: 4,
-    color: colors.leche,
-    textAlign: 'center',
-  },
-  // ── cifra ──────────────────────────────────────────────────────────
-  countBlock: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  countHuge: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 84,
-    paddingTop: 8,
-    paddingBottom: 6,
-    color: colors.magenta,
-    textAlign: 'center',
-  },
-  // A smaller 4:5 photo, centred — the count is the hero, not the photo.
-  cifraPhoto: {
-    alignSelf: 'center',
-    width: '46%',
-  },
-  // ── sello ──────────────────────────────────────────────────────────
-  sealHeader: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  eyebrowMd: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 4,
-    color: colors.niebla,
-  },
-  // The sign as serif-italic hero with a gold glow behind it — no magenta
-  // on the type; the lone second magenta accent is the photo halo below.
-  signHuge: {
-    // Hanken upright (NOT serif italic): serif italic is reserved for the
-    // coach voice, and the coach line on this same card is already italic —
-    // reusing it for the sign name would blur that signal. The celestial
-    // feel comes from the oro glow + letter-spacing + leche, not italic.
-    fontFamily: typography.displayHeavy,
-    fontSize: 52,
-    letterSpacing: 4,
-    color: colors.leche,
-    textAlign: 'center',
-    textShadowColor: colors.oro,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
-  },
-  sealPhoto: {
-    alignSelf: 'center',
-    width: '62%',
-  },
-  // ── coach line ─────────────────────────────────────────────────────
   coach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',

@@ -1,24 +1,20 @@
-import { LinearGradient } from 'expo-linear-gradient'
-import { useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle } from 'react-native-svg'
+import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
+import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
+import StelarIcon from '@/assets/stelar-icon.png'
+import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
+
 // Fixed 9:16 — rendered at this exact size so the capture is
-// consistent and fits the share-sheet carousel on any phone.
+// consistent and fits the share-sheet stage on any phone.
 export const CARD_W = 320
 export const CARD_H = Math.round((CARD_W * 16) / 9)
 
-export type ShareVariant = 'cielo' | 'retrato' | 'cifra'
-
-/** The carousel's variants, in order. */
-export const SHARE_VARIANTS: { id: ShareVariant; label: string }[] = [
-  { id: 'cielo', label: 'Cielo' },
-  { id: 'retrato', label: 'Retrato' },
-  { id: 'cifra', label: 'Cifra' },
-]
+export type VisualShareVariant = 'retrato' | 'transformacion' | 'cambio'
 
 // A seeded starfield with three brightness tiers — the celestial bed.
 const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
@@ -42,44 +38,124 @@ const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
   return arr
 })()
 
+// Capa de grano para dithering — muchos puntos diminutos de opacidad muy baja
+// repartidos por toda la tarjeta. Rompen los escalones de 8-bit del degradado
+// (la causa de la "línea") sin leerse como estrellas.
+const CARD_GRAIN: { x: number; y: number; r: number; o: number }[] = (() => {
+  const arr: { x: number; y: number; r: number; o: number }[] = []
+  let s = 24681
+  const rand = () => {
+    s = (s * 1664525 + 1013904223) % 4294967296
+    return s / 4294967296
+  }
+  for (let i = 0; i < 520; i += 1) {
+    arr.push({
+      x: rand() * CARD_W,
+      y: rand() * CARD_H,
+      r: 0.4 + rand() * 0.55,
+      o: 0.014 + rand() * 0.045,
+    })
+  }
+  return arr
+})()
+
 type Props = {
-  variant: ShareVariant
+  variant: VisualShareVariant
   beforeUrl: string
   afterUrl: string
   beforeDate: string
   afterDate: string
-  deltaText: string
+  /** Peso inicial / actual — null oculta la fila (sin datos falsos). */
+  weightFrom: number | null
+  weightTo: number | null
+  /** Delta con signo, p. ej. "−0.3". */
+  deltaText: string | null
+  /** Entrenos del ciclo → "0 → N". */
+  workoutsCount: number
+  /** Constelación → "0% → N%". */
+  revealedPct: number
+  /** Signo + días encendidos — para la constelación firma / héroe. */
+  sign: ZodiacSign
+  litCount: number
+  /** "ESCORPIO" — para "0% → 62% Escorpio". */
+  signLabel: string
   coachCopy: string | null
+  /** Fondo elegido en la fila "ESTILO". */
+  cardStyle?: ShareCardStyle
   /** Fires once both photos have settled — gates the capture. */
   onReady: () => void
 }
 
-function PhotoFrame({ url, now, onSettled }: { url: string; now: boolean; onSettled: () => void }) {
+function PhotoFrame({
+  url,
+  now,
+  accent,
+  onSettled,
+}: {
+  url: string
+  now: boolean
+  accent: string
+  onSettled: () => void
+}) {
   return (
-    <View style={[styles.frame, now && styles.frameNow]}>
-      <Image
-        source={{ uri: url }}
-        style={styles.img}
-        resizeMode="cover"
-        onLoad={onSettled}
-        onError={onSettled}
-      />
-      <View style={[styles.chip, now ? styles.chipNow : styles.chipBefore]}>
-        <Text style={[styles.chipText, now ? styles.chipTextNow : styles.chipTextBefore]}>
-          {now ? 'Ahora' : 'Antes'}
-        </Text>
+    // La foto "Ahora" se ilumina como una estrella encendida: un aura
+    // suave del acento detrás del marco. "Antes" descansa, sin halo.
+    <View style={now ? styles.nowHalo : undefined}>
+      <View style={[styles.frame, now && { borderColor: accent }]}>
+        <Image
+          source={{ uri: url }}
+          style={styles.img}
+          resizeMode="cover"
+          onLoad={onSettled}
+          onError={onSettled}
+        />
+        <View style={[styles.chip, now ? { backgroundColor: accent } : styles.chipBefore]}>
+          <Text style={[styles.chipText, now ? styles.chipTextNow : styles.chipTextBefore]}>
+            {now ? 'Ahora' : 'Antes'}
+          </Text>
+        </View>
       </View>
     </View>
   )
 }
 
+// Title-case del label en mayúsculas: "ESCORPIO" → "Escorpio".
+function titleCase(label: string): string {
+  return label.charAt(0) + label.slice(1).toLowerCase()
+}
+
+/* La firma de pie — la voz del coach y, opcionalmente, el emblema del
+ * signo (arte zodiac-art con su halo dorado) como sello de marca. Llena
+ * el tercio inferior con cielo en vez de aire muerto. */
+function CardFooter({
+  coachCopy,
+  sign,
+  showEmblem,
+}: {
+  coachCopy: string | null
+  sign: ZodiacSign
+  showEmblem: boolean
+}) {
+  return (
+    <View style={styles.footer}>
+      {coachCopy ? <Text style={styles.coach}>{coachCopy}</Text> : null}
+      {showEmblem ? (
+        <View style={styles.footerEmblem}>
+          <ZodiacArt sign={sign} size={108} halo="soft" />
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
 /*
- * The shareable progress card — a 9:16 Instagram-story image. Three
- * variants share the celestial bed and brand but rearrange the same
- * pieces (diptych, change, coach line):
- *   cielo   — balanced: photos, then the change, then the coach line.
- *   retrato — photos forward, the change as a compact tag.
- *   cifra   — the change huge, the photos a small strip beneath.
+ * La tarjeta compartible del cambio visual — una imagen 9:16 para Stories.
+ * Tres franjas verticales (marca arriba · héroe al medio · firma abajo)
+ * llenan el alto con intención. Tres formatos comparten la cama celeste:
+ *   retrato        — las dos fotos, ANTES/AHORA y el cambio de peso.
+ *   transformacion — el resumen: fotos + tres métricas (peso, entrenos,
+ *                    constelación).
+ *   cambio         — la constancia como héroe sobre la constelación.
  */
 export function ProgressShareCard({
   variant,
@@ -87,8 +163,16 @@ export function ProgressShareCard({
   afterUrl,
   beforeDate,
   afterDate,
+  weightFrom,
+  weightTo,
   deltaText,
+  workoutsCount,
+  revealedPct,
+  sign,
+  litCount,
+  signLabel,
   coachCopy,
+  cardStyle = DEFAULT_SHARE_STYLE,
   onReady,
 }: Props) {
   const settled = useRef(0)
@@ -97,26 +181,87 @@ export function ProgressShareCard({
     if (settled.current >= 2) onReady()
   }
 
-  const before = <PhotoFrame url={beforeUrl} now={false} onSettled={handleSettled} />
-  const after = <PhotoFrame url={afterUrl} now onSettled={handleSettled} />
+  // Cambio no muestra fotos (el emblema es el héroe): nada async que
+  // esperar, así que habilita la captura al montar.
+  useEffect(() => {
+    if (variant === 'cambio') onReady()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant])
+
+  // El acento sigue el estilo: magenta por defecto, pero en Oro/Índigo
+  // toma el glow del estilo para no chocar con el fondo cálido/frío.
+  const accent =
+    cardStyle.id === 'oro' || cardStyle.id === 'indigo' ? cardStyle.glow : colors.magenta
+
+  const before = (
+    <PhotoFrame url={beforeUrl} now={false} accent={accent} onSettled={handleSettled} />
+  )
+  const after = <PhotoFrame url={afterUrl} now accent={accent} onSettled={handleSettled} />
+
+  const hasWeight = weightFrom != null && weightTo != null
 
   return (
-    <View style={styles.card}>
-      <LinearGradient colors={[colors.magentaTint2, 'transparent']} style={styles.nebula} />
+    <View style={[styles.card, { backgroundColor: cardStyle.bg }]}>
+      {/* Nebulosa como GLOW RADIAL (no degradado lineal): el radial difumina
+          en curvas y evita el banding de 8-bit que dejaba líneas horizontales
+          en los estilos de color. Misma técnica que la cama celeste del entreno. */}
       <Svg style={StyleSheet.absoluteFill} width={CARD_W} height={CARD_H}>
+        <Defs>
+          {/* Caída suave de 2 stops + radio amplio = sin filo de disco. */}
+          <RadialGradient id="psc-nebula" cx="50%" cy="-6%" r="118%">
+            <Stop
+              offset="0"
+              stopColor={cardStyle.nebulaColor}
+              stopOpacity={cardStyle.nebulaAlpha}
+            />
+            <Stop offset="1" stopColor={cardStyle.nebulaColor} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={CARD_W} height={CARD_H} fill="url(#psc-nebula)" />
+        {/* Grano sutil: dithering que rompe cualquier escalón de 8-bit del
+            degradado para que no se lea como una línea. */}
+        {CARD_GRAIN.map((g, i) => (
+          <Circle key={`g-${i}`} cx={g.x} cy={g.y} r={g.r} fill={colors.leche} opacity={g.o} />
+        ))}
         {CARD_STARS.map((st, i) => (
           <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
         ))}
       </Svg>
 
       <View style={styles.brand}>
-        <Text style={styles.brandStar}>✦</Text>
+        <Image source={StelarIcon} style={styles.brandIcon} resizeMode="contain" />
         <Text style={styles.brandWord}>STELAR</Text>
       </View>
 
-      {variant === 'cielo' ? (
+      {variant === 'retrato' ? (
         <>
-          <View style={styles.middle}>
+          <View style={styles.hero}>
+            <View style={styles.diptychWide}>
+              <View style={styles.col}>
+                {before}
+                <Text style={styles.date}>{beforeDate}</Text>
+              </View>
+              <View style={styles.col}>
+                {after}
+                <Text style={styles.date}>{afterDate}</Text>
+              </View>
+            </View>
+            {hasWeight ? (
+              <View
+                style={[styles.deltaTag, { borderColor: accent, backgroundColor: tint(accent) }]}
+              >
+                <Text style={[styles.deltaTagText, { color: accent }]}>
+                  {weightFrom} → {weightTo} kg
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <CardFooter coachCopy={coachCopy} sign={sign} showEmblem />
+        </>
+      ) : variant === 'transformacion' ? (
+        <>
+          <View style={styles.hero}>
+            <Text style={styles.transformTitle}>MI TRANSFORMACIÓN</Text>
             <View style={styles.diptych}>
               <View style={styles.col}>
                 {before}
@@ -127,47 +272,122 @@ export function ProgressShareCard({
                 <Text style={styles.date}>{afterDate}</Text>
               </View>
             </View>
-            <View style={styles.deltaRow}>
-              <Text style={styles.deltaMd}>{deltaText}</Text>
-              <Text style={styles.unitMd}>kg</Text>
+            <View style={styles.metricBox}>
+              {hasWeight ? (
+                <>
+                  <MetricColumn
+                    icon={<PesoIcon />}
+                    label="PESO"
+                    before={`${weightFrom} kg`}
+                    after={`${weightTo} kg`}
+                    accent={accent}
+                  />
+                  <View style={styles.metricDivider} />
+                </>
+              ) : null}
+              <MetricColumn
+                icon={<EntrenosIcon />}
+                label="ENTRENOS"
+                before="0"
+                after={`${workoutsCount}`}
+                accent={accent}
+              />
+              <View style={styles.metricDivider} />
+              <MetricColumn
+                icon={<ConstelacionMetricIcon />}
+                label="CONSTELACIÓN"
+                before="0%"
+                after={`${revealedPct}%`}
+                sub={titleCase(signLabel)}
+                accent={accent}
+              />
             </View>
-            <EyebrowLabel tone="niebla" size={9.5} style={styles.centered}>
-              Rumbo a tu Andrómeda
-            </EyebrowLabel>
           </View>
-          {coachCopy ? <Text style={styles.coach}>{coachCopy}</Text> : null}
+          <CardFooter coachCopy={coachCopy} sign={sign} showEmblem={false} />
         </>
-      ) : variant === 'retrato' ? (
-        <View style={styles.middle}>
-          <View style={styles.diptychWide}>
-            <View style={styles.col}>{before}</View>
-            <View style={styles.col}>{after}</View>
-          </View>
-          <Text style={styles.rangeLine}>
-            {beforeDate} → {afterDate}
-          </Text>
-          <View style={styles.deltaTag}>
-            <Text style={styles.deltaTagText}>{deltaText} kg</Text>
-          </View>
-        </View>
       ) : (
         <>
-          <View style={styles.middle}>
-            <View style={styles.deltaRow}>
-              <Text style={styles.deltaHuge}>{deltaText}</Text>
-              <Text style={styles.unitHuge}>kg</Text>
+          {/* El emblema del signo es el héroe — grande y nítido. La
+              constancia se sella debajo, sin fotos: una sola idea limpia. */}
+          <View style={styles.cambioHero}>
+            <View style={styles.cambioEmblemBox}>
+              <ZodiacArt sign={sign} size={210} halo="soft" />
             </View>
-            <EyebrowLabel tone="niebla" size={9.5} style={styles.centered}>
-              Rumbo a tu Andrómeda
-            </EyebrowLabel>
-            <View style={styles.strip}>
-              <View style={styles.col}>{before}</View>
-              <View style={styles.col}>{after}</View>
+            <View style={styles.cambioSeal}>
+              <Text style={[styles.cambioSealStar, { color: accent }]}>✦</Text>
+              <Text style={[styles.cambioSealNum, { color: accent }]}>{litCount}</Text>
+              <Text style={styles.cambioSealDias}>días</Text>
             </View>
+            <Text style={styles.cambioSealLabel}>DE CONSTANCIA</Text>
           </View>
-          {coachCopy ? <Text style={styles.coach}>{coachCopy}</Text> : null}
+          <View style={styles.cambioFooter}>
+            {coachCopy ? <Text style={styles.coach}>{coachCopy}</Text> : null}
+          </View>
         </>
       )}
+    </View>
+  )
+}
+
+// Un tinte translúcido del acento para el fondo del pill de retrato.
+function tint(hex: string): string {
+  return `${hex}22`
+}
+
+/* Iconos dorados de cada métrica — un trazo, delicados, a tono observatorio. */
+function PesoIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path d="M7 8 H17 L19 19 H5 Z" stroke={colors.oro} strokeWidth={1.4} strokeLinejoin="round" />
+      <Path d="M9.5 8 A2.5 2.5 0 0 1 14.5 8" stroke={colors.oro} strokeWidth={1.4} />
+    </Svg>
+  )
+}
+
+function EntrenosIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 12 H15" stroke={colors.oro} strokeWidth={1.4} strokeLinecap="round" />
+      <Rect x={4} y={9} width={3} height={6} rx={1} stroke={colors.oro} strokeWidth={1.4} />
+      <Rect x={17} y={9} width={3} height={6} rx={1} stroke={colors.oro} strokeWidth={1.4} />
+    </Svg>
+  )
+}
+
+function ConstelacionMetricIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
+        fill={colors.oro}
+      />
+    </Svg>
+  )
+}
+
+function MetricColumn({
+  icon,
+  label,
+  before,
+  after,
+  sub,
+  accent,
+}: {
+  icon: ReactNode
+  label: string
+  before: string
+  after: string
+  sub?: string
+  accent: string
+}) {
+  return (
+    <View style={styles.metricCol}>
+      {icon}
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricBefore}>{before}</Text>
+      <Text style={[styles.metricArrow, { color: accent }]}>↓</Text>
+      <Text style={[styles.metricAfter, { color: accent }]}>{after}</Text>
+      {sub ? <Text style={styles.metricSub}>{sub}</Text> : null}
     </View>
   )
 }
@@ -178,48 +398,49 @@ const styles = StyleSheet.create({
     height: CARD_H,
     backgroundColor: colors.bg,
     paddingHorizontal: 22,
-    paddingTop: 30,
-    paddingBottom: 26,
-  },
-  nebula: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: CARD_H * 0.6,
+    paddingTop: 38,
+    paddingBottom: 30,
+    // Tres franjas: marca arriba · héroe al medio · firma abajo.
+    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 8,
   },
-  brandStar: {
-    fontSize: typography.sizes.label,
-    color: colors.magenta,
+  brandIcon: {
+    width: 26,
+    height: 26,
   },
   brandWord: {
     fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.title,
     color: colors.leche,
-    letterSpacing: 3,
+    letterSpacing: 4,
   },
-  middle: {
+  hero: {
     flex: 1,
     justifyContent: 'center',
   },
   // ── shared photo frame ─────────────────────────────────────────────
+  nowHalo: {
+    borderRadius: 18,
+    shadowColor: colors.magenta,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
+  },
   frame: {
     width: '100%',
     aspectRatio: 3 / 4,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.bruma,
     backgroundColor: colors.bgCard2,
     overflow: 'hidden',
-  },
-  frameNow: {
-    borderColor: colors.magenta,
   },
   img: {
     width: '100%',
@@ -234,19 +455,16 @@ const styles = StyleSheet.create({
     borderRadius: 7,
   },
   chipBefore: {
-    backgroundColor: colors.bg,
-  },
-  chipNow: {
-    backgroundColor: colors.magenta,
+    backgroundColor: 'rgba(8, 5, 7, 0.78)',
   },
   chipText: {
     fontFamily: typography.uiBold,
-    fontSize: 8.5,
+    fontSize: 9.5,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   chipTextBefore: {
-    color: colors.bone,
+    color: colors.leche,
   },
   chipTextNow: {
     color: colors.leche,
@@ -255,40 +473,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   date: {
-    marginTop: 7,
+    marginTop: 8,
     textAlign: 'center',
     fontFamily: typography.uiMedium,
-    fontSize: 10.5,
+    fontSize: 11,
     color: colors.niebla,
-  },
-  centered: {
-    marginTop: 3,
-    textAlign: 'center',
-  },
-  // ── cielo ──────────────────────────────────────────────────────────
-  diptych: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  deltaRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 24,
-  },
-  deltaMd: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 54,
-    paddingTop: 10,
-    paddingBottom: 6,
-    color: colors.magenta,
-    letterSpacing: -2,
-  },
-  unitMd: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.title,
-    color: colors.bone,
   },
   // ── retrato ────────────────────────────────────────────────────────
   diptychWide: {
@@ -296,57 +485,146 @@ const styles = StyleSheet.create({
     gap: 10,
     marginHorizontal: -6,
   },
-  rangeLine: {
-    marginTop: 14,
-    textAlign: 'center',
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-  },
   deltaTag: {
-    marginTop: 14,
+    marginTop: 18,
     alignSelf: 'center',
-    backgroundColor: colors.magentaTint2,
     borderWidth: 1,
-    borderColor: colors.magenta,
     borderRadius: 100,
     paddingHorizontal: 18,
     paddingVertical: 8,
   },
   deltaTagText: {
     fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.heading,
-    color: colors.magenta,
+    fontSize: typography.sizes.title,
     letterSpacing: -0.5,
   },
-  // ── cifra ──────────────────────────────────────────────────────────
-  deltaHuge: {
+  // ── transformacion ─────────────────────────────────────────────────
+  transformTitle: {
     fontFamily: typography.displayHeavy,
-    fontSize: 88,
-    paddingTop: 16,
-    paddingBottom: 10,
-    color: colors.magenta,
-    letterSpacing: -4,
+    fontSize: typography.sizes.title,
+    letterSpacing: 2.4,
+    color: colors.leche,
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  unitHuge: {
+  diptych: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  metricBox: {
+    marginTop: 22,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    paddingVertical: 16,
+  },
+  metricDivider: {
+    width: 0.5,
+    backgroundColor: colors.hairline,
+    marginVertical: 4,
+  },
+  metricCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 6,
+  },
+  metricLabel: {
+    marginTop: 2,
+    fontFamily: typography.uiBold,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    color: colors.niebla,
+    textTransform: 'uppercase',
+  },
+  metricBefore: {
+    fontFamily: typography.displayMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+  },
+  metricArrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    marginVertical: -2,
+  },
+  metricAfter: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.title,
+  },
+  metricSub: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.micro,
+    color: colors.oro,
+  },
+  // ── cambio (emblema héroe + sello de constancia) ───────────────────
+  cambioHero: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  cambioEmblemBox: {
+    width: 210,
+    height: 210,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+    marginBottom: 8,
+  },
+  cambioSeal: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  cambioSealStar: {
+    fontFamily: typography.displayMedium,
+    fontSize: typography.sizes.heading,
+  },
+  cambioSealNum: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 44,
+    letterSpacing: -1,
+  },
+  cambioSealDias: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.segmentTitle,
     color: colors.bone,
   },
-  strip: {
-    flexDirection: 'row',
-    gap: 10,
-    width: 190,
-    alignSelf: 'center',
-    marginTop: 30,
+  cambioSealLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    letterSpacing: 2.6,
+    color: colors.leche,
+    textTransform: 'uppercase',
   },
-  // ── coach line ─────────────────────────────────────────────────────
+  cambioFooter: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  // ── firma de pie ───────────────────────────────────────────────────
+  footer: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  footerEmblem: {
+    width: 108,
+    height: 108,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
   coach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 21,
     color: colors.bone,
     textAlign: 'center',
+    paddingHorizontal: 8,
   },
 })

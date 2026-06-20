@@ -109,6 +109,8 @@ export const ProfileUpdateSchema = z
     monthly_focus_secondary: z.array(z.enum(MONTHLY_FOCUS_VALUES)),
     acquisition_source: z.enum(ACQUISITION_SOURCE_VALUES),
     notification_window: z.enum(NOTIFICATION_WINDOW_VALUES),
+    // Ajustes: contar líquidos de las comidas como hidratación (ON default).
+    count_liquids_from_meals: z.boolean(),
   })
   .partial()
 

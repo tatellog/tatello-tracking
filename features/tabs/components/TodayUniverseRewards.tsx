@@ -34,6 +34,7 @@ import {
   type UniverseAttributeKey,
   type UniverseInput,
   type UniverseState,
+  wellbeingAvg,
 } from '@/features/tabs/universe-rewards'
 import {
   tint,
@@ -42,7 +43,8 @@ import {
   UNIVERSE_ICON_PATH,
 } from '@/features/tabs/universe-visuals'
 import { useFirstSeenWindow } from '@/features/tabs/useFirstSeenWindow'
-import { useWaterToday } from '@/features/water/hooks'
+import { useWaterFromMeals, useWaterToday } from '@/features/water/hooks'
+import { formatGlasses, glassesWord } from '@/features/water/liquid-detection'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { colors, duration, easing, radius, spacing, typography } from '@/theme'
@@ -99,6 +101,9 @@ type Props = {
 
 export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const water = useWaterToday(date)
+  // El agua derivada de comidas se lee aparte para no tocar el optimismo del
+  // stepper directo; el total que ve la usuaria = directa + comidas.
+  const waterFromMeals = useWaterFromMeals(date)
   const { goalMl } = useWaterGoal()
   const sleep = useSleepLog(date)
   const wellbeing = useTodayWellbeing(date)
@@ -143,12 +148,15 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
         proteinTarget: ctx.targets?.protein_g ?? null,
         caloriesToday: ctx.today_macros.calories,
         mealCount: ctx.meal_count_today,
-        // useWaterToday already returns GLASSES (water_intake.glasses).
-        waterGlasses: water.data ?? 0,
+        // Total = agua directa (water_intake.glasses) + derivada de comidas.
+        waterGlasses: (water.data ?? 0) + (waterFromMeals.data ?? 0),
         waterGoalGlasses: Math.max(1, Math.round(goalMl / GLASS_ML)),
+        waterFromMeals: waterFromMeals.data ?? 0,
         sleepMinutes: sleep.data?.duration_minutes ?? null,
         restedToday,
         energy: checkin?.energy ?? null,
+        motivation: checkin?.motivation ?? null,
+        stress: checkin?.stress ?? null,
         hasWellbeingSignal:
           checkin != null &&
           (checkin.energy != null || checkin.motivation != null || checkin.stress != null),
@@ -160,7 +168,12 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
 
   // Armed only once every query is settled — while loading, pct moves
   // are hydration, not registros.
-  const ready = attributes != null && !water.isLoading && !sleep.isLoading && !wellbeing.isLoading
+  const ready =
+    attributes != null &&
+    !water.isLoading &&
+    !waterFromMeals.isLoading &&
+    !sleep.isLoading &&
+    !wellbeing.isLoading
 
   // Delta watch keyed on a pct SIGNATURE, not on `attributes`: the array
   // is fresh every render (input lee new Date().getHours(), que el
@@ -246,6 +259,11 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
                   key={attr.key}
                   attr={attr}
                   source={input ? sourceLineFor(attr.key, input) : ''}
+                  subnote={
+                    attr.key === 'claridad' && input.waterFromMeals > 0
+                      ? `+${formatGlasses(input.waterFromMeals)} ${glassesWord(input.waterFromMeals)} desde comidas`
+                      : undefined
+                  }
                   reducedMotion={reducedMotion}
                   selected={openKey === attr.key}
                   onPress={() => {
@@ -304,7 +322,7 @@ function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string 
         ? 'Aún sin comidas hoy'
         : `${input.mealCount} ${input.mealCount === 1 ? 'comida' : 'comidas'} hoy`
     case 'claridad':
-      return `${input.waterGlasses} / ${Math.max(1, input.waterGoalGlasses)} vasos`
+      return `${formatGlasses(input.waterGlasses)} / ${Math.max(1, input.waterGoalGlasses)} vasos`
     case 'estabilidad':
       if (input.sleepMinutes != null) {
         const h = Math.floor(input.sleepMinutes / 60)
@@ -312,9 +330,11 @@ function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string 
         return m > 0 ? `${h} h ${m} min de sueño` : `${h} h de sueño`
       }
       return input.restedToday ? 'Descanso hoy' : 'Aún sin sueño'
-    case 'brillo':
-      // Cualquier dimensión del check-in (energía/motivación/calma) cuenta.
-      return input.energy != null || input.hasWellbeingSignal ? 'Hecho ✓' : 'Te espera'
+    case 'brillo': {
+      // Promedio de energía/motivación/calma (1–5). Refleja tu estado del día.
+      const avg = wellbeingAvg(input)
+      return avg != null ? `${Math.round(avg * 10) / 10} / 5` : 'Te espera'
+    }
   }
 }
 
@@ -322,12 +342,14 @@ type CardProps = {
   attr: UniverseAttribute
   /** Concrete source line for the closed card ("2 comidas hoy", "3 de 8 vasos"). */
   source: string
+  /** Rosa tenue bajo el contador — p. ej. "+1 vaso desde comidas" (Agua). */
+  subnote?: string
   reducedMotion: boolean
   selected: boolean
   onPress: () => void
 }
 
-function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardProps) {
+function AttributeCard({ attr, source, subnote, reducedMotion, selected, onPress }: CardProps) {
   const accent = UNIVERSE_ACCENT[attr.key]
   // La card LIDERA con la acción (Comida/Agua/…) — concreta, sin traducir.
   // La recompensa (Energía/…) se descubre como secundaria, "Contribuye a".
@@ -509,6 +531,11 @@ function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardP
           <Text style={styles.sourceLine} numberOfLines={2} adjustsFontSizeToFit>
             {source}
           </Text>
+          {subnote ? (
+            <Text style={styles.subnote} numberOfLines={1} adjustsFontSizeToFit>
+              {subnote}
+            </Text>
+          ) : null}
         </View>
 
         {/* Recompensa DESCUBIERTA: la acción contribuye a un atributo del
@@ -839,6 +866,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.ui,
     fontSize: typography.sizes.micro,
     color: colors.niebla,
+    textAlign: 'center',
+  },
+  // "+N vaso desde comidas" — rosa tenue, debajo del contador de Agua.
+  subnote: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: tint(colors.magenta, 'B3'),
     textAlign: 'center',
   },
   // "Contribuye a {recompensa}" — fila secundaria al pie del card; la

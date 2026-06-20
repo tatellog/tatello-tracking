@@ -59,8 +59,23 @@ import {
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
 import { SkyBackground } from '@/features/tabs/components'
+import { useProfile } from '@/features/profile/hooks'
+import { getWaterBreakdown, toStoredLiquids } from '@/features/water/api'
+import {
+  LiquidDetectionSheet,
+  type LiquidAcceptPayload,
+} from '@/features/water/components/LiquidDetectionSheet'
+import { WaterFromMealsToast } from '@/features/water/components/WaterFromMealsToast'
+import { useAddDirectWater, useMealHydration, useSaveMealHydration } from '@/features/water/hooks'
+import {
+  detectLiquids,
+  liquidFactor,
+  type LiquidDetection,
+} from '@/features/water/liquid-detection'
+import { track } from '@/lib/analytics'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
+import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 // Mensaje legible de un error de registro: el primer issue de Zod (p.ej.
@@ -590,6 +605,37 @@ export default function ScanMealScreen() {
   const [photoChanged, setPhotoChanged] = useState(false)
   const populatedRef = useRef(false)
 
+  // ── Detección de líquidos → hidratación ────────────────────────────
+  // Tras guardar la comida, si tiene bebidas/alimentos líquidos, ofrecemos
+  // sumar su aporte al agua del día (con confirmación, nunca en silencio).
+  const profileQ = useProfile()
+  const liquidsEnabled = profileQ.data?.count_liquids_from_meals !== false
+  const saveHydration = useSaveMealHydration()
+  const addDirectWater = useAddDirectWater()
+  // La decisión previa de esta comida (solo en edit) — para recalcular o
+  // limpiar su aporte si dejó de tener líquidos.
+  const priorHydrationQ = useMealHydration(editId)
+  // El contexto de la hoja: qué comida, qué día, qué se detectó, agua actual,
+  // y a dónde seguir (reveal en nuevas, volver en edición).
+  const [liquidCtx, setLiquidCtx] = useState<{
+    mealId: string
+    intakeDate: string
+    detection: LiquidDetection
+    currentGlasses: number
+    isEdit: boolean
+    proceed: () => void
+  } | null>(null)
+  // El toast "✦ +N vaso desde comidas" sobre el reveal.
+  const [waterToast, setWaterToast] = useState({ glasses: 0, seq: 0 })
+  // Caso "agua pura por el escáner de comida": no se crea comida; el agua
+  // entra como directa. Mostramos la misma hoja para confirmar, pero al
+  // aceptar sumamos a water_intake y salimos sin reveal de comida.
+  const [pureWaterCtx, setPureWaterCtx] = useState<{
+    detection: LiquidDetection
+    intakeDate: string
+    currentGlasses: number
+  } | null>(null)
+
   // Photo scan whenever we (re-)enter the scanning phase — skipped in
   // edit / manual / describe modes (describe runs the text scan on submit).
   useEffect(() => {
@@ -806,6 +852,175 @@ export default function ScanMealScreen() {
     setPhase('reveal')
   }
 
+  // El día (local) al que cuenta una comida nueva: el día visto en backfill, o hoy.
+  const intakeDateForNew = () => activeLogDate ?? todayInTimezone()
+
+  /*
+   * ¿Lo que se va a registrar es agua/té PURO? En ese caso no es una comida:
+   * no creamos meal (no prende Energía) y lo sumamos como agua directa.
+   *
+   * Regla CONSERVADORA (un caldo/sopa/jugo es COMIDA que además hidrata, NO
+   * agua pura): solo cuenta como agua pura si el NOMBRE mismo es un líquido al
+   * 100% (agua / té / infusión / agua mineral / agua con limón) Y casi no
+   * aporta nutrición (calorías ~0 y proteína ~0). Así "caldo de pollo" (caldo
+   * = 50%, con pollo) crea su comida normal y además ofrece su agua.
+   * Devuelve true si tomó el control del guardado (el caller debe `return`).
+   */
+  const tryPureWater = async (calories: number, protein: number): Promise<boolean> => {
+    if (!liquidsEnabled) return false
+    const mealName = name.trim() || 'Comida'
+    // El nombre TIENE que ser un líquido 100% por sí mismo (no caldo/sopa/jugo).
+    if (liquidFactor(mealName) !== 1) return false
+    if (calories >= 10 || protein >= 2) return false
+    const detection = detectLiquids({
+      name: mealName,
+      ingredients: ingredients.map((i) => ({ name: i.name, grams: i.grams })),
+    })
+    if (detection.items.length === 0) return false
+    const intakeDate = intakeDateForNew()
+    let currentGlasses = 0
+    try {
+      currentGlasses = (await getWaterBreakdown(intakeDate)).total
+    } catch {
+      // Sin red: la hoja muestra el "N →" desde 0; el agua igual se suma.
+    }
+    track('liquids_detected', {
+      detected_items: detection.items.map((i) => i.label),
+      total_water_estimate: detection.totalGlasses,
+      pure_water: true,
+    })
+    setSaving(false)
+    setPureWaterCtx({ detection, intakeDate, currentGlasses })
+    return true
+  }
+
+  const handlePureWaterAccept = async (payload: LiquidAcceptPayload) => {
+    const ctx = pureWaterCtx
+    if (!ctx) return
+    setPureWaterCtx(null)
+    // water_intake es int → redondeamos a vasos enteros (mín. 1).
+    const added = Math.max(1, Math.round(payload.totalGlasses))
+    try {
+      await addDirectWater.mutateAsync({ date: ctx.intakeDate, delta: added })
+      track('liquids_accepted', { water_added: added, pure_water: true })
+    } catch {
+      // best-effort
+    }
+    // El alza de Claridad se ve al volver a Hoy (toast de delta del universo).
+    router.back()
+  }
+
+  const handlePureWaterReject = () => {
+    setPureWaterCtx(null)
+    track('liquids_rejected', { pure_water: true })
+    router.back()
+  }
+
+  /*
+   * Tras guardar una comida, decide si ofrecer el aporte de líquidos. Si el
+   * ajuste está apagado o no hay líquidos, sigue derecho (`proceed`). En
+   * edición sin líquidos, limpia un aporte previo (el agua baja con
+   * explicación: el delta de Claridad re-sincroniza al volver). Si hay
+   * líquidos, abre la hoja de confirmación.
+   */
+  const presentLiquids = async (
+    mealId: string,
+    intakeDate: string,
+    isEditFlow: boolean,
+    proceed: () => void,
+  ) => {
+    if (!liquidsEnabled) {
+      proceed()
+      return
+    }
+    const detection = detectLiquids({
+      name: name.trim() || 'Comida',
+      ingredients: ingredients.map((i) => ({ name: i.name, grams: i.grams })),
+    })
+    const prior = isEditFlow ? priorHydrationQ.data : null
+    if (detection.items.length === 0) {
+      // Editó y ya no hay líquidos: retira el aporte que esta comida tenía.
+      if (isEditFlow && prior && prior.glasses > 0) {
+        try {
+          await saveHydration.mutateAsync({
+            mealId,
+            intakeDate,
+            glasses: 0,
+            status: 'rejected',
+            items: [],
+          })
+        } catch {
+          // El agua derivada es best-effort; el registro de comida ya quedó.
+        }
+      }
+      proceed()
+      return
+    }
+    track('liquids_detected', {
+      meal_id: mealId,
+      detected_items: detection.items.map((i) => i.label),
+      total_water_estimate: detection.totalGlasses,
+    })
+    // Agua actual del día SIN el aporte previo de esta comida (para el "N → N").
+    let currentGlasses = 0
+    try {
+      const breakdown = await getWaterBreakdown(intakeDate)
+      currentGlasses = Math.max(0, breakdown.total - (prior?.glasses ?? 0))
+    } catch {
+      // Sin red: la hoja muestra el "N →" desde 0; el aporte igual se guarda.
+    }
+    setLiquidCtx({ mealId, intakeDate, detection, currentGlasses, isEdit: isEditFlow, proceed })
+  }
+
+  const handleLiquidAccept = async (payload: LiquidAcceptPayload) => {
+    const ctx = liquidCtx
+    if (!ctx) return
+    setLiquidCtx(null)
+    try {
+      await saveHydration.mutateAsync({
+        mealId: ctx.mealId,
+        intakeDate: ctx.intakeDate,
+        glasses: payload.totalGlasses,
+        status: 'accepted',
+        items: toStoredLiquids(payload.items),
+      })
+      track('liquids_accepted', { water_added: payload.totalGlasses })
+      if (payload.edited) {
+        track('liquids_edited', {
+          original_amount: ctx.detection.totalGlasses,
+          final_amount: payload.totalGlasses,
+        })
+      }
+      // El toast vive sobre el reveal (nuevas). En edición, el delta de
+      // Claridad al volver es la confirmación.
+      if (!ctx.isEdit && payload.totalGlasses > 0) {
+        setWaterToast((t) => ({ glasses: payload.totalGlasses, seq: t.seq + 1 }))
+      }
+    } catch {
+      // best-effort: el agua no se sumó pero la comida ya quedó registrada.
+    }
+    ctx.proceed()
+  }
+
+  const handleLiquidReject = async () => {
+    const ctx = liquidCtx
+    if (!ctx) return
+    setLiquidCtx(null)
+    try {
+      await saveHydration.mutateAsync({
+        mealId: ctx.mealId,
+        intakeDate: ctx.intakeDate,
+        glasses: 0,
+        status: 'rejected',
+        items: toStoredLiquids(ctx.detection.items),
+      })
+      track('liquids_rejected', { meal_id: ctx.mealId })
+    } catch {
+      // best-effort
+    }
+    ctx.proceed()
+  }
+
   const handleConfirm = async () => {
     if (saving) return
     if (isManual) {
@@ -818,6 +1033,14 @@ export default function ScanMealScreen() {
 
     // Manual log — macros typed by hand, no ingredient breakdown.
     if (isManual) {
+      // Agua/té puro tecleado a mano: lo sumamos como agua, no como comida.
+      if (
+        await tryPureWater(
+          Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0))),
+          Math.min(500, Math.max(0, Number(proteinInput) || 0)),
+        )
+      )
+        return
       let manualPhoto: string | undefined
       if (photoUri) {
         try {
@@ -842,7 +1065,10 @@ export default function ScanMealScreen() {
           photo_storage_path: manualPhoto,
         },
         {
-          onSuccess: () => goToReveal(Math.min(500, Math.max(0, Number(proteinInput) || 0))),
+          onSuccess: (meal) => {
+            const protein = Math.min(500, Math.max(0, Number(proteinInput) || 0))
+            void presentLiquids(meal.id, intakeDateForNew(), false, () => goToReveal(protein))
+          },
           onError: (e) => {
             setSaving(false)
             Alert.alert('No pudimos registrar tu comida', mealErrorMessage(e))
@@ -894,10 +1120,22 @@ export default function ScanMealScreen() {
             ...(photoPath ? { photo_storage_path: photoPath } : {}),
           },
         },
-        { onSuccess: () => router.back(), onError: () => setSaving(false) },
+        {
+          onSuccess: () => {
+            const m = editMeal.data!
+            // meal_date es columna generada (no null en la práctica); fallback a hoy.
+            void presentLiquids(m.id, m.meal_date ?? todayInTimezone(), true, () => router.back())
+          },
+          onError: () => setSaving(false),
+        },
       )
       return
     }
+
+    // Agua/té puro escaneado/descrito: lo sumamos como agua directa, no como
+    // comida (no prende Energía). Solo si el NOMBRE es agua/té 100% y casi sin
+    // nutrición (un caldo/sopa/jugo NO entra: es comida que además hidrata).
+    if (await tryPureWater(macros.calories, macros.protein_g)) return
 
     // Create — upload the photo first (best effort; the meal saves
     // either way, but a failed upload is surfaced, not lost silently).
@@ -919,7 +1157,11 @@ export default function ScanMealScreen() {
         ingredients: storedIngredients,
       },
       {
-        onSuccess: () => goToReveal(macros.protein_g),
+        onSuccess: (meal) => {
+          void presentLiquids(meal.id, intakeDateForNew(), false, () =>
+            goToReveal(macros.protein_g),
+          )
+        },
         onError: (e) => {
           setSaving(false)
           Alert.alert('No pudimos registrar tu comida', mealErrorMessage(e))
@@ -1013,6 +1255,7 @@ export default function ScanMealScreen() {
           </View>
         ) : phase === 'reveal' ? (
           <View style={styles.reveal}>
+            <WaterFromMealsToast glasses={waterToast.glasses} seq={waterToast.seq} />
             <RevealPlate uri={photoUri} />
             <Animated.Text entering={FadeInUp.duration(520).delay(700)} style={styles.revealLine}>
               {revealLine}
@@ -1292,6 +1535,26 @@ export default function ScanMealScreen() {
           </>
         )}
       </SafeAreaView>
+
+      {liquidCtx ? (
+        <LiquidDetectionSheet
+          visible
+          detection={liquidCtx.detection}
+          currentGlasses={liquidCtx.currentGlasses}
+          onAccept={handleLiquidAccept}
+          onReject={handleLiquidReject}
+        />
+      ) : null}
+
+      {pureWaterCtx ? (
+        <LiquidDetectionSheet
+          visible
+          detection={pureWaterCtx.detection}
+          currentGlasses={pureWaterCtx.currentGlasses}
+          onAccept={handlePureWaterAccept}
+          onReject={handlePureWaterReject}
+        />
+      ) : null}
     </View>
   )
 }

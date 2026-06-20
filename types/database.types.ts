@@ -273,6 +273,50 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_hydration: {
+        Row: {
+          created_at: string
+          detected_items: Json
+          glasses: number
+          id: string
+          intake_date: string
+          meal_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detected_items?: Json
+          glasses?: number
+          id?: string
+          intake_date: string
+          meal_id: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detected_items?: Json
+          glasses?: number
+          id?: string
+          intake_date?: string
+          meal_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'meal_hydration_meal_id_fkey'
+            columns: ['meal_id']
+            isOneToOne: true
+            referencedRelation: 'meals'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       meals: {
         Row: {
           ai_raw_response: Json | null
@@ -389,6 +433,7 @@ export type Database = {
           acquisition_source: string | null
           avatar_path: string | null
           biological_sex: string | null
+          count_liquids_from_meals: boolean
           created_at: string
           cycle_length_days: number | null
           cycle_situation: string | null
@@ -414,6 +459,7 @@ export type Database = {
           acquisition_source?: string | null
           avatar_path?: string | null
           biological_sex?: string | null
+          count_liquids_from_meals?: boolean
           created_at?: string
           cycle_length_days?: number | null
           cycle_situation?: string | null
@@ -439,6 +485,7 @@ export type Database = {
           acquisition_source?: string | null
           avatar_path?: string | null
           biological_sex?: string | null
+          count_liquids_from_meals?: boolean
           created_at?: string
           cycle_length_days?: number | null
           cycle_situation?: string | null
@@ -546,6 +593,36 @@ export type Database = {
           sleep_date?: string
           user_id?: string
           wake_time?: string
+        }
+        Relationships: []
+      }
+      soul_node_reveals: {
+        Row: {
+          config_version: number
+          id: string
+          node_id: string
+          revealed_at: string
+          sign: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          config_version?: number
+          id?: string
+          node_id: string
+          revealed_at?: string
+          sign: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          config_version?: number
+          id?: string
+          node_id?: string
+          revealed_at?: string
+          sign?: string
+          source?: string
+          user_id?: string
         }
         Relationships: []
       }

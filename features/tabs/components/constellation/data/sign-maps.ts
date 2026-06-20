@@ -67,12 +67,10 @@ export const SIGN_CONSTELLATION_TRANSFORM_PARAMS: Record<
   aries: { tx: 46, ty: 37, sx: 0.68, sy: 0.68 },
   cancer: { tx: 45, ty: 40, sx: 0.68, sy: 0.68 },
   capricornio: { tx: 33, ty: 46, sx: 0.68, sy: 0.68 },
-  // Escorpio: sx/sy 0.88 ESPACIA las estrellas (antes 0.76 se veían
-  // amontonadas). tx 29 compensa el corrimiento a la derecha que produce
-  // escalar desde el origen (mantiene el eje ~5% a la derecha del centro del
-  // lienzo). ty 52 + el descenso natural del escalado BAJAN la constelación
-  // (su centroide caía alto, sobre el centro del anillo).
-  escorpio: { tx: 33, ty: 44, sx: 0.88, sy: 0.88 },
+  // Escorpio: figura re-trazada sobre el arte real (escorpio-reveal/f10) con
+  // scripts/overlay-scorpio.mjs — pinzas abajo-izquierda, cola alzándose a la
+  // derecha. Estos tx/ty/sx/sy son los del harness, que coincide con la app.
+  escorpio: { tx: 34, ty: 36, sx: 0.84, sy: 0.84 },
   geminis: { tx: 52, ty: 43, sx: 0.68, sy: 0.68 },
   // Leo: busto cabeza+melena de perfil a la izquierda. Escala grande (0.82)
   // para llenar cara+melena; las estrellas derechas (Zosma/Denebola) están

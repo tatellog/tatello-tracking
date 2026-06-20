@@ -35,7 +35,8 @@ import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
 import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints } from '@/features/progress/logic'
-import { useSetWater, useWaterToday } from '@/features/water/hooks'
+import { useSetWater, useWaterFromMeals, useWaterToday } from '@/features/water/hooks'
+import { formatGlasses, glassesWord } from '@/features/water/liquid-detection'
 import {
   GLASS_ML,
   GOAL_STEP_ML,
@@ -124,12 +125,18 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  * reading as the cycle tracker. On the false→true transition it pops
  * once (scale) — a satisfying one-shot, the most-repeated action's
  * reward. Reduced motion shows the fill with no pop. */
+// Vasito de agua derivada de comidas — rosa tenue, de solo lectura: muestra
+// que ese vaso vino de un líquido detectado, no de un tap directo.
+const WATER_FROM_MEALS_TINT = 'rgba(233,30,99,0.5)'
+
 function WaterGlass({
   filled,
   size = 26,
   onPress,
   accessibilityLabel,
   tick,
+  fillColor = colors.magenta,
+  interactive = true,
 }: {
   filled: boolean
   size?: number
@@ -138,6 +145,10 @@ function WaterGlass({
   /** Bumped by the parent on each tap. The pop fires only on a tap-driven
    *  fill — never when the day's count loads from the server on open. */
   tick: number
+  /** Color del relleno cuando está lleno (magenta directo / rosa comidas). */
+  fillColor?: string
+  /** Los vasitos de comidas son de solo lectura (no editan el agua directa). */
+  interactive?: boolean
 }) {
   const pop = useSharedValue(0)
   const reduce = useReducedMotion() ?? false
@@ -163,7 +174,8 @@ function WaterGlass({
   const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + pop.value * 0.14 }] }))
   return (
     <Pressable
-      onPress={onPress}
+      onPress={interactive ? onPress : undefined}
+      disabled={!interactive}
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -172,8 +184,8 @@ function WaterGlass({
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path
             d={GLASS}
-            fill={filled ? colors.magenta : 'none'}
-            stroke={filled ? colors.magenta : colors.bruma}
+            fill={filled ? fillColor : 'none'}
+            stroke={filled ? fillColor : colors.bruma}
             strokeWidth={1.7}
             strokeLinejoin="round"
           />
@@ -366,6 +378,10 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const { data: measurements } = useMeasurements(90, visible)
   const addMeasurement = useAddMeasurement()
   const { data: glasses = 0 } = useWaterToday(logDate, visible)
+  // Agua derivada de comidas (líquidos detectados y aceptados) ese día. Los
+  // vasitos siguen siendo el agua DIRECTA que tocas; esto se muestra como una
+  // línea aparte para que el aporte de comidas se reconozca aquí también.
+  const { data: waterFromMeals = 0 } = useWaterFromMeals(logDate, visible)
   const setWater = useSetWater(logDate)
   const { goalMl, updateGoal } = useWaterGoal()
 
@@ -440,6 +456,10 @@ export function QuickLogSheet({ visible, onClose }: Props) {
 
   // Glasses are a fixed 250 ml; the count = goal ÷ 250 (2 L → 8, 3 L → 12).
   const waterTarget = Math.max(1, Math.round(goalMl / GLASS_ML))
+  // Vasos derivados de comidas, redondeados a entero para el visual (el aporte
+  // exacto vive en la tarjeta Agua de Hoy). Se pintan en rosa DESPUÉS de los
+  // directos para que el nivel suba de verdad, no solo el texto.
+  const mealCups = waterFromMeals > 0 ? Math.round(waterFromMeals) : 0
   // Shrink the glyphs as the count grows so they stay on one row.
   const glassSize = waterTarget <= 8 ? 20 : waterTarget <= 12 ? 16 : 13
 
@@ -702,7 +722,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                     style={styles.waterCaptionRow}
                   >
                     <Text style={styles.stripCaption}>
-                      Agua · {mlToLitresLabel(glasses * GLASS_ML)} / {mlToLitresLabel(goalMl)} L
+                      Agua · {mlToLitresLabel((glasses + mealCups) * GLASS_ML)} /{' '}
+                      {mlToLitresLabel(goalMl)} L
                     </Text>
                     {/* Chevron = "toca para ajustar tu ritual" (mismo lenguaje
                         de chevron que el resto de la app). Se va al editar. */}
@@ -746,18 +767,36 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                     </View>
                   ) : (
                     <View style={styles.dropletsCompact}>
-                      {Array.from({ length: waterTarget }).map((_, i) => (
-                        <WaterGlass
-                          key={i}
-                          size={glassSize}
-                          filled={i < glasses}
-                          tick={waterTick}
-                          onPress={(e) => tapDroplet(i, e)}
-                          accessibilityLabel={`Agua, ${i + 1} de ${waterTarget} vasos`}
-                        />
-                      ))}
+                      {Array.from({ length: waterTarget }).map((_, i) => {
+                        const isDirect = i < glasses
+                        // Los vasitos de comidas van después de los directos.
+                        const isMeal = !isDirect && i < glasses + mealCups
+                        return (
+                          <WaterGlass
+                            key={i}
+                            size={glassSize}
+                            filled={isDirect || isMeal}
+                            fillColor={isMeal ? WATER_FROM_MEALS_TINT : colors.magenta}
+                            interactive={!isMeal}
+                            tick={waterTick}
+                            onPress={(e) => tapDroplet(i, e)}
+                            accessibilityLabel={
+                              isMeal
+                                ? `Agua desde comidas, vaso ${i + 1}`
+                                : `Agua, ${i + 1} de ${waterTarget} vasos`
+                            }
+                          />
+                        )
+                      })}
                     </View>
                   )}
+                  {/* El aporte de comidas: los vasitos rosa de arriba. Esta línea
+                      lo nombra (mismo conteo redondeado que los vasitos). */}
+                  {!editingGoal && mealCups > 0 ? (
+                    <Text style={styles.waterFromMealsNote}>
+                      +{formatGlasses(mealCups)} {glassesWord(mealCups)} desde tus comidas
+                    </Text>
+                  ) : null}
                 </View>
               </View>
 
@@ -1081,6 +1120,13 @@ const styles = StyleSheet.create({
     color: colors.magenta,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
+  },
+  // "+N vaso desde tus comidas" — rosa tenue, debajo de los vasitos.
+  waterFromMealsNote: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: 'rgba(233,30,99,0.85)',
   },
   // Caption de agua + chevron → señala que la meta es editable.
   waterCaptionRow: {

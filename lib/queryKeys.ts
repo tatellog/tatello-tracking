@@ -58,6 +58,12 @@ export const queryKeys = {
     all: ['water'] as const,
     day: (date: string) => ['water', date] as const,
     range: (start: string, end: string) => ['water', 'range', start, end] as const,
+    // Desglose del día: agua directa + agua derivada de comidas.
+    breakdown: (date: string) => ['water', 'breakdown', date] as const,
+    // El agua que las comidas de un día aportan (suma aceptada).
+    fromMeals: (date: string) => ['water', 'fromMeals', date] as const,
+    // La decisión de hidratación guardada para UNA comida (para recalc al editar).
+    meal: (mealId: string) => ['water', 'meal', mealId] as const,
   },
   rest: {
     all: ['rest'] as const,

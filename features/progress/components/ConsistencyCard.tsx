@@ -79,7 +79,7 @@ export function ConsistencyCard() {
       { key: 'sue', label: 'Sueño', pct: pct(count((s) => s.sleep_minutes != null)) },
       {
         key: 'chk',
-        label: 'Check-in',
+        label: 'Ánimo',
         pct: pct(count((s) => (s.wellbeing_checkins ?? 0) > 0 || s.energy != null)),
       },
     ]

@@ -40,7 +40,7 @@ const REASON: Record<UniverseAttributeKey, string> = {
   energia: 'por tu comida',
   claridad: 'por tu agua',
   estabilidad: 'por tu sueño',
-  brillo: 'por tu check-in',
+  brillo: 'por tu ánimo',
 }
 
 type Moment = {
@@ -140,47 +140,62 @@ function DeltaPill({ moment, onPress }: { moment: Moment; onPress?: () => void }
 
 export function UniverseDeltaToast({ placement = 'bottom', haptics = true }: Props) {
   const router = useRouter()
-  const [moment, setMoment] = useState<Moment | null>(null)
+  // COLA de momentos: queue[0] es el que se muestra. Cuando dos atributos
+  // suben a la vez (comida → Energía + agua → Claridad), cada uno se encola y
+  // se muestran ENCADENADOS en vez de pisarse. Taps repetidos del mismo
+  // atributo ACUMULAN en su entrada (no spamean la cola).
+  const [queue, setQueue] = useState<Moment[]>([])
+  const head = queue[0] ?? null
+
   // Solo el toast global (bottom) es tappable: lleva a Hoy y abre el
   // detalle de ese atributo (reusa el panel de "Tu universo hoy"). El de
   // la hoja (top) vive sobre un Modal y debe quedar inerte para no robar
   // taps al registro.
   const handlePress =
-    placement === 'bottom' && moment
+    placement === 'bottom' && head
       ? () => {
-          const key = moment.key
+          const key = head.key
           Haptics.selectionAsync().catch(() => {})
           requestUniverseDetail(key)
           router.navigate('/')
         }
       : undefined
-  // El haptic solo al APARECER el toast — visible.current evita que cada
-  // vaso acumulado vuelva a vibrar encima del selection del tap.
-  const visible = useRef(false)
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
     const unsub = subscribeUniverseDelta(({ key, delta }) => {
-      if (haptics && !visible.current) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-      }
-      visible.current = true
-      setMoment((prev) =>
-        prev && prev.key === key
-          ? { key, delta: prev.delta + delta, seq: prev.seq + 1 }
-          : { key, delta, seq: 0 },
-      )
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => {
-        visible.current = false
-        setMoment(null)
-      }, VISIBLE_MS)
+      setQueue((prev) => {
+        const i = prev.findIndex((m) => m.key === key)
+        if (i >= 0) {
+          // Ya hay un "+N" de este atributo (mostrándose o en cola) → acumula.
+          const next = prev.slice()
+          next[i] = { key, delta: next[i]!.delta + delta, seq: next[i]!.seq + 1 }
+          return next
+        }
+        return [...prev, { key, delta, seq: 0 }]
+      })
     })
-    return () => {
-      unsub()
-      if (timer) clearTimeout(timer)
+    return unsub
+  }, [])
+
+  // Avanza la cola: el de adelante vive VISIBLE_MS y luego sale; entonces
+  // entra el siguiente. El haptic suena UNA vez por pill nuevo (no en cada
+  // acumulación), comparando contra el último atributo que vibró.
+  const lastHapticKey = useRef<UniverseAttributeKey | null>(null)
+  useEffect(() => {
+    if (!head) {
+      lastHapticKey.current = null
+      return
     }
-  }, [haptics])
+    if (haptics && head.key !== lastHapticKey.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    }
+    lastHapticKey.current = head.key
+    const timer = setTimeout(() => setQueue((prev) => prev.slice(1)), VISIBLE_MS)
+    return () => clearTimeout(timer)
+    // `head` como dep: su identidad cambia exactamente cuando cambia el de
+    // adelante (nuevo atributo) o se acumula (nuevo objeto) → reinicia el
+    // temporizador. Un re-render que no toca la cola no lo re-corre.
+  }, [head, haptics])
 
   // El wrap está SIEMPRE montado (vacío y pointer-none cuando no hay
   // momento) para que el `exiting` del pill corra de verdad.
@@ -191,7 +206,7 @@ export function UniverseDeltaToast({ placement = 'bottom', haptics = true }: Pro
       // pill (Pressable) sí lo recibe. En la hoja queda 'none' (inerte).
       pointerEvents={placement === 'bottom' ? 'box-none' : 'none'}
     >
-      {moment ? <DeltaPill moment={moment} onPress={handlePress} /> : null}
+      {head ? <DeltaPill key={head.key} moment={head} onPress={handlePress} /> : null}
     </View>
   )
 }

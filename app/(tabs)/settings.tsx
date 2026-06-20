@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useState, type ReactNode } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
@@ -18,7 +18,7 @@ import { track } from '@/lib/analytics'
 import { useTransformProgress } from '@/features/emblem'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { avatarUrl } from '@/features/profile/api'
-import { useDeleteAccount, useProfile } from '@/features/profile/hooks'
+import { useDeleteAccount, useProfile, useUpdateProfile } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -117,6 +117,14 @@ function SettingsBody() {
   // "resolved" as "not loading".
   const { data: targets, isLoading: targetsLoading } = useMacroTargets()
   const { goalMl } = useWaterGoal()
+  // Ajuste: contar líquidos de las comidas como hidratación (ON por defecto).
+  const updateProfile = useUpdateProfile()
+  const countLiquids = profile?.count_liquids_from_meals !== false
+  const toggleCountLiquids = (value: boolean) => {
+    Haptics.selectionAsync().catch(() => {})
+    updateProfile.mutate({ count_liquids_from_meals: value })
+    track('settings_count_liquids_toggled', { enabled: value })
+  }
   // % de transformación del emblema — la identidad CONSTRUIDA en Stelar, el
   // dato emocional de la card de perfil (no la ficha médica).
   const { progress: transformPct } = useTransformProgress()
@@ -334,6 +342,12 @@ function SettingsBody() {
                 onPress={editWater}
               />
             </View>
+            <ToggleRow
+              label="Contar líquidos de tus comidas"
+              description="Stelar detecta bebidas en tus comidas y te propone sumarlas a tu agua del día."
+              value={countLiquids}
+              onValueChange={toggleCountLiquids}
+            />
           </Animated.View>
 
           {/* ── Acerca de Stelar — DOCUMENTACIÓN del producto, no ajustes.
@@ -721,6 +735,39 @@ function CaminoRow({
   )
 }
 
+/* Una fila con interruptor — para ajustes booleanos (ON/OFF). Misma card
+ * compacta que CaminoRow, pero con un Switch en lugar de chevron: la usuaria
+ * cambia el valor aquí mismo, sin navegar. El Switch nativo ya es accesible
+ * (role + estado), así que la fila no lo duplica. */
+function ToggleRow({
+  label,
+  description,
+  value,
+  onValueChange,
+}: {
+  label: string
+  description: string
+  value: boolean
+  onValueChange: (value: boolean) => void
+}) {
+  return (
+    <View style={styles.toggleCard}>
+      <View style={styles.toggleText}>
+        <Text style={styles.caminoLabel}>{label}</Text>
+        <Text style={styles.toggleDesc}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.bgCard2, true: colors.magenta }}
+        thumbColor={colors.leche}
+        ios_backgroundColor={colors.bgCard2}
+        accessibilityLabel={label}
+      />
+    </View>
+  )
+}
+
 /* Una fila de "Acerca de Stelar" — card compacta de DOCUMENTACIÓN (sin emoji):
  * etiqueta + descripción + chevron + press feedback. Toca → pantalla de doc.
  * Misma forma que CaminoRow para que la sección se sienta hermana, pero su
@@ -1021,6 +1068,29 @@ const styles = StyleSheet.create({
   caminoValue: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  // Fila de interruptor — hermana de caminoCard, separada del list con aire.
+  toggleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 10,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  toggleText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  toggleDesc: {
+    marginTop: 2,
+    fontFamily: typography.ui,
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },

@@ -859,7 +859,7 @@ function WellbeingSlide({ date }: { date: string }) {
             Energía <Text style={styles.captionEm}>{ENERGY_WORDS[draft.energy - 1]}</Text>
           </Text>
         ) : (
-          <Text style={styles.captionLine}>Check-in guardado</Text>
+          <Text style={styles.captionLine}>Ánimo guardado</Text>
         )}
       </View>
     </View>

@@ -72,16 +72,23 @@ export type UniverseInput = {
   caloriesToday: number
   /** Comidas registradas hoy — fallback cuando no hay objetivo. */
   mealCount: number
-  /** Vasos tomados + meta en vasos (250 ml c/u). */
+  /** Vasos tomados (TOTAL: agua directa + derivada de comidas) + meta. */
   waterGlasses: number
   waterGoalGlasses: number
+  /** De los vasos de hoy, cuántos vienen de líquidos detectados en comidas.
+   *  0 cuando no hay aporte. Alimenta el desglose del detalle de Agua. */
+  waterFromMeals: number
   /** Minutos dormidos anoche; null = sin registrar. */
   sleepMinutes: number | null
   /** "Descansé" marcado hoy — mejora Estabilidad ligeramente. */
   restedToday: boolean
-  /** Energía del check-in (1–5); null = sin registrar. */
+  /** Energía del ánimo (1–5); null = sin registrar. */
   energy: number | null
-  /** ¿Hay CUALQUIER señal de bienestar hoy (mood/motivación/estrés)? */
+  /** Motivación del ánimo (1–5); null = sin registrar. */
+  motivation: number | null
+  /** Estrés del ánimo (1–5); la calma = 6 - estrés. null = sin registrar. */
+  stress: number | null
+  /** ¿Hay CUALQUIER señal de ánimo hoy (energía/motivación/estrés)? */
   hasWellbeingSignal: boolean
   /** Hora local (0–23) — gatea el faltante de proteína de noche. */
   localHour: number
@@ -195,15 +202,24 @@ function estabilidad(input: UniverseInput): UniverseAttribute {
   }
 }
 
-/* ── Brillo ← check-in de bienestar ───────────────────────────────── */
+/** Promedio de ánimo (energía, motivación, calma=6-estrés) en escala 1–5, o
+ *  null si no hay ninguna dimensión registrada. La calma es el inverso del
+ *  estrés (estrés 5 → calma 1). Solo promedia lo que SÍ se registró. */
+export function wellbeingAvg(input: UniverseInput): number | null {
+  const calm = input.stress != null ? 6 - input.stress : null
+  const dims = [input.energy, input.motivation, calm].filter((v): v is number => v != null)
+  if (dims.length === 0) return null
+  return dims.reduce((sum, v) => sum + v, 0) / dims.length
+}
+
+/* ── Brillo ← ánimo (promedio de energía, motivación y calma) ───────── */
 function brillo(input: UniverseInput): UniverseAttribute {
-  // El Ánimo premia el GESTO de escucharte, no el nivel ni una dimensión
-  // en particular: registrar cómo amaneciste —energía, motivación o calma,
-  // cualquiera de las tres cuenta IGUAL— completa el Brillo. (Antes exigía
-  // la energía y dejaba en 70 si solo registrabas las otras dos: un
-  // privilegio arbitrario que confundía y castigaba un check-in válido.)
-  const done = input.energy != null || input.hasWellbeingSignal
-  const pct = done ? 100 : 0
+  // El Ánimo refleja tu estado: promedio de las tres dimensiones (1–5) → %.
+  // Registrar solo una promedia esa; las tres, las tres. Sin registro = 0
+  // ("en calma / te espera"), nunca negativo ni de culpa. Un día bajo se ve
+  // bajo (decisión de producto), pero el copy del estado nunca juzga.
+  const avg = wellbeingAvg(input)
+  const pct = avg != null ? clampPct((avg / 5) * 100) : 0
   const state = stateForPct(pct)
   return {
     key: 'brillo',
@@ -211,7 +227,7 @@ function brillo(input: UniverseInput): UniverseAttribute {
     pct,
     state,
     microcopy: STATE_COPY[state],
-    kind: 'gesture',
+    kind: 'progress',
   }
 }
 
@@ -292,14 +308,23 @@ export function detailForAttribute(
     }
     case 'claridad': {
       const goal = Math.max(1, input.waterGoalGlasses)
-      return {
-        essence,
-        grows: ATTRIBUTE_GROWS.claridad,
-        lines: [
-          { label: 'Vasos', value: `${input.waterGlasses} hoy` },
-          { label: 'Tu meta', value: `${goal}` },
-        ],
-      }
+      const fmt = (n: number) =>
+        Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100)
+      // Con aporte de comidas, desglosamos el origen (directa vs comidas);
+      // sin él, la vista simple de siempre.
+      const lines: UniverseDetailLine[] =
+        input.waterFromMeals > 0
+          ? [
+              { label: 'Agua directa', value: `${fmt(input.waterGlasses - input.waterFromMeals)}` },
+              { label: 'Desde comidas', value: `${fmt(input.waterFromMeals)}` },
+              { label: 'Total', value: `${fmt(input.waterGlasses)} hoy` },
+              { label: 'Tu meta', value: `${goal}` },
+            ]
+          : [
+              { label: 'Vasos', value: `${fmt(input.waterGlasses)} hoy` },
+              { label: 'Tu meta', value: `${goal}` },
+            ]
+      return { essence, grows: ATTRIBUTE_GROWS.claridad, lines }
     }
     case 'estabilidad': {
       const lines: UniverseDetailLine[] = [
@@ -312,12 +337,18 @@ export function detailForAttribute(
       return { essence, grows: ATTRIBUTE_GROWS.estabilidad, lines }
     }
     case 'brillo': {
-      const done = input.energy != null || input.hasWellbeingSignal
-      return {
-        essence,
-        grows: ATTRIBUTE_GROWS.brillo,
-        lines: [{ label: 'Ánimo', value: done ? 'Hecho ✓' : 'Te espera' }],
+      const calm = input.stress != null ? 6 - input.stress : null
+      const fmt = (v: number | null) => (v != null ? `${v} / 5` : 'Sin registro')
+      const avg = wellbeingAvg(input)
+      const lines: UniverseDetailLine[] = [
+        { label: 'Energía', value: fmt(input.energy) },
+        { label: 'Motivación', value: fmt(input.motivation) },
+        { label: 'Calma', value: fmt(calm) },
+      ]
+      if (avg != null) {
+        lines.push({ label: 'Promedio', value: `${Math.round(avg * 10) / 10} / 5` })
       }
+      return { essence, grows: ATTRIBUTE_GROWS.brillo, lines }
     }
   }
 }

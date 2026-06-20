@@ -9,9 +9,12 @@ const base: UniverseInput = {
   mealCount: 0,
   waterGlasses: 0,
   waterGoalGlasses: 8,
+  waterFromMeals: 0,
   sleepMinutes: null,
   restedToday: false,
   energy: null,
+  motivation: null,
+  stress: null,
   hasWellbeingSignal: false,
   localHour: 12,
 }
@@ -354,51 +357,35 @@ describe('Estabilidad — sueño y descanso', () => {
 // Brillo
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Brillo — check-in de bienestar', () => {
-  it('energy=3 → 100 pct complete (el nivel no importa, registrarlo es el ritual)', () => {
-    const result = calculateTodayUniverseRewards({
-      ...base,
-      energy: 3,
-      hasWellbeingSignal: false,
-    })
-    const brillo = result.find((a) => a.key === 'brillo')!
+describe('Brillo — promedio de ánimo (energía, motivación, calma)', () => {
+  const brilloOf = (over: Partial<typeof base>) =>
+    calculateTodayUniverseRewards({ ...base, ...over }).find((a) => a.key === 'brillo')!
 
+  it('las tres al máximo → 100 pct', () => {
+    // energía 5, motivación 5, estrés 1 (calma 5) → promedio 5/5 = 100%.
+    const brillo = brilloOf({ energy: 5, motivation: 5, stress: 1 })
     expect(brillo.pct).toBe(100)
     expect(brillo.state).toBe('complete')
   })
 
-  it('energy=1 → 100 pct complete (nivel bajo vale igual que nivel alto)', () => {
-    const result = calculateTodayUniverseRewards({
-      ...base,
-      energy: 1,
-      hasWellbeingSignal: false,
-    })
-    const brillo = result.find((a) => a.key === 'brillo')!
-
-    expect(brillo.pct).toBe(100)
-    expect(brillo.state).toBe('complete')
+  it('energía baja se refleja (no default 100): energy=1 sola → 20 pct', () => {
+    const brillo = brilloOf({ energy: 1 })
+    expect(brillo.pct).toBe(20)
+    expect(brillo.state).toBe('partial')
   })
 
-  it('energy null + otra señal (motivación/calma) → 100 pct complete (las 3 cuentan igual)', () => {
-    const result = calculateTodayUniverseRewards({
-      ...base,
-      energy: null,
-      hasWellbeingSignal: true,
-    })
-    const brillo = result.find((a) => a.key === 'brillo')!
-
-    expect(brillo.pct).toBe(100)
-    expect(brillo.state).toBe('complete')
+  it('promedia las TRES: energy=1, motivation=3, estrés=4 (calma 2) → avg 2 → 40 pct', () => {
+    const brillo = brilloOf({ energy: 1, motivation: 3, stress: 4 })
+    expect(brillo.pct).toBe(40)
   })
 
-  it('sin ninguna señal de bienestar → 0 pct empty', () => {
-    const result = calculateTodayUniverseRewards({
-      ...base,
-      energy: null,
-      hasWellbeingSignal: false,
-    })
-    const brillo = result.find((a) => a.key === 'brillo')!
+  it('solo promedia lo registrado: motivation=4 sola → 80 pct', () => {
+    const brillo = brilloOf({ motivation: 4 })
+    expect(brillo.pct).toBe(80)
+  })
 
+  it('sin ninguna dimensión → 0 pct empty (te espera)', () => {
+    const brillo = brilloOf({ energy: null, motivation: null, stress: null })
     expect(brillo.pct).toBe(0)
     expect(brillo.state).toBe('empty')
   })
@@ -417,7 +404,7 @@ describe('calculateTodayUniverseRewards — estructura y orden', () => {
     expect(result.map((a) => a.label)).toEqual(['Energía', 'Claridad', 'Estabilidad', 'Brillo'])
   })
 
-  it('solo Brillo es gesto (encendido/en calma); el resto es esfuerzo proporcional', () => {
+  it('los cuatro atributos son esfuerzo proporcional (Brillo ahora es promedio)', () => {
     const byKey = Object.fromEntries(
       calculateTodayUniverseRewards(base).map((a) => [a.key, a.kind]),
     )
@@ -425,7 +412,7 @@ describe('calculateTodayUniverseRewards — estructura y orden', () => {
       energia: 'progress',
       claridad: 'progress',
       estabilidad: 'progress',
-      brillo: 'gesture',
+      brillo: 'progress',
     })
   })
 })
@@ -493,13 +480,21 @@ describe('detailForAttribute', () => {
     ])
   })
 
-  it('brillo (Ánimo): hecho con cualquier señal / te espera', () => {
-    expect(detailForAttribute('brillo', { ...base, energy: 3 }).lines[0]?.value).toBe('Hecho ✓')
-    expect(
-      detailForAttribute('brillo', { ...base, hasWellbeingSignal: true }).lines[0]?.value,
-    ).toBe('Hecho ✓')
-    expect(detailForAttribute('brillo', base).lines[0]?.value).toBe('Te espera')
-    expect(detailForAttribute('brillo', { ...base, energy: 3 }).lines[0]?.label).toBe('Ánimo')
+  it('brillo (Ánimo): muestra energía/motivación/calma + promedio', () => {
+    const d = detailForAttribute('brillo', { ...base, energy: 1, motivation: 3, stress: 4 })
+    expect(d.lines).toEqual([
+      { label: 'Energía', value: '1 / 5' },
+      { label: 'Motivación', value: '3 / 5' },
+      { label: 'Calma', value: '2 / 5' }, // 6 - estrés 4
+      { label: 'Promedio', value: '2 / 5' },
+    ])
+    // Sin registro: las tres "Sin registro", sin línea de promedio.
+    const empty = detailForAttribute('brillo', base)
+    expect(empty.lines).toEqual([
+      { label: 'Energía', value: 'Sin registro' },
+      { label: 'Motivación', value: 'Sin registro' },
+      { label: 'Calma', value: 'Sin registro' },
+    ])
   })
 
   it('cada atributo trae su esencia en voz del coach', () => {

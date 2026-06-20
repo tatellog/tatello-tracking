@@ -304,37 +304,39 @@ export const FIGURES: Record<ZodiacSign, ZodiacDef> = {
     ],
   },
 
-  // Escorpio — long S-curve from head with claws at the upper-left
-  // down through Antares to a curled stinger.
+  // Escorpio — trazado sobre el arte real del reveal (escorpio-reveal/f10):
+  // las PINZAS bajan a la izquierda, la CABEZA y ANTARES (corazón) al centro,
+  // y la COLA se alza a la derecha enroscándose hasta el AGUIJÓN arriba.
   escorpio: {
     label: 'ESCORPIO',
     glyph: '♏',
-    // Mapeado al Emblema Celeste (escorpio-art2): cuerpo al centro, las
-    // pinzas/cabeza abajo, y la COLA subiendo y enroscándose hasta el
-    // aguijón arriba. Sin flips/rotación (frame directo) — overlay:
-    // scripts/overlay-scorpio.mjs.
+    // Coords calibradas con scripts/overlay-scorpio.mjs (figura sobre f10.png),
+    // que coincide con cómo la app compone arte + figura. Las pinzas caen sobre
+    // las dos tenazas abajo-izquierda, Antares en el cuerpo, y la cola sigue la
+    // curva del aguijón arriba-derecha. Reveal: tenaza izq → unión → tenaza baja
+    // → cabeza → Antares → cuerpo → cola → gancho → aguijón. Sin flips/rotación.
     stars: [
-      { x: 0.43, y: 0.6, mag: 2.7 }, // 0 pinza derecha
-      { x: 0.07, y: 0.48, mag: 2.3 }, // 1 pinza izquierda
-      { x: 0.24, y: 0.53, mag: 2.7 }, // 2 cabeza (junta de las pinzas)
-      { x: 0.31, y: 0.45, mag: 2.9 }, // 3 cuerpo alto
-      { x: 0.42, y: 0.36, mag: 1.5 }, // 4 Antares — el corazón
-      { x: 0.5, y: 0.29, mag: 3.0 }, // 5 cuerpo → cola
-      { x: 0.63, y: 0.17, mag: 2.8 }, // 6 cola
-      { x: 0.64, y: 0.07, mag: 2.4 }, // 7 cola arriba
-      { x: 0.51, y: 0.0, mag: 2.6 }, // 8 curva del aguijón
-      { x: 0.4, y: 0.08, mag: 1.9 }, // 9 aguijón — la punta
+      { x: 0.13, y: 0.62, mag: 2.5 }, // 0 pinza izquierda (claw)
+      { x: 0.35, y: 0.58, mag: 2.7 }, // 1 unión cabeza / pinzas
+      { x: 0.42, y: 0.74, mag: 2.4 }, // 2 pinza derecha (claw)
+      { x: 0.46, y: 0.48, mag: 2.8 }, // 3 cabeza
+      { x: 0.51, y: 0.42, mag: 1.5 }, // 4 Antares — el corazón
+      { x: 0.56, y: 0.34, mag: 2.9 }, // 5 cuerpo → arranque de cola
+      { x: 0.62, y: 0.24, mag: 2.8 }, // 6 cola (curva exterior)
+      { x: 0.62, y: 0.14, mag: 2.6 }, // 7 cola alta (enrosque)
+      { x: 0.54, y: 0.06, mag: 2.4 }, // 8 codo del gancho
+      { x: 0.44, y: 0.18, mag: 1.9 }, // 9 aguijón — la punta
     ],
     lines: [
-      [2, 1], // pinza izquierda
-      [2, 0], // pinza derecha
-      [2, 3], // cabeza → cuerpo
-      [3, 4],
-      [4, 5],
-      [5, 6],
-      [6, 7],
-      [7, 8],
-      [8, 9], // cola → aguijón
+      [0, 1], // tenaza izquierda → unión
+      [1, 2], // unión → tenaza inferior
+      [1, 3], // unión → cabeza
+      [3, 4], // cabeza → Antares (corazón)
+      [4, 5], // Antares → cuerpo
+      [5, 6], // cuerpo → cola
+      [6, 7], // cola asciende
+      [7, 8], // enrosque → codo del gancho
+      [8, 9], // gancho → aguijón
     ],
   },
 

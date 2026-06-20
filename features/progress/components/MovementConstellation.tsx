@@ -247,6 +247,10 @@ export function MovementConstellation({
             : null}
         </Svg>
 
+        {/* Pista de interacción — los días son tappables pero las estrellas no
+            lo gritan; una línea callada lo invita (mismo patrón que Semana/Día). */}
+        {onDayPress ? <Text style={styles.tapHint}>Toca un día para ver su detalle</Text> : null}
+
         {/* Leyenda — cómo se lee el cielo. Solo cuando hay tap (Historia). */}
         {onDayPress ? <StarLegend /> : null}
       </View>
@@ -539,6 +543,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     width: CELL,
     textAlign: 'center',
+  },
+  // Pista de toque — callada, centrada, bajo el cielo (igual que Semana/Día).
+  tapHint: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   // Leyenda — fila envolvente de marcas, bajo el cielo.
   legend: {

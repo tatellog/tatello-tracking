@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -13,21 +14,25 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
+import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
+import { useProfile } from '@/features/profile/hooks'
 import type { ProgressPhoto } from '@/features/progress/api'
 import { useBeforeAfterPhotos, useDeletePhoto, useMeasurements } from '@/features/progress/hooks'
-import {
-  computeDelta,
-  computeTrend,
-  formatTrendCopy,
-  toWeightPoints,
-} from '@/features/progress/logic'
+import { computeTrend, formatTrendCopy, toWeightPoints } from '@/features/progress/logic'
+import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
 import { BeforeAfterSlider } from './BeforeAfterSlider'
-import { ProgressShareCard, SHARE_VARIANTS } from './ProgressShareCard'
-import { ProgressShareSheet, type ShareVariant } from './ProgressShareSheet'
+import { ProgressShareCard } from './ProgressShareCard'
+import { ProgressShareSheet, type ShareTab } from './ProgressShareSheet'
+import { CambioIcon, RetratoIcon, TransformacionIcon } from './share-icons'
+import { constellationReveal, weightSpan } from '../share-logic'
+import type { ShareCardStyle } from '../share-styles'
+
+// Persistencia del slot sostenido (ID de la foto que vive en "Ahora").
+const SOLO_AFTER_KEY = '@app:beforeafter_solo_after_id'
 
 const MESES_FMT = [
   'ene',
@@ -47,12 +52,6 @@ const MESES_FMT = [
 function formatDateForCard(iso: string): string {
   const d = new Date(iso)
   return `${d.getDate()} ${MESES_FMT[d.getMonth()] ?? ''} ${d.getFullYear()}`
-}
-
-function formatDeltaForCard(kg: number | undefined): string {
-  if (kg == null) return '·'
-  if (kg === 0) return '0.0'
-  return `${kg < 0 ? '−' : '+'}${Math.abs(kg).toFixed(1)}`
 }
 
 /* iOS-style share glyph — a box with an arrow rising out of it. */
@@ -197,6 +196,17 @@ function PhotoColumn({
     </View>
   ) : filled ? (
     <View style={[styles.frame, accent && styles.frameAccent]}>
+      {/* Fondo: la MISMA foto en cover + blur, para rellenar las bandas con la
+          propia imagen (no negro) cuando su proporción no coincide con el
+          marco 3/4. Un scrim tenue encima la apaga para que la foto nítida del
+          frente resalte. */}
+      <Image
+        source={{ uri: photo!.signed_url! }}
+        style={styles.imgBlurBg}
+        resizeMode="cover"
+        blurRadius={18}
+      />
+      <View style={styles.imgBlurScrim} pointerEvents="none" />
       {/* resizeMode "contain" so the full body stays visible in the
           frame — the diptych's whole point is comparing silhouettes,
           and "cover" was cropping the head/feet of portrait shots. */}
@@ -262,45 +272,117 @@ function PhotoColumn({
 export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
   const { data } = useBeforeAfterPhotos()
   const measurements = useMeasurements(null)
+  const brief = useHomeBrief()
+  const profile = useProfile()
   const takePhoto = useTakePhoto()
   const deletePhoto = useDeletePhoto()
   const [shareOpen, setShareOpen] = useState(false)
   // Modo "Comparar": diptico (default) vs slider de arrastrar-para-revelar.
   const [mode, setMode] = useState<'diptych' | 'slider'>('diptych')
+  // Slots FIJOS: la data se deriva por fecha (1 foto = la más antigua = Antes),
+  // pero al borrar el Antes la usuaria espera que el placeholder quede en Antes
+  // y la foto de Ahora se conserve. Guardamos el ID de la foto que debe vivir en
+  // "Ahora" (atado a la foto, no un booleano: así persiste correcto entre
+  // sesiones y nunca se aplica a otra foto distinta).
+  const [soloAfterId, setSoloAfterId] = useState<string | null>(null)
 
-  // Build the card-config used to feed the generic share sheet. Lives
+  // Hidrata el slot sostenido al montar (persistencia entre sesiones).
+  useEffect(() => {
+    let active = true
+    AsyncStorage.getItem(SOLO_AFTER_KEY)
+      .then((v) => {
+        if (active && v) setSoloAfterId(v)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Guarda/limpia el slot sostenido (estado + AsyncStorage).
+  const persistSoloAfter = (id: string | null) => {
+    setSoloAfterId(id)
+    if (id) AsyncStorage.setItem(SOLO_AFTER_KEY, id).catch(() => {})
+    else AsyncStorage.removeItem(SOLO_AFTER_KEY).catch(() => {})
+  }
+
+  // Datos de las métricas que viven en las tarjetas (entrenos del ciclo +
+  // constelación revelada). El signo sale del perfil; el conteo, del brief.
+  const sign = useMemo(
+    () => zodiacFromDate(profile.data?.date_of_birth),
+    [profile.data?.date_of_birth],
+  )
+  const dayCount = useMemo(
+    () => brief.data?.grid_28_days.filter((c) => c.completed).length ?? 0,
+    [brief.data?.grid_28_days],
+  )
+
+  // Build the tab-config used to feed the generic share sheet. Lives
   // here (not in the sheet) because the data — photo URLs, dates,
-  // delta, coach line — is specific to the antes/después flow.
-  const shareVariants: ShareVariant[] = useMemo(() => {
+  // métricas, coach line — is specific to the antes/después flow.
+  const tabs: readonly ShareTab[] = useMemo(() => {
     const before = data?.before
     const after = data?.after
     const beforeUrl = before?.signed_url
     const afterUrl = after?.signed_url
     if (!before || !after || !beforeUrl || !afterUrl) return []
-    const points = toWeightPoints(measurements.data ?? [])
-    const delta = computeDelta(points)
-    const trend = computeTrend(points)
-    const deltaText = formatDeltaForCard(delta?.abs)
+    const trend = computeTrend(toWeightPoints(measurements.data ?? []))
     const coachCopy = trend ? formatTrendCopy(trend) : null
+    const weight = weightSpan(measurements.data)
+    const reveal = constellationReveal(sign, dayCount)
     const beforeDate = formatDateForCard(before.taken_at)
     const afterDate = formatDateForCard(after.taken_at)
-    return SHARE_VARIANTS.map((v) => ({
-      id: v.id,
-      label: v.label,
-      render: (onReady: () => void) => (
-        <ProgressShareCard
-          variant={v.id}
-          beforeUrl={beforeUrl}
-          afterUrl={afterUrl}
-          beforeDate={beforeDate}
-          afterDate={afterDate}
-          deltaText={deltaText}
-          coachCopy={coachCopy}
-          onReady={onReady}
-        />
-      ),
-    }))
-  }, [data?.before, data?.after, measurements.data])
+
+    const cardFor = (
+      variant: 'retrato' | 'transformacion' | 'cambio',
+      onReady: () => void,
+      cardStyle: ShareCardStyle,
+    ) => (
+      <ProgressShareCard
+        variant={variant}
+        beforeUrl={beforeUrl}
+        afterUrl={afterUrl}
+        beforeDate={beforeDate}
+        afterDate={afterDate}
+        weightFrom={weight?.from ?? null}
+        weightTo={weight?.to ?? null}
+        deltaText={weight?.deltaText ?? null}
+        workoutsCount={dayCount}
+        revealedPct={reveal.revealedPct}
+        sign={sign}
+        litCount={dayCount}
+        signLabel={ZODIAC[sign].label}
+        coachCopy={coachCopy}
+        cardStyle={cardStyle}
+        onReady={onReady}
+      />
+    )
+
+    return [
+      {
+        id: 'retrato',
+        label: 'Retrato',
+        icon: (active: boolean) => <RetratoIcon active={active} />,
+        render: (onReady: () => void, cardStyle: ShareCardStyle) =>
+          cardFor('retrato', onReady, cardStyle),
+      },
+      {
+        id: 'transformacion',
+        label: 'Transformación',
+        icon: (active: boolean) => <TransformacionIcon active={active} />,
+        recommended: true,
+        render: (onReady: () => void, cardStyle: ShareCardStyle) =>
+          cardFor('transformacion', onReady, cardStyle),
+      },
+      {
+        id: 'cambio',
+        label: 'Cambio',
+        icon: (active: boolean) => <CambioIcon active={active} />,
+        render: (onReady: () => void, cardStyle: ShareCardStyle) =>
+          cardFor('cambio', onReady, cardStyle),
+      },
+    ]
+  }, [data?.before, data?.after, measurements.data, sign, dayCount])
 
   if (!data) return null
 
@@ -323,6 +405,9 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     if (result.canceled || !result.assets[0]) return
     try {
       await takePhoto.mutateAsync({ uri: result.assets[0].uri, angle: 'front' })
+      // La foto nueva es la más reciente (Ahora) y el orden por fecha vuelve a
+      // mandar; soltamos el slot sostenido.
+      persistSoloAfter(null)
     } catch (err) {
       Alert.alert('No se pudo subir', err instanceof Error ? err.message : 'Intenta de nuevo.')
     }
@@ -336,6 +421,14 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     })
   }
 
+  // Fotos por SLOT estable. Con 1 sola foto, vive en "Ahora" solo si su ID es
+  // el sostenido (se borró el Antes); si no, en Antes (default = punto de
+  // partida). Con 2 fotos, el orden por fecha manda (más antigua = Antes).
+  const single = data.count === 1
+  const soloInAfter = single && data.before != null && data.before.id === soloAfterId
+  const antesPhoto = soloInAfter ? null : data.before
+  const ahoraPhoto = soloInAfter ? data.before : data.after
+
   const beforeUrl = data.before?.signed_url ?? null
   const afterUrl = data.after?.signed_url ?? null
   // Comparar/compartir necesitan AMBAS fotos cargadas (URL firmada).
@@ -346,7 +439,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
 
   // Soft, reversible-tone confirm before removing a photo (irreversible,
   // emotionally costly). "Conservar" reads warmer than "Cancelar".
-  const confirmDelete = (photo: ProgressPhoto) => {
+  const confirmDelete = (photo: ProgressPhoto, slot: 'before' | 'after') => {
     Alert.alert(
       'Eliminar esta foto',
       'Esta foto se quita de tu comparación. No se puede recuperar.',
@@ -355,7 +448,11 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () =>
+          onPress: () => {
+            // Slot fijo: si borro el "Antes", la foto que sobrevive (data.after)
+            // se conserva en "Ahora" — guardamos su ID. Si borro el "Ahora", la
+            // que queda vuelve a "Antes" (default) — limpiamos.
+            persistSoloAfter(slot === 'before' ? (data.after?.id ?? null) : null)
             deletePhoto.mutate(
               { id: photo.id, storagePath: photo.storage_path },
               {
@@ -365,7 +462,8 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
                     err instanceof Error ? err.message : 'Intenta de nuevo.',
                   ),
               },
-            ),
+            )
+          },
         },
       ],
     )
@@ -386,7 +484,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         },
         (i) => {
           if (i === 0) choosePhoto()
-          else if (i === 1) confirmDelete(photo)
+          else if (i === 1) confirmDelete(photo, slot)
         },
       )
     } else {
@@ -398,7 +496,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
           destructiveButtonIndex: 0,
         },
         (i) => {
-          if (i === 0) confirmDelete(photo)
+          if (i === 0) confirmDelete(photo, slot)
         },
       )
     }
@@ -461,29 +559,31 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
             <PhotoColumn
               label="Antes"
               tone="niebla"
-              photo={data.before}
-              onPress={onColumnPress('before', data.before)}
+              photo={antesPhoto}
+              onPress={onColumnPress('before', antesPhoto)}
               uploading={
                 (takePhoto.isPending && data.count === 0) ||
-                (deletingId != null && deletingId === data.before?.id)
+                (deletingId != null && deletingId === antesPhoto?.id)
               }
             />
             <Text style={styles.arrow}>→</Text>
             <PhotoColumn
               label="Ahora"
               tone="magenta"
-              photo={data.after}
+              photo={ahoraPhoto}
               accent
-              onPress={onColumnPress('after', data.after)}
+              onPress={onColumnPress('after', ahoraPhoto)}
               uploading={
                 (takePhoto.isPending && data.count >= 1) ||
-                (deletingId != null && deletingId === data.after?.id)
+                (deletingId != null && deletingId === ahoraPhoto?.id)
               }
-              dateOverride={data.after ? formatAfterDate(data.after, data.before) : undefined}
+              dateOverride={
+                ahoraPhoto && !single ? formatAfterDate(ahoraPhoto, data.before) : undefined
+              }
             />
           </View>
           {data.count === 1 ? (
-            <Text style={styles.caption}>Tu próxima foto frontal completa el después.</Text>
+            <Text style={styles.caption}>Tu próxima foto frontal abre la comparación.</Text>
           ) : null}
         </>
       )}
@@ -521,7 +621,10 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         <ProgressShareSheet
           visible={shareOpen}
           onClose={() => setShareOpen(false)}
-          variants={shareVariants}
+          subtitle="Tu cambio visual"
+          shareType="visual_change"
+          defaultTabId="transformacion"
+          tabs={tabs}
         />
       ) : null}
     </Animated.View>
@@ -650,6 +753,16 @@ const styles = StyleSheet.create({
   // (The onboarding PhotoCaptureCard fills its frame the same way.)
   img: {
     ...StyleSheet.absoluteFillObject,
+  },
+  // Fondo difuminado (misma foto, cover) que rellena las bandas cuando la
+  // proporción no coincide con el marco — evita el letterbox negro.
+  imgBlurBg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  // Apaga el fondo difuminado para que la foto nítida del frente resalte.
+  imgBlurScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10,6,8,0.45)',
   },
   date: {
     marginTop: 8,
