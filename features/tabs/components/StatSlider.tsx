@@ -1,5 +1,6 @@
 import { curveMonotoneX, line as d3Line } from 'd3-shape'
 import * as Haptics from 'expo-haptics'
+import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LayoutChangeEvent,
@@ -277,6 +278,10 @@ function Slide({
 /* ─── Slide 1 — today's macros ─────────────────────────────────────── */
 
 function MacroSlide({ ctx }: { ctx: BriefContext }) {
+  const router = useRouter()
+  // Tocar una tarjeta abre el editor de METAS (reusa la pantalla validada que
+  // ya usan Comidas/Ajustes). source=settings → vuelve atrás a Hoy al guardar.
+  const editTargets = () => router.push('/onboarding/macro-targets?source=settings')
   if (!ctx.targets) {
     return (
       <View style={[styles.slide, styles.emptyCard]}>
@@ -296,6 +301,16 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
   const caloriesTarget = ctx.targets.calories
   const calOver = Math.max(0, Math.round(caloriesConsumed - caloriesTarget))
   const calSubtitle = calOver > 0 ? `+${calOver} kcal` : `/ ${caloriesTarget} kcal`
+
+  // Línea honesta "cuánto te falta/queda" (copy autorizado para macros).
+  // Proteína: meta a alcanzar → "Te faltan N g". Calorías: presupuesto →
+  // "Te quedan N kcal"; si te pasaste, el +N del subtítulo ya lo dice (sin
+  // "te pasaste", manifiesto).
+  const proteinLeft = Math.max(0, Math.round(ctx.targets.protein_g - ctx.today_macros.protein_g))
+  const proteinRemaining = proteinLeft > 0 ? `Te faltan ${proteinLeft} g` : 'Meta cumplida ✓'
+  const calLeft = Math.max(0, Math.round(caloriesTarget - caloriesConsumed))
+  const calRemaining =
+    calOver > 0 ? null : calLeft > 0 ? `Te quedan ${calLeft} kcal` : 'Meta cumplida ✓'
   return (
     <View style={[styles.slide, styles.macroRow]}>
       {/* Each card cascades in (FadeInDown staggered) on first paint
@@ -310,8 +325,10 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
           target={ctx.targets.protein_g}
           formatted={Math.round(ctx.today_macros.protein_g).toString()}
           unitSuffix={`/ ${ctx.targets.protein_g} g`}
+          remainingText={proteinRemaining}
           ringColor={colors.magenta}
           ringDelay={400}
+          onPress={editTargets}
         />
       </MacroCardWrap>
       <MacroCardWrap enterDelay={280}>
@@ -322,9 +339,11 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
           target={caloriesTarget}
           formatted={Math.round(caloriesConsumed).toString()}
           unitSuffix={calSubtitle}
+          remainingText={calRemaining}
           ringColor={colors.magenta}
           ringDelay={600}
           small
+          onPress={editTargets}
         />
       </MacroCardWrap>
     </View>

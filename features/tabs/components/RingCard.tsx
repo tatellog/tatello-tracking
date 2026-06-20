@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
@@ -30,6 +30,13 @@ type Props = {
   speedometer?: boolean
   /** Overflow tint for speedometer mode — warm amber by default. */
   overColor?: string
+  /** Línea honesta de "cuánto te falta/queda" bajo el subtítulo (p. ej.
+   *  "Te faltan 73 g", "Te quedan 475 kcal"). null = no se muestra. UI font
+   *  (no italic) para no invadir la voz del coach (italic = coach). */
+  remainingText?: string | null
+  /** Si se pasa, la tarjeta es tocable y abre el editor de la META. Muestra
+   *  un "Ajustar ›" tenue como pista de que es editable. */
+  onPress?: () => void
 }
 
 export function RingCard({
@@ -44,6 +51,8 @@ export function RingCard({
   budget = false,
   speedometer = false,
   overColor,
+  remainingText,
+  onPress,
 }: Props) {
   const ringSize = small ? 76 : 88
   // Empty state: when nothing's been logged in an *accumulating* card,
@@ -53,11 +62,20 @@ export function RingCard({
   // entirely: in budget mode, value=0 means "fully consumed" (real
   // info), and the full-budget state shows the target instead of 0.
   const isEmpty = !budget && value <= 0
+  const Container = onPress ? Pressable : View
   return (
-    <View style={styles.column}>
-      <EyebrowLabel tone="magenta" size={11} tracking={3}>
-        {label}
-      </EyebrowLabel>
+    <Container
+      style={styles.column}
+      onPress={onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityHint={onPress ? 'Toca para ajustar tu meta' : undefined}
+    >
+      <View style={styles.labelRow}>
+        <EyebrowLabel tone="magenta" size={11} tracking={3}>
+          {label}
+        </EyebrowLabel>
+        {onPress ? <Text style={styles.editHint}>Ajustar ›</Text> : null}
+      </View>
       <View style={styles.row}>
         {speedometer ? (
           <SpeedometerRing
@@ -86,12 +104,23 @@ export function RingCard({
           >
             {formatted}
           </Text>
+          {/* La meta vive JUNTO al número ("62 / 135 g"), no separada abajo. */}
           <Text style={[styles.subtitle, isEmpty && styles.subtitleEmpty]}>
             {isEmpty ? 'todavía sin sumar' : unitSuffix}
           </Text>
         </View>
       </View>
-    </View>
+
+      {/* Lo único abajo: el renglón honesto, CENTRADO y anclado al fondo
+          (marginTop auto) para que quede alineado entre ambas tarjetas
+          (misma altura por el stretch de la fila). En vacío no se muestra,
+          para que el día cero sea invitación, no checklist. */}
+      {remainingText && !isEmpty ? (
+        <View style={styles.labelsBlock}>
+          <Text style={styles.remaining}>{remainingText}</Text>
+        </View>
+      ) : null}
+    </Container>
   )
 }
 
@@ -110,6 +139,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 14,
+  },
+  // Fila del eyebrow + pista "Ajustar ›" para enseñar que la meta es editable.
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  editHint: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
   },
   row: {
     flexDirection: 'row',
@@ -136,6 +177,15 @@ const styles = StyleSheet.create({
   valueEmpty: {
     opacity: 0.42,
   },
+  // Renglón honesto, centrado y anclado al fondo (marginTop auto) para que
+  // ambas tarjetas lo muestren a la misma altura.
+  labelsBlock: {
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 'auto',
+    paddingTop: 8,
+  },
+  // La meta — contexto suave (serif italic, bone), junto al número.
   subtitle: {
     marginTop: 6,
     fontFamily: typography.serif,
@@ -145,5 +195,15 @@ const styles = StyleSheet.create({
   },
   subtitleEmpty: {
     opacity: 0.72,
+  },
+  // "Te faltan X g" / "Te quedan X kcal" — el dato honesto que RESALTA: oro
+  // cálido (no magenta/alerta, no leche que competiría con el número),
+  // SemiBold, no italic (es dato, no voz de coach), centrado.
+  remaining: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.oro,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
 })

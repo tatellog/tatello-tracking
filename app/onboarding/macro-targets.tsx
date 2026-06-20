@@ -80,37 +80,54 @@ export default function MacroTargetsScreen() {
             </Text>
           </View>
 
-          <View style={styles.stack}>
-            <Controller
-              control={control}
-              name="protein_g"
-              render={({ field, fieldState }) => (
-                <NumberField
-                  label="Proteína"
-                  suffix="g"
-                  placeholder="130"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  onBlur={field.onBlur}
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              control={control}
-              name="calories"
-              render={({ field, fieldState }) => (
-                <NumberField
-                  label="Calorías"
-                  suffix="cal"
-                  placeholder="1800"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  onBlur={field.onBlur}
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
+          <View style={styles.middle}>
+            <View style={styles.stack}>
+              <Controller
+                control={control}
+                name="protein_g"
+                render={({ field, fieldState }) => (
+                  <NumberField
+                    label="Proteína"
+                    suffix="g"
+                    placeholder="130"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    onBlur={field.onBlur}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="calories"
+                render={({ field, fieldState }) => (
+                  <NumberField
+                    label="Calorías"
+                    suffix="cal"
+                    placeholder="1800"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    onBlur={field.onBlur}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+            </View>
+
+            {/* Informativo (solo lectura): de dónde salen los números, para que
+                la usuaria entienda en qué se basa su meta. Voz de guía, no de
+                regla (manifiesto: macros son guías, no prescripciones). */}
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>DE DÓNDE SALE</Text>
+              <Text style={styles.infoText}>
+                Tu meta se calcula desde tu perfil: peso, estatura, edad, sexo y qué tan seguido te
+                mueves, más tu objetivo. La proteína se calcula a partir de tu peso.
+              </Text>
+              <Text style={styles.infoText}>
+                En Hoy, lo consumido es la suma de las comidas que registras en el día.
+              </Text>
+              <Text style={styles.infoText}>Es una guía, no una regla.</Text>
+            </View>
           </View>
 
           <View style={styles.actions}>
@@ -188,7 +205,28 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     justifyContent: 'space-between',
   },
+  middle: { gap: spacing.lg },
   stack: { gap: spacing.lg },
+  // Bloque informativo de "de dónde sale" — solo lectura, tono guía.
+  infoCard: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.tile,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  infoTitle: {
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: typography.letterSpacing.uppercaseWide,
+    color: colors.niebla,
+  },
+  infoText: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    lineHeight: typography.sizes.body * typography.lineHeight.body,
+  },
   meta: {
     fontSize: typography.sizes.smallLabel,
     letterSpacing: typography.letterSpacing.uppercaseWide,
