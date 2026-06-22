@@ -1,271 +1,225 @@
 import { useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 
 import { EmText } from '@/components/EmText'
+import { useMacroTargets } from '@/features/macros/hooks'
 import { colors, typography } from '@/theme'
 
-import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
-import { useMacroTargets } from '@/features/macros/hooks'
-
-import { useHasAnySignals, useWeekSignals } from '../hooks'
-import { buildArquetipoSemana } from '../mock'
+import { useIsoWeekSignals } from '../hooks'
 import {
-  buildEnLuzSemana,
-  buildVozSemanaReal,
-  buildWeekDaysReal,
-  buildWeekObservations,
-  buildWeekRecap,
-  enLuzSentence,
-} from '../week-logic'
+  buildWeekDimensions,
+  buildWeekFindings,
+  dimDetail,
+  dimensionLine,
+  mostRepeated,
+  risingSignal,
+  type DayCell,
+  type WeekDimKey,
+} from '../week-orbit-logic'
 import { EmptySegmentCard } from './EmptySegmentCard'
-import { LiveDot } from './LiveDot'
-import { StelarVoice } from './StelarVoice'
-import { WeekConstellation } from './WeekConstellation'
-import { ObservationCard } from './ObservationCard'
-import { LuzStar, RecapDust, SectionDivider } from './WeekRecapArt'
+import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
+import { hexA, weekDimGlyph, WEEK_DIM_COLOR } from './week-dim-visual'
 
 /*
- * The Semana segment — "Las Órbitas". Mirrors Día's anatomy: the
- * week's archetype names the seven days at once, the constellation
- * hero places them around a luminous star with today as its own
- * little orbital system inside, the DayCard adapts to whichever day
- * is selected (today by default), and the Voz de Stelar closes the
- * week with confidence + scope. MOCK content (../mock.ts).
+ * Órbita · Semana — "¿Qué se repitió esta semana?".
+ *
+ * Rediseño orbital: la galaxia es la primera aparición fuerte del lenguaje
+ * de Órbita. Cada dimensión es un orbe cuya masa = días presentes esta
+ * semana. Debajo, evidencia escaneable: lo que más se repitió, lo que pide
+ * atención, la semana en una línea (aparición por día) y hallazgos
+ * determinísticos. Sin IA, sin predicción — solo datos reales.
  */
-export function WeekSegment({ onOpenDia }: { onOpenDia: () => void }) {
-  // The whole week is built procedurally from the real day-of-week —
-  // days, archetype, counts and prose all stay in sync regardless
-  // of which day the user opens the app. JS Date.getDay() returns
-  // 0 for Sunday, matching the Sunday-first template layout.
-  const todayIdx = useMemo(() => new Date().getDay(), [])
-
-  // ALWAYS real — no mock. With no signals the week simply renders its
-  // honest "forming" state (every day at the dim floor, the voice says
-  // the week's just starting). `hasRealData` only decides whether to
-  // show the "leído por Stelar" credit, never whether the data is real.
-  const { data: weekSignals } = useWeekSignals()
-  // Macro targets make `alimento` deficit-aware (see deriveDimensions).
+export function WeekSegment({ onOpenDia }: { onOpenDia?: () => void }) {
+  const { data: signals, todayIso, isLoading } = useIsoWeekSignals()
   const macros = useMacroTargets()
-  const calorieTarget = macros.data?.calories ?? null
   const proteinTarget = macros.data?.protein_g ?? null
-  // Gate de ciclo: sin ciclo activo, la dimensión `ciclo` no entra a las
-  // notas ni a los conteos de la semana.
-  const cycleEnabled = useCycleEnabled()
-  const dimCtx = useMemo(
-    () => ({ calorieTarget, proteinTarget, cycleEnabled }),
-    [calorieTarget, proteinTarget, cycleEnabled],
-  )
-  const hasRealData = (weekSignals?.length ?? 0) > 0
-  const days = useMemo(
-    () => buildWeekDaysReal(weekSignals ?? [], todayIdx, dimCtx),
-    [weekSignals, todayIdx, dimCtx],
-  )
-  const arquetipo = useMemo(() => buildArquetipoSemana(days, todayIdx), [days, todayIdx])
-  // Voz + "En Luz" — ambos describen REPETICIONES de los días reales (PRD V1).
-  const voz = useMemo(
-    () => buildVozSemanaReal(weekSignals ?? [], todayIdx, dimCtx),
-    [weekSignals, todayIdx, dimCtx],
-  )
-  const enLuz = useMemo(
-    () => buildEnLuzSemana(weekSignals ?? [], todayIdx, dimCtx),
-    [weekSignals, todayIdx, dimCtx],
-  )
 
-  const [selectedIdx, setSelectedIdx] = useState<number>(todayIdx)
-  const { data: hasAny } = useHasAnySignals()
-
-  // Conteo de calidad para el recap ("N de tus M días, con buena señal").
-  const livedCount = arquetipo.daysRead
-  const daysEnLuz = arquetipo.daysEnLuz
-
-  // "Esta semana, en números" — this week's log totals, computed locally
-  // from the same shared rules (the Día/Mes engine lives in the BE; this
-  // recap is a pure read over the week's signals).
-  const recap = useMemo(() => buildWeekRecap(weekSignals ?? [], todayIdx), [weekSignals, todayIdx])
-  // Within-week micro-observations ("el lunes y el miércoles tu comida pasó
-  // tu objetivo") — day-named facts of THIS week, deficit-aware via dimCtx.
-  const observations = useMemo(
-    () => buildWeekObservations(weekSignals ?? [], todayIdx, dimCtx),
-    [weekSignals, todayIdx, dimCtx],
+  const week = useMemo(() => signals ?? [], [signals])
+  const dims = useMemo(
+    () => buildWeekDimensions(week, todayIso, { proteinTarget }),
+    [week, todayIso, proteinTarget],
   )
+  // Señal Naciente (lo que crece vs. la semana pasada); si no hay, el Ancla
+  // (lo más constante) — reemplazan al par "más se repitió / necesita atención"
+  // que solo duplicaba el tamaño de las estrellas.
+  const rising = useMemo(
+    () => risingSignal(week, todayIso, { proteinTarget }),
+    [week, todayIso, proteinTarget],
+  )
+  const anchor = useMemo(() => mostRepeated(dims), [dims])
+  const findings = useMemo(() => buildWeekFindings(week, todayIso), [week, todayIso])
 
-  // "Lo que viene" se RETIRÓ: predecía el futuro ("el viernes suele pedir
-  // más de ti") — viola el PRD de Semana ("no predicciones") y roza la
-  // línea roja (anticipar fallo). Semana responde "¿qué se repitió?"
-  // (pasado), no "¿qué viene?".
+  const hasEvidence = dims.some((d) => d.present > 0)
 
-  // Empty-state branch: el mapa con los 7 días en silencio (signalCount 0
-  // → anillos punteados), sin patrón ni voz hasta que haya registros.
-  if (hasAny === false) {
-    return (
-      <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-        <View style={styles.header}>
-          <EmText
-            text="tu primera semana"
-            emphasis="primera semana"
-            style={styles.archetype}
-            emStyle={styles.archetypeEm}
-          />
-        </View>
-        <View style={styles.diagram}>
-          <WeekConstellation
-            days={days.map((d) => ({ ...d, brightness: 0, archetype: '', dimEnLuz: 0, drift: 0 }))}
-            selectedIdx={todayIdx}
-            onSelect={() => {}}
-            onOpenDia={onOpenDia}
-          />
-        </View>
-        <EmptySegmentCard
-          eyebrow="La galaxia se enciende con la data"
-          body="Por ahora todos los días están en silencio. Registra desde Hoy y los días brillan según lo que pasó."
-          hint="Cuando algo se repita tres días, aparece aquí lo que más repites."
-        />
-      </Animated.View>
-    )
+  // Dimensión enfocada (estrella tocada) → muestra su readout, como Día.
+  const [focusedDim, setFocusedDim] = useState<WeekDimKey | null>(null)
+  const focused = focusedDim ? (dims.find((d) => d.key === focusedDim) ?? null) : null
+
+  if (isLoading) {
+    return <View style={styles.wrap} />
   }
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Header — solo el crédito honesto "leído por Stelar · N días". El
-          arquetipo poético ("la semana de vaivén") se retiró: describía la
-          FORMA del brillo, no respondía "¿qué se repite?" — atmósfera, no
-          información. La respuesta vive en "En Luz" + la Voz, abajo. */}
-      {hasRealData ? (
-        <View style={styles.header}>
-          <View style={styles.metaRow}>
-            <LiveDot />
-            <Text style={styles.meta}>
-              <Text>leído por </Text>
-              <Text style={styles.metaStelar}>Stelar</Text>
-              <Text>{` · ${arquetipo.daysRead} días`}</Text>
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Hero — la constelación de los 7 días (la galaxia). Tap a un halo
-          abre su HaloBubble con la info del día. */}
-      <View style={styles.diagram}>
-        <WeekConstellation
-          days={days}
-          selectedIdx={selectedIdx}
-          onSelect={setSelectedIdx}
-          onOpenDia={onOpenDia}
+      {/* Hero — el título orbital + la galaxia de evidencia. */}
+      <View style={styles.hero}>
+        <EmText
+          text="Tu órbita esta semana"
+          emphasis="órbita"
+          style={styles.title}
+          emStyle={styles.titleEm}
         />
+        <Text style={styles.subtitle}>Las huellas que dejaron tus hábitos.</Text>
       </View>
-      {/* The week stars carry no "tap me" chrome (their halos mean state), so
-          a quiet line makes them discoverable — same pattern as Día. */}
-      <Text style={styles.tapHint}>Toca una estrella para ver ese día.</Text>
 
-      {/* En Luz — la RESPUESTA del PRD: el comportamiento más repetido de la
-          semana (≥3 días). Solo se muestra si hay repetición real; si no,
-          la Voz de abajo dice "aún no se repite nada con fuerza". */}
-      {enLuz ? (
-        <View style={styles.enLuz}>
-          <Text style={styles.enLuzEyebrow}>Lo que más se repitió</Text>
-          <View style={styles.enLuzRow}>
-            <View style={[styles.enLuzDot, { backgroundColor: colors.dimension[enLuz.key] }]} />
-            <Text style={[styles.enLuzLabel, { color: colors.dimension[enLuz.key] }]}>
-              {enLuz.label}
+      <WeekOrbitGalaxy
+        dims={dims}
+        onFocusChange={setFocusedDim}
+        initialFocus={anchor?.dim.key ?? null}
+      />
+      {hasEvidence && focused ? (
+        <>
+          <Animated.View
+            key={focused.key}
+            entering={FadeInDown.duration(320)}
+            style={styles.readout}
+          >
+            <Text style={[styles.readoutLabel, { color: WEEK_DIM_COLOR[focused.key] }]}>
+              {focused.label}
             </Text>
-          </View>
-          <Text style={styles.enLuzCount}>{enLuzSentence(enLuz, 'semana')}</Text>
-        </View>
+            <Text style={styles.readoutDetail}>
+              {dimDetail(focused.key, focused.present, focused.total)}
+            </Text>
+            <DayLine cells={dimensionLine(week, todayIso, focused.key, { proteinTarget })} />
+          </Animated.View>
+          <Text style={styles.tapHint}>Toca afuera para ver toda tu órbita.</Text>
+        </>
+      ) : hasEvidence ? (
+        <Text style={styles.tapHint}>Toca una estrella para ver su hábito.</Text>
       ) : null}
 
-      {/* Voz de Stelar — describe REPETICIONES (PRD): "Te moviste 4 veces",
-          "incluso en días sin entreno", "el registro bajó el finde". */}
-      <StelarVoice
-        parts={voz.parts}
-        tag={todayIdx === 6 ? 'Cierre de semana' : 'Hasta ahora'}
-        signature={hasRealData ? voz.signature : undefined}
-      />
-
-      {/* Esta semana, en números — the four log counts in a 2×2, with "días
-          en luz" pulled out below as a quality read (not a raw count). The
-          card sits in the observatory's light (oro): a faint star-dust wash,
-          an oro hairline, the tiles igniting in a soft cascade. Honest:
-          sleep/water recede to "—" when nothing's logged, never a 0. */}
-      <View style={styles.recap}>
-        <Text style={styles.recapEyebrow}>Esta semana, en números</Text>
-        <View style={styles.recapCard}>
-          <RecapDust />
-          <View style={styles.recapGrid}>
-            <Stat index={0} value={String(recap.entrenos)} label="Entrenos" />
-            <Stat
-              index={1}
-              value={recap.sleepAvgMin != null ? (recap.sleepAvgMin / 60).toFixed(1) : '·'}
-              unit={recap.sleepAvgMin != null ? 'h' : undefined}
-              label="Sueño prom."
-              empty={recap.sleepAvgMin == null}
-            />
-            <Stat index={2} value={String(recap.meals)} label="Comidas" />
-            <Stat
-              index={3}
-              value={recap.waterAvg != null ? String(recap.waterAvg) : '·'}
-              unit={recap.waterAvg != null ? 'vasos' : undefined}
-              label="Agua prom."
-              empty={recap.waterAvg == null}
-            />
-          </View>
-          {/* Días con buena señal — lectura de calidad (NO "en luz", para
-              no chocar con el comportamiento "En Luz" de arriba). */}
-          <View style={styles.luzRow}>
-            <LuzStar />
-            <Text style={styles.luzText}>
-              <Text style={styles.luzNum}>{daysEnLuz}</Text>
-              <Text>{` de tus ${livedCount} ${livedCount === 1 ? 'día' : 'días'}, con buena señal`}</Text>
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Lo que noté esta semana — within-week micro-observations. Each is a
-          catalogued star: a WIN burns in its dimension's color (haloed), a
-          WATCH in oro (no halo, never red). The eyebrow goes oro — this is
-          Stelar's read, the differentiator, lifted above the gray chrome. */}
-      {observations.length > 0 ? (
+      {!hasEvidence ? (
+        <EmptySegmentCard
+          eyebrow="La galaxia se enciende con tu registro"
+          body="Esta semana aún está en silencio. Registra desde Hoy y cada hábito gana masa según los días que aparece."
+          hint="Cuando algo se repita, lo verás crecer aquí."
+        />
+      ) : (
         <>
-          <SectionDivider />
-          <View style={styles.obs}>
-            <Text style={styles.obsEyebrowLit}>Lo que noté esta semana</Text>
-            {observations.map((o, i) => (
-              <Animated.View key={o.key} entering={FadeIn.duration(420).delay(i * 90)}>
-                <ObservationCard obs={o} />
-              </Animated.View>
-            ))}
-          </View>
+          {/* Señal Naciente — lo que EMERGE vs. la semana pasada (la lectura
+              que la galaxia no verbaliza). Si no hay tendencia o es semana 1,
+              cae a Tu Ancla: lo más constante. */}
+          {rising ? (
+            <ReliquiaBlock
+              eyebrow="Señal naciente"
+              dimKey={rising.key}
+              label={rising.label}
+              count={`de ${rising.last} a ${rising.current} días`}
+              line={`Tu ${rising.label} apareció más que la semana pasada.`}
+            />
+          ) : anchor ? (
+            <ReliquiaBlock
+              eyebrow="Tu ancla"
+              dimKey={anchor.dim.key}
+              label={anchor.dim.label}
+              count={`${anchor.dim.present} de ${anchor.dim.total} días`}
+              line={anchor.line}
+            />
+          ) : null}
+
+          {/* Otros hallazgos — hechos determinísticos de la semana. */}
+          {findings.length > 0 ? (
+            <View style={styles.block}>
+              <Text style={[styles.eyebrow, styles.eyebrowOro]}>Otros hallazgos</Text>
+              <View style={styles.findings}>
+                {findings.map((f, i) => (
+                  <Animated.View
+                    key={f.key}
+                    entering={FadeIn.duration(380).delay(i * 90)}
+                    style={styles.findingRow}
+                  >
+                    <Text style={styles.findingStar}>✦</Text>
+                    <Text style={styles.findingText}>{f.text}</Text>
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </>
+      )}
+
+      {onOpenDia ? (
+        <Pressable onPress={onOpenDia} hitSlop={8} style={styles.diaLink}>
+          <Text style={styles.diaLinkText}>Ver un día en detalle ›</Text>
+        </Pressable>
       ) : null}
     </Animated.View>
   )
 }
 
-/* One recap tile (half-width, 2×2) — a datum over a quiet label, igniting
- * in a soft cascade. An empty metric ("—") recedes to bruma so what's real
- * keeps the light. The optional unit rides small next to the value. */
-function Stat({
-  index,
-  value,
-  unit,
+/* Una Reliquia Celeste (Señal Naciente / Ancla): el glyph en su orbe de
+ * color, la etiqueta grande coloreada, el dato y la frase de evidencia. */
+function ReliquiaBlock({
+  eyebrow,
+  dimKey,
   label,
-  empty,
+  count,
+  line,
 }: {
-  index: number
-  value: string
-  unit?: string
+  eyebrow: string
+  dimKey: WeekDimKey
   label: string
-  empty?: boolean
+  count: string
+  line: string
 }) {
+  const color = WEEK_DIM_COLOR[dimKey]
   return (
-    <Animated.View entering={FadeIn.duration(380).delay(index * 80)} style={styles.stat}>
-      <Text style={[styles.statValue, empty ? styles.statValueEmpty : null]}>
-        {value}
-        {unit ? <Text style={styles.statUnit}> {unit}</Text> : null}
-      </Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </Animated.View>
+    <View style={styles.block}>
+      <Text style={[styles.eyebrow, styles.eyebrowOro]}>{eyebrow}</Text>
+      <View style={styles.hlCard}>
+        <View
+          style={[
+            styles.hlOrb,
+            { backgroundColor: hexA(color, 0.16), borderColor: hexA(color, 0.9) },
+          ]}
+        >
+          {weekDimGlyph(dimKey, 40)}
+        </View>
+        <View style={styles.hlBody}>
+          <Text style={[styles.hlLabel, { color }]}>{label}</Text>
+          <Text style={styles.hlCount}>{count}</Text>
+          <Text style={styles.hlLine}>{line}</Text>
+        </View>
+      </View>
+    </View>
+  )
+}
+
+/* La semana en una línea: 7 columnas (lun→dom), letra arriba + celda de
+ * aparición. Presente = punto encendido (leche); ausente = aro vacío;
+ * futuro = punto tenue (aún no llega, nunca falla). */
+function DayLine({ cells }: { cells: readonly DayCell[] }) {
+  return (
+    <View style={styles.dayLine}>
+      {cells.map((c, i) => (
+        <View key={i} style={styles.dayCol}>
+          <Text style={[styles.dayLetter, c.state === 'future' && styles.dayLetterFuture]}>
+            {c.letter}
+          </Text>
+          <View
+            style={[
+              styles.dayMark,
+              c.state === 'present' && styles.dayPresent,
+              c.state === 'absent' && styles.dayAbsent,
+              c.state === 'future' && styles.dayFuture,
+            ]}
+          >
+            {c.state === 'present' ? <Text style={styles.dayCheck}>✓</Text> : null}
+          </View>
+        </View>
+      ))}
+    </View>
   )
 }
 
@@ -273,98 +227,66 @@ const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
   },
-  // ── Header — compressed, archetype as the only hero ──────────
-  header: {
+  // ── Hero ──────────────────────────────────────────────────────────
+  hero: {
     alignItems: 'center',
+    marginBottom: 8,
   },
-  archetype: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+  title: {
+    fontFamily: typography.displayMedium,
     fontSize: 24,
-    lineHeight: 30,
     color: colors.leche,
     textAlign: 'center',
+    letterSpacing: -0.4,
   },
-  archetypeEm: {
+  titleEm: {
     color: colors.magenta,
   },
-  metaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  meta: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  metaStelar: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: 12.5,
-    color: colors.magenta,
-  },
-  // ── En Luz — el comportamiento más repetido (hero del PRD) ───────
-  enLuz: {
-    alignItems: 'center',
-    marginTop: 22,
-  },
-  enLuzEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 10,
-  },
-  enLuzRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  enLuzDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  enLuzLabel: {
+  subtitle: {
+    marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 26,
-    lineHeight: 30,
-  },
-  enLuzCount: {
-    marginTop: 6,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  enLuzNum: {
-    fontFamily: typography.uiBold,
+    fontSize: 15,
+    lineHeight: 20,
     color: colors.bone,
-  },
-  // ── Diagram — la galaxia de 7 días, centrada ──────────────────
-  diagram: {
-    width: '72%',
-    alignSelf: 'center',
-    marginTop: 10,
+    textAlign: 'center',
   },
   tapHint: {
-    marginTop: 6,
+    marginTop: 10,
     textAlign: 'center',
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,
     color: colors.niebla,
   },
-  // ── Esta semana, en números — the recap stat grid ──────────────
-  recap: {
-    marginTop: 24,
+  // Readout de la dimensión enfocada — info al tocar una estrella (como Día).
+  readout: {
+    marginTop: 14,
+    gap: 10,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
   },
-  recapEyebrow: {
+  readoutLabel: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 22,
+    lineHeight: 26,
+    textAlign: 'center',
+  },
+  readoutDetail: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    textAlign: 'center',
+    lineHeight: typography.sizes.bodyLarge * 1.45,
+  },
+  // ── Bloques ───────────────────────────────────────────────────────
+  block: {
+    marginTop: 26,
+  },
+  eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: 11,
     letterSpacing: 1.8,
@@ -373,77 +295,130 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 2,
   },
-  // The card — in the observatory's light: oro hairline, star-dust wash
-  // behind (overflow-hidden clips it to the rounded corners).
-  recapCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.oroHairline,
-    paddingVertical: 4,
-    overflow: 'hidden',
+  eyebrowOro: {
+    color: colors.oro,
   },
-  recapGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  stat: {
-    width: '50%',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  statValue: {
-    fontFamily: typography.uiBold,
-    fontSize: 24,
-    color: colors.leche,
-  },
-  statValueEmpty: {
-    color: colors.bruma,
-  },
-  statUnit: {
-    fontFamily: typography.uiMedium,
-    fontSize: 12,
-    color: colors.niebla,
-  },
-  statLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginTop: 4,
-  },
-  // Días en luz — its own line below the grid, divided by an oro hairline.
-  luzRow: {
+  // Highlight (más repetido / atención)
+  hlCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    marginTop: 2,
-    marginHorizontal: 18,
-    paddingTop: 13,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.oroHairlineSoft,
+    gap: 14,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    padding: 16,
   },
-  luzText: {
+  hlOrb: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hlBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  hlLabel: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  hlCount: {
+    marginTop: 2,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
     color: colors.bone,
   },
-  luzNum: {
-    color: colors.oroLight,
+  hlLine: {
+    marginTop: 4,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    lineHeight: typography.sizes.body * 1.5,
   },
-  // ── Lo que noté esta semana — the micro-observation list ───────
-  obs: {},
-  // The differentiator's eyebrow — oro, lifted above the gray chrome.
-  obsEyebrowLit: {
+  // Semana en una línea
+  dayLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+  },
+  dayCol: {
+    alignItems: 'center',
+    gap: 9,
+  },
+  dayLetter: {
     fontFamily: typography.uiBold,
     fontSize: 11,
-    letterSpacing: 1.8,
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: colors.niebla,
+  },
+  dayLetterFuture: {
+    color: colors.bruma,
+  },
+  dayMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPresent: {
+    backgroundColor: colors.magenta,
+  },
+  dayAbsent: {
+    borderWidth: 1.5,
+    borderColor: colors.bruma,
+  },
+  dayFuture: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: hexA(colors.leche, 0.12),
+  },
+  dayCheck: {
+    fontFamily: typography.uiBold,
+    fontSize: 12,
+    color: colors.leche,
+  },
+  // Otros hallazgos
+  findings: {
+    gap: 12,
+  },
+  findingRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  findingStar: {
+    fontFamily: typography.ui,
+    fontSize: 13,
     color: colors.oro,
-    marginBottom: 14,
-    marginLeft: 2,
+    marginTop: 1,
+  },
+  findingText: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    lineHeight: typography.sizes.bodyLarge * 1.5,
+  },
+  // Footer link
+  diaLink: {
+    alignSelf: 'center',
+    marginTop: 28,
+  },
+  diaLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
 })

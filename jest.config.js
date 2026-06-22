@@ -11,7 +11,10 @@
  */
 module.exports = {
   preset: 'jest-expo',
-  setupFiles: ['<rootDir>/jest.setup.ts'],
+  // El jestSetup de Skia registra jest.mock('@shopify/react-native-skia') → los
+  // componentes que lo importan (LunarConstellation, etc.) corren en jest sin el
+  // módulo nativo y sin tropezar con su ESM en transformIgnorePatterns.
+  setupFiles: ['@shopify/react-native-skia/jestSetup.js', '<rootDir>/jest.setup.ts'],
   testMatch: ['**/__tests__/**/*.test.(ts|tsx)'],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@tanstack|nativewind|react-native-css-interop|react-native-reanimated|react-native-gesture-handler))',

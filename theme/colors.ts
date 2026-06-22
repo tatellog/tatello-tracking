@@ -21,6 +21,9 @@ export const colors = {
   // ── Hairlines (alpha over leche) ───────────────────────────────
   hairline: 'rgba(244, 236, 222, 0.10)',
   hairlineStrong: 'rgba(244, 236, 222, 0.22)',
+  // Barely-there leche surface for read-only cards/pills that need a hint of
+  // body without becoming a panel (Órbita Día tablero, pills).
+  lecheTint: 'rgba(244, 236, 222, 0.04)',
 
   oro: '#D9AE6F',
   oroSoft: '#E8B872',
@@ -58,6 +61,14 @@ export const colors = {
     ciclo: '#B5C4DD', // cool silver-blue
     energia: '#FFC56B', // warm gold
     mente: '#C18FFF', // violet
+  },
+  // Sub-señales que NO son dimensiones (proteína, agua) pero llevan acento en
+  // los chips de Órbita. Antes vivían como hex sueltos en el componente y
+  // chocaban con la paleta: proteína era casi idéntica al índigo de sueño, y
+  // agua era el único cian frío-saturado. Reubicadas y diferenciadas.
+  signal: {
+    proteina: '#E0AEA0', // coral cálido — nutrición, distinto del índigo
+    agua: '#8FBEDB', // azul cielo calmado — menos neón que el cian previo
   },
 
   // ── Legacy Pearl Mauve aliases (deprecated — see file header) ──

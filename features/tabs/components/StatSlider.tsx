@@ -35,6 +35,8 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
 import { nextPhaseInfo, PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { computeTdee, enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
+import { useMacroInputs } from '@/features/profile/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
 import type { SleepDraft } from '@/features/sleep/api'
@@ -196,6 +198,15 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
         <Animated.View key={safeActive} entering={FadeIn.duration(280)}>
           <EyebrowLabel tone="magenta">{slides[safeActive]?.title ?? ''}</EyebrowLabel>
         </Animated.View>
+        {/* Strategy chip — only on the macros slide. Ties today's numbers
+            to the chosen enfoque ("Déficit moderado") as quiet context,
+            not a metric. Tapping it opens the goal editor. */}
+        {safeActive === 0 && ctx.targets ? (
+          <EnfoqueChip
+            targetCalories={ctx.targets.calories}
+            consumedCalories={ctx.today_macros.calories}
+          />
+        ) : null}
       </View>
 
       {width > 0 ? (
@@ -275,6 +286,45 @@ function Slide({
   return <Animated.View style={[{ width }, style]}>{children}</Animated.View>
 }
 
+/* Strategy chip in the macros header. For a deficit strategy it reads the
+ * LIVE day standing: while today's intake stays under maintenance (TDEE)
+ * the user is still losing, even past their calorie goal — "Aún en
+ * déficit" reframes going over the target as not-failure (manifiesto:
+ * context, no guilt). Once intake reaches maintenance it softens to a
+ * neutral "En tu mantenimiento". Surplus / maintain keep the static
+ * enfoque label. Quiet by design; renders nothing without a TDEE. */
+function EnfoqueChip({
+  targetCalories,
+  consumedCalories,
+}: {
+  targetCalories: number
+  consumedCalories: number
+}) {
+  const { inputs } = useMacroInputs()
+  const state = reconstructState(targetCalories, inputs)
+  if (!state) return null
+  // `state` is non-null only when a TDEE exists, so this is always a number.
+  const tdee = computeTdee(inputs)
+  const label =
+    state.enfoque === 'deficit' && tdee != null
+      ? consumedCalories < tdee
+        ? 'Aún en déficit'
+        : 'En tu mantenimiento'
+      : enfoqueLabel(state.enfoque, state.level)
+  // Pure status, not a button: editing lives on the cards ("Ajustar ›"),
+  // so the chip is only context and never surprises with a navigation.
+  return (
+    <View
+      style={styles.enfoqueChip}
+      accessibilityRole="text"
+      accessibilityLabel={`Tu enfoque hoy: ${label}`}
+    >
+      <View style={styles.enfoqueDot} />
+      <Text style={styles.enfoqueChipText}>{label}</Text>
+    </View>
+  )
+}
+
 /* ─── Slide 1 — today's macros ─────────────────────────────────────── */
 
 function MacroSlide({ ctx }: { ctx: BriefContext }) {
@@ -303,14 +353,14 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
   const calSubtitle = calOver > 0 ? `+${calOver} kcal` : `/ ${caloriesTarget} kcal`
 
   // Línea honesta "cuánto te falta/queda" (copy autorizado para macros).
-  // Proteína: meta a alcanzar → "Te faltan N g". Calorías: presupuesto →
-  // "Te quedan N kcal"; si te pasaste, el +N del subtítulo ya lo dice (sin
+  // Al cumplir, voz cálida — NO checklist ("✓ Meta cumplida" suena a app de
+  // hábitos): proteína "cerrada" (vocabulario que ya usa el coach), calorías
+  // "En tu meta". Si te pasaste, el +N del subtítulo ya lo dice solo (sin
   // "te pasaste", manifiesto).
   const proteinLeft = Math.max(0, Math.round(ctx.targets.protein_g - ctx.today_macros.protein_g))
-  const proteinRemaining = proteinLeft > 0 ? `Te faltan ${proteinLeft} g` : 'Meta cumplida ✓'
+  const proteinRemaining = proteinLeft > 0 ? `Te faltan ${proteinLeft} g` : 'Proteína cerrada'
   const calLeft = Math.max(0, Math.round(caloriesTarget - caloriesConsumed))
-  const calRemaining =
-    calOver > 0 ? null : calLeft > 0 ? `Te quedan ${calLeft} kcal` : 'Meta cumplida ✓'
+  const calRemaining = calOver > 0 ? null : calLeft > 0 ? `Te quedan ${calLeft} kcal` : 'En tu meta'
   return (
     <View style={[styles.slide, styles.macroRow]}>
       {/* Each card cascades in (FadeInDown staggered) on first paint
@@ -340,7 +390,14 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
           formatted={Math.round(caloriesConsumed).toString()}
           unitSuffix={calSubtitle}
           remainingText={calRemaining}
-          ringColor={colors.magenta}
+          // Calorías es contexto, no presupuesto: su renglón va en tono quiet
+          // (niebla, nota al pie) para no leerse como countdown (manifiesto).
+          remainingTone="quiet"
+          // Proteína es la métrica más cuidada (recomposición): se queda con
+          // el magenta pleno y la tarjeta grande. Calorías recede un tono
+          // (magenta profundo) para que el ojo aterrice primero en proteína,
+          // sin sacar el dato del sistema de marca.
+          ringColor={colors.magentaDeep}
           ringDelay={600}
           small
           onPress={editTargets}
@@ -1067,6 +1124,31 @@ const styles = StyleSheet.create({
   header: {
     marginTop: 22,
     marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  // Strategy chip: quiet pill, magenta dot + bone label, hairline border.
+  enfoqueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 100,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+  },
+  enfoqueDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.magenta,
+  },
+  enfoqueChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.micro,
+    color: colors.bone,
   },
   measurePlaceholder: {
     height: 150,

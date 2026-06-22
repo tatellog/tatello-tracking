@@ -6,6 +6,7 @@ import { todayInTimezone } from '@/lib/time'
 import { getMealsInRange } from '@/features/macros/api'
 
 import { getTodaySignals, getWeekSignals, hasAnySignals } from './api'
+import { isoTwoWeekRange } from './week-orbit-logic'
 
 /*
  * Today's órbita signals — the data behind the Día segment's orbital
@@ -50,6 +51,25 @@ export function useWeekSignals() {
     queryFn: () => getWeekSignals(from, to),
     staleTime: 60_000,
   })
+}
+
+/*
+ * TWO-week window (last Monday → today) for the redesigned Semana (Órbita)
+ * view. Two weeks so the view can compare the current week with the previous
+ * one (Señal Naciente); every pure consumer filters to its own week, so
+ * passing both weeks is safe. Monday-first to match the "L·M·M·J·V·S·D" line.
+ * Returns the signals plus `todayIso` (same day source) so the pure logic
+ * stays deterministic. Distinct cache key from the Sunday-based week above.
+ */
+export function useIsoWeekSignals() {
+  const todayIso = todayInTimezone()
+  const { from, to } = isoTwoWeekRange(todayIso)
+  const query = useQuery({
+    queryKey: queryKeys.orbit.week(from, to),
+    queryFn: () => getWeekSignals(from, to),
+    staleTime: 60_000,
+  })
+  return { ...query, todayIso }
 }
 
 /*

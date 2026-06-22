@@ -1,23 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="820" fill="none" viewBox="0 0 820 820">
-  <!-- Orbital arc (tapered dust trail) connecting the three phases -->
-  <path fill="#EEDD91" fill-opacity="0.30" d="M214 446 C 304 386, 364 360, 410 360 C 478 360, 528 392, 612 446 C 528 432, 472 414, 410 414 C 348 414, 296 430, 214 446 Z"/>
-  <!-- LEFT: waxing crescent (boolean diff via single closed path) -->
-  <path fill="#EEDD91" d="M230 360 C 268 360, 300 392, 300 430 C 300 468, 268 500, 230 500 C 256 488, 272 462, 272 430 C 272 398, 256 372, 230 360 Z"/>
-  <!-- CENTRE: full disc, shifted up ~20 from row line -->
-  <circle cx="410" cy="390" r="90" fill="#EEDD91"/>
-  <!-- Inner crescent of light on centre disc (volume trick, matches energy) -->
-  <path fill="#DCCC7B" fill-opacity="0.5" d="M340 348 C 354 318, 388 302, 422 308 C 392 312, 366 332, 354 360 C 344 384, 344 410, 354 432 C 332 408, 326 374, 340 348 Z"/>
-  <!-- RIGHT: waning crescent (mirror of left) -->
-  <path fill="#EEDD91" d="M590 360 C 552 360, 520 392, 520 430 C 520 468, 552 500, 590 500 C 564 488, 548 462, 548 430 C 548 398, 564 372, 590 360 Z"/>
-  <!-- Satellite: 4-point star top-right of left crescent -->
-  <path fill="#EEDD91" d="M312 304 L316 318 L312 332 L308 318 Z M298 318 L312 314 L326 318 L312 322 Z"/>
-  <!-- Satellite: tiny dot below centre disc -->
-  <circle cx="404" cy="528" r="4" fill="#DCCC7B"/>
-  <!-- Satellites: two dust motes around right crescent -->
-  <circle cx="652" cy="498" r="6" fill="#EEDD91" fill-opacity="0.7"/>
-  <circle cx="678" cy="370" r="7" fill="#EEDD91" fill-opacity="0.5"/>
-  <!-- Satellite: balance dot lower-left third -->
-  <circle cx="186" cy="588" r="5" fill="#EEDD91" fill-opacity="0.65"/>
-  <!-- Cool-silver accent dot (upper third) — signals ciclo ≠ sueño -->
-  <circle cx="486" cy="232" r="5" fill="#D9D2C0" fill-opacity="0.6"/>
+  <!-- Lunar cycle: one clean orbital ring with three graduated moon phases.
+       Redrawn to read at chip size (22px) — the old three-crescent + dust-mote
+       composition turned to mud when small. Family palette #EEDD91 / #DCCC7B /
+       #9A8F40, fill-only, no human forms. -->
+  <!-- Orbital ring -->
+  <circle cx="410" cy="410" r="250" stroke="#EEDD91" stroke-width="40" fill="none"/>
+  <!-- Full moon at the top of the orbit -->
+  <circle cx="410" cy="160" r="96" fill="#EEDD91"/>
+  <!-- Soft lit side on the full moon (volume, matches family) -->
+  <circle cx="372" cy="138" r="44" fill="#DCCC7B" fill-opacity="0.55"/>
+  <!-- Waning phase, lower-left of the orbit -->
+  <circle cx="234" cy="586" r="44" fill="#DCCC7B"/>
+  <!-- New phase, lower-right of the orbit -->
+  <circle cx="586" cy="586" r="28" fill="#9A8F40"/>
 </svg>

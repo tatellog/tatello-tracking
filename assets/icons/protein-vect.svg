@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="820" fill="none" viewBox="0 0 820 820">
+  <!-- Protein: an egg. Clean, calm, universally nutritional (not a water drop,
+       not a gym dumbbell). Family palette #EEDD91 / #DCCC7B, fill-only,
+       legible at chip size (22px). -->
+  <!-- Egg body (narrower top, rounder bottom) -->
+  <path fill="#EEDD91" d="M410 150 C 502 150 570 302 570 432 C 570 564 498 670 410 670 C 322 670 250 564 250 432 C 250 302 318 150 410 150 Z"/>
+  <!-- Soft lit side for volume (matches family) -->
+  <path fill="#DCCC7B" fill-opacity="0.5" d="M410 150 C 502 150 570 302 570 432 C 570 564 498 670 410 670 C 470 620 504 528 504 432 C 504 320 466 218 410 150 Z"/>
+</svg>

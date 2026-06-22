@@ -1,10 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,27 +14,247 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { DeficitSlider } from '@/features/macros/components/DeficitSlider'
+import { EnfoqueSelector } from '@/features/macros/components/EnfoqueSelector'
+import { MacroPreviewCard } from '@/features/macros/components/MacroPreviewCard'
 import { MacroTargetsInputSchema, type MacroTargetsInput } from '@/features/macros/api'
 import { useMacroTargets, useUpsertMacroTargets } from '@/features/macros/hooks'
+import {
+  computeTdee,
+  levelsFor,
+  macrosForDelta,
+  reconstructState,
+  type Enfoque,
+  type Nivel,
+} from '@/features/profile/calcMacros'
+import { useMacroInputs } from '@/features/profile/hooks'
 import { colors, radius, spacing, typography } from '@/theme'
 
 type Source = 'banner' | 'settings' | 'onboarding' | undefined
 
+// Plain-language definition of each enfoque, shown in the note card so
+// the user understands what they're choosing. Warm, no clinical terms,
+// no pressure (manifiesto): describes the strategy, never commands it.
+const ENFOQUE_INFO: Record<Enfoque, { name: string; desc: string }> = {
+  deficit: {
+    name: 'Déficit',
+    desc: 'Comes un poco menos de lo que tu cuerpo gasta. Así usa tu reserva como energía y bajas de grasa sin prisa.',
+  },
+  maintain: {
+    name: 'Mantenimiento',
+    desc: 'Comes más o menos lo que gastas. Sostienes tu peso mientras cuidas tu energía y tus hábitos.',
+  },
+  surplus: {
+    name: 'Superávit',
+    desc: 'Comes un poco más de lo que gastas, con buena proteína, para darle a tu cuerpo material para ganar músculo.',
+  },
+}
+
 /*
- * Single screen for both 'set first targets' and 'edit existing
- * targets'. The copy reflects which state the user is in, derived
- * from the targets query (exists → edit mode, null → first time).
- * The `source` query param only affects the back/cancel behaviour
- * because different entry points have different 'home' destinations.
+ * Goal editor. The rich path lets the user pick an enfoque (déficit /
+ * mantenimiento / superávit) and a nivel; we recompute the macros live
+ * from their profile's TDEE and persist only calories + protein (fat /
+ * carbs derive). When the profile can't yield a TDEE (missing weight /
+ * height / age), we fall back to the manual two-field form so the
+ * screen never dead-ends. The `source` param only steers back/cancel.
  */
 export default function MacroTargetsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { source } = useLocalSearchParams<{ source?: Source }>()
+
+  const { inputs, isLoading: inputsLoading } = useMacroInputs()
   const targetsQuery = useMacroTargets()
-  const upsert = useUpsertMacroTargets()
 
   const existing = targetsQuery.data
+  const tdee = computeTdee(inputs)
+  const canCompute = tdee != null
+
+  const goHome = () => {
+    if (source === 'banner' || source === 'settings') {
+      if (router.canGoBack()) router.back()
+      else router.replace('/(tabs)')
+    } else {
+      router.replace('/(tabs)')
+    }
+  }
+
+  // Still resolving profile + targets — render nothing rather than
+  // flashing the manual fallback before the TDEE is known.
+  if (inputsLoading || targetsQuery.isLoading) {
+    return <View style={[styles.screen, { paddingTop: insets.top }]} />
+  }
+
+  if (!canCompute) {
+    return (
+      <ManualTargets
+        insets={insets}
+        existing={existing ? { protein_g: existing.protein_g, calories: existing.calories } : null}
+        onSaved={goHome}
+        onCancel={goHome}
+      />
+    )
+  }
+
+  return (
+    <GoalEditor
+      insets={insets}
+      inputs={inputs}
+      tdee={tdee}
+      savedCalories={existing?.calories ?? null}
+      onSaved={goHome}
+      onCancel={goHome}
+    />
+  )
+}
+
+/* ─── rich editor (profile complete) ─────────────────────────────── */
+
+type EditorProps = {
+  insets: ReturnType<typeof useSafeAreaInsets>
+  inputs: ReturnType<typeof useMacroInputs>['inputs']
+  tdee: number
+  savedCalories: number | null
+  onSaved: () => void
+  onCancel: () => void
+}
+
+function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: EditorProps) {
+  const router = useRouter()
+  const upsert = useUpsertMacroTargets()
+
+  const [enfoque, setEnfoque] = useState<Enfoque>('deficit')
+  const [nivel, setNivel] = useState<Nivel>('moderate')
+  const inited = useRef(false)
+
+  // Seed the controls from the saved target (or the profile's intention)
+  // once, when data is ready.
+  useEffect(() => {
+    if (inited.current) return
+    inited.current = true
+    if (savedCalories != null) {
+      const state = reconstructState(savedCalories, inputs)
+      if (state) {
+        setEnfoque(state.enfoque)
+        if (state.level) setNivel(state.level)
+        return
+      }
+    }
+    setEnfoque(inputs.monthly_focus === 'weight' ? 'deficit' : 'maintain')
+  }, [savedCalories, inputs])
+
+  const stops = levelsFor(enfoque)
+  const delta = enfoque === 'maintain' ? 0 : (stops.find((s) => s.key === nivel)?.delta ?? 0)
+  const preview = macrosForDelta(inputs, enfoque, delta)
+
+  const onSave = async () => {
+    if (!preview) return
+    try {
+      await upsert.mutateAsync({ protein_g: preview.protein_g, calories: preview.calories })
+      onSaved()
+    } catch {
+      // Mutation error surfaces below; keep the screen open to retry.
+    }
+  }
+
+  const levelLabel = stops.find((s) => s.key === nivel)?.label ?? ''
+  const nivelHeading = enfoque === 'surplus' ? 'NIVEL DE SUPERÁVIT' : 'NIVEL DE DÉFICIT'
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* Top bar: back + Guardar */}
+      <View style={styles.topbar}>
+        <Pressable onPress={onCancel} hitSlop={12} style={styles.backBtn}>
+          <Text style={styles.backGlyph}>‹</Text>
+        </Pressable>
+        <Pressable onPress={onSave} disabled={upsert.isPending || !preview} hitSlop={12}>
+          <Text style={[styles.save, (upsert.isPending || !preview) && styles.saveDisabled]}>
+            {upsert.isPending ? 'Guardando…' : 'Guardar'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.head}>
+          <Text style={styles.headline}>Ajusta tus objetivos</Text>
+          <Text style={styles.editorial}>
+            Personaliza tu enfoque. Nosotros recalculamos tus macros.
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <EyebrowLabel tone="niebla" size={10} tracking={2.4}>
+            ELIGE TU ENFOQUE
+          </EyebrowLabel>
+          <EnfoqueSelector value={enfoque} onChange={setEnfoque} />
+        </View>
+
+        {enfoque !== 'maintain' ? (
+          <View style={styles.section}>
+            <View style={styles.nivelRow}>
+              <EyebrowLabel tone="niebla" size={10} tracking={2.4}>
+                {nivelHeading}
+              </EyebrowLabel>
+              <Text style={styles.nivelValue}>
+                {levelLabel} ({delta > 0 ? '+' : ''}
+                {delta} kcal)
+              </Text>
+            </View>
+            <DeficitSlider stops={stops} value={nivel} onChange={setNivel} />
+          </View>
+        ) : null}
+
+        {preview ? (
+          <MacroPreviewCard
+            title="VISTA PREVIA DE TUS NUEVOS OBJETIVOS"
+            macros={preview}
+            weightKg={inputs.weight_kg ?? 0}
+            delta={delta}
+          />
+        ) : null}
+
+        <Pressable
+          onPress={() => router.push('/macro-breakdown')}
+          style={styles.calcLink}
+          hitSlop={8}
+        >
+          <Text style={styles.calcLinkText}>¿Cómo se calcula? ›</Text>
+        </Pressable>
+
+        <View style={styles.note}>
+          <Text style={styles.noteGlyph}>✦</Text>
+          <View style={styles.noteBody}>
+            <Text style={styles.noteTitle}>{ENFOQUE_INFO[enfoque].name}</Text>
+            <Text style={styles.noteText}>{ENFOQUE_INFO[enfoque].desc}</Text>
+          </View>
+        </View>
+
+        {upsert.isError ? (
+          <Text style={styles.errorText}>No se pudo guardar. Intenta de nuevo.</Text>
+        ) : null}
+      </ScrollView>
+    </View>
+  )
+}
+
+/* ─── manual fallback (profile incomplete) ───────────────────────── */
+
+function ManualTargets({
+  insets,
+  existing,
+  onSaved,
+  onCancel,
+}: {
+  insets: ReturnType<typeof useSafeAreaInsets>
+  existing: MacroTargetsInput | null
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const upsert = useUpsertMacroTargets()
   const isEdit = Boolean(existing)
 
   const { control, handleSubmit, formState } = useForm<MacroTargetsInput>({
@@ -41,26 +263,16 @@ export default function MacroTargetsScreen() {
       protein_g: existing?.protein_g ?? 130,
       calories: existing?.calories ?? 1800,
     },
-    values: existing ? { protein_g: existing.protein_g, calories: existing.calories } : undefined,
+    values: existing ?? undefined,
   })
 
   const onSubmit = async (values: MacroTargetsInput) => {
     try {
       await upsert.mutateAsync(values)
-      if (source === 'banner' || source === 'settings') {
-        router.back()
-      } else {
-        router.replace('/(tabs)')
-      }
+      onSaved()
     } catch {
-      // Error will be visible via the mutation's error state; the
-      // form stays open so the user can retry without losing input.
+      // Error visible via the mutation state; the form stays open.
     }
-  }
-
-  const onCancel = () => {
-    if (router.canGoBack()) router.back()
-    else router.replace('/(tabs)')
   }
 
   return (
@@ -69,7 +281,7 @@ export default function MacroTargetsScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.container}>
+        <View style={styles.manualContainer}>
           <View style={{ gap: spacing.sm }}>
             <Text style={styles.meta}>METAS DIARIAS</Text>
             <Text style={styles.headline}>
@@ -80,51 +292,42 @@ export default function MacroTargetsScreen() {
             </Text>
           </View>
 
-          <View style={styles.middle}>
-            <View style={styles.stack}>
-              <Controller
-                control={control}
-                name="protein_g"
-                render={({ field, fieldState }) => (
-                  <NumberField
-                    label="Proteína"
-                    suffix="g"
-                    placeholder="130"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    onBlur={field.onBlur}
-                    error={fieldState.error?.message}
-                  />
-                )}
-              />
-              <Controller
-                control={control}
-                name="calories"
-                render={({ field, fieldState }) => (
-                  <NumberField
-                    label="Calorías"
-                    suffix="cal"
-                    placeholder="1800"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    onBlur={field.onBlur}
-                    error={fieldState.error?.message}
-                  />
-                )}
-              />
-            </View>
-
-            {/* Informativo (solo lectura): de dónde salen los números, para que
-                la usuaria entienda en qué se basa su meta. Voz de guía, no de
-                regla (manifiesto: macros son guías, no prescripciones). */}
+          <View style={{ gap: spacing.lg }}>
+            <Controller
+              control={control}
+              name="protein_g"
+              render={({ field, fieldState }) => (
+                <NumberField
+                  label="Proteína"
+                  suffix="g"
+                  placeholder="130"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onBlur={field.onBlur}
+                  error={fieldState.error?.message}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="calories"
+              render={({ field, fieldState }) => (
+                <NumberField
+                  label="Calorías"
+                  suffix="cal"
+                  placeholder="1800"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onBlur={field.onBlur}
+                  error={fieldState.error?.message}
+                />
+              )}
+            />
             <View style={styles.infoCard}>
               <Text style={styles.infoTitle}>DE DÓNDE SALE</Text>
               <Text style={styles.infoText}>
-                Tu meta se calcula desde tu perfil: peso, estatura, edad, sexo y qué tan seguido te
-                mueves, más tu objetivo. La proteína se calcula a partir de tu peso.
-              </Text>
-              <Text style={styles.infoText}>
-                En Hoy, lo consumido es la suma de las comidas que registras en el día.
+                Completa tu perfil (peso, estatura, edad) para calcular tus metas automáticamente.
+                Mientras tanto, puedes ajustarlas a mano aquí.
               </Text>
               <Text style={styles.infoText}>Es una guía, no una regla.</Text>
             </View>
@@ -177,7 +380,6 @@ function NumberField({
         <TextInput
           value={value ? String(value) : ''}
           onChangeText={(text) => {
-            // Coerce empty to 0; react-hook-form + zod reports invalid.
             const n = text === '' ? 0 : Number(text.replace(/[^0-9]/g, ''))
             onChangeText(Number.isFinite(n) ? n : 0)
           }}
@@ -198,16 +400,103 @@ function NumberField({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  container: {
+
+  // ── rich editor ──
+  topbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -8,
+  },
+  backGlyph: {
+    fontFamily: typography.ui,
+    fontSize: 30,
+    lineHeight: 32,
+    color: colors.leche,
+  },
+  save: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    color: colors.magenta,
+  },
+  saveDisabled: {
+    opacity: 0.4,
+  },
+  scroll: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    gap: spacing.xxl,
+  },
+  head: { gap: spacing.sm },
+  section: { gap: spacing.md },
+  nivelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  nivelValue: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+  },
+  calcLink: {
+    alignSelf: 'flex-start',
+    marginTop: -spacing.md,
+  },
+  calcLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  note: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    padding: spacing.md,
+    borderRadius: radius.tile,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.oroTint,
+  },
+  noteGlyph: {
+    fontFamily: typography.ui,
+    fontSize: 13,
+    color: colors.oro,
+    marginTop: 1,
+  },
+  noteBody: {
+    flex: 1,
+    gap: 3,
+  },
+  noteTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  noteText: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    lineHeight: typography.sizes.body * typography.lineHeight.body,
+  },
+
+  // ── manual fallback ──
+  manualContainer: {
     flex: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xxl,
     paddingBottom: spacing.xl,
     justifyContent: 'space-between',
   },
-  middle: { gap: spacing.lg },
-  stack: { gap: spacing.lg },
-  // Bloque informativo de "de dónde sale" — solo lectura, tono guía.
   infoCard: {
     gap: spacing.sm,
     padding: spacing.md,
@@ -280,8 +569,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.magenta,
   },
-  // Dim the magenta pill while saving / invalid, rather than swapping it
-  // for a flat fill — keeps the button identity, just quietens it.
   primaryDisabled: {
     opacity: 0.4,
   },

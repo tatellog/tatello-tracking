@@ -1,0 +1,230 @@
+import {
+  appearanceCount,
+  buildAppearanceLine,
+  buildWeekDimensions,
+  buildWeekFindings,
+  isoTwoWeekRange,
+  isoWeekRange,
+  mondayOf,
+  mostRepeated,
+  needsAttention,
+  risingSignal,
+  WEEK_DIM_ORDER,
+} from '../week-orbit-logic'
+import { mkSig } from './signals.fixture'
+
+// Semana de referencia: lunes 2026-06-15 … domingo 2026-06-21.
+const MON = '2026-06-15'
+const TUE = '2026-06-16'
+const WED = '2026-06-17'
+const THU = '2026-06-18'
+const FRI = '2026-06-19'
+const SUN = '2026-06-21'
+const CTX = { proteinTarget: 130 }
+
+describe('fechas ISO (lunes-primero)', () => {
+  it('mondayOf cae en lunes para cualquier día de la semana', () => {
+    expect(mondayOf(SUN)).toBe(MON)
+    expect(mondayOf(WED)).toBe(MON)
+    expect(mondayOf(MON)).toBe(MON)
+  })
+
+  it('isoWeekRange va de lunes a hoy', () => {
+    expect(isoWeekRange(WED)).toEqual({ from: MON, to: WED })
+  })
+
+  it('isoTwoWeekRange arranca el lunes de la semana pasada', () => {
+    expect(isoTwoWeekRange(SUN)).toEqual({ from: '2026-06-08', to: SUN })
+  })
+})
+
+describe('risingSignal (Señal Naciente vs. semana pasada)', () => {
+  // Semana pasada: lun 2026-06-08 … dom 2026-06-14.
+  const lastWeek = (d: number, o: object) => mkSig(`2026-06-${String(8 + d).padStart(2, '0')}`, o)
+
+  it('detecta la dimensión que más creció en la misma ventana', () => {
+    const signals = [
+      // Semana pasada: agua 1 día.
+      lastWeek(0, { water_glasses: 5, meal_count: 1 }),
+      // Esta semana: agua 4 días (creció +3).
+      mkSig(MON, { water_glasses: 5, meal_count: 1 }),
+      mkSig(TUE, { water_glasses: 5 }),
+      mkSig(WED, { water_glasses: 5 }),
+      mkSig(THU, { water_glasses: 5 }),
+    ]
+    const r = risingSignal(signals, SUN, CTX)
+    expect(r?.key).toBe('agua')
+    expect(r?.last).toBe(1)
+    expect(r?.current).toBe(4)
+  })
+
+  it('compara la MISMA ventana de días transcurridos (no semana completa)', () => {
+    // Hoy = martes (2 días): solo cuentan lun+mar de cada semana.
+    const signals = [
+      lastWeek(0, { meal_count: 1 }), // lun pasado (en ventana) → base de comparación
+      lastWeek(4, { trained: true }), // vie pasado: FUERA de la ventana lun-mar → se ignora
+      mkSig(MON, { trained: true }),
+      mkSig(TUE, { trained: true }), // hoy=mar → movimiento 2 esta semana, 0 en la ventana pasada
+    ]
+    const r = risingSignal(signals, TUE, CTX)
+    expect(r?.key).toBe('movimiento')
+    expect(r?.last).toBe(0)
+    expect(r?.current).toBe(2)
+  })
+
+  it('null sin base de comparación (semana pasada vacía)', () => {
+    const signals = [mkSig(MON, { water_glasses: 5 }), mkSig(TUE, { water_glasses: 5 })]
+    expect(risingSignal(signals, SUN, CTX)).toBeNull()
+  })
+
+  it('null si nada creció lo suficiente (ruido 0→1)', () => {
+    const signals = [
+      lastWeek(0, { meal_count: 1 }),
+      mkSig(MON, { meal_count: 1, water_glasses: 5 }),
+    ]
+    // comida igual (1 vs 1), agua +1 (0→1) < MIN_RISE.
+    expect(risingSignal(signals, SUN, CTX)).toBeNull()
+  })
+})
+
+describe('buildWeekDimensions', () => {
+  it('cuenta días presentes por dimensión, total = días transcurridos', () => {
+    // Semana completa (domingo): movimiento 2, comida 3, proteína 2, agua 1.
+    const signals = [
+      mkSig(MON, { trained: true, meal_count: 3, protein_g: 140, water_glasses: 5 }),
+      mkSig(TUE, { meal_count: 2, protein_g: 100 }),
+      mkSig(WED, { trained: true, meal_count: 1, protein_g: 130 }),
+    ]
+    const dims = buildWeekDimensions(signals, SUN, CTX)
+    const by = (k: string) => dims.find((d) => d.key === k)!
+    expect(dims.map((d) => d.key)).toEqual([...WEEK_DIM_ORDER])
+    expect(by('movimiento').present).toBe(2)
+    expect(by('comida').present).toBe(3)
+    expect(by('proteina').present).toBe(2) // 140 y 130 ≥ 130; 100 no
+    expect(by('agua').present).toBe(1)
+    expect(by('sueno').present).toBe(0)
+    expect(by('comida').total).toBe(7) // domingo → 7 días transcurridos
+    expect(by('comida').ratio).toBeCloseTo(3 / 7)
+  })
+
+  it('total = días transcurridos a media semana (miércoles → 3)', () => {
+    const dims = buildWeekDimensions([mkSig(MON, { meal_count: 1 })], WED, CTX)
+    expect(dims[0]!.total).toBe(3)
+  })
+
+  it('ignora señales fuera de la semana en curso', () => {
+    const lastWeek = '2026-06-08'
+    const dims = buildWeekDimensions(
+      [mkSig(lastWeek, { trained: true }), mkSig(MON, { trained: true })],
+      SUN,
+      CTX,
+    )
+    expect(dims.find((d) => d.key === 'movimiento')?.present).toBe(1)
+  })
+
+  it('sin meta de proteína, basta con registrarla', () => {
+    const dims = buildWeekDimensions([mkSig(MON, { protein_g: 40 })], SUN, {
+      proteinTarget: null,
+    })
+    expect(dims.find((d) => d.key === 'proteina')?.present).toBe(1)
+  })
+})
+
+describe('mostRepeated / needsAttention', () => {
+  const signals = [
+    mkSig(MON, { trained: true, meal_count: 2, water_glasses: 4, protein_g: 140 }),
+    mkSig(TUE, { trained: true, meal_count: 2 }),
+    mkSig(WED, { meal_count: 2 }),
+  ]
+  // Conteos: comida 3, movimiento 2, proteína 1, agua 1, sueño 0 (mín. único).
+  const dims = buildWeekDimensions(signals, SUN, CTX)
+
+  it('mostRepeated elige la dimensión con más días (comida 3)', () => {
+    expect(mostRepeated(dims)?.dim.key).toBe('comida')
+    expect(mostRepeated(dims)?.line).toMatch(/comidas/i)
+  })
+
+  it('needsAttention elige la de menos días, distinta del tope', () => {
+    expect(needsAttention(dims)?.dim.key).toBe('sueno')
+  })
+
+  it('mostRepeated es null cuando nada apareció', () => {
+    const empty = buildWeekDimensions([], SUN, CTX)
+    expect(mostRepeated(empty)).toBeNull()
+    expect(needsAttention(empty)).toBeNull()
+  })
+
+  it('needsAttention se suprime en semana redonda (todo presente cada día)', () => {
+    const perfect = buildWeekDimensions(
+      [
+        mkSig(MON, {
+          trained: true,
+          meal_count: 1,
+          protein_g: 130,
+          water_glasses: 8,
+          sleep_minutes: 450,
+        }),
+      ],
+      MON, // lunes: total = 1, y todo presente ese día
+      CTX,
+    )
+    expect(needsAttention(perfect)).toBeNull()
+  })
+})
+
+describe('buildAppearanceLine', () => {
+  it('marca presente / ausente / futuro en orden lunes-primero', () => {
+    const signals = [mkSig(MON, { trained: true }), mkSig(WED, { meal_count: 1 })]
+    const line = buildAppearanceLine(signals, THU) // hoy = jueves
+    expect(line.map((c) => c.letter)).toEqual(['L', 'M', 'M', 'J', 'V', 'S', 'D'])
+    expect(line.map((c) => c.state)).toEqual([
+      'present', // L
+      'absent', // M (martes, sin registro)
+      'present', // M (miércoles)
+      'absent', // J (hoy, sin registro aún)
+      'future', // V
+      'future', // S
+      'future', // D
+    ])
+    expect(appearanceCount(line)).toBe(2)
+  })
+})
+
+describe('buildWeekFindings', () => {
+  it('detecta mejor sueño en días de entreno cuando hay margen', () => {
+    const signals = [
+      mkSig(MON, { trained: true, sleep_minutes: 460 }),
+      mkSig(TUE, { trained: true, sleep_minutes: 450 }),
+      mkSig(WED, { sleep_minutes: 380 }),
+    ]
+    const findings = buildWeekFindings(signals, SUN)
+    expect(findings.some((f) => f.key === 'trained-sleep')).toBe(true)
+  })
+
+  it('no afirma correlación de sueño sin margen suficiente', () => {
+    const signals = [
+      mkSig(MON, { trained: true, sleep_minutes: 400 }),
+      mkSig(TUE, { trained: true, sleep_minutes: 405 }),
+      mkSig(WED, { sleep_minutes: 400 }),
+    ]
+    expect(buildWeekFindings(signals, SUN).some((f) => f.key === 'trained-sleep')).toBe(false)
+  })
+
+  it('reporta la mejor racha de comida (consecutiva) y los días que apareciste', () => {
+    const signals = [
+      mkSig(MON, { meal_count: 2 }),
+      mkSig(TUE, { meal_count: 1 }),
+      mkSig(WED, { meal_count: 3 }),
+      mkSig(FRI, { trained: true }), // gap el jueves corta la racha
+    ]
+    const findings = buildWeekFindings(signals, SUN)
+    const streak = findings.find((f) => f.key === 'meal-streak')
+    expect(streak?.text).toMatch(/3 días/)
+    const appeared = findings.find((f) => f.key === 'appeared')
+    expect(appeared?.text).toMatch(/Apareciste 4 días/)
+  })
+
+  it('sin datos no inventa hallazgos', () => {
+    expect(buildWeekFindings([], SUN)).toEqual([])
+  })
+})

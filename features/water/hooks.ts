@@ -41,6 +41,8 @@ export function useSetWater(date: string) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.water.day(date) })
+      // El chip de Agua de Órbita lee water_glasses del view daily_signals.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }
@@ -90,6 +92,7 @@ export function useSaveMealHydration() {
       qc.invalidateQueries({ queryKey: queryKeys.water.all })
       qc.invalidateQueries({ queryKey: queryKeys.water.meal(variables.mealId) })
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }
@@ -107,6 +110,7 @@ export function useAddDirectWater() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.water.all })
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

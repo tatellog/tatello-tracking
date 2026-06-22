@@ -148,7 +148,7 @@ describe('formatTrendCopy', () => {
 
   it('describes an up trend without alarming language', () => {
     const copy = formatTrendCopy({ direction: 'up', weeklyChange: 0.1 })
-    expect(copy).toMatch(/sub[íi]|asciende|rumbo/i)
+    expect(copy).toMatch(/sube|asciende|rumbo/i)
   })
 
   it('describes flat trend as calm/sustained', () => {

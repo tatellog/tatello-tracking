@@ -268,9 +268,24 @@ export type RevealedEmblemProps = {
   transformProgress: number
   /** Lado del lienzo cuadrado en px (canvasPx del padre). */
   size: number
+  /* Opacidades — default = receso para Tab Hoy (el emblema debe RECEDER tras la
+   * constelación natal magenta). En Órbita Mes NO hay constelación encima y el
+   * emblema ES el protagonista, así que esa vista las sube para coronar. */
+  masterOpacity?: number
+  frameOpacity?: number
+  glyphOpacity?: number
+  bloomMaxOpacity?: number
 }
 
-export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblemProps) {
+export function RevealedEmblem({
+  sign,
+  transformProgress,
+  size,
+  masterOpacity = MASTER_OPACITY,
+  frameOpacity = FRAME_OPACITY,
+  glyphOpacity = GLYPH_OPACITY,
+  bloomMaxOpacity = BLOOM_MAX_OPACITY,
+}: RevealedEmblemProps) {
   const frames = FRAMES_BY_SIGN[sign]
   const Glyph = GLYPH_BY_SIGN[sign]
   const animalSrc = frames ? frames[frameIndexFor(transformProgress)] : null
@@ -323,7 +338,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           top: archY,
           width: archW,
           height: archH,
-          opacity: FRAME_OPACITY,
+          opacity: frameOpacity,
         }}
       />
       <Image
@@ -336,7 +351,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           top: lionY,
           width: lionW,
           height: lionH,
-          opacity: MASTER_OPACITY,
+          opacity: masterOpacity,
         }}
       />
 
@@ -344,10 +359,10 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
           si aún no carga la textura, no hay bloom (jamás blanquea la figura). */}
       {bloomT > 0 && animalSkia ? (
         <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Group opacity={MASTER_OPACITY}>
+          <Group opacity={masterOpacity}>
             <Group
               layer={
-                <Paint opacity={bloomT * BLOOM_MAX_OPACITY} blendMode="screen">
+                <Paint opacity={bloomT * bloomMaxOpacity} blendMode="screen">
                   <Blur blur={bloomRadius} />
                 </Paint>
               }
@@ -379,7 +394,7 @@ export function RevealedEmblem({ sign, transformProgress, size }: RevealedEmblem
             },
           ]}
         >
-          <Glyph width="100%" height="100%" color={colors.oro} opacity={GLYPH_OPACITY} />
+          <Glyph width="100%" height="100%" color={colors.oro} opacity={glyphOpacity} />
         </View>
       ) : null}
     </Animated.View>

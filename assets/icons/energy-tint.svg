@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="820" fill="none" viewBox="0 0 820 820">
+  <!-- Sun disc -->
+  <circle cx="410" cy="420" r="130" fill="currentColor"/>
+  <!-- Inner crescent of light (volume trick): top-left lit hemisphere -->
+  <path fill="currentColor" d="M308 358c12-44 52-77 102-83 18-2 36 0 53 6-44 4-83 24-110 56-23 27-37 60-39 95-9-23-12-49-6-74Z"/>
+  <!-- Deep accent shading inside disc -->
+  <path fill="currentColor" d="M520 470c-14 38-49 65-90 70 30-5 56-23 73-49 11-17 17-37 17-58 4 12 4 25 0 37Z"/>
+  <!-- Ray 1 (long, top) ends in 4-point star -->
+  <path fill="currentColor" d="M414 254 L406 100 L398 254 Z"/>
+  <path fill="currentColor" d="M406 78 L410 96 L406 114 L402 96 Z M388 96 L406 92 L424 96 L406 100 Z"/>
+  <!-- Ray 2 (medium, upper-right) -->
+  <path fill="currentColor" d="M518 312 L630 218 L528 326 Z"/>
+  <!-- Ray 3 (long, right) ends in 4-point star -->
+  <path fill="currentColor" d="M548 418 L740 410 L548 430 Z"/>
+  <path fill="currentColor" d="M758 410 L744 414 L730 410 L744 406 Z M744 392 L748 410 L744 428 L740 410 Z"/>
+  <!-- Ray 4 (short, lower-right) -->
+  <path fill="currentColor" d="M500 524 L582 612 L490 532 Z"/>
+  <!-- Ray 5 (medium, bottom-left) -->
+  <path fill="currentColor" d="M320 514 L208 638 L312 506 Z"/>
+  <!-- Ray 6 (long, left) -->
+  <path fill="currentColor" d="M276 408 L88 446 L276 426 Z"/>
+  <!-- Dust dots: top-right cluster -->
+  <circle cx="678" cy="178" r="6" fill="currentColor"/>
+  <circle cx="708" cy="216" r="4" fill="currentColor"/>
+  <circle cx="652" cy="142" r="5" fill="currentColor"/>
+  <!-- Dust dots: bottom-left -->
+  <circle cx="146" cy="654" r="7" fill="currentColor"/>
+  <circle cx="186" cy="690" r="4" fill="currentColor"/>
+  <!-- Comet-trail dabs (paths instead of ellipses + transform —
+       transformer-generated string transforms crash RNSVG on Fabric Android) -->
+  <path fill="currentColor" d="M723.6 634.3 a22 3 -28 1 1 -39.2 -20.6 a22 3 -28 1 1 39.2 20.6 Z"/>
+  <path fill="currentColor" d="M147.1 261.6 a18 2.5 34 1 1 -30.2 -19.2 a18 2.5 34 1 1 30.2 19.2 Z"/>
+</svg>

@@ -26,6 +26,8 @@ export function useSetRestToday(date: string) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.rest.day(date) })
+      // `rested` también vive en daily_signals → refresca Órbita Día.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

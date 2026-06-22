@@ -34,6 +34,11 @@ type Props = {
    *  "Te faltan 73 g", "Te quedan 475 kcal"). null = no se muestra. UI font
    *  (no italic) para no invadir la voz del coach (italic = coach). */
   remainingText?: string | null
+  /** Peso visual del renglón honesto. `strong` (default) = oro + SemiBold,
+   *  para la métrica que SÍ quieres accionar (proteína). `quiet` = niebla,
+   *  más chico, leído como nota al pie — para que calorías no domine ni se
+   *  lea como countdown (manifiesto: calorías es contexto, no presupuesto). */
+  remainingTone?: 'strong' | 'quiet'
   /** Si se pasa, la tarjeta es tocable y abre el editor de la META. Muestra
    *  un "Ajustar ›" tenue como pista de que es editable. */
   onPress?: () => void
@@ -52,6 +57,7 @@ export function RingCard({
   speedometer = false,
   overColor,
   remainingText,
+  remainingTone = 'strong',
   onPress,
 }: Props) {
   const ringSize = small ? 76 : 88
@@ -104,20 +110,25 @@ export function RingCard({
           >
             {formatted}
           </Text>
-          {/* La meta vive JUNTO al número ("62 / 135 g"), no separada abajo. */}
-          <Text style={[styles.subtitle, isEmpty && styles.subtitleEmpty]}>
-            {isEmpty ? 'todavía sin sumar' : unitSuffix}
-          </Text>
+          {/* La meta vive JUNTO al número ("62 / 135 g"), no separada abajo.
+              En vacío no se muestra aquí: el prompt va abajo, centrado. */}
+          {isEmpty ? null : <Text style={styles.subtitle}>{unitSuffix}</Text>}
         </View>
       </View>
 
-      {/* Lo único abajo: el renglón honesto, CENTRADO y anclado al fondo
-          (marginTop auto) para que quede alineado entre ambas tarjetas
-          (misma altura por el stretch de la fila). En vacío no se muestra,
-          para que el día cero sea invitación, no checklist. */}
-      {remainingText && !isEmpty ? (
+      {/* Lo único abajo: renglón CENTRADO y anclado al fondo (marginTop auto)
+          para que quede alineado entre ambas tarjetas (misma altura por el
+          stretch de la fila). En vacío muestra el prompt poético "todavía sin
+          sumar"; con datos, el renglón honesto "Te faltan X". */}
+      {isEmpty ? (
         <View style={styles.labelsBlock}>
-          <Text style={styles.remaining}>{remainingText}</Text>
+          <Text style={styles.emptyPrompt}>todavía sin sumar</Text>
+        </View>
+      ) : remainingText ? (
+        <View style={styles.labelsBlock}>
+          <Text style={remainingTone === 'quiet' ? styles.remainingQuiet : styles.remaining}>
+            {remainingText}
+          </Text>
         </View>
       ) : null}
     </Container>
@@ -147,10 +158,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  // Única pista de edición visible (el chip de enfoque ya no es tocable):
+  // sube de niebla → bone + medium para que se lea, sin gritar.
   editHint: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    color: colors.bone,
   },
   row: {
     flexDirection: 'row',
@@ -185,16 +198,24 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingTop: 8,
   },
-  // La meta — contexto suave (serif italic, bone), junto al número.
+  // La meta ("/ 135 g") es DATO, no voz del coach: fuente UI upright, no
+  // serif italic (el italic está reservado para frases del coach).
   subtitle: {
     marginTop: 6,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.ui,
+    color: colors.bone,
+  },
+  // "todavía sin sumar" — invitación cálida del día cero. ESTA sí es voz
+  // suave del coach (serif italic), por eso conserva el tratamiento; vive
+  // en el bloque de abajo, centrada en su propia línea.
+  emptyPrompt: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.ui,
     color: colors.bone,
-  },
-  subtitleEmpty: {
     opacity: 0.72,
+    textAlign: 'center',
   },
   // "Te faltan X g" / "Te quedan X kcal" — el dato honesto que RESALTA: oro
   // cálido (no magenta/alerta, no leche que competiría con el número),
@@ -203,6 +224,16 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
     color: colors.oro,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  // Variante "quiet": calorías como contexto, nota al pie tenue — ni oro
+  // (que resaltaría) ni SemiBold ni tan grande. Deja a proteína el dato
+  // que de verdad resalta.
+  remainingQuiet: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
     letterSpacing: 0.2,
     textAlign: 'center',
   },

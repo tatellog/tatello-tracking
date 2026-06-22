@@ -6,3 +6,11 @@
 
 // Reanimated ships its own jest helper that installs worklet stubs.
 import 'react-native-reanimated/mock'
+
+// Componentes que usan `useIsFocused()` (constelación, emblema) se renderizan
+// en tests sin un NavigationContainer. Solo sobreescribimos ese hook (el resto
+// de @react-navigation queda real) para que rendericen como "en foco".
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useIsFocused: () => true,
+}))

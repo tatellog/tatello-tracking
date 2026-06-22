@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
+import { useMeasurements } from '@/features/progress/hooks'
+import { toWeightPoints } from '@/features/progress/logic'
 import { clearAnalyticsCache } from '@/lib/analytics'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
@@ -15,6 +18,7 @@ import {
   uploadAvatar,
   type ProfileUpdate,
 } from './api'
+import type { MacroInputs } from './calcMacros'
 
 /*
  * The profile is read constantly (every wizard step needs the user's
@@ -34,6 +38,38 @@ export function useProfile() {
     staleTime: __DEV__ ? 0 : 1000 * 60 * 5,
     refetchOnMount: __DEV__ ? 'always' : true,
   })
+}
+
+/*
+ * Assembles the MacroInputs the calorie engine needs: the slow-moving
+ * profile fields plus the *latest* weight from the body_measurements
+ * time-series (weight lives there, not on the profile row). Feeds the
+ * goal editor + breakdown screen. `isLoading` is true until both
+ * queries resolve; any missing field leaves the engine to return null,
+ * which the editor handles by falling back to manual entry.
+ */
+export function useMacroInputs(): { inputs: MacroInputs; isLoading: boolean } {
+  const profile = useProfile()
+  const measurements = useMeasurements(null)
+
+  const latestWeight = useMemo(() => {
+    const points = toWeightPoints(measurements.data ?? [])
+    return points.at(-1)?.weight ?? null
+  }, [measurements.data])
+
+  // The profile columns are enum-constrained in the DB but generated as
+  // plain strings; cast to the engine's narrowed types at this seam.
+  const p = profile.data
+  const inputs: MacroInputs = {
+    weight_kg: latestWeight,
+    height_cm: p?.height_cm ?? null,
+    date_of_birth: p?.date_of_birth ?? null,
+    biological_sex: (p?.biological_sex as MacroInputs['biological_sex']) ?? null,
+    monthly_focus: (p?.monthly_focus as MacroInputs['monthly_focus']) ?? null,
+    training_frequency: (p?.training_frequency as MacroInputs['training_frequency']) ?? null,
+  }
+
+  return { inputs, isLoading: profile.isLoading || measurements.isLoading }
 }
 
 export function useUpdateProfile() {

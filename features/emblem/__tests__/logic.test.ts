@@ -77,13 +77,15 @@ describe('transformProgressForPoints', () => {
 
 describe('stageForProgress', () => {
   it.each([
+    // Los límites son INCLUSIVOS (minPct con `>=`): a 25% ya estás en la
+    // siguiente etapa. El test refleja el código.
     [0, 'despierta'],
-    [25, 'despierta'],
-    [26, 'forma'],
-    [50, 'forma'],
-    [51, 'revela'],
-    [75, 'revela'],
-    [76, 'casi'],
+    [24, 'despierta'],
+    [25, 'forma'],
+    [49, 'forma'],
+    [50, 'revela'],
+    [74, 'revela'],
+    [75, 'casi'],
     [99, 'casi'],
     [100, 'completo'],
   ] as const)('%i%% → etapa %s', (pct, key) => {
@@ -153,9 +155,11 @@ describe('stageIndexForProgress', () => {
   })
 
   it('el índice es DISCRETO: dentro de una etapa no se mueve', () => {
-    expect(stageIndexForProgress(1)).toBe(stageIndexForProgress(25))
-    expect(stageIndexForProgress(30)).toBe(stageIndexForProgress(50))
-    expect(stageIndexForProgress(60)).toBe(stageIndexForProgress(75))
+    // Pares DENTRO de una etapa (límites inclusivos): despierta [0,25),
+    // forma [25,50), revela [50,75).
+    expect(stageIndexForProgress(1)).toBe(stageIndexForProgress(24))
+    expect(stageIndexForProgress(30)).toBe(stageIndexForProgress(49))
+    expect(stageIndexForProgress(60)).toBe(stageIndexForProgress(74))
   })
 
   it('cruzar etapa sube el índice en 1', () => {

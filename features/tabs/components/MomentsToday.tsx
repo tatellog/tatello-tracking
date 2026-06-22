@@ -12,12 +12,12 @@ const MOMENTS: { type: MealMoment; label: string }[] = [
   { type: 'snack', label: 'Snack' },
 ]
 
-// Frase REAL (no poética) por momento pendiente — nombra el momento concreto.
-const PENDING_LINE: Record<MealMoment, string> = {
-  breakfast: 'El desayuno aún no está registrado.',
-  lunch: 'La comida aún no está registrada.',
-  dinner: 'La cena aún no está registrada.',
-  snack: 'El snack aún no está registrado.',
+// Nombre en minúscula para el CTA ("Registrar comida").
+const MOMENT_NOUN: Record<MealMoment, string> = {
+  breakfast: 'desayuno',
+  lunch: 'comida',
+  dinner: 'cena',
+  snack: 'snack',
 }
 
 /** El momento que "toca" por hora — para nombrar el pendiente más relevante. */
@@ -47,24 +47,16 @@ export function MomentsToday({ meals, viewingPast }: Props) {
   const litCount = MOMENTS.filter((m) => registered.has(m.type)).length
   const allLit = litCount === MOMENTS.length
 
-  // Línea contextual: el momento concreto que sigue (por hora si está
-  // pendiente, si no el primer pendiente). Sin culpa, real.
-  let context: string
-  let contextTone: 'normal' | 'complete' = 'normal'
-  if (viewingPast) {
-    context = `${litCount} de 4 momentos registrados`
-  } else if (litCount === 0) {
-    context = 'Aún no registras nada hoy.'
-  } else if (allLit) {
-    context = 'Registraste cada momento de hoy.'
-    contextTone = 'complete'
-  } else {
-    const byHour = momentByHour()
-    const target = !registered.has(byHour)
-      ? byHour
-      : (MOMENTS.find((m) => !registered.has(m.type))?.type ?? byHour)
-    context = PENDING_LINE[target]
-  }
+  // El próximo momento por registrar — el que "toca" por hora si sigue
+  // pendiente, si no el primer pendiente. SOLO uno se vuelve accionable
+  // (estrella magenta + CTA), para guiar sin convertir el cielo en checklist.
+  const byHour = momentByHour()
+  const nextPending: MealMoment | null =
+    viewingPast || allLit
+      ? null
+      : !registered.has(byHour)
+        ? byHour
+        : (MOMENTS.find((m) => !registered.has(m.type))?.type ?? null)
 
   return (
     <View style={styles.section}>
@@ -78,10 +70,18 @@ export function MomentsToday({ meals, viewingPast }: Props) {
         {MOMENTS.map((m) => {
           const lit = registered.has(m.type)
           const tappable = !viewingPast && !lit
+          const awaiting = m.type === nextPending
           const inner = (
             <>
-              <MomentStar lit={lit} />
-              <Text style={[styles.label, lit ? styles.labelLit : styles.labelOff]}>{m.label}</Text>
+              <MomentStar lit={lit} awaiting={awaiting} />
+              <Text
+                style={[
+                  styles.label,
+                  lit ? styles.labelLit : awaiting ? styles.labelAwaiting : styles.labelOff,
+                ]}
+              >
+                {m.label}
+              </Text>
             </>
           )
           return tappable ? (
@@ -106,10 +106,28 @@ export function MomentsToday({ meals, viewingPast }: Props) {
         })}
       </View>
 
-      <Text style={[styles.context, contextTone === 'complete' && styles.contextComplete]}>
-        {context}
-      </Text>
-      {/* El conteo honesto que pediste — como nota al pie callada (no score). */}
+      {/* CTA directo — sumar el momento que toca, con su tipo preseleccionado.
+          Calmo (texto + ＋ magenta, no botón ruidoso) e invitación, no culpa. */}
+      {viewingPast ? (
+        <Text style={styles.context}>{litCount} de 4 momentos registrados</Text>
+      ) : allLit ? (
+        <Text style={[styles.context, styles.contextComplete]}>
+          Registraste cada momento de hoy.
+        </Text>
+      ) : nextPending ? (
+        <Pressable
+          onPress={() => emitRegistroIntent(nextPending)}
+          accessibilityRole="button"
+          accessibilityLabel={`Registrar ${MOMENT_NOUN[nextPending]}`}
+          hitSlop={10}
+          style={styles.cta}
+        >
+          <Text style={styles.ctaPlus}>＋</Text>
+          <Text style={styles.ctaText}>Registrar {MOMENT_NOUN[nextPending]}</Text>
+        </Pressable>
+      ) : null}
+
+      {/* El conteo honesto — nota al pie callada (no score). */}
       {!viewingPast && litCount > 0 && !allLit ? (
         <Text style={styles.count}>{litCount} de 4 momentos registrados</Text>
       ) : null}
@@ -161,6 +179,10 @@ const styles = StyleSheet.create({
   labelOff: {
     color: colors.niebla,
   },
+  // El momento que toca — label magenta, hace juego con su estrella accionable.
+  labelAwaiting: {
+    color: colors.magenta,
+  },
   // Línea contextual — práctica, upright (no italic: no es voz de coach).
   context: {
     marginTop: 14,
@@ -171,6 +193,26 @@ const styles = StyleSheet.create({
   },
   contextComplete: {
     color: colors.oroLight,
+  },
+  // CTA directo de registro — texto + ＋ magenta, no botón ruidoso (manifiesto:
+  // calma, sin presión). Una sola acción a la vez.
+  cta: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 7,
+  },
+  ctaPlus: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.magenta,
+  },
+  ctaText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.bodyLarge,
+    letterSpacing: 0.2,
+    color: colors.magenta,
   },
   count: {
     marginTop: 3,

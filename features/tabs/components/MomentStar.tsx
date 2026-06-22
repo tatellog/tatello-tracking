@@ -15,7 +15,17 @@ const STAR_PATH =
  * la constelación: lo que cambia es la luz, no la forma. Oro, no magenta —
  * el magenta es de la luna y el CTA.
  */
-export function MomentStar({ lit, size = 24 }: { lit: boolean; size?: number }) {
+export function MomentStar({
+  lit,
+  awaiting = false,
+  size = 24,
+}: {
+  lit: boolean
+  /** El próximo momento por registrar — se marca en magenta (= acción/CTA)
+   *  para que se lea como tappable, no como adorno. Solo UNO a la vez. */
+  awaiting?: boolean
+  size?: number
+}) {
   if (lit) {
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -23,6 +33,17 @@ export function MomentStar({ lit, size = 24 }: { lit: boolean; size?: number }) 
         <Circle cx={12} cy={12} r={9} stroke={colors.oro} strokeWidth={0.6} opacity={0.28} />
         <Path d={STAR_PATH} fill={colors.oro} />
         <Circle cx={12} cy={12} r={2} fill={colors.oroLight} />
+      </Svg>
+    )
+  }
+  if (awaiting) {
+    // El que toca ahora — anillo magenta + núcleo lleno: "te espera, tócame".
+    // El magenta = el lenguaje de acción del CTA (consistente con el `+` de Hoy).
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Circle cx={12} cy={12} r={9} stroke={colors.magenta} strokeWidth={1.1} opacity={0.55} />
+        <Circle cx={12} cy={12} r={8} stroke={colors.magenta} strokeWidth={1.1} />
+        <Circle cx={12} cy={12} r={2.6} fill={colors.magenta} />
       </Svg>
     )
   }

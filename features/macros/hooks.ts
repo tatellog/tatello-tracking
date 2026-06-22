@@ -234,6 +234,10 @@ export function useCreateMeal() {
       // current slot keeps "Lo de ayer" honest after a fresh insert.
       qc.invalidateQueries({ queryKey: queryKeys.macros.suggestions(variables.meal_type) })
       qc.invalidateQueries({ queryKey: queryKeys.macros.frequentMeals() })
+      // Órbita lee el view daily_signals (meal_count + proteína del día). Sin
+      // esto, agregar una comida no refresca los chips de Órbita hasta que el
+      // staleTime de 60 s expire.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }
@@ -277,6 +281,7 @@ export function useUpdateMeal() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       qc.invalidateQueries({ queryKey: queryKeys.macros.frequentMeals() })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }
@@ -313,6 +318,7 @@ export function useDeleteMeal() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       qc.invalidateQueries({ queryKey: queryKeys.macros.all })
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

@@ -34,6 +34,10 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
       "y": 0.5511338699176667,
     },
     {
+      "x": 0.4445299216777448,
+      "y": 0.2578891937579465,
+    },
+    {
       "x": 0.33092717854821785,
       "y": 0.6857601002749107,
     },
@@ -68,10 +72,6 @@ exports[`deriveProgress snapshot — aries · 7 marked · todayIdx 7 1`] = `
     {
       "x": 0.500616254250126,
       "y": 0.9083147240710696,
-    },
-    {
-      "x": 0.7041212317418561,
-      "y": 0.24002880450951125,
     },
   ],
   "figureComplete": false,

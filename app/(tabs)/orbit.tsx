@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import {
-  DaySegment,
+  DayPresent,
   MonthSegment,
   OrbitSegments,
   ScreenCosmos,
@@ -104,8 +104,8 @@ function OrbitBody() {
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <RadialGradient id="orbit-ambient" cx="50%" cy="48%" rx="75%" ry="70%">
-              <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.18} />
-              <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.06} />
+              <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.1} />
+              <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.035} />
               <Stop offset="100%" stopColor="#E91E63" stopOpacity={0} />
             </RadialGradient>
           </Defs>
@@ -135,7 +135,7 @@ function OrbitBody() {
               mount is the cheaper baseline.) The `key` replays the fade-in.
               Semana hands the segment switch back for its "Abrir Día" CTA. */}
             {segment === 'dia' ? (
-              <DaySegment key="dia" />
+              <DayPresent key="dia" />
             ) : segment === 'semana' ? (
               <WeekSegment key="semana" onOpenDia={() => setSegment('dia')} />
             ) : (

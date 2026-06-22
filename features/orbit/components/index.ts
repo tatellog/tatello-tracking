@@ -1,4 +1,5 @@
 export { ScreenCosmos } from './Cosmos'
+export { DayPresent } from './DayPresent'
 export { DaySegment } from './DaySegment'
 export { MonthSegment } from './MonthSegment'
 export { OrbitalSystem } from './OrbitalSystem'

@@ -44,6 +44,9 @@ export function useToggleWorkoutToday() {
       // Refresh the month-based constellation + the all-time trained-days
       // count, both keyed under ['progress'].
       qc.invalidateQueries({ queryKey: ['progress'] })
+      // Órbita lee `trained` del view daily_signals — sin esto, marcar el
+      // entreno no refresca el hero/chips de Órbita Día.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }
@@ -97,6 +100,9 @@ export function useToggleWorkoutForDate() {
       // Refresh the month-based constellation + the all-time trained-days
       // count, both keyed under ['progress'].
       qc.invalidateQueries({ queryKey: ['progress'] })
+      // Órbita lee `trained` del view daily_signals — sin esto, marcar el
+      // entreno no refresca el hero/chips de Órbita Día.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

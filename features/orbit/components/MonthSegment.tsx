@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Dimensions, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import {
+  Dimensions,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -15,83 +23,83 @@ import { useIsFocused } from '@react-navigation/native'
 
 import { colors, typography } from '@/theme'
 
-import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
-import { useTransformProgress, withSign } from '@/features/emblem'
-import { useMacroTargets } from '@/features/macros/hooks'
+import { useTransformProgress, useTransformProgressAsOf, withSign } from '@/features/emblem'
 import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
-import { GLASS_ML, mlToLitresLabel } from '@/features/water/useWaterGoal'
+import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
+import { todayInTimezone } from '@/lib/time'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
-import { useDailyIntelligence } from '../useDailyIntelligence'
-import { buildEnLuzMes, buildMonthEvidence, buildVozMes, monthDaysLogged } from '../month-logic'
-import { enLuzSentence } from '../week-logic'
+import { biggestWin, buildMonthBuilt, detectMonthPatterns, type MonthPattern } from '../month-built'
 import { EmptySegmentCard } from './EmptySegmentCard'
-import { LiveDot } from './LiveDot'
-import { PatternCard } from './PatternCard'
-import { StelarVoice } from './StelarVoice'
 
 /*
- * The Mes segment — "El Cielo" (PRD V1: ¿qué estoy construyendo?).
+ * El segmento Mes — "El Cielo": ¿qué estoy construyendo con lo que repito?
  *
- * El HERO es el EMBLEMA revelándose por la consistencia acumulada — la
- * respuesta literal a "¿qué construyo?". Debajo: lo más consistente del
- * mes, la evidencia acumulada (conteos contables), y la Voz de evidencia.
- *
- * Reglas del PRD: NO IA, NO correlaciones, NO causas, NO tendencias.
- * Solo acumulación y consistencia. (El cosmos MonthSky y los patrones de
- * correlación/comparación se retiraron — pertenecen a Órbita IA futura.)
+ * La vista más transformacional de Órbita. Conecta hábitos con transformación:
+ *   1 · Hero — la CONSTELACIÓN zodiacal revelándose por la consistencia
+ *       acumulada (% revelado + cuánto subió este mes). El resultado visible.
+ *   2 · "Esto construiste" — conteos acumulados (la prueba tangible).
+ *   3 · "Lo que descubrimos" — patrones REALES con "Ver evidencia" (las barras
+ *       que los sostienen). Sin IA, sin inventar: todo nace de contar lo
+ *       registrado (ver month-built.ts).
+ *   4 · "Tu mayor victoria" — la consistencia, celebrada.
  */
-const HERO_SIZE = Math.round(Math.min(Dimensions.get('window').width * 0.72, 320))
+const HERO_SIZE = Math.round(Math.min(Dimensions.get('window').width * 0.84, 360))
+
+// Color por hábito para las barras de evidencia — cada uno reconocible por su
+// tono de dimensión (igual que los chips de Día), no todo en oro plano.
+const BAR_COLOR: Record<string, string> = {
+  comida: colors.dimension.alimento,
+  cuerpo: colors.dimension.cuerpo,
+  sueno: colors.dimension.sueno,
+  energia: colors.dimension.energia,
+  agua: colors.signal.agua,
+}
 
 export function MonthSegment() {
   const { data: hasAny } = useHasAnySignals()
-  const { data: history } = useSignalsHistory(30)
-  const macros = useMacroTargets()
-  // Gate de ciclo: sin ciclo activo, el ciclo no entra a la evidencia.
-  const cycleEnabled = useCycleEnabled()
-  const dimCtx = useMemo(
-    () => ({
-      calorieTarget: macros.data?.calories ?? null,
-      proteinTarget: macros.data?.protein_g ?? null,
-      cycleEnabled,
-    }),
-    [macros.data?.calories, macros.data?.protein_g, cycleEnabled],
-  )
-
+  const { data: history } = useSignalsHistory(31)
   const signals = useMemo(() => history ?? [], [history])
-  const daysLogged = monthDaysLogged(signals)
-  const hasRealData = daysLogged > 0
-  const voz = useMemo(() => buildVozMes(signals, dimCtx, daysLogged), [signals, dimCtx, daysLogged])
-  const enLuz = useMemo(() => buildEnLuzMes(signals, dimCtx), [signals, dimCtx])
-  const evidence = useMemo(() => buildMonthEvidence(signals), [signals])
 
-  // Solo recurrencias PURAS: el PRD del Mes prohíbe correlaciones y
-  // comparaciones ("los lunes es cuando más te mueves") — eso es Órbita IA.
-  const intel = useDailyIntelligence()
-  const monthPatterns = (intel.data?.month.patterns ?? []).filter(
-    (p) => p.category === 'recurrencia',
+  const { goalMl } = useWaterGoal()
+  const waterGoalGlasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+  const built = useMemo(
+    () => buildMonthBuilt(signals, { waterGoalGlasses }),
+    [signals, waterGoalGlasses],
   )
+  const patterns = useMemo(() => detectMonthPatterns(signals), [signals])
+  const win = useMemo(() => biggestWin(signals), [signals])
 
-  // El emblema (hero) — el león/figura del signo revelándose con los puntos
-  // de transformación (suma de hábitos del mes). Los 12 signos tienen arte.
+  // Hero — la constelación del signo revelándose por los puntos de
+  // transformación (suma de hábitos del mes), y cuánto subió este mes.
   const { data: profile } = useProfile()
-  const { progress, stage } = useTransformProgress()
   const sign = profile ? zodiacFromDate(profile.date_of_birth) : null
+  const { progress, stage } = useTransformProgress()
+  const firstOfMonth = `${todayInTimezone().slice(0, 8)}01`
+  const { progress: prevProgress } = useTransformProgressAsOf(firstOfMonth)
+  const delta = prevProgress != null ? Math.max(0, progress - prevProgress) : null
+
+  const [evidence, setEvidence] = useState<MonthPattern | null>(null)
 
   if (hasAny === false) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         {sign ? (
-          <EmblemHero sign={sign} progress={0} message="Tu emblema apenas empieza a formarse." />
+          <EmblemHero
+            sign={sign}
+            progress={0}
+            delta={null}
+            message="Tu constelación apenas empieza a formarse."
+          />
         ) : null}
         <EmptySegmentCard
-          eyebrow="El emblema se forma día a día"
-          body="Cada registro suma puntos y revela un poco más tu emblema. Registra desde Hoy y el mes empieza a construirse."
-          hint="El emblema nunca se reinicia: lo que revelas, queda."
+          eyebrow="Tu constelación se forma día a día"
+          body="Cada registro suma puntos y revela un poco más tu constelación. Registra desde Hoy y el mes empieza a construirse."
+          hint="La constelación nunca se reinicia: lo que revelas, queda."
         />
       </Animated.View>
     )
@@ -99,101 +107,73 @@ export function MonthSegment() {
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Header mínimo — solo el crédito honesto (sin tema poético). */}
-      {hasRealData ? (
-        <View style={styles.header}>
-          <View style={styles.metaRow}>
-            <LiveDot />
-            <Text style={styles.meta}>
-              <Text style={styles.metaNum}>{daysLogged}</Text>
-              <Text> días con señales · leído por </Text>
-              <Text style={styles.metaStelar}>Stelar</Text>
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* 1 · Tu Transformación — el emblema revelándose es la respuesta a
-          "¿qué estoy construyendo?". Hero del Mes. */}
+      {/* 1 · Hero — la constelación revelada (resultado visible de la consistencia). */}
       {sign ? (
         <EmblemHero
           sign={sign}
           progress={progress}
+          delta={delta}
           message={withSign(stage.message, signName(sign))}
         />
       ) : null}
 
-      {/* 2 · Lo que más se repitió — el comportamiento más consistente del
-          mes (≥8 días). Solo si hay constancia real. */}
-      {enLuz ? (
-        <View style={styles.enLuz}>
-          <Text style={styles.enLuzEyebrow}>Lo que más se repitió</Text>
-          <View style={styles.enLuzRow}>
-            <View style={[styles.enLuzDot, { backgroundColor: colors.dimension[enLuz.key] }]} />
-            <Text style={[styles.enLuzLabel, { color: colors.dimension[enLuz.key] }]}>
-              {enLuz.label}
-            </Text>
-          </View>
-          <Text style={styles.enLuzCount}>{enLuzSentence(enLuz, 'mes')}</Text>
+      {/* 2 · Esto construiste — la prueba tangible, en conteos acumulados. */}
+      {built.daysAppeared > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.eyebrow}>Esto construiste</Text>
+          <BuiltGrid built={built} />
         </View>
       ) : null}
 
-      {/* 3 · Esto construiste — evidencia ACUMULADA (conteos contables, no
-          % de brillo): la prueba tangible de "lo construí yo". */}
-      {hasRealData ? (
+      {/* 3 · Lo que descubrimos — patrones reales, cada uno con su evidencia. */}
+      {patterns.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>Esto construiste</Text>
-          <View style={styles.evGrid}>
-            <EvTile value={String(evidence.entrenos)} label="Entrenamientos" />
-            <EvTile value={String(evidence.comidas)} label="Comidas" />
-            <EvTile
-              value={evidence.sleepAvgMin != null ? (evidence.sleepAvgMin / 60).toFixed(1) : '·'}
-              unit={evidence.sleepAvgMin != null ? 'h prom.' : undefined}
-              label="Sueño"
-              empty={evidence.sleepAvgMin == null}
-            />
-            <EvTile
-              value={
-                evidence.waterAvg != null ? mlToLitresLabel(evidence.waterAvg * GLASS_ML) : '·'
-              }
-              unit={evidence.waterAvg != null ? 'L prom.' : undefined}
-              label="Agua"
-              empty={evidence.waterAvg == null}
-            />
+          <Text style={styles.eyebrow}>Lo que descubrimos</Text>
+          <View style={styles.patternList}>
+            {patterns.map((p) => (
+              <View key={p.id} style={styles.patternRow}>
+                <Text style={styles.patternTitle}>{p.title}</Text>
+                <Pressable
+                  onPress={() => setEvidence(p)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver evidencia: ${p.title}`}
+                >
+                  <Text style={styles.patternCta}>Ver evidencia →</Text>
+                </Pressable>
+              </View>
+            ))}
           </View>
         </View>
       ) : null}
 
-      {/* 4 · Voz de Stelar — narrativa de EVIDENCIA (consistencia en días),
-          sin tendencias ni causas. */}
-      <StelarVoice
-        parts={voz.parts}
-        tag="Este mes"
-        signature={hasRealData ? voz.signature : undefined}
-      />
-
-      {/* Tus patrones del mes — SOLO recurrencias puras (repetición), nunca
-          correlaciones ni comparaciones (esas son de Órbita IA). */}
-      {monthPatterns.length > 0 ? (
+      {/* 4 · Tu mayor victoria — la consistencia, celebrada. */}
+      {win ? (
         <View style={styles.section}>
-          <Text style={styles.sectionEyebrow}>Tus patrones del mes</Text>
-          {monthPatterns.map((p) => (
-            <PatternCard key={p.id} patron={p} />
-          ))}
+          <Text style={[styles.eyebrow, styles.eyebrowWin]}>Tu mayor victoria</Text>
+          <View style={styles.victoryCard}>
+            <Text style={styles.victoryStar}>✦</Text>
+            <Text style={styles.victoryHeadline}>{win.headline}</Text>
+            <Text style={styles.victoryLine}>{win.line}</Text>
+          </View>
         </View>
       ) : null}
+
+      <EvidenceModal pattern={evidence} onClose={() => setEvidence(null)} />
     </Animated.View>
   )
 }
 
-/* ── El emblema hero — figura del signo revelándose + % sereno ───────── */
+/* ── Hero — la constelación del signo revelándose ────────────────────── */
 function EmblemHero({
   sign,
   progress,
+  delta,
   message,
 }: {
   sign: ZodiacSign
   progress: number
+  delta: number | null
   message: string
 }) {
   const [w, setW] = useState(0)
@@ -201,16 +181,9 @@ function EmblemHero({
     const next = e.nativeEvent.layout.width
     setW((p) => (Math.abs(p - next) < 1 ? p : next))
   }
-  // Respiración del emblema — un halo oro que pulsa lento, para que el
-  // emblema EMITA (no flote muerto). UN solo loop, gateado en foco
-  // (useScreenActive: pausa fuera de tab y en scroll) + reduced-motion.
-  // Opacidad + escala en un Animated.View (compositor) → no repinta el
-  // Skia del emblema ni el SVG del halo. Cero costo en reposo/off-tab.
+  // Respiración del halo — un loop, gateado en foco (pausa fuera de tab/scroll)
+  // + reduced-motion. Opacidad + escala en compositor; no repinta Skia ni SVG.
   const active = useScreenActive()
-  // Gate de MONTAJE del Canvas Skia: foco puro (no useScreenActive, que
-  // se apaga en scroll y haría parpadear el emblema al desplazar). Al salir
-  // de Órbita este Canvas se desmonta, así nunca coexiste con el de Hoy
-  // (LunarConstellation) — dos Canvas Skia en pantallas distintas se borran.
   const focused = useIsFocused()
   const reduce = useReducedMotion() ?? false
   const breath = useSharedValue(0)
@@ -234,6 +207,9 @@ function EmblemHero({
   return (
     <View style={styles.heroWrap}>
       <View style={styles.heroStage} onLayout={onLayout}>
+        {/* Disco de vacío cálido — recorta el wash magenta justo detrás de la
+            figura para que el oro del emblema no se enturbie (capa de fondo). */}
+        <VoidDisc size={w || HERO_SIZE} />
         <Animated.View
           style={[StyleSheet.absoluteFill, styles.heroGlow, glowStyle]}
           pointerEvents="none"
@@ -241,24 +217,39 @@ function EmblemHero({
           <EmblemGlow size={w || HERO_SIZE} />
         </Animated.View>
         <StaticField size={w || HERO_SIZE} />
+        {/* En Mes el emblema NO recede (no hay constelación natal encima): es el
+            protagonista, así que sube su opacidad para coronar (default = receso
+            de Tab Hoy). */}
         {w > 0 && focused ? (
-          <RevealedEmblem sign={sign} transformProgress={progress} size={w} />
+          <RevealedEmblem
+            sign={sign}
+            transformProgress={progress}
+            size={w}
+            masterOpacity={0.95}
+            frameOpacity={0.6}
+            glyphOpacity={0.78}
+            bloomMaxOpacity={0.72}
+          />
         ) : null}
       </View>
-      {/* % sereno, sin barra — el reveal del arte ES la barra; el número
-          acompaña, nunca como meta a alcanzar. */}
+
+      {/* El signo — el nombre de lo que se está revelando. */}
+      <Text style={styles.heroSign}>{signName(sign)}</Text>
+      {/* % revelado — el reveal del arte ES la barra; el número acompaña. */}
       <Text style={styles.heroPct}>
         {progress}
-        <Text style={styles.heroPctSign}>%</Text>
+        <Text style={styles.heroPctSign}>% revelado</Text>
       </Text>
-      <Text style={styles.heroCaption}>transformación revelada</Text>
+      {/* Cuánto subió este mes — la transformación visible, sin meta. */}
+      {delta != null && delta > 0 ? (
+        <Text style={styles.heroDelta}>+{delta}% respecto al mes anterior</Text>
+      ) : null}
       <Text style={styles.heroMessage}>{message}</Text>
     </View>
   )
 }
 
-/* Polvo estelar tenue detrás del emblema — fondo, no cosmos animado
- * (estático, cero costo). Posiciones seeded relativas al tamaño. */
+/* Polvo estelar tenue detrás del emblema — estático, cero costo. */
 const FIELD = [
   [0.14, 0.18, 1.4, 0.16],
   [0.82, 0.12, 1, 0.18],
@@ -280,8 +271,6 @@ function StaticField({ size }: { size: number }) {
   )
 }
 
-/* El halo oro detrás del emblema — SVG estático (radial); la respiración
- * la da el Animated.View que lo envuelve (opacidad + escala), no el SVG. */
 function EmblemGlow({ size }: { size: number }) {
   if (size <= 0) return null
   return (
@@ -298,26 +287,116 @@ function EmblemGlow({ size }: { size: number }) {
   )
 }
 
-/* ── Una ficha de evidencia (conteo acumulado) ──────────────────────── */
-function EvTile({
-  value,
-  unit,
-  label,
-  empty,
-}: {
-  value: string
-  unit?: string
-  label: string
-  empty?: boolean
-}) {
+/* Disco de vacío — un radial del fondo (#0A0608) que oscurece el wash magenta
+ * detrás de la figura, devolviéndole pureza al oro del emblema (iluminación
+ * selectiva: una pieza brilla, el resto descansa). Capa de fondo, estática. */
+function VoidDisc({ size }: { size: number }) {
+  if (size <= 0) return null
   return (
-    <View style={styles.evTile}>
-      <Text style={[styles.evValue, empty ? styles.evValueEmpty : null]}>
-        {value}
-        {unit ? <Text style={styles.evUnit}> {unit}</Text> : null}
-      </Text>
-      <Text style={styles.evLabel}>{label}</Text>
+    <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <RadialGradient id="emblem-void" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor={colors.bg} stopOpacity={0.6} />
+          <Stop offset="62%" stopColor={colors.bg} stopOpacity={0.32} />
+          <Stop offset="100%" stopColor={colors.bg} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#emblem-void)" />
+    </Svg>
+  )
+}
+
+/* ── "Esto construiste" — conteos acumulados ─────────────────────────── */
+function BuiltGrid({ built }: { built: ReturnType<typeof buildMonthBuilt> }) {
+  const cards: { value: string; unit?: string; label: string }[] = [
+    { value: String(built.trainedDays), label: 'Entrenamientos' },
+    { value: String(built.foodDays), label: 'Días con comida' },
+    {
+      value: built.proteinAvgG != null ? String(built.proteinAvgG) : '·',
+      unit: built.proteinAvgG != null ? 'g' : undefined,
+      label: 'Proteína prom.',
+    },
+    { value: String(built.waterGoalDays), label: 'Días de agua' },
+    {
+      value: built.sleepAvgH != null ? built.sleepAvgH.toFixed(1) : '·',
+      unit: built.sleepAvgH != null ? 'h' : undefined,
+      label: 'Sueño prom.',
+    },
+  ]
+  return (
+    <View style={styles.builtGrid}>
+      {cards.map((c) => (
+        <View key={c.label} style={styles.builtCard}>
+          <Text style={styles.builtValue}>
+            {c.value}
+            {c.unit ? <Text style={styles.builtUnit}> {c.unit}</Text> : null}
+          </Text>
+          <Text style={styles.builtLabel}>{c.label}</Text>
+        </View>
+      ))}
     </View>
+  )
+}
+
+/* ── "Ver evidencia" — las barras que sostienen un patrón ────────────── */
+function EvidenceModal({
+  pattern,
+  onClose,
+}: {
+  pattern: MonthPattern | null
+  onClose: () => void
+}) {
+  const ev = pattern?.evidence
+  const max = ev ? Math.max(1, ...ev.bars.map((b) => b.value)) : 1
+  return (
+    <Modal visible={pattern != null} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.modalCard} onPress={() => {}}>
+          {pattern && ev ? (
+            <>
+              <Text style={styles.modalEyebrow}>La evidencia</Text>
+              <Text style={styles.modalTitle}>{pattern.title}</Text>
+              <View style={styles.bars}>
+                {ev.bars.map((b, i) => {
+                  const barColor = b.colorKey ? (BAR_COLOR[b.colorKey] ?? colors.oro) : colors.oro
+                  return (
+                    <View key={`${b.label}-${i}`} style={styles.barRow}>
+                      <Text style={styles.barLabel} numberOfLines={1}>
+                        {b.label}
+                      </Text>
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            {
+                              width: `${Math.round((b.value / max) * 100)}%`,
+                              backgroundColor: barColor,
+                              opacity: b.highlight ? 1 : 0.4,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
+                        {b.value}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+              <Text style={styles.modalCaption}>{ev.caption}</Text>
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                accessibilityRole="button"
+                style={styles.modalCloseBtn}
+              >
+                <Text style={styles.modalClose}>Cerrar</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </Pressable>
+      </Pressable>
+    </Modal>
   )
 }
 
@@ -325,33 +404,7 @@ const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
   },
-  header: {
-    alignItems: 'center',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  meta: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  metaNum: {
-    color: colors.magenta,
-  },
-  metaStelar: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: 12.5,
-    color: colors.oroSoft,
-    textTransform: 'none',
-  },
-  // ── Emblema hero ──────────────────────────────────────────────
+  // ── Hero ──────────────────────────────────────────────────────
   heroWrap: {
     alignItems: 'center',
     marginTop: 14,
@@ -367,28 +420,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroPct: {
-    marginTop: 10,
-    fontFamily: typography.displayHeavy,
+  heroSign: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
     fontSize: 34,
+    lineHeight: 40,
     color: colors.leche,
-    fontVariant: ['tabular-nums'],
-    letterSpacing: -1,
+    textAlign: 'center',
   },
-  heroPctSign: {
-    fontSize: 16,
-    color: colors.niebla,
-  },
-  heroCaption: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
+  heroPct: {
+    marginTop: 6,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: colors.niebla,
-    marginTop: 2,
+    color: colors.oroSoft,
+    fontVariant: ['tabular-nums'],
+  },
+  heroPctSign: {
+    fontFamily: typography.uiBold,
+    color: colors.oroSoft,
+  },
+  heroDelta: {
+    marginTop: 6,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.4,
+    color: colors.magentaHot,
   },
   heroMessage: {
-    marginTop: 10,
+    marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: 16,
@@ -397,93 +459,201 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 16,
   },
-  // ── Lo que más se repitió ─────────────────────────────────────
-  enLuz: {
-    alignItems: 'center',
-    marginTop: 26,
-  },
-  enLuzEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: 10,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 10,
-  },
-  enLuzRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  enLuzDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  enLuzLabel: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 26,
-    lineHeight: 30,
-  },
-  enLuzCount: {
-    marginTop: 6,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 15,
-    lineHeight: 21,
-    color: colors.bone,
-    textAlign: 'center',
-    paddingHorizontal: 16,
-  },
   // ── Secciones ─────────────────────────────────────────────────
   section: {
-    marginTop: 26,
+    marginTop: 30,
   },
-  sectionEyebrow: {
+  eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: 11,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
-    marginBottom: 12,
+    marginBottom: 14,
     marginLeft: 2,
   },
-  // ── Evidencia acumulada (tiles 2×2) ───────────────────────────
-  evGrid: {
+  // El eyebrow de la victoria va en oro: marca que esta sección es el premio,
+  // no un dato más.
+  eyebrowWin: {
+    color: colors.oroSoft,
+  },
+  // ── Esto construiste ──────────────────────────────────────────
+  builtGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: colors.bgCard,
+    gap: 10,
+  },
+  builtCard: {
+    width: '31.5%',
     borderRadius: 16,
-    borderWidth: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    backgroundColor: colors.bgCard,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.oroHairline,
-    paddingVertical: 4,
-    overflow: 'hidden',
   },
-  evTile: {
-    width: '50%',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  evValue: {
+  builtValue: {
     fontFamily: typography.uiBold,
-    fontSize: 24,
+    fontSize: 26,
     color: colors.leche,
   },
-  evValueEmpty: {
-    color: colors.bruma,
-  },
-  evUnit: {
+  builtUnit: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: 14,
     color: colors.niebla,
   },
-  evLabel: {
+  builtLabel: {
+    marginTop: 6,
     fontFamily: typography.uiBold,
     fontSize: 9.5,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: colors.niebla,
-    marginTop: 4,
+  },
+  // ── Lo que descubrimos ────────────────────────────────────────
+  patternList: {
+    gap: 2,
+  },
+  patternRow: {
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  patternTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 18,
+    lineHeight: 24,
+    color: colors.leche,
+  },
+  patternCta: {
+    marginTop: 7,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.oro,
+  },
+  // ── Tu mayor victoria ─────────────────────────────────────────
+  victoryCard: {
+    borderRadius: 20,
+    paddingVertical: 26,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    backgroundColor: colors.oroTint,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairline,
+  },
+  victoryStar: {
+    fontSize: 26,
+    color: colors.oro,
+    marginBottom: 12,
+  },
+  victoryHeadline: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 24,
+    lineHeight: 30,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  victoryLine: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    color: colors.oroSoft,
+    textAlign: 'center',
+  },
+  // ── Modal de evidencia ────────────────────────────────────────
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 22,
+    paddingVertical: 24,
+    paddingHorizontal: 22,
+    backgroundColor: colors.bgCard2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  modalEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  modalTitle: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 21,
+    lineHeight: 27,
+    color: colors.leche,
+  },
+  bars: {
+    marginTop: 18,
+    gap: 10,
+  },
+  barRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  barLabel: {
+    width: 74,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  barTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(244, 236, 222, 0.06)',
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 5,
+    backgroundColor: colors.oroHairline,
+  },
+  barValue: {
+    width: 22,
+    textAlign: 'right',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  barValueHi: {
+    fontFamily: typography.uiBold,
+    color: colors.leche,
+  },
+  modalCaption: {
+    marginTop: 16,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
+  modalCloseBtn: {
+    marginTop: 20,
+    alignSelf: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 26,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+  },
+  modalClose: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.3,
+    color: colors.bone,
   },
 })

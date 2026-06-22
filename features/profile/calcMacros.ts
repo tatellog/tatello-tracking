@@ -1,30 +1,21 @@
 import { type BiologicalSex, type MonthlyFocus, type TrainingFrequency } from './api'
 
 /*
- * Compute starting macro targets from the profile fields gathered
- * during the wizard. Used by the reveal screen to seed the user's
- * macro_targets so they enter the app with a usable baseline; they
- * can edit any time from Settings → Mis metas (via the existing
- * /onboarding/macro-targets?source=settings flow).
+ * Macro engine. Computes calorie / macro targets from the profile
+ * fields gathered during the wizard, and powers the goal editor
+ * (enfoque + nivel) where the user re-tunes them later.
  *
- * Calorie target uses Mifflin-St Jeor for BMR and a coarse activity
- * multiplier mapped from `training_frequency`. The deficit (if any)
- * comes from `monthly_focus` — only `weight` triggers a -500 kcal
- * delta; everything else maintains. STELAR's voice avoids
- * "you must eat X" — macros are guides, not prescriptions.
+ * Pipeline (all pure, all here so onboarding and the editor never
+ * drift):
+ *   profile ──► BMR (Mifflin-St Jeor) ──► TDEE (× activity)
+ *           ──► + kcal delta (enfoque + nivel) ──► calorie target
+ *           ──► protein (g/kg by enfoque) + fat (g/kg) + carbs (rest)
  *
- * Protein target is 1.8 g/kg of body weight when the focus is
- * weight-loss (to support muscle retention during a deficit) and
- * 1.6 g/kg otherwise.
- *
- * Returns null if any required input is missing — the caller should
- * keep macros undefined in that case so the existing manual flow can
- * still be opened from Settings.
+ * STELAR's voice avoids "you must eat X" — these are guides, not
+ * prescriptions. The editor frames them as such.
  */
-export type MacroTargets = {
-  protein_g: number
-  calories: number
-}
+
+/* ─── shared profile inputs ──────────────────────────────────────── */
 
 export type MacroInputs = {
   /** kg, from body_measurements.weight_kg */
@@ -40,6 +31,45 @@ export type MacroInputs = {
   training_frequency: TrainingFrequency | null
 }
 
+/* ─── enfoque + nivel model (the editor's controls) ──────────────── */
+
+/** Direction of the calorie target vs maintenance. */
+export type Enfoque = 'deficit' | 'maintain' | 'surplus'
+
+/** Magnitude bucket within deficit / surplus. Maintain has no level. */
+export type Nivel = 'light' | 'moderate' | 'marked'
+
+export type NivelOption = {
+  key: Nivel
+  /** UI label — guilt-free per manifesto ("Marcado", never "Agresivo"). */
+  label: string
+  /** kcal vs TDEE. Negative = deficit, positive = surplus. */
+  delta: number
+}
+
+// The slider stops, ordered for display. Deficit reads strongest →
+// gentlest top-to-bottom in the mockup, but we keep the array gentle →
+// strong and let the component map positions.
+export const DEFICIT_LEVELS: readonly NivelOption[] = [
+  { key: 'light', label: 'Ligero', delta: -250 },
+  { key: 'moderate', label: 'Moderado', delta: -475 },
+  { key: 'marked', label: 'Marcado', delta: -750 },
+]
+
+export const SURPLUS_LEVELS: readonly NivelOption[] = [
+  { key: 'light', label: 'Ligero', delta: 150 },
+  { key: 'moderate', label: 'Moderado', delta: 250 },
+  { key: 'marked', label: 'Marcado', delta: 400 },
+]
+
+export function levelsFor(enfoque: Enfoque): readonly NivelOption[] {
+  if (enfoque === 'deficit') return DEFICIT_LEVELS
+  if (enfoque === 'surplus') return SURPLUS_LEVELS
+  return []
+}
+
+/* ─── tuning constants ───────────────────────────────────────────── */
+
 const ACTIVITY_MULTIPLIER: Record<TrainingFrequency, number> = {
   none: 1.2,
   low: 1.375,
@@ -47,27 +77,50 @@ const ACTIVITY_MULTIPLIER: Record<TrainingFrequency, number> = {
   high: 1.725,
 }
 
-/** Internal derived band. `monthly_focus` collapses to two macro
- *  modes: weight-loss (deficit + higher protein) or maintain. Other
- *  intentions (energy, sleep, food, cycle, patterns, mind, other)
- *  don't imply a calorie target — the user can refine from Settings. */
-type MacroMode = 'lose_fat' | 'maintain'
-
-const MODE_DELTA_KCAL: Record<MacroMode, number> = {
-  lose_fat: -500,
-  maintain: 0,
+/** Short label for the TDEE breakdown screen ("Actividad: Moderada"). */
+export const ACTIVITY_LABEL: Record<TrainingFrequency, string> = {
+  none: 'En reposo',
+  low: 'Ligera',
+  mid: 'Moderada',
+  high: 'Alta',
 }
 
-const MODE_PROTEIN_PER_KG: Record<MacroMode, number> = {
-  lose_fat: 1.8,
-  maintain: 1.6,
+// Protein g/kg of body weight. Higher in a deficit to protect muscle
+// during weight loss; moderate at maintenance; supportive in surplus.
+const PROTEIN_PER_KG: Record<Enfoque, number> = {
+  deficit: 2.1,
+  maintain: 1.8,
+  surplus: 2.0,
 }
 
-function focusToMode(focus: MonthlyFocus | null): MacroMode {
-  return focus === 'weight' ? 'lose_fat' : 'maintain'
+// Fat floor g/kg of body weight (hormonal health). Carbs take whatever
+// energy is left, so fat is a fixed anchor, not a percentage.
+const FAT_PER_KG = 0.9
+
+/* ─── outputs ────────────────────────────────────────────────────── */
+
+/** The four numbers the goal editor + breakdown render. */
+export type FullMacros = {
+  calories: number
+  protein_g: number
+  fat_g: number
+  carbs_g: number
 }
 
-export function calculateMacros(input: MacroInputs): MacroTargets | null {
+/** Back-compat shape consumed by the onboarding reveal + macro_targets
+ *  upsert (only protein + calories are persisted; fat/carbs derive). */
+export type MacroTargets = {
+  protein_g: number
+  calories: number
+}
+
+/* ─── TDEE ───────────────────────────────────────────────────────── */
+
+/**
+ * Maintenance calories (TDEE) from the profile. Returns null if any
+ * required input is missing so callers can fall back to manual entry.
+ */
+export function computeTdee(input: MacroInputs): number | null {
   const { weight_kg, height_cm, date_of_birth, biological_sex, training_frequency } = input
   if (
     weight_kg == null ||
@@ -84,20 +137,103 @@ export function calculateMacros(input: MacroInputs): MacroTargets | null {
   // Mifflin-St Jeor: female subtracts 161, male adds 5.
   const sexConstant = biological_sex === 'female' ? -161 : 5
   const bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age + sexConstant
-  const tdee = bmr * ACTIVITY_MULTIPLIER[training_frequency]
+  return Math.round(bmr * ACTIVITY_MULTIPLIER[training_frequency])
+}
 
-  const mode = focusToMode(input.monthly_focus)
-  const calories = Math.round(tdee + MODE_DELTA_KCAL[mode])
-  const protein_g = Math.round(weight_kg * MODE_PROTEIN_PER_KG[mode])
+/* ─── full macro distribution for a chosen delta ─────────────────── */
 
-  // Clamp to the schema's safe range. The macro_targets CHECK
-  // constraint rejects values outside the human plausible band; we
-  // saturate here so a quirky input (very low weight, no entreno)
-  // never trips the DB validation.
-  return {
-    protein_g: clamp(protein_g, 30, 350),
-    calories: clamp(calories, 900, 6000),
+/**
+ * Calories + protein + fat + carbs for a given enfoque and kcal delta.
+ * `enfoque` drives the protein ratio; `kcalDelta` shifts calories off
+ * TDEE (0 for maintain). Returns null if the profile can't yield a TDEE.
+ *
+ * Carbs are the energy remainder after protein and fat, so calories
+ * stay the single source of truth (the mockup's standalone g/kg carbs
+ * didn't energy-balance — this does). Clamped to the macro_targets
+ * safe band so a quirky profile never trips the DB CHECK.
+ */
+export function macrosForDelta(
+  input: MacroInputs,
+  enfoque: Enfoque,
+  kcalDelta: number,
+): FullMacros | null {
+  const tdee = computeTdee(input)
+  if (tdee == null || input.weight_kg == null) return null
+
+  const calories = clamp(Math.round(tdee + kcalDelta), 900, 6000)
+  const protein_g = clamp(Math.round(input.weight_kg * PROTEIN_PER_KG[enfoque]), 30, 350)
+  const fat_g = clamp(Math.round(input.weight_kg * FAT_PER_KG), 20, 200)
+  const carbsKcal = calories - protein_g * 4 - fat_g * 9
+  const carbs_g = clamp(Math.round(carbsKcal / 4), 0, 800)
+
+  return { calories, protein_g, fat_g, carbs_g }
+}
+
+/**
+ * Reconstruct the editor state ({ enfoque, level, delta }) from a saved
+ * calorie target, by comparing it to the live TDEE. Lets the editor
+ * re-open on the user's current choice without persisting it. Returns
+ * null when there's no TDEE (incomplete profile → manual fallback).
+ *
+ * A small dead-band around 0 reads as "maintain" so a near-maintenance
+ * target doesn't snap to a deficit/surplus label.
+ */
+export function reconstructState(
+  savedCalories: number,
+  input: MacroInputs,
+): { enfoque: Enfoque; level: Nivel | null; delta: number } | null {
+  const tdee = computeTdee(input)
+  if (tdee == null) return null
+  const delta = savedCalories - tdee
+
+  const MAINTAIN_BAND = 80
+  if (Math.abs(delta) <= MAINTAIN_BAND) {
+    return { enfoque: 'maintain', level: null, delta: 0 }
   }
+  const enfoque: Enfoque = delta < 0 ? 'deficit' : 'surplus'
+  const level = nearestLevel(levelsFor(enfoque), delta)
+  return { enfoque, level: level.key, delta }
+}
+
+/**
+ * Human label for an enfoque + nivel ("Déficit moderado", "Superávit
+ * ligero", "Mantenimiento"). Shared by the editor chip on Hoy and the
+ * breakdown screen so the wording never drifts.
+ */
+export function enfoqueLabel(enfoque: Enfoque, level: Nivel | null): string {
+  if (enfoque === 'maintain') return 'Mantenimiento'
+  const base = enfoque === 'surplus' ? 'Superávit' : 'Déficit'
+  const lvl = levelsFor(enfoque).find((l) => l.key === level)
+  return lvl ? `${base} ${lvl.label.toLowerCase()}` : base
+}
+
+/* ─── back-compat: onboarding reveal seed ────────────────────────── */
+
+/**
+ * Starting targets from the wizard. `monthly_focus === 'weight'` seeds
+ * a moderate deficit; everything else maintains. Delegates to the
+ * shared engine so the seed never drifts from the editor's math.
+ * Returns null if the profile is incomplete (caller keeps macros
+ * undefined and opens manual entry from Settings).
+ */
+export function calculateMacros(input: MacroInputs): MacroTargets | null {
+  const enfoque: Enfoque = input.monthly_focus === 'weight' ? 'deficit' : 'maintain'
+  const delta = enfoque === 'deficit' ? deltaForLevel(DEFICIT_LEVELS, 'moderate') : 0
+  const full = macrosForDelta(input, enfoque, delta)
+  if (full == null) return null
+  return { protein_g: full.protein_g, calories: full.calories }
+}
+
+/* ─── helpers ────────────────────────────────────────────────────── */
+
+function deltaForLevel(levels: readonly NivelOption[], key: Nivel): number {
+  return levels.find((l) => l.key === key)?.delta ?? 0
+}
+
+function nearestLevel(levels: readonly NivelOption[], delta: number): NivelOption {
+  return levels.reduce((best, l) =>
+    Math.abs(l.delta - delta) < Math.abs(best.delta - delta) ? l : best,
+  )
 }
 
 function ageInYears(iso: string): number | null {
