@@ -81,6 +81,61 @@ scripts/              Seeds dev/real
 | `pnpm types:db`                          | Regenera `types/database.types.ts` desde Supabase  |
 | `pnpm seed:dev [--fresh]`                | Resetea data del dev user                          |
 
+## Builds (EAS)
+
+Los builds se generan con **EAS Build** (remoto). El proyecto ya está vinculado
+(`slug: tracking-app`, `owner: tatello`, `projectId` en `app.json`). Versionado:
+`appVersionSource: remote` — EAS maneja `versionCode`/`buildNumber`; el perfil
+`production` los auto-incrementa.
+
+### Prerrequisitos (una vez)
+
+```bash
+npm install -g eas-cli      # o usa `npx eas-cli@latest` en cada comando
+eas login                   # interactivo
+eas whoami                  # confirma sesión
+```
+
+iOS para TestFlight requiere **Apple Developer Program ($99/año)** + la app creada
+en App Store Connect. Sin la cuenta de paga solo se puede iOS en Simulador
+(`--profile simulator`) o Expo Go. Android no requiere nada de esto.
+
+### Android · APK de prueba
+
+```bash
+eas build --platform android --profile preview
+```
+
+`preview` produce un **APK** (`buildType: apk`, distribución interna). Al terminar,
+EAS da un link: ábrelo en el Android y se instala directo.
+
+### iOS · TestFlight
+
+```bash
+# 1. Build de tienda (.ipa firmado). La 1ª vez EAS pide credenciales de Apple
+#    y crea/gestiona el provisioning por ti.
+eas build --platform ios --profile production
+
+# 2. Subir a App Store Connect → TestFlight
+eas submit --platform ios --profile production --latest
+```
+
+Tras `submit`, el build aparece en **App Store Connect → TestFlight** (procesa
+~5-15 min); desde ahí se reparte a los testers. La app debe existir antes en App
+Store Connect con el bundle id `com.tatello.stelar`.
+
+### Perfiles disponibles (`eas.json`)
+
+| Perfil        | Para qué                                         | Apple de paga |
+| ------------- | ------------------------------------------------ | ------------- |
+| `preview`     | APK Android · iOS device ad-hoc                  | iOS sí        |
+| `production`  | Tienda (Play Store / TestFlight), auto-increment | iOS sí        |
+| `simulator`   | iOS Simulator (`.app`)                           | no            |
+| `development` | dev client (internal)                            | iOS sí        |
+
+> Nota: no hace falta `supabase functions deploy` salvo que se toquen las edge
+> functions (`supabase/functions/`).
+
 ## Convenciones
 
 - Path alias `@/*` → raíz del proyecto
