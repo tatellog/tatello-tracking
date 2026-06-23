@@ -15,6 +15,7 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { usePressFeedback } from '@/components/ui/interaction'
 import { useMealsForDate } from '@/features/macros/hooks'
+import { emitReplayReveal } from '@/features/revelations'
 import { colors, typography } from '@/theme'
 
 import { DayDetailContent, dateHeading } from './DayDetailContent'
@@ -121,6 +122,13 @@ export function DayDetailPanel({
         showValues={past}
         meals={past ? mealsQuery.data : undefined}
         footer={footer}
+        onEventPress={(ev) =>
+          emitReplayReveal({
+            tier: ev.tier ?? '',
+            kind: ev.kind ?? '',
+            message: ev.message ?? ev.title,
+          })
+        }
       />
     </Animated.View>
   )

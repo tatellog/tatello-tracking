@@ -43,20 +43,41 @@ describe('detectMonthPatterns', () => {
     expect(detectMonthPatterns(month(5, () => ({ meal_count: 2 })))).toEqual([])
   })
 
-  it('detecta hábito más y menos constante', () => {
-    // Comida todos los días, agua pocos → comida más constante, agua menos.
+  it('detecta el hábito menos constante (observación local de Mes)', () => {
+    // Comida todos los días, agua pocos → agua es el menos constante.
     const signals = month(14, (i) => ({
       meal_count: 2, // 14 días
       sleep_minutes: i < 9 ? 360 : null, // 9 días
       water_glasses: i < 3 ? 2 : 0, // 3 días
     }))
     const ps = detectMonthPatterns(signals)
-    expect(ps.find((p) => p.id === 'habit-top')?.title).toMatch(/Comida es tu hábito más constante/)
-    expect(ps.find((p) => p.id === 'habit-low')?.title).toMatch(/Agua es tu hábito menos constante/)
-    // La evidencia trae barras con días por hábito.
-    const top = ps.find((p) => p.id === 'habit-top')!
-    expect(top.evidence.bars.find((b) => b.label === 'Comida')?.value).toBe(14)
-    expect(top.evidence.bars.find((b) => b.label === 'Comida')?.highlight).toBe(true)
+    const low = ps.find((p) => p.id === 'habit-low')!
+    expect(low.title).toMatch(/Agua fue tu señal más silenciosa/)
+    expect(low.evidence.bars.find((b) => b.label === 'Agua')?.highlight).toBe(true)
+  })
+
+  it('consume los patrones POSITIVOS del motor (proteína/movimiento/sueño)', () => {
+    // 16 días: entreno y proteína en meta ≥8 días, sueño ≥6.5h ≥8 noches.
+    const signals = month(16, (i) => ({
+      trained: i < 10, // 10 días → training_consistent (≥8)
+      protein_g: i < 12 ? 100 : null, // 12 días en meta
+      sleep_minutes: i < 9 ? 420 : 300, // 9 noches ≥6.5h
+      meal_count: 2,
+    }))
+    const ps = detectMonthPatterns(signals, { proteinTarget: 90 })
+    expect(ps.find((p) => p.id === 'consistent-training')).toBeTruthy()
+    expect(ps.find((p) => p.id === 'consistent-protein')).toBeTruthy()
+    expect(ps.find((p) => p.id === 'consistent-sleep')).toBeTruthy()
+    // El de proteína resalta su barra y trae el conteo del motor.
+    const prot = ps.find((p) => p.id === 'consistent-protein')!
+    expect(prot.evidence.bars.find((b) => b.label === 'Proteína')?.highlight).toBe(true)
+    expect(prot.evidence.bars.find((b) => b.label === 'Proteína')?.value).toBe(12)
+  })
+
+  it('sin meta de proteína, el patrón de proteína no dispara', () => {
+    const signals = month(16, () => ({ protein_g: 100, meal_count: 2 }))
+    const ps = detectMonthPatterns(signals) // sin proteinTarget
+    expect(ps.find((p) => p.id === 'consistent-protein')).toBeUndefined()
   })
 
   it('detecta "apareces más entre semana"', () => {
@@ -73,11 +94,11 @@ describe('detectMonthPatterns', () => {
 
 describe('biggestWin', () => {
   it('escala la línea con los días aparecidos', () => {
-    expect(biggestWin(month(22, () => ({ meal_count: 1 })))?.line).toMatch(/superpoder/i)
-    expect(biggestWin(month(14, () => ({ meal_count: 1 })))?.line).toMatch(/hábito real/i)
+    expect(biggestWin(month(22, () => ({ meal_count: 1 })))?.line).toMatch(/constancia/i)
+    expect(biggestWin(month(14, () => ({ meal_count: 1 })))?.line).toMatch(/ritmo/i)
     expect(biggestWin(month(5, () => ({ meal_count: 1 })))?.line).toMatch(/suma/i)
     expect(biggestWin(month(22, () => ({ meal_count: 1 })))?.headline).toBe(
-      'Apareciste 22 días este mes.',
+      'Estuviste presente 22 días este mes.',
     )
   })
 

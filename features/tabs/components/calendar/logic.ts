@@ -30,6 +30,13 @@ export type CalendarEvent = {
   /** Tier de la revelación ('transformation' | 'return' | 'pattern') — para
    *  pintar el indicador del día en el calendario Historia. */
   tier?: string
+  /** `kind` de la revelación (umbral '25'/'50'/… o tipo de patrón) — para
+   *  re-abrir la ceremonia full-screen al tocar el evento. */
+  kind?: string
+  /** Copy completo (voz del coach) que respalda el evento — se muestra al tocarlo
+   *  ("ver evidencia"). Para patrones incluye el conteo; para transformación, el
+   *  signo en vivo. */
+  message?: string
 }
 
 /** Valores REALES registrados ese día (no presencia). `null` = no registrado.

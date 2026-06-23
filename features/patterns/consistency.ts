@@ -63,13 +63,19 @@ function localDateKey(ms: number): string {
   return `${y}-${m}-${day}`
 }
 
+/* La MISMA lógica sirve para la ventana semanal (reveal de Hoy, default 7 días)
+ * y para la mensual (Órbita Mes, ~31 días con su propio umbral): `opts` deja
+ * pasar `windowDays` + `minDays` sin romper a quien llama con la firma de 2
+ * args (revelations/detect.ts y los tests semanales). */
+export type ConsistencyOpts = { windowDays?: number; minDays?: number }
+
 /**
  * The earliest date string still inside the window: today's local date
- * minus (WINDOW_DAYS - 1) days, so the window spans 7 calendar days
- * ending today (inclusive). Comparison is lexical, valid for YYYY-MM-DD.
+ * minus (windowDays - 1) days, so the window spans `windowDays` calendar
+ * days ending today (inclusive). Comparison is lexical, valid for YYYY-MM-DD.
  */
-function windowStartKey(nowMs: number): string {
-  return localDateKey(nowMs - (WINDOW_DAYS - 1) * DAY_MS)
+function windowStartKey(nowMs: number, windowDays: number): string {
+  return localDateKey(nowMs - (windowDays - 1) * DAY_MS)
 }
 
 /** True when `date` (YYYY-MM-DD) falls within [start, today]. */
@@ -85,9 +91,10 @@ function inWindow(date: string, startKey: string, todayKey: string): boolean {
 function countQualifyingDays<T extends { date: string }>(
   entries: readonly T[],
   nowMs: number,
+  windowDays: number,
   qualifies: (entry: T) => boolean,
 ): number {
-  const startKey = windowStartKey(nowMs)
+  const startKey = windowStartKey(nowMs, windowDays)
   const todayKey = localDateKey(nowMs)
   const counted = new Set<string>()
   for (const entry of entries) {
@@ -98,45 +105,48 @@ function countQualifyingDays<T extends { date: string }>(
   return counted.size
 }
 
-/** Days where protein reached its target in the last 7 days. */
+/** Days where protein reached its target inside the window. */
 export function detectProteinConsistency(
   days: readonly ProteinDay[],
   nowMs: number,
+  opts?: ConsistencyOpts,
 ): ConsistencyResult {
-  const count = countQualifyingDays(days, nowMs, (d) => d.targetG > 0 && d.proteinG >= d.targetG)
-  return {
-    detected: count >= PROTEIN_CONSISTENT_MIN_DAYS,
-    count,
-    windowDays: WINDOW_DAYS,
-  }
+  const windowDays = opts?.windowDays ?? WINDOW_DAYS
+  const min = opts?.minDays ?? PROTEIN_CONSISTENT_MIN_DAYS
+  const count = countQualifyingDays(
+    days,
+    nowMs,
+    windowDays,
+    (d) => d.targetG > 0 && d.proteinG >= d.targetG,
+  )
+  return { detected: count >= min, count, windowDays }
 }
 
-/** Distinct training days in the last 7 days. */
+/** Distinct training days inside the window. */
 export function detectTrainingConsistency(
   workoutDates: readonly string[],
   nowMs: number,
+  opts?: ConsistencyOpts,
 ): ConsistencyResult {
+  const windowDays = opts?.windowDays ?? WINDOW_DAYS
+  const min = opts?.minDays ?? TRAINING_CONSISTENT_MIN_DAYS
   const count = countQualifyingDays(
     workoutDates.map((date) => ({ date })),
     nowMs,
+    windowDays,
     () => true,
   )
-  return {
-    detected: count >= TRAINING_CONSISTENT_MIN_DAYS,
-    count,
-    windowDays: WINDOW_DAYS,
-  }
+  return { detected: count >= min, count, windowDays }
 }
 
-/** Nights with enough sleep (≥ 7h) in the last 7 days. */
+/** Nights with enough sleep (≥ SLEEP_ENOUGH_MIN) inside the window. */
 export function detectSleepConsistency(
   nights: readonly SleepNight[],
   nowMs: number,
+  opts?: ConsistencyOpts,
 ): ConsistencyResult {
-  const count = countQualifyingDays(nights, nowMs, (n) => n.minutes >= SLEEP_ENOUGH_MIN)
-  return {
-    detected: count >= SLEEP_CONSISTENT_MIN_DAYS,
-    count,
-    windowDays: WINDOW_DAYS,
-  }
+  const windowDays = opts?.windowDays ?? WINDOW_DAYS
+  const min = opts?.minDays ?? SLEEP_CONSISTENT_MIN_DAYS
+  const count = countQualifyingDays(nights, nowMs, windowDays, (n) => n.minutes >= SLEEP_ENOUGH_MIN)
+  return { detected: count >= min, count, windowDays }
 }

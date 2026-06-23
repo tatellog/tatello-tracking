@@ -30,3 +30,5 @@ export {
   type PendingRevelation,
 } from './logic'
 export { TransformationReveal } from './components/TransformationReveal'
+export { RevealReplayHost } from './components/RevealReplayHost'
+export { emitReplayReveal, subscribeReplayReveal, type ReplayEvent } from './replay-bus'

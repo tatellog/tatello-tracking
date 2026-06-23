@@ -6,7 +6,8 @@ import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
-import StelarIcon from '@/assets/stelar-icon.png'
+import StelarIcon from '@/assets/stelar.png'
+import { StelarLogo } from '@/components/brand/StelarLogo'
 import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
 
 // Fixed 9:16 — rendered at this exact size so the capture is
@@ -230,7 +231,9 @@ export function ProgressShareCard({
 
       <View style={styles.brand}>
         <Image source={StelarIcon} style={styles.brandIcon} resizeMode="contain" />
-        <Text style={styles.brandWord}>STELAR</Text>
+        {/* Wordmark como brand asset (PNG), no como fuente. Más grande + blanco
+            puro para que resalte junto al S9. */}
+        <StelarLogo variant="wordmark" size={20} color="#FFFFFF" />
       </View>
 
       {variant === 'retrato' ? (
@@ -408,17 +411,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    // El S9 ya trae margen transparente propio; gap 0 (el margen del PNG ya
+    // deja aire) para que el wordmark quede junto al ícono.
+    gap: 0,
   },
   brandIcon: {
     width: 26,
     height: 26,
-  },
-  brandWord: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    letterSpacing: 4,
   },
   hero: {
     flex: 1,

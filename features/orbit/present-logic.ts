@@ -9,7 +9,7 @@
  * capa visual la consume en DayPresent.tsx.
  */
 import type { DailySignals } from './api'
-import { dimensionDetail, TONE_BRILLANTE, type Dimension, type DimensionKey } from './logic'
+import { TONE_BRILLANTE, type Dimension, type DimensionKey } from './logic'
 
 /** Meta de vasos de agua del día — alineada al MAX_GLASSES de features/water. */
 export const WATER_TARGET = 8
@@ -38,7 +38,62 @@ const DIM_TITLE: Record<DimensionKey, string> = {
   ciclo: 'Ciclo',
 }
 
-export type DayHero = { key: DimensionKey; label: string; line: string }
+export type DayHero = {
+  key: DimensionKey
+  label: string
+  /** Voz del coach (italic serif): observa el día, no lo califica. */
+  observation: string
+  /** El dato que importa para el objetivo, anclado a tu meta cuando existe
+   *  (proteína vs meta, sueño en horas). Upright, evidencia bajo la voz. */
+  detail: string
+}
+
+/** Opcionales del motor de cálculo — dejan anclar el dato del héroe a TUS
+ *  metas (no a un estándar genérico). `null`/ausente → el dato va solo. */
+export type DayTargets = { proteinTarget?: number | null; calorieTarget?: number | null }
+
+/* Observación cálida del héroe (italic serif = voz del coach). Observa lo que
+ * pasó, sin puntuar. Determinística: misma señal → misma frase. */
+function heroObservation(key: DimensionKey, s: DailySignals): string {
+  switch (key) {
+    case 'alimento':
+      return (s.meal_count ?? 0) >= 2 ? 'Tu plato sostuvo el día.' : 'Tu plato empezó a aparecer.'
+    case 'sueno':
+      return (s.sleep_minutes ?? 0) >= 420 ? 'La noche te cuidó.' : 'Tu cuerpo buscó descanso.'
+    case 'cuerpo':
+      return s.trained ? 'Tu cuerpo se movió hoy.' : 'Tu cuerpo eligió descansar.'
+    default:
+      return DIM_TITLE[key]
+  }
+}
+
+/* El dato bajo la voz — anclado a TU meta donde de verdad mueve el objetivo
+ * (proteína). Honesto, observacional; nunca prescribe ("deberías"). */
+function heroDetail(key: DimensionKey, s: DailySignals, targets?: DayTargets): string {
+  switch (key) {
+    case 'alimento': {
+      if (s.protein_g != null && s.protein_g > 0) {
+        const p = Math.round(s.protein_g)
+        const t = targets?.proteinTarget
+        return t != null && t > 0
+          ? `${p} g de proteína de tu meta de ${Math.round(t)} g.`
+          : `${p} g de proteína hoy.`
+      }
+      const n = s.meal_count ?? 0
+      return `${n} ${n === 1 ? 'comida' : 'comidas'} registradas.`
+    }
+    case 'sueno': {
+      const h = ((s.sleep_minutes ?? 0) / 60).toFixed(1)
+      return s.sleep_quality != null
+        ? `${h} h · calidad ${s.sleep_quality}/5.`
+        : `${h} h esta noche.`
+    }
+    case 'cuerpo':
+      return s.trained ? 'Entrenaste hoy.' : 'Día de descanso.'
+    default:
+      return ''
+  }
+}
 
 /* El héroe ("lo que más brilló") premia ACCIONES (entreno, comida, sueño), no
  * auto-ratings (energía, mente) ni el estado del ciclo: "brillar" es algo que
@@ -66,15 +121,24 @@ function heroPriorityRank(k: DimensionKey): number {
  *  ratings y ciclo), híbrido: si alguna se hizo BIEN (brillo ≥ brillante)
  *  gana la de mayor prioridad para el objetivo; si nada destacó, gana la de
  *  mayor brillo (lo mejor que hubo). `null` si no hay acción registrada. */
-export function brightestToday(dims: Dimension[], signals: DailySignals | null): DayHero | null {
+export function brightestToday(
+  dims: Dimension[],
+  signals: DailySignals | null,
+  targets?: DayTargets,
+): DayHero | null {
   const registered = dims.filter((d) => d.registered && !HERO_EXCLUDED.has(d.key))
-  if (registered.length === 0) return null
+  if (registered.length === 0 || signals == null) return null
   const good = registered.filter((d) => d.brightness >= TONE_BRILLANTE)
   const top =
     good.length > 0
       ? good.reduce((a, b) => (heroPriorityRank(b.key) < heroPriorityRank(a.key) ? b : a))
       : registered.reduce((a, b) => (b.brightness > a.brightness ? b : a))
-  return { key: top.key, label: DIM_TITLE[top.key], line: dimensionDetail(top.key, signals) }
+  return {
+    key: top.key,
+    label: DIM_TITLE[top.key],
+    observation: heroObservation(top.key, signals),
+    detail: heroDetail(top.key, signals, targets),
+  }
 }
 
 /* ── "También estuvieron presentes" ──────────────────────────────────

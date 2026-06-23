@@ -345,6 +345,8 @@ async function main() {
       tier: 'pattern',
       kind: 'training_consistent',
       title: 'Tu movimiento se está volviendo constante',
+      // Evidencia para el detalle ("5 de los últimos 7 días…").
+      metadata: { count: 5, window_days: 7 },
       shown_at: ts(localDate(6), 18),
     },
   ]

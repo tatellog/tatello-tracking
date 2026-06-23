@@ -31,6 +31,8 @@ import { useRouter } from 'expo-router'
 
 import { ScreenCosmos } from '@/features/orbit/components/Cosmos'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
+import { requestWeekFocus } from '@/features/orbit/pending-week-focus'
+import type { WeekDimKey } from '@/features/orbit/week-orbit-logic'
 // Import directo (no por el barrel) para no crear ciclo patterns↔revelations.
 import {
   RevealParticles,
@@ -262,6 +264,17 @@ const RevealNode = memo(function RevealNode({
 
 type RevealedPattern = { id: string; type: PatternType; message: string }
 
+/* Qué estrella de la galaxia Semana enfoca cada patrón al tocar "Verlo en mi
+ * órbita" — así aterrizas en la evidencia exacta de la que habló la ceremonia
+ * (su readout: los días reales), no en la galaxia genérica. `abandonment` no
+ * lleva a Órbita (su CTA es "Aquí sigo"), por eso no está. */
+const PATTERN_TO_WEEK_DIM: Partial<Record<PatternType, WeekDimKey>> = {
+  training_consistent: 'movimiento',
+  protein_consistent: 'proteina',
+  sleep_consistent: 'sueno',
+  night_eating: 'comida',
+}
+
 /* The animated body — mounted only while visible, so all hooks here run
  * unconditionally. A centered card that is BORN from a point of light at
  * the screen's centre: a bloom flashes, the card condenses out of it,
@@ -452,6 +465,10 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
     // reliably); navigate FIRST, then close, so the unmount can't race
     // the navigation. Object pathname form (the one that navigated).
     requestOrbitSegment('semana')
+    // Y enfoca la estrella del hábito de este patrón, para caer en su
+    // evidencia exacta (no en la galaxia genérica).
+    const dim = PATTERN_TO_WEEK_DIM[pattern.type]
+    if (dim) requestWeekFocus(dim)
     router.navigate({ pathname: '/orbit' })
     onClose()
   }
@@ -701,39 +718,53 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
             </Animated.View>
 
             <Animated.View style={[styles.ctaWrap, ctaStyle]}>
+              {/* El chrome del botón (fill/borde/padding) va en un <View> INTERNO,
+                  no en el style del Pressable: en este setup (RN new arch) los
+                  estilos de fondo/borde/flex no se pintan fiable sobre un
+                  Pressable, y además colapsan su hit area (por eso "no se veía
+                  clickable" ni redirigía). Mismo patrón que ActionButton. */}
               {pattern.type === 'abandonment' ? (
                 <Pressable
                   onPress={close}
-                  style={({ pressed }) => [
-                    styles.ctaPrimary,
-                    { backgroundColor: tier.ctaFill, shadowColor: tier.ctaFill },
-                    pressed && styles.pressed,
-                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Aquí sigo"
                 >
-                  <Text style={[styles.ctaPrimaryText, { color: tier.ctaText }]}>Aquí sigo</Text>
+                  {({ pressed }) => (
+                    <View
+                      style={[
+                        styles.ctaPrimary,
+                        { backgroundColor: tier.ctaFill, shadowColor: tier.ctaFill },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.ctaPrimaryText, { color: tier.ctaText }]}>
+                        Aquí sigo
+                      </Text>
+                    </View>
+                  )}
                 </Pressable>
               ) : (
-                <>
-                  <Pressable
-                    onPress={goToOrbit}
-                    style={({ pressed }) => [
-                      styles.ctaPrimary,
-                      { backgroundColor: tier.ctaFill, shadowColor: tier.ctaFill },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.ctaPrimaryText, { color: tier.ctaText }]}>
-                      Verlo en mi órbita
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={close}
-                    hitSlop={10}
-                    style={({ pressed }) => [styles.ctaSecondary, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.ctaSecondaryText}>Lo veo</Text>
-                  </Pressable>
-                </>
+                // Una sola acción: ir a Órbita. Cerrar sin ir vive en la ✕ de
+                // arriba — un segundo botón "Lo veo" solo duplicaba esa salida.
+                <Pressable
+                  onPress={goToOrbit}
+                  accessibilityRole="button"
+                  accessibilityLabel="Verlo en mi órbita"
+                >
+                  {({ pressed }) => (
+                    <View
+                      style={[
+                        styles.ctaPrimary,
+                        { backgroundColor: tier.ctaFill, shadowColor: tier.ctaFill },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.ctaPrimaryText, { color: tier.ctaText }]}>
+                        Verlo en mi órbita
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
               )}
             </Animated.View>
           </Animated.View>

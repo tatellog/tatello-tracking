@@ -29,6 +29,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
+import { useMacroTargets } from '@/features/macros/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
 
@@ -58,6 +59,7 @@ const BAR_COLOR: Record<string, string> = {
   sueno: colors.dimension.sueno,
   energia: colors.dimension.energia,
   agua: colors.signal.agua,
+  proteina: colors.signal.proteina,
 }
 
 export function MonthSegment() {
@@ -71,7 +73,11 @@ export function MonthSegment() {
     () => buildMonthBuilt(signals, { waterGoalGlasses }),
     [signals, waterGoalGlasses],
   )
-  const patterns = useMemo(() => detectMonthPatterns(signals), [signals])
+  const proteinTarget = useMacroTargets().data?.protein_g ?? null
+  const patterns = useMemo(
+    () => detectMonthPatterns(signals, { proteinTarget }),
+    [signals, proteinTarget],
+  )
   const win = useMemo(() => biggestWin(signals), [signals])
 
   // Hero — la constelación del signo revelándose por los puntos de
@@ -164,6 +170,17 @@ export function MonthSegment() {
   )
 }
 
+/* Avance del mes en palabras (sin un segundo %): qué proporción del total
+ * revelado ocurrió este mes. Mata el choque "75% vs +64%". */
+function deltaPhrase(delta: number, progress: number): string {
+  const ratio = progress > 0 ? delta / progress : 0
+  if (ratio >= 0.6) return 'La mayor parte la revelaste este mes.'
+  if (ratio >= 0.3) return 'Buena parte la revelaste este mes.'
+  // "Algo se reveló" conserva el ancla de "revelar" (la constelación); un
+  // genérico "Avanzaste" lo perdía (voice-and-copy).
+  return 'Algo se reveló este mes.'
+}
+
 /* ── Hero — la constelación del signo revelándose ────────────────────── */
 function EmblemHero({
   sign,
@@ -240,9 +257,12 @@ function EmblemHero({
         {progress}
         <Text style={styles.heroPctSign}>% revelado</Text>
       </Text>
-      {/* Cuánto subió este mes — la transformación visible, sin meta. */}
+      {/* Avance del mes en CUALITATIVO, sin un segundo "%": dos porcentajes
+          juntos (75% total vs +64% del mes) competían y confundían cuál era
+          cuál. El número héroe es el % revelado; esto solo dice cuánto de ese
+          avance ocurrió este mes. */}
       {delta != null && delta > 0 ? (
-        <Text style={styles.heroDelta}>+{delta}% respecto al mes anterior</Text>
+        <Text style={styles.heroDelta}>{deltaPhrase(delta, progress)}</Text>
       ) : null}
       <Text style={styles.heroMessage}>{message}</Text>
     </View>
@@ -359,8 +379,14 @@ function EvidenceModal({
               <View style={styles.bars}>
                 {ev.bars.map((b, i) => {
                   const barColor = b.colorKey ? (BAR_COLOR[b.colorKey] ?? colors.oro) : colors.oro
+                  // Una señal sin registro (0) atenúa toda la fila para que
+                  // receda en vez de leerse como un hueco/falla.
+                  const zero = b.value === 0
                   return (
-                    <View key={`${b.label}-${i}`} style={styles.barRow}>
+                    <View
+                      key={`${b.label}-${i}`}
+                      style={[styles.barRow, zero && styles.barRowZero]}
+                    >
                       <Text style={styles.barLabel} numberOfLines={1}>
                         {b.label}
                       </Text>
@@ -377,7 +403,11 @@ function EvidenceModal({
                         />
                       </View>
                       <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
+                        {/* Denominador para anclar el número ("18 / 32"). */}
                         {b.value}
+                        {b.total != null ? (
+                          <Text style={styles.barValueTotal}> / {b.total}</Text>
+                        ) : null}
                       </Text>
                     </View>
                   )
@@ -623,8 +653,11 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.oroHairline,
   },
+  barRowZero: {
+    opacity: 0.45,
+  },
   barValue: {
-    width: 22,
+    width: 52,
     textAlign: 'right',
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
@@ -633,6 +666,11 @@ const styles = StyleSheet.create({
   barValueHi: {
     fontFamily: typography.uiBold,
     color: colors.leche,
+  },
+  // El denominador va atenuado para que el número grande (días presentes) pese.
+  barValueTotal: {
+    fontFamily: typography.ui,
+    color: colors.niebla,
   },
   modalCaption: {
     marginTop: 16,

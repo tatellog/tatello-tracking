@@ -221,7 +221,7 @@ describe('buildWeekFindings', () => {
     const streak = findings.find((f) => f.key === 'meal-streak')
     expect(streak?.text).toMatch(/3 días/)
     const appeared = findings.find((f) => f.key === 'appeared')
-    expect(appeared?.text).toMatch(/Apareciste 4 días/)
+    expect(appeared?.text).toMatch(/Estuviste presente 4 días/)
   })
 
   it('sin datos no inventa hallazgos', () => {

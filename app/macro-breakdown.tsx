@@ -80,13 +80,13 @@ export default function MacroBreakdownScreen() {
               <Text style={styles.tdeeSub}>Gasto diario total</Text>
 
               <View style={styles.factors}>
-                <Factor label="Peso" value={inputs.weight_kg ? `${inputs.weight_kg} kg` : '—'} />
-                <Factor label="Altura" value={inputs.height_cm ? `${inputs.height_cm} cm` : '—'} />
+                <Factor label="Peso" value={inputs.weight_kg ? `${inputs.weight_kg} kg` : '-'} />
+                <Factor label="Altura" value={inputs.height_cm ? `${inputs.height_cm} cm` : '-'} />
                 <Factor label="Edad" value={ageLabel(inputs.date_of_birth)} />
                 <Factor
                   label="Actividad"
                   value={
-                    inputs.training_frequency ? ACTIVITY_LABEL[inputs.training_frequency] : '—'
+                    inputs.training_frequency ? ACTIVITY_LABEL[inputs.training_frequency] : '-'
                   }
                 />
               </View>
@@ -153,15 +153,15 @@ function Factor({ label, value }: { label: string; value: string }) {
 }
 
 function ageLabel(dob: string | null): string {
-  if (!dob) return '—'
+  if (!dob) return '-'
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob)
-  if (!m) return '—'
+  if (!m) return '-'
   const birth = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
   const now = new Date()
   let age = now.getFullYear() - birth.getFullYear()
   const md = now.getMonth() - birth.getMonth()
   if (md < 0 || (md === 0 && now.getDate() < birth.getDate())) age -= 1
-  return age >= 0 ? `${age} años` : '—'
+  return age >= 0 ? `${age} años` : '-'
 }
 
 function enfoqueSub(enfoque: Enfoque, delta: number): string {

@@ -45,7 +45,13 @@ export function DeficitSlider({ stops, value, onChange }: Props) {
   // Last index reported during a drag, so we haptic + fire once per stop.
   const lastIdx = useSharedValue(selectedIndex)
 
-  const slotX = (i: number, w: number) => (count <= 1 ? 0 : (i / (count - 1)) * w)
+  // 'worklet': se llama tanto desde el JS thread (useEffect/onLayout/jumpTo)
+  // como DENTRO del worklet del gesto (.onEnd). Sin la directiva, llamarla en
+  // el worklet crashea la app al soltar el slider.
+  const slotX = (i: number, w: number) => {
+    'worklet'
+    return count <= 1 ? 0 : (i / (count - 1)) * w
+  }
 
   // When the selection changes from outside (or on first layout) and we
   // aren't dragging, settle the thumb onto its stop.

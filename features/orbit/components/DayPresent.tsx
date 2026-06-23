@@ -86,7 +86,7 @@ const SIGNAL_MEANING: Record<string, { label: string; meaning: string }> = {
   cuerpo: {
     label: 'Movimiento',
     meaning:
-      'Mover el cuerpo —entrenar o descansar activo— acompaña tu energía y tu recomposición.',
+      'Mover el cuerpo (entrenar o descansar activo) acompaña tu energía y tu recomposición.',
   },
   alimento: {
     label: 'Comida',
@@ -108,7 +108,7 @@ const SIGNAL_MEANING: Record<string, { label: string; meaning: string }> = {
   },
   mente: {
     label: 'Mente',
-    meaning: 'Tu ánimo, motivación y calma — una dimensión más de cómo viene tu día.',
+    meaning: 'Tu ánimo, motivación y calma: una dimensión más de cómo viene tu día.',
   },
   sueno: {
     label: 'Sueño',
@@ -139,17 +139,22 @@ function glyphFor(key: string, box: number, tint?: string) {
   const s = box * 0.7
   const p = { width: s, height: s, preserveAspectRatio: 'xMidYMid meet' as const }
   switch (key) {
-    case 'cuerpo':
+    case 'cuerpo': {
       // En el héroe se tinta al magenta de la dimensión (tintColor aplana el oro
       // a magenta plano, conservando alpha → runner magenta con sus destellos).
       // Como chip va sin tint = oro.
+      // El runner es una figura diagonal de trazo fino: pesa menos que los
+      // demás glyphs al mismo tamaño, así que se agranda para leer parejo
+      // (mismo factor que la galaxia Semana, weekDimGlyph).
+      const m = box * 1.3
       return (
         <Image
           source={MOVEMENT_PNG}
-          style={[pngStyle, tint ? { tintColor: tint } : null]}
+          style={[{ width: m, height: m }, tint ? { tintColor: tint } : null]}
           resizeMode="contain"
         />
       )
+    }
     case 'sueno':
       return png(SUENO_PNG)
     case 'energia':
@@ -274,7 +279,7 @@ export function DayPresent() {
 
   const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget, cycleEnabled })
 
-  const hero = brightestToday(dimensions, signals)
+  const hero = brightestToday(dimensions, signals, { calorieTarget, proteinTarget })
   const weak = weakestToday(dimensions, signals, { excludeKey: hero?.key })
   const chips = presentChips(signals, {
     cycleEnabled,
@@ -336,8 +341,7 @@ export function DayPresent() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Tu día aún está en calma</Text>
           <Text style={styles.cardBody}>
-            En cuanto registres algo —una comida, tu sueño, un vaso de agua— aparece aquí cómo va tu
-            día.
+            Registra una comida, tu sueño o un vaso de agua, y aquí aparece cómo va tu día.
           </Text>
         </View>
       </Animated.View>
@@ -365,7 +369,10 @@ export function DayPresent() {
             </HeroEmblem>
           </Pressable>
           <Text style={styles.heroTitle}>{hero.label}</Text>
-          <Text style={styles.heroLine}>{hero.line}</Text>
+          {/* Voz del coach (italic serif) — observa, no califica. */}
+          <Text style={styles.heroObservation}>{hero.observation}</Text>
+          {/* El dato anclado a tu meta — evidencia bajo la voz. */}
+          <Text style={styles.heroDetail}>{hero.detail}</Text>
 
           {chips.length > 0 ? (
             <View style={styles.chipsBlock}>
@@ -515,20 +522,34 @@ const styles = StyleSheet.create({
     // (emblema flotando en vacío + "lo que menos apareció" cortado).
     marginTop: 6,
   },
+  // El LABEL es UI, no voz del coach → upright (el italic serif queda reservado
+  // para la observación, abajo). Antes era serif italic, lo que chocaba con la
+  // regla "italic = voz del coach".
   heroTitle: {
-    marginTop: 4,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 30,
-    lineHeight: 36,
+    marginTop: 8,
+    fontFamily: typography.uiBold,
+    fontSize: 24,
+    lineHeight: 30,
     color: colors.leche,
     textAlign: 'center',
   },
-  heroLine: {
-    marginTop: 6,
+  // La voz del coach: observación cálida del día (italic serif).
+  heroObservation: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 20,
+    lineHeight: 27,
+    color: colors.leche,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+  },
+  // El dato bajo la voz — anclado a tu meta (upright, evidencia).
+  heroDetail: {
+    marginTop: 8,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    lineHeight: 20,
+    lineHeight: 21,
     color: colors.niebla,
     textAlign: 'center',
     paddingHorizontal: 16,

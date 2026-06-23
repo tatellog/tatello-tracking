@@ -17,6 +17,7 @@ import {
   type DayCell,
   type WeekDimKey,
 } from '../week-orbit-logic'
+import { consumeWeekFocus } from '../pending-week-focus'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
 import { hexA, weekDimGlyph, WEEK_DIM_COLOR } from './week-dim-visual'
@@ -53,7 +54,10 @@ export function WeekSegment({ onOpenDia }: { onOpenDia?: () => void }) {
   const hasEvidence = dims.some((d) => d.present > 0)
 
   // Dimensión enfocada (estrella tocada) → muestra su readout, como Día.
-  const [focusedDim, setFocusedDim] = useState<WeekDimKey | null>(null)
+  // Arranca con la dimensión que pidió un deep-link de patrón ("Verlo en mi
+  // órbita"), si lo hubo: así aterrizas con esa estrella ya enfocada y su
+  // evidencia visible. consumeWeekFocus se limpia al leer (one-shot).
+  const [focusedDim, setFocusedDim] = useState<WeekDimKey | null>(() => consumeWeekFocus())
   const focused = focusedDim ? (dims.find((d) => d.key === focusedDim) ?? null) : null
 
   if (isLoading) {
@@ -73,11 +77,9 @@ export function WeekSegment({ onOpenDia }: { onOpenDia?: () => void }) {
         <Text style={styles.subtitle}>Las huellas que dejaron tus hábitos.</Text>
       </View>
 
-      <WeekOrbitGalaxy
-        dims={dims}
-        onFocusChange={setFocusedDim}
-        initialFocus={anchor?.dim.key ?? null}
-      />
+      {/* Sin auto-enfoque: arranca mostrando la galaxia completa, nada
+          seleccionado. El readout aparece solo cuando la usuaria toca. */}
+      <WeekOrbitGalaxy dims={dims} onFocusChange={setFocusedDim} initialFocus={focusedDim} />
       {hasEvidence && focused ? (
         <>
           <Animated.View

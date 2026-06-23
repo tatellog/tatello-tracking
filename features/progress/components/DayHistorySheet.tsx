@@ -23,6 +23,7 @@ import ChoreStar from '@/assets/icons/choreStar.svg'
 import { ChevronHint } from '@/components/ui/interaction'
 import { DayDetailContent } from '@/features/tabs/components/calendar/DayDetailContent'
 import type { CalendarDay } from '@/features/tabs/components/calendar/logic'
+import { emitReplayReveal } from '@/features/revelations'
 import { colors, radius, spacing, typography } from '@/theme'
 
 import { DaySheetAtmosphere, GrabberAstro } from './DaySheetAtmosphere'
@@ -81,6 +82,19 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
           <DayDetailContent
             day={day}
             tone="observe"
+            // Tocar el evento re-abre su ceremonia full-screen. Este sheet es un
+            // RN <Modal> (ventana nativa aparte) y la ceremonia es absoluteFill
+            // montada en la RAÍZ de Progreso → quedaría DEBAJO del modal. Por eso
+            // cerramos el sheet primero y luego emitimos: al desmontarse el modal,
+            // la ceremonia en la raíz queda visible.
+            onEventPress={(ev) => {
+              onClose()
+              emitReplayReveal({
+                tier: ev.tier ?? '',
+                kind: ev.kind ?? '',
+                message: ev.message ?? ev.title,
+              })
+            }}
             // Día con evento = día especial: la estrella ornamental (oro,
             // memoria) remata la fecha como una unidad. Sin magenta — ese
             // queda para el CTA.

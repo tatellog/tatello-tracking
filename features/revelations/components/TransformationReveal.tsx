@@ -227,31 +227,38 @@ export function TransformationReveal({
               entering={FadeIn.duration(360).delay(reduced ? 300 : 1200)}
               style={styles.ctaWrap}
             >
+              {/* El chrome del botón va en un <View> INTERNO, no en el style del
+                  Pressable: en este setup (RN new arch) fondo/borde no se pintan
+                  fiable sobre un Pressable y colapsan su hit area. Mismo patrón
+                  que ActionButton / PatternReveal. */}
               {isReturn ? (
                 // Regreso: una sola salida cálida — no se "va a ver" nada,
                 // solo se reafirma la presencia.
                 <Pressable
                   onPress={close}
-                  style={({ pressed }) => [styles.ctaPrimary, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Aquí sigo"
                 >
-                  <Text style={styles.ctaPrimaryText}>Aquí sigo</Text>
+                  {({ pressed }) => (
+                    <View style={[styles.ctaPrimary, pressed && styles.pressed]}>
+                      <Text style={styles.ctaPrimaryText}>Aquí sigo</Text>
+                    </View>
+                  )}
                 </Pressable>
               ) : (
-                <>
-                  <Pressable
-                    onPress={goToOrbit}
-                    style={({ pressed }) => [styles.ctaPrimary, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.ctaPrimaryText}>Verlo en mi órbita</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={close}
-                    hitSlop={10}
-                    style={({ pressed }) => [styles.ctaSecondary, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.ctaSecondaryText}>Lo veo</Text>
-                  </Pressable>
-                </>
+                // Una sola acción: ir a Órbita. Cerrar sin ir vive en la ✕ de
+                // arriba — "Lo veo" solo duplicaba esa salida.
+                <Pressable
+                  onPress={goToOrbit}
+                  accessibilityRole="button"
+                  accessibilityLabel="Verlo en mi órbita"
+                >
+                  {({ pressed }) => (
+                    <View style={[styles.ctaPrimary, pressed && styles.pressed]}>
+                      <Text style={styles.ctaPrimaryText}>Verlo en mi órbita</Text>
+                    </View>
+                  )}
+                </Pressable>
               )}
             </Animated.View>
           </Animated.View>

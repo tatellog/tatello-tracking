@@ -113,6 +113,11 @@ const styles = StyleSheet.create({
   value: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.displaySm,
+    // lineHeight con holgura para el descendente de la "g" ("143 g"): sin él,
+    // Android recorta la cola de la g (la caja de línea queda al ras del
+    // fontSize). includeFontPadding lo deja respirar arriba y abajo.
+    lineHeight: Math.round(typography.sizes.displaySm * 1.3),
+    includeFontPadding: true,
     color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },

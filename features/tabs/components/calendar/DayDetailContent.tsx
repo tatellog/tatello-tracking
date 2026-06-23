@@ -14,12 +14,22 @@
  */
 
 import { type ReactNode } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
-import type { CalendarDay, DayRegistered, DayValues } from './logic'
+import type { CalendarDay, CalendarEvent, DayRegistered, DayValues } from './logic'
+
+/** Color + etiqueta del evento según su tier — espeja el marcador del
+ *  calendario (azul = Patrón, oro = Revelación/Transformación). */
+function tierMeta(tier: string | undefined): { color: string; label: string | null } {
+  if (tier === 'pattern') return { color: colors.dimension.sueno, label: 'Patrón' }
+  if (tier === 'transformation' || tier === 'return') {
+    return { color: colors.oro, label: 'Revelación' }
+  }
+  return { color: colors.oro, label: null }
+}
 
 // Divisor estelar: un hairline que es una pequeña constelación (estrella al
 // centro + satélites asimétricos), no una línea recta. Solo en OBSERVACIÓN y
@@ -125,6 +135,7 @@ export function DayDetailContent({
   footer,
   headerAccessory,
   tone = 'operate',
+  onEventPress,
 }: {
   day: CalendarDay
   /** Historia (Progreso): muestra VALORES reales. Hoy lo deja en false →
@@ -142,6 +153,10 @@ export function DayDetailContent({
    *  culpa, chips con más presencia. Gatea SOLO la capa visual; el contenido
    *  es el mismo. */
   tone?: 'operate' | 'observe'
+  /** Tocar un evento → re-vivir su ceremonia full-screen. Opcional: sin esto
+   *  los eventos son de solo lectura (la presentación sigue siendo pura; el
+   *  efecto vive en quien envuelve). */
+  onEventPress?: (ev: CalendarEvent) => void
 }) {
   const observe = tone === 'observe'
   const checks = REGISTERED_ITEMS.filter((it) => day.registered[it.key])
@@ -229,12 +244,54 @@ export function DayDetailContent({
         <View style={styles.section}>
           <Text style={styles.eyebrow}>{day.events.length > 1 ? 'Eventos' : 'Evento'}</Text>
           <View style={styles.eventList}>
-            {day.events.map((ev) => (
-              <View key={ev.id} style={styles.eventRow}>
-                <View style={styles.eventDot} />
-                <Text style={styles.eventTitle}>{ev.title}</Text>
-              </View>
-            ))}
+            {day.events.map((ev) => {
+              // El punto y la etiqueta del evento toman el COLOR de su tier, igual
+              // que el marcador del calendario (azul = Patrón, oro = Revelación)
+              // — así el día azul "se conecta" con su evento al abrirlo.
+              const t = tierMeta(ev.tier)
+              // Tocar el evento → re-vivir su ceremonia full-screen. Solo si
+              // quien envuelve pasó onEventPress; si no, es de solo lectura.
+              const tappable = onEventPress != null
+              const body = (
+                <>
+                  <View style={styles.eventRow}>
+                    <View style={[styles.eventDot, { backgroundColor: t.color }]} />
+                    <Text style={styles.eventTitle}>{ev.title}</Text>
+                    {t.label ? (
+                      <Text style={[styles.eventTag, { color: t.color }]}>{t.label}</Text>
+                    ) : null}
+                    {tappable ? <Text style={styles.eventChevron}>›</Text> : null}
+                  </View>
+                  {/* La evidencia / el porqué — para patrones trae el conteo
+                      ("X de los últimos N días…"); para transformación, el trazo. */}
+                  {ev.message && ev.message !== ev.title ? (
+                    <Text style={styles.eventEvidence}>{ev.message}</Text>
+                  ) : null}
+                  {tappable ? (
+                    <Text style={styles.eventReplayHint}>Un momento para revivir</Text>
+                  ) : null}
+                </>
+              )
+              if (!tappable) {
+                return (
+                  <View key={ev.id} style={styles.eventItem}>
+                    {body}
+                  </View>
+                )
+              }
+              return (
+                <Pressable
+                  key={ev.id}
+                  style={({ pressed }) => [styles.eventItem, pressed && styles.eventItemPressed]}
+                  onPress={() => onEventPress(ev)}
+                  accessibilityRole="button"
+                  accessibilityLabel={ev.title}
+                  accessibilityHint="Vuelve a este momento"
+                >
+                  {body}
+                </Pressable>
+              )
+            })}
           </View>
         </View>
       ) : null}
@@ -382,18 +439,57 @@ const styles = StyleSheet.create({
   },
   // Evento(s)
   eventList: {
-    gap: 7,
+    gap: 12,
+  },
+  eventItem: {
+    gap: 4,
+  },
+  eventItemPressed: {
+    opacity: 0.6,
+  },
+  // El acento "›" al final de la fila: señala que el momento se puede re-vivir.
+  // La etiqueta del tier ya empuja a la derecha con marginLeft:auto; el chevron
+  // se sienta justo después. (Todos los eventos reales traen tier → etiqueta.)
+  eventChevron: {
+    marginLeft: 6,
+    fontFamily: typography.uiMedium,
+    fontSize: 18,
+    color: colors.niebla,
+  },
+  // Pista discreta bajo la evidencia, alineada con ella (pasa el punto).
+  eventReplayHint: {
+    marginLeft: 14,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 0.6,
+    color: colors.bruma,
   },
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  // La evidencia bajo el título, alineada pasando el punto (6 + gap 8).
+  eventEvidence: {
+    marginLeft: 14,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
   eventDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: colors.oro,
+  },
+  // Etiqueta del tier (Patrón / Revelación) a la derecha del título, en su color.
+  eventTag: {
+    marginLeft: 'auto',
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   eventTitle: {
     flexShrink: 1,

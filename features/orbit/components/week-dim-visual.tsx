@@ -7,10 +7,9 @@ import { type WeekDimKey } from '../week-orbit-logic'
 
 /*
  * Identidad visual de las 5 dimensiones de la Semana. Los íconos son LOS
- * MISMOS que Órbita Día (DayPresent): arte PNG dorado (movement / sueño /
- * proteína / agua) + `food-vect.svg` para comida. El glyph va en oro; el
- * COLOR de la dimensión vive en el aro/halo del nodo, no en el trazo —
- * igual que el patrón del orbital de Día.
+ * MISMOS que Órbita Día (DayPresent): arte PNG (movement / sueño / proteína /
+ * agua) + `food-vect.svg` para comida. Cada ícono se TINTA a SU color de
+ * dimensión (el mismo del aro), no al oro — cohesión pedida por la owner.
  */
 export const WEEK_DIM_COLOR: Record<WeekDimKey, string> = {
   movimiento: '#FF4886', // magenta hot (cuerpo)
@@ -20,15 +19,12 @@ export const WEEK_DIM_COLOR: Record<WeekDimKey, string> = {
   sueno: '#7C8FFF', // índigo (sueño)
 }
 
-// Mismos PNG dorados que usa Órbita Día (raster → <Image>, no SvgImage, para
-// no sufrir el re-rasterizado que salta al hacer scroll en Android).
+// Mismos PNG que usa Órbita Día (raster → <Image>, no SvgImage, para no sufrir
+// el re-rasterizado que salta al hacer scroll en Android).
 const MOVEMENT_PNG = require('@/assets/icons/movement.png')
 const SUENO_PNG = require('@/assets/icons/sueno.png')
 const PROTEIN_PNG = require('@/assets/icons/protein.png')
 const AGUA_PNG = require('@/assets/icons/agua.png')
-
-// El oro cálido de la familia de glyphs (mismo que Día para food-vect).
-const GLYPH_GOLD = '#EEDD91'
 
 /** rgba a partir de un hex #RRGGBB + alpha. */
 export function hexA(hex: string, alpha: number): string {
@@ -44,24 +40,36 @@ export function hexRgb(hex: string): string {
   return `${r}, ${g}, ${b}`
 }
 
-/** El glyph de la dimensión — idéntico a Órbita Día. Los PNG llenan la caja
- *  (contain); food-vect va más compacto (0.7) para pesar igual que los PNG. */
+/* Escala óptica por ícono — el "peso visual" difiere entre piezas (una gota o
+ * una luna sólidas llenan más que un runner diagonal de trazo fino), así que un
+ * mismo `size` no se ve parejo. AGUA es la referencia (1.0): la owner pidió que
+ * los demás se vean tan grandes como agua. Fáciles de ajustar a ojo. */
+const GLYPH_SCALE: Record<WeekDimKey, number> = {
+  agua: 1.0, // referencia
+  movimiento: 1.5, // runner: figura diagonal y fina, necesita más para pesar igual
+  sueno: 1.3,
+  proteina: 1.25,
+  comida: 1.0, // food-vect (antes 0.7), ahora pesa como las demás
+}
+
+/** El glyph de la dimensión, tintado a SU color (el mismo del aro). Mismos
+ *  íconos que Órbita Día. `tintColor` aplana el arte a ese color conservando el
+ *  alpha; el contenido (contain) se centra en el contenedor que lo monta. */
 export function weekDimGlyph(key: WeekDimKey, size: number): ReactNode {
-  const pngStyle = { width: size, height: size }
-  const png = (src: number) => <Image source={src} style={pngStyle} resizeMode="contain" />
-  const s = size * 0.7
-  switch (key) {
-    case 'movimiento':
-      return png(MOVEMENT_PNG)
-    case 'sueno':
-      return png(SUENO_PNG)
-    case 'proteina':
-      return png(PROTEIN_PNG)
-    case 'agua':
-      return png(AGUA_PNG)
-    case 'comida':
-      return (
-        <FoodVect width={s} height={s} color={GLYPH_GOLD} preserveAspectRatio="xMidYMid meet" />
-      )
+  const tint = WEEK_DIM_COLOR[key]
+  const s = size * GLYPH_SCALE[key]
+  if (key === 'comida') {
+    return <FoodVect width={s} height={s} color={tint} preserveAspectRatio="xMidYMid meet" />
   }
+  const src =
+    key === 'movimiento'
+      ? MOVEMENT_PNG
+      : key === 'sueno'
+        ? SUENO_PNG
+        : key === 'proteina'
+          ? PROTEIN_PNG
+          : AGUA_PNG
+  return (
+    <Image source={src} style={{ width: s, height: s, tintColor: tint }} resizeMode="contain" />
+  )
 }

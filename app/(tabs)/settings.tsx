@@ -10,6 +10,7 @@ import FoodVect from '@/assets/icons/food-vect.svg'
 import NorthStar from '@/assets/icons/north-star.svg'
 import Orbits from '@/assets/icons/orbits.svg'
 import WaterVect from '@/assets/icons/water-vect.svg'
+import { StelarLogo } from '@/components/brand/StelarLogo'
 import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
@@ -605,6 +606,12 @@ function SettingsBody() {
                 </Text>
               </Pressable>
             ) : null}
+          </Animated.View>
+
+          {/* Marca al cierre de Ajustes (patrón premium: lockup + versión al
+              fondo). El wordmark va como brand asset, no como fuente. */}
+          <Animated.View entering={enter(300)} style={styles.brandLockup}>
+            <StelarLogo variant="horizontal" size={30} />
           </Animated.View>
 
           <Animated.View entering={enter(320)}>
@@ -1488,13 +1495,19 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   // ── Footer ─────────────────────────────────────────────────────
+  brandLockup: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
   footer: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.ui,
     color: colors.bone,
     textAlign: 'center',
-    marginTop: 32,
+    // Cerca del lockup para que marca + frase lean como UN cierre, no como
+    // dos elementos sueltos.
+    marginTop: 16,
   },
   footerEm: {
     fontFamily: typography.serifSemi,

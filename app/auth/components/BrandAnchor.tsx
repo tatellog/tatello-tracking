@@ -1,6 +1,6 @@
 import LottieView from 'lottie-react-native'
 import { useEffect } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -14,7 +14,8 @@ import Animated, {
 import Svg, { Circle } from 'react-native-svg'
 
 import NorthStar from '@/assets/icons/north-star.svg'
-import { colors, duration, typography } from '@/theme'
+import { StelarLogo } from '@/components/brand/StelarLogo'
+import { colors, duration } from '@/theme'
 
 const ANCHOR_SIZE = 64
 // The Lottie canvas is square; size it generously so the bloom + orbiting
@@ -100,7 +101,10 @@ export function BrandAnchor({ pulseOnce = false, showWordmark = true }: BrandAnc
           <NorthStar width={ANCHOR_SIZE} height={ANCHOR_SIZE} color={colors.oro} />
         </Animated.View>
       </View>
-      {showWordmark ? <Text style={styles.wordmark}>STELAR</Text> : null}
+      {/* Wordmark como BRAND ASSET (PNG exportado), no como fuente de UI.
+          Tintado a leche para conservar el matiz original sobre el fondo
+          cálido-oscuro. */}
+      {showWordmark ? <StelarLogo variant="wordmark" size={22} color={colors.leche} /> : null}
     </View>
   )
 }
@@ -135,13 +139,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: GLOW_SIZE,
     height: GLOW_SIZE,
-  },
-  wordmark: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.headingLg,
-    color: colors.leche,
-    // Wider tracking gives the wordmark "quiet luxury" presence under the
-    // hero without adding font weight (display-heavy is off-brand here).
-    letterSpacing: typography.letterSpacing.uppercaseWide,
   },
 })

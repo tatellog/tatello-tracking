@@ -74,6 +74,35 @@ describe('brightestToday', () => {
     const hero = brightestToday(dims(o), mkSig(DAY, o))
     expect(hero?.key).toBe('alimento')
   })
+
+  it('héroe Comida: ancla la proteína a TU meta cuando existe', () => {
+    const o = { meal_count: 3, protein_g: 86 }
+    const hero = brightestToday(dims(o), mkSig(DAY, o), { proteinTarget: 120 })
+    expect(hero?.key).toBe('alimento')
+    expect(hero?.detail).toMatch(/86 g de proteína de tu meta de 120 g/)
+    expect(hero?.observation).toBe('Tu plato sostuvo el día.')
+  })
+
+  it('héroe Comida: sin meta de proteína, el dato va solo (sin inventar meta)', () => {
+    const o = { meal_count: 2, protein_g: 40 }
+    const hero = brightestToday(dims(o), mkSig(DAY, o))
+    expect(hero?.detail).toMatch(/40 g de proteína hoy/)
+    expect(hero?.detail).not.toMatch(/meta/)
+  })
+
+  it('héroe Comida: sin proteína registrada, cae al conteo de comidas', () => {
+    const o = { meal_count: 2 }
+    const hero = brightestToday(dims(o), mkSig(DAY, o), { proteinTarget: 120 })
+    expect(hero?.detail).toBe('2 comidas registradas.')
+  })
+
+  it('héroe Sueño: el detalle reporta las horas reales', () => {
+    const o = { trained: true, sleep_minutes: 450 }
+    const hero = brightestToday(dims(o), mkSig(DAY, o))
+    // sueño gana por prioridad sobre movimiento cuando ambos están "bien".
+    expect(hero?.key).toBe('sueno')
+    expect(hero?.detail).toMatch(/7\.5 h/)
+  })
 })
 
 describe('presentChips', () => {

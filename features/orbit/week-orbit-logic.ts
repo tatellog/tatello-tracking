@@ -288,6 +288,10 @@ function longestMealStreak(signals: readonly DailySignals[], todayIso: string): 
 
 const SLEEP_DIFF_MIN = 20 // margen mínimo para afirmar "dormiste mejor"
 
+// Mínimo de días presentes para celebrar la aparición como CONSTANCIA. Por
+// debajo no se muestra (un conteo bajo se lee como reproche, no como dato).
+const APPEARED_CONSTANCY_MIN = 4
+
 /**
  * Hallazgos determinísticos de la semana — solo los que se sostienen con
  * datos reales (nunca predicción). Orden: correlación → racha → aparición.
@@ -324,13 +328,16 @@ export function buildWeekFindings(
     })
   }
 
-  // 3 · Días que apareciste.
+  // 3 · Días que apareciste — SOLO como señal de constancia (positiva). Un
+  // "Apareciste 1 día" no informa y se lee como un puntaje bajo; solo lo
+  // surfaceamos cuando estuviste presente la mayor parte de la semana. Por
+  // debajo del umbral no mostramos nada (mejor vacío que un dato hueco).
   const appeared = new Set(inWeek.filter((s) => signalCount(s) > 0).map((s) => s.day as string))
     .size
-  if (appeared > 0) {
+  if (appeared >= APPEARED_CONSTANCY_MIN) {
     out.push({
       key: 'appeared',
-      text: `Apareciste ${appeared} ${appeared === 1 ? 'día' : 'días'} esta semana.`,
+      text: `Estuviste presente ${appeared} días esta semana. Tu ritmo se nota.`,
     })
   }
 

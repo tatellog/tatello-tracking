@@ -160,8 +160,13 @@ export function macrosForDelta(
   const tdee = computeTdee(input)
   if (tdee == null || input.weight_kg == null) return null
 
-  const calories = clamp(Math.round(tdee + kcalDelta), 900, 6000)
-  const protein_g = clamp(Math.round(input.weight_kg * PROTEIN_PER_KG[enfoque]), 30, 350)
+  // Band IDÉNTICA a la del MacroTargetsInputSchema (features/macros/api.ts):
+  // calorías [1000, 5000], proteína [50, 300]. Solo se persisten calorías +
+  // proteína, así que estas dos deben caer SIEMPRE dentro del esquema o el
+  // upsert falla con "No se pudo guardar" (p. ej. un déficit marcado sobre un
+  // TDEE bajo producía 938 kcal < 1000). fat/carbs no se guardan.
+  const calories = clamp(Math.round(tdee + kcalDelta), 1000, 5000)
+  const protein_g = clamp(Math.round(input.weight_kg * PROTEIN_PER_KG[enfoque]), 50, 300)
   const fat_g = clamp(Math.round(input.weight_kg * FAT_PER_KG), 20, 200)
   const carbsKcal = calories - protein_g * 4 - fat_g * 9
   const carbs_g = clamp(Math.round(carbsKcal / 4), 0, 800)

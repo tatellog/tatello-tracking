@@ -14,6 +14,12 @@
  * Toda comparación de día-de-semana se parsea en UTC (como el resto del repo)
  * para no correrse de día por timezone.
  */
+import {
+  detectProteinConsistency,
+  detectSleepConsistency,
+  detectTrainingConsistency,
+} from '@/features/patterns/consistency'
+
 import type { DailySignals } from './api'
 
 /** Vasos para considerar el agua "alcanzada" ese día (meta diaria). */
@@ -100,6 +106,10 @@ export function buildMonthBuilt(
 export type EvidenceBar = {
   label: string
   value: number
+  /** Denominador de la barra (días de la ventana). Cuando está presente, el
+   *  modal muestra "value / total" para anclar el número. Ausente en barras
+   *  relativas (día-de-semana), que se comparan entre sí. */
+  total?: number
   highlight?: boolean
   /** Clave de dimensión para tintar la barra (hábitos); ausente en barras de
    *  día-de-semana, que van en oro neutro. */
@@ -143,12 +153,126 @@ function weekdayCounts(days: readonly DailySignals[]): number[] {
   return wd
 }
 
-export function detectMonthPatterns(signals: readonly DailySignals[]): MonthPattern[] {
+/* Patrones POSITIVOS del MOTOR de consistencia (features/patterns/consistency)
+ * — la MISMA lógica del reveal semanal de Hoy, aquí sobre la ventana del mes.
+ * "Lo que descubrimos" ya no inventa su propia constancia: la consume del motor
+ * (un solo origen de verdad, testeado). Umbral mensual propio. */
+const MONTH_CONSISTENT_MIN = 8
+const MONTH_WINDOW_DAYS = 32
+
+/** Fecha más reciente (medianoche local) como ms — ancla de la ventana de los
+ *  detectores, derivada de los datos (no de `new Date()`) → determinística. */
+function latestDayMs(days: readonly DailySignals[]): number | null {
+  let max: string | null = null
+  for (const s of days) if (s.day && (max == null || s.day > max)) max = s.day
+  return max != null ? new Date(`${max}T00:00:00`).getTime() : null
+}
+
+export type MonthConsistency = {
+  protein: { detected: boolean; count: number }
+  training: { detected: boolean; count: number }
+  sleep: { detected: boolean; count: number }
+}
+
+/** Corre los detectores del motor (proteína/movimiento/sueño) sobre el mes. */
+export function monthConsistency(
+  signals: readonly DailySignals[],
+  opts?: { proteinTarget?: number | null },
+): MonthConsistency {
+  const days = loggedDays(signals)
+  const nowMs = latestDayMs(days)
+  const empty = { detected: false, count: 0 }
+  if (nowMs == null) return { protein: empty, training: empty, sleep: empty }
+  const win = { windowDays: MONTH_WINDOW_DAYS, minDays: MONTH_CONSISTENT_MIN }
+  const targetG = opts?.proteinTarget ?? 0
+  const p = detectProteinConsistency(
+    days
+      .filter((s) => s.protein_g != null)
+      .map((s) => ({ date: s.day!, proteinG: s.protein_g!, targetG })),
+    nowMs,
+    win,
+  )
+  const t = detectTrainingConsistency(
+    days.filter((s) => s.trained === true).map((s) => s.day!),
+    nowMs,
+    win,
+  )
+  const sl = detectSleepConsistency(
+    days
+      .filter((s) => s.sleep_minutes != null)
+      .map((s) => ({ date: s.day!, minutes: s.sleep_minutes! })),
+    nowMs,
+    win,
+  )
+  return {
+    protein: { detected: p.detected, count: p.count },
+    training: { detected: t.detected, count: t.count },
+    sleep: { detected: sl.detected, count: sl.count },
+  }
+}
+
+export function detectMonthPatterns(
+  signals: readonly DailySignals[],
+  opts?: { proteinTarget?: number | null },
+): MonthPattern[] {
   const days = loggedDays(signals)
   if (days.length < PATTERN_MIN_DAYS) return []
   const out: MonthPattern[] = []
 
-  // 1 + 2 · Hábito más / menos constante (sobre la misma evidencia de barras).
+  // 1 · Patrones del MOTOR — la constancia positiva (proteína/movimiento/sueño)
+  // viene de features/patterns/consistency, no de un cálculo paralelo. Evidencia
+  // = los conteos del motor (el conteo "va al frente" en los positivos, ok).
+  const c = monthConsistency(signals, { proteinTarget: opts?.proteinTarget })
+  // El motor cuenta días presentes en una ventana de MONTH_WINDOW_DAYS (~mes),
+  // así que ese es el denominador correcto para anclar el número ("18 / 32").
+  const consistencyBars = (highlight: string): EvidenceBar[] => [
+    {
+      label: 'Proteína',
+      value: c.protein.count,
+      total: MONTH_WINDOW_DAYS,
+      colorKey: 'proteina',
+      highlight: highlight === 'proteina',
+    },
+    {
+      label: 'Movimiento',
+      value: c.training.count,
+      total: MONTH_WINDOW_DAYS,
+      colorKey: 'cuerpo',
+      highlight: highlight === 'cuerpo',
+    },
+    {
+      label: 'Sueño',
+      value: c.sleep.count,
+      total: MONTH_WINDOW_DAYS,
+      colorKey: 'sueno',
+      highlight: highlight === 'sueno',
+    },
+  ]
+  const consistencyCaption = 'Días en que cada señal estuvo presente.'
+  if (c.protein.detected) {
+    out.push({
+      id: 'consistent-protein',
+      title: 'Tu proteína se mantuvo consistente este mes.',
+      evidence: { bars: consistencyBars('proteina'), caption: consistencyCaption, unit: 'días' },
+    })
+  }
+  if (c.training.detected) {
+    out.push({
+      id: 'consistent-training',
+      title: 'El movimiento fue una de tus constantes este mes.',
+      evidence: { bars: consistencyBars('cuerpo'), caption: consistencyCaption, unit: 'días' },
+    })
+  }
+  if (c.sleep.detected) {
+    out.push({
+      id: 'consistent-sleep',
+      title: 'Tu sueño se mantuvo estable este mes.',
+      evidence: { bars: consistencyBars('sueno'), caption: consistencyCaption, unit: 'días' },
+    })
+  }
+
+  // 2 · "Lo que menos apareció" — observación local de Mes (el motor no tiene
+  // un patrón de "menos constante"; lo mantenemos como nota de crecimiento).
   const habits = habitCounts(days).filter((h) => h.count > 0)
   if (habits.length >= 3) {
     const sorted = [...habits].sort((a, b) => b.count - a.count)
@@ -163,26 +287,15 @@ export function detectMonthPatterns(signals: readonly DailySignals[]): MonthPatt
           highlight: h.label === highlight,
           colorKey: h.key,
         }))
-    // Más constante — solo si hay un líder claro (no empate con el segundo).
-    if (top.count >= 5 && top.count > (sorted[1]?.count ?? 0)) {
-      out.push({
-        id: 'habit-top',
-        title: `${top.label} es tu hábito más constante.`,
-        evidence: {
-          bars: habitBars(top.label),
-          caption: 'Días del mes en que apareció cada hábito.',
-          unit: 'días',
-        },
-      })
-    }
-    // Menos constante — solo si el rezagado es claramente menor que el líder.
     if (low.count < top.count) {
       out.push({
         id: 'habit-low',
-        title: `${low.label} es tu hábito menos constante.`,
+        // Sujeto = la señal, no la usuaria; "silenciosa" observa el espacio sin
+        // señalar carencia (manifesto-reviewer + voice-and-copy).
+        title: `${low.label} fue tu señal más silenciosa este mes.`,
         evidence: {
           bars: habitBars(low.label),
-          caption: 'Días del mes en que apareció cada hábito.',
+          caption: 'Días en que cada señal estuvo presente.',
           unit: 'días',
         },
       })
@@ -261,11 +374,18 @@ export type MonthWin = { headline: string; line: string }
 export function biggestWin(signals: readonly DailySignals[]): MonthWin | null {
   const days = loggedDays(signals).length
   if (days === 0) return null
+  // Voz Stelar: observa, no etiqueta. "Superpoder" sonaba a autoayuda; "ritmo
+  // real" validaba de más. Constancia > consistencia (manifiesto).
   const line =
     days >= 20
-      ? 'La consistencia es tu superpoder.'
+      ? 'Tu constancia habló este mes.'
       : days >= 12
-        ? 'Estás construyendo un hábito real.'
-        : 'Cada día que apareces, suma.'
-  return { headline: `Apareciste ${days} ${days === 1 ? 'día' : 'días'} este mes.`, line }
+        ? 'Un ritmo empieza a aparecer.'
+        : 'Cada día que registras, suma.'
+  // "Estuviste presente" en vez de "Apareciste": cálido y claro a la vez (qué
+  // = registraste alguna señal ese día). voice-and-copy.
+  return {
+    headline: `Estuviste presente ${days} ${days === 1 ? 'día' : 'días'} este mes.`,
+    line,
+  }
 }
