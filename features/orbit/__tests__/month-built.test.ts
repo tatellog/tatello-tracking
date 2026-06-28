@@ -52,8 +52,24 @@ describe('detectMonthPatterns', () => {
     }))
     const ps = detectMonthPatterns(signals)
     const low = ps.find((p) => p.id === 'habit-low')!
-    expect(low.title).toMatch(/Agua fue tu señal más silenciosa/)
+    expect(low.title).toMatch(/El agua fue tu señal más silenciosa/)
     expect(low.evidence.bars.find((b) => b.label === 'Agua')?.highlight).toBe(true)
+  })
+
+  it('NO contradice: si el movimiento fue una constante, no es la "más silenciosa"', () => {
+    // Entrena 10 días (constancia de movimiento) pero los demás hábitos
+    // aparecen los 14 → sin dedupe, "movimiento" saldría como el más silencioso
+    // a la vez que constante. El dedupe por dimensión lo impide.
+    const signals = month(14, (i) => ({
+      trained: i < 10,
+      meal_count: 2,
+      sleep_minutes: 360,
+      energy: 3,
+      water_glasses: 1,
+    }))
+    const ps = detectMonthPatterns(signals)
+    expect(ps.some((p) => p.id === 'consistent-training')).toBe(true)
+    expect(ps.some((p) => p.id === 'habit-low' && /movimiento/i.test(p.title))).toBe(false)
   })
 
   it('consume los patrones POSITIVOS del motor (proteína/movimiento/sueño)', () => {

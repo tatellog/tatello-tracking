@@ -68,6 +68,27 @@ export function levelsFor(enfoque: Enfoque): readonly NivelOption[] {
   return []
 }
 
+/** Banda de calorías — IDÉNTICA al MacroTargetsInputSchema (features/macros/api.ts).
+ *  El piso es además un mínimo de SEGURIDAD: el manifiesto prohíbe promover
+ *  restricción extrema, así que nunca proponemos un objetivo por debajo. */
+export const MIN_CALORIES = 1000
+export const MAX_CALORIES = 5000
+
+/**
+ * Niveles que NO aterrizan por debajo del mínimo saludable para ESTE TDEE — el
+ * slider solo debe ofrecer déficits sostenibles, nunca uno que se tope contra
+ * el piso de seguridad (manifiesto). Si ninguno es seguro (TDEE muy bajo) deja
+ * solo el más ligero, para que el control no quede vacío y el mensaje de "tu
+ * mínimo" haga el resto. Solo filtra déficit; superávit no es riesgo de
+ * restricción.
+ */
+export function safeLevelsFor(enfoque: Enfoque, tdee: number | null): readonly NivelOption[] {
+  const all = levelsFor(enfoque)
+  if (enfoque !== 'deficit' || tdee == null) return all
+  const safe = all.filter((l) => tdee + l.delta >= MIN_CALORIES)
+  return safe.length > 0 ? safe : all.slice(0, 1)
+}
+
 /* ─── tuning constants ───────────────────────────────────────────── */
 
 const ACTIVITY_MULTIPLIER: Record<TrainingFrequency, number> = {
@@ -105,6 +126,10 @@ export type FullMacros = {
   protein_g: number
   fat_g: number
   carbs_g: number
+  /** true si las calorías se toparon contra el piso/techo de seguridad (el
+   *  delta pedido habría caído fuera de la banda). La UI lo usa para mostrar
+   *  el delta REAL y un mensaje de cuidado en vez del nominal. */
+  clamped: boolean
 }
 
 /** Back-compat shape consumed by the onboarding reveal + macro_targets
@@ -165,13 +190,14 @@ export function macrosForDelta(
   // proteína, así que estas dos deben caer SIEMPRE dentro del esquema o el
   // upsert falla con "No se pudo guardar" (p. ej. un déficit marcado sobre un
   // TDEE bajo producía 938 kcal < 1000). fat/carbs no se guardan.
-  const calories = clamp(Math.round(tdee + kcalDelta), 1000, 5000)
+  const rawCalories = Math.round(tdee + kcalDelta)
+  const calories = clamp(rawCalories, MIN_CALORIES, MAX_CALORIES)
   const protein_g = clamp(Math.round(input.weight_kg * PROTEIN_PER_KG[enfoque]), 50, 300)
   const fat_g = clamp(Math.round(input.weight_kg * FAT_PER_KG), 20, 200)
   const carbsKcal = calories - protein_g * 4 - fat_g * 9
   const carbs_g = clamp(Math.round(carbsKcal / 4), 0, 800)
 
-  return { calories, protein_g, fat_g, carbs_g }
+  return { calories, protein_g, fat_g, carbs_g, clamped: calories !== rawCalories }
 }
 
 /**

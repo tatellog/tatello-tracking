@@ -18,7 +18,8 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
+import { BlurView } from 'expo-blur'
 import { useIsFocused } from '@react-navigation/native'
 
 import { colors, typography } from '@/theme'
@@ -136,29 +137,55 @@ export function MonthSegment() {
         <View style={styles.section}>
           <Text style={styles.eyebrow}>Lo que descubrimos</Text>
           <View style={styles.patternList}>
-            {patterns.map((p) => (
-              <View key={p.id} style={styles.patternRow}>
-                <Text style={styles.patternTitle}>{p.title}</Text>
+            {patterns.map((p) => {
+              // El dato clave AL FRENTE (la prueba que reconquista a una
+              // escéptica), sin obligar a abrir el modal. Cada patrón se ancla
+              // con un punto del color de SU dimensión; una línea vertical tenue
+              // los conecta como una constelación de hallazgos (no filas sueltas).
+              const stat = patternStat(p)
+              const dotColor = stat?.color ?? colors.oro
+              return (
                 <Pressable
+                  key={p.id}
+                  style={styles.patternRow}
                   onPress={() => setEvidence(p)}
-                  hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={`Ver evidencia: ${p.title}`}
                 >
-                  <Text style={styles.patternCta}>Ver evidencia →</Text>
+                  <View style={styles.patternRail}>
+                    <View style={styles.railLine} />
+                    <View style={[styles.railDot, { backgroundColor: dotColor }]} />
+                  </View>
+                  <View style={styles.patternBody}>
+                    <Text style={styles.patternTitle}>{p.title}</Text>
+                    {stat ? (
+                      <Text style={styles.patternStat}>
+                        <Text style={[styles.patternStatNum, { color: stat.color }]}>
+                          {stat.value}
+                        </Text>
+                        <Text style={styles.patternStatUnit}> {stat.unit}</Text>
+                      </Text>
+                    ) : null}
+                    <Text style={styles.patternCta}>Ver evidencia →</Text>
+                  </View>
                 </Pressable>
-              </View>
-            ))}
+              )
+            })}
           </View>
         </View>
       ) : null}
 
       {/* 4 · Tu mayor victoria — la consistencia, celebrada. */}
       {win ? (
-        <View style={styles.section}>
+        <View style={[styles.section, styles.victorySection]}>
           <Text style={[styles.eyebrow, styles.eyebrowWin]}>Tu mayor victoria</Text>
           <View style={styles.victoryCard}>
-            <Text style={styles.victoryStar}>✦</Text>
+            {/* Estrellas-satélite dentro de la tarjeta: la frase vive en su
+                propio cielo pequeño (no un campo, solo 2-3 puntos). */}
+            <View style={[styles.victorySat, styles.victorySatA]} />
+            <View style={[styles.victorySat, styles.victorySatB]} />
+            <View style={[styles.victorySat, styles.victorySatC]} />
+            <VictoryStar />
             <Text style={styles.victoryHeadline}>{win.headline}</Text>
             <Text style={styles.victoryLine}>{win.line}</Text>
           </View>
@@ -327,7 +354,44 @@ function VoidDisc({ size }: { size: number }) {
 }
 
 /* ── "Esto construiste" — conteos acumulados ─────────────────────────── */
+/** El dato clave de un patrón, inline (sin abrir el modal): el conteo de días +
+ *  el color de su dimensión. El "/ N" vive SOLO en el modal (donde la barra le
+ *  da contexto): inline siempre es "N días", así los patrones con ventana fija
+ *  y los de conteo de presencia se leen IGUAL (antes "19 / 32 días" vs "24
+ *  días" parecía un bug). */
+function patternStat(p: MonthPattern): { value: number; unit: string; color: string } | null {
+  const hi = p.evidence.bars.find((b) => b.highlight) ?? p.evidence.bars[0]
+  if (!hi) return null
+  const color = hi.colorKey ? (BAR_COLOR[hi.colorKey] ?? colors.oro) : colors.oro
+  return { value: hi.value, unit: p.evidence.unit, color }
+}
+
+/** La chispa de "Tu mayor victoria": una estrella de 4 púas desiguales con un
+ *  bloom dorado radial — eco del emblema del hero (la victoria es la chispa de
+ *  la misma constelación que corona la vista). SVG estático, sin pulso. */
+function VictoryStar() {
+  return (
+    <Svg width={52} height={52} viewBox="0 0 48 48" style={styles.victoryStar}>
+      <Defs>
+        <RadialGradient id="victory-bloom" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor={colors.oroLight} stopOpacity={0.5} />
+          <Stop offset="0.55" stopColor={colors.oro} stopOpacity={0.16} />
+          <Stop offset="1" stopColor={colors.oro} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={24} cy={24} r={24} fill="url(#victory-bloom)" />
+      <Path
+        d="M24 12 C24.6 21 27 23.4 36 24 C27 24.6 24.6 27 24 36 C23.4 27 21 24.6 12 24 C21 23.4 23.4 21 24 12 Z"
+        fill={colors.oroLight}
+      />
+    </Svg>
+  )
+}
+
 function BuiltGrid({ built }: { built: ReturnType<typeof buildMonthBuilt> }) {
+  // 4 stats curadas en 2×2 (las que más importan: proteína cuidada + entrenos +
+  // comida + días presentes). Agua y sueño bajan a una línea de resumen, así el
+  // grid queda parejo (antes 5 cards dejaban un hueco) y respira más.
   const cards: { value: string; unit?: string; label: string }[] = [
     { value: String(built.trainedDays), label: 'Entrenamientos' },
     { value: String(built.foodDays), label: 'Días con comida' },
@@ -336,24 +400,26 @@ function BuiltGrid({ built }: { built: ReturnType<typeof buildMonthBuilt> }) {
       unit: built.proteinAvgG != null ? 'g' : undefined,
       label: 'Proteína prom.',
     },
-    { value: String(built.waterGoalDays), label: 'Días de agua' },
-    {
-      value: built.sleepAvgH != null ? built.sleepAvgH.toFixed(1) : '·',
-      unit: built.sleepAvgH != null ? 'h' : undefined,
-      label: 'Sueño prom.',
-    },
+    { value: String(built.daysAppeared), label: 'Días presentes' },
   ]
+  const summary: string[] = [
+    `${built.waterGoalDays} ${built.waterGoalDays === 1 ? 'día' : 'días'} de agua`,
+  ]
+  if (built.sleepAvgH != null) summary.push(`${built.sleepAvgH.toFixed(1)} h de sueño en promedio`)
   return (
-    <View style={styles.builtGrid}>
-      {cards.map((c) => (
-        <View key={c.label} style={styles.builtCard}>
-          <Text style={styles.builtValue}>
-            {c.value}
-            {c.unit ? <Text style={styles.builtUnit}> {c.unit}</Text> : null}
-          </Text>
-          <Text style={styles.builtLabel}>{c.label}</Text>
-        </View>
-      ))}
+    <View style={styles.builtWrap}>
+      <View style={styles.builtGrid}>
+        {cards.map((c) => (
+          <View key={c.label} style={styles.builtCard}>
+            <Text style={styles.builtValue}>
+              {c.value}
+              {c.unit ? <Text style={styles.builtUnit}> {c.unit}</Text> : null}
+            </Text>
+            <Text style={styles.builtLabel}>{c.label}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.builtSummary}>{summary.join(' · ')}</Text>
     </View>
   )
 }
@@ -367,26 +433,39 @@ function EvidenceModal({
   onClose: () => void
 }) {
   const ev = pattern?.evidence
-  const max = ev ? Math.max(1, ...ev.bars.map((b) => b.value)) : 1
+  // Las señales SIN registro (0) no se dibujan como barra vacía (se leería como
+  // hueco/falla): bajan a una nota al pie. La evidencia muestra lo que SÍ pasó.
+  const shown = ev ? ev.bars.filter((b) => b.value > 0) : []
+  const zeros = ev ? ev.bars.filter((b) => b.value === 0) : []
+  const max = Math.max(1, ...shown.map((b) => b.value))
+  const titleColor = ev
+    ? (() => {
+        const hi = ev.bars.find((b) => b.highlight) ?? ev.bars[0]
+        return hi?.colorKey ? (BAR_COLOR[hi.colorKey] ?? colors.oro) : colors.oro
+      })()
+    : colors.oro
   return (
     <Modal visible={pattern != null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        {/* Fondo difuminado: la pantalla detrás se va a desenfoque, el modal
+            flota. El scrim cálido encima da separación y es el respaldo si en
+            algún Android el BlurView no rinde. Ambos pointerEvents none → el tap
+            afuera sigue cerrando vía el Pressable contenedor. */}
+        <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={[StyleSheet.absoluteFill, styles.modalScrim]} pointerEvents="none" />
         <Pressable style={styles.modalCard} onPress={() => {}}>
           {pattern && ev ? (
             <>
               <Text style={styles.modalEyebrow}>La evidencia</Text>
-              <Text style={styles.modalTitle}>{pattern.title}</Text>
+              <View style={styles.modalTitleRow}>
+                <View style={[styles.modalTitleDot, { backgroundColor: titleColor }]} />
+                <Text style={styles.modalTitle}>{pattern.title}</Text>
+              </View>
               <View style={styles.bars}>
-                {ev.bars.map((b, i) => {
+                {shown.map((b, i) => {
                   const barColor = b.colorKey ? (BAR_COLOR[b.colorKey] ?? colors.oro) : colors.oro
-                  // Una señal sin registro (0) atenúa toda la fila para que
-                  // receda en vez de leerse como un hueco/falla.
-                  const zero = b.value === 0
                   return (
-                    <View
-                      key={`${b.label}-${i}`}
-                      style={[styles.barRow, zero && styles.barRowZero]}
-                    >
+                    <View key={`${b.label}-${i}`} style={styles.barRow}>
                       <Text style={styles.barLabel} numberOfLines={1}>
                         {b.label}
                       </Text>
@@ -397,7 +476,7 @@ function EvidenceModal({
                             {
                               width: `${Math.round((b.value / max) * 100)}%`,
                               backgroundColor: barColor,
-                              opacity: b.highlight ? 1 : 0.4,
+                              opacity: b.highlight ? 1 : 0.32,
                             },
                           ]}
                         />
@@ -414,6 +493,11 @@ function EvidenceModal({
                 })}
               </View>
               <Text style={styles.modalCaption}>{ev.caption}</Text>
+              {zeros.length > 0 ? (
+                <Text style={styles.modalZeroNote}>
+                  {zeros.map((z) => z.label).join(' · ')}: aún sin registro este mes.
+                </Text>
+              ) : null}
               <Pressable
                 onPress={onClose}
                 hitSlop={10}
@@ -508,46 +592,83 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
   },
   // ── Esto construiste ──────────────────────────────────────────
+  builtWrap: {
+    gap: 12,
+  },
   builtGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
   builtCard: {
-    width: '31.5%',
+    // 2×2: dos por fila (antes 3 dejaban hueco en la última fila con 5 cards).
+    width: '48%',
     borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
     backgroundColor: colors.bgCard,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.oroHairline,
   },
   builtValue: {
     fontFamily: typography.uiBold,
-    fontSize: 26,
+    fontSize: 28,
     color: colors.leche,
   },
   builtUnit: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.niebla,
   },
   builtLabel: {
     marginTop: 6,
     fontFamily: typography.uiBold,
-    fontSize: 9.5,
+    fontSize: 11,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: colors.niebla,
   },
+  // Línea de resumen bajo el grid — agua + sueño, sin tarjeta propia.
+  builtSummary: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    textAlign: 'center',
+  },
   // ── Lo que descubrimos ────────────────────────────────────────
+  // gap 0 + sin hairline: la línea vertical del riel (railLine) es la que
+  // CONECTA los patrones (constelación), no cortes horizontales que los separan.
   patternList: {
-    gap: 2,
+    gap: 0,
   },
   patternRow: {
-    paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 16,
+  },
+  // Riel de constelación a la izquierda: punto de la dimensión + línea vertical.
+  patternRail: {
+    width: 12,
+    alignItems: 'center',
+  },
+  // Línea continua que atraviesa el riel; al estar las filas pegadas (gap 0) se
+  // lee como un solo hilo que une los puntos.
+  railLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.oroHairlineSoft,
+  },
+  // El punto del color de la dimensión, alineado con la primera línea del título.
+  railDot: {
+    marginTop: 7,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  patternBody: {
+    flex: 1,
   },
   patternTitle: {
     fontFamily: typography.serif,
@@ -555,6 +676,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     color: colors.leche,
+  },
+  // El dato clave inline (la prueba): el número en el color de su dimensión (el
+  // único toque de color del bloque), la unidad en niebla. El CTA queda como el
+  // único oro de la fila.
+  patternStat: {
+    marginTop: 6,
+  },
+  patternStatNum: {
+    fontFamily: typography.uiBold,
+    fontSize: 20,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.2,
+  },
+  patternStatUnit: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   patternCta: {
     marginTop: 7,
@@ -564,19 +702,50 @@ const styles = StyleSheet.create({
     color: colors.oro,
   },
   // ── Tu mayor victoria ─────────────────────────────────────────
+  // Más aire arriba: el premio llega como un beat aparte, no como el siguiente
+  // ítem de la lista.
+  victorySection: {
+    marginTop: 38,
+  },
   victoryCard: {
-    borderRadius: 20,
-    paddingVertical: 26,
+    borderRadius: 22,
+    paddingVertical: 30,
     paddingHorizontal: 22,
     alignItems: 'center',
+    overflow: 'hidden',
     backgroundColor: colors.oroTint,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.oroHairline,
   },
   victoryStar: {
-    fontSize: 26,
-    color: colors.oro,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  // Estrellas-satélite (contención total: 3 puntos, fuera del eje del texto).
+  victorySat: {
+    position: 'absolute',
+    borderRadius: 2,
+    backgroundColor: colors.oroSoft,
+  },
+  victorySatA: {
+    top: 22,
+    left: 30,
+    width: 3,
+    height: 3,
+    opacity: 0.7,
+  },
+  victorySatB: {
+    top: 40,
+    right: 36,
+    width: 4,
+    height: 4,
+    opacity: 0.5,
+  },
+  victorySatC: {
+    bottom: 26,
+    left: 48,
+    width: 2.5,
+    height: 2.5,
+    opacity: 0.6,
   },
   victoryHeadline: {
     fontFamily: typography.serif,
@@ -597,19 +766,29 @@ const styles = StyleSheet.create({
   // ── Modal de evidencia ────────────────────────────────────────
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
+  // Velo cálido sobre el blur (no negro plano): mantiene la temperatura de
+  // Stelar y oscurece lo justo para que el modal flote.
+  modalScrim: {
+    backgroundColor: 'rgba(10, 6, 8, 0.55)',
+  },
   modalCard: {
     width: '100%',
-    borderRadius: 22,
-    paddingVertical: 24,
-    paddingHorizontal: 22,
+    borderRadius: 24,
+    paddingVertical: 26,
+    paddingHorizontal: 24,
     backgroundColor: colors.bgCard2,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
+    borderColor: colors.oroHairline,
+    // Elevación suave para que el modal se despegue del blur (iOS; en Android
+    // el blur + scrim ya dan separación).
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
   },
   modalEyebrow: {
     fontFamily: typography.uiBold,
@@ -618,8 +797,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.niebla,
   },
-  modalTitle: {
+  // La misma estrella de la dimensión que viste en la lista te recibe en el
+  // modal (continuidad de identidad por color).
+  modalTitleRow: {
     marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+  },
+  modalTitleDot: {
+    marginTop: 9,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  modalTitle: {
+    flex: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: 21,
@@ -653,9 +846,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.oroHairline,
   },
-  barRowZero: {
-    opacity: 0.45,
-  },
   barValue: {
     width: 52,
     textAlign: 'right',
@@ -677,13 +867,21 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     lineHeight: 18,
+    color: colors.bone,
+  },
+  // Nota al pie de las señales sin registro — neutra, sin culpa.
+  modalZeroNote: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 18,
     color: colors.niebla,
   },
   modalCloseBtn: {
     marginTop: 20,
     alignSelf: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 26,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.hairlineStrong,

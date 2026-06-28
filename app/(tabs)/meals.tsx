@@ -1,8 +1,10 @@
+import * as Haptics from 'expo-haptics'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useMemo } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import NorthStar from '@/assets/icons/north-star.svg'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { track } from '@/lib/analytics'
 import {
@@ -46,6 +48,7 @@ function MealsBody() {
     }, []),
   )
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const today = useMemo(() => todayInTimezone(), [])
   // Coherencia con el "modo ver día" (P1): si Hoy está anclado a un día pasado,
   // el resumen de macros de Comidas refleja ESE día (el resto —consistencia,
@@ -73,12 +76,18 @@ function MealsBody() {
 
   const nourish = useNourishmentConsistency()
 
+  // Sticky "Agregar entrada" → abre la cámara de captura (/capture-meal).
+  const openCapture = () => {
+    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {})
+    router.push('/capture-meal')
+  }
+
   return (
     <View style={styles.screen}>
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -139,6 +148,25 @@ function MealsBody() {
           />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Sticky "Agregar entrada" — flota sobre la tab bar; la acción más
+          visible del tab (reemplaza el CTA "Agregar comida" inline). Sin
+          ícono de código de barras. */}
+      <Pressable
+        onPress={openCapture}
+        style={[styles.sticky, { bottom: 6 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Agregar entrada. Registra lo que alimenta tu universo."
+      >
+        <View style={styles.stickyStarWrap} pointerEvents="none">
+          <View style={styles.stickyStarGlow} />
+          <NorthStar width={30} height={30} color={colors.magenta} />
+        </View>
+        <View style={styles.stickyTextCol}>
+          <Text style={styles.stickyTitle}>Agregar entrada</Text>
+          <Text style={styles.stickySubtitle}>Registra lo que alimenta tu universo.</Text>
+        </View>
+      </Pressable>
     </View>
   )
 }
@@ -184,6 +212,55 @@ const styles = StyleSheet.create({
   targetInviteChevron: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.headingLg,
+    color: colors.niebla,
+  },
+  // ── Sticky "Agregar entrada" ──────────────────────────────────────
+  sticky: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    backgroundColor: '#1A0810',
+    borderWidth: 1,
+    borderColor: 'rgba(233, 30, 99, 0.40)',
+    // Glow magenta suave para que flote sobre el contenido.
+    shadowColor: colors.magenta,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  stickyStarWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickyStarGlow: {
+    position: 'absolute',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.magentaTint2,
+  },
+  stickyTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  stickyTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.magenta,
+  },
+  stickySubtitle: {
+    marginTop: 2,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
 })

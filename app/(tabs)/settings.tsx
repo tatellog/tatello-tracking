@@ -611,7 +611,7 @@ function SettingsBody() {
           {/* Marca al cierre de Ajustes (patrón premium: lockup + versión al
               fondo). El wordmark va como brand asset, no como fuente. */}
           <Animated.View entering={enter(300)} style={styles.brandLockup}>
-            <StelarLogo variant="horizontal" size={30} />
+            <StelarLogo variant="stacked" size={56} />
           </Animated.View>
 
           <Animated.View entering={enter(320)}>

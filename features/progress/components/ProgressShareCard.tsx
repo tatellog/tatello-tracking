@@ -6,7 +6,7 @@ import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
-import StelarIcon from '@/assets/stelar.png'
+import StelarIcon from '@/assets/stelar-icon.png'
 import { StelarLogo } from '@/components/brand/StelarLogo'
 import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
 

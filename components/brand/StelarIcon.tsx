@@ -3,16 +3,15 @@ import { Image, type ImageStyle, type StyleProp } from 'react-native'
 import { colors } from '@/theme'
 
 /*
- * StelarIcon — la marca S9 como ÍCONO (símbolo del producto). Es un brand
- * asset: se usa la imagen exportada, NUNCA se recrea con texto. Para light/
- * dark se tinta vía `tintColor` (el PNG conserva su alpha), no se cambia el
- * archivo. El lenguaje celeste vive DENTRO del producto, no en la marca: este
- * ícono no lleva estrellas, glow ni galaxia.
+ * StelarIcon — la marca como ÍCONO (símbolo del producto): el aro orbital con
+ * su esfera. Es un brand asset: se usa la imagen exportada, NUNCA se recrea con
+ * texto. Para light/dark se tinta vía `tintColor` (el PNG conserva su alpha),
+ * no se cambia el archivo.
  */
 
-// S9 — la marca del producto (645×635, casi cuadrada). Raster con alpha, así
-// que tintar para monocromo/inverso funciona.
-const S9 = require('@/assets/stelar.png')
+// La marca del producto (1255×1255, cuadrada). Raster con alpha transparente,
+// así que tintar para monocromo/inverso funciona.
+const MARK = require('@/assets/stelar-icon.png')
 
 export type StelarIconVariant = 'color' | 'monochrome' | 'inverse'
 
@@ -35,7 +34,7 @@ export function StelarIcon({ size = 32, color, variant = 'color', style }: Props
 
   return (
     <Image
-      source={S9}
+      source={MARK}
       accessibilityRole="image"
       accessibilityLabel="Stelar"
       resizeMode="contain"

@@ -467,7 +467,15 @@ export function ProgressShareSheet({
                       accessibilityLabel={t.label}
                     >
                       {t.icon(isActive)}
-                      <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                      {/* numberOfLines+adjustsFontSizeToFit: "Transformación" es
+                          una palabra larga que en Android se partía a la mitad
+                          ("Transformaci/ón"); aquí encoge a UNA línea. */}
+                      <Text
+                        style={[styles.tabLabel, isActive && styles.tabLabelActive]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                      >
                         {t.label}
                       </Text>
                     </Pressable>
@@ -662,6 +670,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.magentaTint,
   },
   tabLabel: {
+    flexShrink: 1,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.caption,
     letterSpacing: 0.2,

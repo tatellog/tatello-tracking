@@ -4,7 +4,9 @@ import {
   DEFICIT_LEVELS,
   levelsFor,
   macrosForDelta,
+  MIN_CALORIES,
   reconstructState,
+  safeLevelsFor,
   SURPLUS_LEVELS,
   type MacroInputs,
 } from '@/features/profile/calcMacros'
@@ -49,7 +51,53 @@ describe('computeTdee', () => {
   })
 })
 
+// Perfil de TDEE bajo: algunos déficits aterrizarían por debajo del piso.
+// BMR = 10*45 + 6.25*150 - 5*28 - 161 = 450 + 937.5 - 140 - 161 = 1086.5
+// TDEE = 1086.5 * 1.2 (none) = 1303.8 → 1304
+const LOW_TDEE: MacroInputs = {
+  ...BASE,
+  weight_kg: 45,
+  height_cm: 150,
+  training_frequency: 'none',
+}
+
+describe('safeLevelsFor', () => {
+  it('ofrece los 3 niveles cuando ninguno topa (TDEE normal)', () => {
+    const tdee = computeTdee(BASE)! // 2139
+    expect(safeLevelsFor('deficit', tdee)).toHaveLength(DEFICIT_LEVELS.length)
+  })
+
+  it('recorta los niveles que caerían bajo el mínimo (TDEE bajo)', () => {
+    const tdee = computeTdee(LOW_TDEE)! // 1304
+    const safe = safeLevelsFor('deficit', tdee)
+    // 1304-250=1054 ok · 1304-475=829 y 1304-750=554 topan
+    expect(safe.map((l) => l.key)).toEqual(['light'])
+    expect(safe.every((l) => tdee + l.delta >= MIN_CALORIES)).toBe(true)
+  })
+
+  it('nunca deja el control vacío: al menos el más ligero', () => {
+    const safe = safeLevelsFor('deficit', 900) // todo topa
+    expect(safe).toHaveLength(1)
+    expect(safe[0]!.key).toBe('light')
+  })
+
+  it('no filtra superávit ni mantenimiento', () => {
+    expect(safeLevelsFor('surplus', 1304)).toEqual(levelsFor('surplus'))
+    expect(safeLevelsFor('maintain', 1304)).toEqual([])
+  })
+})
+
 describe('macrosForDelta', () => {
+  it('marca clamped=false cuando el objetivo cae dentro de la banda', () => {
+    expect(macrosForDelta(BASE, 'deficit', -475)!.clamped).toBe(false)
+  })
+
+  it('topa al mínimo y marca clamped=true en TDEE bajo', () => {
+    const m = macrosForDelta(LOW_TDEE, 'deficit', -475)!
+    expect(m.calories).toBe(MIN_CALORIES)
+    expect(m.clamped).toBe(true)
+  })
+
   it('subtracts the deficit from TDEE and sets protein/fat by g/kg', () => {
     const tdee = computeTdee(BASE)!
     const m = macrosForDelta(BASE, 'deficit', -475)!

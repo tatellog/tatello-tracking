@@ -1,25 +1,78 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { mealPhotoUrl } from '@/features/macros/api'
 import { colors, typography } from '@/theme'
 
-// Estrella de 4 puntas cóncava (lenguaje del sistema celeste).
-const STAR_PATH =
-  'M12 3 C12.7 8.3 13.7 9.3 21 12 C13.7 14.7 12.7 15.7 12 21 C11.3 15.7 10.3 14.7 3 12 C10.3 9.3 11.3 8.3 12 3 Z'
+const PHOTO = 50
+const FRAME = PHOTO + 16
 
-/* Estrella de rango (top 3 de tus aliados, por frecuencia). El podio se lee por
- * BRILLO en oro, no por metales: #1 grande y luminosa (con halo), #2 media, #3
- * chica. Lenguaje de constelación — tus mejores aliadas brillan más. */
-function RankStar({ rank }: { rank: number }) {
+/* El medallón ornamentado de la foto: la imagen circular dentro de un marco de
+ * oro con un anillo + una corona de perlas (beads) alrededor — la "medalla" de
+ * la comida aliada. El #1 va en oro claro con un glow más marcado; los demás en
+ * oro pleno. Reemplaza la estrella suelta por un marco como joya. */
+function MealMedallion({ photoPath, rank }: { photoPath?: string | null; rank: number }) {
   const top = rank === 0
-  const size = top ? 19 : rank === 1 ? 15 : 12.5
-  const color = top ? colors.oroLight : colors.oro
-  const opacity = top ? 1 : rank === 1 ? 0.92 : 0.78
+  const ringColor = top ? colors.oroLight : colors.oro
+  const c = FRAME / 2
+  const photoR = PHOTO / 2
+  const ringR = photoR + 3
+  const beadR = ringR + 4
+  // Pocos puntitos, dispersos (no una corona densa). Ángulos asimétricos.
+  const dots = [-72, 6, 78, 150, 214, 288]
   return (
-    <View style={[styles.rankStar, top && styles.rankStarTop]} pointerEvents="none">
-      <Svg width={size} height={size} viewBox="0 0 24 24">
-        <Path d={STAR_PATH} fill={color} opacity={opacity} />
+    <View style={styles.medallion}>
+      {photoPath ? (
+        <Image source={{ uri: mealPhotoUrl(photoPath) }} style={styles.photo} resizeMode="cover" />
+      ) : (
+        <View style={[styles.photo, styles.photoEmpty]}>
+          <BowlIcon color={colors.oroSoft} />
+        </View>
+      )}
+      <Svg width={FRAME} height={FRAME} style={StyleSheet.absoluteFill} pointerEvents="none">
+        {/* Aro DIFUMINADO: dos capas anchas de baja opacidad simulan el blur. */}
+        <Circle
+          cx={c}
+          cy={c}
+          r={ringR}
+          stroke={ringColor}
+          strokeWidth={top ? 7 : 6}
+          opacity={top ? 0.13 : 0.09}
+          fill="none"
+        />
+        <Circle
+          cx={c}
+          cy={c}
+          r={ringR}
+          stroke={ringColor}
+          strokeWidth={3.5}
+          opacity={0.12}
+          fill="none"
+        />
+        {/* El aro fino, SUAVE (no una línea dura). */}
+        <Circle
+          cx={c}
+          cy={c}
+          r={ringR}
+          stroke={ringColor}
+          strokeWidth={1}
+          opacity={top ? 0.6 : 0.42}
+          fill="none"
+        />
+        {/* Pocos puntitos dorados sobre el aro — sutiles. */}
+        {dots.map((deg) => {
+          const a = (deg * Math.PI) / 180
+          return (
+            <Circle
+              key={deg}
+              cx={c + beadR * Math.cos(a)}
+              cy={c + beadR * Math.sin(a)}
+              r={1}
+              fill={ringColor}
+              opacity={0.75}
+            />
+          )
+        })}
       </Svg>
     </View>
   )
@@ -77,8 +130,6 @@ export function AllyCard({
   onRepeat,
   onOpen,
 }: Props) {
-  const ranked = rank < 3
-
   return (
     <View style={styles.card}>
       <Pressable
@@ -88,20 +139,7 @@ export function AllyCard({
         accessibilityLabel={`Abrir ${name}`}
         accessibilityHint="Abre la comida en el editor"
       >
-        <View style={styles.thumbWrap}>
-          {photoPath ? (
-            <Image
-              source={{ uri: mealPhotoUrl(photoPath) }}
-              style={styles.thumb}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.thumb, styles.thumbEmpty]}>
-              <BowlIcon color={colors.niebla} />
-            </View>
-          )}
-          {ranked ? <RankStar rank={rank} /> : null}
-        </View>
+        <MealMedallion photoPath={photoPath} rank={rank} />
 
         <View style={styles.textCol}>
           <Text style={styles.name} numberOfLines={1}>
@@ -152,41 +190,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  thumbWrap: {
-    width: 48,
-    height: 48,
+  // El medallón — la foto en su marco de oro con perlas.
+  medallion: {
+    width: FRAME,
+    height: FRAME,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  thumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+  photo: {
+    width: PHOTO,
+    height: PHOTO,
+    borderRadius: PHOTO / 2,
   },
-  thumbEmpty: {
+  photoEmpty: {
     backgroundColor: colors.bgCard2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // Estrella de rango — sobre la esquina del thumb (top 3). Sombra oscura
-  // tenue para que el oro lea sobre cualquier foto.
-  rankStar: {
-    position: 'absolute',
-    top: -7,
-    left: -7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.bg,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 3,
-  },
-  // El #1 lleva un halo dorado tenue — "tu mejor aliada" sin gritar.
-  rankStarTop: {
-    shadowColor: colors.oro,
-    shadowOpacity: 0.95,
-    shadowRadius: 6,
-    elevation: 4,
   },
   textCol: {
     flex: 1,

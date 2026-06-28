@@ -16,7 +16,7 @@ import Animated, {
 import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
-import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
+import { usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
 import { todayInTimezone } from '@/lib/time'
 import { useSleepLog } from '@/features/sleep/hooks'
@@ -44,7 +44,7 @@ import {
 } from '@/features/tabs/universe-visuals'
 import { useFirstSeenWindow } from '@/features/tabs/useFirstSeenWindow'
 import { useWaterFromMeals, useWaterToday } from '@/features/water/hooks'
-import { formatGlasses, glassesWord } from '@/features/water/liquid-detection'
+import { formatGlasses } from '@/features/water/liquid-detection'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { colors, duration, easing, radius, spacing, typography } from '@/theme'
@@ -252,18 +252,17 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
               whole grid is tappable, so the cards stay clean (no per-card
               chrome that fights the cosmos). */}
           <Text style={styles.tapHint}>Toca una categoría para ver cómo progresa.</Text>
+          {/* Un SOLO panel con las 4 columnas divididas por hairlines verticales
+              (ya no 4 tarjetas con borde propio). Cada columna sigue siendo
+              tappable → expande su detalle abajo. */}
           <View style={styles.gridWrap}>
             <View style={styles.grid}>
-              {attributes.map((attr) => (
+              {attributes.map((attr, i) => (
                 <AttributeCard
                   key={attr.key}
                   attr={attr}
                   source={input ? sourceLineFor(attr.key, input) : ''}
-                  subnote={
-                    attr.key === 'claridad' && input.waterFromMeals > 0
-                      ? `+${formatGlasses(input.waterFromMeals)} ${glassesWord(input.waterFromMeals)} desde comidas`
-                      : undefined
-                  }
+                  divided={i > 0}
                   reducedMotion={reducedMotion}
                   selected={openKey === attr.key}
                   onPress={() => {
@@ -342,14 +341,14 @@ type CardProps = {
   attr: UniverseAttribute
   /** Concrete source line for the closed card ("2 comidas hoy", "3 de 8 vasos"). */
   source: string
-  /** Rosa tenue bajo el contador — p. ej. "+1 vaso desde comidas" (Agua). */
-  subnote?: string
+  /** Lleva divisor vertical a la izquierda (todas menos la primera columna). */
+  divided: boolean
   reducedMotion: boolean
   selected: boolean
   onPress: () => void
 }
 
-function AttributeCard({ attr, source, subnote, reducedMotion, selected, onPress }: CardProps) {
+function AttributeCard({ attr, source, divided, reducedMotion, selected, onPress }: CardProps) {
   const accent = UNIVERSE_ACCENT[attr.key]
   // La card LIDERA con la acción (Comida/Agua/…) — concreta, sin traducir.
   // La recompensa (Energía/…) se descubre como secundaria, "Contribuye a".
@@ -428,7 +427,7 @@ function AttributeCard({ attr, source, subnote, reducedMotion, selected, onPress
       onPress={onPress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={styles.cardHit}
+      style={[styles.cardHit, divided && styles.colDivider]}
       accessibilityRole="button"
       accessibilityState={{ expanded: selected }}
       accessibilityLabel={`${action}, ${attr.pct} por ciento. Contribuye a ${reward}. ${source}`}
@@ -446,8 +445,6 @@ function AttributeCard({ attr, source, subnote, reducedMotion, selected, onPress
           pointerEvents="none"
           style={[styles.cardGlow, { backgroundColor: tint(accent, '1F') }, glowStyle]}
         />
-
-        <Text style={[styles.label, { color: complete ? accent : colors.bone }]}>{action}</Text>
 
         <View style={styles.ringZone}>
           <Svg
@@ -521,35 +518,21 @@ function AttributeCard({ attr, source, subnote, reducedMotion, selected, onPress
           {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
         </View>
 
-        {/* Acción visible: el % (número, no solo el anillo) + el estado real
-            ("2 comidas", "3 / 8 vasos") — responde "¿cuánto llevo?". */}
-        <View style={styles.cardFooter}>
-          <Text style={[styles.pctNum, { color: complete ? accent : colors.leche }]}>
-            {attr.pct}
-            <Text style={styles.pctSign}>%</Text>
-          </Text>
-          <Text style={styles.sourceLine} numberOfLines={2} adjustsFontSizeToFit>
-            {source}
-          </Text>
-          {subnote ? (
-            <Text style={styles.subnote} numberOfLines={1} adjustsFontSizeToFit>
-              {subnote}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Recompensa DESCUBIERTA: la acción contribuye a un atributo del
-            universo. Secundaria (no compite con la acción) y es a la vez la
-            fila de expandir — lleva el chevron (⌄ cerrado / ⌃ abierto). */}
-        <View style={styles.rewardRow}>
-          <Text style={styles.rewardPre}>Contribuye a </Text>
-          <Text style={[styles.rewardName, { color: accent }]}>{reward}</Text>
-          <ChevronHint
-            direction={selected ? 'up' : 'down'}
-            size={typography.sizes.body}
-            style={styles.rewardChevron}
-          />
-        </View>
+        {/* % grande → acción → la recompensa que genera (compacto para la
+            columna). El estado concreto y el resto vive al expandir (tap). */}
+        <Text
+          style={[styles.pctNum, { color: complete ? accent : colors.leche }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {attr.pct}
+          <Text style={styles.pctSign}>%</Text>
+        </Text>
+        <Text style={[styles.colLabel, { color: complete ? accent : colors.bone }]}>{action}</Text>
+        <Text style={[styles.colReward, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>
+          {/* La recompensa "+N Atributo"; en 0 cae al estado real ("0 / 8 vasos"). */}
+          {attr.pct > 0 ? `+${attr.pct} ${reward}` : source}
+        </Text>
       </Animated.View>
     </Pressable>
   )
@@ -674,11 +657,10 @@ export function FlightToConstellation({
   index: number
 }) {
   const accent = UNIVERSE_ACCENT[attrKey]
-  // 2×2 grid → quadrant origin of the card that rose.
-  const col = index % 2
-  const row = index < 2 ? 0 : 1
-  const baseLeft = col === 0 ? 25 : 75
-  const baseTop = row === 0 ? 22 : 72
+  // Fila de 4 columnas → origen en el centro de la columna que subió
+  // (12.5 / 37.5 / 62.5 / 87.5 %). El anillo vive en la franja superior.
+  const baseLeft = (index + 0.5) * 25
+  const baseTop = 26
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -792,49 +774,47 @@ const styles = StyleSheet.create({
     marginTop: spacing.s1,
     marginBottom: spacing.s4,
   },
+  // El PANEL único: un contenedor con borde sutil que aloja las 4 columnas
+  // (ya no 4 tarjetas sueltas). Es también el ancla del overlay de vuelo (las
+  // partículas se desbordan hacia arriba, por eso overflow visible por default).
   gridWrap: {
-    // Anchor for the flight overlay; particles overflow upward.
     position: 'relative',
+    marginTop: spacing.s2,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingVertical: spacing.s4,
   },
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.s3,
+    alignItems: 'flex-start',
   },
-  // The Pressable is the flex item (two per row: half the width minus half
-  // the gap); the inner Animated card carries the visual + the press squish.
+  // Cada columna ocupa un cuarto del panel (4 en fila, sin wrap).
   cardHit: {
-    flexBasis: '47%',
-    flexGrow: 1,
+    flex: 1,
   },
+  // Divisor vertical entre columnas (todas menos la primera).
+  colDivider: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.hairline,
+  },
+  // La columna ya no es tarjeta: sin fondo ni borde, solo centra su contenido.
   card: {
     alignItems: 'center',
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    paddingTop: spacing.s3,
-    paddingBottom: spacing.s3,
-    paddingHorizontal: spacing.s2,
+    paddingVertical: spacing.s1,
+    paddingHorizontal: spacing.s1,
     overflow: 'hidden',
   },
-  // The pulse wash — fills the card, pulses once on upgrade.
+  // The pulse wash — fills the column, pulses once on upgrade.
   cardGlow: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: radius.card,
     opacity: 0,
-  },
-  label: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    letterSpacing: typography.letterSpacing.bodyLoose,
-    textAlign: 'center',
-    marginBottom: spacing.s3,
   },
   ringZone: {
     width: RING_SIZE,
     height: RING_SIZE,
-    marginBottom: spacing.s3,
+    marginBottom: spacing.s2,
   },
   ringSvg: {
     transform: [{ rotate: '-90deg' }],
@@ -848,12 +828,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.niebla,
   },
-  cardFooter: {
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 1,
-  },
   // The explicit % — a number, not just the ring. Earned progress in leche /
   // accent when complete.
   pctNum: {
@@ -861,39 +835,22 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.deltaNum,
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.5,
-  },
-  sourceLine: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
     textAlign: 'center',
   },
-  // "+N vaso desde comidas" — rosa tenue, debajo del contador de Agua.
-  subnote: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
-    color: tint(colors.magenta, 'B3'),
+  // La acción (Sueño/Comida/Agua/Ánimo) bajo el número.
+  colLabel: {
+    marginTop: spacing.s1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: typography.letterSpacing.bodyLoose,
     textAlign: 'center',
   },
-  // "Contribuye a {recompensa}" — fila secundaria al pie del card; la
-  // recompensa va en su acento y arrastra el chevron de expandir.
-  rewardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.s2,
-  },
-  rewardPre: {
-    fontFamily: typography.ui,
+  // La recompensa que genera ("+100 Estabilidad"), en su acento.
+  colReward: {
+    marginTop: 3,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
-    color: colors.niebla,
-  },
-  rewardName: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.micro,
-  },
-  rewardChevron: {
-    marginLeft: 1,
+    textAlign: 'center',
   },
   particle: {
     position: 'absolute',

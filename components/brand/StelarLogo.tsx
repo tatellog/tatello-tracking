@@ -11,18 +11,26 @@ import { StelarIcon } from './StelarIcon'
  * cards, marketing). Para body/botones/labels usa tipografía normal.
  *
  * Variantes:
- *  · horizontal  — ícono + wordmark, a color.
- *  · icon-only   — solo la marca S9.
+ *  · horizontal  — ícono + wordmark en fila, a color.
+ *  · stacked     — ícono ARRIBA, wordmark debajo (lockup vertical centrado).
+ *  · icon-only   — solo la marca (el aro orbital).
  *  · wordmark    — solo el wordmark (cuando ya hay un hero aparte).
  *  · monochrome  — lockup tintado a un color (default texto leche).
  *  · inverse     — lockup tintado oscuro, para fondos claros.
  */
 
-// 358×104 — wordmark exportado.
+// 1905×825 — wordmark exportado (sin padding transparente: el contenido llena
+// el canvas, así que el ratio es el del archivo).
 const WORDMARK = require('@/assets/stelar-word-mark.png')
-const WORDMARK_RATIO = 358 / 104
+const WORDMARK_RATIO = 1905 / 825
 
-export type StelarLogoVariant = 'horizontal' | 'icon-only' | 'wordmark' | 'monochrome' | 'inverse'
+export type StelarLogoVariant =
+  | 'horizontal'
+  | 'stacked'
+  | 'icon-only'
+  | 'wordmark'
+  | 'monochrome'
+  | 'inverse'
 
 type Props = {
   /** Altura del ícono (o del wordmark en variant `wordmark`) en px. */
@@ -36,6 +44,27 @@ type Props = {
 export function StelarLogo({ size = 28, color, variant = 'horizontal', style }: Props) {
   if (variant === 'icon-only') {
     return <StelarIcon size={size} color={color} style={style as never} />
+  }
+
+  if (variant === 'stacked') {
+    // El aro (size) trae ~20% de margen transparente por lado, así que el
+    // wordmark se sube para sentarse justo bajo el círculo visible, no bajo
+    // el borde del canvas. Ancho ~0.80·size para empatar con el aro.
+    const wordW = Math.round(size * 0.8)
+    const wordH = Math.round(wordW / WORDMARK_RATIO)
+    return (
+      <View accessibilityRole="image" accessibilityLabel="Stelar" style={[styles.col, style]}>
+        <StelarIcon size={size} color={color} />
+        <Image
+          source={WORDMARK}
+          resizeMode="contain"
+          style={[
+            { width: wordW, height: wordH, marginTop: -Math.round(size * 0.17) },
+            color ? { tintColor: color } : null,
+          ]}
+        />
+      </View>
+    )
   }
 
   if (variant === 'wordmark') {
@@ -61,10 +90,10 @@ export function StelarLogo({ size = 28, color, variant = 'horizontal', style }: 
   // trazo delgado).
   const wordH = Math.round(size * 0.72)
   const wordW = Math.round(wordH * WORDMARK_RATIO)
-  // Tanto el S9 como el wordmark traen margen transparente propio (~17% por
-  // lado), así que con gap 0 todavía se ven despegados. Un marginLeft negativo
-  // generoso cierra ese aire y los deja como un solo lockup.
-  const pull = -Math.round(size * 0.26)
+  // El aro trae ~19% de margen transparente a su derecha (el wordmark ya no
+  // trae padding propio), así que un marginLeft negativo cierra ese aire y los
+  // deja como un solo lockup con un respiro mínimo.
+  const pull = -Math.round(size * 0.14)
 
   return (
     <View accessibilityRole="image" accessibilityLabel="Stelar" style={[styles.row, style]}>
@@ -84,6 +113,9 @@ export function StelarLogo({ size = 28, color, variant = 'horizontal', style }: 
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  col: {
     alignItems: 'center',
   },
 })

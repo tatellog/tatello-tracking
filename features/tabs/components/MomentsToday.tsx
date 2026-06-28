@@ -1,9 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Svg, { Circle, Ellipse, Path } from 'react-native-svg'
 
 import { emitRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { colors, typography } from '@/theme'
-
-import { MomentStar } from './MomentStar'
 
 const MOMENTS: { type: MealMoment; label: string }[] = [
   { type: 'breakfast', label: 'Desayuno' },
@@ -12,21 +11,161 @@ const MOMENTS: { type: MealMoment; label: string }[] = [
   { type: 'snack', label: 'Snack' },
 ]
 
-// Nombre en minúscula para el CTA ("Registrar comida").
-const MOMENT_NOUN: Record<MealMoment, string> = {
-  breakfast: 'desayuno',
-  lunch: 'comida',
-  dinner: 'cena',
-  snack: 'snack',
-}
-
-/** El momento que "toca" por hora — para nombrar el pendiente más relevante. */
+/** El momento que "toca" por hora — el héroe visual de la estela. */
 function momentByHour(): MealMoment {
   const h = new Date().getHours()
   if (h < 11) return 'breakfast'
   if (h < 16) return 'lunch'
   if (h < 21) return 'dinner'
   return 'snack'
+}
+
+/* El glifo celeste de cada momento — su astro en la órbita del día:
+ *   desayuno = sol · comida = planeta (anillo) · cena = luna · snack = estrella.
+ * SVG en viewBox 24, tintable con `color`. El anillo de saturno usa la prop
+ * `rotation` (no `transform` en array — eso se rompe en Android, ver memoria). */
+function MealGlyph({ type, size, color }: { type: MealMoment; size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {type === 'breakfast' ? (
+        <>
+          <Circle cx={12} cy={12} r={4.2} fill={color} />
+          <Path
+            d="M12 2 V4.6 M12 19.4 V22 M2 12 H4.6 M19.4 12 H22 M5 5 L6.8 6.8 M17.2 17.2 L19 19 M17.2 6.8 L19 5 M5 19 L6.8 17.2"
+            stroke={color}
+            strokeWidth={1.6}
+            strokeLinecap="round"
+          />
+        </>
+      ) : type === 'lunch' ? (
+        <>
+          <Circle cx={12} cy={12} r={4.6} fill={color} />
+          <Ellipse
+            cx={12}
+            cy={12}
+            rx={9.2}
+            ry={3}
+            rotation={-22}
+            originX={12}
+            originY={12}
+            stroke={color}
+            strokeWidth={1.5}
+            fill="none"
+          />
+        </>
+      ) : type === 'dinner' ? (
+        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
+      ) : (
+        <Path
+          d="M12 2.6 L13.6 10.4 L21.4 12 L13.6 13.6 L12 21.4 L10.4 13.6 L2.6 12 L10.4 10.4 Z"
+          fill={color}
+        />
+      )}
+    </Svg>
+  )
+}
+
+/* El aro del nodo, dibujado en SVG para lograr el look de la referencia:
+ *   · una capa ancha de baja opacidad = el "blur"/glow del aro;
+ *   · el aro fino encima;
+ *   · puntitos (cuentas de luz) repartidos sobre la circunferencia, asimétricos.
+ * `tone` = color del oro; `active` lo hace más brillante y grueso. */
+function NodeRing({
+  size,
+  tone,
+  active,
+  dim,
+}: {
+  size: number
+  tone: string
+  active: boolean
+  dim: boolean
+}) {
+  const c = size / 2
+  const r = c - (active ? 3 : 2)
+  // Ángulos (grados) de los puntitos — asimétricos a propósito (art-brief).
+  const dots = active ? [-58, 40, 150, 232] : [-50, 122, 210]
+  return (
+    <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* glow (el "blur" del aro) */}
+      <Circle
+        cx={c}
+        cy={c}
+        r={r}
+        stroke={tone}
+        strokeWidth={active ? 6 : 4}
+        opacity={active ? 0.18 : 0.1}
+        fill="none"
+      />
+      {/* el aro fino */}
+      <Circle
+        cx={c}
+        cy={c}
+        r={r}
+        stroke={tone}
+        strokeWidth={active ? 2 : 1.2}
+        opacity={active ? 0.95 : dim ? 0.4 : 0.62}
+        fill="none"
+      />
+      {/* puntitos sobre el aro */}
+      {dots.map((deg) => {
+        const a = (deg * Math.PI) / 180
+        return (
+          <Circle
+            key={deg}
+            cx={c + r * Math.cos(a)}
+            cy={c + r * Math.sin(a)}
+            r={active ? 1.7 : 1.3}
+            fill={tone}
+            opacity={active ? 1 : 0.85}
+          />
+        )
+      })}
+    </Svg>
+  )
+}
+
+/* Un nodo de la estela: el disco con su astro. Estados:
+ *   lit (registrado, count>0) → disco dorado encendido + badge de conteo.
+ *   awaiting (el que toca) → anillo dorado con halo, invita a registrar.
+ *   pendiente → contorno tenue, astro apagado. */
+function MomentNode({
+  type,
+  lit,
+  current,
+  count,
+}: {
+  type: MealMoment
+  lit: boolean
+  /** El momento que "toca" por hora — el HÉROE: más grande, doble anillo + glow
+   *  (aunque ya esté registrado). */
+  current: boolean
+  count: number
+}) {
+  const size = current ? NODE_ACTIVE : NODE_BASE
+  // Los astros van SIEMPRE en oro (como la referencia); solo cambia la
+  // intensidad: encendido/actual en oro claro, pendiente en oro suave.
+  const glyphColor = lit || current ? colors.oroLight : colors.oroSoft
+  const ringTone = current ? colors.oroLight : colors.oro
+  return (
+    <View style={styles.nodeZone}>
+      <View
+        style={[
+          styles.node,
+          { width: size, height: size, borderRadius: size / 2 },
+          current && styles.nodeGlow,
+        ]}
+      >
+        <NodeRing size={size} tone={ringTone} active={current} dim={!lit && !current} />
+        <MealGlyph type={type} size={Math.round(size * 0.5)} color={glyphColor} />
+        {count > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{count}</Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  )
 }
 
 type Props = {
@@ -37,49 +176,46 @@ type Props = {
 }
 
 /*
- * "HOY" — los momentos del día como estrellas que se encienden al registrar.
- * El lado PRÁCTICO del Tab Comidas (qué me falta capturar), frente al hero
- * EMOCIONAL (la luna). Contextual + accionable: tocar un momento pendiente
- * abre el registro con ese tipo preseleccionado.
+ * "HOY" — los momentos del día como una ESTELA de astros que se encienden al
+ * registrar (sol/planeta/luna/estrella). El lado PRÁCTICO del Tab Comidas (qué
+ * me falta capturar), frente al hero EMOCIONAL (la luna). Contextual +
+ * accionable: tocar un momento pendiente abre el registro con ese tipo
+ * preseleccionado.
  */
 export function MomentsToday({ meals, viewingPast }: Props) {
-  const registered = new Set(meals.map((m) => m.meal_type))
-  const litCount = MOMENTS.filter((m) => registered.has(m.type)).length
+  const countByType = MOMENTS.reduce<Record<MealMoment, number>>(
+    (acc, m) => {
+      acc[m.type] = meals.filter((meal) => meal.meal_type === m.type).length
+      return acc
+    },
+    { breakfast: 0, lunch: 0, dinner: 0, snack: 0 },
+  )
+  const registered = new Set(MOMENTS.filter((m) => countByType[m.type] > 0).map((m) => m.type))
+  const litCount = registered.size
   const allLit = litCount === MOMENTS.length
 
-  // El próximo momento por registrar — el que "toca" por hora si sigue
-  // pendiente, si no el primer pendiente. SOLO uno se vuelve accionable
-  // (estrella magenta + CTA), para guiar sin convertir el cielo en checklist.
+  // El momento que "toca" por hora — el HÉROE visual (nodo más grande + glow).
   const byHour = momentByHour()
-  const nextPending: MealMoment | null =
-    viewingPast || allLit
-      ? null
-      : !registered.has(byHour)
-        ? byHour
-        : (MOMENTS.find((m) => !registered.has(m.type))?.type ?? null)
 
   return (
     <View style={styles.section}>
       <Text style={styles.eyebrow}>Hoy</Text>
 
       <View style={styles.row}>
-        {/* Hairline de constelación — convierte 4 puntos en un cielo, no en
-            un checklist. Corre por el centro de las estrellas, detrás. */}
+        {/* La estela — hairline de constelación que une los 4 astros (centros a
+            1/8 y 7/8). Detrás de los nodos. */}
         <View style={styles.connector} pointerEvents="none" />
 
         {MOMENTS.map((m) => {
           const lit = registered.has(m.type)
           const tappable = !viewingPast && !lit
-          const awaiting = m.type === nextPending
+          // El HÉROE visual = el momento que toca por hora (no el "siguiente
+          // pendiente"): en la mañana, Desayuno manda aunque ya esté registrado.
+          const current = !viewingPast && m.type === byHour
           const inner = (
             <>
-              <MomentStar lit={lit} awaiting={awaiting} />
-              <Text
-                style={[
-                  styles.label,
-                  lit ? styles.labelLit : awaiting ? styles.labelAwaiting : styles.labelOff,
-                ]}
-              >
+              <MomentNode type={m.type} lit={lit} current={current} count={countByType[m.type]} />
+              <Text style={[styles.label, lit || current ? styles.labelLit : styles.labelOff]}>
                 {m.label}
               </Text>
             </>
@@ -98,7 +234,7 @@ export function MomentsToday({ meals, viewingPast }: Props) {
             <View
               key={m.type}
               style={styles.chip}
-              accessibilityLabel={`${m.label}, ${lit ? 'registrado' : 'sin registro'}`}
+              accessibilityLabel={`${m.label}, ${lit ? `${countByType[m.type]} registrado` : 'sin registro'}`}
             >
               {inner}
             </View>
@@ -106,34 +242,29 @@ export function MomentsToday({ meals, viewingPast }: Props) {
         })}
       </View>
 
-      {/* CTA directo — sumar el momento que toca, con su tipo preseleccionado.
-          Calmo (texto + ＋ magenta, no botón ruidoso) e invitación, no culpa. */}
+      {/* Sin botón: el registro vive en TOCAR el astro pendiente. Una línea
+          callada lo enseña (invitación, no culpa). */}
       {viewingPast ? (
         <Text style={styles.context}>{litCount} de 4 momentos registrados</Text>
       ) : allLit ? (
         <Text style={[styles.context, styles.contextComplete]}>
           Registraste cada momento de hoy.
         </Text>
-      ) : nextPending ? (
-        <Pressable
-          onPress={() => emitRegistroIntent(nextPending)}
-          accessibilityRole="button"
-          accessibilityLabel={`Registrar ${MOMENT_NOUN[nextPending]}`}
-          hitSlop={10}
-          style={styles.cta}
-        >
-          <Text style={styles.ctaPlus}>＋</Text>
-          <Text style={styles.ctaText}>Registrar {MOMENT_NOUN[nextPending]}</Text>
-        </Pressable>
-      ) : null}
-
-      {/* El conteo honesto — nota al pie callada (no score). */}
-      {!viewingPast && litCount > 0 && !allLit ? (
-        <Text style={styles.count}>{litCount} de 4 momentos registrados</Text>
-      ) : null}
+      ) : (
+        <>
+          <Text style={styles.hint}>Toca un astro para registrar esa comida.</Text>
+          {litCount > 0 ? (
+            <Text style={styles.count}>{litCount} de 4 momentos registrados</Text>
+          ) : null}
+        </>
+      )}
     </View>
   )
 }
+
+const NODE_BASE = 44
+const NODE_ACTIVE = 58
+const NODE_ZONE = 66
 
 const styles = StyleSheet.create({
   section: {
@@ -152,21 +283,69 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     position: 'relative',
   },
-  // Backbone de constelación entre las 4 estrellas (centros a 1/8 y 7/8).
+  // Backbone de constelación entre los 4 astros (centros a 1/8 y 7/8), a la
+  // altura del centro de los nodos.
+  // Backbone de constelación entre los 4 astros (centros a 1/8 y 7/8), a la
+  // altura del centro de los nodos (el zone los centra a todos por igual aunque
+  // el activo sea más grande).
   connector: {
     position: 'absolute',
-    top: 11,
+    top: NODE_ZONE / 2,
     left: '12.5%',
     right: '12.5%',
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.oro,
-    opacity: 0.2,
+    opacity: 0.3,
   },
   chip: {
     flex: 1,
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     paddingVertical: 2,
+  },
+  // ── Nodo (disco + astro + badge) ──────────────────────────────────
+  // Zona de tamaño fijo: centra el nodo (chico o grande) en la MISMA línea, así
+  // el activo crece sin desalinear la estela.
+  nodeZone: {
+    width: NODE_ACTIVE + 10,
+    height: NODE_ZONE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // El disco: solo el fondo de la página (recorta la estela) + centra. El aro y
+  // los puntitos los dibuja NodeRing (SVG), no un border.
+  node: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+  },
+  // Glow del nodo actual — shadow real (blur) que refuerza el aro SVG.
+  nodeGlow: {
+    shadowColor: colors.oro,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  // Badge de conteo (cuántas comidas en ese momento) — magenta de marca.
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.magenta,
+    borderWidth: 1.5,
+    borderColor: colors.bg,
+  },
+  badgeText: {
+    fontFamily: typography.uiBold,
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.leche,
   },
   label: {
     fontFamily: typography.uiMedium,
@@ -174,14 +353,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   labelLit: {
-    color: colors.bone,
+    color: colors.oroLight,
   },
+  // Los pendientes en un oro cálido tenue (no gris), como la referencia.
   labelOff: {
-    color: colors.niebla,
-  },
-  // El momento que toca — label magenta, hace juego con su estrella accionable.
-  labelAwaiting: {
-    color: colors.magenta,
+    color: colors.bone,
   },
   // Línea contextual — práctica, upright (no italic: no es voz de coach).
   context: {
@@ -194,25 +370,14 @@ const styles = StyleSheet.create({
   contextComplete: {
     color: colors.oroLight,
   },
-  // CTA directo de registro — texto + ＋ magenta, no botón ruidoso (manifiesto:
-  // calma, sin presión). Una sola acción a la vez.
-  cta: {
+  // Hint de uso — enseña que se registra TOCANDO un astro. Callado, invitación
+  // (no botón, no presión).
+  hint: {
     marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 7,
-  },
-  ctaPlus: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.magenta,
-  },
-  ctaText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
     letterSpacing: 0.2,
-    color: colors.magenta,
+    color: colors.bone,
   },
   count: {
     marginTop: 3,

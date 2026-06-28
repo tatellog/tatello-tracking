@@ -415,14 +415,18 @@ export function MealComposer({ onOpenMeal }: Props) {
 
   return (
     <View>
-      {/* ── §2 · CTA primario — la acción más visible del tab. ── */}
-      <PrimaryCta
-        label={registroOpen ? 'Cerrar' : '+  Agregar comida'}
-        variant={registroOpen ? 'soft' : 'primary'}
-        onPress={handleCta}
-        marginTop={6}
-        accessibilityLabel="Agregar una comida"
-      />
+      {/* ── §2 · Cerrar — el "+ Agregar comida" se movió al sticky button del
+          tab (abre la cámara). Aquí solo queda el cierre para cuando Momentos
+          abre el bloque (tocar ○ Cena → emitRegistroIntent). ── */}
+      {registroOpen ? (
+        <PrimaryCta
+          label="Cerrar"
+          variant="soft"
+          onPress={handleCta}
+          marginTop={6}
+          accessibilityLabel="Cerrar el registro"
+        />
+      ) : null}
 
       {/* ── §4 · ¿Cómo quieres registrar? — Buscar · Foto · Escribir ── */}
       {registroOpen ? (

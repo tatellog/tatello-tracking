@@ -21,6 +21,10 @@ type Props = {
   title?: string
   /** Include carbohidratos as a fourth stat. */
   withCarbs?: boolean
+  /** Cuando el objetivo se topó contra el mínimo saludable, reemplaza el delta
+   *  bajo Calorías por esta nota cálida ("tu mínimo saludable") en vez de un
+   *  número que no cuadra. */
+  floorNote?: string | null
 }
 
 function perKg(grams: number, weightKg: number): string {
@@ -32,9 +36,12 @@ function fmt(n: number): string {
   return n.toLocaleString('es-MX')
 }
 
-export function MacroPreviewCard({ macros, weightKg, delta, title, withCarbs }: Props) {
+export function MacroPreviewCard({ macros, weightKg, delta, title, withCarbs, floorNote }: Props) {
   const deltaText =
     delta == null || delta === 0 ? null : `${delta > 0 ? '+' : ''}${fmt(delta)} kcal`
+  // floorNote tiene prioridad: si el objetivo se topó, no mostramos un delta que
+  // no cuadra, sino la nota cálida del mínimo.
+  const caloriesSub = floorNote ?? deltaText
 
   return (
     <View style={styles.wrap}>
@@ -44,7 +51,7 @@ export function MacroPreviewCard({ macros, weightKg, delta, title, withCarbs }: 
         </EyebrowLabel>
       ) : null}
       <View style={styles.card}>
-        <Stat label="Calorías" value={fmt(macros.calories)} sub={deltaText} />
+        <Stat label="Calorías" value={fmt(macros.calories)} sub={caloriesSub} />
         <View style={styles.divider} />
         <Stat
           label="Proteína"

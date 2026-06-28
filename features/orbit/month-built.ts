@@ -134,6 +134,17 @@ const HABITS: readonly Habit[] = [
   { key: 'agua', label: 'Agua', has: (s) => (s.water_glasses ?? 0) > 0 },
 ]
 
+/** Forma con artículo para PROSA ("El movimiento…"), no el label suelto
+ *  ("Movimiento…"). Da frases gramaticales y consistentes con los demás
+ *  patrones (que sí abren con artículo). */
+const HABIT_PROSE: Record<string, string> = {
+  comida: 'La comida',
+  cuerpo: 'El movimiento',
+  sueno: 'El sueño',
+  energia: 'La energía',
+  agua: 'El agua',
+}
+
 function habitCounts(
   days: readonly DailySignals[],
 ): { key: string; label: string; count: number }[] {
@@ -249,24 +260,33 @@ export function detectMonthPatterns(
     },
   ]
   const consistencyCaption = 'Días en que cada señal estuvo presente.'
+  // Dimensiones que YA tienen voz como fortaleza este mes. Una dimensión no
+  // puede ser a la vez "constante" y "la más silenciosa" (era la contradicción
+  // que rompía la confianza). Se excluyen de habit-low más abajo.
+  const spoken = new Set<string>()
+  // El contexto temporal ("este mes") lo da la sección + la victoria; NO cada
+  // frase, para que la voz no suene a plantilla.
   if (c.protein.detected) {
+    spoken.add('proteina')
     out.push({
       id: 'consistent-protein',
-      title: 'Tu proteína se mantuvo consistente este mes.',
+      title: 'Tu proteína se mantuvo consistente.',
       evidence: { bars: consistencyBars('proteina'), caption: consistencyCaption, unit: 'días' },
     })
   }
   if (c.training.detected) {
+    spoken.add('cuerpo')
     out.push({
       id: 'consistent-training',
-      title: 'El movimiento fue una de tus constantes este mes.',
+      title: 'El movimiento fue una de tus constantes.',
       evidence: { bars: consistencyBars('cuerpo'), caption: consistencyCaption, unit: 'días' },
     })
   }
   if (c.sleep.detected) {
+    spoken.add('sueno')
     out.push({
       id: 'consistent-sleep',
-      title: 'Tu sueño se mantuvo estable este mes.',
+      title: 'Tu sueño se mantuvo estable.',
       evidence: { bars: consistencyBars('sueno'), caption: consistencyCaption, unit: 'días' },
     })
   }
@@ -277,7 +297,9 @@ export function detectMonthPatterns(
   if (habits.length >= 3) {
     const sorted = [...habits].sort((a, b) => b.count - a.count)
     const top = sorted[0]!
-    const low = sorted[sorted.length - 1]!
+    // La "más silenciosa" se elige entre las dimensiones que NO salieron ya como
+    // fortaleza (dedupe por dimensión): nunca contradecir "fue una constante".
+    const low = [...sorted].reverse().find((h) => !spoken.has(h.key))
     const habitBars = (highlight: string): EvidenceBar[] =>
       [...habits]
         .sort((a, b) => b.count - a.count)
@@ -287,12 +309,13 @@ export function detectMonthPatterns(
           highlight: h.label === highlight,
           colorKey: h.key,
         }))
-    if (low.count < top.count) {
+    if (low && low.count < top.count) {
       out.push({
         id: 'habit-low',
         // Sujeto = la señal, no la usuaria; "silenciosa" observa el espacio sin
-        // señalar carencia (manifesto-reviewer + voice-and-copy).
-        title: `${low.label} fue tu señal más silenciosa este mes.`,
+        // señalar carencia (manifesto-reviewer + voice-and-copy). Con artículo
+        // para que lea como prosa ("El movimiento…", no "Movimiento…").
+        title: `${HABIT_PROSE[low.key] ?? low.label} fue tu señal más silenciosa.`,
         evidence: {
           bars: habitBars(low.label),
           caption: 'Días en que cada señal estuvo presente.',
@@ -376,9 +399,11 @@ export function biggestWin(signals: readonly DailySignals[]): MonthWin | null {
   if (days === 0) return null
   // Voz Stelar: observa, no etiqueta. "Superpoder" sonaba a autoayuda; "ritmo
   // real" validaba de más. Constancia > consistencia (manifiesto).
+  // "este mes" vive SOLO en el headline (el ancla temporal de la sección); la
+  // línea no lo repite para que la voz no suene a plantilla.
   const line =
     days >= 20
-      ? 'Tu constancia habló este mes.'
+      ? 'Tu constancia habló.'
       : days >= 12
         ? 'Un ritmo empieza a aparecer.'
         : 'Cada día que registras, suma.'

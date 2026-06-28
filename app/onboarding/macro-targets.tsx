@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import * as Haptics from 'expo-haptics'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import {
   KeyboardAvoidingView,
@@ -25,6 +26,7 @@ import {
   levelsFor,
   macrosForDelta,
   reconstructState,
+  safeLevelsFor,
   type Enfoque,
   type Nivel,
 } from '@/features/profile/calcMacros'
@@ -144,21 +146,45 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
     setEnfoque(inputs.monthly_focus === 'weight' ? 'deficit' : 'maintain')
   }, [savedCalories, inputs])
 
-  const stops = levelsFor(enfoque)
-  const delta = enfoque === 'maintain' ? 0 : (stops.find((s) => s.key === nivel)?.delta ?? 0)
-  const preview = macrosForDelta(inputs, enfoque, delta)
+  // El slider solo ofrece niveles SOSTENIBLES para este TDEE — nunca uno que
+  // aterrice bajo el mínimo saludable (manifiesto). `capped` = se recortó algún
+  // nivel (déficit) respecto al rango completo.
+  const stops = useMemo(() => safeLevelsFor(enfoque, tdee), [enfoque, tdee])
+  const capped = enfoque === 'deficit' && stops.length < levelsFor('deficit').length
 
+  // Si el nivel seleccionado dejó de estar disponible (cambió el enfoque o el
+  // rango se recortó), reencaja al más fuerte que SÍ se ofrece.
+  useEffect(() => {
+    if (enfoque === 'maintain') return
+    if (!stops.some((s) => s.key === nivel)) {
+      const fallback = stops[stops.length - 1]?.key
+      if (fallback) setNivel(fallback)
+    }
+  }, [stops, nivel, enfoque])
+
+  const selectedStop = stops.find((s) => s.key === nivel)
+  const delta = enfoque === 'maintain' ? 0 : (selectedStop?.delta ?? 0)
+  const preview = macrosForDelta(inputs, enfoque, delta)
+  // Delta REAL aplicado (calorías - TDEE): honesto aunque el objetivo se tope.
+  const deltaReal = preview ? preview.calories - tdee : delta
+  const clamped = preview?.clamped ?? false
+
+  const [justSaved, setJustSaved] = useState(false)
   const onSave = async () => {
-    if (!preview) return
+    if (!preview || justSaved) return
     try {
       await upsert.mutateAsync({ protein_g: preview.protein_g, calories: preview.calories })
-      onSaved()
+      // Confirmación cálida antes de salir: háptico + el botón pasa a
+      // "Guardado ✓" un instante para que se SIENTA que quedó.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+      setJustSaved(true)
+      setTimeout(onSaved, 850)
     } catch {
       // Mutation error surfaces below; keep the screen open to retry.
     }
   }
 
-  const levelLabel = stops.find((s) => s.key === nivel)?.label ?? ''
+  const levelLabel = selectedStop?.label ?? ''
   const nivelHeading = enfoque === 'surplus' ? 'NIVEL DE SUPERÁVIT' : 'NIVEL DE DÉFICIT'
 
   return (
@@ -168,9 +194,13 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
         <Pressable onPress={onCancel} hitSlop={12} style={styles.backBtn}>
           <Text style={styles.backGlyph}>‹</Text>
         </Pressable>
-        <Pressable onPress={onSave} disabled={upsert.isPending || !preview} hitSlop={12}>
+        <Pressable
+          onPress={onSave}
+          disabled={upsert.isPending || !preview || justSaved}
+          hitSlop={12}
+        >
           <Text style={[styles.save, (upsert.isPending || !preview) && styles.saveDisabled]}>
-            {upsert.isPending ? 'Guardando…' : 'Guardar'}
+            {upsert.isPending ? 'Guardando…' : justSaved ? 'Guardado ✓' : 'Guardar'}
           </Text>
         </Pressable>
       </View>
@@ -199,12 +229,20 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
               <EyebrowLabel tone="niebla" size={10} tracking={2.4}>
                 {nivelHeading}
               </EyebrowLabel>
+              {/* El delta mostrado es el REAL (calorías - TDEE), no el nominal:
+                  si el objetivo se topó, no mentimos con "-750". */}
               <Text style={styles.nivelValue}>
-                {levelLabel} ({delta > 0 ? '+' : ''}
-                {delta} kcal)
+                {levelLabel} ({deltaReal > 0 ? '+' : ''}
+                {deltaReal} kcal)
               </Text>
             </View>
             <DeficitSlider stops={stops} value={nivel} onChange={setNivel} />
+            {/* El rango se recortó a lo sostenible para este cuerpo. */}
+            {capped ? (
+              <Text style={styles.sustainNote}>
+                El rango refleja lo que funciona para tu cuerpo.
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -213,8 +251,17 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
             title="VISTA PREVIA DE TUS NUEVOS OBJETIVOS"
             macros={preview}
             weightKg={inputs.weight_kg ?? 0}
-            delta={delta}
+            delta={deltaReal}
+            floorNote={clamped ? 'el mínimo para este cuerpo' : null}
           />
+        ) : null}
+
+        {/* Caso límite (TDEE bajo, todo se topa): una línea cálida del coach
+            que explica el piso como cuidado, no como bloqueo. */}
+        {clamped ? (
+          <Text style={styles.floorCoach}>
+            Aquí nos detenemos. Hay un punto donde cuidar es también no bajar más.
+          </Text>
         ) : null}
 
         <Pressable
@@ -447,6 +494,23 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.magenta,
+  },
+  // Nota tenue bajo el slider cuando el rango se recortó (UI, no voz de coach).
+  sustainNote: {
+    marginTop: spacing.sm,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // Línea del coach (serif italic) cuando el objetivo toca el mínimo: cuidado,
+  // no bloqueo. Reservada para el caso límite (todo se topa).
+  floorCoach: {
+    marginTop: -spacing.md,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
+    color: colors.oroLight,
   },
   calcLink: {
     alignSelf: 'flex-start',

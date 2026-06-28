@@ -26,6 +26,9 @@ import Animated, {
 import Svg, {
   Circle as SvgCircle,
   Defs as SvgDefs,
+  Ellipse as SvgEllipse,
+  G as SvgG,
+  Path as SvgPath,
   RadialGradient as SvgRadialGradient,
   Stop as SvgStop,
 } from 'react-native-svg'
@@ -46,8 +49,28 @@ const PHASE_MAX = MOON_PHASES.length - 1
 
 const HERO_H = 210
 const GUTTER = 20
-const R_MOON = 67 // a touch smaller so the protein number keeps the focus
+const R_MOON = 67 // tamaño original
 const MOON_BOX = Math.round((R_MOON * 2) / 0.78) // disc fills ~78% of the PNG
+
+// Aros orbitales REDONDOS alrededor de la luna (círculos concéntricos, no una
+// elipse plana "de lado"). rx ≈ ry y ambos > R_MOON, así rodean la luna como
+// halos (no la cruzan), quedan visibles completos y leen "normales".
+// Dos aros REDONDOS, juntos entre sí (outer 1.13). Concéntricos con la luna
+// (justificada a la derecha), así se extienden hacia la izquierda hasta donde
+// termina la barra de proteína.
+const RING_OUTER = 1.13 // escala del aro EXTERIOR respecto al interior
+const RING_RX = R_MOON * 1.34
+const RING_RY = R_MOON * 1.34
+const RING_ROT = -4
+// Los aros se corren a la IZQUIERDA respecto a la luna (la luna queda al lado
+// derecho del sistema orbital, no en su centro).
+const RING_OFFSET = R_MOON * 0.18
+// Distancia de la luna al borde derecho. Más alto = luna más a la izquierda.
+const MOON_RIGHT_INSET = 32
+// Altura de la barra de proteína por debajo del centro del hero (la barra vive
+// abajo del número). Sirve para que la barra toque el aro A SU ALTURA, no en el
+// punto más a la izquierda del aro (donde no hay barra).
+const BAR_DY = 28
 const TAU = Math.PI * 2
 const FILL_EASE = Easing.bezier(0.2, 0.7, 0.2, 1)
 
@@ -100,8 +123,11 @@ function Sky({
   // Manifesto-safe reward — the cielo gets warmer/golden when you fill the
   // moon, never a "100%!" badge. Low protein = a quieter, cooler sky.
   const glowO = useDerivedValue(() => {
-    const w = 0.5 + 0.5 * (p.value / PHASE_MAX)
-    return (0.14 + 0.28 * (0.5 + 0.5 * Math.sin(breath.value * TAU))) * w
+    // Piso alto (0.7) para que el bloom rosa SE VEA aun con poca proteína
+    // (la referencia "apenas despierta" igual brilla rosa); sube un poco más al
+    // llenar la luna.
+    const w = 0.7 + 0.3 * (p.value / PHASE_MAX)
+    return (0.18 + 0.14 * (0.5 + 0.5 * Math.sin(breath.value * TAU))) * w
   })
   const haloO = useDerivedValue(() => {
     const w = 0.28 + 0.72 * (p.value / PHASE_MAX)
@@ -120,12 +146,12 @@ function Sky({
 
       {/* Nebula — wide soft magenta field, slow drift. */}
       <Group transform={nebTransform}>
-        <Circle cx={cx - 6} cy={cy - 8} r={W * 0.62}>
+        <Circle cx={cx - R_MOON * 0.1} cy={cy} r={R_MOON * 1.75}>
           <SkiaRadialGradient
-            c={vec(cx - 6, cy - 8)}
-            r={W * 0.62}
-            colors={[rgba('#B32A4E', 0.5), rgba(colors.magenta, 0.18), rgba(colors.magenta, 0)]}
-            positions={[0, 0.45, 1]}
+            c={vec(cx - R_MOON * 0.1, cy)}
+            r={R_MOON * 1.75}
+            colors={[rgba('#D1547A', 0.32), rgba(colors.magenta, 0.1), rgba(colors.magenta, 0)]}
+            positions={[0, 0.5, 1]}
           />
           <BlurMask blur={28} style="normal" />
         </Circle>
@@ -144,10 +170,10 @@ function Sky({
           blendMode "plus" = light SUMS (physically right, reads premium). */}
       <Group blendMode="plus">
         <Group opacity={glowO}>
-          <Circle cx={cx} cy={cy} r={R_MOON * 1.75}>
+          <Circle cx={cx - R_MOON * 0.18} cy={cy} r={R_MOON * 1.15}>
             <SkiaRadialGradient
-              c={vec(cx, cy)}
-              r={R_MOON * 1.75}
+              c={vec(cx - R_MOON * 0.18, cy)}
+              r={R_MOON * 1.15}
               colors={[
                 rgba(colors.magentaHot, 0.95),
                 rgba(colors.magenta, 0.32),
@@ -186,34 +212,31 @@ function Sky({
         </Circle>
       </Group>
 
-      {/* Vignette. */}
+      {/* Vignette — suave, solo cierra las esquinas. Subirla de tono
+          convertía el hero en un rectángulo más oscuro que el cielo de la
+          pantalla (costura visible en el borde superior). */}
       <SkiaRect x={0} y={0} width={W} height={HERO_H}>
         <SkiaRadialGradient
           c={vec(W * 0.46, HERO_H * 0.46)}
-          r={W * 0.62}
-          colors={[rgba(colors.bg, 0), rgba(colors.bg, 0), rgba(colors.bg, 0.5)]}
-          positions={[0, 0.62, 1]}
+          r={W * 0.68}
+          colors={[rgba(colors.bg, 0), rgba(colors.bg, 0), rgba(colors.bg, 0.28)]}
+          positions={[0, 0.7, 1]}
         />
       </SkiaRect>
 
-      {/* Top fade — la nebula se RECORTA en el borde superior del hero (overflow
-          hidden), dejando una costura dura contra el fondo de arriba (debajo de
-          "Comidas"). Este degradado funde ese borde hacia bg para que la nebula
-          ENTRE suave en vez de cortarse de golpe. */}
-      <SkiaRect x={0} y={0} width={W} height={HERO_H}>
-        <SkiaLinearGradient
-          start={vec(0, 0)}
-          end={vec(0, HERO_H * 0.4)}
-          colors={[rgba(colors.bg, 0.85), rgba(colors.bg, 0)]}
-        />
-      </SkiaRect>
+      {/* NO top fade: el tope del Canvas queda transparente para que el
+          SkyBackground de la pantalla (haze magenta + estrellas) CONTINÚE sin
+          escalón hacia el hero. La nebula es casi nula en el borde superior
+          (≈0.02), así que no hay costura dura que esconder; pintar bg ahí era
+          justo lo que creaba la separación. */}
 
-      {/* Bottom fade — melt into the meal list below. */}
+      {/* Bottom fade — funde con la lista de comidas de abajo. Tenue y
+          gradual para no formar su propio escalón. */}
       <SkiaRect x={0} y={0} width={W} height={HERO_H}>
         <SkiaLinearGradient
-          start={vec(0, HERO_H * 0.62)}
+          start={vec(0, HERO_H * 0.72)}
           end={vec(0, HERO_H)}
-          colors={[rgba(colors.bg, 0), rgba(colors.bg, 0.82)]}
+          colors={[rgba(colors.bg, 0), rgba(colors.bg, 0.45)]}
         />
       </SkiaRect>
     </Canvas>
@@ -417,6 +440,78 @@ type Props = {
  * the readout). Non-stellar depth only. Reaching/passing the reference is a
  * full moon — celebrated, never "te pasaste". Calorías = quiet fact.
  */
+const RING_GOLD = colors.oroLight
+
+/* Estrella de 4 puntas (sparkle ✦) como path SVG, centrada en (x,y), radio s.
+ * Lados cóncavos → lee como destello, no como diamante. */
+function starPath(x: number, y: number, s: number): string {
+  const t = s * 0.26 // cintura (qué tan cóncavos los lados)
+  return [
+    `M ${x} ${y - s}`,
+    `C ${x} ${y - t} ${x + t} ${y} ${x + s} ${y}`,
+    `C ${x + t} ${y} ${x} ${y + t} ${x} ${y + s}`,
+    `C ${x} ${y + t} ${x - t} ${y} ${x - s} ${y}`,
+    `C ${x - t} ${y} ${x} ${y - t} ${x} ${y - s}`,
+    'Z',
+  ].join(' ')
+}
+
+/* Dos aros: el INTERIOR sólido, el EXTERIOR difuminado/punteado (dashed +
+ * tenue), con puntitos y estrellas dorados repartidos. */
+function OrbitRing({ W, cx, cy }: { W: number; cx: number; cy: number }) {
+  // Posición sobre un aro (escala sx) en su ángulo a.
+  const at = (a: number, sx: number) => ({
+    x: cx + RING_RX * sx * Math.cos(a),
+    y: cy + RING_RY * sx * Math.sin(a),
+  })
+  // Estrellas ✦ (ángulo, escala radial, tamaño, alpha).
+  const stars = [
+    { a: 1.95, sx: 1.0, s: 3.6, o: 0.95 },
+    { a: 2.55, sx: RING_OUTER, s: 4.6, o: 1 },
+    { a: 3.35, sx: 1.0, s: 3.0, o: 0.85 },
+    { a: 4.55, sx: RING_OUTER, s: 4.2, o: 0.95 },
+    { a: 5.5, sx: 1.0, s: 3.0, o: 0.85 },
+  ]
+  // Puntitos sobre el aro exterior (entre las estrellas).
+  const dots = [0.5, 1.4, 2.2, 3.0, 3.9, 4.9, 5.9].map((a) => ({ ...at(a, RING_OUTER), r: 1 }))
+  return (
+    <Svg width={W} height={HERO_H} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <SvgG transform={`rotate(${RING_ROT} ${cx} ${cy})`}>
+        {/* Exterior — difuminado: trazo tenue + dash corto = punteado/roto. */}
+        <SvgEllipse
+          cx={cx}
+          cy={cy}
+          rx={RING_RX * RING_OUTER}
+          ry={RING_RY * RING_OUTER}
+          stroke={rgba(RING_GOLD, 0.24)}
+          strokeWidth={0.9}
+          strokeDasharray="2 9"
+          fill="none"
+        />
+        {/* Interior — sólido. */}
+        <SvgEllipse
+          cx={cx}
+          cy={cy}
+          rx={RING_RX}
+          ry={RING_RY}
+          stroke={rgba(RING_GOLD, 0.42)}
+          strokeWidth={1.1}
+          fill="none"
+        />
+        {dots.map((d, i) => (
+          <SvgCircle key={`d${i}`} cx={d.x} cy={d.y} r={d.r} fill={rgba(RING_GOLD, 0.7)} />
+        ))}
+        {stars.map((sp, i) => {
+          const c = at(sp.a, sp.sx)
+          return (
+            <SvgPath key={`sp${i}`} d={starPath(c.x, c.y, sp.s)} fill={rgba(RING_GOLD, sp.o)} />
+          )
+        })}
+      </SvgG>
+    </Svg>
+  )
+}
+
 export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }: Props) {
   const { width: W } = useWindowDimensions()
   const reduced = useReducedMotion() ?? false
@@ -429,7 +524,10 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
   // CÓMO VA, no una frase vaga.
   const copy = moonProgressCopy(proteinValue, reference)
 
-  const cx = W - R_MOON - 14
+  // Luna justificada a la derecha (14px del borde). Los aros, concéntricos, se
+  // extienden hacia la izquierda; su mitad derecha cae fuera (la luna está al
+  // borde), lo cual es intencional.
+  const cx = W - R_MOON - MOON_RIGHT_INSET
   const cy = HERO_H * 0.5
 
   // §6 · al registrar una comida en Comidas, la luna celebra (partículas).
@@ -449,6 +547,9 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
   return (
     <View style={styles.hero}>
       <Sky W={W} cx={cx} cy={cy} p={p} reduced={reduced} />
+      {/* Aros corridos a la izquierda (centro = cx - RING_OFFSET); la luna queda
+          a la derecha del sistema orbital. */}
+      <OrbitRing W={W} cx={cx - RING_OFFSET} cy={cy} />
       <Moon
         left={cx - MOON_BOX / 2}
         top={cy - MOON_BOX / 2}
@@ -562,6 +663,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
+    // La barra TERMINA tocando el PRIMER círculo (el aro interior sólido) a la
+    // altura de la barra: x = ringCx - sqrt(RING_RX² - BAR_DY²). Desde la derecha
+    // = MOON_RIGHT_INSET + RING_OFFSET + sqrt(...); menos el paddingRight (R_MOON*2+8).
+    marginRight: Math.round(
+      MOON_RIGHT_INSET + RING_OFFSET + Math.sqrt(RING_RX * RING_RX - BAR_DY * BAR_DY) - R_MOON - 8,
+    ),
   },
   barTrack: {
     flex: 1,
