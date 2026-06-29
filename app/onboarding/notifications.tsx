@@ -712,6 +712,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    // El eyebrow del StepHeader arrancaba en top:0, justo bajo el fadeTop (28px
+    // bg→transparente) y se tapaba. Este paddingTop lo baja por debajo del fade.
+    paddingTop: 32,
     paddingBottom: 24,
   },
   // Top edge fade — bg → transparent, ~28px, pinned under the StepHeader so

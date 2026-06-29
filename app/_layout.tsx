@@ -166,7 +166,20 @@ export default function RootLayout() {
       <ErrorBoundary screen="root">
         <PersistQueryClientProvider
           client={queryClient}
-          persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE }}
+          // `buster` ata la caché persistida al usuario: si el cache en disco lo
+          // escribió OTRA cuenta (p. ej. un usuario seedeado de dev), al rehidratar
+          // no coincide el buster y se descarta — un usuario nuevo nunca hereda las
+          // señales/transformación de otro. Cubre el hueco del arranque en frío que
+          // el wipe por LAST_AUTH_USER_KEY no atrapaba sin race. (Los cambios de
+          // usuario en caliente los limpia el subscriber de onAuthStateChange.)
+          persistOptions={{
+            persister: queryPersister,
+            maxAge: QUERY_CACHE_MAX_AGE,
+            // El prefijo de versión fuerza un descarte ÚNICO de cualquier caché
+            // persistida con el formato anterior (incl. la que quedó contaminada
+            // bajo el mismo id durante el dev). Súbelo si hace falta re-flushar.
+            buster: `v2:${session?.user?.id ?? 'anon'}`,
+          }}
         >
           <SafeAreaProvider>
             <ThemeProvider value={navTheme}>

@@ -63,10 +63,14 @@ export function AuthScreenLayout({
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <View style={styles.anchor}>
-            <BrandAnchor pulseOnce={anchorPulseOnce} />
+          {/* El form se CENTRA verticalmente en el espacio sobre la marca
+              (flex:1 + justifyContent center). El gap conserva la separación
+              entre el encabezado y los campos. */}
+          <View style={styles.formArea}>{children}</View>
+          {/* La marca vive ABAJO como lockup horizontal (ícono + wordmark). */}
+          <View style={styles.brandFooter}>
+            <BrandAnchor layout="lockup" pulseOnce={anchorPulseOnce} />
           </View>
-          {children}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -84,10 +88,18 @@ const styles = StyleSheet.create({
     // past it and scroll when the keyboard shrinks the visible area.
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
+  },
+  // El form ocupa todo el espacio sobre la marca y se centra en él (en vez de
+  // quedar pegado arriba con un hueco). El gap mantiene la separación interna.
+  formArea: {
+    flex: 1,
+    justifyContent: 'center',
     gap: spacing.xl,
   },
-  anchor: {
+  brandFooter: {
     alignItems: 'center',
-    marginTop: spacing.lg,
+    paddingTop: spacing.xl,
+    // Sube la marca por encima de la línea del horizonte (no pegada al borde).
+    marginBottom: spacing.xxxl,
   },
 })

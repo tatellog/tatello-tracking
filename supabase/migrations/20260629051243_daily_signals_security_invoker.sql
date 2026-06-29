@@ -1,0 +1,18 @@
+-- 2026-06-29 — Fix de seguridad: la vista daily_signals debe correr con
+-- security_invoker para que el RLS de las tablas base (workouts, meals,
+-- sleep_logs, wellbeing_checkins, mood_checkins, water_intake,
+-- body_measurements, cycle_events) se aplique como el USUARIO que consulta.
+--
+-- Sin esta opción, la vista corría con los privilegios del DUEÑO (definer's
+-- rights) y se SALTABA el RLS: una consulta `select * from daily_signals
+-- where day = '...'` (sin filtrar por user_id, confiando en RLS) devolvía las
+-- filas de TODOS los usuarios. En Órbita eso se fusionaba (mergeDaySignals) y
+-- una usuaria nueva veía datos de otra cuenta (p. ej. el seed de dev). Además
+-- de los datos cruzados, es un hueco de privacidad.
+--
+-- Las tablas base ya tienen RLS habilitado con policies auth.uid() = user_id,
+-- así que activar security_invoker basta para scopear la vista por usuario.
+-- (La migración original declaraba security_invoker, pero una recreación
+-- posterior de la vista lo perdió; este ALTER lo restablece sin tocar la
+-- definición.)
+alter view public.daily_signals set (security_invoker = on);

@@ -27,9 +27,17 @@ type BrandAnchorProps = {
   /** When true, the star plays a single oro pulse instead of looping —
    *  used by the "revisa tu correo" moment. */
   pulseOnce?: boolean
-  /** Whether to render the STELAR wordmark beneath the star. */
+  /** Whether to render the STELAR wordmark with the star. */
   showWordmark?: boolean
+  /**
+   * 'hero'   — gran glow celestial + ícono sobre el wordmark (centro/arriba).
+   * 'lockup' — marca horizontal compacta (ícono + wordmark en fila), para el
+   *            pie de la pantalla. Sin el glow grande: es firma, no protagonista.
+   */
+  layout?: 'hero' | 'lockup'
 }
+
+const LOCKUP_ICON = 46
 
 /*
  * The fixed point of the auth sky: the north-star glyph in oro over a REAL
@@ -47,7 +55,11 @@ type BrandAnchorProps = {
  * alpha gradient). The star itself breathes subtly (scale + opacity) on the
  * same clock so it reads as a live point of light, not a printed glyph.
  */
-export function BrandAnchor({ pulseOnce = false, showWordmark = true }: BrandAnchorProps) {
+export function BrandAnchor({
+  pulseOnce = false,
+  showWordmark = true,
+  layout = 'hero',
+}: BrandAnchorProps) {
   const breath = useSharedValue(0)
   const reduceMotion = useReducedMotion() ?? false
 
@@ -80,6 +92,19 @@ export function BrandAnchor({ pulseOnce = false, showWordmark = true }: BrandAnc
     opacity: 0.86 + breath.value * 0.14,
     transform: [{ scale: 0.97 + breath.value * 0.04 }],
   }))
+
+  // LOCKUP — marca horizontal compacta para el pie: ícono + wordmark en fila,
+  // sin el glow grande. El ícono mantiene su latido sutil (vida, no estática).
+  if (layout === 'lockup') {
+    return (
+      <View style={styles.lockupRow}>
+        <Animated.View style={starStyle} pointerEvents="none">
+          <StelarIcon size={LOCKUP_ICON} />
+        </Animated.View>
+        {showWordmark ? <StelarLogo variant="wordmark" size={30} color={colors.leche} /> : null}
+      </View>
+    )
+  }
 
   return (
     <View style={styles.wrap}>
@@ -128,6 +153,13 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     gap: 12,
+  },
+  // Lockup horizontal (pie): ícono + wordmark en fila, firma de marca.
+  lockupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 13,
   },
   starWrap: {
     width: GLOW_SIZE,

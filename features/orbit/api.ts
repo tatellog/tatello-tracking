@@ -41,7 +41,22 @@ export async function getWeekSignals(fromDate: string, toDate: string): Promise<
     .lte('day', toDate)
     .order('day', { ascending: true })
   if (error) throw error
-  return data ?? []
+  if (!data || data.length === 0) return []
+  // La vista hace fan-out (varias filas por día). Igual que getDaySignals,
+  // fusionamos a UNA fila por día: si no, los consumidores que cuentan filas
+  // (habitReveal, consistencia, patrones) contaban días duplicados → "60 días"
+  // en una ventana de 31, consistencias >100%. Devuelve una fila por día, en
+  // orden ascendente.
+  const byDay = new Map<string, DailySignals[]>()
+  for (const r of data) {
+    if (r.day == null) continue
+    const arr = byDay.get(r.day)
+    if (arr) arr.push(r)
+    else byDay.set(r.day, [r])
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([, rows]) => (rows.length === 1 ? rows[0]! : mergeDaySignals(rows)))
 }
 
 export async function hasAnySignals(): Promise<boolean> {

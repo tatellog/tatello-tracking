@@ -84,7 +84,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.displayHeavy,
     fontSize: 36,
     letterSpacing: -1.4,
-    lineHeight: 36,
+    // lineHeight > fontSize: la palabra enfatizada va en Cormorant italic (glifo
+    // más alto que Hanken); con lineHeight == 36 se cortaba (asc/desc del italic),
+    // sobre todo en títulos de 2 líneas. 42 le da aire sin soltar el interlineado.
+    lineHeight: 42,
     color: colors.leche,
   },
   questionCenter: { textAlign: 'center' },

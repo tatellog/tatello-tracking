@@ -28,7 +28,8 @@ export function useUpsertSleep(date: string) {
     mutationFn: (draft: SleepDraft) => upsertSleepLog(date, draft),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.sleep.day(date) })
-      qc.invalidateQueries({ queryKey: queryKeys.orbit.today() })
+      // orbit.all (prefijo) cubre las keys de órbita ahora scopeadas por usuario.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

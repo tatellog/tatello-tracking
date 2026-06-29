@@ -39,7 +39,6 @@ import {
 } from '@/features/onboarding/components'
 import {
   type BiologicalSex,
-  type CycleSituation,
   type MonthlyFocus,
   type TrainingFrequency,
 } from '@/features/profile/api'
@@ -69,22 +68,22 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 const AnimatedLine = Animated.createAnimatedComponent(Line)
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedRect = Animated.createAnimatedComponent(Rect)
+
+// DEV: ponlo en `true` para FORZAR la ceremonia completa (spin → flash → rayos
+// → anillos → confeti de estrellas) en CADA visita, ignorando reduce-motion y
+// el flag "ya revelado" (onboarding_completed_at / caché persistida). Útil para
+// probar la celebración sin resetear datos. DEBE quedar en `false` para envío.
+const DEV_FORCE_CEREMONY = false
+
+// Intro "Tu cielo en Stelar" (docs/intro-tu-cielo-spec.md): pantalla QUIETA, no
+// ceremonia. El cielo respira (halo + estrellas) y la constelación queda como
+// silueta tenue; sin spin/flash/rayos/anillos/confeti. Ponlo en `false` para
+// recuperar el reveal celebratorio.
+const QUIET_INTRO = true
+
 // expo-blur's BlurView animated for the optional desenfoque→foco pass.
 // PROGRESSIVE ENHANCEMENT only — gated by its own mount/unmount window.
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView)
-
-/** Verb phrase the reveal cites in the multi-datum line. Reads like
- *  the user's own goal, not a Stelar-side categorization. */
-const FOCUS_VERB: Record<MonthlyFocus, string> = {
-  weight: 'quieres bajar de peso',
-  energy: 'quieres más energía',
-  sleep: 'quieres dormir mejor',
-  food: 'quieres reconciliarte con la comida',
-  cycle: 'quieres conocer tu ciclo',
-  patterns: 'quieres entender tus patrones',
-  mind: 'quieres calmar la mente',
-  other: 'estás buscando algo propio',
-}
 
 /*
  * Reveal — the "Tu cielo" ceremony, the emotional peak of the wizard
@@ -236,18 +235,8 @@ export default function RevealScreen() {
   // own handleStart patch lands) and folded into the same instant branch
   // as reduced motion. `instant` is what every clock/schedule keys off.
   const alreadyRevealedRef = useRef<boolean>(profile?.onboarding_completed_at != null)
-  const instant = reduceMotion || alreadyRevealedRef.current
-
-  const firstName = useMemo(
-    () => (profile?.display_name ?? '').trim().split(' ')[0] || 'tú',
-    [profile?.display_name],
-  )
-  const focusVerb = useMemo(() => {
-    const k = (profile?.monthly_focus as MonthlyFocus | null) ?? null
-    // Fallback is a VERB clause (not the noun "tu intención") so the
-    // multi-datum line stays grammatical: "…, buscas algo propio. Stelar…".
-    return k ? FOCUS_VERB[k] : 'buscas algo propio'
-  }, [profile?.monthly_focus])
+  const instant =
+    QUIET_INTRO || (!DEV_FORCE_CEREMONY && (reduceMotion || alreadyRevealedRef.current))
 
   // Signo zodiacal — derived strictly from date_of_birth. We need both
   // the label (for the body line) AND the sign key (to look up the
@@ -263,16 +252,6 @@ export default function RevealScreen() {
     [profile?.date_of_birth],
   )
   const zodiacLabel = useMemo(() => (zodiacSign ? ZODIAC[zodiacSign].label : null), [zodiacSign])
-
-  // Estado del ciclo — solo lo cito si la usuaria menstrúa.
-  const cycleActiveSituations: readonly CycleSituation[] = [
-    'menstruates',
-    'contraception',
-    'irregular',
-  ]
-  const showsCycle =
-    profile?.cycle_situation != null &&
-    cycleActiveSituations.includes(profile.cycle_situation as CycleSituation)
 
   // ── Ceremony clocks ─────────────────────────────────────────────
   // climaxClock — the master "tada". Fires once at B3 over 140 ms and
@@ -349,6 +328,12 @@ export default function RevealScreen() {
   const skyClock = useSharedValue(0)
   const skyOrbit = useSharedValue(0)
 
+  // ── Intro QUIETA (docs/intro-tu-cielo-spec.md) — entrada por fases ──
+  // introVeil: telón negro a pantalla completa (1 → 0) para "oscuridad
+  // inicial". introZoom: zoom-out lento del stage (1.06 → 1.0) + pulso final.
+  const introVeil = useSharedValue(QUIET_INTRO ? 1 : 0)
+  const introZoom = useSharedValue(QUIET_INTRO ? 1.06 : 1)
+
   // ── Reveal stage flags ──────────────────────────────────────────
   // `figureMounted` mounts the ghost figure + ART (op 0) at B0/B1 so the
   // raster decodes during the anticipation, never at the climax.
@@ -367,9 +352,10 @@ export default function RevealScreen() {
       -1,
       false,
     )
-    // auraBreath — only animate the resting pulse on the FULL ceremony. On
-    // the instant branch it stays at 0 so the golden aura is dead-static.
-    if (!instant) {
+    // auraBreath — el pulso de reposo del aura/halo. En la intro QUIETA SÍ
+    // respira (el cielo nunca está estático); solo se queda quieto si NO es la
+    // intro y además es la rama instant por reduce-motion / re-entrada.
+    if (QUIET_INTRO || !instant) {
       auraBreath.value = withRepeat(
         withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.sin) }),
         -1,
@@ -394,24 +380,69 @@ export default function RevealScreen() {
     // flash/rays/burst/rings/beam (their clocks stay 0 → every gate stays
     // false). Text appears promptly.
     if (instant) {
+      // Modo QUIETO (sin ceremonia): el emblema de frente, sin asterismo.
       climaxClock.value = 1
-      artClock.value = 0.55
       spinClock.value = 1
       constSettle.value = 0
-      haloClock.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) })
       setFigureMounted(true)
       setLinesLit(true)
-      setCtaSettled(true)
-      const tH = setTimeout(() => setHeadlineReady(true), 250)
-      const tB = setTimeout(() => setBodyReady(true), 650)
+
+      // Accesibilidad: con reduce-motion vamos directo al estado final.
+      if (reduceMotion) {
+        introVeil.value = 0
+        introZoom.value = 1
+        haloClock.value = 1
+        artClock.value = 0.32
+        setHeadlineReady(true)
+        setBodyReady(true)
+        setCtaSettled(true)
+        return undefined
+      }
+
+      // ENTRADA POR FASES (~8 s) — oscuridad → estrella central → emblema
+      // silueta (con zoom-out lento) → copy → CTA → pulso. Reusa el emblema,
+      // NO una constelación de líneas (docs/intro-tu-cielo-spec.md).
+      artClock.value = 0
+      haloClock.value = 0
+      // 1 · oscuridad inicial → el cielo ambiente emerge (el telón se va).
+      introVeil.value = withTiming(0, { duration: 1200, easing: Easing.out(Easing.cubic) })
+      // 2 · nace la estrella central + glow, lento (no estalla).
+      haloClock.value = withDelay(
+        700,
+        withTiming(1, { duration: 3000, easing: Easing.out(Easing.cubic) }),
+      )
+      // 3-4 · la cámara se aleja despacio (zoom-out + parallax del polvo).
+      introZoom.value = withTiming(1, { duration: 4800, easing: Easing.out(Easing.cubic) })
+      // 6 · el emblema aparece como SILUETA tenue (fade lento a 0.32).
+      artClock.value = withDelay(
+        3200,
+        withTiming(0.32, { duration: 3600, easing: Easing.inOut(Easing.ease) }),
+      )
+      // 7 · el texto entra después de la silueta.
+      const tH = setTimeout(() => setHeadlineReady(true), 7000)
+      const tB = setTimeout(() => setBodyReady(true), 7800)
+      // 9 · el CTA al final.
+      const tC = setTimeout(() => setCtaSettled(true), 8900)
+      // 8 · pulso final suave (de punto a pequeña luz) — vía el zoom del stage.
+      const tP = setTimeout(() => {
+        introZoom.value = withSequence(
+          withTiming(1.03, { duration: 480, easing: Easing.out(Easing.cubic) }),
+          withTiming(1, { duration: 720, easing: Easing.inOut(Easing.sin) }),
+        )
+      }, 9900)
+
       return () => {
         clearTimeout(tH)
         clearTimeout(tB)
+        clearTimeout(tC)
+        clearTimeout(tP)
         cancelAnimation(climaxClock)
         cancelAnimation(artClock)
         cancelAnimation(spinClock)
         cancelAnimation(constSettle)
         cancelAnimation(haloClock)
+        cancelAnimation(introVeil)
+        cancelAnimation(introZoom)
       }
     }
 
@@ -568,6 +599,9 @@ export default function RevealScreen() {
     inhaleClock,
     ringsClock,
     beamClock,
+    reduceMotion,
+    introVeil,
+    introZoom,
   ])
 
   const handleStart = async () => {
@@ -606,6 +640,10 @@ export default function RevealScreen() {
   // invisible to VoiceOver beyond the text below it).
   const stageA11yLabel = zodiacLabel ? `Tu constelación de ${zodiacLabel}` : 'Tu cielo de Stelar'
 
+  // Intro QUIETA — zoom-out lento del stage + telón negro que se va.
+  const stageZoomStyle = useAnimatedStyle(() => ({ transform: [{ scale: introZoom.value }] }))
+  const veilStyle = useAnimatedStyle(() => ({ opacity: introVeil.value }))
+
   return (
     <WizardLayout
       step={10}
@@ -624,7 +662,7 @@ export default function RevealScreen() {
       // is always offered; the ceremony only decides how much it celebrates
       // it. At settle it BLOOMS to the full solid primary "ENTRAR A TU
       // ÓRBITA →". Never a gate.
-      continueLabel={ctaSettled ? 'Entrar a tu órbita →' : 'Entrar'}
+      continueLabel={ctaSettled ? 'Entrar a mi cielo →' : 'Entrar'}
       ctaVariant={ctaSettled ? 'primary' : 'soft'}
       ctaTransform={ctaSettled ? 'uppercase' : 'none'}
       atmosphere={
@@ -660,8 +698,8 @@ export default function RevealScreen() {
             question=""
           />
 
-          <View
-            style={[styles.stage, { width: stageSize, height: stageSize }]}
+          <Animated.View
+            style={[styles.stage, { width: stageSize, height: stageSize }, stageZoomStyle]}
             accessible
             accessibilityRole="image"
             accessibilityLabel={stageA11yLabel}
@@ -714,7 +752,7 @@ export default function RevealScreen() {
             {/* Bottom breathing strip — keeps the art (op 0.55) confined to
                 the stage and OFF the headline, preserving body contrast. */}
             <View pointerEvents="none" style={styles.fadeBottom} />
-          </View>
+          </Animated.View>
         </View>
 
         {/* TEXT group — headline + body anchored together below the stage.
@@ -723,7 +761,7 @@ export default function RevealScreen() {
         <View style={styles.textGroup}>
           {headlineReady ? (
             <Animated.Text entering={FadeIn.duration(520)} style={styles.headline}>
-              {firstName}, <Text style={styles.headlineEm}>aquí empieza tu lectura</Text>.
+              Aquí empieza tu <Text style={styles.headlineEm}>evidencia</Text>.
             </Animated.Text>
           ) : (
             <View style={styles.headlinePlaceholder} />
@@ -731,26 +769,26 @@ export default function RevealScreen() {
 
           {bodyReady ? (
             <Animated.Text entering={FadeIn.duration(480)} style={styles.body}>
-              {/* Sign clause — only when we ACTUALLY have a derived sign.
-                  No invented sign is ever shown; if date_of_birth is
-                  missing the clause is omitted entirely. */}
-              {zodiacLabel ? <Text style={styles.bodyEm}>{zodiacLabel}</Text> : null}
-              {zodiacLabel && showsCycle ? ', ' : null}
-              {/* Ciclo segment — NO magenta (brand magenta economy: max 2
-                  strong accents/screen). "con tu ciclo en cuenta" replaces
-                  the old "en fase lútea": the phase was ASSERTED for anyone
-                  who menstruates without computing the real cycle day, so it
-                  could be false (contraception / irregular) and was the only
-                  clinical term on the screen. Plain leche, no emphasis. */}
-              {showsCycle ? 'con tu ciclo en cuenta' : null}
-              {zodiacLabel || showsCycle ? ', ' : null}
-              {focusVerb}. Stelar ya empezó a leerte. Cuanto más registres, más se afina.
+              {/* Manifiesto: Stelar NO lee, NO interpreta, NO predice — solo
+                  convierte registros en evidencia que ilumina el cielo. Sin
+                  mención de signo/fase: la metáfora es la luz que se enciende. */}
+              Hoy tu cielo apenas puede verse. Cada entrenamiento, cada comida, cada noche dejará
+              una pequeña luz. Con el tiempo, esas luces revelarán algo que hoy todavía permanece
+              invisible.
             </Animated.Text>
           ) : (
             <View style={styles.bodyPlaceholder} />
           )}
         </View>
       </ScrollView>
+
+      {/* Telón negro de la "oscuridad inicial" — cubre el contenido y se va
+          (introVeil 1 → 0) al arrancar la entrada por fases. pointerEvents
+          none para no bloquear el CTA. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.introVeil, veilStyle]}
+      />
     </WizardLayout>
   )
 }
@@ -988,19 +1026,19 @@ function RevealConstellation({
             at ~66% that decays — insinúa un borde circular WITHOUT a closed
             stroke, so it never reads as a diana). cx/cy 48% keeps the optical
             centre slightly high. */}
-        <RadialGradient id="reveal-aura-bloom" cx="50%" cy="48%" r="50%">
+        <RadialGradient id="reveal-aura-bloom" cx="50%" cy="50%" r="50%">
           <Stop offset="0%" stopColor="#FFF6E5" stopOpacity={0.1} />
           <Stop offset="42%" stopColor="#D9AE6F" stopOpacity={0.16} />
           <Stop offset="78%" stopColor="#D9AE6F" stopOpacity={0.06} />
           <Stop offset="100%" stopColor="#D9AE6F" stopOpacity={0} />
         </RadialGradient>
-        <RadialGradient id="reveal-aura-body" cx="50%" cy="48%" r="50%">
+        <RadialGradient id="reveal-aura-body" cx="50%" cy="50%" r="50%">
           <Stop offset="0%" stopColor="#FFF6E5" stopOpacity={0.22} />
           <Stop offset="34%" stopColor="#E8B872" stopOpacity={0.2} />
           <Stop offset="68%" stopColor="#D9AE6F" stopOpacity={0.12} />
           <Stop offset="100%" stopColor="#D9AE6F" stopOpacity={0} />
         </RadialGradient>
-        <RadialGradient id="reveal-aura-rim" cx="50%" cy="48%" r="50%">
+        <RadialGradient id="reveal-aura-rim" cx="50%" cy="50%" r="50%">
           <Stop offset="0%" stopColor="#D9AE6F" stopOpacity={0} />
           <Stop offset="52%" stopColor="#D9AE6F" stopOpacity={0} />
           <Stop offset="66%" stopColor="#FFE9C2" stopOpacity={0.3} />
@@ -1299,8 +1337,15 @@ function RevealArt({
     // the worklet renders it verbatim. Clamped to 0.72 so the emerge never
     // overshoots even if the clock is mid-spring. This is what makes the toro
     // settle at ~0.55 EFFECTIVE — protagonist, not dimmer than its halo.
+    // Intro QUIETA: la constelación queda como SILUETA tenue (0.32), "apenas
+    // insinuada / dormida" (docs/intro-tu-cielo-spec.md). En la rama instant
+    // por reduce-motion/re-entrada del reveal celebratorio sería 0.55, pero hoy
+    // la pantalla es la intro quieta, así que 0.32.
+    // Intro QUIETA: el emblema entra como SILUETA tenue — su opacidad sigue al
+    // reloj (fade lento), con tope 0.32 ("apenas insinuado / dormido"). En la
+    // rama celebratoria mantiene su arco hasta 0.72.
     const c = artClock.value
-    const opacity = isInstant ? 0.55 : c <= 0 ? 0 : Math.min(0.72, c)
+    const opacity = isInstant ? Math.max(0, Math.min(0.32, c)) : c <= 0 ? 0 : Math.min(0.72, c)
     return {
       opacity,
       // perspective + rotateY on the Y axis (degrees, not %). backface
@@ -1369,11 +1414,11 @@ function GoldenAura({
   cy: number
   scale: number
 }) {
-  // Optical centre desplazado slightly up (anti-symmetry); offset bumped to
-  // 9*scale so the bigger glow doesn't invade the eyebrow above on the
-  // short (288) stage.
+  // Halo CONCÉNTRICO con el emblema: mismo centro exacto (cx, cy). Antes tenía
+  // un offset hacia arriba (-9·scale) que lo descentraba respecto al arte; en la
+  // intro quieta el aura debe quedar perfectamente centrada en el emblema.
   const acx = cx
-  const acy = cy - 9 * scale
+  const acy = cy
   const groupProps = useAnimatedProps(() => {
     'worklet'
     const h = clock.value
@@ -1397,9 +1442,14 @@ function GoldenAura({
   })
   return (
     <AnimatedG animatedProps={groupProps}>
-      <Circle cx={acx} cy={acy} r={225 * scale} fill="url(#reveal-aura-bloom)" />
-      <Circle cx={acx} cy={acy} r={195 * scale} fill="url(#reveal-aura-body)" />
-      <Circle cx={acx} cy={acy} r={198 * scale} fill="url(#reveal-aura-rim)" />
+      {/* Radios inscritos en el viewport (≤168·scale; el centro está 9·scale
+          arriba, así que el borde superior queda a 171·scale). Si exceden, el
+          gradiente aún tiene opacidad en el borde del <Svg> y este lo RECORTA
+          en cuadro (el "cuadrado que cortaba el aro"). Inscrito = se desvanece
+          a 0 antes del borde → círculo limpio. */}
+      <Circle cx={acx} cy={acy} r={168 * scale} fill="url(#reveal-aura-bloom)" />
+      <Circle cx={acx} cy={acy} r={146 * scale} fill="url(#reveal-aura-body)" />
+      <Circle cx={acx} cy={acy} r={148 * scale} fill="url(#reveal-aura-rim)" />
     </AnimatedG>
   )
 }
@@ -2566,6 +2616,10 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 28,
+  },
+  // Telón de "oscuridad inicial" de la intro quieta (se desvanece al entrar).
+  introVeil: {
+    backgroundColor: colors.bg,
   },
   // TEXT group — headline + body anchored together below the stage. The
   // small negative-ish top pull (just a tight marginTop) keeps the headline

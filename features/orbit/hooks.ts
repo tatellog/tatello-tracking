@@ -3,11 +3,18 @@ import { useEffect, useRef, useState } from 'react'
 
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
+import { useSession } from '@/hooks/useSession'
 
 import { getMealsInRange } from '@/features/macros/api'
 
 import { getDaySignals, getTodaySignals, getWeekSignals, hasAnySignals } from './api'
 import { isoTwoWeekRange } from './week-orbit-logic'
+
+/** Id del usuario en sesión para scopear las keys de órbita (un usuario nuevo no
+ *  hereda la caché de otro en el mismo dispositivo). 'anon' sin sesión. */
+function useOrbitUid(): string {
+  return useSession().session?.user?.id ?? 'anon'
+}
 
 /*
  * Vigila el cambio de día mientras Órbita está montada. El tab persiste entre
@@ -38,10 +45,11 @@ export function useOrbitDayRollover(): void {
  * surface here quickly. Returns null when nothing is logged today.
  */
 export function useTodaySignals() {
-  // La fecha local va EN la key: al cambiar de día, la caché persistida ya no
-  // sirve las señales de ayer como "hoy" (refetch limpio para el día nuevo).
+  // Key scopeada por usuario + fecha local: un usuario nuevo no hereda la caché
+  // de otro, y al cambiar de día no se sirven las señales de ayer como "hoy".
+  const uid = useOrbitUid()
   return useQuery({
-    queryKey: queryKeys.orbit.today(todayInTimezone()),
+    queryKey: queryKeys.orbit.today(uid, todayInTimezone()),
     queryFn: getTodaySignals,
     staleTime: 60_000,
   })
@@ -54,8 +62,9 @@ export function useTodaySignals() {
  * propia key (no colisionan).
  */
 export function useDaySignals(day: string, enabled = true) {
+  const uid = useOrbitUid()
   return useQuery({
-    queryKey: queryKeys.orbit.day(day),
+    queryKey: queryKeys.orbit.day(uid, day),
     queryFn: () => getDaySignals(day),
     staleTime: 5 * 60_000,
     enabled,
@@ -86,9 +95,10 @@ function currentWeekRange(): { from: string; to: string } {
  * nothing was logged this week.
  */
 export function useWeekSignals() {
+  const uid = useOrbitUid()
   const { from, to } = currentWeekRange()
   return useQuery({
-    queryKey: queryKeys.orbit.week(from, to),
+    queryKey: queryKeys.orbit.week(uid, from, to),
     queryFn: () => getWeekSignals(from, to),
     staleTime: 60_000,
   })
@@ -103,10 +113,11 @@ export function useWeekSignals() {
  * stays deterministic. Distinct cache key from the Sunday-based week above.
  */
 export function useIsoWeekSignals() {
+  const uid = useOrbitUid()
   const todayIso = todayInTimezone()
   const { from, to } = isoTwoWeekRange(todayIso)
   const query = useQuery({
-    queryKey: queryKeys.orbit.week(from, to),
+    queryKey: queryKeys.orbit.week(uid, from, to),
     queryFn: () => getWeekSignals(from, to),
     staleTime: 60_000,
   })
@@ -128,9 +139,10 @@ function historyRange(days: number): { from: string; to: string } {
 }
 
 export function useSignalsHistory(days = 35) {
+  const uid = useOrbitUid()
   const { from, to } = historyRange(days)
   return useQuery({
-    queryKey: queryKeys.orbit.history(from, to),
+    queryKey: queryKeys.orbit.history(uid, from, to),
     queryFn: () => getWeekSignals(from, to),
     // 60s (was 10 min): the pattern list should reflect a freshly logged
     // day — or a reseed in dev — within a minute, not stay frozen for
@@ -146,9 +158,10 @@ export function useSignalsHistory(days = 35) {
  * window as the signals history; 60s staleTime so it tracks new meals.
  */
 export function useHistoryMeals(days = 35) {
+  const uid = useOrbitUid()
   const { from, to } = historyRange(days)
   return useQuery({
-    queryKey: ['orbit', 'history-meals', from, to] as const,
+    queryKey: ['orbit', 'history-meals', uid, from, to] as const,
     queryFn: () => getMealsInRange(from, to),
     staleTime: 60_000,
   })
@@ -162,8 +175,9 @@ export function useHistoryMeals(days = 35) {
  * re-check on every focus.
  */
 export function useHasAnySignals() {
+  const uid = useOrbitUid()
   return useQuery({
-    queryKey: queryKeys.orbit.hasAny(),
+    queryKey: queryKeys.orbit.hasAny(uid),
     queryFn: hasAnySignals,
     staleTime: 1000 * 60 * 5,
   })

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
+import { useSession } from '@/hooks/useSession'
 import { queryKeys } from '@/lib/queryKeys'
 
 import { fetchTransformPoints, fetchTransformPointsAsOf } from './api'
@@ -12,10 +13,15 @@ import { stageForProgress, transformProgressForPoints, type EmblemStage } from '
 // la promesa "Tu transformación nunca retrocede"). El % crudo es función de
 // los puntos ACTUALES, así que destogglear un registro hoy (Entrené −10,
 // agua −3) lo bajaría y el emblema se des-revelaría. Guardamos el máximo
-// alcanzado en disco y nunca mostramos menos. Local por dispositivo para el
-// MVP; la versión durable sería una columna max_transform_progress en
-// Postgres actualizada por la RPC (no des-revelar entre dispositivos).
-const EMBLEM_HWM_KEY = 'stelar.emblem.progress_hwm'
+// alcanzado en disco y nunca mostramos menos. La versión durable sería una
+// columna max_transform_progress en Postgres actualizada por la RPC.
+//
+// Scopeado POR USUARIO: la key lleva el id de la sesión. Sin esto era global
+// del dispositivo, así que un usuario NUEVO heredaba el % del usuario anterior
+// (p. ej. abrir con tatellog tras un seed mostraba 82% que no era suyo).
+const EMBLEM_HWM_PREFIX = 'stelar.emblem.progress_hwm'
+const hwmKeyFor = (userId: string | null): string | null =>
+  userId ? `${EMBLEM_HWM_PREFIX}:${userId}` : null
 
 /*
  * Progreso real del Emblema Celeste.
@@ -46,12 +52,18 @@ export function useTransformProgress(): {
 
   const rawProgress = transformProgressForPoints(query.data ?? 0)
 
-  // El piso monotónico. Se hidrata de disco al montar y solo SUBE: nunca
-  // se persiste un valor menor → el reveal jamás retrocede.
+  // El piso monotónico, POR USUARIO. Se hidrata de disco al montar (y al cambiar
+  // de usuario) y solo SUBE: nunca se persiste un valor menor → el reveal jamás
+  // retrocede. La key lleva el id de sesión para no heredar el piso de otra cuenta.
+  const hwmKey = hwmKeyFor(useSession().session?.user?.id ?? null)
   const [floor, setFloor] = useState(0)
   useEffect(() => {
     let active = true
-    AsyncStorage.getItem(EMBLEM_HWM_KEY)
+    // Resetea al cambiar de usuario antes de hidratar el suyo (si no, el piso del
+    // usuario anterior seguiría en estado hasta que el nuevo lea su disco).
+    setFloor(0)
+    if (hwmKey == null) return
+    AsyncStorage.getItem(hwmKey)
       .then((v) => {
         const stored = v != null ? Number(v) : 0
         if (active && Number.isFinite(stored) && stored > 0) setFloor((f) => Math.max(f, stored))
@@ -60,13 +72,14 @@ export function useTransformProgress(): {
     return () => {
       active = false
     }
-  }, [])
+  }, [hwmKey])
   useEffect(() => {
+    if (hwmKey == null) return
     if (rawProgress > floor) {
       setFloor(rawProgress)
-      AsyncStorage.setItem(EMBLEM_HWM_KEY, String(rawProgress)).catch(() => {})
+      AsyncStorage.setItem(hwmKey, String(rawProgress)).catch(() => {})
     }
-  }, [rawProgress, floor])
+  }, [rawProgress, floor, hwmKey])
 
   const progress = Math.max(rawProgress, floor)
   return { progress, stage: stageForProgress(progress), isLoading: query.isLoading }

@@ -98,15 +98,23 @@ export const queryKeys = {
   },
   orbit: {
     all: ['orbit'] as const,
-    // El día va EN la key: con la caché persistida (AsyncStorage 24 h), una key
-    // sin fecha hacía que al cambiar de día se mostraran las señales de ayer como
-    // si fueran de hoy. Las invalidaciones (orbit.all / orbit.today()) siguen
-    // funcionando: son prefijos de la key con fecha.
-    today: (day?: string) =>
-      day ? (['orbit', 'today', day] as const) : (['orbit', 'today'] as const),
-    day: (day: string) => ['orbit', 'day', day] as const,
-    week: (fromDate: string, toDate: string) => ['orbit', 'week', fromDate, toDate] as const,
-    history: (fromDate: string, toDate: string) => ['orbit', 'history', fromDate, toDate] as const,
-    hasAny: () => ['orbit', 'hasAny'] as const,
+    // Las keys de órbita van SCOPEADAS POR USUARIO (`uid`) y por día. Sin el uid,
+    // la caché persistida (AsyncStorage 24 h) servía las señales de OTRA cuenta a
+    // un usuario nuevo en el mismo dispositivo (un usuario nuevo "heredaba" los
+    // datos de un seed de dev). Con el uid en la key, un usuario distinto = key
+    // distinta = cache miss = fetch real. El día también va en la key para no
+    // mostrar las señales de ayer como hoy al cruzar la medianoche.
+    //
+    // El uid va DESPUÉS del segmento de tipo para que las invalidaciones por
+    // prefijo sigan funcionando: orbit.all (['orbit']) matchea todo; una
+    // invalidación de ['orbit','today'] matchea ['orbit','today', uid, day].
+    today: (uid: string, day?: string) =>
+      day ? (['orbit', 'today', uid, day] as const) : (['orbit', 'today', uid] as const),
+    day: (uid: string, day: string) => ['orbit', 'day', uid, day] as const,
+    week: (uid: string, fromDate: string, toDate: string) =>
+      ['orbit', 'week', uid, fromDate, toDate] as const,
+    history: (uid: string, fromDate: string, toDate: string) =>
+      ['orbit', 'history', uid, fromDate, toDate] as const,
+    hasAny: (uid: string) => ['orbit', 'hasAny', uid] as const,
   },
 } as const
