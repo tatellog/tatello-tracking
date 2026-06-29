@@ -1,15 +1,20 @@
 /*
- * Órbita · Mes — "¿Qué estoy construyendo con lo que repito?".
+ * Órbita · Mes — "¿En qué me estoy transformando?".
  *
- * Lógica pura y DETERMINÍSTICA (sin IA) sobre ~30 días de daily_signals. Tres
- * piezas:
- *   · buildMonthBuilt   → "Esto construiste": conteos acumulados (la prueba
- *                         tangible de "lo construí yo").
- *   · detectMonthPatterns → "Lo que descubrimos": patrones REALES con su
- *                         evidencia visual (barras). No inventa correlaciones:
- *                         cada patrón nace de contar lo registrado, y solo
- *                         aparece si el dato lo sostiene (guardas de honestidad).
- *   · biggestWin        → "Tu mayor victoria": la consistencia, celebrada.
+ * Lógica pura y DETERMINÍSTICA (sin IA) sobre ~30 días de daily_signals. Ver
+ * docs/orbita-mes-spec.md (fuente de verdad). Piezas:
+ *   · habitReveal        → "Así revelaste tu constelación" + "Tu evolución":
+ *                          conteo de días por dimensión (qué iluminó la
+ *                          constelación). La misma data ordena ambas secciones.
+ *   · detectMonthPatterns → "Haz visible lo invisible" (kind 'discovery') +
+ *                          "Tus patrones" (kind 'pattern'). Patrones REALES con
+ *                          su evidencia visual (barras). No inventa
+ *                          correlaciones: cada patrón nace de contar lo
+ *                          registrado, y solo aparece si el dato lo sostiene
+ *                          (guardas de honestidad).
+ *   · finalPhrase        → la frase de cierre, elegida por la evidencia.
+ *   · buildMonthBuilt    → conteos acumulados (prueba tangible, reutilizable).
+ *   · biggestWin         → la consistencia, celebrada (legacy/auxiliar).
  *
  * Toda comparación de día-de-semana se parsea en UTC (como el resto del repo)
  * para no correrse de día por timezone.
@@ -52,6 +57,66 @@ function appeared(s: DailySignals): boolean {
 
 function loggedDays(signals: readonly DailySignals[]): DailySignals[] {
   return signals.filter((s) => s.day != null && appeared(s))
+}
+
+/* ── "Así revelaste tu constelación" / "Tu evolución" ────────────────── */
+/* Conteo de días con evidencia por dimensión. Cada categoría ilumina una parte
+ * de la constelación; este es el origen tanto de la lista de revelación como de
+ * las barras de evolución. `colorKey` mapea al tono de dimensión en el
+ * componente (ver BAR_COLOR). */
+
+export type HabitReveal = {
+  key: string
+  label: string
+  /** Label compacto para columnas de ancho fijo (ej. "Registro"), para no
+   *  truncar. Igual a `label` salvo donde el nombre largo no cabe. */
+  shortLabel: string
+  colorKey: string
+  count: number
+}
+
+type RevealHabit = {
+  key: string
+  label: string
+  shortLabel?: string
+  colorKey: string
+  has: (s: DailySignals) => boolean
+}
+
+const REVEAL_HABITS: readonly RevealHabit[] = [
+  {
+    key: 'cuerpo',
+    label: 'Movimiento',
+    colorKey: 'cuerpo',
+    has: (s) => s.trained === true || s.rested === true,
+  },
+  { key: 'sueno', label: 'Sueño', colorKey: 'sueno', has: (s) => s.sleep_minutes != null },
+  {
+    key: 'comida',
+    label: 'Registro de comida',
+    shortLabel: 'Registro',
+    colorKey: 'comida',
+    has: (s) => (s.meal_count ?? 0) > 0,
+  },
+  { key: 'proteina', label: 'Proteína', colorKey: 'proteina', has: (s) => s.protein_g != null },
+  { key: 'energia', label: 'Energía', colorKey: 'energia', has: (s) => s.energy != null },
+  { key: 'agua', label: 'Agua', colorKey: 'agua', has: (s) => (s.water_glasses ?? 0) > 0 },
+  // Ciclo NO entra: es CONTEXTO (derivado del inicio de período), no una señal
+  // de presencia/hábito. No se cuenta como "días registrados" ni cae en "aún no
+  // sabemos". Ver decisión de proyecto (memoria: ciclo-is-context-not-habit).
+]
+
+/** Días con evidencia por dimensión, de mayor a menor. La partición
+ *  conocido/«aún no sabemos» (umbral mínimo) la decide el componente. */
+export function habitReveal(signals: readonly DailySignals[]): HabitReveal[] {
+  const days = loggedDays(signals)
+  return REVEAL_HABITS.map((h) => ({
+    key: h.key,
+    label: h.label,
+    shortLabel: h.shortLabel ?? h.label,
+    colorKey: h.colorKey,
+    count: days.filter(h.has).length,
+  })).sort((a, b) => b.count - a.count)
 }
 
 /* ── "Esto construiste" — conteos acumulados ─────────────────────────── */
@@ -117,6 +182,12 @@ export type EvidenceBar = {
 }
 export type MonthPattern = {
   id: string
+  /** 'discovery' → "Haz visible lo invisible" (constancia de una dimensión).
+   *  'pattern'   → "Tus patrones" (forma temporal demostrable). */
+  kind: 'discovery' | 'pattern'
+  /** Encabezado corto de la tarjeta (p. ej. "Movimiento"). El `title` es la
+   *  frase observacional que lo describe. */
+  label: string
   title: string
   evidence: { bars: EvidenceBar[]; caption: string; unit: string }
 }
@@ -124,36 +195,6 @@ export type MonthPattern = {
 /** Mínimo de días registrados para arriesgar cualquier patrón — debajo de esto
  *  el mes apenas se forma y un "patrón" sería ruido. */
 const PATTERN_MIN_DAYS = 8
-
-type Habit = { key: string; label: string; has: (s: DailySignals) => boolean }
-const HABITS: readonly Habit[] = [
-  { key: 'comida', label: 'Comida', has: (s) => (s.meal_count ?? 0) > 0 },
-  { key: 'cuerpo', label: 'Movimiento', has: (s) => s.trained === true || s.rested === true },
-  { key: 'sueno', label: 'Sueño', has: (s) => s.sleep_minutes != null },
-  { key: 'energia', label: 'Energía', has: (s) => s.energy != null },
-  { key: 'agua', label: 'Agua', has: (s) => (s.water_glasses ?? 0) > 0 },
-]
-
-/** Forma con artículo para PROSA ("El movimiento…"), no el label suelto
- *  ("Movimiento…"). Da frases gramaticales y consistentes con los demás
- *  patrones (que sí abren con artículo). */
-const HABIT_PROSE: Record<string, string> = {
-  comida: 'La comida',
-  cuerpo: 'El movimiento',
-  sueno: 'El sueño',
-  energia: 'La energía',
-  agua: 'El agua',
-}
-
-function habitCounts(
-  days: readonly DailySignals[],
-): { key: string; label: string; count: number }[] {
-  return HABITS.map((h) => ({
-    key: h.key,
-    label: h.label,
-    count: days.filter((s) => h.has(s)).length,
-  }))
-}
 
 function weekdayCounts(days: readonly DailySignals[]): number[] {
   const wd = [0, 0, 0, 0, 0, 0, 0]
@@ -260,69 +301,39 @@ export function detectMonthPatterns(
     },
   ]
   const consistencyCaption = 'Días en que cada señal estuvo presente.'
-  // Dimensiones que YA tienen voz como fortaleza este mes. Una dimensión no
-  // puede ser a la vez "constante" y "la más silenciosa" (era la contradicción
-  // que rompía la confianza). Se excluyen de habit-low más abajo.
-  const spoken = new Set<string>()
-  // El contexto temporal ("este mes") lo da la sección + la victoria; NO cada
-  // frase, para que la voz no suene a plantilla.
+  // El contexto temporal ("este mes") lo da la sección; NO cada frase, para que
+  // la voz no suene a plantilla. Solo CONSTANCIAS positivas viven en "Haz
+  // visible lo invisible": lo que faltó lo cuentan "Lo que aún no sabemos" (lo
+  // genuinamente ausente) y las barras de "Tu evolución". Mezclar aquí una
+  // "señal más silenciosa" rompía la confianza: contaba presencia cruda contra
+  // el conteo del motor (escalas distintas), así que la "silenciosa" podía
+  // mostrar MÁS días que una "constante".
   if (c.protein.detected) {
-    spoken.add('proteina')
     out.push({
       id: 'consistent-protein',
+      kind: 'discovery',
+      label: 'Proteína',
       title: 'Tu proteína se mantuvo consistente.',
       evidence: { bars: consistencyBars('proteina'), caption: consistencyCaption, unit: 'días' },
     })
   }
   if (c.training.detected) {
-    spoken.add('cuerpo')
     out.push({
       id: 'consistent-training',
+      kind: 'discovery',
+      label: 'Movimiento',
       title: 'El movimiento fue una de tus constantes.',
       evidence: { bars: consistencyBars('cuerpo'), caption: consistencyCaption, unit: 'días' },
     })
   }
   if (c.sleep.detected) {
-    spoken.add('sueno')
     out.push({
       id: 'consistent-sleep',
+      kind: 'discovery',
+      label: 'Sueño',
       title: 'Tu sueño se mantuvo estable.',
       evidence: { bars: consistencyBars('sueno'), caption: consistencyCaption, unit: 'días' },
     })
-  }
-
-  // 2 · "Lo que menos apareció" — observación local de Mes (el motor no tiene
-  // un patrón de "menos constante"; lo mantenemos como nota de crecimiento).
-  const habits = habitCounts(days).filter((h) => h.count > 0)
-  if (habits.length >= 3) {
-    const sorted = [...habits].sort((a, b) => b.count - a.count)
-    const top = sorted[0]!
-    // La "más silenciosa" se elige entre las dimensiones que NO salieron ya como
-    // fortaleza (dedupe por dimensión): nunca contradecir "fue una constante".
-    const low = [...sorted].reverse().find((h) => !spoken.has(h.key))
-    const habitBars = (highlight: string): EvidenceBar[] =>
-      [...habits]
-        .sort((a, b) => b.count - a.count)
-        .map((h) => ({
-          label: h.label,
-          value: h.count,
-          highlight: h.label === highlight,
-          colorKey: h.key,
-        }))
-    if (low && low.count < top.count) {
-      out.push({
-        id: 'habit-low',
-        // Sujeto = la señal, no la usuaria; "silenciosa" observa el espacio sin
-        // señalar carencia (manifesto-reviewer + voice-and-copy). Con artículo
-        // para que lea como prosa ("El movimiento…", no "Movimiento…").
-        title: `${HABIT_PROSE[low.key] ?? low.label} fue tu señal más silenciosa.`,
-        evidence: {
-          bars: habitBars(low.label),
-          caption: 'Días en que cada señal estuvo presente.',
-          unit: 'días',
-        },
-      })
-    }
   }
 
   // 3 · Entre semana vs fin de semana.
@@ -336,6 +347,8 @@ export function detectMonthPatterns(
   if (avgWeekday >= avgWeekend * 1.3 && weekdaySum >= 4) {
     out.push({
       id: 'weekday',
+      kind: 'pattern',
+      label: 'Tu semana',
       title: 'Apareces más entre semana.',
       evidence: {
         bars: wdBars([0, 1, 2, 3, 4]),
@@ -346,11 +359,46 @@ export function detectMonthPatterns(
   } else if (avgWeekend >= avgWeekday * 1.3 && weekendSum >= 2) {
     out.push({
       id: 'weekend',
+      kind: 'pattern',
+      label: 'Tu fin de semana',
       title: 'Apareces más en fin de semana.',
       evidence: {
         bars: wdBars([5, 6]),
         caption: 'Días que apareciste, por día de la semana.',
         unit: 'días',
+      },
+    })
+  }
+
+  // 3.5 · Noches con ≥ 7 h de sueño — patrón demostrable directo (sin asumir
+  // causa): cuántas noches registradas alcanzaron las 7 h. Solo si hay sueño
+  // registrado y un puñado de noches profundas lo sostienen.
+  const sleepNights = days.filter((s) => s.sleep_minutes != null)
+  const deepNights = sleepNights.filter((s) => s.sleep_minutes! >= 420).length
+  if (sleepNights.length >= PATTERN_MIN_DAYS && deepNights >= 4) {
+    out.push({
+      id: 'sleep-7h',
+      kind: 'pattern',
+      label: 'Tus noches',
+      title: `Dormiste más de 7 h en ${deepNights} ${deepNights === 1 ? 'noche' : 'noches'}.`,
+      evidence: {
+        bars: [
+          {
+            label: '≥ 7 h',
+            value: deepNights,
+            total: sleepNights.length,
+            colorKey: 'sueno',
+            highlight: true,
+          },
+          {
+            label: '< 7 h',
+            value: sleepNights.length - deepNights,
+            total: sleepNights.length,
+            colorKey: 'sueno',
+          },
+        ],
+        caption: 'Noches registradas según las horas de sueño.',
+        unit: 'noches',
       },
     })
   }
@@ -374,6 +422,8 @@ export function detectMonthPatterns(
           : `Tu mejor día suele ser ${names[0]}.`
       out.push({
         id: 'best-days',
+        kind: 'pattern',
+        label: 'Tus mejores días',
         title,
         evidence: {
           bars: wdBars(tops),
@@ -384,10 +434,9 @@ export function detectMonthPatterns(
     }
   }
 
-  // El tono abre en positivo: "lo que menos apareció" (habit-low) nunca va
-  // primero. Orden estable que solo lo empuja al final (manifiesto: aspiracional,
-  // sin que la primera lectura sobre ti sea una carencia).
-  return out.sort((a, b) => (a.id === 'habit-low' ? 1 : 0) - (b.id === 'habit-low' ? 1 : 0))
+  // El orden ya nace positivo (constancias primero por el orden de push); el
+  // componente separa discoveries de patterns por `kind`.
+  return out
 }
 
 /* ── "Tu mayor victoria" — la consistencia, celebrada ────────────────── */
@@ -413,4 +462,17 @@ export function biggestWin(signals: readonly DailySignals[]): MonthWin | null {
     headline: `Estuviste presente ${days} ${days === 1 ? 'día' : 'días'} este mes.`,
     line,
   }
+}
+
+/* ── Frase final — cierre basado en evidencia ────────────────────────── */
+
+/** Una sola frase de cierre, elegida por la cantidad de días presentes. Todas
+ *  se sostienen con datos (no son motivacionales vacías): hablan de constancia,
+ *  repetición y de que la evidencia empieza a contar una historia. */
+export function finalPhrase(signals: readonly DailySignals[]): string | null {
+  const days = loggedDays(signals).length
+  if (days === 0) return null
+  if (days >= 18) return 'La constancia apareció más veces que la perfección.'
+  if (days >= 10) return 'Lo que repetiste comenzó a definir este mes.'
+  return 'La evidencia empieza a contar una historia.'
 }

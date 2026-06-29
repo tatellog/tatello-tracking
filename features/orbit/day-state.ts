@@ -26,9 +26,38 @@ export type DayStateKey =
  *  Agua acompañan. */
 export type SignalKey = 'movimiento' | 'recuperacion' | 'nutricion' | 'bienestar' | 'agua'
 
-export type SignalStrength = { key: SignalKey; label: string; stars: number; present: boolean }
+export type SignalStrength = {
+  key: SignalKey
+  label: string
+  stars: number
+  present: boolean
+  /** El dato real registrado (p. ej. "7.8 h", "1 comida", "Energía 3/5") — para
+   *  mostrar evidencia concreta, no un puntaje abstracto. */
+  detail?: string
+}
 
-export type EvidenceItem = { label: string; detail: string }
+/** Tono de cada evidencia = el color de SU dimensión (la capa visual lo resuelve
+ *  a hex). Hace de "LA EVIDENCIA" un cielo multicolor, no una lista monocroma. */
+export type EvidenceTone =
+  | 'cuerpo'
+  | 'sueno'
+  | 'alimento'
+  | 'ciclo'
+  | 'energia'
+  | 'mente'
+  | 'proteina'
+  | 'agua'
+  | 'leche'
+
+export type EvidenceItem = {
+  label: string
+  /** Dato real (p. ej. "7.5 horas"). undefined si no hay cifra: el verbo basta
+   *  como evidencia (no inventar "Registrado"/"Anotado" de relleno). */
+  detail?: string
+  tone: EvidenceTone
+  /** La señal a la que pertenece (para resaltar la del driver del estado). */
+  signal?: SignalKey
+}
 export type AbsentItem = { key: string; label: string }
 
 export type DayState = {
@@ -37,6 +66,11 @@ export type DayState = {
   title: string
   /** Una frase de explicación (máx 2 líneas). */
   explanation: string
+  /** La señal que CAUSÓ el estado (la que se resalta al explicar el porqué), o
+   *  null cuando el estado no nace de una sola señal (constancia = amplitud,
+   *  equilibrio = nada dominó, presencia = sólo registro). El resaltado debe
+   *  seguir ESTO, no "la de más estrellas" (si no, contradice la razón). */
+  driver: SignalKey | null
   /** Las fuerzas de las señales, orden descendente — el desglose transparente. */
   strengths: SignalStrength[]
   /** ✓ acciones registradas que respaldan el estado. */
@@ -62,6 +96,37 @@ const BREADTH_MIN = 4
 
 const clampStars = (n: number): number => Math.max(0, Math.min(5, Math.round(n)))
 const sleepHours = (min: number): number => Math.round((min / 60) * 10) / 10
+// Una escala 1-5 → palabra (energía, motivación, calma). Clara, no poética.
+const qualWord = (n: number): string => (n >= 4 ? 'alta' : n === 3 ? 'media' : 'baja')
+const energyWord = qualWord
+const moodWord = (m: string): string =>
+  m === 'good' ? 'bien' : m === 'neutral' ? 'neutral' : 'en lucha'
+
+/** Resumen humano del check-in de bienestar: el label dice CÓMO se sintió (lo más
+ *  legible), el detalle resume lo demás que registró (hasta 2 métricas). Hace que
+ *  "registraste cómo te sentiste" muestre el dato real, no un verbo vacío. */
+function wellbeingEvidence(s: DailySignals): { label: string; detail?: string } {
+  const extras: string[] = []
+  if (s.energy != null) extras.push(`energía ${qualWord(s.energy)}`)
+  if (s.stress != null) extras.push(`calma ${qualWord(6 - s.stress)}`)
+  else if (s.motivation != null) extras.push(`motivación ${qualWord(s.motivation)}`)
+  const joined = extras.slice(0, 2).join(' · ')
+  const detail = joined ? joined.charAt(0).toUpperCase() + joined.slice(1) : undefined
+  return s.mood != null
+    ? { label: `Te sentiste ${moodWord(s.mood)}`, detail }
+    : { label: 'Registraste cómo te sentiste', detail }
+}
+
+/** Piso de cordura del déficit (manifiesto · línea roja): NUNCA celebrar como
+ *  evidencia positiva una ingesta muy por debajo de la meta — eso premiaría la
+ *  restricción extrema. Sólo cuenta como "déficit del día" si está EN déficit
+ *  pero por encima del 60% de la meta. Debajo, no es logro: no se muestra. */
+const DEFICIT_FLOOR_RATIO = 0.6
+function healthyDeficit(s: DailySignals, ctx: DayStateCtx): boolean {
+  if (!ctx.calorieTarget || ctx.calorieTarget <= 0) return false
+  if (s.calories == null || s.calories <= 0) return false
+  return s.calories <= ctx.calorieTarget && s.calories >= ctx.calorieTarget * DEFICIT_FLOOR_RATIO
+}
 
 /* ── Fuerzas (★ 0-5) por señal — sólo de lo registrado ───────────────── */
 
@@ -96,10 +161,8 @@ function nutricionStars(s: DailySignals, ctx: DayStateCtx): number {
       stars += 1
     }
   }
-  // Déficit logrado: calorías registradas y por debajo (o en) la meta.
-  if (ctx.calorieTarget && ctx.calorieTarget > 0 && s.calories != null && s.calories > 0) {
-    if (s.calories <= ctx.calorieTarget) stars += 1
-  }
+  // Déficit SANO (no restricción extrema, ver healthyDeficit).
+  if (healthyDeficit(s, ctx)) stars += 1
   return clampStars(stars)
 }
 
@@ -122,6 +185,37 @@ const SIGNAL_LABEL: Record<SignalKey, string> = {
   nutricion: 'Nutrición',
   bienestar: 'Bienestar',
   agua: 'Agua',
+}
+
+/** El dato real registrado de cada señal (factual, no puntaje). undefined si no
+ *  hay registro. */
+function signalDetail(key: SignalKey, s: DailySignals): string | undefined {
+  switch (key) {
+    case 'movimiento':
+      if (s.trained === true) return 'Entrenaste'
+      if (s.rested === true) return 'Descanso activo'
+      return undefined
+    case 'recuperacion':
+      if (s.sleep_minutes != null) return `${sleepHours(s.sleep_minutes)} h`
+      if (s.rested === true) return 'Descansaste'
+      return undefined
+    case 'nutricion': {
+      const meals = s.meal_count ?? 0
+      if (meals > 0) return `${meals} ${meals === 1 ? 'comida' : 'comidas'}`
+      if (s.protein_g != null) return `${Math.round(s.protein_g)} g proteína`
+      return undefined
+    }
+    case 'bienestar':
+      // Cualitativo, no "x/5" (la spec prohíbe el puntaje desnudo en el modal).
+      if (s.energy != null) return `Energía ${energyWord(s.energy)}`
+      if (s.mood != null || s.motivation != null || s.stress != null) return 'Registrado'
+      return undefined
+    case 'agua': {
+      const g = s.water_glasses ?? 0
+      if (g > 0) return `${g} ${g === 1 ? 'vaso' : 'vasos'}`
+      return undefined
+    }
+  }
 }
 
 function signalPresent(key: SignalKey, s: DailySignals): boolean {
@@ -153,6 +247,7 @@ export function signalStrengths(s: DailySignals, ctx: DayStateCtx = {}): SignalS
     label: SIGNAL_LABEL[key],
     stars: stars[key],
     present: signalPresent(key, s),
+    detail: signalDetail(key, s),
   }))
 }
 
@@ -162,6 +257,19 @@ const STATE_FOR_SIGNAL: Partial<Record<SignalKey, DayStateKey>> = {
   movimiento: 'energia',
   recuperacion: 'recuperacion',
   nutricion: 'nutricion',
+}
+
+/** La señal que CAUSA cada estado (para resaltarla al explicar el porqué). Los
+ *  estados que NO nacen de una sola señal son null: constancia (la decide la
+ *  amplitud), equilibrio (nada dominó) y presencia (sólo el registro). */
+const STATE_DRIVER: Record<DayStateKey, SignalKey | null> = {
+  energia: 'movimiento',
+  recuperacion: 'recuperacion',
+  nutricion: 'nutricion',
+  exploracion: 'bienestar',
+  constancia: null,
+  equilibrio: null,
+  presencia: null,
 }
 
 /** Resuelve QUÉ estado predominó hoy (o null si no hubo registro). Puro. */
@@ -238,26 +346,72 @@ const STATE_COPY: Record<DayStateKey, { title: string; explanation: string }> = 
   },
 }
 
+// Misma observación en PASADO, para ver un día pasado desde Semana ("Ese día…"
+// en vez de "Hoy…"). Mismo significado, sin culpa.
+const STATE_COPY_PAST: Record<DayStateKey, { title: string; explanation: string }> = {
+  constancia: {
+    title: 'Ese día predominó la constancia.',
+    explanation: 'La mayoría de tus señales estuvieron presentes.',
+  },
+  energia: {
+    title: 'Ese día predominó la energía.',
+    explanation: 'Tu movimiento fue la señal más fuerte.',
+  },
+  recuperacion: {
+    title: 'Ese día predominó la recuperación.',
+    explanation: 'Tu descanso fue la señal más fuerte.',
+  },
+  nutricion: {
+    title: 'Ese día predominó la nutrición.',
+    explanation: 'Tu alimentación fue la señal más fuerte.',
+  },
+  equilibrio: {
+    title: 'Ese día predominó el equilibrio.',
+    explanation: 'Ninguna señal dominó: el día estuvo parejo.',
+  },
+  exploracion: {
+    title: 'Ese día predominó la exploración.',
+    explanation: 'Registraste señales más sutiles. Son las que construyen el patrón con el tiempo.',
+  },
+  presencia: {
+    title: 'Ese día predominó la presencia.',
+    explanation: 'El registro estuvo presente. Las otras señales, en pausa.',
+  },
+}
+
 /* ── Evidencia (✓) — sólo lo registrado ──────────────────────────────── */
 
-function buildEvidence(s: DailySignals, ctx: DayStateCtx): EvidenceItem[] {
+function buildEvidence(
+  s: DailySignals,
+  ctx: DayStateCtx,
+  driver: SignalKey | null,
+): EvidenceItem[] {
   const out: EvidenceItem[] = []
-  if (s.trained === true) out.push({ label: 'Entrenaste', detail: 'Registrado' })
-  else if (s.rested === true) out.push({ label: 'Descansaste', detail: 'Registrado' })
+  // Sin "detail" cuando no hay cifra: el verbo ES la evidencia (no relleno).
+  if (s.trained === true) out.push({ label: 'Entrenaste', tone: 'energia', signal: 'movimiento' })
+  else if (s.rested === true)
+    // Toggle binario: sin cifra que mostrar, la claridad va en label + qué alimenta.
+    out.push({
+      label: 'Día de descanso',
+      detail: 'Recuperación',
+      tone: 'sueno',
+      signal: 'recuperacion',
+    })
   if (s.sleep_minutes != null) {
-    out.push({ label: 'Dormiste', detail: `${sleepHours(s.sleep_minutes)} horas` })
+    out.push({
+      label: 'Dormiste',
+      detail: `${sleepHours(s.sleep_minutes)} horas`,
+      tone: 'sueno',
+      signal: 'recuperacion',
+    })
   }
-  if (
-    ctx.calorieTarget &&
-    ctx.calorieTarget > 0 &&
-    s.calories != null &&
-    s.calories > 0 &&
-    s.calories <= ctx.calorieTarget
-  ) {
-    // Espejo de evidencia, sin verbo de esfuerzo evaluativo (voice-and-copy).
+  // Sólo un déficit SANO es evidencia (nunca celebrar restricción extrema).
+  if (healthyDeficit(s, ctx)) {
     out.push({
       label: 'Tu déficit del día',
-      detail: `${Math.round(s.calories)} / ${Math.round(ctx.calorieTarget)} kcal`,
+      detail: `${Math.round(s.calories!)} / ${Math.round(ctx.calorieTarget!)} kcal`,
+      tone: 'alimento',
+      signal: 'nutricion',
     })
   }
   if (
@@ -270,29 +424,55 @@ function buildEvidence(s: DailySignals, ctx: DayStateCtx): EvidenceItem[] {
     out.push({
       label: 'Tu proteína estuvo en objetivo',
       detail: `${Math.round(s.protein_g)} / ${Math.round(ctx.proteinTarget)} g`,
+      tone: 'proteina',
+      signal: 'nutricion',
     })
   }
   if ((s.meal_count ?? 0) > 0) {
     const n = s.meal_count!
-    out.push({ label: 'Registraste tus comidas', detail: `${n} ${n === 1 ? 'comida' : 'comidas'}` })
+    out.push({
+      label: 'Registraste tus comidas',
+      detail: `${n} ${n === 1 ? 'comida' : 'comidas'}`,
+      tone: 'alimento',
+      signal: 'nutricion',
+    })
   }
   if (s.energy != null || s.mood != null || s.motivation != null || s.stress != null) {
-    const detail = s.energy != null ? `Energía ${s.energy}/5` : 'Anotado'
-    out.push({ label: 'Registraste cómo te sentiste', detail })
+    // El label dice cómo te sentiste; el detalle resume lo demás registrado.
+    const w = wellbeingEvidence(s)
+    out.push({ label: w.label, detail: w.detail, tone: 'mente', signal: 'bienestar' })
   }
   if ((s.water_glasses ?? 0) > 0) {
     const n = s.water_glasses!
-    out.push({ label: 'Tomaste agua', detail: `${n} ${n === 1 ? 'vaso' : 'vasos'}` })
+    out.push({
+      label: 'Tomaste agua',
+      detail: `${n} ${n === 1 ? 'vaso' : 'vasos'}`,
+      tone: 'agua',
+      signal: 'agua',
+    })
   }
   if (s.weight_kg != null) {
-    out.push({ label: 'Registraste tu peso', detail: `${s.weight_kg.toFixed(1)} kg` })
+    out.push({
+      label: 'Registraste tu peso',
+      detail: `${s.weight_kg.toFixed(1)} kg`,
+      tone: 'leche',
+    })
   }
-  if (s.on_period === true) out.push({ label: 'Registraste tu ciclo', detail: 'Día de ciclo' })
+  if (s.on_period === true) out.push({ label: 'Registraste tu ciclo', tone: 'ciclo' })
+  // La evidencia de la señal que DECIDIÓ el estado va primero (confirma el titular
+  // de arriba); el resto conserva su orden. Sort estable.
+  if (driver != null) {
+    return [...out].sort((a, b) => Number(b.signal === driver) - Number(a.signal === driver))
+  }
   return out
 }
 
 /* ── Señales ausentes (○) — ausencia, no error ───────────────────────── */
 
+// SOLO señales DIARIAS: cosas que tiene sentido registrar cada día. El CICLO se
+// excluye a propósito — no es diario (menstrúas ~5 días por ciclo), así que pedir
+// "registra tu ciclo" todos los días sería presión y, las más, factualmente falso.
+// El ciclo se registra como evento en su propio flujo, no como ausencia diaria.
 const ABSENT_CANDIDATES: { key: string; label: string; present: (s: DailySignals) => boolean }[] = [
   { key: 'sueno', label: 'Sueño', present: (s) => s.sleep_minutes != null },
   { key: 'comida', label: 'Comida', present: (s) => (s.meal_count ?? 0) > 0 },
@@ -302,7 +482,6 @@ const ABSENT_CANDIDATES: { key: string; label: string; present: (s: DailySignals
     label: 'Estado de ánimo',
     present: (s) => s.mood != null || s.energy != null || s.motivation != null,
   },
-  { key: 'ciclo', label: 'Ciclo', present: (s) => s.on_period === true },
 ]
 
 function buildAbsent(s: DailySignals): AbsentItem[] {
@@ -324,18 +503,24 @@ function closingFor(day: string | null | undefined): string {
 
 /* ── Ensamblado ──────────────────────────────────────────────────────── */
 
-/** El estado completo del día (o null si no hubo ningún registro). Puro. */
-export function buildDayState(s: DailySignals | null, ctx: DayStateCtx = {}): DayState | null {
+/** El estado completo del día (o null si no hubo ningún registro). Puro.
+ *  `opts.past` usa la observación en pasado ("Ese día…") al ver un día pasado. */
+export function buildDayState(
+  s: DailySignals | null,
+  ctx: DayStateCtx = {},
+  opts: { past?: boolean } = {},
+): DayState | null {
   if (s == null) return null
   const key = selectDayStateKey(s, ctx)
   if (key == null) return null
-  const copy = STATE_COPY[key]
+  const copy = opts.past ? STATE_COPY_PAST[key] : STATE_COPY[key]
   return {
     key,
     title: copy.title,
     explanation: copy.explanation,
+    driver: STATE_DRIVER[key],
     strengths: signalStrengths(s, ctx).sort((a, b) => b.stars - a.stars),
-    evidence: buildEvidence(s, ctx),
+    evidence: buildEvidence(s, ctx, STATE_DRIVER[key]),
     absent: buildAbsent(s),
     closing: closingFor(s.day),
   }

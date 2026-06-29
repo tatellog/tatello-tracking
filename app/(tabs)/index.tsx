@@ -40,11 +40,9 @@ import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe
 import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
-  type CalendarDay,
   CoachLine,
   DayCheckIn,
   type DayState,
-  type DayStatus,
   LunarConstellation,
   SectionHeader,
   SkyBackground,
@@ -53,8 +51,6 @@ import {
   TabHeader,
   TodayMealLog,
   TodayUniverseRewards,
-  useCalendarDays,
-  WeekStrip,
 } from '@/features/tabs/components'
 import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
 import { namedStarProgress } from '@/features/tabs/components/constellation/data/derive-progress'
@@ -90,24 +86,6 @@ function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
 function makeEnter(cadence: Cadence) {
   if (cadence === 'reduced') return (_d: number) => FadeIn.duration(220)
   return (d: number) => FadeInDown.duration(380).delay(d).springify().damping(18)
-}
-
-// Día de la semana local (0=Dom) sin drift de medianoche UTC.
-function weekdayIdxLocal(iso: string): number {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  return new Date(y, m - 1, d).getDay()
-}
-
-// Los 7 días (Dom→Sáb) de la semana que CONTIENE `iso`. Mismo convenio que la
-// constelación del mes (domingo primero).
-function weekDatesOf(iso: string): string[] {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  const dow = new Date(y, m - 1, d).getDay() // 0=Dom
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return Array.from({ length: 7 }, (_, i) => {
-    const dt = new Date(y, m - 1, d - dow + i)
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
-  })
 }
 
 export default function TodayScreen() {
@@ -219,10 +197,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // (CelebrationOverlay) para cubrir también la barra de tabs; Hoy solo lo
   // dispara por el bus (emitCelebrate) al marcar "Entrené".
 
-  // Overrides locales optimistas por fecha (status que se aplica al instante
-  // mientras la mutación viaja; convergen al refetch, se limpian en onError).
-  const [dayOverrides, setDayOverrides] = useState<Record<string, DayStatus>>({})
-
   // Pause the constellation's animation loops while the page is actively
   // scrolling so the UI thread isn't split between scroll frames and the
   // SVG/Skia repaint — kills the scroll jank. A debounced idle timer flips it
@@ -252,12 +226,24 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // El offset de la sección se captura por onLayout en su wrapper.
   const scrollRef = useRef<ScrollView>(null)
   const universeY = useRef(0)
-  // Captured by onLayout on the month section so the streak chip can scroll
-  // to its own history (the calendar) when tapped.
-  const monthY = useRef(0)
-  const scrollToY = useCallback((y: number) => {
-    scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true })
-  }, [])
+  // Offsets de las secciones a las que llega un deep-link desde Órbita
+  // ("Todavía no vimos → registrar"): el slider de stats y las comidas del día.
+  const slidesY = useRef(0)
+  const mealsY = useRef(0)
+
+  // Deep-link desde Órbita: además de que StatSlider enfoque el slide horizontal,
+  // hay que BAJAR la página a esa sección (si no, aterrizas arriba y no la ves).
+  // 'meals' apunta a "Comidas de hoy"; el resto, al slider. Se limpia el param al
+  // terminar para que volver a tocar el mismo chip vuelva a enfocar.
+  useEffect(() => {
+    if (!slideParam) return
+    const targetY = slideParam === 'meals' ? mealsY : slidesY
+    const id = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, targetY.current - 80), animated: true })
+      router.setParams({ slide: undefined })
+    }, 260)
+    return () => clearTimeout(id)
+  }, [slideParam, router])
   useEffect(() => {
     return subscribeUniverseDetailRequest(() => {
       scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
@@ -324,55 +310,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return m
   }, [todayIsoLocal, monthWorkoutDates, ctx.today_workout_completed])
 
-  // El calendario "editor oficial": fusiona workouts + daily_signals (descanso
-  // + qué registró) + revelations (eventos). Reusa stripWorkouts internamente.
-  const { days: calendarDays } = useCalendarDays({
-    // 37 días: cubre la semana COMPLETA de un día visto de hasta 30d atrás
-    // (30 + 6 hacia atrás del domingo de esa semana).
-    span: 37,
-    today: todayIsoLocal,
-    todayWorkoutCompleted: ctx.today_workout_completed,
-    overrides: dayOverrides,
-  })
-
-  // El strip de Hoy se acota a UNA SEMANA: la del día VISTO (selectedDate). Por
-  // defecto la semana corriente; al llegar desde Progreso con el 2 de junio,
-  // muestra la semana del 2 de junio. (Explorar el mes entero es rol de
-  // Progreso — el strip de Hoy navega dentro de la semana, no es historial.)
-  const weekDays: CalendarDay[] = useMemo(() => {
-    const byDate = new Map(calendarDays.map((d) => [d.date, d]))
-    return weekDatesOf(selectedDate).map(
-      (date): CalendarDay =>
-        byDate.get(date) ?? {
-          date,
-          dayNum: Number(date.slice(8, 10)),
-          weekdayIdx: weekdayIdxLocal(date),
-          isToday: date === todayIsoLocal,
-          isFuture: date > todayIsoLocal,
-          status: 'empty',
-          registered: {
-            comida: false,
-            agua: false,
-            sueno: false,
-            energia: false,
-            peso: false,
-            ciclo: false,
-          },
-          values: {
-            mealCount: null,
-            proteinG: null,
-            calories: null,
-            waterGlasses: null,
-            sleepMinutes: null,
-            energy: null,
-            weightKg: null,
-            onPeriod: false,
-          },
-          events: [],
-        },
-    )
-  }, [calendarDays, selectedDate, todayIsoLocal])
-
   const trainedThisMonth = month.trainedThisMonth
   const MONTHS_ES = [
     'Enero',
@@ -388,9 +325,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     'Noviembre',
     'Diciembre',
   ]
-  // Etiqueta del strip de semana: el mes del día VISTO (la semana corriente por
-  // defecto; la del día visto al llegar desde Progreso).
-  const weekLabel = MONTHS_ES[Number(selectedDate.slice(5, 7)) - 1] ?? 'Tu semana'
   // "2 de junio" — para el banner de modo ver día.
   const viewingLabel = `${Number(selectedDate.slice(8, 10))} de ${MONTHS_ES[Number(selectedDate.slice(5, 7)) - 1] ?? ''}`
 
@@ -470,56 +404,21 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     }
   }
 
-  // Acciones del calendario sobre un día seleccionado. NUNCA celebran
-  // (sin fireworks/shockwave/reward) — solo haptic suave + override optimista
-  // para que el strip cambie al instante mientras la mutación viaja.
-  const setOverride = useCallback((date: string, status: DayStatus) => {
-    setDayOverrides((prev) => ({ ...prev, [date]: status }))
-  }, [])
-  const clearOverride = useCallback((date: string) => {
-    setDayOverrides((prev) => {
-      if (!(date in prev)) return prev
-      const next = { ...prev }
-      delete next[date]
-      return next
-    })
-  }, [])
-
-  // Tocar un día en el strip → Hoy se llena con ESE día y sube al inicio, donde
-  // viven el universo/macros/comidas del día visto (+ el banner).
-  const handleSelectViewedDay = useCallback(
-    (date: string) => {
-      setSelectedDate(date)
-      // Beat de ~140ms antes del salto: tu ultima imagen abajo es "elegi este dia"
-      // (el ring resaltado + la pill), y la primera arriba es "y aqui esta completo".
-      setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 140)
-      const d = calendarDays.find((c) => c.date === date)
-      track('calendar_day_selected', {
-        date,
-        status: d?.status ?? 'empty',
-        has_event: (d?.events.length ?? 0) > 0,
-      })
-    },
-    [calendarDays],
-  )
-
+  // Backfill de un día pasado (desde el toggle del hero al ver ese día). NUNCA
+  // celebra (sin fireworks/reward) — solo persiste + haptic suave.
   const isToday = useCallback((date: string) => date === todayIsoLocal, [todayIsoLocal])
 
   const markTrained = useCallback(
     (date: string) => {
-      setOverride(date, 'trained')
       // Si ese día estaba marcado como descanso, lo retiramos (mutuamente
       // excluyentes: la constelación se llena solo con entreno).
-      setRestForDate.mutate({ date, rested: false }, { onError: () => clearOverride(date) })
-      if (isToday(date)) {
-        toggleToday.mutate(true, { onError: () => clearOverride(date) })
-      } else {
-        toggleForDate.mutate({ date, complete: true }, { onError: () => clearOverride(date) })
-      }
+      setRestForDate.mutate({ date, rested: false })
+      if (isToday(date)) toggleToday.mutate(true)
+      else toggleForDate.mutate({ date, complete: true })
       playCommitHaptic('backfill')
       track('calendar_day_marked', { date, status: 'trained', source: 'calendar' })
     },
-    [setOverride, clearOverride, setRestForDate, isToday, toggleToday, toggleForDate],
+    [setRestForDate, isToday, toggleToday, toggleForDate],
   )
 
   // (No hay clearTrained: la constelación no retrocede — una estrella de
@@ -527,42 +426,28 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const markRested = useCallback(
     (date: string) => {
-      setOverride(date, 'rested')
       // Descanso no llena estrella; si estaba entrenado lo quitamos.
       if (isToday(date)) {
         if (ctx.today_workout_completed) toggleToday.mutate(false)
-        setRest.mutate(true, { onError: () => clearOverride(date) })
+        setRest.mutate(true)
       } else {
         toggleForDate.mutate({ date, complete: false })
-        setRestForDate.mutate({ date, rested: true }, { onError: () => clearOverride(date) })
+        setRestForDate.mutate({ date, rested: true })
       }
       playCommitHaptic('rested')
       track('calendar_day_marked', { date, status: 'rested', source: 'calendar' })
     },
-    [
-      setOverride,
-      clearOverride,
-      isToday,
-      ctx.today_workout_completed,
-      toggleToday,
-      toggleForDate,
-      setRest,
-      setRestForDate,
-    ],
+    [isToday, ctx.today_workout_completed, toggleToday, toggleForDate, setRest, setRestForDate],
   )
 
   const clearRested = useCallback(
     (date: string) => {
-      setOverride(date, 'empty')
-      if (isToday(date)) {
-        setRest.mutate(false, { onError: () => clearOverride(date) })
-      } else {
-        setRestForDate.mutate({ date, rested: false }, { onError: () => clearOverride(date) })
-      }
+      if (isToday(date)) setRest.mutate(false)
+      else setRestForDate.mutate({ date, rested: false })
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
       track('calendar_day_cleared', { date, was: 'rested' })
     },
-    [setOverride, clearOverride, isToday, setRest, setRestForDate],
+    [isToday, setRest, setRestForDate],
   )
 
   const enter = makeEnter(cadence)
@@ -704,9 +589,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               })()}
             </Animated.View>
 
-            {/* Racha — navegación al calendario, secundaria. Bajo el hero. */}
+            {/* Racha — lectura secundaria bajo el hero. */}
             <Animated.View entering={enter(360)}>
-              <StreakLine streak={ctx.streak_days} onPress={() => scrollToY(monthY.current)} />
+              <StreakLine streak={ctx.streak_days} />
             </Animated.View>
 
             {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
@@ -730,7 +615,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 Lo que la usuaria consulta cuando ya hizo lo principal:
                 macros, comidas, y el calendario (historia/editor) al final. */}
 
-            <Animated.View entering={enter(520)}>
+            <Animated.View
+              entering={enter(520)}
+              onLayout={(e) => {
+                slidesY.current = e.nativeEvent.layout.y
+              }}
+            >
               <StatSlider
                 ctx={vctx}
                 targetSlide={slideParam ?? null}
@@ -738,7 +628,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               />
             </Animated.View>
 
-            <Animated.View entering={enter(560)}>
+            <Animated.View
+              entering={enter(560)}
+              onLayout={(e) => {
+                mealsY.current = e.nativeEvent.layout.y
+              }}
+            >
               <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas de hoy'} />
             </Animated.View>
             <Animated.View entering={enter(600)}>
@@ -746,24 +641,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 date={vctx.date}
                 onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
                 onAddMeal={() => router.push({ pathname: '/capture-meal' })}
-              />
-            </Animated.View>
-
-            {/* Calendario — ahora SELECTOR del día visto: tocar un día llena
-                TODO Hoy (universo, macros, comidas) con ese día y sube al inicio
-                + el banner. El detalle ya no vive en un panel aparte. */}
-            <Animated.View
-              entering={enter(680)}
-              onLayout={(e) => {
-                monthY.current = e.nativeEvent.layout.y
-              }}
-            >
-              <SectionHeader label={weekLabel} />
-              <Text style={styles.weekHint}>Tu semana · toca un día para verlo completo.</Text>
-              <WeekStrip
-                days={weekDays}
-                selectedDate={selectedDate}
-                onSelect={handleSelectViewedDay}
               />
             </Animated.View>
           </ScrollView>
@@ -942,13 +819,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 36,
-  },
-  weekHint: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-    marginTop: -4,
-    marginBottom: 4,
   },
   // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
   // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,

@@ -5,7 +5,7 @@ import { todayInTimezone } from '@/lib/time'
 
 import { getMealsInRange } from '@/features/macros/api'
 
-import { getTodaySignals, getWeekSignals, hasAnySignals } from './api'
+import { getDaySignals, getTodaySignals, getWeekSignals, hasAnySignals } from './api'
 import { isoTwoWeekRange } from './week-orbit-logic'
 
 /*
@@ -18,6 +18,21 @@ export function useTodaySignals() {
     queryKey: queryKeys.orbit.today(),
     queryFn: getTodaySignals,
     staleTime: 60_000,
+  })
+}
+
+/*
+ * Las señales de UN día (para ver un día pasado en Órbita Día desde la tira de
+ * Semana). `day` ISO 'YYYY-MM-DD'. Cache por día; un día pasado es estable, así
+ * que staleTime alto. El día de hoy igual lo sirve useTodaySignals con su
+ * propia key (no colisionan).
+ */
+export function useDaySignals(day: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.orbit.day(day),
+    queryFn: () => getDaySignals(day),
+    staleTime: 5 * 60_000,
+    enabled,
   })
 }
 

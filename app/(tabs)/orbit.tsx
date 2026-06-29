@@ -47,6 +47,9 @@ function OrbitBody() {
     }, []),
   )
   const [segment, setSegment] = useState<OrbitSegment>('dia')
+  // Día visto en Órbita Día: null = hoy. Lo setea la tira de 7 días de Semana;
+  // cambiar de segmento a mano (OrbitSegments) lo resetea a hoy.
+  const [viewedDay, setViewedDay] = useState<string | null>(null)
 
   useFocusEffect(
     useCallback(() => {
@@ -124,7 +127,13 @@ function OrbitBody() {
             </Animated.View>
 
             <Animated.View entering={FadeIn.duration(320).delay(80)}>
-              <OrbitSegments value={segment} onChange={setSegment} />
+              <OrbitSegments
+                value={segment}
+                onChange={(seg) => {
+                  setViewedDay(null) // navegar a mano vuelve a hoy
+                  setSegment(seg)
+                }}
+              />
             </Animated.View>
 
             {/* Only the active segment is mounted — so only ONE constellation's
@@ -135,9 +144,20 @@ function OrbitBody() {
               mount is the cheaper baseline.) The `key` replays the fade-in.
               Semana hands the segment switch back for its "Abrir Día" CTA. */}
             {segment === 'dia' ? (
-              <DayPresent key="dia" />
+              <DayPresent
+                key="dia"
+                viewedDay={viewedDay}
+                onReturnToToday={() => setViewedDay(null)}
+              />
             ) : segment === 'semana' ? (
-              <WeekSegment key="semana" onOpenDia={() => setSegment('dia')} />
+              <WeekSegment
+                key="semana"
+                onOpenMes={() => setSegment('mes')}
+                onPickDay={(date) => {
+                  setViewedDay(date)
+                  setSegment('dia')
+                }}
+              />
             ) : (
               <MonthSegment key="mes" />
             )}

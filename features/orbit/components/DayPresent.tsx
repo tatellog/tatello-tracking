@@ -1,308 +1,297 @@
+import { BlurView } from 'expo-blur'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
+import Svg, { Circle, Path } from 'react-native-svg'
 
-import FoodVect from '@/assets/icons/food-vect.svg'
-import NorthStar from '@/assets/icons/north-star.svg'
-import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
+import { usePressFeedback } from '@/components/ui/interaction'
 import { useMacroTargets } from '@/features/macros/hooks'
+import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-import { useTodaySignals } from '../hooks'
-import { deriveDimensions } from '../logic'
-import { HeroEmblem } from './HeroEmblem'
-import {
-  brightestToday,
-  formatLongDate,
-  presentChips,
-  tomorrowFocus,
-  weakestToday,
-  type SignalChip,
-} from '../present-logic'
+import { useScreenActive } from '../useScreenActive'
+import { useDaySignals, useTodaySignals } from '../hooks'
+import { buildDayState, type DayState, type DayStateKey, type EvidenceTone } from '../day-state'
+import { formatLongDate } from '../present-logic'
+import { StateHeroSky } from './StateHeroSky'
 
-// Arte dorado con destellos para cuerpo/sueño/energía/proteína — raster, así
-// que van por <Image> (no SvgImage: evita el re-rasterizado que salta al hacer
-// scroll en Android). Van en oro; el color de la dimensión vive en el aro.
-const MOVEMENT_PNG = require('@/assets/icons/movement.png')
-const SUENO_PNG = require('@/assets/icons/sueno.png')
-const ENERGIA_PNG = require('@/assets/icons/energia.png')
-const PROTEIN_PNG = require('@/assets/icons/protein.png')
-const CICLO_PNG = require('@/assets/icons/ciclo.png')
-const MENTE_PNG = require('@/assets/icons/mente.png')
-const AGUA_PNG = require('@/assets/icons/agua.png')
+const STAGE = 300
 
 /*
- * Órbita · Día — "Tu órbita de hoy".
+ * Órbita · Día — "¿Quién fuiste hoy?" (Stelar v1, sin IA).
  *
- * Un centro de situación, NO una segunda Hoy. Responde "¿cómo va mi día?" en
- * 5 segundos con cuatro piezas derivadas de las señales de HOY (present-
- * logic.ts): lo que más brilló (héroe con emblema brillante), lo que también
- * estuvo presente (chips con su dato), lo que menos apareció y un enfoque
- * suave para mañana. Sin galaxia, sin órbitas, sin constelación, sin IA.
- *
- * El color de cada señal vive en el ANILLO/halo del emblema (patrón del
- * orbital), no en el glyph — los glyphs son plates de oro cálido; el aura
- * tintada es la que da la identidad cromática de la dimensión.
+ * No responde "¿qué comiste?" sino qué PREDOMINÓ en tu evidencia hoy: el día
+ * resuelve a uno de 7 estados (ver day-state.ts + docs/orbita-dia-redesign-spec).
+ * Un espejo, no un coach. La pantalla es un diario elegante: el héroe es el astro
+ * GRANDE del estado sobre su cielo. Tocarlo abre un modal "por qué" con los datos
+ * reales de las señales que decidieron el día (sistema de modales de Órbita Mes).
+ * Debajo, LA EVIDENCIA, las señales ausentes (tappables → registrar) y un cierre
+ * que conecta con Órbita Semana. Mucho aire, nada de dashboard.
  */
 
-// Acentos por señal. Las seis dimensiones salen de colors.dimension; proteína
-// y agua no son dimensiones, así que llevan su propio azul de señal.
-const SIGNAL_COLOR: Record<string, string> = {
-  cuerpo: colors.dimension.cuerpo,
-  alimento: colors.dimension.alimento,
-  comida: colors.dimension.alimento,
-  energia: colors.dimension.energia,
+// El arte de cada estado (PNG) y su color (del spec).
+const STATE_ART: Record<DayStateKey, number> = {
+  constancia: require('@/assets/icons/orbit-day/constancia.png'),
+  energia: require('@/assets/icons/orbit-day/energia.png'),
+  recuperacion: require('@/assets/icons/orbit-day/recuperacion.png'),
+  nutricion: require('@/assets/icons/orbit-day/nutricion.png'),
+  equilibrio: require('@/assets/icons/orbit-day/equilibrio.png'),
+  exploracion: require('@/assets/icons/orbit-day/exploracion.png'),
+  presencia: require('@/assets/icons/orbit-day/presencia.png'),
+}
+
+const STATE_COLOR: Record<DayStateKey, string> = {
+  constancia: colors.magentaHot, // rosa
+  energia: '#FF9E57', // naranja
+  recuperacion: colors.dimension.sueno, // azul
+  nutricion: colors.dimension.alimento, // verde
+  equilibrio: colors.leche, // blanco
+  exploracion: colors.dimension.mente, // morado
+  presencia: colors.oroSoft, // oro suave (neutral cálido)
+}
+
+// A qué slide de Hoy lleva cada señal ausente (cierra el loop "no lo vimos →
+// regístralo"). Agua no tiene slide propio → cae a Hoy (quick-log ✦).
+const ABSENT_SLIDE: Record<string, string | null> = {
+  sueno: 'sleep',
+  animo: 'wellbeing',
+  ciclo: 'cycle',
+  comida: 'meals', // la sección "Comidas de hoy" (no el slide de macros)
+  agua: null,
+}
+
+// Color de cada señal ausente (= su dimensión) para el latido del chip.
+const ABSENT_TONE: Record<string, string> = {
   sueno: colors.dimension.sueno,
-  mente: colors.dimension.mente,
+  comida: colors.dimension.alimento,
+  agua: colors.signal.agua,
+  animo: colors.dimension.mente,
   ciclo: colors.dimension.ciclo,
+}
+
+/** Punto que LATE (núcleo + halo que se expande y disuelve) — afordancia viva de
+ *  "esto se puede tocar". Gateado en pantalla activa + reduce-motion. */
+function PulsingDot({ color }: { color: string }) {
+  const reduced = useReducedMotion() ?? false
+  const active = useScreenActive()
+  const p = useSharedValue(0)
+  useEffect(() => {
+    if (active && !reduced) {
+      p.value = withRepeat(
+        withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        false,
+      )
+    } else {
+      cancelAnimation(p)
+      p.value = 0
+    }
+    return () => cancelAnimation(p)
+  }, [active, reduced, p])
+  const halo = useAnimatedStyle(() => ({
+    opacity: 0.45 * (1 - p.value),
+    transform: [{ scale: 1 + 1.8 * p.value }],
+  }))
+  return (
+    <View style={styles.dotWrap}>
+      <Animated.View style={[styles.dotHalo, { backgroundColor: color }, halo]} />
+      <View style={[styles.dotCore, { backgroundColor: color }]} />
+    </View>
+  )
+}
+
+/** El astro GRANDE del estado sobre su cielo Skia (aura que respira + glow). El
+ *  glifo PNG va ENCIMA del Canvas (patrón seguro, no dentro de Skia). */
+function StateGlyph({ stateKey, color }: { stateKey: DayStateKey; color: string }) {
+  return (
+    <View style={styles.glyphStage}>
+      <StateHeroSky color={color} />
+      <Image source={STATE_ART[stateKey]} style={styles.glyphImgHero} resizeMode="contain" />
+    </View>
+  )
+}
+
+/** Modal "¿Por qué este estado?" — los DATOS REALES de las señales que decidieron
+ *  el día, en barras (mismo sistema que el modal de Órbita Mes). El valor es el
+ *  dato registrado (no un puntaje). Se resalta el DRIVER del estado (la señal que
+ *  lo causó), no "la más fuerte" — si no, contradice la razón (constancia la
+ *  decide la amplitud, equilibrio que nada dominó). Cuando no hay driver, ninguna
+ *  barra manda y se lidera con el dato real (cuántas señales presentes). */
+function WhyModal({
+  day,
+  color,
+  visible,
+  onClose,
+}: {
+  day: DayState
+  color: string
+  visible: boolean
+  onClose: () => void
+}) {
+  const present = day.strengths.filter((s) => s.present)
+  const absent = day.strengths.filter((s) => !s.present)
+  const driver = day.driver
+  // La barra se normaliza al máximo de HOY (peso relativo entre tus señales), no
+  // a 5 — así no es "% del ideal/meta" (línea roja del manifiesto).
+  const maxStars = Math.max(1, ...present.map((s) => s.stars))
+  // Para los estados que nacen de la amplitud, el dato real que los decidió.
+  const breadthStat =
+    day.key === 'constancia' || day.key === 'equilibrio'
+      ? `${present.length} de ${day.strengths.length} señales presentes hoy`
+      : null
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <BlurView intensity={32} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={[StyleSheet.absoluteFill, styles.modalScrim]} pointerEvents="none" />
+        <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Text style={styles.modalEyebrow}>Por qué</Text>
+          <View style={styles.modalTitleRow}>
+            <View style={[styles.modalTitleDot, { backgroundColor: color }]} />
+            <Text style={[styles.modalTitle, { color }]}>{day.title}</Text>
+          </View>
+          <Text style={styles.modalLead}>{day.explanation}</Text>
+          {breadthStat ? <Text style={styles.modalStat}>{breadthStat}</Text> : null}
+
+          <View style={styles.bars}>
+            {present.map((s) => {
+              // Resalta sólo el driver. Si no hay driver, todas parejas (ni una manda).
+              const hi = driver != null && s.key === driver
+              return (
+                <View key={s.key} style={styles.barRow}>
+                  <Text style={styles.barLabel} numberOfLines={1}>
+                    {s.label}
+                  </Text>
+                  <View style={styles.barTrack}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          width: `${Math.round((s.stars / maxStars) * 100)}%`,
+                          backgroundColor: color,
+                          opacity: driver == null ? 0.5 : hi ? 1 : 0.32,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.barValue, hi && styles.barValueHi]} numberOfLines={1}>
+                    {s.detail ?? ''}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+
+          {absent.length > 0 ? (
+            <Text style={styles.modalZeroNote}>
+              {absent.map((a) => a.label).join(' · ')}: aún sin registro hoy.
+            </Text>
+          ) : null}
+
+          <Pressable onPress={onClose} hitSlop={10} style={styles.modalCloseBtn}>
+            <Text style={styles.modalClose}>Cerrar</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  )
+}
+
+// Cada evidencia se tinta al color de SU dimensión → un cielo multicolor, no una
+// lista monocroma. (La lógica entrega el `tone`; aquí se resuelve a hex.)
+const EVIDENCE_TONE: Record<EvidenceTone, string> = {
+  cuerpo: colors.dimension.cuerpo,
+  sueno: colors.dimension.sueno,
+  alimento: colors.dimension.alimento,
+  ciclo: colors.dimension.ciclo,
+  energia: colors.dimension.energia,
+  mente: colors.dimension.mente,
   proteina: colors.signal.proteina,
   agua: colors.signal.agua,
-  // El emblema de "enfoque" usa el magenta de la voz, no un tono de dimensión.
-  star: colors.magenta,
+  leche: colors.leche,
 }
 
-// El oro cálido de la familia de glyphs — para los contextos NO tintados
-// (chips + emblema secundario), donde el glyph va dorado dentro de su anillo.
-const GLYPH_GOLD = '#EEDD91'
-
-/* El slide de Hoy donde se registra cada señal (el `targetSlide` de StatSlider).
- * cuerpo (DayCheckIn) y agua (QuickLog ✦) viven en la raíz de Hoy → sin slide. */
-const SLIDE_FOR: Record<string, string> = {
-  alimento: 'macros',
-  comida: 'macros',
-  proteina: 'macros',
-  energia: 'wellbeing',
-  mente: 'wellbeing',
-  sueno: 'sleep',
-  ciclo: 'cycle',
+/** La evidencia como ESTRELLA que se encendió en tu cielo (no una palomita). Dos
+ *  tamaños: la del driver del estado brilla mayor + halo; las demás, menores. La
+ *  punta ya apunta arriba en el path (sin rotación → seguro en Android release). */
+function EvidenceStar({ color, major }: { color: string; major: boolean }) {
+  const s = major ? 18 : 13
+  return (
+    <Svg width={s} height={s} viewBox="0 0 18 18">
+      {major ? <Circle cx={9} cy={9} r={7} fill={color} opacity={0.16} /> : null}
+      <Path
+        d="M9 2.2 C9.5 6.7 11.3 8.5 15.8 9 C11.3 9.5 9.5 11.3 9 15.8 C8.5 11.3 6.7 9.5 2.2 9 C6.7 8.5 8.5 6.7 9 2.2 Z"
+        fill={color}
+        opacity={major ? 1 : 0.9}
+      />
+    </Svg>
+  )
 }
 
-/* Tocar una señal abre su significado (Órbita OBSERVA: explica qué es y por qué
- * cuenta, sin aconsejar) + un acceso para registrarla. Copy en voz Stelar. */
-const SIGNAL_MEANING: Record<string, { label: string; meaning: string }> = {
-  cuerpo: {
-    label: 'Movimiento',
-    meaning:
-      'Mover el cuerpo (entrenar o descansar activo) acompaña tu energía y tu recomposición.',
-  },
-  alimento: {
-    label: 'Comida',
-    meaning: 'Lo que comes es el centro de tu día. Aquí cuentan las comidas que registraste.',
-  },
-  comida: {
-    label: 'Comida',
-    meaning: 'Lo que comes es el centro de tu día. Aquí cuentan las comidas que registraste.',
-  },
-  proteina: {
-    label: 'Proteína',
-    meaning:
-      'La proteína acompaña tu masa muscular mientras bajas de peso. Es la métrica que más cuidamos.',
-  },
-  energia: {
-    label: 'Energía',
-    meaning:
-      'Cómo te sentiste de pila hoy. Tu energía es una de las señales que leemos para entender tus patrones.',
-  },
-  mente: {
-    label: 'Mente',
-    meaning: 'Tu ánimo, motivación y calma: una dimensión más de cómo viene tu día.',
-  },
-  sueno: {
-    label: 'Sueño',
-    meaning:
-      'El sueño acompaña casi todo lo demás: tu energía, tus antojos y tu ánimo del día siguiente.',
-  },
-  agua: {
-    label: 'Agua',
-    meaning: 'La hidratación acompaña tu día. Llevas el conteo de tus vasos aquí.',
-  },
-  ciclo: {
-    label: 'Ciclo',
-    meaning: 'Tu ciclo da contexto a la balanza y a tus patrones estos días.',
-  },
-}
-
-/* Renderiza el glyph de una señal DENTRO de su caja (`box` = tamaño del
- * contenedor). El arte PNG dorado trae padding interno, así que llena ~0.82 de
- * la caja para pesar; los glyphs SVG van más compactos (~0.46). Todos van en
- * oro: el color de la dimensión lo da el aro/halo del emblema o del chip. */
-function glyphFor(key: string, box: number, tint?: string) {
-  // Los PNG vienen recortados a su contenido + ~8% de margen uniforme, así que
-  // llenan la caja casi completa (contain, sin recortes). Los SVG van compactos.
-  const pngStyle = { width: box, height: box }
-  const png = (src: number) => <Image source={src} style={pngStyle} resizeMode="contain" />
-  // SVG (comida/estrella) a 0.7 — antes 0.5 los hacía verse a media escala
-  // junto a los PNG que llenan la caja.
-  const s = box * 0.7
-  const p = { width: s, height: s, preserveAspectRatio: 'xMidYMid meet' as const }
-  switch (key) {
-    case 'cuerpo': {
-      // En el héroe se tinta al magenta de la dimensión (tintColor aplana el oro
-      // a magenta plano, conservando alpha → runner magenta con sus destellos).
-      // Como chip va sin tint = oro.
-      // El runner es una figura diagonal de trazo fino: pesa menos que los
-      // demás glyphs al mismo tamaño, así que se agranda para leer parejo
-      // (mismo factor que la galaxia Semana, weekDimGlyph).
-      const m = box * 1.3
-      return (
-        <Image
-          source={MOVEMENT_PNG}
-          style={[{ width: m, height: m }, tint ? { tintColor: tint } : null]}
-          resizeMode="contain"
-        />
-      )
-    }
-    case 'sueno':
-      return png(SUENO_PNG)
-    case 'energia':
-      return png(ENERGIA_PNG)
-    case 'proteina':
-      return png(PROTEIN_PNG)
-    case 'ciclo':
-      return png(CICLO_PNG)
-    case 'mente':
-      return png(MENTE_PNG)
-    case 'agua':
-      return png(AGUA_PNG)
-    case 'alimento':
-    case 'comida':
-      return <FoodVect {...p} color={GLYPH_GOLD} />
-    case 'star':
-      return <NorthStar {...p} />
-    default:
-      return png(MOVEMENT_PNG)
-  }
-}
-
-/** Emblema brillante — el glyph dentro de un aura radial + anillo tintado de
- *  la señal. SVG estático (sin animación pesada): solo da el resplandor. */
-function Emblem({
-  glyphKey,
-  size,
-  intensity = 1,
+export function DayPresent({
+  viewedDay = null,
+  onReturnToToday,
 }: {
-  glyphKey: string
-  size: number
-  intensity?: number
-}) {
-  const color = SIGNAL_COLOR[glyphKey] ?? colors.oro
-  const id = `emblem-${glyphKey}`
-  const r = size / 2
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Defs>
-          <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={color} stopOpacity={0.5 * intensity} />
-            <Stop offset="55%" stopColor={color} stopOpacity={0.14 * intensity} />
-            <Stop offset="100%" stopColor={color} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width={size} height={size} fill={`url(#${id})`} />
-        <Circle
-          cx={r}
-          cy={r}
-          r={r - 6}
-          stroke={color}
-          strokeWidth={1.5}
-          fill="none"
-          opacity={0.85}
-        />
-        <Circle cx={r} cy={r} r={r - 2} stroke={color} strokeWidth={1} fill="none" opacity={0.25} />
-      </Svg>
-      {glyphFor(glyphKey, size)}
-    </View>
-  )
-}
+  /** Día a mostrar (ISO 'YYYY-MM-DD'); null = hoy. Lo setea la tira de Semana. */
+  viewedDay?: string | null
+  onReturnToToday?: () => void
+} = {}) {
+  const todayIso = todayInTimezone()
+  const isPast = viewedDay != null && viewedDay !== todayIso
+  const targetDay = viewedDay ?? todayIso
 
-/** Fila de chips de las señales que también estuvieron presentes — cada una
- *  con su glyph dorado dentro de un anillo tintado + su dato concreto. Tocar un
- *  chip lleva a registrar esa señal (`onPress`). */
-function ChipsRow({ chips, onPress }: { chips: SignalChip[]; onPress: (key: string) => void }) {
-  return (
-    <View style={styles.chipsRow}>
-      {chips.map((c) => {
-        const color = SIGNAL_COLOR[c.key] ?? colors.oro
-        return (
-          <Pressable
-            key={c.key}
-            style={styles.chip}
-            onPress={() => onPress(c.key)}
-            accessibilityRole="button"
-            accessibilityLabel={`${c.label}, ${c.value}`}
-            accessibilityHint={`Abre qué significa ${c.label.toLowerCase()}`}
-          >
-            <View
-              style={[
-                styles.chipCircle,
-                { borderColor: `${color}40`, backgroundColor: `${color}0F` },
-              ]}
-            >
-              {glyphFor(c.key, 56)}
-            </View>
-            <Text style={styles.chipLabel} numberOfLines={1}>
-              {c.label}
-            </Text>
-            <Text style={styles.chipValue} numberOfLines={1}>
-              {c.value}
-            </Text>
-          </Pressable>
-        )
-      })}
-    </View>
-  )
-}
-
-export function DayPresent() {
-  const router = useRouter()
-  const { data, isLoading, isError, refetch } = useTodaySignals()
+  // Hoy comparte caché con el resto de la app (useTodaySignals); un día pasado
+  // usa su propia query (solo activa cuando se está viendo un día pasado).
+  const todayQ = useTodaySignals()
+  const pastQ = useDaySignals(targetDay, isPast)
+  const { data, isLoading, isError, refetch } = isPast ? pastQ : todayQ
   const signals = data ?? null
-
-  // Tap → abre el significado de esa señal.
-  const [openKey, setOpenKey] = useState<string | null>(null)
-  // Desde el detalle: navega a donde se registra (forma de objeto — el string
-  // con `?slide=` no aterrizaba). Con slide hace scroll; sin slide → raíz de Hoy.
-  const register = (key: string) => {
-    setOpenKey(null)
-    const slide = SLIDE_FOR[key]
-    if (slide) router.navigate({ pathname: '/(tabs)', params: { slide } })
-    else router.navigate('/(tabs)')
-  }
-
   const targets = useMacroTargets()
-  const calorieTarget = targets.data?.calories ?? null
-  const proteinTarget = targets.data?.protein_g ?? null
-  const cycleEnabled = useCycleEnabled()
+  const { goalMl } = useWaterGoal()
 
-  const dimensions = deriveDimensions(signals, { calorieTarget, proteinTarget, cycleEnabled })
+  const ctx = {
+    proteinTarget: targets.data?.protein_g ?? null,
+    calorieTarget: targets.data?.calories ?? null,
+    waterGoalGlasses: Math.max(1, Math.round(goalMl / GLASS_ML)),
+  }
+  const day = buildDayState(signals, ctx, { past: isPast })
 
-  const hero = brightestToday(dimensions, signals, { calorieTarget, proteinTarget })
-  const weak = weakestToday(dimensions, signals, { excludeKey: hero?.key })
-  const chips = presentChips(signals, {
-    cycleEnabled,
-    excludeKeys: [hero?.key, weak?.key].filter((k) => k != null),
-  })
-  const focus = tomorrowFocus(weak)
-
+  const router = useRouter()
+  const press = usePressFeedback({ haptic: true })
+  const [whyOpen, setWhyOpen] = useState(false)
   const settled = !isLoading
-  // Vacío real = nada que mostrar. Ojo: el héroe ahora solo es una ACCIÓN, así
-  // que un día con solo auto-ratings (energía/mente) o ciclo no tiene héroe
-  // pero SÍ tiene chips → no es "vacío".
-  const nothingToday = settled && hero == null && weak == null && chips.length === 0
+
+  // Tocar una señal ausente → Hoy, con focus EXACTO en su slide (cierra el loop).
+  // Mismo patrón probado que DaySegment: querystring, no params-object.
+  const goRegister = (key: string) => {
+    const slide = ABSENT_SLIDE[key]
+    router.push(slide ? `/(tabs)?slide=${slide}` : '/(tabs)')
+  }
 
   const header = (
     <View style={styles.header}>
-      <Text style={styles.title}>Tu órbita de hoy</Text>
-      <Text style={styles.date}>{formatLongDate(todayInTimezone())}</Text>
+      <Text style={styles.title}>{isPast ? '¿Quién fuiste?' : '¿Quién fuiste hoy?'}</Text>
+      <Text style={styles.date}>{formatLongDate(targetDay)}</Text>
+      {isPast && onReturnToToday ? (
+        <Pressable onPress={onReturnToToday} hitSlop={8} style={styles.backToToday}>
+          <Text style={styles.backToTodayText}>‹ Volver a hoy</Text>
+        </Pressable>
+      ) : null}
     </View>
   )
 
-  // Primera carga sin datos en caché: un placeholder cálido en vez de la
-  // tarjeta vacía (antes, durante el load, hero=null + chips=[] dejaban la
-  // pantalla en blanco salvo el header).
+  // Primera carga sin caché — placeholder cálido, no pantalla en blanco.
   if (!settled && signals == null) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -334,150 +323,108 @@ export function DayPresent() {
     )
   }
 
-  if (nothingToday) {
+  // Sin ningún registro hoy → invitación (no hay estado todavía).
+  if (day == null) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         {header}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Tu día aún está en calma</Text>
+          <Text style={styles.cardTitle}>Tu día aún no habla</Text>
           <Text style={styles.cardBody}>
-            Registra una comida, tu sueño o un vaso de agua, y aquí aparece cómo va tu día.
+            En cuanto registres una señal (comida, sueño, movimiento), tu día empieza a mostrar
+            quién fuiste hoy.
           </Text>
         </View>
       </Animated.View>
     )
   }
 
+  const color = STATE_COLOR[day.key]
+
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
       {header}
 
-      {/* Lo que más brilló hoy — héroe con emblema brillante + chips de lo que
-          también estuvo presente, todo en una sola tarjeta. */}
-      {hero ? (
-        <View style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>Lo que más brilló hoy</Text>
-          <Pressable
-            style={styles.heroEmblem}
-            onPress={() => setOpenKey(hero.key)}
-            accessibilityRole="button"
-            accessibilityLabel={`${hero.label}, lo que más brilló hoy`}
-            accessibilityHint={`Abre qué significa ${hero.label.toLowerCase()}`}
-          >
-            <HeroEmblem color={SIGNAL_COLOR[hero.key] ?? colors.oro}>
-              {glyphFor(hero.key, 120, SIGNAL_COLOR[hero.key])}
-            </HeroEmblem>
-          </Pressable>
-          <Text style={styles.heroTitle}>{hero.label}</Text>
-          {/* Voz del coach (italic serif) — observa, no califica. */}
-          <Text style={styles.heroObservation}>{hero.observation}</Text>
-          {/* El dato anclado a tu meta — evidencia bajo la voz. */}
-          <Text style={styles.heroDetail}>{hero.detail}</Text>
-
-          {chips.length > 0 ? (
-            <View style={styles.chipsBlock}>
-              <Text style={styles.subEyebrow}>También estuvieron presentes</Text>
-              <ChipsRow chips={chips} onPress={setOpenKey} />
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* Sin acción registrada todavía (solo auto-ratings/ciclo): no hay héroe,
-          pero mostramos lo que SÍ quedó anotado para no esconder el registro. */}
-      {!hero && chips.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.eyebrow}>Lo que registraste hoy</Text>
-          <View style={styles.card}>
-            <ChipsRow chips={chips} onPress={setOpenKey} />
-          </View>
-        </View>
-      ) : null}
-
-      {/* Lo que menos apareció — la dimensión que pide más cuidado, con dato
-          + sugerencia suave. */}
-      {weak ? (
-        <View style={styles.section}>
-          <Text style={styles.eyebrow}>Lo que menos apareció</Text>
-          <Pressable
-            style={styles.card}
-            onPress={() => setOpenKey(weak.key)}
-            accessibilityRole="button"
-            accessibilityLabel={`${weak.label}, ${weak.value}`}
-            accessibilityHint={`Abre qué significa ${weak.label.toLowerCase()}`}
-          >
-            <View style={styles.weakRow}>
-              <Emblem glyphKey={weak.key} size={64} intensity={0.7} />
-              <View style={styles.weakText}>
-                <Text style={styles.weakTitle}>{weak.label}</Text>
-                <Text style={styles.weakValue}>{weak.value}</Text>
-                <Text style={styles.weakSuggestion}>{weak.suggestion}</Text>
-              </View>
-              {/* Cue de navegación — esta sección es la más accionable. */}
-              <Text style={styles.weakChevron}>›</Text>
-            </View>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {/* Tu enfoque para mañana — un foco cálido que mira adelante. */}
-      {focus ? (
-        <View style={styles.section}>
-          <Text style={styles.focusEyebrow}>Tu enfoque para mañana</Text>
-          <View style={styles.focusCard}>
-            <Text style={styles.focusLine}>{focus}</Text>
-            <View style={styles.focusEmblem}>
-              <Emblem glyphKey="star" size={64} intensity={0.9} />
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      <SignalDetailModal openKey={openKey} onClose={() => setOpenKey(null)} onRegister={register} />
-    </Animated.View>
-  )
-}
-
-/** Detalle al tocar una señal — qué significa (Órbita observa, explica) + un
- *  acceso para registrarla. Un Modal ligero; toca fuera para cerrar. */
-function SignalDetailModal({
-  openKey,
-  onClose,
-  onRegister,
-}: {
-  openKey: string | null
-  onClose: () => void
-  onRegister: (key: string) => void
-}) {
-  const info = openKey ? SIGNAL_MEANING[openKey] : null
-  return (
-    <Modal visible={openKey != null} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        {/* Stop propagation: tocar la tarjeta no cierra. */}
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          {info && openKey ? (
-            <>
-              <View style={styles.modalEmblem}>
-                <Emblem glyphKey={openKey} size={84} />
-              </View>
-              <Text style={styles.modalTitle}>{info.label}</Text>
-              <Text style={styles.modalMeaning}>{info.meaning}</Text>
-              <Pressable
-                style={styles.modalCta}
-                onPress={() => onRegister(openKey)}
-                accessibilityRole="button"
-                accessibilityLabel={`Registrar ${info.label.toLowerCase()}`}
-              >
-                <Text style={styles.modalCtaText}>Registrar {info.label.toLowerCase()} →</Text>
-              </Pressable>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.modalClose}>Cerrar</Text>
-              </Pressable>
-            </>
-          ) : null}
+      {/* Hero — el astro GRANDE del estado, sobre su cielo. Tocarlo abre la
+          constelación (el porqué) en un modal: el héroe queda limpio, el detalle
+          a un tap. Debajo, el estado en palabra. */}
+      <View style={styles.hero}>
+        <Pressable
+          onPress={() => setWhyOpen(true)}
+          onPressIn={press.onPressIn}
+          onPressOut={press.onPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={day.title}
+          accessibilityHint="Ver por qué predominó este estado"
+        >
+          <Animated.View style={press.animatedStyle}>
+            <StateGlyph stateKey={day.key} color={color} />
+          </Animated.View>
         </Pressable>
-      </Pressable>
-    </Modal>
+        <Text style={[styles.stateTitle, { color }]}>{day.title}</Text>
+        <Text style={styles.stateExplanation}>{day.explanation}</Text>
+        <Text style={[styles.whyHint, { color }]}>Toca el astro para ver por qué ›</Text>
+      </View>
+
+      <WhyModal day={day} color={color} visible={whyOpen} onClose={() => setWhyOpen(false)} />
+
+      {/* LA EVIDENCIA — el cielo que encendiste hoy: cada señal una estrella
+          tintada a SU dimensión, enhebradas por un hilo de luz. La del driver
+          brilla mayor (confirma el titular). Se encienden escalonadas al montar. */}
+      {day.evidence.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.eyebrow}>La evidencia</Text>
+          {day.evidence.map((e, i) => {
+            const major = day.driver != null && e.signal === day.driver
+            const last = i === day.evidence.length - 1
+            return (
+              <Animated.View
+                key={e.label}
+                entering={FadeIn.duration(420).delay(i * 70)}
+                style={styles.evidenceRow}
+              >
+                <View style={styles.evidenceChannel}>
+                  {!last ? <View style={styles.evidenceThread} /> : null}
+                  <EvidenceStar color={EVIDENCE_TONE[e.tone]} major={major} />
+                </View>
+                <View style={styles.evidenceText}>
+                  <Text style={[styles.evidenceLabel, major && styles.evidenceLabelMajor]}>
+                    {e.label}
+                  </Text>
+                  {e.detail ? <Text style={styles.evidenceDetail}>{e.detail}</Text> : null}
+                </View>
+              </Animated.View>
+            )
+          })}
+        </View>
+      ) : null}
+
+      {/* TODAVÍA NO VIMOS — ausencia, no error (secundaria a la evidencia). Cada
+          una es un CTA suave: tocar lleva a registrarla (sin culpa, sin "te faltó"). */}
+      {day.absent.length > 0 ? (
+        <View style={styles.sectionAbsent}>
+          <Text style={styles.eyebrowQuiet}>Todavía no vimos</Text>
+          <Text style={styles.absentHint}>Tócalas para sumarlas a tu día.</Text>
+          <View style={styles.absentRow}>
+            {day.absent.map((a) => (
+              <Pressable
+                key={a.key}
+                style={styles.absentItem}
+                onPress={() => goRegister(a.key)}
+                accessibilityRole="button"
+                accessibilityLabel={`Registrar ${a.label}`}
+              >
+                <PulsingDot color={ABSENT_TONE[a.key] ?? colors.magentaHot} />
+                <Text style={styles.absentLabel}>{a.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Cierre — conecta con Órbita Semana (voz del coach). */}
+      <Text style={styles.closing}>{day.closing}</Text>
+    </Animated.View>
   )
 }
 
@@ -486,146 +433,35 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   header: {
-    marginBottom: 18,
+    marginBottom: 22,
   },
   title: {
-    fontFamily: typography.uiBold,
-    fontSize: 22,
+    fontFamily: typography.displayHeavy,
+    fontSize: 30,
+    letterSpacing: -1.2,
+    lineHeight: 36,
     color: colors.leche,
   },
   date: {
-    marginTop: 4,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-
-  // ── Hero card ────────────────────────────────────────────────────
-  heroCard: {
-    borderRadius: 22,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    backgroundColor: colors.bgCard,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-  },
-  heroEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.magenta,
-  },
-  heroEmblem: {
-    alignItems: 'center',
-    // El PAD del glow del emblema ya da el aire — el margen extra era de más
-    // (emblema flotando en vacío + "lo que menos apareció" cortado).
     marginTop: 6,
-  },
-  // El LABEL es UI, no voz del coach → upright (el italic serif queda reservado
-  // para la observación, abajo). Antes era serif italic, lo que chocaba con la
-  // regla "italic = voz del coach".
-  heroTitle: {
-    marginTop: 8,
-    fontFamily: typography.uiBold,
-    fontSize: 24,
-    lineHeight: 30,
-    color: colors.leche,
-    textAlign: 'center',
-  },
-  // La voz del coach: observación cálida del día (italic serif).
-  heroObservation: {
-    marginTop: 8,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 20,
-    lineHeight: 27,
-    color: colors.leche,
-    textAlign: 'center',
-    paddingHorizontal: 12,
-  },
-  // El dato bajo la voz — anclado a tu meta (upright, evidencia).
-  heroDetail: {
-    marginTop: 8,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    lineHeight: 21,
     color: colors.niebla,
-    textAlign: 'center',
-    paddingHorizontal: 16,
   },
-
-  // ── "También estuvieron presentes" chips ─────────────────────────
-  chipsBlock: {
-    marginTop: 24,
-    paddingTop: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
+  backToToday: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
   },
-  subEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 16,
-  },
-  // Grid que envuelve: 3 por fila. Antes eran 6 en una sola fila con flex:1,
-  // y "Movimiento" no cabía (se partía "Movimient/o" y desalineaba los valores).
-  // A ~30% de ancho los labels caben en una línea; el número de chips es
-  // dinámico (4–6) y `center` deja prolijas las filas parciales.
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    rowGap: 18,
-    columnGap: 8,
-  },
-  chip: {
-    width: '30%',
-    alignItems: 'center',
-  },
-  chipCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // El label identifica la dimensión; el VALOR es el dato que importa para
-  // "¿cómo voy?", así que se sube de niebla→bone y +1px para que no sea un
-  // susurro junto al nombre.
-  chipLabel: {
-    marginTop: 9,
+  backToTodayText: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
-    color: colors.leche,
-    textAlign: 'center',
+    letterSpacing: 0.3,
+    color: colors.magenta,
   },
-  chipValue: {
-    marginTop: 3,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-    textAlign: 'center',
-  },
-
-  // ── Sections ─────────────────────────────────────────────────────
-  section: {
-    marginTop: 22,
-  },
-  eyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.bone,
-    marginBottom: 12,
-  },
+  // ── Estados de carga / error / vacío ─────────────────────────────
   card: {
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     backgroundColor: colors.bgCard,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.hairline,
@@ -633,8 +469,8 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 19,
-    lineHeight: 26,
+    fontSize: 20,
+    lineHeight: 27,
     color: colors.leche,
   },
   cardBody: {
@@ -648,131 +484,288 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
     color: colors.oro,
   },
-
-  // ── "Lo que menos apareció" ──────────────────────────────────────
-  weakRow: {
-    flexDirection: 'row',
+  // ── Hero (el estado como constelación) ───────────────────────────
+  hero: {
     alignItems: 'center',
-    gap: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    paddingHorizontal: 20,
   },
-  weakText: {
-    flex: 1,
-  },
-  weakTitle: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 22,
-    lineHeight: 27,
-    color: colors.leche,
-  },
-  weakValue: {
-    marginTop: 2,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-  },
-  weakSuggestion: {
-    marginTop: 8,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    lineHeight: 18,
-    color: colors.niebla,
-  },
-  weakChevron: {
-    fontFamily: typography.ui,
-    fontSize: 24,
-    color: colors.niebla,
-    marginLeft: 4,
-  },
-
-  // ── Detalle de señal (modal "qué significa") ─────────────────────
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  glyphStage: {
+    width: STAGE,
+    height: STAGE,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
   },
-  modalCard: {
-    width: '100%',
-    borderRadius: 22,
-    paddingVertical: 26,
-    paddingHorizontal: 22,
-    backgroundColor: colors.bgCard2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    alignItems: 'center',
+  // En el héroe el astro manda: grande y solo sobre el aura.
+  glyphImgHero: {
+    width: 196,
+    height: 196,
   },
-  modalEmblem: {
-    marginBottom: 6,
-  },
-  modalTitle: {
+  stateTitle: {
+    marginTop: 4,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 26,
-    lineHeight: 32,
-    color: colors.leche,
+    fontSize: 27,
+    lineHeight: 33,
     textAlign: 'center',
   },
-  modalMeaning: {
+  stateExplanation: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     lineHeight: 21,
-    color: colors.niebla,
+    color: colors.bone,
     textAlign: 'center',
+    paddingHorizontal: 8,
   },
-  modalCta: {
-    marginTop: 22,
-    paddingVertical: 12,
-    paddingHorizontal: 22,
-    borderRadius: 999,
-    backgroundColor: colors.magenta,
-  },
-  modalCtaText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.2,
-    color: colors.leche,
-  },
-  modalClose: {
+  whyHint: {
     marginTop: 14,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    color: colors.niebla,
+    letterSpacing: 0.3,
+    opacity: 0.75,
   },
-
-  // ── "Tu enfoque para mañana" ─────────────────────────────────────
-  focusEyebrow: {
+  // ── Modal "Por qué" (datos reales de las señales · sistema de Órbita Mes) ──
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalScrim: {
+    backgroundColor: 'rgba(10, 6, 8, 0.55)',
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 24,
+    paddingVertical: 26,
+    paddingHorizontal: 24,
+    backgroundColor: colors.bgCard2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairline,
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  modalEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.magenta,
-    marginBottom: 12,
+    color: colors.niebla,
   },
-  focusCard: {
+  modalTitleRow: {
+    marginTop: 8,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    borderRadius: 20,
-    padding: 18,
-    backgroundColor: colors.magentaTint,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.magentaTint2,
+    alignItems: 'flex-start',
+    gap: 9,
   },
-  focusLine: {
+  modalTitleDot: {
+    marginTop: 10,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  modalTitle: {
     flex: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  modalLead: {
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 20,
+    color: colors.bone,
+  },
+  // El dato concreto que decidió un estado de amplitud (constancia/equilibrio).
+  modalStat: {
+    marginTop: 12,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
     color: colors.leche,
   },
-  focusEmblem: {
-    width: 64,
+  bars: {
+    marginTop: 18,
+    gap: 10,
+  },
+  barRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  barLabel: {
+    width: 84,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  barTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(244, 236, 222, 0.06)',
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  barValue: {
+    width: 78,
+    textAlign: 'right',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  barValueHi: {
+    fontFamily: typography.uiBold,
+    color: colors.leche,
+  },
+  modalZeroNote: {
+    marginTop: 16,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    lineHeight: 19,
+    color: colors.niebla,
+  },
+  modalCloseBtn: {
+    marginTop: 20,
+    alignSelf: 'center',
+  },
+  modalClose: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.3,
+    color: colors.niebla,
+  },
+  // ── Secciones (evidencia / ausencias) ────────────────────────────
+  section: {
+    marginTop: 26,
+  },
+  eyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 14,
+  },
+  evidenceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 13,
+    marginBottom: 18,
+  },
+  // Canal fijo: la estrella se centra y el hilo cae recto entre estrellas (el
+  // hilo va absoluto desde debajo de esta estrella hasta el centro de la siguiente,
+  // cruzando el gap con bottom negativo — funciona con filas de altura variable).
+  evidenceChannel: {
+    width: 20,
+    paddingTop: 2,
+    alignItems: 'center',
+  },
+  evidenceThread: {
+    position: 'absolute',
+    top: 20,
+    bottom: -18,
+    width: 1,
+    backgroundColor: 'rgba(244, 236, 222, 0.13)',
+  },
+  evidenceText: {
+    flex: 1,
+  },
+  evidenceLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  // La evidencia del driver del estado pesa más (confirma el titular).
+  evidenceLabelMajor: {
+    fontFamily: typography.uiBold,
+  },
+  evidenceDetail: {
+    marginTop: 2,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // ── Todavía no vimos (secundaria) ────────────────────────────────
+  sectionAbsent: {
+    marginTop: 36,
+  },
+  // Eyebrow más callado que el de la evidencia: las ausencias no compiten.
+  eyebrowQuiet: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.bruma,
+    marginBottom: 12,
+  },
+  absentHint: {
+    marginTop: -8,
+    marginBottom: 14,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 15,
+    color: colors.bone,
+  },
+  absentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  absentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    minHeight: 44,
+    paddingVertical: 11,
+    paddingLeft: 13,
+    paddingRight: 16,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  absentLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.leche,
+  },
+  // Punto que late (núcleo + halo expansivo): afordancia de "tócame".
+  dotWrap: {
+    width: 14,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotHalo: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  dotCore: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  // ── Cierre ───────────────────────────────────────────────────────
+  closing: {
+    marginTop: 34,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 17,
+    lineHeight: 25,
+    color: colors.bone,
+    textAlign: 'center',
+    paddingHorizontal: 12,
   },
 })

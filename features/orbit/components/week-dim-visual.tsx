@@ -17,6 +17,7 @@ export const WEEK_DIM_COLOR: Record<WeekDimKey, string> = {
   proteina: '#FFC56B', // oro cálido — la métrica más cuidada
   agua: '#6FD3E2', // aqua
   sueno: '#7C8FFF', // índigo (sueño)
+  energia: '#FF8A5C', // coral cálido (energía)
 }
 
 // Mismos PNG que usa Órbita Día (raster → <Image>, no SvgImage, para no sufrir
@@ -25,6 +26,7 @@ const MOVEMENT_PNG = require('@/assets/icons/movement.png')
 const SUENO_PNG = require('@/assets/icons/sueno.png')
 const PROTEIN_PNG = require('@/assets/icons/protein.png')
 const AGUA_PNG = require('@/assets/icons/agua.png')
+const ENERGIA_PNG = require('@/assets/icons/energia.png')
 
 /** rgba a partir de un hex #RRGGBB + alpha. */
 export function hexA(hex: string, alpha: number): string {
@@ -50,6 +52,7 @@ const GLYPH_SCALE: Record<WeekDimKey, number> = {
   sueno: 1.3,
   proteina: 1.25,
   comida: 1.0, // food-vect (antes 0.7), ahora pesa como las demás
+  energia: 1.3, // rayo de trazo medio
 }
 
 /** El glyph de la dimensión, tintado a SU color (el mismo del aro). Mismos
@@ -68,7 +71,9 @@ export function weekDimGlyph(key: WeekDimKey, size: number): ReactNode {
         ? SUENO_PNG
         : key === 'proteina'
           ? PROTEIN_PNG
-          : AGUA_PNG
+          : key === 'energia'
+            ? ENERGIA_PNG
+            : AGUA_PNG
   return (
     <Image source={src} style={{ width: s, height: s, tintColor: tint }} resizeMode="contain" />
   )

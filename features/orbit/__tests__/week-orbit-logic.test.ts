@@ -163,6 +163,7 @@ describe('mostRepeated / needsAttention', () => {
           protein_g: 130,
           water_glasses: 8,
           sleep_minutes: 450,
+          energy: 4, // energía también presente → semana redonda en las 6 dims
         }),
       ],
       MON, // lunes: total = 1, y todo presente ese día

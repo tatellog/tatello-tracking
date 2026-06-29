@@ -2,6 +2,8 @@ import {
   biggestWin,
   buildMonthBuilt,
   detectMonthPatterns,
+  finalPhrase,
+  habitReveal,
   WATER_GOAL_GLASSES,
 } from '../month-built'
 import { addDays, mkSig } from './signals.fixture'
@@ -43,33 +45,20 @@ describe('detectMonthPatterns', () => {
     expect(detectMonthPatterns(month(5, () => ({ meal_count: 2 })))).toEqual([])
   })
 
-  it('detecta el hábito menos constante (observación local de Mes)', () => {
-    // Comida todos los días, agua pocos → agua es el menos constante.
+  it('NO produce "señal más silenciosa" (eliminada: contaba en otra escala)', () => {
+    // "Haz visible lo invisible" es solo constancias POSITIVAS; lo que faltó lo
+    // cuentan "Lo que aún no sabemos" + "Tu evolución".
     const signals = month(14, (i) => ({
-      meal_count: 2, // 14 días
-      sleep_minutes: i < 9 ? 360 : null, // 9 días
-      water_glasses: i < 3 ? 2 : 0, // 3 días
-    }))
-    const ps = detectMonthPatterns(signals)
-    const low = ps.find((p) => p.id === 'habit-low')!
-    expect(low.title).toMatch(/El agua fue tu señal más silenciosa/)
-    expect(low.evidence.bars.find((b) => b.label === 'Agua')?.highlight).toBe(true)
-  })
-
-  it('NO contradice: si el movimiento fue una constante, no es la "más silenciosa"', () => {
-    // Entrena 10 días (constancia de movimiento) pero los demás hábitos
-    // aparecen los 14 → sin dedupe, "movimiento" saldría como el más silencioso
-    // a la vez que constante. El dedupe por dimensión lo impide.
-    const signals = month(14, (i) => ({
-      trained: i < 10,
       meal_count: 2,
-      sleep_minutes: 360,
-      energy: 3,
-      water_glasses: 1,
+      sleep_minutes: i < 9 ? 360 : null,
+      water_glasses: i < 3 ? 2 : 0,
     }))
     const ps = detectMonthPatterns(signals)
-    expect(ps.some((p) => p.id === 'consistent-training')).toBe(true)
-    expect(ps.some((p) => p.id === 'habit-low' && /movimiento/i.test(p.title))).toBe(false)
+    expect(ps.some((p) => p.id === 'habit-low')).toBe(false)
+    // Todo descubrimiento es una constancia positiva, ninguno una carencia.
+    for (const p of ps.filter((x) => x.kind === 'discovery')) {
+      expect(p.title).not.toMatch(/silenciosa|menos|faltó/i)
+    }
   })
 
   it('consume los patrones POSITIVOS del motor (proteína/movimiento/sueño)', () => {
@@ -105,6 +94,80 @@ describe('detectMonthPatterns', () => {
     const ps = detectMonthPatterns(signals)
     // Necesita ≥8 días; 14 días → 10 entre semana. Patrón presente.
     expect(ps.some((p) => p.id === 'weekday')).toBe(true)
+  })
+})
+
+describe('habitReveal', () => {
+  it('cuenta días con evidencia por dimensión, ordenado desc', () => {
+    const signals = month(20, (i) => ({
+      meal_count: 2, // comida 20
+      trained: i < 12, // movimiento 12
+      sleep_minutes: i < 15 ? 400 : null, // sueño 15
+      protein_g: i < 8 ? 90 : null, // proteína 8
+      water_glasses: i < 5 ? 4 : 0, // agua 5
+      energy: i < 18 ? 3 : null, // energía 18
+      on_period: i < 4 ? true : null, // ciclo: NO se cuenta (contexto, no hábito)
+    }))
+    const r = habitReveal(signals)
+    // Ordenado de mayor a menor.
+    expect(r.map((h) => h.count)).toEqual([...r.map((h) => h.count)].sort((a, b) => b - a))
+    const by = Object.fromEntries(r.map((h) => [h.key, h.count]))
+    expect(by.comida).toBe(20)
+    expect(by.cuerpo).toBe(12)
+    expect(by.sueno).toBe(15)
+    expect(by.proteina).toBe(8)
+    expect(by.agua).toBe(5)
+    expect(by.energia).toBe(18)
+    // Ciclo es contexto, no hábito: no aparece como dimensión de presencia.
+    expect(by.ciclo).toBeUndefined()
+  })
+
+  it('cubre las 6 dimensiones de presencia (sin ciclo) aunque estén en cero', () => {
+    const r = habitReveal(month(5, () => ({ meal_count: 1 })))
+    expect(r).toHaveLength(6)
+    expect(r.some((h) => h.key === 'ciclo')).toBe(false)
+    expect(r.find((h) => h.key === 'agua')?.count).toBe(0)
+  })
+})
+
+describe('detectMonthPatterns · kind / secciones', () => {
+  it('etiqueta constancia como discovery y forma temporal como pattern', () => {
+    const signals = month(16, (i) => ({
+      trained: i < 10, // consistent-training (discovery)
+      protein_g: i < 12 ? 100 : null,
+      meal_count: 2,
+    })).filter((s) => (new Date(`${s.day}T00:00:00Z`).getUTCDay() + 6) % 7 < 5) // solo entre semana
+    const ps = detectMonthPatterns(signals, { proteinTarget: 90 })
+    const train = ps.find((p) => p.id === 'consistent-training')!
+    expect(train.kind).toBe('discovery')
+    expect(train.label).toBe('Movimiento')
+    const weekday = ps.find((p) => p.id === 'weekday')
+    expect(weekday?.kind).toBe('pattern')
+  })
+
+  it('detecta noches con ≥ 7 h de sueño (pattern demostrable)', () => {
+    // 16 noches registradas, 10 de ellas ≥ 7 h (420 min).
+    const signals = month(16, (i) => ({
+      sleep_minutes: i < 10 ? 440 : 360,
+      meal_count: 2,
+    }))
+    const deep = detectMonthPatterns(signals).find((p) => p.id === 'sleep-7h')!
+    expect(deep).toBeTruthy()
+    expect(deep.kind).toBe('pattern')
+    expect(deep.title).toContain('10 noches')
+    expect(deep.evidence.bars.find((b) => b.label === '≥ 7 h')?.value).toBe(10)
+  })
+})
+
+describe('finalPhrase', () => {
+  it('escala la frase con los días presentes y todas se sostienen con datos', () => {
+    expect(finalPhrase(month(20, () => ({ meal_count: 1 })))).toMatch(/constancia/i)
+    expect(finalPhrase(month(12, () => ({ meal_count: 1 })))).toMatch(/repetiste/i)
+    expect(finalPhrase(month(4, () => ({ meal_count: 1 })))).toMatch(/evidencia/i)
+  })
+
+  it('null sin días', () => {
+    expect(finalPhrase([])).toBeNull()
   })
 })
 

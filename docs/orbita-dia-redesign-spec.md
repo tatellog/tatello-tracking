@@ -52,28 +52,34 @@ pero fue honesta y registró. "Hoy predominó tu presencia. Porque apareciste."
 
 ## Estructura de la pantalla
 
-### Hero
+### Hero — el astro del estado
 
 - Título: **¿Quién fuiste hoy?**
-- El estado del día: **"Hoy predominó la [estado]."** (con su color/glifo).
-- Una explicación de 1 frase (máx. 2 líneas), p. ej. "Hoy cumpliste contigo en
-  varios momentos importantes." / "Elegiste descansar cuando tu cuerpo lo
-  necesitó." / "Aunque el día no fue perfecto, permaneciste presente."
+- El héroe es el **astro GRANDE del estado** (su glifo PNG) sobre el cielo Skia
+  (aura que respira + glow), tintado a su color. Limpio, sin datos encima.
+- Debajo: el estado en palabra, **"Hoy predominó la [estado]."** (en su color),
+  una explicación de 1 frase, y un hint: _"Toca el astro para ver por qué ›"_.
+- El astro es tappable → abre el modal "Por qué".
 
-### El algoritmo es VISIBLE (transparencia)
+### El algoritmo es VISIBLE (transparencia · en el modal)
 
-Al tocar el estado, la usuaria ve EXACTAMENTE por qué apareció — las fuerzas de
-sus señales, en estrellas:
+Al tocar el astro se abre un modal (mismo sistema que el modal de Órbita Mes:
+blur + scrim cálido + tarjeta) con los **DATOS REALES** de las señales que
+decidieron el día:
 
-```
-Hoy predominó:
-RECUPERACIÓN
-Porque hoy tus señales fueron:
-★★★★★ Sueño
-★★★★  Descanso
-★★    Movimiento
-★     Nutrición
-```
+- Eyebrow "POR QUÉ" + el estado (con su punto de color) + la regla que lo decidió
+  (la explicación: "La mayoría de tus señales estuvieron presentes hoy.").
+- **Barras**, una por señal presente, ordenadas por fuerza: etiqueta + barra (su
+  peso relativo, la dominante resaltada) + el **valor real registrado** (p. ej.
+  "7.8 h", "1 comida", "Energía 3/5") — nunca un puntaje abstracto "x/5".
+- Las señales sin registro van abajo como ausencia: "Sueño · Ciclo: aún sin
+  registro hoy."
+
+> **Decisión de diseño (v1.2):** la lista de `★★★★★ Señal` en pantalla se retiró
+> (se leía como boleta de calificaciones · culpa + ranking). El detalle vive ahora
+> en el modal, **a un tap**, con datos reales en barras y la dominante resaltada —
+> el héroe queda limpio con el astro. (Se probó una constelación de estrellas en el
+> héroe y se descartó: ensuciaba la pantalla.)
 
 Todo transparente. Nada mágico. Nada parece inventado.
 

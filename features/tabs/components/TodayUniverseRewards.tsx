@@ -529,8 +529,13 @@ function AttributeCard({ attr, source, divided, reducedMotion, selected, onPress
           <Text style={styles.pctSign}>%</Text>
         </Text>
         <Text style={[styles.colLabel, { color: complete ? accent : colors.bone }]}>{action}</Text>
-        <Text style={[styles.colReward, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>
-          {/* La recompensa "+N Atributo"; en 0 cae al estado real ("0 / 8 vasos"). */}
+        <Text
+          style={[styles.colReward, { color: attr.pct > 0 ? accent : colors.niebla }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {/* La recompensa "+N Atributo" en su acento; en 0 cae al estado real
+              ("Aún sin comidas hoy") pero en niebla — un vacío no debe gritar. */}
           {attr.pct > 0 ? `+${attr.pct} ${reward}` : source}
         </Text>
       </Animated.View>
@@ -829,12 +834,13 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // The explicit % — a number, not just the ring. Earned progress in leche /
-  // accent when complete.
+  // accent when complete. Discreto: peso UI (no display) y tamaño contenido,
+  // para que el anillo + el glifo lleven la voz, no un número que grita.
   pctNum: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.deltaNum,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
     fontVariant: ['tabular-nums'],
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
     textAlign: 'center',
   },
   // La acción (Sueño/Comida/Agua/Ánimo) bajo el número.

@@ -56,6 +56,17 @@ describe('selectDayStateKey — los 7 estados', () => {
     expect(selectDayStateKey(s, CTX)).toBe('equilibrio')
   })
 
+  it('NUNCA celebra restricción extrema como déficit (línea roja)', () => {
+    // 617 / 1463 kcal = 42% de la meta → no es evidencia ni suma ★.
+    const extreme = mkSig(DAY, { meal_count: 1, calories: 617 })
+    expect(buildDayState(extreme, CTX)!.evidence.map((e) => e.label)).not.toContain(
+      'Tu déficit del día',
+    )
+    // Un déficit sano (≥60% de la meta) SÍ cuenta.
+    const sane = mkSig(DAY, { meal_count: 1, calories: 1100 })
+    expect(buildDayState(sane, CTX)!.evidence.map((e) => e.label)).toContain('Tu déficit del día')
+  })
+
   it('Exploración: lo más fuerte fueron señales suaves (check-in completo)', () => {
     const s = mkSig(DAY, { energy: 4, mood: 'good', motivation: 4, stress: 2 })
     expect(stars(s).bienestar).toBe(5)
@@ -74,15 +85,53 @@ describe('buildDayState — ensamblado', () => {
     expect(labels).toContain('Dormiste')
     expect(labels).toContain('Registraste tus comidas')
     expect(day.evidence.find((e) => e.label === 'Dormiste')?.detail).toMatch(/7\.8 horas/)
-    // Ausencias: agua y ciclo no se registraron
+    // Ausencias: sólo señales DIARIAS. Agua sin registro aparece; sueño no (se
+    // registró). El ciclo NUNCA aparece como ausencia diaria (no es señal diaria).
     const absent = day.absent.map((a) => a.key)
     expect(absent).toContain('agua')
-    expect(absent).toContain('ciclo')
+    expect(absent).not.toContain('ciclo')
     expect(absent).not.toContain('sueno')
     // Transparencia: fuerzas ordenadas desc, sueño arriba
     expect(day.strengths[0]!.stars).toBeGreaterThanOrEqual(day.strengths[1]!.stars)
     // Cierre estable
     expect(day.closing.length).toBeGreaterThan(0)
+  })
+
+  it('driver = la señal que CAUSÓ el estado; null si nace de amplitud/paridad', () => {
+    // Estados de una sola señal → driver = esa señal (se resalta al explicar).
+    expect(buildDayState(mkSig(DAY, { trained: true }), CTX)!.driver).toBe('movimiento')
+    expect(buildDayState(mkSig(DAY, { sleep_minutes: 480, rested: true }), CTX)!.driver).toBe(
+      'recuperacion',
+    )
+    expect(
+      buildDayState(mkSig(DAY, { meal_count: 3, protein_g: 130, calories: 1300 }), CTX)!.driver,
+    ).toBe('nutricion')
+    expect(
+      buildDayState(mkSig(DAY, { energy: 4, mood: 'good', motivation: 4, stress: 2 }), CTX)!.driver,
+    ).toBe('bienestar')
+    // Amplitud/paridad/sólo-registro → sin solista (no se resalta ninguna barra).
+    const constancia = mkSig(DAY, {
+      trained: true,
+      sleep_minutes: 420,
+      meal_count: 2,
+      water_glasses: 8,
+    })
+    expect(buildDayState(constancia, CTX)!.driver).toBeNull()
+    const equilibrio = mkSig(DAY, { sleep_minutes: 390, meal_count: 3, protein_g: 90 })
+    expect(buildDayState(equilibrio, CTX)!.driver).toBeNull()
+    expect(buildDayState(mkSig(DAY, { meal_count: 1, water_glasses: 1 }), CTX)!.driver).toBeNull()
+  })
+
+  it('la evidencia de bienestar/descanso muestra el dato real, no un verbo vacío', () => {
+    // Bienestar: el label dice cómo te sentiste; el detalle resume lo demás.
+    const w = buildDayState(mkSig(DAY, { mood: 'good', energy: 4, stress: 2 }), CTX)!
+    const wb = w.evidence.find((e) => e.label.startsWith('Te sentiste'))!
+    expect(wb.label).toBe('Te sentiste bien')
+    expect(wb.detail).toBe('Energía alta · calma alta')
+    // Descanso: label claro + qué alimenta (sin inventar cifra).
+    const r = buildDayState(mkSig(DAY, { rested: true, water_glasses: 2 }), CTX)!
+    const rest = r.evidence.find((e) => e.label === 'Día de descanso')!
+    expect(rest.detail).toBe('Recuperación')
   })
 
   it('título nunca etiqueta a la persona ("predominó", no "eres/fuiste")', () => {

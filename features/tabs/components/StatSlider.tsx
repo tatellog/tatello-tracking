@@ -181,7 +181,12 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // works on the web.
   //
   useEffect(() => {
-    if (!targetSlide || slideW === 0) return
+    // Al limpiarse el param (Hoy lo borra tras honrar el deep-link), reseteamos
+    // el guard para que volver a pedir el MISMO slide vuelva a enfocar.
+    if (!targetSlide || slideW === 0) {
+      if (!targetSlide) honouredTargetRef.current = null
+      return
+    }
     if (honouredTargetRef.current === targetSlide) return
     const idx = slides.findIndex((s) => s.id === targetSlide)
     if (idx < 0) return
