@@ -254,7 +254,7 @@ function Explainer() {
       <Text style={styles.expEyebrow}>Cómo funciona</Text>
       <Text style={styles.expBody}>
         Cada registro cuenta: el movimiento, la comida, el sueño, el agua, cómo te sentiste. Todo
-        suma — y tu Leo se revela por etapas, una parte nueva cada vez.
+        suma, y tu Leo se revela por etapas, una parte nueva cada vez.
       </Text>
 
       <Text style={styles.expEyebrow}>Las reglas de tu universo</Text>

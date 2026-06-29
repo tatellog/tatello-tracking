@@ -98,7 +98,12 @@ export const queryKeys = {
   },
   orbit: {
     all: ['orbit'] as const,
-    today: () => ['orbit', 'today'] as const,
+    // El día va EN la key: con la caché persistida (AsyncStorage 24 h), una key
+    // sin fecha hacía que al cambiar de día se mostraran las señales de ayer como
+    // si fueran de hoy. Las invalidaciones (orbit.all / orbit.today()) siguen
+    // funcionando: son prefijos de la key con fecha.
+    today: (day?: string) =>
+      day ? (['orbit', 'today', day] as const) : (['orbit', 'today'] as const),
     day: (day: string) => ['orbit', 'day', day] as const,
     week: (fromDate: string, toDate: string) => ['orbit', 'week', fromDate, toDate] as const,
     history: (fromDate: string, toDate: string) => ['orbit', 'history', fromDate, toDate] as const,

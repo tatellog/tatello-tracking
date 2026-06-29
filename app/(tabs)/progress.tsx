@@ -227,7 +227,7 @@ function ProgressBody() {
           </EyebrowLabel>
           {hasFocus && !focusIsWeight ? (
             <Text style={styles.focusNote}>
-              Tu enfoque este mes no es el peso — esto es solo una referencia, sin metas.
+              Tu enfoque este mes no es el peso. Esto es solo una referencia, sin metas.
             </Text>
           ) : hasTrajectory ? (
             <Text style={styles.patientSub}>

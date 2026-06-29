@@ -24,6 +24,7 @@ import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/compone
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
+import { useSession } from '@/hooks/useSession'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
@@ -129,6 +130,9 @@ function SettingsBody() {
   // % de transformación del emblema — la identidad CONSTRUIDA en Stelar, el
   // dato emocional de la card de perfil (no la ficha médica).
   const { progress: transformPct } = useTransformProgress()
+  // El email de registro (auth) — no vive en profiles, sale de la sesión.
+  const { session } = useSession()
+  const email = session?.user?.email ?? null
 
   const [signingOut, setSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -280,6 +284,7 @@ function SettingsBody() {
               <IdentityCard
                 name={profile?.display_name ?? 'Aún sin nombre'}
                 signAge={identityLine}
+                email={email}
                 transformPct={transformPct}
                 avatarUri={avatarUri}
                 zodiacSign={zodiacSign}
@@ -490,7 +495,7 @@ function SettingsBody() {
                     letterSpacing: 0.6,
                   }}
                 >
-                  ✦ DEV — ver todas las constelaciones
+                  ✦ DEV · ver todas las constelaciones
                 </Text>
               </Pressable>
             ) : null}
@@ -518,7 +523,7 @@ function SettingsBody() {
                     letterSpacing: 0.6,
                   }}
                 >
-                  ✦ DEV — Leo: todos los estados
+                  ✦ DEV · Leo: todos los estados
                 </Text>
               </Pressable>
             ) : null}
@@ -546,7 +551,7 @@ function SettingsBody() {
                     letterSpacing: 0.6,
                   }}
                 >
-                  ✦ DEV — signos por porcentaje
+                  ✦ DEV · signos por porcentaje
                 </Text>
               </Pressable>
             ) : null}
@@ -574,7 +579,7 @@ function SettingsBody() {
                     letterSpacing: 0.6,
                   }}
                 >
-                  ✦ DEV — sistema de recompensas
+                  ✦ DEV · sistema de recompensas
                 </Text>
               </Pressable>
             ) : null}
@@ -602,7 +607,7 @@ function SettingsBody() {
                     letterSpacing: 0.6,
                   }}
                 >
-                  ✦ DEV — revelaciones / patrones
+                  ✦ DEV · revelaciones / patrones
                 </Text>
               </Pressable>
             ) : null}
@@ -632,6 +637,7 @@ function SettingsBody() {
 function IdentityCard({
   name,
   signAge,
+  email,
   transformPct,
   avatarUri,
   zodiacSign,
@@ -640,6 +646,7 @@ function IdentityCard({
 }: {
   name: string
   signAge: string
+  email: string | null
   transformPct: number
   avatarUri: string | null
   zodiacSign: ZodiacSign | null
@@ -674,6 +681,11 @@ function IdentityCard({
             {signAge ? <Text style={styles.identitySignAge}>{signAge}</Text> : null}
             {transformPct > 0 ? (
               <Text style={styles.identityTransform}>{transformPct}% de transformación</Text>
+            ) : null}
+            {email ? (
+              <Text style={styles.identityEmail} numberOfLines={1}>
+                {email}
+              </Text>
             ) : null}
           </View>
         </View>
@@ -1009,6 +1021,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     letterSpacing: 0.2,
     color: colors.magenta,
+  },
+  // Email de registro (auth) — dato de cuenta, callado.
+  identityEmail: {
+    marginTop: 6,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   identityCta: {
     flexDirection: 'row',

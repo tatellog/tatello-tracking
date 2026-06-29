@@ -14,8 +14,10 @@ import { isoTwoWeekRange } from './week-orbit-logic'
  * surface here quickly. Returns null when nothing is logged today.
  */
 export function useTodaySignals() {
+  // La fecha local va EN la key: al cambiar de día, la caché persistida ya no
+  // sirve las señales de ayer como "hoy" (refetch limpio para el día nuevo).
   return useQuery({
-    queryKey: queryKeys.orbit.today(),
+    queryKey: queryKeys.orbit.today(todayInTimezone()),
     queryFn: getTodaySignals,
     staleTime: 60_000,
   })

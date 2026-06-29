@@ -172,8 +172,8 @@ function DevRewardsScreen() {
           <View style={styles.reward}>
             <Text style={styles.rewardTitle}>Vuelo a la constelación</Text>
             <Text style={styles.rewardDesc}>
-              Las chispas que salen del atributo y vuelan hacia el hero de Leo — la cadena registro
-              → cielo.
+              Las chispas que salen del atributo y vuelan hacia el hero de Leo: la cadena registro →
+              cielo.
             </Text>
             <View style={styles.stage}>
               {/* index 2 = cuadrante inferior, para que el vuelo arranque

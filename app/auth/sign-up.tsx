@@ -81,8 +81,7 @@ export default function SignUpScreen() {
         <Animated.View entering={enter(160)} style={styles.sentBody}>
           {/* Voice moment — Cormorant italic is allowed here. */}
           <Text style={styles.serifBody}>
-            Creé tu cuenta. Te mandé un correo para confirmarla — ábrelo y volvemos a empezar
-            juntas.
+            Creé tu cuenta. Te mandé un correo para confirmarla. Ábrelo y volvemos a empezar juntas.
           </Text>
         </Animated.View>
 

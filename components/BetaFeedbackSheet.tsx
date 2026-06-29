@@ -115,7 +115,7 @@ export function BetaFeedbackSheet({ visible, onClose }: Props) {
             <>
               <Text style={styles.title}>Cuéntanos</Text>
               <Text style={styles.hint}>
-                Lo que sea — un bug, una idea, qué te confunde, qué te enamoró.
+                Lo que sea: un bug, una idea, qué te confunde, qué te enamoró.
               </Text>
               <TextInput
                 value={message}
