@@ -11,7 +11,32 @@
  */
 export const USER_TIMEZONE = 'America/Mexico_City'
 
-export function todayInTimezone(tz: string = USER_TIMEZONE): string {
+/*
+ * El "hoy" del cliente debe usar la MISMA zona que el server: `profiles.timezone`,
+ * que es como la vista `daily_signals` (y las columnas *_date) bucketean los días.
+ * Si el cliente usa otra zona, pide/borra el día equivocado — el bug de la usuaria.
+ *
+ * `profiles.timezone` se cachea acá a nivel de módulo; `queryClient` lo sincroniza
+ * cuando el perfil carga (incluso al hidratar de AsyncStorage) vía setUserTimezone,
+ * y lo limpia al cambiar de usuario. Cascada de fallback mientras no se conoce:
+ *   profiles.timezone → zona del device → México (último recurso).
+ *
+ * Esto resuelve también el caso "viajera" (device ≠ zona del onboarding): el
+ * cliente sigue a la MISMA zona que la vista, así que nunca se desalinean.
+ */
+let cachedUserTimezone: string | null = null
+
+/** Sincroniza la zona del perfil hacia el cálculo de "hoy" del cliente. */
+export function setUserTimezone(tz: string | null | undefined): void {
+  cachedUserTimezone = tz && tz.length > 0 ? tz : null
+}
+
+/** La zona efectiva para bucketear el día del usuario (perfil → device → MX). */
+export function userTimezone(): string {
+  return cachedUserTimezone ?? deviceTimezone()
+}
+
+export function todayInTimezone(tz: string = userTimezone()): string {
   // en-CA locale happens to format as 'YYYY-MM-DD' natively, avoiding
   // a manual zero-pad + concat.
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())

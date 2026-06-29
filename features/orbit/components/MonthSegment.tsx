@@ -208,7 +208,7 @@ export function MonthSegment() {
 function HeroHeader() {
   return (
     <View style={styles.heroHeader}>
-      <Text style={styles.heroQuestion}>¿En qué me estoy transformando?</Text>
+      <Text style={styles.heroQuestion}>¿Qué estás construyendo?</Text>
       <Text style={styles.heroSubtitle}>
         No es una meta. Es lo que tus acciones empezaron a construir.
       </Text>

@@ -274,7 +274,7 @@ export default function WhatItDoesScreen() {
       </View>
 
       <View style={styles.stage}>
-        <Text style={styles.eyebrow}>Lo que Stelar hace</Text>
+        <Text style={styles.eyebrow}>Haz visible lo invisible</Text>
 
         <Text style={styles.title}>
           Sí, cuento calorías.{'\n'}

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
 
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
@@ -7,6 +8,29 @@ import { getMealsInRange } from '@/features/macros/api'
 
 import { getDaySignals, getTodaySignals, getWeekSignals, hasAnySignals } from './api'
 import { isoTwoWeekRange } from './week-orbit-logic'
+
+/*
+ * Vigila el cambio de día mientras Órbita está montada. El tab persiste entre
+ * sesiones (no se desmonta), así que si cruza la medianoche sin re-render, las
+ * queries de Órbita (today/week/month) siguen keyeadas con la fecha de AYER y
+ * muestran datos viejos como "hoy" — justo el bug que vio la usuaria. Cada minuto
+ * comparamos el día local; al cambiar, forzamos un re-render: las keys derivan de
+ * todayInTimezone(), así que recalculan a HOY → fetch limpio del día nuevo. (Hoy
+ * ya hace esto vía useDayRollover; Órbita no lo tenía.) */
+export function useOrbitDayRollover(): void {
+  const dayRef = useRef(todayInTimezone())
+  const [, force] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const today = todayInTimezone()
+      if (today !== dayRef.current) {
+        dayRef.current = today
+        force((n) => n + 1)
+      }
+    }, 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+}
 
 /*
  * Today's órbita signals — the data behind the Día segment's orbital

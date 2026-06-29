@@ -281,7 +281,7 @@ export function DayPresent({
 
   const header = (
     <View style={styles.header}>
-      <Text style={styles.title}>{isPast ? '¿Quién fuiste?' : '¿Quién fuiste hoy?'}</Text>
+      <Text style={styles.title}>{isPast ? '¿Cómo fue ese día?' : '¿Cómo fue tu día?'}</Text>
       <Text style={styles.date}>{formatLongDate(targetDay)}</Text>
       {isPast && onReturnToToday ? (
         <Pressable onPress={onReturnToToday} hitSlop={8} style={styles.backToToday}>

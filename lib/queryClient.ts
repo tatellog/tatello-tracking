@@ -3,6 +3,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { QueryClient } from '@tanstack/react-query'
 
 import { supabase } from './supabase'
+import { setUserTimezone, userTimezone } from './time'
 
 /*
  * TanStack Query configuration for the app.
@@ -79,7 +80,33 @@ supabase.auth.onAuthStateChange((_event, session) => {
   const newUserId = session?.user?.id ?? null
   if (lastAuthUserId !== undefined && lastAuthUserId !== newUserId) {
     queryClient.clear()
+    // No heredar la zona del usuario anterior: cae a device hasta que cargue el
+    // perfil nuevo (lo re-sincroniza el subscriber de abajo).
+    setUserTimezone(null)
     Promise.resolve(queryPersister.removeClient()).catch(() => {})
   }
   lastAuthUserId = newUserId
+})
+
+/*
+ * Sincroniza `profiles.timezone` → lib/time, para que el "hoy" del cliente
+ * bucketee como el server (la vista daily_signals usa esa zona). Vive a nivel de
+ * módulo (no en un componente) y reacciona al perfil hidratado de AsyncStorage,
+ * así "hoy" ya es correcto en el primer paint. Si la zona EFECTIVA cambia (p. ej.
+ * el perfil de una viajera trae otra zona que la del device), invalidamos los días
+ * keyeados con la zona vieja para que refetcheen el día correcto.
+ */
+let lastSyncedTimezone: string | null = null
+queryClient.getQueryCache().subscribe((event) => {
+  const key = event.query.queryKey
+  if (!Array.isArray(key) || key[0] !== 'profile' || key[1] !== 'me') return
+  const data = event.query.state.data as { timezone?: string | null } | undefined
+  if (!data) return
+  setUserTimezone(data.timezone)
+  const effective = userTimezone()
+  if (lastSyncedTimezone !== null && lastSyncedTimezone !== effective) {
+    queryClient.invalidateQueries({ queryKey: ['brief'] })
+    queryClient.invalidateQueries({ queryKey: ['orbit'] })
+  }
+  lastSyncedTimezone = effective
 })

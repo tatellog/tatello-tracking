@@ -45,11 +45,11 @@ import {
 } from '@/features/profile/api'
 import { calculateMacros } from '@/features/profile/calcMacros'
 import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
-// ParticleBurst lives next to StarBurst but is not re-exported by the
-// burst index.ts (that surfaces only StarBurst); import it directly from
-// its module. It is gated by a `pulse` SharedValue (renders only while
-// 0 < pulse < 1) so it stays inert outside the climax.
-import { ParticleBurst } from '@/features/tabs/components/constellation/rendering/burst/particle-burst'
+// Celebración del clímax SOLO de onboarding: estrellas (chicas y grandes) con
+// flare, en vez del confeti de rayitas (ParticleBurst) compartido. Gateada por
+// un `pulse` SharedValue (renderiza solo mientras 0 < pulse < 1) → inerte fuera
+// del clímax.
+import { StarConfettiBurst } from '@/features/onboarding/components/StarConfettiBurst'
 // The pictorial zodiac art map — the SAME mechanism the Órbita tab uses.
 // NOTE: the art is now RASTERISED PNG (the ~500 KB .svg originals were the
 // heaviest cost — see sign-maps.ts), so ART_BY_SIGN entries are bitmap sources
@@ -1101,8 +1101,8 @@ function RevealConstellation({
         raysClock={raysClock}
         ringsClock={ringsClock}
       />
-      {/* (d) particle burst — gated internally by burstPulse */}
-      <ParticleBurst cx={CX} cy={CY} pulse={burstPulse} trainedCount={1} />
+      {/* (d) confeti de estrellas con flare — gateado por burstPulse */}
+      <StarConfettiBurst cx={CX} cy={CY} size={size} pulse={burstPulse} />
     </Svg>
   )
 }
@@ -1275,9 +1275,10 @@ function RevealArt({
   size: number
   instant: boolean
 }) {
-  // The art fills almost the whole stage now (~95 %) — bigger, the painted
-  // creature dominates the stage as the user asked. The View is centred.
-  const artSize = size * 0.95
+  // El arte cabe DENTRO del aro ceremonial (ART_FRAME 0.78): a 0.95 la figura se
+  // salía del aro y se veía cortada. 0.80 deja la cabeza/agua adentro con aire,
+  // sin perder presencia. La View se recentra sola con `offset`.
+  const artSize = size * 0.8
   const offset = (size - artSize) / 2
   // `instant` is a plain prop; mirror it into a shared value so the worklet
   // reads it on the UI thread without closing over a JS boolean each frame.
@@ -2564,7 +2565,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 40,
+    height: 28,
   },
   // TEXT group — headline + body anchored together below the stage. The
   // small negative-ish top pull (just a tight marginTop) keeps the headline

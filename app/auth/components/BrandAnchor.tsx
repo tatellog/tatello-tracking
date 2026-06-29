@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle } from 'react-native-svg'
 
-import NorthStar from '@/assets/icons/north-star.svg'
+import { StelarIcon } from '@/components/brand/StelarIcon'
 import { StelarLogo } from '@/components/brand/StelarLogo'
 import { colors, duration } from '@/theme'
 
@@ -98,7 +98,7 @@ export function BrandAnchor({ pulseOnce = false, showWordmark = true }: BrandAnc
           </View>
         )}
         <Animated.View style={starStyle} pointerEvents="none">
-          <NorthStar width={ANCHOR_SIZE} height={ANCHOR_SIZE} color={colors.oro} />
+          <StelarIcon size={ANCHOR_SIZE} />
         </Animated.View>
       </View>
       {/* Wordmark como BRAND ASSET (PNG exportado), no como fuente de UI.

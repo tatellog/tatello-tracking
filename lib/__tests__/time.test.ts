@@ -1,4 +1,10 @@
-import { deviceTimezone, USER_TIMEZONE, todayInTimezone } from '@/lib/time'
+import {
+  deviceTimezone,
+  setUserTimezone,
+  USER_TIMEZONE,
+  todayInTimezone,
+  userTimezone,
+} from '@/lib/time'
 
 describe('todayInTimezone', () => {
   beforeEach(() => {
@@ -22,9 +28,14 @@ describe('todayInTimezone', () => {
     expect(todayInTimezone('Asia/Tokyo')).toBe('2026-04-24')
   })
 
-  it('defaults to USER_TIMEZONE when none is passed', () => {
+  it('por defecto usa userTimezone() (la zona del perfil, o el device)', () => {
     jest.setSystemTime(new Date('2026-04-24T10:00:00Z'))
-    expect(todayInTimezone()).toBe(todayInTimezone(USER_TIMEZONE))
+    setUserTimezone(null)
+    expect(todayInTimezone()).toBe(todayInTimezone(userTimezone()))
+    // Con la zona del perfil seteada, el default la sigue.
+    setUserTimezone('Asia/Tokyo')
+    expect(todayInTimezone()).toBe(todayInTimezone('Asia/Tokyo'))
+    setUserTimezone(null)
   })
 
   it('pads single-digit months and days', () => {
@@ -54,5 +65,23 @@ describe('deviceTimezone', () => {
       .mockReturnValue({ timeZone: '' } as Intl.ResolvedDateTimeFormatOptions)
     expect(deviceTimezone()).toBe(USER_TIMEZONE)
     spy.mockRestore()
+  })
+})
+
+describe('userTimezone / setUserTimezone', () => {
+  afterEach(() => setUserTimezone(null))
+
+  it('usa la zona del perfil cuando está seteada (calza con la vista del server)', () => {
+    setUserTimezone('Asia/Tokyo')
+    expect(userTimezone()).toBe('Asia/Tokyo')
+  })
+
+  it('null o cadena vacía → cae al device (no hereda zona ajena)', () => {
+    setUserTimezone('America/Mexico_City')
+    expect(userTimezone()).toBe('America/Mexico_City')
+    setUserTimezone('')
+    expect(userTimezone()).toBe(deviceTimezone())
+    setUserTimezone(null)
+    expect(userTimezone()).toBe(deviceTimezone())
   })
 })

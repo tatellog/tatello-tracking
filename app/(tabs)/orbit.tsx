@@ -13,6 +13,7 @@ import {
   WeekSegment,
   type OrbitSegment,
 } from '@/features/orbit/components'
+import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -46,6 +47,9 @@ function OrbitBody() {
       track('tab_changed', { tab: 'orbita' })
     }, []),
   )
+  // Al cruzar la medianoche con el tab montado, recalcula "hoy" → fetch limpio
+  // (si no, Órbita seguiría mostrando los datos de ayer como hoy).
+  useOrbitDayRollover()
   const [segment, setSegment] = useState<OrbitSegment>('dia')
   // Día visto en Órbita Día: null = hoy. Lo setea la tira de 7 días de Semana;
   // cambiar de segmento a mano (OrbitSegments) lo resetea a hoy.
