@@ -21,7 +21,7 @@ import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
-import { ConsistencyCard } from '@/features/progress/components/ConsistencyCard'
+import { ReadingCard } from '@/features/progress/components/ReadingCard'
 import { TransformationCard } from '@/features/emblem'
 import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
@@ -208,10 +208,12 @@ function ProgressBody() {
           <View style={styles.divider} />
           <TransformationCard compact />
 
-          {/* "Consistencia" — adherencia a HÁBITOS (proceso, no resultado) en los
-              últimos 30 días. Responde "¿qué tan constante he sido?". */}
+          {/* "Lectura" — UNA observación destilada de los últimos 30 días (voz
+              Observadora), reusando el motor de patrones del Mes. Responde
+              "¿qué revela mi mes?" y abre a Órbita. Reemplazó al viejo
+              scoreboard de Consistencia (medía frecuencia de registro). */}
           <View style={styles.divider} />
-          <ConsistencyCard />
+          <ReadingCard />
 
           {/* Historia (el calendario-constelación) — ahora debajo del hero. */}
           <View style={styles.divider} />

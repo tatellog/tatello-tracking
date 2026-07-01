@@ -15,9 +15,13 @@ import { addMoodCheckin, type MoodValue } from './api'
 export function useAddMoodCheckin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (value: MoodValue) => addMoodCheckin(value),
+    mutationFn: ({ value, date }: { value: MoodValue; date?: string }) =>
+      addMoodCheckin(value, date),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
+      // Órbita lee el mood del día desde daily_signals → refrescar para que la
+      // señal 'animo' deje de faltar tras registrarla.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })
 }

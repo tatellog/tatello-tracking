@@ -3,7 +3,9 @@ import {
   dimObservation,
   mainDiscovery,
   quietestSignal,
+  signalLine,
   steadyThings,
+  strongestCoOccurrence,
   weekAbsences,
   weekEvidence,
   weeklyRhythms,
@@ -21,30 +23,151 @@ const SAT = '2026-06-20'
 const SUN = '2026-06-21'
 const CTX = { proteinTarget: 130 }
 
-describe('mainDiscovery (descubrimiento principal)', () => {
-  it('Constancia cuando la presencia amplia domina', () => {
-    const signals = [MON, TUE, WED, THU, FRI, SAT].map((d) => mkSig(d, { meal_count: 2 }))
+describe('mainDiscovery (descubrimiento principal · v2 híbrido)', () => {
+  it('co-ocurrencia gana: movimiento junto a proteína', () => {
+    // Entreno + proteína el MISMO día en 4 días; hoy domingo (7 días).
+    const signals = [MON, TUE, THU, FRI].map((d) =>
+      mkSig(d, { trained: true, protein_g: 140, meal_count: 2 }),
+    )
     const d = mainDiscovery(signals, SUN, CTX)
-    expect(d.archetype).toBe('constancia')
-    expect(d.symbol).toBe('ancla')
-    expect(d.headline).toBe('Estuviste presente 6 de 7 días.')
-    expect(d.sub).toMatch(/consistente/i)
-  })
-
-  it('una dimensión que destaca es el descubrimiento', () => {
-    // Solo entrenamiento, lun-mar-mié; hoy viernes (5 días). Movimiento 3/5.
-    const signals = [MON, TUE, WED].map((d) => mkSig(d, { trained: true }))
-    const d = mainDiscovery(signals, FRI, CTX)
+    expect(d.kind).toBe('cooccurrence')
     expect(d.archetype).toBe('movimiento')
     expect(d.symbol).toBe('movimiento')
-    expect(d.headline).toBe('Tu cuerpo se movió 3 de 5 días.')
+    expect(d.title).toBe('Movimiento y proteína')
+    expect(d.phrase).toBe('Tu movimiento apareció junto a tu proteína 4 veces esta semana.')
+    expect(d.emphasis).toBe('4 veces')
+    expect(d.headline).toBe('Coincidieron 4 de 7 días.')
+    // Dos timelines: una por señal del par, ambas de 7 celdas.
+    expect(d.timelines).toHaveLength(2)
+    expect(d.timelines.map((t) => t.key)).toEqual(['movimiento', 'proteina'])
+    expect(d.timelines[0]!.cells).toHaveLength(7)
   })
 
-  it('Comienzo cálido con poca evidencia (sin puntaje bajo)', () => {
+  it('co-ocurrencia con déficit requiere meta calórica (déficit × sueño +7 h)', () => {
+    // 1700 kcal con meta 2000 = déficit sano (≥0.6×); sueño 430 min = +7 h.
+    const ctx = { proteinTarget: 130, calorieTarget: 2000 }
+    const signals = [MON, TUE, WED].map((d) =>
+      mkSig(d, { calories: 1700, sleep_minutes: 430, meal_count: 2 }),
+    )
+    const d = mainDiscovery(signals, SUN, ctx)
+    expect(d.kind).toBe('cooccurrence')
+    expect(d.archetype).toBe('descanso')
+    expect(d.symbol).toBe('sueno')
+    expect(d.phrase).toBe('Tu déficit apareció junto a noches de más de 7 h 3 veces esta semana.')
+
+    // Sin meta calórica, el déficit no existe → degrada (no co-ocurrencia).
+    const noTarget = mainDiscovery(signals, SUN, { proteinTarget: 130 })
+    expect(noTarget.kind).not.toBe('cooccurrence')
+  })
+
+  it('presencia cuando hay constancia pero ninguna co-ocurrencia fuerte', () => {
+    // Solo comida (una sola señal → no hay par posible). 6/7 días presente.
+    const signals = [MON, TUE, WED, THU, FRI, SAT].map((d) => mkSig(d, { meal_count: 2 }))
+    const d = mainDiscovery(signals, SUN, CTX)
+    expect(d.kind).toBe('presence')
+    expect(d.archetype).toBe('constancia')
+    expect(d.symbol).toBe('ancla')
+    expect(d.headline).toBe('Apareciste 6 de 7 días.')
+    expect(d.timelines).toHaveLength(1)
+    expect(d.timelines[0]!.key).toBe('presencia')
+  })
+
+  it('comienzo cálido con poca evidencia (sin puntaje bajo)', () => {
     const signals = [MON, TUE].map((d) => mkSig(d, { meal_count: 1 }))
     const d = mainDiscovery(signals, SUN, CTX)
+    expect(d.kind).toBe('comienzo')
     expect(d.archetype).toBe('comienzo')
     expect(d.headline).toBe('Apareciste 2 días esta semana.')
+    expect(d.snapshot).toBeNull() // 2 días: sin foto del día
+  })
+
+  it('un solo día rico: hero lo reconoce + evidencia es la foto del día', () => {
+    // Un único día (lunes) con muchas señales → comienzo, pero sin minimizar.
+    const signals = [
+      mkSig(MON, {
+        meal_count: 3,
+        trained: true,
+        protein_g: 140,
+        sleep_minutes: 430,
+        water_glasses: 5,
+        energy: 4,
+      }),
+    ]
+    const d = mainDiscovery(signals, SUN, CTX)
+    expect(d.kind).toBe('comienzo')
+    expect(d.phrase).toBe('Tu primer día ya dejó huella.')
+    expect(d.emphasis).toBe('dejó huella')
+    expect(d.snapshot).not.toBeNull()
+    expect(d.snapshot!.weekdayLabel).toBe('el lunes')
+    // Orden fijo: comida, entreno, proteína, sueño +7 h, agua, energía.
+    expect(d.snapshot!.items).toEqual([
+      'comida',
+      'entreno',
+      'proteína',
+      'sueño +7 h',
+      'agua',
+      'energía',
+    ])
+  })
+
+  it('un solo día pobre (1 señal): foto del día pero hero NO lo sobrevende', () => {
+    const signals = [mkSig(MON, { meal_count: 1 })]
+    const d = mainDiscovery(signals, SUN, CTX)
+    expect(d.kind).toBe('comienzo')
+    expect(d.phrase).toBe('Tu semana apenas toma forma.')
+    expect(d.snapshot).not.toBeNull()
+    expect(d.snapshot!.items).toEqual(['comida'])
+  })
+
+  it('co-ocurrencia por debajo del mínimo (2 días) no gana: degrada a presencia', () => {
+    // Entreno+proteína solo 2 días (< MIN 3) pero comida 5 días → presencia.
+    const signals = [
+      mkSig(MON, { trained: true, protein_g: 140, meal_count: 2 }),
+      mkSig(TUE, { trained: true, protein_g: 140, meal_count: 2 }),
+      mkSig(WED, { meal_count: 2 }),
+      mkSig(THU, { meal_count: 2 }),
+      mkSig(FRI, { meal_count: 2 }),
+    ]
+    const d = mainDiscovery(signals, SUN, CTX)
+    expect(d.kind).toBe('presence')
+  })
+})
+
+describe('strongestCoOccurrence (motor de co-ocurrencia)', () => {
+  it('elige el par con más días coincidentes', () => {
+    // movimiento×proteína: 4 días. déficit pares: 0 (sin meta calórica).
+    const signals = [MON, TUE, THU, FRI].map((d) =>
+      mkSig(d, { trained: true, protein_g: 140, meal_count: 2 }),
+    )
+    const co = strongestCoOccurrence(signals, SUN, CTX)
+    expect(co).not.toBeNull()
+    expect(co!.pair.a).toBe('movimiento')
+    expect(co!.pair.b).toBe('proteina')
+    expect(co!.both).toBe(4)
+  })
+
+  it('null cuando ninguna co-ocurrencia llega al mínimo', () => {
+    const signals = [
+      mkSig(MON, { trained: true, protein_g: 140, meal_count: 2 }),
+      mkSig(TUE, { trained: true, protein_g: 140, meal_count: 2 }),
+    ]
+    expect(strongestCoOccurrence(signals, SUN, CTX)).toBeNull()
+  })
+})
+
+describe('signalLine (línea de cualquier señal de evidencia)', () => {
+  it('marca presente solo los días del predicado (déficit con meta)', () => {
+    const ctx = { proteinTarget: 130, calorieTarget: 2000 }
+    const signals = [
+      mkSig(MON, { calories: 1700 }), // déficit sano
+      mkSig(TUE, { calories: 2400 }), // superávit → ausente
+      mkSig(WED, { calories: 900 }), // por debajo del piso 0.6× → ausente
+    ]
+    const cells = signalLine(signals, SUN, 'deficit', ctx)
+    expect(cells).toHaveLength(7)
+    expect(cells[0]!.state).toBe('present') // lunes
+    expect(cells[1]!.state).toBe('absent') // martes
+    expect(cells[2]!.state).toBe('absent') // miércoles (bajo el piso)
   })
 })
 

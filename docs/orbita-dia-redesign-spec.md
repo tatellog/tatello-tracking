@@ -1,104 +1,146 @@
-# Rediseño de Órbita Día (Stelar v1 · Sin IA)
+# Rediseño de Órbita Día (Stelar v2 · Sin IA)
 
-> FUENTE DE VERDAD para Órbita · Día. Sustituye el modelo anterior de DayPresent
-> ("¿cómo va mi día?" con héroe/chips/menos-apareció/enfoque). Determinístico,
-> sin IA. Nada se inventa: todo sale de la evidencia que la usuaria ya registró.
+> FUENTE DE VERDAD para Órbita · Día. Sustituye el modelo v1 de "¿Quién fuiste
+> hoy?" (7 estados / arquetipo + diagrama orbital). Determinístico, sin IA. Nada
+> se inventa: todo sale de la evidencia que la usuaria ya registró.
+>
+> **ACCIONABLE (cambio dueña, jun 2026).** Órbita ya NO es Observadora pura:
+> puede **recomendar un FOCO** desde los propios datos (modo recomendación, no
+> orden; nunca receta dieta/rutina/clínico). Se mantienen las líneas rojas.
+> Ver manifiesto § "la frontera".
 
-## Filosofía
+## Filosofía del rediseño
 
-> Haz visible lo invisible.
+Órbita Día NO es un dashboard. NO es un reporte diario. NO es una pantalla de
+estadísticas. Responde UNA sola pregunta:
 
-Las calorías, proteínas y pasos ya son visibles. Lo invisible es **el patrón
-dominante que ya estaba en tus acciones**. La app NO dice quién eres; dice:
+> **¿Cómo voy hoy?**
 
-> "Esto es lo que tus datos hicieron visible hoy."
+Nada más.
 
-En esta v1 NO existe IA. Toda la experiencia se construye con reglas de negocio
-transparentes sobre los datos registrados. Nunca inventar conclusiones.
+La usuaria abrió Stelar porque quiere bajar de peso. No pregunta "¿cuántas cosas
+registré?". Pregunta "¿me estoy acercando a mi objetivo hoy?". Órbita Día debe
+REDUCIR la incertidumbre, no generar más información.
 
-## Objetivo
+> Promesa de Stelar: hacer visible lo invisible.
 
-Órbita Día NO responde "¿qué comiste?" ni "¿cómo van tus macros?" (eso vive en
-otras pantallas). Responde una sola pregunta —**¿Quién fuiste hoy?**— pero NO
-desde la personalidad, sino desde el comportamiento observado. Debe sentirse
-como un espejo, no como un coach.
+Órbita Día no predice, no motiva, no aconseja, no juzga. Solo muestra:
+**¿qué dice la evidencia de hoy?**
 
-## Principio: estados, no arquetipos
+## Override consciente del manifiesto (decisión de la dueña)
 
-NO son personalidad. Representan **qué mostró tu evidencia hoy** — el patrón de
-señales que predominó. Por eso el lenguaje es:
+El manifiesto v3.0 marca como línea roja que el déficit NUNCA domine una
+pantalla. Para Órbita Día la dueña anuló esa regla de forma explícita: el héroe
+de esta vista es el estado del déficit del día. Se mantiene la voz del
+manifiesto (informa, nunca culpa ni celebra) y el resto de líneas rojas siguen
+vigentes (sin lenguaje clínico, sin comparaciones, sin presión).
 
-> "Hoy predominó la recuperación." (porque el sueño fue la señal más fuerte)
+## Regla #1 · nunca contar registros como logro vacío
 
-NO "Hoy fuiste disciplinada" (no se puede saber) ni "Eres X" (etiqueta).
-
-## Los 7 estados de Stelar
-
-Cada estado se activa por reglas transparentes sobre las señales del día. Cada
-uno tiene un color.
-
-| Estado           | Color   | Se activa cuando…                                                                                                                     |
-| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Constancia**   | Rosa    | La MAYORÍA de las señales del día estuvieron presentes (continuidad). No importa cuáles; importa que hubo continuidad.                |
-| **Energía**      | Naranja | Las señales de MOVIMIENTO fueron las más fuertes (entreno, pasos, actividad, FC a futuro).                                            |
-| **Recuperación** | Azul    | La señal dominante fue DESCANSAR (sueño, descanso, poca carga). No es flojera: es recuperación.                                       |
-| **Nutrición**    | Verde   | Las señales más fuertes vinieron de la COMIDA (déficit logrado, proteína, registro completo, calorías).                               |
-| **Equilibrio**   | Blanco  | NINGUNA señal dominó; todo estuvo parejo. Eso también es evidencia.                                                                   |
-| **Exploración**  | Morado  | La usuaria registró señales NUEVAS/suaves (emoción, ciclo, energía, hambre, sueño). La app aprendió algo nuevo de ella.               |
-| **Presencia**    | —       | NO hubo buenos resultados (entreno ❌, déficit ❌, proteína ❌) PERO sí hubo registro. Apareció. No desapareció. Rompe el "ya fallé". |
-
-**Presencia es el más importante**: protege a la usuaria que no tuvo un buen día
-pero fue honesta y registró. "Hoy predominó tu presencia. Porque apareciste."
+A la usuaria no le importa "registraste proteína / agua / sueño" como conteo.
+Eso son acciones. Órbita revela lo que esas acciones SIGNIFICAN para su
+objetivo. Los registros aparecen como evidencia que sostiene (o no) el rumbo del
+día, nunca como un marcador de cuántas cosas anotó.
 
 ## Estructura de la pantalla
 
-### Hero — el astro del estado
+Muy calmada, mucho aire, 3-4 bloques, sin listas largas, sin analytics densos.
+Fondo celestial oscuro, tipografía editorial, sensación premium. La UI respira.
 
-- Título: **¿Quién fuiste hoy?**
-- El héroe es el **astro GRANDE del estado** (su glifo PNG) sobre el cielo Skia
-  (aura que respira + glow), tintado a su color. Limpio, sin datos encima.
-- Debajo: el estado en palabra, **"Hoy predominó la [estado]."** (en su color),
-  una explicación de 1 frase, y un hint: _"Toca el astro para ver por qué ›"_.
-- El astro es tappable → abre el modal "Por qué".
+Orden de bloques: Hero → Hacia dónde va tu día → La evidencia → Lo que aún no
+aparece → Cierre. La síntesis ("Hacia dónde va tu día") va justo después del héroe,
+antes del detalle.
 
-### El algoritmo es VISIBLE (transparencia · en el modal)
+### Hero · ¿Cómo va tu objetivo hoy?
 
-Al tocar el astro se abre un modal (mismo sistema que el modal de Órbita Mes:
-blur + scrim cálido + tarjeta) con los **DATOS REALES** de las señales que
-decidieron el día:
+La información más importante, inmediata. Un anillo que **se llena hacia la meta**
+(metáfora Apple Watch): la traza crece con `consumo / meta`; lleno = llegaste a tu
+presupuesto del día (que ya es un déficit, así que llenar es sano y protege contra
+comer de menos).
 
-- Eyebrow "POR QUÉ" + el estado (con su punto de color) + la regla que lo decidió
-  (la explicación: "La mayoría de tus señales estuvieron presentes hoy.").
-- **Barras**, una por señal presente, ordenadas por fuerza: etiqueta + barra (su
-  peso relativo, la dominante resaltada) + el **valor real registrado** (p. ej.
-  "7.8 h", "1 comida", "Energía 3/5") — nunca un puntaje abstracto "x/5".
-- Las señales sin registro van abajo como ausencia: "Sueño · Ciclo: aún sin
-  registro hoy."
+**Dentro del anillo vive un CAMPO DE ESTRELLAS** (sin líneas, no un asterismo):
+unas pocas grandes (destello de 4 puntas, con halo) y varias pequeñas de tamaños
+variados. Es el "cielo" del día, identidad de Stelar. El número y la palabra viven
+DEBAJO del anillo, para que el cielo no compita con el dato.
 
-> **Decisión de diseño (v1.2):** la lista de `★★★★★ Señal` en pantalla se retiró
-> (se leía como boleta de calificaciones · culpa + ranking). El detalle vive ahora
-> en el modal, **a un tap**, con datos reales en barras y la dominante resaltada —
-> el héroe queda limpio con el astro. (Se probó una constelación de estrellas en el
-> héroe y se descartó: ensuciaba la pantalla.)
+Bajo el anillo, el estado del objetivo (como el mockup de la dueña):
 
-Todo transparente. Nada mágico. Nada parece inventado.
+> HOY ESTÁS EN · **Déficit** · **425 kcal** · _Aún tienes margen para cerrar el día._
 
-### LA EVIDENCIA
+El número = `|consumido − meta|`: **SIEMPRE positivo, nunca un negativo** (decisión
+de la dueña: ver números negativos no es bueno). La PALABRA da el rumbo ("Déficit"
+= vas bajo tu meta = bien · "Sobre tu objetivo" = te pasaste); el número es solo la
+magnitud. Sin signo `+` ni `−`.
 
-Sólo las acciones registradas que respaldan el estado. No interpretar, no
-explicar — sólo mostrar:
+Tratamiento visual (premium, vivo): traza con gradiente diagonal (magentaDeep →
+magentaHot · oro para "sobre objetivo"), una **aura que respira** detrás del anillo
+(halo de luz del color del estado, late lento · da profundidad + vida), un **pozo
+de luz interior** (lit-from-within detrás de las estrellas), track tintado al
+estado, y una **cabeza de cometa** en la punta. La respiración vive en la opacidad
+de una View (op de compositor, no re-rasteriza el SVG) y se apaga fuera de pantalla
 
-- ✓ Entrenaste — 42 minutos registrados
-- ✓ Permaneciste en déficit — 1280 / 1450 kcal
-- ✓ Dormiste — 7.8 horas
-- ✓ Registraste tus comidas — 3 comidas
-- ✓ Registraste cómo te sentiste — Energía 4/5
+- reduce-motion. Cross-platform (RNSVG, sin Skia).
 
-### TODAVÍA NO VIMOS
+* **Déficit** (consumo ≤ meta): palabra "Déficit", número "425 kcal" magenta,
+  línea "Aún tienes margen para cerrar el día." Anillo magenta.
+* **Sobre tu objetivo** (consumo > meta): anillo completo en oro (cálido, nunca
+  rojo) + un arco oro corto que insinúa el excedente. Número "135 kcal" oro,
+  línea "Tu ritmo continúa mañana."
+* **Aún se revela** (sin comida o sin meta de calorías): sin número, la
+  constelación baja su intensidad (a la espera, no "cargando"). Palabra "Tu día
+  aún se revela", línea "Cuando registres tu comida, verás cómo va tu objetivo."
 
-Señales importantes no registradas, como AUSENCIA (no error):
+Nunca avergonzar. Nunca celebrar. Nunca un número negativo. Solo informar.
 
-- ○ Agua · ○ Estado de ánimo · ○ Ciclo
+> **Gráfica de tendencia (retirada en Día).** Se probó un sparkline de ingesta
+> acumulada (reconstruido de las horas de las comidas) pero NO respondía "¿cómo
+> voy hoy?" (regla de validación) y empujaba a dashboard. La curva que sí valdría
+> (déficit hora a hora) necesita gasto calórico intradía → wearables (futuro). La
+> tendencia por días vive en Semana/Mes, no en Día.
+
+### Hacia dónde va tu día (Dirección + Por qué)
+
+La sección más importante después del Hero, por eso va PRIMERO (responde "¿cómo
+voy?" antes del detalle). Órbita resume la trayectoria de hoy, sin predicciones:
+
+- "La evidencia de hoy se parece a tus días dentro del objetivo."
+- "La evidencia de hoy aún está incompleta. Sabremos más conforme avance el día."
+- "La evidencia de hoy muestra un día sobre tu objetivo."
+- "La evidencia de hoy todavía está tomando forma." (déficit por debajo del piso
+  sano: nunca se valida la restricción extrema como "dentro del objetivo").
+
+Toda conclusión lleva su evidencia debajo (**¿Por qué?**), transparente:
+
+> La evidencia de hoy apunta a un día dentro de tu objetivo.
+> ¿Por qué? · ✓ Déficit de calorías · ✓ Proteína en objetivo · ✓ Entrenamiento
+
+La usuaria siempre entiende de dónde salió la conclusión.
+
+### La evidencia de hoy
+
+NO rankea dimensiones, NO dice que una ganó. Solo lo que YA apareció hoy, como
+respaldo del rumbo, con su dato real. La primera estrella brilla mayor (jerarquía,
+no checklist):
+
+- ✓ Proteína en objetivo · 122 / 120 g
+- ✓ Entrenaste
+- ✓ Dormiste · 7.5 h
+- ✓ Agua completa · 8 / 8 vasos
+- ✓ Te sentiste bien · Energía alta
+
+NO se repite el déficit (ya es el Hero) NI se cuenta "N comidas" (Regla #1: nunca
+contar registros como logro). El bienestar es una frase corta y humana, sin
+"calma alta/baja" (suena clínico). Solo lo que apareció. Nada más.
+
+### Lo que aún no aparece
+
+No es un error, no es una advertencia. Solo la evidencia que todavía no llegó,
+en lenguaje calmado. Cada una es tappable → lleva a registrarla (sin culpa, sin
+"te faltó"):
+
+- ○ Sueño · ○ Ánimo · ○ Agua
+
+(El ciclo se excluye: se ancla cuando el período empieza, no es algo "diario".)
 
 ### Cierre
 
@@ -108,21 +150,52 @@ Una frase elegante que conecta con Órbita Semana:
 - "Mañana tu historia continuará."
 - "Una señal por sí sola dice poco. Varias comienzan a mostrar un patrón."
 
-## Reglas importantes
+## Qué NO mostrar
 
-- Nunca usar IA. Nunca inventar conclusiones. Nunca lenguaje tipo coach ni
-  frases vacías ("Eres increíble", "Vas excelente", "Sigue así").
-- Nunca etiquetar a la persona. El estado describe la EVIDENCIA, no a la usuaria.
-- Todo debe sentirse científico pero cálido. Elegante. Silencioso. Honesto.
+- NO mostrar dimensiones en estrellas/puntajes (Movimiento 5★, Proteína 4★…).
+  Eso es un dashboard. Órbita no es un dashboard.
+- NO rankear dimensiones. Lo único que importa: ¿me acerco al objetivo de hoy?
+- NO el diagrama orbital interactivo ni los 7 estados/arquetipo (retirados en v2).
 
-## Estilo visual
+## Movimiento
 
-Lenguaje visual de Stelar. Fondo espacial. Mucho aire / espacio negativo. UNA
-sola tarjeta principal. Tipografía editorial. No saturar. La pantalla transmite
-calma — no dashboard, no analytics, no tablas. Como abrir un diario elegante.
+Todo aparece con fades lentos. El anillo de progreso se anima al entrar. Las
+tarjetas de evidencia aparecen una a una. Sin confeti, sin gamificación, sin
+celebración. Solo confianza silenciosa.
 
-## Objetivo UX
+## Voz
 
-Al cerrar la pantalla, la usuaria debe sentir:
+Órbita es una OBSERVADORA, no coach, no nutrióloga, no psicóloga.
 
-> "No solo vi mis datos. Entendí lo que esos datos dijeron sobre mí hoy."
+- ✓ "La evidencia de hoy es consistente con tu objetivo." · ✗ "¡Buen trabajo!"
+- ✓ "Tu proteína ya apareció hoy." · ✗ "¡Increíble! ¡Proteína desbloqueada!"
+- ✓ "Hoy todavía se está revelando." · ✗ "¡No te rindas!"
+
+Sin em-dashes en copy visible. Español cálido, sin culpa, sin tecnicismo, sin
+lenguaje clínico.
+
+## Regla de validación
+
+Antes de renderizar cualquier tarjeta, pregunta: ¿esto ayuda a responder "cómo
+voy hoy"? Si la respuesta es NO, quítalo.
+
+## Sensación final
+
+Al cerrar Órbita Día la usuaria debe pensar: "Sé exactamente dónde estoy hoy."
+No "vi más datos." Eso es el propósito de Órbita Día. Lo invisible ahora se
+siente visible.
+
+## Notas de implementación
+
+- Lógica pura y testeable en `features/orbit/day-goal.ts` (`buildDayGoal`). La
+  capa visual la consume en `components/DayPresent.tsx`.
+- El campo de estrellas del anillo es fijo y estático. La única animación continua
+  es la opacidad del aura (View envolvente → compositor, no re-rasteriza el SVG;
+  apagada fuera de pantalla + reduce-motion). El draw-in del arco es one-shot.
+- El déficit "sano" comparte definición con Semana/Mes (`features/orbit/deficit.ts`,
+  `isDeficitDay`): solo cuenta como sano dentro de `[0.6×meta, meta]`. El héroe
+  muestra el consumo honesto siempre, pero la DIRECCIÓN y el "¿Por qué?" solo
+  validan "dentro del objetivo" si el déficit es sano. Por debajo del piso
+  (restricción extrema) la lectura es neutral ("todavía está tomando forma") y no
+  afirma el déficit como logro (línea roja del manifiesto).
+- El modelo v1 (`day-state.ts`, 7 estados) queda retirado de la UI.

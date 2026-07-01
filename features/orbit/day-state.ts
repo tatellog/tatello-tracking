@@ -1,7 +1,11 @@
 /*
  * Órbita · Día — "¿Quién fuiste hoy?" (Stelar v1, SIN IA).
  *
- * Fuente de verdad: docs/orbita-dia-redesign-spec.md. El día resuelve a UNO de
+ * @deprecated Modelo v1 (7 estados). Órbita Día migró a "¿Cómo voy hoy?"
+ * (day-goal.ts, héroe del déficit) en v2 — ver docs/orbita-dia-redesign-spec.md.
+ * Se conserva por sus tests; ya no lo consume la UI.
+ *
+ * El día resuelve a UNO de
  * 7 ESTADOS — no arquetipos de personalidad, sino "qué predominó en tu evidencia
  * hoy". Todo determinístico: las fuerzas (★) salen sólo de lo registrado, y el
  * algoritmo es VISIBLE (se muestran las estrellas que lo decidieron). Nunca se
@@ -11,6 +15,7 @@
  * Lógica pura y testeable; la capa visual la consume en DayPresent.tsx.
  */
 import type { DailySignals } from './api'
+import { isDeficitDay } from './deficit'
 
 export type DayStateKey =
   | 'constancia'
@@ -120,12 +125,10 @@ function wellbeingEvidence(s: DailySignals): { label: string; detail?: string } 
 /** Piso de cordura del déficit (manifiesto · línea roja): NUNCA celebrar como
  *  evidencia positiva una ingesta muy por debajo de la meta — eso premiaría la
  *  restricción extrema. Sólo cuenta como "déficit del día" si está EN déficit
- *  pero por encima del 60% de la meta. Debajo, no es logro: no se muestra. */
-const DEFICIT_FLOOR_RATIO = 0.6
+ *  pero por encima del 60% de la meta. Debajo, no es logro: no se muestra.
+ *  La definición vive en ./deficit (fuente única, compartida con Semana/Mes). */
 function healthyDeficit(s: DailySignals, ctx: DayStateCtx): boolean {
-  if (!ctx.calorieTarget || ctx.calorieTarget <= 0) return false
-  if (s.calories == null || s.calories <= 0) return false
-  return s.calories <= ctx.calorieTarget && s.calories >= ctx.calorieTarget * DEFICIT_FLOOR_RATIO
+  return isDeficitDay(s.calories, ctx.calorieTarget)
 }
 
 /* ── Fuerzas (★ 0-5) por señal — sólo de lo registrado ───────────────── */

@@ -72,6 +72,10 @@ function OrbitBody() {
   // the jank. Debounced idle flips it back ~140 ms after the last scroll event.
   const [isScrolling, setIsScrolling] = useState(false)
   const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
+  const scrollToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true })
+  }, [])
   const handleScroll = useCallback(() => {
     setIsScrolling((s) => (s ? s : true))
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
@@ -121,6 +125,7 @@ function OrbitBody() {
 
         <SafeAreaView style={styles.flex} edges={['top']}>
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             onScroll={handleScroll}
@@ -152,6 +157,7 @@ function OrbitBody() {
                 key="dia"
                 viewedDay={viewedDay}
                 onReturnToToday={() => setViewedDay(null)}
+                onScrollTop={scrollToTop}
               />
             ) : segment === 'semana' ? (
               <WeekSegment
@@ -161,9 +167,17 @@ function OrbitBody() {
                   setViewedDay(date)
                   setSegment('dia')
                 }}
+                onScrollTop={scrollToTop}
               />
             ) : (
-              <MonthSegment key="mes" />
+              <MonthSegment
+                key="mes"
+                onPickDay={(date) => {
+                  setViewedDay(date)
+                  setSegment('dia')
+                }}
+                onScrollTop={scrollToTop}
+              />
             )}
           </ScrollView>
         </SafeAreaView>

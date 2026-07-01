@@ -112,10 +112,16 @@ docs/PRD-v2.md     · qué construir (nav, Reliquias, Lecturas, Alma Celeste)
 - **Reliquias Celestes** · patrones (no registros) que viven en Órbita:
   **Brillo** (qué potencia), **Ancla** (qué mantiene constante), **Pausa**
   (qué ayuda a recuperarse), **Señal Naciente** (cambios que emergen).
-- **Lecturas** · la IA de Órbita OBSERVANDO (Diaria / Semanal / Mensual).
-  Observa y describe, NUNCA aconseja ni prescribe ("tu energía fue más
-  estable cuando dormiste más de 7h" ✓ · "deberías dormir más" ✗).
-- **IA de Órbita = Observadora.** No coach, no terapeuta, no nutrióloga.
+- **Lecturas** · la IA de Órbita observa tus datos **y recomienda un FOCO /
+  palanca** (Diaria / Semanal / Mensual). Puede decir en QUÉ enfocarte
+  ("este mes, tu palanca es sostener el finde" ✓) · NUNCA recetar dieta /
+  rutina / clínico ("comé menos", "dormí más" ✗) ni diagnosticar.
+- **IA de Órbita = Guía observacional** · recomienda un foco desde tus propios
+  datos (accionable en modo recomendación, no orden). NO nutrióloga / coach /
+  médico: no receta dieta, rutina ni tratamiento. (Cambio dueña jun 2026:
+  antes era Observadora pura "nunca aconseja"; ahora sí recomienda un foco.
+  Aplica a Día, Semana y Mes. Ver [[orbita-actionable-shift]] y manifiesto §
+  "la frontera".)
 - **Evolución Celeste / Alma Celeste** · constelación mensual + historial
   de largo plazo. Alma Celeste NO reemplaza la constelación mensual.
 

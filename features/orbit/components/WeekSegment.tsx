@@ -17,16 +17,20 @@ import { colors, typography } from '@/theme'
 
 import { useIsoWeekSignals } from '../hooks'
 import {
-  buildAppearanceLine,
   buildWeekDimensions,
+  confirmedFacts,
+  dayTimeline,
   dimObservation,
   dimensionLine,
+  emergingEvidence,
   mainDiscovery,
-  quietestSignal,
+  needsMoreEvidence,
   weekAbsences,
-  weekObservations,
+  weekInvitations,
   type DayCell,
+  type DayTimelineRow,
   type DiscoveryArchetype,
+  type DiscoveryTimeline,
   type MainDiscovery,
   type WeekDimKey,
 } from '../week-orbit-logic'
@@ -62,36 +66,47 @@ const DISCOVERY_COLOR: Record<DiscoveryArchetype, string> = {
 }
 
 /*
- * Órbita · Semana (v1 sin IA) — "¿Qué descubriste sobre ti esta semana?".
+ * Órbita · Semana (v2 · evidencia sin IA) — "¿Qué empezó a repetirse esta
+ * semana?".
  *
  * No es un dashboard: es EVIDENCIA convertida en descubrimiento. Cada
  * conclusión sale de daily_signals y se puede explicar ("¿Por qué?"). No
- * interpreta, no diagnostica, no inventa. Secciones (ver
- * docs/orbita-semana-spec.md): descubrimiento principal → el cielo semanal
- * (galaxia) → lo más silencioso → tus ritmos → lo constante → la ausencia →
- * tu órbita cambia.
+ * interpreta, no diagnostica, no inventa; observa, nunca afirma causa.
+ * Secciones (ver docs/orbita-semana-spec.md): §1 descubrimiento principal
+ * (co-ocurrencia, híbrido) → §2 el cielo semanal (galaxia) → §3 evidencia
+ * emergente → §4 lo que podemos confirmar → §5 lo que aún necesita más
+ * evidencia → §6 la semana día por día → §7 la ausencia → §8 repetir la
+ * próxima semana.
  */
 export function WeekSegment({
   onOpenMes,
   onPickDay,
+  onScrollTop,
 }: {
   onOpenMes?: () => void
   /** Abrir un día de la semana en Órbita Día (lo dispara la tira de 7 días). */
   onPickDay?: (date: string) => void
+  /** Volver al inicio del scroll (botón al final del recorrido). */
+  onScrollTop?: () => void
 }) {
   const { data: signals, todayIso, isLoading } = useIsoWeekSignals()
   const macros = useMacroTargets()
   const proteinTarget = macros.data?.protein_g ?? null
-  const ctx = useMemo(() => ({ proteinTarget }), [proteinTarget])
+  // La meta calórica habilita la evidencia de déficit (co-ocurrencias, §3-§6).
+  // Sin ella, esas observaciones simplemente no aparecen (degradación segura).
+  const calorieTarget = macros.data?.calories ?? null
+  const ctx = useMemo(() => ({ proteinTarget, calorieTarget }), [proteinTarget, calorieTarget])
 
   const week = useMemo(() => signals ?? [], [signals])
   const dims = useMemo(() => buildWeekDimensions(week, todayIso, ctx), [week, todayIso, ctx])
   const discovery = useMemo(() => mainDiscovery(week, todayIso, ctx), [week, todayIso, ctx])
-  const quiet = useMemo(() => quietestSignal(dims), [dims])
-  const observations = useMemo(() => weekObservations(week, todayIso), [week, todayIso])
+  // §3 evidencia emergente · §4 hechos · §5 honestidad · §6 día por día · §8.
+  const emerging = useMemo(() => emergingEvidence(week, todayIso, ctx), [week, todayIso, ctx])
+  const facts = useMemo(() => confirmedFacts(week, todayIso, ctx), [week, todayIso, ctx])
+  const moreEvidence = useMemo(() => needsMoreEvidence(week, todayIso, ctx), [week, todayIso, ctx])
+  const timeline = useMemo(() => dayTimeline(week, todayIso, ctx), [week, todayIso, ctx])
+  const invitations = useMemo(() => weekInvitations(week, todayIso, ctx), [week, todayIso, ctx])
   const absences = useMemo(() => weekAbsences(week, todayIso), [week, todayIso])
-  // Tus 7 días (lun→dom) con su estado de aparición — la tira para abrir un día.
-  const appearanceCells = useMemo(() => buildAppearanceLine(week, todayIso), [week, todayIso])
 
   const hasEvidence = dims.some((d) => d.present > 0)
   // La galaxia muestra solo señales con presencia; las que nunca aparecieron
@@ -160,49 +175,56 @@ export function WeekSegment({
             <Text style={styles.tapHint}>Toca un planeta para ver sus días.</Text>
           )}
 
-          {/* Tus 7 días — la tira para ABRIR cualquier día en Órbita Día. Vive
-              junto a la galaxia (explorar días es su contexto). */}
-          {onPickDay ? (
-            <WeekDayStrip cells={appearanceCells} todayIso={todayIso} onPick={onPickDay} />
-          ) : null}
-
-          {/* §3-5 · Una sola zona de evidencia: la señal más callada (fila
-              líder) + observaciones (ritmos + lo constante fusionados, con el
-              sueño deduplicado). Trato uniforme de filas, no card vs lista. */}
-          {quiet || observations.length > 0 ? (
+          {/* §3 · Evidencia emergente — observaciones con número (2 a 4). */}
+          {emerging.length > 0 ? (
             <View style={styles.block}>
-              <Text style={styles.sectionEyebrow}>Lo que mostró tu semana</Text>
+              <Text style={styles.sectionEyebrow}>Evidencia emergente</Text>
               <View style={styles.list}>
-                {quiet ? (
-                  <View style={styles.listRow}>
-                    <Text style={[styles.listStar, { color: WEEK_DIM_COLOR[quiet.key] }]}>✦</Text>
-                    <Text style={styles.listText}>
-                      <Text style={[styles.listEm, { color: WEEK_DIM_COLOR[quiet.key] }]}>
-                        {quiet.label}
-                      </Text>
-                      {` fue tu señal más callada: ${quiet.present} de ${quiet.total} días.`}
-                    </Text>
-                  </View>
-                ) : null}
-                {observations.map((text, i) => (
+                {emerging.map((e, i) => (
                   <Animated.View
-                    key={`obs-${i}`}
-                    entering={FadeIn.duration(360).delay(i * 80)}
+                    key={e.key}
+                    entering={FadeIn.duration(360).delay(i * 70)}
                     style={styles.listRow}
                   >
                     <Text style={[styles.listStar, { color: accent }]}>✦</Text>
-                    <Text style={styles.listText}>{text}</Text>
+                    <Text style={styles.listText}>{e.text}</Text>
                   </Animated.View>
                 ))}
               </View>
             </View>
           ) : null}
 
-          {/* §6 · La ausencia también cuenta — lo que nunca apareció, sin culpa. */}
+          {/* §4 · Lo que podemos confirmar — hechos puros, sin interpretación. */}
+          {facts.length > 0 ? (
+            <View style={styles.block}>
+              <Text style={styles.sectionEyebrow}>Lo que podemos confirmar</Text>
+              <View style={styles.list}>
+                {facts.map((f) => (
+                  <View key={f.key} style={styles.listRow}>
+                    <Text style={styles.factCheck}>✓</Text>
+                    <Text style={styles.listText}>{f.text}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {/* §5 · Lo que aún necesita más evidencia — honestidad, sin fingir. */}
+          {moreEvidence ? (
+            <View style={styles.blockTight}>
+              <Text style={styles.sectionEyebrow}>Lo que aún necesita más evidencia</Text>
+              <Text style={styles.honestNote}>{moreEvidence}</Text>
+            </View>
+          ) : null}
+
+          {/* §6 · La semana día por día — etiquetas de evidencia + abrir el día. */}
+          <DayTimelineBlock rows={timeline} todayIso={todayIso} onPick={onPickDay} />
+
+          {/* §7 · La ausencia también cuenta — lo que nunca apareció, sin culpa. */}
           {absences.length > 0 ? <AbsenceBlock items={absences} /> : null}
 
-          {/* §7 · Tu órbita cambia — el cierre, solo: cada semana construye tu mes. */}
-          <TransitionBlock onOpenMes={onOpenMes} accent={accent} />
+          {/* §8 · Repetir la próxima semana — invitaciones + cierre hacia Mes. */}
+          <TransitionBlock onOpenMes={onOpenMes} accent={accent} invitations={invitations} />
         </>
       )}
 
@@ -211,6 +233,19 @@ export function WeekSegment({
         discovery={discovery}
         onClose={() => setShowEvidence(false)}
       />
+
+      {/* Fin del recorrido: volver al inicio sin hacer scroll a mano. */}
+      {onScrollTop ? (
+        <Pressable
+          style={styles.backTop}
+          onPress={onScrollTop}
+          accessibilityRole="button"
+          accessibilityLabel="Volver arriba"
+        >
+          <Text style={styles.backTopArrow}>↑</Text>
+          <Text style={styles.backTopText}>Volver arriba</Text>
+        </Pressable>
+      ) : null}
     </Animated.View>
   )
 }
@@ -251,6 +286,11 @@ function SymbolHalo({
  *  dimensión proteína; nunca tiñe toda la pestaña. */
 function discoveryColor(archetype: DiscoveryArchetype): string {
   return DISCOVERY_COLOR[archetype]
+}
+
+/** "el lunes" → "El lunes" — capitaliza la primera letra de la foto del día. */
+function capitalize(s: string): string {
+  return s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }
 
 /* §1 · El descubrimiento principal — card con chevron, mismo patrón que
@@ -306,7 +346,53 @@ function DiscoveryCard({ discovery, onWhy }: { discovery: MainDiscovery; onWhy: 
           </View>
         </Animated.View>
       </Pressable>
+      {/* La línea de evidencia del descubrimiento: las dos señales que
+          coincidieron, una marca por día. Solo en co-ocurrencia (en presencia,
+          la tira "Tus 7 días" y la galaxia ya cubren la aparición). */}
+      {discovery.kind === 'cooccurrence' ? <HeroTimelines timelines={discovery.timelines} /> : null}
     </Animated.View>
+  )
+}
+
+/** Color de una línea de evidencia del hero. Las dimensiones reusan su color;
+ *  déficit y sueño +7 h toman el de su dimensión más cercana. */
+function timelineColor(key: DiscoveryTimeline['key']): string {
+  if (key === 'deficit') return colors.dimension.alimento
+  if (key === 'sleep7h') return colors.dimension.sueno
+  if (key === 'presencia') return colors.leche
+  return WEEK_DIM_COLOR[key]
+}
+
+/* Las dos líneas L·M·M·J·V·S·D del descubrimiento de co-ocurrencia: cada señal
+ * con su color, una marca por día (encendida = apareció). Lectura visual de la
+ * coincidencia, sin interpretar. */
+function HeroTimelines({ timelines }: { timelines: DiscoveryTimeline[] }) {
+  return (
+    <View style={styles.heroTl}>
+      {timelines.map((t) => {
+        const c = timelineColor(t.key)
+        return (
+          <View key={t.key} style={styles.heroTlRow}>
+            <Text style={[styles.heroTlLabel, { color: c }]} numberOfLines={1}>
+              {t.label}
+            </Text>
+            <View style={styles.heroTlDots}>
+              {t.cells.map((cell, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.heroTlDot,
+                    cell.state === 'present' && { backgroundColor: c },
+                    cell.state === 'absent' && styles.heroTlDotAbsent,
+                    cell.state === 'future' && styles.heroTlDotFuture,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+        )
+      })}
+    </View>
   )
 }
 
@@ -328,19 +414,43 @@ function AbsenceBlock({ items }: { items: readonly string[] }) {
   )
 }
 
-/* §7 · "Tu órbita cambia": el cierre — cada semana construye el mes. */
-function TransitionBlock({ onOpenMes, accent }: { onOpenMes?: () => void; accent: string }) {
+/* §8 · "Repetir la próxima semana": invitaciones a observar ("esto apareció
+ * varias veces", nunca "deberías") + el cierre hacia Mes. */
+function TransitionBlock({
+  onOpenMes,
+  accent,
+  invitations,
+}: {
+  onOpenMes?: () => void
+  accent: string
+  invitations: readonly string[]
+}) {
   return (
-    <View style={styles.transition}>
-      <Text style={styles.transitionLine}>Cada semana deja una huella en tu mes.</Text>
-      {onOpenMes ? (
-        <Pressable onPress={onOpenMes} hitSlop={8} accessibilityRole="button">
-          <Text style={[styles.transitionLink, { color: accent }]}>
-            Ver cómo se transforma tu mes ›
-          </Text>
-        </Pressable>
+    <>
+      {invitations.length > 0 ? (
+        <View style={styles.block}>
+          <Text style={styles.sectionEyebrow}>Para observar la próxima semana</Text>
+          <View style={styles.list}>
+            {invitations.map((text, i) => (
+              <View key={i} style={styles.listRow}>
+                <Text style={[styles.listStar, { color: accent }]}>✦</Text>
+                <Text style={styles.listText}>{text}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
       ) : null}
-    </View>
+      <View style={styles.transition}>
+        <Text style={styles.transitionLine}>Cada semana deja una huella en tu mes.</Text>
+        {onOpenMes ? (
+          <Pressable onPress={onOpenMes} hitSlop={8} accessibilityRole="button">
+            <Text style={[styles.transitionLink, { color: accent }]}>
+              Ver cómo se transforma tu mes ›
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </>
   )
 }
 
@@ -371,15 +481,30 @@ function EvidenceSheet({
             />
             <Text style={styles.modalTitle}>{discovery.title}</Text>
           </View>
-          <View style={styles.evList}>
-            {discovery.evidence.map((e) => (
-              <View key={e.key} style={styles.evRow}>
-                <Text style={styles.evCheck}>✓</Text>
-                <Text style={styles.evText}>{e.text}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.modalCaption}>Todo esto salió de tus registros de la semana.</Text>
+          {discovery.snapshot ? (
+            // Foto del día: un solo registro esta semana → su instantánea, no
+            // seis conteos de "1 día".
+            <View style={styles.snapBlock}>
+              <Text style={styles.snapDay}>
+                {capitalize(discovery.snapshot.weekdayLabel)} registraste:
+              </Text>
+              <Text style={styles.snapItems}>{discovery.snapshot.items.join('  ·  ')}</Text>
+            </View>
+          ) : (
+            <View style={styles.evList}>
+              {discovery.evidence.map((e) => (
+                <View key={e.key} style={styles.evRow}>
+                  <Text style={styles.evCheck}>✓</Text>
+                  <Text style={styles.evText}>{e.text}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.modalCaption}>
+            {discovery.snapshot
+              ? 'Todo esto salió de tu registro de ese día.'
+              : 'Todo esto salió de tus registros de la semana.'}
+          </Text>
           <Pressable
             onPress={onClose}
             hitSlop={10}
@@ -394,64 +519,82 @@ function EvidenceSheet({
   )
 }
 
-/* Tus 7 días — tira de FECHAS tappable (lun→dom): cada día abre Órbita Día
- * anclado a esa fecha. Distinta a la línea de presencia del panel del planeta:
- * aquí se lee "elegir fecha" (número de día), no "presencia" (puntos/✓). Hoy =
- * píldora magenta; días sin registro = número atenuado; futuro = tenue y no
- * tappable. */
-function WeekDayStrip({
-  cells,
+/* Color de cada etiqueta de evidencia del día. Déficit/proteína cálidos (oro =
+ * proteína, la métrica más cuidada); entreno naranja (movimiento). "Por encima
+ * de tu meta" y "Sin registros" en gris niebla: evidencia neutra, nunca alarma. */
+const TAG_COLOR: Record<string, string> = {
+  Déficit: colors.dimension.alimento,
+  Proteína: colors.oroLight,
+  Entreno: '#FF9E57',
+  'Por encima de tu meta': colors.niebla,
+  'Sin registros': colors.bruma,
+  Registro: colors.niebla,
+}
+const MUTED_TAGS = new Set(['Por encima de tu meta', 'Sin registros', 'Registro'])
+
+/* §6 · La semana día por día — cada día con sus ETIQUETAS de evidencia
+ * (Déficit, Proteína, Entreno, "Por encima de tu meta" o "Sin registros"). Se
+ * entiende la semana en 10 segundos; cada fila abre ese día en Órbita Día. */
+function DayTimelineBlock({
+  rows,
   todayIso,
   onPick,
 }: {
-  cells: readonly DayCell[]
+  rows: readonly DayTimelineRow[]
   todayIso: string
-  onPick: (date: string) => void
+  onPick?: (date: string) => void
 }) {
   return (
     <View style={styles.block}>
-      <Text style={styles.sectionEyebrow}>Tus 7 días</Text>
-      <View style={styles.stripRow}>
-        {cells.map((c, i) => {
-          const isToday = c.date === todayIso
-          const isFuture = c.state === 'future'
-          const dayNum = Number(c.date.slice(8, 10))
-          return (
-            <Pressable
-              key={i}
-              disabled={isFuture}
-              onPress={() => onPick(c.date)}
-              hitSlop={4}
-              style={styles.stripCol}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver el día ${dayNum} en detalle`}
-            >
+      <Text style={styles.sectionEyebrow}>La semana día por día</Text>
+      <View style={styles.tlList}>
+        {rows.map((r) => {
+          const isToday = r.date === todayIso
+          const isFuture = r.state === 'future'
+          const tappable = !!onPick && !isFuture
+          const content = (
+            <View style={styles.tlRow}>
               <Text
-                style={[
-                  styles.stripLetter,
-                  isToday && styles.stripLetterToday,
-                  isFuture && styles.stripLetterFuture,
-                ]}
+                style={[styles.tlDay, isToday && styles.tlDayToday, isFuture && styles.tlDayFuture]}
               >
-                {c.letter}
+                {r.weekdayLabel}
               </Text>
-              <View style={[styles.stripPill, isToday && styles.stripPillToday]}>
-                <Text
-                  style={[
-                    styles.stripNum,
-                    isToday && styles.stripNumToday,
-                    c.state === 'absent' && styles.stripNumAbsent,
-                    isFuture && styles.stripNumFuture,
-                  ]}
-                >
-                  {dayNum}
-                </Text>
+              <View style={styles.tlTags}>
+                {isFuture ? (
+                  <Text style={styles.tlFuture}>—</Text>
+                ) : (
+                  r.tags.map((t, i) => {
+                    const c = TAG_COLOR[t] ?? colors.niebla
+                    const muted = MUTED_TAGS.has(t)
+                    return (
+                      <View
+                        key={i}
+                        style={[styles.tlTag, { backgroundColor: hexA(c, muted ? 0.1 : 0.16) }]}
+                      >
+                        <Text style={[styles.tlTagText, { color: c }]}>{t}</Text>
+                      </View>
+                    )
+                  })
+                )}
               </View>
+            </View>
+          )
+          return tappable ? (
+            <Pressable
+              key={r.date}
+              onPress={() => onPick!(r.date)}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel={`Ver ${r.weekdayLabel} en detalle`}
+            >
+              {content}
             </Pressable>
+          ) : (
+            <View key={r.date}>{content}</View>
           )
         })}
       </View>
-      <Text style={styles.stripHint}>Toca un día para verlo en detalle.</Text>
+      {onPick ? <Text style={styles.stripHint}>Toca un día para verlo en detalle.</Text> : null}
     </View>
   )
 }
@@ -608,6 +751,41 @@ const styles = StyleSheet.create({
     color: colors.bone,
     marginLeft: 2,
   },
+  // ── §1 Línea(s) de evidencia del hero (co-ocurrencia) ─────────────
+  heroTl: {
+    marginTop: 12,
+    gap: 8,
+  },
+  heroTlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroTlLabel: {
+    width: 96,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+  },
+  heroTlDots: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  heroTlDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  heroTlDotAbsent: {
+    borderWidth: 1.5,
+    borderColor: colors.bruma,
+  },
+  heroTlDotFuture: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: hexA(colors.leche, 0.12),
+  },
   // ── §2 Panel del planeta enfocado ─────────────────────────────────
   panel: {
     marginTop: 14,
@@ -663,6 +841,65 @@ const styles = StyleSheet.create({
   // El nombre de la dimensión dentro de una fila (silencioso) — su color.
   listEm: {
     fontFamily: typography.uiSemi,
+  },
+  // ── §4 Lo que podemos confirmar (✓ hechos) ────────────────────────
+  factCheck: {
+    fontFamily: typography.uiBold,
+    fontSize: 14,
+    color: colors.oroLight,
+    marginTop: 1,
+  },
+  // ── §5 Lo que aún necesita más evidencia (nota honesta) ───────────
+  honestNote: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.bone,
+  },
+  // ── §6 La semana día por día (timeline con etiquetas) ─────────────
+  tlList: {
+    gap: 10,
+  },
+  tlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 26,
+  },
+  tlDay: {
+    width: 88,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  tlDayToday: {
+    color: colors.magenta,
+    fontFamily: typography.uiBold,
+  },
+  tlDayFuture: {
+    color: colors.bruma,
+  },
+  tlTags: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tlTag: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  tlTagText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 0.2,
+  },
+  tlFuture: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.bruma,
   },
   // ── Ausencia ──────────────────────────────────────────────────────
   absenceMark: {
@@ -850,6 +1087,24 @@ const styles = StyleSheet.create({
     marginTop: 18,
     gap: 12,
   },
+  // ── Foto del día (estado comienzo · un solo registro) ──────────────
+  snapBlock: {
+    marginTop: 18,
+    gap: 8,
+  },
+  snapDay: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  // Las señales del día en una línea, separadas por puntos (no una lista de ✓
+  // que repetiría "1 día"). Lectura de instantánea, no de conteos.
+  snapItems: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.sizes.bodyLarge * 1.5,
+    color: colors.leche,
+  },
   evRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -889,5 +1144,29 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
     color: colors.bone,
+  },
+  // ── Volver arriba (fin del recorrido) ────────────────────────────
+  backTop: {
+    marginTop: 36,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  backTopArrow: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.oroSoft,
+  },
+  backTopText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
 })

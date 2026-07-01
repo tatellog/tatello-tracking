@@ -21,17 +21,18 @@
  * daily_signals). Aquí solo se mapea puntos → progreso → etapa.
  */
 
-/** Puntos por fuente, una vez por día (espejo de fn_transform_points —
- *  si cambias uno, cambia el otro). Máximo 30/día. Entrenar pesa más,
- *  pero una usuaria que se cuida a diario avanza aunque no entrene. */
+/** Puntos por fuente de EVIDENCIA, una vez por día (espejo de
+ *  fn_transform_points — si cambias uno, cambia el otro). Máximo 31/día. El
+ *  emblema crece por evidencia (lo que crea cambio físico), NO por presencia:
+ *  el déficit es el objetivo primario → el peso más alto; el sueño cuenta como
+ *  EVIDENCIA de calidad (≥ 7 h), no por estar registrado. Primera comida,
+ *  energía subjetiva y check-in son PRESENCIA: ya no suman al emblema. */
 export const TRANSFORM_WEIGHTS = {
-  trained: 10,
-  firstMeal: 3,
+  deficit: 10,
+  trained: 8,
   proteinTarget: 6,
-  sleepLogged: 4,
+  sleep7h: 4,
   waterComplete: 3,
-  energyLogged: 2,
-  dailyCheckin: 2,
 } as const
 
 /** Puntos para revelar el emblema completo (100%). Con ~15-18 pts/día

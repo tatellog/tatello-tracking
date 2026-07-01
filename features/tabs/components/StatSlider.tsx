@@ -33,7 +33,13 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
-import { nextPhaseInfo, PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
+import {
+  CycleNextMilestone,
+  CyclePhaseHero,
+  CycleTimeline,
+  nextMilestoneLine,
+} from '@/features/cycle/components/CycleTimeline'
+import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { computeTdee, enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
@@ -949,93 +955,29 @@ function WellbeingSlide({ date }: { date: string }) {
 
 /* ─── Slide — cycle phase ──────────────────────────────────────────── */
 
-// Dial — a full ring of the cycle's days, the lit arc growing from
-// the top clockwise to today and tipped with a small marker. Visual
-// rhyme with the weight sparkline (a curve + a tip dot).
-const DIAL_W = 130
-const DIAL_H = 130
-const DIAL_R = 52
-const DIAL_CX = DIAL_W / 2
-const DIAL_CY = DIAL_H / 2
-const DIAL_CIRC = 2 * Math.PI * DIAL_R
-
-function CycleDial({ day, cycleLength }: { day: number; cycleLength: number }) {
-  const fraction = Math.min(1, day / cycleLength)
-  const filled = DIAL_CIRC * fraction
-  // Start at top (−90°), sweep clockwise.
-  const angle = fraction * 2 * Math.PI - Math.PI / 2
-  const markerX = DIAL_CX + DIAL_R * Math.cos(angle)
-  const markerY = DIAL_CY + DIAL_R * Math.sin(angle)
-
-  return (
-    <Svg width={DIAL_W} height={DIAL_H}>
-      <Circle
-        cx={DIAL_CX}
-        cy={DIAL_CY}
-        r={DIAL_R}
-        stroke={colors.bruma}
-        strokeWidth={2}
-        fill="none"
-      />
-      <Circle
-        cx={DIAL_CX}
-        cy={DIAL_CY}
-        r={DIAL_R}
-        stroke={colors.magenta}
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray={`${filled} ${DIAL_CIRC}`}
-        // Native rotation props (NOT a transform array): start the dash at the
-        // top by rotating −90° about the dial centre. On Android release the
-        // `transform` array + strokeDasharray combo mis-rendered (arc shifted
-        // left); rotation/originX/originY is the reliable path.
-        rotation={-90}
-        originX={DIAL_CX}
-        originY={DIAL_CY}
-      />
-      <Circle cx={markerX} cy={markerY} r={3.6} fill={colors.magenta} />
-    </Svg>
-  )
-}
-
 /*
- * Cycle phase — a read-only snapshot of where the user is in her
- * menstrual cycle today. Phase reframes the rest of the dashboard
- * (calories, sleep, mood), which is why it lives next to them on Hoy.
- * Inputs (period start / end) belong in QuickLog ✦, not this slide.
+ * Cycle phase — answers "¿dónde estoy hoy?" as a journey, not a day count.
+ * A hero (the phase you're in) + a horizontal timeline (where you've been,
+ * where you are, what's next) + the single next milestone. Read-only and
+ * deterministic from the user's own period anchor; inputs live in QuickLog ✦.
+ * The journey UI is shared with the (fuller) Progreso card via
+ * features/cycle/components/CycleTimeline.
  */
 function CycleSlide({
   cycle,
 }: {
   cycle: { day: number; phase: CyclePhase; length: number; daysToNext: number }
 }) {
-  // Muestra qué FASE viene (no "la próxima regla"), igual que la card de
-  // Progreso: así nunca contradice al header. Estando en el período, lo que
-  // viene es "primera mitad"; el conteo a la regla aparece solo en la fase
-  // previa (lútea → "tu período, en unos X días"), nunca encima de ella.
-  // Proyección suave ("unos" = estimado), nunca pronóstico determinista.
-  const next = nextPhaseInfo(cycle.day, cycle.length)
-  const nextLabel = PHASE_LABEL[next.phase].toLowerCase()
-  const nextLine =
-    next.days <= 1 ? `${nextLabel}, pronto` : `${nextLabel}, en unos ${next.days} días`
-
   return (
     <View style={styles.slide}>
-      <View style={styles.card}>
-        <View style={styles.weightRow}>
-          <View style={styles.cycleDialWrap}>
-            <CycleDial day={cycle.day} cycleLength={cycle.length} />
-            <View style={styles.cycleDialCenter} pointerEvents="none">
-              <Text style={styles.cycleDialDay}>{cycle.day}</Text>
-              <Text style={styles.cycleDialOf}>/ {cycle.length}</Text>
-            </View>
-          </View>
-          <View style={styles.numberStack}>
-            <Text style={styles.cyclePhaseLine}>{PHASE_LABEL[cycle.phase]}</Text>
-            <Text style={styles.weeklyLine}>{nextLine}</Text>
-          </View>
-        </View>
+      <View
+        style={styles.card}
+        accessible
+        accessibilityLabel={`Tu ciclo. ${PHASE_LABEL[cycle.phase]}, día ${cycle.day} de ${cycle.length}. ${nextMilestoneLine(cycle.day, cycle.length)}`}
+      >
+        <CyclePhaseHero phase={cycle.phase} day={cycle.day} length={cycle.length} />
+        <CycleTimeline phase={cycle.phase} />
+        <CycleNextMilestone day={cycle.day} length={cycle.length} />
       </View>
     </View>
   )
@@ -1360,40 +1302,8 @@ const styles = StyleSheet.create({
   },
   // ── Cycle slide ────────────────────────────────────────────────
   // The dial holds the day number stacked at its centre.
-  cycleDialWrap: {
-    width: DIAL_W,
-    height: DIAL_H,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cycleDialCenter: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Day N — the headline number, sized like the weight value.
-  cycleDialDay: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 38,
-    color: colors.leche,
-    letterSpacing: -1.6,
-    lineHeight: 40,
-  },
-  // "/ 28" — small, serif, sitting just under the day number.
-  cycleDialOf: {
-    marginTop: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  // Phase headline — serif italic like the weight's total delta line.
-  cyclePhaseLine: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.ui,
-    color: colors.bone,
-  },
+  // Cycle slide chrome lives in features/cycle/components/CycleTimeline
+  // (shared with Progreso); only styles.slide + styles.card wrap it here.
   // ── Shared caption — the serif italic line under a slide. ──────
   captionLine: {
     textAlign: 'center',

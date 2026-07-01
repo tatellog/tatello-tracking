@@ -16,32 +16,32 @@ const expanded = (progress: number) =>
 const FORBIDDEN = /falta|debes|deberías|atrás|incompleto|atracón|trastorno/i
 
 describe('TRANSFORM_WEIGHTS', () => {
-  it('un día perfecto suma 30 puntos', () => {
+  it('un día perfecto de EVIDENCIA suma 31 puntos', () => {
     const total = Object.values(TRANSFORM_WEIGHTS).reduce((a, b) => a + b, 0)
-    expect(total).toBe(30)
+    expect(total).toBe(31)
   })
 
-  it('entrenar pesa más que cualquier otra fuente individual', () => {
-    const { trained, ...rest } = TRANSFORM_WEIGHTS
-    for (const v of Object.values(rest)) expect(trained).toBeGreaterThan(v)
+  it('el déficit pesa al menos tanto como cualquier otra fuente (objetivo primario)', () => {
+    const { deficit, ...rest } = TRANSFORM_WEIGHTS
+    for (const v of Object.values(rest)) expect(deficit).toBeGreaterThanOrEqual(v)
   })
 
   // Los ejemplos canónicos de la regla de negocio: la constelación de A
-  // está más llena (12 vs 8 entrenos), pero el Leo de B está más
-  // revelado — el emblema es la suma de hábitos, no solo ejercicio.
-  it('Usuario A — 12 entrenos y nada más → 120 pts', () => {
-    expect(12 * TRANSFORM_WEIGHTS.trained).toBe(120)
+  // está más llena (12 vs 8 entrenos), pero el emblema de B está más
+  // revelado — el emblema es la suma de EVIDENCIA, no solo ejercicio.
+  it('Usuario A — 12 entrenos y nada más → 96 pts', () => {
+    expect(12 * TRANSFORM_WEIGHTS.trained).toBe(96)
   })
 
-  it('Usuario B — 8 entrenos + 20 días de hábitos → 360 pts (más que A)', () => {
+  it('Usuario B — 8 entrenos + 20 días de evidencia → 524 pts (más que A)', () => {
     const b =
       8 * TRANSFORM_WEIGHTS.trained +
+      20 * TRANSFORM_WEIGHTS.deficit +
       20 * TRANSFORM_WEIGHTS.proteinTarget +
-      20 * TRANSFORM_WEIGHTS.sleepLogged +
-      20 * TRANSFORM_WEIGHTS.energyLogged +
-      20 * TRANSFORM_WEIGHTS.dailyCheckin
-    expect(b).toBe(360)
-    expect(b).toBeGreaterThan(120)
+      20 * TRANSFORM_WEIGHTS.sleep7h +
+      20 * TRANSFORM_WEIGHTS.waterComplete
+    expect(b).toBe(524)
+    expect(b).toBeGreaterThan(96)
   })
 })
 

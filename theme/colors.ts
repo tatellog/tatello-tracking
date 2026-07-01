@@ -33,6 +33,10 @@ export const colors = {
   oroTint: 'rgba(217, 174, 111, 0.08)',
   // Even fainter hairline for "astral chart" row dividers inside cards.
   oroHairlineSoft: 'rgba(217, 174, 111, 0.12)',
+  // Halo de un "día encendido" (estrella de luz): glow medio + bloom exterior.
+  // Pareja del oro para puntos de luz, como `magentaGlow` lo es del magenta.
+  oroGlow: 'rgba(217, 174, 111, 0.22)',
+  oroBloom: 'rgba(217, 174, 111, 0.10)',
 
   // ── Feedback ───────────────────────────────────────────────────
   feedbackSuccess: '#5A6F4C',
