@@ -12,9 +12,10 @@ import type { CalendarDay, MonthCalendar } from '../month-built'
  * El reencuadre clave: NO es "verde=bien / rosa=malo" (gramática de fitness que
  * roza la culpa), sino "días ENCENDIDOS vs cielo en reposo". El déficit es el
  * único día que emite luz (estrella oro con halo); el superávit es una brasa
- * que descansa (sin halo); muy bajo, un anillo cálido; sin datos, polvo. La
- * distinción es por LUMINANCIA + FORMA, no por hue alarmante → coherente con la
- * familia warm-gold de Stelar y manifiesto-safe (ni premia ni castiga).
+ * NEUTRA que descansa (sin halo, sin el magenta de marca); "comiste muy poco", un
+ * anillo frío distinto del oro (cuidado, no logro); sin datos, polvo. La distinción
+ * es por LUMINANCIA + FORMA, no por hue alarmante → coherente con la familia
+ * warm-gold de Stelar y manifiesto-safe (ni premia ni castiga).
  *
  * Calendario full-width (lee como calendario: cabecera L-M-M-J-V-S-D + hoy
  * marcado); el conteo va como caption debajo. Lógica en `monthCalendar`.
@@ -39,11 +40,11 @@ function DayMark({ day }: { day: CalendarDay }) {
     )
   }
   if (day.status === 'surplus') {
-    // Brasa que descansa: magenta de marca pero apagado, SIN halo (recede).
+    // Brasa NEUTRA que descansa, SIN halo (recede). No magenta (color de marca).
     return <View style={styles.ember} />
   }
   if (day.status === 'low') {
-    // "Casi déficit, no celebrado": anillo cálido (no niebla fría).
+    // Comiste muy poco: anillo FRÍO, distinto del oro (señal de cuidado, no logro).
     return <View style={styles.lowRing} />
   }
   // Sin datos: polvo cósmico que se hunde en el negro. El futuro, aún más.
@@ -66,12 +67,26 @@ export function MonthGlanceCalendar({
   const cell = w > 0 ? w / 7 : 0
   const cells: (CalendarDay | null)[] = [...Array(data.leadOffset).fill(null), ...data.days]
   const pct = data.dataDays > 0 ? Math.round((data.deficitDays / data.dataDays) * 100) : 0
+  // Un verdicto CÁLIDO (no un número frío): la usuaria quiere saber "¿voy bien?",
+  // no interpretar un % sola. Aliento, nunca calificación ni culpa.
+  const verdict =
+    pct >= 70
+      ? 'La mayor parte de tu mes, en déficit. Eso se construye.'
+      : pct >= 50
+        ? 'Más días en déficit que fuera de él. Vas en camino.'
+        : pct >= 30
+          ? 'Ya vas armando el ritmo, un día a la vez.'
+          : 'Cada día en déficit suma. Lo vas construyendo.'
 
   return (
     <View
       style={styles.section}
       accessible
-      accessibilityLabel={`${data.deficitDays} de ${data.dataDays} días en déficit este mes, ${pct} por ciento.`}
+      accessibilityLabel={
+        data.dataDays < 5
+          ? `Llevas ${data.dataDays} ${data.dataDays === 1 ? 'día registrado' : 'días registrados'} este mes.`
+          : `${data.deficitDays} de ${data.dataDays} días en déficit este mes, ${pct} por ciento.`
+      }
     >
       <View style={styles.calendar} onLayout={onLayout}>
         {cell > 0 ? (
@@ -130,21 +145,39 @@ export function MonthGlanceCalendar({
         ) : null}
       </View>
 
-      {/* Conteo como caption: describe la grilla de arriba. Número en leche
-          (sereno); el campo de estrellas oro es la textura. */}
-      <Text style={styles.caption}>
-        <Text style={styles.captionNum}>{data.deficitDays}</Text>
-        <Text style={styles.captionRest}> de {data.dataDays} días en déficit</Text>
-        <Text style={styles.captionDot}> · </Text>
-        <Text style={styles.captionPct}>{pct}%</Text>
-      </Text>
+      {/* Conteo como caption. Con POCOS días (arranque de mes) NO se muestra el %:
+          un "0%" sobre 1 día no es dato, es culpa el peor día posible. Se gana el
+          derecho a aparecer cuando ya significa algo (≥ 5 días registrados). */}
+      {data.dataDays < 5 ? (
+        <Text style={styles.caption}>
+          <Text style={styles.captionRest}>
+            Llevas {data.dataDays} {data.dataDays === 1 ? 'día registrado' : 'días registrados'}{' '}
+            este mes. Cada día se enciende aquí.
+          </Text>
+        </Text>
+      ) : (
+        <>
+          <Text style={styles.caption}>
+            <Text style={styles.captionNum}>{data.deficitDays}</Text>
+            {/* Denominador EXPLÍCITO: "26" salía de la nada; son tus días con
+                registro, no los del mes. */}
+            <Text style={styles.captionRest}>
+              {' '}
+              de los {data.dataDays} días con registro, en déficit
+            </Text>
+            <Text style={styles.captionDot}> · </Text>
+            <Text style={styles.captionPct}>{pct}%</Text>
+          </Text>
+          <Text style={styles.captionVerdict}>{verdict}</Text>
+        </>
+      )}
 
       {/* Leyenda: cada chip es una miniatura del tratamiento real. */}
       <View style={styles.legend}>
         <LegendItem kind="deficit" label="Déficit" />
         <LegendItem kind="surplus" label="Superávit" />
         <LegendItem kind="none" label="Sin datos" />
-        {data.hasLow ? <LegendItem kind="low" label="Muy bajo" /> : null}
+        {data.hasLow ? <LegendItem kind="low" label="Día muy bajo" /> : null}
       </View>
     </View>
   )
@@ -215,9 +248,9 @@ const styles = StyleSheet.create({
   dayNum: {
     marginTop: 3,
     fontFamily: typography.uiMedium,
-    fontSize: 9.5,
+    fontSize: 11,
     letterSpacing: 0.2,
-    color: colors.niebla,
+    color: colors.bone,
     fontVariant: ['tabular-nums'],
   },
   dayNumToday: {
@@ -282,21 +315,23 @@ const styles = StyleSheet.create({
     borderRadius: 1.25,
     backgroundColor: colors.oroLeche,
   },
-  // ── Día sobre meta: brasa que descansa (sin halo) ─────────────
+  // ── Día sobre meta: brasa NEUTRA tibia que descansa (sin halo). NO el magenta
+  //    de marca: ese color celebra en el resto de la app; usarlo para "te pasaste"
+  //    manda señal cruzada. Un ascua taupe: presente pero apagada, sin premiar. ──
   ember: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.magentaDeep,
-    opacity: 0.6,
+    backgroundColor: 'rgba(188, 150, 128, 0.55)',
   },
-  // ── Muy bajo: anillo cálido ───────────────────────────────────
+  // ── Muy bajo (comiste muy poco): anillo FRÍO, claramente distinto del oro — no
+  //    debe leerse como "casi déficit / casi bien". Es señal de cuidado, no logro. ─
   lowRing: {
     width: 6,
     height: 6,
     borderRadius: 3,
     borderWidth: 1.2,
-    borderColor: 'rgba(217, 174, 111, 0.35)',
+    borderColor: 'rgba(150, 158, 172, 0.5)',
     backgroundColor: 'transparent',
   },
   // ── Sin datos: polvo ──────────────────────────────────────────
@@ -336,6 +371,17 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.niebla,
+  },
+  // El verdicto cálido: voz de coach (serif italic), no un dato más. Responde
+  // "¿voy bien?" sin volverlo calificación.
+  captionVerdict: {
+    marginTop: 8,
+    paddingLeft: 2,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 16,
+    lineHeight: 22,
+    color: colors.bone,
   },
   // ── Leyenda ───────────────────────────────────────────────────
   legend: {

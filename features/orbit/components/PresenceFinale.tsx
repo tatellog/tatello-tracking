@@ -59,31 +59,25 @@ const WEAVE_MS = 1850
 const ARRIVE = WEAVE_DELAY + WEAVE_MS
 const MSG_BASE = ARRIVE + 220
 
-/** La afirmación cálida que reemplaza al número (un mensaje, no una métrica). */
-function affirmation(presence: PresenceSummary): string {
+/** La frase HÉROE del cierre: UNA sola, la más metafórica (conversa con el hilo
+ *  que se acaba de tejer). Sin coda redundante ("sin interrupciones" ≈ "no se
+ *  cortó"). Un mensaje, nunca una métrica. */
+function heroLine(presence: PresenceSummary): string {
   if (presence.presentDays < TRAIL_MIN_DAYS)
     return 'Apenas empieza. Lo que vuelvas a hacer, se queda.'
-  if (presence.returns === 0) return 'Apareciste sin interrupciones.'
+  if (presence.returns === 0) return 'El hilo no se cortó este mes.'
   const maxGap = presence.trail.reduce((m, s) => (!s.present ? Math.max(m, s.length) : m), 0)
   if (maxGap >= 3) return 'Volviste. Eso también es presencia.'
   return 'Volver también cuenta.'
 }
 
-export function PresenceFinale({
-  presence,
-  phrase,
-}: {
-  presence: PresenceSummary
-  phrase: string | null
-}) {
+export function PresenceFinale({ presence }: { presence: PresenceSummary }) {
   const enoughForTrail = presence.presentDays >= TRAIL_MIN_DAYS && presence.trail.length > 0
-  const closing =
-    enoughForTrail && presence.returns === 0 ? 'El hilo no se cortó este mes.' : phrase
 
-  // Los mensajes entran DESPUÉS de que el hilo terminó de tejerse (cascada).
-  const legendDelay = enoughForTrail ? MSG_BASE : 620
-  const affirmDelay = legendDelay + 260
-  const closeDelay = affirmDelay + 260
+  // Cascada: la anotación (caption) abraza el hilo al terminar de tejerse; luego,
+  // tras un respiro, la frase héroe (el pico emocional).
+  const captionDelay = enoughForTrail ? MSG_BASE : 620
+  const heroDelay = captionDelay + 280
 
   return (
     <Animated.View entering={FadeIn.duration(560)} style={styles.card}>
@@ -99,23 +93,17 @@ export function PresenceFinale({
       {enoughForTrail ? <PresenceThread trail={presence.trail} /> : <SoloStar />}
 
       {enoughForTrail ? (
-        <Animated.Text entering={FadeInDown.duration(520).delay(legendDelay)} style={styles.legend}>
+        <Animated.Text
+          entering={FadeInDown.duration(520).delay(captionDelay)}
+          style={styles.caption}
+        >
           Cada punto, un día que apareciste.
         </Animated.Text>
       ) : null}
 
-      <Animated.Text
-        entering={FadeInDown.duration(560).delay(affirmDelay)}
-        style={styles.affirmation}
-      >
-        {affirmation(presence)}
+      <Animated.Text entering={FadeInDown.duration(600).delay(heroDelay)} style={styles.hero}>
+        {heroLine(presence)}
       </Animated.Text>
-
-      {closing ? (
-        <Animated.Text entering={FadeInDown.duration(560).delay(closeDelay)} style={styles.phrase}>
-          {closing}
-        </Animated.Text>
-      ) : null}
     </Animated.View>
   )
 }
@@ -175,9 +163,12 @@ function BgStars() {
 
 /* ── El hilo que se teje (Skia) ───────────────────────────────────────── */
 
-const TRAIL_H = 108
+const TRAIL_H = 84 // caja más baja → el hilo la LLENA (no flota en vacío)
 const PAD_X = 24
-const CURVE = 6 // micro-curva, casi imperceptible (cuerda viva)
+// Drapeado (catenaria), no una sinusoide de gráfica: el hilo CUELGA (sag) y se
+// TENSA subiendo hacia la estrella. Amplitud real → se siente como cuerda viva.
+const SAG = 16
+const LIFT = 8
 const STAR_SAMPLES = 120 // muestras del path para la posición de la estrella
 const CLAMP = Extrapolation.CLAMP
 
@@ -218,14 +209,15 @@ function PresenceThread({ trail }: { trail: PresenceSummary['trail'] }) {
   const active = useScreenActive()
   const reduce = useReducedMotion() ?? false
 
-  // El path (micro-curva S), su path Skia, longitud y muestras.
+  // El path: drapeado que cuelga (sag) y remonta hacia la estrella (lift). No una
+  // línea recta ni una onda de gráfica — una hebra con peso.
   const cy = TRAIL_H / 2
   const linePath = useMemo(() => {
     if (w <= 0) return null
-    const d = `M${PAD_X},${cy} C${w * 0.3},${cy - CURVE} ${w * 0.7},${cy + CURVE} ${w - PAD_X},${cy}`
+    const d = `M${PAD_X},${cy + 2} C${w * 0.3},${cy + SAG} ${w * 0.6},${cy + SAG} ${w - PAD_X},${cy - LIFT}`
     return Skia.Path.MakeFromSVGString(d)
   }, [w, cy])
-  const starPath = useMemo(() => Skia.Path.MakeFromSVGString(fourPointStarPath(0, 0, 7)), [])
+  const starPath = useMemo(() => Skia.Path.MakeFromSVGString(fourPointStarPath(0, 0, 9)), [])
 
   // Muestras por FRACCIÓN DE LONGITUD (mismo espacio que el trim `end`): la
   // estrella recorre exactamente el hilo trazado.
@@ -333,8 +325,18 @@ function PresenceThread({ trail }: { trail: PresenceSummary['trail'] }) {
     return [{ translateX: sx }, { translateY: sy + wobble.value }, { scale }]
   })
   const weaveEnd = useDerivedValue(() => Math.max(0.001, weave.value))
+  // El segmento "recién tejido": los últimos ~14% detrás del astro, más brillante;
+  // al terminar de tejer queda un rastro tenue (hebra que se acaba de hilar).
+  const wetStart = useDerivedValue(() => Math.max(0, weave.value - 0.14))
+  const wetGlow = useDerivedValue(
+    () => starIn.value * interpolate(weave.value, [0.9, 1], [0.5, 0.3], CLAMP),
+  )
   const starOpacity = useDerivedValue(() => starIn.value)
-  const haloOpacity = useDerivedValue(() => starIn.value * (0.4 + pulse.value * 0.5))
+  // El glow del astro RESPIRA (no solo pulsa a la llegada) → presencia física.
+  const haloOpacity = useDerivedValue(
+    () => starIn.value * (0.34 + pulse.value * 0.5 + breath.value * 0.14),
+  )
+  const bloomOpacity = useDerivedValue(() => starIn.value * (0.1 + breath.value * 0.04))
 
   return (
     <View style={styles.trailBlock}>
@@ -355,6 +357,20 @@ function PresenceThread({ trail }: { trail: PresenceSummary['trail'] }) {
                 end={weaveEnd}
               >
                 <BlurMask blur={1.4} style="solid" />
+              </SkiaPath>
+
+              {/* El segmento recién tejido: más grueso y cálido, detrás del astro. */}
+              <SkiaPath
+                path={linePath}
+                style="stroke"
+                strokeWidth={2.6}
+                strokeCap="round"
+                color={colors.oroLight}
+                opacity={wetGlow}
+                start={wetStart}
+                end={weaveEnd}
+              >
+                <BlurMask blur={3} style="solid" />
               </SkiaPath>
 
               {/* Los días: memoria que aparece cuando la estrella ya pasó. */}
@@ -378,9 +394,13 @@ function PresenceThread({ trail }: { trail: PresenceSummary['trail'] }) {
               )}
             </SkiaGroup>
 
-            {/* La estrella (presencia): halo + núcleo, recorre el hilo. */}
+            {/* La estrella (presencia): PROTAGONISTA. Bloom persistente (pesa aun
+                quieta) + halo que respira + núcleo, recorre el hilo. */}
             <SkiaGroup transform={starTransform}>
-              <SkiaCircle cx={0} cy={0} r={13} color={colors.magenta} opacity={haloOpacity}>
+              <SkiaCircle cx={0} cy={0} r={26} color={colors.magenta} opacity={bloomOpacity}>
+                <BlurMask blur={18} style="normal" />
+              </SkiaCircle>
+              <SkiaCircle cx={0} cy={0} r={16} color={colors.magenta} opacity={haloOpacity}>
                 <BlurMask blur={12} style="normal" />
               </SkiaCircle>
               {starPath ? (
@@ -388,7 +408,7 @@ function PresenceThread({ trail }: { trail: PresenceSummary['trail'] }) {
                   <BlurMask blur={1} style="solid" />
                 </SkiaPath>
               ) : null}
-              <SkiaCircle cx={0} cy={0} r={1.8} color="#FFFFFF" opacity={starOpacity} />
+              <SkiaCircle cx={0} cy={0} r={2.2} color="#FFFFFF" opacity={starOpacity} />
             </SkiaGroup>
           </Canvas>
         ) : null}
@@ -510,7 +530,7 @@ const styles = StyleSheet.create({
   card: {
     marginTop: 40,
     borderRadius: 26,
-    paddingVertical: 40,
+    paddingVertical: 32,
     paddingHorizontal: 26,
     alignItems: 'center',
     backgroundColor: colors.bgCard,
@@ -529,7 +549,7 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   lede: {
-    marginTop: 18,
+    marginTop: 16,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: 23,
@@ -539,43 +559,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   trailBlock: {
-    marginTop: 26,
+    marginTop: 24,
     width: '100%',
   },
   trailWrap: {
     width: '100%',
     height: TRAIL_H,
   },
-  legend: {
-    marginTop: 14,
+  // Anotación del gráfico: PEGADA al hilo (lo abraza), no una de las frases.
+  caption: {
+    marginTop: 8,
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,
     color: colors.niebla,
     textAlign: 'center',
   },
-  affirmation: {
-    marginTop: 22,
+  // La frase HÉROE: el pico emocional. Más grande, en leche, con aire arriba (el
+  // único gap grande = el silencio antes de lo que importa).
+  hero: {
+    marginTop: 32,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 17,
-    lineHeight: 25,
-    color: colors.bone,
+    fontSize: 21,
+    lineHeight: 29,
+    color: colors.leche,
     textAlign: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   starWrap: {
     marginTop: 30,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  phrase: {
-    marginTop: 16,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 18,
-    lineHeight: 26,
-    color: colors.bone,
-    textAlign: 'center',
-    paddingHorizontal: 12,
   },
 })

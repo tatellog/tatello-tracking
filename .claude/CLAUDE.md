@@ -107,6 +107,20 @@ docs/PRD-v2.md     · qué construir (nav, Reliquias, Lecturas, Alma Celeste)
 
 ---
 
+## Motor de patrones · fuente de verdad
+
+La lógica de patrones/inteligencia de Órbita vive en
+`supabase/functions/_shared/intelligence/` — corre en el **backend** (edge
+function `daily-intelligence`) Y en el **cliente** (re-export). Órbita Día ya la
+consume. `features/orbit/month-built.ts` es un motor **solo-cliente divergente**
+que alimenta Órbita Mes ("Tus patrones") y debe **converger** a la lib
+compartida. **NO agregues detectores nuevos a `month-built.ts`** — van a
+`_shared/intelligence/` (ahí se enchufa la IA de Fase B, server-side; la key no
+puede ir en el cliente). IA hoy: solo `scan-meal` (OpenAI gpt-4o-mini). La "Voz
+de Stelar" de Día es MOCK (`features/orbit/mock.ts`), Anthropic planeado.
+
+---
+
 ## Glosario V2 (vocabulario canónico · usar estos términos)
 
 - **Reliquias Celestes** · patrones (no registros) que viven en Órbita:

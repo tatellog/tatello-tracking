@@ -50,7 +50,7 @@ const BUCKET_MP = [0, 0.5, 1]
 // Paletas (Difícil · Neutral · Bien).
 const BG = ['#160B26', '#0A0608', '#210C17'] // morado profundo · negro · rosa cálido
 const NEBULA = ['#5A3A8E', '#241326', '#9E3560'] // color de la nebulosa
-const GLOW = ['#C7B6F0', '#F4ECDE', '#FF7DA6'] // glow del glifo: lavanda · blanco · rosa
+const GLOW = ['#C7B6F0', '#F4ECDE', '#FF4886'] // glow del glifo: lavanda · blanco · magenta (Bien, magentaHot)
 
 const STAGE = 320
 const GLYPH_SIZE = 156

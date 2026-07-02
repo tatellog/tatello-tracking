@@ -924,6 +924,17 @@ export type EvidenceBar = {
    *  día-de-semana, que van en oro neutro. */
   colorKey?: string
 }
+/** Forma por día de la semana: la usuaria VE la silueta de su semana (qué días
+ *  sostiene), no solo dos barras agregadas. Sin % crudos por barra (eso se lee
+ *  como boletín); la silueta + el lado iluminado bastan. Solo `deficit-daytype`. */
+export type WeekdayShape = {
+  /** Tasa de déficit + días con dato por día (índice 0=lun … 6=dom). */
+  week: { rate: number; total: number }[]
+  /** El lado que SOSTIENE (se ilumina en oro); el otro es el margen, atenuado.
+   *  Nunca se resalta el día bajo — iluminar tu peor día se lee como culpa. */
+  strongSide: 'weekday' | 'weekend'
+}
+
 export type MonthPattern = {
   id: string
   /** 'discovery' → "Haz visible lo invisible" (constancia de una dimensión).
@@ -941,6 +952,8 @@ export type MonthPattern = {
    *  qué importa" (la constancia); en patterns es el lever que puede mover (la
    *  acción implícita). Siempre voz Observadora: describe, NO aconseja. */
   why?: string
+  /** Solo `deficit-daytype`: la forma por día de semana para la evidencia. */
+  weekdayShape?: WeekdayShape
 }
 
 /* Patrones POSITIVOS del MOTOR de consistencia (features/patterns/consistency)
@@ -1098,31 +1111,70 @@ export function detectMonthPatterns(
   /* ── B · PATRONES ACCIONABLES (correlaciones demostrables) ─────────── */
   const food = foodDays(signals)
 
-  // B1 · Déficit entre semana — un positivo que se puede repetir. Solo si la
-  // tasa es genuinamente alta (≥ 60%): no convertimos un mal dato en "patrón".
+  // B1 · DÓNDE SE SOSTIENE TU DÉFICIT (simétrico) — el "dónde fallas" de la
+  // promesa. Compara la tasa de déficit entre semana vs finde; si la brecha es
+  // marcada (≥ 20pp) nombra el lado fuerte Y el débil, en cualquier dirección (no
+  // solo cuando eres fuerte entre semana). Voz Observadora, sin culpa.
+  let daytypeFired = false
   if (target != null && target > 0) {
     const wdFood = food.filter((s) => weekdayMon(s.day!) < 5)
-    const wdDef = wdFood.filter((s) => isDeficitDay(s.calories, target)).length
-    if (wdFood.length >= 5 && wdDef / wdFood.length >= 0.6) {
-      const pct = Math.round((wdDef / wdFood.length) * 100)
-      out.push({
-        id: 'deficit-weekday',
-        kind: 'pattern',
-        label: 'Entre semana',
-        title: `Lograste tu déficit en el ${pct}% de tus días entre semana.`,
-        why: 'Entre semana tu déficit fue más estable este mes.',
-        evidence: {
-          bars: [{ label: 'Lun a vie', value: wdDef, total: wdFood.length, highlight: true }],
-          caption: 'Días en déficit sobre tus días con comida, de lunes a viernes.',
-          unit: 'días',
-        },
-      })
+    const weFood = food.filter((s) => weekdayMon(s.day!) >= 5)
+    if (wdFood.length >= 4 && weFood.length >= 4) {
+      const wdDef = wdFood.filter((s) => isDeficitDay(s.calories, target)).length
+      const weDef = weFood.filter((s) => isDeficitDay(s.calories, target)).length
+      const rWd = wdDef / wdFood.length
+      const rWe = weDef / weFood.length
+      if (Math.abs(rWd - rWe) >= 0.2) {
+        const weekdayStronger = rWd >= rWe
+        daytypeFired = true
+
+        // Silueta por día de semana (0=lun … 6=dom) para la gráfica.
+        const wkTotal = Array.from({ length: 7 }, () => 0)
+        const wkDef = Array.from({ length: 7 }, () => 0)
+        for (const s of food) {
+          const wd = weekdayMon(s.day!)
+          wkTotal[wd]! += 1
+          if (isDeficitDay(s.calories, target)) wkDef[wd]! += 1
+        }
+        const week = wkTotal.map((t, i) => ({ rate: t ? wkDef[i]! / t : 0, total: t }))
+
+        out.push({
+          id: 'deficit-daytype',
+          kind: 'pattern',
+          label: weekdayStronger ? 'Tu fin de semana' : 'Entre semana',
+          // Veredicto en llano: qué te SOSTIENE (fortaleza) + dónde hay MARGEN. Sin
+          // jerga ("palanca"/"ancla" confunden); orden fortaleza→margen (sin culpa).
+          title: `${weekdayStronger ? 'Entre semana' : 'Tu fin de semana'} te sostiene. ${weekdayStronger ? 'El fin de semana' : 'Entre semana'} es donde tienes margen.`,
+          // Cierre accionable = el foco (un día más, alcanzable). La frase que motiva.
+          why: `Un día más ${weekdayStronger ? 'el fin de semana' : 'entre semana'} en déficit ya se nota en tu mes.`,
+          evidence: {
+            bars: [
+              {
+                label: 'Entre semana',
+                value: wdDef,
+                total: wdFood.length,
+                highlight: weekdayStronger,
+              },
+              {
+                label: 'Fin de semana',
+                value: weDef,
+                total: weFood.length,
+                highlight: !weekdayStronger,
+              },
+            ],
+            caption: 'Días en déficit sobre tus días con comida, según el día.',
+            unit: 'días',
+          },
+          weekdayShape: { week, strongSide: weekdayStronger ? 'weekday' : 'weekend' },
+        })
+      }
     }
   }
 
-  // B2 · Superávit en fin de semana — dónde se concentra lo que se va de meta.
-  // Observación, sin culpa: "el superávit vive el finde" es accionable.
-  if (target != null && target > 0) {
+  // B2 · DÓNDE SE CONCENTRA TU SUPERÁVIT (simétrico) — si el exceso vive en un lado
+  // (≥ 60% del total real ≥ 1000 kcal), entre semana O finde. Solo si B1 no cubrió
+  // ya el mismo insight de día (evita redundancia). Observación, sin culpa.
+  if (target != null && target > 0 && !daytypeFired) {
     let wdSurplus = 0
     let weSurplus = 0
     for (const s of food) {
@@ -1132,18 +1184,20 @@ export function detectMonthPatterns(
       else weSurplus += over
     }
     const total = wdSurplus + weSurplus
-    if (total >= 1000 && weSurplus / total >= 0.6) {
-      const pct = Math.round((weSurplus / total) * 100)
+    const weekendHeavy = weSurplus >= wdSurplus
+    const heavy = weekendHeavy ? weSurplus : wdSurplus
+    if (total >= 1000 && heavy / total >= 0.6) {
+      const pct = Math.round((heavy / total) * 100)
       out.push({
-        id: 'weekend-surplus',
+        id: 'surplus-concentration',
         kind: 'pattern',
-        label: 'Tu fin de semana',
-        title: `El ${pct}% de tu superávit cae en fin de semana.`,
-        why: 'Tus fines de semana concentraron el mayor exceso este mes.',
+        label: weekendHeavy ? 'Tu fin de semana' : 'Entre semana',
+        title: `El ${pct}% de tu superávit cae ${weekendHeavy ? 'en fin de semana' : 'entre semana'}.`,
+        why: `${weekendHeavy ? 'Tus fines de semana' : 'Tus días entre semana'} concentraron el mayor exceso este mes.`,
         evidence: {
           bars: [
-            { label: 'Entre semana', value: Math.round(wdSurplus) },
-            { label: 'Fin de semana', value: Math.round(weSurplus), highlight: true },
+            { label: 'Entre semana', value: Math.round(wdSurplus), highlight: !weekendHeavy },
+            { label: 'Fin de semana', value: Math.round(weSurplus), highlight: weekendHeavy },
           ],
           caption: 'Calorías por encima de tu meta, según el día.',
           unit: 'kcal',

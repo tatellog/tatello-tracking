@@ -40,13 +40,16 @@ function richWeek() {
 }
 
 describe('emergingEvidence (§3 · observaciones con número)', () => {
-  it('déficit, proteína en entreno, día de más calorías y señal más callada', () => {
+  it('proteína en entreno y señal más callada (v2.2: sin déficit-conteo ni día de más calorías)', () => {
     const out = emergingEvidence(richWeek(), SUN, CTX)
     const texts = out.map((o) => o.text)
-    expect(texts).toContain('Tu déficit apareció en 5 de 6 días con comida.')
     expect(texts).toContain('Tu proteína apareció en tus días de entreno 3 de 3 veces.')
-    expect(texts).toContain('El sábado fue tu día de más calorías.')
-    expect(texts).toContain('Agua apareció solo 1 día.')
+    // v2.2: "[señal] apareció solo N días" SALE (regaño disfrazado de hallazgo);
+    // la línea de conteo de déficit vive en Mes; el "día de más calorías" se
+    // retiró. Ninguna debe aparecer en Semana.
+    expect(texts.some((t) => t.includes('apareció solo'))).toBe(false)
+    expect(texts.some((t) => t.includes('déficit'))).toBe(false)
+    expect(texts.some((t) => t.includes('día de más calorías'))).toBe(false)
     expect(out.length).toBeLessThanOrEqual(4)
   })
 
@@ -75,17 +78,39 @@ describe('confirmedFacts (§4 · hechos puros)', () => {
 })
 
 describe('needsMoreEvidence (§5 · honestidad)', () => {
-  it('señala un par prometedor pero sub-muestreado (agua × déficit)', () => {
-    const msg = needsMoreEvidence(richWeek(), SUN, CTX)
-    expect(msg).toBe(
-      'Todavía no tenemos suficientes datos para saber si tu agua y tu déficit aparecen juntos. Sigue registrando.',
+  // v2.2: piso ALTO (ambas señales en ≥3 días, coincidiendo <3) → "casi-patrón"
+  // ganado, no un pie de página que sale casi siempre. Copy de anticipación.
+  it('un casi-patrón (agua ≥3d y déficit ≥3d, coincidiendo 0) → susurro de anticipación', () => {
+    const week = [
+      mkSig(MON, { water_glasses: 5, calories: 2400, meal_count: 2 }), // agua, superávit
+      mkSig(TUE, { water_glasses: 5, calories: 2400, meal_count: 2 }),
+      mkSig(WED, { water_glasses: 5, calories: 2400, meal_count: 2 }),
+      mkSig(THU, { calories: 1500, meal_count: 2 }), // déficit, sin agua
+      mkSig(FRI, { calories: 1500, meal_count: 2 }),
+      mkSig(SAT, { calories: 1500, meal_count: 2 }),
+    ]
+    expect(needsMoreEvidence(week, SUN, CTX)).toBe(
+      'Tu agua y tu déficit todavía no se han encontrado las veces suficientes. Algo se sigue dibujando.',
     )
   })
 
+  it('con piso bajo (señales en <3 días) ya NO dispara el susurro', () => {
+    // agua solo 1 día: antes disparaba (piso ≥1); ahora no (piso ≥3).
+    const week = [mkSig(MON, { water_glasses: 5, calories: 1500, meal_count: 2 })]
+    expect(needsMoreEvidence(week, SUN, CTX)).toBeNull()
+  })
+
   it('sin meta calórica omite los pares con déficit (cae a sueño × energía)', () => {
-    const msg = needsMoreEvidence(richWeek(), SUN, { proteinTarget: 130 })
-    expect(msg).toBe(
-      'Todavía no tenemos suficientes datos para saber si tu sueño y tu energía aparecen juntos. Sigue registrando.',
+    const week = [
+      mkSig(MON, { sleep_minutes: 430, meal_count: 1 }),
+      mkSig(TUE, { sleep_minutes: 430, meal_count: 1 }),
+      mkSig(WED, { sleep_minutes: 430, meal_count: 1 }),
+      mkSig(THU, { energy: 4, meal_count: 1 }),
+      mkSig(FRI, { energy: 4, meal_count: 1 }),
+      mkSig(SAT, { energy: 4, meal_count: 1 }),
+    ]
+    expect(needsMoreEvidence(week, SUN, { proteinTarget: 130 })).toBe(
+      'Tu sueño y tu energía todavía no se han encontrado las veces suficientes. Algo se sigue dibujando.',
     )
   })
 

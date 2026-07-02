@@ -196,6 +196,8 @@ export default function RootLayout() {
                   {/* Slide-up sheet for logging a measurement. Other routes
                     inherit the default fullscreen push. */}
                   <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
+                  {/* Calendario de movimiento en pantalla completa (modal). */}
+                  <Stack.Screen name="movement-calendar" options={{ presentation: 'modal' }} />
                 </Stack>
               </ConfirmProvider>
             </ThemeProvider>

@@ -33,18 +33,11 @@ const TIMELINE_LABEL: Record<CyclePhase, string> = {
 // luz, no horóscopo.
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
-// Color por SIGNIFICADO (espeja CycleRing): magenta en las fases que mueven la
-// balanza (período + semana antes, las que cargan el mensaje anti-culpa), oro
-// en el medio calmo. No es decoración: el color tiene gramática.
-function accentFor(phase: CyclePhase): string {
-  return phase === 'menstrual' || phase === 'lutea' ? colors.magenta : colors.oro
-}
-
 // Fraseo suave, nunca determinista. "unos" = estimado, nunca pronóstico.
 const agoPhrase = (n: number) => (n <= 1 ? 'hace 1 día' : `hace unos ${n} días`)
 const inPhrase = (n: number) => (n <= 1 ? 'pronto' : `en unos ${n} días`)
 
-// Sub contextual SIN el día (el día vive en el kicker oro del hero).
+// Sub contextual SIN el día (el día vive en el kicker magenta del hero).
 export function phaseHeroSub(phase: CyclePhase, day: number): string {
   switch (phase) {
     case 'menstrual':
@@ -113,7 +106,9 @@ function TodayStar({ accent }: { accent: string }) {
  * anillo. NO es barra de progreso-a-meta: es posición en un ciclo natural. */
 export function CycleTimeline({ phase }: { phase: CyclePhase }) {
   const current = PHASE_SEQUENCE.indexOf(phase)
-  const accent = accentFor(phase)
+  // El marcador de HOY (estrella + label) es magenta: el color-identidad del
+  // ciclo, no depende de la fase.
+  const accent = colors.magenta
   const reduce = useReducedMotion()
   const [w, setW] = useState(0)
   const onLayout = (e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)
@@ -258,13 +253,14 @@ export function CycleNextMilestone({ day, length }: { day: number; length: numbe
 }
 
 const styles = StyleSheet.create({
-  // Kicker — el día es el dato ancla, en oro (metal precioso), sobre el titular.
+  // Kicker — el día es el dato ancla, en magenta (color-identidad del ciclo),
+  // sobre el titular.
   heroKicker: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
-    color: colors.oro,
+    color: colors.magenta,
     marginBottom: 5,
   },
   heroPhase: {
@@ -329,6 +325,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  proximoDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.oro },
+  proximoDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.magenta },
   proximoText: { fontFamily: typography.ui, fontSize: typography.sizes.label, color: colors.bone },
 })

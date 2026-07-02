@@ -38,7 +38,6 @@ import { todayInTimezone } from '@/lib/time'
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
   detectMonthPatterns,
-  finalPhrase,
   monthCalendar,
   monthReveals,
   presenceSummary,
@@ -47,6 +46,7 @@ import {
   type EvidenceBar,
   type MonthPattern,
   type MonthReveals,
+  type WeekdayShape,
   type WinningCombo as WinningComboData,
 } from '../month-built'
 import { EmptySegmentCard } from './EmptySegmentCard'
@@ -64,6 +64,8 @@ type EvidenceItem = {
   /** Las fechas concretas que anclan el conteo ("¿de dónde salen las N?"). */
   dates?: string[]
   why?: string
+  /** Solo deficit-daytype: la forma por día de semana (picos/valles). */
+  weekdayShape?: WeekdayShape
 }
 
 /*
@@ -119,21 +121,43 @@ type RevealDetail = {
 
 /** Qué CUENTA como cada dimensión (criterio transparente, sin jerga). */
 const REVEAL_CRITERION: Record<string, string> = {
-  deficit: 'Un día cuenta cuando comiste dentro de tu rango sano.',
+  deficit: 'Un día cuenta cuando tu comida estuvo dentro de tu objetivo, sin bajar de más.',
   sueno: 'Una noche cuenta cuando dormiste alrededor de 7 horas.',
   registro: 'Un día cuenta cuando registraste tu comida.',
   proteina: 'Un día cuenta cuando alcanzaste tu meta de proteína.',
   agua: 'Un día cuenta cuando llegaste a tu meta de agua.',
   movimiento: 'Un día cuenta cuando entrenaste.',
 }
-/** El ROL de cada dimensión (por qué importa) — observacional, sin recetar. */
-const REVEAL_ROLE: Record<string, string> = {
-  deficit: 'Es tu palanca principal hacia la pérdida de peso.',
-  sueno: 'Sostuvo tu constancia este mes.',
-  registro: 'Sostuvo tu constancia este mes.',
-  proteina: 'Acompaña tu déficit, mes a mes.',
-  agua: 'Sostuvo tu constancia este mes.',
-  movimiento: 'Sostuvo tu constancia este mes.',
+/** El ROL de cada dimensión (por qué importa) — observacional, sin recetar y SIN
+ *  jerga ("palanca"/"ancla" ya se retiraron por confusas). Distinto por dimensión
+ *  (nada de molde repetido) Y por ESTADO: `on` (encendida) habla en pasado del
+ *  logro; `off` (pendiente) SOLO anticipa — nunca elogia en pasado algo que no
+ *  encendió (esa era la mentira de Agua). Copy provisional → pasar por voice-and-copy. */
+const REVEAL_ROLE: Record<string, { on: string; off: string }> = {
+  deficit: {
+    on: 'Es lo que más mueve tu cuerpo hacia donde va.',
+    off: 'Cuando se encienda, cambia el tono de tu mes.',
+  },
+  sueno: {
+    on: 'Las noches que descansaste, el día siguiente lo notó.',
+    off: 'Cuando se encienda, será una base para tus días.',
+  },
+  registro: {
+    on: 'Anotar fue el gesto que sostuvo lo demás.',
+    off: 'Cuando se encienda, verás lo demás con más claridad.',
+  },
+  proteina: {
+    on: 'Tu proteína fue la base de lo que tu cuerpo sostuvo.',
+    off: 'Cuando se encienda, acompañará tu déficit.',
+  },
+  agua: {
+    on: 'La hidratación fue tu base callada del mes.',
+    off: 'Cuando se encienda, sumará a tu constancia.',
+  },
+  movimiento: {
+    on: 'Moverte fue de los gestos que más repetiste.',
+    off: 'Cuando se encienda, será otra de tus constantes.',
+  },
 }
 
 /** Una estrellita de 4 puntas con pequeño flare — el "día" de la parrilla.
@@ -143,22 +167,31 @@ function DayStar({ on, color }: { on: boolean; color: string }) {
   return (
     <Svg width={9} height={9} pointerEvents="none">
       {on ? <Circle cx={4.5} cy={4.5} r={4.5} fill={color} opacity={0.16} /> : null}
-      <Path d={fourPointStarPath(4.5, 4.5, on ? 3.2 : 2.2)} fill={color} opacity={on ? 1 : 0.26} />
+      {/* Apagada = slot NEUTRO perceptible (no el color de dimensión casi invisible):
+          así se lee el "de N", el denominador honesto. */}
+      <Path
+        d={fourPointStarPath(4.5, 4.5, on ? 3.2 : 2.4)}
+        fill={on ? color : colors.niebla}
+        opacity={on ? 1 : 0.42}
+      />
     </Svg>
   )
 }
 
-/** "Días como estrellas": una estrellita por día del denominador; los sostenidos
- *  encendidos (encendiéndose en secuencia al entrar), el resto tenues. Se VE la
- *  proporción "16 de 27" sin barra ni cálculo mental. */
+/** Medidor de proporción de ANCHO FIJO: siempre `GAUGE_STARS` estrellas; se
+ *  encienden `round(count/total * N)`. El ancho es igual en TODAS las filas → el
+ *  largo ya no miente (antes 27 estrellas vs 8 se comparaban como misma unidad y
+ *  el déficit se veía "más lleno" que agua sin serlo). El conteo exacto vive en el
+ *  texto de la fila (ese es el ancla honesta); esto solo dibuja qué tan lleno. */
+const GAUGE_STARS = 10
 function DayStars({ count, total, color }: { count: number; total: number; color: string }) {
-  const n = Math.max(0, Math.min(60, total)) // techo de cordura
-  const lit = Math.max(0, Math.min(n, count))
+  const frac = total > 0 ? Math.max(0, Math.min(1, count / total)) : 0
+  const lit = Math.round(frac * GAUGE_STARS)
   return (
     <View style={styles.dayStars}>
-      {Array.from({ length: n }, (_, i) =>
+      {Array.from({ length: GAUGE_STARS }, (_, i) =>
         i < lit ? (
-          <Animated.View key={i} entering={FadeIn.duration(220).delay(Math.min(i, 24) * 22)}>
+          <Animated.View key={i} entering={FadeIn.duration(220).delay(i * 34)}>
             <DayStar on color={color} />
           </Animated.View>
         ) : (
@@ -196,11 +229,7 @@ export function MonthSegment({
   // CURSO (no de la ventana rodante de 31 días), así sus conteos coinciden
   // exactamente: mismos días-con-comida, mismos días en déficit.
   const today = todayInTimezone()
-  const monthStr = today.slice(0, 7) // 'YYYY-MM'
-  const monthSignals = useMemo(
-    () => signals.filter((s) => s.day != null && s.day.startsWith(monthStr)),
-    [signals, monthStr],
-  )
+  const monthStr = today.slice(0, 7) // 'YYYY-MM' del mes en curso
 
   // "Tu mes de un vistazo": calendario con NAVEGADOR de mes. 0 = mes en curso;
   // negativo = meses pasados (usa la ventana de 90d para poder ojearlos, útil los
@@ -248,10 +277,11 @@ export function MonthSegment({
       return false
     }
     const PRIORITY: Record<string, number> = {
-      'sleep-deficit': 0,
-      'deficit-weekday': 1,
-      'training-protein': 2,
-      'weekend-surplus': 3,
+      // La FALLA primero (dónde se rompe tu déficit) — es la promesa.
+      'deficit-daytype': 0,
+      'surplus-concentration': 1,
+      'sleep-deficit': 2,
+      'training-protein': 3,
     }
     return detectMonthPatterns(patternSignals, { calorieTarget, proteinTarget })
       .filter((p) => p.kind === 'pattern' && !coveredByCombo(p.id))
@@ -260,7 +290,6 @@ export function MonthSegment({
   }, [patternSignals, calorieTarget, proteinTarget, combo])
   // Sistema PRESENCIA: separado del progreso físico.
   const presence = useMemo(() => presenceSummary(signals), [signals])
-  const phrase = useMemo(() => finalPhrase(signals), [signals])
 
   // Hero — la constelación del signo revelándose por los puntos de
   // transformación (suma de hábitos del mes), y cuánto subió este mes.
@@ -270,17 +299,19 @@ export function MonthSegment({
   const firstOfMonth = `${todayInTimezone().slice(0, 8)}01`
   const { progress: prevProgress } = useTransformProgressAsOf(firstOfMonth)
   const delta = prevProgress != null ? Math.max(0, progress - prevProgress) : null
-  // Las dos listas del héroe: lo que se reveló este mes (★) y lo que falta (○).
+  // Las dos listas del héroe: lo que sostuviste (★) y lo que falta (○). VENTANA
+  // RODANTE de 31 días (informativo, no se vacía el día 1). Su modal de evidencia
+  // (RevealDaysGrid) dibuja EXACTAMENTE esa ventana → el conteo coincide con los
+  // días mostrados, aunque abarque dos meses.
   const reveals = useMemo(
     () => monthReveals(signals, { calorieTarget, proteinTarget, waterGoalGlasses }),
     [signals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
-  // Los días concretos por dimensión — la evidencia al tocar una fila del héroe.
-  // Usa monthSignals porque la rejilla del modal (RevealDaysGrid) es del mes en
-  // curso; alimentarla con 31d pondría días de otro mes que no caben en la rejilla.
+  // Los días concretos por dimensión — MISMA ventana de 31d que `reveals`, para
+  // que los días de la rejilla del modal cuadren con el conteo.
   const revealDays = useMemo(
-    () => revealDayMap(monthSignals, { calorieTarget, proteinTarget, waterGoalGlasses }),
-    [monthSignals, calorieTarget, proteinTarget, waterGoalGlasses],
+    () => revealDayMap(signals, { calorieTarget, proteinTarget, waterGoalGlasses }),
+    [signals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
 
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
@@ -343,7 +374,7 @@ export function MonthSegment({
       {/* ── Tiempo 2 · El calendario de déficit, con navegador de mes (‹ mes ›)
           para ojear meses pasados. Si el mes seleccionado no tiene registro, un
           estado de inicio (con hint para retroceder). */}
-      <View style={styles.beat}>
+      <View style={[styles.beat, styles.glancePanel]}>
         {/* Un solo encabezado apilado en el riel izquierdo: categoría → el MES (el
             título, navegable) → qué muestran los puntos. Igual para lleno y vacío. */}
         <View style={styles.calHeader}>
@@ -371,11 +402,22 @@ export function MonthSegment({
               <Text style={[styles.monthArrow, !canNextMonth && styles.monthArrowOff]}>›</Text>
             </Pressable>
           </View>
-          <Text style={styles.calQuestion}>¿En qué días estuviste en déficit?</Text>
+          <Text style={styles.calQuestion}>
+            El oro son tus días en déficit. Lo que el mes fue construyendo.
+          </Text>
         </View>
 
         {glance ? (
-          <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
+          <>
+            <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
+            {/* Arranque de mes (pocos días): NO dejar a la usuaria sola frente al
+                conteo bajo — junio, con historia real, a un tap. */}
+            {monthOffset === 0 && glance.dataDays < 5 && canPrevMonth ? (
+              <Text style={styles.monthEmptyHint}>
+                Este mes va empezando. Usa ‹ para ver meses anteriores.
+              </Text>
+            ) : null}
+          </>
         ) : (
           <View style={styles.monthEmpty}>
             <Text style={styles.monthEmptyBody}>
@@ -390,17 +432,15 @@ export function MonthSegment({
         )}
       </View>
 
-      {/* ── Tiempo 3 · ¿Qué hago distinto el próximo mes? — UN foco (la palanca
-          más cerca de encender), y los patrones como su evidencia/por qué. */}
-      {combo || supportPatterns.length > 0 ? (
-        <View style={styles.beat}>
-          {/* El bloque "Tu foco" se quitó (decisión dueña). El tiempo 3 abre con
-              los patrones. */}
-          {/* Los patrones = la evidencia/"por qué". Siempre visibles
-              (decisión dueña): sin colapsable. */}
+      {/* ── Tiempo 3 · Tus patrones — lo que Stelar encontró. La usuaria ya tiene
+          datos (el guard de arriba lo asegura), así que la sección SIEMPRE está: con
+          patrón probado, lo muestra; sin uno, un estado vacío HONESTO — nunca un
+          patrón débil de relleno (Apple/Yazio: jamás fingir). */}
+      <View style={styles.beat}>
+        <View style={styles.section}>
+          <Text style={styles.eyebrow}>Tus patrones</Text>
           {combo || supportPatterns.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.eyebrow}>Tus patrones</Text>
+            <>
               <Text style={styles.sectionLede}>Lo que apareció junto en tus días.</Text>
               {combo ? (
                 <DominantPatternCard combo={combo} onOpen={() => setReveal(comboReveal(combo))} />
@@ -414,13 +454,21 @@ export function MonthSegment({
                   onOpen={() => setEvidence(p)}
                 />
               ))}
+            </>
+          ) : (
+            <View style={styles.patternsEmpty}>
+              <Text style={styles.patternsEmptyLede}>Aún no emerge un patrón claro.</Text>
+              <Text style={styles.patternsEmptyBody}>
+                Stelar solo te muestra un patrón cuando tus datos lo sostienen. Con más días,
+                aparecerá.
+              </Text>
             </View>
-          ) : null}
+          )}
         </View>
-      ) : null}
+      </View>
 
       {/* ── Tiempo 4 · ¿Sigo así? — el cierre emocional (volver sin culpa). */}
-      {presence ? <PresenceFinale presence={presence} phrase={phrase} /> : null}
+      {presence ? <PresenceFinale presence={presence} /> : null}
 
       {/* Fin del recorrido: volver al inicio sin tener que hacer scroll a mano. */}
       {onScrollTop ? (
@@ -522,26 +570,9 @@ function EmblemHero({
     transform: [{ scale: 0.88 + breath.value * 0.22 }],
   }))
 
-  // "Tap me": los chevrons de las filas hacen un nudge suave (se corren y se
-  // encienden) para invitar al toque. Gateado (foco + reduced-motion).
-  const nudge = useSharedValue(0)
-  useEffect(() => {
-    if (!active || reduce) {
-      cancelAnimation(nudge)
-      nudge.value = withTiming(0, { duration: 300 })
-      return
-    }
-    nudge.value = withRepeat(
-      withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-    return () => cancelAnimation(nudge)
-  }, [active, reduce, nudge])
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: nudge.value * 3 }],
-    opacity: 0.5 + nudge.value * 0.45,
-  }))
+  // El chevron es un affordance ESTÁTICO y discreto (‹›): un chevron ya invita al
+  // toque. Antes latía en bucle en CADA fila → la pantalla "vibraba" en vez de
+  // respirar. Órbita Mes debe sentirse en calma.
 
   // El módulo "Lo que encendió tu cielo" (consolidado): el déficit coronado
   // aparte (norte), el resto de dimensiones como contexto, las pendientes "en
@@ -550,10 +581,13 @@ function EmblemHero({
   // no transformación → vive en "Tu presencia").
   const deficitLit = reveals.revealed.find((r) => r.key === 'deficit') ?? null
   const ctxLit = reveals.revealed.filter((r) => r.key !== 'deficit' && r.key !== 'registro')
+  // UN solo foco: la pendiente MÁS cerca de encender (no un roster de carencias
+  // stackeado bajo tus logros). Solo si ya pasó la mitad del umbral → anticipación
+  // sana; mostrar una lejana ("2 de 8") deflaciona en vez de motivar.
   const shadow = reveals.pending
-    .filter((r) => r.key !== 'registro')
+    .filter((r) => r.key !== 'registro' && r.count >= REVEAL_THRESHOLD / 2)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3)
+    .slice(0, 1)
   // El FOCO ya NO vive en el héroe: subió al Tiempo 3 ("¿qué hago distinto?").
   const hasModule = reveals.revealed.length > 0
 
@@ -615,14 +649,14 @@ function EmblemHero({
             <Pressable
               style={styles.deficitRow}
               accessibilityRole="button"
-              accessibilityLabel={`Déficit constante, ${deficitLit.count} de ${deficitLit.total} días con comida. Ver evidencia.`}
+              accessibilityLabel={`Déficit constante, ${deficitLit.count} de ${deficitLit.total} días que registraste. Ver evidencia.`}
               onPress={() => onOpenReveal?.(deficitLit, true)}
             >
               <DiscoveryStar color={revealColor('deficit')} mag={0.72} size={26} />
               <View style={styles.deficitBody}>
                 <Text style={styles.deficitLabel}>{deficitLit.label}</Text>
                 <Text style={styles.deficitSub}>
-                  {deficitLit.count} de {deficitLit.total} días con comida
+                  {deficitLit.count} de {deficitLit.total} días que registraste
                 </Text>
                 <DayStars
                   count={deficitLit.count}
@@ -630,7 +664,7 @@ function EmblemHero({
                   color={revealColor('deficit')}
                 />
               </View>
-              <Animated.Text style={[styles.revChevron, chevronStyle]}>›</Animated.Text>
+              <Text style={styles.revChevron}>›</Text>
             </Pressable>
           ) : null}
 
@@ -655,7 +689,7 @@ function EmblemHero({
                 </Text>
                 <DayStars count={it.count} total={it.total} color={revealColor(it.colorKey)} />
               </View>
-              <Animated.Text style={[styles.revChevronSm, chevronStyle]}>›</Animated.Text>
+              <Text style={styles.revChevronSm}>›</Text>
             </AnimatedPressable>
           ))}
 
@@ -665,7 +699,10 @@ function EmblemHero({
               enciende. Nunca en tono de reproche. */}
           {shadow.length > 0 ? (
             <>
-              <Text style={styles.shadowHeading}>Aún por encender</Text>
+              {/* Divisor: el salto de "esto ya lo tienes" a "esto viene" debe ser
+                  inequívoco (no una sola lista). */}
+              <View style={styles.revealDivider} />
+              <Text style={styles.shadowHeading}>Lo más cerca de encender</Text>
               {shadow.map((it) => (
                 <Pressable
                   key={it.key}
@@ -683,7 +720,7 @@ function EmblemHero({
                     <Text style={styles.shadowTitle}>{it.label}</Text>
                     <Text style={styles.ctxSub}>
                       {it.count > 0
-                        ? `${it.count} de ${REVEAL_THRESHOLD} · te faltan ${REVEAL_THRESHOLD - it.count} para encender`
+                        ? `${it.count} de ${REVEAL_THRESHOLD} · ${REVEAL_THRESHOLD - it.count} más para encender`
                         : 'Apenas empieza'}
                     </Text>
                     <DayStars
@@ -692,7 +729,7 @@ function EmblemHero({
                       color={revealColor(it.colorKey)}
                     />
                   </View>
-                  <Animated.Text style={[styles.revChevronSm, chevronStyle]}>›</Animated.Text>
+                  <Text style={styles.revChevronSm}>›</Text>
                 </Pressable>
               ))}
             </>
@@ -979,6 +1016,44 @@ function PatternFindingCard({
   )
 }
 
+/* ── La forma de tu semana — 7 columnas, tu déficit por día (picos/valles) ── */
+const DOW_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
+function WeekdayShapeChart({ shape }: { shape: WeekdayShape }) {
+  // Sin % por barra (se leería como boletín): solo la SILUETA. Se ilumina el lado
+  // que SOSTIENE (oro); el otro, atenuado. Nunca se resalta el día bajo.
+  return (
+    <View style={styles.shapeWrap}>
+      <Text style={styles.shapeHeading}>Cómo sostuviste cada día</Text>
+      <View style={styles.shapeRow}>
+        {shape.week.map((d, i) => {
+          const has = d.total > 0
+          const isStrong = has && (shape.strongSide === 'weekend' ? i >= 5 : i < 5)
+          return (
+            <View key={i} style={styles.shapeCol}>
+              <View style={styles.shapeTrack}>
+                <View
+                  style={[
+                    styles.shapeFill,
+                    {
+                      height: `${has ? Math.max(6, Math.round(d.rate * 100)) : 0}%`,
+                      backgroundColor: isStrong ? colors.oro : colors.oroSoft,
+                      opacity: has ? (isStrong ? 1 : 0.42) : 0,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.shapeDow, isStrong ? styles.shapeDowHi : null]}>
+                {DOW_LETTERS[i]}
+              </Text>
+            </View>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
+
 /* ── "Ver evidencia" — las barras que sostienen un hallazgo ──────────── */
 function EvidenceModal({
   pattern,
@@ -1016,51 +1091,76 @@ function EvidenceModal({
                 <View style={[styles.modalTitleDot, { backgroundColor: titleColor }]} />
                 <Text style={styles.modalTitle}>{pattern.title}</Text>
               </View>
-              <View style={styles.bars}>
-                {shown.map((b, i) => {
-                  const barColor = b.colorKey ? (BAR_COLOR[b.colorKey] ?? colors.oro) : colors.oro
-                  return (
-                    <View key={`${b.label}-${i}`} style={styles.barRow}>
-                      <Text style={styles.barLabel} numberOfLines={1}>
-                        {b.label}
-                      </Text>
-                      <View style={styles.barTrack}>
-                        <View
-                          style={[
-                            styles.barFill,
-                            {
-                              width: `${Math.round((b.value / max) * 100)}%`,
-                              backgroundColor: barColor,
-                              opacity: b.highlight ? 1 : 0.32,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
-                        {/* Denominador para anclar el número ("18 / 32"). */}
-                        {b.value}
-                        {b.total != null ? (
-                          <Text style={styles.barValueTotal}> / {b.total}</Text>
-                        ) : null}
-                      </Text>
-                    </View>
-                  )
-                })}
-              </View>
-              <Text style={styles.modalCaption}>{ev.caption}</Text>
-              {/* Las fechas concretas — anclan el conteo ("¿de dónde salen?"). */}
-              {pattern.dates && pattern.dates.length > 0 ? (
-                <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
-              ) : null}
-              {zeros.length > 0 ? (
-                <Text style={styles.modalZeroNote}>
-                  {zeros.map((z) => z.label).join(' · ')}: aún sin registro este mes.
-                </Text>
-              ) : null}
-              {/* "Por qué importa" — el lever que la usuaria puede mover (voz
-                  Observadora: describe lo que pasó, no aconseja). Solo en los
-                  patrones del motor; el combo no lo trae. */}
-              {pattern.why ? <Text style={styles.modalWhy}>{pattern.why}</Text> : null}
+              {pattern.weekdayShape ? (
+                // Forma por día de semana: la usuaria VE sus picos y valles + el
+                // dato traducido en plano ("de cada 10 días entre semana sostienes 5").
+                <>
+                  <WeekdayShapeChart shape={pattern.weekdayShape} />
+                  {pattern.why ? <Text style={styles.modalWhy}>{pattern.why}</Text> : null}
+                </>
+              ) : (
+                <>
+                  <View style={styles.bars}>
+                    {shown.map((b, i) => {
+                      const barColor = b.colorKey
+                        ? (BAR_COLOR[b.colorKey] ?? colors.oro)
+                        : colors.oro
+                      // Con denominador, la barra dibuja la TASA (value/total), no el
+                      // conteo crudo — si no, "11 de 22" (50%) se vería más largo que
+                      // "7 de 8" (87%) y diría lo contrario a la verdad.
+                      const rate = b.total != null ? b.value / b.total : null
+                      const frac = rate != null ? rate : b.value / max
+                      return (
+                        <View key={`${b.label}-${i}`} style={styles.barRow}>
+                          <Text style={styles.barLabel} numberOfLines={1}>
+                            {b.label}
+                          </Text>
+                          <View style={styles.barTrack}>
+                            <View
+                              style={[
+                                styles.barFill,
+                                {
+                                  width: `${Math.round(frac * 100)}%`,
+                                  backgroundColor: barColor,
+                                  opacity: b.highlight ? 1 : 0.32,
+                                },
+                              ]}
+                            />
+                          </View>
+                          {rate != null ? (
+                            // % protagonista (el número que golpea) + conteo como ancla.
+                            <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
+                              {Math.round(rate * 100)}%
+                              <Text style={styles.barValueTotal}>
+                                {'  '}
+                                {b.value}/{b.total}
+                              </Text>
+                            </Text>
+                          ) : (
+                            <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
+                              {b.value}
+                            </Text>
+                          )}
+                        </View>
+                      )
+                    })}
+                  </View>
+                  <Text style={styles.modalCaption}>{ev.caption}</Text>
+                  {/* Las fechas concretas — anclan el conteo ("¿de dónde salen?"). */}
+                  {pattern.dates && pattern.dates.length > 0 ? (
+                    <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
+                  ) : null}
+                  {zeros.length > 0 ? (
+                    <Text style={styles.modalZeroNote}>
+                      {zeros.map((z) => z.label).join(' · ')}: aún sin registro este mes.
+                    </Text>
+                  ) : null}
+                  {/* "Por qué importa" — el lever que la usuaria puede mover (voz
+                      Observadora: describe lo que pasó, no aconseja). Solo en los
+                      patrones del motor; el combo no lo trae. */}
+                  {pattern.why ? <Text style={styles.modalWhy}>{pattern.why}</Text> : null}
+                </>
+              )}
               <Pressable
                 onPress={onClose}
                 hitSlop={10}
@@ -1080,42 +1180,46 @@ function EvidenceModal({
 /* Mini-calendario del mes con los días de UNA dimensión encendidos — la PRUEBA
  * de "¿de dónde salen esos días?". Días logrados en su color; el resto del mes
  * transcurrido, tenue; futuro, en blanco. */
+const REVEAL_WINDOW = 31 // debe coincidir con useSignalsHistory(31) que alimenta reveals
+
+function isoBack(today: string, back: number): string {
+  const d = new Date(`${today}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - back)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Rango legible de la ventana: "Del 2 jun al 1 jul". */
+function formatWindowRange(startIso: string, endIso: string): string {
+  const day = (iso: string) => Number(iso.slice(8, 10))
+  const mo = (iso: string) => MONTHS_SHORT[Number(iso.slice(5, 7)) - 1]
+  return `Del ${day(startIso)} ${mo(startIso)} al ${day(endIso)} ${mo(endIso)}`
+}
+
+/** La rejilla de días: la VENTANA RODANTE de 31 días (viejo → nuevo), no un mes
+ *  calendario. Puede abarcar dos meses → cuadra con el conteo rodante del módulo. */
 function RevealDaysGrid({ days, color, today }: { days: string[]; color: string; today: string }) {
-  const monthStr = today.slice(0, 7)
-  const daysInMonth = new Date(
-    Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0),
-  ).getUTCDate()
-  const todayNum = Number(today.slice(8, 10))
   const onSet = new Set(days)
+  const window = Array.from({ length: REVEAL_WINDOW }, (_, i) =>
+    isoBack(today, REVEAL_WINDOW - 1 - i),
+  )
+  // Cuadros del calendario, SIN números: numerar + huecos invita a contar lo que
+  // faltó (boleta). Sin número, los encendidos (color) forman la figura y los días
+  // que no contaron quedan tan tenues como el futuro — calendario, no auditoría.
   return (
-    <View style={styles.revGrid}>
-      {Array.from({ length: daysInMonth }, (_, i) => {
-        const d = i + 1
-        const date = `${monthStr}-${String(d).padStart(2, '0')}`
-        const on = onSet.has(date)
-        const future = d > todayNum
-        return (
-          <View
-            key={d}
-            style={[
-              styles.revCell,
-              on && { backgroundColor: color },
-              !on && !future && styles.revCellPast,
-            ]}
-          >
-            <Text
-              style={[
-                styles.revCellNum,
-                on && styles.revCellNumOn,
-                future && styles.revCellNumFuture,
-              ]}
-            >
-              {d}
-            </Text>
-          </View>
-        )
-      })}
-    </View>
+    <>
+      <View style={styles.revGrid}>
+        {window.map((iso) => {
+          const on = onSet.has(iso)
+          return (
+            <View
+              key={iso}
+              style={[styles.revCell, on ? { backgroundColor: color } : styles.revCellPast]}
+            />
+          )
+        })}
+      </View>
+      <Text style={styles.revRange}>{formatWindowRange(window[0]!, today)}</Text>
+    </>
   )
 }
 
@@ -1152,15 +1256,20 @@ function RevealEvidenceModal({
               <Text style={styles.revThreshold}>
                 {detail.revealed
                   ? `Una dimensión se enciende a los ${detail.threshold} días. Este mes llegaste.`
-                  : `Se enciende a los ${detail.threshold} días. Te faltan ${remaining} para encenderla.`}
+                  : `Se enciende a los ${detail.threshold} días. ${remaining} más para encenderla.`}
               </Text>
 
               {/* La prueba: los días concretos. */}
               <Text style={styles.revProofLabel}>Tus días</Text>
               <RevealDaysGrid days={detail.days} color={color} today={today} />
 
-              {/* El rol (por qué importa). */}
-              <Text style={styles.revRole}>{REVEAL_ROLE[detail.key] ?? ''}</Text>
+              {/* El rol (por qué importa) — según el ESTADO: pasado si encendió,
+                  anticipación si aún no (nunca elogio en pasado de lo pendiente). */}
+              <Text style={styles.revRole}>
+                {detail.revealed
+                  ? (REVEAL_ROLE[detail.key]?.on ?? '')
+                  : (REVEAL_ROLE[detail.key]?.off ?? '')}
+              </Text>
 
               <Pressable
                 onPress={onClose}
@@ -1267,15 +1376,22 @@ const styles = StyleSheet.create({
     // resto de secciones del Mes.
     alignSelf: 'stretch',
     alignItems: 'flex-start',
-    paddingLeft: 2,
+    // Panel un poco más oscuro que el fondo: apaga el polvo estelar del cosmos
+    // detrás del componente para que NO se confunda con las estrellas del medidor.
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
   },
   revealHeading: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1.4,
+    fontSize: typography.sizes.label,
+    letterSpacing: 1.6,
     textTransform: 'uppercase',
     color: colors.oroSoft,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   revealRow: {
     flexDirection: 'row',
@@ -1316,10 +1432,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
   },
+  // El número es la SEÑAL (el ancla honesta), no una nota al pie gris: leche + peso.
   deficitSub: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
+    marginTop: 1,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
   revealDivider: {
@@ -1347,9 +1465,9 @@ const styles = StyleSheet.create({
   },
   ctxSub: {
     marginTop: 2,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
     fontVariant: ['tabular-nums'],
   },
   // Título de una fila "aún por encender": como el contexto pero en bone (un
@@ -1359,12 +1477,11 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
-  // Días como estrellas: una por día, encendidas = sostenidas.
+  // Medidor de proporción: 10 estrellas fijas (ancho igual en todas las filas).
   dayStars: {
     marginTop: 8,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 3,
+    gap: 5,
   },
   dayStar: {
     width: 5,
@@ -1387,13 +1504,15 @@ const styles = StyleSheet.create({
   },
   // "Aún en sombra" — lo pendiente, en tono callado (aro hueco, no estrella).
   shadowHeading: {
-    marginTop: 18,
-    marginBottom: 10,
+    marginTop: 2,
+    marginBottom: 12,
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1.4,
+    fontSize: typography.sizes.label,
+    letterSpacing: 1.6,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    // Oro (oroSoft) como los demás eyebrows de Mes — antes gris (inconsistente
+    // con "Lo que sostuviste este mes", que sí va en oro).
+    color: colors.oroSoft,
   },
   shadowRow: {
     flexDirection: 'row',
@@ -1512,7 +1631,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
     marginBottom: 14,
     marginLeft: 2,
   },
@@ -1527,6 +1646,23 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     lineHeight: 20,
+    color: colors.niebla,
+  },
+  // Estado vacío honesto de "Tus patrones": calmo, sin patrón débil de relleno.
+  patternsEmpty: {
+    marginTop: 6,
+    marginLeft: 2,
+  },
+  patternsEmptyLede: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  patternsEmptyBody: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
     color: colors.niebla,
   },
   // ── Tu presencia — sistema separado ───────────────────────────
@@ -1640,6 +1776,17 @@ const styles = StyleSheet.create({
   },
   // Encabezado del calendario: UN solo bloque en el riel izquierdo (categoría →
   // el MES como título navegable → la pregunta-lede). El mes es el protagonista.
+  // Panel un poco más oscuro (igual que el grupo de constancias): apaga el polvo
+  // estelar del fondo bajo el calendario para que sus puntos-día no se confundan
+  // con las estrellas del cosmos.
+  glancePanel: {
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
   calHeader: {
     marginLeft: 2,
   },
@@ -1798,10 +1945,10 @@ const styles = StyleSheet.create({
   },
   // La frase serif es la protagonista: aquí vive el descubrimiento.
   findingTitle: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 20,
-    lineHeight: 28,
+    // Hanken, no serif italic: es una observación de dato, no voz de coach.
+    fontFamily: typography.uiSemi,
+    fontSize: 18,
+    lineHeight: 25,
     color: colors.leche,
   },
   findingCta: {
@@ -1943,10 +2090,10 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     flex: 1,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 21,
-    lineHeight: 27,
+    // Hanken: el hallazgo es dato, no frase emocional.
+    fontFamily: typography.uiSemi,
+    fontSize: 18,
+    lineHeight: 24,
     color: colors.leche,
   },
   bars: {
@@ -1956,10 +2103,10 @@ const styles = StyleSheet.create({
   barRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   barLabel: {
-    width: 74,
+    width: 86,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.bone,
@@ -1977,7 +2124,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.oroHairline,
   },
   barValue: {
-    width: 52,
+    width: 68,
     textAlign: 'right',
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
@@ -1991,6 +2138,47 @@ const styles = StyleSheet.create({
   barValueTotal: {
     fontFamily: typography.ui,
     color: colors.niebla,
+  },
+  // ── Forma de tu semana (7 columnas) ──────────────────────────
+  shapeWrap: {
+    marginTop: 20,
+  },
+  shapeHeading: {
+    marginBottom: 12,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  shapeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  shapeCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  shapeTrack: {
+    width: '100%',
+    height: 54,
+    borderRadius: 5,
+    backgroundColor: 'rgba(244, 236, 222, 0.06)',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  shapeFill: {
+    width: '100%',
+    borderRadius: 5,
+  },
+  shapeDow: {
+    fontFamily: typography.uiMedium,
+    fontSize: 11,
+    color: colors.niebla,
+  },
+  shapeDowHi: {
+    fontFamily: typography.uiBold,
+    color: colors.bone,
   },
   modalCaption: {
     marginTop: 16,
@@ -2045,14 +2233,14 @@ const styles = StyleSheet.create({
   revChevron: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.segmentTitle,
-    color: colors.niebla,
+    color: colors.bruma,
     marginLeft: 4,
   },
   // Chevron más chico para las filas de contexto y "en sombra".
   revChevronSm: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.heading,
-    color: colors.niebla,
+    color: colors.bruma,
     marginLeft: 4,
   },
   // ── Modal de evidencia de un reveal ───────────────────────────────
@@ -2091,29 +2279,24 @@ const styles = StyleSheet.create({
   revGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 5,
+    gap: 6,
   },
+  // Cuadro del calendario (sin número): encendido = color pleno; el resto, tenue.
   revCell: {
-    width: 28,
-    height: 26,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 22,
+    height: 20,
+    borderRadius: 5,
   },
   revCellPast: {
     backgroundColor: 'rgba(244, 236, 222, 0.05)',
   },
-  revCellNum: {
-    fontFamily: typography.uiSemi,
-    fontSize: 11,
+  // El rango de la ventana bajo la rejilla ("Del 2 jun al 1 jul") — deja claro que
+  // no es un mes calendario sino los últimos 31 días.
+  revRange: {
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
-  },
-  revCellNumOn: {
-    color: '#0A0608',
-    fontFamily: typography.uiBold,
-  },
-  revCellNumFuture: {
-    color: colors.bruma,
   },
 })

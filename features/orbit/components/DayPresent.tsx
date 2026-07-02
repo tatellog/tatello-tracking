@@ -967,7 +967,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2.2,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
     marginBottom: 6,
   },
   // La palabra-titular ("Déficit") — serif, en leche (registro observacional).
@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
     marginBottom: 14,
   },
   evidenceRow: {
@@ -1122,7 +1122,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
     marginBottom: 12,
   },
   whyRow: {

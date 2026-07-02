@@ -292,31 +292,54 @@ describe('detectMonthPatterns · descubrimientos (constancias del motor)', () =>
 })
 
 describe('detectMonthPatterns · patrones accionables (correlaciones)', () => {
-  it('déficit entre semana cuando la tasa es alta', () => {
-    // Lun–vie en déficit (1400), sáb–dom en superávit (2400).
+  it('déficit por tipo de día: fuerte entre semana (déficit L-V, superávit finde)', () => {
+    // Lun–vie en déficit (1400), sáb–dom en superávit (2400) → entre semana fuerte.
     const signals = month(14, (i) => {
       const wd = monIdxUTC(addDays(BASE, i))
       return { meal_count: 2, calories: wd < 5 ? 1400 : 2400 }
     })
-    const ps = detectMonthPatterns(signals, { calorieTarget: TARGET })
-    const wd = ps.find((p) => p.id === 'deficit-weekday')!
-    expect(wd).toBeTruthy()
-    expect(wd.kind).toBe('pattern')
-    expect(wd.title).toMatch(/%/)
+    const p = detectMonthPatterns(signals, { calorieTarget: TARGET }).find(
+      (p) => p.id === 'deficit-daytype',
+    )!
+    expect(p).toBeTruthy()
+    expect(p.kind).toBe('pattern')
+    // Veredicto: fortaleza (entre semana) → margen (el fin de semana), sin jerga.
+    expect(p.title).toMatch(/Entre semana te sostiene/)
+    expect(p.title).toMatch(/fin de semana es donde tienes margen/)
+    // La forma por día de semana viaja para la gráfica (7 días) + el lado fuerte.
+    expect(p.weekdayShape?.week).toHaveLength(7)
+    expect(p.weekdayShape?.strongSide).toBe('weekday')
   })
 
-  it('superávit concentrado en fin de semana', () => {
-    // Entre semana en meta (1700), finde con superávit fuerte (2600).
+  it('déficit por tipo de día nombra la FALLA: flaquea entre semana (fuerte el finde)', () => {
+    // Inverso: entre semana en superávit (2400), finde en déficit (1400) → entre
+    // semana es el lado DÉBIL. La promesa "dónde fallas".
     const signals = month(14, (i) => {
       const wd = monIdxUTC(addDays(BASE, i))
-      return { meal_count: 2, calories: wd < 5 ? 1700 : 2600 }
+      return { meal_count: 2, calories: wd < 5 ? 2400 : 1400 }
     })
-    const we = detectMonthPatterns(signals, { calorieTarget: TARGET }).find(
-      (p) => p.id === 'weekend-surplus',
+    const p = detectMonthPatterns(signals, { calorieTarget: TARGET }).find(
+      (p) => p.id === 'deficit-daytype',
     )!
+    expect(p).toBeTruthy()
+    // El veredicto nombra el margen (la falla) en llano: entre semana.
+    expect(p.title).toMatch(/Entre semana es donde tienes margen/)
+  })
+
+  it('superávit concentrado en fin de semana (cuando la tasa de déficit es pareja)', () => {
+    // Todos en superávit (tasa de déficit 0 en ambos → no dispara deficit-daytype);
+    // el finde concentra el mayor exceso (1900 vs 2800).
+    const signals = month(14, (i) => {
+      const wd = monIdxUTC(addDays(BASE, i))
+      return { meal_count: 2, calories: wd < 5 ? 1900 : 2800 }
+    })
+    const ps = detectMonthPatterns(signals, { calorieTarget: TARGET })
+    expect(ps.some((p) => p.id === 'deficit-daytype')).toBe(false)
+    const we = ps.find((p) => p.id === 'surplus-concentration')!
     expect(we).toBeTruthy()
     expect(we.kind).toBe('pattern')
     expect(we.evidence.unit).toBe('kcal')
+    expect(we.title).toMatch(/fin de semana/)
   })
 
   it('sueño ≥7h × déficit cuando el efecto es marcado', () => {

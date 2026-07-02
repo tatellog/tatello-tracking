@@ -4,7 +4,6 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Circle, Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
 import {
   buildMonthGrid,
   effectiveTrainingPhrase,
@@ -46,6 +45,15 @@ export type DayMark = 'transformation' | 'revelation' | 'pattern'
  *  (vs sin registro) y si tuvo un evento. Lo provee Progreso desde sus
  *  CalendarDay (recientes); meses viejos quedan sin meta (degradación suave). */
 export type DayMeta = { rested: boolean; mark: DayMark | null }
+
+/** Reconoce la CONSTANCIA del movimiento (all-time). Voz de coach cálida, sin
+ *  racha rígida, sin countdown, sin culpa: el número solo crece. */
+function constancyLine(count: number): string {
+  if (count >= 30) return 'Tu cuerpo ya tiene su ritmo. La constancia se ve en tu cielo.'
+  if (count >= 12) return 'Vas tejiendo tu constancia, un día a la vez.'
+  if (count >= 4) return 'Cada día en movimiento suma. Tu cielo los guarda.'
+  return 'Tu constelación de movimiento apenas empieza.'
+}
 
 /*
  * Movement hero — the all-time trained-days counter PLUS a browsable
@@ -113,15 +121,13 @@ export function MovementConstellation({
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(80)}>
-      <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-        Movimiento
-      </EyebrowLabel>
-
       <View style={styles.card}>
         {/* The all-time counter — the hero number. */}
         <View style={styles.countRow}>
           <Text style={styles.bigNum}>{count}</Text>
-          <Text style={styles.countLabel}>{count === 1 ? 'día entrenado' : 'días entrenados'}</Text>
+          <Text style={styles.countLabel}>
+            {count === 1 ? 'día entrenado en total' : 'días entrenados en total'}
+          </Text>
         </View>
         {/* Human milestone, once a full month of effective training is in. */}
         {count >= 30 ? (
@@ -253,6 +259,10 @@ export function MovementConstellation({
 
         {/* Leyenda — cómo se lee el cielo. Solo cuando hay tap (Historia). */}
         {onDayPress ? <StarLegend /> : null}
+
+        {/* Cierre: reconoce la CONSTANCIA (no un entreno de hoy). Voz de coach,
+            sin racha rígida ni presión — el número solo crece. */}
+        {count >= 1 ? <Text style={styles.constancy}>{constancyLine(count)}</Text> : null}
       </View>
     </Animated.View>
   )
@@ -552,6 +562,17 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.label,
     color: colors.niebla,
+  },
+  // Cierre del card: reconoce la constancia. Voz de coach (serif italic).
+  constancy: {
+    marginTop: 16,
+    textAlign: 'center',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 24,
+    color: colors.bone,
+    paddingHorizontal: 8,
   },
   // Leyenda — fila envolvente de marcas, bajo el cielo.
   legend: {

@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
     marginBottom: 10,
   },
   vozRegistered: {
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
     marginBottom: 6,
   },
   evidenceList: {

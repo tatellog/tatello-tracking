@@ -17,14 +17,17 @@ import { signalCount } from './week-logic'
 
 export type WeekDimKey = 'movimiento' | 'comida' | 'proteina' | 'agua' | 'sueno' | 'energia'
 
-/** El orden canónico — posiciones estables de los orbes en la galaxia. */
+/** El orden canónico — posiciones estables de los orbes en la galaxia.
+ *  v2.2: Energía SALE de la galaxia (coherencia con Mes, que ya la retiró: es
+ *  calorías consumidas − gastadas, no una señal propia; era el planeta que más
+ *  confundió y el único naranja-de-alarma). Sigue existiendo como WeekDimKey
+ *  para la evidencia/probes, pero ya no es un planeta. Quedan 5 señales. */
 export const WEEK_DIM_ORDER: readonly WeekDimKey[] = [
   'movimiento',
   'comida',
   'proteina',
   'agua',
   'sueno',
-  'energia',
 ]
 
 const LABEL: Record<WeekDimKey, string> = {
@@ -205,6 +208,102 @@ export function risingSignal(
   return best ? { key: best.key, label: best.label, last: best.last, current: best.current } : null
 }
 
+/* ── §0 · Todavía puedo + dirección (la ventana abierta) ──────────────
+ * Lo que SOLO Semana da: (a) los días que faltan (lienzo por delante, nunca
+ * cuota) y (b) el RUMBO de la semana vs la misma ventana de la pasada
+ * (movimiento, no conteo). Ni Día (un punto) ni Mes (una foto) lo dan.
+ * Ver docs/orbita-semana-spec.md §0. */
+
+/** Días de la semana que faltan DESPUÉS de hoy. Lunes → 6; miércoles → 4;
+ *  domingo → 0. Es lienzo por delante, no una cuota a alcanzar. */
+export function daysAhead(todayIso: string): number {
+  return 7 - isoWeekday(todayIso)
+}
+
+export type WeekDirectionState = 'rising' | 'steady' | 'softer'
+
+export type WeekDirection = {
+  /** Rumbo de la semana en curso vs la MISMA ventana de la pasada. */
+  state: WeekDirectionState
+  /** La dimensión que más creció, para la línea de evidencia (o null). */
+  topRise: RisingSignal | null
+}
+
+// Dimensiones que cuentan para el "ritmo". Energía queda FUERA (coherencia con
+// Mes: es calorías consumidas − gastadas, no una señal propia).
+const RHYTHM_DIMS: readonly WeekDimKey[] = ['movimiento', 'comida', 'proteina', 'agua', 'sueno']
+
+// Cuánto debe moverse el ritmo agregado para no ser "sostenido" (evita ruido).
+const DIRECTION_BAND = 2
+
+/**
+ * El RUMBO de la semana en curso comparada con la misma ventana de la anterior
+ * (lun→hoy vs lun→mismo-día). NO es un conteo: es dirección — subiendo /
+ * sostenido / más suave — el "movimiento" que la usuaria pide (Mes da la foto,
+ * Semana da el movimiento). Métrica = suma de días presentes en RHYTHM_DIMS (el
+ * "ritmo" de la semana). `null` si la semana pasada no tiene con qué comparar
+ * (primera semana medible) → no se muestra dirección.
+ */
+export function weekDirection(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekDirection | null {
+  const lastTodayIso = addDays(todayIso, -7)
+  const lastDims = buildWeekDimensions(signals, lastTodayIso, ctx)
+  if (!lastDims.some((d) => d.present > 0)) return null // sin base de comparación
+  const thisDims = buildWeekDimensions(signals, todayIso, ctx)
+  const rhythm = (dims: readonly WeekDimension[]): number =>
+    dims.reduce((n, d) => (RHYTHM_DIMS.includes(d.key) ? n + d.present : n), 0)
+  const delta = rhythm(thisDims) - rhythm(lastDims)
+  const state: WeekDirectionState =
+    delta >= DIRECTION_BAND ? 'rising' : delta <= -DIRECTION_BAND ? 'softer' : 'steady'
+  return { state, topRise: risingSignal(signals, todayIso, ctx) }
+}
+
+/* ── §S · La silueta de los 7 días (la forma del tramo) ───────────────
+ * El ritmo hecho imagen: lo único que solo la semana muestra ("empecé fuerte y
+ * me caí el jueves"). Altura/luz = plenitud del día (signalCount, la misma
+ * "richness" que ya usa weeklyRhythms); día en déficit = celda que emite luz
+ * oro (misma gramática "encendido vs en reposo" del calendario de Mes → los tres
+ * tabs riman visualmente). Futuro = polvo tenue, nunca falla. Ver §S del spec. */
+
+export type WeekSilhouetteCell = {
+  letter: string
+  date: string
+  state: 'past' | 'today' | 'future'
+  /** 0..1 — plenitud del día (cuánto registraste), para la altura/luz. */
+  fullness: number
+  /** ¿día en déficit? → la celda emite luz oro. */
+  deficit: boolean
+}
+
+// Señales para altura COMPLETA (signalCount máx real ~6; 5 = un día lleno).
+const SILHOUETTE_FULL = 5
+
+/** Los 7 días (lun→dom) con su plenitud y si cerraron en déficit. Los días
+ *  futuros van tenues (fullness 0), nunca como falla. */
+export function weekSilhouette(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekSilhouetteCell[] {
+  const monday = mondayOf(todayIso)
+  const byDay = new Map(signals.filter((s) => s.day != null).map((s) => [s.day as string, s]))
+  return WEEKDAY_LETTERS.map((letter, i) => {
+    const date = addDays(monday, i)
+    const state: WeekSilhouetteCell['state'] =
+      date > todayIso ? 'future' : date === todayIso ? 'today' : 'past'
+    const sig = byDay.get(date) ?? null
+    const fullness = state === 'future' ? 0 : Math.min(1, signalCount(sig) / SILHOUETTE_FULL)
+    const deficit =
+      state !== 'future' && sig != null && ctx.calorieTarget != null
+        ? isDeficitDay(sig.calories, ctx.calorieTarget)
+        : false
+    return { letter, date, state, fullness, deficit }
+  })
+}
+
 /* ── "Tu semana en una línea" ─────────────────────────────────────── */
 
 export type DayCellState = 'present' | 'absent' | 'future'
@@ -277,6 +376,34 @@ export function dimObservation(present: number, total: number): string {
   if (ratio >= 0.85) return 'Apareció casi toda la semana.'
   if (ratio >= 0.5) return 'Apareció la mayor parte de la semana.'
   return 'Apareció algunos días.'
+}
+
+/**
+ * §2 · El puente hábito↔peso para el panel de foco: de los días en que ESTE
+ * hábito apareció, cuántos cerraron TAMBIÉN en déficit. Responde "¿por qué este
+ * hábito importa para mi peso?" con sus propios datos — es lo que hace que la
+ * galaxia se sienta progreso y no solo hábitos. Solo para dims de
+ * TRANSFORMACIÓN (proteína, movimiento) y con meta calórica. OBSERVACIONAL
+ * (co-ocurrencia "junto a"), nunca causal. Usa el piso sano de `isDeficitDay`.
+ * `null` si no hay señal suficiente (no inventar).
+ */
+export function dimDeficitBridge(
+  key: WeekDimKey,
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): string | null {
+  if (ctx.calorieTarget == null || ctx.calorieTarget <= 0) return null
+  if (key !== 'proteina' && key !== 'movimiento') return null
+  const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
+  const dimDays = c((s) => PRESENT[key](s, ctx))
+  if (dimDays < 2) return null
+  const both = c((s) => PRESENT[key](s, ctx) && isDeficitDay(s.calories, ctx.calorieTarget))
+  if (both < 2) return null
+  const subj = key === 'proteina' ? 'Tu proteína' : 'Tu movimiento'
+  // "junto a tu déficit … esta semana" — paralelo al sistema de co-ocurrencias
+  // del archivo (voice-and-copy); observacional, nunca causal.
+  return `${subj} apareció junto a tu déficit ${both} de ${dimDays} ${veces(both)} esta semana.`
 }
 
 /* ── "Otros hallazgos" ────────────────────────────────────────────── */
@@ -970,37 +1097,14 @@ const cap = (s: string): string => (s.length > 0 ? s.charAt(0).toUpperCase() + s
 /** ¿Ese día se alcanzó la proteína? (meta si la hay, registro si no). */
 const proteinReached = (s: DailySignals, ctx: WeekDimCtx): boolean => PRESENT.proteina(s, ctx)
 
-/** El día de la semana (lun→hoy) con MÁS calorías, si hay un único pico claro.
- *  `null` con <2 días de comida o empate (sin pico que señalar). Evidencia de
- *  distribución, neutra: nunca reproche. */
-function highestCalorieWeekday(signals: readonly DailySignals[], todayIso: string): string | null {
-  const monday = mondayOf(todayIso)
-  const food = signals.filter(
-    (s) =>
-      s.day != null && s.day >= monday && s.day <= todayIso && s.calories != null && s.calories > 0,
-  )
-  if (food.length < 2) return null
-  let top = food[0]!
-  let tie = false
-  for (const s of food) {
-    if (s.calories! > top.calories!) {
-      top = s
-      tie = false
-    } else if (s !== top && s.calories === top.calories) {
-      tie = true
-    }
-  }
-  if (tie) return null
-  return SPANISH_WEEKDAYS[isoWeekday(top.day as string) - 1] ?? null
-}
-
 /* ── §3 · Evidencia emergente — observaciones con número (2 a 4) ───────── */
 
 /**
- * Las observaciones numéricas de la semana, distintas del hero: déficit,
- * proteína en días de entreno, día de más calorías, señal menos presente.
- * Cada una es un hecho con su evidencia, nunca un consejo ni una causa. Las de
- * déficit/calorías solo existen con meta calórica (degradación segura). Tope 4.
+ * Las observaciones numéricas de la semana, distintas del hero. v2.2: SIN la
+ * línea de conteo de déficit (es el KPI-foto de Mes; en Semana el déficit vive
+ * como dirección en §0) y SIN "día de más calorías" (culpa vaga sin salida).
+ * Quedan: proteína en días de entreno y la señal menos presente. Cada una es un
+ * hecho con su evidencia, nunca un consejo ni una causa. Tope 4.
  */
 export function emergingEvidence(
   signals: readonly DailySignals[],
@@ -1010,18 +1114,12 @@ export function emergingEvidence(
   const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
   const out: WeekEvidenceItem[] = []
 
-  // Déficit — denominador = días con comida (no días de la semana): decir "N de
-  // 7" implicaría que los días sin comida "no fueron déficit", lo cual es falso.
-  if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
-    const food = c((s) => s.calories != null && s.calories > 0)
-    const def = c((s) => isDeficitDay(s.calories, ctx.calorieTarget))
-    if (def >= 2 && food > 0) {
-      out.push({
-        key: 'deficit',
-        text: `Tu déficit apareció en ${def} de ${food} ${dayWord(food)} con comida.`,
-      })
-    }
-  }
+  // v2.2: la línea de conteo de déficit ("N de M días con comida") SALE de aquí
+  // — es el KPI-foto de Mes en chiquito. En Semana el déficit vive como DIRECCIÓN
+  // (§0 weekDirection) y, cuando se construya, como FORMA (§S silueta). Y "El día
+  // de más calorías" también sale: la usuaria lo reportó como culpa vaga sin
+  // salida (señala el mal día sin decir si aun así cerró en déficit). Ver
+  // docs/orbita-semana-spec.md §3. Aquí quedan solo observaciones NO de déficit.
 
   // Proteína en días de entreno — co-ocurrencia secundaria, con su denominador.
   const trained = c((s) => s.trained === true)
@@ -1035,20 +1133,10 @@ export function emergingEvidence(
     }
   }
 
-  // Día de más calorías — distribución neutra (solo con pico único claro).
-  if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
-    const hi = highestCalorieWeekday(signals, todayIso)
-    if (hi) out.push({ key: 'hi-cal', text: `El ${hi} fue tu día de más calorías.` })
-  }
-
-  // Señal menos presente — "el agua apareció solo N días".
-  const quiet = quietestSignal(buildWeekDimensions(signals, todayIso, ctx))
-  if (quiet) {
-    out.push({
-      key: 'quiet',
-      text: `${quiet.label} apareció solo ${quiet.present} ${dayWord(quiet.present)}.`,
-    })
-  }
+  // v2.2: "[señal] apareció solo N días" SALE (patrón prohibido en toda Órbita).
+  // El "solo" es regaño y disfrazado de hallazgo solo cuenta lo que faltó. La
+  // baja frecuencia ya la dice la galaxia con su planeta pequeño/tenue (masa por
+  // frecuencia, nunca hue de alarma). La frecuencia baja se VE, no se dice.
 
   return out.slice(0, 4)
 }
@@ -1121,8 +1209,11 @@ export function needsMoreEvidence(
     const aDays = c((s) => EVIDENCE_PRED[p.a](s, ctx))
     const bDays = c((s) => EVIDENCE_PRED[p.b](s, ctx))
     const both = c((s) => EVIDENCE_PRED[p.a](s, ctx) && EVIDENCE_PRED[p.b](s, ctx))
-    if (aDays >= 1 && bDays >= 1 && both < MIN_COOCCURRENCE) {
-      return `Todavía no tenemos suficientes datos para saber si ${p.aWord} y ${p.bWord} aparecen juntos. Sigue registrando.`
+    // v2.2: piso ALTO (ambas señales en ≥3 días) → un "casi-patrón" ganado, no
+    // un pie de página que sale casi siempre. Y copy de ANTICIPACIÓN ("se sigue
+    // dibujando"), no de deuda ("no tenemos datos / sigue registrando").
+    if (aDays >= 3 && bDays >= 3 && both < MIN_COOCCURRENCE) {
+      return `${cap(p.aWord)} y ${p.bWord} todavía no se han encontrado las veces suficientes. Algo se sigue dibujando.`
     }
   }
   return null
@@ -1225,4 +1316,67 @@ export function weekInvitations(
   }
 
   return out.slice(0, 2)
+}
+
+/* ── §8 · Tu palanca para los PRÓXIMOS DÍAS (cierre accionable, cercano) ──
+ * v2.2: no es "invitaciones a observar" ni la palanca ESTRUCTURAL de Mes ("Tu
+ * fin de semana te sostiene, entre semana margen"). Es UNA palanca cercana —
+ * "estos días / este finde" — derivada de la forma de ESTA semana. Foco, no
+ * orden (recomendación; nunca "comé menos"). Ver docs/orbita-semana-spec.md §8. */
+
+export type WeekLever = { focus: string }
+
+/**
+ * UNA palanca de foco para los próximos días, en clave cercana (no la estructura
+ * mensual de Mes). Prioridad: (1) reparto de calorías del finde vs entre semana
+ * (con meta), (2) sostener el entre semana si viene firme, (3) repetir la
+ * co-ocurrencia más fuerte. `null` si no hay señal suficiente.
+ */
+export function weekLever(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekLever | null {
+  if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
+    const monday = mondayOf(todayIso)
+    const elapsed = isoWeekday(todayIso)
+    let weekendOver = 0
+    let weekdayOver = 0
+    let weekdayNear = 0
+    for (let i = 0; i < elapsed; i++) {
+      const s = signals.find((x) => x.day === addDays(monday, i))
+      if (!s || s.calories == null || s.calories <= 0) continue
+      const over = s.calories > ctx.calorieTarget
+      if (i >= 5) {
+        if (over) weekendOver += 1
+      } else if (over) weekdayOver += 1
+      else weekdayNear += 1
+    }
+    if (weekendOver >= 1 && weekendOver >= weekdayOver) {
+      // Anclado a dato ("más alto en calorías"), sin "exceso" (etiqueta de
+      // juicio) ni "margen" (vocabulario de la palanca mensual de Mes).
+      return {
+        focus:
+          'Esta semana el finde fue el más alto en calorías. Ese es el espacio que tienes ahora.',
+      }
+    }
+    if (weekdayNear >= 3 && weekdayOver === 0) {
+      // "calórica" despeja que no es meta de peso; "foco" en vez de repetir
+      // "palanca" del eyebrow.
+      return {
+        focus:
+          'Entre semana estás cerca de tu meta calórica. Ese ritmo es tu foco para los días que vienen.',
+      }
+    }
+  }
+
+  const co = strongestCoOccurrence(signals, todayIso, ctx)
+  if (co) {
+    // Verbo observacional aprobado ("aparecieron"); "foco", no "palanca"/"repetir".
+    return {
+      focus: `${EVIDENCE_LABEL[co.pair.a]} y ${EVIDENCE_LABEL[co.pair.b].toLowerCase()} aparecieron juntos esta semana. Eso puede ser tu foco para los próximos días.`,
+    }
+  }
+
+  return null
 }

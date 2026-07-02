@@ -3,19 +3,20 @@ import { useSegments } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
+  cancelAnimation,
   FadeIn,
   interpolate,
-  useAnimatedProps,
+  type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
 import { todayInTimezone } from '@/lib/time'
@@ -34,32 +35,24 @@ import {
   type UniverseAttributeKey,
   type UniverseInput,
   type UniverseState,
-  wellbeingAvg,
 } from '@/features/tabs/universe-rewards'
 import {
   tint,
   UNIVERSE_ACCENT,
   UNIVERSE_ACCENT_MUTED,
-  UNIVERSE_ICON_PATH,
+  UNIVERSE_GLYPH,
 } from '@/features/tabs/universe-visuals'
-import { useFirstSeenWindow } from '@/features/tabs/useFirstSeenWindow'
 import { useWaterFromMeals, useWaterToday } from '@/features/water/hooks'
 import { formatGlasses } from '@/features/water/liquid-detection'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
-import { useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { colors, duration, easing, radius, spacing, typography } from '@/theme'
-
-// El susurro de bienvenida de "Tu universo hoy" se muestra los primeros 3
-// días desde que la sección aparece por primera vez, luego se desvanece.
-const UNIVERSE_INTRO_KEY = 'stelar.universe.first_seen'
-const UNIVERSE_INTRO_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
 
 /*
  * "Tu universo hoy" — the visible reward layer for the registros that
  * do NOT light constellation stars (those are exclusively "Entrené").
- * A 2×2 grid of attribute cards, each with an astral progress ring;
- * the maths live in `universe-rewards.ts` (pure), this file only
- * paints + feels.
+ * A single ROW of 4 discreet icon + % items (no rings — those already
+ * live in the Macros slide); tap an item to expand its detail. The maths
+ * live in `universe-rewards.ts` (pure), this file only paints + feels.
  *
  * Reward grammar (la recompensa ocurre ARRIBA; el card es el acumulado):
  *   registro → el atributo SUBE → este componente lo detecta (es la
@@ -106,7 +99,6 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const waterFromMeals = useWaterFromMeals(date)
   const { goalMl } = useWaterGoal()
   const sleep = useSleepLog(date)
-  const wellbeing = useTodayWellbeing(date)
   const reducedMotion = useReducedMotion()
   // ¿Estamos DENTRO del tabs layout? El toast de delta vive global en
   // (tabs)/_layout, así que es visible desde CUALQUIER tab — registrar agua en
@@ -129,7 +121,27 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const [openKey, setOpenKey] = useState<UniverseAttributeKey | null>(null)
   const [flight, setFlight] = useState<{ key: UniverseAttributeKey; id: number } | null>(null)
   const prevPcts = useRef<Record<UniverseAttributeKey, number> | null>(null)
-  const showIntro = useFirstSeenWindow(UNIVERSE_INTRO_KEY, UNIVERSE_INTRO_WINDOW_MS)
+
+  // Palpitar SINCRONIZADO de los iconos → señal "esto es accionable, tócame".
+  // Un solo latido para las 4 cards (misma fase) → laten al unísono, no ansioso.
+  // Latido: sube rápido, suelta lento, pausa → como un pulso, no un parpadeo.
+  const palpita = useSharedValue(0)
+  useEffect(() => {
+    if (reducedMotion) {
+      cancelAnimation(palpita)
+      palpita.value = 0
+      return () => cancelAnimation(palpita)
+    }
+    palpita.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 420, easing: easing.out }),
+        withTiming(0, { duration: 1500, easing: easing.out }),
+      ),
+      -1,
+      false,
+    )
+    return () => cancelAnimation(palpita)
+  }, [reducedMotion, palpita])
 
   // Tap del toast de delta ("+13 Claridad") → abre el detalle de ESE
   // atributo aquí (reusa el panel, sin UI duplicada). Hoy queda montado
@@ -141,7 +153,6 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
     return subscribeUniverseDetailRequest((key) => setOpenKey(key))
   }, [])
 
-  const checkin = wellbeing.data ?? null
   const input: UniverseInput | null = ctx
     ? {
         proteinG: ctx.today_macros.protein_g,
@@ -154,12 +165,10 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
         waterFromMeals: waterFromMeals.data ?? 0,
         sleepMinutes: sleep.data?.duration_minutes ?? null,
         restedToday,
-        energy: checkin?.energy ?? null,
-        motivation: checkin?.motivation ?? null,
-        stress: checkin?.stress ?? null,
-        hasWellbeingSignal:
-          checkin != null &&
-          (checkin.energy != null || checkin.motivation != null || checkin.stress != null),
+        // Brillo ← el ánimo del día (lo que setea el slider de "Cómo
+        // amaneciste"). Vive en el brief; useAddMoodCheckin lo invalida, así
+        // que Brillo se enciende al instante al setear el slider.
+        mood: ctx.latest_mood?.value ?? null,
         // Gatea el faltante de proteína de noche (no empujar comida tardía).
         localHour: new Date().getHours(),
       }
@@ -169,11 +178,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   // Armed only once every query is settled — while loading, pct moves
   // are hydration, not registros.
   const ready =
-    attributes != null &&
-    !water.isLoading &&
-    !waterFromMeals.isLoading &&
-    !sleep.isLoading &&
-    !wellbeing.isLoading
+    attributes != null && !water.isLoading && !waterFromMeals.isLoading && !sleep.isLoading
 
   // Delta watch keyed on a pct SIGNATURE, not on `attributes`: the array
   // is fresh every render (input lee new Date().getHours(), que el
@@ -230,40 +235,27 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
 
   return (
     <View style={styles.section}>
-      <EyebrowLabel tone="magenta">Tu universo hoy</EyebrowLabel>
       {allDormant ? (
         <Text style={styles.dormantLine}>
           Aún no enciendes nada hoy. En cuanto registres algo, tu universo aparece aquí.
         </Text>
       ) : (
         <>
-          {/* Los primeros 3 días el susurro de bienvenida REEMPLAZA al caption
-              (introduce "solo suma" en voz del coach y se desvanece solo);
-              después queda el caption quieto de siempre — nunca se apilan. */}
-          {showIntro ? (
-            <Animated.Text entering={FadeIn.duration(400)} style={styles.introWhisper}>
-              Cada registro enciende algo. Tu universo solo crece.
-            </Animated.Text>
-          ) : (
-            <Text style={styles.sectionCaption}>Lo que tus registros hicieron florecer hoy.</Text>
-          )}
-          {/* Group-level affordance — the app's proven, on-brand pattern (same
-              as the calendar's "toca un día…"). One quiet line teaches the
-              whole grid is tappable, so the cards stay clean (no per-card
-              chrome that fights the cosmos). */}
-          <Text style={styles.tapHint}>Toca una categoría para ver cómo progresa.</Text>
+          {/* Sin título ni caption (decisión dueña): el row de iconos habla solo.
+              Solo queda la pista de que son tappables. */}
+          <Text style={styles.tapHint}>Toca un astro para ver su detalle.</Text>
           {/* Un SOLO panel con las 4 columnas divididas por hairlines verticales
               (ya no 4 tarjetas con borde propio). Cada columna sigue siendo
               tappable → expande su detalle abajo. */}
           <View style={styles.gridWrap}>
             <View style={styles.grid}>
-              {attributes.map((attr, i) => (
+              {attributes.map((attr) => (
                 <AttributeCard
                   key={attr.key}
                   attr={attr}
                   source={input ? sourceLineFor(attr.key, input) : ''}
-                  divided={i > 0}
                   reducedMotion={reducedMotion}
+                  palpita={palpita}
                   selected={openKey === attr.key}
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {})
@@ -298,19 +290,6 @@ const STATE_RANK: Record<UniverseState, number> = {
 
 /* ── One attribute card ────────────────────────────────────────────── */
 
-const RING_SIZE = 64
-const RING_STROKE = 4
-const RING_R = RING_SIZE / 2 - RING_STROKE
-const RING_C = 2 * Math.PI * RING_R
-const RING_MID = RING_SIZE / 2
-
-// Destellos de cruz del astro encendido — 4 ticks cardinales cortos
-// alrededor de la corona (radio ~8–14 px). Simétrico en los 4 ejes: la
-// rotación -90° del <Svg> no lo altera. Coords en el viewBox de 64.
-const ASTRO_CROSS = 'M32 18 V24 M32 40 V46 M18 32 H24 M40 32 H46'
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-
 // The concrete source behind each attribute's % — what you registered today,
 // in plain numbers (food count, water glasses, sleep, check-in). Replaces the
 // vague "Crece con…" copy so the card answers "¿cuánto y de qué?".
@@ -330,9 +309,16 @@ function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string 
       }
       return input.restedToday ? 'Descanso hoy' : 'Aún sin sueño'
     case 'brillo': {
-      // Promedio de energía/motivación/calma (1–5). Refleja tu estado del día.
-      const avg = wellbeingAvg(input)
-      return avg != null ? `${Math.round(avg * 10) / 10} / 5` : 'Te espera'
+      // El ánimo del día (lo que setea el slider). Refleja tu estado, sin juicio.
+      const word =
+        input.mood == null
+          ? null
+          : input.mood === 'good'
+            ? 'Bien'
+            : input.mood === 'neutral'
+              ? 'Neutral'
+              : 'Difícil'
+      return word != null ? `Ánimo: ${word}` : 'Te espera'
     }
   }
 }
@@ -341,93 +327,83 @@ type CardProps = {
   attr: UniverseAttribute
   /** Concrete source line for the closed card ("2 comidas hoy", "3 de 8 vasos"). */
   source: string
-  /** Lleva divisor vertical a la izquierda (todas menos la primera columna). */
-  divided: boolean
   reducedMotion: boolean
+  /** Latido sincronizado (0..1) compartido por las 4 cards → señal de "tócame". */
+  palpita: SharedValue<number>
   selected: boolean
   onPress: () => void
 }
 
-function AttributeCard({ attr, source, divided, reducedMotion, selected, onPress }: CardProps) {
+function AttributeCard({ attr, source, reducedMotion, palpita, selected, onPress }: CardProps) {
   const accent = UNIVERSE_ACCENT[attr.key]
-  // La card LIDERA con la acción (Comida/Agua/…) — concreta, sin traducir.
-  // La recompensa (Energía/…) se descubre como secundaria, "Contribuye a".
+  const accentMuted = UNIVERSE_ACCENT_MUTED[attr.key]
   const action = ACTION_LABEL[attr.key]
   const reward = ATTRIBUTE_LABEL[attr.key]
+  const complete = attr.state === 'complete'
+  const lit = attr.pct > 0
+  // Diferenciación por LUZ, no por saturación: dormido = el propio acento a alpha
+  // muy bajo (susurra su color, no un gris "apagado"); en progreso = atenuado;
+  // completo = pleno (único saturado del row). Sin anillo (viven en Macros).
+  const astroColor = complete ? accent : lit ? accentMuted : tint(accent, '40')
 
-  // Seeded at the CURRENT pct — no mount sweep; only changes animate.
-  const progress = useSharedValue(attr.pct)
-  const glow = useSharedValue(0)
-  const prevPctRef = useRef(attr.pct)
-  const prevStateRef = useRef(attr.state)
-  const [burstKey, setBurstKey] = useState(0)
-
-  // ── Affordance: interaction system (expand). Scale-on-press from the
-  // shared usePressFeedback; the ⌄/⌃ chevron + the active border (when
-  // selected) are the other signals. Haptic off here — the parent already
-  // fires a selection tick on press, so we don't double up.
   const { onPressIn, onPressOut, animatedStyle } = usePressFeedback({ haptic: false })
 
-  // Ring fill — one-shot withTiming toward the new pct when it changes
-  // post-mount; the <Svg> is static at rest.
-  useEffect(() => {
-    if (prevPctRef.current === attr.pct) return
-    prevPctRef.current = attr.pct
-    progress.value = reducedMotion
-      ? attr.pct
-      : withTiming(attr.pct, { duration: duration.languid, easing: easing.out })
-  }, [attr.pct, reducedMotion, progress])
-
-  // State transitions — milestone feedback ONLY on an UPGRADE into
-  // complete (the ref is seeded with the mount state, so first render
-  // never fires; coming back to the tab already-complete is silent).
-  // El haptic de `almost` se retiró: el toast de delta ya vibra Light
-  // con cada subida — apilar otro Light leía a doble buzz.
+  // Pulso del icono al COMPLETAR (feedback de hito, one-shot).
+  const pulse = useSharedValue(0)
+  const prevStateRef = useRef(attr.state)
   useEffect(() => {
     const prev = prevStateRef.current
     if (prev === attr.state) return
     prevStateRef.current = attr.state
-    if (STATE_RANK[attr.state] <= STATE_RANK[prev]) return
-    if (attr.state !== 'complete') return
-
+    if (STATE_RANK[attr.state] <= STATE_RANK[prev] || attr.state !== 'complete') return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     if (reducedMotion) return
-
-    // A brief wash over the card — pulses once, never stays lit.
-    glow.value = withSequence(
+    pulse.value = withSequence(
       withTiming(1, { duration: duration.standard, easing: easing.out }),
       withTiming(0, { duration: duration.languid, easing: easing.out }),
     )
-    setBurstKey((k) => k + 1)
-  }, [attr.state, reducedMotion, glow])
+  }, [attr.state, reducedMotion, pulse])
 
-  // Unmount the particle layer once the drift is over (~1150 ms + delays)
-  // so absolute views aren't kept alive per completed card.
+  // Bloom difuso detrás del glifo (radial SVG, color estático) — canal de
+  // jerarquía: apagado sin halo, en progreso tenue, completo pleno y RESPIRA
+  // (solo el completo tiene vida). Solo se anima la opacidad (compositor).
+  const bloom = useSharedValue(0)
   useEffect(() => {
-    if (burstKey === 0) return
-    const id = setTimeout(() => setBurstKey(0), 1450)
-    return () => clearTimeout(id)
-  }, [burstKey])
+    if (complete) {
+      if (reducedMotion) {
+        cancelAnimation(bloom)
+        bloom.value = 0.22
+        return
+      }
+      bloom.value = withRepeat(
+        withSequence(
+          withTiming(0.26, { duration: 1900, easing: easing.out }),
+          withTiming(0.15, { duration: 1900, easing: easing.out }),
+        ),
+        -1,
+        false,
+      )
+      return () => cancelAnimation(bloom)
+    }
+    cancelAnimation(bloom)
+    bloom.value = withTiming(lit ? 0.1 : 0, { duration: duration.standard })
+    return undefined
+  }, [complete, lit, reducedMotion, bloom])
 
-  const ringProps = useAnimatedProps(() => ({
-    strokeDasharray: [(RING_C * progress.value) / 100, RING_C],
+  // Escala del icono = latido compartido (accionable) + pulso de hito (one-shot).
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + palpita.value * 0.06 + pulse.value * 0.18 }],
   }))
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value,
+  const bloomStyle = useAnimatedStyle(() => ({
+    opacity: bloom.value + palpita.value * 0.08,
   }))
-
-  const accentMuted = UNIVERSE_ACCENT_MUTED[attr.key]
-  const complete = attr.state === 'complete'
-  // El glifo es el astro: pleno al encenderse, atenuado mientras orbita,
-  // apenas niebla en calma.
-  const astroColor = complete ? accent : attr.pct > 0 ? accentMuted : colors.niebla
 
   return (
     <Pressable
       onPress={onPress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={[styles.cardHit, divided && styles.colDivider]}
+      style={styles.item}
       accessibilityRole="button"
       accessibilityState={{ expanded: selected }}
       accessibilityLabel={`${action}, ${attr.pct} por ciento. Contribuye a ${reward}. ${source}`}
@@ -435,109 +411,46 @@ function AttributeCard({ attr, source, divided, reducedMotion, selected, onPress
     >
       <Animated.View
         style={[
-          styles.card,
-          complete && { borderColor: tint(accent, '4D') },
-          selected && { borderColor: tint(accent, '8C') },
+          styles.itemInner,
+          selected && { backgroundColor: tint(accent, '14') },
           animatedStyle,
         ]}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.cardGlow, { backgroundColor: tint(accent, '1F') }, glowStyle]}
-        />
-
-        <View style={styles.ringZone}>
-          <Svg
-            width={RING_SIZE}
-            height={RING_SIZE}
-            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
-            style={styles.ringSvg}
-          >
-            {/* el campo: track fino, no una barra a llenar */}
-            <Circle
-              cx={RING_MID}
-              cy={RING_MID}
-              r={RING_R}
-              fill="none"
-              stroke={colors.hairline}
-              strokeWidth={1}
-            />
-
-            {complete ? (
-              <>
-                {/* anillo de luz exterior — la corona de la órbita */}
-                <Circle
-                  cx={RING_MID}
-                  cy={RING_MID}
-                  r={RING_R + 3}
-                  fill="none"
-                  stroke={tint(accent, '26')}
-                  strokeWidth={1}
-                />
-                {/* órbita cerrada, color pleno */}
-                <Circle
-                  cx={RING_MID}
-                  cy={RING_MID}
-                  r={RING_R}
-                  fill="none"
-                  stroke={accent}
-                  strokeWidth={2.5}
-                />
-                {/* corona difusa detrás del astro — halo dibujado, no blur */}
-                <Circle cx={RING_MID} cy={RING_MID} r={9} fill={tint(accent, '1A')} />
-                <Circle cx={RING_MID} cy={RING_MID} r={5.5} fill={tint(accent, '33')} />
-                {/* puntas de estrella */}
-                <Path
-                  d={ASTRO_CROSS}
-                  stroke={tint(accent, '80')}
-                  strokeWidth={1}
-                  strokeLinecap="round"
-                />
-              </>
-            ) : attr.kind === 'progress' ? (
-              /* órbita en progreso — arco atenuado, one-shot al subir */
-              <AnimatedCircle
-                cx={RING_MID}
-                cy={RING_MID}
-                r={RING_R}
-                fill="none"
-                stroke={accentMuted}
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                animatedProps={ringProps}
-              />
-            ) : attr.pct > 0 ? (
-              /* gesto con una señal, aún no encendido: chispa tenue del
-               astro, sin arco proporcional — un tap no es una barra. */
-              <Circle cx={RING_MID} cy={RING_MID} r={6} fill={tint(accent, '1A')} />
-            ) : null}
-          </Svg>
-          <View style={styles.ringCenter} pointerEvents="none">
-            <AttributeIcon attrKey={attr.key} color={astroColor} size={24} />
-          </View>
-          {burstKey > 0 ? <ParticleBurst key={burstKey} color={accent} /> : null}
+        <View style={styles.glyphWrap}>
+          {/* Glow radial SVG (se difumina a transparente → sin borde ni sombra
+              cuadrada). Color estático (accent, JS) → crash-safe; solo la
+              opacidad se anima con el estado + el palpitar. */}
+          <Animated.View pointerEvents="none" style={[styles.bloom, bloomStyle]}>
+            <Svg width="100%" height="100%">
+              <Defs>
+                <RadialGradient id={`ug-${attr.key}`} cx="50%" cy="50%" r="50%">
+                  <Stop offset="0" stopColor={accent} stopOpacity={0.9} />
+                  <Stop offset="0.5" stopColor={accent} stopOpacity={0.35} />
+                  <Stop offset="1" stopColor={accent} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Rect x="0" y="0" width="100%" height="100%" fill={`url(#ug-${attr.key})`} />
+            </Svg>
+          </Animated.View>
+          <Animated.View style={iconStyle}>
+            <AttributeIcon attrKey={attr.key} color={astroColor} size={26} />
+          </Animated.View>
         </View>
-
-        {/* % grande → acción → la recompensa que genera (compacto para la
-            columna). El estado concreto y el resto vive al expandir (tap). */}
-        <Text
-          style={[styles.pctNum, { color: complete ? accent : colors.leche }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {attr.pct}
-          <Text style={styles.pctSign}>%</Text>
-        </Text>
-        <Text style={[styles.colLabel, { color: complete ? accent : colors.bone }]}>{action}</Text>
-        <Text
-          style={[styles.colReward, { color: attr.pct > 0 ? accent : colors.niebla }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {/* La recompensa "+N Atributo" en su acento; en 0 cae al estado real
-              ("Aún sin comidas hoy") pero en niebla — un vacío no debe gritar. */}
-          {attr.pct > 0 ? `+${attr.pct} ${reward}` : source}
-        </Text>
+        {lit ? (
+          <Text
+            style={[
+              styles.itemPct,
+              { color: complete ? accent : attr.pct >= 60 ? colors.leche : colors.bone },
+            ]}
+            numberOfLines={1}
+          >
+            {attr.pct}
+            <Text style={styles.pctSign}>%</Text>
+          </Text>
+        ) : (
+          // Dormido: un punto tenue, no "0%" frío (evita el "examen en ceros").
+          <Text style={styles.itemDash}>·</Text>
+        )}
       </Animated.View>
     </Pressable>
   )
@@ -597,16 +510,19 @@ function AttributeIcon({
   color: string
   size?: number
 }) {
+  const g = UNIVERSE_GLYPH[attrKey]
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* silueta fina + núcleo de luz (el "astro"). */}
       <Path
-        d={UNIVERSE_ICON_PATH[attrKey]}
+        d={g.body}
         fill="none"
         stroke={color}
-        strokeWidth={1.8}
+        strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      {g.core.r > 0 ? <Circle cx={g.core.cx} cy={g.core.cy} r={g.core.r} fill={color} /> : null}
     </Svg>
   )
 }
@@ -744,13 +660,6 @@ const styles = StyleSheet.create({
   // Una línea callada que nombra qué es la sección — la conexión
   // registro → atributo no siempre se ve (si entras a media tarde, los
   // astros ya están encendidos sin causa visible).
-  sectionCaption: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    marginTop: spacing.s1,
-    marginBottom: spacing.s4,
-  },
   // Group-level tap hint — sits just under the caption, close to the grid it
   // describes. Quiet niebla, same register as the calendar's "toca un día…".
   tapHint: {
@@ -771,92 +680,65 @@ const styles = StyleSheet.create({
   },
   // Susurro de bienvenida (≤3 días) — voz del coach, cálido, introduce
   // "nada se resta" sin enseñarlo. Se va solo cuando cierra la ventana.
-  introWhisper: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-    marginTop: spacing.s1,
-    marginBottom: spacing.s4,
-  },
   // El PANEL único: un contenedor con borde sutil que aloja las 4 columnas
   // (ya no 4 tarjetas sueltas). Es también el ancla del overlay de vuelo (las
   // partículas se desbordan hacia arriba, por eso overflow visible por default).
   gridWrap: {
     position: 'relative',
     marginTop: spacing.s2,
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
+    // Sin contenedor: los astros flotan sobre el fondo (su propia luz aporta la
+    // presencia). Solo espacio vertical para respirar.
     paddingVertical: spacing.s4,
   },
   grid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  // Cada columna ocupa un cuarto del panel (4 en fila, sin wrap).
-  cardHit: {
+  // Cada categoría: icono discreto + su % (sin anillo). Distribución uniforme.
+  item: {
     flex: 1,
   },
-  // Divisor vertical entre columnas (todas menos la primera).
-  colDivider: {
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderLeftColor: colors.hairline,
-  },
-  // La columna ya no es tarjeta: sin fondo ni borde, solo centra su contenido.
-  card: {
+  itemInner: {
     alignItems: 'center',
-    paddingVertical: spacing.s1,
-    paddingHorizontal: spacing.s1,
-    overflow: 'hidden',
+    gap: 5,
+    paddingVertical: 6,
+    marginHorizontal: 4,
+    borderRadius: radius.card,
   },
-  // The pulse wash — fills the column, pulses once on upgrade.
-  cardGlow: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0,
-  },
-  ringZone: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    marginBottom: spacing.s2,
-  },
-  ringSvg: {
-    transform: [{ rotate: '-90deg' }],
-  },
-  ringCenter: {
-    ...StyleSheet.absoluteFillObject,
+  // El glifo flota sobre su propia luz (bloom detrás, mismo centro).
+  glyphWrap: {
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Glow radial suave, más grande que el glifo y centrado; se desvanece a
+  // transparente en el borde (sin caja, sin sombra cuadrada).
+  bloom: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    top: -8,
+    left: -8,
+  },
+  // Halo difuso: círculo pleno del acento a baja opacidad → sin arista sobre el
+  // negro warm. shadow refuerza el bloom en iOS. Opacidad la maneja el estado.
+  itemPct: {
+    fontFamily: typography.displaySemi,
+    fontSize: 16,
+    letterSpacing: -0.3,
+    fontVariant: ['tabular-nums'],
+  },
+  // Astro dormido: un punto tenue en lugar de "0%".
+  itemDash: {
+    fontFamily: typography.uiMedium,
+    fontSize: 16,
+    color: colors.bruma,
+  },
+  // Cada columna ocupa un cuarto del panel (4 en fila, sin wrap).
   pctSign: {
     fontSize: 11,
     color: colors.niebla,
-  },
-  // The explicit % — a number, not just the ring. Earned progress in leche /
-  // accent when complete. Discreto: peso UI (no display) y tamaño contenido,
-  // para que el anillo + el glifo lleven la voz, no un número que grita.
-  pctNum: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.headingLg,
-    fontVariant: ['tabular-nums'],
-    letterSpacing: -0.3,
-    textAlign: 'center',
-  },
-  // La acción (Sueño/Comida/Agua/Ánimo) bajo el número.
-  colLabel: {
-    marginTop: spacing.s1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    letterSpacing: typography.letterSpacing.bodyLoose,
-    textAlign: 'center',
-  },
-  // La recompensa que genera ("+100 Estabilidad"), en su acento.
-  colReward: {
-    marginTop: 3,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    textAlign: 'center',
   },
   particle: {
     position: 'absolute',

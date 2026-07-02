@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
-    color: colors.niebla,
+    color: colors.oroSoft,
   },
   card: {
     borderRadius: 22,

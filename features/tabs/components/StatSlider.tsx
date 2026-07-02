@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { Gesture, GestureDetector, type NativeGesture } from 'react-native-gesture-handler'
 import Animated, {
   Easing,
   Extrapolation,
@@ -41,14 +42,14 @@ import {
 } from '@/features/cycle/components/CycleTimeline'
 import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { DailyNoteInline } from '@/features/moods/components/DailyNoteInline'
+import { MoodSliderInline } from '@/features/moods/components/MoodSliderInline'
 import { computeTdee, enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
 import type { SleepDraft } from '@/features/sleep/api'
 import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
-import type { WellbeingDraft } from '@/features/wellbeing/api'
-import { useSaveWellbeing, useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
@@ -91,6 +92,15 @@ type Props = {
 export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
+  // Un slide con arrastre horizontal propio (el slider de ánimo) bloquea el
+  // pager mientras dura su gesto, si no ambos compiten por el swipe horizontal.
+  const [pagerEnabled, setPagerEnabled] = useState(true)
+
+  // Gesto NATIVO del scroll del pager. El slider de ánimo hace
+  // `blocksExternalGesture(pagerNative)` → cuando su Pan se activa (arrastre
+  // horizontal), bloquea el scroll del carrusel de forma NATIVA (sin el race del
+  // toggle scrollEnabled, que dejaba que el swipe robara el arrastre del mood).
+  const pagerNative = useMemo(() => Gesture.Native(), [])
 
   // Slide width = viewport minus the peek, so the next slide shows on the
   // right. This is also the snap pitch (replaces page-width paging).
@@ -155,9 +165,20 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const slides: { id: string; title: string; node: ReactNode }[] = [
     { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
     { id: 'sleep', title: 'Sueño de anoche', node: <SleepSlide date={ctx.date} /> },
-    { id: 'wellbeing', title: 'Cómo amaneciste', node: <WellbeingSlide date={ctx.date} /> },
-    { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
+    {
+      id: 'wellbeing',
+      title: 'Cómo amaneciste',
+      node: (
+        <WellbeingSlide
+          date={ctx.date}
+          onLockPager={(locked) => setPagerEnabled(!locked)}
+          pagerGesture={pagerNative}
+        />
+      ),
+    },
     ...(cycle ? [{ id: 'cycle', title: 'Tu ciclo', node: <CycleSlide cycle={cycle} /> }] : []),
+    // Peso al final: es la tendencia lenta, no un ritual diario → cierra el pager.
+    { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
   ]
   const safeActive = Math.min(active, slides.length - 1)
 
@@ -221,34 +242,37 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
       </View>
 
       {width > 0 ? (
-        <Animated.ScrollView
-          ref={scrollRef}
-          horizontal
-          // Peek carousel: each slide is `slideW` wide (viewport − peek) so the
-          // next slide shows on the right. That requires snapToInterval (NOT
-          // pagingEnabled, which forces a full-viewport snap and would hide the
-          // peek) on BOTH platforms. `decelerationRate: fast` keeps it snappy;
-          // Android adds disableIntervalMomentum so it doesn't float past.
-          snapToInterval={slideW}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          {...(Platform.OS === 'android' ? { disableIntervalMomentum: true } : {})}
-          overScrollMode="never"
-          showsHorizontalScrollIndicator={false}
-          // Trailing pad so the LAST slide can settle flush (no orphan peek gap).
-          contentContainerStyle={{ paddingRight: SLIDE_PEEK }}
-          onScrollBeginDrag={() => onSwipeStateChange?.(true)}
-          onScrollEndDrag={() => onSwipeStateChange?.(false)}
-          onMomentumScrollEnd={onScrollEnd}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-        >
-          {slides.map((s, i) => (
-            <Slide key={s.id} index={i} width={slideW} scrollX={scrollX}>
-              {s.node}
-            </Slide>
-          ))}
-        </Animated.ScrollView>
+        <GestureDetector gesture={pagerNative}>
+          <Animated.ScrollView
+            ref={scrollRef}
+            horizontal
+            // Peek carousel: each slide is `slideW` wide (viewport − peek) so the
+            // next slide shows on the right. That requires snapToInterval (NOT
+            // pagingEnabled, which forces a full-viewport snap and would hide the
+            // peek) on BOTH platforms. `decelerationRate: fast` keeps it snappy;
+            // Android adds disableIntervalMomentum so it doesn't float past.
+            scrollEnabled={pagerEnabled}
+            snapToInterval={slideW}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            {...(Platform.OS === 'android' ? { disableIntervalMomentum: true } : {})}
+            overScrollMode="never"
+            showsHorizontalScrollIndicator={false}
+            // Trailing pad so the LAST slide can settle flush (no orphan peek gap).
+            contentContainerStyle={{ paddingRight: SLIDE_PEEK }}
+            onScrollBeginDrag={() => onSwipeStateChange?.(true)}
+            onScrollEndDrag={() => onSwipeStateChange?.(false)}
+            onMomentumScrollEnd={onScrollEnd}
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+          >
+            {slides.map((s, i) => (
+              <Slide key={s.id} index={i} width={slideW} scrollX={scrollX}>
+                {s.node}
+              </Slide>
+            ))}
+          </Animated.ScrollView>
+        </GestureDetector>
       ) : (
         <View style={styles.measurePlaceholder} />
       )}
@@ -795,159 +819,31 @@ function SleepSlide({ date }: { date: string }) {
 
 /* ─── Slide — this morning's check-in ──────────────────────────────── */
 
-const WELLBEING_AXES = [
-  { key: 'energy', label: 'Energía', invert: false },
-  { key: 'motivation', label: 'Motivación', invert: false },
-  // The DB column is `stress`, but the slide asks for its opposite,
-  // Calma — so all three axes read "more = better" and a fully lit
-  // row is unambiguously a good morning. Stored value = 6 − calma.
-  { key: 'stress', label: 'Calma', invert: true },
-] as const
-
-type WellbeingAxis = (typeof WELLBEING_AXES)[number]
-
-const ENERGY_WORDS = ['en reserva', 'baja', 'estable', 'en alza', 'radiante'] as const
-
-// A 4-point star — the app's celestial glyph. Here it's a rating
-// that lights up: rated levels glow, the rest stay as dim embers.
-const STAR = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
-
-// Taps coalesce: adjusting an axis fires one write 350 ms after the
-// last touch, so a multi-axis check-in doesn't spray rows.
-const WELLBEING_DEBOUNCE_MS = 350
-
-/** The 1–5 value shown for an axis — inverted axes show 6 − stored. */
-function shownValue(axis: WellbeingAxis, draft: WellbeingDraft): number | null {
-  const stored = draft[axis.key]
-  if (stored == null) return null
-  return axis.invert ? 6 - stored : stored
-}
-
-/* One 1–5 axis — five levels that light from embers into glowing
- * stars as it's rated. */
-function AxisStars({ value, onRate }: { value: number | null; onRate: (i: number) => void }) {
-  const lit = value ?? 0
-  return (
-    <View style={styles.starsRow}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Pressable
-          key={i}
-          onPress={() => onRate(i)}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={`${i + 1} de 5`}
-          style={({ pressed }) => [styles.starSlot, pressed && styles.starSlotPressed]}
-        >
-          {lit > i ? (
-            <View style={styles.starGlow}>
-              <Svg width={18} height={18} viewBox="0 0 24 24">
-                <Path d={STAR} fill={colors.magenta} />
-              </Svg>
-            </View>
-          ) : (
-            // Empty level = a HOLLOW star outline (not a dim dot). Brighter
-            // bone stroke (not faint niebla) so the row reads as a present,
-            // interactive control rather than decoration — a non-text cue on
-            // top of the "Toca las estrellas…" line.
-            <Svg width={18} height={18} viewBox="0 0 24 24">
-              <Path
-                d={STAR}
-                fill="none"
-                stroke={colors.bone}
-                strokeWidth={1.7}
-                strokeLinejoin="round"
-              />
-            </Svg>
-          )}
-        </Pressable>
-      ))}
-    </View>
-  )
-}
-
 /*
- * This morning's check-in — energy, motivation and calm on a 1–5
- * scale. Like the sleep slide it registers inline (a once-a-day
- * ritual, not a QuickLog action) and feeds two órbita dimensions:
- * energía and mente. The slide owns the draft; taps are debounced
- * into one write, and later edits update that same row in place.
+ * This morning's check-in — el ánimo (MoodSliderInline, 1 eje) + una NOTA
+ * libre opcional (daily_notes). Reemplazó el detalle de energía/motivación/
+ * calma (3 ejes): decisión de producto (jul 2026) — la usuaria escribe una
+ * nota en vez de calificar 3 escalas. Nota: Órbita ya no recibe energía/mente
+ * desde esta tarjeta.
  */
-function WellbeingSlide({ date }: { date: string }) {
-  const { data: row, isLoading } = useTodayWellbeing(date)
-  const save = useSaveWellbeing(date)
-
-  const [draft, setDraft] = useState<WellbeingDraft | null>(null)
-  const [touched, setTouched] = useState(false)
-  // Row id and debounce timer live in refs so a tap reads their
-  // latest value without the draft effect re-running.
-  const rowId = useRef<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Seed the editable draft once today's check-in (or its absence) loads.
-  useEffect(() => {
-    if (isLoading || draft != null) return
-    setDraft({
-      energy: row?.energy ?? null,
-      motivation: row?.motivation ?? null,
-      stress: row?.stress ?? null,
-    })
-    rowId.current = row?.id ?? null
-  }, [isLoading, row, draft])
-
-  // Drop a still-pending write when the slide unmounts.
-  useEffect(() => () => clearTimeout(timer.current ?? undefined), [])
-
-  if (draft == null) {
-    return <View style={[styles.slide, styles.card]} />
-  }
-
-  // A row exists once the check-in is logged or the user has touched it.
-  const hasEntry = row != null || touched
-
-  const rate = (axis: WellbeingAxis, i: number) => {
-    Haptics.selectionAsync().catch(() => {})
-    // Tap a star to set the level; tap the current top star to step
-    // back. The step works on the shown value, then converts to the
-    // stored one (inverted for Calma).
-    const shown = shownValue(axis, draft)
-    const nextShown = shown === i + 1 ? (i === 0 ? null : i) : i + 1
-    const stored = nextShown == null ? null : axis.invert ? 6 - nextShown : nextShown
-    const nextDraft = { ...draft, [axis.key]: stored }
-    setDraft(nextDraft)
-    setTouched(true)
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      save.mutate(
-        { id: rowId.current, draft: nextDraft },
-        { onSuccess: (saved) => (rowId.current = saved?.id ?? null) },
-      )
-    }, WELLBEING_DEBOUNCE_MS)
-  }
-
+function WellbeingSlide({
+  date,
+  onLockPager,
+  pagerGesture,
+}: {
+  date: string
+  onLockPager?: (locked: boolean) => void
+  pagerGesture?: NativeGesture
+}) {
   return (
     <View style={styles.slide}>
       <View style={[styles.card, styles.wellbeingCard]}>
-        {WELLBEING_AXES.map((axis) => (
-          <View key={axis.key} style={styles.axisRow}>
-            <Text style={styles.axisLabel}>{axis.label}</Text>
-            <AxisStars value={shownValue(axis, draft)} onRate={(i) => rate(axis, i)} />
-          </View>
-        ))}
+        {/* Ánimo (1 eje) — el registro primario, MISMO gesto que Órbita. */}
+        <MoodSliderInline date={date} onDragActive={onLockPager} pagerGesture={pagerGesture} />
 
-        {!hasEntry ? (
-          // Empty state = the moment to teach tappability. An explicit "toca"
-          // instruction (Hanken, not the serif coach line) — the same pattern
-          // as the universe ("Toca un astro…") and the calendar. The stars
-          // can't read as a button (they're a rating control), so the words
-          // carry it; magenta is too overloaded in Stelar to be the signal.
-          <Text style={styles.tapHint}>Toca las estrellas para marcar cómo amaneciste.</Text>
-        ) : draft.energy != null ? (
-          <Text style={styles.captionLine}>
-            Energía <Text style={styles.captionEm}>{ENERGY_WORDS[draft.energy - 1]}</Text>
-          </Text>
-        ) : (
-          <Text style={styles.captionLine}>Ánimo guardado</Text>
-        )}
+        {/* Nota libre del día (daily_notes) — SIEMPRE visible, reemplaza el
+            detalle de energía/motivación/calma. */}
+        <DailyNoteInline date={date} />
       </View>
     </View>
   )
@@ -1101,7 +997,10 @@ const styles = StyleSheet.create({
     height: 150,
   },
   slide: {
-    minHeight: 150,
+    // Altura uniforme para TODAS las slides → el carrusel no salta al pasar de
+    // una card corta (peso) a una alta (ciclo/macros). La card interna (flex:1)
+    // llena esta altura y centra su contenido.
+    minHeight: 224,
   },
   macroRow: {
     flexDirection: 'row',
@@ -1264,42 +1163,6 @@ const styles = StyleSheet.create({
   wellbeingCard: {
     gap: 13,
   },
-  // Label + stars as one centred cluster; the fixed label width
-  // keeps the three star columns aligned.
-  axisRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  axisLabel: {
-    width: 104,
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  starsRow: {
-    flexDirection: 'row',
-  },
-  // Fixed slot so a lit star and a hollow outline occupy the same box.
-  starSlot: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  starSlotPressed: {
-    opacity: 0.55,
-  },
-  // A rated level — the star sits on a soft magenta glow.
-  starGlow: {
-    shadowColor: colors.magenta,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 5,
-    shadowOpacity: 0.75,
-    elevation: 4,
-  },
   // ── Cycle slide ────────────────────────────────────────────────
   // The dial holds the day number stacked at its centre.
   // Cycle slide chrome lives in features/cycle/components/CycleTimeline
@@ -1310,14 +1173,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.ui,
-    color: colors.niebla,
-  },
-  // Explicit tap instruction (Hanken, not serif) — teaches that the stars are
-  // tappable when the check-in is still empty.
-  tapHint: {
-    textAlign: 'center',
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
   captionEm: {
