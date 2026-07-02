@@ -135,8 +135,10 @@ export function AppTabBar({ state, descriptors, navigation }: BottomTabBarProps)
             const descriptor = descriptors[route.key]
             if (!descriptor) return null
             // Ajustes is reached from the header gear, not the pill —
-            // skip it here while keeping the route navigable.
-            if (route.name === 'settings') return null
+            // skip it here while keeping the route navigable. "movement-calendar"
+            // ("Tu historia") se alcanza desde el ícono de calendario del header,
+            // no es una pestaña del pill → también se salta.
+            if (route.name === 'settings' || route.name === 'movement-calendar') return null
             const { options } = descriptor
             const label = options.title ?? route.name
             const focused = state.index === index

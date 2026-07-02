@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { useProfile } from '@/features/profile/hooks'
 import { useTransformProgress } from '@/features/emblem'
-import { PatternReveal } from '@/features/patterns'
-import type { PatternType } from '@/features/patterns/logic'
+import { PatternConstellationReveal } from '@/features/orbit/components/PatternConstellationReveal'
 import { zodiacFromDate } from '@/features/tabs/zodiac'
 
 import { TransformationReveal } from './TransformationReveal'
@@ -52,10 +51,7 @@ export function RevealReplayHost() {
       />
     )
   }
-  return (
-    <PatternReveal
-      pattern={{ id: 'replay', type: replay.kind as PatternType, message: replay.message }}
-      onClose={close}
-    />
-  )
+  // pattern → constelación de nodos en el MARCO del modal de Órbita·Mes
+  // (consistente con el patrón que ve la usuaria en Mes).
+  return <PatternConstellationReveal phrase={replay.message} onClose={close} />
 }

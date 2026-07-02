@@ -8,7 +8,6 @@ import Orbits from '@/assets/icons/orbits.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
-import { RevealReplayHost } from '@/features/revelations'
 import { AppTabBar, CelebrationOverlay, UniverseDeltaToast } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
@@ -128,22 +127,20 @@ export default function TabsLayout() {
             title: 'Ajustes',
           }}
         />
+        {/* "Tu historia" (calendario de movimiento) — pantalla del navegador de
+            tabs pero OCULTA del pill (href: null + AppTabBar la salta). Vive aquí
+            para conservar la barra de tabs y el header; se abre desde el ícono de
+            calendario del header. */}
+        <Tabs.Screen name="movement-calendar" options={{ href: null, title: 'Tu historia' }} />
       </Tabs>
       {/* Celebración full-screen ("Entrené") — DESPUÉS de <Tabs> para que el
           flash dorado cubra toda la pantalla, incluyendo la barra de tabs. */}
       <CelebrationOverlay />
       <BetaFeedbackButton />
       <UniverseDeltaToast />
-      {/* Re-vivir una revelación: tocar el evento de un día (en el panel del
-          calendario de Hoy o en el sheet de Progreso) re-abre su ceremonia
-          full-screen. Montado UNA sola vez aquí, sobre <Tabs> —como
-          CelebrationOverlay— para que cubra la barra de tabs y, sobre todo,
-          para que NO viva dentro de la pantalla desde la que se navega: su
-          CTA "Verlo en mi órbita" hace router.navigate('/orbit'), y un host
-          por-pantalla se desmontaba en la transición (la navegación no
-          llegaba). Un único host evita además que quede una ceremonia
-          fantasma en la otra pestaña. */}
-      <RevealReplayHost />
+      {/* La ceremonia de revelación (RevealReplayHost) subió a la RAÍZ
+          (app/_layout), encima del Stack, para cubrir también rutas modales
+          como movement-calendar (antes, aquí en (tabs), quedaba debajo). */}
     </View>
   )
 }

@@ -27,6 +27,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
+import { RevealReplayHost } from '@/features/revelations'
 import { ConfirmProvider } from '@/lib/confirm'
 import { ensureDevUserSession } from '@/lib/devAuth'
 import { clearVisitedDayOne, useVisitedDayOne } from '@/lib/onboardingFlags'
@@ -194,11 +195,16 @@ export default function RootLayout() {
                   }}
                 >
                   {/* Slide-up sheet for logging a measurement. Other routes
-                    inherit the default fullscreen push. */}
+                    (incluido movement-calendar) heredan el push de página
+                    completa por defecto — "Tu historia" es una página, no un
+                    modal deslizante. */}
                   <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
-                  {/* Calendario de movimiento en pantalla completa (modal). */}
-                  <Stack.Screen name="movement-calendar" options={{ presentation: 'modal' }} />
                 </Stack>
+                {/* Ceremonias de revelación/patrón (absoluteFill): viven en la RAÍZ,
+                    ENCIMA del Stack, para cubrir TODAS las rutas — incluidas las
+                    modales como movement-calendar. Antes vivían en (tabs) y quedaban
+                    DEBAJO de esas rutas (la ceremonia salía atrás del calendario). */}
+                <RevealReplayHost />
               </ConfirmProvider>
             </ThemeProvider>
           </SafeAreaProvider>
