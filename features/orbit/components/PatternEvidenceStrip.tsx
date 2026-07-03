@@ -27,6 +27,7 @@ function Dot({
   filled,
   order,
   span,
+  tone,
   progress,
 }: {
   filled: boolean
@@ -34,6 +35,9 @@ function Dot({
   order: number
   /** Cuántos encienden en total (para escalonar). */
   span: number
+  /** 'lit' = magenta (constancia, celebra); 'neutral' = gris frío (noticing,
+   *  solo evidencia, sin festejo). */
+  tone: 'lit' | 'neutral'
   progress: SharedValue<number>
 }) {
   // Ventana de encendido de ESTE punto dentro del recorrido [0.18, 0.72].
@@ -43,16 +47,20 @@ function Dot({
     const t = interpolate(progress.value, [start, start + 0.12], [0, 1], CLAMP)
     return { opacity: 0.35 + t * 0.65, transform: [{ scale: 0.72 + t * 0.28 }] }
   })
-  return <Animated.View style={[styles.dot, filled ? styles.filled : styles.empty, style]} />
+  const fill = !filled ? styles.empty : tone === 'neutral' ? styles.filledNeutral : styles.filled
+  return <Animated.View style={[styles.dot, fill, style]} />
 }
 
 export function PatternEvidenceStrip({
   count,
   total,
+  tone = 'lit',
   progress,
 }: {
   count: number
   total: number
+  /** 'lit' (magenta, constancia) | 'neutral' (gris frío, noticing). */
+  tone?: 'lit' | 'neutral'
   progress: SharedValue<number>
 }) {
   // Puntos encendidos primero (izq.), apagados después; `order` solo para los
@@ -62,7 +70,14 @@ export function PatternEvidenceStrip({
   return (
     <View style={styles.row}>
       {dots.map((filled, i) => (
-        <Dot key={i} filled={filled} order={filled ? lit++ : -1} span={count} progress={progress} />
+        <Dot
+          key={i}
+          filled={filled}
+          order={filled ? lit++ : -1}
+          span={count}
+          tone={tone}
+          progress={progress}
+        />
       ))}
     </View>
   )
@@ -85,6 +100,14 @@ const styles = StyleSheet.create({
     shadowColor: colors.magentaHot,
     shadowOpacity: 0.9,
     shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  // Noticing: gris frío con halo tenue — evidencia, no festejo.
+  filledNeutral: {
+    backgroundColor: 'rgba(150, 158, 172, 0.85)',
+    shadowColor: 'rgba(150, 158, 172, 1)',
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 0 },
   },
   empty: {

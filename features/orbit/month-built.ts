@@ -1223,7 +1223,7 @@ export function detectMonthPatterns(
           kind: 'pattern',
           label: 'Sueño y déficit',
           title: 'Cuando dormiste 7 h o más, alcanzaste tu déficit más seguido.',
-          why: 'Tu descanso y tu déficit coincidieron más seguido este mes.',
+          why: 'Una noche más de buen descanso ya se nota en tu mes.',
           evidence: {
             bars: [
               {
@@ -1295,7 +1295,7 @@ export function detectMonthPatterns(
           kind: 'pattern',
           label: 'Entreno y déficit',
           title: 'Los días que entrenaste, tu déficit apareció más seguido.',
-          why: 'Tus entrenos y tu déficit coincidieron más seguido este mes.',
+          why: 'Un día más de movimiento ya se nota en tu mes.',
           evidence: {
             bars: [
               {
@@ -1335,7 +1335,7 @@ export function correlationForKind(
   signals: readonly DailySignals[],
   opts: { proteinTarget?: number | null; calorieTarget?: number | null },
   kind: string,
-): { bars: EvidenceBar[]; caption: string; insight: string } | null {
+): { title: string; bars: EvidenceBar[]; caption: string; insight: string } | null {
   const id =
     kind === 'training_consistent'
       ? 'movement-deficit'
@@ -1345,7 +1345,7 @@ export function correlationForKind(
   if (!id) return null
   const p = detectMonthPatterns(signals, opts).find((mp) => mp.id === id)
   if (!p || !p.why) return null
-  return { bars: p.evidence.bars, caption: p.evidence.caption, insight: p.why }
+  return { title: p.title, bars: p.evidence.bars, caption: p.evidence.caption, insight: p.why }
 }
 
 /* ── "No sabías que..." — hallazgos de astrónomo ─────────────────────── */

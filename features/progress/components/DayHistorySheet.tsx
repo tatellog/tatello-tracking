@@ -101,6 +101,7 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
                 evidenceTotal: ev.evidenceTotal,
                 evidenceBars: ev.evidenceBars,
                 correlationInsight: ev.correlationInsight,
+                date: day?.date,
               })
             }}
             // Día con evento = día especial: la estrella ornamental (oro,

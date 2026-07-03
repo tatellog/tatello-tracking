@@ -35,9 +35,9 @@ export function MovementCalendarPanel() {
   const metaByDate = useMemo(() => {
     const m = new Map<string, DayMeta>()
     for (const d of calendarDays) {
-      const mark = markFromEvents(d.events)
+      const marks = marksFromEvents(d.events)
       const rested = d.status === 'rested'
-      if (rested || mark) m.set(d.date, { rested, mark })
+      if (rested || marks.length) m.set(d.date, { rested, marks })
     }
     return m
   }, [calendarDays])
@@ -81,19 +81,22 @@ export function MovementCalendarPanel() {
   )
 }
 
-// Marca del día desde sus eventos (revelaciones). Precedencia: transformación
-// (hito mayor) > regreso (revelación) > patrón. Un día rara vez tiene varios.
-function markFromEvents(events: CalendarDay['events']): DayMark | null {
-  let hasReturn = false
+// Marcas del día desde sus eventos (revelaciones). Un día PUEDE tener varias
+// (p.ej. una revelación dorada Y un patrón azul): antes se perdía el azul bajo
+// el dorado. Devolvemos hasta dos: el "dorado" (transformación > regreso) y el
+// patrón (azul), para pintarlos juntos.
+function marksFromEvents(events: CalendarDay['events']): DayMark[] {
+  let gold: DayMark | null = null
   let hasPattern = false
   for (const e of events) {
-    if (e.tier === 'transformation') return 'transformation'
-    if (e.tier === 'return') hasReturn = true
-    if (e.tier === 'pattern') hasPattern = true
+    if (e.tier === 'transformation') gold = 'transformation'
+    else if (e.tier === 'return' && gold !== 'transformation') gold = 'revelation'
+    else if (e.tier === 'pattern') hasPattern = true
   }
-  if (hasReturn) return 'revelation'
-  if (hasPattern) return 'pattern'
-  return null
+  const marks: DayMark[] = []
+  if (gold) marks.push(gold)
+  if (hasPattern) marks.push('pattern')
+  return marks
 }
 
 // Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC).

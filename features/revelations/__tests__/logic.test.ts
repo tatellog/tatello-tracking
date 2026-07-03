@@ -271,22 +271,23 @@ describe('patternRevelationCopy', () => {
     const copy = patternRevelationCopy('training_consistent', 4, 7)
 
     expect(copy.message).not.toMatch(/\d/)
-    expect(copy.title).toBe('Un ritmo de entreno.')
+    expect(copy.title).toBe('Entreno constante.')
   })
 
   test('sleep_consistent: no cuenta frecuencia', () => {
     const copy = patternRevelationCopy('sleep_consistent', 6, 7)
 
     expect(copy.message).not.toMatch(/\d/)
-    expect(copy.title).toBe('Descanso más estable.')
+    expect(copy.title).toBe('Descanso constante.')
   })
 
-  test('night_eating: no cuenta frecuencia, sujeto = las noches', () => {
+  test('night_eating: no cuenta frecuencia, concreto (qué se movió)', () => {
     const copy = patternRevelationCopy('night_eating', 3, 7)
 
     expect(copy.message).not.toMatch(/\d/)
-    expect(copy.message).toMatch(/noches/)
-    expect(copy.title).toBeTruthy()
+    // Lenguaje llano y concreto (no poético): habla de comer más tarde.
+    expect(copy.message).toMatch(/tarde/)
+    expect(copy.title).toMatch(/tarde|comida/i)
   })
 
   test('kind desconocido cae en el default (night_eating) y retorna copy válido', () => {

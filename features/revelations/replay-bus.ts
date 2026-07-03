@@ -28,6 +28,9 @@ export type ReplayEvent = {
     highlight?: boolean
   }[]
   correlationInsight?: string
+  /** La fecha del día desde el que se re-vive (ISO 'YYYY-MM-DD') — la ceremonia
+   *  la muestra para dar contexto ("¿de cuándo es esto?"). */
+  date?: string
 }
 
 type Listener = (e: ReplayEvent) => void

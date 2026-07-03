@@ -95,31 +95,31 @@ export function patternRevelationCopy(
   _windowDays: number,
 ): { message: string; title: string } {
   switch (kind) {
+    // Lenguaje LLANO en todos (feedback usuaria: "muy fumado, me cuesta leer").
+    // Título = hallazgo directo; mensaje = el mismo en simple. La evidencia (el
+    // conteo) la pone patternEvidenceLine; la ceremonia NO agrega cierre poético.
     case 'protein_consistent':
       return {
-        // "necesita", no "construye": evita la lectura de recomposición/músculo
-        // (fuera del scope de pérdida de peso · manifesto-reviewer).
-        message: 'Tu proteína se volvió una de tus constantes. Sostiene lo que tu cuerpo necesita.',
+        message: 'Cumpliste tu proteína con constancia.',
         title: 'Proteína constante.',
       }
     case 'training_consistent':
       return {
-        // "Entreno", no "movimiento": el dato son los días con entreno registrado
-        // (no pasos/caminar). Claridad pedida por la dueña.
-        message: 'Entrenar se volvió parte de tu ritmo. Tu semana lo nota cuando aparece.',
-        title: 'Un ritmo de entreno.',
+        message: 'Entrenaste con constancia.',
+        title: 'Entreno constante.',
       }
     case 'sleep_consistent':
       return {
-        message: 'Algo se asentó en tus noches. El resto de tu día lo siente.',
-        title: 'Descanso más estable.',
+        message: 'Dormiste bien con constancia.',
+        title: 'Descanso constante.',
       }
     case 'night_eating':
     default:
       return {
-        // Sin "esta semana": la revelación se re-vive en el historial meses después.
-        message: 'Las noches pidieron más. Algo se movió en tu rutina al caer el día.',
-        title: 'Un patrón en tus noches.',
+        // Lenguaje LLANO, no poético (feedback usuaria: "muy fumado"). El título
+        // es el hallazgo directo; el mensaje es el mismo en simple.
+        message: 'Comiste más tarde algunas noches.',
+        title: 'Comida más tarde de lo normal.',
       }
   }
 }

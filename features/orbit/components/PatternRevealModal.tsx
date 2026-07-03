@@ -49,10 +49,13 @@ export function PatternRevealModal({
   takeaway,
   evidence,
   bars,
-  eyebrow = 'Lo encontré en lo que registras',
+  date,
+  eyebrow = 'Nuevo patrón encontrado',
   lifeline = false,
   onClose,
 }: {
+  /** Fecha legible del día (p.ej. "14 de junio") — contexto de cuándo. */
+  date?: string
   /** El marco de descubrimiento: "esto lo saqué de TU tracking" (el
    *  diferenciador de Stelar). Va arriba de la observación. */
   eyebrow?: string
@@ -69,7 +72,7 @@ export function PatternRevealModal({
   /** Evidencia VISUAL de frecuencia (patrones de constancia): la tira de días
    *  con `count` encendidos de `total`. Reemplaza a la línea de vida (que es la
    *  metáfora del combo de déficit, no de este patrón). Ausente → línea de vida. */
-  evidence?: { count: number; total: number }
+  evidence?: { count: number; total: number; tone?: 'lit' | 'neutral' }
   /** Etapa 3: la correlación con el déficit (barras pareadas). Es la PRUEBA que
    *  más importa (conecta con el norte) → gana al strip de frecuencia. */
   bars?: EvidenceBar[]
@@ -121,6 +124,7 @@ export function PatternRevealModal({
             <PatternEvidenceStrip
               count={evidence.count}
               total={evidence.total}
+              tone={evidence.tone ?? 'lit'}
               progress={progress}
             />
           </View>
@@ -143,6 +147,16 @@ export function PatternRevealModal({
             <Text style={styles.takeaway}>{takeaway}</Text>
           </Animated.View>
         </View>
+
+        {/* La fecha ARRIBA-izquierda, brillante — ancla de "cuándo" antes de leer. */}
+        {date ? (
+          <Animated.Text
+            style={[styles.dateTop, { top: insets.top + 16 }, line1Style]}
+            pointerEvents="none"
+          >
+            {date}
+          </Animated.Text>
+        ) : null}
 
         <Pressable
           onPress={onClose}
@@ -179,6 +193,15 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     paddingHorizontal: 40,
+  },
+  // La fecha del día — arriba-izquierda, brillante (leche): ancla de "cuándo".
+  dateTop: {
+    position: 'absolute',
+    left: 24,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+    letterSpacing: 0.3,
   },
   // El marco de descubrimiento: label pequeño en oro, arriba de la observación.
   // "Esto salió de TUS datos" — el diferenciador de Stelar.

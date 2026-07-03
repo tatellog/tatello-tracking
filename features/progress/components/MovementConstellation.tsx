@@ -1,7 +1,15 @@
-import { type ReactNode, useMemo, useState } from 'react'
+import { Fragment, type ReactNode, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg'
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  RadialGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 
 import {
@@ -44,7 +52,7 @@ export type DayMark = 'transformation' | 'revelation' | 'pattern'
 /** Estado extra del día que el grid de workouts no conoce: si fue descanso
  *  (vs sin registro) y si tuvo un evento. Lo provee Progreso desde sus
  *  CalendarDay (recientes); meses viejos quedan sin meta (degradación suave). */
-export type DayMeta = { rested: boolean; mark: DayMark | null }
+export type DayMeta = { rested: boolean; marks: DayMark[] }
 
 /** Reconoce la CONSTANCIA del movimiento (all-time). Voz de coach cálida, sin
  *  racha rígida, sin countdown, sin culpa: el número solo crece. */
@@ -210,17 +218,32 @@ export function MovementConstellation({
             const cx = col * CELL + CELL / 2
             const cy = row * CELL + CELL / 2
             const meta = metaByDate?.get(cell.date)
+            const dayNum = Number(cell.date.slice(8, 10))
             return (
-              <DayDot
-                key={cell.date}
-                cx={cx}
-                cy={cy}
-                lit={cell.trained}
-                isToday={cell.isToday}
-                isFuture={cell.isFuture}
-                rested={meta?.rested ?? false}
-                mark={meta?.mark ?? null}
-              />
+              <Fragment key={cell.date}>
+                <DayDot
+                  cx={cx}
+                  cy={cy}
+                  lit={cell.trained}
+                  isToday={cell.isToday}
+                  isFuture={cell.isFuture}
+                  rested={meta?.rested ?? false}
+                  marks={meta?.marks ?? []}
+                />
+                {/* Número del día, tenue, debajo de la estrella — para ubicarte
+                    ("¿qué día toqué?") sin competir con la constelación. */}
+                <SvgText
+                  x={cx}
+                  y={cy + CELL / 2 - 1}
+                  fill={LECHE}
+                  opacity={cell.isFuture ? 0.18 : 0.5}
+                  fontSize={8.5}
+                  fontFamily={typography.uiMedium}
+                  textAnchor="middle"
+                >
+                  {dayNum}
+                </SvgText>
+              </Fragment>
             )
           })}
 
@@ -302,7 +325,7 @@ function DayDot({
   isToday,
   isFuture,
   rested,
-  mark,
+  marks,
 }: {
   cx: number
   cy: number
@@ -310,7 +333,7 @@ function DayDot({
   isToday: boolean
   isFuture: boolean
   rested: boolean
-  mark: DayMark | null
+  marks: DayMark[]
 }) {
   // Base — la estrella según el estado del día. El indicador (mark) se
   // SUPERPONE encima, así un día entrenado puede además tener su revelación.
@@ -346,7 +369,11 @@ function DayDot({
   return (
     <>
       {base}
-      {mark ? <MarkDot cx={cx} cy={cy} mark={mark} /> : null}
+      {/* Un día puede tener VARIOS marcadores (p.ej. revelación + patrón): cada
+          uno va en su esquina (azul izq., dorado der.), sin taparse. */}
+      {marks.map((m) => (
+        <MarkDot key={m} cx={cx} cy={cy} mark={m} />
+      ))}
     </>
   )
 }
@@ -355,8 +382,11 @@ function DayDot({
  * SOBRE la estrella base: revelación (dorado), patrón (azul), transformación
  * (dorado con micro-aro, el hito mayor). Se lee sin tapar la estrella. */
 function MarkDot({ cx, cy, mark }: { cx: number; cy: number; mark: DayMark }) {
-  const mx = cx + 9.5
-  const my = cy - 9.5
+  // Patrón (azul) en la esquina superior IZQUIERDA; revelación/transformación
+  // (dorado) en la DERECHA. Esquinas opuestas → un día con ambos nunca se
+  // amontona, y cada marcador respira lejos de la estrella.
+  const mx = mark === 'pattern' ? cx - 8.5 : cx + 8.5
+  const my = cy - 9
   if (mark === 'pattern') {
     return <Circle cx={mx} cy={my} r={2} fill={BLUE} />
   }

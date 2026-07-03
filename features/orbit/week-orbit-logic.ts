@@ -1380,3 +1380,66 @@ export function weekLever(
 
   return null
 }
+
+/* ── Palanca de la semana en curso (criterio Apple: meta TUYA + lo que falta) ──
+ * El "qué hago AHORA" del patrón entreno×déficit: cuántos entrenos llevas esta
+ * semana vs los que TUS mejores semanas en déficit suelen tener, en tono de
+ * oportunidad, nunca de deuda. Ver features/patterns/CLAUDE.md (enmienda jul 2026):
+ * la palanca-presente SÍ puede mostrar meta + lo que falta, sin culpa. */
+
+/** Entrenos-por-semana típicos de tus semanas FUERTES en déficit = la meta
+ *  derivada de TUS datos. `null` si no hay base suficiente (→ solo marcador). */
+function typicalTrainedInStrongWeeks(
+  signals: readonly DailySignals[],
+  target: number,
+): number | null {
+  const byWeek = new Map<string, { trained: number; food: number; deficit: number }>()
+  for (const s of signals) {
+    if (!s.day) continue
+    const wk = mondayOf(s.day)
+    const e = byWeek.get(wk) ?? { trained: 0, food: 0, deficit: 0 }
+    if (s.trained === true) e.trained += 1
+    if (s.calories != null && s.calories > 0) {
+      e.food += 1
+      if (isDeficitDay(s.calories, target)) e.deficit += 1
+    }
+    byWeek.set(wk, e)
+  }
+  const strong = [...byWeek.values()].filter(
+    (e) => e.food >= 3 && e.trained >= 1 && e.deficit / e.food >= 0.5,
+  )
+  if (strong.length < 2) return null
+  const counts = strong.map((e) => e.trained).sort((a, b) => a - b)
+  return Math.max(1, counts[Math.floor(counts.length / 2)]!)
+}
+
+/** Entrenos de la semana EN CURSO (lun→hoy). */
+function trainedThisWeek(signals: readonly DailySignals[], todayIso: string): number {
+  const monday = mondayOf(todayIso)
+  return signals.filter(
+    (s) => s.day != null && s.day >= monday && s.day <= todayIso && s.trained === true,
+  ).length
+}
+
+/** La palanca-presente del patrón entreno×déficit: marcador de esta semana +
+ *  meta de TUS datos + la oportunidad. `null` si no hay meta calórica. */
+export function weeklyMovementLever(
+  signals: readonly DailySignals[],
+  calorieTarget: number | null | undefined,
+  todayIso: string,
+): string | null {
+  if (calorieTarget == null || calorieTarget <= 0) return null
+  const w = trainedThisWeek(signals, todayIso)
+  const typical = typicalTrainedInStrongWeeks(signals, calorieTarget)
+  // Sin meta derivable: solo el marcador (honesto, sin inventar cuota).
+  if (typical == null) {
+    return `Esta semana el movimiento ya apareció ${w} ${w === 1 ? 'vez' : 'veces'}.`
+  }
+  // Ya estás en tu forma: celebra, no pidas más.
+  if (w >= typical) {
+    return `Esta semana llevas ${w} entrenos. Ya estás en tu forma de déficit.`
+  }
+  const faltan = typical - w
+  const mas = faltan === 1 ? 'uno más' : `${faltan} más`
+  return `Esta semana llevas ${w} de ${typical} entrenos que suelen ponerte en déficit. Con ${mas}, lo repites.`
+}

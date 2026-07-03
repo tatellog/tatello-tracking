@@ -395,7 +395,8 @@ describe('detectMonthPatterns · patrones accionables (correlaciones)', () => {
     const corr = correlationForKind(signals, { calorieTarget: TARGET }, 'training_consistent')
     expect(corr).toBeTruthy()
     expect(corr!.bars.find((b) => b.label === 'Con entreno')?.total).toBe(6)
-    expect(corr!.insight).toMatch(/déficit/)
+    // El insight es la PALANCA (un foco accionable), no un restatement.
+    expect(corr!.insight).toMatch(/entreno|día/i)
     // Un kind sin correlación mapeada → null (cae a la tira de frecuencia).
     expect(correlationForKind(signals, { calorieTarget: TARGET }, 'protein_consistent')).toBeNull()
   })
