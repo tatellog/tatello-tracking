@@ -258,35 +258,34 @@ describe('transformationCopy', () => {
 // --- patternRevelationCopy ---
 
 describe('patternRevelationCopy', () => {
-  test('protein_consistent: interpola count y windowDays en el message', () => {
+  // Regla dura (patterns/CLAUDE.md): el narrativo NO cuenta frecuencia. La
+  // cadencia se SIENTE por el eyebrow, no se CUENTA → sin dígitos en el message.
+  test('protein_consistent: no cuenta frecuencia, título correcto', () => {
     const copy = patternRevelationCopy('protein_consistent', 5, 7)
 
-    expect(copy.message).toContain('5')
-    expect(copy.message).toContain('7')
-    expect(copy.title).toBeTruthy()
+    expect(copy.message).not.toMatch(/\d/)
+    expect(copy.title).toBe('Proteína constante.')
   })
 
-  test('training_consistent: interpola count y windowDays en el message', () => {
+  test('training_consistent: no cuenta frecuencia', () => {
     const copy = patternRevelationCopy('training_consistent', 4, 7)
 
-    expect(copy.message).toContain('4')
-    expect(copy.message).toContain('7')
-    expect(copy.title).toBeTruthy()
+    expect(copy.message).not.toMatch(/\d/)
+    expect(copy.title).toBe('Un ritmo de entreno.')
   })
 
-  test('sleep_consistent: interpola count y windowDays en el message', () => {
+  test('sleep_consistent: no cuenta frecuencia', () => {
     const copy = patternRevelationCopy('sleep_consistent', 6, 7)
 
-    expect(copy.message).toContain('6')
-    expect(copy.message).toContain('7')
-    expect(copy.title).toBeTruthy()
+    expect(copy.message).not.toMatch(/\d/)
+    expect(copy.title).toBe('Descanso más estable.')
   })
 
-  test('night_eating: interpola count y windowDays en el message', () => {
+  test('night_eating: no cuenta frecuencia, sujeto = las noches', () => {
     const copy = patternRevelationCopy('night_eating', 3, 7)
 
-    expect(copy.message).toContain('3')
-    expect(copy.message).toContain('7')
+    expect(copy.message).not.toMatch(/\d/)
+    expect(copy.message).toMatch(/noches/)
     expect(copy.title).toBeTruthy()
   })
 

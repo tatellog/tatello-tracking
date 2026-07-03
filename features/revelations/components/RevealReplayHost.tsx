@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { useProfile } from '@/features/profile/hooks'
 import { useTransformProgress } from '@/features/emblem'
-import { PatternConstellationReveal } from '@/features/orbit/components/PatternConstellationReveal'
+import { PatternRevealModal } from '@/features/orbit/components/PatternRevealModal'
 import { zodiacFromDate } from '@/features/tabs/zodiac'
 
 import { TransformationReveal } from './TransformationReveal'
@@ -51,7 +51,29 @@ export function RevealReplayHost() {
       />
     )
   }
-  // pattern → constelación de nodos en el MARCO del modal de Órbita·Mes
-  // (consistente con el patrón que ve la usuaria en Mes).
-  return <PatternConstellationReveal phrase={replay.message} onClose={close} />
+  // pattern → la ceremonia con el patrón de ESTE día: observación + PRUEBA
+  // (correlación con el déficit si existe, o la frecuencia) + significado.
+  const hasBars = replay.evidenceBars != null && replay.evidenceBars.length > 0
+  return (
+    <PatternRevealModal
+      phrase={replay.title || replay.message}
+      // Observación (title) → PRUEBA → significado (message). La prueba es la
+      // correlación con el déficit si existe (countLine = su porqué); si no, la
+      // frecuencia; si nada, el detalle (sin repetir el título).
+      countLine={
+        hasBars
+          ? (replay.correlationInsight ?? '')
+          : replay.evidence || (replay.message !== replay.title ? replay.message : '')
+      }
+      takeaway={hasBars || replay.evidence ? replay.message : ''}
+      // Barras de correlación con el déficit (Etapa 3) > tira de frecuencia.
+      bars={hasBars ? replay.evidenceBars : undefined}
+      evidence={
+        replay.evidenceCount != null && replay.evidenceTotal != null
+          ? { count: replay.evidenceCount, total: replay.evidenceTotal }
+          : undefined
+      }
+      onClose={close}
+    />
+  )
 }

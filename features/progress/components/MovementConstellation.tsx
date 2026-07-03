@@ -114,7 +114,7 @@ export function MovementConstellation({
   // Warm, no-guilt month line — never "0/30". A quiet month is a pause.
   const monthLine =
     trained > 0
-      ? `${trained} ${trained === 1 ? 'día' : 'días'} en movimiento`
+      ? `${trained} ${trained === 1 ? 'día entrenado' : 'días entrenados'}`
       : isCurrentMonth
         ? 'tu mes empieza'
         : 'un mes en pausa'

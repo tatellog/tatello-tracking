@@ -7,10 +7,13 @@
 
 import { useMemo } from 'react'
 
+import { useMacroTargets } from '@/features/macros/hooks'
+import { correlationForKind } from '@/features/orbit/month-built'
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import {
+  patternEvidenceLine,
   patternRevelationCopy,
   RETURN_COPY,
   TRANSFORMATION_THRESHOLDS,
@@ -55,7 +58,16 @@ function localDayOf(iso: string, tz: string = USER_TIMEZONE): string {
  * para el detalle ("ver evidencia"): el patrón con su conteo, el regreso con su
  * bienvenida.
  */
-function eventCopy(r: RevelationRow, signLabel: string): { title: string; message: string } {
+function eventCopy(
+  r: RevelationRow,
+  signLabel: string,
+): {
+  title: string
+  message: string
+  evidence?: string
+  evidenceCount?: number
+  evidenceTotal?: number
+} {
   if (r.tier === 'transformation') {
     const t = Number(r.kind) as TransformationThreshold
     if ((TRANSFORMATION_THRESHOLDS as readonly number[]).includes(t)) {
@@ -66,11 +78,26 @@ function eventCopy(r: RevelationRow, signLabel: string): { title: string; messag
   if (r.tier === 'return') return { title: r.title, message: RETURN_COPY.message }
   const count = Number(r.metadata?.count ?? 0)
   const windowDays = Number(r.metadata?.window_days ?? r.metadata?.windowDays ?? 7)
-  // Sin conteo válido (revelaciones viejas/seed sin metadata) NO fabricamos
-  // "0 de los últimos N días" — solo el título (el detalle lo suprime al
-  // coincidir con el título). Con conteo, el mensaje trae la evidencia real.
-  const message = count > 0 ? patternRevelationCopy(r.kind, count, windowDays).message : r.title
-  return { title: r.title, message }
+  // Patrón: el copy ya NO cuenta frecuencia (patterns/CLAUDE.md), así que
+  // REGENERAMOS título + mensaje desde patternRevelationCopy en vez de usar el
+  // título GUARDADO. Ese título viejo quedó genérico y se repetía como título Y
+  // cuerpo (p.ej. "Algo que noté en tus noches." en ambos). Los 4 kinds de patrón
+  // (training/protein/sleep/night) están cubiertos, así título ≠ detalle y con voz.
+  // El conteo NO va al narrativo, pero SÍ como EVIDENCIA en la ceremonia.
+  const copy = patternRevelationCopy(r.kind, count, windowDays)
+  const evidence = patternEvidenceLine(r.kind, count, windowDays)
+  // La tira visual de días ENCENDIDOS solo para positivos de constancia (celebra
+  // cadencia). El noticing de noches NO la lleva (encender días de "comida tarde"
+  // se leería como festejo); usa solo la evidencia en texto.
+  const isPositive = r.kind !== 'night_eating'
+  const hasCount = isPositive && count > 0 && windowDays > 0 && count <= windowDays
+  return {
+    title: copy.title,
+    message: copy.message,
+    evidence,
+    evidenceCount: hasCount ? count : undefined,
+    evidenceTotal: hasCount ? windowDays : undefined,
+  }
 }
 
 export type UseCalendarDaysOpts = {
@@ -96,6 +123,10 @@ export function useCalendarDays(opts: UseCalendarDaysOpts): {
   // guardados quedaron con el signo viejo). Ver eventCopy.
   const { data: profile } = useProfile()
   const signLabel = ZODIAC[zodiacFromDate(profile?.date_of_birth)].label
+  // Metas para computar la correlación con el déficit (Etapa 3).
+  const targets = useMacroTargets().data
+  const calorieTarget = targets?.calories ?? null
+  const proteinTarget = targets?.protein_g ?? null
 
   const signalsByDay = useMemo(() => {
     const map: Record<string, DaySignal> = {}
@@ -107,13 +138,39 @@ export function useCalendarDays(opts: UseCalendarDaysOpts): {
 
   const eventsByDay = useMemo(() => {
     const map: Record<string, CalendarEvent[]> = {}
+    // Un patrón de CONSTANCIA (mismo kind) es UNA cosa en curso, no un
+    // descubrimiento nuevo cada vez que se detecta: si "ritmo de movimiento"
+    // aparece el 21 y el 28, se repite ("el 21 es igualito al 28"). Mostramos
+    // solo su instancia MÁS RECIENTE (la data viene ordenada shown_at desc).
+    const seenPatternKinds = new Set<string>()
     for (const r of revelations.data ?? []) {
+      if (r.tier === 'pattern') {
+        if (seenPatternKinds.has(r.kind)) continue
+        seenPatternKinds.add(r.kind)
+      }
       const day = localDayOf(r.shown_at)
-      const { title, message } = eventCopy(r, signLabel)
-      ;(map[day] ??= []).push({ id: r.id, title, tier: r.tier, kind: r.kind, message })
+      const { title, message, evidence, evidenceCount, evidenceTotal } = eventCopy(r, signLabel)
+      // Etapa 3: si el patrón de constancia tiene una correlación con el déficit
+      // (el norte), la adjuntamos como PRUEBA pareada para la ceremonia.
+      const corr =
+        r.tier === 'pattern'
+          ? correlationForKind(signals.data ?? [], { calorieTarget, proteinTarget }, r.kind)
+          : null
+      ;(map[day] ??= []).push({
+        id: r.id,
+        title,
+        tier: r.tier,
+        kind: r.kind,
+        message,
+        evidence,
+        evidenceCount,
+        evidenceTotal,
+        evidenceBars: corr?.bars,
+        correlationInsight: corr?.insight,
+      })
     }
     return map
-  }, [revelations.data, signLabel])
+  }, [revelations.data, signLabel, signals.data, calorieTarget, proteinTarget])
 
   const days = useMemo(
     () =>

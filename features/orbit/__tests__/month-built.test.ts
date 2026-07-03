@@ -1,4 +1,5 @@
 import {
+  correlationForKind,
   daysInDeficit,
   deficitTrajectoryRead,
   detectMonthPatterns,
@@ -366,6 +367,37 @@ describe('detectMonthPatterns · patrones accionables (correlaciones)', () => {
     expect(tp).toBeTruthy()
     expect(tp.evidence.bars.find((b) => b.label === 'Con entreno')?.value).toBe(150)
     expect(tp.evidence.bars.find((b) => b.label === 'Sin entreno')?.value).toBe(120)
+  })
+
+  it('movimiento × déficit cuando el déficit aparece más los días de movimiento', () => {
+    // Días de movimiento en déficit (1400); sin movimiento en superávit (2400).
+    const signals = month(12, (i) => ({
+      meal_count: 2,
+      trained: i % 2 === 0,
+      calories: i % 2 === 0 ? 1400 : 2400,
+    }))
+    const p = detectMonthPatterns(signals, { calorieTarget: TARGET }).find(
+      (p) => p.id === 'movement-deficit',
+    )!
+    expect(p).toBeTruthy()
+    expect(p.kind).toBe('pattern')
+    expect(p.title).toMatch(/entrenaste/)
+    // Barras por TASA: con entreno 6/6, sin entreno 0/6.
+    expect(p.evidence.bars.find((b) => b.label === 'Con entreno')?.total).toBe(6)
+  })
+
+  it('correlationForKind conecta el patrón de constancia con su correlación al déficit', () => {
+    const signals = month(12, (i) => ({
+      meal_count: 2,
+      trained: i % 2 === 0,
+      calories: i % 2 === 0 ? 1400 : 2400,
+    }))
+    const corr = correlationForKind(signals, { calorieTarget: TARGET }, 'training_consistent')
+    expect(corr).toBeTruthy()
+    expect(corr!.bars.find((b) => b.label === 'Con entreno')?.total).toBe(6)
+    expect(corr!.insight).toMatch(/déficit/)
+    // Un kind sin correlación mapeada → null (cae a la tira de frecuencia).
+    expect(correlationForKind(signals, { calorieTarget: TARGET }, 'protein_consistent')).toBeNull()
   })
 
   it('NO existe el patrón decorativo "Dormiste más de 7 h en N noches"', () => {

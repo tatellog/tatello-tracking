@@ -14,8 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { colors, typography } from '@/theme'
 
+import { PatternCorrelationBars } from './PatternCorrelationBars'
+import { PatternEvidenceStrip } from './PatternEvidenceStrip'
 import { PatternRevealCosmos } from './PatternRevealCosmos'
 import { PatternRevealLifeLine } from './PatternRevealLifeLine'
+
+import type { EvidenceBar } from '../month-built'
 
 /*
  * PatternRevealModal — la revelación cinemática del patrón dominante (Órbita·Mes).
@@ -43,14 +47,32 @@ export function PatternRevealModal({
   phrase,
   countLine,
   takeaway,
+  evidence,
+  bars,
+  eyebrow = 'Lo encontré en lo que registras',
+  lifeline = false,
   onClose,
 }: {
+  /** El marco de descubrimiento: "esto lo saqué de TU tracking" (el
+   *  diferenciador de Stelar). Va arriba de la observación. */
+  eyebrow?: string
+  /** Muestra la "línea de vida" (metáfora de déficit) como héroe cuando no hay
+   *  barras ni tira. Solo el combo de Órbita Mes la quiere; los patrones del
+   *  calendario sin evidencia visual (p.ej. el noticing) quedan sobre el cosmos. */
+  lifeline?: boolean
   /** La frase del patrón (observación, voz de coach). */
   phrase: string
   /** "Coincidieron 7 días. Los 7, en déficit." (la prueba). */
   countLine: string
   /** El cierre útil ("Cuando aparecen juntas, es tu señal más confiable."). */
   takeaway: string
+  /** Evidencia VISUAL de frecuencia (patrones de constancia): la tira de días
+   *  con `count` encendidos de `total`. Reemplaza a la línea de vida (que es la
+   *  metáfora del combo de déficit, no de este patrón). Ausente → línea de vida. */
+  evidence?: { count: number; total: number }
+  /** Etapa 3: la correlación con el déficit (barras pareadas). Es la PRUEBA que
+   *  más importa (conecta con el norte) → gana al strip de frecuencia. */
+  bars?: EvidenceBar[]
   onClose: () => void
 }) {
   const { width, height } = useWindowDimensions()
@@ -85,15 +107,36 @@ export function PatternRevealModal({
         <PatternRevealCosmos width={width} height={height} style={StyleSheet.absoluteFill} />
         <View style={styles.dim} pointerEvents="none" />
 
-        {/* La línea de vida (Skia): grid + cuadro + trayectoria + astro + zoom. */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <PatternRevealLifeLine width={width} height={height} progress={progress} />
-        </View>
+        {/* El HÉROE visual, por prioridad de PRUEBA:
+            1) barras de correlación con el déficit (lo que conecta con el norte),
+            2) tira de frecuencia (la constancia: días reales encendidos),
+            3) línea de vida (el combo de déficit de Órbita Mes).
+            La usuaria pidió VER su dato, no una animación genérica. */}
+        {bars && bars.length > 0 ? (
+          <View style={styles.heroWrap} pointerEvents="none">
+            <PatternCorrelationBars bars={bars} progress={progress} />
+          </View>
+        ) : evidence ? (
+          <View style={styles.heroWrap} pointerEvents="none">
+            <PatternEvidenceStrip
+              count={evidence.count}
+              total={evidence.total}
+              progress={progress}
+            />
+          </View>
+        ) : lifeline ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <PatternRevealLifeLine width={width} height={height} progress={progress} />
+          </View>
+        ) : null}
 
         {/* La evidencia, en dos fases, abajo. box-none → el toque pasa al fondo.
             Fase 1: la observación (frase). Fase 2 (al abrir el contexto): la
             prueba (conteo + fechas). */}
         <View style={[styles.textWrap, { bottom: insets.bottom + 56 }]} pointerEvents="none">
+          {eyebrow ? (
+            <Animated.Text style={[styles.eyebrow, line1Style]}>{eyebrow}</Animated.Text>
+          ) : null}
           <Animated.Text style={[styles.phrase, line1Style]}>{phrase}</Animated.Text>
           <Animated.View style={line2Style}>
             <Text style={styles.count}>{countLine}</Text>
@@ -124,12 +167,29 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(10, 6, 8, 0.55)',
   },
+  // La tira de evidencia se centra en el área héroe (donde iba la línea).
+  heroWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   textWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     alignItems: 'center',
     paddingHorizontal: 40,
+  },
+  // El marco de descubrimiento: label pequeño en oro, arriba de la observación.
+  // "Esto salió de TUS datos" — el diferenciador de Stelar.
+  eyebrow: {
+    marginBottom: 12,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    color: colors.oroSoft,
   },
   // Fase 1: la observación del patrón → voz de coach, serif italic.
   phrase: {

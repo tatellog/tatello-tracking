@@ -82,41 +82,69 @@ export const RETURN_COPY = {
 } as const
 
 /**
- * Copy CON CONTEO de las Revelaciones de Patrones (T3). Enmarcado por tono
- * (behavioral + spec Decisión #8): en positivos el conteo va al frente y
- * "hacia arriba" (X/N = constancia, nunca "te faltaron 2"); en el noticing
- * la observación cálida va primero y el número al PIE como contexto, con el
- * sujeto en "las noches". (Borrador; pasa por voice-and-copy.)
+ * Copy SIN CONTEO de las Revelaciones de Patrones (T3). `patterns/CLAUDE.md`
+ * prohíbe cuantificadores de cadencia ("X de los últimos N días", "la mayoría
+ * de tus noches"): la cadencia se SIENTE por el eyebrow ("ALGO CONSTANTE"), no
+ * se CUENTA (contar = factura = vigilancia). El sujeto es el DATO, no la usuaria.
+ * El número, si hace falta, vive como EVIDENCIA en el detalle, no en el narrativo.
+ * (Borrador; pasa por voice-and-copy + manifesto-reviewer.)
  */
 export function patternRevelationCopy(
   kind: string,
-  count: number,
-  windowDays: number,
+  _count: number,
+  _windowDays: number,
 ): { message: string; title: string } {
   switch (kind) {
     case 'protein_consistent':
       return {
-        message: `${count} de los últimos ${windowDays} días tu proteína estuvo presente. Ya tiene forma.`,
+        // "necesita", no "construye": evita la lectura de recomposición/músculo
+        // (fuera del scope de pérdida de peso · manifesto-reviewer).
+        message: 'Tu proteína se volvió una de tus constantes. Sostiene lo que tu cuerpo necesita.',
         title: 'Proteína constante.',
       }
     case 'training_consistent':
       return {
-        // Sujeto = el dato (el movimiento), no la usuaria ("te moviste"),
-        // parejo con las otras cadenas (regla de sujeto de patterns).
-        message: `${count} de los últimos ${windowDays} días el movimiento estuvo ahí. Ya es un ritmo.`,
-        title: 'Un ritmo de movimiento.',
+        // "Entreno", no "movimiento": el dato son los días con entreno registrado
+        // (no pasos/caminar). Claridad pedida por la dueña.
+        message: 'Entrenar se volvió parte de tu ritmo. Tu semana lo nota cuando aparece.',
+        title: 'Un ritmo de entreno.',
       }
     case 'sleep_consistent':
       return {
-        message: `${count} de los últimos ${windowDays} días tu descanso fue sólido. Tu cuerpo tuvo eso.`,
+        message: 'Algo se asentó en tus noches. El resto de tu día lo siente.',
         title: 'Descanso más estable.',
       }
     case 'night_eating':
     default:
       return {
-        message: `Las noches pidieron más esta semana. Registraste algo tarde en ${count} de los últimos ${windowDays} días.`,
+        // Sin "esta semana": la revelación se re-vive en el historial meses después.
+        message: 'Las noches pidieron más. Algo se movió en tu rutina al caer el día.',
         title: 'Un patrón en tus noches.',
       }
+  }
+}
+
+/**
+ * La EVIDENCIA (prueba) de un patrón de constancia: la frecuencia como DATO
+ * CONSULTADO en la ceremonia, no como titular. `patterns/CLAUDE.md` prohíbe el
+ * conteo en el NARRATIVO (el titular/observación); como evidencia que respalda
+ * la observación sí es defendible (revelations-spec Decisión #1). Vive SOLO en
+ * el detalle/ceremonia. `''` sin conteo válido (no fabricamos "0 de N").
+ * (Borrador; pasa por voice-and-copy + manifesto-reviewer.)
+ */
+export function patternEvidenceLine(kind: string, count: number, windowDays: number): string {
+  if (!count || count <= 0 || !windowDays || windowDays <= 0) return ''
+  switch (kind) {
+    case 'protein_consistent':
+      return `Tu proteína estuvo en objetivo ${count} de los últimos ${windowDays} días.`
+    case 'training_consistent':
+      return `Entrenaste ${count} de tus últimos ${windowDays} días.`
+    case 'sleep_consistent':
+      return `Tu descanso fue sólido en ${count} de tus últimas ${windowDays} noches.`
+    case 'night_eating':
+      return `${count} de tus últimas ${windowDays} noches tuvieron comida tardía.`
+    default:
+      return ''
   }
 }
 

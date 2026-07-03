@@ -9,7 +9,26 @@
  * pantalla si se montan en la raíz — por eso el host vive en la pantalla y el
  * detalle solo emite.
  */
-export type ReplayEvent = { tier: string; kind: string; message: string }
+export type ReplayEvent = {
+  tier: string
+  kind: string
+  message: string
+  title?: string
+  /** La prueba del patrón (frecuencia como evidencia), para la ceremonia. */
+  evidence?: string
+  /** La misma evidencia en NÚMEROS (count de total) → la tira visual. */
+  evidenceCount?: number
+  evidenceTotal?: number
+  /** Etapa 3: la correlación con el déficit (barras pareadas + su porqué). */
+  evidenceBars?: {
+    label: string
+    value: number
+    total?: number
+    colorKey?: string
+    highlight?: boolean
+  }[]
+  correlationInsight?: string
+}
 
 type Listener = (e: ReplayEvent) => void
 

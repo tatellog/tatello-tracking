@@ -284,7 +284,7 @@ export function TrainingShareCard({
         <View style={styles.middle}>
           <Text style={styles.calMonth}>{monthLabel}</Text>
           <Text style={styles.calCount}>
-            {(monthCells ?? []).filter((c) => c.trained).length} días en movimiento
+            {(monthCells ?? []).filter((c) => c.trained).length} días entrenados
           </Text>
           <View style={styles.calGrid}>
             {Array.from({ length: monthFirstWeekday ?? 0 }).map((_, i) => (

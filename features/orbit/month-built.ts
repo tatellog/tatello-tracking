@@ -1223,7 +1223,7 @@ export function detectMonthPatterns(
           kind: 'pattern',
           label: 'Sueño y déficit',
           title: 'Cuando dormiste 7 h o más, alcanzaste tu déficit más seguido.',
-          why: 'Tu descanso y tu déficit se movieron juntos este mes.',
+          why: 'Tu descanso y tu déficit coincidieron más seguido este mes.',
           evidence: {
             bars: [
               {
@@ -1277,6 +1277,44 @@ export function detectMonthPatterns(
     }
   }
 
+  // B5 · Movimiento × déficit — EL par que conecta el esfuerzo (moverte) con el
+  // NORTE (déficit/peso). Co-ocurrencia, NO causa ("de la mano con", nunca
+  // "moverte te hace bajar"). Mismas guardas que B3 (muestra ≥3 por lado + efecto
+  // marcado): no convertimos ruido en "patrón".
+  if (target != null && target > 0) {
+    const trained = food.filter((s) => s.trained === true)
+    const rest = food.filter((s) => s.trained !== true)
+    if (trained.length >= 3 && rest.length >= 3) {
+      const defT = trained.filter((s) => isDeficitDay(s.calories, target)).length
+      const defR = rest.filter((s) => isDeficitDay(s.calories, target)).length
+      const rateT = defT / trained.length
+      const rateR = defR / rest.length
+      if (rateT >= rateR * 1.3 && rateT - rateR >= 0.2) {
+        out.push({
+          id: 'movement-deficit',
+          kind: 'pattern',
+          label: 'Entreno y déficit',
+          title: 'Los días que entrenaste, tu déficit apareció más seguido.',
+          why: 'Tus entrenos y tu déficit coincidieron más seguido este mes.',
+          evidence: {
+            bars: [
+              {
+                label: 'Con entreno',
+                value: defT,
+                total: trained.length,
+                colorKey: 'cuerpo',
+                highlight: true,
+              },
+              { label: 'Sin entreno', value: defR, total: rest.length, colorKey: 'cuerpo' },
+            ],
+            caption: 'Días en déficit según si entrenaste ese día.',
+            unit: 'días',
+          },
+        })
+      }
+    }
+  }
+
   // NOTA: NO existe un patrón de "Dormiste más de 7 h en N noches". Era un
   // conteo decorativo (no accionable): no dice qué hacer ni por qué importa, y
   // el doc prohíbe explícitamente los insights decorativos. El sueño SÍ aparece
@@ -1286,6 +1324,28 @@ export function detectMonthPatterns(
   // (cuándo/qué con un resultado) y trae su `why` = el lever que la usuaria
   // puede mover. Si ninguno se sostiene con los datos, la sección no aparece.
   return out
+}
+
+/** La correlación con el DÉFICIT (el norte) que respalda un patrón de constancia
+ *  de "Tu historia": conecta el esfuerzo (entreno/sueño) con lo que la usuaria
+ *  quiere (bajar). Devuelve las barras pareadas + el porqué, o null si esa
+ *  correlación no se sostiene con los datos. Etapa 3: la ceremonia del patrón
+ *  deja de ser solo frecuencia y muestra la PRUEBA que importa. */
+export function correlationForKind(
+  signals: readonly DailySignals[],
+  opts: { proteinTarget?: number | null; calorieTarget?: number | null },
+  kind: string,
+): { bars: EvidenceBar[]; caption: string; insight: string } | null {
+  const id =
+    kind === 'training_consistent'
+      ? 'movement-deficit'
+      : kind === 'sleep_consistent'
+        ? 'sleep-deficit'
+        : null
+  if (!id) return null
+  const p = detectMonthPatterns(signals, opts).find((mp) => mp.id === id)
+  if (!p || !p.why) return null
+  return { bars: p.evidence.bars, caption: p.evidence.caption, insight: p.why }
 }
 
 /* ── "No sabías que..." — hallazgos de astrónomo ─────────────────────── */
@@ -1461,6 +1521,42 @@ export type WinningCombo = {
 }
 
 const COMBO_MIN_OCCUR = 3
+
+/* Verbos naturales por hábito para NOMBRAR el combo en la frase (no etiquetas
+ * sueltas): "Entrenar e hidratarte fueron de la mano con tu déficit." */
+const COMBO_VERB: Record<string, string> = {
+  cuerpo: 'entrenar',
+  agua: 'hidratarte',
+  sueno: 'dormir bien',
+  proteina: 'cuidar tu proteína',
+}
+
+/** La frase que NOMBRA el combo (sin genéricos "estas señales"). Voz
+ *  Observadora: "de la mano con", nunca causa. */
+export function comboPhrase(combo: WinningCombo): string {
+  const verbs = combo.signals.map((s) => COMBO_VERB[s.key] ?? s.label.toLowerCase())
+  if (verbs.length === 0) return ''
+  const last = verbs[verbs.length - 1]!
+  // "e" antes de sonido i- ("entrenar e hidratarte"); "y" en el resto.
+  const conj = /^h?i/i.test(last) ? 'e' : 'y'
+  const list = verbs.length > 1 ? `${verbs.slice(0, -1).join(', ')} ${conj} ${last}` : verbs[0]!
+  return `${list.charAt(0).toUpperCase() + list.slice(1)} fueron de la mano con tu déficit.`
+}
+
+/** La evidencia del patrón dominante (frase + conteo + takeaway) para el modal
+ *  cinemático de revelación. Compartida por Órbita Mes Y por el re-vivir del
+ *  patrón desde "Tu historia" (mismo sistema). */
+export type ComboReveal = { phrase: string; countLine: string; takeaway: string }
+export function comboReveal(combo: WinningCombo): ComboReveal {
+  const allDeficit = combo.deficits >= combo.occurrences
+  return {
+    phrase: comboPhrase(combo),
+    countLine: allDeficit
+      ? `Coincidieron ${combo.occurrences} días. Los ${combo.occurrences}, en déficit.`
+      : `Coincidieron ${combo.occurrences} días. ${combo.deficits}, en déficit.`,
+    takeaway: 'Cuando aparecen juntas, es tu señal más confiable.',
+  }
+}
 
 export function winningCombo(
   signals: readonly DailySignals[],

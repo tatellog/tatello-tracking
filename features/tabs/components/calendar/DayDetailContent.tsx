@@ -262,10 +262,11 @@ export function DayDetailContent({
                     ) : null}
                     {tappable ? <Text style={styles.eventChevron}>›</Text> : null}
                   </View>
-                  {/* La evidencia / el porqué — para patrones trae el conteo
-                      ("X de los últimos N días…"); para transformación, el trazo. */}
-                  {ev.message && ev.message !== ev.title ? (
-                    <Text style={styles.eventEvidence}>{ev.message}</Text>
+                  {/* La evidencia CONCRETA primero (el conteo: "5 de tus últimos
+                      7 días") — es lo que DIFERENCIA un día de otro y da prueba;
+                      si no hay conteo, el porqué/mensaje. */}
+                  {ev.evidence || (ev.message && ev.message !== ev.title) ? (
+                    <Text style={styles.eventEvidence}>{ev.evidence || ev.message}</Text>
                   ) : null}
                   {tappable ? (
                     <Text style={styles.eventReplayHint}>Un momento para revivir</Text>

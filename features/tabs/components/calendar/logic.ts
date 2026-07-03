@@ -34,9 +34,27 @@ export type CalendarEvent = {
    *  re-abrir la ceremonia full-screen al tocar el evento. */
   kind?: string
   /** Copy completo (voz del coach) que respalda el evento — se muestra al tocarlo
-   *  ("ver evidencia"). Para patrones incluye el conteo; para transformación, el
-   *  signo en vivo. */
+   *  ("ver evidencia"). Para transformación, el signo en vivo. */
   message?: string
+  /** La PRUEBA del patrón de constancia (la frecuencia como dato consultado,
+   *  p.ej. "El movimiento apareció en 5 de tus últimos 7 días"). Solo para la
+   *  ceremonia — el número vive como evidencia, nunca como titular. */
+  evidence?: string
+  /** La misma evidencia en forma NUMÉRICA (count de total), para la tira visual
+   *  de la ceremonia. */
+  evidenceCount?: number
+  evidenceTotal?: number
+  /** Etapa 3: la correlación con el déficit (barras pareadas + el porqué), si el
+   *  patrón la tiene. La ceremonia la muestra como la PRUEBA que conecta con el
+   *  norte. Tipo laxo (import de orbit evitaría el ciclo) — son EvidenceBar. */
+  evidenceBars?: {
+    label: string
+    value: number
+    total?: number
+    colorKey?: string
+    highlight?: boolean
+  }[]
+  correlationInsight?: string
 }
 
 /** Valores REALES registrados ese día (no presencia). `null` = no registrado.

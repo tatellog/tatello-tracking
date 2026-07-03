@@ -92,7 +92,15 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
               emitReplayReveal({
                 tier: ev.tier ?? '',
                 kind: ev.kind ?? '',
-                message: ev.message ?? ev.title,
+                // El patrón de ESTE día (observación + detalle + evidencia) —
+                // distinto por día, no el combo global de Mes.
+                title: ev.title,
+                message: ev.message ?? '',
+                evidence: ev.evidence,
+                evidenceCount: ev.evidenceCount,
+                evidenceTotal: ev.evidenceTotal,
+                evidenceBars: ev.evidenceBars,
+                correlationInsight: ev.correlationInsight,
               })
             }}
             // Día con evento = día especial: la estrella ornamental (oro,

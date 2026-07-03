@@ -37,12 +37,15 @@ import { todayInTimezone } from '@/lib/time'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
+  comboPhrase,
+  comboReveal,
   detectMonthPatterns,
   monthCalendar,
   monthReveals,
   presenceSummary,
   revealDayMap,
   winningCombo,
+  type ComboReveal,
   type EvidenceBar,
   type MonthPattern,
   type MonthReveals,
@@ -274,14 +277,18 @@ export function MonthSegment({
     const coveredByCombo = (id: string): boolean => {
       if (id === 'sleep-deficit') return comboKeys.has('sueno')
       if (id === 'training-protein') return comboKeys.has('cuerpo') && comboKeys.has('proteina')
+      // El combo ya conecta movimiento con el déficit → no repetir.
+      if (id === 'movement-deficit') return comboKeys.has('cuerpo')
       return false
     }
     const PRIORITY: Record<string, number> = {
       // La FALLA primero (dónde se rompe tu déficit) — es la promesa.
       'deficit-daytype': 0,
-      'surplus-concentration': 1,
-      'sleep-deficit': 2,
-      'training-protein': 3,
+      // El par que conecta esfuerzo (movimiento) ↔ norte (déficit): alto valor.
+      'movement-deficit': 1,
+      'surplus-concentration': 2,
+      'sleep-deficit': 3,
+      'training-protein': 4,
     }
     return detectMonthPatterns(patternSignals, { calorieTarget, proteinTarget })
       .filter((p) => p.kind === 'pattern' && !coveredByCombo(p.id))
@@ -490,6 +497,7 @@ export function MonthSegment({
           phrase={reveal.phrase}
           countLine={reveal.countLine}
           takeaway={reveal.takeaway}
+          lifeline
           onClose={() => setReveal(null)}
         />
       ) : null}
@@ -872,43 +880,6 @@ function formatDates(dates: string[]): string {
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
-
-/* Verbos naturales por hábito para NOMBRAR el combo en la frase (no etiquetas
- * sueltas): "Entrenar y tomar tu agua fueron de la mano con tu déficit." */
-const COMBO_VERB: Record<string, string> = {
-  cuerpo: 'entrenar',
-  agua: 'hidratarte',
-  sueno: 'dormir bien',
-  proteina: 'cuidar tu proteína',
-}
-
-/** La frase que NOMBRA el combo (sin genéricos "estas señales"). El combo es
- *  siempre ≥2 hábitos → verbo plural ("fueron"). Voz Observadora: "de la mano
- *  con", nunca causa. */
-function comboPhrase(combo: WinningComboData): string {
-  const verbs = combo.signals.map((s) => COMBO_VERB[s.key] ?? s.label.toLowerCase())
-  if (verbs.length === 0) return ''
-  const last = verbs[verbs.length - 1]!
-  // "e" antes de sonido i- ("entrenar e hidratarte"); "y" en el resto.
-  const conj = /^h?i/i.test(last) ? 'e' : 'y'
-  const list = verbs.length > 1 ? `${verbs.slice(0, -1).join(', ')} ${conj} ${last}` : verbs[0]!
-  return `${list.charAt(0).toUpperCase() + list.slice(1)} fueron de la mano con tu déficit.`
-}
-
-/** Las líneas de la evidencia del patrón: la frase (observación, coach), el
- *  conteo y las fechas (la prueba). Las usa el modal cinemático de revelación. */
-type ComboReveal = { phrase: string; countLine: string; takeaway: string }
-function comboReveal(combo: WinningComboData): ComboReveal {
-  const allDeficit = combo.deficits >= combo.occurrences
-  return {
-    phrase: comboPhrase(combo),
-    countLine: allDeficit
-      ? `Coincidieron ${combo.occurrences} días. Los ${combo.occurrences}, en déficit.`
-      : `Coincidieron ${combo.occurrences} días. ${combo.deficits}, en déficit.`,
-    // El cierre útil (modal): qué significa para ti (una señal en la que apoyarte).
-    takeaway: 'Cuando aparecen juntas, es tu señal más confiable.',
-  }
-}
 
 // Etiqueta corta + color por astro del combo (los nodos del asterismo `*—*—*`).
 const NODE_LABEL: Record<string, string> = {
