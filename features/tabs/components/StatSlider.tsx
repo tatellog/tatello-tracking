@@ -173,6 +173,12 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
           date={ctx.date}
           onLockPager={(locked) => setPagerEnabled(!locked)}
           pagerGesture={pagerNative}
+          // wellbeing es SIEMPRE el índice 2 (macros·sleep·wellbeing van fijos al
+          // frente). Con scrollX+índice+ancho el mood decide solo si está centrada:
+          // así su track no roba el swipe cuando solo asoma en el peek de otra slide.
+          scrollX={scrollX}
+          slideIndex={2}
+          slideW={slideW}
         />
       ),
     },
@@ -830,16 +836,30 @@ function WellbeingSlide({
   date,
   onLockPager,
   pagerGesture,
+  scrollX,
+  slideIndex,
+  slideW,
 }: {
   date: string
   onLockPager?: (locked: boolean) => void
   pagerGesture?: NativeGesture
+  /** Para gatear el gesto del mood a "slide centrada" (ver MoodSliderInline). */
+  scrollX?: SharedValue<number>
+  slideIndex?: number
+  slideW?: number
 }) {
   return (
     <View style={styles.slide}>
       <View style={[styles.card, styles.wellbeingCard]}>
         {/* Ánimo (1 eje) — el registro primario, MISMO gesto que Órbita. */}
-        <MoodSliderInline date={date} onDragActive={onLockPager} pagerGesture={pagerGesture} />
+        <MoodSliderInline
+          date={date}
+          onDragActive={onLockPager}
+          pagerGesture={pagerGesture}
+          scrollX={scrollX}
+          slideIndex={slideIndex}
+          slideW={slideW}
+        />
 
         {/* Nota libre del día (daily_notes) — SIEMPRE visible, reemplaza el
             detalle de energía/motivación/calma. */}

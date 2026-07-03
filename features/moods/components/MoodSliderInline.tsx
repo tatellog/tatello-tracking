@@ -5,11 +5,13 @@ import { Gesture, GestureDetector, type NativeGesture } from 'react-native-gestu
 import Animated, {
   Easing,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withSpring,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
@@ -71,6 +73,9 @@ export function MoodSliderInline({
   date,
   onDragActive,
   pagerGesture,
+  scrollX,
+  slideIndex,
+  slideW,
 }: {
   date: string
   /** Bloquea el pager horizontal mientras dura el arrastre. */
@@ -78,6 +83,15 @@ export function MoodSliderInline({
   /** Gesto nativo del scroll del pager: el Pan lo bloquea al activarse
    *  (`blocksExternalGesture`) → el carrusel no roba el arrastre horizontal. */
   pagerGesture?: NativeGesture
+  /** Offset de scroll del pager (UI thread) + índice/ancho de ESTA slide. Con
+   *  ellos el gesto solo escucha cuando la slide está CENTRADA; si no, su track
+   *  asoma en el peek de la slide vecina y roba el swipe (guardaba el ánimo en
+   *  vez de paginar). Se decide desde scrollX en el UI thread → robusto ante la
+   *  memoización de props o el lag del índice activo. Sin estos datos → siempre
+   *  activo (back-compat / tests). */
+  scrollX?: SharedValue<number>
+  slideIndex?: number
+  slideW?: number
 }) {
   const brief = useBriefContext(date)
   const saved = brief.data?.latest_mood?.value ?? null
@@ -98,6 +112,21 @@ export function MoodSliderInline({
   // guardado de ESE día (Hoy en modo día pasado).
   const [seededDate, setSeededDate] = useState<string | null>(null)
   const [justSaved, setJustSaved] = useState(false)
+
+  // ¿Esta slide está CENTRADA en el pager? Solo entonces el gesto escucha (si no,
+  // el track asoma en el peek de la vecina y roba el swipe). Se deriva de scrollX
+  // en el UI thread — no depende de que un prop/estado se propague a tiempo.
+  const [centered, setCentered] = useState(slideIndex == null)
+  useAnimatedReaction(
+    () => {
+      if (scrollX == null || slideW == null || slideW <= 0 || slideIndex == null) return true
+      return Math.abs(scrollX.value - slideIndex * slideW) < slideW * 0.5
+    },
+    (isCentered, prev) => {
+      if (isCentered !== prev) runOnJS(setCentered)(isCentered)
+    },
+    [slideW, slideIndex],
+  )
 
   useEffect(() => {
     if (brief.isLoading || seededDate === date) return
@@ -141,6 +170,7 @@ export function MoodSliderInline({
 
   const pan = useMemo(() => {
     const g = Gesture.Pan()
+      .enabled(centered)
       .activeOffsetX([-6, 6])
       .onBegin(() => {
         dragging.value = withTiming(1, { duration: 140 })
@@ -194,6 +224,7 @@ export function MoodSliderInline({
     stablePersist,
     stableSetDrag,
     pagerGesture,
+    centered,
   ])
 
   // Tap: tocar la barra fija ESA posición y guarda (incluido NEUTRAL). Sin esto,
@@ -202,6 +233,7 @@ export function MoodSliderInline({
   const tap = useMemo(
     () =>
       Gesture.Tap()
+        .enabled(centered)
         .maxDuration(260)
         .maxDistance(12)
         .onEnd((e) => {
@@ -223,7 +255,7 @@ export function MoodSliderInline({
           )
           runOnJS(stablePersist)(b)
         }),
-    [mp, trackW, lastBucket, lastColorPos, flare, stableCommit, stablePersist],
+    [mp, trackW, lastBucket, lastColorPos, flare, stableCommit, stablePersist, centered],
   )
 
   // Pan tiene prioridad (arrastre); si el toque no se convierte en arrastre,

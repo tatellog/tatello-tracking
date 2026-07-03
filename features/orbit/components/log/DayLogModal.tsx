@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
   Easing,
@@ -124,9 +124,16 @@ function LogShell({
         <Text style={styles.title}>{title}</Text>
       </View>
 
-      <Animated.View entering={FadeInUp.duration(360)} style={styles.stage}>
-        {children}
-      </Animated.View>
+      <ScrollView
+        style={styles.stage}
+        contentContainerStyle={styles.stageContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <Animated.View entering={FadeInUp.duration(360)} style={styles.stageInner}>
+          {children}
+        </Animated.View>
+      </ScrollView>
 
       <Pressable
         onPress={onSubmit}
@@ -382,7 +389,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   head: {
-    marginTop: 44,
+    marginTop: 26,
     alignItems: 'center',
   },
   eyebrow: {
@@ -405,7 +412,15 @@ const styles = StyleSheet.create({
   },
   stage: {
     flex: 1,
+  },
+  // El contenido se centra si cabe y hace scroll si no → la luna nunca se encoge
+  // y nada se corta en pantallas cortas (el CTA queda fijo abajo, fuera del scroll).
+  stageContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  stageInner: {
     alignItems: 'center',
   },
   // ── CTA ───────────────────────────────────────────────
