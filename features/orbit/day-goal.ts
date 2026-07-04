@@ -278,6 +278,29 @@ function buildMissing(s: DailySignals): GoalMissing[] {
   }))
 }
 
+/** Hero "en reposo" para el empty state de Órbita Día: los anillos existen pero
+ *  en calma (status incomplete, fill 0) → "aquí va a nacer tu día", nunca "esto
+ *  no hiciste". Reusa la gramática del track-en-reposo de GoalRing. */
+export const REST_HERO: GoalHero = {
+  status: 'incomplete',
+  deltaKcal: null,
+  consumed: null,
+  target: null,
+  fill: 0,
+  over: 0,
+  proteinFill: null,
+  proteinG: null,
+  trained: false,
+  stateLabel: '',
+  line: '',
+}
+
+/** Todas las señales diarias como AUSENTES (nada registrado) → los chips de
+ *  registro del empty state, para que haya algo tocable (no un callejón sin salida). */
+export function restDayMissing(): GoalMissing[] {
+  return MISSING_CANDIDATES.map((c) => ({ key: c.key, label: c.label }))
+}
+
 /* ── Dirección — la trayectoria de hoy en una frase ──────────────────── */
 
 function buildDirection(hero: GoalHero, s: DailySignals, ctx: DayGoalCtx, past: boolean): string {

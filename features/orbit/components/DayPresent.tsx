@@ -26,6 +26,8 @@ import { useScreenActive } from '../useScreenActive'
 import { useDaySignals, useTodaySignals } from '../hooks'
 import {
   buildDayGoal,
+  REST_HERO,
+  restDayMissing,
   type GoalHero,
   type GoalStatus,
   type GoalTone,
@@ -709,18 +711,43 @@ export function DayPresent({
     )
   }
 
-  // Sin ningún registro hoy → invitación (no hay día que leer todavía).
+  // Sin ningún registro hoy → el día EN REPOSO (no una tarjeta suelta): el anillo
+  // en calma da estructura ("aquí va a nacer tu día", nunca "esto no hiciste"), y
+  // los chips son algo TOCABLE (antes era un callejón sin salida: describía el
+  // registro pero no lo ofrecía). Reusa GoalRing + AbsentChip. (uxui-specialist.)
   if (day == null) {
+    const missing = restDayMissing()
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         {header}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Tu día aún no habla</Text>
-          <Text style={styles.cardBody}>
-            En cuanto registres una señal (una comida, tu sueño, un entreno), aquí verás cómo va tu
-            objetivo de hoy.
-          </Text>
+        <View style={styles.hero}>
+          <GoalRing hero={REST_HERO} />
+          <View style={styles.heroText}>
+            <Text style={styles.emptyTitle}>Tu cielo de hoy aún no enciende</Text>
+            <Text style={styles.emptyBody}>
+              Registra una señal (una comida, tu sueño, un entreno) y tu día empieza a tomar forma
+              aquí.
+            </Text>
+          </View>
         </View>
+
+        {missing.length > 0 ? (
+          <View style={styles.sectionAbsent}>
+            <Text style={styles.absentHint}>Tócalas para sumarlas a tu día.</Text>
+            <View style={styles.absentRow}>
+              {missing.map((a) => (
+                <AbsentChip
+                  key={a.key}
+                  label={a.label}
+                  tone={ABSENT_TONE[a.key] ?? colors.magentaHot}
+                  onPress={() => onMissingPress(a.key)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <DayLogModal signalKey={logKey} date={targetDay} onClose={() => setLogKey(null)} />
       </Animated.View>
     )
   }
@@ -916,6 +943,23 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     lineHeight: 21,
+    color: colors.niebla,
+  },
+  // Empty state (día en reposo): título e invitación bajo el anillo, centrados.
+  emptyTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 22,
+    lineHeight: 29,
+    textAlign: 'center',
+    color: colors.leche,
+  },
+  emptyBody: {
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    textAlign: 'center',
     color: colors.niebla,
   },
   retry: {

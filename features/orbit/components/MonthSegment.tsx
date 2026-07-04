@@ -28,6 +28,7 @@ import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry'
 import { useTransformProgress, useTransformProgressAsOf, withSign } from '@/features/emblem'
 import { useProfile } from '@/features/profile/hooks'
+import { emitReplayReveal, useRevelationHistory } from '@/features/revelations'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -39,6 +40,7 @@ import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
   comboPhrase,
   comboReveal,
+  correlationForKind,
   daysInDeficit,
   deficitTrajectoryRead,
   detectMonthPatterns,
@@ -57,6 +59,7 @@ import {
   type WinningCombo as WinningComboData,
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
+import { weeklyMovementLever } from '../week-orbit-logic'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PatternDiscovery } from './PatternDiscovery'
@@ -131,6 +134,9 @@ type RevealDetail = {
   /** Solo déficit: dirección dentro del mes (inicio vs final) — el "¿voy bien?"
    *  como comparación contigo misma, no como % que reprueba. */
   direction?: string | null
+  /** Solo déficit: días en déficit de cada una de las 4 semanas del mes, para
+   *  dibujar las barras + la hairline de TU promedio (Apple Trends, self-only). */
+  weeklyDeficit?: number[] | null
 }
 
 /** Qué CUENTA como cada dimensión (criterio transparente, sin jerga). */
@@ -306,6 +312,56 @@ export function MonthSegment({
       .sort((a, b) => (PRIORITY[a.id] ?? 9) - (PRIORITY[b.id] ?? 9))
       .slice(0, combo ? 2 : 3)
   }, [patternSignals, calorieTarget, proteinTarget, combo])
+  // Puente con la ceremonia fechada: si una PIEZA del combo dominante ya se
+  // reveló y guardó (tabla `revelations`), mostramos su procedencia factual
+  // ("Entreno → déficit · 18/22 días · descubierto el 30 jun") que revive la
+  // ceremonia REAL con su fecha + barras. Solo entreno/sueño tienen correlación
+  // de déficit (los únicos `kind` que correlationForKind mapea). El combo es el
+  // zoom-out del mes; la ceremonia, el zoom-in del momento en que se notó.
+  const revelations = useRevelationHistory()
+  const provenance = useMemo(() => {
+    if (!combo) return null
+    const HABIT_KIND: Record<string, string> = {
+      cuerpo: 'training_consistent',
+      sueno: 'sleep_consistent',
+    }
+    const HABIT_LABEL: Record<string, string> = { cuerpo: 'Entreno', sueno: 'Sueño' }
+    const kindToKey = (k: string) =>
+      (Object.keys(HABIT_KIND) as string[]).find((key) => HABIT_KIND[key] === k) ?? null
+    const comboKinds = new Set(
+      combo.signals.map((s) => HABIT_KIND[s.key]).filter((k): k is string => Boolean(k)),
+    )
+    const row = (revelations.data ?? [])
+      .filter((r) => r.tier === 'pattern' && comboKinds.has(r.kind))
+      .sort((a, b) => (a.shown_at < b.shown_at ? 1 : -1))[0] // más reciente
+    if (!row) return null
+    const corr = correlationForKind(patternSignals, { calorieTarget, proteinTarget }, row.kind)
+    if (!corr) return null
+    const key = kindToKey(row.kind)
+    if (!key) return null
+    const bar = corr.bars.find((b) => b.highlight) ?? corr.bars[0]
+    const proof = bar?.total ? ` · ${bar.value}/${bar.total} días` : ''
+    const d = row.shown_at.slice(0, 10)
+    const when = `${Number(d.slice(8, 10))} ${MONTHS_SHORT[Number(d.slice(5, 7)) - 1]}`
+    const lever =
+      row.kind === 'training_consistent'
+        ? weeklyMovementLever(patternSignals, calorieTarget, today)
+        : null
+    return {
+      label: `${HABIT_LABEL[key]} → déficit${proof} · descubierto el ${when}`,
+      onReplay: () =>
+        emitReplayReveal({
+          tier: row.tier,
+          kind: row.kind,
+          title: corr.title,
+          message: lever ?? corr.insight,
+          evidenceBars: corr.bars,
+          correlationInsight: lever ?? corr.insight,
+          date: d,
+        }),
+    }
+  }, [combo, revelations.data, patternSignals, calorieTarget, proteinTarget, today])
+
   // Sistema PRESENCIA: separado del progreso físico.
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
@@ -360,7 +416,7 @@ export function MonthSegment({
   // Dirección del déficit DENTRO del mes (inicio vs final) — la flecha "Trends"
   // de Apple: responde "¿voy bien?" comparándote CONTIGO, no contra un 100% que
   // reprueba. Reusa monthChange + deficitTrajectoryRead (§8, hoy sin renderizar).
-  const deficitDirection = useMemo(() => {
+  const deficitTrend = useMemo(() => {
     const cats = monthChange(signals, {
       today,
       calorieTarget,
@@ -369,8 +425,12 @@ export function MonthSegment({
     })
     const def = cats.find((c) => c.key === 'deficit')
     if (!def) return null
-    const traj = deficitTrajectoryRead(def.weeks.map((w) => w.count ?? 0))
-    return traj.state === 'low' ? null : traj.takeaway
+    const counts = def.weeks.map((w) => w.count ?? 0)
+    const traj = deficitTrajectoryRead(counts)
+    return {
+      takeaway: traj.state === 'low' ? null : traj.takeaway,
+      weeks: counts,
+    }
   }, [signals, today, calorieTarget, proteinTarget, waterGoalGlasses])
 
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
@@ -387,7 +447,8 @@ export function MonthSegment({
       threshold: REVEAL_THRESHOLD,
       days: revealDays[item.key] ?? [],
       avgOnDeficitDays: item.key === 'deficit' ? (deficitSummary?.avgOnDeficitDays ?? null) : null,
-      direction: item.key === 'deficit' ? deficitDirection : null,
+      direction: item.key === 'deficit' ? (deficitTrend?.takeaway ?? null) : null,
+      weeklyDeficit: item.key === 'deficit' ? (deficitTrend?.weeks ?? null) : null,
     })
 
   if (hasAny === false) {
@@ -507,6 +568,7 @@ export function MonthSegment({
               {combo ? (
                 <DominantPatternCard
                   combo={combo}
+                  provenance={provenance}
                   onOpen={() => {
                     const base = comboReveal(combo)
                     // La palanca de esta semana reemplaza al cierre retrospectivo.
@@ -993,7 +1055,17 @@ const NODE_COLOR: Record<string, string> = {
  * déficit. La card es una ESCENA DE DESCUBRIMIENTO (PatternDiscovery): una
  * constelación que Stelar traza sola + el insight. Sigue tappable → modal
  * life-line. Highlight que respira en el borde como "tócame". */
-function DominantPatternCard({ combo, onOpen }: { combo: WinningComboData; onOpen: () => void }) {
+function DominantPatternCard({
+  combo,
+  onOpen,
+  provenance,
+}: {
+  combo: WinningComboData
+  onOpen: () => void
+  /** Procedencia factual: la pieza del combo que ya se reveló y guardó, con su
+   *  fecha. Toca → revive la ceremonia real. `null` si ninguna pieza se reveló. */
+  provenance?: { label: string; onReplay: () => void } | null
+}) {
   const active = useScreenActive()
   const reduce = useReducedMotion() ?? false
   const pulse = useSharedValue(0)
@@ -1040,6 +1112,19 @@ function DominantPatternCard({ combo, onOpen }: { combo: WinningComboData; onOpe
         <Text style={styles.discoverCtaText}>Ver la revelación</Text>
         <Animated.Text style={[styles.discoverCtaArrow, ctaStyle]}>→</Animated.Text>
       </View>
+      {/* Procedencia: acción SECUNDARIA (Pressable anidado → captura el toque, el
+          padre no abre el combo). Revive la ceremonia fechada de esa pieza. */}
+      {provenance ? (
+        <Pressable
+          style={styles.provenanceRow}
+          onPress={provenance.onReplay}
+          accessibilityRole="button"
+          accessibilityLabel={`${provenance.label}. Revivir la revelación.`}
+        >
+          <Text style={styles.provenanceText}>{provenance.label}</Text>
+          <Text style={styles.provenanceChevron}>›</Text>
+        </Pressable>
+      ) : null}
     </AnimatedPressable>
   )
 }
@@ -1260,31 +1345,6 @@ function weekdayMonIdx(iso: string): number {
   return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
 }
 
-const WEEKDAY_PLURAL = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos']
-
-/** La línea que hace HABLAR la cuadrícula: qué día de la semana casi siempre
- *  enciende y cuál tiene más margen. `null` si no hay patrón claro. Voz "margen",
- *  nunca "fallas" (reutiliza el lenguaje del patrón deficit-daytype). */
-function weekdayLitPhrase(litDays: readonly string[], window: readonly string[]): string | null {
-  const lit = new Set(litDays)
-  const per = Array.from({ length: 7 }, () => ({ total: 0, on: 0 }))
-  for (const iso of window) {
-    const wd = weekdayMonIdx(iso)
-    per[wd]!.total += 1
-    if (lit.has(iso)) per[wd]!.on += 1
-  }
-  const rated = per
-    .map((p, i) => ({ i, rate: p.total >= 2 ? p.on / p.total : -1 }))
-    .filter((r) => r.rate >= 0)
-  if (rated.length < 4) return null
-  const best = rated.reduce((a, b) => (b.rate > a.rate ? b : a))
-  const worst = rated.reduce((a, b) => (b.rate < a.rate ? b : a))
-  if (best.i === worst.i || best.rate - worst.rate < 0.3) return null // sin patrón claro
-  // "casi siempre" solo si el dato lo aguanta (≥75%); si no, "más seguido" (no miente).
-  const bestVerb = best.rate >= 0.75 ? 'casi siempre encienden' : 'encienden más seguido'
-  return `Tus ${WEEKDAY_PLURAL[best.i]} ${bestVerb}. Los ${WEEKDAY_PLURAL[worst.i]} son donde tienes más margen.`
-}
-
 /** Rango legible de la ventana: "Del 2 jun al 1 jul". */
 function formatWindowRange(startIso: string, endIso: string): string {
   const day = (iso: string) => Number(iso.slice(8, 10))
@@ -1294,23 +1354,11 @@ function formatWindowRange(startIso: string, endIso: string): string {
 
 /** La rejilla de días: la VENTANA RODANTE de 31 días (viejo → nuevo), no un mes
  *  calendario. Puede abarcar dos meses → cuadra con el conteo rodante del módulo. */
-function RevealDaysGrid({
-  days,
-  color,
-  today,
-  showPattern,
-}: {
-  days: string[]
-  color: string
-  today: string
-  /** Muestra la línea que interpreta el patrón por día de semana (solo déficit). */
-  showPattern?: boolean
-}) {
+function RevealDaysGrid({ days, color, today }: { days: string[]; color: string; today: string }) {
   const onSet = new Set(days)
   const window = Array.from({ length: REVEAL_WINDOW }, (_, i) =>
     isoBack(today, REVEAL_WINDOW - 1 - i),
   )
-  const patternLine = showPattern ? weekdayLitPhrase(days, window) : null
   // Cuadros alineados a 7 COLUMNAS (lun→dom): así verticalmente se lee el patrón
   // ("tus lunes encienden, tus sábados tienen margen") sin números — la cuadrícula
   // habla. Huecos iniciales para que el primer día caiga en su columna de día de
@@ -1339,8 +1387,47 @@ function RevealDaysGrid({
         })}
       </View>
       <Text style={styles.revRange}>{formatWindowRange(window[0]!, today)}</Text>
-      {patternLine ? <Text style={styles.revPatternLine}>{patternLine}</Text> : null}
     </>
+  )
+}
+
+/** Las 4 semanas del mes como barras de días en déficit, con una hairline en TU
+ *  promedio del mes (la "línea de promedio" de Apple Trends). Barras a la altura de
+ *  tu promedio o encima = color pleno; debajo = atenuadas, nunca rojas. Es el glance
+ *  "¿mi déficit sube o baja dentro del mes?" — comparación contigo, sin meta externa
+ *  que batir. La línea de dirección debajo lo pone en palabras. */
+function WeekDeficitBars({ weeks, color }: { weeks: number[]; color: string }) {
+  const H = 72 // alto del área de barras
+  const avg = weeks.reduce((a, b) => a + b, 0) / weeks.length
+  const scale = Math.max(...weeks, 1) // la barra más alta llena el área
+  const avgY = H - (avg / scale) * H // hairline medida desde arriba
+  return (
+    <View style={styles.wdWrap}>
+      <View style={[styles.wdChart, { height: H }]}>
+        <View style={[styles.wdAvgLine, { top: avgY }]} />
+        {weeks.map((c, i) => (
+          <View
+            key={i}
+            style={[
+              styles.wdBar,
+              {
+                height: Math.max(3, (c / scale) * H),
+                backgroundColor: color,
+                opacity: c >= avg - 0.001 ? 1 : 0.38,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <View style={styles.wdEnds}>
+        <Text style={styles.wdEndLabel}>hace un mes</Text>
+        <Text style={styles.wdEndLabel}>esta semana</Text>
+      </View>
+      <View style={styles.wdLegend}>
+        <View style={styles.wdLegendDash} />
+        <Text style={styles.wdEndLabel}>tu promedio</Text>
+      </View>
+    </View>
   )
 }
 
@@ -1381,18 +1468,14 @@ function RevealEvidenceModal({
 
               {/* La prueba: los días concretos. */}
               <Text style={styles.revProofLabel}>Tus días</Text>
-              <RevealDaysGrid
-                days={detail.days}
-                color={color}
-                today={today}
-                showPattern={detail.key === 'deficit'}
-              />
+              <RevealDaysGrid days={detail.days} color={color} today={today} />
 
-              {/* Dirección dentro del mes (inicio vs final) — el "¿voy bien?" como
-                  comparación contigo, no como % capado que reprueba en mes bajo.
-                  Segunda lectura del mismo grid (la primera es el patrón por día). */}
-              {detail.key === 'deficit' && detail.direction ? (
-                <Text style={styles.revPatternLine}>{detail.direction}</Text>
+              {/* Dirección dentro del mes (inicio vs final) como GLANCE: las 4
+                  barras + la hairline de tu promedio hablan solas, sin verso que
+                  las repita. `direction` se conserva solo como guarda de honestidad
+                  (null = datos muy delgados → no dibujar barras ruidosas). */}
+              {detail.key === 'deficit' && detail.direction && detail.weeklyDeficit ? (
+                <WeekDeficitBars weeks={detail.weeklyDeficit} color={color} />
               ) : null}
 
               {/* "Lo que sostuviste" (solo déficit revelado, con intensidad) —
@@ -2066,6 +2149,28 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.oroSoft,
   },
+  // Procedencia: acción secundaria, discreta (niebla, no oro) — factual, con
+  // evidencia, sin poesía. No compite con "Ver la revelación".
+  provenanceRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  provenanceText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.tinyLabel,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  provenanceChevron: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.tinyLabel,
+    color: colors.niebla,
+  },
   // La frase serif es la protagonista: aquí vive el patrón (voz Observadora).
   dominantPhrase: {
     marginTop: 12,
@@ -2541,13 +2646,48 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
-  // La línea que interpreta la cuadrícula (patrón por día de semana) — voz coach.
-  revPatternLine: {
-    marginTop: 14,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: 16,
-    lineHeight: 23,
-    color: colors.bone,
+  // Barras de las 4 semanas del mes (días en déficit) + hairline de promedio.
+  wdWrap: {
+    alignSelf: 'stretch',
+    marginTop: 18,
+  },
+  wdChart: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+  },
+  wdBar: {
+    width: 30,
+    borderRadius: 6,
+  },
+  // La hairline del promedio del mes (referencia descriptiva, no meta a batir).
+  wdAvgLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(244, 236, 222, 0.4)',
+  },
+  wdEnds: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  wdEndLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  wdLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  wdLegendDash: {
+    width: 14,
+    height: 1,
+    backgroundColor: 'rgba(244, 236, 222, 0.4)',
   },
 })

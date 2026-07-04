@@ -328,7 +328,7 @@ Va a Settings, lo cambia, sigue. Sin drama, sin gráfica, sin "comparemos con tu
 - **Calorías:** existen, se muestran en Tab Comidas como contexto, no como countdown
 - **Proteína:** la métrica que más se cuida (anillo visible, importante para mantener músculo durante pérdida de peso)
 - **Carbohidratos y grasas:** anillos compactos, presentes pero secundarios
-- **Déficit:** calculado, informado como contexto ("estás en déficit suave hoy"), nunca gamificado
+- **Déficit:** calculado, informado como contexto ("estás en déficit suave hoy"), nunca gamificado como presión (racha/countdown/culpa). EXCEPCIÓN (enmienda jul 2026, criterio Apple): la PALANCA de un patrón SÍ puede mostrar una meta derivada de TUS datos + lo que falta ("llevas 3 de 5, con 2 más lo repites"), como los anillos de Apple — realismo sin culpa. Ver `features/patterns/CLAUDE.md`
 
 **Regla:** ningún número de comida domina la pantalla home. La pantalla home es de la constelación y del coach, no de las calorías.
 

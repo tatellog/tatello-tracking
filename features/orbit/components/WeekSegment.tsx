@@ -15,7 +15,8 @@ import { usePressFeedback } from '@/components/ui/interaction'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { colors, typography } from '@/theme'
 
-import { useIsoWeekSignals } from '../hooks'
+import { WEEK_BASELINE_COPY, weekBaselineObservations } from '../baseline'
+import { useIsoWeekSignals, useSignalsHistory } from '../hooks'
 import {
   buildWeekDimensions,
   dayTimeline,
@@ -24,6 +25,7 @@ import {
   dimensionLine,
   emergingEvidence,
   mainDiscovery,
+  mondayOf,
   needsMoreEvidence,
   weekAbsences,
   weekDirection,
@@ -112,6 +114,16 @@ export function WeekSegment({
   // §S · la silueta de los 7 días (la forma del tramo).
   const silhouette = useMemo(() => weekSilhouette(week, todayIso, ctx), [week, todayIso, ctx])
   const emerging = useMemo(() => emergingEvidence(week, todayIso, ctx), [week, todayIso, ctx])
+  // Baseline "esta semana vs tu costumbre" (sueño, energía) — necesita historial
+  // más largo que la ventana de 2 semanas; el detector filtra a los días previos
+  // al lunes de esta semana. Comparación SIEMPRE contigo misma (Apple "Typical").
+  const { data: historyData } = useSignalsHistory(35)
+  const baseline = useMemo(() => {
+    const history = historyData ?? []
+    const monday = mondayOf(todayIso)
+    const thisWeek = week.filter((s) => s.day != null && s.day >= monday && s.day <= todayIso)
+    return weekBaselineObservations(thisWeek, history, monday)
+  }, [historyData, week, todayIso])
   const moreEvidence = useMemo(() => needsMoreEvidence(week, todayIso, ctx), [week, todayIso, ctx])
   const timeline = useMemo(() => dayTimeline(week, todayIso, ctx), [week, todayIso, ctx])
   const lever = useMemo(() => weekLever(week, todayIso, ctx), [week, todayIso, ctx])
@@ -247,6 +259,28 @@ export function WeekSegment({
                   >
                     <Text style={[styles.listStar, { color: accent }]}>✦</Text>
                     <Text style={styles.listText}>{e.text}</Text>
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {/* Comparado con tu costumbre — el "Typical / distinto en ti" de Apple
+              Health, pero SIEMPRE contra tu propia línea base (sueño, energía).
+              Vive en Semana (compara por naturaleza), no en Día. Solo aparece con
+              suficiente historial; si no, calla (Stelar no infiere sin evidencia). */}
+          {baseline.length > 0 ? (
+            <View style={styles.block}>
+              <Text style={styles.sectionEyebrow}>Comparado con tu costumbre</Text>
+              <View style={styles.list}>
+                {baseline.map((b, i) => (
+                  <Animated.View
+                    key={b.key}
+                    entering={FadeIn.duration(360).delay(i * 70)}
+                    style={styles.listRow}
+                  >
+                    <Text style={[styles.listStar, { color: accent }]}>✦</Text>
+                    <Text style={styles.listText}>{WEEK_BASELINE_COPY[b.key]?.[b.status]}</Text>
                   </Animated.View>
                 ))}
               </View>
