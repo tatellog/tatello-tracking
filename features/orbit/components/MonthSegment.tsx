@@ -39,11 +39,15 @@ import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
   comboPhrase,
   comboReveal,
+  daysInDeficit,
+  deficitTrajectoryRead,
   detectMonthPatterns,
   monthCalendar,
+  monthChange,
   monthReveals,
   presenceSummary,
   revealDayMap,
+  weeklyComboLever,
   winningCombo,
   type ComboReveal,
   type EvidenceBar,
@@ -52,6 +56,7 @@ import {
   type WeekdayShape,
   type WinningCombo as WinningComboData,
 } from '../month-built'
+import { isDeficitDay } from '../deficit'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PatternDiscovery } from './PatternDiscovery'
@@ -120,6 +125,12 @@ type RevealDetail = {
   count: number
   threshold: number
   days: string[]
+  /** Solo déficit: promedio kcal por debajo de la meta EN los días de déficit
+   *  (la "conclusión" que la usuaria pedía como total, sin ser una suma). */
+  avgOnDeficitDays?: number | null
+  /** Solo déficit: dirección dentro del mes (inicio vs final) — el "¿voy bien?"
+   *  como comparación contigo misma, no como % que reprueba. */
+  direction?: string | null
 }
 
 /** Qué CUENTA como cada dimensión (criterio transparente, sin jerga). */
@@ -138,27 +149,27 @@ const REVEAL_CRITERION: Record<string, string> = {
  *  encendió (esa era la mentira de Agua). Copy provisional → pasar por voice-and-copy. */
 const REVEAL_ROLE: Record<string, { on: string; off: string }> = {
   deficit: {
-    on: 'Es lo que más mueve tu cuerpo hacia donde va.',
+    on: 'El déficit es lo que más te acerca a bajar de peso.',
     off: 'Cuando se encienda, cambia el tono de tu mes.',
   },
   sueno: {
-    on: 'Las noches que descansaste, el día siguiente lo notó.',
+    on: 'El descanso sostiene tus demás días.',
     off: 'Cuando se encienda, será una base para tus días.',
   },
   registro: {
-    on: 'Anotar fue el gesto que sostuvo lo demás.',
+    on: 'Anotar sostuvo todo lo demás.',
     off: 'Cuando se encienda, verás lo demás con más claridad.',
   },
   proteina: {
-    on: 'Tu proteína fue la base de lo que tu cuerpo sostuvo.',
+    on: 'Tu proteína cuida tu músculo mientras bajas.',
     off: 'Cuando se encienda, acompañará tu déficit.',
   },
   agua: {
-    on: 'La hidratación fue tu base callada del mes.',
+    on: 'El agua ya es casi un hábito tuyo.',
     off: 'Cuando se encienda, sumará a tu constancia.',
   },
   movimiento: {
-    on: 'Moverte fue de los gestos que más repetiste.',
+    on: 'Moverte se volvió parte de tu mes.',
     off: 'Cuando se encienda, será otra de tus constantes.',
   },
 }
@@ -314,12 +325,53 @@ export function MonthSegment({
     () => monthReveals(signals, { calorieTarget, proteinTarget, waterGoalGlasses }),
     [signals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
+  // Tendencia del déficit vs tu mes pasado (Apple Trends, self-only). SOLO al
+  // alza y SIN número: mes cerrado = evidencia retrospectiva → la dirección sí, el
+  // conteo del delta no (manifesto-reviewer). A la baja/plano → sin chip, para no
+  // meter comparación/presión en una sección de celebración.
+  const deficitTrendUp = useMemo(() => {
+    const lit = reveals.revealed.find((r) => r.key === 'deficit')
+    if (lit == null || calorieTarget == null || calorieTarget <= 0) return false
+    const [y, m] = selectedMonth.split('-').map(Number) as [number, number]
+    const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
+    const prevCount = patternSignals.filter(
+      (s) =>
+        s.day != null &&
+        s.day.startsWith(prev) &&
+        s.calories != null &&
+        s.calories > 0 &&
+        isDeficitDay(s.calories, calorieTarget),
+    ).length
+    return prevCount > 0 && lit.count > prevCount
+  }, [reveals, calorieTarget, selectedMonth, patternSignals])
   // Los días concretos por dimensión — MISMA ventana de 31d que `reveals`, para
   // que los días de la rejilla del modal cuadren con el conteo.
   const revealDays = useMemo(
     () => revealDayMap(signals, { calorieTarget, proteinTarget, waterGoalGlasses }),
     [signals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
+  // Resumen de déficit — de aquí sale la "intensidad diaria" (avgOnDeficitDays)
+  // que corona el modal de "Déficit constante" (lo que la usuaria pedía como
+  // "déficit total", pero como conclusión, no como suma gastable).
+  const deficitSummary = useMemo(
+    () => daysInDeficit(signals, { calorieTarget }),
+    [signals, calorieTarget],
+  )
+  // Dirección del déficit DENTRO del mes (inicio vs final) — la flecha "Trends"
+  // de Apple: responde "¿voy bien?" comparándote CONTIGO, no contra un 100% que
+  // reprueba. Reusa monthChange + deficitTrajectoryRead (§8, hoy sin renderizar).
+  const deficitDirection = useMemo(() => {
+    const cats = monthChange(signals, {
+      today,
+      calorieTarget,
+      proteinTarget,
+      waterGoalGlasses,
+    })
+    const def = cats.find((c) => c.key === 'deficit')
+    if (!def) return null
+    const traj = deficitTrajectoryRead(def.weeks.map((w) => w.count ?? 0))
+    return traj.state === 'low' ? null : traj.takeaway
+  }, [signals, today, calorieTarget, proteinTarget, waterGoalGlasses])
 
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
@@ -334,6 +386,8 @@ export function MonthSegment({
       count: item.count,
       threshold: REVEAL_THRESHOLD,
       days: revealDays[item.key] ?? [],
+      avgOnDeficitDays: item.key === 'deficit' ? (deficitSummary?.avgOnDeficitDays ?? null) : null,
+      direction: item.key === 'deficit' ? deficitDirection : null,
     })
 
   if (hasAny === false) {
@@ -369,6 +423,7 @@ export function MonthSegment({
           delta={delta}
           message={withSign(stage.message, signName(sign))}
           reveals={reveals}
+          deficitTrendUp={deficitTrendUp}
           onOpenReveal={openReveal}
         />
       ) : null}
@@ -450,7 +505,20 @@ export function MonthSegment({
             <>
               <Text style={styles.sectionLede}>Lo que apareció junto en tus días.</Text>
               {combo ? (
-                <DominantPatternCard combo={combo} onOpen={() => setReveal(comboReveal(combo))} />
+                <DominantPatternCard
+                  combo={combo}
+                  onOpen={() => {
+                    const base = comboReveal(combo)
+                    // La palanca de esta semana reemplaza al cierre retrospectivo.
+                    const lever = weeklyComboLever(
+                      patternSignals,
+                      combo,
+                      { calorieTarget, proteinTarget, waterGoalGlasses },
+                      today,
+                    )
+                    setReveal({ ...base, takeaway: lever ?? base.takeaway })
+                  }}
+                />
               ) : null}
               {supportPatterns.map((p, i) => (
                 <PatternFindingCard
@@ -540,6 +608,7 @@ function EmblemHero({
   delta,
   message,
   reveals,
+  deficitTrendUp,
   onOpenReveal,
 }: {
   sign: ZodiacSign
@@ -547,6 +616,8 @@ function EmblemHero({
   delta: number | null
   message: string
   reveals: MonthReveals
+  /** El déficit subió vs el mes pasado (chip de dirección, solo al alza). */
+  deficitTrendUp?: boolean
   onOpenReveal?: (item: MonthReveals['revealed'][number], revealed: boolean) => void
 }) {
   const [w, setW] = useState(0)
@@ -635,6 +706,13 @@ function EmblemHero({
         {progress}
         <Text style={styles.heroPctSign}>% revelado</Text>
       </Text>
+      {/* Ancla de significado del número (estilo "unidad" de anillo Apple): dice
+          QUÉ mide el % y NIEGA el peso — así "93% revelado" no se lee como "93%
+          de mi meta de peso" (countdown, línea roja). Y de paso, el "por qué un
+          {signo}": es tu signo, dibujado por tu constancia. */}
+      <Text style={styles.heroAnchor}>
+        Tu {signName(sign)} se dibuja con tu constancia, no con tu peso.
+      </Text>
       {/* Avance del mes en CUALITATIVO, sin un segundo "%": dos porcentajes
           juntos competían y confundían cuál era cuál. El número héroe es el %
           revelado; esto solo dice cuánto de ese avance ocurrió este mes. */}
@@ -663,40 +741,56 @@ function EmblemHero({
               <DiscoveryStar color={revealColor('deficit')} mag={0.72} size={26} />
               <View style={styles.deficitBody}>
                 <Text style={styles.deficitLabel}>{deficitLit.label}</Text>
-                <Text style={styles.deficitSub}>
-                  {deficitLit.count} de {deficitLit.total} días que registraste
-                </Text>
+                {/* Solo el LOGRO (no la fracción "X de N", que se lee como examen
+                    reprobado). El denominador honesto vive en la cuadrícula del
+                    modal. + chip de dirección vs tu mes pasado (solo al alza). */}
+                <View style={styles.deficitSubRow}>
+                  <Text style={styles.deficitSub}>{deficitLit.count} días</Text>
+                  {deficitTrendUp ? (
+                    <Text style={styles.trendChip}>↑ Más que el mes pasado</Text>
+                  ) : null}
+                </View>
                 <DayStars
                   count={deficitLit.count}
                   total={deficitLit.total}
                   color={revealColor('deficit')}
                 />
+                {/* El veredicto (voz coach) SOLO en el déficit — es el norte. Las
+                    otras 3 se colapsan sin frase (antes las 4 se leían iguales). */}
+                <Text style={styles.deficitVerdict}>{REVEAL_ROLE.deficit?.on ?? ''}</Text>
               </View>
               <Text style={styles.revChevron}>›</Text>
             </Pressable>
           ) : null}
 
-          {deficitLit && ctxLit.length > 0 ? <View style={styles.revealDivider} /> : null}
+          {deficitLit && ctxLit.length > 0 ? (
+            <>
+              <View style={styles.revealDivider} />
+              {/* Jerarquía: el déficit es el norte; estas 3 son lo que lo sostuvo.
+                  El encabezado lo hace explícito (antes las 4 se leían iguales). */}
+              <Text style={styles.accompHeading}>Lo que lo acompañó</Text>
+            </>
+          ) : null}
 
-          {/* Lo que lo sostuvo (contexto): mismo lenguaje de días-estrella, más
-              chico. El conteo ancla el número exacto a la derecha. */}
+          {/* Lo que lo sostuvo (contexto): COMPACTO (una línea, sin medidor) para
+              que el déficit —único con medidor + veredicto— siga siendo el héroe.
+              El conteo ancla el número a la derecha. */}
           {ctxLit.map((it, i) => (
             <AnimatedPressable
               key={it.key}
               entering={FadeIn.duration(360).delay(i * 80)}
               style={styles.ctxRow}
               accessibilityRole="button"
-              accessibilityLabel={`${it.label}, ${it.count} de ${it.total} días. Ver evidencia.`}
+              accessibilityLabel={`${it.label}, ${it.count} días. Ver evidencia.`}
               onPress={() => onOpenReveal?.(it, true)}
             >
-              <DiscoveryStar color={revealColor(it.colorKey)} mag={0.5} size={18} />
-              <View style={styles.ctxBody}>
-                <Text style={styles.ctxLabel}>{it.label}</Text>
-                <Text style={styles.ctxSub}>
-                  {it.count} de {it.total} {it.key === 'sueno' ? 'noches' : 'días'}
-                </Text>
-                <DayStars count={it.count} total={it.total} color={revealColor(it.colorKey)} />
-              </View>
+              <DiscoveryStar color={revealColor(it.colorKey)} mag={0.5} size={16} />
+              <Text style={styles.ctxLabel} numberOfLines={1}>
+                {it.label}
+              </Text>
+              <Text style={styles.ctxCount}>
+                {it.count} {it.key === 'sueno' ? 'noches' : 'días'}
+              </Text>
               <Text style={styles.revChevronSm}>›</Text>
             </AnimatedPressable>
           ))}
@@ -1152,11 +1246,43 @@ function EvidenceModal({
  * de "¿de dónde salen esos días?". Días logrados en su color; el resto del mes
  * transcurrido, tenue; futuro, en blanco. */
 const REVEAL_WINDOW = 31 // debe coincidir con useSignalsHistory(31) que alimenta reveals
+const REVEAL_GRID_GAP = 6 // separación entre cuadros del mini-calendario (7 columnas)
 
 function isoBack(today: string, back: number): string {
   const d = new Date(`${today}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() - back)
   return d.toISOString().slice(0, 10)
+}
+
+/** Día de semana con LUNES como columna 0 (0=lun … 6=dom). */
+function weekdayMonIdx(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+}
+
+const WEEKDAY_PLURAL = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos']
+
+/** La línea que hace HABLAR la cuadrícula: qué día de la semana casi siempre
+ *  enciende y cuál tiene más margen. `null` si no hay patrón claro. Voz "margen",
+ *  nunca "fallas" (reutiliza el lenguaje del patrón deficit-daytype). */
+function weekdayLitPhrase(litDays: readonly string[], window: readonly string[]): string | null {
+  const lit = new Set(litDays)
+  const per = Array.from({ length: 7 }, () => ({ total: 0, on: 0 }))
+  for (const iso of window) {
+    const wd = weekdayMonIdx(iso)
+    per[wd]!.total += 1
+    if (lit.has(iso)) per[wd]!.on += 1
+  }
+  const rated = per
+    .map((p, i) => ({ i, rate: p.total >= 2 ? p.on / p.total : -1 }))
+    .filter((r) => r.rate >= 0)
+  if (rated.length < 4) return null
+  const best = rated.reduce((a, b) => (b.rate > a.rate ? b : a))
+  const worst = rated.reduce((a, b) => (b.rate < a.rate ? b : a))
+  if (best.i === worst.i || best.rate - worst.rate < 0.3) return null // sin patrón claro
+  // "casi siempre" solo si el dato lo aguanta (≥75%); si no, "más seguido" (no miente).
+  const bestVerb = best.rate >= 0.75 ? 'casi siempre encienden' : 'encienden más seguido'
+  return `Tus ${WEEKDAY_PLURAL[best.i]} ${bestVerb}. Los ${WEEKDAY_PLURAL[worst.i]} son donde tienes más margen.`
 }
 
 /** Rango legible de la ventana: "Del 2 jun al 1 jul". */
@@ -1168,28 +1294,52 @@ function formatWindowRange(startIso: string, endIso: string): string {
 
 /** La rejilla de días: la VENTANA RODANTE de 31 días (viejo → nuevo), no un mes
  *  calendario. Puede abarcar dos meses → cuadra con el conteo rodante del módulo. */
-function RevealDaysGrid({ days, color, today }: { days: string[]; color: string; today: string }) {
+function RevealDaysGrid({
+  days,
+  color,
+  today,
+  showPattern,
+}: {
+  days: string[]
+  color: string
+  today: string
+  /** Muestra la línea que interpreta el patrón por día de semana (solo déficit). */
+  showPattern?: boolean
+}) {
   const onSet = new Set(days)
   const window = Array.from({ length: REVEAL_WINDOW }, (_, i) =>
     isoBack(today, REVEAL_WINDOW - 1 - i),
   )
-  // Cuadros del calendario, SIN números: numerar + huecos invita a contar lo que
-  // faltó (boleta). Sin número, los encendidos (color) forman la figura y los días
-  // que no contaron quedan tan tenues como el futuro — calendario, no auditoría.
+  const patternLine = showPattern ? weekdayLitPhrase(days, window) : null
+  // Cuadros alineados a 7 COLUMNAS (lun→dom): así verticalmente se lee el patrón
+  // ("tus lunes encienden, tus sábados tienen margen") sin números — la cuadrícula
+  // habla. Huecos iniciales para que el primer día caiga en su columna de día de
+  // semana. Sin números: numerar invita a contar lo que faltó (boleta).
+  const lead = weekdayMonIdx(window[0]!)
+  // Full-width: mido el ancho disponible y reparto en 7 columnas → las celdas
+  // ESCALAN para llenar la tarjeta (antes fijas a 190 px, alineadas a la izq).
+  const [gridW, setGridW] = useState(0)
+  const cellW = gridW > 0 ? Math.floor((gridW - REVEAL_GRID_GAP * 6) / 7) : 22
+  const cellH = Math.round(cellW * (20 / 22)) // conserva la proporción original
+  const cellSize = { width: cellW, height: cellH, borderRadius: 5 }
   return (
     <>
-      <View style={styles.revGrid}>
+      <View style={styles.revGrid} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
+        {Array.from({ length: lead }, (_, i) => (
+          <View key={`blank-${i}`} style={[cellSize, styles.revCellBlank]} />
+        ))}
         {window.map((iso) => {
           const on = onSet.has(iso)
           return (
             <View
               key={iso}
-              style={[styles.revCell, on ? { backgroundColor: color } : styles.revCellPast]}
+              style={[cellSize, on ? { backgroundColor: color } : styles.revCellPast]}
             />
           )
         })}
       </View>
       <Text style={styles.revRange}>{formatWindowRange(window[0]!, today)}</Text>
+      {patternLine ? <Text style={styles.revPatternLine}>{patternLine}</Text> : null}
     </>
   )
 }
@@ -1207,7 +1357,6 @@ function RevealEvidenceModal({
   onClose: () => void
 }) {
   const color = detail ? revealColor(detail.colorKey) : colors.oro
-  const remaining = detail ? Math.max(0, detail.threshold - detail.count) : 0
   return (
     <Modal visible={detail != null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
@@ -1226,21 +1375,52 @@ function RevealEvidenceModal({
               <Text style={styles.revCriterion}>{REVEAL_CRITERION[detail.key] ?? ''}</Text>
               <Text style={styles.revThreshold}>
                 {detail.revealed
-                  ? `Una dimensión se enciende a los ${detail.threshold} días. Este mes llegaste.`
-                  : `Se enciende a los ${detail.threshold} días. ${remaining} más para encenderla.`}
+                  ? `Con ${detail.threshold} días ya cuenta como una constante. Este mes la tienes.`
+                  : `Con ${detail.threshold} días ya cuenta como una constante.`}
               </Text>
 
               {/* La prueba: los días concretos. */}
               <Text style={styles.revProofLabel}>Tus días</Text>
-              <RevealDaysGrid days={detail.days} color={color} today={today} />
+              <RevealDaysGrid
+                days={detail.days}
+                color={color}
+                today={today}
+                showPattern={detail.key === 'deficit'}
+              />
 
-              {/* El rol (por qué importa) — según el ESTADO: pasado si encendió,
-                  anticipación si aún no (nunca elogio en pasado de lo pendiente). */}
-              <Text style={styles.revRole}>
-                {detail.revealed
-                  ? (REVEAL_ROLE[detail.key]?.on ?? '')
-                  : (REVEAL_ROLE[detail.key]?.off ?? '')}
-              </Text>
+              {/* Dirección dentro del mes (inicio vs final) — el "¿voy bien?" como
+                  comparación contigo, no como % capado que reprueba en mes bajo.
+                  Segunda lectura del mismo grid (la primera es el patrón por día). */}
+              {detail.key === 'deficit' && detail.direction ? (
+                <Text style={styles.revPatternLine}>{detail.direction}</Text>
+              ) : null}
+
+              {/* "Lo que sostuviste" (solo déficit revelado, con intensidad) —
+                  la CONCLUSIÓN que la usuaria pedía como "déficit total": la
+                  intensidad diaria (kcal por debajo de la meta en SUS días), no
+                  una suma gastable, + un verso que reencuadra del número al hecho
+                  de volver. Reemplaza al rol para no duplicar cierre serif. */}
+              {detail.key === 'deficit' &&
+              detail.revealed &&
+              detail.avgOnDeficitDays != null &&
+              detail.avgOnDeficitDays > 0 ? (
+                <View style={styles.sustained}>
+                  <Text style={styles.sustainedEyebrow}>Lo que sostuviste</Text>
+                  <Text style={styles.sustainedLine}>
+                    Esos días tu déficit promedio fue de{' '}
+                    <Text style={styles.sustainedNum}>{detail.avgOnDeficitDays} kcal</Text>.
+                  </Text>
+                  <Text style={styles.sustainedVerse}>
+                    No es la suma lo que te acerca a bajar de peso. Es que volviste, una y otra vez.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.revRole}>
+                  {detail.revealed
+                    ? (REVEAL_ROLE[detail.key]?.on ?? '')
+                    : (REVEAL_ROLE[detail.key]?.off ?? '')}
+                </Text>
+              )}
 
               <Pressable
                 onPress={onClose}
@@ -1319,6 +1499,17 @@ const styles = StyleSheet.create({
   heroPctSign: {
     fontFamily: typography.uiBold,
     color: colors.oroSoft,
+  },
+  // Ancla de significado bajo el "%" (la "unidad" del número, estilo Apple):
+  // quieta, niebla, para explicar sin competir con el número héroe.
+  heroAnchor: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: typography.sizes.label * typography.lineHeight.body,
+    color: colors.niebla,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   heroDelta: {
     marginTop: 6,
@@ -1404,12 +1595,33 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   // El número es la SEÑAL (el ancla honesta), no una nota al pie gris: leche + peso.
-  deficitSub: {
+  deficitSubRow: {
     marginTop: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  deficitSub: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
+  },
+  // Chip de dirección (solo al alza) — oro, sin número: "la dirección sí".
+  trendChip: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    color: colors.oroSoft,
+  },
+  // Veredicto del déficit (voz coach) — serif italic, cálido.
+  deficitVerdict: {
+    marginTop: 10,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 22,
+    color: colors.oroLeche,
   },
   revealDivider: {
     alignSelf: 'stretch',
@@ -1430,9 +1642,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   ctxLabel: {
+    flex: 1,
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.body,
     color: colors.leche,
+  },
+  // El conteo, anclado a la derecha (compacto, sin medidor).
+  ctxCount: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
   },
   ctxSub: {
     marginTop: 2,
@@ -1484,6 +1704,17 @@ const styles = StyleSheet.create({
     // Oro (oroSoft) como los demás eyebrows de Mes — antes gris (inconsistente
     // con "Lo que sostuviste este mes", que sí va en oro).
     color: colors.oroSoft,
+  },
+  // Encabezado de las dimensiones de contexto (bajo el déficit) — más tenue que
+  // el título de sección, para que el déficit siga siendo el héroe.
+  accompHeading: {
+    marginTop: 2,
+    marginBottom: 12,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.niebla,
   },
   shadowRow: {
     flexDirection: 'row',
@@ -2246,11 +2477,51 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: colors.bone,
   },
-  // Mini-calendario de días.
+  // "Lo que sostuviste" — cierre de intensidad del déficit (solo déficit).
+  sustained: {
+    alignSelf: 'stretch',
+    marginTop: 18,
+  },
+  sustainedEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 8,
+  },
+  // El dato duro (intensidad diaria) en Inter; el número en oro, no héroe.
+  sustainedLine: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: typography.sizes.body * typography.lineHeight.body,
+    color: colors.bone,
+  },
+  sustainedNum: {
+    fontFamily: typography.uiBold,
+    color: colors.oroLeche,
+    fontVariant: ['tabular-nums'],
+  },
+  // El verso que reencuadra del número al hecho (voz de coach, serif italic).
+  sustainedVerse: {
+    marginTop: 10,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 16,
+    lineHeight: 23,
+    color: colors.bone,
+  },
+  // Mini-calendario de días, 7 columnas (lun→dom). Full-width: ocupa todo el
+  // ancho de la tarjeta y las celdas escalan (ancho medido en onLayout).
   revGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: REVEAL_GRID_GAP,
+    alignSelf: 'stretch',
+  },
+  // Hueco de alineación (día de semana antes del primer día real): invisible.
+  revCellBlank: {
+    backgroundColor: 'transparent',
   },
   // Cuadro del calendario (sin número): encendido = color pleno; el resto, tenue.
   revCell: {
@@ -2269,5 +2540,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
+  },
+  // La línea que interpreta la cuadrícula (patrón por día de semana) — voz coach.
+  revPatternLine: {
+    marginTop: 14,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: 16,
+    lineHeight: 23,
+    color: colors.bone,
   },
 })

@@ -293,13 +293,20 @@ describe('steadyThings (lo constante)', () => {
   })
 })
 
-describe('weekAbsences (la ausencia también cuenta)', () => {
-  it('lista lo que nunca apareció (tope 2), sin culpa', () => {
+describe('weekAbsences (un patrón por descubrir · invitación con premio)', () => {
+  it('invita a registrar lo que falta (tope 2), sin culpa ni "no registraste"', () => {
     const signals = [MON, TUE, THU].map((d) => mkSig(d, { meal_count: 2 }))
     const a = weekAbsences(signals, SUN)
     expect(a.length).toBeLessThanOrEqual(2)
-    expect(a.some((l) => /agua/i.test(l))).toBe(true)
-    expect(a.every((l) => !/deberías|debes/i.test(l))).toBe(true)
+    expect(a.some((l) => /hidrataci|agua/i.test(l))).toBe(true)
+    // Invitación con premio, no reproche: nada de culpa ("no registraste"), nada
+    // de imperativo-orden (anota/registra/marca) ni de promesa (podrás) ni causa
+    // (te da chispa). Cada línea abre con una PREGUNTA y ofrece una posibilidad
+    // en condicional (podrías / podría / empezarías).
+    expect(
+      a.every((l) => !/deberías|debes|no registraste|no encontramos|podrás|chispa/i.test(l)),
+    ).toBe(true)
+    expect(a.every((l) => l.includes('?'))).toBe(true)
   })
 
   it('semana vacía → sin ausencias (lo cubre el estado vacío)', () => {

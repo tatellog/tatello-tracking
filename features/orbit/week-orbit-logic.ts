@@ -1040,44 +1040,48 @@ export function weekObservations(signals: readonly DailySignals[], todayIso: str
   return out
 }
 
-/* ── §6 · "La ausencia también cuenta" — señales que nunca aparecieron ── */
+/* ── §7 · "Un patrón por descubrir" — invitación con premio, no ausencia ── */
 
 /**
- * Señales que NUNCA aparecieron esta semana. Es evidencia, no reproche: copy
- * neutro. Excluye el ciclo (su ausencia significa "no estás en tu periodo", no
- * un registro faltante). Tope de 2 para no leerse como regaño. Solo cuando ya
- * hay ALGUNA evidencia (si todo está vacío, la pantalla muestra el estado
- * vacío, no una lista de ausencias).
+ * Señales que NO aparecieron esta semana, reencuadradas como INVITACIÓN CON
+ * PREMIO (no como "lo que NO hiciste"): cada una nombra el patrón que podrías
+ * ver si la registras (decisión dueña jul 2026 — la usuaria leía "No registraste
+ * X" como regaño/tarea con culpa). Excluye el ciclo (su ausencia significa "no
+ * estás en tu periodo"). Tope de 2 para que sea un guiño, no una lista de deberes.
+ * Solo cuando ya hay ALGUNA evidencia (si todo está vacío, va el estado vacío).
  */
 export function weekAbsences(signals: readonly DailySignals[], todayIso: string): string[] {
   const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
   const appeared = appearanceCount(buildAppearanceLine(signals, todayIso))
   if (appeared === 0) return []
 
+  // Pregunta que despierta curiosidad + posibilidad en CONDICIONAL (nunca
+  // imperativo "anota/registra", que sería orden; nunca "podrás/te da chispa",
+  // que prometería un resultado o insinuaría causa). Solo se abre la puerta.
   const candidates: { present: number; line: string }[] = [
     {
       present: c((s) => (s.water_glasses ?? 0) > 0),
-      line: 'No encontramos registros de agua. Eso también es parte de tu semana.',
+      line: '¿Tu hidratación sigue algún ritmo? Con unos días anotados, podrías verlo.',
     },
     {
       present: c((s) => s.sleep_minutes != null),
-      line: 'No encontramos registros de sueño. Eso también es parte de tu semana.',
+      line: '¿Hay algo entre tu sueño y tu energía? Con unos días anotados, podrías descubrirlo.',
     },
     {
       present: c((s) => s.trained === true),
-      line: 'No encontramos entrenamientos. Eso también es parte de tu semana.',
+      line: '¿Cuándo te mueves más en la semana? Con unos días registrados, el patrón podría aparecer.',
     },
     {
       present: c((s) => s.mood != null || (s.wellbeing_checkins ?? 0) > 0),
-      line: 'No registraste cómo te sentiste. Todavía no podemos descubrir ese patrón.',
+      line: '¿Tu ánimo tiene un ritmo en la semana? Con unos días marcados, podría verse.',
     },
     {
       present: c((s) => (s.meal_count ?? 0) > 0),
-      line: 'No encontramos comidas registradas. Eso también es parte de tu semana.',
+      line: '¿Cómo va tomando forma tu déficit? Con unos días de registro, empezarías a verlo.',
     },
     {
       present: c((s) => s.energy != null),
-      line: 'No registraste tu energía. Todavía no podemos descubrir ese patrón.',
+      line: '¿Tu energía sube o baja con la semana? Con unos días anotados, podrías verlo.',
     },
   ]
   return candidates
@@ -1122,13 +1126,17 @@ export function emergingEvidence(
   // docs/orbita-semana-spec.md §3. Aquí quedan solo observaciones NO de déficit.
 
   // Proteína en días de entreno — co-ocurrencia secundaria, con su denominador.
+  // Solo se muestra si es MAYORÍA (≥60%): un 2 de 4 (50%) la usuaria lo leía como
+  // hueco/reprobado, no como logro. Copy con el número al FRENTE (ritmo natural)
+  // y la proteína como sujeto ("también estuvo") — ni "apareció" (que sonaba a
+  // que llega sola) ni "cuidaste" (que metía elogio); pura co-ocurrencia.
   const trained = c((s) => s.trained === true)
   if (trained >= 2) {
     const both = c((s) => s.trained === true && proteinReached(s, ctx))
-    if (both >= 2) {
+    if (both >= 2 && both * 5 >= trained * 3) {
       out.push({
         key: 'prot-train',
-        text: `Tu proteína apareció en tus días de entreno ${both} de ${trained} ${veces(both)}.`,
+        text: `En ${both} de tus ${trained} días de entreno, la proteína también estuvo.`,
       })
     }
   }

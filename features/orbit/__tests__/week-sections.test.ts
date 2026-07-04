@@ -43,7 +43,7 @@ describe('emergingEvidence (§3 · observaciones con número)', () => {
   it('proteína en entreno y señal más callada (v2.2: sin déficit-conteo ni día de más calorías)', () => {
     const out = emergingEvidence(richWeek(), SUN, CTX)
     const texts = out.map((o) => o.text)
-    expect(texts).toContain('Tu proteína apareció en tus días de entreno 3 de 3 veces.')
+    expect(texts).toContain('En 3 de tus 3 días de entreno, la proteína también estuvo.')
     // v2.2: "[señal] apareció solo N días" SALE (regaño disfrazado de hallazgo);
     // la línea de conteo de déficit vive en Mes; el "día de más calorías" se
     // retiró. Ninguna debe aparecer en Semana.
@@ -58,6 +58,27 @@ describe('emergingEvidence (§3 · observaciones con número)', () => {
     const keys = out.map((o) => o.key)
     expect(keys).not.toContain('deficit')
     expect(keys).not.toContain('hi-cal')
+  })
+
+  it('proteína×entreno solo si es MAYORÍA: 2 de 4 (50%) no aparece, 3 de 4 sí', () => {
+    // 4 días de entreno; proteína en 2 → 50% → NO se muestra (se leía como hueco).
+    const half = [
+      mkSig(MON, { trained: true, protein_g: 140, meal_count: 1 }),
+      mkSig(TUE, { trained: true, protein_g: 140, meal_count: 1 }),
+      mkSig(WED, { trained: true, protein_g: 50, meal_count: 1 }),
+      mkSig(THU, { trained: true, protein_g: 50, meal_count: 1 }),
+    ]
+    expect(emergingEvidence(half, SUN, CTX).some((o) => o.key === 'prot-train')).toBe(false)
+    // Proteína en 3 de 4 → mayoría → sí aparece, reencuadrada.
+    const most = [
+      mkSig(MON, { trained: true, protein_g: 140, meal_count: 1 }),
+      mkSig(TUE, { trained: true, protein_g: 140, meal_count: 1 }),
+      mkSig(WED, { trained: true, protein_g: 140, meal_count: 1 }),
+      mkSig(THU, { trained: true, protein_g: 50, meal_count: 1 }),
+    ]
+    expect(emergingEvidence(most, SUN, CTX).map((o) => o.text)).toContain(
+      'En 3 de tus 4 días de entreno, la proteína también estuvo.',
+    )
   })
 })
 

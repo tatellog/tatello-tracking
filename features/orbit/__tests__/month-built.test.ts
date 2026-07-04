@@ -37,6 +37,8 @@ describe('daysInDeficit', () => {
     expect(d.rate).toBeCloseTo(0.6)
     // media de (target − consumo): (12·300 + 8·(−600)) / 20 = −60.
     expect(d.avgDeficitKcal).toBe(-60)
+    // promedio SOLO en los 12 días de déficit: 300 por debajo de la meta.
+    expect(d.avgOnDeficitDays).toBe(300)
   })
 
   it('el denominador excluye días sin comida registrada', () => {
@@ -88,6 +90,7 @@ describe('monthVerdict', () => {
       overDays: food - deficitDays,
       rate: deficitDays / food,
       avgDeficitKcal: 0,
+      avgOnDeficitDays: 0,
     })
 
   it('lee de un vistazo si fue buen mes, sin juzgar', () => {

@@ -150,6 +150,11 @@ export type DeficitSummary = {
   /** Déficit promedio (target − consumo) sobre los días con comida. Puede ser
    *  negativo si en promedio hubo superávit; la UI decide cómo mostrarlo. */
   avgDeficitKcal: number
+  /** Déficit promedio SOLO en los días que sí fueron déficit (intensidad diaria
+   *  de esos días). Acotado por el piso 60%, así que nunca premia comer de menos.
+   *  0 si no hubo días en déficit. Es la "conclusión" que la usuaria pedía como
+   *  "déficit total", sin ser una suma gastable. */
+  avgOnDeficitDays: number
 }
 
 /** El objetivo primario de la app, hecho visible. `null` si no hay meta de
@@ -165,8 +170,12 @@ export function daysInDeficit(
   let deficitDays = 0
   let overDays = 0
   let deltaSum = 0
+  let deficitDeltaSum = 0
   for (const s of days) {
-    if (isDeficitDay(s.calories, target)) deficitDays += 1
+    if (isDeficitDay(s.calories, target)) {
+      deficitDays += 1
+      deficitDeltaSum += target - s.calories!
+    }
     if (s.calories! > target) overDays += 1
     deltaSum += target - s.calories!
   }
@@ -176,6 +185,7 @@ export function daysInDeficit(
     overDays,
     rate: deficitDays / days.length,
     avgDeficitKcal: Math.round(deltaSum / days.length),
+    avgOnDeficitDays: deficitDays > 0 ? Math.round(deficitDeltaSum / deficitDays) : 0,
   }
 }
 
@@ -1540,7 +1550,7 @@ export function comboPhrase(combo: WinningCombo): string {
   // "e" antes de sonido i- ("entrenar e hidratarte"); "y" en el resto.
   const conj = /^h?i/i.test(last) ? 'e' : 'y'
   const list = verbs.length > 1 ? `${verbs.slice(0, -1).join(', ')} ${conj} ${last}` : verbs[0]!
-  return `${list.charAt(0).toUpperCase() + list.slice(1)} fueron de la mano con tu déficit.`
+  return `${list.charAt(0).toUpperCase() + list.slice(1)} coincidieron con tu déficit.`
 }
 
 /** La evidencia del patrón dominante (frase + conteo + takeaway) para el modal
@@ -1554,8 +1564,96 @@ export function comboReveal(combo: WinningCombo): ComboReveal {
     countLine: allDeficit
       ? `Coincidieron ${combo.occurrences} días. Los ${combo.occurrences}, en déficit.`
       : `Coincidieron ${combo.occurrences} días. ${combo.deficits}, en déficit.`,
-    takeaway: 'Cuando aparecen juntas, es tu señal más confiable.',
+    takeaway: 'Juntas son tu apuesta más segura al déficit.',
   }
+}
+
+/* ── Palanca del combo (semana en curso, criterio Apple) ─────────────────
+ * El "qué hago AHORA" del combo dominante: cuántos días esta semana las señales
+ * fueron juntas, vs los que TUS mejores semanas en déficit suelen tener. Meta de
+ * tus datos + lo que falta, sin culpa. Ver features/patterns/CLAUDE.md (enmienda). */
+
+function addDaysIso(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+/** Lunes (ISO) de la semana de `iso`. weekdayMon: 0=lun … 6=dom. */
+function mondayIso(iso: string): string {
+  return addDaysIso(iso, -weekdayMon(iso))
+}
+
+/** Predicado "este día cumple TODAS las señales del combo". */
+function comboMatcher(
+  combo: WinningCombo,
+  opts: { proteinTarget?: number | null; waterGoalGlasses?: number | null },
+): (s: DailySignals) => boolean {
+  const pt = opts.proteinTarget ?? null
+  const wg = Math.max(1, opts.waterGoalGlasses ?? WATER_GOAL_GLASSES)
+  const preds = combo.signals.map((sig): ((s: DailySignals) => boolean) => {
+    switch (sig.key) {
+      case 'sueno':
+        return (s) => s.sleep_minutes != null && s.sleep_minutes >= SLEEP_7H_MIN
+      case 'proteina':
+        return (s) => pt != null && s.protein_g != null && s.protein_g >= pt
+      case 'cuerpo':
+        return (s) => s.trained === true
+      case 'agua':
+        return (s) => (s.water_glasses ?? 0) >= wg
+      default:
+        return () => false
+    }
+  })
+  return (s) => preds.length > 0 && preds.every((p) => p(s))
+}
+
+export function weeklyComboLever(
+  signals: readonly DailySignals[],
+  combo: WinningCombo,
+  opts: {
+    calorieTarget?: number | null
+    proteinTarget?: number | null
+    waterGoalGlasses?: number | null
+  },
+  todayIso: string,
+): string | null {
+  const target = opts.calorieTarget ?? null
+  if (target == null || target <= 0) return null
+  const matches = comboMatcher(combo, opts)
+  const monday = mondayIso(todayIso)
+  const w = signals.filter(
+    (s) =>
+      s.day != null &&
+      s.day >= monday &&
+      s.day <= todayIso &&
+      s.calories != null &&
+      s.calories > 0 &&
+      matches(s),
+  ).length
+  // typical = días-de-combo por semana en sus semanas fuertes en déficit.
+  const byWeek = new Map<string, { combo: number; food: number; deficit: number }>()
+  for (const s of signals) {
+    if (!s.day || s.calories == null || s.calories <= 0) continue
+    const wk = mondayIso(s.day)
+    const e = byWeek.get(wk) ?? { combo: 0, food: 0, deficit: 0 }
+    e.food += 1
+    if (matches(s)) e.combo += 1
+    if (isDeficitDay(s.calories, target)) e.deficit += 1
+    byWeek.set(wk, e)
+  }
+  const strong = [...byWeek.values()].filter(
+    (e) => e.food >= 3 && e.combo >= 1 && e.deficit / e.food >= 0.5,
+  )
+  if (strong.length < 2) {
+    return `Esta semana ya coincidieron ${w} ${w === 1 ? 'día' : 'días'}.`
+  }
+  const counts = strong.map((e) => e.combo).sort((a, b) => a - b)
+  const typical = Math.max(1, counts[Math.floor(counts.length / 2)]!)
+  if (w >= typical) {
+    return `Esta semana ya coincidieron ${w} días. Vas en tu mejor forma de déficit.`
+  }
+  const faltan = typical - w
+  const mas = faltan === 1 ? 'uno más' : `${faltan} más`
+  return `Esta semana ya coincidieron ${w} de ${typical} días. Con ${mas}, tu déficit se repite.`
 }
 
 export function winningCombo(

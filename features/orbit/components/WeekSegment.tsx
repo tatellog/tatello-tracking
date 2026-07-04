@@ -440,16 +440,17 @@ function HeroTimelines({ timelines }: { timelines: DiscoveryTimeline[] }) {
   )
 }
 
-/* §6 · "La ausencia también cuenta": lo que nunca apareció, en tono neutro
- * (aro hueco, no estrella; nunca culpabiliza). */
+/* §7 · "Un patrón por descubrir": las señales que aún no registras, como
+ * INVITACIÓN CON PREMIO (no "lo que no hiciste"). Estrella hueca (✧) = una luz
+ * que podría encenderse, no un aro de falta. Nunca culpabiliza. */
 function AbsenceBlock({ items }: { items: readonly string[] }) {
   return (
     <View style={styles.blockTight}>
-      <Text style={styles.sectionEyebrow}>La ausencia también cuenta</Text>
+      <Text style={styles.sectionEyebrow}>Algo por descubrir</Text>
       <View style={styles.list}>
         {items.map((text, i) => (
           <View key={i} style={styles.listRow}>
-            <Text style={styles.absenceMark}>○</Text>
+            <Text style={styles.absenceMark}>✧</Text>
             <Text style={styles.absenceText}>{text}</Text>
           </View>
         ))}

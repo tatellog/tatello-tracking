@@ -210,53 +210,35 @@ export function TuEmblemaModal({
                   />
                 </View>
 
-                {/* Titular CÁLIDO: el conteo de LUCES (no el %). El % vive chico
-                  bajo la barra — el progreso se siente, no se examina. */}
-                <Text style={styles.headline}>
-                  <Text style={styles.headlineNum}>{trained}</Text> de{' '}
-                  <Text style={styles.headlineNum}>{total}</Text> luces encendidas
+                {/* LÍNEA DE PROPÓSITO — el "ah, ya entendí" arriba, no al pie:
+                  qué es, por qué un {signTitle}, y cómo se llena. Antes vivía
+                  enterrada en la leyenda; la usuaria solo la hallaba al final. */}
+                <Text style={styles.purpose}>
+                  La figura de tu {signTitle} tiene estrellas con nombre propio. Cada «Entrené» que
+                  registras enciende una de ellas.
                 </Text>
 
-                {/* La barra ES la lectura del %: sin caption numérico aparte (el
-                  headline ya cuenta las luces). Se siente, no se examina. */}
+                {/* Conteo reencuadrado a CRECIMIENTO: "N luces encendidas · este
+                  mes" (no "N de M", que se leía como hueco/deuda). El total va
+                  tenue bajo la barra, como contexto callado. */}
+                <Text style={styles.headline}>
+                  <Text style={styles.headlineNum}>{trained}</Text> luces encendidas
+                  <Text style={styles.headlineMuted}> · este mes</Text>
+                </Text>
+
                 <View style={styles.barTrack}>
                   <View style={[styles.barFill, { width: `${pct}%` }]} />
                   {/* Spark clampeado para no salirse del track al 100 %. */}
                   <Text style={[styles.barSpark, { left: `${Math.min(pct, 96)}%` }]}>✦</Text>
                 </View>
+                <Text style={styles.barCaption}>de {total} en tu figura</Text>
 
-                {recentStars.length > 0 ? (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionEyebrow}>Lo que ya despertó</Text>
-                    {recentStars.map((s, idx) => (
-                      <View
-                        key={s.name}
-                        style={[styles.starRow, idx > 0 ? styles.starRowDivider : null]}
-                      >
-                        <Text style={styles.starDot}>✦</Text>
-                        <Text style={styles.starName}>{s.name}</Text>
-                        <Text style={styles.starRole} numberOfLines={1}>
-                          {s.role}
-                        </Text>
-                      </View>
-                    ))}
-                    {olderCount > 0 ? (
-                      <Text style={styles.olderLine}>
-                        y {olderCount} {olderCount === 1 ? 'más encendida' : 'más encendidas'}
-                      </Text>
-                    ) : null}
-                  </View>
-                ) : null}
-
-                {/* Anticipación, no countdown. Tres estados:
+                {/* "La que sigue" ANTES del catálogo: la anticipación tira hacia
+                  adelante (lo que la usuaria sí quería sentir). Tres estados:
                   · queda una estrella con nombre → la nombramos (lo más rico)
                   · ya no quedan nombres pero la figura sigue → "se sigue tejiendo"
-                    (las líneas que conectan no llevan nombre)
                   · figura completa → la luz extra de cada «Entrené». */}
                 {nextStar ? (
-                  /* "La que sigue" como un panel con su astro a la derecha — la
-                   anticipación se ve como un hito a punto de encenderse, no
-                   como una línea más de texto. */
                   <View style={styles.comingPanel}>
                     <View style={styles.comingTextCol}>
                       <Text style={styles.comingEyebrow}>La que sigue</Text>
@@ -291,25 +273,38 @@ export function TuEmblemaModal({
                   </Text>
                 )}
 
-                {/* Cómo se lee — distingue las dos capas que la usuaria veía
-                  mezcladas: las estrellas (este mes) y el emblema (el largo
-                  plazo). Resuelve "¿y qué hay del emblema?". */}
-                <View style={styles.legend}>
-                  <View style={styles.legendRow}>
-                    <Text style={styles.legendMark}>✦</Text>
-                    <Text style={styles.legendText}>
-                      Cada «Entrené» enciende una <Text style={styles.legendKey}>estrella</Text> de
-                      tu figura este mes.
-                    </Text>
+                {/* "Lo que ya despertó" — ahora TEXTURA/recompensa, ya con el
+                  modelo entendido: los nombres astronómicos no cargan el primer
+                  vistazo, se disfrutan de vuelta. */}
+                {recentStars.length > 0 ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionEyebrow}>Lo que ya despertó</Text>
+                    {recentStars.map((s, idx) => (
+                      <View
+                        key={s.name}
+                        style={[styles.starRow, idx > 0 ? styles.starRowDivider : null]}
+                      >
+                        <Text style={styles.starDot}>✦</Text>
+                        <Text style={styles.starName}>{s.name}</Text>
+                        <Text style={styles.starRole} numberOfLines={1}>
+                          {s.role}
+                        </Text>
+                      </View>
+                    ))}
+                    {olderCount > 0 ? (
+                      <Text style={styles.olderLine}>
+                        y {olderCount} {olderCount === 1 ? 'más encendida' : 'más encendidas'}
+                      </Text>
+                    ) : null}
                   </View>
-                  <View style={styles.legendRow}>
-                    <Text style={styles.legendMark}>☉</Text>
-                    <Text style={styles.legendText}>
-                      Tu <Text style={styles.legendKey}>{signTitle}</Text> se revela despacio, con
-                      todo lo que sostienes a lo largo del tiempo.
-                    </Text>
-                  </View>
-                </View>
+                ) : null}
+
+                {/* Cierre de largo plazo — la SEGUNDA capa (el signo se revela con
+                  el tiempo), que antes se mezclaba con la mecánica en la leyenda. */}
+                <Text style={styles.closingLine}>
+                  Tu <Text style={styles.closingKey}>{signTitle}</Text> se revela despacio, con todo
+                  lo que sostienes.
+                </Text>
               </ScrollView>
             </View>
           </Animated.View>
@@ -391,6 +386,19 @@ const styles = StyleSheet.create({
   halo: { position: 'absolute' },
   // El emblema ocupa ~0.76 del halo (estética sello: respira dentro del aro).
   emblem: { width: 116, height: 116 },
+  // Línea de propósito — el ancla explicativa que abre el modal (voz de coach,
+  // serif italic). Es el "ah, ya entendí" que antes vivía enterrado al pie.
+  purpose: {
+    alignSelf: 'stretch',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: typography.sizes.body * typography.lineHeight.body,
+    color: colors.bone,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
   // Titular cálido — el conteo de luces, no el %. Números en oro.
   headline: {
     fontFamily: typography.uiMedium,
@@ -403,6 +411,19 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     color: colors.oroLeche,
     fontVariant: ['tabular-nums'],
+  },
+  // "· este mes" — contexto callado, no compite con el número.
+  headlineMuted: {
+    fontFamily: typography.uiMedium,
+    color: colors.niebla,
+  },
+  // Total tenue bajo la barra ("de 19 en tu figura") — contexto, no deuda.
+  barCaption: {
+    alignSelf: 'center',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.smallLabel,
+    color: colors.niebla,
+    marginTop: spacing.xs,
   },
   // Pie de la lista capada — "y N más encendidas", callado (no es una fila
   // más, es un resumen del resto). Alineado con los nombres (sangría del ✦).
@@ -513,30 +534,22 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.bone,
   },
-  // "Cómo se lee" — bloque que separa estrella (mes) de emblema (largo plazo).
-  legend: {
+  // Cierre de largo plazo — la segunda capa (el signo se revela con el tiempo),
+  // voz de coach (serif italic), separado por un hairline oro del resto.
+  closingLine: {
     alignSelf: 'stretch',
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.oroHairlineSoft,
-    gap: spacing.sm,
-  },
-  legendRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  legendMark: {
-    fontSize: typography.sizes.body,
-    color: colors.oro,
-    lineHeight: typography.sizes.body * typography.lineHeight.body,
-  },
-  legendText: {
-    flex: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
     lineHeight: typography.sizes.body * typography.lineHeight.body,
     color: colors.bone,
+    textAlign: 'center',
   },
-  legendKey: { fontFamily: typography.uiSemi, fontStyle: 'normal', color: colors.oroLeche },
+  closingKey: { fontFamily: typography.uiSemi, fontStyle: 'normal', color: colors.oroLeche },
   // Preloader invisible — 1×1, fuera de layout, solo para calentar el caché.
   preloader: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 })

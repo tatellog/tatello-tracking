@@ -10,7 +10,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { useSetWater, useWaterToday } from '@/features/water/hooks'
@@ -63,10 +63,14 @@ export function DayLogModal({
             <SkyBackground />
             {/* Viñeta: oscurece los bordes y enfoca el centro (hondura). */}
             <Vignette />
-            <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+            {/* Padding manual desde el hook: el SafeAreaView de safe-area-context
+                NO aplica insets dentro de un <Modal> de RN (otra jerarquía nativa)
+                → el encabezado quedaba bajo el notch y el layout se subía. El hook
+                sí da insets correctos (el botón cerrar lo confirma). */}
+            <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
               {signalKey === 'agua' ? <WaterLog date={date} onDone={onClose} /> : null}
               {signalKey === 'sueno' ? <SleepLog date={date} onDone={onClose} /> : null}
-            </SafeAreaView>
+            </View>
           </>
         )}
 
@@ -268,21 +272,27 @@ function SleepLog({ date, onDone }: { date: string; onDone: () => void }) {
         <Text style={[styles.sleepReadout, styles.sleepReadoutOnMoon]}>{fmtDuration(minutes)}</Text>
       </View>
 
-      <View style={styles.presetRow}>
-        {SLEEP_PRESETS.map((p) => {
-          const on = p.minutes === minutes
-          return (
-            <Pressable
-              key={p.minutes}
-              onPress={() => setMinutes(p.minutes)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              style={[styles.presetChip, on && styles.presetChipOn]}
-            >
-              <Text style={[styles.presetLabel, on && styles.presetLabelOn]}>{p.label}</Text>
-            </Pressable>
-          )
-        })}
+      {/* Dos filas balanceadas (3+3): siestas arriba, sueño de noche abajo. Antes
+          era un flexWrap que dejaba "8 h" solo en una segunda fila (5+1). */}
+      <View style={styles.presetGroup}>
+        {[SLEEP_PRESETS.slice(0, 3), SLEEP_PRESETS.slice(3)].map((row, ri) => (
+          <View key={ri} style={styles.presetRow}>
+            {row.map((p) => {
+              const on = p.minutes === minutes
+              return (
+                <Pressable
+                  key={p.minutes}
+                  onPress={() => setMinutes(p.minutes)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[styles.presetChip, on && styles.presetChipOn]}
+                >
+                  <Text style={[styles.presetLabel, on && styles.presetLabelOn]}>{p.label}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        ))}
       </View>
 
       <View style={styles.stepper}>
@@ -536,10 +546,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 0,
   },
-  presetRow: {
+  // Contenedor de las 2 filas de presets (3+3).
+  presetGroup: {
     marginTop: 28,
+    gap: 10,
+  },
+  presetRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 10,
   },
