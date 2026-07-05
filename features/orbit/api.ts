@@ -67,3 +67,14 @@ export async function hasAnySignals(): Promise<boolean> {
   if (error) throw error
   return (count ?? 0) > 0
 }
+
+/** Días con al menos una señal, de por vida (la view es una fila por día).
+ *  Alimenta "X días en órbita" en Hoy: acumulado que solo crece, nunca se
+ *  resetea — no es racha. RLS (security_invoker) lo scopea a la usuaria. */
+export async function countSignalDays(): Promise<number> {
+  const { count, error } = await supabase
+    .from('daily_signals')
+    .select('day', { count: 'exact', head: true })
+  if (error) throw error
+  return count ?? 0
+}

@@ -119,6 +119,11 @@ const revealColor = (colorKey: string): string => BAR_COLOR[colorKey] ?? colors.
 // Umbral para "encendida" — espejo de REVEAL_MIN en month-built.ts.
 const REVEAL_THRESHOLD = 8
 
+// Fase 8 · bajo este % el número héroe del emblema se lee como montaña
+// ("1% revelado" en día 2 = anti-pago); hasta cruzarlo, el hero habla en
+// cualitativo y explica el mecanismo. El % vuelve cuando cuenta historia.
+const EMBLEM_PCT_THRESHOLD = 8
+
 /* El detalle al tocar una fila de "Lo que sostuviste este mes". */
 type RevealDetail = {
   key: string
@@ -231,13 +236,25 @@ export function MonthSegment({
   onScrollTop?: () => void
 } = {}) {
   const { data: hasAny } = useHasAnySignals()
-  const { data: history } = useSignalsHistory(31)
+  const {
+    data: history,
+    isLoading: historyLoading,
+    isError: historyError,
+    refetch: refetchHistory,
+  } = useSignalsHistory(31)
   const signals = useMemo(() => history ?? [], [history])
   // Los PATRONES son acumulativos: se aprenden con el tiempo, no pertenecen a un
   // mes calendario (si no, se borrarían cada día 1). Leen una ventana larga (90d),
   // no monthSignals. El calendario y el KPI sí son del mes en curso.
   const { data: longHistory } = useSignalsHistory(90)
   const patternSignals = useMemo(() => longHistory ?? [], [longHistory])
+  // Días con señal en la ventana de patrones — decide el TONO del estado
+  // vacío: pocos días = promesa con siluetas (anticipación honesta); muchos
+  // días sin patrón = el "sin relleno" honesto de siempre.
+  const patternDataDays = useMemo(
+    () => patternSignals.filter((s) => s.day != null).length,
+    [patternSignals],
+  )
 
   const targets = useMacroTargets().data
   const proteinTarget = targets?.protein_g ?? null
@@ -263,9 +280,19 @@ export function MonthSegment({
   // Mes pasado → su "día 31" (inexistente): todo el mes visible, sin futuro ni
   // "hoy". El mes en curso usa el hoy real.
   const calendarToday = monthOffset === 0 ? today : `${selectedMonth}-31`
+  // Primer día con datos (en 90d) — guard del "muy bajo" de arranque (5.3).
+  const firstDataDay = useMemo(() => {
+    let min: string | null = null
+    for (const s of patternSignals) {
+      if (s.day == null) continue
+      if ((s.meal_count ?? 0) <= 0 && (s.calories ?? 0) <= 0) continue
+      if (min == null || s.day < min) min = s.day
+    }
+    return min
+  }, [patternSignals])
   const glance = useMemo(
-    () => monthCalendar(calendarSignals, { today: calendarToday, calorieTarget }),
-    [calendarSignals, calendarToday, calorieTarget],
+    () => monthCalendar(calendarSignals, { today: calendarToday, calorieTarget, firstDataDay }),
+    [calendarSignals, calendarToday, calorieTarget, firstDataDay],
   )
   // Hasta dónde se puede retroceder: el mes más viejo con registro (en 90d).
   const oldestMonth = useMemo(() => {
@@ -451,6 +478,39 @@ export function MonthSegment({
       weeklyDeficit: item.key === 'deficit' ? (deficitTrend?.weeks ?? null) : null,
     })
 
+  // 9.4 · carga y error explícitos (mismo par cálido de Día): sin esto, un
+  // fetch fallido dejaba el Mes en blanco sin salida.
+  if (historyLoading && history == null) {
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+        <HeroHeader />
+        <View style={styles.stateCard}>
+          <Text style={styles.stateBody}>Mirando tu mes…</Text>
+        </View>
+      </Animated.View>
+    )
+  }
+  if (historyError && history == null) {
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
+        <HeroHeader />
+        <View style={styles.stateCard}>
+          <Text style={styles.stateTitle}>Tu mes no terminó de cargar</Text>
+          <Text style={styles.stateBody}>Vuelve a intentarlo en un momento.</Text>
+          <Pressable
+            style={styles.stateRetryBtn}
+            onPress={() => void refetchHistory()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar"
+          >
+            <Text style={styles.stateRetry}>Reintentar</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+    )
+  }
+
   if (hasAny === false) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -525,9 +585,15 @@ export function MonthSegment({
               <Text style={[styles.monthArrow, !canNextMonth && styles.monthArrowOff]}>›</Text>
             </Pressable>
           </View>
-          <Text style={styles.calQuestion}>
-            El oro son tus días en déficit. Lo que el mes fue construyendo.
-          </Text>
+          {/* "El oro son tus días en déficit" se enseñaba 3 veces (aquí, la
+              leyenda y la silueta de Semana). Relevo: este sub enseña mientras
+              la leyenda aún no aparece (<5 días); con ≥5 la leyenda toma el
+              lugar y el sub se retira. Un solo maestro a la vez. */}
+          {(glance?.dataDays ?? 0) < 5 ? (
+            <Text style={styles.calQuestion}>
+              El oro son tus días en déficit. Lo que el mes fue construyendo.
+            </Text>
+          ) : null}
         </View>
 
         {glance ? (
@@ -592,6 +658,36 @@ export function MonthSegment({
                 />
               ))}
             </>
+          ) : patternDataDays < 14 ? (
+            /* Semanas 1-2: el diferenciador entero de Stelar aún no puede
+               hablar. Un "no hay nada" sin forma se lee como "esta sección no
+               sirve"; lo bloqueado-pero-visible (siluetas de QUÉ va a
+               descubrir) convierte la ausencia en anticipación. Umbral
+               aproximado, sin countdown (retention-spec · Mecánica C). */
+            <View style={styles.patternsEmpty}>
+              <Text style={styles.patternsEmptyLede}>Tus patrones se están formando.</Text>
+              <Text style={styles.patternsEmptyBody}>
+                Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:
+              </Text>
+              <View style={styles.patternSilhouettes}>
+                {[
+                  'Qué días son distintos en tu rutina',
+                  'Qué acompaña tus mejores días',
+                  'Qué combinación te sostiene en déficit',
+                ].map((t) => (
+                  <View key={t} style={styles.patternSilhouetteRow}>
+                    <View style={styles.patternSilhouetteStar} />
+                    <Text style={styles.patternSilhouetteText}>{t}</Text>
+                  </View>
+                ))}
+              </View>
+              {/* El horizonte honesto (GAP 5): el umbral concreto que abre la
+                  puerta, sin countdown ni prometer CUÁL patrón llega primero
+                  (eso depende de sus datos, no lo fingimos). */}
+              <Text style={styles.patternsEmptyHorizon}>
+                Un patrón nace cuando algo se repite unas tres veces en tus datos.
+              </Text>
+            </View>
           ) : (
             <View style={styles.patternsEmpty}>
               <Text style={styles.patternsEmptyLede}>Aún no emerge un patrón claro.</Text>
@@ -605,7 +701,12 @@ export function MonthSegment({
       </View>
 
       {/* ── Tiempo 4 · ¿Sigo así? — el cierre emocional (volver sin culpa). */}
-      {presence ? <PresenceFinale presence={presence} /> : null}
+      {/* 9.6 · la coda de presencia se gana su lugar con ≥7 días de datos:
+          en la primera semana era la cuarta promesa apilada de un pasillo de
+          puertas cerradas ("Apenas empieza"); sin historia de regresos que
+          contar, la promesa de patrones (con siluetas + horizonte) ya cierra
+          el recorrido. */}
+      {presence && patternDataDays >= 7 ? <PresenceFinale presence={presence} /> : null}
 
       {/* Fin del recorrido: volver al inicio sin tener que hacer scroll a mano. */}
       {onScrollTop ? (
@@ -763,11 +864,21 @@ function EmblemHero({
 
       {/* El signo — el nombre de lo que se está revelando. */}
       <Text style={styles.heroSign}>{signName(sign)}</Text>
-      {/* % revelado — el reveal del arte ES la barra; el número acompaña. */}
-      <Text style={styles.heroPct}>
-        {progress}
-        <Text style={styles.heroPctSign}>% revelado</Text>
-      </Text>
+      {/* % revelado — el reveal del arte ES la barra; el número acompaña.
+          Fase 8: bajo el umbral, el número deflaciona ("1%" = "esto es una
+          montaña" en el momento más frágil — anti-anillo de Apple). El %
+          aparece cuando ya cuenta una historia (misma regla que el calendario
+          gana su % con ≥5 días); antes, cualitativo + el mecanismo explícito
+          (qué lo hace subir, y que no retrocede). El frame cambia; la
+          honestidad no: nada se acelera. */}
+      {progress < EMBLEM_PCT_THRESHOLD ? (
+        <Text style={styles.heroPct}>Apenas empieza a revelarse</Text>
+      ) : (
+        <Text style={styles.heroPct}>
+          {progress}
+          <Text style={styles.heroPctSign}>% revelado</Text>
+        </Text>
+      )}
       {/* Ancla de significado del número (estilo "unidad" de anillo Apple): dice
           QUÉ mide el % y NIEGA el peso — así "93% revelado" no se lee como "93%
           de mi meta de peso" (countdown, línea roja). Y de paso, el "por qué un
@@ -775,6 +886,13 @@ function EmblemHero({
       <Text style={styles.heroAnchor}>
         Tu {signName(sign)} se dibuja con tu constancia, no con tu peso.
       </Text>
+      {/* El mecanismo, solo en el arranque: la usuaria no sabía qué lo hace
+          subir, y "no se apaga" es la regla de inmutabilidad hecha promesa. */}
+      {progress < EMBLEM_PCT_THRESHOLD ? (
+        <Text style={styles.heroMechanism}>
+          Cada día que registras suma luz. Lo que enciendes no se apaga.
+        </Text>
+      ) : null}
       {/* Avance del mes en CUALITATIVO, sin un segundo "%": dos porcentajes
           juntos competían y confundían cuál era cuál. El número héroe es el %
           revelado; esto solo dice cuánto de ese avance ocurrió este mes. */}
@@ -1047,7 +1165,7 @@ const NODE_LABEL: Record<string, string> = {
 const NODE_COLOR: Record<string, string> = {
   sueno: colors.dimension.sueno,
   proteina: colors.dimension.alimento,
-  cuerpo: '#FF9E57',
+  cuerpo: colors.signal.entreno,
   agua: colors.leche,
 }
 
@@ -1525,6 +1643,42 @@ const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
   },
+  // 9.4 · carga/error — mismo par cálido de Día (card + Reintentar 44pt).
+  stateCard: {
+    borderRadius: 20,
+    padding: 20,
+    backgroundColor: colors.bgCard,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  stateTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+    marginBottom: 6,
+  },
+  stateBody: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.niebla,
+  },
+  stateRetry: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+  },
+  stateRetryBtn: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+  },
   // ── Hero header ───────────────────────────────────────────────
   // Mismo tratamiento que Día ("¿Quién fuiste hoy?"): título de página en
   // tipografía display (Hanken) alineado a la izquierda, y la línea secundaria
@@ -1532,10 +1686,11 @@ const styles = StyleSheet.create({
   heroHeader: {
     alignItems: 'flex-start',
   },
+  // 9.2 · un solo título grande por vista (ver WeekSegment.title).
   heroQuestion: {
     fontFamily: typography.displaySemi,
-    fontSize: 27,
-    lineHeight: 32,
+    fontSize: typography.sizes.displaySm,
+    lineHeight: 30,
     letterSpacing: -0.6,
     color: colors.leche,
   },
@@ -1594,6 +1749,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 24,
   },
+  // El mecanismo del emblema en el arranque — qué lo hace subir + la promesa
+  // de inmutabilidad. Un tono más presente que el ancla (es la respuesta a
+  // "¿y yo qué hago para que suba?").
+  heroMechanism: {
+    marginTop: 6,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: typography.sizes.label * typography.lineHeight.body,
+    color: colors.bone,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
   heroDelta: {
     marginTop: 6,
     fontFamily: typography.uiBold,
@@ -1605,7 +1772,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.bone,
     textAlign: 'center',
@@ -1844,7 +2011,7 @@ const styles = StyleSheet.create({
   focusText: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.bone,
   },
@@ -1853,7 +2020,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.bone,
     textAlign: 'center',
@@ -1870,7 +2037,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 28,
     color: colors.leche,
   },
@@ -1893,7 +2060,7 @@ const styles = StyleSheet.create({
   },
   collapseChevron: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.oroSoft,
   },
   collapseBody: {
@@ -1913,7 +2080,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.oroSoft,
@@ -1950,6 +2117,38 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.niebla,
   },
+  // Siluetas de descubrimiento — bloqueado-pero-visible: estrellas tenues
+  // sin encender, mismo lenguaje que los días sin datos del calendario.
+  patternSilhouettes: {
+    marginTop: 14,
+    gap: 10,
+  },
+  patternSilhouetteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  patternSilhouetteStar: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    borderWidth: 1,
+    borderColor: colors.bone,
+    opacity: 0.45,
+  },
+  patternSilhouetteText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  patternsEmptyHorizon: {
+    marginTop: 14,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.caption,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
   // ── Tu presencia — sistema separado ───────────────────────────
   presenceCard: {
     borderRadius: 18,
@@ -1962,7 +2161,7 @@ const styles = StyleSheet.create({
   presenceLede: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 22,
     color: colors.bone,
   },
@@ -2083,7 +2282,7 @@ const styles = StyleSheet.create({
   },
   monthTitle: {
     fontFamily: typography.displaySemi,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 24,
     letterSpacing: -0.4,
     color: colors.leche,
@@ -2091,7 +2290,7 @@ const styles = StyleSheet.create({
   },
   monthArrow: {
     fontFamily: typography.uiMedium,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 24,
     color: colors.oroSoft,
   },
@@ -2254,7 +2453,7 @@ const styles = StyleSheet.create({
   findingTitle: {
     // Hanken, no serif italic: es una observación de dato, no voz de coach.
     fontFamily: typography.uiSemi,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 25,
     color: colors.leche,
   },
@@ -2323,7 +2522,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 21,
     color: colors.bone,
   },
@@ -2342,7 +2541,7 @@ const styles = StyleSheet.create({
   finalText: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 28,
     color: colors.bone,
     textAlign: 'center',
@@ -2399,7 +2598,7 @@ const styles = StyleSheet.create({
     flex: 1,
     // Hanken: el hallazgo es dato, no frase emocional.
     fontFamily: typography.uiSemi,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 24,
     color: colors.leche,
   },
@@ -2480,7 +2679,7 @@ const styles = StyleSheet.create({
   },
   shapeDow: {
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
   shapeDowHi: {
@@ -2578,7 +2777,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.bone,
   },
@@ -2612,7 +2811,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.bone,
   },

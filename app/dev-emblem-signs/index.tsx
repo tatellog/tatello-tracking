@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontFamily: typography.ui,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     color: colors.niebla,
     marginRight: 8,
   },

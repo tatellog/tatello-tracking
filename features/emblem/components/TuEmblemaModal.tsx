@@ -43,7 +43,7 @@ type TuEmblemaModalProps = {
   sign: ZodiacSign
   /** La etiqueta del signo en MAYÚSCULAS ("LEO", "ARIES", …). */
   signLabel: string
-  /** Figure stars lit THIS MONTH (via «Entrené») + the figure total. */
+  /** Figure stars lit THIS MONTH (any registered day) + the figure total. */
   trained: number
   total: number
   /** Named figure stars already lit, in lighting order. */
@@ -214,8 +214,8 @@ export function TuEmblemaModal({
                   qué es, por qué un {signTitle}, y cómo se llena. Antes vivía
                   enterrada en la leyenda; la usuaria solo la hallaba al final. */}
                 <Text style={styles.purpose}>
-                  La figura de tu {signTitle} tiene estrellas con nombre propio. Cada «Entrené» que
-                  registras enciende una de ellas.
+                  La figura de tu {signTitle} tiene estrellas con nombre propio. Cada día que
+                  registras algo enciende una de ellas.
                 </Text>
 
                 {/* Conteo reencuadrado a CRECIMIENTO: "N luces encendidas · este
@@ -268,8 +268,8 @@ export function TuEmblemaModal({
                   </Text>
                 ) : (
                   <Text style={styles.comingLine}>
-                    Tu figura está <Text style={styles.comingEm}>completa</Text>. Cada «Entrené»
-                    suma luz extra.
+                    Tu figura está <Text style={styles.comingEm}>completa</Text>. Cada día
+                    registrado suma luz extra.
                   </Text>
                 )}
 

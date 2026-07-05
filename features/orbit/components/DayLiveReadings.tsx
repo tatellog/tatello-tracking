@@ -17,7 +17,7 @@ import { colors, typography } from '@/theme'
 import type { DayCard, DayCardWeight, DayMetric } from '../day-readings'
 import { LiveDot } from './LiveDot'
 
-const STAR_GOLD = '#FFE9C2'
+const STAR_GOLD = colors.oroLight
 const STAR_PINK = '#FBD7E3'
 
 /*
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.oroSoft,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },

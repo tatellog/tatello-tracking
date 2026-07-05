@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   stepGlyph: {
     fontFamily: typography.uiMedium,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 24,
     color: colors.niebla,
   },

@@ -14,7 +14,7 @@ export function HomeError({ onRetry }: Props) {
         <Text style={styles.meta}>SIN CONEXIÓN</Text>
         <Text style={styles.headline}>No pudimos traer tu brief</Text>
         <Text style={styles.editorial}>
-          Revisa tu conexión o intenta de nuevo en un momento. Tu racha y tus medidas siguen a
+          Revisa tu conexión o intenta de nuevo en un momento. Tus registros y tus medidas siguen a
           salvo.
         </Text>
         <Pressable onPress={onRetry} style={styles.retry}>
@@ -28,7 +28,7 @@ export function HomeError({ onRetry }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.pearlBase,
+    backgroundColor: colors.bg,
     paddingHorizontal: spacing.xl,
   },
   stack: {
@@ -39,18 +39,18 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: typography.sizes.smallLabel,
     letterSpacing: typography.letterSpacing.uppercaseWide,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   headline: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.anchor,
-    color: colors.inkPrimary,
+    color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
   editorial: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.labelMuted,
+    color: colors.niebla,
     lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
   },
   retry: {
@@ -59,11 +59,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
   },
   retryLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.pearlBase,
+    color: colors.bg,
   },
 })

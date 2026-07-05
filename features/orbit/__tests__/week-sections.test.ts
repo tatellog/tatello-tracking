@@ -145,11 +145,18 @@ describe('dayTimeline (§6 · etiquetas por día)', () => {
     const rows = dayTimeline(richWeek(), SUN, CTX)
     expect(rows).toHaveLength(7)
     const byLabel = Object.fromEntries(rows.map((r) => [r.weekdayLabel, r]))
-    expect(byLabel['Lunes']!.tags).toEqual(['Déficit', 'Proteína', 'Entreno'])
+    // 5.4 · además del estado calórico, el panel nombra las señales reales
+    // del día (sueño/agua/etc.) para que el tap pague en sitio.
+    expect(byLabel['Lunes']!.tags).toEqual(['Déficit', 'Proteína', 'Entreno', 'Sueño', 'Agua'])
     expect(byLabel['Miércoles']!.tags).toEqual(['Déficit'])
     expect(byLabel['Sábado']!.tags).toEqual(['Por encima de tu meta'])
     expect(byLabel['Domingo']!.state).toBe('absent')
     expect(byLabel['Domingo']!.tags).toEqual(['Sin registros'])
+  })
+
+  it('un día con solo señales suaves nombra las señales, no "Registro"', () => {
+    const rows = dayTimeline([mkSig(MON, { sleep_minutes: 420, water_glasses: 3 })], MON, CTX)
+    expect(rows[0]!.tags).toEqual(['Sueño', 'Agua'])
   })
 
   it('días futuros no llevan etiquetas', () => {

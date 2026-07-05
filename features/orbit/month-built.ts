@@ -44,6 +44,9 @@ import {
 
 import type { DailySignals } from './api'
 import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit'
+// Detección por TIPO de entreno — lógica en _shared/intelligence (fuente de
+// verdad del motor); aquí solo se adapta a las tarjetas de Mes.
+import { workoutTypeDeficitSplit, workoutTypeMix, workoutTypeMixPhrase } from './workout-type'
 
 /** Vasos para considerar el agua "alcanzada" ese día (meta diaria). */
 export const WATER_GOAL_GLASSES = 8
@@ -320,7 +323,15 @@ function pad2(n: number): string {
  *  hay meta de calorías o si el mes aún no tiene un solo día con comida. */
 export function monthCalendar(
   signals: readonly DailySignals[],
-  opts: { today: string; calorieTarget?: number | null },
+  opts: {
+    today: string
+    calorieTarget?: number | null
+    /** Primer día con datos de la usuaria (ventana 90d del caller). Su
+     *  primer día suele ser un registro parcial (instaló a media tarde):
+     *  clasificarlo "muy bajo" es un falso positivo que se lee como regaño
+     *  retroactivo. Ese día se pinta neutro. */
+    firstDataDay?: string | null
+  },
 ): MonthCalendar | null {
   const target = opts.calorieTarget ?? null
   if (target == null || target <= 0) return null
@@ -349,7 +360,9 @@ export function monthCalendar(
     if (!future && cals != null && cals > 0) {
       if (isDeficitDay(cals, target)) status = 'deficit'
       else if (cals > target) status = 'surplus'
-      else status = 'low' // registró pero < 60% del target
+      // Guard de arranque (5.3): el primer día con datos no se marca "muy
+      // bajo" (cuenta como registrado, sin anillo ni nota).
+      else if (date !== opts.firstDataDay) status = 'low' // registró pero < 60% del target
       dataDays += 1
       if (status === 'deficit') deficitDays += 1
       if (status === 'low') hasLow = true
@@ -1088,6 +1101,11 @@ export function detectMonthPatterns(
     const notes: string[] = []
     if (longest >= 2) notes.push(`Continuidad más larga: ${longest} días`)
     if (current >= 2) notes.push(`Continuidad reciente: ${current} días`)
+    // El ECO del tipo que anota en Hoy ("4 de fuerza · 2 de caminata") — vive
+    // aquí como evidencia de la constancia, NO como tarjeta suelta (regla
+    // anti-conteo-decorativo). Es el dato de la usuaria devuelto con su nombre.
+    const mix = workoutTypeMix(days)
+    if (mix) notes.push(`Tu mezcla: ${workoutTypeMixPhrase(mix)}`)
     out.push({
       id: 'consistent-training',
       kind: 'discovery',
@@ -1322,6 +1340,44 @@ export function detectMonthPatterns(
           },
         })
       }
+    }
+  }
+
+  // B6 · TIPO de entreno × déficit — cierra el loop de los chips de Hoy: el
+  // tipo que la usuaria anota vuelve como patrón cuando los datos lo
+  // sostienen. Compara el mejor tipo contra el RESTO de los entrenos (otros
+  // tipos + sin tipo). Detección en _shared/intelligence/workout-type
+  // (mismas guardas que B3/B5); co-ocurrencia, NO causa.
+  if (target != null && target > 0) {
+    const split = workoutTypeDeficitSplit(food, target, isDeficitDay)
+    if (split) {
+      const lower = split.label.toLowerCase()
+      out.push({
+        id: 'workout-type-deficit',
+        kind: 'pattern',
+        label: `${split.label} y déficit`,
+        title: `Tus días de ${lower}, tu déficit apareció más seguido.`,
+        why: `De tus entrenos, ${lower} es el que más acompaña tu déficit.`,
+        evidence: {
+          bars: [
+            {
+              label: split.label,
+              value: split.bestDeficit,
+              total: split.bestTotal,
+              colorKey: 'cuerpo',
+              highlight: true,
+            },
+            {
+              label: 'Otros entrenos',
+              value: split.otherDeficit,
+              total: split.otherTotal,
+              colorKey: 'cuerpo',
+            },
+          ],
+          caption: 'Días en déficit según el tipo de entreno.',
+          unit: 'días',
+        },
+      })
     }
   }
 

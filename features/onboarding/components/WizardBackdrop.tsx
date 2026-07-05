@@ -146,7 +146,7 @@ const STARS: readonly StarSpec[] = (() => {
     if (x > 78 && y < 18) {
       x = a * 60 // push out of the corner
     }
-    const tint = c > 0.93 ? '#D9B57A' : c > 0.86 ? '#9DB5D6' : c > 0.55 ? '#F4ECDE' : '#FBD7E3'
+    const tint = c > 0.93 ? '#D9B57A' : c > 0.86 ? '#9DB5D6' : c > 0.55 ? colors.leche : '#FBD7E3'
     out.push({
       x,
       y,

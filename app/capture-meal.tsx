@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   frameHint: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
     opacity: 0.85,
     textShadowColor: 'rgba(0,0,0,0.6)',

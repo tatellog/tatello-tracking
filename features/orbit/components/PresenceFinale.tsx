@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 2.4,
     textTransform: 'uppercase',
     color: colors.niebla,

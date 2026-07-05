@@ -20,6 +20,7 @@ import { track } from '@/lib/analytics'
 import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { emitMealLogged } from '@/features/macros/meal-logged-bus'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { subscribeRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { showActionSheet } from '@/lib/actionSheet'
@@ -38,13 +39,7 @@ const PREVIEW_STAR = 19
 
 type MealType = MealInput['meal_type']
 
-function currentMealType(): MealType {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+const currentMealType = (): MealType => mealMomentByHour()
 
 // ── Iconos de los métodos de registro ──
 function SearchIcon({ color, size = 20 }: { color: string; size?: number }) {
@@ -246,6 +241,12 @@ export function MealComposer({ onOpenMeal }: Props) {
 
   const collapsible = !composing && history.length > COLLAPSED_COUNT
   const visible = collapsible && !expanded ? history.slice(0, COLLAPSED_COUNT) : history
+
+  // "Aliada" se gana con evidencia: repetición real o aporte de proteína
+  // que mueva la aguja. Con una comida de 2 g registrada 1 vez, llamar a la
+  // sección "lo que más impulsa tu transformación" enseña a descontar la
+  // voz del coach. En frío la sección se presenta sin promesa inflada.
+  const hasAliados = (foods ?? []).some((f) => f.freq >= 3 || f.protein_g >= 15)
 
   const clear = () => {
     setName('')
@@ -557,10 +558,14 @@ export function MealComposer({ onOpenMeal }: Props) {
       {/* ── §3 · Tus Aliados ── */}
       <View style={styles.aliadosHead}>
         <EyebrowLabel tone="magenta" size={10}>
-          Tus Aliados
+          {hasAliados ? 'Tus Aliados' : 'Tus Comidas'}
         </EyebrowLabel>
       </View>
-      <Text style={styles.aliadosSub}>Las comidas que más impulsan tu transformación.</Text>
+      <Text style={styles.aliadosSub}>
+        {hasAliados
+          ? 'Las comidas que más impulsan tu transformación.'
+          : 'Las que más repitas se vuelven tus aliadas.'}
+      </Text>
 
       <View style={styles.list}>
         {visible.map((item, i) => (
@@ -570,7 +575,7 @@ export function MealComposer({ onOpenMeal }: Props) {
             protein={item.protein_g}
             freq={item.freq}
             photoPath={item.photo_storage_path}
-            rank={composing ? 99 : i}
+            rank={composing || !hasAliados ? 99 : i}
             confirmed={confirmed === item.name}
             onRepeat={() => handleRepeat(item)}
             onOpen={() => onOpenMeal(item.id, item.photo_storage_path ?? undefined)}

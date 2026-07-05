@@ -54,6 +54,10 @@ function OrbitBody() {
   // Día visto en Órbita Día: null = hoy. Lo setea la tira de 7 días de Semana;
   // cambiar de segmento a mano (OrbitSegments) lo resetea a hoy.
   const [viewedDay, setViewedDay] = useState<string | null>(null)
+  // 9.1 · memoria del segmento de ORIGEN al abrir un día pasado: el back del
+  // summary→detail nunca se rompe (Apple) — desde el calendario de Mes,
+  // "Volver" regresa a Mes, no te deja varada en Día-hoy.
+  const [dayOrigin, setDayOrigin] = useState<Exclude<OrbitSegment, 'dia'> | null>(null)
 
   useFocusEffect(
     useCallback(() => {
@@ -140,6 +144,7 @@ function OrbitBody() {
                 value={segment}
                 onChange={(seg) => {
                   setViewedDay(null) // navegar a mano vuelve a hoy
+                  setDayOrigin(null)
                   setSegment(seg)
                 }}
               />
@@ -156,7 +161,21 @@ function OrbitBody() {
               <DayPresent
                 key="dia"
                 viewedDay={viewedDay}
-                onReturnToToday={() => setViewedDay(null)}
+                returnLabel={
+                  dayOrigin === 'mes'
+                    ? 'Volver a tu mes'
+                    : dayOrigin === 'semana'
+                      ? 'Volver a tu semana'
+                      : undefined
+                }
+                onReturnToToday={() => {
+                  setViewedDay(null)
+                  if (dayOrigin) {
+                    setSegment(dayOrigin)
+                    setDayOrigin(null)
+                    scrollToTop()
+                  }
+                }}
                 onScrollTop={scrollToTop}
               />
             ) : segment === 'semana' ? (
@@ -165,6 +184,7 @@ function OrbitBody() {
                 onOpenMes={() => setSegment('mes')}
                 onPickDay={(date) => {
                   setViewedDay(date)
+                  setDayOrigin('semana')
                   setSegment('dia')
                 }}
                 onScrollTop={scrollToTop}
@@ -174,6 +194,7 @@ function OrbitBody() {
                 key="mes"
                 onPickDay={(date) => {
                   setViewedDay(date)
+                  setDayOrigin('mes')
                   setSegment('dia')
                 }}
                 onScrollTop={scrollToTop}

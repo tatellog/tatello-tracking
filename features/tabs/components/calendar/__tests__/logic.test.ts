@@ -1,6 +1,7 @@
 import {
   buildCalendarDays,
   dayNumOf,
+  deficitContextLine,
   weekdayIdxOf,
   type BuildCalendarDaysArgs,
   type CalendarEvent,
@@ -198,5 +199,30 @@ describe('buildCalendarDays · values (Historia)', () => {
       weightKg: null,
       onPeriod: false,
     })
+  })
+})
+
+describe('deficitContextLine · el norte como contexto (Historia)', () => {
+  test('día en déficit sano → línea que suma', () => {
+    expect(deficitContextLine(1500, 1800)).toBe('Un día en déficit. De esos que suman.')
+  })
+
+  test('en el target exacto sigue siendo déficit sano', () => {
+    expect(deficitContextLine(1800, 1800)).toBe('Un día en déficit. De esos que suman.')
+  })
+
+  test('por encima del target → voz canónica, sin delta ni culpa', () => {
+    expect(deficitContextLine(2100, 1800)).toBe('Ese día tu cuerpo pidió más.')
+  })
+
+  test('bajo el piso sano (60%) → silencio, jamás se celebra restricción', () => {
+    expect(deficitContextLine(900, 1800)).toBeNull()
+  })
+
+  test('sin calorías o sin target → silencio (no se inventa contexto)', () => {
+    expect(deficitContextLine(null, 1800)).toBeNull()
+    expect(deficitContextLine(0, 1800)).toBeNull()
+    expect(deficitContextLine(1500, null)).toBeNull()
+    expect(deficitContextLine(1500, 0)).toBeNull()
   })
 })

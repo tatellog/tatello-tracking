@@ -7,7 +7,13 @@ import { useSession } from '@/hooks/useSession'
 
 import { getMealsInRange } from '@/features/macros/api'
 
-import { getDaySignals, getTodaySignals, getWeekSignals, hasAnySignals } from './api'
+import {
+  countSignalDays,
+  getDaySignals,
+  getTodaySignals,
+  getWeekSignals,
+  hasAnySignals,
+} from './api'
 import { isoTwoWeekRange } from './week-orbit-logic'
 
 /** Id del usuario en sesión para scopear las keys de órbita (un usuario nuevo no
@@ -180,5 +186,20 @@ export function useHasAnySignals() {
     queryKey: queryKeys.orbit.hasAny(uid),
     queryFn: hasAnySignals,
     staleTime: 1000 * 60 * 5,
+  })
+}
+
+/*
+ * Días con señal de por vida — "X días en órbita" en Hoy. Acumulado que
+ * solo crece (no racha): sin días consecutivos, sin reset, sin pérdida.
+ * El +1 de HOY lo aporta el caller en vivo (el conteo del server puede
+ * tardar en incluir el día en curso).
+ */
+export function useTotalSignalDays() {
+  const uid = useOrbitUid()
+  return useQuery({
+    queryKey: queryKeys.orbit.totalDays(uid),
+    queryFn: countSignalDays,
+    staleTime: 60_000,
   })
 }

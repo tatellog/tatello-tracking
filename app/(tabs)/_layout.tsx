@@ -8,6 +8,7 @@ import Orbits from '@/assets/icons/orbits.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
+import { useNextStarInvite } from '@/features/notifications/hooks'
 import { AppTabBar, CelebrationOverlay, UniverseDeltaToast } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
@@ -67,6 +68,10 @@ function SvgTabIcon({
 // icon here because it's not in the pill — it's the header gear, and
 // AppTabBar skips its route.
 export default function TabsLayout() {
+  // La invitación del día siguiente (Mecánica D): cada sesión re-agenda la
+  // única notificación de mañana en la ventana elegida — auto-capada, ver
+  // features/notifications/invite.ts.
+  useNextStarInvite()
   return (
     <View style={{ flex: 1 }}>
       <Tabs

@@ -53,6 +53,18 @@ const ENFOQUE_INFO: Record<Enfoque, { name: string; desc: string }> = {
   },
 }
 
+// El déficit se describe por NIVEL: decir "sin prisa" bajo un Marcado de
+// -750 contradice lo que la usuaria acaba de elegir. Honesto con el ritmo
+// y con lo que pide sostenerlo, sin culpa (manifiesto).
+const DEFICIT_DESC: Record<Nivel, string> = {
+  light:
+    'Comes un poco menos de lo que tu cuerpo gasta. Así usa tu reserva como energía y bajas de grasa sin prisa.',
+  moderate:
+    'Comes menos de lo que tu cuerpo gasta, en un punto medio que la mayoría puede sostener. Avance constante sin exigirte de más.',
+  marked:
+    'Comes bastante menos de lo que tu cuerpo gasta. El cambio se nota antes, pero es el nivel que más pide. Si un día pesa, bajar de nivel también es cuidarte.',
+}
+
 /*
  * Goal editor. The rich path lets the user pick an enfoque (déficit /
  * mantenimiento / superávit) and a nivel; we recompute the macros live
@@ -276,7 +288,9 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
           <Text style={styles.noteGlyph}>✦</Text>
           <View style={styles.noteBody}>
             <Text style={styles.noteTitle}>{ENFOQUE_INFO[enfoque].name}</Text>
-            <Text style={styles.noteText}>{ENFOQUE_INFO[enfoque].desc}</Text>
+            <Text style={styles.noteText}>
+              {enfoque === 'deficit' ? DEFICIT_DESC[nivel] : ENFOQUE_INFO[enfoque].desc}
+            </Text>
           </View>
         </View>
 

@@ -148,7 +148,9 @@ const styles = StyleSheet.create({
     fontSize: 36,
     color: colors.leche,
     letterSpacing: -1.6,
-    lineHeight: 38,
+    // 42, no 38: con 2pt de leading la tilde de "Ó" (Tu Órbita) se
+    // recortaba y el header leía "Tu Orbita".
+    lineHeight: 42,
   },
   // Greeting keeps the serif-italic accent; the title emphasis is plain
   // Hanken heavy — the accent is carried by colour, not by face.

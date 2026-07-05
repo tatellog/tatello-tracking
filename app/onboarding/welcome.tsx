@@ -519,6 +519,28 @@ export default function ManifestoScreen() {
           transform="none"
           onPress={() => router.push('/onboarding/what-it-does')}
         />
+        {/* Aceptación legal (v3.0): consentimiento explícito ANTES de entrar
+            al wizard + el disclaimer médico a la vista. Los links abren las
+            pantallas completas; el CTA de arriba es la aceptación. */}
+        <Text style={styles.legal}>
+          Al continuar aceptas los{' '}
+          <Text
+            style={styles.legalLink}
+            onPress={() => router.push('/terms')}
+            accessibilityRole="link"
+          >
+            Términos
+          </Text>{' '}
+          y la{' '}
+          <Text
+            style={styles.legalLink}
+            onPress={() => router.push('/privacy')}
+            accessibilityRole="link"
+          >
+            Privacidad
+          </Text>
+          . Stelar es una app de bienestar, no un servicio médico, y no sustituye a profesionales.
+        </Text>
       </View>
     </View>
   )
@@ -632,5 +654,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 16,
     paddingTop: 12,
+  },
+  legal: {
+    marginTop: 12,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    lineHeight: 16,
+    color: colors.niebla,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  legalLink: {
+    fontFamily: typography.uiMedium,
+    color: colors.bone,
+    textDecorationLine: 'underline',
   },
 })

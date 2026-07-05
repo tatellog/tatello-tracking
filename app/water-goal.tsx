@@ -53,6 +53,9 @@ function WaterGoalBody() {
           </View>
 
           <Text style={styles.eyebrow}>Elige tu meta diaria</Text>
+          {/* La duda "¿se guardó?" muere aquí: contrato explícito (el hero de
+              arriba ya refleja el cambio al instante, esto lo nombra). */}
+          <Text style={styles.saveHint}>Se guarda al elegir.</Text>
           <View style={styles.presets}>
             {WATER_PRESETS_ML.map((ml) => {
               const active = goalMl === ml
@@ -74,6 +77,7 @@ function WaterGoalBody() {
                   ]}
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {active ? '✓ ' : ''}
                     {mlToLitresLabel(ml)} L
                   </Text>
                   <Text style={[styles.chipGlasses, active && styles.chipTextActive]}>
@@ -119,7 +123,11 @@ const styles = StyleSheet.create({
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  heroUnit: { fontFamily: typography.displayMedium, fontSize: 22, color: colors.bone },
+  heroUnit: {
+    fontFamily: typography.displayMedium,
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.bone,
+  },
   heroSub: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
@@ -132,9 +140,19 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.niebla,
+    marginBottom: 4,
+  },
+  saveHint: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.caption,
+    color: colors.niebla,
     marginBottom: 12,
   },
   presets: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  // Contraste OLED (uxui jul 2026): bgCard sobre bg era luminancia casi nula
+  // (los chips leían como texto suelto en pantalla real) y hairline al 10%
+  // desaparecía. Idle sube a bgCard2 + hairlineStrong; el activo se dice en
+  // MAGENTA (borde + fill 0.18 + texto), no con un bold imperceptible.
   chip: {
     flexGrow: 1,
     flexBasis: '47%',
@@ -142,17 +160,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.hairline,
-    backgroundColor: colors.bgCard,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.bgCard2,
   },
   chipActive: {
     borderColor: colors.magenta,
-    backgroundColor: colors.magentaTint,
+    backgroundColor: colors.magentaTint2,
   },
   chipPressed: { opacity: 0.7 },
   chipText: {
     fontFamily: typography.displayHeavy,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     letterSpacing: -0.5,
     color: colors.bone,
   },
@@ -162,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: colors.niebla,
   },
-  chipTextActive: { color: colors.leche },
+  chipTextActive: { color: colors.magentaHot },
   note: {
     marginTop: 22,
     fontFamily: typography.serif,

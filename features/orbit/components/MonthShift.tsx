@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   takeaway: {
     marginTop: 14,
     fontFamily: typography.displaySemi,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 27,
     letterSpacing: -0.3,
     color: colors.leche,

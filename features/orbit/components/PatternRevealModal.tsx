@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   phrase: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     lineHeight: 32,
     textAlign: 'center',
     color: colors.leche,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   closeX: {
     fontFamily: typography.uiMedium,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.niebla,
   },
 })

@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 25,
     color: colors.leche,
   },

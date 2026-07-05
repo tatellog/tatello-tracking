@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   back: {
     fontFamily: typography.ui,
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     lineHeight: 32,
     color: colors.leche,
     width: 32,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   arrow: {
     alignSelf: 'center',
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.bruma,
   },
   stepCard: {

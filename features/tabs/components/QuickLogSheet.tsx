@@ -32,6 +32,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { isCycleActive } from '@/features/cycle/phase'
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
 import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints } from '@/features/progress/logic'
@@ -311,13 +312,7 @@ function KeyboardIcon({ color }: { color: string }) {
 }
 
 // Meal type pre-selected by time of day so the common case needs no tap.
-function defaultMealType(): MealType {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+const defaultMealType = (): MealType => mealMomentByHour()
 
 type Mode = 'home' | 'weight'
 
@@ -833,7 +828,11 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                     })}
                   </View>
 
-                  <Text style={styles.frequentLabel}>Lo de siempre</Text>
+                  {/* "Lo de siempre" se gana con repetición: con puras comidas
+                      de 1 vez la app exageraría lo que sabe de ti. */}
+                  <Text style={styles.frequentLabel}>
+                    {items.some((it) => it.freq >= 2) ? 'Lo de siempre' : 'Tus recientes'}
+                  </Text>
 
                   {items.slice(0, FREQUENT_PREVIEW).map((item) => {
                     const confirming = confirmingName === item.name
@@ -1136,7 +1135,7 @@ const styles = StyleSheet.create({
   },
   waterCaptionEdit: {
     fontFamily: typography.ui,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 15,
     color: colors.magenta,
   },
@@ -1182,7 +1181,7 @@ const styles = StyleSheet.create({
   },
   goalStepSign: {
     fontFamily: typography.uiBold,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     lineHeight: 19,
     color: colors.magenta,
   },
@@ -1262,7 +1261,7 @@ const styles = StyleSheet.create({
   showMoreChevron: {
     // chevStyle: 90° (down → "ver más") ↔ 270° (up → "ver menos").
     fontFamily: typography.uiMedium,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 18,
     color: colors.magenta,
   },
@@ -1271,7 +1270,7 @@ const styles = StyleSheet.create({
   // coach voice), so it reads as a plain UI section label.
   newMealLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     // Oro eyebrow — "luz del cielo", consistent with the app's eyebrows.

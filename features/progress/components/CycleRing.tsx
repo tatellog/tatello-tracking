@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   dayNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     color: colors.leche,
     letterSpacing: -0.8,
   },

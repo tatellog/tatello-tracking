@@ -112,14 +112,26 @@ export function buildWeekDimensions(
   signals: readonly DailySignals[],
   todayIso: string,
   ctx: WeekDimCtx,
+  /** Primer día CON DATOS de la usuaria (primera semana de uso). Los días
+   *  previos a su llegada no entran al denominador: "2 de 6" en el día 2 de
+   *  uso juzga días en los que la app no existía en su vida — 4 fallas
+   *  retroactivas, el juicio injusto que hace abandonar. */
+  fromDate?: string,
 ): WeekDimension[] {
   const monday = mondayOf(todayIso)
-  const inWeek = signals.filter((s) => s.day != null && s.day >= monday && s.day <= todayIso)
-  const total = isoWeekday(todayIso) // lun→hoy inclusivo
+  const start = fromDate != null && fromDate > monday ? fromDate : monday
+  const inWeek = signals.filter((s) => s.day != null && s.day >= start && s.day <= todayIso)
+  const total = diffDaysInclusive(start, todayIso)
   return WEEK_DIM_ORDER.map((key) => {
     const present = inWeek.reduce((n, s) => (PRESENT[key](s, ctx) ? n + 1 : n), 0)
     return { key, label: LABEL[key], present, total, ratio: total > 0 ? present / total : 0 }
   })
+}
+
+/** Días de `a` a `b` inclusivo (ISO local-day strings, a <= b). */
+function diffDaysInclusive(a: string, b: string): number {
+  const ms = new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()
+  return Math.max(1, Math.round(ms / 86_400_000) + 1)
 }
 
 /* ── "Lo que más se repitió" / "Lo que necesita atención" ─────────── */
@@ -342,6 +354,9 @@ export function dimensionLine(
   todayIso: string,
   key: WeekDimKey,
   ctx: WeekDimCtx,
+  /** Primer día con datos (primera semana de uso): los días previos se pintan
+   *  como 'future' (aún-no), no como 'absent' (falla retroactiva). */
+  fromDate?: string,
 ): DayCell[] {
   const monday = mondayOf(todayIso)
   const present = new Set(
@@ -349,8 +364,9 @@ export function dimensionLine(
   )
   return WEEKDAY_LETTERS.map((letter, i) => {
     const date = addDays(monday, i)
+    const preData = fromDate != null && date < fromDate
     const state: DayCellState =
-      date > todayIso ? 'future' : present.has(date) ? 'present' : 'absent'
+      date > todayIso || preData ? 'future' : present.has(date) ? 'present' : 'absent'
     return { letter, date, state }
   })
 }
@@ -1266,11 +1282,21 @@ export function dayTimeline(
 
     const tags: string[] = []
     const hasTarget = ctx.calorieTarget != null && ctx.calorieTarget > 0
+    const caloriesTagged = hasTarget && s.calories != null && s.calories > 0
     if (hasTarget && isDeficitDay(s.calories, ctx.calorieTarget)) tags.push('Déficit')
     else if (hasTarget && s.calories != null && s.calories > ctx.calorieTarget!)
       tags.push('Por encima de tu meta')
     if (proteinReached(s, ctx)) tags.push('Proteína')
     if (s.trained === true) tags.push('Entreno')
+    // 5.4 · el tap debe pagar en sitio: nombrar las señales REALES del día en
+    // vez del fallback "Registro" (la etiqueta más vaga: no decía nada y
+    // enseñaba que tocar no sirve). Comida solo si las calorías no quedaron
+    // ya contadas por Déficit / Por encima.
+    if (s.rested === true) tags.push('Descanso')
+    if ((s.meal_count ?? 0) > 0 && !caloriesTagged) tags.push('Comida')
+    if ((s.sleep_minutes ?? 0) > 0) tags.push('Sueño')
+    if ((s.water_glasses ?? 0) > 0) tags.push('Agua')
+    if (s.mood != null) tags.push('Ánimo')
     if (tags.length === 0) tags.push('Registro')
 
     return { date, letter, weekdayLabel, state: 'present' as const, tags }
@@ -1450,4 +1476,69 @@ export function weeklyMovementLever(
   const faltan = typical - w
   const mas = faltan === 1 ? 'uno más' : `${faltan} más`
   return `Esta semana llevas ${w} de ${typical} entrenos que suelen ponerte en déficit. Con ${mas}, lo repites.`
+}
+
+/* ── El sello de semana (la cita del lunes · Fase 7) ─────────────────── */
+
+export type WeekSeal = {
+  /** El domingo de la semana sellada — pásalo como `todayIso` a
+   *  weekSilhouette para render de los 7 días completos. */
+  prevSunday: string
+  /** UNA observación de evidencia. Sin denominador "de 7" (la primera
+   *  semana pudo empezar a media semana → examen retroactivo) y sin
+   *  "lograste / no lograste": la semana se sella con lo que hubo. */
+  observation: string
+}
+
+/**
+ * La semana pasada, sellada — el artefacto del lunes. Solo existe el LUNES
+ * (la cita: la usuaria aprende que ese día hay algo nuevo sí o sí) y solo
+ * si la semana pasada dejó huella (null si no; el lunes sin historia previa
+ * muestra la Semana normal). Referente: el refresh de Apple Trends, sin su
+ * deadline ni score.
+ */
+export function weekSeal(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekSeal | null {
+  if (isoWeekday(todayIso) !== 1) return null // solo el lunes
+  const monday = mondayOf(todayIso)
+  const prevMonday = addDays(monday, -7)
+  const prevSunday = addDays(monday, -1)
+  const prev = signals.filter((s) => s.day != null && s.day >= prevMonday && s.day <= prevSunday)
+  if (prev.length === 0) return null
+
+  // La dimensión con más presencia — la protagonista de la semana sellada.
+  let topKey: WeekDimKey | null = null
+  let topCount = 0
+  for (const key of WEEK_DIM_ORDER) {
+    const n = prev.reduce((acc, s) => (PRESENT[key](s, ctx) ? acc + 1 : acc), 0)
+    if (n > topCount) {
+      topKey = key
+      topCount = n
+    }
+  }
+
+  // El día más encendido — plenitud por signalCount (misma vara que la silueta).
+  let brightest: DailySignals | null = null
+  for (const s of prev) {
+    if (brightest == null || signalCount(s) > signalCount(brightest)) brightest = s
+  }
+  const brightDay = brightest?.day != null ? SPANISH_WEEKDAYS[isoWeekday(brightest.day) - 1] : null
+
+  if (topKey != null && topCount > 0) {
+    // Sujeto = TÚ, no la métrica ("Registraste comida 3 días", nunca
+    // "Comida apareció 3 días" — voice-and-copy: el sujeto somos tú y ella).
+    const dias = topCount === 1 ? 'un día' : `${topCount} días`
+    const base = `Registraste ${LABEL[topKey].toLowerCase()} ${dias} esta semana.`
+    return {
+      prevSunday,
+      observation:
+        brightDay != null && topCount > 1
+          ? `${base} El ${brightDay} fue tu día más encendido.`
+          : base,
+    }
+  }
+  return { prevSunday, observation: 'Tu semana quedó registrada, día a día.' }
 }

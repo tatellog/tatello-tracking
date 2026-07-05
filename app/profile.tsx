@@ -1,8 +1,10 @@
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import { useState } from 'react'
 import {
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Line, Path } from 'react-native-svg'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { StarLoader } from '@/components/StarLoader'
 import { useTransformProgress } from '@/features/emblem'
 import { avatarUrl } from '@/features/profile/api'
@@ -68,16 +71,25 @@ function ProfileBody() {
 
   const sign = profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null
   const signLabel = sign ? ZODIAC[sign].label : null
+  // Title-case para frases ("Escorpio", no "ESCORPIO" gritado en medio de una oración).
+  const signTitle = signLabel
+    ? signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
+    : null
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const kicker = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join(' · ')
   const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
   const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
   const SignGlyph = sign ? GLYPH_BY_SIGN[sign] : null
 
+  const [avatarPermDenied, setAvatarPermDenied] = useState(false)
   const pickAvatar = async () => {
     if (uploadAvatar.isPending) return
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) return
+    if (!perm.granted) {
+      setAvatarPermDenied(true)
+      return
+    }
+    setAvatarPermDenied(false)
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -90,6 +102,13 @@ function ProfileBody() {
 
   const editAboutYou = () => router.push('/onboarding/about-you?source=settings')
   const editBody = () => router.push('/onboarding/body-base?source=settings')
+  // El % abre su objeto: el emblema en Órbita Mes (patrón Apple: el perfil
+  // es la puerta a la recompensa, no un dato suelto).
+  const openEmblem = () => {
+    requestOrbitSegment('mes')
+    router.push('/(tabs)/orbit')
+  }
+  const editTargets = () => router.push('/onboarding/macro-targets?source=settings')
 
   return (
     <View style={styles.screen}>
@@ -157,31 +176,53 @@ function ProfileBody() {
               </View>
             ) : null}
 
+            {/* Re-anclado al EMBLEMA (benchmark jul 2026): "transformación"
+                justo bajo la foto de la usuaria se leía como transformación
+                corporal (línea roja de lectura). Y un % sin su objeto es
+                número de spreadsheet: ahora es la puerta al emblema (tap →
+                Órbita Mes). Bajo el 8%, cualitativo (mismo umbral que Mes). */}
             {transformPct > 0 ? (
-              <Text style={styles.transform}>
-                <Text style={styles.transformNum}>{transformPct}%</Text> de transformación
-              </Text>
+              <Pressable
+                onPress={openEmblem}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Ver tu emblema en Órbita"
+              >
+                <Text style={styles.transform}>
+                  {transformPct < 8 ? (
+                    'Tu constelación apenas empieza a revelarse'
+                  ) : (
+                    <>
+                      <Text style={styles.transformNum}>{transformPct}%</Text> de tu constelación
+                      revelada
+                    </>
+                  )}
+                  <Text style={styles.transformChevron}> ›</Text>
+                </Text>
+              </Pressable>
             ) : null}
           </Animated.View>
 
-          {/* Tu carta — identidad (de la fecha nace el signo). */}
+          {/* Tu carta — identidad (de la fecha nace el signo). Los vacíos
+              INVITAN ("Añadir"), nunca suenan a base de datos ("Sin definir"
+              era Capa 3 filtrándose a la UI). */}
           <Animated.View entering={enter(110)}>
             <Text style={styles.groupLabel}>Tu carta</Text>
             <View style={styles.card}>
               <Row
                 label="Nombre"
-                value={profile?.display_name ?? 'Sin definir'}
+                value={profile?.display_name ?? 'Añadir'}
                 onPress={editAboutYou}
               />
               <Row
                 label="Fecha de nacimiento"
-                value={
-                  profile?.date_of_birth ? formatBirthdate(profile.date_of_birth) : 'Sin definir'
-                }
+                value={profile?.date_of_birth ? formatBirthdate(profile.date_of_birth) : 'Añadir'}
                 onPress={editAboutYou}
                 last
               />
             </View>
+            {/* El dato declara qué alimenta (patrón Apple Health, en cálido). */}
+            <Text style={styles.cardCaption}>De tu fecha nace tu constelación.</Text>
           </Animated.View>
 
           {/* Tu cuerpo — datos del motor de cálculo. */}
@@ -190,25 +231,62 @@ function ProfileBody() {
             <View style={styles.card}>
               <Row
                 label="Altura"
-                value={profile?.height_cm ? `${profile.height_cm} cm` : 'Sin definir'}
+                value={profile?.height_cm ? `${profile.height_cm} cm` : 'Añadir'}
                 onPress={editBody}
               />
               <Row
                 label="Sexo biológico"
                 value={
                   profile?.biological_sex
-                    ? (SEX_LABEL[profile.biological_sex] ?? 'Sin definir')
-                    : 'Sin definir'
+                    ? (SEX_LABEL[profile.biological_sex] ?? 'Añadir')
+                    : 'Añadir'
                 }
                 onPress={editBody}
                 last
               />
             </View>
+            {/* La consecuencia invisible, dicha: estos datos alimentan las
+                metas, y el link cierra el loop (editas altura → revisas tus
+                metas recalculadas en el editor, que lee inputs en vivo). */}
+            <Text style={styles.cardCaption}>Con esto ajustamos tus metas.</Text>
+            <Pressable
+              onPress={editTargets}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Revisar mis metas"
+              style={styles.cardLinkHit}
+            >
+              <Text style={styles.cardLink}>Revisar mis metas ›</Text>
+            </Pressable>
           </Animated.View>
+
+          {/* El remate de la carta — une la constelación del fondo con la
+              identidad de arriba. Un elemento, no una sección (el vacío
+              inferior respira a propósito). */}
+          {signTitle ? (
+            <Animated.View entering={enter(210)}>
+              <Text style={styles.coachClose}>
+                Naciste bajo {signTitle}. Tu cielo se dibuja con lo que haces cada semana.
+              </Text>
+            </Animated.View>
+          ) : null}
 
           {uploadAvatar.isError ? (
             <Pressable onPress={pickAvatar} accessibilityRole="button">
               <Text style={styles.error}>No pudimos cambiar tu foto. Toca para reintentar.</Text>
+            </Pressable>
+          ) : null}
+          {/* Permiso de fotos negado: antes fallaba en silencio ("la app está
+              rota"). Nombrarlo + la salida (Ajustes del sistema). */}
+          {avatarPermDenied ? (
+            <Pressable
+              onPress={() => void Linking.openSettings()}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir ajustes del teléfono"
+            >
+              <Text style={styles.error}>
+                No tenemos permiso para ver tus fotos. Toca para abrir Ajustes.
+              </Text>
             </Pressable>
           ) : null}
         </ScrollView>
@@ -317,11 +395,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
   // Constelación del signo: tenue, abajo, desbordando a la derecha (asimetría).
+  // 0.28 (era 0.16): sobre estrellas que ya van a 0.4 de opacidad propia, en
+  // device real era invisible y el vacío inferior leía "falta contenido" en
+  // vez de "mi cielo".
   constellation: {
     position: 'absolute',
     bottom: -10,
     right: -48,
-    opacity: 0.16,
+    opacity: 0.28,
   },
   header: {
     flexDirection: 'row',
@@ -433,6 +514,41 @@ const styles = StyleSheet.create({
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.bodyLarge,
     color: colors.magenta,
+  },
+  transformChevron: {
+    fontFamily: typography.uiMedium,
+    color: colors.niebla,
+  },
+  // Caption bajo cada card — el dato declara qué alimenta (Apple Health en
+  // cálido, jamás "TDEE" ni ficha médica).
+  cardCaption: {
+    marginTop: 8,
+    marginLeft: 2,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.caption,
+    color: colors.niebla,
+  },
+  cardLinkHit: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  cardLink: {
+    marginLeft: 2,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+  },
+  // El remate de la carta — voz del coach, cierre emocional del perfil.
+  coachClose: {
+    marginTop: 26,
+    paddingHorizontal: 18,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 24,
+    color: colors.bone,
+    textAlign: 'center',
   },
   // ── Cards de datos ──
   groupLabel: {

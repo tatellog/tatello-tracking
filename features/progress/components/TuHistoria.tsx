@@ -71,7 +71,14 @@ type Row = {
  * Antes → Ahora (el pasado tenue, el presente luminoso) + el delta a la
  * derecha. El % de constelación usa el RPC con fecha de corte para el "antes"
  * exacto de hace 30 días.
+ *
+ * Gate por volumen de datos (principio Apple Trends): con pocos días de
+ * señales, los saltos rinden comparaciones absurdas (76→76 +0.0, dobles
+ * ceros, "prom. 2 g") que destruyen la confianza en todos los números.
+ * Bajo el umbral la tarjeta promete en vez de comparar, y muestra lo único
+ * vivo temprano: la constelación.
  */
+const MIN_DIAS_HISTORIA = 14
 export function TuHistoria() {
   const today = useMemo(() => todayInTimezone(), [])
   const cut30 = useMemo(() => isoDaysAgo(today, 30), [today])
@@ -96,6 +103,12 @@ export function TuHistoria() {
     signals.isLoading ||
     cBefore.isLoading ||
     cNow.isLoading
+
+  // Días con al menos una señal — decide si la historia ya puede hablar.
+  const diasConSenal = useMemo(
+    () => ((signals.data ?? []) as Signal[]).filter((r) => r.day != null).length,
+    [signals.data],
+  )
 
   const rows = useMemo<Row[]>(() => {
     const mRows = measurements.data ?? []
@@ -198,6 +211,36 @@ export function TuHistoria() {
     signLabel,
   ])
 
+  // Modo promesa — todavía no hay historia suficiente para comparar.
+  if (!loading && diasConSenal < MIN_DIAS_HISTORIA) {
+    const conNow = cNow.progress
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.card}>
+        <EyebrowLabel tone="magenta" size={10}>
+          Tu Historia
+        </EyebrowLabel>
+        <Text style={styles.promiseLead}>Tu historia se está escribiendo.</Text>
+        <Text style={styles.promiseBody}>
+          Con unas dos semanas de registros, aquí aparece tu antes y tu ahora.
+        </Text>
+        {conNow != null && conNow > 0 ? (
+          <View style={styles.promiseAlive}>
+            {/* Mismo umbral que el hero de Órbita Mes (Fase 8): bajo 8% el
+                número deflaciona; cualitativo hasta que cuente historia. */}
+            {Math.round(conNow) < 8 ? (
+              <Text style={styles.promiseAliveText}>{signLabel} · empieza a revelarse</Text>
+            ) : (
+              <Text style={styles.promiseAliveText}>
+                {signLabel} <Text style={styles.promiseAliveValue}>{Math.round(conNow)}%</Text>{' '}
+                revelado
+              </Text>
+            )}
+          </View>
+        ) : null}
+      </Animated.View>
+    )
+  }
+
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.card}>
       <EyebrowLabel tone="magenta" size={10}>
@@ -276,6 +319,42 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
     color: colors.niebla,
+  },
+  // Modo promesa — voz del coach arriba, mecánica en UI abajo.
+  promiseLead: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  promiseBody: {
+    marginTop: 6,
+    marginBottom: 14,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.caption,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
+  promiseAlive: {
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+  },
+  promiseAliveText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    letterSpacing: 0.2,
+    color: colors.bone,
+  },
+  promiseAliveValue: {
+    fontFamily: typography.uiBold,
+    color: colors.oroLight,
+    fontVariant: ['tabular-nums'],
   },
   rows: {
     marginTop: 4,

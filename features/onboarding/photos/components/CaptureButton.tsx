@@ -39,7 +39,7 @@ export function CaptureButton({ onPress, disabled = false }: Props) {
       <Animated.View style={[styles.outer, disabled && styles.disabled, animStyle]}>
         <View style={styles.inner}>
           <LinearGradient
-            colors={[colors.mauveLight, colors.mauveDeep]}
+            colors={[colors.magentaHot, colors.magenta]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -55,9 +55,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.pearlElevated,
+    backgroundColor: colors.bgCard,
     borderWidth: 3,
-    borderColor: colors.inkPrimary,
+    borderColor: colors.leche,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: 'rgba(255,255,255,0.4)',

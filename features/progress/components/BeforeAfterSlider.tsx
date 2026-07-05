@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   },
   knobGlyph: {
     fontFamily: typography.uiBold,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     letterSpacing: 1,
     color: colors.leche,
   },

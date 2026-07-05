@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 23,
     color: colors.bone,
     textAlign: 'center',
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   ephemValue: {
     fontFamily: typography.uiSemi,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   emptyHint: {

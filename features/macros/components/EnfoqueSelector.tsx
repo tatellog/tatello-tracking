@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.magenta,
   },
   checkMark: {
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     lineHeight: 11,
     color: colors.leche,
     fontFamily: typography.uiSemi,

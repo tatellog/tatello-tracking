@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   },
   weightUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.bone,
   },
   // "Cambio total" — chip callado en oro (sin rojo/verde: el peso no se juzga).
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   },
   deltaChipLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1,
     textTransform: 'uppercase',
     color: colors.niebla,

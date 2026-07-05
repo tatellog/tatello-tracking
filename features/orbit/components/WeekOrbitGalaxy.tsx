@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 0.4,
     color: colors.niebla,
   },

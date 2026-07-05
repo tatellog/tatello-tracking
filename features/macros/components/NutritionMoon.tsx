@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiSemi,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.bone,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 18,
     color: colors.leche,
   },

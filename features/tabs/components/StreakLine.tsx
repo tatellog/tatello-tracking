@@ -12,17 +12,17 @@ import Animated, {
 import { colors, typography } from '@/theme'
 
 /*
- * The streak line — a compact "X días en órbita" sat right under the
- * Hoy check-in. It's the *stake* of the toggle: what each log
- * protects and extends. Loss aversion is the strongest recurring
- * motivator there is, so the streak has to be visible — but STELAR is
- * anti-guilt, so it only ever names what's held, never threatens.
+ * "X días en órbita" — a compact line sat right under the Hoy check-in.
  *
- * `streak` comes from the server (`BriefContext.streak_days`) — one
- * source of truth, so this and the rest of the app always agree.
+ * The count is the LIFETIME total of days with any registro (decisión
+ * dueña jul 2026, alineada a "cualquier registro enciende"): it only
+ * ever grows, never resets, so there is nothing to lose and nothing to
+ * protect. NOT a consecutive streak — the manifiesto prohibits rigid
+ * streaks / loss-aversion mechanics, and this used to be one
+ * (ctx.streak_days). A pause simply pauses; the number waits.
  *
  * On an increment the number does a scale-pop + a magenta→white
- * colour flash, so the eye catches the streak *growing* the moment
+ * colour flash, so the eye catches the count *growing* the moment
  * the user commits. Hidden under 2 days — a "1 día" / "0 días" line
  * would nag more than it rewards.
  */

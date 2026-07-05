@@ -66,8 +66,8 @@ export function OrnamentShape({ variant, size }: Props) {
       <Svg width={dim} height={dim}>
         <Defs>
           <SvgRadial id={`ornament-${variant}`} cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={colors.mauveDeep} stopOpacity="0.13" />
-            <Stop offset="70%" stopColor={colors.mauveDeep} stopOpacity="0" />
+            <Stop offset="0%" stopColor={colors.magenta} stopOpacity="0.13" />
+            <Stop offset="70%" stopColor={colors.magenta} stopOpacity="0" />
           </SvgRadial>
         </Defs>
         <Circle cx={dim / 2} cy={dim / 2} r={dim / 2} fill={`url(#ornament-${variant})`} />

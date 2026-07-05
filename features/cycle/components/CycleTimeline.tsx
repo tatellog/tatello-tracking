@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   heroPhase: {
     fontFamily: typography.displaySemi,
-    fontSize: 24,
+    fontSize: typography.sizes.displaySm,
     color: colors.leche,
     letterSpacing: -0.4,
     lineHeight: 28,

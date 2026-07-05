@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -303,14 +303,14 @@ const styles = StyleSheet.create({
   countLine: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     lineHeight: 26,
     color: colors.bone,
   },
   countNum: {
     fontFamily: typography.uiBold,
     fontStyle: 'normal',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.oroSoft,
     fontVariant: ['tabular-nums'],
   },

@@ -44,7 +44,7 @@ import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { DailyNoteInline } from '@/features/moods/components/DailyNoteInline'
 import { MoodSliderInline } from '@/features/moods/components/MoodSliderInline'
-import { computeTdee, enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
+import { enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
@@ -240,10 +240,7 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
             to the chosen enfoque ("Déficit moderado") as quiet context,
             not a metric. Tapping it opens the goal editor. */}
         {safeActive === 0 && ctx.targets ? (
-          <EnfoqueChip
-            targetCalories={ctx.targets.calories}
-            consumedCalories={ctx.today_macros.calories}
-          />
+          <EnfoqueChip targetCalories={ctx.targets.calories} />
         ) : null}
       </View>
 
@@ -327,39 +324,23 @@ function Slide({
   return <Animated.View style={[{ width }, style]}>{children}</Animated.View>
 }
 
-/* Strategy chip in the macros header. For a deficit strategy it reads the
- * LIVE day standing: while today's intake stays under maintenance (TDEE)
- * the user is still losing, even past their calorie goal — "Aún en
- * déficit" reframes going over the target as not-failure (manifiesto:
- * context, no guilt). Once intake reaches maintenance it softens to a
- * neutral "En tu mantenimiento". Surplus / maintain keep the static
- * enfoque label. Quiet by design; renders nothing without a TDEE. */
-function EnfoqueChip({
-  targetCalories,
-  consumedCalories,
-}: {
-  targetCalories: number
-  consumedCalories: number
-}) {
+/* Strategy chip in the macros header. Names the PLAN, never the day's live
+ * standing: the intraday "Aún en déficit" was budget-semaphore framing
+ * (MFP's anxiety loop, and with 0 kcal it celebrated not eating — línea
+ * roja). The day's verdict now lives in the DayCloseCard at 20:00, with
+ * the same healthy-deficit definition as the month calendar. Quiet by
+ * design; renders nothing without a TDEE. */
+function EnfoqueChip({ targetCalories }: { targetCalories: number }) {
   const { inputs } = useMacroInputs()
   const state = reconstructState(targetCalories, inputs)
   if (!state) return null
-  // `state` is non-null only when a TDEE exists, so this is always a number.
-  const tdee = computeTdee(inputs)
-  const label =
-    state.enfoque === 'deficit' && tdee != null
-      ? consumedCalories < tdee
-        ? 'Aún en déficit'
-        : 'En tu mantenimiento'
-      : enfoqueLabel(state.enfoque, state.level)
+  // "Tu enfoque" — mismo vocabulario que el editor ("ELIGE TU ENFOQUE"),
+  // no "plan" (corporativo, per voice-and-copy).
+  const label = `Tu enfoque: ${enfoqueLabel(state.enfoque, state.level)}`
   // Pure status, not a button: editing lives on the cards ("Ajustar ›"),
   // so the chip is only context and never surprises with a navigation.
   return (
-    <View
-      style={styles.enfoqueChip}
-      accessibilityRole="text"
-      accessibilityLabel={`Tu enfoque hoy: ${label}`}
-    >
+    <View style={styles.enfoqueChip} accessibilityRole="text" accessibilityLabel={label}>
       <View style={styles.enfoqueDot} />
       <Text style={styles.enfoqueChipText}>{label}</Text>
     </View>
@@ -1226,7 +1207,7 @@ const styles = StyleSheet.create({
   // Magenta to tie to the dots; opacity is animated in JS-side.
   hint: {
     fontFamily: typography.uiBold,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 20,
     color: colors.magenta,
     marginLeft: 6,

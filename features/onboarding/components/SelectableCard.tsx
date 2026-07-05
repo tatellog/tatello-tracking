@@ -92,13 +92,13 @@ const styles = StyleSheet.create({
   squareIcon: {
     fontFamily: typography.display,
     fontSize: typography.sizes.macroNum,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
   squareLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.2,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
   row: {
     width: '100%',
@@ -112,25 +112,25 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
   rowDescription: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,
     lineHeight: 17,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   labelSelected: {
-    color: colors.mauveDeep,
+    color: colors.magenta,
   },
   idle: {
-    backgroundColor: colors.pearlElevated,
+    backgroundColor: colors.bgCard,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle,
   },
   selected: {
-    backgroundColor: colors.mauveTinted,
+    backgroundColor: colors.magentaTint,
     borderWidth: 1.5,
-    borderColor: colors.mauveDeep,
+    borderColor: colors.magenta,
   },
 })

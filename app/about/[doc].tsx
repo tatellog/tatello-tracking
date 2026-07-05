@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   point: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  pointGlyph: { fontSize: 11, lineHeight: 20, color: colors.magenta },
+  pointGlyph: { fontSize: typography.sizes.micro, lineHeight: 20, color: colors.magenta },
   pointText: {
     flex: 1,
     fontFamily: typography.ui,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   },
   versionTag: {
     fontFamily: typography.displayHeavy,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     letterSpacing: -0.4,
     color: colors.leche,
     marginBottom: 12,

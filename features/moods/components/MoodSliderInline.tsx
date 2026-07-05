@@ -44,7 +44,7 @@ const BUCKET_MP = [0, 0.5, 1]
 // Glow del glifo: lavanda (Difícil) · blanco (Neutral) · magenta (Bien). Mismo
 // lenguaje que MoodSky. "Bien" = magentaHot del tema (#FF4886), más magenta que
 // el rosa pastel anterior, on-brand con el acento fucsia de la app.
-const GLOW = ['#C7B6F0', '#F4ECDE', '#FF4886']
+const GLOW = ['#C7B6F0', colors.leche, colors.magentaHot]
 
 const THUMB = 22
 
@@ -355,14 +355,14 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.displaySemi,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     letterSpacing: -0.4,
     color: colors.leche,
   },
   hint: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
   trackHit: {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
   },
   scaleEnd: {
     fontFamily: typography.uiMedium,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.bruma,
   },
 })

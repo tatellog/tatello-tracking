@@ -165,9 +165,16 @@ export default function BodyBaseScreen() {
       totalSteps={9}
       canContinue={canContinue}
       loading={updateProfile.isPending}
-      errorMessage={updateProfile.error?.message}
+      // Copy cálido, nunca el error técnico crudo de Supabase (manifiesto).
+      errorMessage={
+        updateProfile.error ? 'No pudimos guardar esto. ¿Lo intentamos de nuevo?' : null
+      }
       onContinue={handleContinue}
-      continueLabel="Continuar"
+      // Modo settings (mismo patrón que about-you): CTA "Guardar" y sin barra
+      // de progreso, para que editar tu altura no se sienta como recaer en el
+      // wizard ("¿si toco Continuar me lleva por más pasos?").
+      continueLabel={fromSettings ? 'Guardar' : 'Continuar'}
+      showProgress={!fromSettings}
       ctaVariant="soft"
       ctaTransform="none"
       atmosphere={
@@ -198,11 +205,15 @@ export default function BodyBaseScreen() {
         showsVerticalScrollIndicator={false}
       >
         <StepHeader
-          eyebrow="El cuerpo que te lee"
+          eyebrow={fromSettings ? 'Tus datos' : 'El cuerpo que te lee'}
           eyebrowColor="magenta"
           question="Tu cuerpo base."
           questionEmphasis="Tu cuerpo"
-          hint="Stelar lo usa para calibrar lo que registras."
+          hint={
+            fromSettings
+              ? 'Con esto ajustamos tus metas. Puedes actualizarlas cuando quieras.'
+              : 'Stelar lo usa para calibrar lo que registras.'
+          }
         />
 
         <Section label="CUÁNTO MIDES">

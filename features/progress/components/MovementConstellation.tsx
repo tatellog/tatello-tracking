@@ -23,7 +23,8 @@ import { useAllWorkoutDates, useTotalTrainedDays } from '../hooks'
 
 const COLS = 7
 const CELL = 34
-const WD = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+// Lunes-primero — mismo idioma de calendario que Órbita Mes (MonthGlanceCalendar).
+const WD = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 const MONTHS = [
   'enero',
   'febrero',
@@ -39,10 +40,11 @@ const MONTHS = [
   'diciembre',
 ]
 
-// Scene colours (same palette as Día/Semana flares — not theme tokens).
-const MAGENTA = '#E91E63'
-const LECHE = '#F4ECDE'
-const GOLD = '#D9AE6F' // revelación / transformación
+// Scene colours — ALIAS de tokens (nunca hex literal: si el token cambia,
+// un literal copiado drifteaba en silencio).
+const MAGENTA = colors.magenta
+const LECHE = colors.leche
+const GOLD = colors.oro // revelación / transformación
 const BLUE = '#7C8FFF' // patrón
 
 /** Indicador del día: revelación (dorado), patrón (azul), transformación
@@ -61,6 +63,27 @@ function constancyLine(count: number): string {
   if (count >= 12) return 'Vas tejiendo tu constancia, un día a la vez.'
   if (count >= 4) return 'Cada día en movimiento suma. Tu cielo los guarda.'
   return 'Tu constelación de movimiento apenas empieza.'
+}
+
+/** Puente de continuidad: los primeros días del mes el cielo se ve vacío por
+ *  calendario, no por ausencia. Esta línea ancla ese vacío al mes anterior
+ *  PROPIO (el principio de Apple Trends: contra tu historial, nunca una vara:
+ *  aquí no hay meta ni "¿puedes con más?"). */
+function continuityLine(prevCount: number, prevMonth: string, currentMonth: string): string {
+  const cap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)
+  if (prevCount === 1) {
+    return `La estrella de ${prevMonth} sigue en tu cielo. ${cap} apenas amanece.`
+  }
+  return `Las ${prevCount} estrellas de ${prevMonth} siguen en tu cielo. ${cap} apenas amanece.`
+}
+
+/** Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC). */
+function isoDaysAgo(today: string, n: number): string {
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number]
+  const dt = new Date(y, m - 1, d - n)
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${dt.getFullYear()}-${mm}-${dd}`
 }
 
 /*
@@ -96,7 +119,7 @@ export function MovementConstellation({
     const rm = ref.getMonth() + 1 // 1-based
     const monthRef = `${ry}-${String(rm).padStart(2, '0')}-01`
     const m = buildMonthGrid(monthRef, allWorkouts.data ?? [], today)
-    const fw = new Date(ry, rm - 1, 1).getDay() // 0 = Sunday
+    const fw = (new Date(ry, rm - 1, 1).getDay() + 6) % 7 // 0 = Monday
     // Drop the year unless we've scrolled out of the current one.
     const label = ry === ty ? (MONTHS[rm - 1] ?? '') : `${MONTHS[rm - 1] ?? ''} ${ry}`
     return {
@@ -127,16 +150,59 @@ export function MovementConstellation({
         ? 'tu mes empieza'
         : 'un mes en pausa'
 
+  // El "ahora" junto al total vitalicio: una ventana propia de 4 semanas. Solo
+  // aparece si hay algo que susurrar; si el ritmo bajó a cero, silencio (nunca
+  // se señala el descenso). Redundante si el total ES la ventana (usuaria nueva).
+  const recentCount = (allWorkouts.data ?? []).filter((d) => d >= isoDaysAgo(today, 27)).length
+  const recentLine =
+    recentCount > 0 && count > recentCount ? `${recentCount} en las últimas 4 semanas` : null
+
+  // Puente de continuidad los primeros 7 días del mes: el cierre deja de hablar
+  // del all-time y recuerda que el mes pasado sigue ahí. Después, constancia.
+  const dayOfMonth = Number(today.slice(8, 10))
+  const [ty, tm] = today.split('-').map(Number) as [number, number]
+  const prevRef = new Date(ty, tm - 2, 1)
+  const prevPrefix = `${prevRef.getFullYear()}-${String(prevRef.getMonth() + 1).padStart(2, '0')}`
+  const prevMonthCount = (allWorkouts.data ?? []).filter((d) => d.startsWith(prevPrefix)).length
+  const closingLine =
+    dayOfMonth <= 7 && prevMonthCount > 0
+      ? continuityLine(prevMonthCount, MONTHS[prevRef.getMonth()] ?? '', MONTHS[tm - 1] ?? '')
+      : constancyLine(count)
+
+  // Leyenda viva: solo los estados que EXISTEN en el mes visible. Una marca
+  // que nunca aparece no merece renglón (el primer dorado se estrena solo).
+  let legendTrained = false
+  let legendRested = false
+  let legendRevelation = false
+  let legendPattern = false
+  for (const cell of month.cells) {
+    if (cell.trained) legendTrained = true
+    const meta = metaByDate?.get(cell.date)
+    if (meta?.rested) legendRested = true
+    for (const mark of meta?.marks ?? []) {
+      if (mark === 'pattern') legendPattern = true
+      else legendRevelation = true
+    }
+  }
+
   return (
     <Animated.View entering={FadeIn.duration(360).delay(80)}>
       <View style={styles.card}>
-        {/* The all-time counter — the hero number. */}
-        <View style={styles.countRow}>
-          <Text style={styles.bigNum}>{count}</Text>
-          <Text style={styles.countLabel}>
-            {count === 1 ? 'día entrenado en total' : 'días entrenados en total'}
-          </Text>
-        </View>
+        {/* The all-time counter — the hero number. A lifetime zero never
+            renders as a giant number (un cero como identidad): before the
+            first workout the hero is an invitation, not a count. */}
+        {count > 0 ? (
+          <View style={styles.countRow}>
+            <Text style={styles.bigNum}>{count}</Text>
+            <Text style={styles.countLabel}>
+              {count === 1 ? 'día entrenado en total' : 'días entrenados en total'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.startLine}>Tu historia empieza con tu primer entreno.</Text>
+        )}
+        {/* El "ahora": ventana propia de 4 semanas, en susurro bajo el héroe. */}
+        {recentLine ? <Text style={styles.recentLine}>{recentLine}</Text> : null}
         {/* Human milestone, once a full month of effective training is in. */}
         {count >= 30 ? (
           <Text style={styles.milestone}>{effectiveTrainingPhrase(count)} de entreno efectivo</Text>
@@ -281,24 +347,45 @@ export function MovementConstellation({
         {onDayPress ? <Text style={styles.tapHint}>Toca un día para ver su detalle</Text> : null}
 
         {/* Leyenda — cómo se lee el cielo. Solo cuando hay tap (Historia). */}
-        {onDayPress ? <StarLegend /> : null}
+        {onDayPress ? (
+          <StarLegend
+            trained={legendTrained}
+            rested={legendRested}
+            revelation={legendRevelation}
+            pattern={legendPattern}
+          />
+        ) : null}
 
         {/* Cierre: reconoce la CONSTANCIA (no un entreno de hoy). Voz de coach,
-            sin racha rígida ni presión — el número solo crece. */}
-        {count >= 1 ? <Text style={styles.constancy}>{constancyLine(count)}</Text> : null}
+            sin racha rígida ni presión — el número solo crece. Al abrir el mes,
+            el puente de continuidad con el mes anterior toma su lugar. */}
+        {count >= 1 ? <Text style={styles.constancy}>{closingLine}</Text> : null}
       </View>
     </Animated.View>
   )
 }
 
-/* Cómo se lee el calendario Historia: cada marca, una línea. Estática. */
-function StarLegend() {
+/* Cómo se lee el calendario Historia. Leyenda VIVA: solo lista las marcas
+ * presentes en el mes visible — un estado que no existe en tu cielo no cobra
+ * renglón, y el primer dorado/azul del mes estrena el suyo. */
+function StarLegend({
+  trained,
+  rested,
+  revelation,
+  pattern,
+}: {
+  trained: boolean
+  rested: boolean
+  revelation: boolean
+  pattern: boolean
+}) {
+  if (!trained && !rested && !revelation && !pattern) return null
   return (
     <View style={styles.legend}>
-      <LegendItem color={MAGENTA} label="Entrenaste" />
-      <LegendItem color={LECHE} faint label="Descansaste" />
-      <LegendItem color={GOLD} label="Revelación" />
-      <LegendItem color={BLUE} label="Patrón" />
+      {trained ? <LegendItem color={MAGENTA} label="Entrenaste" /> : null}
+      {rested ? <LegendItem color={LECHE} faint label="Descansaste" /> : null}
+      {revelation ? <LegendItem color={GOLD} label="Revelación" /> : null}
+      {pattern ? <LegendItem color={BLUE} label="Patrón" /> : null}
     </View>
   )
 }
@@ -511,12 +598,29 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
   },
+  // Hero antes del primer entreno — invitación, sin número.
+  startLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    paddingVertical: 6,
+  },
   milestone: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.label,
     color: colors.bone,
     marginTop: 4,
+  },
+  // El "ahora" bajo el total vitalicio — susurro, nunca compite con el héroe.
+  recentLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    marginTop: 4,
+    opacity: 0.85,
   },
   monthHead: {
     marginTop: 18,

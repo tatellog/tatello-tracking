@@ -20,6 +20,7 @@ import { useIsoWeekSignals, useSignalsHistory } from '../hooks'
 import {
   buildWeekDimensions,
   dayTimeline,
+  daysAhead as computeDaysAhead,
   dimDeficitBridge,
   dimObservation,
   dimensionLine,
@@ -30,6 +31,7 @@ import {
   weekAbsences,
   weekDirection,
   weekLever,
+  weekSeal,
   weekSilhouette,
   type DayCell,
   type DayTimelineRow,
@@ -64,12 +66,12 @@ const DISCOVERY_ART: Record<DiscoveryArchetype, number> = {
 const DISCOVERY_COLOR: Record<DiscoveryArchetype, string> = {
   constancia: colors.magentaHot,
   comienzo: colors.oroSoft,
-  movimiento: '#FF9E57',
+  movimiento: colors.signal.entreno,
   nutricion: colors.dimension.alimento,
   proteina: colors.dimension.alimento,
   descanso: colors.dimension.sueno,
   hidratacion: colors.leche,
-  energia: '#FF9E57',
+  energia: colors.signal.entreno,
 }
 
 /*
@@ -96,7 +98,7 @@ export function WeekSegment({
   /** Volver al inicio del scroll (botón al final del recorrido). */
   onScrollTop?: () => void
 }) {
-  const { data: signals, todayIso, isLoading } = useIsoWeekSignals()
+  const { data: signals, todayIso, isLoading, isError, refetch } = useIsoWeekSignals()
   const macros = useMacroTargets()
   const proteinTarget = macros.data?.protein_g ?? null
   // La meta calórica habilita la evidencia de déficit (co-ocurrencias, §3-§6).
@@ -105,7 +107,25 @@ export function WeekSegment({
   const ctx = useMemo(() => ({ proteinTarget, calorieTarget }), [proteinTarget, calorieTarget])
 
   const week = useMemo(() => signals ?? [], [signals])
-  const dims = useMemo(() => buildWeekDimensions(week, todayIso, ctx), [week, todayIso, ctx])
+  // Primera semana CON DATOS (sin señal alguna antes del lunes): gatea el
+  // marco temporal del hero (5.1) y recorta denominadores/celdas al primer
+  // día con señal (5.2). En el día 2 de uso, "1 día por delante" y "2 de 6
+  // días" juzgan días en los que la app no existía en su vida.
+  const monday = mondayOf(todayIso)
+  const firstWeekOfData = useMemo(
+    () => !week.some((s) => s.day != null && s.day < monday),
+    [week, monday],
+  )
+  const denomFrom = useMemo(() => {
+    if (!firstWeekOfData) return undefined
+    let min: string | undefined
+    for (const s of week) if (s.day != null && (min == null || s.day < min)) min = s.day
+    return min
+  }, [firstWeekOfData, week])
+  const dims = useMemo(
+    () => buildWeekDimensions(week, todayIso, ctx, denomFrom),
+    [week, todayIso, ctx, denomFrom],
+  )
   const discovery = useMemo(() => mainDiscovery(week, todayIso, ctx), [week, todayIso, ctx])
   // §3 evidencia emergente · §4 hechos · §5 honestidad · §6 día por día · §8.
   // §0 · rumbo de la semana vs la pasada (dirección, no conteo). null en la
@@ -113,6 +133,13 @@ export function WeekSegment({
   const direction = useMemo(() => weekDirection(week, todayIso, ctx), [week, todayIso, ctx])
   // §S · la silueta de los 7 días (la forma del tramo).
   const silhouette = useMemo(() => weekSilhouette(week, todayIso, ctx), [week, todayIso, ctx])
+  // El sello de la semana pasada — solo el lunes (la cita: ese día siempre
+  // hay algo nuevo). La ventana de 2 semanas ya trae la semana sellada.
+  const seal = useMemo(() => weekSeal(week, todayIso, ctx), [week, todayIso, ctx])
+  const sealCells = useMemo(
+    () => (seal ? weekSilhouette(week, seal.prevSunday, ctx) : null),
+    [seal, week, ctx],
+  )
   const emerging = useMemo(() => emergingEvidence(week, todayIso, ctx), [week, todayIso, ctx])
   // Baseline "esta semana vs tu costumbre" (sueño, energía) — necesita historial
   // más largo que la ventana de 2 semanas; el detector filtra a los días previos
@@ -138,6 +165,11 @@ export function WeekSegment({
   // patrón ("Verlo en mi órbita") si lo hubo (one-shot).
   const [focusedDim, setFocusedDim] = useState<WeekDimKey | null>(() => consumeWeekFocus())
   const focused = focusedDim ? (dims.find((d) => d.key === focusedDim) ?? null) : null
+  // 9.5 · la galaxia se gana su despliegue con historia (≥2 señales con ≥3
+  // días); antes, colapsada tras un tap. Un deep-link de patrón la abre.
+  const galaxyHasStory = galaxyDims.filter((d) => d.present >= 3).length >= 2
+  const [galaxyOpen, setGalaxyOpen] = useState<boolean>(() => focusedDim != null)
+  const galaxyVisible = galaxyHasStory || galaxyOpen
 
   const [showEvidence, setShowEvidence] = useState(false)
   // §S · día seleccionado en la silueta → su panel de etiquetas emerge abajo
@@ -150,21 +182,67 @@ export function WeekSegment({
   // propio color.
   const accent = discoveryColor(discovery.archetype)
 
-  if (isLoading) {
-    return <View style={styles.wrap} />
+  // 9.4 · carga y error explícitos (mismo par cálido de Día): la pantalla en
+  // blanco de antes se leía como rota, y un fetch fallido no tenía salida.
+  if (isLoading && signals == null) {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.stateCard}>
+          <Text style={styles.stateBody}>Mirando tu semana…</Text>
+        </View>
+      </View>
+    )
+  }
+  if (isError && signals == null) {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.stateCard}>
+          <Text style={styles.stateTitle}>Tu semana no terminó de cargar</Text>
+          <Text style={styles.stateBody}>Vuelve a intentarlo en un momento.</Text>
+          <Pressable
+            style={styles.stateRetryBtn}
+            onPress={() => void refetch()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar"
+          >
+            <Text style={styles.stateRetry}>Reintentar</Text>
+          </Pressable>
+        </View>
+      </View>
+    )
   }
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* Hero — la pregunta que responde la pantalla. */}
+      {/* Hero — la pregunta que responde la pantalla. El sub "todavía se está
+          escribiendo" se oculta al final de la semana: convivía con "está por
+          terminar" del hero y la contradicción confundía (¿se escribe o ya se
+          acabó?). */}
       <View style={styles.hero}>
         <Text style={styles.title}>¿Qué descubriste esta semana?</Text>
-        <Text style={styles.subtitle}>Tu semana todavía se está escribiendo.</Text>
+        {firstWeekOfData || computeDaysAhead(todayIso) > 1 ? (
+          <Text style={styles.subtitle}>Tu semana todavía se está escribiendo.</Text>
+        ) : null}
       </View>
+
+      {/* El sello del lunes (Fase 7) — la semana pasada como artefacto: la
+          silueta final de sus 7 días + UNA observación + el puente. La razón
+          estructural de volver cada lunes (cita con novedad garantizada).
+          Sin score, sin "lograste": la semana se sella con lo que hubo. */}
+      {seal && sealCells ? (
+        <View style={styles.sealCard}>
+          <Text style={styles.sealEyebrow}>El sello de tu semana</Text>
+          <Text style={styles.sealTitle}>Tu semana quedó escrita.</Text>
+          <WeekSilhouette cells={sealCells} />
+          <Text style={styles.sealObservation}>{seal.observation}</Text>
+          <Text style={styles.sealBridge}>Una semana nueva se abre.</Text>
+        </View>
+      ) : null}
 
       {/* §0 · Todavía puedo + dirección — lo único que solo Semana da (ver
           docs/orbita-semana-spec.md §0). Se muestra siempre que haya semana. */}
-      <WeekProgressHero todayIso={todayIso} direction={direction} />
+      <WeekProgressHero todayIso={todayIso} direction={direction} firstWeek={firstWeekOfData} />
 
       {!hasEvidence ? (
         <EmptySegmentCard
@@ -191,14 +269,33 @@ export function WeekSegment({
           {/* §2 · El cielo semanal — la galaxia ES evidencia (cada planeta, su
               masa por días presentes). El centro que la usuaria ama; el eje
               vertical (qué hábitos) que complementa la silueta. Más aire arriba
-              para separar de la silueta/tapHint. */}
+              para separar de la silueta/tapHint.
+              9.5 · on-demand mientras no tenga historia (≥2 señales con ≥3
+              días): dos gramáticas interactivas maestras en una vista eran
+              mucha maquinaria para decir "registraste 2 días". Un tap la abre
+              cuando la usuaria quiera; se despliega sola al ganarse su lugar. */}
           <Text style={[styles.sectionEyebrow, styles.sectionEyebrowGap]}>El cielo semanal</Text>
-          <WeekOrbitGalaxy
-            dims={galaxyDims}
-            onFocusChange={setFocusedDim}
-            initialFocus={focusedDim}
-          />
-          {focused && focused.present > 0 ? (
+          {!galaxyVisible ? (
+            <Pressable
+              style={styles.galaxyTeaser}
+              onPress={() => setGalaxyOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Ver el cielo semanal"
+            >
+              <Text style={styles.galaxyTeaserBody}>
+                Tus señales de la semana, como sistema. Se despliega solo cuando ya tiene historia
+                que contar.
+              </Text>
+              <Text style={styles.galaxyTeaserLink}>Ver el cielo semanal ›</Text>
+            </Pressable>
+          ) : (
+            <WeekOrbitGalaxy
+              dims={galaxyDims}
+              onFocusChange={setFocusedDim}
+              initialFocus={focusedDim}
+            />
+          )}
+          {galaxyVisible && focused && focused.present > 0 ? (
             <Animated.View
               key={focused.key}
               entering={FadeInDown.duration(320)}
@@ -212,7 +309,7 @@ export function WeekSegment({
                   no se confunde con la silueta §S ni con el día-por-día. */}
               <Text style={styles.panelObs}>{dimObservation(focused.present, focused.total)}</Text>
               <DayLine
-                cells={dimensionLine(week, todayIso, focused.key, ctx)}
+                cells={dimensionLine(week, todayIso, focused.key, ctx, denomFrom)}
                 color={WEEK_DIM_COLOR[focused.key]}
               />
               {/* Puente hábito↔peso (solo proteína/movimiento, con meta): conecta
@@ -230,9 +327,9 @@ export function WeekSegment({
                 {focused.present} de {focused.total} {focused.total === 1 ? 'día' : 'días'}
               </Text>
             </Animated.View>
-          ) : (
+          ) : galaxyVisible ? (
             <Text style={styles.tapHint}>Toca un planeta para ver sus días.</Text>
-          )}
+          ) : null}
 
           {/* §1 · Una observación de la semana — la co-ocurrencia más fuerte,
               DEMOVIDA a apoyo (ya no es el hero; los patrones profundos son de
@@ -521,7 +618,9 @@ function TransitionBlock({
         <Text style={styles.transitionLine}>Cada semana deja una huella en tu mes.</Text>
         {onOpenMes ? (
           <Pressable onPress={onOpenMes} hitSlop={8} accessibilityRole="button">
-            <Text style={[styles.transitionLink, { color: accent }]}>
+            {/* 9.3 · tint FIJO de navegación (oro): "esto navega" debe ser
+                aprendible; el acento por arquetipo queda para las ✦. */}
+            <Text style={[styles.transitionLink, { color: colors.oro }]}>
               Ver cómo se transforma tu mes ›
             </Text>
           </Pressable>
@@ -602,10 +701,16 @@ function EvidenceSheet({
 const TAG_COLOR: Record<string, string> = {
   Déficit: colors.dimension.alimento,
   Proteína: colors.oroLight,
-  Entreno: '#FF9E57',
+  Entreno: colors.signal.entreno,
   'Por encima de tu meta': colors.niebla,
   'Sin registros': colors.bruma,
   Registro: colors.niebla,
+  // 5.4 · las señales reales del día (mismos acentos que la galaxia/dims).
+  Comida: colors.dimension.alimento,
+  Sueño: colors.dimension.sueno,
+  Agua: colors.signal.agua,
+  Ánimo: colors.dimension.mente,
+  Descanso: colors.dimension.ciclo,
 }
 const MUTED_TAGS = new Set(['Por encima de tu meta', 'Sin registros', 'Registro'])
 
@@ -648,7 +753,8 @@ function DayFocusPanel({
           accessibilityRole="button"
           accessibilityLabel={`Ver el ${row.weekdayLabel.toLowerCase()} en Órbita Día`}
         >
-          <Text style={[styles.dayFocusLink, { color: accent }]}>
+          {/* 9.3 · tint fijo de navegación (oro), no el acento del arquetipo. */}
+          <Text style={[styles.dayFocusLink, { color: colors.oro }]}>
             Ver el {row.weekdayLabel.toLowerCase()} en detalle ›
           </Text>
         </Pressable>
@@ -689,6 +795,42 @@ const styles = StyleSheet.create({
   wrap: {
     marginTop: 10,
   },
+  // 9.4 · carga/error — mismo par cálido de Día (card + Reintentar 44pt).
+  stateCard: {
+    borderRadius: 20,
+    padding: 20,
+    backgroundColor: colors.bgCard,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  stateTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+    marginBottom: 6,
+  },
+  stateBody: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.niebla,
+  },
+  stateRetry: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+  },
+  stateRetryBtn: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+  },
   // ── Hero ──────────────────────────────────────────────────────────
   // La pregunta es voz de coach → serif italic, alineada a la izquierda, igual
   // que "¿Quién fuiste hoy?" de Día.
@@ -699,11 +841,14 @@ const styles = StyleSheet.create({
   // Título de página = tipografía display (Hanken), no serif italic: el serif
   // italic está reservado para la voz de coach. Va a la izquierda como héroe.
   // Mismo título que Día (Hanken displayHeavy), para un header consistente.
+  // 9.2 · UN solo título grande por vista: el hero es "Tu Órbita" (36);
+  // la pregunta baja a nivel de sección (24) para no competir (doble título
+  // del mismo peso era la queja Apple). Mismo tamaño en Día/Semana/Mes.
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -1.2,
+    fontSize: typography.sizes.displaySm,
+    lineHeight: 30,
+    letterSpacing: -0.8,
     color: colors.leche,
   },
   // Mismo estilo que el subtítulo de Día (su línea de fecha): UI gris niebla.
@@ -722,6 +867,66 @@ const styles = StyleSheet.create({
   },
   // Eyebrows neutros (gris niebla), misma métrica que Día — el eyebrow nunca
   // lleva color de marca.
+  // ── El sello del lunes ─────────────────────────────────────────────
+  sealCard: {
+    marginBottom: 24,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
+    backgroundColor: colors.bgCard,
+  },
+  sealEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+    marginBottom: 8,
+  },
+  sealTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 26,
+    color: colors.leche,
+    marginBottom: 12,
+  },
+  sealObservation: {
+    marginTop: 12,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.bone,
+  },
+  sealBridge: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  // 9.5 · teaser de la galaxia colapsada.
+  galaxyTeaser: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+    padding: 16,
+  },
+  galaxyTeaserBody: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.niebla,
+  },
+  galaxyTeaserLink: {
+    marginTop: 10,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+  },
   sectionEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -866,7 +1071,7 @@ const styles = StyleSheet.create({
   panelLabel: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 26,
     textAlign: 'center',
   },
@@ -910,7 +1115,7 @@ const styles = StyleSheet.create({
   },
   listStar: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
     marginTop: 1,
   },
@@ -926,7 +1131,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 23,
     color: colors.leche,
   },
@@ -940,7 +1145,7 @@ const styles = StyleSheet.create({
   whisperNote: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 20,
     color: colors.niebla,
   },
@@ -993,7 +1198,7 @@ const styles = StyleSheet.create({
   dayFocusName: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
   },
   dayFocusTags: {
@@ -1014,7 +1219,7 @@ const styles = StyleSheet.create({
   // ── Ausencia ──────────────────────────────────────────────────────
   absenceMark: {
     fontFamily: typography.ui,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.bruma,
     marginTop: 1,
   },
@@ -1034,7 +1239,7 @@ const styles = StyleSheet.create({
   transitionLine: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 22,
     color: colors.bone,
     textAlign: 'center',
@@ -1056,7 +1261,7 @@ const styles = StyleSheet.create({
   },
   dayLetter: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 0.5,
     color: colors.niebla,
   },
@@ -1085,7 +1290,7 @@ const styles = StyleSheet.create({
   },
   dayCheck: {
     fontFamily: typography.uiBold,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     color: colors.leche,
   },
   // ── Tira de fechas (picker de día) — distinta a la línea de presencia ──
@@ -1100,7 +1305,7 @@ const styles = StyleSheet.create({
   },
   stripLetter: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 0.5,
     color: colors.niebla,
   },
@@ -1122,7 +1327,7 @@ const styles = StyleSheet.create({
   },
   stripNum: {
     fontFamily: typography.uiSemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
   },
   stripNumToday: {
@@ -1189,7 +1394,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 27,
     color: colors.leche,
   },
@@ -1222,7 +1427,7 @@ const styles = StyleSheet.create({
   },
   evCheck: {
     fontFamily: typography.uiBold,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.oroLight,
     marginTop: 1,
   },

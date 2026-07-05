@@ -7,6 +7,7 @@ import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
   FadeInDown,
+  LinearTransition,
   useReducedMotion,
   useSharedValue,
 } from 'react-native-reanimated'
@@ -29,6 +30,9 @@ import { TransformationReveal, useRevelationOrchestrator } from '@/features/reve
 import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
+import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
+import { useFirstStarCeremony } from '@/features/tabs/first-star'
+import { useWaterToday } from '@/features/water/hooks'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { useBriefContext } from '@/features/brief/hooks'
 import { setActiveLogDate, subscribeReturnToToday } from '@/features/tabs/active-log-date'
@@ -37,12 +41,19 @@ import {
   subscribeCalendarDayRequest,
 } from '@/features/tabs/pending-calendar-day'
 import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
-import { useToggleWorkoutForDate, useToggleWorkoutToday } from '@/features/streak/hooks'
+import {
+  useSetWorkoutTypeToday,
+  useToggleWorkoutForDate,
+  useToggleWorkoutToday,
+  useWorkoutTypeToday,
+} from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
 import {
   CoachLine,
   DayCheckIn,
+  DayCloseCard,
   type DayState,
+  type WorkoutTypeId,
   LunarConstellation,
   SectionHeader,
   SkyBackground,
@@ -147,6 +158,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const toggleToday = useToggleWorkoutToday()
   const toggleForDate = useToggleWorkoutForDate()
+  const setWorkoutType = useSetWorkoutTypeToday()
 
   // ── Modo "ver día": Hoy puede mostrar CUALQUIER día, no solo hoy. El día
   // visto es `selectedDate` (lo setean el strip y el "Editar día" de Progreso).
@@ -300,15 +312,65 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     () => (stripWorkouts.data ?? []).filter((d) => d.startsWith(monthPrefix)),
     [stripWorkouts.data, monthPrefix],
   )
+  // Mecánica A (retention-mechanics-spec): CUALQUIER registro del día
+  // enciende su estrella — comida, agua, sueño, ánimo, entreno o descanso —
+  // no solo «Entrené». daily_signals ya agrega todas las señales por día;
+  // los workouts se unen aparte porque el registro de hoy puede no estar
+  // aún en la view cacheada. Solo SUMA días (nunca apaga uno encendido).
+  const monthSignals = useSignalsHistory(45)
+  const monthLitDates = useMemo(() => {
+    const days = new Set(monthWorkoutDates)
+    for (const r of monthSignals.data ?? []) {
+      if (r.day != null && r.day.startsWith(monthPrefix)) days.add(r.day)
+    }
+    return Array.from(days)
+  }, [monthWorkoutDates, monthSignals.data, monthPrefix])
+  // Hoy en vivo: la señal de hoy puede tardar hasta 60 s en la view; los
+  // flags frescos (entreno / comidas / ánimo / agua) encienden al instante.
+  const todaySignals = useTodaySignals()
+  const todayWater = useWaterToday(todayIsoLocal)
+  const todayHasRegistro =
+    ctx.today_workout_completed ||
+    ctx.meal_count_today > 0 ||
+    ctx.latest_mood?.checkin_date === todayIsoLocal ||
+    (todayWater.data ?? 0) > 0 ||
+    // «Descansé» es camino de primera clase a la estrella (restQuery sigue al
+    // día visto; solo cuenta si el día visto es hoy).
+    (restQuery.data === true && selectedDate === todayIsoLocal) ||
+    todaySignals.data != null
   const month = useMemo(() => {
-    const m = buildMonthGrid(todayIsoLocal, monthWorkoutDates)
-    if (ctx.today_workout_completed && m.todayIdx >= 0 && !m.grid[m.todayIdx]) {
+    const m = buildMonthGrid(todayIsoLocal, monthLitDates)
+    if (todayHasRegistro && m.todayIdx >= 0 && !m.grid[m.todayIdx]) {
       m.grid[m.todayIdx] = true
       m.cells[m.todayIdx]!.trained = true
       m.trainedThisMonth += 1
     }
     return m
-  }, [todayIsoLocal, monthWorkoutDates, ctx.today_workout_completed])
+  }, [todayIsoLocal, monthLitDates, todayHasRegistro])
+
+  // Micro-ceremonia de la PRIMERA estrella de la vida de la usuaria: haptic +
+  // fuegos sobre la constelación + línea del coach. Si la primera acción fue
+  // «Entrené», su celebración propia ya corre — no doblamos el Lottie, la
+  // línea basta. Una sola vez, persistido (useFirstStarCeremony).
+  // "X días en órbita" — acumulado de por vida de días con señal (decisión
+  // dueña jul 2026: alineado a la mecánica "cualquier registro enciende";
+  // reemplaza a la racha consecutiva ctx.streak_days, que era loss-aversion).
+  // El +1 en vivo: hoy cuenta apenas registra, aunque la view aún no lo traiga.
+  const totalSignalDays = useTotalSignalDays()
+  const daysInOrbit =
+    (totalSignalDays.data ?? 0) + (todayHasRegistro && todaySignals.data == null ? 1 : 0)
+
+  const firstStarFired = useFirstStarCeremony(todayHasRegistro)
+  const firstStarPlayed = useRef(false)
+  useEffect(() => {
+    if (!firstStarFired || firstStarPlayed.current) return
+    firstStarPlayed.current = true
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    if (!reducedMotion && !celebrating) {
+      setCelebrating(true)
+      setCelebrateKey((k) => k + 1)
+    }
+  }, [firstStarFired, reducedMotion, celebrating])
 
   const trainedThisMonth = month.trainedThisMonth
   const MONTHS_ES = [
@@ -365,6 +427,15 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     : restedToday
       ? 'rested'
       : 'undecided'
+
+  // Tipo de entreno de HOY para los chips post-confirmación. Solo consulta
+  // cuando hoy ya está entrenado; en modo "ver día" los chips no existen.
+  const workoutTypeQ = useWorkoutTypeToday(!viewingPast && dayState === 'trained')
+
+  const handleWorkoutType = (type: WorkoutTypeId | null) => {
+    setWorkoutType.mutate(type)
+    track('workout_type_selected', { type: type ?? 'cleared' })
+  }
 
   const handleDayChange = (next: DayState) => {
     // Día PASADO: backfill sin celebración. GUARD — la constelación NO retrocede
@@ -484,10 +555,21 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
             <Animated.View entering={enter(120)}>
               <DayCheckIn
+                // Resetea el modo "cambiar" interno al navegar entre días.
+                key={selectedDate}
                 state={dayState}
                 onChange={handleDayChange}
                 label={viewingPast ? viewingLabel : 'Hoy'}
+                question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
                 locked={viewingPast && vctx.today_workout_completed}
+                workoutType={viewingPast ? undefined : workoutTypeQ.data}
+                onWorkoutType={viewingPast ? undefined : handleWorkoutType}
+                saveFailed={
+                  toggleToday.isError ||
+                  setRest.isError ||
+                  toggleForDate.isError ||
+                  setRestForDate.isError
+                }
               />
             </Animated.View>
 
@@ -498,7 +580,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 regla del mecanismo vive en el modal. La figura es tappable:
                 abre "Tu {signo}" (press-scale + la pista "toca para ver tus
                 estrellas" debajo). */}
-            <Animated.View entering={enter(200)} style={styles.heroWrap}>
+            {/* layout: cuando el check-in de arriba cambia de altura (colapso,
+                chips), el hero se DESLIZA a su nueva posición en vez de
+                brincar en el frame de la celebración. */}
+            <Animated.View
+              entering={enter(200)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(220)}
+              style={styles.heroWrap}
+            >
               <Pressable
                 onPress={() => {
                   heroPress.triggerHaptic()
@@ -525,7 +614,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       todayIdx={month.todayIdx}
                       target={month.daysInMonth}
                       sign={sign}
-                      committed={ctx.today_workout_completed}
+                      committed={todayHasRegistro}
                       suppressBurst
                       pausedSV={constellationPaused}
                     />
@@ -549,20 +638,38 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       press-scale). Texto sutil, NO el chevron flotante que se
                       veía raro. Se oculta en el estado vacío — ahí el contador
                       ya muestra su propia invitación. */}
-                  {trainedThisMonth > 0 ? (
-                    <Text style={styles.heroTapHint}>toca para ver tus estrellas ›</Text>
-                  ) : null}
+                  {/* Siempre montado: si esta línea aparece/desaparece cambia
+                      el ALTO de heroWrap y la layout transition animaría a la
+                      constelación como scale (la estira). Con el espacio
+                      reservado, el hero solo se desliza (translateY). */}
+                  <Text style={styles.heroTapHint}>
+                    {trainedThisMonth > 0 ? 'toca para ver tus estrellas ›' : ' '}
+                  </Text>
                 </Animated.View>
               </Pressable>
             </Animated.View>
 
-            <Animated.View entering={enter(300)} style={styles.coachLineWrap}>
+            <Animated.View
+              entering={enter(300)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(220)}
+              style={styles.coachLineWrap}
+            >
+              {/* La línea de la primera estrella — visible el resto de la
+                  sesión del día 1; mañana el coach normal retoma. */}
+              {firstStarFired ? (
+                <Animated.Text entering={FadeIn.duration(600)} style={styles.firstStarLine}>
+                  Tu primera estrella. Así empieza un cielo.
+                </Animated.Text>
+              ) : null}
               <CoachLine
                 align="center"
                 {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
               />
               {(() => {
-                if (dayState !== 'trained') return null
+                // El gancho del día 2 (Mecánica D): con la estrella de HOY ya
+                // encendida — por CUALQUIER registro, no solo «Entrené» — se
+                // nombra la que sigue. Open loop por deseo, nunca racha.
+                if (!todayHasRegistro || viewingPast) return null
                 if (trainedThisMonth >= figureCount) {
                   return (
                     <Text style={styles.tomorrowHint}>
@@ -589,9 +696,21 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               })()}
             </Animated.View>
 
-            {/* Racha — lectura secundaria bajo el hero. */}
+            {/* El cierre de hoy — veredicto nocturno (≥20:00, ≥1 comida):
+                "¿quedé en déficit?" claro y sin poesía, con la misma
+                definición de déficit sano del calendario dorado del mes.
+                Solo para HOY (en modo ver-día no hay cierre que dar). */}
+            {!viewingPast ? (
+              <DayCloseCard
+                consumedCalories={ctx.today_macros.calories}
+                targetCalories={ctx.targets?.calories}
+                mealCount={ctx.meal_count_today}
+              />
+            ) : null}
+
+            {/* Días en órbita — acumulado (no racha), lectura secundaria. */}
             <Animated.View entering={enter(360)}>
-              <StreakLine streak={ctx.streak_days} />
+              <StreakLine streak={daysInOrbit} />
             </Animated.View>
 
             {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
@@ -858,6 +977,17 @@ const styles = StyleSheet.create({
   coachLineWrap: {
     marginTop: 6,
     marginBottom: 14,
+  },
+  // La línea de la primera estrella — voz del coach, un tono más presente
+  // que el CoachLine normal porque ES el momento (una vez en la vida).
+  firstStarLine: {
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginBottom: 8,
   },
   tomorrowHint: {
     fontFamily: typography.serifSemi,

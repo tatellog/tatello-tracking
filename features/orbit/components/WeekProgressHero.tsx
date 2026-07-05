@@ -57,11 +57,18 @@ function directionSubline(dir: WeekDirection, ahead: number): string {
 export function WeekProgressHero({
   todayIso,
   direction,
+  firstWeek = false,
 }: {
   todayIso: string
   /** Rumbo vs la semana pasada, o null si no hay con qué comparar (primera
    *  semana medible) → solo se muestra la ventana abierta. */
   direction: WeekDirection | null
+  /** Primera semana CON DATOS de la usuaria. El marco por día-de-semana
+   *  ("Tu semana está por terminar · 1 día por delante") en el día 2 de uso
+   *  dice "ya perdiste esta semana antes de empezar" — lo contrario de
+   *  "ciclo, no carrera". En la primera semana no hay ventana que se cierre:
+   *  empieza donde estés, sin conteo de días restantes. */
+  firstWeek?: boolean
 }) {
   const ahead = computeDaysAhead(todayIso)
   const dir = direction ? DIR[direction.state] : null
@@ -72,13 +79,22 @@ export function WeekProgressHero({
   return (
     <View style={styles.wrap}>
       {/* (a) La ventana abierta */}
-      <Text style={styles.frame}>{frameLine(ahead)}</Text>
-      {ahead > 0 ? (
-        <Text style={styles.daysLine}>
-          <Text style={styles.daysNum}>{ahead}</Text>
-          {ahead === 1 ? ' día por delante' : ' días por delante'}
-        </Text>
-      ) : null}
+      {firstWeek ? (
+        <>
+          <Text style={styles.frame}>Tu primera semana empieza donde estés.</Text>
+          <Text style={styles.daysLine}>Cada día que registres deja huella.</Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.frame}>{frameLine(ahead)}</Text>
+          {ahead > 0 ? (
+            <Text style={styles.daysLine}>
+              <Text style={styles.daysNum}>{ahead}</Text>
+              {ahead === 1 ? ' día por delante' : ' días por delante'}
+            </Text>
+          ) : null}
+        </>
+      )}
 
       {/* (b) La dirección vs la semana pasada — la esfera que CONSTRUYE su camino
           de luz reemplaza la flecha y le da protagonismo a §0. El estado
@@ -122,7 +138,7 @@ const styles = StyleSheet.create({
   frame: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 28,
     color: colors.leche,
   },
@@ -136,7 +152,7 @@ const styles = StyleSheet.create({
   // veredicto. Por eso baja a ~anchor, para no competir ni leerse como cuota.
   daysNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     color: colors.leche,
   },
   dirBlock: {

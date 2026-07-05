@@ -78,6 +78,16 @@ export function moonProgressCopy(
   const pct = Math.max(0, protein / reference)
   const remaining = Math.max(0, Math.round(reference - protein))
 
+  // En CERO no hay honestidad que dar: "Faltan 160 g" a las 4pm sin nada
+  // registrado se lee como montaña, no como invitación (target-user). El
+  // faltante exacto vuelve con el primer gramo, cuando ya es progreso.
+  if (protein <= 0) {
+    return {
+      phrase: 'Tu luna apenas despierta.',
+      honest: 'Tu primera comida empieza a encenderla.',
+    }
+  }
+
   let phrase: string
   if (pct < 0.25) phrase = 'Tu luna apenas despierta.'
   else if (pct < 0.5) phrase = 'Tu luna va tomando luz.'

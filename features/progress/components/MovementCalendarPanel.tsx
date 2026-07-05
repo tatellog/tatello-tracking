@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import { track } from '@/lib/analytics'
+import { useMacroTargets } from '@/features/macros/hooks'
 import { dayNumOf, weekdayIdxOf, type CalendarDay } from '@/features/tabs/components/calendar/logic'
 import { useCalendarDays } from '@/features/tabs/components/calendar/useCalendarDays'
 import { requestCalendarDay } from '@/features/tabs/pending-calendar-day'
@@ -43,6 +44,8 @@ export function MovementCalendarPanel() {
   }, [calendarDays])
   const [historyDay, setHistoryDay] = useState<CalendarDay | null>(null)
   const [sheetVisible, setSheetVisible] = useState(false)
+  // Meta calórica del perfil → el sheet contextualiza el día frente al norte.
+  const calorieTarget = useMacroTargets().data?.calories ?? null
   // Ventana editable = últimos 30 días: solo ahí "Ver día" lleva a editar.
   const editableFrom = useMemo(() => isoDaysAgo(today, 29), [today])
   const sheetEditable = historyDay != null && historyDay.date >= editableFrom
@@ -74,6 +77,7 @@ export function MovementCalendarPanel() {
         visible={sheetVisible}
         day={historyDay}
         editable={sheetEditable}
+        calorieTarget={calorieTarget}
         onClose={() => setSheetVisible(false)}
         onSeeDay={seeDayInHoy}
       />

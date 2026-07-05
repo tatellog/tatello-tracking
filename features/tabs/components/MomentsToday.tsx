@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg'
 
+import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { emitRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { colors, typography } from '@/theme'
 
@@ -12,13 +13,7 @@ const MOMENTS: { type: MealMoment; label: string }[] = [
 ]
 
 /** El momento que "toca" por hora — el héroe visual de la estela. */
-function momentByHour(): MealMoment {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+const momentByHour = (): MealMoment => mealMomentByHour()
 
 /* El glifo celeste de cada momento — su astro en la órbita del día:
  *   desayuno = sol · comida = planeta (anillo) · cena = luna · snack = estrella.
@@ -343,7 +338,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     lineHeight: 13,
     color: colors.leche,
   },

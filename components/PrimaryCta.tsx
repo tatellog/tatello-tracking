@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiBold,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: '#FFFFFF',
     letterSpacing: 2.16,
     textTransform: 'uppercase',
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     letterSpacing: 0.2,
     fontFamily: typography.uiSemi,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
   },
   labelDisabled: {
     color: colors.niebla,

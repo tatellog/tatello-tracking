@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
   },
   closeGlyph: {
     fontFamily: typography.ui,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.leche,
     opacity: 0.55,
     lineHeight: 18,

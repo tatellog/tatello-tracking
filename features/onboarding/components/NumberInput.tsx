@@ -52,7 +52,7 @@ export function NumberInput({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder={placeholder}
-        placeholderTextColor={colors.labelDim}
+        placeholderTextColor={colors.bruma}
         keyboardType={decimal ? 'decimal-pad' : 'number-pad'}
         autoFocus={autoFocus}
         maxLength={decimal ? 6 : 4}
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSubtle,
   },
   rowFocused: {
-    borderBottomColor: colors.mauveDeep,
+    borderBottomColor: colors.magenta,
   },
   input: {
     // flex: 1 lets the input share the row with the unit instead of
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.display,
     fontSize: 56,
     letterSpacing: -1,
-    color: colors.inkPrimary,
+    color: colors.leche,
     backgroundColor: 'transparent',
     padding: 0,
   },
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.labelMuted,
+    color: colors.niebla,
     letterSpacing: 0.3,
   },
 })

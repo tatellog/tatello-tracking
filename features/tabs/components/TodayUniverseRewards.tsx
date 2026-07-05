@@ -48,8 +48,9 @@ import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { colors, duration, easing, radius, spacing, typography } from '@/theme'
 
 /*
- * "Tu universo hoy" — the visible reward layer for the registros that
- * do NOT light constellation stars (those are exclusively "Entrené").
+ * "Tu universo hoy" — the visible per-attribute reward layer for the
+ * day's registros. (Any registro now also lights today's constellation
+ * star — Mecánica A; this layer keeps the attribute-level feedback.)
  * A single ROW of 4 discreet icon + % items (no rings — those already
  * live in the Macros slide); tap an item to expand its detail. The maths
  * live in `universe-rewards.ts` (pure), this file only paints + feels.
@@ -725,19 +726,19 @@ const styles = StyleSheet.create({
   // negro warm. shadow refuerza el bloom en iOS. Opacidad la maneja el estado.
   itemPct: {
     fontFamily: typography.displaySemi,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     letterSpacing: -0.3,
     fontVariant: ['tabular-nums'],
   },
   // Astro dormido: un punto tenue en lugar de "0%".
   itemDash: {
     fontFamily: typography.uiMedium,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.bruma,
   },
   // Cada columna ocupa un cuarto del panel (4 en fila, sin wrap).
   pctSign: {
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
   particle: {
@@ -752,7 +753,7 @@ const styles = StyleSheet.create({
   microCoach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.bone,
     textAlign: 'center',
   },

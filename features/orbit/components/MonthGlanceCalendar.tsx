@@ -172,13 +172,28 @@ export function MonthGlanceCalendar({
         </>
       )}
 
-      {/* Leyenda: cada chip es una miniatura del tratamiento real. */}
-      <View style={styles.legend}>
-        <LegendItem kind="deficit" label="Déficit" />
-        <LegendItem kind="surplus" label="Superávit" />
-        <LegendItem kind="none" label="Sin datos" />
-        {data.hasLow ? <LegendItem kind="low" label="Día muy bajo" /> : null}
-      </View>
+      {/* Leyenda: cada chip es una miniatura del tratamiento real. Se gana el
+          derecho a aparecer con ≥5 días (mismo umbral que el %): enseñar la
+          gramática de 4 estados con 1 punto es explicar un texto que aún no
+          existe. */}
+      {data.dataDays >= 5 ? (
+        <>
+          <View style={styles.legend}>
+            <LegendItem kind="deficit" label="Déficit" />
+            <LegendItem kind="surplus" label="Superávit" />
+            <LegendItem kind="none" label="Sin datos" />
+            {data.hasLow ? <LegendItem kind="low" label="Día muy bajo" /> : null}
+          </View>
+          {/* "Muy bajo" sin explicación se lee como regaño en voz bajita ("¿hice
+              algo mal?"). Una línea que lo nombra como cuidado, no como falta. */}
+          {data.hasLow ? (
+            <Text style={styles.lowNote}>
+              Muy bajo: ese día quedó muy poca comida registrada. No es un logro ni una falta; tu
+              cuerpo también necesita energía para sostener el cambio.
+            </Text>
+          ) : null}
+        </>
+      ) : null}
     </View>
   )
 }
@@ -248,7 +263,7 @@ const styles = StyleSheet.create({
   dayNum: {
     marginTop: 3,
     fontFamily: typography.uiMedium,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     letterSpacing: 0.2,
     color: colors.bone,
     fontVariant: ['tabular-nums'],
@@ -353,7 +368,7 @@ const styles = StyleSheet.create({
   },
   captionNum: {
     fontFamily: typography.uiBold,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     letterSpacing: -0.4,
     color: colors.leche,
   },
@@ -379,7 +394,7 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     lineHeight: 22,
     color: colors.bone,
   },
@@ -421,6 +436,13 @@ const styles = StyleSheet.create({
   legendLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  lowNote: {
+    marginTop: 10,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.tinyLabel,
+    lineHeight: 16,
     color: colors.niebla,
   },
 })

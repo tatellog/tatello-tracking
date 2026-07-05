@@ -9,6 +9,8 @@
  * la constelación nunca discrepan. `rested` es válido pero no enciende estrella.
  */
 
+import { DEFICIT_FLOOR_RATIO, isDeficitDay } from '@/features/orbit/deficit'
+
 import { buildTrailingDays } from '../constellation/data/month-grid'
 
 export type DayStatus = 'empty' | 'trained' | 'rested'
@@ -175,6 +177,27 @@ function valuesFor(sig: DaySignal | undefined): DayValues {
     weightKg: sig?.weight_kg ?? null,
     onPeriod: sig?.on_period === true,
   }
+}
+
+/**
+ * Contexto del NORTE para el detalle de un día en Historia: cómo quedó ese día
+ * frente a tu meta, como estado CUALITATIVO en voz de coach. Nunca el delta
+ * numérico, nunca semáforo (la frontera countdown/contexto del manifiesto).
+ *
+ * Silencio (null) cuando no hay nada honesto que decir:
+ *   · sin calorías registradas o sin target → no se inventa contexto
+ *   · por debajo del piso sano (60% del target) → no se comenta; comentar un
+ *     día de restricción extrema sería celebrarlo o señalarlo, ambos prohibidos
+ */
+export function deficitContextLine(
+  calories: number | null | undefined,
+  target: number | null | undefined,
+): string | null {
+  if (target == null || target <= 0) return null
+  if (calories == null || calories <= 0) return null
+  if (isDeficitDay(calories, target)) return 'Un día en déficit. De esos que suman.'
+  if (calories < target * DEFICIT_FLOOR_RATIO) return null
+  return 'Ese día tu cuerpo pidió más.'
 }
 
 export function buildCalendarDays(args: BuildCalendarDaysArgs): CalendarDay[] {

@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
@@ -280,7 +279,11 @@ export default function IntentionScreen() {
         totalSteps={9}
         canContinue={canContinue}
         loading={updateProfile.isPending}
-        errorMessage={updateProfile.error?.message}
+        // Nunca el error técnico crudo ("Network request failed") en pantalla:
+        // copy cálido; el CTA sigue disponible para reintentar.
+        errorMessage={
+          updateProfile.isError ? 'No pudimos guardarlo ahora. Intenta de nuevo.' : undefined
+        }
         onContinue={handleContinue}
         continueLabel={fromSettings ? 'Guardar' : 'Continuar'}
         // From Ajustes this is an EDIT, not an onboarding step — hide the
@@ -316,7 +319,7 @@ export default function IntentionScreen() {
           eyebrowColor="magenta"
           question="¿Qué quieres lograr?"
           questionEmphasis="lograr"
-          hint="Elige una o varias. La primera es donde Stelar pone el foco."
+          hint="Elige una o varias. La primera que elijas es tu foco."
         />
 
         {/* Scroll stage — the ScrollView plus two bg-coloured edge fades so
@@ -364,21 +367,13 @@ export default function IntentionScreen() {
             </View>
           </ScrollView>
 
-          {/* Top edge fade — bg (#0A0608) → transparent, pegado bajo el
-              StepHeader. The cards emerge from the sky here. */}
-          <LinearGradient
-            colors={[colors.bg, 'rgba(10, 6, 8, 0)']}
-            style={styles.fadeTop}
-            pointerEvents="none"
-          />
-          {/* Bottom edge fade — transparent → bg (#0A0608), pegado al fondo
-              del área scrolleable (sobre el CTA). The cards dissolve into the
-              sky rather than clipping in a hard line. */}
-          <LinearGradient
-            colors={['rgba(10, 6, 8, 0)', colors.bg]}
-            style={styles.fadeBottom}
-            pointerEvents="none"
-          />
+          {/* Los edge fades se RETIRARON: pintaban bg (#0A0608) opaco sobre la
+              atmósfera (AtmosphericSky/bloom, más luminosa que el negro base),
+              y el anclaje opaco creaba una banda con bordes duros arriba y
+              abajo del scroll que cortaba el cielo y el glow. Con 5 cards casi
+              no hay scroll; el clipping ocasional es invisible sobre fondo
+              oscuro. (Si algún día se quiere el fade real, es MaskedView sobre
+              el contenido, nunca un rect del color "del fondo".) */}
         </View>
       </WizardLayout>
 
@@ -468,12 +463,13 @@ function IntentCard({
   dim: boolean
   onPress: () => void
 }) {
-  // Scale spring — the tactile bounce on selection.
+  // Scale spring — the tactile bounce on selection. Solo la PRIORIDAD se
+  // eleva (jerarquía: un héroe por pantalla); las secundarias no.
   const scale = useSharedValue(1)
   useEffect(() => {
-    scale.value = withSpring(selected ? 1.02 : 1, { damping: 16, stiffness: 220 })
+    scale.value = withSpring(selected && priority ? 1.02 : 1, { damping: 16, stiffness: 220 })
     return () => cancelAnimation(scale)
-  }, [selected, scale])
+  }, [selected, priority, scale])
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -566,13 +562,21 @@ function IntentCard({
           {/* Idle card — ALWAYS solid bgCard + hairline so the label stays
               legible over the cosmic backdrop regardless of selection. */}
           <View style={styles.card}>
-            {/* (a) Shadow layer — static magenta iOS shadow, crossfaded by
-                opacity. Behind the content so the halo blooms under the card. */}
-            <Animated.View style={[styles.cardGlowShadow, glowStyle]} pointerEvents="none" />
-            {/* (b) Magenta fill — 0.12 tint, crossfaded in. */}
-            <Animated.View style={[styles.cardGlowFill, glowStyle]} pointerEvents="none" />
-            {/* (c) Magenta border — 1 px, crossfaded in over the hairline. */}
-            <Animated.View style={[styles.cardGlowBorder, glowStyle]} pointerEvents="none" />
+            {/* Jerarquía de selección (uxui jul 2026): el tratamiento COMPLETO
+                (sombra + fill + borde magenta pleno) es SOLO de la prioridad —
+                con 4 seleccionadas iguales, la pantalla gritaba y la única
+                info importante (cuál manda el motor) era la más débil. Las
+                secundarias se marcan con check + borde magenta sutil. */}
+            {priority ? (
+              <Animated.View style={[styles.cardGlowShadow, glowStyle]} pointerEvents="none" />
+            ) : null}
+            {priority ? (
+              <Animated.View style={[styles.cardGlowFill, glowStyle]} pointerEvents="none" />
+            ) : null}
+            <Animated.View
+              style={[priority ? styles.cardGlowBorder : styles.cardGlowBorderSoft, glowStyle]}
+              pointerEvents="none"
+            />
 
             {/* Checkbox — rounded SQUARE (reads as casilla, multi-select).
                 Idle: empty box, faint hairline border. Checked: magenta fill
@@ -1075,25 +1079,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 24,
   },
-  // Top edge fade — bg → transparent, ~28px, pinned under the StepHeader so
-  // the card column emerges from the sky. pointerEvents none (set on the
-  // element) so it never intercepts taps.
-  fadeTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 28,
-  },
-  // Bottom edge fade — transparent → bg, ~40px, pinned to the bottom of the
-  // scroll area (above the CTA) so the cards dissolve into the sky.
-  fadeBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 40,
-  },
   list: {
     marginTop: 24,
     // Inset horizontally so the selected card's magenta shadow has
@@ -1113,7 +1098,9 @@ const styles = StyleSheet.create({
   // pick without dramatising any one option (manifesto-safe over weight).
   priorityMark: {
     fontFamily: typography.uiBold,
-    fontSize: 9.5,
+    // 11.5, no 9.5: era la señal más importante de la pantalla con el tamaño
+    // más chico (bajo cualquier piso de legibilidad).
+    fontSize: 11.5,
     letterSpacing: 2.2,
     color: colors.magenta,
     marginBottom: 6,
@@ -1163,6 +1150,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.magenta,
+  },
+  // Borde de las SECUNDARIAS seleccionadas — magenta sutil (glow al 45%,
+  // no el pleno), sin sombra ni fill: marcadas, pero calladas frente a la
+  // prioridad.
+  cardGlowBorderSoft: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.magentaGlow,
   },
   // Checkbox — rounded SQUARE so it reads as a casilla (multi-select), not a
   // radio dot. Idle: transparent fill + faint hairline border. The magenta

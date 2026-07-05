@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
@@ -23,7 +23,9 @@ import { DayLogModal, type DayLogKey } from './log/DayLogModal'
 import { colors, typography } from '@/theme'
 
 import { useScreenActive } from '../useScreenActive'
-import { useDaySignals, useTodaySignals } from '../hooks'
+import { isDeficitDay } from '../deficit'
+import { earlyReading } from '../early-readings'
+import { useDaySignals, useSignalsHistory, useTodaySignals } from '../hooks'
 import {
   buildDayGoal,
   REST_HERO,
@@ -612,11 +614,15 @@ export function DayPresent({
   viewedDay = null,
   onReturnToToday,
   onScrollTop,
+  returnLabel,
 }: {
   /** Día a mostrar (ISO 'YYYY-MM-DD'); null = hoy. Lo setea la tira de Semana. */
   viewedDay?: string | null
   onReturnToToday?: () => void
   onScrollTop?: () => void
+  /** Etiqueta del back cuando el día se abrió desde otro segmento
+   *  ("Volver a tu mes"); default "Volver a hoy". */
+  returnLabel?: string
 } = {}) {
   const todayIso = todayInTimezone()
   const isPast = viewedDay != null && viewedDay !== todayIso
@@ -646,6 +652,26 @@ export function DayPresent({
   const router = useRouter()
   const settled = !isLoading
 
+  // La lectura garantizada (Fase 6): un día vacío nunca responde solo "nada
+  // todavía" — el puente con ayer hace que no se sienta empezar de cero cada
+  // mañana. Prioridad: ayer en déficit (el hilo dorado) > micro-lectura de
+  // señales (early-readings, determinista). Sin nada honesto que decir, la
+  // invitación de siempre se queda sola.
+  const history7 = useSignalsHistory(7)
+  const emptyBridge = useMemo(() => {
+    if (isPast) return null
+    const rows = history7.data ?? []
+    const d = new Date(`${targetDay}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() - 1)
+    const yesterdayIso = d.toISOString().slice(0, 10)
+    const y = rows.find((s) => s.day === yesterdayIso) ?? null
+    if (y && isDeficitDay(y.calories, ctx.calorieTarget)) {
+      return { text: 'Ayer tu día cerró en déficit. Hoy sigue desde ahí.', gold: true }
+    }
+    const reading = earlyReading(rows, targetDay)
+    return reading ? { text: reading.text, gold: false } : null
+  }, [isPast, history7.data, targetDay, ctx.calorieTarget])
+
   // Señales que se registran EN CONTEXTO con su propio modal (agua/ánimo/sueño),
   // sin salir de Órbita. Comida (escaneo pesado) y los días pasados siguen yendo
   // a Hoy.
@@ -672,8 +698,14 @@ export function DayPresent({
       <Text style={styles.title}>{isPast ? '¿Cómo fue ese día?' : '¿Cómo voy hoy?'}</Text>
       <Text style={styles.date}>{formatLongDate(targetDay)}</Text>
       {isPast && onReturnToToday ? (
-        <Pressable onPress={onReturnToToday} hitSlop={8} style={styles.backToToday}>
-          <Text style={styles.backToTodayText}>‹ Volver a hoy</Text>
+        <Pressable
+          onPress={onReturnToToday}
+          hitSlop={8}
+          style={styles.backToToday}
+          accessibilityRole="button"
+          accessibilityLabel={returnLabel ?? 'Volver a hoy'}
+        >
+          <Text style={styles.backToTodayText}>‹ {returnLabel ?? 'Volver a hoy'}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -698,14 +730,16 @@ export function DayPresent({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Tu día no terminó de cargar</Text>
           <Text style={styles.cardBody}>Vuelve a intentarlo en un momento.</Text>
-          <Text
-            style={styles.retry}
+          {/* Pressable pill de 44pt+ (era un Text con onPress: target chico). */}
+          <Pressable
+            style={styles.retryBtn}
             onPress={() => void refetch()}
+            hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Reintentar"
           >
-            Reintentar
-          </Text>
+            <Text style={styles.retry}>Reintentar</Text>
+          </Pressable>
         </View>
       </Animated.View>
     )
@@ -728,11 +762,20 @@ export function DayPresent({
               Registra una señal (una comida, tu sueño, un entreno) y tu día empieza a tomar forma
               aquí.
             </Text>
+            {/* El puente con ayer — no empiezas de cero cada mañana. */}
+            {emptyBridge ? (
+              <Text style={[styles.emptyBridge, emptyBridge.gold && styles.emptyBridgeGold]}>
+                {emptyBridge.text}
+              </Text>
+            ) : null}
           </View>
         </View>
 
         {missing.length > 0 ? (
           <View style={styles.sectionAbsent}>
+            {/* Eyebrow ancla: sin él, las pills flotaban sin título de sección
+                en el estado en reposo (uxui 5.5). */}
+            <Text style={styles.absentEyebrow}>Empieza por aquí</Text>
             <Text style={styles.absentHint}>Tócalas para sumarlas a tu día.</Text>
             <View style={styles.absentRow}>
               {missing.map((a) => (
@@ -900,11 +943,12 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 22,
   },
+  // 9.2 · un solo título grande por vista (ver WeekSegment.title).
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 30,
-    letterSpacing: -1.2,
-    lineHeight: 36,
+    fontSize: typography.sizes.displaySm,
+    letterSpacing: -0.8,
+    lineHeight: 30,
     color: colors.leche,
   },
   date: {
@@ -934,7 +978,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 27,
     color: colors.leche,
   },
@@ -949,7 +993,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 29,
     textAlign: 'center',
     color: colors.leche,
@@ -962,11 +1006,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.niebla,
   },
+  // El puente con ayer — dato en upright (no voz de coach), un tono más
+  // presente que el body; oro cuando ayer quedó en déficit (el hilo dorado).
+  emptyBridge: {
+    marginTop: 12,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    textAlign: 'center',
+    color: colors.bone,
+  },
+  emptyBridgeGold: {
+    color: colors.oroLight,
+  },
   retry: {
-    marginTop: 14,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     color: colors.oro,
+  },
+  retryBtn: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.oroHairline,
   },
   // ── Hero (el anillo del objetivo) ────────────────────────────────
   hero: {
@@ -1036,7 +1102,7 @@ const styles = StyleSheet.create({
   },
   heroNumberUnit: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.3,
     color: colors.bone,
   },
@@ -1151,7 +1217,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 28,
     color: colors.leche,
   },
@@ -1208,11 +1274,18 @@ const styles = StyleSheet.create({
   },
   // Microcopy instructivo → Hanken upright (el serif italic se reserva para la
   // voz del coach, no para instrucciones de UI).
+  absentEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.oro,
+  },
   absentHint: {
     marginTop: 6,
     marginBottom: 16,
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
   },
   absentRow: {
@@ -1260,7 +1333,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     lineHeight: 25,
     color: colors.bone,
     textAlign: 'center',

@@ -7,7 +7,11 @@ import Svg, { Path } from 'react-native-svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useProfile } from '@/features/profile/hooks'
-import { useMeasurements, useMonthWorkoutDates } from '@/features/progress/hooks'
+import {
+  useMeasurements,
+  useMonthWorkoutDates,
+  useTotalTrainedDays,
+} from '@/features/progress/hooks'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { showActionSheet } from '@/lib/actionSheet'
 import { todayInTimezone } from '@/lib/time'
@@ -97,6 +101,7 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
   const profile = useProfile()
   const measurements = useMeasurements(null)
   const monthWorkouts = useMonthWorkoutDates()
+  const totalTrained = useTotalTrainedDays()
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -134,7 +139,8 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
   )
   const monthFirstWeekday = useMemo(() => {
     const [y, m] = todayIso.split('-').map(Number) as [number, number]
-    return new Date(y, m - 1, 1).getDay()
+    // Lunes-primero, como todos los calendarios de la app.
+    return (new Date(y, m - 1, 1).getDay() + 6) % 7
   }, [todayIso])
   // "Compartiste tu entreno de hoy" — persiste por día (solo la acción, no la
   // imagen). Se resetea al cambiar de día. Sin racha ni culpa: su ausencia es
@@ -254,9 +260,12 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
   ])
 
   // Gate: en el dashboard de hoy aparece solo si entrenaste hoy. En historyMode
-  // (pantalla "Tu historia") está SIEMPRE disponible — es historial, no "hoy".
+  // (pantalla "Tu historia") está disponible en cuanto exista ALGO que
+  // compartir — con 0 entrenos totales, invitar a "compartir mi historia"
+  // es invitar a compartir un cero.
   const trainedToday = brief.data?.today_workout_completed === true
   if (!trainedToday && !historyMode) return null
+  if (historyMode && (totalTrained.data ?? 0) === 0) return null
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(320)} style={styles.wrap}>

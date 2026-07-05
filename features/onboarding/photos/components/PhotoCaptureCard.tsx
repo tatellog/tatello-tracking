@@ -85,7 +85,7 @@ export function PhotoCaptureCard({ photos, onStartCapture, onSlotPress }: Props)
   return (
     <View style={styles.card}>
       <LinearGradient
-        colors={[colors.pearlElevated, '#FCF7F9']}
+        colors={[colors.bgCard, '#FCF7F9']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: colors.mauveDeep,
+    borderColor: colors.magenta,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
@@ -251,26 +251,26 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.mauveDeep,
+    color: colors.magenta,
     marginBottom: 6,
   },
   title: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.heading,
     letterSpacing: -0.5,
-    color: colors.inkPrimary,
+    color: colors.leche,
     marginBottom: 6,
   },
   titleEmphasis: {
     fontFamily: typography.displaySemi,
     fontWeight: typography.fontWeight.medium,
-    color: colors.mauveDeep,
+    color: colors.magenta,
   },
   sub: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.caption,
     lineHeight: 17,
-    color: colors.labelMuted,
+    color: colors.niebla,
     marginBottom: 12,
   },
   slotsGrid: {
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: 'dashed',
-    borderColor: colors.mauveBorderSoft,
+    borderColor: colors.bruma,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
@@ -297,13 +297,13 @@ const styles = StyleSheet.create({
   slotPlus: {
     fontFamily: typography.display,
     fontSize: typography.sizes.segmentTitle,
-    color: colors.mauveDeep,
+    color: colors.magenta,
   },
   slotLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.smallLabel,
     letterSpacing: 0.4,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   slotFilled: {
     flex: 1,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     minHeight: 110,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: colors.pearlMuted,
+    backgroundColor: colors.bgCard2,
   },
   checkBadge: {
     position: 'absolute',
@@ -320,22 +320,22 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkBadgeText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.micro,
-    color: colors.pearlBase,
+    color: colors.bg,
   },
   cta: {
-    backgroundColor: colors.mauveDeep,
+    backgroundColor: colors.magenta,
     borderRadius: 100,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.mauveDeep,
+    shadowColor: colors.magenta,
     shadowOpacity: 0.25,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -345,6 +345,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: 12.5,
     letterSpacing: 0.3,
-    color: colors.pearlBase,
+    color: colors.bg,
   },
 })

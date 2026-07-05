@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   dayName: {
     width: 96,
     fontFamily: typography.uiBold,
-    fontSize: 12,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.5,
     color: colors.leche,
   },

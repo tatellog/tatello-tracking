@@ -32,7 +32,7 @@ function Slot({ state }: { state: SlotState }) {
     return (
       <View style={styles.slotDone}>
         <LinearGradient
-          colors={[colors.mauveLight, colors.mauveDeep]}
+          colors={[colors.magentaHot, colors.magenta]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: colors.mauveDeep,
+    borderColor: colors.magenta,
     backgroundColor: 'rgba(168, 94, 124, 0.15)',
   },
   slotPending: {
@@ -75,11 +75,11 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: 'dashed',
     borderColor: colors.borderDashed,
-    backgroundColor: colors.pearlMuted,
+    backgroundColor: colors.bgCard2,
   },
   checkText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.pearlBase,
+    color: colors.bg,
   },
 })

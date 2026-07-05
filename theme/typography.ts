@@ -41,8 +41,8 @@ export const typography = {
     headingLg: 20,
     segmentTitle: 22,
     displaySm: 24,
+    // (tilePlus, duplicado exacto de deltaNum, se fusionó el 5 jul 2026.)
     deltaNum: 28,
-    tilePlus: 28,
     macroNum: 30,
     streakNum: 48,
   },
