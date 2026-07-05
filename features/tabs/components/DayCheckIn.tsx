@@ -86,7 +86,7 @@ function Answer({ label, active, onPress }: AnswerProps) {
       style={[styles.answer, active && styles.answerActive]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={label}
+      accessibilityLabel={active ? `${label}. Tu respuesta actual, toca para confirmar` : label}
     >
       <Text style={[styles.answerText, { color: tint }]}>{label}</Text>
     </Pressable>
@@ -166,8 +166,25 @@ export function DayCheckIn({
 
       {showAnswers ? (
         <Animated.View layout={layout} entering={fadeIn} exiting={fadeOut}>
-          {/* En edición la pregunta no se repite: la usuaria ya sabe qué edita. */}
-          {!answered ? <Text style={styles.question}>{question}</Text> : null}
+          {/* Flujo fresco: la pregunta coach. En edición: el modo se DECLARA
+              (sin lead se veía idéntico a "te pregunto de nuevo") y tiene
+              puerta explícita "Listo" que cierra sin mutar nada (feedback
+              usuaria: "busco un listo o una X y no hay"). */}
+          {!answered ? (
+            <Text style={styles.question}>{question}</Text>
+          ) : (
+            <View style={styles.editHeader}>
+              <Text style={styles.editLead}>Cambiando tu respuesta</Text>
+              <Pressable
+                onPress={() => setEditing(false)}
+                hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Listo, cerrar edición"
+              >
+                <Text style={styles.changeLink}>Listo</Text>
+              </Pressable>
+            </View>
+          )}
           <View style={styles.answers}>
             <Answer label="Entrené" active={state === 'trained'} onPress={() => pick('trained')} />
             <Answer
@@ -221,7 +238,11 @@ export function DayCheckIn({
           exiting={chipsExit}
           style={styles.typeBlock}
         >
-          <Text style={styles.typeLead}>¿De qué tipo?</Text>
+          {/* En edición los chips quedan bajo "Fue descanso" y el lead corto
+              se leía "¿de qué tipo de descanso?" — nombrar el sujeto. */}
+          <Text style={styles.typeLead}>
+            {editing ? '¿De qué tipo fue tu entreno?' : '¿De qué tipo?'}
+          </Text>
           <View style={styles.typeRow}>
             {WORKOUT_TYPES.map((t) => {
               const active = workoutType === t.id || justPicked === t.id
@@ -230,8 +251,16 @@ export function DayCheckIn({
                   key={t.id}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-                    onWorkoutType?.(active ? null : t.id)
-                    setJustPicked(active ? null : t.id)
+                    if (active) {
+                      // Afirmación, no borrado (patrón Apple de selección
+                      // única): tocar lo prendido = "sí, esto" y cierra.
+                      // El mismo gesto borraba el tipo en silencio — la
+                      // trampa exacta que reportó la usuaria.
+                      setEditing(false)
+                      return
+                    }
+                    onWorkoutType?.(t.id)
+                    setJustPicked(t.id)
                     setEditing(false)
                   }}
                   hitSlop={{ top: 6, bottom: 6 }}
@@ -294,6 +323,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
     marginLeft: 2,
+  },
+  // Modo edición declarado — capa meta de UI (Hanken upright, no coach).
+  editHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+  editLead: {
+    fontFamily: typography.uiMedium,
+    fontSize: 12.5,
+    color: colors.bone,
+    letterSpacing: 0.3,
   },
   // Voz coach — la pregunta que el control responde.
   question: {

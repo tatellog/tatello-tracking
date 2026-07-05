@@ -42,6 +42,7 @@ import {
 } from '@/features/cycle/components/CycleTimeline'
 import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import type { MoodValue } from '@/features/moods/api'
 import { DailyNoteInline } from '@/features/moods/components/DailyNoteInline'
 import { MoodSliderInline } from '@/features/moods/components/MoodSliderInline'
 import { enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
@@ -64,6 +65,13 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 // How much of the NEXT slide peeks on the right edge — a persistent "hay más"
 // affordance. Slides are this much narrower than the viewport.
 const SLIDE_PEEK = 22
+
+// Etiquetas del resumen colapsado (mismo vocabulario del slider de ánimo).
+const MOOD_SUMMARY_LABEL: Record<MoodValue, string> = {
+  struggle: 'Difícil',
+  neutral: 'Neutral',
+  good: 'Bien',
+}
 
 type Props = {
   ctx: BriefContext
@@ -155,6 +163,30 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // Real cycle phase (null when the user has no active/anchored cycle).
   const cycle = useCyclePhase()
 
+  // ── Colapso post-ritual (edición de Hoy 5 jul 2026, veredicto dueña) ──
+  // Con los DOS rituales del día ya escritos (sueño + ánimo), el pager se
+  // comprime a una línea-resumen tocable ("Ánimo: Bien · Dormiste 7.5 h ›").
+  // Nada se pierde: el tap re-abre el pager completo (macros/ciclo/peso
+  // incluidos). Antes de registrar, el pager invita como siempre — el
+  // colapso es el premio de silencio por haber cumplido el ritual.
+  const sleepToday = useSleepLog(ctx.date)
+  const moodToday =
+    ctx.latest_mood?.checkin_date === ctx.date ? (ctx.latest_mood.value as MoodValue) : null
+  const ritualsDone = moodToday != null && sleepToday.data?.duration_minutes != null
+  const [expanded, setExpanded] = useState(false)
+  // Otro día (navegación o medianoche) → vuelve al estado natural del día.
+  useEffect(() => setExpanded(false), [ctx.date])
+  // Un deep-link a una slide (pill de Órbita, etc.) siempre abre el pager;
+  // el efecto de scroll de abajo lo honra en cuanto el layout mide. Mismos
+  // resets que openPager: el ScrollView remonta en offset 0.
+  useEffect(() => {
+    if (!targetSlide) return
+    scrollX.value = 0
+    setActive(0)
+    setExpanded(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSlide])
+
   // Slides are built dynamically so the cycle slide ONLY appears when
   // there's a real cycle to show — never a fake/mock one for users who
   // don't menstruate or haven't anchored a period (matches Progreso's
@@ -228,6 +260,38 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
     setActive(idx)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSlide, slideW])
+
+  // Reabrir el pager tras el colapso: el ScrollView se REMONTA con offset
+  // nativo 0, así que scrollX y active deben volver a 0 juntos — si no, el
+  // título/dots muestran la slide vieja y la primera slide pinta un frame
+  // con la opacity/scale del scrollX rancio (hallazgo reanimated-guardian).
+  const openPager = () => {
+    scrollX.value = 0
+    setActive(0)
+    setExpanded(true)
+  }
+
+  if (ritualsDone && !expanded) {
+    const mins = sleepToday.data?.duration_minutes ?? 0
+    const hours = (mins / 60).toFixed(mins % 60 === 0 ? 0 : 1)
+    const moodLabel = MOOD_SUMMARY_LABEL[moodToday]
+    return (
+      <Pressable
+        onPress={openPager}
+        accessibilityRole="button"
+        accessibilityLabel={`Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas. Toca para abrir el detalle.`}
+        style={({ pressed }) => pressed && styles.collapsedPressed}
+      >
+        <View style={styles.collapsedRow}>
+          <Text style={styles.collapsedText} numberOfLines={1}>
+            Ánimo: <Text style={styles.collapsedValue}>{moodLabel}</Text> · Dormiste{' '}
+            <Text style={styles.collapsedValue}>{hours} h</Text>
+          </Text>
+          <Text style={styles.collapsedChevron}>›</Text>
+        </View>
+      </Pressable>
+    )
+  }
 
   return (
     <View onLayout={onLayout}>
@@ -965,6 +1029,36 @@ function SwipeHint() {
 }
 
 const styles = StyleSheet.create({
+  // ── Resumen colapsado post-ritual — una línea callada, tocable ──
+  collapsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  collapsedPressed: {
+    opacity: 0.7,
+  },
+  collapsedText: {
+    flexShrink: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  collapsedValue: {
+    fontFamily: typography.uiSemi,
+    color: colors.bone,
+  },
+  collapsedChevron: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.title,
+    color: colors.niebla,
+  },
   header: {
     marginTop: 22,
     marginBottom: 12,

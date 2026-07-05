@@ -650,3 +650,89 @@ La tesis en una línea: Stelar no necesita trackear mejor que MFP —
 necesita que lo poquito que trackea sea suficientemente consistente para
 que lo invisible que revela sea verdad. Consistencia = retención (hecha),
 robustez = TDEE adaptativo, puerta de entrada = scan excelente.
+
+---
+
+# Parte 5 · Percepción de exclusividad (5 jul 2026) — que se sienta Apple
+
+Origen: pregunta de dueña "¿qué le falta para verse exclusiva y seria?" +
+auditoría del lema. Diagnóstico: exclusivo no es un feature, es la
+AUSENCIA TOTAL de descuido — cada aproximación encontrada esta semana
+(tilde recortada, ↑ −18 g, sheet decapitado, link muerto) era pequeña; la
+suma es la diferencia entre Apple y el resto. La SUSTANCIA del lema
+(capas 2 y 3: significado + causa) ya vive en Parte 4 (M2 TDEE
+adaptativo, M3 Voz real); esta parte es la PERCEPCIÓN.
+
+## E1 · Barrido C2 por superficie (mecánico, sin decisiones de dueña)
+
+Cerrar las ~170 aproximaciones vivas que el guardrail ya señala, una
+superficie a la vez (orden por exposición: Hoy → Comidas → Órbita →
+Progreso → Ajustes/Perfil → onboarding):
+
+- hex → token (cubeta b del inventario: decidir token vs const de escena)
+- fontSize fuera de ramp → rol de text-styles (13.5, 16.5, 26...)
+- unicode-como-icono (› ‹ ✓ ↑) → Chrome; UN solo lenguaje de "volver"
+  (patrón Agua)
+- al terminar cada superficie: subir el lint de warn → error para esa
+  carpeta (el candado que impide regresión)
+  Definición de hecho: `pnpm lint` con 0 warnings de sistema visual.
+
+## E2 · Pase de edición de Hoy (decisión dueña, la de mayor impacto)
+
+Hoy hace demasiado: constelación + check-in + días en órbita + universo
+(4 atributos) + momentos + sliders + comidas + cierre. Apple Fitness =
+tres anillos y silencio. Proceso propuesto:
+
+1. Inventario de elementos de Hoy con su función (retención / registro /
+   lectura) y su costo de atención.
+2. Dueña decide por elemento: héroe / secundario / un tap más lejos /
+   fuera.
+3. Regla resultante: UN héroe por pantalla; lo demás baja un nivel de
+   volumen (tamaño, opacidad, posición).
+   NO se ejecuta sin la sesión de decisión con dueña.
+
+## E3 · Los primeros 30 segundos (mayor retorno de pulido por minuto)
+
+La exclusividad se decide antes de entrar:
+
+- Icono de app + splash: auditar con lupa (consistencia con el arte final).
+- Onboarding pantallas 1-3: microauditoría de craft (tipografía, ritmo,
+  animación de entrada, copy) — es la primera impresión de las betas.
+- Screenshots de App Store + subtítulo (cruza con M6 posicionamiento:
+  rigor primero, capa celeste como recompensa).
+- El momento Day One (cierre del onboarding) como ceremonia impecable.
+
+## E4 · La gramática de los microdetalles (auditoría transversal)
+
+Lo que no se ve pero se siente; auditar y unificar:
+
+- Háptica: mapa de qué gesto produce qué buzz (hoy: ¿el mismo tap vibra
+  igual en toda la app?); una gramática escrita (light=tap, success=
+  registro, etc.).
+- Transiciones: cero flashes/blanks restantes (varios ya cazados);
+  revisar rutas modales.
+- Accesibilidad (la señal de seriedad que casi nadie da): Dynamic Type
+  sin romper layouts (probar en XL), VoiceOver labels reales en
+  controles clave, reduced motion completo (ya respetado en muchos
+  sitios — completar el barrido).
+- Estados: loading/empty/error de cada pantalla con el mismo nivel de
+  arte que el happy path (Semana/Mes ya lo tienen; completar).
+
+## E5 · Postura de marca
+
+Ya cubierto en Parte 4: precio/paywall (M5) y posicionamiento
+anti-horóscopo (M6). Gratis-para-siempre y "app de signos" leen baratos;
+precio claro y "tus datos, tu evidencia" leen serios. No duplicar aquí.
+
+## Lo que ya es nivel Apple (proteger, no tocar)
+
+Dirección de arte de la constelación; celebración del registro (burst +
+cielo + háptica — dictamen benchmark: mejor que los 3 referentes);
+disciplina de voz (serif = coach, sin culpa).
+
+## Secuencia sugerida
+
+1. E1 superficie Hoy + E3 (antes del build a betas: es lo que van a ver).
+2. E2 sesión de edición con dueña → ejecutar el veredicto.
+3. E1 resto de superficies + E4 auditoría transversal.
+4. E5 llega solo con M5/M6.

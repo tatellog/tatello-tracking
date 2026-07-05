@@ -446,6 +446,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     track('workout_type_selected', { type: type ?? 'cleared' })
   }
 
+  // Memoria de sesión del tipo: cambiar entreno→descanso BORRA la fila de
+  // workouts (y su type con ella). Si en la misma sesión regresa a entreno,
+  // su "Fuerza" se restaura sola — la app se acuerda de lo que ELLA dijo
+  // hoy (memoria de sesión sí; presunción de hábito, nunca).
+  const stashedWorkoutType = useRef<string | null>(null)
+
   const handleDayChange = (next: DayState) => {
     // Día PASADO: backfill sin celebración. GUARD — la constelación NO retrocede
     // (memoria immutable-vs-recalculable): una estrella de entreno ya encendida
@@ -462,6 +468,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       const wasFirstDay = isFirstDay
       if (restedToday) setRest.mutate(false)
       toggleToday.mutate(true)
+      // Restaura el tipo que dijo hoy antes de pasar por descanso.
+      if (stashedWorkoutType.current) {
+        setWorkoutType.mutate(stashedWorkoutType.current as WorkoutTypeId)
+        stashedWorkoutType.current = null
+      }
       playCommitHaptic('trained')
       // Only gate on the reward when it actually plays (reduced motion shows
       // no Lottie → onAnimationFinish would never fire → stuck paused).
@@ -474,7 +485,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         qc.invalidateQueries({ queryKey: queryKeys.profile.all })
       }
     } else if (next === 'rested') {
-      if (ctx.today_workout_completed) toggleToday.mutate(false)
+      if (ctx.today_workout_completed) {
+        // El unmark destruye la fila de workouts (y el type): guárdalo
+        // para el arrepentimiento de la misma sesión.
+        stashedWorkoutType.current = workoutTypeQ.data ?? null
+        toggleToday.mutate(false)
+      }
       setRest.mutate(true)
       playCommitHaptic('rested')
     } else {
@@ -725,9 +741,15 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               />
             ) : null}
 
-            {/* Días en órbita — acumulado (no racha), lectura secundaria. */}
+            {/* Días en órbita — acumulado (no racha), lectura secundaria.
+                Tocable: abre el calendario del mes (la historia de esos
+                días). El hairline ya prometía tap; sin onPress era un link
+                vestido que no hacía nada. */}
             <Animated.View entering={enter(360)}>
-              <StreakLine streak={daysInOrbit} />
+              <StreakLine
+                streak={daysInOrbit}
+                onPress={() => router.navigate('/movement-calendar')}
+              />
             </Animated.View>
 
             {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────

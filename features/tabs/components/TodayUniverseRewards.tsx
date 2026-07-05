@@ -6,7 +6,6 @@ import Animated, {
   cancelAnimation,
   FadeIn,
   interpolate,
-  type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -123,26 +122,10 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
   const [flight, setFlight] = useState<{ key: UniverseAttributeKey; id: number } | null>(null)
   const prevPcts = useRef<Record<UniverseAttributeKey, number> | null>(null)
 
-  // Palpitar SINCRONIZADO de los iconos → señal "esto es accionable, tócame".
-  // Un solo latido para las 4 cards (misma fase) → laten al unísono, no ansioso.
-  // Latido: sube rápido, suelta lento, pausa → como un pulso, no un parpadeo.
-  const palpita = useSharedValue(0)
-  useEffect(() => {
-    if (reducedMotion) {
-      cancelAnimation(palpita)
-      palpita.value = 0
-      return () => cancelAnimation(palpita)
-    }
-    palpita.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 420, easing: easing.out }),
-        withTiming(0, { duration: 1500, easing: easing.out }),
-      ),
-      -1,
-      false,
-    )
-    return () => cancelAnimation(palpita)
-  }, [reducedMotion, palpita])
+  // (El palpitar sincronizado en reposo se retiró — edición de Hoy, 5 jul
+  // 2026, veredicto dueña "secundario callado": una animación continua pide
+  // atención permanente y competía con la constelación. La vida quedó en los
+  // momentos ganados: pulso al completar, bloom del completo, partículas.)
 
   // Tap del toast de delta ("+13 Claridad") → abre el detalle de ESE
   // atributo aquí (reusa el panel, sin UI duplicada). Hoy queda montado
@@ -256,7 +239,6 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
                   attr={attr}
                   source={input ? sourceLineFor(attr.key, input) : ''}
                   reducedMotion={reducedMotion}
-                  palpita={palpita}
                   selected={openKey === attr.key}
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {})
@@ -329,13 +311,12 @@ type CardProps = {
   /** Concrete source line for the closed card ("2 comidas hoy", "3 de 8 vasos"). */
   source: string
   reducedMotion: boolean
-  /** Latido sincronizado (0..1) compartido por las 4 cards → señal de "tócame". */
-  palpita: SharedValue<number>
+  /** El detalle de esta card está abierto (tinta el fondo con su acento). */
   selected: boolean
   onPress: () => void
 }
 
-function AttributeCard({ attr, source, reducedMotion, palpita, selected, onPress }: CardProps) {
+function AttributeCard({ attr, source, reducedMotion, selected, onPress }: CardProps) {
   const accent = UNIVERSE_ACCENT[attr.key]
   const accentMuted = UNIVERSE_ACCENT_MUTED[attr.key]
   const action = ACTION_LABEL[attr.key]
@@ -391,12 +372,12 @@ function AttributeCard({ attr, source, reducedMotion, palpita, selected, onPress
     return undefined
   }, [complete, lit, reducedMotion, bloom])
 
-  // Escala del icono = latido compartido (accionable) + pulso de hito (one-shot).
+  // Escala del icono = solo el pulso de hito (one-shot al completar).
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + palpita.value * 0.06 + pulse.value * 0.18 }],
+    transform: [{ scale: 1 + pulse.value * 0.18 }],
   }))
   const bloomStyle = useAnimatedStyle(() => ({
-    opacity: bloom.value + palpita.value * 0.08,
+    opacity: bloom.value,
   }))
 
   return (
@@ -420,7 +401,7 @@ function AttributeCard({ attr, source, reducedMotion, palpita, selected, onPress
         <View style={styles.glyphWrap}>
           {/* Glow radial SVG (se difumina a transparente → sin borde ni sombra
               cuadrada). Color estático (accent, JS) → crash-safe; solo la
-              opacidad se anima con el estado + el palpitar. */}
+              opacidad se anima con el estado. */}
           <Animated.View pointerEvents="none" style={[styles.bloom, bloomStyle]}>
             <Svg width="100%" height="100%">
               <Defs>
@@ -434,7 +415,7 @@ function AttributeCard({ attr, source, reducedMotion, palpita, selected, onPress
             </Svg>
           </Animated.View>
           <Animated.View style={iconStyle}>
-            <AttributeIcon attrKey={attr.key} color={astroColor} size={26} />
+            <AttributeIcon attrKey={attr.key} color={astroColor} size={22} />
           </Animated.View>
         </View>
         {lit ? (
@@ -699,17 +680,19 @@ const styles = StyleSheet.create({
   item: {
     flex: 1,
   },
+  // Compactado (edición de Hoy 5 jul 2026, "secundario callado"): un paso
+  // más chico en todo — la funcionalidad no cambia, el volumen sí.
   itemInner: {
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
+    gap: 4,
+    paddingVertical: 4,
     marginHorizontal: 4,
     borderRadius: radius.card,
   },
   // El glifo flota sobre su propia luz (bloom detrás, mismo centro).
   glyphWrap: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -726,14 +709,14 @@ const styles = StyleSheet.create({
   // negro warm. shadow refuerza el bloom en iOS. Opacidad la maneja el estado.
   itemPct: {
     fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
+    fontSize: typography.sizes.bodyLarge,
     letterSpacing: -0.3,
     fontVariant: ['tabular-nums'],
   },
   // Astro dormido: un punto tenue en lugar de "0%".
   itemDash: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.title,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bruma,
   },
   // Cada columna ocupa un cuarto del panel (4 en fila, sin wrap).
