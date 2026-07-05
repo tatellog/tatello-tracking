@@ -201,6 +201,10 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
 
   const levelLabel = selectedStop?.label ?? ''
   const nivelHeading = enfoque === 'surplus' ? 'NIVEL DE SUPERÁVIT' : 'NIVEL DE DÉFICIT'
+  // ~kg/semana del nivel elegido, sobre el delta REAL (post-topes). Null
+  // bajo 0.1 kg/sem (ruido) — la línea simplemente no aparece.
+  const weeklyKgNum = (Math.abs(deltaReal) * 7) / 7700
+  const weeklyKg = weeklyKgNum >= 0.1 ? weeklyKgNum.toFixed(1) : null
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -256,6 +260,15 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
             {capped ? (
               <Text style={styles.sustainNote}>
                 El rango refleja lo que funciona para tu cuerpo.
+              </Text>
+            ) : null}
+            {/* Equivalencia física del nivel — aritmética honesta del PLAN
+                (|kcal/día| × 7 ≈ kg/sem; 7700 kcal ≈ 1 kg), jamás promesa
+                con fecha ni "projected end date" (manifiesto: sin quick-fix
+                ni metas comparativas; la traducción sana del benchmark). */}
+            {weeklyKg != null ? (
+              <Text style={styles.sustainNote}>
+                Este nivel ≈ ~{weeklyKg} kg por semana. Sin fechas: tu cuerpo pone el ritmo.
               </Text>
             ) : null}
           </View>

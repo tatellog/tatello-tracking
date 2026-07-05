@@ -19,13 +19,9 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
 import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
-import { useMacroTargets } from '@/features/macros/hooks'
-import { daysInDeficit } from '@/features/orbit/month-built'
-import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
-import { ReadingCard } from '@/features/progress/components/ReadingCard'
-import { TransformationCard } from '@/features/emblem'
+import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { useMeasurements } from '@/features/progress/hooks'
@@ -119,26 +115,6 @@ function ProgressBody() {
   const goLogMeasurement = () => router.push('/log-measurement')
   const hasTrajectory = count >= 2
 
-  // La prueba déficit ↔ báscula — conecta el esfuerzo dorado del mes con lo
-  // que la usuaria quiere ver ("tus días dorados se están notando"). Solo
-  // habla en la vista de 30 días, con ≥3 días en déficit Y descenso real;
-  // co-ocurrencia, no causa, y una subida simplemente calla (jamás culpa).
-  const signals31 = useSignalsHistory(31)
-  const { data: macroTargets } = useMacroTargets()
-  const deficitProof = useMemo(() => {
-    if (period !== '30D') return null
-    const summary = daysInDeficit(signals31.data ?? [], {
-      calorieTarget: macroTargets?.calories ?? null,
-    })
-    if (!summary || summary.deficitDays < 3) return null
-    if (!first || !last || smoothed.length < 3) return null
-    const dropKg = first.weight - last.weight
-    if (dropKg < 0.2) return null
-    const dropLabel =
-      dropKg >= 1 ? `${dropKg.toFixed(1)} kg` : `${Math.round((dropKg * 1000) / 50) * 50} g`
-    return `Últimos 30 días: ${summary.deficitDays} días en déficit · ${dropLabel} menos.`
-  }, [period, signals31.data, macroTargets?.calories, first, last, smoothed.length])
-
   return (
     <View style={styles.screen}>
       <SkyBackground />
@@ -154,22 +130,21 @@ function ProgressBody() {
               que nada. Reemplaza a Movimiento como primer elemento. */}
           <TuHistoria />
 
+          {/* Síntesis — resultado → causa → qué intentar, la respuesta a
+              "¿está funcionando?" en el primer screenful (feedback beta).
+              Absorbe la vieja ReadingCard + la línea déficit↔báscula; es el
+              ÚNICO link saliente del tab (cuarto, no pasillo). La card del
+              emblema se retiró de Progreso: su % junto a la báscula se leía
+              como "% de mi meta de peso" (anti-patrón del manifiesto por
+              contexto); el emblema vive en Hoy y en Órbita Mes. */}
+          <View style={styles.divider} />
+          <SynthesisCard />
+
           {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
               ahora en grande, con modo "Comparar" (slider de arrastrar).
-              Inmediatamente bajo Tu Historia. Responde "¿realmente cambio?". */}
+              Responde "¿realmente cambio?". */}
           <View style={styles.divider} />
           <BeforeAfterPhotos />
-
-          {/* "Tu transformación" — el emblema como símbolo del crecimiento. */}
-          <View style={styles.divider} />
-          <TransformationCard compact />
-
-          {/* "Lectura" — UNA observación destilada de los últimos 30 días (voz
-              Observadora), reusando el motor de patrones del Mes. Responde
-              "¿qué revela mi mes?" y abre a Órbita. Reemplazó al viejo
-              scoreboard de Consistencia (medía frecuencia de registro). */}
-          <View style={styles.divider} />
-          <ReadingCard />
 
           {/* ── Tu cuerpo — weight + measurements. Demoted out of the
               hero: one section among several, an outcome shown
@@ -242,7 +217,13 @@ function ProgressBody() {
               </Animated.View>
 
               <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartSection}>
-                <Text style={styles.chartCaption}>{count} mediciones · media de 7 días</Text>
+                {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
+                    plan con fecha): cuando la realidad cambia, la línea cambia
+                    sin que nadie "incumpla". */}
+                <Text style={styles.chartCaption}>
+                  {count} mediciones · media de 7 días
+                  {trend ? ' · la punteada sigue tu ritmo real' : ''}
+                </Text>
                 <TrajectoryChart points={smoothed} trend={trend} />
               </Animated.View>
 
@@ -262,12 +243,6 @@ function ProgressBody() {
               {trend ? (
                 <Animated.View entering={FadeIn.duration(360).delay(320)}>
                   <CoachLine text={formatTrendCopy(trend)} />
-                </Animated.View>
-              ) : null}
-
-              {deficitProof ? (
-                <Animated.View entering={FadeIn.duration(360).delay(380)}>
-                  <Text style={styles.deficitProof}>{deficitProof}</Text>
                 </Animated.View>
               ) : null}
             </>
@@ -320,6 +295,11 @@ function ProgressBody() {
               <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
             </Animated.View>
           ) : null}
+
+          {/* La coda del cuarto — lo único que se rescató de la card del
+              emblema (feedback beta: "esa frase me cuida; pero es una frase,
+              no una card"). Cierra el tab quitando el miedo a la mala semana. */}
+          <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -759,14 +739,13 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.niebla,
   },
-  // La prueba déficit ↔ báscula — dato en UI upright (números literales,
-  // no voz de coach), en oro: el mismo lenguaje del calendario dorado.
-  deficitProof: {
-    marginTop: 10,
-    fontFamily: typography.uiSemi,
+  // Coda del tab — serif micro en niebla, mismo registro que las codas de Órbita.
+  footerCoda: {
+    marginTop: 26,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
     fontSize: typography.sizes.body,
-    color: colors.oroLight,
-    fontVariant: ['tabular-nums'],
+    color: colors.niebla,
     textAlign: 'center',
   },
   // Shown in "Tu cuerpo" when the month's focus isn't weight — the
