@@ -22,10 +22,16 @@ export function DayCloseCard({
   consumedCalories,
   targetCalories,
   mealCount,
+  reading,
 }: {
   consumedCalories: number
   targetCalories: number | null | undefined
   mealCount: number
+  /** Micro-observación real del motor (early-readings): la recompensa
+   *  VARIABLE del cierre — cada noche puede decir algo distinto de ELLA,
+   *  el puente de las semanas 1-3 antes de los patrones. Null = se omite
+   *  (jamás relleno). */
+  reading?: string | null
 }) {
   const [hour, setHour] = useState(() => new Date().getHours())
   useEffect(() => {
@@ -61,6 +67,7 @@ export function DayCloseCard({
       </View>
       <Text style={styles.data}>{copy.data}</Text>
       <Text style={[styles.coach, gold && styles.coachGold]}>{copy.coach}</Text>
+      {reading ? <Text style={styles.reading}>{reading}</Text> : null}
     </Animated.View>
   )
 }
@@ -124,5 +131,16 @@ const styles = StyleSheet.create({
   },
   coachGold: {
     color: colors.oroLight,
+  },
+  // La micro-observación — dato en UI upright (no voz de coach), separada
+  // del veredicto por un respiro; discreta, nunca compite con el número.
+  reading: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
   },
 })

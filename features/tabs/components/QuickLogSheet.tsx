@@ -48,6 +48,7 @@ import {
 } from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -406,6 +407,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     daysSincePeriod != null && daysSincePeriod >= 0 && daysSincePeriod < PERIOD_WINDOW_DAYS
 
   const [mode, setMode] = useState<Mode>('home')
+  const sheetScrollRef = useRef<ScrollView>(null)
   const [mealType, setMealType] = useState<MealType>(defaultMealType)
   const [confirmingName, setConfirmingName] = useState<string | null>(null)
   const [weightDraft, setWeightDraft] = useState<number | null>(null)
@@ -470,22 +472,39 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       setMealType(defaultMealType())
       setWeightDraft(null)
       setEditingGoal(false)
+      // El sheet vive montado: sin este reset, el offset de la sesión
+      // anterior persistía y el sheet abría con el header decapitado y la
+      // primera sección fuera de vista.
+      sheetScrollRef.current?.scrollTo({ y: 0, animated: false })
     }
   }, [visible])
 
   const handleLogMeal = (item: FrequentMeal) => {
     if (confirmingName) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    createMeal.mutate({
-      name: item.name,
-      protein_g: item.protein_g,
-      calories: item.calories,
-      // Backfill: mediodía del día visto; si es hoy, el momento real.
-      consumed_at: logConsumedAt(),
-      meal_type: mealType,
-      photo_storage_path: item.photo_storage_path,
-      ingredients: item.ingredients ?? undefined,
-    })
+    createMeal.mutate(
+      {
+        name: item.name,
+        protein_g: item.protein_g,
+        calories: item.calories,
+        // Backfill: mediodía del día visto; si es hoy, el momento real.
+        consumed_at: logConsumedAt(),
+        meal_type: mealType,
+        photo_storage_path: item.photo_storage_path,
+        ingredients: item.ingredients ?? undefined,
+      },
+      {
+        // El 1-tap solo es sin fricción si equivocarse también lo es: el
+        // toast global de deshacer sobrevive al cierre del sheet.
+        onSuccess: (meal) => {
+          emitMealUndo({
+            id: meal.id,
+            name: item.name,
+            mealTypeLabel: MEAL_TYPES.find((t) => t.value === mealType)?.label ?? 'tu día',
+          })
+        },
+      },
+    )
     setConfirmingName(item.name)
     // Ignición inmediata cerca de las tarjetas de comida (Energía =
     // magentaHot). El "+N Energía" + vuelo a Leo los emite la detección
@@ -556,7 +575,9 @@ export function QuickLogSheet({ visible, onClose }: Props) {
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
     if (result.canceled || !result.assets[0]) return
     onClose()
-    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri } })
+    // El momento elegido en el sheet VIAJA al scan (antes se ignoraba y el
+    // "Snack" de madrugada aterrizaba como dijera la hora).
+    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri, mealType } })
   }
 
   const handlePhotoLog = () => {
@@ -579,7 +600,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const handleTextLog = () => {
     if (confirmingName != null) return
     onClose()
-    router.push({ pathname: '/scan-meal', params: { describe: '1' } })
+    router.push({ pathname: '/scan-meal', params: { describe: '1', mealType } })
   }
 
   // The two AI methods — the headline way to log a meal, so they sit up
@@ -686,27 +707,17 @@ export function QuickLogSheet({ visible, onClose }: Props) {
             </View>
           ) : (
             <ScrollView
+              ref={sheetScrollRef}
               style={styles.body}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* ── Hoy: peso + agua, one compact strip ── */}
+              {/* ── Agua — frecuente (varios taps/día), vive arriba con la
+                  comida. El PESO bajó al fondo (es eventual, ~semanal, y
+                  encabezar el sheet más abierto de la app con "Peso 67.1 kg"
+                  lo volvía ambiente de cada registro — benchmark jul 2026 +
+                  manifiesto: peso en contexto, no en el centro). ── */}
               <View style={styles.strip}>
-                <Pressable
-                  onPress={openWeight}
-                  style={styles.stripZone}
-                  accessibilityRole="button"
-                  accessibilityLabel="Registrar peso"
-                >
-                  <Text style={styles.stripCaption}>Peso</Text>
-                  <View style={styles.stripWeightRow}>
-                    <Text style={styles.stripWeight} numberOfLines={1}>
-                      {latestWeight != null ? `${latestWeight.toFixed(1)} kg` : 'Registrar'}
-                    </Text>
-                    <Text style={styles.chevron}>›</Text>
-                  </View>
-                </Pressable>
-                <View style={styles.stripDivider} />
                 <View style={[styles.stripZone, styles.stripZoneWater]}>
                   <Pressable
                     onPress={() => setEditingGoal((v) => !v)}
@@ -846,6 +857,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                         name={item.name}
                         protein={item.protein_g}
                         calories={item.calories}
+                        freq={item.freq}
+                        photoPath={item.photo_storage_path}
                         state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
                         onPress={() => handleLogMeal(item)}
                         disabled={confirmingName != null}
@@ -867,6 +880,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                             name={item.name}
                             protein={item.protein_g}
                             calories={item.calories}
+                            freq={item.freq}
+                            photoPath={item.photo_storage_path}
                             state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
                             onPress={() => handleLogMeal(item)}
                             disabled={confirmingName != null}
@@ -891,6 +906,19 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                   ) : null}
                 </>
               )}
+
+              {/* ── Peso — eventual (~semanal): al fondo junto al ciclo, como
+                  par de acciones eventuales. Sin el número en reposo: el
+                  valor vive dentro de la rueda al abrir. ── */}
+              <Pressable
+                onPress={openWeight}
+                style={styles.weightRow}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar peso"
+              >
+                <Text style={styles.weightRowLabel}>Registrar peso</Text>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
 
               {/* Cycle — eventual (~1×/month), so it sits last, quiet. Only
                * for users who track a cycle. Oro/luna, never clinical. */}
@@ -1108,11 +1136,6 @@ const styles = StyleSheet.create({
   stripZoneWater: {
     flex: 1,
   },
-  stripDivider: {
-    width: 1,
-    marginVertical: 10,
-    backgroundColor: colors.hairline,
-  },
   stripCaption: {
     fontFamily: typography.uiBold,
     fontSize: 9.5,
@@ -1139,16 +1162,23 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     color: colors.magenta,
   },
-  stripWeightRow: {
+  // Peso al fondo — fila callada de acción eventual, sin número en reposo.
+  weightRow: {
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
   },
-  stripWeight: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    letterSpacing: -0.3,
+  weightRowLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.ui,
+    color: colors.bone,
   },
   chevron: {
     fontFamily: typography.ui,

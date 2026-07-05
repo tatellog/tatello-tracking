@@ -30,6 +30,7 @@ import { TransformationReveal, useRevelationOrchestrator } from '@/features/reve
 import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
+import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
 import { useWaterToday } from '@/features/water/hooks'
@@ -325,6 +326,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     }
     return Array.from(days)
   }, [monthWorkoutDates, monthSignals.data, monthPrefix])
+  // La micro-lectura del cierre — una observación real del motor (early-
+  // readings) como recompensa VARIABLE de la noche: cada cierre puede decir
+  // algo distinto de ELLA. Reusa monthSignals (cero fetch extra); null si
+  // no hay nada honesto que decir (la card simplemente omite la línea).
+  const closeReading = useMemo(
+    () => earlyReading(monthSignals.data ?? [], todayIsoLocal)?.text ?? null,
+    [monthSignals.data, todayIsoLocal],
+  )
   // Hoy en vivo: la señal de hoy puede tardar hasta 60 s en la view; los
   // flags frescos (entreno / comidas / ánimo / agua) encienden al instante.
   const todaySignals = useTodaySignals()
@@ -663,7 +672,14 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               ) : null}
               <CoachLine
                 align="center"
-                {...getCoachCopy(trainedThisMonth, signLabel, dayState === 'trained', sign)}
+                {...getCoachCopy(
+                  trainedThisMonth,
+                  signLabel,
+                  dayState === 'trained',
+                  sign,
+                  // Mañana real de HOY (no de un día visto): antes de mediodía.
+                  !viewingPast && new Date().getHours() < 12,
+                )}
               />
               {(() => {
                 // El gancho del día 2 (Mecánica D): con la estrella de HOY ya
@@ -705,6 +721,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 consumedCalories={ctx.today_macros.calories}
                 targetCalories={ctx.targets?.calories}
                 mealCount={ctx.meal_count_today}
+                reading={closeReading}
               />
             ) : null}
 
@@ -873,6 +890,7 @@ function getCoachCopy(
   signLabel: string,
   trainedToday: boolean,
   sign: ZodiacSign,
+  morning = false,
 ): CoachCopy {
   const lower = signLabel.toLowerCase()
 
@@ -917,6 +935,17 @@ function getCoachCopy(
       { before: 'Quedó marcado. Una luz ', emphasis: 'más', after: ' en tu figura.' },
     ]
     return done[count % done.length]!
+  }
+
+  // El beat matinal — cobra el gancho de anoche ("Mañana: {estrella}"): la
+  // mañana siguiente, con el día aún sin responder, la estrella prometida se
+  // nombra como invitación, nunca como orden. Cierra el ciclo anticipación →
+  // pago de la Mecánica D; sin él, el coach genérico dejaba la promesa fría.
+  if (morning) {
+    const next = pickStarForCount(sign, count + 1)
+    if (next) {
+      return { before: 'Hoy se enciende ', emphasis: next.name, after: ', si tú quieres.' }
+    }
   }
 
   const phase = COACH_PHASE_POOLS.find((p) => count >= p.min)

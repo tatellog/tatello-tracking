@@ -59,3 +59,51 @@ export function nextSealDate(now: Date, window: Exclude<NotificationWindow, 'not
   if (ahead === 0) ahead = 7
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + ahead, t.hour, t.minute, 0, 0)
 }
+
+/*
+ * La SEGUNDA invitación de regreso (~7 días) — para quien pausó de verdad.
+ * Se agenda junto a la de mañana y se re-arma igual en cada apertura, así
+ * que la usuaria activa jamás la oye. Anclada en lo que PERSISTE (nada se
+ * apagó), sin conteo de ausencia, sin "te extrañamos". Techo duro del
+ * canal: estos dos toques y luego silencio respetuoso — no existe un
+ * tercer slot a propósito. (Copy pasa por voice-and-copy.)
+ */
+export const RETURN_COPY = {
+  title: 'Tu cielo sigue contigo',
+  body: 'Todo lo que construiste sigue aquí, tal como lo dejaste.',
+} as const
+
+/** Siete días después, a la hora de la ventana elegida. */
+export function nextReturnDate(now: Date, window: Exclude<NotificationWindow, 'not_yet'>): Date {
+  const t = WINDOW_TIME[window]
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, t.hour, t.minute, 0, 0)
+}
+
+/*
+ * La cita del cierre — la única notificación DIARIA, y solo existe en días
+ * con comida registrada: es un veredicto GANADO, nunca un recordatorio de
+ * deuda. Sin números en el push (el contenido vive en la card); se agenda
+ * al registrar comida y muere sola si el día no la ganó. 20:15: después de
+ * que el cierre existe (20:00), antes de que la noche se apague.
+ */
+export const DAY_CLOSE_TIME = { hour: 20, minute: 15 } as const
+
+export const CLOSE_COPY = {
+  title: 'Tu cierre de hoy está listo ✦',
+  body: 'Tu día ya tiene su veredicto. Míralo cuando quieras.',
+} as const
+
+/** HOY a las 20:15, o null si ya pasó (el cierre tardío se vive en la app;
+ *  no se agenda nada para mañana — mañana lo arma su propia comida). */
+export function todayCloseDate(now: Date): Date | null {
+  const d = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    DAY_CLOSE_TIME.hour,
+    DAY_CLOSE_TIME.minute,
+    0,
+    0,
+  )
+  return d.getTime() > now.getTime() ? d : null
+}

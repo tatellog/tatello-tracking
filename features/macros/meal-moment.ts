@@ -10,6 +10,10 @@
 import type { MealMoment } from './registro-intent'
 
 export function mealMomentByHour(hour: number = new Date().getHours()): MealMoment {
+  // La madrugada (0-4) es picoteo, no mañana: "Desayuno" preseleccionado a
+  // las 2:36 AM leía "la app no tiene idea de mi vida" y de paso "tu día ya
+  // empezó comiendo de más" (target-user jul 2026).
+  if (hour < 5) return 'snack'
   if (hour < 11) return 'breakfast'
   if (hour < 17) return 'lunch'
   if (hour < 22) return 'dinner'

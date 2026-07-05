@@ -8,8 +8,13 @@ import Orbits from '@/assets/icons/orbits.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
-import { useNextStarInvite } from '@/features/notifications/hooks'
-import { AppTabBar, CelebrationOverlay, UniverseDeltaToast } from '@/features/tabs/components'
+import { useDayCloseInvite, useNextStarInvite } from '@/features/notifications/hooks'
+import {
+  AppTabBar,
+  CelebrationOverlay,
+  UndoMealToast,
+  UniverseDeltaToast,
+} from '@/features/tabs/components'
 import { colors } from '@/theme'
 
 /* Tab glyphs. Custom vector illustrations from `assets/icons/`:
@@ -69,9 +74,12 @@ function SvgTabIcon({
 // AppTabBar skips its route.
 export default function TabsLayout() {
   // La invitación del día siguiente (Mecánica D): cada sesión re-agenda la
-  // única notificación de mañana en la ventana elegida — auto-capada, ver
-  // features/notifications/invite.ts.
+  // invitación de mañana + la red de 7 días en la ventana elegida —
+  // auto-capadas, ver features/notifications/invite.ts.
   useNextStarInvite()
+  // La cita del cierre: primera comida del día → push 20:15 "tu cierre
+  // está listo". Solo días con comida; jamás reproche.
+  useDayCloseInvite()
   return (
     <View style={{ flex: 1 }}>
       <Tabs
@@ -143,6 +151,8 @@ export default function TabsLayout() {
       <CelebrationOverlay />
       <BetaFeedbackButton />
       <UniverseDeltaToast />
+      {/* Deshacer del re-log de 1 tap — global: sobrevive al cierre del sheet. */}
+      <UndoMealToast />
       {/* La ceremonia de revelación (RevealReplayHost) subió a la RAÍZ
           (app/_layout), encima del Stack, para cubrir también rutas modales
           como movement-calendar (antes, aquí en (tabs), quedaba debajo). */}

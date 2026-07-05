@@ -23,6 +23,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { useNotificationResponseRouter } from '@/features/notifications/response'
 import { useProfile } from '@/features/profile/hooks'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
@@ -186,6 +187,7 @@ export default function RootLayout() {
             <ThemeProvider value={navTheme}>
               <ConfirmProvider>
                 <RouteGuard />
+                <NotificationTapRouter />
                 <Stack
                   screenOptions={{
                     headerShown: false,
@@ -212,6 +214,13 @@ export default function RootLayout() {
       </ErrorBoundary>
     </GestureHandlerRootView>
   )
+}
+
+/* El destino del tap de cada notificación (data.target → navegación).
+ * Vive junto a RouteGuard: dentro de los providers, render nulo. */
+function NotificationTapRouter() {
+  useNotificationResponseRouter()
+  return null
 }
 
 /*

@@ -44,7 +44,14 @@ import {
   type MealInput,
   type StoredIngredient,
 } from '@/features/macros/api'
-import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
+import {
+  useCreateMeal,
+  useFrequentMeals,
+  useMealById,
+  useUpdateMeal,
+} from '@/features/macros/hooks'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
+import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
@@ -464,14 +471,16 @@ const PHOTO_W = SCREEN_W - 40
 const PHOTO_MAX_H = 340
 
 // Slot pre-selected by time of day — the user can change it in the
-// picker before confirming.
-function currentMealType(): MealInput['meal_type'] {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+// picker before confirming. Helper COMPARTIDO (era el cuarto duplicado de
+// los cortes por hora, y con los cortes viejos: comida moría a las 4pm).
+const currentMealType = (): MealInput['meal_type'] => mealMomentByHour()
+
+const MEAL_TYPE_VALUES: readonly MealInput['meal_type'][] = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+]
 
 type MealType = MealInput['meal_type']
 
@@ -536,7 +545,14 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  */
 export default function ScanMealScreen() {
   const router = useRouter()
-  const { uri, editId, manual, describe, photoPath } = useLocalSearchParams<{
+  const {
+    uri,
+    editId,
+    manual,
+    describe,
+    photoPath,
+    mealType: mealTypeParam,
+  } = useLocalSearchParams<{
     uri?: string
     editId?: string
     manual?: string
@@ -544,6 +560,10 @@ export default function ScanMealScreen() {
     /** Foto representativa del platillo (storage path) — fallback cuando la
      *  instancia editada no tiene foto propia (p.ej. un re-log sin foto). */
     photoPath?: string
+    /** Momento elegido en el QuickLog ANTES de abrir el scan: la elección de
+     *  la usuaria manda sobre el default por hora (antes se ignoraba y su
+     *  "Snack" de madrugada aterrizaba como lo que la hora dijera). */
+    mealType?: string
   }>()
   const isEdit = !!editId
   // Manual log — no scan, no ingredient breakdown; the user types the
@@ -594,7 +614,12 @@ export default function ScanMealScreen() {
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
   const [name, setName] = useState('')
-  const [mealType, setMealType] = useState<MealType>(currentMealType)
+  // La elección del QuickLog manda sobre el default por hora (si vino).
+  const [mealType, setMealType] = useState<MealType>(() =>
+    mealTypeParam != null && (MEAL_TYPE_VALUES as readonly string[]).includes(mealTypeParam)
+      ? (mealTypeParam as MealType)
+      : currentMealType(),
+  )
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([])
   const [proteinInput, setProteinInput] = useState('')
   const [caloriesInput, setCaloriesInput] = useState('')
@@ -844,11 +869,27 @@ export default function ScanMealScreen() {
     )
   }
 
+  // ¿Era su PRIMERA comida de la vida? Snapshot al montar (tras guardar, la
+  // query de frecuentes se refresca y ya no sabría distinguirlo). Alimenta
+  // la línea de compounding: el registro más caro del producto (primer scan,
+  // 60-90 s) debe anunciar su recompensa — que mañana cuesta un toque.
+  const frequent = useFrequentMeals(1)
+  const hadMealsBefore = useRef<boolean | null>(null)
+  if (hadMealsBefore.current === null && frequent.data !== undefined) {
+    hadMealsBefore.current = frequent.data.length > 0
+  }
+
   // New logs land on the reveal (state C) before returning to the tab —
   // a star joins the sky + the protein of this meal + a coach line.
   const goToReveal = (protein: number) => {
     setRevealProtein(Math.round(protein))
-    setRevealLine(REVEAL_LINES[Math.floor(Math.random() * REVEAL_LINES.length)] ?? REVEAL_LINES[0]!)
+    setRevealLine(
+      // La primera comida de la vida cierra con la promesa del día 2, no
+      // con una frase genérica: convierte el esfuerzo en compounding.
+      hadMealsBefore.current === false
+        ? 'Guardada. La próxima vez está a un toque en ✦.'
+        : (REVEAL_LINES[Math.floor(Math.random() * REVEAL_LINES.length)] ?? REVEAL_LINES[0]!),
+    )
     setPhase('reveal')
   }
 
@@ -1274,6 +1315,22 @@ export default function ScanMealScreen() {
                 ✦ +{energiaDelta} {ATTRIBUTE_LABEL.energia}
               </Animated.Text>
             ) : null}
+            {/* El puente registro → significado: en el momento de máxima
+                atención, la respuesta a "¿cómo voy?" queda a un tap. La
+                evidencia vive en Órbita Día (sin semáforo en el home). */}
+            <Animated.View entering={FadeInUp.duration(520).delay(1150)}>
+              <Pressable
+                onPress={() => {
+                  requestOrbitSegment('dia')
+                  router.replace('/orbit')
+                }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Ver cómo va tu día en Órbita"
+              >
+                <Text style={styles.revealOrbitaLink}>Ver cómo va tu día ›</Text>
+              </Pressable>
+            </Animated.View>
             <Animated.View entering={FadeInUp.duration(520).delay(1100)}>
               <Pressable
                 onPress={() => router.back()}
@@ -1667,6 +1724,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
     fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  // El puente a Órbita Día — secundario al check de "listo", nunca compite.
+  revealOrbitaLink: {
+    marginTop: 16,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    letterSpacing: 0.3,
     textAlign: 'center',
   },
   // A round gold "done" stamp — reads as confirmed, not as a nav/tab

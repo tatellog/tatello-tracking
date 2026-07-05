@@ -19,6 +19,9 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
 import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { useMacroTargets } from '@/features/macros/hooks'
+import { daysInDeficit } from '@/features/orbit/month-built'
+import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { ReadingCard } from '@/features/progress/components/ReadingCard'
@@ -115,6 +118,26 @@ function ProgressBody() {
 
   const goLogMeasurement = () => router.push('/log-measurement')
   const hasTrajectory = count >= 2
+
+  // La prueba déficit ↔ báscula — conecta el esfuerzo dorado del mes con lo
+  // que la usuaria quiere ver ("tus días dorados se están notando"). Solo
+  // habla en la vista de 30 días, con ≥3 días en déficit Y descenso real;
+  // co-ocurrencia, no causa, y una subida simplemente calla (jamás culpa).
+  const signals31 = useSignalsHistory(31)
+  const { data: macroTargets } = useMacroTargets()
+  const deficitProof = useMemo(() => {
+    if (period !== '30D') return null
+    const summary = daysInDeficit(signals31.data ?? [], {
+      calorieTarget: macroTargets?.calories ?? null,
+    })
+    if (!summary || summary.deficitDays < 3) return null
+    if (!first || !last || smoothed.length < 3) return null
+    const dropKg = first.weight - last.weight
+    if (dropKg < 0.2) return null
+    const dropLabel =
+      dropKg >= 1 ? `${dropKg.toFixed(1)} kg` : `${Math.round((dropKg * 1000) / 50) * 50} g`
+    return `Últimos 30 días: ${summary.deficitDays} días en déficit · ${dropLabel} menos.`
+  }, [period, signals31.data, macroTargets?.calories, first, last, smoothed.length])
 
   return (
     <View style={styles.screen}>
@@ -239,6 +262,12 @@ function ProgressBody() {
               {trend ? (
                 <Animated.View entering={FadeIn.duration(360).delay(320)}>
                   <CoachLine text={formatTrendCopy(trend)} />
+                </Animated.View>
+              ) : null}
+
+              {deficitProof ? (
+                <Animated.View entering={FadeIn.duration(360).delay(380)}>
+                  <Text style={styles.deficitProof}>{deficitProof}</Text>
                 </Animated.View>
               ) : null}
             </>
@@ -729,6 +758,16 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
+  },
+  // La prueba déficit ↔ báscula — dato en UI upright (números literales,
+  // no voz de coach), en oro: el mismo lenguaje del calendario dorado.
+  deficitProof: {
+    marginTop: 10,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.oroLight,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
   },
   // Shown in "Tu cuerpo" when the month's focus isn't weight — the
   // section is reference, not a target to chase.

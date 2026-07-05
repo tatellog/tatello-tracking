@@ -666,8 +666,13 @@ export function MonthSegment({
                aproximado, sin countdown (retention-spec · Mecánica C). */
             <View style={styles.patternsEmpty}>
               <Text style={styles.patternsEmptyLede}>Tus patrones se están formando.</Text>
+              {/* El marcador de anticipación (Mecánica C): progresa con DÍAS
+                  CON DATOS, nunca con fechas — la usuaria ve que su registro
+                  alimenta algo que se está gestando (Zeigarnik sin countdown). */}
               <Text style={styles.patternsEmptyBody}>
-                Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:
+                {patternDataDays > 0
+                  ? `Stelar ya leyó ${patternDataDays} ${patternDataDays === 1 ? 'día tuyo' : 'días tuyos'}. Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:`
+                  : 'Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:'}
               </Text>
               <View style={styles.patternSilhouettes}>
                 {[

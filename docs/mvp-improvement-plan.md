@@ -557,3 +557,96 @@ el loop core por esto.
 Hecho ya (5 jul): dedupe de literales (MovementConstellation,
 PatternReveal → alias de tokens), `signal.entreno` tokenizado y sus 4
 usos migrados, `water-tint.svg` (4 jul).
+
+---
+
+# Parte 4 · Plan de mercado (5 jul 2026) — bajo el marco "haz visible lo invisible"
+
+Origen: pregunta de dueña ("¿qué le falta a Stelar para tomarse en serio y
+competir?") + corrección de marco de dueña: Stelar NO es app de tracking;
+no compite en la guerra de bases de datos (ahí MFP gana por diseño y
+ganarla sería construir "MFP con tema oscuro", prohibido por manifiesto).
+
+**El principio que gobierna este plan:** lo que Órbita hace visible tiene
+que ser VERDAD. La evidencia se calcula desde lo registrado, así que la
+pregunta de mercado no es "¿trackeamos mejor?" sino "¿qué calidad de input
+necesita nuestra inferencia?". Respuesta: CONSISTENCIA sobre precisión.
+Los patrones sobreviven al error sistemático (si siempre subestima 15%,
+el patrón relativo sigue siendo cierto); los mata el día faltante — y la
+completitud es un problema de RETENCIÓN (resuelto en Partes 1-2).
+
+## Descartado a propósito
+
+- **Barcode + base de datos de alimentos**: la mejora del juego viejo.
+  Cal AI validó que el mercado no la exige (ganó sin base de datos, con
+  foto + IA, quitando la fricción que la base impone). No construir.
+
+## Las líneas, en orden
+
+### M1 · Scan excepcional (la única puerta de entrada de comida)
+
+Hoy: gpt-4o-mini estima sin loop de corrección. Objetivo: porciones
+editables post-scan; corrección de un tap ("¿le atiné?") que además
+entrena la consistencia de la usuaria; manejo de confianza explícito
+(cuando la IA duda, lo dice — honestidad de evidencia, nunca fingir
+precisión). Es la forma Cal AI del rigor, no la forma MFP.
+
+### M2 · TDEE adaptativo (lo invisible #1 hecho visible)
+
+El gasto real del cuerpo, despejado de sus propios datos por balance
+energético: TDEE real = kcal promedio comidas + (Δkg suavizado × 7700 /
+días), re-estimado semanal con ventana rodante. Por qué es LA feature:
+(a) responde el "¿esto está funcionando?" textual de la usuaria (peso
+plano + 19 entrenos = tu gasto real es menor; ajustamos tu meta) con
+matemática honesta, sin culpa; (b) captura la adaptación metabólica que
+causa los estancamientos que hacen abandonar; (c) es ROBUSTO al estilo de
+registro (un sesgo consistente se absorbe en la calibración — por eso no
+necesita barcode); (d) es el sello de seriedad (MacroFactor) que nadie
+hace en español. Guardas: mínimo de datos antes de re-estimar, jamás
+bajo MIN_CALORIES, comunicado como observación ("tu cuerpo gasta ~1,900
+según tus últimas 4 semanas"), nunca sentencia. Función pura + tests,
+sobre daily_signals + pesajes suavizados que ya existen.
+
+### M3 · La Voz real + Lecturas (Fase B)
+
+Anthropic en las Lecturas (Diaria/Semanal/Mensual) reemplazando el mock;
+los patrones profundos server-side en \_shared/intelligence. Es el
+producto en sí; va DESPUÉS de M2 (la Lectura más valiosa cita el gasto
+real).
+
+### M4 · Apple Health, solo peso (lectura)
+
+La báscula sincronizada = pesajes frecuentes sin ritual = mejor input
+para M2. No es tracking: es quitar fricción a lo invisible. (La
+integración completa de wearables sigue siendo premium futuro, plan
+aparte.)
+
+### M5 · Plomería sin bando
+
+Sentry (crash reporting: hoy un crash en producción es invisible),
+RevenueCat + paywall (sin precio no hay negocio; el paywall sube la
+percepción de valor), presencia de App Store (screenshots que venden el
+diferenciador, ASO es-MX, página de soporte).
+
+### M6 · Posicionamiento anti-horóscopo
+
+Riesgo real: signo zodiacal como portada → el shopper de 3 segundos la
+clasifica con Co-Star, no con las apps de peso. El posicionamiento
+público abre con el rigor (déficit, patrones, tus datos) y revela la
+capa celeste como recompensa, no como portada. Marketing, no producto —
+pero mal jugado invalida el resto.
+
+## Secuencia
+
+1. M1 scan + M4 Health-peso + Sentry (4-6 semanas).
+2. Después: M2 TDEE adaptativo → M5 cobro → M3 Voz real.
+3. En paralelo (barato): M6 posicionamiento.
+
+(El dato "retengo X% a D7 sin rachas ni culpa" que salga de la validación
+con las betas sigue siendo el argumento de mercado más fuerte; la
+secuencia de arriba no depende de esperarla.)
+
+La tesis en una línea: Stelar no necesita trackear mejor que MFP —
+necesita que lo poquito que trackea sea suficientemente consistente para
+que lo invisible que revela sea verdad. Consistencia = retención (hecha),
+robustez = TDEE adaptativo, puerta de entrada = scan excelente.

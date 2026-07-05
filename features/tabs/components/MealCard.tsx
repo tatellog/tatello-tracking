@@ -99,7 +99,9 @@ export function MealCard({
       <Text
         style={[styles.macros, compact && styles.macrosCompact, confirmed && styles.textOnStamp]}
       >
-        {Math.round(protein)} g · {calories} kcal
+        {/* "g prot", nunca "g" pelón: es LA métrica más cuidada y estaba de
+            incógnito ("¿30 gramos de qué?", target-user jul 2026). */}
+        {Math.round(protein)} g prot · {calories} kcal
         {freq != null && freq > 1 ? (
           <Text style={[styles.freq, confirmed && styles.textOnStamp]}>{`  ·  ${freq} veces`}</Text>
         ) : null}

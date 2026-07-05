@@ -21,21 +21,25 @@ function isoDaysAgo(iso: string, n: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 
-/** Peso (kg) registrado más cercano a `targetIso`. null si no hay pesajes. */
-function weightAt(rows: readonly BodyMeasurement[], targetIso: string): number | null {
+/** Peso SUAVIZADO al cierre de una ventana: media de los pesajes de los 10
+ *  días que terminan en `targetIso`. El pesaje crudo más cercano hacía que
+ *  un día hinchado/liviano fuera el titular de la card — misma disciplina
+ *  que "Tu cuerpo" (media móvil), nunca ruido como historia. */
+function smoothedWeightAt(rows: readonly BodyMeasurement[], targetIso: string): number | null {
   const [y, m, d] = targetIso.split('-').map(Number) as [number, number, number]
-  const targetTs = new Date(y, m - 1, d, 12).getTime()
-  let best: number | null = null
-  let bestDelta = Infinity
+  const endTs = new Date(y, m - 1, d, 23, 59).getTime()
+  const startTs = endTs - 10 * 86_400_000
+  let sum = 0
+  let n = 0
   for (const r of rows) {
     if (r.weight_kg == null) continue
-    const dd = Math.abs(new Date(r.measured_at).getTime() - targetTs)
-    if (dd < bestDelta) {
-      bestDelta = dd
-      best = r.weight_kg
+    const t = new Date(r.measured_at).getTime()
+    if (t >= startTs && t <= endTs) {
+      sum += r.weight_kg
+      n += 1
     }
   }
-  return best
+  return n > 0 ? sum / n : null
 }
 
 type Signal = { day?: string | null; protein_g?: number | null }
@@ -66,17 +70,26 @@ type Row = {
 }
 
 /*
- * "Tu Historia" — el hero de Progreso. Responde "¿qué ha cambiado desde que
- * empecé?" con EVIDENCIA, no un dashboard: cada métrica como un salto
- * Antes → Ahora (el pasado tenue, el presente luminoso) + el delta a la
- * derecha. El % de constelación usa el RPC con fecha de corte para el "antes"
- * exacto de hace 30 días.
+ * "Tu Historia" — el hero de Progreso. Responde "¿qué ha cambiado?" con
+ * EVIDENCIA, no un dashboard: cada métrica como un salto Antes → Ahora (el
+ * pasado tenue, el presente luminoso) + el delta a la derecha.
+ *
+ * UNA sola regla de lectura (rediseño 5 jul 2026, decisión dueña): TODAS
+ * las filas comparan "estos 30 días vs los 30 anteriores" (Apple Trends:
+ * una semántica, luego escaneas). Antes convivían cuatro (peso puntual,
+ * entrenos/días acumulados de por vida, proteína promedio) y la usuaria
+ * tenía que jugar al detective ("¿23 entrenos en un mes?"). El orden
+ * cuenta la tesis del producto: lo que HICISTE primero (entrenos,
+ * proteína, presencia), el outcome corporal al final — peso SUAVIZADO y
+ * "estable" bajo el ruido (nunca un "+0.0 kg" abriendo tu historia). Los
+ * deltas son honestos en ambas direcciones: ↑ oro al subir, ↓ niebla al
+ * bajar (nunca rojo). La constelación ya no es fila de tabla (error de
+ * categoría: la capa simbólica no tabula) — su historia vive en la
+ * TransformationCard de esta misma pantalla.
  *
  * Gate por volumen de datos (principio Apple Trends): con pocos días de
- * señales, los saltos rinden comparaciones absurdas (76→76 +0.0, dobles
- * ceros, "prom. 2 g") que destruyen la confianza en todos los números.
- * Bajo el umbral la tarjeta promete en vez de comparar, y muestra lo único
- * vivo temprano: la constelación.
+ * señales, los saltos rinden comparaciones absurdas. Bajo el umbral la
+ * tarjeta promete en vez de comparar.
  */
 const MIN_DIAS_HISTORIA = 14
 export function TuHistoria() {
@@ -87,7 +100,8 @@ export function TuHistoria() {
   const measurements = useMeasurements(70)
   const workouts = useAllWorkoutDates()
   const signals = useSignalsHistory(95)
-  const cBefore = useTransformProgressAsOf(cut30)
+  // Solo el % actual (para el modo promesa); el "as of hace 30 días" se fue
+  // con la fila de constelación (ya no tabula junto a gramos y kilos).
   const cNow = useTransformProgressAsOf(today)
   const { data: profile } = useProfile()
 
@@ -98,11 +112,7 @@ export function TuHistoria() {
   }, [profile?.date_of_birth])
 
   const loading =
-    measurements.isLoading ||
-    workouts.isLoading ||
-    signals.isLoading ||
-    cBefore.isLoading ||
-    cNow.isLoading
+    measurements.isLoading || workouts.isLoading || signals.isLoading || cNow.isLoading
 
   // Días con al menos una señal — decide si la historia ya puede hablar.
   const diasConSenal = useMemo(
@@ -115,60 +125,50 @@ export function TuHistoria() {
     const wDates = workouts.data ?? []
     const sRows = (signals.data ?? []) as Signal[]
 
-    // Peso — valor puntual entonces vs ahora (sin juicio: delta neutro).
-    const wBefore = weightAt(mRows, cut30)
-    const wNow = weightAt(mRows, today)
-    const weightDelta =
-      wBefore != null && wNow != null
-        ? {
-            text: `${wNow - wBefore >= 0 ? '+' : '−'}${Math.abs(wNow - wBefore).toFixed(1)} kg`,
-            up: wNow - wBefore >= 0,
-          }
-        : null
+    // UNA regla para todas las filas: estos 30 días vs los 30 anteriores.
+    // Delta honesto en ambas direcciones (una baja jamás se oculta ni se
+    // pinta de alarma); sin cambio → sin chip (silencio, no "+0").
+    const growthDelta = (before: number, now: number, unit = '') => {
+      const d = now - before
+      if (d === 0) return null
+      return { text: `${d > 0 ? '+' : '−'}${Math.abs(Math.round(d))}${unit}`, up: d > 0 }
+    }
 
-    // Entrenos — acumulado de por vida entonces vs ahora.
-    const eBefore = wDates.filter((d) => d <= cut30).length
-    const eNow = wDates.length
+    // Entrenos — conteo por ventana.
+    const eBefore = wDates.filter((d) => d > cut60 && d <= cut30).length
+    const eNow = wDates.filter((d) => d > cut30 && d <= today).length
 
-    // Proteína — promedio del mes previo vs el reciente.
+    // Proteína — promedio por ventana (solo días con proteína registrada).
     const pBefore = avgProtein(sRows, cut60, cut30)
     const pNow = avgProtein(sRows, cut30, today)
     const proteinDelta =
       pBefore != null && pNow != null
-        ? {
-            text: `${pNow - pBefore >= 0 ? '+' : '−'}${Math.round(Math.abs(pNow - pBefore))} g`,
-            up: pNow - pBefore >= 0,
-          }
+        ? growthDelta(Math.round(pBefore), Math.round(pNow), ' g')
         : null
 
-    // Días registrados — días con señal, acumulado entonces vs ahora.
-    const dBefore = sRows.filter((r) => r.day != null && r.day <= cut30).length
-    const dNow = sRows.filter((r) => r.day != null).length
+    // Días con registro — días con señal por ventana.
+    const dBefore = sRows.filter((r) => r.day != null && r.day > cut60 && r.day <= cut30).length
+    const dNow = sRows.filter((r) => r.day != null && r.day > cut30 && r.day <= today).length
 
-    // Constelación — % exacto (RPC con corte) entonces vs ahora.
-    const conBefore = cBefore.progress
-    const conNow = cNow.progress
-    const conDelta =
-      conBefore != null && conNow != null
-        ? { text: `+${Math.round(conNow - conBefore)}%`, up: conNow >= conBefore }
-        : null
+    // Peso — ÚLTIMA fila (el outcome después del hacer), suavizado al cierre
+    // de cada ventana, y "estable" bajo el ruido de báscula: un "+0.0 kg"
+    // abriendo tu historia era la anti-apertura (decisión dueña 5 jul 2026).
+    const wBefore = smoothedWeightAt(mRows, cut30)
+    const wNow = smoothedWeightAt(mRows, today)
+    const weightDelta = (() => {
+      if (wBefore == null || wNow == null) return null
+      const d = wNow - wBefore
+      if (Math.abs(d) < 0.5) return { text: 'estable', up: false }
+      return { text: `${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(1)} kg`, up: d > 0 }
+    })()
 
     return [
-      {
-        key: 'peso',
-        label: 'Peso',
-        before: wBefore != null ? wBefore.toFixed(1) : null,
-        now: wNow != null ? wNow.toFixed(1) : null,
-        unit: 'kg',
-        delta: weightDelta,
-        tone: 'neutral',
-      },
       {
         key: 'entrenos',
         label: 'Entrenos',
         before: String(eBefore),
         now: String(eNow),
-        delta: eNow - eBefore > 0 ? { text: `+${eNow - eBefore}`, up: true } : null,
+        delta: growthDelta(eBefore, eNow),
         tone: 'growth',
       },
       {
@@ -182,34 +182,23 @@ export function TuHistoria() {
       },
       {
         key: 'dias',
-        label: 'Días registrados',
+        label: 'Días con registro',
         before: String(dBefore),
         now: String(dNow),
-        delta: dNow - dBefore > 0 ? { text: `+${dNow - dBefore}`, up: true } : null,
+        delta: growthDelta(dBefore, dNow),
         tone: 'growth',
       },
       {
-        key: 'constelacion',
-        label: 'Constelación',
-        before: conBefore != null ? String(Math.round(conBefore)) : null,
-        now: conNow != null ? String(Math.round(conNow)) : null,
-        unit: '%',
-        suffix: signLabel,
-        delta: conDelta,
-        tone: 'growth',
+        key: 'peso',
+        label: 'Peso',
+        before: wBefore != null ? wBefore.toFixed(1) : null,
+        now: wNow != null ? wNow.toFixed(1) : null,
+        unit: 'kg',
+        delta: weightDelta,
+        tone: 'neutral',
       },
     ]
-  }, [
-    measurements.data,
-    workouts.data,
-    signals.data,
-    cBefore.progress,
-    cNow.progress,
-    cut30,
-    cut60,
-    today,
-    signLabel,
-  ])
+  }, [measurements.data, workouts.data, signals.data, cut30, cut60, today])
 
   // Modo promesa — todavía no hay historia suficiente para comparar.
   if (!loading && diasConSenal < MIN_DIAS_HISTORIA) {
@@ -246,9 +235,9 @@ export function TuHistoria() {
       <EyebrowLabel tone="magenta" size={10}>
         Tu Historia
       </EyebrowLabel>
-      <Text style={styles.subtitle}>
-        Hace 30 días <Text style={styles.subtitleArrow}>→</Text> Hoy
-      </Text>
+      {/* UNA regla de lectura para toda la card (nunca más el acertijo de
+          "¿23 entrenos en un mes?"). */}
+      <Text style={styles.subtitle}>Estos 30 días, frente a los 30 anteriores.</Text>
 
       {loading ? (
         <Text style={styles.loading}>Reuniendo tu historia…</Text>
@@ -272,8 +261,16 @@ export function TuHistoria() {
 
               {r.delta ? (
                 <View style={[styles.delta, r.tone === 'neutral' && styles.deltaNeutral]}>
-                  <Text style={[styles.deltaText, r.tone === 'neutral' && styles.deltaTextNeutral]}>
-                    {r.tone === 'growth' ? '↑ ' : ''}
+                  {/* La flecha respeta la DIRECCIÓN real (bug: "↑ −18 g"). Una
+                      bajada se dice en calma — flecha ↓ en tono neutro (niebla),
+                      nunca rojo ni alarma (Apple Trends + manifiesto). */}
+                  <Text
+                    style={[
+                      styles.deltaText,
+                      (r.tone === 'neutral' || !r.delta.up) && styles.deltaTextNeutral,
+                    ]}
+                  >
+                    {r.tone === 'growth' ? (r.delta.up ? '↑ ' : '↓ ') : ''}
                     {r.delta.text}
                   </Text>
                 </View>
@@ -282,6 +279,15 @@ export function TuHistoria() {
               )}
             </View>
           ))}
+          {/* Ante una baja de la métrica más cuidada: observación en
+              pregunta (forma canónica del manifiesto), jamás receta ni
+              alarma. Responde el "¿y esto qué significa?" que la tabla
+              sola no puede. */}
+          {rows.find((r) => r.key === 'proteina')?.delta?.up === false ? (
+            <Text style={styles.coachNote}>
+              Tu proteína bajó estos 30 días. ¿Cambió algo en tus comidas?
+            </Text>
+          ) : null}
         </View>
       )}
     </Animated.View>
@@ -309,9 +315,17 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  subtitleArrow: {
-    color: colors.oro,
-    fontStyle: 'normal',
+  // Nota del coach al pie (solo ante una baja) — serif italic, en calma.
+  coachNote: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.oroHairlineSoft,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
   },
   loading: {
     paddingVertical: 18,
