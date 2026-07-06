@@ -1,0 +1,46 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Rampa del aro: emana del orbe (arriba-derecha) hacia el punto más lejano (abajo-izquierda).
+         Offsets remapeados de fracción de arco a proyección sobre la cuerda: c = (1 - cos(pi*s)) / 2 -->
+    <linearGradient id="ringRamp" gradientUnits="userSpaceOnUse" x1="758.07" y1="265.93" x2="265.93" y2="758.07">
+      <stop offset="0" stop-color="#FBD7E3"/>
+      <stop offset="0.1464" stop-color="#FF4886"/>
+      <stop offset="0.5782" stop-color="#E91E63"/>
+      <stop offset="1" stop-color="#A6164A"/>
+    </linearGradient>
+    <!-- Orbe de emisión: núcleo casi blanco cálido que cae a magenta hot, sin especular -->
+    <radialGradient id="orbCore" gradientUnits="userSpaceOnUse" cx="758.07" cy="265.93" r="77">
+      <stop offset="0" stop-color="#FFD9E8"/>
+      <stop offset="0.45" stop-color="#FFA8C6"/>
+      <stop offset="1" stop-color="#FF4886"/>
+    </radialGradient>
+    <!-- Halo del orbe: gradiente radial a transparente (sin filtros SVG) -->
+    <radialGradient id="orbHalo" gradientUnits="userSpaceOnUse" cx="758.07" cy="265.93" r="150">
+      <stop offset="0.5" stop-color="#E91E63" stop-opacity="0.45"/>
+      <stop offset="0.75" stop-color="#E91E63" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#E91E63" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Halo tenue de la estrella firma -->
+    <radialGradient id="starHalo" gradientUnits="userSpaceOnUse" cx="335" cy="689" r="58">
+      <stop offset="0" stop-color="#D9AE6F" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#D9AE6F" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#D9AE6F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo warm black: llena todo el lienzo, el squircle de iOS enmascara después -->
+  <rect width="1024" height="1024" fill="#0A0608"/>
+
+  <!-- Aro de órbita: dos semicírculos que comparten la misma rampa, costura brillante bajo el orbe,
+       costura oscura en el punto de menor luz -->
+  <path d="M 758.07 265.93 A 348 348 0 0 1 265.93 758.07" stroke="url(#ringRamp)" stroke-width="34" stroke-linecap="round"/>
+  <path d="M 758.07 265.93 A 348 348 0 0 0 265.93 758.07" stroke="url(#ringRamp)" stroke-width="34" stroke-linecap="round"/>
+
+  <!-- Firma: una sola estrella de 4 puntas, contrapeso diagonal del orbe -->
+  <circle cx="335" cy="689" r="58" fill="url(#starHalo)"/>
+  <path d="M 335 654 Q 341 683 370 689 Q 341 695 335 724 Q 329 695 300 689 Q 329 683 335 654 Z" fill="#FFE9C2"/>
+
+  <!-- Orbe: halo que muerde el aro, luego el cuerpo de emisión -->
+  <circle cx="758.07" cy="265.93" r="150" fill="url(#orbHalo)"/>
+  <circle cx="758.07" cy="265.93" r="77" fill="url(#orbCore)"/>
+</svg>

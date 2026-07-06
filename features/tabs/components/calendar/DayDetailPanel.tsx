@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontFamily: typography.uiBold,
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     letterSpacing: 0.2,
   },
   actionTextPrimary: {

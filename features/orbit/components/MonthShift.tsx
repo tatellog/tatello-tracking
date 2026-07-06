@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   focusText: {
     marginTop: 8,
     fontFamily: typography.uiMedium,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     lineHeight: 23,
     color: colors.leche,
   },

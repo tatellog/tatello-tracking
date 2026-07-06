@@ -77,7 +77,7 @@ function DailyChart({ data }: { data: Extract<ChartData, { kind: 'daily' }> }) {
           cx={focusIdx * (BAR_W + GAP) + BAR_W / 2}
           cy={BASELINE - data.days[focusIdx]! * MAX_H - 5}
           r={2.4}
-          fill="#FFFFFF"
+          fill={colors.blanco}
           opacity={0.95}
         />
       ) : null}

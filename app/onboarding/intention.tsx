@@ -11,6 +11,7 @@ import Animated, {
   interpolate,
   useAnimatedProps,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -72,7 +73,7 @@ const FOCUS_OPTIONS: readonly IntentOption[] = [
     tagline: 'Ver qué pasa antes, durante y después de cada comida.',
   },
   { value: 'patterns', label: 'Entender mis patrones', tagline: 'Qué hace los viernes distintos.' },
-  { value: 'other', label: 'Algo más', tagline: 'La nombras tú.' },
+  { value: 'other', label: 'Algo más', tagline: 'Lo tuyo es distinto.' },
 ]
 
 /** Phrase Stelar quietly utters after the user picks an intention. A
@@ -89,7 +90,7 @@ const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
   energy: 'Stelar busca de dónde nace tu fuerza.',
   food: 'Stelar mira el qué y el cuándo de cada comida.',
   patterns: 'Stelar observa qué se repite en ti.',
-  other: 'Stelar lo guarda y se ajusta a ti.',
+  other: 'Stelar se ajusta a ti.',
   // ── Inert: pruned from the UI, kept for enum completeness. ──
   sleep: 'Stelar mide cómo descansas para que el cuerpo suelte.',
   cycle: 'Stelar lee tu ciclo junto a todo lo demás.',
@@ -97,7 +98,7 @@ const FOCUS_CELEBRATION: Record<MonthlyFocus, string> = {
 }
 
 /*
- * Step 10 — Tu objetivo. MULTI-SELECT con PRIORIDAD. Stelar C is a
+ * Paso 3 del spine — Tu objetivo. MULTI-SELECT con PRIORIDAD. Stelar C is a
  * weight-loss app with emotional intelligence; the framing makes that
  * honest. "Bajar de peso" is the headline option (the outcome bucket);
  * the rest name the dimensions that SOSTAIN the outcome (energy, the
@@ -209,7 +210,15 @@ export default function IntentionScreen() {
   const dust = useSharedValue(0)
   const orbit = useSharedValue(0)
 
+  // Reduced motion: cielo estático (hallazgo E3; el resto del repo ya lo respeta).
+  const reduceMotion = useReducedMotion() ?? false
   useEffect(() => {
+    if (reduceMotion) {
+      clock.value = 0.5
+      dust.value = 0
+      orbit.value = 0
+      return
+    }
     clock.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
     dust.value = withRepeat(withTiming(1, { duration: 18000, easing: Easing.linear }), -1, false)
     orbit.value = withRepeat(withTiming(1, { duration: 40000, easing: Easing.linear }), -1, false)
@@ -218,7 +227,7 @@ export default function IntentionScreen() {
       cancelAnimation(dust)
       cancelAnimation(orbit)
     }
-  }, [clock, dust, orbit])
+  }, [clock, dust, orbit, reduceMotion])
 
   // Toggle in ORDER. Tap an unselected card → append (becomes the new
   // last pick; if the column was empty it also becomes the priority).
@@ -233,7 +242,9 @@ export default function IntentionScreen() {
   }
 
   const handleContinue = () => {
-    if (!canContinue || !priority) return
+    // `celebrating` como guard: el beat dura 1.4 s y el overlay no debe
+    // permitir un segundo tap (doble mutate + pantalla duplicada en stack).
+    if (!canContinue || !priority || celebrating) return
 
     // Persist the FULL ordered selection split across two columns:
     //   • monthly_focus           → priority (selected[0]) — engine input
@@ -319,7 +330,7 @@ export default function IntentionScreen() {
           eyebrowColor="magenta"
           question="¿Qué quieres lograr?"
           questionEmphasis="lograr"
-          hint="Elige una o varias. La primera que elijas es tu foco."
+          hint="Elige una o varias. La primera que elijas es tu prioridad."
         />
 
         {/* Scroll stage — the ScrollView plus two bg-coloured edge fades so
@@ -399,7 +410,9 @@ export default function IntentionScreen() {
         <Animated.View
           entering={FadeIn.duration(320)}
           exiting={FadeOut.duration(360)}
-          pointerEvents="none"
+          // "auto": el velo ABSORBE los taps del beat — antes era permeable
+          // (pointerEvents none) y un segundo tap tocaba cards/CTA invisibles.
+          pointerEvents="auto"
           style={styles.celebOverlay}
         >
           <View style={styles.celebInner}>
@@ -1189,9 +1202,10 @@ const styles = StyleSheet.create({
   textCol: {
     flex: 1,
   },
+  // Upright Hanken: un label de opción es UI, no voz del coach — el italic
+  // queda reservado al acknowledgment (celebText), que SÍ es coach (E3 #6).
   label: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
+    fontFamily: typography.displaySemi,
     fontSize: typography.sizes.anchor,
     lineHeight: 22,
     color: colors.bone,

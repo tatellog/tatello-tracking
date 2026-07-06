@@ -50,7 +50,7 @@ export function SpeedometerRing({
   target,
   size = 88,
   color = colors.magenta,
-  overColor = '#F1A65A',
+  overColor = colors.ambar,
   delay = 200,
 }: Props) {
   const r = size / 2 - 6

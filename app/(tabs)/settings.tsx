@@ -36,7 +36,7 @@ const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).sprin
 // horneadas energy/moon/water usan como `fill`). Los glifos `currentColor`
 // (orbits, food) se tintan a ESTE valor —no a oroSoft, más oscuro— para que
 // los cuatro iconos de "Tu camino" lean a una sola luminancia.
-const ICON_GOLD = '#EEDD91'
+const ICON_GOLD = colors.oroVect
 
 // TODO: Términos y privacidad — la fila "Términos y privacidad" está
 // disabled hasta que estas páginas estén hospedadas. Cuando existan,
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   },
   identityInitial: {
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     color: colors.magenta,
   },
   identityTextCol: {
@@ -1019,7 +1019,7 @@ const styles = StyleSheet.create({
   // Nombre — tipografía editorial, grande, la heroína de la card.
   identityName: {
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     letterSpacing: -0.8,
     color: colors.leche,
   },
@@ -1185,7 +1185,7 @@ const styles = StyleSheet.create({
   signAge: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     marginTop: 4,
   },
@@ -1248,12 +1248,12 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     color: colors.niebla,
   },
   rowValue: {
     fontFamily: typography.displaySemi,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: -0.2,
     flexShrink: 1,
@@ -1286,7 +1286,7 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontFamily: typography.displaySemi,
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     color: colors.leche,
     letterSpacing: -0.3,
   },
@@ -1353,7 +1353,7 @@ const styles = StyleSheet.create({
   inlineError: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.feedbackError,
     paddingHorizontal: 2,
   },
@@ -1406,7 +1406,7 @@ const styles = StyleSheet.create({
   },
   accountLabel: {
     fontFamily: typography.displaySemi,
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     color: colors.leche,
     letterSpacing: -0.3,
   },
@@ -1441,7 +1441,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.feedbackError,
     textAlign: 'center',
   },

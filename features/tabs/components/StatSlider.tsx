@@ -1141,7 +1141,7 @@ const styles = StyleSheet.create({
   },
   weightValue: {
     fontFamily: typography.displayHeavy,
-    fontSize: 44,
+    fontSize: typography.sizes.gaugeNum,
     color: colors.leche,
     letterSpacing: -1.8,
     lineHeight: 46,
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   deltaGood: {

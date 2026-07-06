@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   // OBSERVACIÓN: la fecha sube a heroína — domina el sheet como "este día,
   // este recuerdo", no como un campo más.
   dateHero: {
-    fontSize: 29,
+    fontSize: typography.sizes.macroNum,
     letterSpacing: -0.8,
     color: colors.oroLeche,
   },
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   eyebrow: {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   },
   checkLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.bone,
   },
   checkLabelObserve: {

@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', marginBottom: 28 },
   heroNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 52,
+    fontSize: typography.sizes.heroNum,
     letterSpacing: -2,
     color: colors.leche,
     fontVariant: ['tabular-nums'],

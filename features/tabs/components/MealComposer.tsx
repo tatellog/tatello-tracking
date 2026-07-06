@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
   },
   newName: {
     fontFamily: typography.displaySemi,
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     color: colors.leche,
     letterSpacing: -0.3,
     marginTop: 2,

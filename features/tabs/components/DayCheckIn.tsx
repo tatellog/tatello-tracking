@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 9.5,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 2.4,
     textTransform: 'uppercase',
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   editLead: {
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.bone,
     letterSpacing: 0.3,
   },
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   },
   changeLink: {
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     letterSpacing: 0.3,
   },
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   // Capa meta unificada a 12.5 — en niebla 11.5 el lead se leía apretado.
   typeLead: {
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.bone,
     letterSpacing: 0.3,
     marginBottom: 8,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   },
   typeChipText: {
     fontFamily: typography.uiSemi,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
     letterSpacing: 0.3,
   },

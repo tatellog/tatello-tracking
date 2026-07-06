@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 9,
     fontFamily: typography.uiBold,
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     lineHeight: 25,
     color: colors.leche,
     letterSpacing: -0.3,
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
   },

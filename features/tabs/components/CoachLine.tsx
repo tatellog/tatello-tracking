@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   line: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     lineHeight: 24,
     color: colors.bone,
     marginTop: 12,

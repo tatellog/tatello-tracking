@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   emptyHint: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.bone,
     textAlign: 'center',

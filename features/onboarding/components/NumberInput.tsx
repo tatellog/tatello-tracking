@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontFamily: typography.display,
-    fontSize: 56,
+    fontSize: typography.sizes.inputNum,
     letterSpacing: -1,
     color: colors.leche,
     backgroundColor: 'transparent',

@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   sigDots: {
-    fontSize: 7,
+    fontSize: typography.sizes.nano,
     letterSpacing: 2,
     color: colors.magenta,
   },

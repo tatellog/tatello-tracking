@@ -125,7 +125,9 @@ export function useWeeklyMealStats(): {
  * reference) and Agua (days the glass goal was met) — both real
  * nutrients. All read-only, manifesto-safe framing lives in the pure
  * computeNourishmentConsistency. */
-const NOURISH_WINDOW = 10
+// 7, no 10: una semana mapea a memoria humana ("el martes salí") y las
+// iniciales L-D anclan cada barra a su día real (feedback beta).
+const NOURISH_WINDOW = 7
 
 export function useNourishmentConsistency(): {
   data: NourishmentConsistency | null

@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   avatarImg: { width: AVATAR, height: AVATAR },
   avatarInitial: {
     fontFamily: typography.displayHeavy,
-    fontSize: 34,
+    fontSize: typography.sizes.displayHero,
     color: colors.magenta,
   },
   // Badge de cámara — afordance de "cambiar foto" sobre el avatar.
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   // Ruby — héroe tipográfico.
   name: {
     fontFamily: typography.displayHeavy,
-    fontSize: 32,
+    fontSize: typography.sizes.displayLg,
     letterSpacing: -1,
     color: colors.leche,
     textAlign: 'center',

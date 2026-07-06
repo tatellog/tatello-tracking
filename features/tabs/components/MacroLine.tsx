@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     color: colors.leche,
     letterSpacing: -1,
     lineHeight: 26,

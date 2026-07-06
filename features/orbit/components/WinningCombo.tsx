@@ -107,9 +107,9 @@ function Glint({
   return (
     <AnimatedG animatedProps={animatedProps}>
       {/* Espiga larga y fina (el rayo del destello). */}
-      <Path d={sparklePath(x, y, size, 0.06)} fill="#FFFFFF" />
+      <Path d={sparklePath(x, y, size, 0.06)} fill={colors.blanco} />
       {/* Núcleo brillante compacto (el corazón del brillo). */}
-      <Circle cx={x} cy={y} r={size * 0.22} fill="#FFFFFF" />
+      <Circle cx={x} cy={y} r={size * 0.22} fill={colors.blanco} />
     </AnimatedG>
   )
 }
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   // Etiquetas de señal = DATOS (no voz de coach): Hanken upright, no serif italic.
   labelText: {
     fontFamily: typography.uiMedium,
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     lineHeight: 22,
     color: colors.leche,
   },

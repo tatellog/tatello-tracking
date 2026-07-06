@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   right: {

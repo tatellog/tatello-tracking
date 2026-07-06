@@ -112,7 +112,7 @@ export function PrimaryCta({
         <View style={styles.loadingRow}>
           <StarLoader
             size={18}
-            color={isGhost ? colors.leche : isSoft ? (accent ?? colors.magenta) : '#FFFFFF'}
+            color={isGhost ? colors.leche : isSoft ? (accent ?? colors.magenta) : colors.blanco}
           />
           <Text
             style={[
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
-    color: '#FFFFFF',
+    color: colors.blanco,
     letterSpacing: 2.16,
     textTransform: 'uppercase',
   },
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     letterSpacing: 0,
     fontFamily: typography.uiMedium,
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
   },
   labelSoft: {
     color: colors.magenta,

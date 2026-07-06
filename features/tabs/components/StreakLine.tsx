@@ -46,7 +46,7 @@ export function StreakLine({ streak, onPress }: { streak: number; onPress?: () =
 
   const numStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + pop.value * 0.18 }],
-    color: interpolateColor(pop.value, [0, 1], [colors.magenta, '#FFF3FA']),
+    color: interpolateColor(pop.value, [0, 1], [colors.magenta, colors.blanco]),
   }))
 
   if (streak < 2) return null
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
 })

@@ -51,10 +51,17 @@ function MealGlyph({ type, size, color }: { type: MealMoment; size: number; colo
       ) : type === 'dinner' ? (
         <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
       ) : (
-        <Path
-          d="M12 2.6 L13.6 10.4 L21.4 12 L13.6 13.6 L12 21.4 L10.4 13.6 L2.6 12 L10.4 10.4 Z"
-          fill={color}
-        />
+        <>
+          {/* Snack = COMETA (núcleo + estela). La estrella de 4 puntas era el
+              mismo glifo del FAB Registrar: colisión simbólica. */}
+          <Circle cx={15.6} cy={8.4} r={3.6} fill={color} />
+          <Path
+            d="M12.4 11.6 L5 19 M14.8 13.6 L10 18.4 M10.6 9.2 L6.6 13.2"
+            stroke={color}
+            strokeWidth={1.6}
+            strokeLinecap="round"
+          />
+        </>
       )}
     </Svg>
   )
@@ -247,10 +254,14 @@ export function MomentsToday({ meals, viewingPast }: Props) {
         </Text>
       ) : (
         <>
-          <Text style={styles.hint}>Toca un astro para registrar esa comida.</Text>
-          {litCount > 0 ? (
+          {/* El instructivo solo mientras hace falta: tras el primer registro
+              del día, el conteo toma su lugar (el texto-manual permanente era
+              ruido para quien ya aprendió el gesto). */}
+          {litCount === 0 ? (
+            <Text style={styles.hint}>Toca un astro para registrar esa comida.</Text>
+          ) : (
             <Text style={styles.count}>{litCount} de 4 momentos registrados</Text>
-          ) : null}
+          )}
         </>
       )}
     </View>

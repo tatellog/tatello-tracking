@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   heroEmptyTitle: {
     marginTop: 4,
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     lineHeight: 32,
     color: colors.leche,
     letterSpacing: -0.6,
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
   },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
   // number the tab opens on.
   firstWeightNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 46,
+    fontSize: typography.sizes.statHero,
     paddingTop: 4,
     paddingBottom: 2,
     color: colors.leche,
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   },
   firstWeightUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 21,
+    fontSize: typography.sizes.headingLg,
     color: colors.magenta,
   },
   heroCtaWrap: {
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   // giant delta that used to open the tab.
   deltaNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 46,
+    fontSize: typography.sizes.statHero,
     paddingTop: 4,
     paddingBottom: 4,
     color: colors.magenta,
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   },
   deltaUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 21,
+    fontSize: typography.sizes.headingLg,
     color: colors.bone,
   },
   deltaRange: {
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   },
   weightNow: {
     fontFamily: typography.displayHeavy,
-    fontSize: 34,
+    fontSize: typography.sizes.displayHero,
     letterSpacing: -1,
     color: colors.leche,
     fontVariant: ['tabular-nums'],

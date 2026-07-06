@@ -299,7 +299,7 @@ export function DaySegment() {
             tercio bajo del orbital, sin borde duro — el fondo retoma sin
             escalón. */}
         <LinearGradient
-          colors={['transparent', '#1A0810', 'transparent']}
+          colors={['transparent', colors.bgNav, 'transparent']}
           locations={[0, 0.5, 1]}
           pointerEvents="none"
           style={styles.heroFade}
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   archetype: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 27,
+    fontSize: typography.sizes.displayMd,
     lineHeight: 32,
     color: colors.leche,
     textAlign: 'center',
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   vozRegistered: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     lineHeight: 27,
     color: colors.leche,
     textAlign: 'center',
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.niebla,
     textAlign: 'center',
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
     textAlign: 'center',
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   readoutDetail: {
     marginTop: 7,
     fontFamily: typography.uiMedium,
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
   },
@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.oro,
   },

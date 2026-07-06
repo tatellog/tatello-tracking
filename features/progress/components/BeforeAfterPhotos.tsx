@@ -651,13 +651,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyStar: {
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     color: colors.magenta,
     marginBottom: 12,
   },
   emptyTitle: {
     fontFamily: typography.uiSemi,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
     letterSpacing: 0.1,
     textAlign: 'center',
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
   caption: {
     marginTop: 12,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     lineHeight: 18,
     color: colors.bone,
   },

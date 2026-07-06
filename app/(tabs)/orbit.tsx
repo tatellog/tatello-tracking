@@ -119,9 +119,9 @@ function OrbitBody() {
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <RadialGradient id="orbit-ambient" cx="50%" cy="48%" rx="75%" ry="70%">
-              <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.1} />
-              <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.035} />
-              <Stop offset="100%" stopColor="#E91E63" stopOpacity={0} />
+              <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.1} />
+              <Stop offset="55%" stopColor={colors.magenta} stopOpacity={0.035} />
+              <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
             </RadialGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#orbit-ambient)" />

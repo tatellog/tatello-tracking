@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   tag: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // Right column — the human reading.
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displaySemi,
-    fontSize: 21,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 25,
     color: colors.leche,
     letterSpacing: -0.4,

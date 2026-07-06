@@ -177,13 +177,13 @@ const styles = StyleSheet.create({
   },
   value: {
     fontFamily: typography.displayHeavy,
-    fontSize: 38,
+    fontSize: typography.sizes.displayXl,
     color: colors.leche,
     letterSpacing: -1.6,
     lineHeight: 38,
   },
   valueSmall: {
-    fontSize: 32,
+    fontSize: typography.sizes.displayLg,
     lineHeight: 32,
     letterSpacing: -1.3,
   },

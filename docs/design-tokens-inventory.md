@@ -163,3 +163,23 @@ ganar rol (`heroNumber`, `screenTitle`) o quedar exentos si son escena.
   sitios) → migración gradual en C2.
 - Back: TRES lenguajes (Feather ‹ / "‹ ATRÁS" wizard / "‹ Volver a...") →
   unificar al patrón de Agua en C2.
+
+---
+
+## Estado final (5 jul 2026 · E1 completado)
+
+- **Cero aproximaciones vivas**: todas las superficies migradas; el
+  guardrail corre en ERROR global (un hex o fontSize numérico nuevo en
+  UI ya no entra).
+- Tokens promovidos en la ronda 2: `rosaLuz` #FBD7E3 (el candidato ×39
+  del censo), `oroVect` #EEDD91, `blanco`, `sombra`, `bgNav`, `ambar`, y
+  el tier display completo (nano 7 ... sliderNum 58) — DECLARADO, no
+  consolidado: fusionar vecinos (32/34/36/38, 44/46, 52/54/56/58) es
+  cambio visual y decisión de dueña.
+- Exentos ronda 2 (escenas que el primer censo no listó): WizardBackdrop,
+  StarConfettiBurst, ManifiestoOrb, NutritionMoon, PatternRevealCosmos,
+  PatternDiscovery, PresenceFinale, WeekOrbitGalaxy, DayLiveReadings,
+  week-dim-visual, constellationTheme.
+- Pintura puntual dentro de UI con disable justificado: DayPresent
+  (rampas de gauges), MoodSliderInline (glow del orbe), PhotoCaptureCard
+  (gradiente de card).

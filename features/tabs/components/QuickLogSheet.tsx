@@ -232,7 +232,10 @@ function SheetSky({ pulseKey = 0 }: { pulseKey?: number }) {
   }))
   return (
     <View style={styles.sky} pointerEvents="none">
-      <LinearGradient colors={['#1E0C12', 'rgba(20,8,11,0)']} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={[colors.bgCard2, 'rgba(20,8,11,0)']}
+        style={StyleSheet.absoluteFill}
+      />
       <Svg width={SCREEN_W} height={170} style={StyleSheet.absoluteFill}>
         <Circle cx={SCREEN_W * 0.13} cy={34} r={1.2} fill={colors.leche} opacity={0.16} />
         <Circle cx={SCREEN_W * 0.84} cy={22} r={3.4} fill={colors.oro} opacity={0.05} />
@@ -982,7 +985,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 34,
-    shadowColor: '#000000',
+    shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -1087,7 +1090,7 @@ const styles = StyleSheet.create({
   },
   back: {
     fontFamily: typography.uiBold,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     lineHeight: 26,
     color: colors.niebla,
     width: 24,
@@ -1138,7 +1141,7 @@ const styles = StyleSheet.create({
   },
   stripCaption: {
     fontFamily: typography.uiBold,
-    fontSize: 9.5,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
@@ -1313,7 +1316,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     fontFamily: typography.ui,
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.niebla,
     paddingVertical: 14,

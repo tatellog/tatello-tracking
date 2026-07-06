@@ -14,22 +14,38 @@ type Props = {
   isError: boolean
   /** Tapped on the protein-invite row when no reference is set. */
   onAddReference?: () => void
+  /** Vasos directos de HOY + sumar uno — convierte la fila de Agua en
+   *  acción ("vi mi tira floja → registré ya"), no solo espejo. */
+  todayGlasses?: number
+  onAddGlass?: () => void
 }
 
 /*
  * "Lo que alimenta tu transformación" — the consistency band in Comidas.
  *
- * Two read-only rows (Proteína + Agua — both real nutrients) over the
- * last 10 days, each a row of dots filled to the days fulfilled.
- * Reinforces CONSISTENCY, never scores it: an unmet day is just an unlit
- * dot, never red, never a verdict.
- *
- * When no protein reference is set, the protein row becomes a gentle
- * INVITE (not "0 de 10", which would read as failure, and not a single
- * lonely Agua row, which reads as a broken card). On error the card
- * stays put with a warm line — it never vanishes silently.
+ * Rediseño (feedback beta 2026-07-05: "leo bug, no matiz"): el matiz
+ * "registré pero no llegué" vivía en la OPACIDAD del magenta y se leía
+ * como decoración o como error. Ahora:
+ *   · presencia = existe barra; logro = ALTURA de relleno (geometría,
+ *     patrón Apple: el arco a medias se auto-explica). El color nunca
+ *     cambia de significado.
+ *   · la ventana se nombra ("ÚLTIMOS 7 DÍAS") y cada barra ancla a su
+ *     día real con iniciales L-D; hoy va marcado y NO se juzga (su
+ *     barra vive en directo, el conteo solo mira días cerrados).
+ *   · la meta es visible por fila ("Referencia: 120 g") — "llegaste"
+ *     sin el número no significa nada (excepción de Comidas vigente).
+ *   · el texto cuenta EXACTAMENTE lo que las barras muestran.
+ * Un día corto jamás es rojo ni veredicto; un día vacío es ausencia de
+ * datos, no falla.
  */
-export function NourishmentConsistency({ data, isLoading, isError, onAddReference }: Props) {
+export function NourishmentConsistency({
+  data,
+  isLoading,
+  isError,
+  onAddReference,
+  todayGlasses,
+  onAddGlass,
+}: Props) {
   let body: ReactElement
   if (isError) {
     body = (
@@ -46,10 +62,11 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
   } else {
     body = (
       <View style={styles.rows}>
-        {data.protein ? (
+        {data.protein && data.proteinTarget != null ? (
           <ScoreRow
             label="Proteína"
-            meaning="lo que tu cuerpo construye"
+            meta={`Referencia: ${Math.round(data.proteinTarget)} g`}
+            metaPhrase={`tus ${Math.round(data.proteinTarget)} g`}
             score={data.protein}
             glyph={<ProteinGlyph />}
           />
@@ -58,9 +75,28 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
         )}
         <ScoreRow
           label="Agua"
-          meaning="lo que mantiene tu claridad"
+          meta={`Meta: ${data.waterGoalGlasses} vasos`}
+          metaPhrase={`tus ${data.waterGoalGlasses} vasos`}
           score={data.agua}
           glyph={<AguaGlyph />}
+          today={
+            onAddGlass && todayGlasses != null ? (
+              <View style={styles.todayRow}>
+                <Text style={styles.todayText}>
+                  Hoy: {todayGlasses} de {data.waterGoalGlasses}
+                </Text>
+                <Pressable
+                  onPress={onAddGlass}
+                  hitSlop={8}
+                  style={styles.addGlass}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sumar un vaso de agua a hoy"
+                >
+                  <Text style={styles.addGlassLabel}>+1 vaso</Text>
+                </Pressable>
+              </View>
+            ) : null
+          }
         />
       </View>
     )
@@ -68,55 +104,62 @@ export function NourishmentConsistency({ data, isLoading, isError, onAddReferenc
 
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>Lo que alimenta tu transformación</Text>
+      <View style={styles.eyebrowRow}>
+        <Text style={styles.eyebrow}>Lo que alimenta tu transformación</Text>
+        <Text style={styles.window}>Últimos 7 días</Text>
+      </View>
       {body}
     </View>
   )
 }
 
-// Mínimo de días registrados para mostrar un conteo: con menos que esto aún
-// no hay señal de consistencia, solo una invitación a seguir registrando
-// (mostrar "0 de 2" desmotiva sin informar).
-const MIN_LOGGED = 4
+// Mínimo de días CERRADOS registrados para mostrar un conteo: con menos aún
+// no hay señal de consistencia (mostrar "0 de 2" desmotiva sin informar).
+const MIN_LOGGED = 3
 
-/* Un bloque por nutriente: cabecera (glifo · nombre), una línea cálida de
- * POR QUÉ importa, la tira de días, y la frase de avance. El "avance de qué"
- * se entiende: el denominador son los días que REGISTRASTE, no 10 de
- * calendario, así que no castiga el no-registrar. */
+/* Un bloque por nutriente: cabecera (glifo · nombre · meta visible), la
+ * tira de barras con iniciales de día, y la frase que cuenta EXACTAMENTE
+ * lo que la tira muestra (denominador = días registrados CERRADOS). */
 function ScoreRow({
   label,
-  meaning,
+  meta,
+  metaPhrase,
   score,
   glyph,
+  today,
 }: {
   label: string
-  meaning: string
+  meta: string
+  metaPhrase: string
   score: ConsistencyScore
   glyph: ReactElement
+  /** Fila de acción de HOY (solo Agua por ahora): dato + tap-para-sumar. */
+  today?: ReactElement | null
 }) {
-  // Gateo: con pocos días de datos no hay consistencia que puntuar — invita
-  // a registrar en vez de mostrar un score frío. Con datos: la frase dice
-  // que el número son DÍAS, sobre los días REGISTRADOS (no de 10), y nunca
-  // un "0 de N" a secas (la línea de 0 mira hacia adelante).
   let caption: string
-  if (score.logged < MIN_LOGGED) {
-    caption = 'Conforme registres, tus días se irán dibujando aquí.'
+  if (score.logged === 0) {
+    caption = 'Conforme registres, tus días se dibujan aquí.'
+  } else if (score.logged < MIN_LOGGED) {
+    caption = `Llevas ${score.logged} ${score.logged === 1 ? 'día registrado' : 'días registrados'}. Con algunos más, tu tendencia se dibuja sola.`
   } else if (score.reached === 0) {
-    caption = `Aún ninguno de los ${score.logged} días que registraste. Cada uno cuenta.`
+    // El caso que se leía como bug: nombra PRIMERO lo que las barras
+    // muestran (registraste), luego el umbral con su número, y deja hoy
+    // abierto — imagen y texto por fin cuentan lo mismo.
+    caption = `Registraste ${score.logged} días. Ninguno llegó aún a ${metaPhrase}. Hoy sigue abierto.`
   } else {
-    caption = `La alcanzaste ${score.reached} de los ${score.logged} días que registraste.`
+    caption = `Llegaste ${score.reached} de los ${score.logged} días que registraste.`
   }
   return (
     <View style={styles.scoreBlock}>
       <View style={styles.scoreHeader}>
         <View style={styles.glyphBox}>{glyph}</View>
         <Text style={styles.label}>{label}</Text>
+        <Text style={styles.meta}>{meta}</Text>
       </View>
       <View style={styles.scoreBody}>
-        {/* Por qué importa — voz cálida (serif italic), no clínica. */}
-        <Text style={styles.meaning}>{meaning}</Text>
-        <Dots score={score} />
+        <Bars score={score} />
         <Text style={styles.caption}>{caption}</Text>
+        {today ?? null}
       </View>
     </View>
   )
@@ -142,27 +185,47 @@ function InviteRow({ onPress }: { onPress?: () => void }) {
   )
 }
 
-/* Un punto por día de la ventana (viejo→nuevo), en SU día real. Tres
- * estados: 'reached' = lleno magenta (registraste y llegaste), 'short' =
- * magenta tenue (registraste, aún no llegaste), 'empty' = hairline (sin
- * registro — no es falla, es ausencia de datos). Distinguir 'short' de
- * 'empty' es la clave: "no llegué" no se ve igual que "no registré". */
-function Dots({ score }: { score: ConsistencyScore }) {
+/** Inicial del día real de una fecha local (D L M X J V S). */
+const WEEKDAY_INITIALS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
+function weekdayInitial(date: string): string {
+  return WEEKDAY_INITIALS[new Date(`${date}T00:00:00`).getDay()] ?? ''
+}
+
+/* Una barra por día (viejo→nuevo, hoy al final): track fijo + relleno que
+ * SUBE con el progreso real. Llegaste = llena; registraste sin llegar =
+ * parcial (la geometría se auto-explica); sin registro = solo el track.
+ * Hoy lleva contorno (vivo, sin juicio) y su inicial en leche. */
+function Bars({ score }: { score: ConsistencyScore }) {
+  const lastIdx = score.days.length - 1
   return (
-    <View style={styles.dots}>
-      {score.days.map((state, i) => (
-        <View
-          key={i}
-          style={[
-            styles.dot,
-            state === 'reached'
-              ? styles.dotReached
-              : state === 'short'
-                ? styles.dotShort
-                : styles.dotEmpty,
-          ]}
-        />
-      ))}
+    <View>
+      <View style={styles.bars}>
+        {score.days.map((d, i) => {
+          // Techo del parcial en 70%: lleno y casi-lleno jamás se confunden
+          // (a 18px de track, 80% vs 100% eran ~4px — el mismo bug de canal
+          // en versión suave).
+          const fill =
+            d.state === 'reached'
+              ? 1
+              : d.state === 'short'
+                ? Math.min(0.7, Math.max(0.25, d.ratio))
+                : 0
+          return (
+            <View key={d.date} style={[styles.barTrack, i === lastIdx && styles.barTrackToday]}>
+              {fill > 0 ? (
+                <View style={[styles.barFill, { height: `${Math.round(fill * 100)}%` }]} />
+              ) : null}
+            </View>
+          )
+        })}
+      </View>
+      <View style={styles.initials}>
+        {score.days.map((d, i) => (
+          <Text key={d.date} style={[styles.initial, i === lastIdx && styles.initialToday]}>
+            {weekdayInitial(d.date)}
+          </Text>
+        ))}
+      </View>
     </View>
   )
 }
@@ -195,10 +258,6 @@ function AguaGlyph() {
 
 const styles = StyleSheet.create({
   card: {
-    // Slightly less air than before: the hero's bottom fade is now a soft
-    // 0.78 wash (not a hard black cut), so it already eases into the card —
-    // 22 read as a gap. Softer hairline so it reads as a panel condensing
-    // out of the sky, not a foreign box.
     marginTop: 18,
     borderRadius: 18,
     backgroundColor: colors.bgCard,
@@ -207,11 +266,26 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
   },
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   eyebrow: {
+    flexShrink: 1,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 2.4,
+    textTransform: 'uppercase',
+  },
+  // La ventana, nombrada: nadie deduce ventanas, se leen.
+  window: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.smallLabel,
+    color: colors.niebla,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   empty: {
@@ -223,23 +297,19 @@ const styles = StyleSheet.create({
   },
   rows: {
     marginTop: 14,
-    gap: 16,
+    gap: 18,
   },
-  // Bloque por nutriente: cabecera + cuerpo (significado + tira de días).
   scoreBlock: {
-    gap: 7,
+    gap: 8,
   },
   scoreHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // Cuerpo sangrado bajo el nombre (alineado tras el glifo): significado
-  // arriba, tira de días abajo.
   scoreBody: {
     paddingLeft: 26,
     gap: 7,
   },
-  // La fila del invite sigue siendo horizontal (glifo · nombre · invite).
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -254,35 +324,58 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.leche,
   },
-  // Por qué importa el nutriente — voz cálida (serif italic), niebla.
-  meaning: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
+  // La referencia visible — sin ella "llegaste" no significa nada.
+  meta: {
+    flex: 1,
+    textAlign: 'right',
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
-  // Tira de 10 días a todo lo ancho — segmentos parejos = "10 días" obvio.
-  dots: {
+  // Tira de 7 barras a todo lo ancho, una por día real. 24px de alto:
+  // suficiente recorrido para que parcial (≤70%) y lleno se lean a un metro.
+  bars: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    alignItems: 'flex-end',
+    gap: 5,
+    height: 24,
   },
-  dot: {
+  // El track: existe siempre (día sin registro = solo track, ausencia de
+  // datos, jamás "fallo"). El relleno crece desde abajo.
+  barTrack: {
     flex: 1,
-    height: 5,
+    alignSelf: 'stretch',
     borderRadius: 3,
+    backgroundColor: colors.hairline,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
   },
-  // Llegaste — magenta pleno.
-  dotReached: {
+  // Hoy: contorno vivo — está en curso, no se juzga.
+  barTrackToday: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.bone,
+  },
+  barFill: {
+    width: '100%',
+    borderRadius: 3,
     backgroundColor: colors.magenta,
   },
-  // Registraste pero corto — magenta tenue (presente, aún no llegaste).
-  dotShort: {
-    backgroundColor: `${colors.magenta}59`,
+  initials: {
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 4,
   },
-  // Sin registro — hairline, sin juicio.
-  dotEmpty: {
-    backgroundColor: colors.hairline,
+  initial: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.tinyLabel,
+    color: colors.niebla,
+    letterSpacing: 0.4,
+  },
+  initialToday: {
+    fontFamily: typography.uiSemi,
+    color: colors.leche,
   },
   invite: {
     flex: 1,
@@ -291,8 +384,35 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  // Qué es el número — frase completa bajo la tira: "La alcanzaste 3 de tus
-  // últimos 10 días". Texto-ayuda (Hanken upright, tenue): resuelve "1 qué".
+  // "Hoy: 3 de 8 · [+1 vaso]" — la tira floja con su acción al lado.
+  todayRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  todayText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  addGlass: {
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard2,
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  addGlassLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.magenta,
+    letterSpacing: 0.3,
+  },
+  // La frase cuenta lo MISMO que las barras (denominador = días cerrados
+  // registrados). Texto-ayuda en Hanken upright, tenue.
   caption: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,

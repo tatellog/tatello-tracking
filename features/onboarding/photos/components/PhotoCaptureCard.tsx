@@ -85,6 +85,7 @@ export function PhotoCaptureCard({ photos, onStartCapture, onSlotPress }: Props)
   return (
     <View style={styles.card}>
       <LinearGradient
+        // eslint-disable-next-line no-restricted-syntax -- pintura del gradiente de la card
         colors={[colors.bgCard, '#FCF7F9']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.3,
     color: colors.bg,
   },

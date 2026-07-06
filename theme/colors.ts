@@ -56,6 +56,22 @@ export const colors = {
   oroGlow: 'rgba(217, 174, 111, 0.22)',
   oroBloom: 'rgba(217, 174, 111, 0.10)',
 
+  // ── Utilitarios con rol (E1 · 5 jul 2026) ──────────────────────
+  /** Glifos sobre acento y núcleos de luz (leche es crema; esto es blanco puro). */
+  blanco: '#FFFFFF',
+  /** shadowColor de cards/sheets — el negro puro solo existe como sombra. */
+  sombra: '#000000',
+  /** La píldora de navegación (chrome del tab bar, un paso sobre bg). */
+  bgNav: '#1A0810',
+  /** Sobre-meta sereno: ámbar cálido, nunca rojo (SpeedometerRing y afines). */
+  ambar: '#F1A65A',
+  /** La luz rosa pálida de los núcleos/glow de estrella — recurría ×39 como
+   *  literal entre escenas (cubeta b del inventario C0, promovida a token). */
+  rosaLuz: '#FBD7E3',
+  /** Tinte oro de la familia de iconos line-art cuando acompaña ilustraciones
+   *  vect (su oro horneado es #EEDD91; el icono tintado debe hermanar). */
+  oroVect: '#EEDD91',
+
   // ── Feedback ───────────────────────────────────────────────────
   feedbackSuccess: '#5A6F4C',
   feedbackError: '#B85045',

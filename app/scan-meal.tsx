@@ -1806,7 +1806,7 @@ const styles = StyleSheet.create({
   },
   scanText: {
     fontFamily: typography.uiMedium,
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     letterSpacing: 0.2,
   },
@@ -1974,7 +1974,7 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
     fontFamily: typography.displaySemi,
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     color: colors.leche,
     letterSpacing: -0.3,
     padding: 0,

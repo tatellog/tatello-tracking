@@ -1725,7 +1725,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 34,
+    fontSize: typography.sizes.displayHero,
     lineHeight: 40,
     color: colors.leche,
     textAlign: 'center',
@@ -2380,7 +2380,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 21,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 29,
     color: colors.leche,
   },
@@ -2573,7 +2573,7 @@ const styles = StyleSheet.create({
     borderColor: colors.oroHairline,
     // Elevación suave para que el modal se despegue del blur (iOS; en Android
     // el blur + scrim ya dan separación).
-    shadowColor: '#000',
+    shadowColor: colors.sombra,
     shadowOpacity: 0.5,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },

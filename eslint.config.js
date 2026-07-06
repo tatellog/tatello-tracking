@@ -25,15 +25,17 @@ module.exports = [
   },
   // ── Guardrail del sistema visual (C3 · plan Parte 3, modelo Apple) ──
   // La consistencia no se vigila, se hace API: hex y fontSize numéricos
-  // fuera de theme/ son WARN (suben a error por carpeta cuando su
-  // superficie migre, C2). Los tokens viven en theme/; las ESCENAS DE
-  // ARTE (el hex es pintura) están exentas abajo — la lista canónica es
-  // docs/design-tokens-inventory.md.
+  // fuera de theme/ son ERROR en toda superficie de UI (migración E1
+  // completada 5 jul 2026: cero aproximaciones vivas). Los tokens viven
+  // en theme/; las ESCENAS DE ARTE (el hex es pintura) están exentas
+  // abajo — la lista canónica es docs/design-tokens-inventory.md. Un
+  // literal puntual de pintura DENTRO de un componente de UI lleva un
+  // disable de línea con su porqué (ver DayPresent).
   {
     files: ['app/**/*.{ts,tsx}', 'features/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
-        'warn',
+        'error',
         {
           selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
           message:
@@ -70,6 +72,19 @@ module.exports = [
       'features/revelations/components/**',
       'features/home/components/celebrate-shockwave/**',
       'components/StarLoader.tsx',
+      // ── Segunda ronda E1 (5 jul): escenas que el primer censo no listó ──
+      'features/onboarding/components/WizardBackdrop.tsx',
+      'features/onboarding/components/StarConfettiBurst.tsx',
+      'features/onboarding/components/ManifiestoOrb.tsx',
+      'features/macros/components/NutritionMoon.tsx',
+      'features/orbit/components/PatternRevealCosmos.tsx',
+      'features/orbit/components/PatternDiscovery.tsx',
+      'features/orbit/components/PresenceFinale.tsx',
+      'features/orbit/components/WeekOrbitGalaxy.tsx',
+      'features/orbit/components/DayLiveReadings.tsx',
+      // Paleta semántica local por diseño (documentada en el propio archivo).
+      'features/orbit/components/week-dim-visual.tsx',
+      'features/orbit/constants/constellationTheme.ts',
     ],
     rules: {
       'no-restricted-syntax': 'off',

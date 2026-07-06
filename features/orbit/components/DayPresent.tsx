@@ -120,12 +120,16 @@ const RING_STOPS: Record<GoalStatus, [string, string, string]> = {
 }
 
 // Proteína (anillo medio) — derivaciones de `colors.signal.proteina` (coral).
+// Pintura de escena del gauge (rampa terracota), no rol de UI.
+// eslint-disable-next-line no-restricted-syntax
 const PROTEIN_STOPS: [string, string, string] = ['#C98F80', '#E0AEA0', '#F0CFC4']
 const PROTEIN_TRACK = 'rgba(224, 174, 160, 0.12)'
 
 // Entreno (anillo interior) — VIOLETA, distinto del magenta de calorías y del
 // coral de proteína: los tres anillos se leen aparte, sin repetir el rosa.
 const TRAIN_COLOR = colors.dimension.mente // #C18FFF
+// Pintura de escena del gauge (familia de dimension.mente), no rol de UI.
+// eslint-disable-next-line no-restricted-syntax
 const TRAIN_STOPS: [string, string, string] = ['#8E5FC7', '#C18FFF', '#DABBFF']
 const TRAIN_TRACK = 'rgba(193, 143, 255, 0.12)'
 
@@ -1084,7 +1088,7 @@ const styles = StyleSheet.create({
   heroWord: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 27,
+    fontSize: typography.sizes.displayMd,
     lineHeight: 32,
     color: colors.leche,
     textAlign: 'center',
@@ -1096,7 +1100,7 @@ const styles = StyleSheet.create({
   heroNumber: {
     marginTop: 4,
     fontFamily: typography.displayHeavy,
-    fontSize: 34,
+    fontSize: typography.sizes.displayHero,
     lineHeight: 40,
     letterSpacing: -1,
   },
@@ -1110,7 +1114,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.bone,
     textAlign: 'center',

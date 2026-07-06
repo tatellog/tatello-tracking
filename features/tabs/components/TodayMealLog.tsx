@@ -618,7 +618,7 @@ function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
       {/* Delete zone — the magenta + trash revealed behind the card. */}
       <View style={styles.deleteZone}>
         <Animated.View style={trashStyle}>
-          <TrashIcon color="#FFFFFF" />
+          <TrashIcon color={colors.blanco} />
         </Animated.View>
       </View>
       <GestureDetector gesture={pan}>
@@ -685,14 +685,14 @@ const styles = StyleSheet.create({
   // vive a la izquierda en ambos estados, así nunca "salta" al centro).
   emptyTitle: {
     fontFamily: typography.displaySemi,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: -0.2,
   },
   emptyHint: {
     marginTop: 4,
     fontFamily: typography.ui,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // Fila del pile: justificada a la IZQUIERDA (el grupo pega al borde izq). El
@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontFamily: typography.displaySemi,
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     color: colors.leche,
     letterSpacing: -0.3,
   },

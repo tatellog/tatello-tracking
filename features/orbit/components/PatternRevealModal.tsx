@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     lineHeight: 26,
     textAlign: 'center',
     color: colors.oroLeche,

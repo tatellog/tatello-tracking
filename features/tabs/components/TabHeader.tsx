@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 36,
+    fontSize: typography.sizes.displayTitle,
     color: colors.leche,
     letterSpacing: -1.6,
     // 42, no 38: con 2pt de leading la tilde de "Ó" (Tu Órbita) se
@@ -154,10 +154,10 @@ const styles = StyleSheet.create({
   },
   // Greeting keeps the serif-italic accent; the title emphasis is plain
   // Hanken heavy — the accent is carried by colour, not by face.
-  italicEmGreeting: { ...italicEmBase, fontSize: 26 },
+  italicEmGreeting: { ...italicEmBase, fontSize: typography.sizes.displayMd },
   emTitle: {
     fontFamily: typography.displayHeavy,
-    fontSize: 36,
+    fontSize: typography.sizes.displayTitle,
     color: colors.magenta,
     letterSpacing: -1.6,
   },

@@ -44,6 +44,8 @@ const BUCKET_MP = [0, 0.5, 1]
 // Glow del glifo: lavanda (Difícil) · blanco (Neutral) · magenta (Bien). Mismo
 // lenguaje que MoodSky. "Bien" = magentaHot del tema (#FF4886), más magenta que
 // el rosa pastel anterior, on-brand con el acento fucsia de la app.
+// Pintura del orbe reactivo (lavanda de amanecer), no rol de UI.
+// eslint-disable-next-line no-restricted-syntax
 const GLOW = ['#C7B6F0', colors.leche, colors.magentaHot]
 
 const THUMB = 22

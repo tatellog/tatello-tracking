@@ -299,7 +299,7 @@ const SCRIM = 'rgba(10,6,8,0.55)'
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.sombra,
   },
   noPreview: {
     backgroundColor: colors.bg,

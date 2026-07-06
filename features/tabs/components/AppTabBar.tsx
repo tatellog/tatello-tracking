@@ -30,7 +30,7 @@ const FAB_SIZE = 56
 function StarGlyph({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={STAR_PATH} fill="#FFFFFF" />
+      <Path d={STAR_PATH} fill={colors.blanco} />
     </Svg>
   )
 }
@@ -216,11 +216,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: PILL_HEIGHT,
     borderRadius: PILL_HEIGHT / 2,
-    backgroundColor: '#1A0810',
+    backgroundColor: colors.bgNav,
     borderWidth: 1,
     borderColor: 'rgba(244, 236, 222, 0.22)',
     padding: 5,
-    shadowColor: '#000000',
+    shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 6,

@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
     paddingVertical: 10,
     paddingHorizontal: 13,
-    shadowColor: '#000000',
+    shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
     shadowRadius: 8,
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   macros: {
     marginTop: 3,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   macrosCompact: {

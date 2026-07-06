@@ -50,7 +50,7 @@ export const textStyles = {
   /** Número héroe (52pt): la meta de agua, el peso en Progreso. */
   heroNumber: {
     fontFamily: typography.displayHeavy,
-    fontSize: 52,
+    fontSize: typography.sizes.heroNum,
     letterSpacing: -2,
     fontVariant: ['tabular-nums'],
   },

@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
   },
