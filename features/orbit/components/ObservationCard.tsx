@@ -18,7 +18,7 @@ import type { WeekObservation } from '../week-logic'
  * opens the detail screen.
  */
 
-const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 /** Seven day-bars (Mon-first); the days the observation is about burn in
  *  the accent color, the rest stay quiet. `days` are Sunday-first (0=Sun). */
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   right: {
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displaySemi,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 24,
     color: colors.leche,
     letterSpacing: -0.3,

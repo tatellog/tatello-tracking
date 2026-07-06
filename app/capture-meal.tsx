@@ -299,7 +299,7 @@ const SCRIM = 'rgba(10,6,8,0.55)'
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.sombra,
   },
   noPreview: {
     backgroundColor: colors.bg,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   frameHint: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
     opacity: 0.85,
     textShadowColor: 'rgba(0,0,0,0.6)',

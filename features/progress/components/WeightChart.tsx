@@ -99,7 +99,7 @@ export function WeightChart({ points, height = 180 }: Props) {
       <Pressable onPress={handlePress} onLayout={onLayout} style={{ height }}>
         <Animated.View entering={FadeIn.duration(600)} style={StyleSheet.absoluteFill}>
           <Svg width={width} height={height}>
-            <Path d={d} stroke={colors.mauveDeep} strokeWidth={2} fill="none" />
+            <Path d={d} stroke={colors.magenta} strokeWidth={2} fill="none" />
             {active && (
               <>
                 <Line
@@ -115,8 +115,8 @@ export function WeightChart({ points, height = 180 }: Props) {
                   cx={xOf(active.t)}
                   cy={yOf(active.weight)}
                   r={4}
-                  fill={colors.pearlElevated}
-                  stroke={colors.mauveDeep}
+                  fill={colors.bgCard}
+                  stroke={colors.magenta}
                   strokeWidth={2}
                 />
               </>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.bodyLarge,
     fontWeight: typography.fontWeight.regular,
-    color: colors.inkPrimary,
+    color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
   endpointDate: {
@@ -201,11 +201,11 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     fontWeight: typography.fontWeight.medium,
     letterSpacing: typography.letterSpacing.uppercaseMed,
-    color: colors.labelDim,
+    color: colors.bruma,
   },
   tooltip: {
     position: 'absolute',
-    backgroundColor: colors.pearlElevated,
+    backgroundColor: colors.bgCard,
     borderColor: colors.borderSubtle,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
@@ -219,13 +219,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     fontWeight: typography.fontWeight.medium,
     letterSpacing: typography.letterSpacing.uppercaseMed,
-    color: colors.labelMuted,
+    color: colors.niebla,
   },
   tooltipWeight: {
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.bodyLarge,
     fontWeight: typography.fontWeight.regular,
-    color: colors.inkPrimary,
+    color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
 })

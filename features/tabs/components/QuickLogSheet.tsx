@@ -31,7 +31,9 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { isCycleActive } from '@/features/cycle/phase'
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
+import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
 import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints } from '@/features/progress/logic'
@@ -47,6 +49,7 @@ import {
 } from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -73,52 +76,8 @@ const GLASS = 'M6 3.6 H18 L16.2 20.8 H7.8 Z'
 // screen on a short phone.
 const BODY_MAX_H = Math.round(Dimensions.get('window').height * 0.56)
 
-/* The celestial glyph for each meal slot — sunrise / sun / crescent /
- * sparkle. Same vocabulary as the meal rows on Hoy. */
-function MealGlyph({ type, color }: { type: MealType; color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      {type === 'lunch' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.3} fill={color} />
-          <Path
-            d="M12 5.6 V2.8 M12 18.4 V21.2 M18.4 12 H21.2 M5.6 12 H2.8 M16.5 7.5 L18.5 5.5 M7.5 7.5 L5.5 5.5 M16.5 16.5 L18.5 18.5 M7.5 16.5 L5.5 18.5"
-            stroke={color}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-        </>
-      ) : type === 'dinner' ? (
-        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
-      ) : type === 'breakfast' ? (
-        <>
-          <Path d="M7 17.5 A 5 5 0 0 1 17 17.5 Z" fill={color} />
-          <Path
-            d="M2.6 17.5 H21.4 M12 9 V6.4 M6.6 12 L4.8 10.3 M17.4 12 L19.2 10.3"
-            stroke={color}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-        </>
-      ) : (
-        <>
-          <Path
-            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
-            fill={color}
-          />
-          <Path
-            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
-            fill={color}
-          />
-          <Path
-            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
-            fill={color}
-          />
-        </>
-      )}
-    </Svg>
-  )
-}
+/* El glifo celeste de cada momento vive en el módulo CANÓNICO compartido
+ * (sol/planeta/luna/cometa) — una sola familia en toda la app. */
 
 /* One water glass — a magenta-filled tumbler when logged, a faint
  * outline when not. The glass shape (not a drop) keeps it from
@@ -127,7 +86,7 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  * reward. Reduced motion shows the fill with no pop. */
 // Vasito de agua derivada de comidas — rosa tenue, de solo lectura: muestra
 // que ese vaso vino de un líquido detectado, no de un tap directo.
-const WATER_FROM_MEALS_TINT = 'rgba(233,30,99,0.5)'
+const WATER_FROM_MEALS_TINT = colors.magentaGlow
 
 function WaterGlass({
   filled,
@@ -230,7 +189,10 @@ function SheetSky({ pulseKey = 0 }: { pulseKey?: number }) {
   }))
   return (
     <View style={styles.sky} pointerEvents="none">
-      <LinearGradient colors={['#1E0C12', 'rgba(20,8,11,0)']} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={[colors.bgCard2, 'rgba(20,8,11,0)']}
+        style={StyleSheet.absoluteFill}
+      />
       <Svg width={SCREEN_W} height={170} style={StyleSheet.absoluteFill}>
         <Circle cx={SCREEN_W * 0.13} cy={34} r={1.2} fill={colors.leche} opacity={0.16} />
         <Circle cx={SCREEN_W * 0.84} cy={22} r={3.4} fill={colors.oro} opacity={0.05} />
@@ -251,10 +213,8 @@ function SheetSky({ pulseKey = 0 }: { pulseKey?: number }) {
 function StarSeal({ color, size = 14 }: { color: string; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
-        fill={color}
-      />
+      {/* Silueta CANÓNICA de la ✦ (DaySky) — era la cuarta variante ad-hoc. */}
+      <Path d="M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z" fill={color} />
     </Svg>
   )
 }
@@ -311,13 +271,7 @@ function KeyboardIcon({ color }: { color: string }) {
 }
 
 // Meal type pre-selected by time of day so the common case needs no tap.
-function defaultMealType(): MealType {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+const defaultMealType = (): MealType => mealMomentByHour()
 
 type Mode = 'home' | 'weight'
 
@@ -411,6 +365,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     daysSincePeriod != null && daysSincePeriod >= 0 && daysSincePeriod < PERIOD_WINDOW_DAYS
 
   const [mode, setMode] = useState<Mode>('home')
+  const sheetScrollRef = useRef<ScrollView>(null)
   const [mealType, setMealType] = useState<MealType>(defaultMealType)
   const [confirmingName, setConfirmingName] = useState<string | null>(null)
   const [weightDraft, setWeightDraft] = useState<number | null>(null)
@@ -475,22 +430,39 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       setMealType(defaultMealType())
       setWeightDraft(null)
       setEditingGoal(false)
+      // El sheet vive montado: sin este reset, el offset de la sesión
+      // anterior persistía y el sheet abría con el header decapitado y la
+      // primera sección fuera de vista.
+      sheetScrollRef.current?.scrollTo({ y: 0, animated: false })
     }
   }, [visible])
 
   const handleLogMeal = (item: FrequentMeal) => {
     if (confirmingName) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    createMeal.mutate({
-      name: item.name,
-      protein_g: item.protein_g,
-      calories: item.calories,
-      // Backfill: mediodía del día visto; si es hoy, el momento real.
-      consumed_at: logConsumedAt(),
-      meal_type: mealType,
-      photo_storage_path: item.photo_storage_path,
-      ingredients: item.ingredients ?? undefined,
-    })
+    createMeal.mutate(
+      {
+        name: item.name,
+        protein_g: item.protein_g,
+        calories: item.calories,
+        // Backfill: mediodía del día visto; si es hoy, el momento real.
+        consumed_at: logConsumedAt(),
+        meal_type: mealType,
+        photo_storage_path: item.photo_storage_path,
+        ingredients: item.ingredients ?? undefined,
+      },
+      {
+        // El 1-tap solo es sin fricción si equivocarse también lo es: el
+        // toast global de deshacer sobrevive al cierre del sheet.
+        onSuccess: (meal) => {
+          emitMealUndo({
+            id: meal.id,
+            name: item.name,
+            mealTypeLabel: MEAL_TYPES.find((t) => t.value === mealType)?.label ?? 'tu día',
+          })
+        },
+      },
+    )
     setConfirmingName(item.name)
     // Ignición inmediata cerca de las tarjetas de comida (Energía =
     // magentaHot). El "+N Energía" + vuelo a Leo los emite la detección
@@ -561,7 +533,9 @@ export function QuickLogSheet({ visible, onClose }: Props) {
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
     if (result.canceled || !result.assets[0]) return
     onClose()
-    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri } })
+    // El momento elegido en el sheet VIAJA al scan (antes se ignoraba y el
+    // "Snack" de madrugada aterrizaba como dijera la hora).
+    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri, mealType } })
   }
 
   const handlePhotoLog = () => {
@@ -584,7 +558,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const handleTextLog = () => {
     if (confirmingName != null) return
     onClose()
-    router.push({ pathname: '/scan-meal', params: { describe: '1' } })
+    router.push({ pathname: '/scan-meal', params: { describe: '1', mealType } })
   }
 
   // The two AI methods — the headline way to log a meal, so they sit up
@@ -691,27 +665,17 @@ export function QuickLogSheet({ visible, onClose }: Props) {
             </View>
           ) : (
             <ScrollView
+              ref={sheetScrollRef}
               style={styles.body}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* ── Hoy: peso + agua, one compact strip ── */}
+              {/* ── Agua — frecuente (varios taps/día), vive arriba con la
+                  comida. El PESO bajó al fondo (es eventual, ~semanal, y
+                  encabezar el sheet más abierto de la app con "Peso 67.1 kg"
+                  lo volvía ambiente de cada registro — benchmark jul 2026 +
+                  manifiesto: peso en contexto, no en el centro). ── */}
               <View style={styles.strip}>
-                <Pressable
-                  onPress={openWeight}
-                  style={styles.stripZone}
-                  accessibilityRole="button"
-                  accessibilityLabel="Registrar peso"
-                >
-                  <Text style={styles.stripCaption}>Peso</Text>
-                  <View style={styles.stripWeightRow}>
-                    <Text style={styles.stripWeight} numberOfLines={1}>
-                      {latestWeight != null ? `${latestWeight.toFixed(1)} kg` : 'Registrar'}
-                    </Text>
-                    <Text style={styles.chevron}>›</Text>
-                  </View>
-                </Pressable>
-                <View style={styles.stripDivider} />
                 <View style={[styles.stripZone, styles.stripZoneWater]}>
                   <Pressable
                     onPress={() => setEditingGoal((v) => !v)}
@@ -833,7 +797,11 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                     })}
                   </View>
 
-                  <Text style={styles.frequentLabel}>Lo de siempre</Text>
+                  {/* "Lo de siempre" se gana con repetición: con puras comidas
+                      de 1 vez la app exageraría lo que sabe de ti. */}
+                  <Text style={styles.frequentLabel}>
+                    {items.some((it) => it.freq >= 2) ? 'Lo de siempre' : 'Tus recientes'}
+                  </Text>
 
                   {items.slice(0, FREQUENT_PREVIEW).map((item) => {
                     const confirming = confirmingName === item.name
@@ -847,6 +815,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                         name={item.name}
                         protein={item.protein_g}
                         calories={item.calories}
+                        freq={item.freq}
+                        photoPath={item.photo_storage_path}
                         state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
                         onPress={() => handleLogMeal(item)}
                         disabled={confirmingName != null}
@@ -868,6 +838,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                             name={item.name}
                             protein={item.protein_g}
                             calories={item.calories}
+                            freq={item.freq}
+                            photoPath={item.photo_storage_path}
                             state={confirming ? 'confirmed' : dimmed ? 'dimmed' : 'idle'}
                             onPress={() => handleLogMeal(item)}
                             disabled={confirmingName != null}
@@ -892,6 +864,19 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                   ) : null}
                 </>
               )}
+
+              {/* ── Peso — eventual (~semanal): al fondo junto al ciclo, como
+                  par de acciones eventuales. Sin el número en reposo: el
+                  valor vive dentro de la rueda al abrir. ── */}
+              <Pressable
+                onPress={openWeight}
+                style={styles.weightRow}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar peso"
+              >
+                <Text style={styles.weightRowLabel}>Registrar peso</Text>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
 
               {/* Cycle — eventual (~1×/month), so it sits last, quiet. Only
                * for users who track a cycle. Oro/luna, never clinical. */}
@@ -955,7 +940,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 34,
-    shadowColor: '#000000',
+    shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -1060,7 +1045,7 @@ const styles = StyleSheet.create({
   },
   back: {
     fontFamily: typography.uiBold,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     lineHeight: 26,
     color: colors.niebla,
     width: 24,
@@ -1109,14 +1094,9 @@ const styles = StyleSheet.create({
   stripZoneWater: {
     flex: 1,
   },
-  stripDivider: {
-    width: 1,
-    marginVertical: 10,
-    backgroundColor: colors.hairline,
-  },
   stripCaption: {
     fontFamily: typography.uiBold,
-    fontSize: 9.5,
+    fontSize: typography.sizes.smallLabel,
     color: colors.magenta,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
@@ -1136,20 +1116,27 @@ const styles = StyleSheet.create({
   },
   waterCaptionEdit: {
     fontFamily: typography.ui,
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     lineHeight: 15,
     color: colors.magenta,
   },
-  stripWeightRow: {
+  // Peso al fondo — fila callada de acción eventual, sin número en reposo.
+  weightRow: {
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
   },
-  stripWeight: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    letterSpacing: -0.3,
+  weightRowLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.ui,
+    color: colors.bone,
   },
   chevron: {
     fontFamily: typography.ui,
@@ -1182,7 +1169,7 @@ const styles = StyleSheet.create({
   },
   goalStepSign: {
     fontFamily: typography.uiBold,
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     lineHeight: 19,
     color: colors.magenta,
   },
@@ -1262,7 +1249,7 @@ const styles = StyleSheet.create({
   showMoreChevron: {
     // chevStyle: 90° (down → "ver más") ↔ 270° (up → "ver menos").
     fontFamily: typography.uiMedium,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     lineHeight: 18,
     color: colors.magenta,
   },
@@ -1271,7 +1258,7 @@ const styles = StyleSheet.create({
   // coach voice), so it reads as a plain UI section label.
   newMealLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     // Oro eyebrow — "luz del cielo", consistent with the app's eyebrows.
@@ -1284,7 +1271,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     fontFamily: typography.ui,
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.niebla,
     paddingVertical: 14,

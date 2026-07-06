@@ -4,7 +4,6 @@ import { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { useBriefContext } from '@/features/brief/hooks'
 import { DayOneTask, WizardBackdrop } from '@/features/onboarding/components'
 import { type CycleSituation, type MonthlyFocus } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
@@ -16,22 +15,23 @@ import { colors, shadows, typography } from '@/theme'
 const TASKS: { num: number; text: string }[] = [
   {
     num: 1,
-    text: 'Registra tu primera comida del día. La señal más rápida que Stelar lee.',
+    text: 'Registra tu primera comida. Enciende tu primera estrella hoy.',
   },
 ]
 
 /** Phrases the recap card uses when listing what Stelar already
- *  knows from the wizard. Same vocabulary as the reveal so the
- *  Día 1 lands as continuation, not as a new screen. */
+ *  knows from the wizard. Phrased as the pact going forward ("bajar
+ *  de peso, a tu ritmo"), never as a quoted testimony ("quieres
+ *  bajar de peso") — quoting the user back reads as a case file. */
 const FOCUS_RECAP: Record<MonthlyFocus, string> = {
-  weight: 'quieres bajar de peso',
-  energy: 'quieres más energía',
-  sleep: 'quieres dormir mejor',
-  food: 'quieres entender cómo comes',
-  cycle: 'quieres conocer tu ciclo',
-  patterns: 'quieres entender tus patrones',
-  mind: 'quieres calmar la mente',
-  other: 'tienes una intención propia',
+  weight: 'bajar de peso, a tu ritmo',
+  energy: 'más energía en tus días',
+  sleep: 'dormir mejor',
+  food: 'entender cómo comes',
+  cycle: 'conocer tu ciclo',
+  patterns: 'entender tus patrones',
+  mind: 'calmar la mente',
+  other: 'una intención tuya',
 }
 
 /** TU CICLO recap value — a real FACT per situation (not the old
@@ -73,20 +73,24 @@ const CYCLE_RECAP: Record<CycleSituation, string> = {
  * breath is shared via WizardPresenceContext so it never restarts.
  *
  * The expectation note at the bottom (formerly the reveal's "QUÉ SIGUE"
- * block) was moved here off the peak: it sets the longer arc — Stelar
- * arma la lectura cada día, y los patrones llegan a partir del segundo
- * ciclo — without crowding the reveal. Phrased as coach voice (serif
- * italic), it lands as a calm promise, not a target to hit.
+ * block) was moved here off the peak: it sets the longer arc as a value
+ * ladder in plain units (hoy una estrella, primera semana señales,
+ * patrones en unas semanas). "Ciclo" is RESERVED for the menstrual cycle
+ * everywhere in the app — the recap card above has a TU CICLO row, so
+ * using it here for the 28-day constellation collided head-on. Coach
+ * voice (serif italic): a calm promise, not a target to hit.
  *
  * The body composition track (4 photos + initial weight) lives in
  * Settings → Track corporal; not surfaced here so Día 1 stays
- * focused on signals, not measurements.
+ * focused on signals, not measurements. The starting weight is NOT
+ * re-shown here either: the user confirmed it two steps ago, and
+ * framing it in gold next to her sign read as a dossier, not a start
+ * line (target-user validation, jul 2026).
  */
 export default function DayOneScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { data: profile } = useProfile()
-  const { data: brief } = useBriefContext()
 
   const firstName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
@@ -102,7 +106,20 @@ export default function DayOneScreen() {
 
   const skyA11yLabel = sign ? `Tu cielo de ${ZODIAC[sign].label}` : undefined
 
-  const handleEnter = async () => {
+  // Primary CTA drops her INSIDE the first-meal flow (same /capture-meal
+  // the Comidas tab opens), with Comidas underneath so closing the capture
+  // lands her on her first logged entry. Every screen between "decidí
+  // registrar" and "registré" loses users; the task chip above already
+  // created the intent, the CTA must not disperse it.
+  const handleLogFirstMeal = async () => {
+    await markVisitedDayOne()
+    router.replace('/(tabs)/meals')
+    router.push('/capture-meal')
+  }
+
+  // Quiet escape for the user who opens the app before having eaten:
+  // straight to Hoy, no guilt attached.
+  const handleSeeSky = async () => {
     await markVisitedDayOne()
     router.replace('/(tabs)')
   }
@@ -126,23 +143,12 @@ export default function DayOneScreen() {
     if (cs) {
       out.push({ label: 'TU CICLO', value: CYCLE_RECAP[cs] })
     }
-    // TU BASE — the starting weight, shown as an honest fact. Día 1 is the
-    // close of onboarding (where weight legitimately lives) and the number
-    // IS the credible starting point for a weight-loss goal: it helps, it
-    // doesn't shame — "esto es lo que soy y cómo empiezo". The manifiesto
-    // lines that still hold are the ones about DOMINANCE: weight never shows
-    // in Home, in notifications, or as a comparative goal ("47% de tu meta").
-    // A one-time baseline at the close is honest, not preciousness.
-    const w = brief?.latest_measurement?.weight_kg
-    if (w != null) {
-      out.push({ label: 'TU BASE', value: `${w.toFixed(1)} kg` })
-    }
     const f = (profile?.monthly_focus as MonthlyFocus | null) ?? null
     if (f) {
       out.push({ label: 'TU FOCO', value: FOCUS_RECAP[f] })
     }
     return out
-  }, [profile, brief])
+  }, [profile])
 
   return (
     <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -170,7 +176,7 @@ export default function DayOneScreen() {
             accessibilityRole="image"
             accessibilityLabel={skyA11yLabel}
           >
-            <ZodiacArt sign={sign} size={188} />
+            <ZodiacArt sign={sign} size={164} />
           </View>
         ) : null}
 
@@ -226,28 +232,38 @@ export default function DayOneScreen() {
           Y si hoy te moviste, aunque sea caminar, márcalo. Si no, mañana sigue ahí.
         </Text>
 
-        {/* Expectation note — moved off the reveal's peak. Sets the longer
-            arc in coach voice: Stelar reads every day, and the confirmed
-            patterns arrive from the second cycle on. A calm promise, no
-            target. PLACEHOLDER COPY — voice-and-copy should review. */}
+        {/* Expectation note — the value ladder in plain units (hoy /
+            primera semana / unas semanas). Arrival of gifts, not deadlines.
+            Never say "ciclo" here: the recap card above uses TU CICLO for
+            the menstrual cycle and the word collided in testing. */}
         <View style={styles.horizonNote}>
           <Text style={styles.horizonEyebrow}>Lo que viene</Text>
           <Text style={styles.horizonBody}>
-            Cada día que registras, Stelar arma tu lectura. Los patrones se confirman a partir de tu
-            segundo ciclo: ahí es donde de verdad empieza a verte.
+            Cada día que registras enciende una estrella y afina tu lectura. En una semana ya verás
+            tus primeras señales. Tus patrones de verdad llegan en unas semanas, cuando Stelar ya te
+            conoce.
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
-          onPress={handleEnter}
+          onPress={handleLogFirstMeal}
           style={styles.cta}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Entrar a tu constelación"
+          accessibilityLabel="Registrar mi primera comida"
         >
-          <Text style={styles.ctaLabel}>Entrar a tu constelación →</Text>
+          <Text style={styles.ctaLabel}>Registrar mi primera comida →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleSeeSky}
+          style={styles.ctaSecondary}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Primero quiero ver mi cielo"
+        >
+          <Text style={styles.ctaSecondaryLabel}>Primero quiero ver mi cielo</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -291,13 +307,13 @@ const styles = StyleSheet.create({
     color: colors.magenta,
     letterSpacing: -1,
   },
-  // The sky — sign art floating free over its golden halo. 188×188 box,
-  // overflow:'visible' so the ~240×240 halo can bleed past the edges
-  // without clipping into a hard ring. Sits between the title and the
-  // coach line.
+  // The sky — sign art floating free over its golden halo. 164×164 box
+  // (down from 188 so the "Lo que viene" promise closes above the fold),
+  // overflow:'visible' so the halo can bleed past the edges without
+  // clipping into a hard ring. Sits between the title and the coach line.
   skyArt: {
-    width: 188,
-    height: 188,
+    width: 164,
+    height: 164,
     alignSelf: 'center',
     marginTop: 12,
     marginBottom: 16,
@@ -446,5 +462,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.5,
     color: colors.leche,
+  },
+  // Quiet escape under the CTA — a text link, deliberately not a second
+  // button, so the meal CTA keeps all the visual weight.
+  ctaSecondary: {
+    marginTop: 12,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  ctaSecondaryLabel: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.bone,
   },
 })

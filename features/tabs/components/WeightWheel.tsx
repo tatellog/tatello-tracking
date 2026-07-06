@@ -136,13 +136,13 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontFamily: typography.displayHeavy,
-    fontSize: 54,
+    fontSize: typography.sizes.wheelNum,
     color: colors.leche,
     letterSpacing: -2,
   },
   dot: {
     fontFamily: typography.displayHeavy,
-    fontSize: 54,
+    fontSize: typography.sizes.wheelNum,
     color: colors.leche,
     marginHorizontal: 2,
     marginTop: -10,

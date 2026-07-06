@@ -23,10 +23,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { useNotificationResponseRouter } from '@/features/notifications/response'
 import { useProfile } from '@/features/profile/hooks'
 import { useMagicLinkHandler } from '@/hooks/useMagicLinkHandler'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
+import { RevealReplayHost } from '@/features/revelations'
 import { ConfirmProvider } from '@/lib/confirm'
 import { ensureDevUserSession } from '@/lib/devAuth'
 import { clearVisitedDayOne, useVisitedDayOne } from '@/lib/onboardingFlags'
@@ -185,6 +187,7 @@ export default function RootLayout() {
             <ThemeProvider value={navTheme}>
               <ConfirmProvider>
                 <RouteGuard />
+                <NotificationTapRouter />
                 <Stack
                   screenOptions={{
                     headerShown: false,
@@ -194,9 +197,16 @@ export default function RootLayout() {
                   }}
                 >
                   {/* Slide-up sheet for logging a measurement. Other routes
-                    inherit the default fullscreen push. */}
+                    (incluido movement-calendar) heredan el push de página
+                    completa por defecto — "Tu constancia" es una página, no un
+                    modal deslizante. */}
                   <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
                 </Stack>
+                {/* Ceremonias de revelación/patrón (absoluteFill): viven en la RAÍZ,
+                    ENCIMA del Stack, para cubrir TODAS las rutas — incluidas las
+                    modales como movement-calendar. Antes vivían en (tabs) y quedaban
+                    DEBAJO de esas rutas (la ceremonia salía atrás del calendario). */}
+                <RevealReplayHost />
               </ConfirmProvider>
             </ThemeProvider>
           </SafeAreaProvider>
@@ -204,6 +214,13 @@ export default function RootLayout() {
       </ErrorBoundary>
     </GestureHandlerRootView>
   )
+}
+
+/* El destino del tap de cada notificación (data.target → navegación).
+ * Vive junto a RouteGuard: dentro de los providers, render nulo. */
+function NotificationTapRouter() {
+  useNotificationResponseRouter()
+  return null
 }
 
 /*

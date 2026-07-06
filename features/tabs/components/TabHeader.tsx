@@ -19,6 +19,22 @@ function GearIcon({ color, size = 20 }: { color: string; size?: number }) {
   )
 }
 
+// Calendar glyph (outline) — entry point to the full-screen movement calendar.
+// Sits to the LEFT of the gear when a tab provides `onCalendarPress`.
+function CalendarIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M8 3v3 M16 3v3 M4 8.5h16 M6 5h12a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
 type Props = {
   /** "Hola, Anahí." — uses Hanken 28 px; emphasis word renders Cormorant italic 26 px magenta. */
   greeting?: string
@@ -63,26 +79,39 @@ export function TabHeader({
           />
         ) : null}
       </View>
-      {pillLabel ? (
-        <View style={styles.pill}>
-          <EmText
-            text={pillLabel}
-            emphasis={pillEmphasis}
-            emStyle={styles.pillEm}
-            style={styles.pillText}
-          />
-        </View>
-      ) : (
+      <View style={styles.actions}>
+        {/* Calendario de movimiento — SIEMPRE visible (todas las tabs, con pill o
+            con gear), independiente de la navegación. */}
         <Pressable
-          onPress={() => router.navigate('/settings')}
+          onPress={() => router.navigate('/movement-calendar')}
           hitSlop={10}
           style={styles.settingsBtn}
           accessibilityRole="button"
-          accessibilityLabel="Ajustes"
+          accessibilityLabel="Tu constancia"
         >
-          <GearIcon color={colors.niebla} />
+          <CalendarIcon color={colors.niebla} />
         </Pressable>
-      )}
+        {pillLabel ? (
+          <View style={styles.pill}>
+            <EmText
+              text={pillLabel}
+              emphasis={pillEmphasis}
+              emStyle={styles.pillEm}
+              style={styles.pillText}
+            />
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => router.navigate('/settings')}
+            hitSlop={10}
+            style={styles.settingsBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Ajustes"
+          >
+            <GearIcon color={colors.niebla} />
+          </Pressable>
+        )}
+      </View>
     </View>
   )
 }
@@ -116,24 +145,28 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displayHeavy,
-    fontSize: 36,
+    fontSize: typography.sizes.displayTitle,
     color: colors.leche,
     letterSpacing: -1.6,
-    lineHeight: 38,
+    // 42, no 38: con 2pt de leading la tilde de "Ó" (Tu Órbita) se
+    // recortaba y el header leía "Tu Orbita".
+    lineHeight: 42,
   },
   // Greeting keeps the serif-italic accent; the title emphasis is plain
   // Hanken heavy — the accent is carried by colour, not by face.
-  italicEmGreeting: { ...italicEmBase, fontSize: 26 },
+  italicEmGreeting: { ...italicEmBase, fontSize: typography.sizes.displayMd },
   emTitle: {
     fontFamily: typography.displayHeavy,
-    fontSize: 36,
+    fontSize: typography.sizes.displayTitle,
     color: colors.magenta,
     letterSpacing: -1.6,
   },
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 4,
+    // 999, no 4: la "pill" era un rectángulo hombro a hombro con el gear
+    // circular (auditoría visual: cuadrado y círculo en el mismo chrome).
+    borderRadius: 999,
     backgroundColor: colors.bgCard,
     borderWidth: 1,
     borderColor: colors.bruma,
@@ -147,6 +180,12 @@ const styles = StyleSheet.create({
   },
   pillEm: {
     color: colors.magenta,
+  },
+  // Fila del slot derecho: calendario (opcional) + gear.
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   // Gear button — a bordered chip echoing the metadata pill, so the
   // right slot reads as one consistent surface across tabs.

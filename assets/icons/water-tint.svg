@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+  <!-- Gota line-art TINTABLE (stroke currentColor) — hermana de la familia
+       -tint (moon-tint, energy-tint): trazo fino, sin fills horneados. Nace
+       porque water-vect.svg (gota rellena con volumen) rompía la familia de
+       glifos de "Tu camino" en Ajustes: tres line-art + un cuerpo sólido. -->
+  <!-- Cuerpo de la gota: punta arriba, panza abajo. -->
+  <path
+    stroke="currentColor"
+    stroke-width="1.6"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    d="M12 3.6C12 3.6 5.8 10.8 5.8 15.2a6.2 6.2 0 0 0 12.4 0C18.2 10.8 12 3.6 12 3.6Z"
+  />
+  <!-- Glint interior: el brillo que hace que lea AGUA (asimétrico, izquierda). -->
+  <path
+    stroke="currentColor"
+    stroke-width="1.4"
+    stroke-linecap="round"
+    opacity="0.55"
+    d="M9.2 13.6c-.5 1.9.3 3.6 1.7 4.4"
+  />
+</svg>

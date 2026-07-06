@@ -209,7 +209,7 @@ export function CycleRing({
         {/* 4 · The "today" moon — bloom + body + white core. */}
         <AnimatedCircle cx={today.x} cy={today.y} fill={accent} animatedProps={moonProps} />
         <Circle cx={today.x} cy={today.y} r={4.5} fill={colors.leche} />
-        <Circle cx={today.x} cy={today.y} r={1.8} fill="#FFFFFF" />
+        <Circle cx={today.x} cy={today.y} r={1.8} fill={colors.blanco} />
       </Svg>
 
       {/* Centre — day + phase label in the ring's negative space. */}
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   dayNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 30,
+    fontSize: typography.sizes.macroNum,
     color: colors.leche,
     letterSpacing: -0.8,
   },

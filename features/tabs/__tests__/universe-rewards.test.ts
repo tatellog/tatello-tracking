@@ -12,10 +12,7 @@ const base: UniverseInput = {
   waterFromMeals: 0,
   sleepMinutes: null,
   restedToday: false,
-  energy: null,
-  motivation: null,
-  stress: null,
-  hasWellbeingSignal: false,
+  mood: null,
   localHour: 12,
 }
 
@@ -357,35 +354,34 @@ describe('Estabilidad — sueño y descanso', () => {
 // Brillo
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Brillo — promedio de ánimo (energía, motivación, calma)', () => {
+describe('Brillo — el ánimo (el slider de "Cómo amaneciste")', () => {
   const brilloOf = (over: Partial<typeof base>) =>
     calculateTodayUniverseRewards({ ...base, ...over }).find((a) => a.key === 'brillo')!
 
-  it('las tres al máximo → 100 pct', () => {
-    // energía 5, motivación 5, estrés 1 (calma 5) → promedio 5/5 = 100%.
-    const brillo = brilloOf({ energy: 5, motivation: 5, stress: 1 })
+  it('ánimo "bien" → 100 pct complete', () => {
+    const brillo = brilloOf({ mood: 'good' })
     expect(brillo.pct).toBe(100)
     expect(brillo.state).toBe('complete')
   })
 
-  it('energía baja se refleja (no default 100): energy=1 sola → 20 pct', () => {
-    const brillo = brilloOf({ energy: 1 })
-    expect(brillo.pct).toBe(20)
+  it('ánimo "neutral" → 55 pct partial (enciende, no castiga)', () => {
+    const brillo = brilloOf({ mood: 'neutral' })
+    expect(brillo.pct).toBe(55)
     expect(brillo.state).toBe('partial')
   })
 
-  it('promedia las TRES: energy=1, motivation=3, estrés=4 (calma 2) → avg 2 → 40 pct', () => {
-    const brillo = brilloOf({ energy: 1, motivation: 3, stress: 4 })
-    expect(brillo.pct).toBe(40)
+  it('ánimo "difícil" → 30 pct partial (bajo pero cuenta, sin culpa)', () => {
+    const brillo = brilloOf({ mood: 'struggle' })
+    expect(brillo.pct).toBe(30)
+    expect(brillo.state).toBe('partial')
   })
 
-  it('solo promedia lo registrado: motivation=4 sola → 80 pct', () => {
-    const brillo = brilloOf({ motivation: 4 })
-    expect(brillo.pct).toBe(80)
+  it('cualquier ánimo registrado enciende Brillo (no queda en 0)', () => {
+    expect(brilloOf({ mood: 'struggle' }).pct).toBeGreaterThan(0)
   })
 
-  it('sin ninguna dimensión → 0 pct empty (te espera)', () => {
-    const brillo = brilloOf({ energy: null, motivation: null, stress: null })
+  it('sin ánimo → 0 pct empty (te espera)', () => {
+    const brillo = brilloOf({ mood: null })
     expect(brillo.pct).toBe(0)
     expect(brillo.state).toBe('empty')
   })
@@ -480,20 +476,16 @@ describe('detailForAttribute', () => {
     ])
   })
 
-  it('brillo (Ánimo): muestra energía/motivación/calma + promedio', () => {
-    const d = detailForAttribute('brillo', { ...base, energy: 1, motivation: 3, stress: 4 })
-    expect(d.lines).toEqual([
-      { label: 'Energía', value: '1 / 5' },
-      { label: 'Motivación', value: '3 / 5' },
-      { label: 'Calma', value: '2 / 5' }, // 6 - estrés 4
-      { label: 'Promedio', value: '2 / 5' },
+  it('brillo (Ánimo): muestra el ánimo registrado', () => {
+    expect(detailForAttribute('brillo', { ...base, mood: 'good' }).lines).toEqual([
+      { label: 'Ánimo', value: 'Bien' },
     ])
-    // Sin registro: las tres "Sin registro", sin línea de promedio.
-    const empty = detailForAttribute('brillo', base)
-    expect(empty.lines).toEqual([
-      { label: 'Energía', value: 'Sin registro' },
-      { label: 'Motivación', value: 'Sin registro' },
-      { label: 'Calma', value: 'Sin registro' },
+    expect(detailForAttribute('brillo', { ...base, mood: 'struggle' }).lines).toEqual([
+      { label: 'Ánimo', value: 'Difícil' },
+    ])
+    // Sin registro: no acusa.
+    expect(detailForAttribute('brillo', base).lines).toEqual([
+      { label: 'Ánimo', value: 'Sin registro' },
     ])
   })
 

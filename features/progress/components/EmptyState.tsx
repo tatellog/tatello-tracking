@@ -27,7 +27,7 @@ export function EmptyState({ measurementCount, onAdd }: Props) {
         <Pressable onPress={onAdd} accessibilityRole="button" accessibilityLabel="Agregar peso">
           <View style={shadows.ctaMauve}>
             <LinearGradient
-              colors={[colors.mauveLight, colors.mauveDeep]}
+              colors={[colors.magentaHot, colors.magenta]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.ctaPrimary}
@@ -58,7 +58,7 @@ export function EmptyState({ measurementCount, onAdd }: Props) {
 
 const styles = StyleSheet.create({
   zeroRoot: {
-    backgroundColor: colors.pearlElevated,
+    backgroundColor: colors.bgCard,
     borderColor: colors.borderSubtle,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.card,
@@ -71,14 +71,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
     fontWeight: typography.fontWeight.semi,
-    color: colors.inkPrimary,
+    color: colors.leche,
     textAlign: 'center',
   },
   zeroBody: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
     fontWeight: typography.fontWeight.regular,
-    color: colors.labelMuted,
+    color: colors.niebla,
     textAlign: 'center',
     lineHeight: typography.sizes.body * typography.lineHeight.body,
   },
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     fontWeight: typography.fontWeight.medium,
     letterSpacing: typography.letterSpacing.bodyLoose,
-    color: colors.pearlElevated,
+    color: colors.bgCard,
   },
 
   oneRoot: {
@@ -104,14 +104,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
     fontWeight: typography.fontWeight.regular,
-    color: colors.labelMuted,
+    color: colors.niebla,
     textAlign: 'center',
   },
   ctaSecondary: {
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: colors.pearlElevated,
+    backgroundColor: colors.bgCard,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle,
   },
@@ -119,6 +119,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.caption,
     fontWeight: typography.fontWeight.medium,
-    color: colors.inkPrimary,
+    color: colors.leche,
   },
 })

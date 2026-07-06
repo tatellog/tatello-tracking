@@ -1,5 +1,9 @@
+import { z } from 'zod'
+
 import { requireUserId, supabase } from '@/lib/supabase'
 import { todayInTimezone } from '@/lib/time'
+
+const workoutTypeRow = z.object({ type: z.string().nullable() })
 
 /*
  * Log today's workout. Idempotent: the table has a unique (user_id,
@@ -51,5 +55,35 @@ export async function unmarkWorkoutForDate(date: string): Promise<void> {
     .delete()
     .eq('user_id', userId)
     .eq('workout_date', date)
+  if (error) throw error
+}
+
+/*
+ * Today's workout type — read side of the optional chips in Hoy's
+ * check-in. Null when there's no workout row or no type chosen yet.
+ */
+export async function getWorkoutTypeToday(): Promise<string | null> {
+  const userId = await requireUserId()
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('type')
+    .eq('user_id', userId)
+    .eq('workout_date', todayInTimezone())
+    .maybeSingle()
+  if (error) throw error
+  return data ? workoutTypeRow.parse(data).type : null
+}
+
+/*
+ * Set (or clear) today's workout type. Upsert, NOT update: if the insert
+ * from markWorkoutToday is still in flight when the user taps a chip, an
+ * update would match 0 rows and drop the type silently. The upsert hits
+ * the same unique (user_id, workout_date) index either way.
+ */
+export async function setWorkoutTypeToday(type: string | null): Promise<void> {
+  const userId = await requireUserId()
+  const { error } = await supabase
+    .from('workouts')
+    .upsert({ user_id: userId, type }, { onConflict: 'user_id,workout_date' })
   if (error) throw error
 }

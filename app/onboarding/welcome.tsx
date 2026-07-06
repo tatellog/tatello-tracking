@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
   useAnimatedProps,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -177,7 +178,17 @@ function ManifestoHero() {
   // 18 s dust drift base — each mote derives its own phase from this.
   const dust = useSharedValue(0)
 
+  // Reduced motion: cielo ESTÁTICO a media respiración (el resto del repo ya
+  // lo respeta; la entrada era la excepción — hallazgo E3). Sin loops.
+  const reduceMotion = useReducedMotion() ?? false
   useEffect(() => {
+    if (reduceMotion) {
+      t.value = 0
+      pulse.value = 0.5
+      orbit.value = 0
+      dust.value = 0
+      return
+    }
     t.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.linear }), -1, false)
     pulse.value = withRepeat(
       withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
@@ -192,7 +203,7 @@ function ManifestoHero() {
       cancelAnimation(orbit)
       cancelAnimation(dust)
     }
-  }, [t, pulse, orbit, dust])
+  }, [t, pulse, orbit, dust, reduceMotion])
 
   // Starfield parallax — each stratum drifts on a tiny Lissajous curve
   // derived from `orbit` (no new clock). Amplitude grows toward the
@@ -513,6 +524,34 @@ export default function ManifestoScreen() {
       </View>
 
       <View style={styles.footer}>
+        {/* El bloque legal va ARRIBA del CTA: así el botón primario es el
+            último elemento anclado abajo en TODO el wizard y no salta de
+            altura al cruzar a la pantalla 2 (hallazgo E3 #3).
+            Aceptación legal (v3.0): consentimiento explícito ANTES de entrar
+            al wizard + el disclaimer médico a la vista. Los links viven en su
+            propia fila de Pressables (Text anidado no admite hitSlop y el
+            target quedaba en ~16pt — hallazgo E3). */}
+        <View style={styles.legalLinksRow}>
+          <Pressable
+            onPress={() => router.push('/terms')}
+            hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+            accessibilityRole="link"
+          >
+            <Text style={styles.legalLink}>Términos</Text>
+          </Pressable>
+          <Text style={styles.legalSep}>·</Text>
+          <Pressable
+            onPress={() => router.push('/privacy')}
+            hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+            accessibilityRole="link"
+          >
+            <Text style={styles.legalLink}>Política de Privacidad</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.legal}>
+          Al continuar los aceptas. Stelar es una app de bienestar, no un servicio médico, y no
+          sustituye a profesionales.
+        </Text>
         <PrimaryCta
           label="Empecemos"
           variant="soft"
@@ -554,8 +593,10 @@ const styles = StyleSheet.create({
   },
   quote: {
     fontFamily: typography.displayHeavy,
-    fontSize: 38,
-    lineHeight: 40,
+    fontSize: typography.sizes.displayTitle,
+    // 42 (no 40): el leading canónico del wizard — con menos, las tildes
+    // de mayúsculas acentuadas se recortan (lección "Tu Órbita").
+    lineHeight: 42,
     color: colors.leche,
     letterSpacing: -1.6,
     textAlign: 'center',
@@ -632,5 +673,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 16,
     paddingTop: 12,
+  },
+  legal: {
+    marginTop: 8,
+    marginBottom: 14,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    lineHeight: 16,
+    color: colors.niebla,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  legalLink: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    textDecorationLine: 'underline',
+  },
+  // Fila propia para los links → target táctil real (hitSlop en Pressable).
+  legalLinksRow: {
+    marginTop: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  legalSep: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    color: colors.bruma,
   },
 })

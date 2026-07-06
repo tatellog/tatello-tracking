@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg'
+import Svg, { Circle } from 'react-native-svg'
 
+import { MealGlyph } from '@/features/macros/components/meal-glyphs'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { emitRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { colors, typography } from '@/theme'
 
@@ -12,58 +14,10 @@ const MOMENTS: { type: MealMoment; label: string }[] = [
 ]
 
 /** El momento que "toca" por hora — el héroe visual de la estela. */
-function momentByHour(): MealMoment {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+const momentByHour = (): MealMoment => mealMomentByHour()
 
-/* El glifo celeste de cada momento — su astro en la órbita del día:
- *   desayuno = sol · comida = planeta (anillo) · cena = luna · snack = estrella.
- * SVG en viewBox 24, tintable con `color`. El anillo de saturno usa la prop
- * `rotation` (no `transform` en array — eso se rompe en Android, ver memoria). */
-function MealGlyph({ type, size, color }: { type: MealMoment; size: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      {type === 'breakfast' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.2} fill={color} />
-          <Path
-            d="M12 2 V4.6 M12 19.4 V22 M2 12 H4.6 M19.4 12 H22 M5 5 L6.8 6.8 M17.2 17.2 L19 19 M17.2 6.8 L19 5 M5 19 L6.8 17.2"
-            stroke={color}
-            strokeWidth={1.6}
-            strokeLinecap="round"
-          />
-        </>
-      ) : type === 'lunch' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.6} fill={color} />
-          <Ellipse
-            cx={12}
-            cy={12}
-            rx={9.2}
-            ry={3}
-            rotation={-22}
-            originX={12}
-            originY={12}
-            stroke={color}
-            strokeWidth={1.5}
-            fill="none"
-          />
-        </>
-      ) : type === 'dinner' ? (
-        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
-      ) : (
-        <Path
-          d="M12 2.6 L13.6 10.4 L21.4 12 L13.6 13.6 L12 21.4 L10.4 13.6 L2.6 12 L10.4 10.4 Z"
-          fill={color}
-        />
-      )}
-    </Svg>
-  )
-}
+/* El glifo celeste de cada momento vive en el módulo CANÓNICO compartido
+ * (sol/planeta/luna/cometa) — una sola familia en toda la app. */
 
 /* El aro del nodo, dibujado en SVG para lograr el look de la referencia:
  *   · una capa ancha de baja opacidad = el "blur"/glow del aro;
@@ -252,10 +206,14 @@ export function MomentsToday({ meals, viewingPast }: Props) {
         </Text>
       ) : (
         <>
-          <Text style={styles.hint}>Toca un astro para registrar esa comida.</Text>
-          {litCount > 0 ? (
+          {/* El instructivo solo mientras hace falta: tras el primer registro
+              del día, el conteo toma su lugar (el texto-manual permanente era
+              ruido para quien ya aprendió el gesto). */}
+          {litCount === 0 ? (
+            <Text style={styles.hint}>Toca un astro para registrar esa comida.</Text>
+          ) : (
             <Text style={styles.count}>{litCount} de 4 momentos registrados</Text>
-          ) : null}
+          )}
         </>
       )}
     </View>
@@ -343,7 +301,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     lineHeight: 13,
     color: colors.leche,
   },

@@ -1,5 +1,6 @@
 import { computeNourishmentConsistency } from '../nourishment'
 
+// Ventana de 7 días, HOY al final ('2026-06-07' está abierto: no se juzga).
 const DATES = [
   '2026-06-01',
   '2026-06-02',
@@ -8,13 +9,10 @@ const DATES = [
   '2026-06-05',
   '2026-06-06',
   '2026-06-07',
-  '2026-06-08',
-  '2026-06-09',
-  '2026-06-10',
 ]
 
 describe('computeNourishmentConsistency', () => {
-  it('protein: reached = logged days at >=90% of reference; logged excludes no-meal days', () => {
+  it('protein: reached = closed logged days at >=90% of reference; logged excludes no-meal days', () => {
     const meals = [
       { meal_date: '2026-06-01', protein_g: 60 },
       { meal_date: '2026-06-01', protein_g: 60 }, // 120 >= 112 → reached
@@ -28,9 +26,34 @@ describe('computeNourishmentConsistency', () => {
       proteinTarget: 112,
       waterGoalGlasses: 8,
     })
-    // 3 días con comidas (logged), 2 llegaron al 90% (reached).
-    expect(res.protein).toMatchObject({ reached: 2, logged: 3, total: 10 })
-    expect(res.protein?.days.slice(0, 4)).toEqual(['reached', 'reached', 'short', 'empty'])
+    // 3 días cerrados con comidas (logged), 2 llegaron al 90% (reached).
+    expect(res.protein).toMatchObject({ reached: 2, logged: 3, total: 7 })
+    expect(res.protein?.days.slice(0, 4).map((d) => d.state)).toEqual([
+      'reached',
+      'reached',
+      'short',
+      'empty',
+    ])
+    // El ratio alimenta la ALTURA de la barra (capado a 1).
+    expect(res.protein?.days[0]?.ratio).toBe(1) // 120/112 capado
+    expect(res.protein?.days[2]?.ratio).toBeCloseTo(80 / 112)
+    expect(res.protein?.days[3]?.ratio).toBe(0)
+  })
+
+  it('hoy (última fecha) está ABIERTO: no cuenta en reached/logged pero sí se dibuja', () => {
+    const res = computeNourishmentConsistency({
+      dates: DATES,
+      meals: [{ meal_date: '2026-06-07', protein_g: 200 }],
+      waterByDate: { '2026-06-07': 8 },
+      proteinTarget: 100,
+      waterGoalGlasses: 8,
+    })
+    // Solo hoy tiene datos → el conteo de días cerrados queda en cero…
+    expect(res.protein).toMatchObject({ reached: 0, logged: 0 })
+    expect(res.agua).toMatchObject({ reached: 0, logged: 0 })
+    // …pero la barra de hoy vive en directo.
+    expect(res.protein?.days[6]).toMatchObject({ state: 'reached', ratio: 1 })
+    expect(res.agua.days[6]).toMatchObject({ state: 'reached', ratio: 1 })
   })
 
   it('hides the protein row (null) when no reference is set', () => {
@@ -53,11 +76,17 @@ describe('computeNourishmentConsistency', () => {
       proteinTarget: null,
       waterGoalGlasses: 8,
     })
-    expect(res.agua).toMatchObject({ reached: 2, logged: 3, total: 10 })
-    expect(res.agua.days.slice(0, 4)).toEqual(['reached', 'reached', 'short', 'empty'])
+    expect(res.agua).toMatchObject({ reached: 2, logged: 3, total: 7 })
+    expect(res.agua.days.slice(0, 4).map((d) => d.state)).toEqual([
+      'reached',
+      'reached',
+      'short',
+      'empty',
+    ])
+    expect(res.agua.days[2]?.ratio).toBeCloseTo(5 / 8)
   })
 
-  it('ignores meals/water outside the window', () => {
+  it('ignores meals/water outside the window and exposes the targets', () => {
     const res = computeNourishmentConsistency({
       dates: DATES,
       meals: [{ meal_date: '2026-05-20', protein_g: 200 }],
@@ -65,7 +94,9 @@ describe('computeNourishmentConsistency', () => {
       proteinTarget: 100,
       waterGoalGlasses: 8,
     })
-    expect(res.protein).toMatchObject({ reached: 0, logged: 0, total: 10 })
+    expect(res.protein).toMatchObject({ reached: 0, logged: 0, total: 7 })
     expect(res.agua).toMatchObject({ reached: 0, logged: 0 })
+    expect(res.proteinTarget).toBe(100)
+    expect(res.waterGoalGlasses).toBe(8)
   })
 })

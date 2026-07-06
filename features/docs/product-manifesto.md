@@ -195,9 +195,20 @@ Antes de agregar cualquier feature, hazte esta pregunta:
 - Recibir una rutina de gym → eso es coach ❌
 - Recibir tratamiento de ansiedad → eso es terapeuta ❌
 - Identificar que tu consistencia baja los viernes → leer tus datos ✅
-- Decirte qué hacer al respecto → eso es coach/nutrióloga ❌
+- Señalarte un FOCO desde tus datos ("este mes, tu palanca es el finde") → Órbita te acompaña ✅
+- Recetarte dieta, rutina de ejercicio o tratamiento clínico ("comé X", "entrená Y", "dormí Z") → eso es nutrióloga/coach/médico ❌
 
-**Stelar observa contigo. No te dice qué hacer.** Esa es la frontera.
+**Stelar observa contigo y te señala un FOCO desde tus propios datos** ("este
+mes, tu palanca es sostener el déficit las últimas semanas"). Lo que NO hace:
+recetar dieta, rutina de ejercicio ni tratamiento clínico · eso sigue siendo
+nutrióloga/coach/médico. **Recomendar un foco = sí. Recetar conducta = no.** Esa
+es la frontera.
+
+(Actualización de la dueña, jun 2026: Órbita pasó de Observadora pura a **guía
+que recomienda un foco/palanca** — accionable en modo recomendación, no en modo
+orden. Aplica a Día, Semana y Mes. Se conservan intactas las líneas rojas: sin
+culpa, sin lenguaje clínico, sin vergüenza, sin comparación, y sin recetar
+dieta/rutina/tratamiento.)
 
 ---
 
@@ -317,7 +328,7 @@ Va a Settings, lo cambia, sigue. Sin drama, sin gráfica, sin "comparemos con tu
 - **Calorías:** existen, se muestran en Tab Comidas como contexto, no como countdown
 - **Proteína:** la métrica que más se cuida (anillo visible, importante para mantener músculo durante pérdida de peso)
 - **Carbohidratos y grasas:** anillos compactos, presentes pero secundarios
-- **Déficit:** calculado, informado como contexto ("estás en déficit suave hoy"), nunca gamificado
+- **Déficit:** calculado, informado como contexto ("estás en déficit suave hoy"), nunca gamificado como presión (racha/countdown/culpa). EXCEPCIÓN (enmienda jul 2026, criterio Apple): la PALANCA de un patrón SÍ puede mostrar una meta derivada de TUS datos + lo que falta ("llevas 3 de 5, con 2 más lo repites"), como los anillos de Apple — realismo sin culpa. Ver `features/patterns/CLAUDE.md`
 
 **Regla:** ningún número de comida domina la pantalla home. La pantalla home es de la constelación y del coach, no de las calorías.
 

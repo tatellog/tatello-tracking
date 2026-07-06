@@ -7,7 +7,7 @@
  *   Energía     ← comida (proteína vs objetivo; el macro más cuidado)
  *   Claridad    ← agua (vasos vs meta diaria)
  *   Estabilidad ← sueño (duración vs 7 h, ver SLEEP_FULL_MIN) + descanso
- *   Brillo      ← check-in de bienestar (energía registrada)
+ *   Brillo      ← ánimo (el slider de "Cómo amaneciste")
  *
  * PURO y determinístico — la UI anima lo que esto calcula. Manifiesto:
  * los estados nunca son de fallo ("en calma", no "incompleto"); el
@@ -21,6 +21,8 @@
  *
  * Revisado por behavioral-specialist + voice-and-copy (jun 2026).
  */
+
+import type { MoodValue } from '@/features/moods/api'
 
 export type UniverseAttributeKey = 'energia' | 'claridad' | 'estabilidad' | 'brillo'
 
@@ -82,14 +84,9 @@ export type UniverseInput = {
   sleepMinutes: number | null
   /** "Descansé" marcado hoy — mejora Estabilidad ligeramente. */
   restedToday: boolean
-  /** Energía del ánimo (1–5); null = sin registrar. */
-  energy: number | null
-  /** Motivación del ánimo (1–5); null = sin registrar. */
-  motivation: number | null
-  /** Estrés del ánimo (1–5); la calma = 6 - estrés. null = sin registrar. */
-  stress: number | null
-  /** ¿Hay CUALQUIER señal de ánimo hoy (energía/motivación/estrés)? */
-  hasWellbeingSignal: boolean
+  /** Ánimo de hoy — lo que setea el slider de "Cómo amaneciste"; null = sin
+   *  registrar. Alimenta Brillo. */
+  mood: MoodValue | null
   /** Hora local (0–23) — gatea el faltante de proteína de noche. */
   localHour: number
 }
@@ -202,24 +199,20 @@ function estabilidad(input: UniverseInput): UniverseAttribute {
   }
 }
 
-/** Promedio de ánimo (energía, motivación, calma=6-estrés) en escala 1–5, o
- *  null si no hay ninguna dimensión registrada. La calma es el inverso del
- *  estrés (estrés 5 → calma 1). Solo promedia lo que SÍ se registró. */
-export function wellbeingAvg(input: UniverseInput): number | null {
-  const calm = input.stress != null ? 6 - input.stress : null
-  const dims = [input.energy, input.motivation, calm].filter((v): v is number => v != null)
-  if (dims.length === 0) return null
-  return dims.reduce((sum, v) => sum + v, 0) / dims.length
+/* ── Brillo ← ánimo (el slider de "Cómo amaneciste") ────────────────── */
+
+/** El ánimo (1 eje) → % de Brillo. Registrar CUALQUIER ánimo enciende Brillo;
+ *  un día difícil se ve más bajo (honesto) pero cuenta, y el copy del estado
+ *  nunca juzga (manifiesto). Sin registro = 0 ("te espera"). */
+const MOOD_PCT: Record<MoodValue, number> = { good: 100, neutral: 55, struggle: 30 }
+const MOOD_WORD: Record<MoodValue, string> = {
+  good: 'Bien',
+  neutral: 'Neutral',
+  struggle: 'Difícil',
 }
 
-/* ── Brillo ← ánimo (promedio de energía, motivación y calma) ───────── */
 function brillo(input: UniverseInput): UniverseAttribute {
-  // El Ánimo refleja tu estado: promedio de las tres dimensiones (1–5) → %.
-  // Registrar solo una promedia esa; las tres, las tres. Sin registro = 0
-  // ("en calma / te espera"), nunca negativo ni de culpa. Un día bajo se ve
-  // bajo (decisión de producto), pero el copy del estado nunca juzga.
-  const avg = wellbeingAvg(input)
-  const pct = avg != null ? clampPct((avg / 5) * 100) : 0
+  const pct = input.mood != null ? MOOD_PCT[input.mood] : 0
   const state = stateForPct(pct)
   return {
     key: 'brillo',
@@ -337,17 +330,9 @@ export function detailForAttribute(
       return { essence, grows: ATTRIBUTE_GROWS.estabilidad, lines }
     }
     case 'brillo': {
-      const calm = input.stress != null ? 6 - input.stress : null
-      const fmt = (v: number | null) => (v != null ? `${v} / 5` : 'Sin registro')
-      const avg = wellbeingAvg(input)
       const lines: UniverseDetailLine[] = [
-        { label: 'Energía', value: fmt(input.energy) },
-        { label: 'Motivación', value: fmt(input.motivation) },
-        { label: 'Calma', value: fmt(calm) },
+        { label: 'Ánimo', value: input.mood != null ? MOOD_WORD[input.mood] : 'Sin registro' },
       ]
-      if (avg != null) {
-        lines.push({ label: 'Promedio', value: `${Math.round(avg * 10) / 10} / 5` })
-      }
       return { essence, grows: ATTRIBUTE_GROWS.brillo, lines }
     }
   }

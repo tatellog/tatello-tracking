@@ -29,16 +29,16 @@ type Props = {
 const STROKE_WIDTH = 10
 
 const RING_COLORS: Record<RingColor, string> = {
-  protein: colors.inkPrimary,
-  calories: colors.mauveDeep,
+  protein: colors.leche,
+  calories: colors.magenta,
 }
 
 const OVER_COLORS: Record<RingColor, string> = {
   // Pearl Mauve is bichromatic — both 'over' states resolve to mauve
   // so the ring keeps reading inside the system instead of reaching
   // for a contrasting alarm hue.
-  protein: colors.mauveDeep,
-  calories: colors.mauveDeep,
+  protein: colors.magenta,
+  calories: colors.magenta,
 }
 
 /*
@@ -105,7 +105,7 @@ export function MacroRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={colors.pearlMuted}
+            stroke={colors.bgCard2}
             strokeWidth={STROKE_WIDTH}
             fill="none"
           />
@@ -134,7 +134,7 @@ export function MacroRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={colors.pearlMuted}
+          stroke={colors.bgCard2}
           strokeWidth={STROKE_WIDTH}
           fill="none"
         />
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.displayMedium,
     fontSize: typography.sizes.macroNum,
     fontWeight: typography.fontWeight.regular,
-    color: colors.inkPrimary,
+    color: colors.leche,
     letterSpacing: typography.letterSpacing.displayMed,
   },
   over: {
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     fontWeight: typography.fontWeight.medium,
     letterSpacing: typography.letterSpacing.uppercaseMed,
-    color: colors.labelMuted,
+    color: colors.niebla,
     marginTop: 2,
   },
   label: {
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.tinyLabel,
     fontWeight: typography.fontWeight.medium,
     letterSpacing: typography.letterSpacing.uppercaseMed,
-    color: colors.labelDim,
+    color: colors.bruma,
     marginTop: 6,
   },
 })

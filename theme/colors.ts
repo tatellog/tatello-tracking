@@ -1,3 +1,21 @@
+/*
+ * PALETA CERRADA (contrato C1 · 5 jul 2026, modelo Apple: eliges un ROL,
+ * no un color). Ningún hex/rgba vive fuera de este archivo, con UNA
+ * excepción: las escenas de ARTE (atmósferas, Cosmos, Skia, constelación)
+ * donde el hex es pintura — su lista exenta vive en
+ * docs/design-tokens-inventory.md y alimenta el lint C3. Un hex nuevo aquí
+ * requiere justificación de rol, no de gusto.
+ *
+ * Mapeo de ROLES (la semántica que carga cada primitivo):
+ *   leche    → texto primario            bone  → texto secundario
+ *   niebla   → texto muted/captions      bruma → disabled/dim
+ *   bg       → fondo de pantalla         bgCard/bgCard2 → superficies
+ *   hairline / hairlineStrong → separadores y bordes
+ *   magenta* → acción / acento / lo construido en Stelar
+ *   oro*     → ceremonial / títulos de Órbita / navegación dorada
+ *   dimension.* / signal.* → acentos semánticos por señal de producto
+ *   feedback* → estados de error/éxito
+ */
 export const colors = {
   // ── Surfaces ───────────────────────────────────────────────────
   bg: '#0A0608',
@@ -33,6 +51,26 @@ export const colors = {
   oroTint: 'rgba(217, 174, 111, 0.08)',
   // Even fainter hairline for "astral chart" row dividers inside cards.
   oroHairlineSoft: 'rgba(217, 174, 111, 0.12)',
+  // Halo de un "día encendido" (estrella de luz): glow medio + bloom exterior.
+  // Pareja del oro para puntos de luz, como `magentaGlow` lo es del magenta.
+  oroGlow: 'rgba(217, 174, 111, 0.22)',
+  oroBloom: 'rgba(217, 174, 111, 0.10)',
+
+  // ── Utilitarios con rol (E1 · 5 jul 2026) ──────────────────────
+  /** Glifos sobre acento y núcleos de luz (leche es crema; esto es blanco puro). */
+  blanco: '#FFFFFF',
+  /** shadowColor de cards/sheets — el negro puro solo existe como sombra. */
+  sombra: '#000000',
+  /** La píldora de navegación (chrome del tab bar, un paso sobre bg). */
+  bgNav: '#1A0810',
+  /** Sobre-meta sereno: ámbar cálido, nunca rojo (SpeedometerRing y afines). */
+  ambar: '#F1A65A',
+  /** La luz rosa pálida de los núcleos/glow de estrella — recurría ×39 como
+   *  literal entre escenas (cubeta b del inventario C0, promovida a token). */
+  rosaLuz: '#FBD7E3',
+  /** Tinte oro de la familia de iconos line-art cuando acompaña ilustraciones
+   *  vect (su oro horneado es #EEDD91; el icono tintado debe hermanar). */
+  oroVect: '#EEDD91',
 
   // ── Feedback ───────────────────────────────────────────────────
   feedbackSuccess: '#5A6F4C',
@@ -69,33 +107,11 @@ export const colors = {
   signal: {
     proteina: '#E0AEA0', // coral cálido — nutrición, distinto del índigo
     agua: '#8FBEDB', // azul cielo calmado — menos neón que el cian previo
+    entreno: '#FF9E57', // naranja movimiento — antes copiado como hex en Semana/Mes
   },
 
-  // ── Legacy Pearl Mauve aliases (deprecated — see file header) ──
-  /** @deprecated Use `bg` */
-  pearlBase: '#0A0608',
-  /** @deprecated Use `bgCard` */
-  pearlElevated: '#14080B',
-  /** @deprecated Use `bgCard2` */
-  pearlMuted: '#1F0E13',
-  /** @deprecated Use `leche` */
-  inkPrimary: '#F4ECDE',
-  /** @deprecated Use `bone` */
-  inkSoft: '#C9B8A5',
-  /** @deprecated Use `niebla` */
-  labelMuted: '#8A7570',
-  /** @deprecated Use `bruma` */
-  labelDim: '#4F3A3D',
-  /** @deprecated Use `magentaHot` */
-  mauveLight: '#FF4886',
-  /** @deprecated Use `magenta` */
-  mauveDeep: '#E91E63',
-  /** @deprecated Use `magentaGlow` */
-  mauveShadow: 'rgba(233, 30, 99, 0.45)',
-  /** @deprecated Use `magentaTint` */
-  mauveTinted: 'rgba(233, 30, 99, 0.10)',
-  /** @deprecated Use `bruma` */
-  mauveBorderSoft: '#4F3A3D',
+  // (Los alias legacy Pearl Mauve se migraron y eliminaron el 5 jul 2026:
+  // una paleta cerrada con puerta trasera deprecated no está cerrada.)
   /** @deprecated Use `hairline` */
   borderSubtle: 'rgba(244, 236, 222, 0.10)',
   /** @deprecated Use `bruma` */

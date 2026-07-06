@@ -6,6 +6,7 @@ import Animated, {
   Easing,
   useAnimatedProps,
   useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -123,8 +124,8 @@ const NUC_SEM = { x: 160, y: 112 }
 const NUC_MES = { x: 256, y: 96 }
 
 // Lens labels + previews. Data-driven and module-level so the copy is
-// trivial to swap. The `preview` strings are NEW copy → flag for
-// voice-and-copy review. Sentence case on previews by design.
+// trivial to swap. Previews revisados por voice-and-copy (E3 jul 2026).
+// Sentence case on previews by design.
 const LENSES: {
   key: 'dia' | 'semana' | 'mes'
   art: number
@@ -132,7 +133,7 @@ const LENSES: {
   preview: string
   nuc: { x: number; y: number }
 }[] = [
-  { key: 'dia', art: DIA_ART, label: 'DÍA', preview: 'Tu día', nuc: NUC_DIA },
+  { key: 'dia', art: DIA_ART, label: 'DÍA', preview: 'Tu presente', nuc: NUC_DIA },
   { key: 'semana', art: SEM_ART, label: 'SEMANA', preview: 'Tu ritmo', nuc: NUC_SEM },
   { key: 'mes', art: MES_ART, label: 'MES', preview: 'Tu cielo', nuc: NUC_MES },
 ]
@@ -244,7 +245,15 @@ export default function WhatItDoesScreen() {
   const dust = useSharedValue(0)
   const orbit = useSharedValue(0)
 
+  // Reduced motion: cielo estático (hallazgo E3; el resto del repo ya lo respeta).
+  const reduceMotion = useReducedMotion() ?? false
   useEffect(() => {
+    if (reduceMotion) {
+      clock.value = 0.5
+      dust.value = 0
+      orbit.value = 0
+      return
+    }
     clock.value = withRepeat(withTiming(1, { duration: 5000, easing: Easing.linear }), -1, false)
     dust.value = withRepeat(withTiming(1, { duration: 18000, easing: Easing.linear }), -1, false)
     orbit.value = withRepeat(withTiming(1, { duration: 40000, easing: Easing.linear }), -1, false)
@@ -253,7 +262,7 @@ export default function WhatItDoesScreen() {
       cancelAnimation(dust)
       cancelAnimation(orbit)
     }
-  }, [clock, dust, orbit])
+  }, [clock, dust, orbit, reduceMotion])
 
   return (
     <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -278,11 +287,11 @@ export default function WhatItDoesScreen() {
 
         <Text style={styles.title}>
           Sí, cuento calorías.{'\n'}
-          <Text style={styles.titleEm}>Y también lo que no se cuenta.</Text>
+          <Text style={styles.titleEm}>Y también{'\n'}lo que no se cuenta.</Text>
         </Text>
 
         <Text style={styles.body}>
-          Mido calorías, macros y peso. Pero también te ayudo a entender qué te cuesta sostener.
+          Stelar mide calorías, macros y peso. También te ayuda a entender qué te cuesta sostener.
         </Text>
 
         <View style={styles.previewBlock}>
@@ -292,7 +301,7 @@ export default function WhatItDoesScreen() {
 
       <View style={styles.footer}>
         <PrimaryCta
-          label="Empezar"
+          label="Continuar"
           variant="soft"
           transform="none"
           onPress={() => router.push('/onboarding/intention')}
@@ -757,10 +766,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: typography.displayHeavy,
-    // CAMBIO 6 — aligned to welcome's quote (38/40/-1.6) so the titular
-    // doesn't visibly shrink when crossing from step 1 to step 2.
-    fontSize: 38,
-    lineHeight: 40,
+    // Ritmo canónico del wizard (36/42/-1.6, igual que StepHeader): el
+    // titular ya no encoge al cruzar de paso — hallazgo E3 #5.
+    fontSize: typography.sizes.displayTitle,
+    lineHeight: 42,
     color: colors.leche,
     letterSpacing: -1.6,
     textAlign: 'center',
@@ -770,7 +779,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     // The emphatic line stays serif italic — this IS the emotional
     // (coach) line, so italic is legitimate here.
-    fontSize: 38,
+    fontSize: typography.sizes.displayTitle,
     color: colors.magenta,
     letterSpacing: -1.2,
   },

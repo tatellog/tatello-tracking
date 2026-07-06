@@ -1,5 +1,7 @@
 import Svg, { Path } from 'react-native-svg'
 
+import { colors } from '@/theme'
+
 /*
  * Line icons for the goal editor (enfoque cards, breakdown headers).
  * One stroke, no heavy fill — same language as share-icons. Tinted by
@@ -12,7 +14,7 @@ type IconProps = {
   strokeWidth?: number
 }
 
-const DEFAULT_COLOR = '#E91E63'
+const DEFAULT_COLOR = colors.magenta
 
 /** Llama — déficit / gasto calórico. */
 export function FlameIcon({ size = 22, color = DEFAULT_COLOR, strokeWidth = 1.6 }: IconProps) {

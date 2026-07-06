@@ -1,12 +1,14 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { patchBriefCache, restoreBriefCache } from '@/lib/briefCache'
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 
 import {
+  getWorkoutTypeToday,
   markWorkoutForDate,
   markWorkoutToday,
+  setWorkoutTypeToday,
   unmarkWorkoutForDate,
   unmarkWorkoutToday,
 } from './api'
@@ -46,6 +48,44 @@ export function useToggleWorkoutToday() {
       qc.invalidateQueries({ queryKey: ['progress'] })
       // Órbita lee `trained` del view daily_signals — sin esto, marcar el
       // entreno no refresca el hero/chips de Órbita Día.
+      qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
+    },
+  })
+}
+
+/*
+ * El tipo de entreno de HOY (chips del check-in). `enabled` lo apaga
+ * mientras el día no esté marcado como entrenado — no hay chips que pintar.
+ */
+export function useWorkoutTypeToday(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.workout.typeForDay(todayInTimezone()),
+    queryFn: getWorkoutTypeToday,
+    enabled,
+  })
+}
+
+/*
+ * Optimista sobre la key del tipo; invalida Órbita porque workout_type
+ * fluye a daily_signals y lo consume _shared/intelligence/workout-type
+ * (mezcla de movimiento + patrón tipo×déficit en Órbita Mes).
+ */
+export function useSetWorkoutTypeToday() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (type: string | null) => setWorkoutTypeToday(type),
+    onMutate: async (type) => {
+      const key = queryKeys.workout.typeForDay(todayInTimezone())
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData<string | null>(key)
+      qc.setQueryData(key, type)
+      return { prev, key }
+    },
+    onError: (_err, _vars, context) => {
+      if (context) qc.setQueryData(context.key, context.prev ?? null)
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.workout.all })
       qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     },
   })

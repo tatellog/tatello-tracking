@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontFamily: typography.displayHeavy,
-    fontSize: 40,
+    fontSize: typography.sizes.wheelSm,
     letterSpacing: -1,
     includeFontPadding: false,
   },

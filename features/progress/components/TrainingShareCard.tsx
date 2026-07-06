@@ -4,6 +4,7 @@ import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
+import type { MonthCell } from '@/features/tabs/components/constellation/data/month-grid'
 import { colors, typography } from '@/theme'
 
 import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
@@ -17,7 +18,7 @@ import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
 export const TRAINING_CARD_W = 320
 export const TRAINING_CARD_H = Math.round((TRAINING_CARD_W * 16) / 9)
 
-export type TrainingShareVariant = 'constelacion' | 'momento' | 'progreso'
+export type TrainingShareVariant = 'constelacion' | 'calendario' | 'momento' | 'progreso'
 
 // Seeded starfield with three brightness tiers — the celestial bed
 // behind every shareable STELAR card. The brightest tier (o > 0.36)
@@ -86,6 +87,10 @@ type Props = {
   monthLabel: string
   /** Entrenos del mes civil. */
   workoutsThisMonth: number
+  /** Calendario: las celdas del mes en curso (día, entrenó, hoy). */
+  monthCells?: MonthCell[]
+  /** Calendario: día de la semana (0=domingo) del 1° del mes, para el offset. */
+  monthFirstWeekday?: number
   /** Días activos del ciclo (= dayCount). */
   activeDays: number
   /** Peso inicial / actual — null oculta la fila (sin datos falsos). */
@@ -212,6 +217,8 @@ export function TrainingShareCard({
   nextStarDay,
   monthLabel,
   workoutsThisMonth,
+  monthCells,
+  monthFirstWeekday,
   activeDays,
   weightFrom,
   weightTo,
@@ -271,6 +278,33 @@ export function TrainingShareCard({
             </View>
           ) : null}
 
+          <Text style={styles.coach}>{coachCopy}</Text>
+        </View>
+      ) : variant === 'calendario' ? (
+        <View style={styles.middle}>
+          <Text style={styles.calMonth}>{monthLabel}</Text>
+          <Text style={styles.calCount}>
+            {(monthCells ?? []).filter((c) => c.trained).length} días entrenados
+          </Text>
+          <View style={styles.calGrid}>
+            {Array.from({ length: monthFirstWeekday ?? 0 }).map((_, i) => (
+              <View key={`empty-${i}`} style={styles.calCell} />
+            ))}
+            {(monthCells ?? []).map((c) => (
+              <View key={c.date} style={styles.calCell}>
+                <View
+                  style={[
+                    styles.calDot,
+                    c.trained
+                      ? [styles.calDotOn, { backgroundColor: accent, shadowColor: accent }]
+                      : c.isToday
+                        ? styles.calDotToday
+                        : styles.calDotOff,
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
           <Text style={styles.coach}>{coachCopy}</Text>
         </View>
       ) : variant === 'momento' ? (
@@ -367,6 +401,52 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // ── calendario ─────────────────────────────────────────────────────
+  calMonth: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.heading,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.leche,
+  },
+  calCount: {
+    marginTop: 4,
+    marginBottom: 18,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  calGrid: {
+    width: 245,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  calCell: {
+    width: 35,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  calDotOn: {
+    shadowOpacity: 0.9,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  calDotToday: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.leche,
+  },
+  calDotOff: {
+    backgroundColor: 'rgba(244, 236, 222, 0.12)',
   },
   // ── constelacion ───────────────────────────────────────────────────
   signTitle: {

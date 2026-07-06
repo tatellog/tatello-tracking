@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   },
   prefix: {
     fontFamily: typography.uiBold,
-    fontSize: 8.5,
+    fontSize: typography.sizes.tinyLabel,
     color: colors.magenta,
     letterSpacing: 1.9,
     marginBottom: 4,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   },
   caption: {
     fontFamily: typography.uiMedium,
-    fontSize: 8.5,
+    fontSize: typography.sizes.tinyLabel,
     color: colors.niebla,
     letterSpacing: 1.4,
     textAlign: 'center',

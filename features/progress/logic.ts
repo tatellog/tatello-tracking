@@ -132,25 +132,36 @@ export function computeTrend(points: WeightPoint[]): Trend | null {
   return { weeklyChange, direction }
 }
 
+/** "~200 g" o "~1.2 kg" — el ritmo semanal literal, redondeado a lo que
+ *  la báscula puede sostener (50 g). */
+function weeklyRateLabel(absKg: number): string {
+  if (absKg >= 1) return `~${absKg.toFixed(1)} kg`
+  const g = Math.max(50, Math.round((absKg * 1000) / 50) * 50)
+  return `~${g} g`
+}
+
 /*
  * Una línea corta — la voz que comparte rumbo con el eyebrow "Rumbo a
- * tu Andrómeda". Sin cifras (el número está arriba) y sin juzgar el
- * sentido del cambio: Stelar nombra la trayectoria, no la regaña.
- *
- * El vocabulario es cósmico — órbita, rumbo, gravedad — para que el
- * coach line se sienta parte del mismo cielo que el resto de Progreso.
+ * tu Andrómeda". Número literal PRIMERO, cariño después: la fórmula que
+ * ya ganó en el cierre del día, aplicada a LA pregunta de Progreso
+ * ("¿estoy bajando?"). La poesía sola escondía la respuesta (feedback
+ * beta: "me dan gravedad amable cuando pregunto cuánto bajé").
+ * Sin juzgar el sentido del cambio: se nombra la trayectoria, jamás se
+ * regaña.
  */
 export function formatTrendCopy(trend: Trend): string {
-  if (trend.direction === 'flat') return 'Tu órbita está en pausa: el cielo sostiene tu ritmo.'
+  if (trend.direction === 'flat') return 'Tu peso se sostiene estable. El cielo sostiene tu ritmo.'
 
   const abs = Math.abs(trend.weeklyChange)
+  const rate = weeklyRateLabel(abs)
   if (trend.direction === 'down') {
-    if (abs > 0.5) return 'Vas bajando con fuerza: cuida tu combustible para no perder brillo.'
-    if (abs >= 0.2) return 'Tu trayectoria desciende con calma, sin prisa.'
-    return 'Bajas poco a poco: gravedad amable.'
+    if (abs > 0.5)
+      return `Bajas ${rate} por semana, un ritmo fuerte. Cuida tu combustible para no perder brillo.`
+    if (abs >= 0.2) return `Bajas ${rate} por semana, con calma y sin prisa.`
+    return `Bajas ${rate} por semana. Gravedad amable.`
   }
 
-  if (abs > 0.5) return 'Tu rumbo sube rápido estas semanas.'
-  if (abs >= 0.2) return 'Tu órbita asciende, paso a paso.'
-  return 'Subes apenas un grado: luz tibia.'
+  if (abs > 0.5) return `Tu rumbo sube ${rate} por semana. Míralo sin juicio: es información.`
+  if (abs >= 0.2) return `Subes ${rate} por semana, paso a paso.`
+  return `Subes apenas ${rate} por semana: luz tibia.`
 }

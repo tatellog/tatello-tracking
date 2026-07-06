@@ -33,12 +33,22 @@ type Props = {
   day: CalendarDay | null
   /** La fecha cae en la ventana editable de Hoy (últimos 30 días). */
   editable: boolean
+  /** Meta calórica del perfil — el detalle contextualiza el día frente al
+   *  norte ("Un día en déficit…"). Sin target, la línea no aparece. */
+  calorieTarget?: number | null
   onClose: () => void
   /** "Ver día →" — lleva a Hoy a editar esa fecha. */
   onSeeDay: (date: string) => void
 }
 
-export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: Props) {
+export function DayHistorySheet({
+  visible,
+  day,
+  editable,
+  calorieTarget,
+  onClose,
+  onSeeDay,
+}: Props) {
   const insets = useSafeAreaInsets()
   // Cerrado = SIN Modal montado (no solo visible=false). Evita que un Modal
   // transparente quede "huérfano" capturando toques al volver a Progreso —
@@ -82,6 +92,7 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
           <DayDetailContent
             day={day}
             tone="observe"
+            calorieTarget={calorieTarget}
             // Tocar el evento re-abre su ceremonia full-screen. Este sheet es un
             // RN <Modal> (ventana nativa aparte) y la ceremonia es absoluteFill
             // montada en la RAÍZ de Progreso → quedaría DEBAJO del modal. Por eso
@@ -92,7 +103,16 @@ export function DayHistorySheet({ visible, day, editable, onClose, onSeeDay }: P
               emitReplayReveal({
                 tier: ev.tier ?? '',
                 kind: ev.kind ?? '',
-                message: ev.message ?? ev.title,
+                // El patrón de ESTE día (observación + detalle + evidencia) —
+                // distinto por día, no el combo global de Mes.
+                title: ev.title,
+                message: ev.message ?? '',
+                evidence: ev.evidence,
+                evidenceCount: ev.evidenceCount,
+                evidenceTotal: ev.evidenceTotal,
+                evidenceBars: ev.evidenceBars,
+                correlationInsight: ev.correlationInsight,
+                date: day?.date,
               })
             }}
             // Día con evento = día especial: la estrella ornamental (oro,

@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   pointGlyph: {
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     lineHeight: 20,
     color: colors.magenta,
   },

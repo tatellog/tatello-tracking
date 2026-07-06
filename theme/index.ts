@@ -9,3 +9,6 @@ export type { Spacing, Radius, Shadow } from './spacing'
 
 export { duration, easing, stagger } from './motion'
 export type { Duration, Stagger } from './motion'
+
+export { textStyles } from './text-styles'
+export type { TextStyleRole } from './text-styles'

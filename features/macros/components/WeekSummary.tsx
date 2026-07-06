@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   coach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
     marginBottom: 16,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   empty: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.bone,
     textAlign: 'center',

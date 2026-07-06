@@ -7,9 +7,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import FoodVect from '@/assets/icons/food-vect.svg'
-import NorthStar from '@/assets/icons/north-star.svg'
-import Orbits from '@/assets/icons/orbits.svg'
-import WaterVect from '@/assets/icons/water-vect.svg'
+import NorthStarTint from '@/assets/icons/north-star-tint.svg'
+import WaterTint from '@/assets/icons/water-tint.svg'
 import { StelarLogo } from '@/components/brand/StelarLogo'
 import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -37,7 +36,7 @@ const enter = (delayMs: number) => FadeInDown.duration(400).delay(delayMs).sprin
 // horneadas energy/moon/water usan como `fill`). Los glifos `currentColor`
 // (orbits, food) se tintan a ESTE valor —no a oroSoft, más oscuro— para que
 // los cuatro iconos de "Tu camino" lean a una sola luminancia.
-const ICON_GOLD = '#EEDD91'
+const ICON_GOLD = colors.oroVect
 
 // TODO: Términos y privacidad — la fila "Términos y privacidad" está
 // disabled hasta que estas páginas estén hospedadas. Cuando existan,
@@ -217,6 +216,10 @@ function SettingsBody() {
     router.push('/privacy')
   }
 
+  const openTerms = () => {
+    router.push('/terms')
+  }
+
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
   // Secondary focuses (the picks AFTER the priority in the intention
@@ -225,18 +228,6 @@ function SettingsBody() {
   const secondaryIntentionLabels: string[] = (profile?.monthly_focus_secondary ?? [])
     .map((v) => FOCUS_LABEL[v]?.label)
     .filter((s): s is string => typeof s === 'string')
-  // Truncate the secondary list: show at most 2, fold the rest into a
-  // quiet "y N más" so a heavy multi-pick can't crowd the priority. The
-  // dimmer metaSecondary style carries the hierarchy; no "También:" label.
-  const SECONDARY_VISIBLE = 2
-  const secondaryLine = (() => {
-    if (secondaryIntentionLabels.length === 0) return null
-    const shown = secondaryIntentionLabels.slice(0, SECONDARY_VISIBLE)
-    const rest = secondaryIntentionLabels.length - shown.length
-    const parts = [...shown]
-    if (rest > 0) parts.push(`y ${rest} más`)
-    return parts.join('  ·  ')
-  })()
 
   // Celestial identity line — sign comes from the same source as the
   // Hoy-tab constellation, so the two screens agree.
@@ -247,11 +238,17 @@ function SettingsBody() {
   const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
   const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
 
-  // ── Tu camino — los valores de las 4 sub-secciones (route config). ──
-  const objetivoPrincipal = profileLoaded
-    ? (intention?.label ?? 'Aún sin definir')
+  // ── Tu camino — los valores de las sub-secciones (route config). ──
+  // UNA fila para el objetivo (antes dos filas → el MISMO destino, que
+  // desorientaba: "toqué Secundarios y caí en la pantalla completa"). El
+  // valor compone prioridad + "· N más" (regla Apple: una fila, un destino).
+  const objetivo = profileLoaded
+    ? intention?.label
+      ? secondaryIntentionLabels.length > 0
+        ? `${intention.label}   ·   ${secondaryIntentionLabels.length} más`
+        : intention.label
+      : 'Aún sin definir'
     : 'Tu objetivo del mes'
-  const objetivosSecundarios = secondaryLine ?? 'Añade objetivos que te acompañen'
   const nutricion = targetsLoading
     ? 'Cargando…'
     : targets
@@ -309,23 +306,17 @@ function SettingsBody() {
             <SectionHeader label="Tu camino" />
             <View style={styles.caminoList}>
               <CaminoRow
-                icon={<NorthStar width={26} height={26} preserveAspectRatio="xMidYMid meet" />}
-                featured
-                label="Objetivo principal"
-                value={objetivoPrincipal}
-                onPress={editIntention}
-              />
-              <CaminoRow
                 icon={
-                  <Orbits
-                    width={32}
-                    height={32}
+                  <NorthStarTint
+                    width={26}
+                    height={26}
                     color={ICON_GOLD}
                     preserveAspectRatio="xMidYMid meet"
                   />
                 }
-                label="Objetivos secundarios"
-                value={objetivosSecundarios}
+                featured
+                label="Tu objetivo"
+                value={objetivo}
                 onPress={editIntention}
               />
               <CaminoRow
@@ -342,7 +333,14 @@ function SettingsBody() {
                 onPress={editTargets}
               />
               <CaminoRow
-                icon={<WaterVect width={32} height={32} preserveAspectRatio="xMidYMid meet" />}
+                icon={
+                  <WaterTint
+                    width={26}
+                    height={26}
+                    color={ICON_GOLD}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                }
                 label="Agua"
                 value={agua}
                 onPress={editWater}
@@ -411,6 +409,13 @@ function SettingsBody() {
                 tagline="Tus datos son tuyos."
                 onPress={openPrivacy}
                 accessibilityLabel="Privacidad y tus datos"
+              />
+              <View style={styles.accountDivider} />
+              <AccountRow
+                label="Términos de uso"
+                tagline="Qué es Stelar y qué no."
+                onPress={openTerms}
+                accessibilityLabel="Términos de uso"
               />
             </View>
 
@@ -679,8 +684,18 @@ function IdentityCard({
               {name}
             </Text>
             {signAge ? <Text style={styles.identitySignAge}>{signAge}</Text> : null}
+            {/* Bajo el 8% el número trabaja en contra ("1%" = "saqué 1 de 100
+                en el examen", target-user): cualitativo hasta que el % cuente
+                una historia. "Constelación", no "transformación": junto al
+                avatar se leía como transformación corporal, y el glosario
+                visible habla de constelación/cielo (voice-and-copy jul 2026).
+                Mismo copy que Perfil y mismo umbral que Órbita Mes. */}
             {transformPct > 0 ? (
-              <Text style={styles.identityTransform}>{transformPct}% de transformación</Text>
+              <Text style={styles.identityTransform}>
+                {transformPct < 8
+                  ? 'Tu constelación apenas empieza a revelarse'
+                  : `${transformPct}% de tu constelación revelada`}
+              </Text>
             ) : null}
             {email ? (
               <Text style={styles.identityEmail} numberOfLines={1}>
@@ -994,7 +1009,7 @@ const styles = StyleSheet.create({
   },
   identityInitial: {
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     color: colors.magenta,
   },
   identityTextCol: {
@@ -1004,7 +1019,7 @@ const styles = StyleSheet.create({
   // Nombre — tipografía editorial, grande, la heroína de la card.
   identityName: {
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     letterSpacing: -0.8,
     color: colors.leche,
   },
@@ -1170,7 +1185,7 @@ const styles = StyleSheet.create({
   signAge: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
     marginTop: 4,
   },
@@ -1233,12 +1248,12 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     color: colors.niebla,
   },
   rowValue: {
     fontFamily: typography.displaySemi,
-    fontSize: 15.5,
+    fontSize: typography.sizes.ui,
     color: colors.bone,
     letterSpacing: -0.2,
     flexShrink: 1,
@@ -1266,58 +1281,12 @@ const styles = StyleSheet.create({
   rowPressed: {
     opacity: 0.6,
   },
-  // ── Tu ritual de agua ──────────────────────────────────────────
-  waterCard: {
-    marginTop: 10,
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-  },
-  waterHead: {
-    marginBottom: 14,
-  },
-  waterValue: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
-    marginTop: 4,
-  },
-  waterPresets: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  waterChip: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    backgroundColor: colors.bgCard2,
-  },
-  waterChipActive: {
-    borderColor: colors.magentaGlow,
-    backgroundColor: colors.magentaTint,
-  },
-  waterChipText: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: -0.2,
-  },
-  waterChipTextActive: {
-    color: colors.magenta,
-  },
   metaMain: {
     flex: 1,
   },
   metaLabel: {
     fontFamily: typography.displaySemi,
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     color: colors.leche,
     letterSpacing: -0.3,
   },
@@ -1384,7 +1353,7 @@ const styles = StyleSheet.create({
   inlineError: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.feedbackError,
     paddingHorizontal: 2,
   },
@@ -1437,7 +1406,7 @@ const styles = StyleSheet.create({
   },
   accountLabel: {
     fontFamily: typography.displaySemi,
-    fontSize: 16.5,
+    fontSize: typography.sizes.title,
     color: colors.leche,
     letterSpacing: -0.3,
   },
@@ -1472,7 +1441,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.feedbackError,
     textAlign: 'center',
   },

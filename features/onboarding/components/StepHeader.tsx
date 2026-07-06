@@ -78,11 +78,11 @@ const styles = StyleSheet.create({
   eyebrowCenter: { textAlign: 'center' },
   eyebrowFreeform: {
     fontFamily: typography.uiBold,
-    fontSize: 10.5,
+    fontSize: typography.sizes.smallLabel,
   },
   question: {
     fontFamily: typography.displayHeavy,
-    fontSize: 36,
+    fontSize: typography.sizes.displayTitle,
     letterSpacing: -1.4,
     // lineHeight > fontSize: la palabra enfatizada va en Cormorant italic (glifo
     // más alto que Hanken); con lineHeight == 36 se cortaba (asc/desc del italic),
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   questionEmphasis: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
-    fontSize: 34,
+    fontSize: typography.sizes.displayHero,
     color: colors.magenta,
     letterSpacing: -0.3,
   },

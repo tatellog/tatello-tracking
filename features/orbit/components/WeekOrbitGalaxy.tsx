@@ -10,8 +10,17 @@ import {
 } from '@shopify/react-native-skia'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
-import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import {
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   useAnimatedStyle,
@@ -21,9 +30,11 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
+import { useScreenActive } from '../useScreenActive'
 import { type WeekDimension, type WeekDimKey } from '../week-orbit-logic'
 import { hexRgb, weekDimGlyph, WEEK_DIM_COLOR } from './week-dim-visual'
 
@@ -92,12 +103,19 @@ export function WeekOrbitGalaxy({ dims, size, onFocusChange, initialFocus = null
   })
   const focusStar = stars.find((s) => s.dim.key === focusKey) ?? null
 
+  // Pausa los loops ambientales cuando el tab no está enfocado o se está
+  // scrolleando (patrón useScreenActive; Órbita es el tab más pesado). Sin esto,
+  // la rotación de la nebulosa y el pulso queman UI thread/GPU off-tab y compiten
+  // con cada frame de scroll.
+  const screenActive = useScreenActive()
+
   // Nebulosa viva: la galaxia pintada gira muy lento (90 s/vuelta).
   const spin = useSharedValue(0)
   useEffect(() => {
-    if (reduce) return
+    if (reduce || !screenActive) return
     spin.value = withRepeat(withTiming(1, { duration: 90_000, easing: Easing.linear }), -1, false)
-  }, [spin, reduce])
+    return () => cancelAnimation(spin)
+  }, [spin, reduce, screenActive])
   const nebula = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value * 360}deg` }] }))
 
   // Atenúa estrellas + etiquetas al enfocar, para que el ícono centrado destaque.
@@ -109,6 +127,31 @@ export function WeekOrbitGalaxy({ dims, size, onFocusChange, initialFocus = null
     })
   }, [selected, focused])
   const bgStyle = useAnimatedStyle(() => ({ opacity: 1 - focused.value * 0.72 }))
+
+  // Pulso "tócame": un aro que respira sobre el planeta más brillante mientras
+  // NO hay enfoque, para comunicar que la galaxia es interactiva (uxui). Overlay
+  // RN, no Skia. Reduced motion → sin pulso (se gatea al render).
+  const brightest = stars.reduce<StarLayout | null>(
+    (top, s) => (top == null || s.dim.present > top.dim.present ? s : top),
+    null,
+  )
+  const pulse = useSharedValue(0)
+  useEffect(() => {
+    if (reduce || !screenActive) return
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1300, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 1300, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    )
+    return () => cancelAnimation(pulse)
+  }, [pulse, reduce, screenActive])
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.12 + pulse.value * 0.45,
+    transform: [{ scale: 1 + pulse.value * 0.35 }],
+  }))
 
   const onTapStar = (key: WeekDimKey) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync()
@@ -125,12 +168,20 @@ export function WeekOrbitGalaxy({ dims, size, onFocusChange, initialFocus = null
 
   return (
     <Animated.View entering={FadeIn.duration(500)} style={[styles.canvas, { width: S, height: S }]}>
-      {/* Fondo: nebulosa pintada, girando lento. */}
+      {/* Nebulosa: una copia más grande, tenue y con blur que GIRA lento detrás
+          → el movimiento vive en la nebulosa difusa (sin costura, por el blur). */}
       <Animated.Image
         source={GALAXY_ART}
-        style={[{ width: S, height: S }, nebula]}
+        style={[
+          styles.nebulaHaze,
+          { width: S * 1.28, height: S * 1.28, left: -S * 0.14, top: -S * 0.14 },
+          nebula,
+        ]}
+        blurRadius={9}
         resizeMode="contain"
       />
+      {/* Núcleo: la galaxia pintada, ESTÁTICA (el centro no se mueve). */}
+      <Image source={GALAXY_ART} style={{ width: S, height: S }} resizeMode="contain" />
 
       {/* Backdrop — al enfocar, tocar FUERA del ícono (cualquier zona vacía)
           cierra. Va bajo la capa de estrellas (box-none), así que tocar otra
@@ -173,18 +224,76 @@ export function WeekOrbitGalaxy({ dims, size, onFocusChange, initialFocus = null
                 pointerEvents="none"
                 style={[styles.labelWrap, { left: s.x - 40, top: s.y + s.R * 2.1 }]}
               >
-                <Text style={[styles.count, { color }]}>
-                  {s.dim.present}/{s.dim.total}
-                </Text>
                 <Text style={styles.label}>{s.dim.label}</Text>
+                {/* Aparición como PUNTOS (encendido = día presente), no como "X/3":
+                    una fracción se lee como calificación/reprobado. La masa del
+                    planeta ya dice cuánto; el conteo humano vive en el panel. */}
+                <View style={styles.dotsRow}>
+                  {Array.from({ length: s.dim.total }).map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.dot,
+                        i < s.dim.present ? { backgroundColor: color } : styles.dotDim,
+                      ]}
+                    />
+                  ))}
+                </View>
               </View>
             </View>
           )
         })}
       </Animated.View>
 
+      {/* Pulso "tócame" sobre el planeta más brillante (solo en reposo). Es un
+          glow radial DIFUSO (borde que se desvanece), no un aro de borde duro:
+          se ve suave, no marcado. */}
+      {selected == null && brightest && !reduce
+        ? (() => {
+            const hs = brightest.R * 5
+            const hc = WEEK_DIM_COLOR[brightest.dim.key]
+            return (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.hintWrap,
+                  { left: brightest.x - hs / 2, top: brightest.y - hs / 2, width: hs, height: hs },
+                  pulseStyle,
+                ]}
+              >
+                <Svg width={hs} height={hs}>
+                  <Defs>
+                    <RadialGradient id="hintGlow" cx="50%" cy="50%" r="50%">
+                      <Stop offset="0" stopColor={hc} stopOpacity={0} />
+                      <Stop offset="0.5" stopColor={hc} stopOpacity={0} />
+                      <Stop offset="0.8" stopColor={hc} stopOpacity={0.5} />
+                      <Stop offset="1" stopColor={hc} stopOpacity={0} />
+                    </RadialGradient>
+                  </Defs>
+                  <Circle cx={hs / 2} cy={hs / 2} r={hs / 2} fill="url(#hintGlow)" />
+                </Svg>
+              </Animated.View>
+            )
+          })()
+        : null}
+
       {/* Ícono enfocado — viaja de su estrella al centro con zoom (focus de Día). */}
       <FocusLayer star={focusStar} center={center} active={selected != null} onClose={close} />
+
+      {/* Cierre visible: el glyph central ya cierra al tocarlo, pero no se lee
+          como "cerrar" (uxui). Una píldora explícita cierra el enfoque. */}
+      {selected != null ? (
+        <View style={styles.closeRow} pointerEvents="box-none">
+          <Pressable
+            style={styles.closePill}
+            onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar enfoque"
+          >
+            <Text style={styles.closePillText}>Cerrar</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </Animated.View>
   )
 }
@@ -346,6 +455,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     position: 'relative',
   },
+  // La nebulosa difusa que gira detrás del núcleo estático (tenue + blur).
+  nebulaHaze: {
+    position: 'absolute',
+    opacity: 0.5,
+  },
   glyphWrap: {
     position: 'absolute',
     alignItems: 'center',
@@ -359,21 +473,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Glow-pulso "tócame" difuso (SVG radial, sin borde duro): respira sobre el
+  // planeta más brillante en reposo. Se ve suave, no marcado.
+  hintWrap: {
+    position: 'absolute',
+  },
+  // Cierre visible del enfoque, anclado al pie de la galaxia.
+  closeRow: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  closePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(10, 6, 8, 0.72)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  closePillText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.niebla,
+  },
   labelWrap: {
     position: 'absolute',
     width: 80,
     alignItems: 'center',
   },
-  count: {
-    fontFamily: typography.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.3,
-  },
   label: {
-    fontFamily: typography.ui,
-    fontSize: 9.5,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
     letterSpacing: 0.4,
     color: colors.niebla,
-    marginTop: 1,
+  },
+  // Aparición por día como puntos: encendido (color del dim) = día presente;
+  // apagado (bruma) = día transcurrido sin registro. Nunca una fracción/nota.
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 3,
+    marginTop: 5,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  dotDim: {
+    backgroundColor: colors.bruma,
+    opacity: 0.45,
   },
 })

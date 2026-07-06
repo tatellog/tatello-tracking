@@ -27,6 +27,7 @@ export const typography = {
   serifSemi: 'CormorantGaramond_600SemiBold_Italic',
 
   sizes: {
+    nano: 7,
     tinyLabel: 9,
     smallLabel: 10,
     micro: 11,
@@ -41,10 +42,25 @@ export const typography = {
     headingLg: 20,
     segmentTitle: 22,
     displaySm: 24,
+    // ── Tier display (E1 · 5 jul 2026): los héroes tipográficos dejan de
+    // ser literales sueltos. Consolidar vecinos (32/36/38) es decisión de
+    // dueña aparte — esto solo DECLARA la realidad para poder verla.
+    displayMd: 26,
+    // (tilePlus, duplicado exacto de deltaNum, se fusionó el 5 jul 2026.)
     deltaNum: 28,
-    tilePlus: 28,
     macroNum: 30,
+    displayLg: 32,
+    displayHero: 34,
+    displayTitle: 36,
+    displayXl: 38,
+    wheelSm: 40,
+    gaugeNum: 44,
+    statHero: 46,
     streakNum: 48,
+    heroNum: 52,
+    wheelNum: 54,
+    inputNum: 56,
+    sliderNum: 58,
   },
 
   letterSpacing: {

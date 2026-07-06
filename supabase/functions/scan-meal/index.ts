@@ -54,6 +54,10 @@ const IngredientSchema = z.object({
 const MealSchema = z.object({
   name: z.string().trim().max(80),
   ingredients: z.array(IngredientSchema).max(12),
+  // Honestidad de evidencia (M1): el modelo declara cuánto confía en su
+  // lectura. 'baja'/'media' → el cliente invita a revisar porciones en vez
+  // de fingir precisión. Default 'alta' para no romper respuestas viejas.
+  confidence: z.enum(['alta', 'media', 'baja']).default('alta'),
 })
 
 // Shared JSON contract appended to both prompts.
@@ -64,8 +68,15 @@ const JSON_CONTRACT = [
   'Estima porciones de forma realista para una persona.',
   'Para productos embotellados o de marca conocida (refrescos como Coca-Cola o Fanta, jugos, etc.)',
   'usa sus valores nutricionales típicos.',
+  'Incluye "confidence": "alta" si identificas el plato y las porciones con claridad,',
+  '"media" si identificas el plato pero las porciones son inciertas (foto parcial, plato mixto,',
+  'descripción vaga), y "baja" si el plato mismo es ambiguo. Sé honesto: es mejor declarar duda',
+  'que fingir precisión.',
+  'IMPORTANTE: si la entrada SÍ es comida aunque sea vaga ("algo de pollo con arroz, creo"),',
+  'NUNCA devuelvas vacío: estima los ingredientes más razonables y decláralo con confidence',
+  '"media" o "baja". El vacío es SOLO para entradas que no son comida ni bebida.',
   'Responde con este formato exacto:',
-  '{"name": string, "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number, "sugarPer100": number}]}',
+  '{"name": string, "confidence": "alta"|"media"|"baja", "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number, "sugarPer100": number}]}',
 ].join(' ')
 
 const PHOTO_SYSTEM_PROMPT = [

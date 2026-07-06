@@ -21,22 +21,10 @@ import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
-import { ConsistencyCard } from '@/features/progress/components/ConsistencyCard'
-import { TransformationCard } from '@/features/emblem'
+import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
-import { DayHistorySheet } from '@/features/progress/components/DayHistorySheet'
-import {
-  MovementConstellation,
-  type DayMark,
-  type DayMeta,
-} from '@/features/progress/components/MovementConstellation'
-import { TrainingShareCTA } from '@/features/progress/components/TrainingShareCTA'
 import { useMeasurements } from '@/features/progress/hooks'
-import { dayNumOf, weekdayIdxOf, type CalendarDay } from '@/features/tabs/components/calendar/logic'
-import { useCalendarDays } from '@/features/tabs/components/calendar/useCalendarDays'
-import { requestCalendarDay } from '@/features/tabs/pending-calendar-day'
-import { todayInTimezone } from '@/lib/time'
 import {
   computeDelta,
   computeTrend,
@@ -127,62 +115,6 @@ function ProgressBody() {
   const goLogMeasurement = () => router.push('/log-measurement')
   const hasTrajectory = count >= 2
 
-  // ── Historia (Tab Progreso = observar). Tap en una estrella abre el detalle
-  // SOLO-LECTURA; el MISMO CalendarDay de Hoy para los días recientes, y uno
-  // sintetizado (entrenó/sin registro) para los más viejos. La única puerta a
-  // editar es el CTA "Ver día →" (lleva a Hoy). Nada se muta desde aquí.
-  const today = todayInTimezone()
-  const { days: calendarDays } = useCalendarDays({
-    span: 62,
-    today,
-    todayWorkoutCompleted: false,
-  })
-  const dayByDate = useMemo(() => {
-    const m = new Map<string, CalendarDay>()
-    for (const d of calendarDays) m.set(d.date, d)
-    return m
-  }, [calendarDays])
-  // Estado extra por día para las estrellas del calendario Historia: descanso
-  // (vs sin registro) y marca de evento (revelación/patrón/transformación).
-  // Solo de los días recientes (la ventana de señales); meses viejos quedan
-  // sin meta y caen al estado base (entrenó / sin registro).
-  const metaByDate = useMemo(() => {
-    const m = new Map<string, DayMeta>()
-    for (const d of calendarDays) {
-      const mark = markFromEvents(d.events)
-      const rested = d.status === 'rested'
-      if (rested || mark) m.set(d.date, { rested, mark })
-    }
-    return m
-  }, [calendarDays])
-  const [historyDay, setHistoryDay] = useState<CalendarDay | null>(null)
-  const [sheetVisible, setSheetVisible] = useState(false)
-  // Ventana editable de Hoy = últimos 30 días: solo ahí el CTA "Ver día" lleva
-  // a editar; lo más viejo es historia (lectura pura, sin CTA).
-  const editableFrom = useMemo(() => isoDaysAgo(today, 29), [today])
-  const sheetEditable = historyDay != null && historyDay.date >= editableFrom
-
-  const openHistoryDay = useCallback(
-    (date: string, trained: boolean) => {
-      const day = dayByDate.get(date) ?? synthDay(date, trained, today)
-      setHistoryDay(day)
-      setSheetVisible(true)
-      track('history_day_opened', { date, status: day.status })
-    },
-    [dayByDate, today],
-  )
-  const seeDayInHoy = useCallback(
-    (date: string) => {
-      // Cierra el sheet PRIMERO (desmonta el Modal estando Progreso en foco),
-      // y navega en el siguiente frame — si navegas con el Modal aún montado
-      // queda huérfano y congela Progreso al volver.
-      setSheetVisible(false)
-      requestCalendarDay(date)
-      requestAnimationFrame(() => router.navigate('/(tabs)'))
-    },
-    [router],
-  )
-
   return (
     <View style={styles.screen}>
       <SkyBackground />
@@ -198,24 +130,21 @@ function ProgressBody() {
               que nada. Reemplaza a Movimiento como primer elemento. */}
           <TuHistoria />
 
+          {/* Síntesis — resultado → causa → qué intentar, la respuesta a
+              "¿está funcionando?" en el primer screenful (feedback beta).
+              Absorbe la vieja ReadingCard + la línea déficit↔báscula; es el
+              ÚNICO link saliente del tab (cuarto, no pasillo). La card del
+              emblema se retiró de Progreso: su % junto a la báscula se leía
+              como "% de mi meta de peso" (anti-patrón del manifiesto por
+              contexto); el emblema vive en Hoy y en Órbita Mes. */}
+          <View style={styles.divider} />
+          <SynthesisCard />
+
           {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
               ahora en grande, con modo "Comparar" (slider de arrastrar).
-              Inmediatamente bajo Tu Historia. Responde "¿realmente cambio?". */}
+              Responde "¿realmente cambio?". */}
           <View style={styles.divider} />
           <BeforeAfterPhotos />
-
-          {/* "Tu transformación" — el emblema como símbolo del crecimiento. */}
-          <View style={styles.divider} />
-          <TransformationCard compact />
-
-          {/* "Consistencia" — adherencia a HÁBITOS (proceso, no resultado) en los
-              últimos 30 días. Responde "¿qué tan constante he sido?". */}
-          <View style={styles.divider} />
-          <ConsistencyCard />
-
-          {/* Historia (el calendario-constelación) — ahora debajo del hero. */}
-          <View style={styles.divider} />
-          <MovementConstellation onDayPress={openHistoryDay} metaByDate={metaByDate} />
 
           {/* ── Tu cuerpo — weight + measurements. Demoted out of the
               hero: one section among several, an outcome shown
@@ -288,7 +217,13 @@ function ProgressBody() {
               </Animated.View>
 
               <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartSection}>
-                <Text style={styles.chartCaption}>{count} mediciones · media de 7 días</Text>
+                {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
+                    plan con fecha): cuando la realidad cambia, la línea cambia
+                    sin que nadie "incumpla". */}
+                <Text style={styles.chartCaption}>
+                  {count} mediciones · media de 7 días
+                  {trend ? ' · la punteada sigue tu ritmo real' : ''}
+                </Text>
                 <TrajectoryChart points={smoothed} trend={trend} />
               </Animated.View>
 
@@ -353,10 +288,6 @@ function ProgressBody() {
 
           {/* ("Tu cambio visual" se movió arriba, bajo "Tu Historia".) */}
 
-          {/* ── Entreno de hoy (sólo si trainedToday) ── */}
-          <View style={styles.divider} />
-          <TrainingShareCTA />
-
           {/* Bottom CTA — only once the user already has a trajectory;
               the empty / first-weight states carry their own CTA. */}
           {hasTrajectory ? (
@@ -364,74 +295,15 @@ function ProgressBody() {
               <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
             </Animated.View>
           ) : null}
+
+          {/* La coda del cuarto — lo único que se rescató de la card del
+              emblema (feedback beta: "esa frase me cuida; pero es una frase,
+              no una card"). Cierra el tab quitando el miedo a la mala semana. */}
+          <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
         </ScrollView>
       </SafeAreaView>
-
-      {/* Historia — detalle del día en modo observación (sin editar). */}
-      <DayHistorySheet
-        visible={sheetVisible}
-        day={historyDay}
-        editable={sheetEditable}
-        onClose={() => setSheetVisible(false)}
-        onSeeDay={seeDayInHoy}
-      />
     </View>
   )
-}
-
-// Marca del día desde sus eventos (revelaciones). Precedencia: transformación
-// (hito mayor) > regreso (revelación) > patrón. Un día rara vez tiene varios.
-function markFromEvents(events: CalendarDay['events']): DayMark | null {
-  let hasReturn = false
-  let hasPattern = false
-  for (const e of events) {
-    if (e.tier === 'transformation') return 'transformation'
-    if (e.tier === 'return') hasReturn = true
-    if (e.tier === 'pattern') hasPattern = true
-  }
-  if (hasReturn) return 'revelation'
-  if (hasPattern) return 'pattern'
-  return null
-}
-
-// Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC).
-function isoDaysAgo(today: string, n: number): string {
-  const [y, m, d] = today.split('-').map(Number) as [number, number, number]
-  const dt = new Date(y, m - 1, d - n)
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getDate()).padStart(2, '0')
-  return `${dt.getFullYear()}-${mm}-${dd}`
-}
-
-// Día mínimo para fechas fuera de la ventana de señales recientes: solo
-// sabemos si entrenó (del grid all-time); el resto vacío (lectura honesta).
-function synthDay(date: string, trained: boolean, today: string): CalendarDay {
-  return {
-    date,
-    dayNum: dayNumOf(date),
-    weekdayIdx: weekdayIdxOf(date),
-    isToday: date === today,
-    status: trained ? 'trained' : 'empty',
-    registered: {
-      comida: false,
-      agua: false,
-      sueno: false,
-      energia: false,
-      peso: false,
-      ciclo: false,
-    },
-    values: {
-      mealCount: null,
-      proteinG: null,
-      calories: null,
-      waterGlasses: null,
-      sleepMinutes: null,
-      energy: null,
-      weightKg: null,
-      onPeriod: false,
-    },
-    events: [],
-  }
 }
 
 function formatDelta(kg: number | undefined): string {
@@ -637,7 +509,7 @@ const styles = StyleSheet.create({
   heroEmptyTitle: {
     marginTop: 4,
     fontFamily: typography.displayHeavy,
-    fontSize: 26,
+    fontSize: typography.sizes.displayMd,
     lineHeight: 32,
     color: colors.leche,
     letterSpacing: -0.6,
@@ -646,7 +518,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
   },
@@ -662,7 +534,7 @@ const styles = StyleSheet.create({
   // number the tab opens on.
   firstWeightNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 46,
+    fontSize: typography.sizes.statHero,
     paddingTop: 4,
     paddingBottom: 2,
     color: colors.leche,
@@ -673,7 +545,7 @@ const styles = StyleSheet.create({
   },
   firstWeightUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 21,
+    fontSize: typography.sizes.headingLg,
     color: colors.magenta,
   },
   heroCtaWrap: {
@@ -699,7 +571,7 @@ const styles = StyleSheet.create({
   // giant delta that used to open the tab.
   deltaNum: {
     fontFamily: typography.displayHeavy,
-    fontSize: 46,
+    fontSize: typography.sizes.statHero,
     paddingTop: 4,
     paddingBottom: 4,
     color: colors.magenta,
@@ -707,7 +579,7 @@ const styles = StyleSheet.create({
   },
   deltaUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 21,
+    fontSize: typography.sizes.headingLg,
     color: colors.bone,
   },
   deltaRange: {
@@ -754,14 +626,14 @@ const styles = StyleSheet.create({
   },
   weightNow: {
     fontFamily: typography.displayHeavy,
-    fontSize: 34,
+    fontSize: typography.sizes.displayHero,
     letterSpacing: -1,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
   weightUnit: {
     fontFamily: typography.displayMedium,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.bone,
   },
   // "Cambio total" — chip callado en oro (sin rojo/verde: el peso no se juzga).
@@ -776,7 +648,7 @@ const styles = StyleSheet.create({
   },
   deltaChipLabel: {
     fontFamily: typography.uiBold,
-    fontSize: 9,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -866,6 +738,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
+  },
+  // Coda del tab — serif micro en niebla, mismo registro que las codas de Órbita.
+  footerCoda: {
+    marginTop: 26,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    textAlign: 'center',
   },
   // Shown in "Tu cuerpo" when the month's focus isn't weight — the
   // section is reference, not a target to chase.

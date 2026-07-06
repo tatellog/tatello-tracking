@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { Gesture, GestureDetector, type NativeGesture } from 'react-native-gesture-handler'
 import Animated, {
   Easing,
   Extrapolation,
@@ -33,16 +34,23 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
-import { nextPhaseInfo, PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
+import {
+  CycleNextMilestone,
+  CyclePhaseHero,
+  CycleTimeline,
+  nextMilestoneLine,
+} from '@/features/cycle/components/CycleTimeline'
+import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
-import { computeTdee, enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
+import type { MoodValue } from '@/features/moods/api'
+import { DailyNoteInline } from '@/features/moods/components/DailyNoteInline'
+import { MoodSliderInline } from '@/features/moods/components/MoodSliderInline'
+import { enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
 import type { SleepDraft } from '@/features/sleep/api'
 import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
-import type { WellbeingDraft } from '@/features/wellbeing/api'
-import { useSaveWellbeing, useTodayWellbeing } from '@/features/wellbeing/hooks'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
@@ -57,6 +65,13 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 // How much of the NEXT slide peeks on the right edge — a persistent "hay más"
 // affordance. Slides are this much narrower than the viewport.
 const SLIDE_PEEK = 22
+
+// Etiquetas del resumen colapsado (mismo vocabulario del slider de ánimo).
+const MOOD_SUMMARY_LABEL: Record<MoodValue, string> = {
+  struggle: 'Difícil',
+  neutral: 'Neutral',
+  good: 'Bien',
+}
 
 type Props = {
   ctx: BriefContext
@@ -85,6 +100,15 @@ type Props = {
 export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
+  // Un slide con arrastre horizontal propio (el slider de ánimo) bloquea el
+  // pager mientras dura su gesto, si no ambos compiten por el swipe horizontal.
+  const [pagerEnabled, setPagerEnabled] = useState(true)
+
+  // Gesto NATIVO del scroll del pager. El slider de ánimo hace
+  // `blocksExternalGesture(pagerNative)` → cuando su Pan se activa (arrastre
+  // horizontal), bloquea el scroll del carrusel de forma NATIVA (sin el race del
+  // toggle scrollEnabled, que dejaba que el swipe robara el arrastre del mood).
+  const pagerNative = useMemo(() => Gesture.Native(), [])
 
   // Slide width = viewport minus the peek, so the next slide shows on the
   // right. This is also the snap pitch (replaces page-width paging).
@@ -139,6 +163,30 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // Real cycle phase (null when the user has no active/anchored cycle).
   const cycle = useCyclePhase()
 
+  // ── Colapso post-ritual (edición de Hoy 5 jul 2026, veredicto dueña) ──
+  // Con los DOS rituales del día ya escritos (sueño + ánimo), el pager se
+  // comprime a una línea-resumen tocable ("Ánimo: Bien · Dormiste 7.5 h ›").
+  // Nada se pierde: el tap re-abre el pager completo (macros/ciclo/peso
+  // incluidos). Antes de registrar, el pager invita como siempre — el
+  // colapso es el premio de silencio por haber cumplido el ritual.
+  const sleepToday = useSleepLog(ctx.date)
+  const moodToday =
+    ctx.latest_mood?.checkin_date === ctx.date ? (ctx.latest_mood.value as MoodValue) : null
+  const ritualsDone = moodToday != null && sleepToday.data?.duration_minutes != null
+  const [expanded, setExpanded] = useState(false)
+  // Otro día (navegación o medianoche) → vuelve al estado natural del día.
+  useEffect(() => setExpanded(false), [ctx.date])
+  // Un deep-link a una slide (pill de Órbita, etc.) siempre abre el pager;
+  // el efecto de scroll de abajo lo honra en cuanto el layout mide. Mismos
+  // resets que openPager: el ScrollView remonta en offset 0.
+  useEffect(() => {
+    if (!targetSlide) return
+    scrollX.value = 0
+    setActive(0)
+    setExpanded(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSlide])
+
   // Slides are built dynamically so the cycle slide ONLY appears when
   // there's a real cycle to show — never a fake/mock one for users who
   // don't menstruate or haven't anchored a period (matches Progreso's
@@ -149,9 +197,26 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const slides: { id: string; title: string; node: ReactNode }[] = [
     { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
     { id: 'sleep', title: 'Sueño de anoche', node: <SleepSlide date={ctx.date} /> },
-    { id: 'wellbeing', title: 'Cómo amaneciste', node: <WellbeingSlide date={ctx.date} /> },
-    { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
+    {
+      id: 'wellbeing',
+      title: 'Cómo amaneciste',
+      node: (
+        <WellbeingSlide
+          date={ctx.date}
+          onLockPager={(locked) => setPagerEnabled(!locked)}
+          pagerGesture={pagerNative}
+          // wellbeing es SIEMPRE el índice 2 (macros·sleep·wellbeing van fijos al
+          // frente). Con scrollX+índice+ancho el mood decide solo si está centrada:
+          // así su track no roba el swipe cuando solo asoma en el peek de otra slide.
+          scrollX={scrollX}
+          slideIndex={2}
+          slideW={slideW}
+        />
+      ),
+    },
     ...(cycle ? [{ id: 'cycle', title: 'Tu ciclo', node: <CycleSlide cycle={cycle} /> }] : []),
+    // Peso al final: es la tendencia lenta, no un ritual diario → cierra el pager.
+    { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
   ]
   const safeActive = Math.min(active, slides.length - 1)
 
@@ -196,6 +261,38 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSlide, slideW])
 
+  // Reabrir el pager tras el colapso: el ScrollView se REMONTA con offset
+  // nativo 0, así que scrollX y active deben volver a 0 juntos — si no, el
+  // título/dots muestran la slide vieja y la primera slide pinta un frame
+  // con la opacity/scale del scrollX rancio (hallazgo reanimated-guardian).
+  const openPager = () => {
+    scrollX.value = 0
+    setActive(0)
+    setExpanded(true)
+  }
+
+  if (ritualsDone && !expanded) {
+    const mins = sleepToday.data?.duration_minutes ?? 0
+    const hours = (mins / 60).toFixed(mins % 60 === 0 ? 0 : 1)
+    const moodLabel = MOOD_SUMMARY_LABEL[moodToday]
+    return (
+      <Pressable
+        onPress={openPager}
+        accessibilityRole="button"
+        accessibilityLabel={`Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas. Toca para abrir el detalle.`}
+        style={({ pressed }) => pressed && styles.collapsedPressed}
+      >
+        <View style={styles.collapsedRow}>
+          <Text style={styles.collapsedText} numberOfLines={1}>
+            Ánimo: <Text style={styles.collapsedValue}>{moodLabel}</Text> · Dormiste{' '}
+            <Text style={styles.collapsedValue}>{hours} h</Text>
+          </Text>
+          <Text style={styles.collapsedChevron}>›</Text>
+        </View>
+      </Pressable>
+    )
+  }
+
   return (
     <View onLayout={onLayout}>
       <View style={styles.header}>
@@ -207,42 +304,42 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
             to the chosen enfoque ("Déficit moderado") as quiet context,
             not a metric. Tapping it opens the goal editor. */}
         {safeActive === 0 && ctx.targets ? (
-          <EnfoqueChip
-            targetCalories={ctx.targets.calories}
-            consumedCalories={ctx.today_macros.calories}
-          />
+          <EnfoqueChip targetCalories={ctx.targets.calories} />
         ) : null}
       </View>
 
       {width > 0 ? (
-        <Animated.ScrollView
-          ref={scrollRef}
-          horizontal
-          // Peek carousel: each slide is `slideW` wide (viewport − peek) so the
-          // next slide shows on the right. That requires snapToInterval (NOT
-          // pagingEnabled, which forces a full-viewport snap and would hide the
-          // peek) on BOTH platforms. `decelerationRate: fast` keeps it snappy;
-          // Android adds disableIntervalMomentum so it doesn't float past.
-          snapToInterval={slideW}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          {...(Platform.OS === 'android' ? { disableIntervalMomentum: true } : {})}
-          overScrollMode="never"
-          showsHorizontalScrollIndicator={false}
-          // Trailing pad so the LAST slide can settle flush (no orphan peek gap).
-          contentContainerStyle={{ paddingRight: SLIDE_PEEK }}
-          onScrollBeginDrag={() => onSwipeStateChange?.(true)}
-          onScrollEndDrag={() => onSwipeStateChange?.(false)}
-          onMomentumScrollEnd={onScrollEnd}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-        >
-          {slides.map((s, i) => (
-            <Slide key={s.id} index={i} width={slideW} scrollX={scrollX}>
-              {s.node}
-            </Slide>
-          ))}
-        </Animated.ScrollView>
+        <GestureDetector gesture={pagerNative}>
+          <Animated.ScrollView
+            ref={scrollRef}
+            horizontal
+            // Peek carousel: each slide is `slideW` wide (viewport − peek) so the
+            // next slide shows on the right. That requires snapToInterval (NOT
+            // pagingEnabled, which forces a full-viewport snap and would hide the
+            // peek) on BOTH platforms. `decelerationRate: fast` keeps it snappy;
+            // Android adds disableIntervalMomentum so it doesn't float past.
+            scrollEnabled={pagerEnabled}
+            snapToInterval={slideW}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            {...(Platform.OS === 'android' ? { disableIntervalMomentum: true } : {})}
+            overScrollMode="never"
+            showsHorizontalScrollIndicator={false}
+            // Trailing pad so the LAST slide can settle flush (no orphan peek gap).
+            contentContainerStyle={{ paddingRight: SLIDE_PEEK }}
+            onScrollBeginDrag={() => onSwipeStateChange?.(true)}
+            onScrollEndDrag={() => onSwipeStateChange?.(false)}
+            onMomentumScrollEnd={onScrollEnd}
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+          >
+            {slides.map((s, i) => (
+              <Slide key={s.id} index={i} width={slideW} scrollX={scrollX}>
+                {s.node}
+              </Slide>
+            ))}
+          </Animated.ScrollView>
+        </GestureDetector>
       ) : (
         <View style={styles.measurePlaceholder} />
       )}
@@ -291,39 +388,23 @@ function Slide({
   return <Animated.View style={[{ width }, style]}>{children}</Animated.View>
 }
 
-/* Strategy chip in the macros header. For a deficit strategy it reads the
- * LIVE day standing: while today's intake stays under maintenance (TDEE)
- * the user is still losing, even past their calorie goal — "Aún en
- * déficit" reframes going over the target as not-failure (manifiesto:
- * context, no guilt). Once intake reaches maintenance it softens to a
- * neutral "En tu mantenimiento". Surplus / maintain keep the static
- * enfoque label. Quiet by design; renders nothing without a TDEE. */
-function EnfoqueChip({
-  targetCalories,
-  consumedCalories,
-}: {
-  targetCalories: number
-  consumedCalories: number
-}) {
+/* Strategy chip in the macros header. Names the PLAN, never the day's live
+ * standing: the intraday "Aún en déficit" was budget-semaphore framing
+ * (MFP's anxiety loop, and with 0 kcal it celebrated not eating — línea
+ * roja). The day's verdict now lives in the DayCloseCard at 20:00, with
+ * the same healthy-deficit definition as the month calendar. Quiet by
+ * design; renders nothing without a TDEE. */
+function EnfoqueChip({ targetCalories }: { targetCalories: number }) {
   const { inputs } = useMacroInputs()
   const state = reconstructState(targetCalories, inputs)
   if (!state) return null
-  // `state` is non-null only when a TDEE exists, so this is always a number.
-  const tdee = computeTdee(inputs)
-  const label =
-    state.enfoque === 'deficit' && tdee != null
-      ? consumedCalories < tdee
-        ? 'Aún en déficit'
-        : 'En tu mantenimiento'
-      : enfoqueLabel(state.enfoque, state.level)
+  // "Tu enfoque" — mismo vocabulario que el editor ("ELIGE TU ENFOQUE"),
+  // no "plan" (corporativo, per voice-and-copy).
+  const label = `Tu enfoque: ${enfoqueLabel(state.enfoque, state.level)}`
   // Pure status, not a button: editing lives on the cards ("Ajustar ›"),
   // so the chip is only context and never surprises with a navigation.
   return (
-    <View
-      style={styles.enfoqueChip}
-      accessibilityRole="text"
-      accessibilityLabel={`Tu enfoque hoy: ${label}`}
-    >
+    <View style={styles.enfoqueChip} accessibilityRole="text" accessibilityLabel={label}>
       <View style={styles.enfoqueDot} />
       <Text style={styles.enfoqueChipText}>{label}</Text>
     </View>
@@ -789,159 +870,45 @@ function SleepSlide({ date }: { date: string }) {
 
 /* ─── Slide — this morning's check-in ──────────────────────────────── */
 
-const WELLBEING_AXES = [
-  { key: 'energy', label: 'Energía', invert: false },
-  { key: 'motivation', label: 'Motivación', invert: false },
-  // The DB column is `stress`, but the slide asks for its opposite,
-  // Calma — so all three axes read "more = better" and a fully lit
-  // row is unambiguously a good morning. Stored value = 6 − calma.
-  { key: 'stress', label: 'Calma', invert: true },
-] as const
-
-type WellbeingAxis = (typeof WELLBEING_AXES)[number]
-
-const ENERGY_WORDS = ['en reserva', 'baja', 'estable', 'en alza', 'radiante'] as const
-
-// A 4-point star — the app's celestial glyph. Here it's a rating
-// that lights up: rated levels glow, the rest stay as dim embers.
-const STAR = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
-
-// Taps coalesce: adjusting an axis fires one write 350 ms after the
-// last touch, so a multi-axis check-in doesn't spray rows.
-const WELLBEING_DEBOUNCE_MS = 350
-
-/** The 1–5 value shown for an axis — inverted axes show 6 − stored. */
-function shownValue(axis: WellbeingAxis, draft: WellbeingDraft): number | null {
-  const stored = draft[axis.key]
-  if (stored == null) return null
-  return axis.invert ? 6 - stored : stored
-}
-
-/* One 1–5 axis — five levels that light from embers into glowing
- * stars as it's rated. */
-function AxisStars({ value, onRate }: { value: number | null; onRate: (i: number) => void }) {
-  const lit = value ?? 0
-  return (
-    <View style={styles.starsRow}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Pressable
-          key={i}
-          onPress={() => onRate(i)}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={`${i + 1} de 5`}
-          style={({ pressed }) => [styles.starSlot, pressed && styles.starSlotPressed]}
-        >
-          {lit > i ? (
-            <View style={styles.starGlow}>
-              <Svg width={18} height={18} viewBox="0 0 24 24">
-                <Path d={STAR} fill={colors.magenta} />
-              </Svg>
-            </View>
-          ) : (
-            // Empty level = a HOLLOW star outline (not a dim dot). Brighter
-            // bone stroke (not faint niebla) so the row reads as a present,
-            // interactive control rather than decoration — a non-text cue on
-            // top of the "Toca las estrellas…" line.
-            <Svg width={18} height={18} viewBox="0 0 24 24">
-              <Path
-                d={STAR}
-                fill="none"
-                stroke={colors.bone}
-                strokeWidth={1.7}
-                strokeLinejoin="round"
-              />
-            </Svg>
-          )}
-        </Pressable>
-      ))}
-    </View>
-  )
-}
-
 /*
- * This morning's check-in — energy, motivation and calm on a 1–5
- * scale. Like the sleep slide it registers inline (a once-a-day
- * ritual, not a QuickLog action) and feeds two órbita dimensions:
- * energía and mente. The slide owns the draft; taps are debounced
- * into one write, and later edits update that same row in place.
+ * This morning's check-in — el ánimo (MoodSliderInline, 1 eje) + una NOTA
+ * libre opcional (daily_notes). Reemplazó el detalle de energía/motivación/
+ * calma (3 ejes): decisión de producto (jul 2026) — la usuaria escribe una
+ * nota en vez de calificar 3 escalas. Nota: Órbita ya no recibe energía/mente
+ * desde esta tarjeta.
  */
-function WellbeingSlide({ date }: { date: string }) {
-  const { data: row, isLoading } = useTodayWellbeing(date)
-  const save = useSaveWellbeing(date)
-
-  const [draft, setDraft] = useState<WellbeingDraft | null>(null)
-  const [touched, setTouched] = useState(false)
-  // Row id and debounce timer live in refs so a tap reads their
-  // latest value without the draft effect re-running.
-  const rowId = useRef<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Seed the editable draft once today's check-in (or its absence) loads.
-  useEffect(() => {
-    if (isLoading || draft != null) return
-    setDraft({
-      energy: row?.energy ?? null,
-      motivation: row?.motivation ?? null,
-      stress: row?.stress ?? null,
-    })
-    rowId.current = row?.id ?? null
-  }, [isLoading, row, draft])
-
-  // Drop a still-pending write when the slide unmounts.
-  useEffect(() => () => clearTimeout(timer.current ?? undefined), [])
-
-  if (draft == null) {
-    return <View style={[styles.slide, styles.card]} />
-  }
-
-  // A row exists once the check-in is logged or the user has touched it.
-  const hasEntry = row != null || touched
-
-  const rate = (axis: WellbeingAxis, i: number) => {
-    Haptics.selectionAsync().catch(() => {})
-    // Tap a star to set the level; tap the current top star to step
-    // back. The step works on the shown value, then converts to the
-    // stored one (inverted for Calma).
-    const shown = shownValue(axis, draft)
-    const nextShown = shown === i + 1 ? (i === 0 ? null : i) : i + 1
-    const stored = nextShown == null ? null : axis.invert ? 6 - nextShown : nextShown
-    const nextDraft = { ...draft, [axis.key]: stored }
-    setDraft(nextDraft)
-    setTouched(true)
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      save.mutate(
-        { id: rowId.current, draft: nextDraft },
-        { onSuccess: (saved) => (rowId.current = saved?.id ?? null) },
-      )
-    }, WELLBEING_DEBOUNCE_MS)
-  }
-
+function WellbeingSlide({
+  date,
+  onLockPager,
+  pagerGesture,
+  scrollX,
+  slideIndex,
+  slideW,
+}: {
+  date: string
+  onLockPager?: (locked: boolean) => void
+  pagerGesture?: NativeGesture
+  /** Para gatear el gesto del mood a "slide centrada" (ver MoodSliderInline). */
+  scrollX?: SharedValue<number>
+  slideIndex?: number
+  slideW?: number
+}) {
   return (
     <View style={styles.slide}>
       <View style={[styles.card, styles.wellbeingCard]}>
-        {WELLBEING_AXES.map((axis) => (
-          <View key={axis.key} style={styles.axisRow}>
-            <Text style={styles.axisLabel}>{axis.label}</Text>
-            <AxisStars value={shownValue(axis, draft)} onRate={(i) => rate(axis, i)} />
-          </View>
-        ))}
+        {/* Ánimo (1 eje) — el registro primario, MISMO gesto que Órbita. */}
+        <MoodSliderInline
+          date={date}
+          onDragActive={onLockPager}
+          pagerGesture={pagerGesture}
+          scrollX={scrollX}
+          slideIndex={slideIndex}
+          slideW={slideW}
+        />
 
-        {!hasEntry ? (
-          // Empty state = the moment to teach tappability. An explicit "toca"
-          // instruction (Hanken, not the serif coach line) — the same pattern
-          // as the universe ("Toca un astro…") and the calendar. The stars
-          // can't read as a button (they're a rating control), so the words
-          // carry it; magenta is too overloaded in Stelar to be the signal.
-          <Text style={styles.tapHint}>Toca las estrellas para marcar cómo amaneciste.</Text>
-        ) : draft.energy != null ? (
-          <Text style={styles.captionLine}>
-            Energía <Text style={styles.captionEm}>{ENERGY_WORDS[draft.energy - 1]}</Text>
-          </Text>
-        ) : (
-          <Text style={styles.captionLine}>Ánimo guardado</Text>
-        )}
+        {/* Nota libre del día (daily_notes) — SIEMPRE visible, reemplaza el
+            detalle de energía/motivación/calma. */}
+        <DailyNoteInline date={date} />
       </View>
     </View>
   )
@@ -949,93 +916,29 @@ function WellbeingSlide({ date }: { date: string }) {
 
 /* ─── Slide — cycle phase ──────────────────────────────────────────── */
 
-// Dial — a full ring of the cycle's days, the lit arc growing from
-// the top clockwise to today and tipped with a small marker. Visual
-// rhyme with the weight sparkline (a curve + a tip dot).
-const DIAL_W = 130
-const DIAL_H = 130
-const DIAL_R = 52
-const DIAL_CX = DIAL_W / 2
-const DIAL_CY = DIAL_H / 2
-const DIAL_CIRC = 2 * Math.PI * DIAL_R
-
-function CycleDial({ day, cycleLength }: { day: number; cycleLength: number }) {
-  const fraction = Math.min(1, day / cycleLength)
-  const filled = DIAL_CIRC * fraction
-  // Start at top (−90°), sweep clockwise.
-  const angle = fraction * 2 * Math.PI - Math.PI / 2
-  const markerX = DIAL_CX + DIAL_R * Math.cos(angle)
-  const markerY = DIAL_CY + DIAL_R * Math.sin(angle)
-
-  return (
-    <Svg width={DIAL_W} height={DIAL_H}>
-      <Circle
-        cx={DIAL_CX}
-        cy={DIAL_CY}
-        r={DIAL_R}
-        stroke={colors.bruma}
-        strokeWidth={2}
-        fill="none"
-      />
-      <Circle
-        cx={DIAL_CX}
-        cy={DIAL_CY}
-        r={DIAL_R}
-        stroke={colors.magenta}
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray={`${filled} ${DIAL_CIRC}`}
-        // Native rotation props (NOT a transform array): start the dash at the
-        // top by rotating −90° about the dial centre. On Android release the
-        // `transform` array + strokeDasharray combo mis-rendered (arc shifted
-        // left); rotation/originX/originY is the reliable path.
-        rotation={-90}
-        originX={DIAL_CX}
-        originY={DIAL_CY}
-      />
-      <Circle cx={markerX} cy={markerY} r={3.6} fill={colors.magenta} />
-    </Svg>
-  )
-}
-
 /*
- * Cycle phase — a read-only snapshot of where the user is in her
- * menstrual cycle today. Phase reframes the rest of the dashboard
- * (calories, sleep, mood), which is why it lives next to them on Hoy.
- * Inputs (period start / end) belong in QuickLog ✦, not this slide.
+ * Cycle phase — answers "¿dónde estoy hoy?" as a journey, not a day count.
+ * A hero (the phase you're in) + a horizontal timeline (where you've been,
+ * where you are, what's next) + the single next milestone. Read-only and
+ * deterministic from the user's own period anchor; inputs live in QuickLog ✦.
+ * The journey UI is shared with the (fuller) Progreso card via
+ * features/cycle/components/CycleTimeline.
  */
 function CycleSlide({
   cycle,
 }: {
   cycle: { day: number; phase: CyclePhase; length: number; daysToNext: number }
 }) {
-  // Muestra qué FASE viene (no "la próxima regla"), igual que la card de
-  // Progreso: así nunca contradice al header. Estando en el período, lo que
-  // viene es "primera mitad"; el conteo a la regla aparece solo en la fase
-  // previa (lútea → "tu período, en unos X días"), nunca encima de ella.
-  // Proyección suave ("unos" = estimado), nunca pronóstico determinista.
-  const next = nextPhaseInfo(cycle.day, cycle.length)
-  const nextLabel = PHASE_LABEL[next.phase].toLowerCase()
-  const nextLine =
-    next.days <= 1 ? `${nextLabel}, pronto` : `${nextLabel}, en unos ${next.days} días`
-
   return (
     <View style={styles.slide}>
-      <View style={styles.card}>
-        <View style={styles.weightRow}>
-          <View style={styles.cycleDialWrap}>
-            <CycleDial day={cycle.day} cycleLength={cycle.length} />
-            <View style={styles.cycleDialCenter} pointerEvents="none">
-              <Text style={styles.cycleDialDay}>{cycle.day}</Text>
-              <Text style={styles.cycleDialOf}>/ {cycle.length}</Text>
-            </View>
-          </View>
-          <View style={styles.numberStack}>
-            <Text style={styles.cyclePhaseLine}>{PHASE_LABEL[cycle.phase]}</Text>
-            <Text style={styles.weeklyLine}>{nextLine}</Text>
-          </View>
-        </View>
+      <View
+        style={styles.card}
+        accessible
+        accessibilityLabel={`Tu ciclo. ${PHASE_LABEL[cycle.phase]}, día ${cycle.day} de ${cycle.length}. ${nextMilestoneLine(cycle.day, cycle.length)}`}
+      >
+        <CyclePhaseHero phase={cycle.phase} day={cycle.day} length={cycle.length} />
+        <CycleTimeline phase={cycle.phase} />
+        <CycleNextMilestone day={cycle.day} length={cycle.length} />
       </View>
     </View>
   )
@@ -1126,6 +1029,36 @@ function SwipeHint() {
 }
 
 const styles = StyleSheet.create({
+  // ── Resumen colapsado post-ritual — una línea callada, tocable ──
+  collapsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  collapsedPressed: {
+    opacity: 0.7,
+  },
+  collapsedText: {
+    flexShrink: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  collapsedValue: {
+    fontFamily: typography.uiSemi,
+    color: colors.bone,
+  },
+  collapsedChevron: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.title,
+    color: colors.niebla,
+  },
   header: {
     marginTop: 22,
     marginBottom: 12,
@@ -1159,7 +1092,10 @@ const styles = StyleSheet.create({
     height: 150,
   },
   slide: {
-    minHeight: 150,
+    // Altura uniforme para TODAS las slides → el carrusel no salta al pasar de
+    // una card corta (peso) a una alta (ciclo/macros). La card interna (flex:1)
+    // llena esta altura y centra su contenido.
+    minHeight: 224,
   },
   macroRow: {
     flexDirection: 'row',
@@ -1205,7 +1141,7 @@ const styles = StyleSheet.create({
   },
   weightValue: {
     fontFamily: typography.displayHeavy,
-    fontSize: 44,
+    fontSize: typography.sizes.gaugeNum,
     color: colors.leche,
     letterSpacing: -1.8,
     lineHeight: 46,
@@ -1221,7 +1157,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   deltaGood: {
@@ -1322,92 +1258,16 @@ const styles = StyleSheet.create({
   wellbeingCard: {
     gap: 13,
   },
-  // Label + stars as one centred cluster; the fixed label width
-  // keeps the three star columns aligned.
-  axisRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  axisLabel: {
-    width: 104,
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  starsRow: {
-    flexDirection: 'row',
-  },
-  // Fixed slot so a lit star and a hollow outline occupy the same box.
-  starSlot: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  starSlotPressed: {
-    opacity: 0.55,
-  },
-  // A rated level — the star sits on a soft magenta glow.
-  starGlow: {
-    shadowColor: colors.magenta,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 5,
-    shadowOpacity: 0.75,
-    elevation: 4,
-  },
   // ── Cycle slide ────────────────────────────────────────────────
   // The dial holds the day number stacked at its centre.
-  cycleDialWrap: {
-    width: DIAL_W,
-    height: DIAL_H,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cycleDialCenter: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Day N — the headline number, sized like the weight value.
-  cycleDialDay: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 38,
-    color: colors.leche,
-    letterSpacing: -1.6,
-    lineHeight: 40,
-  },
-  // "/ 28" — small, serif, sitting just under the day number.
-  cycleDialOf: {
-    marginTop: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  // Phase headline — serif italic like the weight's total delta line.
-  cyclePhaseLine: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.ui,
-    color: colors.bone,
-  },
+  // Cycle slide chrome lives in features/cycle/components/CycleTimeline
+  // (shared with Progreso); only styles.slide + styles.card wrap it here.
   // ── Shared caption — the serif italic line under a slide. ──────
   captionLine: {
     textAlign: 'center',
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.ui,
-    color: colors.niebla,
-  },
-  // Explicit tap instruction (Hanken, not serif) — teaches that the stars are
-  // tappable when the check-in is still empty.
-  tapHint: {
-    textAlign: 'center',
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
   captionEm: {
@@ -1441,7 +1301,7 @@ const styles = StyleSheet.create({
   // Magenta to tie to the dots; opacity is animated in JS-side.
   hint: {
     fontFamily: typography.uiBold,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     lineHeight: 20,
     color: colors.magenta,
     marginLeft: 6,

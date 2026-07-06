@@ -1,10 +1,17 @@
-import { type ReactNode, useMemo, useState } from 'react'
+import { Fragment, type ReactNode, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Circle, Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg'
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  RadialGradient,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
 import {
   buildMonthGrid,
   effectiveTrainingPhrase,
@@ -16,7 +23,8 @@ import { useAllWorkoutDates, useTotalTrainedDays } from '../hooks'
 
 const COLS = 7
 const CELL = 34
-const WD = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+// Lunes-primero — mismo idioma de calendario que Órbita Mes (MonthGlanceCalendar).
+const WD = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 const MONTHS = [
   'enero',
   'febrero',
@@ -32,10 +40,11 @@ const MONTHS = [
   'diciembre',
 ]
 
-// Scene colours (same palette as Día/Semana flares — not theme tokens).
-const MAGENTA = '#E91E63'
-const LECHE = '#F4ECDE'
-const GOLD = '#D9AE6F' // revelación / transformación
+// Scene colours — ALIAS de tokens (nunca hex literal: si el token cambia,
+// un literal copiado drifteaba en silencio).
+const MAGENTA = colors.magenta
+const LECHE = colors.leche
+const GOLD = colors.oro // revelación / transformación
 const BLUE = '#7C8FFF' // patrón
 
 /** Indicador del día: revelación (dorado), patrón (azul), transformación
@@ -45,7 +54,37 @@ export type DayMark = 'transformation' | 'revelation' | 'pattern'
 /** Estado extra del día que el grid de workouts no conoce: si fue descanso
  *  (vs sin registro) y si tuvo un evento. Lo provee Progreso desde sus
  *  CalendarDay (recientes); meses viejos quedan sin meta (degradación suave). */
-export type DayMeta = { rested: boolean; mark: DayMark | null }
+export type DayMeta = { rested: boolean; marks: DayMark[] }
+
+/** Reconoce la CONSTANCIA del movimiento (all-time). Voz de coach cálida, sin
+ *  racha rígida, sin countdown, sin culpa: el número solo crece. */
+function constancyLine(count: number): string {
+  if (count >= 30) return 'Tu cuerpo ya tiene su ritmo. La constancia se ve en tu cielo.'
+  if (count >= 12) return 'Vas tejiendo tu constancia, un día a la vez.'
+  if (count >= 4) return 'Cada día en movimiento suma. Tu cielo los guarda.'
+  return 'Tu constelación de movimiento apenas empieza.'
+}
+
+/** Puente de continuidad: los primeros días del mes el cielo se ve vacío por
+ *  calendario, no por ausencia. Esta línea ancla ese vacío al mes anterior
+ *  PROPIO (el principio de Apple Trends: contra tu historial, nunca una vara:
+ *  aquí no hay meta ni "¿puedes con más?"). */
+function continuityLine(prevCount: number, prevMonth: string, currentMonth: string): string {
+  const cap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)
+  if (prevCount === 1) {
+    return `La estrella de ${prevMonth} sigue en tu cielo. ${cap} apenas amanece.`
+  }
+  return `Las ${prevCount} estrellas de ${prevMonth} siguen en tu cielo. ${cap} apenas amanece.`
+}
+
+/** Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC). */
+function isoDaysAgo(today: string, n: number): string {
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number]
+  const dt = new Date(y, m - 1, d - n)
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${dt.getFullYear()}-${mm}-${dd}`
+}
 
 /*
  * Movement hero — the all-time trained-days counter PLUS a browsable
@@ -80,7 +119,7 @@ export function MovementConstellation({
     const rm = ref.getMonth() + 1 // 1-based
     const monthRef = `${ry}-${String(rm).padStart(2, '0')}-01`
     const m = buildMonthGrid(monthRef, allWorkouts.data ?? [], today)
-    const fw = new Date(ry, rm - 1, 1).getDay() // 0 = Sunday
+    const fw = (new Date(ry, rm - 1, 1).getDay() + 6) % 7 // 0 = Monday
     // Drop the year unless we've scrolled out of the current one.
     const label = ry === ty ? (MONTHS[rm - 1] ?? '') : `${MONTHS[rm - 1] ?? ''} ${ry}`
     return {
@@ -106,23 +145,64 @@ export function MovementConstellation({
   // Warm, no-guilt month line — never "0/30". A quiet month is a pause.
   const monthLine =
     trained > 0
-      ? `${trained} ${trained === 1 ? 'día' : 'días'} en movimiento`
+      ? `${trained} ${trained === 1 ? 'día entrenado' : 'días entrenados'}`
       : isCurrentMonth
         ? 'tu mes empieza'
         : 'un mes en pausa'
 
+  // El "ahora" junto al total vitalicio: una ventana propia de 4 semanas. Solo
+  // aparece si hay algo que susurrar; si el ritmo bajó a cero, silencio (nunca
+  // se señala el descenso). Redundante si el total ES la ventana (usuaria nueva).
+  const recentCount = (allWorkouts.data ?? []).filter((d) => d >= isoDaysAgo(today, 27)).length
+  const recentLine =
+    recentCount > 0 && count > recentCount ? `${recentCount} en las últimas 4 semanas` : null
+
+  // Puente de continuidad los primeros 7 días del mes: el cierre deja de hablar
+  // del all-time y recuerda que el mes pasado sigue ahí. Después, constancia.
+  const dayOfMonth = Number(today.slice(8, 10))
+  const [ty, tm] = today.split('-').map(Number) as [number, number]
+  const prevRef = new Date(ty, tm - 2, 1)
+  const prevPrefix = `${prevRef.getFullYear()}-${String(prevRef.getMonth() + 1).padStart(2, '0')}`
+  const prevMonthCount = (allWorkouts.data ?? []).filter((d) => d.startsWith(prevPrefix)).length
+  const closingLine =
+    dayOfMonth <= 7 && prevMonthCount > 0
+      ? continuityLine(prevMonthCount, MONTHS[prevRef.getMonth()] ?? '', MONTHS[tm - 1] ?? '')
+      : constancyLine(count)
+
+  // Leyenda viva: solo los estados que EXISTEN en el mes visible. Una marca
+  // que nunca aparece no merece renglón (el primer dorado se estrena solo).
+  let legendTrained = false
+  let legendRested = false
+  let legendRevelation = false
+  let legendPattern = false
+  for (const cell of month.cells) {
+    if (cell.trained) legendTrained = true
+    const meta = metaByDate?.get(cell.date)
+    if (meta?.rested) legendRested = true
+    for (const mark of meta?.marks ?? []) {
+      if (mark === 'pattern') legendPattern = true
+      else legendRevelation = true
+    }
+  }
+
   return (
     <Animated.View entering={FadeIn.duration(360).delay(80)}>
-      <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-        Movimiento
-      </EyebrowLabel>
-
       <View style={styles.card}>
-        {/* The all-time counter — the hero number. */}
-        <View style={styles.countRow}>
-          <Text style={styles.bigNum}>{count}</Text>
-          <Text style={styles.countLabel}>{count === 1 ? 'día entrenado' : 'días entrenados'}</Text>
-        </View>
+        {/* The all-time counter — the hero number. A lifetime zero never
+            renders as a giant number (un cero como identidad): before the
+            first workout the hero is an invitation, not a count. */}
+        {count > 0 ? (
+          <View style={styles.countRow}>
+            <Text style={styles.bigNum}>{count}</Text>
+            <Text style={styles.countLabel}>
+              {count === 1 ? 'día entrenado en total' : 'días entrenados en total'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.startLine}>Tu constancia empieza con tu primer entreno.</Text>
+        )}
+        {/* El "ahora": ventana propia de 4 semanas, en susurro bajo el héroe. */}
+        {recentLine ? <Text style={styles.recentLine}>{recentLine}</Text> : null}
         {/* Human milestone, once a full month of effective training is in. */}
         {count >= 30 ? (
           <Text style={styles.milestone}>{effectiveTrainingPhrase(count)} de entreno efectivo</Text>
@@ -204,17 +284,32 @@ export function MovementConstellation({
             const cx = col * CELL + CELL / 2
             const cy = row * CELL + CELL / 2
             const meta = metaByDate?.get(cell.date)
+            const dayNum = Number(cell.date.slice(8, 10))
             return (
-              <DayDot
-                key={cell.date}
-                cx={cx}
-                cy={cy}
-                lit={cell.trained}
-                isToday={cell.isToday}
-                isFuture={cell.isFuture}
-                rested={meta?.rested ?? false}
-                mark={meta?.mark ?? null}
-              />
+              <Fragment key={cell.date}>
+                <DayDot
+                  cx={cx}
+                  cy={cy}
+                  lit={cell.trained}
+                  isToday={cell.isToday}
+                  isFuture={cell.isFuture}
+                  rested={meta?.rested ?? false}
+                  marks={meta?.marks ?? []}
+                />
+                {/* Número del día, tenue, debajo de la estrella — para ubicarte
+                    ("¿qué día toqué?") sin competir con la constelación. */}
+                <SvgText
+                  x={cx}
+                  y={cy + CELL / 2 - 1}
+                  fill={LECHE}
+                  opacity={cell.isFuture ? 0.18 : 0.5}
+                  fontSize={8.5}
+                  fontFamily={typography.uiMedium}
+                  textAnchor="middle"
+                >
+                  {dayNum}
+                </SvgText>
+              </Fragment>
             )
           })}
 
@@ -252,20 +347,45 @@ export function MovementConstellation({
         {onDayPress ? <Text style={styles.tapHint}>Toca un día para ver su detalle</Text> : null}
 
         {/* Leyenda — cómo se lee el cielo. Solo cuando hay tap (Historia). */}
-        {onDayPress ? <StarLegend /> : null}
+        {onDayPress ? (
+          <StarLegend
+            trained={legendTrained}
+            rested={legendRested}
+            revelation={legendRevelation}
+            pattern={legendPattern}
+          />
+        ) : null}
+
+        {/* Cierre: reconoce la CONSTANCIA (no un entreno de hoy). Voz de coach,
+            sin racha rígida ni presión — el número solo crece. Al abrir el mes,
+            el puente de continuidad con el mes anterior toma su lugar. */}
+        {count >= 1 ? <Text style={styles.constancy}>{closingLine}</Text> : null}
       </View>
     </Animated.View>
   )
 }
 
-/* Cómo se lee el calendario Historia: cada marca, una línea. Estática. */
-function StarLegend() {
+/* Cómo se lee el calendario Historia. Leyenda VIVA: solo lista las marcas
+ * presentes en el mes visible — un estado que no existe en tu cielo no cobra
+ * renglón, y el primer dorado/azul del mes estrena el suyo. */
+function StarLegend({
+  trained,
+  rested,
+  revelation,
+  pattern,
+}: {
+  trained: boolean
+  rested: boolean
+  revelation: boolean
+  pattern: boolean
+}) {
+  if (!trained && !rested && !revelation && !pattern) return null
   return (
     <View style={styles.legend}>
-      <LegendItem color={MAGENTA} label="Entrenaste" />
-      <LegendItem color={LECHE} faint label="Descansaste" />
-      <LegendItem color={GOLD} label="Revelación" />
-      <LegendItem color={BLUE} label="Patrón" />
+      {trained ? <LegendItem color={MAGENTA} label="Entrenaste" /> : null}
+      {rested ? <LegendItem color={LECHE} faint label="Descansaste" /> : null}
+      {revelation ? <LegendItem color={GOLD} label="Revelación" /> : null}
+      {pattern ? <LegendItem color={BLUE} label="Patrón" /> : null}
     </View>
   )
 }
@@ -292,7 +412,7 @@ function DayDot({
   isToday,
   isFuture,
   rested,
-  mark,
+  marks,
 }: {
   cx: number
   cy: number
@@ -300,7 +420,7 @@ function DayDot({
   isToday: boolean
   isFuture: boolean
   rested: boolean
-  mark: DayMark | null
+  marks: DayMark[]
 }) {
   // Base — la estrella según el estado del día. El indicador (mark) se
   // SUPERPONE encima, así un día entrenado puede además tener su revelación.
@@ -336,7 +456,11 @@ function DayDot({
   return (
     <>
       {base}
-      {mark ? <MarkDot cx={cx} cy={cy} mark={mark} /> : null}
+      {/* Un día puede tener VARIOS marcadores (p.ej. revelación + patrón): cada
+          uno va en su esquina (azul izq., dorado der.), sin taparse. */}
+      {marks.map((m) => (
+        <MarkDot key={m} cx={cx} cy={cy} mark={m} />
+      ))}
     </>
   )
 }
@@ -345,8 +469,11 @@ function DayDot({
  * SOBRE la estrella base: revelación (dorado), patrón (azul), transformación
  * (dorado con micro-aro, el hito mayor). Se lee sin tapar la estrella. */
 function MarkDot({ cx, cy, mark }: { cx: number; cy: number; mark: DayMark }) {
-  const mx = cx + 9.5
-  const my = cy - 9.5
+  // Patrón (azul) en la esquina superior IZQUIERDA; revelación/transformación
+  // (dorado) en la DERECHA. Esquinas opuestas → un día con ambos nunca se
+  // amontona, y cada marcador respira lejos de la estrella.
+  const mx = mark === 'pattern' ? cx - 8.5 : cx + 8.5
+  const my = cy - 9
   if (mark === 'pattern') {
     return <Circle cx={mx} cy={my} r={2} fill={BLUE} />
   }
@@ -471,12 +598,29 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
   },
+  // Hero antes del primer entreno — invitación, sin número.
+  startLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    paddingVertical: 6,
+  },
   milestone: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.label,
     color: colors.bone,
     marginTop: 4,
+  },
+  // El "ahora" bajo el total vitalicio — susurro, nunca compite con el héroe.
+  recentLine: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    marginTop: 4,
+    opacity: 0.85,
   },
   monthHead: {
     marginTop: 18,
@@ -531,9 +675,12 @@ const styles = StyleSheet.create({
   },
   weekdayRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    // Mismo ancho que la grilla del SVG (viewBox 7×CELL, centrado por
+    // xMidYMid): a ancho completo con space-around las letras derivaban
+    // de sus columnas y el domingo se leía bajo S.
+    alignSelf: 'center',
+    width: COLS * CELL,
     marginBottom: 6,
-    paddingHorizontal: CELL / 2,
     opacity: 0.55, // labels are cartography — they whisper, not shout.
   },
   weekdayLabel: {
@@ -552,6 +699,17 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.label,
     color: colors.niebla,
+  },
+  // Cierre del card: reconoce la constancia. Voz de coach (serif italic).
+  constancy: {
+    marginTop: 16,
+    textAlign: 'center',
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 24,
+    color: colors.bone,
+    paddingHorizontal: 8,
   },
   // Leyenda — fila envolvente de marcas, bajo el cielo.
   legend: {

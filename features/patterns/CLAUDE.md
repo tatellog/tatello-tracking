@@ -89,6 +89,27 @@ Regla de sujeto (ya vigente, se reafirma): el sujeto de la frase es el
 patrón / los datos ("las noches piden más"), nunca la usuaria ("comes de
 más"). Y más profundo el tier = MÁS ternura en el copy, no más dureza.
 
+**Permitido en la PALANCA (enmienda jul 2026 · dueña, criterio Apple).** La
+palanca accionable de un patrón —el "qué hago AHORA"— SÍ puede mostrar una meta
+y lo que falta, como los anillos de Apple: realismo sin culpa. El miedo original
+al conteo era la presión tipo MyFitnessPal; Apple prueba que el problema nunca
+fue el número, fue el TONO. Condiciones (todas obligatorias):
+
+- La meta sale de TUS propios datos (tus mejores semanas en déficit), nunca una
+  cuota impuesta ("3 por semana" genérico). Sin histórico suficiente → solo el
+  marcador, sin meta.
+- Es PRESENTE y de la semana EN CURSO (la ventana abierta), no el mes cerrado.
+- Nombra lo ENCENDIDO + la oportunidad ("llevas 2 de 3, con uno más lo repites"),
+  en tono de invitación que celebra el avance.
+- Sigue PROHIBIDO: "racha"/streak, deadline/countdown ("quedan 2 días"), rojo o
+  marcador que retrocede al no cumplir, y recetar la conducta ("entrena mañana").
+  Nombrás el foco, no das la orden.
+
+La regla anti-conteo de arriba sigue vigente para la EVIDENCIA retrospectiva y el
+narrativo del hallazgo; solo la palanca-presente es la excepción. El permiso de
+"faltan X g" de Comidas NO era el modelo (ahí es cuota); acá el modelo es Apple:
+meta TUYA + celebra al llegar + cero vergüenza si no.
+
 ### Palabras prohibidas en suplantación de profesionales
 
 - "como tu nutrióloga" → prohibido

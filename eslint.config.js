@@ -23,4 +23,71 @@ module.exports = [
       'design_handoff_norte_onboarding',
     ],
   },
+  // ── Guardrail del sistema visual (C3 · plan Parte 3, modelo Apple) ──
+  // La consistencia no se vigila, se hace API: hex y fontSize numéricos
+  // fuera de theme/ son ERROR en toda superficie de UI (migración E1
+  // completada 5 jul 2026: cero aproximaciones vivas). Los tokens viven
+  // en theme/; las ESCENAS DE ARTE (el hex es pintura) están exentas
+  // abajo — la lista canónica es docs/design-tokens-inventory.md. Un
+  // literal puntual de pintura DENTRO de un componente de UI lleva un
+  // disable de línea con su porqué (ver DayPresent).
+  {
+    files: ['app/**/*.{ts,tsx}', 'features/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+          message:
+            'Hex fuera de theme/: usa un token de colors.* (o, si es pintura de escena, agrega el archivo a los exentos del eslint.config + inventario).',
+        },
+        {
+          selector: "Property[key.name='fontSize'] > Literal[raw=/^[0-9.]+$/]",
+          message: 'fontSize numérico: usa typography.sizes.* o un rol de theme/text-styles.ts.',
+        },
+      ],
+    },
+  },
+  // Exentos: escenas de arte (atmósferas, constelación, Skia, share cards)
+  // + theme/ mismo. Espejo de la cubeta (c) del inventario C0.
+  {
+    files: [
+      'theme/**',
+      'app/onboarding/**',
+      'features/tabs/components/constellation/**',
+      'features/**/*Sky*.{ts,tsx}',
+      'features/orbit/components/Cosmos.tsx',
+      'features/orbit/components/OrbitalSystem.tsx',
+      'features/orbit/components/WeekConstellation.tsx',
+      'features/orbit/components/week-dim-visual.ts',
+      'features/orbit/components/stairs/**',
+      'features/orbit/components/log/**',
+      'features/progress/components/MovementConstellation.tsx',
+      'features/progress/share-styles.ts',
+      'features/progress/components/*Share*.{ts,tsx}',
+      'features/progress/components/DaySheetAtmosphere.tsx',
+      'features/patterns/components/PatternReveal.tsx',
+      'features/orbit/components/PatternConstellation.tsx',
+      'features/emblem/components/**',
+      'features/revelations/components/**',
+      'features/home/components/celebrate-shockwave/**',
+      'components/StarLoader.tsx',
+      // ── Segunda ronda E1 (5 jul): escenas que el primer censo no listó ──
+      'features/onboarding/components/WizardBackdrop.tsx',
+      'features/onboarding/components/StarConfettiBurst.tsx',
+      'features/onboarding/components/ManifiestoOrb.tsx',
+      'features/macros/components/NutritionMoon.tsx',
+      'features/orbit/components/PatternRevealCosmos.tsx',
+      'features/orbit/components/PatternDiscovery.tsx',
+      'features/orbit/components/PresenceFinale.tsx',
+      'features/orbit/components/WeekOrbitGalaxy.tsx',
+      'features/orbit/components/DayLiveReadings.tsx',
+      // Paleta semántica local por diseño (documentada en el propio archivo).
+      'features/orbit/components/week-dim-visual.tsx',
+      'features/orbit/constants/constellationTheme.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
+  },
 ]

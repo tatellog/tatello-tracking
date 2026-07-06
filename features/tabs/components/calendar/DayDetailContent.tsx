@@ -19,6 +19,7 @@ import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
+import { deficitContextLine } from './logic'
 import type { CalendarDay, CalendarEvent, DayRegistered, DayValues } from './logic'
 
 /** Color + etiqueta del evento según su tier — espeja el marcador del
@@ -135,6 +136,7 @@ export function DayDetailContent({
   footer,
   headerAccessory,
   tone = 'operate',
+  calorieTarget,
   onEventPress,
 }: {
   day: CalendarDay
@@ -153,12 +155,19 @@ export function DayDetailContent({
    *  culpa, chips con más presencia. Gatea SOLO la capa visual; el contenido
    *  es el mismo. */
   tone?: 'operate' | 'observe'
+  /** Meta calórica del perfil — habilita la línea de contexto del norte en
+   *  OBSERVACIÓN ("Un día en déficit…"). Sin target, silencio (nunca se
+   *  inventa contexto). Hoy no la pasa: opera, no lee historia. */
+  calorieTarget?: number | null
   /** Tocar un evento → re-vivir su ceremonia full-screen. Opcional: sin esto
    *  los eventos son de solo lectura (la presentación sigue siendo pura; el
    *  efecto vive en quien envuelve). */
   onEventPress?: (ev: CalendarEvent) => void
 }) {
   const observe = tone === 'observe'
+  // El norte, como contexto de ese día (solo observación): estado cualitativo
+  // desde la clasificación canónica de déficit, jamás el delta ni un semáforo.
+  const northLine = observe ? deficitContextLine(day.values.calories, calorieTarget) : null
   const checks = REGISTERED_ITEMS.filter((it) => day.registered[it.key])
   const showMeals = showValues && meals != null && meals.length > 0
   // Con la lista de platillos, el agregado "Comida · N comidas" sobra.
@@ -178,7 +187,12 @@ export function DayDetailContent({
           subtítulo serif italic (voz cálida, sin eyebrow). En OPERAR queda la
           ficha de siempre: eyebrow + línea de UI. */}
       {observe ? (
-        <Text style={styles.statusPoetic}>{STATUS_POETIC[day.status]}</Text>
+        <>
+          <Text style={styles.statusPoetic}>{STATUS_POETIC[day.status]}</Text>
+          {/* Cómo quedó el día frente a tu meta — la memoria conecta con el
+              norte sin números. Si no hay qué decir, no se dice nada. */}
+          {northLine ? <Text style={styles.northLine}>{northLine}</Text> : null}
+        </>
       ) : (
         <>
           <Text style={styles.eyebrow}>Estado</Text>
@@ -262,10 +276,11 @@ export function DayDetailContent({
                     ) : null}
                     {tappable ? <Text style={styles.eventChevron}>›</Text> : null}
                   </View>
-                  {/* La evidencia / el porqué — para patrones trae el conteo
-                      ("X de los últimos N días…"); para transformación, el trazo. */}
-                  {ev.message && ev.message !== ev.title ? (
-                    <Text style={styles.eventEvidence}>{ev.message}</Text>
+                  {/* La evidencia CONCRETA primero (el conteo: "5 de tus últimos
+                      7 días") — es lo que DIFERENCIA un día de otro y da prueba;
+                      si no hay conteo, el porqué/mensaje. */}
+                  {ev.evidence || (ev.message && ev.message !== ev.title) ? (
+                    <Text style={styles.eventEvidence}>{ev.evidence || ev.message}</Text>
                   ) : null}
                   {tappable ? (
                     <Text style={styles.eventReplayHint}>Un momento para revivir</Text>
@@ -313,7 +328,7 @@ const styles = StyleSheet.create({
   date: {
     flexShrink: 1,
     fontFamily: typography.displayHeavy,
-    fontSize: 20,
+    fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: -0.4,
     textTransform: 'capitalize',
@@ -321,7 +336,7 @@ const styles = StyleSheet.create({
   // OBSERVACIÓN: la fecha sube a heroína — domina el sheet como "este día,
   // este recuerdo", no como un campo más.
   dateHero: {
-    fontSize: 29,
+    fontSize: typography.sizes.macroNum,
     letterSpacing: -0.8,
     color: colors.oroLeche,
   },
@@ -332,12 +347,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 17,
+    fontSize: typography.sizes.anchor,
     color: colors.oroLight,
+  },
+  // El norte como contexto del recuerdo — segunda línea serif, más callada que
+  // el estado (bone, no oro): acompaña, no titula.
+  northLine: {
+    marginTop: 2,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
   },
   eyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: colors.niebla,
@@ -346,7 +370,7 @@ const styles = StyleSheet.create({
   },
   statusLine: {
     fontFamily: typography.uiMedium,
-    fontSize: 16,
+    fontSize: typography.sizes.title,
     color: colors.bone,
   },
   section: {},
@@ -361,12 +385,12 @@ const styles = StyleSheet.create({
   },
   dataLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
   },
   dataValue: {
     fontFamily: typography.uiSemi,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
@@ -383,12 +407,12 @@ const styles = StyleSheet.create({
   mealName: {
     flexShrink: 1,
     fontFamily: typography.uiMedium,
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
   },
   mealKcal: {
     fontFamily: typography.uiMedium,
-    fontSize: 13,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
@@ -420,16 +444,16 @@ const styles = StyleSheet.create({
   },
   checkMark: {
     fontFamily: typography.uiBold,
-    fontSize: 11,
+    fontSize: typography.sizes.micro,
     color: colors.magenta,
   },
   checkLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.bone,
   },
   checkLabelObserve: {
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
   },
   // Divisor estelar (solo OBSERVACIÓN, antes de los eventos).
@@ -453,7 +477,7 @@ const styles = StyleSheet.create({
   eventChevron: {
     marginLeft: 6,
     fontFamily: typography.uiMedium,
-    fontSize: 18,
+    fontSize: typography.sizes.heading,
     color: colors.niebla,
   },
   // Pista discreta bajo la evidencia, alineada con ella (pasa el punto).
@@ -495,7 +519,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 15,
+    fontSize: typography.sizes.ui,
     color: colors.oroLight,
   },
 })

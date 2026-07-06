@@ -44,7 +44,14 @@ import {
   type MealInput,
   type StoredIngredient,
 } from '@/features/macros/api'
-import { useCreateMeal, useMealById, useUpdateMeal } from '@/features/macros/hooks'
+import {
+  useCreateMeal,
+  useFrequentMeals,
+  useMealById,
+  useUpdateMeal,
+} from '@/features/macros/hooks'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
+import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
 import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
@@ -56,6 +63,7 @@ import {
   mealTotals,
   scanMeal,
   scanMealFromText,
+  type ScanConfidence,
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
 import { SkyBackground } from '@/features/tabs/components'
@@ -73,6 +81,7 @@ import {
   type LiquidDetection,
 } from '@/features/water/liquid-detection'
 import { track } from '@/lib/analytics'
+import { emitScanFeedback } from '@/features/meal-scan/feedback-bus'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
 import { todayInTimezone } from '@/lib/time'
@@ -461,17 +470,27 @@ const SCREEN_W = Dimensions.get('window').width
 // Photo column width inside the 20pt content padding, and the cap
 // that keeps a tall (portrait) photo from dominating the screen.
 const PHOTO_W = SCREEN_W - 40
+// M1 · chips del escalador de porción (sobre los gramos del scan).
+const PORTION_SCALES = [
+  { label: '½', scale: 0.5, a11y: 'la mitad' },
+  { label: '¾', scale: 0.75, a11y: 'tres cuartos' },
+  { label: '1', scale: 1, a11y: 'completa' },
+  { label: '1½', scale: 1.5, a11y: 'una y media' },
+] as const
+
 const PHOTO_MAX_H = 340
 
 // Slot pre-selected by time of day — the user can change it in the
-// picker before confirming.
-function currentMealType(): MealInput['meal_type'] {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+// picker before confirming. Helper COMPARTIDO (era el cuarto duplicado de
+// los cortes por hora, y con los cortes viejos: comida moría a las 4pm).
+const currentMealType = (): MealInput['meal_type'] => mealMomentByHour()
+
+const MEAL_TYPE_VALUES: readonly MealInput['meal_type'][] = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+]
 
 type MealType = MealInput['meal_type']
 
@@ -536,7 +555,14 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  */
 export default function ScanMealScreen() {
   const router = useRouter()
-  const { uri, editId, manual, describe, photoPath } = useLocalSearchParams<{
+  const {
+    uri,
+    editId,
+    manual,
+    describe,
+    photoPath,
+    mealType: mealTypeParam,
+  } = useLocalSearchParams<{
     uri?: string
     editId?: string
     manual?: string
@@ -544,6 +570,10 @@ export default function ScanMealScreen() {
     /** Foto representativa del platillo (storage path) — fallback cuando la
      *  instancia editada no tiene foto propia (p.ej. un re-log sin foto). */
     photoPath?: string
+    /** Momento elegido en el QuickLog ANTES de abrir el scan: la elección de
+     *  la usuaria manda sobre el default por hora (antes se ignoraba y su
+     *  "Snack" de madrugada aterrizaba como lo que la hora dijera). */
+    mealType?: string
   }>()
   const isEdit = !!editId
   // Manual log — no scan, no ingredient breakdown; the user types the
@@ -594,7 +624,12 @@ export default function ScanMealScreen() {
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
   const [name, setName] = useState('')
-  const [mealType, setMealType] = useState<MealType>(currentMealType)
+  // La elección del QuickLog manda sobre el default por hora (si vino).
+  const [mealType, setMealType] = useState<MealType>(() =>
+    mealTypeParam != null && (MEAL_TYPE_VALUES as readonly string[]).includes(mealTypeParam)
+      ? (mealTypeParam as MealType)
+      : currentMealType(),
+  )
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([])
   const [proteinInput, setProteinInput] = useState('')
   const [caloriesInput, setCaloriesInput] = useState('')
@@ -604,6 +639,12 @@ export default function ScanMealScreen() {
   // knows to upload it rather than keep the meal's existing one.
   const [photoChanged, setPhotoChanged] = useState(false)
   const populatedRef = useRef(false)
+  // M1 · honestidad de evidencia: cuánto confió el modelo en su lectura.
+  const [confidence, setConfidence] = useState<ScanConfidence>('alta')
+  // M1 · escalador de porción de un tap: gramos ORIGINALES del scan por id
+  // (la escala siempre se aplica sobre la base, no sobre sí misma).
+  const baseGramsRef = useRef<Map<string, number>>(new Map())
+  const [portionScale, setPortionScale] = useState(1)
 
   // ── Detección de líquidos → hidratación ────────────────────────────
   // Tras guardar la comida, si tiene bebidas/alimentos líquidos, ofrecemos
@@ -646,6 +687,9 @@ export default function ScanMealScreen() {
         if (!alive) return
         setName(meal.name)
         setIngredients(meal.ingredients)
+        setConfidence(meal.confidence)
+        baseGramsRef.current = new Map(meal.ingredients.map((i) => [i.id, i.grams]))
+        setPortionScale(1)
         setPhase('confirm')
       })
       .catch(() => {
@@ -663,6 +707,22 @@ export default function ScanMealScreen() {
 
   // Describe-by-AI submit — parse the typed description into ingredients,
   // then drop into the same confirm form. Reuses the scanning theatre.
+  // M1 · un tap = "comí la mitad / más": escala TODOS los ingredientes
+  // detectados desde sus gramos originales (los agregados a mano no tienen
+  // base y se respetan tal cual; un gramo editado a mano se re-deriva de la
+  // base solo si vuelves a tocar un chip).
+  const applyPortionScale = (scale: number) => {
+    Haptics.selectionAsync().catch(() => {})
+    setPortionScale(scale)
+    setIngredients((prev) =>
+      prev.map((i) => {
+        const base = baseGramsRef.current.get(i.id)
+        return base == null ? i : { ...i, grams: Math.max(1, Math.round(base * scale)) }
+      }),
+    )
+    track('scan_portion_scaled', { scale })
+  }
+
   const handleDescribeSubmit = () => {
     const text = description.trim()
     if (text.length < 2 || phase === 'scanning') return
@@ -672,6 +732,9 @@ export default function ScanMealScreen() {
       .then((meal) => {
         setName(meal.name)
         setIngredients(meal.ingredients)
+        setConfidence(meal.confidence)
+        baseGramsRef.current = new Map(meal.ingredients.map((i) => [i.id, i.grams]))
+        setPortionScale(1)
         setPhase('confirm')
       })
       .catch(() => {
@@ -844,11 +907,27 @@ export default function ScanMealScreen() {
     )
   }
 
+  // ¿Era su PRIMERA comida de la vida? Snapshot al montar (tras guardar, la
+  // query de frecuentes se refresca y ya no sabría distinguirlo). Alimenta
+  // la línea de compounding: el registro más caro del producto (primer scan,
+  // 60-90 s) debe anunciar su recompensa — que mañana cuesta un toque.
+  const frequent = useFrequentMeals(1)
+  const hadMealsBefore = useRef<boolean | null>(null)
+  if (hadMealsBefore.current === null && frequent.data !== undefined) {
+    hadMealsBefore.current = frequent.data.length > 0
+  }
+
   // New logs land on the reveal (state C) before returning to the tab —
   // a star joins the sky + the protein of this meal + a coach line.
   const goToReveal = (protein: number) => {
     setRevealProtein(Math.round(protein))
-    setRevealLine(REVEAL_LINES[Math.floor(Math.random() * REVEAL_LINES.length)] ?? REVEAL_LINES[0]!)
+    setRevealLine(
+      // La primera comida de la vida cierra con la promesa del día 2, no
+      // con una frase genérica: convierte el esfuerzo en compounding.
+      hadMealsBefore.current === false
+        ? 'Guardada. La próxima vez está a un toque en ✦.'
+        : (REVEAL_LINES[Math.floor(Math.random() * REVEAL_LINES.length)] ?? REVEAL_LINES[0]!),
+    )
     setPhase('reveal')
   }
 
@@ -1158,6 +1237,11 @@ export default function ScanMealScreen() {
       },
       {
         onSuccess: (meal) => {
+          // Loop de corrección M1: solo para comidas que nacieron de un scan
+          // (foto/texto) — el toast global pregunta "¿le atiné?" al volver.
+          if (!isManual && !isEdit) {
+            emitScanFeedback({ id: meal.id, name: macros.name, confidence })
+          }
           void presentLiquids(meal.id, intakeDateForNew(), false, () =>
             goToReveal(macros.protein_g),
           )
@@ -1274,6 +1358,22 @@ export default function ScanMealScreen() {
                 ✦ +{energiaDelta} {ATTRIBUTE_LABEL.energia}
               </Animated.Text>
             ) : null}
+            {/* El puente registro → significado: en el momento de máxima
+                atención, la respuesta a "¿cómo voy?" queda a un tap. La
+                evidencia vive en Órbita Día (sin semáforo en el home). */}
+            <Animated.View entering={FadeInUp.duration(520).delay(1150)}>
+              <Pressable
+                onPress={() => {
+                  requestOrbitSegment('dia')
+                  router.replace('/orbit')
+                }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Ver cómo va tu día en Órbita"
+              >
+                <Text style={styles.revealOrbitaLink}>Ver cómo va tu día ›</Text>
+              </Pressable>
+            </Animated.View>
             <Animated.View entering={FadeInUp.duration(520).delay(1100)}>
               <Pressable
                 onPress={() => router.back()}
@@ -1435,6 +1535,42 @@ export default function ScanMealScreen() {
                   <Text style={[styles.eyebrow, styles.eyebrowGap]}>
                     {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
                   </Text>
+
+                  {/* M1 · honestidad de evidencia: cuando el modelo dudó, se
+                      dice — jamás fingir precisión. */}
+                  {!isEdit && confidence !== 'alta' ? (
+                    <Text style={styles.confidenceNote}>
+                      {confidence === 'media'
+                        ? 'Leímos tu plato, pero las porciones son un estimado. Dales un vistazo.'
+                        : 'No estamos seguros de este plato. Revisa lo que encontramos.'}
+                    </Text>
+                  ) : null}
+
+                  {/* M1 · porción de un tap: "comí la mitad" sin teclado. */}
+                  {!isEdit && ingredients.length > 0 ? (
+                    <View style={styles.portionRow}>
+                      <Text style={styles.portionLabel}>Porción</Text>
+                      {PORTION_SCALES.map((p) => {
+                        const active = portionScale === p.scale
+                        return (
+                          <Pressable
+                            key={p.label}
+                            onPress={() => applyPortionScale(p.scale)}
+                            style={[styles.portionChip, active && styles.portionChipActive]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
+                            accessibilityLabel={`Porción ${p.a11y}`}
+                          >
+                            <Text
+                              style={[styles.portionChipText, active && styles.portionChipTextOn]}
+                            >
+                              {p.label}
+                            </Text>
+                          </Pressable>
+                        )
+                      })}
+                    </View>
+                  ) : null}
                   {ingredients.map((ing) => (
                     <View key={ing.id} style={styles.row}>
                       <View style={styles.ingMain}>
@@ -1669,6 +1805,15 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },
+  // El puente a Órbita Día — secundario al check de "listo", nunca compite.
+  revealOrbitaLink: {
+    marginTop: 16,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
   // A round gold "done" stamp — reads as confirmed, not as a nav/tab
   // button (a circle + checkmark, no stadium pill).
   revealCheck: {
@@ -1740,7 +1885,7 @@ const styles = StyleSheet.create({
   },
   scanText: {
     fontFamily: typography.uiMedium,
-    fontSize: 14.5,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     letterSpacing: 0.2,
   },
@@ -1893,6 +2038,54 @@ const styles = StyleSheet.create({
   eyebrowGap: {
     marginTop: 22,
   },
+
+  // M1 · nota de duda del modelo — honesta, en calma, nunca alarma.
+  confidenceNote: {
+    marginTop: 2,
+    marginBottom: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.bone,
+  },
+  // M1 · escalador de porción de un tap.
+  portionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  portionLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    marginRight: 2,
+  },
+  portionChip: {
+    minWidth: 44,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.bgCard2,
+  },
+  portionChipActive: {
+    borderColor: colors.magenta,
+    backgroundColor: colors.magentaTint2,
+  },
+  portionChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  portionChipTextOn: {
+    color: colors.magentaHot,
+  },
   // The dish name — a field, not a heading, so it reads as editable.
   nameField: {
     flexDirection: 'row',
@@ -1908,7 +2101,7 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
     fontFamily: typography.displaySemi,
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     color: colors.leche,
     letterSpacing: -0.3,
     padding: 0,

@@ -68,12 +68,13 @@ export function CenterNumberOverlay({
     transform: [{ translateY: -plusOne.value * 22 }],
   }))
   // Estado vacío: con 0 encendidas, un "0 / 19" tenue se lee como roto/vacío.
-  // En su lugar, una invitación cálida que además conecta la acción («Entrené»
-  // del toggle de arriba) con la consecuencia (la primera estrella).
+  // En su lugar, una invitación cálida. Mecánica A: CUALQUIER registro
+  // enciende (comida, agua, ánimo, descanso) — la acción más barata, no la
+  // más cara. Un sábado sin entreno también puede encender su estrella.
   if (initialCount === 0) {
     return (
       <View style={styles.numberOverlay} pointerEvents="none">
-        <Text style={styles.emptyHint}>Tu primera estrella espera tu «Entrené».</Text>
+        <Text style={styles.emptyHint}>Tu primer registro enciende tu primera estrella.</Text>
       </View>
     )
   }

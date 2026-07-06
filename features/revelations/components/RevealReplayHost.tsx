@@ -2,12 +2,34 @@ import { useEffect, useState } from 'react'
 
 import { useProfile } from '@/features/profile/hooks'
 import { useTransformProgress } from '@/features/emblem'
-import { PatternReveal } from '@/features/patterns'
-import type { PatternType } from '@/features/patterns/logic'
+import { PatternRevealModal } from '@/features/orbit/components/PatternRevealModal'
 import { zodiacFromDate } from '@/features/tabs/zodiac'
 
 import { TransformationReveal } from './TransformationReveal'
 import { subscribeReplayReveal, type ReplayEvent } from '../replay-bus'
+
+const MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+]
+
+/** ISO 'YYYY-MM-DD' → "14 de junio" (o undefined). */
+function formatDayLabel(iso?: string): string | undefined {
+  if (!iso) return undefined
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d || m < 1 || m > 12) return undefined
+  return `${d} de ${MONTHS_ES[m - 1]}`
+}
 
 /*
  * Host de "re-vivir" una revelación. Se monta en la RAÍZ de una pantalla (Hoy,
@@ -52,9 +74,36 @@ export function RevealReplayHost() {
       />
     )
   }
+  // pattern → la ceremonia con el patrón de ESTE día: observación + PRUEBA
+  // (correlación con el déficit si existe, o la frecuencia) + significado.
+  const hasBars = replay.evidenceBars != null && replay.evidenceBars.length > 0
   return (
-    <PatternReveal
-      pattern={{ id: 'replay', type: replay.kind as PatternType, message: replay.message }}
+    <PatternRevealModal
+      phrase={replay.title || replay.message}
+      // Observación (title) → PRUEBA → significado (message). La prueba es la
+      // correlación con el déficit si existe (countLine = su porqué); si no, la
+      // frecuencia; si nada, el detalle (sin repetir el título).
+      countLine={
+        hasBars
+          ? (replay.correlationInsight ?? '')
+          : replay.evidence || (replay.message !== replay.title ? replay.message : '')
+      }
+      // TODOS los patrones se autolimitan a la evidencia (feedback usuaria: sin
+      // cierre poético, "me cuesta leer"). La prueba habla; no agregamos moraleja.
+      takeaway=""
+      // Barras de correlación con el déficit (Etapa 3) > tira de frecuencia. El
+      // noticing de noches va en tono neutro (evidencia, no festejo).
+      bars={hasBars ? replay.evidenceBars : undefined}
+      evidence={
+        replay.evidenceCount != null && replay.evidenceTotal != null
+          ? {
+              count: replay.evidenceCount,
+              total: replay.evidenceTotal,
+              tone: replay.kind === 'night_eating' ? 'neutral' : 'lit',
+            }
+          : undefined
+      }
+      date={formatDayLabel(replay.date)}
       onClose={close}
     />
   )

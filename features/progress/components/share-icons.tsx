@@ -39,6 +39,19 @@ export function MomentoIcon({ active }: { active: boolean }) {
   )
 }
 
+/** Calendario — una grilla de mes con la barra del encabezado. */
+export function CalendarioIcon({ active }: { active: boolean }) {
+  const c = tint(active)
+  return (
+    <Svg width={SIZE} height={SIZE} viewBox="0 0 24 24" fill="none">
+      <Rect x={3.5} y={5} width={17} height={15} rx={2.5} stroke={c} strokeWidth={1.5} />
+      <Line x1={3.5} y1={9} x2={20.5} y2={9} stroke={c} strokeWidth={1.5} />
+      <Line x1={8} y1={3.5} x2={8} y2={6} stroke={c} strokeWidth={1.5} strokeLinecap="round" />
+      <Line x1={16} y1={3.5} x2={16} y2={6} stroke={c} strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
 /** Progreso — barras ascendentes. */
 export function ProgresoIcon({ active }: { active: boolean }) {
   const c = tint(active)

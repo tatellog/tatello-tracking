@@ -69,6 +69,11 @@ export const queryKeys = {
     all: ['rest'] as const,
     day: (date: string) => ['rest', date] as const,
   },
+  workout: {
+    all: ['workout'] as const,
+    // Tipo de entreno de un día (chips del check-in en Hoy).
+    typeForDay: (date: string) => ['workout', 'type', date] as const,
+  },
   sleep: {
     all: ['sleep'] as const,
     day: (date: string) => ['sleep', date] as const,
@@ -116,5 +121,6 @@ export const queryKeys = {
     history: (uid: string, fromDate: string, toDate: string) =>
       ['orbit', 'history', uid, fromDate, toDate] as const,
     hasAny: (uid: string) => ['orbit', 'hasAny', uid] as const,
+    totalDays: (uid: string) => ['orbit', 'totalDays', uid] as const,
   },
 } as const

@@ -57,6 +57,27 @@ export function DiscoveryStar({
   )
 }
 
+/** Estrella aún sin encender — el par APAGADO de DiscoveryStar. Mismo contorno de
+ *  4 púas (continuidad con el emblema y los descubrimientos), pero sin relleno,
+ *  sin halo y sin núcleo: el espacio que el cielo todavía no revela. Es la misma
+ *  estrella esperando encenderse, no un glifo de otra familia. */
+export function DormantStar({ size = 20 }: { size?: number }) {
+  const c = 16
+  const r = 4.8
+  return (
+    <Svg width={size} height={size} viewBox="0 0 32 32" pointerEvents="none">
+      <Path
+        d={fourPointStarPath(c, c, r)}
+        fill="none"
+        stroke={colors.niebla}
+        strokeWidth={1}
+        strokeLinejoin="round"
+        opacity={0.5}
+      />
+    </Svg>
+  )
+}
+
 /** Marcador de patrón: un anillo de órbita hairline con un punto en el color de
  *  la dimensión. Es una carta de ritmo, no una estrella: sin halo. */
 export function PatternGlyph({ color, size = 26 }: { color: string; size?: number }) {

@@ -99,7 +99,9 @@ export function MealCard({
       <Text
         style={[styles.macros, compact && styles.macrosCompact, confirmed && styles.textOnStamp]}
       >
-        {Math.round(protein)} g · {calories} kcal
+        {/* "g prot", nunca "g" pelón: es LA métrica más cuidada y estaba de
+            incógnito ("¿30 gramos de qué?", target-user jul 2026). */}
+        {Math.round(protein)} g prot · {calories} kcal
         {freq != null && freq > 1 ? (
           <Text style={[styles.freq, confirmed && styles.textOnStamp]}>{`  ·  ${freq} veces`}</Text>
         ) : null}
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
     paddingVertical: 10,
     paddingHorizontal: 13,
-    shadowColor: '#000000',
+    shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
     shadowRadius: 8,
@@ -262,7 +264,7 @@ const styles = StyleSheet.create({
   macros: {
     marginTop: 3,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   macrosCompact: {

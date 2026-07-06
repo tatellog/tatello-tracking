@@ -54,6 +54,10 @@ function OrbitBody() {
   // Día visto en Órbita Día: null = hoy. Lo setea la tira de 7 días de Semana;
   // cambiar de segmento a mano (OrbitSegments) lo resetea a hoy.
   const [viewedDay, setViewedDay] = useState<string | null>(null)
+  // 9.1 · memoria del segmento de ORIGEN al abrir un día pasado: el back del
+  // summary→detail nunca se rompe (Apple) — desde el calendario de Mes,
+  // "Volver" regresa a Mes, no te deja varada en Día-hoy.
+  const [dayOrigin, setDayOrigin] = useState<Exclude<OrbitSegment, 'dia'> | null>(null)
 
   useFocusEffect(
     useCallback(() => {
@@ -72,6 +76,10 @@ function OrbitBody() {
   // the jank. Debounced idle flips it back ~140 ms after the last scroll event.
   const [isScrolling, setIsScrolling] = useState(false)
   const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
+  const scrollToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true })
+  }, [])
   const handleScroll = useCallback(() => {
     setIsScrolling((s) => (s ? s : true))
     if (scrollIdle.current) clearTimeout(scrollIdle.current)
@@ -111,9 +119,9 @@ function OrbitBody() {
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <RadialGradient id="orbit-ambient" cx="50%" cy="48%" rx="75%" ry="70%">
-              <Stop offset="0%" stopColor="#E91E63" stopOpacity={0.1} />
-              <Stop offset="55%" stopColor="#E91E63" stopOpacity={0.035} />
-              <Stop offset="100%" stopColor="#E91E63" stopOpacity={0} />
+              <Stop offset="0%" stopColor={colors.magenta} stopOpacity={0.1} />
+              <Stop offset="55%" stopColor={colors.magenta} stopOpacity={0.035} />
+              <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
             </RadialGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#orbit-ambient)" />
@@ -121,6 +129,7 @@ function OrbitBody() {
 
         <SafeAreaView style={styles.flex} edges={['top']}>
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             onScroll={handleScroll}
@@ -135,6 +144,7 @@ function OrbitBody() {
                 value={segment}
                 onChange={(seg) => {
                   setViewedDay(null) // navegar a mano vuelve a hoy
+                  setDayOrigin(null)
                   setSegment(seg)
                 }}
               />
@@ -151,7 +161,22 @@ function OrbitBody() {
               <DayPresent
                 key="dia"
                 viewedDay={viewedDay}
-                onReturnToToday={() => setViewedDay(null)}
+                returnLabel={
+                  dayOrigin === 'mes'
+                    ? 'Volver a tu mes'
+                    : dayOrigin === 'semana'
+                      ? 'Volver a tu semana'
+                      : undefined
+                }
+                onReturnToToday={() => {
+                  setViewedDay(null)
+                  if (dayOrigin) {
+                    setSegment(dayOrigin)
+                    setDayOrigin(null)
+                    scrollToTop()
+                  }
+                }}
+                onScrollTop={scrollToTop}
               />
             ) : segment === 'semana' ? (
               <WeekSegment
@@ -159,11 +184,21 @@ function OrbitBody() {
                 onOpenMes={() => setSegment('mes')}
                 onPickDay={(date) => {
                   setViewedDay(date)
+                  setDayOrigin('semana')
                   setSegment('dia')
                 }}
+                onScrollTop={scrollToTop}
               />
             ) : (
-              <MonthSegment key="mes" />
+              <MonthSegment
+                key="mes"
+                onPickDay={(date) => {
+                  setViewedDay(date)
+                  setDayOrigin('mes')
+                  setSegment('dia')
+                }}
+                onScrollTop={scrollToTop}
+              />
             )}
           </ScrollView>
         </SafeAreaView>

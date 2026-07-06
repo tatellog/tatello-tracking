@@ -12,18 +12,22 @@
  * calce con los datos. `todayIso` se inyecta para mantenerla pura.
  */
 import type { DailySignals } from './api'
+import { isDeficitDay } from './deficit'
 import { signalCount } from './week-logic'
 
 export type WeekDimKey = 'movimiento' | 'comida' | 'proteina' | 'agua' | 'sueno' | 'energia'
 
-/** El orden canónico — posiciones estables de los orbes en la galaxia. */
+/** El orden canónico — posiciones estables de los orbes en la galaxia.
+ *  v2.2: Energía SALE de la galaxia (coherencia con Mes, que ya la retiró: es
+ *  calorías consumidas − gastadas, no una señal propia; era el planeta que más
+ *  confundió y el único naranja-de-alarma). Sigue existiendo como WeekDimKey
+ *  para la evidencia/probes, pero ya no es un planeta. Quedan 5 señales. */
 export const WEEK_DIM_ORDER: readonly WeekDimKey[] = [
   'movimiento',
   'comida',
   'proteina',
   'agua',
   'sueno',
-  'energia',
 ]
 
 const LABEL: Record<WeekDimKey, string> = {
@@ -36,8 +40,10 @@ const LABEL: Record<WeekDimKey, string> = {
 }
 
 /** Contexto para resolver "presente": la meta de proteína hace que la
- *  dimensión Proteína cuente "alcanzaste tu meta", no solo "registraste". */
-export type WeekDimCtx = { proteinTarget: number | null }
+ *  dimensión Proteína cuente "alcanzaste tu meta", no solo "registraste". La
+ *  meta calórica (opcional) habilita la evidencia de déficit; sin ella, el
+ *  déficit simplemente no aparece (degradación segura). */
+export type WeekDimCtx = { proteinTarget: number | null; calorieTarget?: number | null }
 
 /** ¿La dimensión apareció ese día? Determinístico, sin umbrales de brillo:
  *  registro directo de la señal. */
@@ -106,14 +112,26 @@ export function buildWeekDimensions(
   signals: readonly DailySignals[],
   todayIso: string,
   ctx: WeekDimCtx,
+  /** Primer día CON DATOS de la usuaria (primera semana de uso). Los días
+   *  previos a su llegada no entran al denominador: "2 de 6" en el día 2 de
+   *  uso juzga días en los que la app no existía en su vida — 4 fallas
+   *  retroactivas, el juicio injusto que hace abandonar. */
+  fromDate?: string,
 ): WeekDimension[] {
   const monday = mondayOf(todayIso)
-  const inWeek = signals.filter((s) => s.day != null && s.day >= monday && s.day <= todayIso)
-  const total = isoWeekday(todayIso) // lun→hoy inclusivo
+  const start = fromDate != null && fromDate > monday ? fromDate : monday
+  const inWeek = signals.filter((s) => s.day != null && s.day >= start && s.day <= todayIso)
+  const total = diffDaysInclusive(start, todayIso)
   return WEEK_DIM_ORDER.map((key) => {
     const present = inWeek.reduce((n, s) => (PRESENT[key](s, ctx) ? n + 1 : n), 0)
     return { key, label: LABEL[key], present, total, ratio: total > 0 ? present / total : 0 }
   })
+}
+
+/** Días de `a` a `b` inclusivo (ISO local-day strings, a <= b). */
+function diffDaysInclusive(a: string, b: string): number {
+  const ms = new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()
+  return Math.max(1, Math.round(ms / 86_400_000) + 1)
 }
 
 /* ── "Lo que más se repitió" / "Lo que necesita atención" ─────────── */
@@ -202,12 +220,108 @@ export function risingSignal(
   return best ? { key: best.key, label: best.label, last: best.last, current: best.current } : null
 }
 
+/* ── §0 · Todavía puedo + dirección (la ventana abierta) ──────────────
+ * Lo que SOLO Semana da: (a) los días que faltan (lienzo por delante, nunca
+ * cuota) y (b) el RUMBO de la semana vs la misma ventana de la pasada
+ * (movimiento, no conteo). Ni Día (un punto) ni Mes (una foto) lo dan.
+ * Ver docs/orbita-semana-spec.md §0. */
+
+/** Días de la semana que faltan DESPUÉS de hoy. Lunes → 6; miércoles → 4;
+ *  domingo → 0. Es lienzo por delante, no una cuota a alcanzar. */
+export function daysAhead(todayIso: string): number {
+  return 7 - isoWeekday(todayIso)
+}
+
+export type WeekDirectionState = 'rising' | 'steady' | 'softer'
+
+export type WeekDirection = {
+  /** Rumbo de la semana en curso vs la MISMA ventana de la pasada. */
+  state: WeekDirectionState
+  /** La dimensión que más creció, para la línea de evidencia (o null). */
+  topRise: RisingSignal | null
+}
+
+// Dimensiones que cuentan para el "ritmo". Energía queda FUERA (coherencia con
+// Mes: es calorías consumidas − gastadas, no una señal propia).
+const RHYTHM_DIMS: readonly WeekDimKey[] = ['movimiento', 'comida', 'proteina', 'agua', 'sueno']
+
+// Cuánto debe moverse el ritmo agregado para no ser "sostenido" (evita ruido).
+const DIRECTION_BAND = 2
+
+/**
+ * El RUMBO de la semana en curso comparada con la misma ventana de la anterior
+ * (lun→hoy vs lun→mismo-día). NO es un conteo: es dirección — subiendo /
+ * sostenido / más suave — el "movimiento" que la usuaria pide (Mes da la foto,
+ * Semana da el movimiento). Métrica = suma de días presentes en RHYTHM_DIMS (el
+ * "ritmo" de la semana). `null` si la semana pasada no tiene con qué comparar
+ * (primera semana medible) → no se muestra dirección.
+ */
+export function weekDirection(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekDirection | null {
+  const lastTodayIso = addDays(todayIso, -7)
+  const lastDims = buildWeekDimensions(signals, lastTodayIso, ctx)
+  if (!lastDims.some((d) => d.present > 0)) return null // sin base de comparación
+  const thisDims = buildWeekDimensions(signals, todayIso, ctx)
+  const rhythm = (dims: readonly WeekDimension[]): number =>
+    dims.reduce((n, d) => (RHYTHM_DIMS.includes(d.key) ? n + d.present : n), 0)
+  const delta = rhythm(thisDims) - rhythm(lastDims)
+  const state: WeekDirectionState =
+    delta >= DIRECTION_BAND ? 'rising' : delta <= -DIRECTION_BAND ? 'softer' : 'steady'
+  return { state, topRise: risingSignal(signals, todayIso, ctx) }
+}
+
+/* ── §S · La silueta de los 7 días (la forma del tramo) ───────────────
+ * El ritmo hecho imagen: lo único que solo la semana muestra ("empecé fuerte y
+ * me caí el jueves"). Altura/luz = plenitud del día (signalCount, la misma
+ * "richness" que ya usa weeklyRhythms); día en déficit = celda que emite luz
+ * oro (misma gramática "encendido vs en reposo" del calendario de Mes → los tres
+ * tabs riman visualmente). Futuro = polvo tenue, nunca falla. Ver §S del spec. */
+
+export type WeekSilhouetteCell = {
+  letter: string
+  date: string
+  state: 'past' | 'today' | 'future'
+  /** 0..1 — plenitud del día (cuánto registraste), para la altura/luz. */
+  fullness: number
+  /** ¿día en déficit? → la celda emite luz oro. */
+  deficit: boolean
+}
+
+// Señales para altura COMPLETA (signalCount máx real ~6; 5 = un día lleno).
+const SILHOUETTE_FULL = 5
+
+/** Los 7 días (lun→dom) con su plenitud y si cerraron en déficit. Los días
+ *  futuros van tenues (fullness 0), nunca como falla. */
+export function weekSilhouette(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekSilhouetteCell[] {
+  const monday = mondayOf(todayIso)
+  const byDay = new Map(signals.filter((s) => s.day != null).map((s) => [s.day as string, s]))
+  return WEEKDAY_LETTERS.map((letter, i) => {
+    const date = addDays(monday, i)
+    const state: WeekSilhouetteCell['state'] =
+      date > todayIso ? 'future' : date === todayIso ? 'today' : 'past'
+    const sig = byDay.get(date) ?? null
+    const fullness = state === 'future' ? 0 : Math.min(1, signalCount(sig) / SILHOUETTE_FULL)
+    const deficit =
+      state !== 'future' && sig != null && ctx.calorieTarget != null
+        ? isDeficitDay(sig.calories, ctx.calorieTarget)
+        : false
+    return { letter, date, state, fullness, deficit }
+  })
+}
+
 /* ── "Tu semana en una línea" ─────────────────────────────────────── */
 
 export type DayCellState = 'present' | 'absent' | 'future'
 export type DayCell = { letter: string; date: string; state: DayCellState }
 
-const WEEKDAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as const
+const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
 
 /**
  * Los 7 días de la semana (lun→dom) con su estado de APARICIÓN: presente
@@ -240,6 +354,9 @@ export function dimensionLine(
   todayIso: string,
   key: WeekDimKey,
   ctx: WeekDimCtx,
+  /** Primer día con datos (primera semana de uso): los días previos se pintan
+   *  como 'future' (aún-no), no como 'absent' (falla retroactiva). */
+  fromDate?: string,
 ): DayCell[] {
   const monday = mondayOf(todayIso)
   const present = new Set(
@@ -247,8 +364,9 @@ export function dimensionLine(
   )
   return WEEKDAY_LETTERS.map((letter, i) => {
     const date = addDays(monday, i)
+    const preData = fromDate != null && date < fromDate
     const state: DayCellState =
-      date > todayIso ? 'future' : present.has(date) ? 'present' : 'absent'
+      date > todayIso || preData ? 'future' : present.has(date) ? 'present' : 'absent'
     return { letter, date, state }
   })
 }
@@ -274,6 +392,34 @@ export function dimObservation(present: number, total: number): string {
   if (ratio >= 0.85) return 'Apareció casi toda la semana.'
   if (ratio >= 0.5) return 'Apareció la mayor parte de la semana.'
   return 'Apareció algunos días.'
+}
+
+/**
+ * §2 · El puente hábito↔peso para el panel de foco: de los días en que ESTE
+ * hábito apareció, cuántos cerraron TAMBIÉN en déficit. Responde "¿por qué este
+ * hábito importa para mi peso?" con sus propios datos — es lo que hace que la
+ * galaxia se sienta progreso y no solo hábitos. Solo para dims de
+ * TRANSFORMACIÓN (proteína, movimiento) y con meta calórica. OBSERVACIONAL
+ * (co-ocurrencia "junto a"), nunca causal. Usa el piso sano de `isDeficitDay`.
+ * `null` si no hay señal suficiente (no inventar).
+ */
+export function dimDeficitBridge(
+  key: WeekDimKey,
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): string | null {
+  if (ctx.calorieTarget == null || ctx.calorieTarget <= 0) return null
+  if (key !== 'proteina' && key !== 'movimiento') return null
+  const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
+  const dimDays = c((s) => PRESENT[key](s, ctx))
+  if (dimDays < 2) return null
+  const both = c((s) => PRESENT[key](s, ctx) && isDeficitDay(s.calories, ctx.calorieTarget))
+  if (both < 2) return null
+  const subj = key === 'proteina' ? 'Tu proteína' : 'Tu movimiento'
+  // "junto a tu déficit … esta semana" — paralelo al sistema de co-ocurrencias
+  // del archivo (voice-and-copy); observacional, nunca causal.
+  return `${subj} apareció junto a tu déficit ${both} de ${dimDays} ${veces(both)} esta semana.`
 }
 
 /* ── "Otros hallazgos" ────────────────────────────────────────────── */
@@ -383,7 +529,131 @@ function countDays(
   return seen.size
 }
 
-/* ── §1 · Descubrimiento principal (arquetipo determinístico) ────────── */
+/* ── Señales de evidencia + co-ocurrencia ──────────────────────────────
+ * Más allá de las 6 dimensiones de la galaxia, el descubrimiento principal
+ * razona sobre señales de evidencia que incluyen el DÉFICIT (calorías) y el
+ * SUEÑO de calidad (>7 h). Cada una es un predicado determinístico por día.
+ */
+
+const SLEEP_7H_MIN = 420 // minutos para "noche de más de 7 h"
+
+/** Llaves de señal sobre las que se construye la evidencia: las dimensiones de
+ *  la galaxia + déficit + sueño de calidad. */
+export type EvidenceKey = WeekDimKey | 'deficit' | 'sleep7h'
+
+const EVIDENCE_PRED: Record<EvidenceKey, (s: DailySignals, ctx: WeekDimCtx) => boolean> = {
+  ...PRESENT,
+  deficit: (s, ctx) => isDeficitDay(s.calories, ctx.calorieTarget),
+  sleep7h: (s) => s.sleep_minutes != null && s.sleep_minutes >= SLEEP_7H_MIN,
+}
+
+const EVIDENCE_LABEL: Record<EvidenceKey, string> = {
+  ...LABEL,
+  deficit: 'Déficit',
+  sleep7h: 'Sueño +7 h',
+}
+
+/** La línea L·M·M·J·V·S·D de CUALQUIER señal de evidencia (predicado): en qué
+ *  días apareció. Generaliza `dimensionLine` a déficit y sueño de calidad. */
+export function signalLine(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  key: EvidenceKey,
+  ctx: WeekDimCtx,
+): DayCell[] {
+  const monday = mondayOf(todayIso)
+  const pred = EVIDENCE_PRED[key]
+  const present = new Set(
+    signals.filter((s) => s.day != null && pred(s, ctx)).map((s) => s.day as string),
+  )
+  return WEEKDAY_LETTERS.map((letter, i) => {
+    const date = addDays(monday, i)
+    const state: DayCellState =
+      date > todayIso ? 'future' : present.has(date) ? 'present' : 'absent'
+    return { letter, date, state }
+  })
+}
+
+/* Pares de co-ocurrencia que el descubrimiento principal evalúa. NO incluye
+ * comida×proteína: alcanzar la proteína ya implica comida registrada, así que
+ * su co-ocurrencia sería una tautología, no un descubrimiento. El orden es el
+ * desempate cuando dos pares coinciden el mismo número de días. */
+type CoPair = {
+  a: EvidenceKey
+  b: EvidenceKey
+  /** Arquetipo SOLO para el arte/color de adorno (híbrido). */
+  archetype: DiscoveryArchetype
+  symbol: DiscoverySymbol
+  title: string
+  /** `n` = días en que ambas señales coincidieron. */
+  phrase: (n: number) => string
+}
+
+const veces = (n: number): string => (n === 1 ? 'vez' : 'veces')
+
+const CO_PAIRS: readonly CoPair[] = [
+  {
+    a: 'movimiento',
+    b: 'proteina',
+    archetype: 'movimiento',
+    symbol: 'movimiento',
+    title: 'Movimiento y proteína',
+    phrase: (n) => `Tu movimiento apareció junto a tu proteína ${n} ${veces(n)} esta semana.`,
+  },
+  {
+    a: 'deficit',
+    b: 'sleep7h',
+    archetype: 'descanso',
+    symbol: 'sueno',
+    title: 'Déficit y descanso',
+    phrase: (n) => `Tu déficit apareció junto a noches de más de 7 h ${n} ${veces(n)} esta semana.`,
+  },
+  {
+    a: 'deficit',
+    b: 'movimiento',
+    archetype: 'movimiento',
+    symbol: 'movimiento',
+    title: 'Déficit y movimiento',
+    phrase: (n) => `Tu déficit apareció junto a tus entrenos ${n} ${veces(n)} esta semana.`,
+  },
+]
+
+// Mínimo de días coincidentes para llamarlo co-ocurrencia (no ruido).
+const MIN_COOCCURRENCE = 3
+
+export type CoOccurrence = {
+  pair: CoPair
+  /** Días en que AMBAS señales coincidieron (lun→hoy). */
+  both: number
+}
+
+/**
+ * La co-ocurrencia más fuerte de la semana (más días coincidentes, ≥ mínimo).
+ * Es el corazón del descubrimiento v2: dos señales que aparecieron JUNTAS,
+ * nunca una causa. `null` si ninguna llega al mínimo (el hero degrada a
+ * presencia). Empate → orden de `CO_PAIRS`. Los pares con déficit requieren
+ * meta calórica; sin ella su conteo es 0 y quedan fuera.
+ */
+export function strongestCoOccurrence(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): CoOccurrence | null {
+  let best: CoOccurrence | null = null
+  for (const pair of CO_PAIRS) {
+    const both = countDays(
+      signals,
+      todayIso,
+      (s) => EVIDENCE_PRED[pair.a](s, ctx) && EVIDENCE_PRED[pair.b](s, ctx),
+    )
+    if (both >= MIN_COOCCURRENCE && (best == null || both > best.both)) {
+      best = { pair, both }
+    }
+  }
+  return best
+}
+
+/* ── §1 · Descubrimiento principal (co-ocurrencia · híbrido v2) ───────── */
 
 export type DiscoveryArchetype =
   | 'constancia'
@@ -400,22 +670,48 @@ export type DiscoverySymbol = WeekDimKey | 'ancla'
 
 export type WeekEvidenceItem = { key: string; text: string }
 
+/** Tipo de descubrimiento principal: una co-ocurrencia de dos señales, la
+ *  presencia simple, o un comienzo cálido con poca evidencia. */
+export type DiscoveryKind = 'cooccurrence' | 'presence' | 'comienzo'
+
+/** Una línea L·M·M·J·V·S·D etiquetada — el hero muestra 1 (presencia) o 2
+ *  (co-ocurrencia) de estas, una por señal. */
+export type DiscoveryTimeline = { key: EvidenceKey | 'presencia'; label: string; cells: DayCell[] }
+
+/** La foto de un único día registrado: en lugar de seis conteos de "1 día"
+ *  (que se contradicen con "apenas toma forma"), la evidencia se lee como la
+ *  instantánea de ESE día. */
+export type DaySnapshot = {
+  /** "el lunes" — el día del único registro de la semana. */
+  weekdayLabel: string
+  /** Señales presentes ese día, en orden ("comida", "entreno", "sueño +7 h"…). */
+  items: string[]
+}
+
 export type MainDiscovery = {
+  /** Qué clase de descubrimiento es (gobierna el render del hero). */
+  kind: DiscoveryKind
+  /** Arquetipo SOLO para el arte/color de adorno (híbrido v2): el TEXTO ya no
+   *  es una etiqueta de arquetipo, pero el arte de estado se conserva. */
   archetype: DiscoveryArchetype
   symbol: DiscoverySymbol
-  /** La palabra del descubrimiento ("Constancia", "Movimiento"…) — título del
-   *  modal de evidencia. */
+  /** Título del modal de evidencia ("Movimiento y proteína", "Tu presencia"…). */
   title: string
-  /** Conclusión en voz de coach (serif italic, como "Hoy predominó la
-   *  constancia." de Día). Es lo protagonista del descubrimiento. */
+  /** Observación en voz de coach (serif italic). Es lo protagonista; en v2 es
+   *  una co-ocurrencia ("Tu movimiento apareció junto a tu proteína 4 veces"). */
   phrase: string
-  /** Subcadena de `phrase` a enfatizar en color (patrón EmText de la voz de
-   *  Stelar): la frase va en leche y solo la palabra clave toma el acento. */
+  /** Subcadena de `phrase` a enfatizar en color (patrón EmText): la frase va en
+   *  leche y solo la clave (el conteo) toma el acento. */
   emphasis: string
-  /** La línea de dato ("Estuviste presente 6 de 7 días."). */
+  /** La línea de dato ("Coincidieron 4 de 7 días."). */
   headline: string
   /** Matiz cálido bajo el dato (puede ser null). */
   sub: string | null
+  /** Las líneas de evidencia que el hero pinta bajo la frase (1 o 2). */
+  timelines: DiscoveryTimeline[]
+  /** Foto del día cuando solo se registró UNO esta semana (estado comienzo). El
+   *  modal la prefiere sobre la lista de conteos. null en los demás casos. */
+  snapshot: DaySnapshot | null
   /** Evidencia transparente que respalda el descubrimiento (para "¿Por qué?"). */
   evidence: WeekEvidenceItem[]
 }
@@ -469,129 +765,138 @@ export function weekEvidence(
   return out
 }
 
-const DIM_ARCHETYPE: Record<
-  WeekDimKey,
-  { archetype: DiscoveryArchetype; title: string; verb: string; phrase: string; emphasis: string }
-> = {
-  movimiento: {
-    archetype: 'movimiento',
-    title: 'Movimiento',
-    verb: 'Tu cuerpo se movió',
-    phrase: 'Esta semana predominó el movimiento.',
-    emphasis: 'movimiento',
-  },
-  comida: {
-    archetype: 'nutricion',
-    title: 'Nutrición',
-    verb: 'Registraste tu comida',
-    phrase: 'Esta semana predominó tu nutrición.',
-    emphasis: 'nutrición',
-  },
-  proteina: {
-    archetype: 'proteina',
-    title: 'Proteína',
-    verb: 'Cuidaste tu proteína',
-    phrase: 'Esta semana predominó tu proteína.',
-    emphasis: 'proteína',
-  },
-  agua: {
-    archetype: 'hidratacion',
-    title: 'Hidratación',
-    verb: 'Tomaste agua',
-    phrase: 'Esta semana predominó tu hidratación.',
-    emphasis: 'hidratación',
-  },
-  sueno: {
-    archetype: 'descanso',
-    title: 'Descanso',
-    verb: 'Registraste tu sueño',
-    phrase: 'Esta semana predominó el descanso.',
-    emphasis: 'descanso',
-  },
-  energia: {
-    archetype: 'energia',
-    title: 'Energía',
-    verb: 'Registraste tu energía',
-    phrase: 'Esta semana predominó tu energía.',
-    emphasis: 'energía',
-  },
+/**
+ * La foto del único día registrado esta semana. Cuando solo hay UN día con
+ * señales, la evidencia se lee como la instantánea de ese día (no seis conteos
+ * de "1 día", que confunden y contradicen "apenas toma forma"). `null` si hay 0
+ * o más de 1 día registrado (ahí los conteos sí informan).
+ */
+export function singleDaySnapshot(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): DaySnapshot | null {
+  const monday = mondayOf(todayIso)
+  const logged = signals.filter(
+    (s) => s.day != null && s.day >= monday && s.day <= todayIso && signalCount(s) > 0,
+  )
+  if (logged.length !== 1) return null
+  const s = logged[0]!
+  const weekdayLabel = `el ${SPANISH_WEEKDAYS[isoWeekday(s.day as string) - 1]}`
+
+  const protein =
+    ctx.proteinTarget != null
+      ? s.protein_g != null && s.protein_g >= ctx.proteinTarget
+      : (s.protein_g ?? 0) > 0
+  const items: string[] = []
+  if ((s.meal_count ?? 0) > 0) items.push('comida')
+  if (s.trained === true) items.push('entreno')
+  if (protein) items.push('proteína')
+  if (s.sleep_minutes != null) items.push(s.sleep_minutes >= SLEEP_7H_MIN ? 'sueño +7 h' : 'sueño')
+  if ((s.water_glasses ?? 0) > 0) items.push('agua')
+  if (s.energy != null) items.push('energía')
+  if (s.mood != null || (s.wellbeing_checkins ?? 0) > 0) items.push('cómo te sentiste')
+  return { weekdayLabel, items }
 }
 
 /**
- * El descubrimiento principal de la semana — UN solo patrón, el más fuerte,
- * derivado determinísticamente. Si la PRESENCIA amplia domina, el arquetipo es
- * Constancia (símbolo: Ancla). Si una dimensión destaca con claridad, ella es
- * el descubrimiento. Con poca evidencia, un Comienzo cálido (nunca un puntaje
- * bajo). La evidencia transparente acompaña siempre (para "¿Por qué?").
+ * El descubrimiento principal de la semana (v2 · híbrido) — UNA sola
+ * observación, derivada determinísticamente. Prioridad:
+ *
+ *   1. CO-OCURRENCIA — dos señales que aparecieron JUNTAS varios días (≥3).
+ *      Es lo más fuerte y lo más fiel a "evidencia, no causa": el texto
+ *      describe la coincidencia, nunca el porqué.
+ *   2. PRESENCIA — sin una co-ocurrencia fuerte, la huella es haber estado
+ *      presente; su timeline es la línea de aparición.
+ *   3. COMIENZO — con poca evidencia (apareciste <3 días), un cierre cálido,
+ *      nunca un puntaje bajo.
+ *
+ * El arquetipo viaja solo para el arte/color de adorno (híbrido): el TEXTO ya
+ * no es una etiqueta. La evidencia transparente acompaña siempre ("¿Por qué?").
  */
 export function mainDiscovery(
   signals: readonly DailySignals[],
   todayIso: string,
   ctx: WeekDimCtx,
 ): MainDiscovery {
-  const dims = buildWeekDimensions(signals, todayIso, ctx)
   const total = isoWeekday(todayIso)
   const appeared = appearanceCount(buildAppearanceLine(signals, todayIso))
   const evidence = weekEvidence(signals, todayIso, ctx)
 
-  let top = dims[0]
-  for (const d of dims) if (top && d.present > top.present) top = d
-
-  // Comienzo — aún poca evidencia: nunca mostrar un conteo como reproche.
-  if (appeared < APPEARED_CONSTANCY_MIN && (top?.present ?? 0) < 3) {
+  // 1 · Co-ocurrencia más fuerte → el descubrimiento.
+  const co = strongestCoOccurrence(signals, todayIso, ctx)
+  if (co) {
+    const n = co.both
     return {
+      kind: 'cooccurrence',
+      archetype: co.pair.archetype,
+      symbol: co.pair.symbol,
+      title: co.pair.title,
+      phrase: co.pair.phrase(n),
+      emphasis: `${n} ${veces(n)}`,
+      headline: `Coincidieron ${n} de ${total} ${dayWord(total)}.`,
+      sub: null,
+      timelines: [
+        {
+          key: co.pair.a,
+          label: EVIDENCE_LABEL[co.pair.a],
+          cells: signalLine(signals, todayIso, co.pair.a, ctx),
+        },
+        {
+          key: co.pair.b,
+          label: EVIDENCE_LABEL[co.pair.b],
+          cells: signalLine(signals, todayIso, co.pair.b, ctx),
+        },
+      ],
+      snapshot: null,
+      evidence,
+    }
+  }
+
+  const presenceTimeline: DiscoveryTimeline = {
+    key: 'presencia',
+    label: 'Presencia',
+    cells: buildAppearanceLine(signals, todayIso),
+  }
+
+  // 2 · Comienzo — aún poca evidencia: nunca mostrar un conteo como reproche.
+  if (appeared < 3) {
+    // Foto del día cuando hay UN solo registro (evita seis "1 día"). Si ese
+    // único día fue rico (≥3 señales), el hero lo RECONOCE en vez de
+    // minimizarlo con "apenas toma forma".
+    const snapshot = singleDaySnapshot(signals, todayIso, ctx)
+    const rich = snapshot != null && snapshot.items.length >= 3
+    return {
+      kind: 'comienzo',
       archetype: 'comienzo',
       symbol: 'ancla',
       title: 'Un comienzo',
-      phrase: 'Tu semana apenas toma forma.',
-      emphasis: 'toma forma',
-      headline: appeared > 0 ? `Apareciste ${appeared} ${dayWord(appeared)} esta semana.` : '',
+      phrase: rich ? 'Tu primer día ya dejó huella.' : 'Tu semana apenas toma forma.',
+      emphasis: rich ? 'dejó huella' : 'toma forma',
+      headline: rich
+        ? 'Registraste varias señales en un solo día.'
+        : appeared > 0
+          ? `Apareciste ${appeared} ${dayWord(appeared)} esta semana.`
+          : '',
       sub: 'Cada registro deja una huella.',
+      timelines: [presenceTimeline],
+      snapshot,
       evidence,
     }
   }
 
-  // Constancia — la presencia amplia es el patrón dominante.
-  if (appeared >= APPEARED_CONSTANCY_MIN && appeared >= Math.ceil(total * 0.7)) {
-    return {
-      archetype: 'constancia',
-      symbol: 'ancla',
-      title: 'Constancia',
-      phrase: 'Esta semana predominó la constancia.',
-      emphasis: 'constancia',
-      headline: `Estuviste presente ${appeared} de ${total} ${dayWord(total)}.`,
-      sub:
-        appeared === total
-          ? 'Apareciste cada día de la semana.'
-          : 'No fue perfecto. Pero sí consistente.',
-      evidence,
-    }
-  }
-
-  // Una dimensión destaca con claridad → ella es el descubrimiento.
-  if (top && top.present >= 3 && top.ratio >= 0.6) {
-    const a = DIM_ARCHETYPE[top.key]
-    return {
-      archetype: a.archetype,
-      symbol: top.key,
-      title: a.title,
-      phrase: a.phrase,
-      emphasis: a.emphasis,
-      headline: `${a.verb} ${top.present} de ${top.total} ${dayWord(top.total)}.`,
-      sub: 'Fue tu señal más constante esta semana.',
-      evidence,
-    }
-  }
-
-  // Presencia media — un cierre cálido, sin sobreafirmar constancia.
+  // 3 · Presencia — sin co-ocurrencia fuerte, la huella es estar presente.
   return {
+    kind: 'presence',
     archetype: 'constancia',
     symbol: 'ancla',
-    title: 'Tu semana',
-    phrase: 'Esta semana dejó su huella en ti.',
+    title: 'Tu presencia',
+    phrase: 'Tu semana dejó su huella en ti.',
     emphasis: 'su huella',
-    headline: `Estuviste presente ${appeared} de ${total} ${dayWord(total)}.`,
-    sub: null,
+    headline: `Apareciste ${appeared} de ${total} ${dayWord(total)}.`,
+    sub: appeared === total ? 'Apareciste cada día de la semana.' : null,
+    timelines: [presenceTimeline],
+    snapshot: null,
     evidence,
   }
 }
@@ -751,48 +1056,489 @@ export function weekObservations(signals: readonly DailySignals[], todayIso: str
   return out
 }
 
-/* ── §6 · "La ausencia también cuenta" — señales que nunca aparecieron ── */
+/* ── §7 · "Un patrón por descubrir" — invitación con premio, no ausencia ── */
 
 /**
- * Señales que NUNCA aparecieron esta semana. Es evidencia, no reproche: copy
- * neutro. Excluye el ciclo (su ausencia significa "no estás en tu periodo", no
- * un registro faltante). Tope de 2 para no leerse como regaño. Solo cuando ya
- * hay ALGUNA evidencia (si todo está vacío, la pantalla muestra el estado
- * vacío, no una lista de ausencias).
+ * Señales que NO aparecieron esta semana, reencuadradas como INVITACIÓN CON
+ * PREMIO (no como "lo que NO hiciste"): cada una nombra el patrón que podrías
+ * ver si la registras (decisión dueña jul 2026 — la usuaria leía "No registraste
+ * X" como regaño/tarea con culpa). Excluye el ciclo (su ausencia significa "no
+ * estás en tu periodo"). Tope de 2 para que sea un guiño, no una lista de deberes.
+ * Solo cuando ya hay ALGUNA evidencia (si todo está vacío, va el estado vacío).
  */
 export function weekAbsences(signals: readonly DailySignals[], todayIso: string): string[] {
   const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
   const appeared = appearanceCount(buildAppearanceLine(signals, todayIso))
   if (appeared === 0) return []
 
+  // Pregunta que despierta curiosidad + posibilidad en CONDICIONAL (nunca
+  // imperativo "anota/registra", que sería orden; nunca "podrás/te da chispa",
+  // que prometería un resultado o insinuaría causa). Solo se abre la puerta.
   const candidates: { present: number; line: string }[] = [
     {
       present: c((s) => (s.water_glasses ?? 0) > 0),
-      line: 'No encontramos registros de agua. Eso también es parte de tu semana.',
+      line: '¿Tu hidratación sigue algún ritmo? Con unos días anotados, podrías verlo.',
     },
     {
       present: c((s) => s.sleep_minutes != null),
-      line: 'No encontramos registros de sueño. Eso también es parte de tu semana.',
+      line: '¿Hay algo entre tu sueño y tu energía? Con unos días anotados, podrías descubrirlo.',
     },
     {
       present: c((s) => s.trained === true),
-      line: 'No encontramos entrenamientos. Eso también es parte de tu semana.',
+      line: '¿Cuándo te mueves más en la semana? Con unos días registrados, el patrón podría aparecer.',
     },
     {
       present: c((s) => s.mood != null || (s.wellbeing_checkins ?? 0) > 0),
-      line: 'No registraste cómo te sentiste. Todavía no podemos descubrir ese patrón.',
+      line: '¿Tu ánimo tiene un ritmo en la semana? Con unos días marcados, podría verse.',
     },
     {
       present: c((s) => (s.meal_count ?? 0) > 0),
-      line: 'No encontramos comidas registradas. Eso también es parte de tu semana.',
+      line: '¿Cómo va tomando forma tu déficit? Con unos días de registro, empezarías a verlo.',
     },
     {
       present: c((s) => s.energy != null),
-      line: 'No registraste tu energía. Todavía no podemos descubrir ese patrón.',
+      line: '¿Tu energía sube o baja con la semana? Con unos días anotados, podrías verlo.',
     },
   ]
   return candidates
     .filter((x) => x.present === 0)
     .slice(0, 2)
     .map((x) => x.line)
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * Órbita Semana v2 — secciones de evidencia alrededor de la galaxia.
+ * Todo determinístico, observacional (nunca causal), con guardas de
+ * honestidad. Ver docs/orbita-semana-spec.md §3-§8.
+ * ════════════════════════════════════════════════════════════════════ */
+
+const cap = (s: string): string => (s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
+/** ¿Ese día se alcanzó la proteína? (meta si la hay, registro si no). */
+const proteinReached = (s: DailySignals, ctx: WeekDimCtx): boolean => PRESENT.proteina(s, ctx)
+
+/* ── §3 · Evidencia emergente — observaciones con número (2 a 4) ───────── */
+
+/**
+ * Las observaciones numéricas de la semana, distintas del hero. v2.2: SIN la
+ * línea de conteo de déficit (es el KPI-foto de Mes; en Semana el déficit vive
+ * como dirección en §0) y SIN "día de más calorías" (culpa vaga sin salida).
+ * Quedan: proteína en días de entreno y la señal menos presente. Cada una es un
+ * hecho con su evidencia, nunca un consejo ni una causa. Tope 4.
+ */
+export function emergingEvidence(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekEvidenceItem[] {
+  const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
+  const out: WeekEvidenceItem[] = []
+
+  // v2.2: la línea de conteo de déficit ("N de M días con comida") SALE de aquí
+  // — es el KPI-foto de Mes en chiquito. En Semana el déficit vive como DIRECCIÓN
+  // (§0 weekDirection) y, cuando se construya, como FORMA (§S silueta). Y "El día
+  // de más calorías" también sale: la usuaria lo reportó como culpa vaga sin
+  // salida (señala el mal día sin decir si aun así cerró en déficit). Ver
+  // docs/orbita-semana-spec.md §3. Aquí quedan solo observaciones NO de déficit.
+
+  // Proteína en días de entreno — co-ocurrencia secundaria, con su denominador.
+  // Solo se muestra si es MAYORÍA (≥60%): un 2 de 4 (50%) la usuaria lo leía como
+  // hueco/reprobado, no como logro. Copy con el número al FRENTE (ritmo natural)
+  // y la proteína como sujeto ("también estuvo") — ni "apareció" (que sonaba a
+  // que llega sola) ni "cuidaste" (que metía elogio); pura co-ocurrencia.
+  const trained = c((s) => s.trained === true)
+  if (trained >= 2) {
+    const both = c((s) => s.trained === true && proteinReached(s, ctx))
+    if (both >= 2 && both * 5 >= trained * 3) {
+      out.push({
+        key: 'prot-train',
+        text: `En ${both} de tus ${trained} días de entreno, la proteína también estuvo.`,
+      })
+    }
+  }
+
+  // v2.2: "[señal] apareció solo N días" SALE (patrón prohibido en toda Órbita).
+  // El "solo" es regaño y disfrazado de hallazgo solo cuenta lo que faltó. La
+  // baja frecuencia ya la dice la galaxia con su planeta pequeño/tenue (masa por
+  // frecuencia, nunca hue de alarma). La frecuencia baja se VE, no se dice.
+
+  return out.slice(0, 4)
+}
+
+/* ── §4 · Lo que podemos confirmar — hechos puros (sin interpretación) ─── */
+
+/**
+ * Hechos confirmados de la semana: conteos directos, sin adjetivos de juicio
+ * ("disciplinada"/"floja" están prohibidos). Solo lo que SÍ pasó (>0).
+ */
+export function confirmedFacts(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekEvidenceItem[] {
+  const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
+  const total = isoWeekday(todayIso)
+  const appeared = appearanceCount(buildAppearanceLine(signals, todayIso))
+  const out: WeekEvidenceItem[] = []
+
+  const trained = c((s) => s.trained === true)
+  if (trained >= 1) out.push({ key: 'trained', text: `Entrenaste ${trained} ${veces(trained)}.` })
+
+  const protein = c((s) => proteinReached(s, ctx))
+  if (protein >= 1)
+    out.push({ key: 'protein', text: `Alcanzaste tu proteína ${protein} ${veces(protein)}.` })
+
+  if (total > 0 && appeared === total) out.push({ key: 'logged', text: 'Registraste cada día.' })
+  else if (appeared >= 1)
+    out.push({ key: 'logged', text: `Registraste ${appeared} de ${total} ${dayWord(total)}.` })
+
+  if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
+    const def = c((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+    if (def >= 1)
+      out.push({
+        key: 'deficit',
+        text: `${def} ${dayWord(def)} ${def === 1 ? 'terminó' : 'terminaron'} en déficit.`,
+      })
+  }
+
+  return out
+}
+
+/* ── §5 · Lo que aún necesita más evidencia — honestidad ───────────────── */
+
+/** Pares que Órbita observa pero aún no puede afirmar: si ambos lados tienen
+ *  datos pero coinciden pocas veces, lo decimos con humildad. */
+const PROBE_PAIRS: readonly { a: EvidenceKey; b: EvidenceKey; aWord: string; bWord: string }[] = [
+  { a: 'agua', b: 'deficit', aWord: 'tu agua', bWord: 'tu déficit' },
+  { a: 'sueno', b: 'energia', aWord: 'tu sueño', bWord: 'tu energía' },
+  { a: 'movimiento', b: 'energia', aWord: 'tu movimiento', bWord: 'tu energía' },
+]
+
+/**
+ * Una observación honesta: un par que aún no tiene suficientes coincidencias
+ * para afirmarse (ambos lados con ≥1 día, pero juntos < mínimo). Crea
+ * curiosidad sin fingir confianza. `null` si la semana está vacía o no hay un
+ * par prometedor pero sub-muestreado. Los pares con déficit requieren meta.
+ */
+export function needsMoreEvidence(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): string | null {
+  if (appearanceCount(buildAppearanceLine(signals, todayIso)) === 0) return null
+  const c = (pred: (s: DailySignals) => boolean) => countDays(signals, todayIso, pred)
+  for (const p of PROBE_PAIRS) {
+    const usesDeficit = p.a === 'deficit' || p.b === 'deficit'
+    if (usesDeficit && !(ctx.calorieTarget != null && ctx.calorieTarget > 0)) continue
+    const aDays = c((s) => EVIDENCE_PRED[p.a](s, ctx))
+    const bDays = c((s) => EVIDENCE_PRED[p.b](s, ctx))
+    const both = c((s) => EVIDENCE_PRED[p.a](s, ctx) && EVIDENCE_PRED[p.b](s, ctx))
+    // v2.2: piso ALTO (ambas señales en ≥3 días) → un "casi-patrón" ganado, no
+    // un pie de página que sale casi siempre. Y copy de ANTICIPACIÓN ("se sigue
+    // dibujando"), no de deuda ("no tenemos datos / sigue registrando").
+    if (aDays >= 3 && bDays >= 3 && both < MIN_COOCCURRENCE) {
+      return `${cap(p.aWord)} y ${p.bWord} todavía no se han encontrado las veces suficientes. Algo se sigue dibujando.`
+    }
+  }
+  return null
+}
+
+/* ── §6 · La semana día por día — etiquetas de evidencia ───────────────── */
+
+export type DayTimelineRow = {
+  date: string
+  letter: string
+  /** "Lunes", "Martes"… */
+  weekdayLabel: string
+  state: DayCellState
+  /** Etiquetas de evidencia de ese día ("Déficit", "Proteína", "Entreno",
+   *  "Por encima de tu meta") o ["Sin registros"]. Vacío en días futuros. */
+  tags: string[]
+}
+
+/**
+ * Cada día de la semana (lun→dom) resumido con sus etiquetas de evidencia. Se
+ * entiende la semana en 10 segundos. "Sin registros" y "Por encima de tu meta"
+ * son neutros, nunca reproche. Futuro = sin etiquetas.
+ */
+export function dayTimeline(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): DayTimelineRow[] {
+  const monday = mondayOf(todayIso)
+  const byDay = new Map<string, DailySignals>()
+  for (const s of signals) if (s.day != null) byDay.set(s.day, s)
+
+  return WEEKDAY_LETTERS.map((letter, i) => {
+    const date = addDays(monday, i)
+    const weekdayLabel = cap(SPANISH_WEEKDAYS[i]!)
+    if (date > todayIso) return { date, letter, weekdayLabel, state: 'future' as const, tags: [] }
+
+    const s = byDay.get(date)
+    if (!s || signalCount(s) === 0) {
+      return { date, letter, weekdayLabel, state: 'absent' as const, tags: ['Sin registros'] }
+    }
+
+    const tags: string[] = []
+    const hasTarget = ctx.calorieTarget != null && ctx.calorieTarget > 0
+    const caloriesTagged = hasTarget && s.calories != null && s.calories > 0
+    if (hasTarget && isDeficitDay(s.calories, ctx.calorieTarget)) tags.push('Déficit')
+    else if (hasTarget && s.calories != null && s.calories > ctx.calorieTarget!)
+      tags.push('Por encima de tu meta')
+    if (proteinReached(s, ctx)) tags.push('Proteína')
+    if (s.trained === true) tags.push('Entreno')
+    // 5.4 · el tap debe pagar en sitio: nombrar las señales REALES del día en
+    // vez del fallback "Registro" (la etiqueta más vaga: no decía nada y
+    // enseñaba que tocar no sirve). Comida solo si las calorías no quedaron
+    // ya contadas por Déficit / Por encima.
+    if (s.rested === true) tags.push('Descanso')
+    if ((s.meal_count ?? 0) > 0 && !caloriesTagged) tags.push('Comida')
+    if ((s.sleep_minutes ?? 0) > 0) tags.push('Sueño')
+    if ((s.water_glasses ?? 0) > 0) tags.push('Agua')
+    if (s.mood != null) tags.push('Ánimo')
+    if (tags.length === 0) tags.push('Registro')
+
+    return { date, letter, weekdayLabel, state: 'present' as const, tags }
+  })
+}
+
+/* ── §8 · Repetir la próxima semana — invitaciones a observar ───────────── */
+
+/**
+ * "Esto apareció varias veces" — invitaciones a observar (nunca "deberías").
+ * Reúne la co-ocurrencia más fuerte + el reparto de calorías finde/entre-semana.
+ * Tope 2. Todo observacional, sin causa.
+ */
+export function weekInvitations(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): string[] {
+  const out: string[] = []
+
+  const co = strongestCoOccurrence(signals, todayIso, ctx)
+  if (co) {
+    out.push(
+      `${EVIDENCE_LABEL[co.pair.a]} y ${EVIDENCE_LABEL[co.pair.b].toLowerCase()} aparecieron juntos la mayor parte de la semana.`,
+    )
+  }
+
+  // Reparto de calorías sobre la meta: finde vs. entre semana (solo con meta).
+  if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
+    const monday = mondayOf(todayIso)
+    const elapsed = isoWeekday(todayIso)
+    let weekendOver = 0
+    let weekdayOver = 0
+    let weekdayNear = 0
+    for (let i = 0; i < elapsed; i++) {
+      const s = signals.find((x) => x.day === addDays(monday, i))
+      if (!s || s.calories == null || s.calories <= 0) continue
+      const over = s.calories > ctx.calorieTarget
+      if (i >= 5) {
+        if (over) weekendOver += 1
+      } else {
+        if (over) weekdayOver += 1
+        else weekdayNear += 1
+      }
+    }
+    if (weekendOver >= 1 && weekendOver >= weekdayOver) {
+      out.push('El fin de semana concentró la mayoría de las calorías extra.')
+    } else if (weekdayNear >= 3 && weekdayOver === 0) {
+      out.push('Entre semana te mantuviste cerca de tu meta calórica.')
+    }
+  }
+
+  return out.slice(0, 2)
+}
+
+/* ── §8 · Tu palanca para los PRÓXIMOS DÍAS (cierre accionable, cercano) ──
+ * v2.2: no es "invitaciones a observar" ni la palanca ESTRUCTURAL de Mes ("Tu
+ * fin de semana te sostiene, entre semana margen"). Es UNA palanca cercana —
+ * "estos días / este finde" — derivada de la forma de ESTA semana. Foco, no
+ * orden (recomendación; nunca "comé menos"). Ver docs/orbita-semana-spec.md §8. */
+
+export type WeekLever = { focus: string }
+
+/**
+ * UNA palanca de foco para los próximos días, en clave cercana (no la estructura
+ * mensual de Mes). Prioridad: (1) reparto de calorías del finde vs entre semana
+ * (con meta), (2) sostener el entre semana si viene firme, (3) repetir la
+ * co-ocurrencia más fuerte. `null` si no hay señal suficiente.
+ */
+export function weekLever(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekLever | null {
+  if (ctx.calorieTarget != null && ctx.calorieTarget > 0) {
+    const monday = mondayOf(todayIso)
+    const elapsed = isoWeekday(todayIso)
+    let weekendOver = 0
+    let weekdayOver = 0
+    let weekdayNear = 0
+    for (let i = 0; i < elapsed; i++) {
+      const s = signals.find((x) => x.day === addDays(monday, i))
+      if (!s || s.calories == null || s.calories <= 0) continue
+      const over = s.calories > ctx.calorieTarget
+      if (i >= 5) {
+        if (over) weekendOver += 1
+      } else if (over) weekdayOver += 1
+      else weekdayNear += 1
+    }
+    if (weekendOver >= 1 && weekendOver >= weekdayOver) {
+      // Anclado a dato ("más alto en calorías"), sin "exceso" (etiqueta de
+      // juicio) ni "margen" (vocabulario de la palanca mensual de Mes).
+      return {
+        focus:
+          'Esta semana el finde fue el más alto en calorías. Ese es el espacio que tienes ahora.',
+      }
+    }
+    if (weekdayNear >= 3 && weekdayOver === 0) {
+      // "calórica" despeja que no es meta de peso; "foco" en vez de repetir
+      // "palanca" del eyebrow.
+      return {
+        focus:
+          'Entre semana estás cerca de tu meta calórica. Ese ritmo es tu foco para los días que vienen.',
+      }
+    }
+  }
+
+  const co = strongestCoOccurrence(signals, todayIso, ctx)
+  if (co) {
+    // Verbo observacional aprobado ("aparecieron"); "foco", no "palanca"/"repetir".
+    return {
+      focus: `${EVIDENCE_LABEL[co.pair.a]} y ${EVIDENCE_LABEL[co.pair.b].toLowerCase()} aparecieron juntos esta semana. Eso puede ser tu foco para los próximos días.`,
+    }
+  }
+
+  return null
+}
+
+/* ── Palanca de la semana en curso (criterio Apple: meta TUYA + lo que falta) ──
+ * El "qué hago AHORA" del patrón entreno×déficit: cuántos entrenos llevas esta
+ * semana vs los que TUS mejores semanas en déficit suelen tener, en tono de
+ * oportunidad, nunca de deuda. Ver features/patterns/CLAUDE.md (enmienda jul 2026):
+ * la palanca-presente SÍ puede mostrar meta + lo que falta, sin culpa. */
+
+/** Entrenos-por-semana típicos de tus semanas FUERTES en déficit = la meta
+ *  derivada de TUS datos. `null` si no hay base suficiente (→ solo marcador). */
+function typicalTrainedInStrongWeeks(
+  signals: readonly DailySignals[],
+  target: number,
+): number | null {
+  const byWeek = new Map<string, { trained: number; food: number; deficit: number }>()
+  for (const s of signals) {
+    if (!s.day) continue
+    const wk = mondayOf(s.day)
+    const e = byWeek.get(wk) ?? { trained: 0, food: 0, deficit: 0 }
+    if (s.trained === true) e.trained += 1
+    if (s.calories != null && s.calories > 0) {
+      e.food += 1
+      if (isDeficitDay(s.calories, target)) e.deficit += 1
+    }
+    byWeek.set(wk, e)
+  }
+  const strong = [...byWeek.values()].filter(
+    (e) => e.food >= 3 && e.trained >= 1 && e.deficit / e.food >= 0.5,
+  )
+  if (strong.length < 2) return null
+  const counts = strong.map((e) => e.trained).sort((a, b) => a - b)
+  return Math.max(1, counts[Math.floor(counts.length / 2)]!)
+}
+
+/** Entrenos de la semana EN CURSO (lun→hoy). */
+function trainedThisWeek(signals: readonly DailySignals[], todayIso: string): number {
+  const monday = mondayOf(todayIso)
+  return signals.filter(
+    (s) => s.day != null && s.day >= monday && s.day <= todayIso && s.trained === true,
+  ).length
+}
+
+/** La palanca-presente del patrón entreno×déficit: marcador de esta semana +
+ *  meta de TUS datos + la oportunidad. `null` si no hay meta calórica. */
+export function weeklyMovementLever(
+  signals: readonly DailySignals[],
+  calorieTarget: number | null | undefined,
+  todayIso: string,
+): string | null {
+  if (calorieTarget == null || calorieTarget <= 0) return null
+  const w = trainedThisWeek(signals, todayIso)
+  const typical = typicalTrainedInStrongWeeks(signals, calorieTarget)
+  // Sin meta derivable: solo el marcador (honesto, sin inventar cuota).
+  if (typical == null) {
+    return `Esta semana el movimiento ya apareció ${w} ${w === 1 ? 'vez' : 'veces'}.`
+  }
+  // Ya estás en tu forma: celebra, no pidas más.
+  if (w >= typical) {
+    return `Esta semana llevas ${w} entrenos. Ya estás en tu forma de déficit.`
+  }
+  const faltan = typical - w
+  const mas = faltan === 1 ? 'uno más' : `${faltan} más`
+  return `Esta semana llevas ${w} de ${typical} entrenos que suelen ponerte en déficit. Con ${mas}, lo repites.`
+}
+
+/* ── El sello de semana (la cita del lunes · Fase 7) ─────────────────── */
+
+export type WeekSeal = {
+  /** El domingo de la semana sellada — pásalo como `todayIso` a
+   *  weekSilhouette para render de los 7 días completos. */
+  prevSunday: string
+  /** UNA observación de evidencia. Sin denominador "de 7" (la primera
+   *  semana pudo empezar a media semana → examen retroactivo) y sin
+   *  "lograste / no lograste": la semana se sella con lo que hubo. */
+  observation: string
+}
+
+/**
+ * La semana pasada, sellada — el artefacto del lunes. Solo existe el LUNES
+ * (la cita: la usuaria aprende que ese día hay algo nuevo sí o sí) y solo
+ * si la semana pasada dejó huella (null si no; el lunes sin historia previa
+ * muestra la Semana normal). Referente: el refresh de Apple Trends, sin su
+ * deadline ni score.
+ */
+export function weekSeal(
+  signals: readonly DailySignals[],
+  todayIso: string,
+  ctx: WeekDimCtx,
+): WeekSeal | null {
+  if (isoWeekday(todayIso) !== 1) return null // solo el lunes
+  const monday = mondayOf(todayIso)
+  const prevMonday = addDays(monday, -7)
+  const prevSunday = addDays(monday, -1)
+  const prev = signals.filter((s) => s.day != null && s.day >= prevMonday && s.day <= prevSunday)
+  if (prev.length === 0) return null
+
+  // La dimensión con más presencia — la protagonista de la semana sellada.
+  let topKey: WeekDimKey | null = null
+  let topCount = 0
+  for (const key of WEEK_DIM_ORDER) {
+    const n = prev.reduce((acc, s) => (PRESENT[key](s, ctx) ? acc + 1 : acc), 0)
+    if (n > topCount) {
+      topKey = key
+      topCount = n
+    }
+  }
+
+  // El día más encendido — plenitud por signalCount (misma vara que la silueta).
+  let brightest: DailySignals | null = null
+  for (const s of prev) {
+    if (brightest == null || signalCount(s) > signalCount(brightest)) brightest = s
+  }
+  const brightDay = brightest?.day != null ? SPANISH_WEEKDAYS[isoWeekday(brightest.day) - 1] : null
+
+  if (topKey != null && topCount > 0) {
+    // Sujeto = TÚ, no la métrica ("Registraste comida 3 días", nunca
+    // "Comida apareció 3 días" — voice-and-copy: el sujeto somos tú y ella).
+    const dias = topCount === 1 ? 'un día' : `${topCount} días`
+    const base = `Registraste ${LABEL[topKey].toLowerCase()} ${dias} la semana pasada.`
+    return {
+      prevSunday,
+      observation:
+        brightDay != null && topCount > 1
+          ? `${base} El ${brightDay} fue tu día más encendido.`
+          : base,
+    }
+  }
+  return { prevSunday, observation: 'Tu semana pasada quedó registrada, día a día.' }
 }

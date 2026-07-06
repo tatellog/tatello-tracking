@@ -28,9 +28,10 @@ import {
   reconstructState,
   safeLevelsFor,
   type Enfoque,
+  type MacroInputs,
   type Nivel,
 } from '@/features/profile/calcMacros'
-import { useMacroInputs } from '@/features/profile/hooks'
+import { useAdaptiveTdee, useMacroInputs } from '@/features/profile/hooks'
 import { colors, radius, spacing, typography } from '@/theme'
 
 type Source = 'banner' | 'settings' | 'onboarding' | undefined
@@ -51,6 +52,18 @@ const ENFOQUE_INFO: Record<Enfoque, { name: string; desc: string }> = {
     name: 'Superávit',
     desc: 'Comes un poco más de lo que gastas, con buena proteína, para darle a tu cuerpo material para ganar músculo.',
   },
+}
+
+// El déficit se describe por NIVEL: decir "sin prisa" bajo un Marcado de
+// -750 contradice lo que la usuaria acaba de elegir. Honesto con el ritmo
+// y con lo que pide sostenerlo, sin culpa (manifiesto).
+const DEFICIT_DESC: Record<Nivel, string> = {
+  light:
+    'Comes un poco menos de lo que tu cuerpo gasta. Así usa tu reserva como energía y bajas de grasa sin prisa.',
+  moderate:
+    'Comes menos de lo que tu cuerpo gasta, en un punto medio que la mayoría puede sostener. Avance constante sin exigirte de más.',
+  marked:
+    'Comes bastante menos de lo que tu cuerpo gasta. El cambio se nota antes, pero es el nivel que más pide. Si un día pesa, bajar de nivel también es cuidarte.',
 }
 
 /*
@@ -93,6 +106,8 @@ export default function MacroTargetsScreen() {
       <ManualTargets
         insets={insets}
         existing={existing ? { protein_g: existing.protein_g, calories: existing.calories } : null}
+        missing={missingInputLabels(inputs)}
+        onCompleteProfile={() => router.push('/profile')}
         onSaved={goHome}
         onCancel={goHome}
       />
@@ -125,6 +140,10 @@ type EditorProps = {
 function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: EditorProps) {
   const router = useRouter()
   const upsert = useUpsertMacroTargets()
+  // M2 · el gasto REAL despejado de sus datos (null sin datos suficientes).
+  // OBSERVACIÓN junto a la fórmula, jamás meta automática: la meta la sigue
+  // eligiendo ella y el piso MIN_CALORIES no se toca.
+  const adaptive = useAdaptiveTdee()
 
   const [enfoque, setEnfoque] = useState<Enfoque>('deficit')
   const [nivel, setNivel] = useState<Nivel>('moderate')
@@ -186,6 +205,10 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
 
   const levelLabel = selectedStop?.label ?? ''
   const nivelHeading = enfoque === 'surplus' ? 'NIVEL DE SUPERÁVIT' : 'NIVEL DE DÉFICIT'
+  // ~kg/semana del nivel elegido, sobre el delta REAL (post-topes). Null
+  // bajo 0.1 kg/sem (ruido) — la línea simplemente no aparece.
+  const weeklyKgNum = (Math.abs(deltaReal) * 7) / 7700
+  const weeklyKg = weeklyKgNum >= 0.1 ? weeklyKgNum.toFixed(1) : null
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -243,6 +266,15 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
                 El rango refleja lo que funciona para tu cuerpo.
               </Text>
             ) : null}
+            {/* Equivalencia física del nivel — aritmética honesta del PLAN
+                (|kcal/día| × 7 ≈ kg/sem; 7700 kcal ≈ 1 kg), jamás promesa
+                con fecha ni "projected end date" (manifiesto: sin quick-fix
+                ni metas comparativas; la traducción sana del benchmark). */}
+            {weeklyKg != null ? (
+              <Text style={styles.sustainNote}>
+                Este nivel ≈ ~{weeklyKg} kg por semana. Sin fechas: tu cuerpo pone el ritmo.
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -254,6 +286,14 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
             delta={deltaReal}
             floorNote={clamped ? 'el mínimo para este cuerpo' : null}
           />
+        ) : null}
+
+        {/* M2 · lo invisible #1: el gasto real, dicho como observación. */}
+        {adaptive ? (
+          <Text style={styles.adaptiveNote}>
+            Según tus últimas 4 semanas, tu cuerpo gasta ~{adaptive.tdee} kcal al día.
+            {adaptive.quality === 'temprana' ? ' Aún es una lectura temprana.' : ''}
+          </Text>
         ) : null}
 
         {/* Caso límite (TDEE bajo, todo se topa): una línea cálida del coach
@@ -276,7 +316,9 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
           <Text style={styles.noteGlyph}>✦</Text>
           <View style={styles.noteBody}>
             <Text style={styles.noteTitle}>{ENFOQUE_INFO[enfoque].name}</Text>
-            <Text style={styles.noteText}>{ENFOQUE_INFO[enfoque].desc}</Text>
+            <Text style={styles.noteText}>
+              {enfoque === 'deficit' ? DEFICIT_DESC[nivel] : ENFOQUE_INFO[enfoque].desc}
+            </Text>
           </View>
         </View>
 
@@ -290,14 +332,37 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
 
 /* ─── manual fallback (profile incomplete) ───────────────────────── */
 
+/** Qué piezas del TDEE faltan, en el idioma de la usuaria — alimenta la
+ *  explicación y el CTA del fallback manual (antes: callejón que solo
+ *  explicaba, sin puerta a completar el perfil). */
+function missingInputLabels(inputs: MacroInputs): string[] {
+  const out: string[] = []
+  if (inputs.weight_kg == null) out.push('tu peso')
+  if (inputs.height_cm == null) out.push('tu estatura')
+  if (inputs.date_of_birth == null) out.push('tu fecha de nacimiento')
+  if (inputs.biological_sex == null) out.push('tu sexo')
+  if (inputs.training_frequency == null) out.push('tu frecuencia de entreno')
+  return out
+}
+
+/** "tu peso, tu estatura y tu sexo" — lista en español natural. */
+function listAnd(xs: string[]): string {
+  if (xs.length <= 1) return xs[0] ?? ''
+  return `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`
+}
+
 function ManualTargets({
   insets,
   existing,
+  missing,
+  onCompleteProfile,
   onSaved,
   onCancel,
 }: {
   insets: ReturnType<typeof useSafeAreaInsets>
   existing: MacroTargetsInput | null
+  missing: string[]
+  onCompleteProfile: () => void
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -373,10 +438,23 @@ function ManualTargets({
             <View style={styles.infoCard}>
               <Text style={styles.infoTitle}>DE DÓNDE SALE</Text>
               <Text style={styles.infoText}>
-                Completa tu perfil (peso, estatura, edad) para calcular tus metas automáticamente.
-                Mientras tanto, puedes ajustarlas a mano aquí.
+                {missing.length > 0
+                  ? `Para calcular tus metas por ti falta ${listAnd(missing)}. Mientras tanto, puedes ajustarlas a mano aquí.`
+                  : 'Completa tu perfil para calcular tus metas automáticamente. Mientras tanto, puedes ajustarlas a mano aquí.'}
               </Text>
               <Text style={styles.infoText}>Es una guía, no una regla.</Text>
+              {/* La puerta al camino rico (déficit/mantenimiento/superávit):
+                  con el perfil completo, esta misma pantalla abre el editor
+                  con enfoque y niveles. */}
+              <Pressable
+                onPress={onCompleteProfile}
+                style={styles.infoCta}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Completar mi perfil"
+              >
+                <Text style={styles.infoCtaLabel}>Completar mi perfil ›</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -504,6 +582,15 @@ const styles = StyleSheet.create({
   },
   // Línea del coach (serif italic) cuando el objetivo toca el mínimo: cuidado,
   // no bloqueo. Reservada para el caso límite (todo se topa).
+  // M2 · la observación del gasto real — voz del coach, en calma.
+  adaptiveNote: {
+    marginTop: -spacing.md + 4,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
+    color: colors.bone,
+  },
   floorCoach: {
     marginTop: -spacing.md,
     fontFamily: typography.serif,
@@ -579,6 +666,16 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.bone,
     lineHeight: typography.sizes.body * typography.lineHeight.body,
+  },
+  infoCta: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  infoCtaLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+    letterSpacing: 0.3,
   },
   meta: {
     fontSize: typography.sizes.smallLabel,

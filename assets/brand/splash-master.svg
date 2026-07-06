@@ -1,0 +1,43 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ringRamp" gradientUnits="userSpaceOnUse" x1="758.07" y1="265.93" x2="265.93" y2="758.07">
+      <stop offset="0" stop-color="#FBD7E3"/>
+      <stop offset="0.1464" stop-color="#FF4886"/>
+      <stop offset="0.5782" stop-color="#E91E63"/>
+      <stop offset="1" stop-color="#A6164A"/>
+    </linearGradient>
+    <radialGradient id="orbCore" gradientUnits="userSpaceOnUse" cx="758.07" cy="265.93" r="77">
+      <stop offset="0" stop-color="#FFD9E8"/>
+      <stop offset="0.45" stop-color="#FFA8C6"/>
+      <stop offset="1" stop-color="#FF4886"/>
+    </radialGradient>
+    <radialGradient id="orbHalo" gradientUnits="userSpaceOnUse" cx="758.07" cy="265.93" r="150">
+      <stop offset="0.5" stop-color="#E91E63" stop-opacity="0.45"/>
+      <stop offset="0.75" stop-color="#E91E63" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#E91E63" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="starHalo" gradientUnits="userSpaceOnUse" cx="335" cy="689" r="58">
+      <stop offset="0" stop-color="#D9AE6F" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#D9AE6F" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#D9AE6F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo warm black a lienzo completo -->
+  <rect width="1024" height="1024" fill="#0A0608"/>
+
+  <!-- Campo estelar mínimo: 3 puntos leche/oro, asimétricos, ninguno espejo de otro -->
+  <circle cx="176" cy="204" r="5" fill="#F4ECDE" opacity="0.22"/>
+  <path d="M 872 333 Q 873.8 340.2 881 342 Q 873.8 343.8 872 351 Q 870.2 343.8 863 342 Q 870.2 340.2 872 333 Z" fill="#FFE9C2" opacity="0.18"/>
+  <circle cx="716" cy="856" r="3.5" fill="#F4ECDE" opacity="0.15"/>
+
+  <!-- El mismo arte maestro al 55%, centrado: (1024 - 1024*0.55)/2 = 230.4 -->
+  <g transform="translate(230.4 230.4) scale(0.55)">
+    <path d="M 758.07 265.93 A 348 348 0 0 1 265.93 758.07" stroke="url(#ringRamp)" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 758.07 265.93 A 348 348 0 0 0 265.93 758.07" stroke="url(#ringRamp)" stroke-width="34" stroke-linecap="round"/>
+    <circle cx="335" cy="689" r="58" fill="url(#starHalo)"/>
+    <path d="M 335 654 Q 341 683 370 689 Q 341 695 335 724 Q 329 695 300 689 Q 329 683 335 654 Z" fill="#FFE9C2"/>
+    <circle cx="758.07" cy="265.93" r="150" fill="url(#orbHalo)"/>
+    <circle cx="758.07" cy="265.93" r="77" fill="url(#orbCore)"/>
+  </g>
+</svg>

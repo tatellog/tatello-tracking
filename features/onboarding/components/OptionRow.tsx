@@ -40,7 +40,7 @@ export function OptionRow({ label, selected, onPress, neutral = false }: Props) 
           <Svg width={10} height={8} viewBox="0 0 10 8" fill="none">
             <Path
               d="M1 4L4 7L9 1"
-              stroke="#FFFFFF"
+              stroke={colors.blanco}
               strokeWidth={1.6}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   label: {
     flex: 1,
     fontFamily: typography.uiSemi,
-    fontSize: 13.5,
+    fontSize: typography.sizes.body,
     color: colors.bone,
   },
   labelNeutral: {

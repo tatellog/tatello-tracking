@@ -18,8 +18,9 @@ import { PrimaryCta } from '@/components/PrimaryCta'
 import { usePressFeedback } from '@/components/ui/interaction'
 import { track } from '@/lib/analytics'
 import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
-import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { useCreateMeal, useFrequentMeals, useMealsForDate } from '@/features/macros/hooks'
 import { emitMealLogged } from '@/features/macros/meal-logged-bus'
+import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { subscribeRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { showActionSheet } from '@/lib/actionSheet'
@@ -38,13 +39,7 @@ const PREVIEW_STAR = 19
 
 type MealType = MealInput['meal_type']
 
-function currentMealType(): MealType {
-  const h = new Date().getHours()
-  if (h < 11) return 'breakfast'
-  if (h < 16) return 'lunch'
-  if (h < 21) return 'dinner'
-  return 'snack'
-}
+const currentMealType = (): MealType => mealMomentByHour()
 
 // ── Iconos de los métodos de registro ──
 function SearchIcon({ color, size = 20 }: { color: string; size?: number }) {
@@ -247,6 +242,42 @@ export function MealComposer({ onOpenMeal }: Props) {
   const collapsible = !composing && history.length > COLLAPSED_COUNT
   const visible = collapsible && !expanded ? history.slice(0, COLLAPSED_COUNT) : history
 
+  // "Como ayer" (MFP: el 80% de las comidas se repiten) — el atajo de un tap
+  // a la comida de AYER en este mismo momento (desayuno/comida/cena). Solo
+  // consulta con el registro abierto; sin comida de ayer en el momento, la
+  // fila simplemente no existe.
+  const yesterdayIso = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${d.getFullYear()}-${mm}-${dd}`
+  }, [])
+  const yesterMeals = useMealsForDate(registroOpen ? yesterdayIso : null)
+  const activeMoment = forcedType ?? currentMealType()
+  const comoAyer = useMemo(
+    () => (yesterMeals.data ?? []).find((m) => m.meal_type === activeMoment) ?? null,
+    [yesterMeals.data, activeMoment],
+  )
+
+  const handleComoAyer = () => {
+    if (!comoAyer || confirmed) return
+    log({
+      name: comoAyer.name,
+      protein_g: comoAyer.protein_g,
+      calories: comoAyer.calories,
+      photo_storage_path: comoAyer.photo_storage_path,
+    })
+    setConfirmed(comoAyer.name)
+    setTimeout(() => setConfirmed((c) => (c === comoAyer.name ? null : c)), CONFIRM_MS)
+  }
+
+  // "Aliada" se gana con evidencia: repetición real o aporte de proteína
+  // que mueva la aguja. Con una comida de 2 g registrada 1 vez, llamar a la
+  // sección "lo que más impulsa tu transformación" enseña a descontar la
+  // voz del coach. En frío la sección se presenta sin promesa inflada.
+  const hasAliados = (foods ?? []).some((f) => f.freq >= 3 || f.protein_g >= 15)
+
   const clear = () => {
     setName('')
     setProtein('')
@@ -432,6 +463,27 @@ export function MealComposer({ onOpenMeal }: Props) {
       {registroOpen ? (
         <View style={styles.registro}>
           <Text style={styles.registroTitle}>¿Cómo quieres registrar?</Text>
+          {/* El camino más corto primero: repetir lo de ayer en este momento
+              es un tap. Aparece solo si ayer hubo comida en este momento. */}
+          {comoAyer ? (
+            <Pressable
+              onPress={handleComoAyer}
+              style={styles.comoAyer}
+              accessibilityRole="button"
+              accessibilityLabel={`Como ayer: ${comoAyer.name}`}
+            >
+              <View style={styles.comoAyerText}>
+                <Text style={styles.comoAyerLabel}>
+                  {confirmed === comoAyer.name ? '✦ Registrada' : 'Como ayer'}
+                </Text>
+                <Text style={styles.comoAyerName} numberOfLines={1}>
+                  {comoAyer.name} · {Math.round(comoAyer.protein_g)} g ·{' '}
+                  {Math.round(comoAyer.calories)} kcal
+                </Text>
+              </View>
+              <Text style={styles.comoAyerChevron}>›</Text>
+            </Pressable>
+          ) : null}
           <View style={styles.methods}>
             <MethodTile
               label="Buscar"
@@ -557,10 +609,14 @@ export function MealComposer({ onOpenMeal }: Props) {
       {/* ── §3 · Tus Aliados ── */}
       <View style={styles.aliadosHead}>
         <EyebrowLabel tone="magenta" size={10}>
-          Tus Aliados
+          {hasAliados ? 'Tus Aliados' : 'Tus Comidas'}
         </EyebrowLabel>
       </View>
-      <Text style={styles.aliadosSub}>Las comidas que más impulsan tu transformación.</Text>
+      <Text style={styles.aliadosSub}>
+        {hasAliados
+          ? 'Las comidas que más impulsan tu transformación.'
+          : 'Las que más repitas se vuelven tus aliadas.'}
+      </Text>
 
       <View style={styles.list}>
         {visible.map((item, i) => (
@@ -570,7 +626,7 @@ export function MealComposer({ onOpenMeal }: Props) {
             protein={item.protein_g}
             freq={item.freq}
             photoPath={item.photo_storage_path}
-            rank={composing ? 99 : i}
+            rank={composing || !hasAliados ? 99 : i}
             confirmed={confirmed === item.name}
             onRepeat={() => handleRepeat(item)}
             onOpen={() => onOpenMeal(item.id, item.photo_storage_path ?? undefined)}
@@ -619,6 +675,41 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.niebla,
     marginBottom: 12,
+  },
+  // "Como ayer" — el atajo de un tap, misma vestimenta de card que las tiles.
+  comoAyer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.bgCard2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  comoAyerText: {
+    flex: 1,
+    gap: 2,
+  },
+  comoAyerLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.magenta,
+  },
+  comoAyerName: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  comoAyerChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
   },
   methods: {
     flexDirection: 'row',
@@ -720,7 +811,7 @@ const styles = StyleSheet.create({
   },
   newName: {
     fontFamily: typography.displaySemi,
-    fontSize: 19,
+    fontSize: typography.sizes.heading,
     color: colors.leche,
     letterSpacing: -0.3,
     marginTop: 2,

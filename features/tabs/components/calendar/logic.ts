@@ -9,6 +9,8 @@
  * la constelación nunca discrepan. `rested` es válido pero no enciende estrella.
  */
 
+import { DEFICIT_FLOOR_RATIO, isDeficitDay } from '@/features/orbit/deficit'
+
 import { buildTrailingDays } from '../constellation/data/month-grid'
 
 export type DayStatus = 'empty' | 'trained' | 'rested'
@@ -34,9 +36,27 @@ export type CalendarEvent = {
    *  re-abrir la ceremonia full-screen al tocar el evento. */
   kind?: string
   /** Copy completo (voz del coach) que respalda el evento — se muestra al tocarlo
-   *  ("ver evidencia"). Para patrones incluye el conteo; para transformación, el
-   *  signo en vivo. */
+   *  ("ver evidencia"). Para transformación, el signo en vivo. */
   message?: string
+  /** La PRUEBA del patrón de constancia (la frecuencia como dato consultado,
+   *  p.ej. "El movimiento apareció en 5 de tus últimos 7 días"). Solo para la
+   *  ceremonia — el número vive como evidencia, nunca como titular. */
+  evidence?: string
+  /** La misma evidencia en forma NUMÉRICA (count de total), para la tira visual
+   *  de la ceremonia. */
+  evidenceCount?: number
+  evidenceTotal?: number
+  /** Etapa 3: la correlación con el déficit (barras pareadas + el porqué), si el
+   *  patrón la tiene. La ceremonia la muestra como la PRUEBA que conecta con el
+   *  norte. Tipo laxo (import de orbit evitaría el ciclo) — son EvidenceBar. */
+  evidenceBars?: {
+    label: string
+    value: number
+    total?: number
+    colorKey?: string
+    highlight?: boolean
+  }[]
+  correlationInsight?: string
 }
 
 /** Valores REALES registrados ese día (no presencia). `null` = no registrado.
@@ -157,6 +177,27 @@ function valuesFor(sig: DaySignal | undefined): DayValues {
     weightKg: sig?.weight_kg ?? null,
     onPeriod: sig?.on_period === true,
   }
+}
+
+/**
+ * Contexto del NORTE para el detalle de un día en Historia: cómo quedó ese día
+ * frente a tu meta, como estado CUALITATIVO en voz de coach. Nunca el delta
+ * numérico, nunca semáforo (la frontera countdown/contexto del manifiesto).
+ *
+ * Silencio (null) cuando no hay nada honesto que decir:
+ *   · sin calorías registradas o sin target → no se inventa contexto
+ *   · por debajo del piso sano (60% del target) → no se comenta; comentar un
+ *     día de restricción extrema sería celebrarlo o señalarlo, ambos prohibidos
+ */
+export function deficitContextLine(
+  calories: number | null | undefined,
+  target: number | null | undefined,
+): string | null {
+  if (target == null || target <= 0) return null
+  if (calories == null || calories <= 0) return null
+  if (isDeficitDay(calories, target)) return 'Un día en déficit. De esos que suman.'
+  if (calories < target * DEFICIT_FLOOR_RATIO) return null
+  return 'Ese día tu cuerpo pidió más.'
 }
 
 export function buildCalendarDays(args: BuildCalendarDaysArgs): CalendarDay[] {

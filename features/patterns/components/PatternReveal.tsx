@@ -46,8 +46,10 @@ import type { PatternType } from '../logic'
 const AnimatedG = Animated.createAnimatedComponent(G)
 const AnimatedPath = Animated.createAnimatedComponent(Path)
 
-const MAGENTA = '#E91E63'
-const ORO = '#D9AE6F'
+// Alias de tokens (nunca hex literal: si el token cambia, un literal copiado
+// driftea en silencio).
+const MAGENTA = colors.magenta
+const ORO = colors.oro
 
 // Figure canvas inside the card — node coordinates live in this box.
 const FW = 300

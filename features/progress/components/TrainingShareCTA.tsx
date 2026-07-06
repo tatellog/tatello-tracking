@@ -7,14 +7,20 @@ import Svg, { Path } from 'react-native-svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useProfile } from '@/features/profile/hooks'
-import { useMeasurements, useMonthWorkoutDates } from '@/features/progress/hooks'
+import {
+  useMeasurements,
+  useMonthWorkoutDates,
+  useTotalTrainedDays,
+} from '@/features/progress/hooks'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { showActionSheet } from '@/lib/actionSheet'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
+import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
+
 import { ProgressShareSheet, type ShareTab } from './ProgressShareSheet'
-import { ConstelacionIcon, MomentoIcon, ProgresoIcon } from './share-icons'
+import { CalendarioIcon, ConstelacionIcon, ProgresoIcon } from './share-icons'
 import { constellationReveal, monthLabelFromIso, weightSpan } from '../share-logic'
 import { useWorkoutSharedToday } from '../shared-flag'
 import type { ShareCardStyle } from '../share-styles'
@@ -85,11 +91,17 @@ function coachLineForDay(dayCount: number): string {
  * si falta, su estado vacío ofrece agregarla sin cerrar el sheet. La
  * foto nunca sale del teléfono — es la celebración de hoy, no un registro.
  */
-export function TrainingShareCTA() {
+/**
+ * `historyMode`: en la pantalla "Tu constancia" (calendario de movimiento) el share
+ * NO se gatea por "entrenaste hoy", NO usa el marco "Entreno de hoy", y la tarjeta
+ * RECOMENDADA es la Constelación (tu cielo/constancia), no el Momento de hoy.
+ */
+export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolean } = {}) {
   const brief = useHomeBrief()
   const profile = useProfile()
   const measurements = useMeasurements(null)
   const monthWorkouts = useMonthWorkoutDates()
+  const totalTrained = useTotalTrainedDays()
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -120,6 +132,16 @@ export function TrainingShareCTA() {
   const monthLabel = monthLabelFromIso(todayIso)
   const workoutsThisMonth = monthWorkouts.data?.length ?? 0
   const coachCopy = coachLineForDay(dayCount)
+  // Grilla del mes en curso para la tarjeta "Calendario" (días entrenados).
+  const monthGrid = useMemo(
+    () => buildMonthGrid(`${todayIso.slice(0, 7)}-01`, monthWorkouts.data ?? [], todayIso),
+    [todayIso, monthWorkouts.data],
+  )
+  const monthFirstWeekday = useMemo(() => {
+    const [y, m] = todayIso.split('-').map(Number) as [number, number]
+    // Lunes-primero, como todos los calendarios de la app.
+    return (new Date(y, m - 1, 1).getDay() + 6) % 7
+  }, [todayIso])
   // "Compartiste tu entreno de hoy" — persiste por día (solo la acción, no la
   // imagen). Se resetea al cambiar de día. Sin racha ni culpa: su ausencia es
   // neutra (manifiesto).
@@ -169,7 +191,7 @@ export function TrainingShareCTA() {
   // corra siempre en el mismo orden.
   const tabs: readonly ShareTab[] = useMemo(() => {
     const cardFor = (
-      variant: 'constelacion' | 'momento' | 'progreso',
+      variant: 'constelacion' | 'calendario' | 'momento' | 'progreso',
       onReady: () => void,
       cardStyle: ShareCardStyle,
     ) => (
@@ -184,6 +206,8 @@ export function TrainingShareCTA() {
         nextStarDay={reveal.nextStarDay}
         monthLabel={monthLabel}
         workoutsThisMonth={workoutsThisMonth}
+        monthCells={monthGrid.cells}
+        monthFirstWeekday={monthFirstWeekday}
         activeDays={dayCount}
         weightFrom={weight?.from ?? null}
         weightTo={weight?.to ?? null}
@@ -192,21 +216,24 @@ export function TrainingShareCTA() {
         onReady={onReady}
       />
     )
+    // Orden: Constelación · CALENDARIO (medio, recomendada) · Progreso.
     return [
       {
         id: 'constelacion',
         label: 'Constelación',
         icon: (active: boolean) => <ConstelacionIcon active={active} />,
+        recommended: !historyMode,
         render: (onReady: () => void, cardStyle: ShareCardStyle) =>
           cardFor('constelacion', onReady, cardStyle),
       },
       {
-        id: 'momento',
-        label: 'Momento',
-        icon: (active: boolean) => <MomentoIcon active={active} />,
-        recommended: true,
+        id: 'calendario',
+        label: 'Calendario',
+        icon: (active: boolean) => <CalendarioIcon active={active} />,
+        // En "Tu constancia" el Calendario (esta grilla) es la recomendada, al centro.
+        recommended: historyMode,
         render: (onReady: () => void, cardStyle: ShareCardStyle) =>
-          cardFor('momento', onReady, cardStyle),
+          cardFor('calendario', onReady, cardStyle),
       },
       {
         id: 'progreso',
@@ -225,25 +252,33 @@ export function TrainingShareCTA() {
     reveal,
     monthLabel,
     workoutsThisMonth,
+    monthGrid,
+    monthFirstWeekday,
     weight,
     coachCopy,
+    historyMode,
   ])
 
-  // Gate: la sección aparece solo una vez que se marcó hoy como entrenado.
+  // Gate: en el dashboard de hoy aparece solo si entrenaste hoy. En historyMode
+  // (pantalla "Tu constancia") está disponible en cuanto exista ALGO que
+  // compartir — con 0 entrenos totales, invitar a "compartir mi constancia"
+  // es invitar a compartir un cero.
   const trainedToday = brief.data?.today_workout_completed === true
-  if (!trainedToday) return null
+  if (!trainedToday && !historyMode) return null
+  if (historyMode && (totalTrained.data ?? 0) === 0) return null
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(320)} style={styles.wrap}>
-      <EyebrowLabel tone="magenta" style={styles.eyebrow}>
-        Entreno de hoy
-      </EyebrowLabel>
-
-      {/* La foto del entreno es efímera (solo para la tarjeta de compartir),
-          así que NO vive acá como registro: se agrega dentro del sheet, en el
-          estado vacío de Momento. El dashboard solo celebra el día (línea del
-          coach) e invita a compartir. */}
-      <Text style={styles.coach}>{coachCopy}</Text>
+      {/* El marco "Entreno de hoy" (eyebrow + línea del coach) NO aplica en la
+          pantalla de constancia: ahí solo un botón limpio para compartir tu cielo. */}
+      {!historyMode ? (
+        <>
+          <EyebrowLabel tone="magenta" style={styles.eyebrow}>
+            Entreno de hoy
+          </EyebrowLabel>
+          <Text style={styles.coach}>{coachCopy}</Text>
+        </>
+      ) : null}
 
       {sharedToday ? (
         <TouchableOpacity
@@ -278,16 +313,20 @@ export function TrainingShareCTA() {
       >
         <ShareIcon />
         <Text style={styles.shareLabel}>
-          {sharedToday ? 'Compartir de nuevo' : 'Compartir entreno'}
+          {sharedToday
+            ? 'Compartir de nuevo'
+            : historyMode
+              ? 'Compartir mi constancia'
+              : 'Compartir entreno'}
         </Text>
       </TouchableOpacity>
 
       <ProgressShareSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        subtitle="Tu entrenamiento"
+        subtitle={historyMode ? 'Tu constancia' : 'Tu entrenamiento'}
         shareType="workout"
-        defaultTabId={lastShare?.template ?? 'momento'}
+        defaultTabId={historyMode ? 'calendario' : (lastShare?.template ?? 'constelacion')}
         tabs={tabs}
         onShared={(r) => {
           markShared(r.action)
@@ -407,7 +446,7 @@ const styles = StyleSheet.create({
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     gap: 8,
     marginTop: 14,
     paddingVertical: 10,

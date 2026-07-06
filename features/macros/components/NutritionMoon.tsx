@@ -544,6 +544,44 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
 
   const barStyle = useAnimatedStyle(() => ({ width: `${(p.value / PHASE_MAX) * 100}%` }))
 
+  // ── Hero COMPACTO en estado 0 (patrón del colapso post-ritual de Hoy):
+  // con 0 g, la luna gigante gastaba el primer screenful para decir "aún
+  // nada". El compacto conserva número, copy y una luna dormida pequeña;
+  // el hero pleno regresa con la primera comida. (Todos los hooks corren
+  // arriba: el early-return no altera su orden entre renders.)
+  if (!isLoading && Math.round(proteinValue) <= 0) {
+    return (
+      <View style={styles.heroCompact}>
+        <View style={styles.compactText}>
+          <Text style={styles.eyebrow}>Tu cielo nutricional</Text>
+          <View
+            style={styles.readout}
+            accessibilityRole="text"
+            accessibilityLabel={
+              reference != null
+                ? `0 de ${reference} gramos de proteína`
+                : '0 gramos de proteína registrados'
+            }
+          >
+            <Text style={styles.compactValue}>0</Text>
+            {reference != null ? (
+              <Text style={styles.reference}> / {reference} g</Text>
+            ) : (
+              <Text style={styles.reference}> g</Text>
+            )}
+          </View>
+          <Text style={styles.coach}>{copy.phrase}</Text>
+          {copy.honest ? <Text style={styles.honest}>{copy.honest}</Text> : null}
+        </View>
+        {/* Luna dormida — glifo estático pequeño, sin cielo Skia. */}
+        <Svg width={52} height={52} viewBox="0 0 52 52" pointerEvents="none">
+          <SvgCircle cx={26} cy={26} r={24} stroke={colors.hairline} strokeWidth={1} fill="none" />
+          <SvgCircle cx={26} cy={26} r={16} fill={colors.bgCard2} />
+        </Svg>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.hero}>
       <Sky W={W} cx={cx} cy={cy} p={p} reduced={reduced} />
@@ -616,6 +654,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     overflow: 'hidden',
   },
+  // Estado 0: media altura, sin cielo Skia — el screenful se lo ganan los
+  // Momentos y los Aliados (lo accionable) hasta que la luna tenga qué contar.
+  heroCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingVertical: 14,
+  },
+  compactText: {
+    flex: 1,
+  },
+  compactValue: {
+    fontFamily: typography.displayHeavy,
+    fontSize: 32,
+    color: colors.leche,
+    letterSpacing: -1,
+    lineHeight: 34,
+  },
   moonImg: {
     width: '100%',
     height: '100%',
@@ -653,7 +712,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: typography.uiSemi,
-    fontSize: 10,
+    fontSize: typography.sizes.smallLabel,
     color: colors.bone,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
@@ -687,7 +746,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: 14,
+    fontSize: typography.sizes.bodyLarge,
     lineHeight: 18,
     color: colors.leche,
   },

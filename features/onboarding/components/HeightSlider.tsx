@@ -219,8 +219,8 @@ export function HeightSlider({
                     <Stop offset="100%" stopColor={colors.magenta} stopOpacity={0} />
                   </RadialGradient>
                   <RadialGradient id="thumb-core" cx="50%" cy="50%" r="60%">
-                    <Stop offset="0%" stopColor="#FFFFFF" />
-                    <Stop offset="50%" stopColor="#FBD7E3" />
+                    <Stop offset="0%" stopColor={colors.blanco} />
+                    <Stop offset="50%" stopColor={colors.rosaLuz} />
                     <Stop offset="100%" stopColor={colors.magenta} />
                   </RadialGradient>
                 </Defs>
@@ -236,7 +236,12 @@ export function HeightSlider({
                   fill="url(#thumb-core)"
                   animatedProps={coreProps}
                 />
-                <Circle cx={THUMB_BOX / 2} cy={THUMB_BOX / 2} r={STAR_R * 0.35} fill="#FFFFFF" />
+                <Circle
+                  cx={THUMB_BOX / 2}
+                  cy={THUMB_BOX / 2}
+                  r={STAR_R * 0.35}
+                  fill={colors.blanco}
+                />
               </Svg>
             </Animated.View>
           </View>
@@ -277,7 +282,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontFamily: typography.displayHeavy,
-    fontSize: 58,
+    fontSize: typography.sizes.sliderNum,
     lineHeight: 60,
     color: colors.leche,
     letterSpacing: -2,
@@ -316,7 +321,7 @@ const styles = StyleSheet.create({
   },
   stepGlyph: {
     fontFamily: typography.uiMedium,
-    fontSize: 22,
+    fontSize: typography.sizes.segmentTitle,
     lineHeight: 24,
     color: colors.niebla,
   },

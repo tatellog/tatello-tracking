@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
+import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
 import { toWeightPoints } from '@/features/progress/logic'
+import { todayInTimezone } from '@/lib/time'
+
+import { adaptiveTdee, type AdaptiveTdee } from './adaptive-tdee'
 import { clearAnalyticsCache } from '@/lib/analytics'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
@@ -177,4 +181,19 @@ export function useDeleteAccount() {
       await supabase.auth.signOut().catch(() => {})
     },
   })
+}
+
+/*
+ * M2 · TDEE adaptativo: el gasto REAL despejado de daily_signals
+ * (calorías + pesajes, últimas 4 semanas cerradas). null bajo los
+ * mínimos de datos — la UI que lo consuma simplemente calla. Reusa la
+ * query cacheada de señales (misma que Órbita): cero fetch extra.
+ */
+export function useAdaptiveTdee(): AdaptiveTdee | null {
+  const signals = useSignalsHistory(40)
+  const today = todayInTimezone()
+  return useMemo(
+    () => adaptiveTdee((signals.data ?? []) as Parameters<typeof adaptiveTdee>[0], today),
+    [signals.data, today],
+  )
 }

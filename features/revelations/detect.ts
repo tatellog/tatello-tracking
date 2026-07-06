@@ -26,12 +26,17 @@ import { fetchPatternData } from './pattern-data'
  * features/patterns + consistency (sin duplicar lógica). El copy de patrón
  * (con conteos) lo arma patternRevelationCopy.
  *
- * Prioridad entre patrones (behavioral, spec Decisión #5): los POSITIVOS
- * ganan al noticing — entreno > proteína > sueño; la comida nocturna solo
- * emerge si NO hay ningún positivo, y con cadencia propia ≥ 14 días.
+ * Prioridad entre patrones (behavioral, spec Decisión #5): los POSITIVOS de
+ * CONSTANCIA ganan al noticing — entreno > proteína > sueño; la comida nocturna
+ * solo emerge si NO hay ningún positivo, y con cadencia propia ≥ 14 días. Todos
+ * se enmarcan como "descubrí esto en tus registros" (el diferenciador: patrones
+ * en TUS datos).
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000
+/** Ventana de "app abierta" para detectar el regreso (abandono). */
+const OPENS_LOOKBACK_MS = 14 * DAY_MS
+/** Cadencia propia del noticing de comida nocturna (no más de 1 cada 14 días). */
 const NOTICING_CADENCE_MS = 14 * DAY_MS
 
 type OpenRow = { created_at: string }
@@ -60,16 +65,15 @@ function buildPattern(kind: string, result: ConsistencyResult): OrchestratorPatt
 }
 
 /**
- * Elige UN patrón (o null). Positivos primero (entreno > proteína > sueño);
- * el noticing solo si no hay positivo y pasó su cadencia de 14 días.
+ * Elige UN patrón (o null). Positivos de constancia primero (entreno > proteína
+ * > sueño); el noticing de comida nocturna solo si no hay positivo y pasó su
+ * cadencia de 14 días.
  */
 function pickPattern(
   data: Awaited<ReturnType<typeof fetchPatternData>>,
   nowMs: number,
   lastNightAtMs: number | null,
 ): OrchestratorPattern | null {
-  const now = new Date(nowMs)
-
   const training = detectTrainingConsistency(data.workoutDates, nowMs)
   if (training.detected) return buildPattern('training_consistent', training)
 
@@ -80,6 +84,7 @@ function pickPattern(
   if (sleep.detected) return buildPattern('sleep_consistent', sleep)
 
   // Noticing — solo en ausencia de positivo, con cadencia propia ≥ 14 días.
+  const now = new Date(nowMs)
   if (
     detectNightEating(data.meals, now) &&
     (lastNightAtMs == null || nowMs - lastNightAtMs >= NOTICING_CADENCE_MS)
@@ -97,7 +102,7 @@ export async function detectPendingRevelation(args: {
 }): Promise<PendingRevelation | null> {
   const userId = await requireUserId()
   const nowMs = Date.now()
-  const since = new Date(nowMs - NOTICING_CADENCE_MS).toISOString()
+  const since = new Date(nowMs - OPENS_LOOKBACK_MS).toISOString()
 
   const [shownKinds, lastReturn, lastPattern, lastNight, opensRes, data] = await Promise.all([
     shownTransformationKinds(),
