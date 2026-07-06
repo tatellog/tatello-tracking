@@ -198,7 +198,7 @@ export default function RootLayout() {
                 >
                   {/* Slide-up sheet for logging a measurement. Other routes
                     (incluido movement-calendar) heredan el push de página
-                    completa por defecto — "Tu historia" es una página, no un
+                    completa por defecto — "Tu constancia" es una página, no un
                     modal deslizante. */}
                   <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
                 </Stack>

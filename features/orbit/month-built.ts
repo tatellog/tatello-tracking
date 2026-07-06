@@ -1393,7 +1393,7 @@ export function detectMonthPatterns(
 }
 
 /** La correlación con el DÉFICIT (el norte) que respalda un patrón de constancia
- *  de "Tu historia": conecta el esfuerzo (entreno/sueño) con lo que la usuaria
+ *  de "Tu constancia" (calendario de movimiento): conecta el esfuerzo (entreno/sueño) con lo que la usuaria
  *  quiere (bajar). Devuelve las barras pareadas + el porqué, o null si esa
  *  correlación no se sostiene con los datos. Etapa 3: la ceremonia del patrón
  *  deja de ser solo frecuencia y muestra la PRUEBA que importa. */
@@ -1611,7 +1611,7 @@ export function comboPhrase(combo: WinningCombo): string {
 
 /** La evidencia del patrón dominante (frase + conteo + takeaway) para el modal
  *  cinemático de revelación. Compartida por Órbita Mes Y por el re-vivir del
- *  patrón desde "Tu historia" (mismo sistema). */
+ *  patrón desde "Tu constancia" (mismo sistema). */
 export type ComboReveal = { phrase: string; countLine: string; takeaway: string }
 export function comboReveal(combo: WinningCombo): ComboReveal {
   const allDeficit = combo.deficits >= combo.occurrences

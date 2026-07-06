@@ -233,7 +233,7 @@ export function WeekSegment({
       {seal && sealCells ? (
         <View style={styles.sealCard}>
           <Text style={styles.sealEyebrow}>El sello de tu semana</Text>
-          <Text style={styles.sealTitle}>Tu semana quedó escrita.</Text>
+          <Text style={styles.sealTitle}>Tu semana pasada quedó escrita.</Text>
           <WeekSilhouette cells={sealCells} />
           <Text style={styles.sealObservation}>{seal.observation}</Text>
           <Text style={styles.sealBridge}>Una semana nueva se abre.</Text>

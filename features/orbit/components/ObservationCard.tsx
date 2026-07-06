@@ -18,7 +18,7 @@ import type { WeekObservation } from '../week-logic'
  * opens the detail screen.
  */
 
-const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 /** Seven day-bars (Mon-first); the days the observation is about burn in
  *  the accent color, the rest stay quiet. `days` are Sunday-first (0=Sun). */

@@ -187,7 +187,7 @@ function WeekdayChart({ data }: { data: Extract<ChartData, { kind: 'weekday' }> 
   const TOP = 10
   const BASELINE = H - 18
   const MAX_H = BASELINE - TOP
-  const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+  const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
   return (
     <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       {data.bars.map((v, i) => {

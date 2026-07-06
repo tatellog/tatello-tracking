@@ -16,7 +16,7 @@ const CATEGORY_TAG: Record<PatronCategory, string> = {
   correlacion: 'se conecta',
 }
 
-const WEEK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 /* The weekday glyph — seven small bars under their day letter, with
  * the pattern's focus day in magenta. You see at once which day the

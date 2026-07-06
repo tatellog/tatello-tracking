@@ -87,7 +87,7 @@ export function TabHeader({
           hitSlop={10}
           style={styles.settingsBtn}
           accessibilityRole="button"
-          accessibilityLabel="Tu historia"
+          accessibilityLabel="Tu constancia"
         >
           <CalendarIcon color={colors.niebla} />
         </Pressable>

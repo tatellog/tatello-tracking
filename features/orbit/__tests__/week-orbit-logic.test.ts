@@ -103,10 +103,10 @@ describe('weekDirection (§0 · rumbo vs la semana pasada)', () => {
 describe('weekSilhouette (§S · la forma de los 7 días)', () => {
   const CTX_CAL = { proteinTarget: 130, calorieTarget: 2000 }
 
-  it('devuelve 7 celdas L-M-M-J-V-S-D con estado por día', () => {
+  it('devuelve 7 celdas L-M-X-J-V-S-D con estado por día', () => {
     const cells = weekSilhouette([mkSig(MON, { meal_count: 1 })], WED, CTX)
     expect(cells).toHaveLength(7)
-    expect(cells.map((c) => c.letter)).toEqual(['L', 'M', 'M', 'J', 'V', 'S', 'D'])
+    expect(cells.map((c) => c.letter)).toEqual(['L', 'M', 'X', 'J', 'V', 'S', 'D'])
     expect(cells[0]?.state).toBe('past') // MON < WED
     expect(cells[2]?.state).toBe('today') // WED
     expect(cells[3]?.state).toBe('future') // THU > WED
@@ -349,11 +349,11 @@ describe('buildAppearanceLine', () => {
   it('marca presente / ausente / futuro en orden lunes-primero', () => {
     const signals = [mkSig(MON, { trained: true }), mkSig(WED, { meal_count: 1 })]
     const line = buildAppearanceLine(signals, THU) // hoy = jueves
-    expect(line.map((c) => c.letter)).toEqual(['L', 'M', 'M', 'J', 'V', 'S', 'D'])
+    expect(line.map((c) => c.letter)).toEqual(['L', 'M', 'X', 'J', 'V', 'S', 'D'])
     expect(line.map((c) => c.state)).toEqual([
       'present', // L
       'absent', // M (martes, sin registro)
-      'present', // M (miércoles)
+      'present', // X (miércoles)
       'absent', // J (hoy, sin registro aún)
       'future', // V
       'future', // S

@@ -24,7 +24,7 @@ import { useAllWorkoutDates, useTotalTrainedDays } from '../hooks'
 const COLS = 7
 const CELL = 34
 // Lunes-primero — mismo idioma de calendario que Órbita Mes (MonthGlanceCalendar).
-const WD = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const WD = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 const MONTHS = [
   'enero',
   'febrero',
@@ -199,7 +199,7 @@ export function MovementConstellation({
             </Text>
           </View>
         ) : (
-          <Text style={styles.startLine}>Tu historia empieza con tu primer entreno.</Text>
+          <Text style={styles.startLine}>Tu constancia empieza con tu primer entreno.</Text>
         )}
         {/* El "ahora": ventana propia de 4 semanas, en susurro bajo el héroe. */}
         {recentLine ? <Text style={styles.recentLine}>{recentLine}</Text> : null}
@@ -675,9 +675,12 @@ const styles = StyleSheet.create({
   },
   weekdayRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    // Mismo ancho que la grilla del SVG (viewBox 7×CELL, centrado por
+    // xMidYMid): a ancho completo con space-around las letras derivaban
+    // de sus columnas y el domingo se leía bajo S.
+    alignSelf: 'center',
+    width: COLS * CELL,
     marginBottom: 6,
-    paddingHorizontal: CELL / 2,
     opacity: 0.55, // labels are cartography — they whisper, not shout.
   },
   weekdayLabel: {

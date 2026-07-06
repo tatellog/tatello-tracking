@@ -141,11 +141,11 @@ export default function TabsLayout() {
             title: 'Ajustes',
           }}
         />
-        {/* "Tu historia" (calendario de movimiento) — pantalla del navegador de
+        {/* "Tu constancia" (calendario de movimiento) — pantalla del navegador de
             tabs pero OCULTA del pill (href: null + AppTabBar la salta). Vive aquí
             para conservar la barra de tabs y el header; se abre desde el ícono de
             calendario del header. */}
-        <Tabs.Screen name="movement-calendar" options={{ href: null, title: 'Tu historia' }} />
+        <Tabs.Screen name="movement-calendar" options={{ href: null, title: 'Tu constancia' }} />
       </Tabs>
       {/* Celebración full-screen ("Entrené") — DESPUÉS de <Tabs> para que el
           flash dorado cubra toda la pantalla, incluyendo la barra de tabs. */}

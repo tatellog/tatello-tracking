@@ -321,7 +321,7 @@ export function weekSilhouette(
 export type DayCellState = 'present' | 'absent' | 'future'
 export type DayCell = { letter: string; date: string; state: DayCellState }
 
-const WEEKDAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as const
+const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
 
 /**
  * Los 7 días de la semana (lun→dom) con su estado de APARICIÓN: presente
@@ -1531,7 +1531,7 @@ export function weekSeal(
     // Sujeto = TÚ, no la métrica ("Registraste comida 3 días", nunca
     // "Comida apareció 3 días" — voice-and-copy: el sujeto somos tú y ella).
     const dias = topCount === 1 ? 'un día' : `${topCount} días`
-    const base = `Registraste ${LABEL[topKey].toLowerCase()} ${dias} esta semana.`
+    const base = `Registraste ${LABEL[topKey].toLowerCase()} ${dias} la semana pasada.`
     return {
       prevSunday,
       observation:
@@ -1540,5 +1540,5 @@ export function weekSeal(
           : base,
     }
   }
-  return { prevSunday, observation: 'Tu semana quedó registrada, día a día.' }
+  return { prevSunday, observation: 'Tu semana pasada quedó registrada, día a día.' }
 }

@@ -8,7 +8,7 @@ import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors } from '@/theme'
 
 /*
- * "Tu historia" — calendario de movimiento. Vive DENTRO de (tabs) como pantalla
+ * "Tu constancia" — calendario de movimiento. Vive DENTRO de (tabs) como pantalla
  * oculta (href: null en el layout; AppTabBar la salta), así conserva la barra de
  * tabs y el header estándar. Se navega desde el ícono de calendario del header;
  * se sale por los tabs (sin botón "Cerrar").
@@ -20,7 +20,7 @@ export default function MovementCalendarScreen() {
       <SafeAreaView style={styles.flex} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <ErrorBoundary screen="movement-calendar">
-            <TabHeader title="Tu historia" titleEmphasis="Tu" />
+            <TabHeader title="Tu constancia" titleEmphasis="Tu" />
             <MovementCalendarPanel />
             <View style={styles.shareWrap}>
               <TrainingShareCTA historyMode />

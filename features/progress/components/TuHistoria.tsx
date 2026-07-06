@@ -248,15 +248,21 @@ export function TuHistoria() {
               <Text style={styles.label}>{r.label}</Text>
 
               <View style={styles.values}>
-                <Text style={styles.before}>{r.before ?? '·'}</Text>
+                {r.before != null ? (
+                  <Text style={styles.before}>{r.before}</Text>
+                ) : (
+                  <Text style={styles.emptyValue}>sin marca</Text>
+                )}
                 <Text style={styles.arrow}>→</Text>
-                <Text style={styles.now} numberOfLines={1}>
-                  {r.now ?? '·'}
-                  {r.now != null && r.unit ? <Text style={styles.unit}> {r.unit}</Text> : null}
-                  {r.now != null && r.suffix ? (
-                    <Text style={styles.suffix}> {r.suffix}</Text>
-                  ) : null}
-                </Text>
+                {r.now != null ? (
+                  <Text style={styles.now} numberOfLines={1}>
+                    {r.now}
+                    {r.unit ? <Text style={styles.unit}> {r.unit}</Text> : null}
+                    {r.suffix ? <Text style={styles.suffix}> {r.suffix}</Text> : null}
+                  </Text>
+                ) : (
+                  <Text style={styles.emptyValue}>aún sin marca</Text>
+                )}
               </View>
 
               {r.delta ? (
@@ -394,6 +400,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 7,
+  },
+  // Ventana sin dato — un vacío con intención (mismo vocabulario que el
+  // CTA "Marcar mi peso" de esta pantalla), nunca un punto suelto.
+  emptyValue: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   // El pasado: tenue. El contraste con el presente luminoso ES la evidencia.
   before: {

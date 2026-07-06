@@ -17,11 +17,11 @@ import type { CalendarDay, MonthCalendar } from '../month-built'
  * es por LUMINANCIA + FORMA, no por hue alarmante → coherente con la familia
  * warm-gold de Stelar y manifiesto-safe (ni premia ni castiga).
  *
- * Calendario full-width (lee como calendario: cabecera L-M-M-J-V-S-D + hoy
+ * Calendario full-width (lee como calendario: cabecera L-M-X-J-V-S-D + hoy
  * marcado); el conteo va como caption debajo. Lógica en `monthCalendar`.
  */
 
-const WD_INITIALS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as const
+const WD_INITIALS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
 const DUST = colors.bruma
 
 /** Un día = un punto de luz (o su ausencia). Centrado en su celda. */

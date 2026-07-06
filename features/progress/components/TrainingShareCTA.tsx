@@ -92,9 +92,9 @@ function coachLineForDay(dayCount: number): string {
  * foto nunca sale del teléfono — es la celebración de hoy, no un registro.
  */
 /**
- * `historyMode`: en la pantalla "Tu historia" (calendario de movimiento) el share
+ * `historyMode`: en la pantalla "Tu constancia" (calendario de movimiento) el share
  * NO se gatea por "entrenaste hoy", NO usa el marco "Entreno de hoy", y la tarjeta
- * RECOMENDADA es la Constelación (tu cielo/historia), no el Momento de hoy.
+ * RECOMENDADA es la Constelación (tu cielo/constancia), no el Momento de hoy.
  */
 export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolean } = {}) {
   const brief = useHomeBrief()
@@ -230,7 +230,7 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
         id: 'calendario',
         label: 'Calendario',
         icon: (active: boolean) => <CalendarioIcon active={active} />,
-        // En "Tu historia" el Calendario (esta grilla) es la recomendada, al centro.
+        // En "Tu constancia" el Calendario (esta grilla) es la recomendada, al centro.
         recommended: historyMode,
         render: (onReady: () => void, cardStyle: ShareCardStyle) =>
           cardFor('calendario', onReady, cardStyle),
@@ -260,8 +260,8 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
   ])
 
   // Gate: en el dashboard de hoy aparece solo si entrenaste hoy. En historyMode
-  // (pantalla "Tu historia") está disponible en cuanto exista ALGO que
-  // compartir — con 0 entrenos totales, invitar a "compartir mi historia"
+  // (pantalla "Tu constancia") está disponible en cuanto exista ALGO que
+  // compartir — con 0 entrenos totales, invitar a "compartir mi constancia"
   // es invitar a compartir un cero.
   const trainedToday = brief.data?.today_workout_completed === true
   if (!trainedToday && !historyMode) return null
@@ -270,7 +270,7 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
   return (
     <Animated.View entering={FadeIn.duration(360).delay(320)} style={styles.wrap}>
       {/* El marco "Entreno de hoy" (eyebrow + línea del coach) NO aplica en la
-          pantalla de historia: ahí solo un botón limpio para compartir tu cielo. */}
+          pantalla de constancia: ahí solo un botón limpio para compartir tu cielo. */}
       {!historyMode ? (
         <>
           <EyebrowLabel tone="magenta" style={styles.eyebrow}>
@@ -316,7 +316,7 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
           {sharedToday
             ? 'Compartir de nuevo'
             : historyMode
-              ? 'Compartir mi historia'
+              ? 'Compartir mi constancia'
               : 'Compartir entreno'}
         </Text>
       </TouchableOpacity>
@@ -324,7 +324,7 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
       <ProgressShareSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        subtitle={historyMode ? 'Tu historia' : 'Tu entrenamiento'}
+        subtitle={historyMode ? 'Tu constancia' : 'Tu entrenamiento'}
         shareType="workout"
         defaultTabId={historyMode ? 'calendario' : (lastShare?.template ?? 'constelacion')}
         tabs={tabs}
