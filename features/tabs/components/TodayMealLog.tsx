@@ -25,9 +25,10 @@ import Animated, {
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Path } from 'react-native-svg'
 
 import { mealPhotoUrl, type Meal } from '@/features/macros/api'
+import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { SAMPLE_MEAL_PHOTOS } from '@/features/macros/sampleMealPhotos'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
@@ -89,51 +90,11 @@ function formatTime(iso: string): string {
   return `${h}:${String(m).padStart(2, '0')} ${meridiem}`
 }
 
-/* The celestial glyph for a meal slot — sunrise / sun / crescent /
- * sparkle. It is the meal's node on the estela. */
+/* El glifo del momento delega en el módulo CANÓNICO (sol/planeta/luna/
+ * cometa) — antes Hoy tenía su propio vocabulario (amanecer/sol/luna/✦)
+ * y la usuaria veía dos familias para los mismos 4 momentos. */
 function PeriodGlyph({ period, size, color }: { period: MealType; size: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      {period === 'lunch' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.3} fill={color} />
-          <Path
-            d="M12 5.6 V2.8 M12 18.4 V21.2 M18.4 12 H21.2 M5.6 12 H2.8 M16.5 7.5 L18.5 5.5 M7.5 7.5 L5.5 5.5 M16.5 16.5 L18.5 18.5 M7.5 16.5 L5.5 18.5"
-            stroke={color}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-        </>
-      ) : period === 'dinner' ? (
-        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
-      ) : period === 'breakfast' ? (
-        <>
-          <Path d="M7 17.5 A 5 5 0 0 1 17 17.5 Z" fill={color} />
-          <Path
-            d="M2.6 17.5 H21.4 M12 9 V6.4 M6.6 12 L4.8 10.3 M17.4 12 L19.2 10.3"
-            stroke={color}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-        </>
-      ) : (
-        <>
-          <Path
-            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
-            fill={color}
-          />
-          <Path
-            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
-            fill={color}
-          />
-          <Path
-            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
-            fill={color}
-          />
-        </>
-      )}
-    </Svg>
-  )
+  return <MealGlyph type={period} size={size} color={color} />
 }
 
 /* A bowl with steam — the placeholder for any meal with no photo,

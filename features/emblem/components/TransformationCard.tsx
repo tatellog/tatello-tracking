@@ -239,8 +239,11 @@ function Explainer() {
       <View style={styles.expRow}>
         <Text style={styles.expGlyph}>✦</Text>
         <Text style={styles.expBody}>
-          <Text style={styles.expTerm}>Tu constelación</Text> responde al movimiento: crece cuando
-          entrenas y empieza de nuevo cada mes. Pregunta “¿cuánto me moví?”.
+          {/* Mecánica A real: CUALQUIER registro enciende la estrella del día.
+              El copy viejo ("crece cuando entrenas") narraba una regla muerta
+              y contradecía lo que la usuaria ve (auditoría coherencia 5 jul). */}
+          <Text style={styles.expTerm}>Tu constelación</Text> responde a tu presencia: cada día con
+          registro enciende una estrella, y empieza de nuevo cada mes. Pregunta “¿aparecí?”.
         </Text>
       </View>
       <View style={styles.expRow}>

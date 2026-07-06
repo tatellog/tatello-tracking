@@ -607,6 +607,20 @@ bajo MIN_CALORIES, comunicado como observación ("tu cuerpo gasta ~1,900
 según tus últimas 4 semanas"), nunca sentencia. Función pura + tests,
 sobre daily_signals + pesajes suavizados que ya existen.
 
+**Progreso (5 jul 2026) — motor construido:**
+
+- `_shared/intelligence/adaptive-tdee.ts` (app+server, 9 tests): ventana
+  de 28 días cerrados, días creíbles ≥800 kcal (≥14 requeridos), racimos
+  de pesajes de 10 días en ambos extremos (span ≥14 entre centros),
+  clamp [1200, 4500], calidad solida/temprana. Null bajo mínimos: jamás
+  inventa.
+- Primera superficie: observación serif en el editor de metas ("Según
+  tus últimas 4 semanas, tu cuerpo gasta ~1,880 kcal al día."), junto a
+  la fórmula, sin tocar la meta ni el piso MIN_CALORIES.
+- Pendiente M2 slice 2 (decisiones dueña): ¿ofrecer "usar mi gasto real"
+  como base del cálculo de niveles? ¿re-estimación semanal visible
+  (Lectura)? ¿dónde más vive la observación (Progreso)?
+
 ### M3 · La Voz real + Lecturas (Fase B)
 
 Anthropic en las Lecturas (Diaria/Semanal/Mensual) reemplazando el mock;

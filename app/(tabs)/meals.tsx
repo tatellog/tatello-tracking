@@ -255,9 +255,11 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: colors.bgNav,
     borderWidth: 1,
-    borderColor: 'rgba(233, 30, 99, 0.40)',
-    // Glow magenta suave para que flote sobre el contenido.
-    shadowColor: colors.magenta,
+    // Superficie CALMA: el borde/glow magenta competía con el FAB ✦ a 70px
+    // (dos fuentes de luz de acción en el mismo viewport = tell de indie,
+    // auditoría visual). El magenta vive en el texto; la luz, en el FAB.
+    borderColor: colors.hairlineStrong,
+    shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 16,

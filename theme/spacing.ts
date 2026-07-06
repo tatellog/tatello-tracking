@@ -35,10 +35,20 @@ export const spacing = {
 export const radius = {
   tick: 2,
   cell: 4,
+  /** @deprecated Escala Norte (4) — para código nuevo usar `cardLg`/`control`. */
   card: 4,
   tile: 4,
   screen: 4,
   pill: 100,
+  // ── Escala REAL del producto (auditoría visual 5 jul 2026): la práctica
+  // dominante era 14 controles · 16/18 cards · 22 héroes · 26 sheets, pero
+  // vivía como literales porque estos tokens declaraban la escala Norte
+  // muerta. Código nuevo consume ESTOS; los literales migran por barrio.
+  control: 14,
+  cardSm: 16,
+  cardLg: 18,
+  hero: 22,
+  sheet: 26,
 } as const
 
 export const shadows = {

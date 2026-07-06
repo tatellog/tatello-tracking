@@ -31,6 +31,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { isCycleActive } from '@/features/cycle/phase'
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
+import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
@@ -75,52 +76,8 @@ const GLASS = 'M6 3.6 H18 L16.2 20.8 H7.8 Z'
 // screen on a short phone.
 const BODY_MAX_H = Math.round(Dimensions.get('window').height * 0.56)
 
-/* The celestial glyph for each meal slot — sunrise / sun / crescent /
- * sparkle. Same vocabulary as the meal rows on Hoy. */
-function MealGlyph({ type, color }: { type: MealType; color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      {type === 'lunch' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.3} fill={color} />
-          <Path
-            d="M12 5.6 V2.8 M12 18.4 V21.2 M18.4 12 H21.2 M5.6 12 H2.8 M16.5 7.5 L18.5 5.5 M7.5 7.5 L5.5 5.5 M16.5 16.5 L18.5 18.5 M7.5 16.5 L5.5 18.5"
-            stroke={color}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-        </>
-      ) : type === 'dinner' ? (
-        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
-      ) : type === 'breakfast' ? (
-        <>
-          <Path d="M7 17.5 A 5 5 0 0 1 17 17.5 Z" fill={color} />
-          <Path
-            d="M2.6 17.5 H21.4 M12 9 V6.4 M6.6 12 L4.8 10.3 M17.4 12 L19.2 10.3"
-            stroke={color}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-        </>
-      ) : (
-        <>
-          <Path
-            d="M9.5 7 L11 12.5 L16.5 14 L11 15.5 L9.5 21 L8 15.5 L2.5 14 L8 12.5 Z"
-            fill={color}
-          />
-          <Path
-            d="M18 3.2 L18.8 5.8 L21.3 6.5 L18.8 7.3 L18 9.8 L17.2 7.3 L14.7 6.5 L17.2 5.8 Z"
-            fill={color}
-          />
-          <Path
-            d="M18.8 14 L19.3 15.6 L20.8 16 L19.3 16.4 L18.8 18 L18.3 16.4 L16.8 16 L18.3 15.6 Z"
-            fill={color}
-          />
-        </>
-      )}
-    </Svg>
-  )
-}
+/* El glifo celeste de cada momento vive en el módulo CANÓNICO compartido
+ * (sol/planeta/luna/cometa) — una sola familia en toda la app. */
 
 /* One water glass — a magenta-filled tumbler when logged, a faint
  * outline when not. The glass shape (not a drop) keeps it from
@@ -129,7 +86,7 @@ function MealGlyph({ type, color }: { type: MealType; color: string }) {
  * reward. Reduced motion shows the fill with no pop. */
 // Vasito de agua derivada de comidas — rosa tenue, de solo lectura: muestra
 // que ese vaso vino de un líquido detectado, no de un tap directo.
-const WATER_FROM_MEALS_TINT = 'rgba(233,30,99,0.5)'
+const WATER_FROM_MEALS_TINT = colors.magentaGlow
 
 function WaterGlass({
   filled,
@@ -256,10 +213,8 @@ function SheetSky({ pulseKey = 0 }: { pulseKey?: number }) {
 function StarSeal({ color, size = 14 }: { color: string; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
-        fill={color}
-      />
+      {/* Silueta CANÓNICA de la ✦ (DaySky) — era la cuarta variante ad-hoc. */}
+      <Path d="M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z" fill={color} />
     </Svg>
   )
 }

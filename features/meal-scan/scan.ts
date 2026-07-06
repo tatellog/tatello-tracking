@@ -7,9 +7,14 @@ import { DISHES, type DishIngredient } from './dishes'
 
 export type ScannedIngredient = DishIngredient & { id: string }
 
+/** Cuánto confía el modelo en su lectura (M1: honestidad de evidencia).
+ *  'media'/'baja' → la UI invita a revisar porciones en vez de fingir. */
+export type ScanConfidence = 'alta' | 'media' | 'baja'
+
 export type ScannedMeal = {
   name: string
   ingredients: ScannedIngredient[]
+  confidence: ScanConfidence
 }
 
 /** Protein (g) for an ingredient at its current grams. */
@@ -59,6 +64,9 @@ const SCAN_DELAY_MS = 1500
 // error instead of feeding NaNs into the confirm form.
 const ScanResponseSchema = z.object({
   name: z.string(),
+  // Funciones viejas (pre-M1) no la devuelven → default honesto 'alta'
+  // (se comportan exactamente como antes).
+  confidence: z.enum(['alta', 'media', 'baja']).default('alta'),
   ingredients: z.array(
     z.object({
       name: z.string(),
@@ -71,10 +79,15 @@ const ScanResponseSchema = z.object({
   ),
 })
 
-function withIds(meal: { name: string; ingredients: DishIngredient[] }): ScannedMeal {
+function withIds(meal: {
+  name: string
+  ingredients: DishIngredient[]
+  confidence?: ScanConfidence
+}): ScannedMeal {
   return {
     name: meal.name,
     ingredients: meal.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })),
+    confidence: meal.confidence ?? 'alta',
   }
 }
 
@@ -96,7 +109,11 @@ async function scanMealFromTextMock(description: string): Promise<ScannedMeal> {
   const dish = randomDish()
   // Echo the user's words as the meal name when they wrote something, so
   // the confirm form feels like it parsed *their* text.
-  return withIds({ name: description.trim() || dish.name, ingredients: dish.ingredients })
+  return withIds({
+    name: description.trim() || dish.name,
+    ingredients: dish.ingredients,
+    confidence: 'media',
+  })
 }
 
 /* ── REAL calls (activated in paso 3: USE_MOCK_SCAN=false + deploy) ───── */

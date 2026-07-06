@@ -63,6 +63,7 @@ import {
   mealTotals,
   scanMeal,
   scanMealFromText,
+  type ScanConfidence,
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
 import { SkyBackground } from '@/features/tabs/components'
@@ -80,6 +81,7 @@ import {
   type LiquidDetection,
 } from '@/features/water/liquid-detection'
 import { track } from '@/lib/analytics'
+import { emitScanFeedback } from '@/features/meal-scan/feedback-bus'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
 import { todayInTimezone } from '@/lib/time'
@@ -468,6 +470,14 @@ const SCREEN_W = Dimensions.get('window').width
 // Photo column width inside the 20pt content padding, and the cap
 // that keeps a tall (portrait) photo from dominating the screen.
 const PHOTO_W = SCREEN_W - 40
+// M1 · chips del escalador de porción (sobre los gramos del scan).
+const PORTION_SCALES = [
+  { label: '½', scale: 0.5, a11y: 'la mitad' },
+  { label: '¾', scale: 0.75, a11y: 'tres cuartos' },
+  { label: '1', scale: 1, a11y: 'completa' },
+  { label: '1½', scale: 1.5, a11y: 'una y media' },
+] as const
+
 const PHOTO_MAX_H = 340
 
 // Slot pre-selected by time of day — the user can change it in the
@@ -629,6 +639,12 @@ export default function ScanMealScreen() {
   // knows to upload it rather than keep the meal's existing one.
   const [photoChanged, setPhotoChanged] = useState(false)
   const populatedRef = useRef(false)
+  // M1 · honestidad de evidencia: cuánto confió el modelo en su lectura.
+  const [confidence, setConfidence] = useState<ScanConfidence>('alta')
+  // M1 · escalador de porción de un tap: gramos ORIGINALES del scan por id
+  // (la escala siempre se aplica sobre la base, no sobre sí misma).
+  const baseGramsRef = useRef<Map<string, number>>(new Map())
+  const [portionScale, setPortionScale] = useState(1)
 
   // ── Detección de líquidos → hidratación ────────────────────────────
   // Tras guardar la comida, si tiene bebidas/alimentos líquidos, ofrecemos
@@ -671,6 +687,9 @@ export default function ScanMealScreen() {
         if (!alive) return
         setName(meal.name)
         setIngredients(meal.ingredients)
+        setConfidence(meal.confidence)
+        baseGramsRef.current = new Map(meal.ingredients.map((i) => [i.id, i.grams]))
+        setPortionScale(1)
         setPhase('confirm')
       })
       .catch(() => {
@@ -688,6 +707,22 @@ export default function ScanMealScreen() {
 
   // Describe-by-AI submit — parse the typed description into ingredients,
   // then drop into the same confirm form. Reuses the scanning theatre.
+  // M1 · un tap = "comí la mitad / más": escala TODOS los ingredientes
+  // detectados desde sus gramos originales (los agregados a mano no tienen
+  // base y se respetan tal cual; un gramo editado a mano se re-deriva de la
+  // base solo si vuelves a tocar un chip).
+  const applyPortionScale = (scale: number) => {
+    Haptics.selectionAsync().catch(() => {})
+    setPortionScale(scale)
+    setIngredients((prev) =>
+      prev.map((i) => {
+        const base = baseGramsRef.current.get(i.id)
+        return base == null ? i : { ...i, grams: Math.max(1, Math.round(base * scale)) }
+      }),
+    )
+    track('scan_portion_scaled', { scale })
+  }
+
   const handleDescribeSubmit = () => {
     const text = description.trim()
     if (text.length < 2 || phase === 'scanning') return
@@ -697,6 +732,9 @@ export default function ScanMealScreen() {
       .then((meal) => {
         setName(meal.name)
         setIngredients(meal.ingredients)
+        setConfidence(meal.confidence)
+        baseGramsRef.current = new Map(meal.ingredients.map((i) => [i.id, i.grams]))
+        setPortionScale(1)
         setPhase('confirm')
       })
       .catch(() => {
@@ -1199,6 +1237,11 @@ export default function ScanMealScreen() {
       },
       {
         onSuccess: (meal) => {
+          // Loop de corrección M1: solo para comidas que nacieron de un scan
+          // (foto/texto) — el toast global pregunta "¿le atiné?" al volver.
+          if (!isManual && !isEdit) {
+            emitScanFeedback({ id: meal.id, name: macros.name, confidence })
+          }
           void presentLiquids(meal.id, intakeDateForNew(), false, () =>
             goToReveal(macros.protein_g),
           )
@@ -1492,6 +1535,42 @@ export default function ScanMealScreen() {
                   <Text style={[styles.eyebrow, styles.eyebrowGap]}>
                     {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
                   </Text>
+
+                  {/* M1 · honestidad de evidencia: cuando el modelo dudó, se
+                      dice — jamás fingir precisión. */}
+                  {!isEdit && confidence !== 'alta' ? (
+                    <Text style={styles.confidenceNote}>
+                      {confidence === 'media'
+                        ? 'Leímos tu plato, pero las porciones son un estimado. Dales un vistazo.'
+                        : 'No estamos seguros de este plato. Revisa lo que encontramos.'}
+                    </Text>
+                  ) : null}
+
+                  {/* M1 · porción de un tap: "comí la mitad" sin teclado. */}
+                  {!isEdit && ingredients.length > 0 ? (
+                    <View style={styles.portionRow}>
+                      <Text style={styles.portionLabel}>Porción</Text>
+                      {PORTION_SCALES.map((p) => {
+                        const active = portionScale === p.scale
+                        return (
+                          <Pressable
+                            key={p.label}
+                            onPress={() => applyPortionScale(p.scale)}
+                            style={[styles.portionChip, active && styles.portionChipActive]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
+                            accessibilityLabel={`Porción ${p.a11y}`}
+                          >
+                            <Text
+                              style={[styles.portionChipText, active && styles.portionChipTextOn]}
+                            >
+                              {p.label}
+                            </Text>
+                          </Pressable>
+                        )
+                      })}
+                    </View>
+                  ) : null}
                   {ingredients.map((ing) => (
                     <View key={ing.id} style={styles.row}>
                       <View style={styles.ingMain}>
@@ -1958,6 +2037,54 @@ const styles = StyleSheet.create({
   },
   eyebrowGap: {
     marginTop: 22,
+  },
+
+  // M1 · nota de duda del modelo — honesta, en calma, nunca alarma.
+  confidenceNote: {
+    marginTop: 2,
+    marginBottom: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.bone,
+  },
+  // M1 · escalador de porción de un tap.
+  portionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  portionLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    marginRight: 2,
+  },
+  portionChip: {
+    minWidth: 44,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.bgCard2,
+  },
+  portionChipActive: {
+    borderColor: colors.magenta,
+    backgroundColor: colors.magentaTint2,
+  },
+  portionChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  portionChipTextOn: {
+    color: colors.magentaHot,
   },
   // The dish name — a field, not a heading, so it reads as editable.
   nameField: {

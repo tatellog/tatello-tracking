@@ -31,7 +31,7 @@ import {
   type MacroInputs,
   type Nivel,
 } from '@/features/profile/calcMacros'
-import { useMacroInputs } from '@/features/profile/hooks'
+import { useAdaptiveTdee, useMacroInputs } from '@/features/profile/hooks'
 import { colors, radius, spacing, typography } from '@/theme'
 
 type Source = 'banner' | 'settings' | 'onboarding' | undefined
@@ -140,6 +140,10 @@ type EditorProps = {
 function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: EditorProps) {
   const router = useRouter()
   const upsert = useUpsertMacroTargets()
+  // M2 · el gasto REAL despejado de sus datos (null sin datos suficientes).
+  // OBSERVACIÓN junto a la fórmula, jamás meta automática: la meta la sigue
+  // eligiendo ella y el piso MIN_CALORIES no se toca.
+  const adaptive = useAdaptiveTdee()
 
   const [enfoque, setEnfoque] = useState<Enfoque>('deficit')
   const [nivel, setNivel] = useState<Nivel>('moderate')
@@ -282,6 +286,14 @@ function GoalEditor({ insets, inputs, tdee, savedCalories, onSaved, onCancel }: 
             delta={deltaReal}
             floorNote={clamped ? 'el mínimo para este cuerpo' : null}
           />
+        ) : null}
+
+        {/* M2 · lo invisible #1: el gasto real, dicho como observación. */}
+        {adaptive ? (
+          <Text style={styles.adaptiveNote}>
+            Según tus últimas 4 semanas, tu cuerpo gasta ~{adaptive.tdee} kcal al día.
+            {adaptive.quality === 'temprana' ? ' Aún es una lectura temprana.' : ''}
+          </Text>
         ) : null}
 
         {/* Caso límite (TDEE bajo, todo se topa): una línea cálida del coach
@@ -570,6 +582,15 @@ const styles = StyleSheet.create({
   },
   // Línea del coach (serif italic) cuando el objetivo toca el mínimo: cuidado,
   // no bloqueo. Reservada para el caso límite (todo se topa).
+  // M2 · la observación del gasto real — voz del coach, en calma.
+  adaptiveNote: {
+    marginTop: -spacing.md + 4,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: typography.sizes.bodyLarge * typography.lineHeight.body,
+    color: colors.bone,
+  },
   floorCoach: {
     marginTop: -spacing.md,
     fontFamily: typography.serif,

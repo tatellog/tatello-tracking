@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     borderRadius: PILL_HEIGHT / 2,
     backgroundColor: colors.bgNav,
     borderWidth: 1,
-    borderColor: 'rgba(244, 236, 222, 0.22)',
+    borderColor: colors.hairlineStrong,
     padding: 5,
     shadowColor: colors.sombra,
     shadowOffset: { width: 0, height: 2 },

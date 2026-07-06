@@ -164,7 +164,9 @@ const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 4,
+    // 999, no 4: la "pill" era un rectángulo hombro a hombro con el gear
+    // circular (auditoría visual: cuadrado y círculo en el mismo chrome).
+    borderRadius: 999,
     backgroundColor: colors.bgCard,
     borderWidth: 1,
     borderColor: colors.bruma,

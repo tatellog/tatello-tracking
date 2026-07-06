@@ -8,6 +8,7 @@ import Orbits from '@/assets/icons/orbits.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
+import { ScanFeedbackToast } from '@/features/meal-scan/components/ScanFeedbackToast'
 import { useDayCloseInvite, useNextStarInvite } from '@/features/notifications/hooks'
 import {
   AppTabBar,
@@ -153,6 +154,8 @@ export default function TabsLayout() {
       <UniverseDeltaToast />
       {/* Deshacer del re-log de 1 tap — global: sobrevive al cierre del sheet. */}
       <UndoMealToast />
+      {/* "¿Le atiné?" del scan (M1) — global: recibe a la usuaria al volver. */}
+      <ScanFeedbackToast />
       {/* La ceremonia de revelación (RevealReplayHost) subió a la RAÍZ
           (app/_layout), encima del Stack, para cubrir también rutas modales
           como movement-calendar (antes, aquí en (tabs), quedaba debajo). */}

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg'
+import Svg, { Circle } from 'react-native-svg'
 
+import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { emitRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
 import { colors, typography } from '@/theme'
@@ -15,57 +16,8 @@ const MOMENTS: { type: MealMoment; label: string }[] = [
 /** El momento que "toca" por hora — el héroe visual de la estela. */
 const momentByHour = (): MealMoment => mealMomentByHour()
 
-/* El glifo celeste de cada momento — su astro en la órbita del día:
- *   desayuno = sol · comida = planeta (anillo) · cena = luna · snack = estrella.
- * SVG en viewBox 24, tintable con `color`. El anillo de saturno usa la prop
- * `rotation` (no `transform` en array — eso se rompe en Android, ver memoria). */
-function MealGlyph({ type, size, color }: { type: MealMoment; size: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      {type === 'breakfast' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.2} fill={color} />
-          <Path
-            d="M12 2 V4.6 M12 19.4 V22 M2 12 H4.6 M19.4 12 H22 M5 5 L6.8 6.8 M17.2 17.2 L19 19 M17.2 6.8 L19 5 M5 19 L6.8 17.2"
-            stroke={color}
-            strokeWidth={1.6}
-            strokeLinecap="round"
-          />
-        </>
-      ) : type === 'lunch' ? (
-        <>
-          <Circle cx={12} cy={12} r={4.6} fill={color} />
-          <Ellipse
-            cx={12}
-            cy={12}
-            rx={9.2}
-            ry={3}
-            rotation={-22}
-            originX={12}
-            originY={12}
-            stroke={color}
-            strokeWidth={1.5}
-            fill="none"
-          />
-        </>
-      ) : type === 'dinner' ? (
-        <Path d="M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z" fill={color} />
-      ) : (
-        <>
-          {/* Snack = COMETA (núcleo + estela). La estrella de 4 puntas era el
-              mismo glifo del FAB Registrar: colisión simbólica. */}
-          <Circle cx={15.6} cy={8.4} r={3.6} fill={color} />
-          <Path
-            d="M12.4 11.6 L5 19 M14.8 13.6 L10 18.4 M10.6 9.2 L6.6 13.2"
-            stroke={color}
-            strokeWidth={1.6}
-            strokeLinecap="round"
-          />
-        </>
-      )}
-    </Svg>
-  )
-}
+/* El glifo celeste de cada momento vive en el módulo CANÓNICO compartido
+ * (sol/planeta/luna/cometa) — una sola familia en toda la app. */
 
 /* El aro del nodo, dibujado en SVG para lograr el look de la referencia:
  *   · una capa ancha de baja opacidad = el "blur"/glow del aro;
