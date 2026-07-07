@@ -32,6 +32,9 @@ function landFactory(router: ReturnType<typeof useRouter>) {
     if (target === 'orbit-semana') {
       requestOrbitSegment('semana')
       router.navigate('/(tabs)/orbit')
+    } else if (target === 'orbit-mes') {
+      requestOrbitSegment('mes')
+      router.navigate('/(tabs)/orbit')
     } else if (target === 'hoy') {
       router.navigate('/(tabs)')
     } else {

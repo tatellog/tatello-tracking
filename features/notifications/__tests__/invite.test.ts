@@ -1,5 +1,7 @@
 import {
+  cycleCopy,
   INVITE_COPY,
+  nextCycleDate,
   nextInviteDate,
   nextSealDate,
   PATTERN_COPY,
@@ -82,6 +84,43 @@ describe('sameLocalDay', () => {
     expect(sameLocalDay(new Date(2026, 6, 6, 9, 0), new Date(2026, 6, 6, 23, 59))).toBe(true)
     expect(sameLocalDay(new Date(2026, 6, 6, 23, 59), new Date(2026, 6, 7, 0, 1))).toBe(false)
     expect(sameLocalDay(new Date(2026, 6, 6), new Date(2026, 7, 6))).toBe(false)
+  })
+})
+
+describe('nextCycleDate — el día 1 del mes siguiente', () => {
+  it('a mitad de mes → día 1 del mes que viene, en la hora de la ventana', () => {
+    const d = nextCycleDate(new Date(2026, 6, 15, 10, 0), 'morning') // 15 jul
+    expect(d.getMonth()).toBe(7) // agosto
+    expect(d.getDate()).toBe(1)
+    expect(d.getHours()).toBe(WINDOW_TIME.morning.hour)
+  })
+
+  it('cruza fin de año: diciembre → 1 de enero', () => {
+    const d = nextCycleDate(new Date(2026, 11, 20, 10, 0), 'evening')
+    expect(d.getFullYear()).toBe(2027)
+    expect(d.getMonth()).toBe(0)
+    expect(d.getDate()).toBe(1)
+  })
+
+  it('el último día del mes agenda para mañana (nunca antes del cierre)', () => {
+    const d = nextCycleDate(new Date(2026, 6, 31, 22, 0), 'midday')
+    expect(d.getMonth()).toBe(7)
+    expect(d.getDate()).toBe(1)
+  })
+})
+
+describe('cycleCopy — N5, hito ganado', () => {
+  it('interpola signo (title-case desde MAYÚSCULAS) y mes sellado', () => {
+    const copy = cycleCopy('TAURO', new Date(2026, 5, 20)) // sellando junio
+    expect(copy.title).toContain('Tauro')
+    expect(copy.title).toContain('junio')
+  })
+
+  it('celebra sin culpa: sin rachas, sin pérdida, sin conteos, sin "a medias"', () => {
+    const copy = cycleCopy('LEO', new Date(2026, 6, 1))
+    const all = `${copy.title} ${copy.body}`
+    expect(all).not.toMatch(/racha|pierd|romp|falta|debe|olvid|medias/i)
+    expect(all).not.toMatch(/\d/)
   })
 })
 

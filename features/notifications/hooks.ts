@@ -6,7 +6,12 @@ import type { NotificationWindow } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { todayInTimezone } from '@/lib/time'
 
-import { syncDayCloseInvite, syncNextStarInvite, syncWeekSealInvite } from './scheduler'
+import {
+  syncCycleSealInvite,
+  syncDayCloseInvite,
+  syncNextStarInvite,
+  syncWeekSealInvite,
+} from './scheduler'
 
 /*
  * Monta el scheduler de las invitaciones: en cada sesión (y cada vez que la
@@ -58,4 +63,24 @@ export function useDayCloseInvite(): void {
     if (window === undefined || mealCount === undefined || hasAny.data === undefined) return
     void syncDayCloseInvite(window, mealCount > 0, hasAny.data === true)
   }, [window, mealCount, hasAny.data])
+}
+
+/*
+ * N5 · el sello del ciclo mensual: Hoy ya calcula la figura del mes
+ * (trainedThisMonth vs figureCount), así que recibe la señal por args en
+ * lugar de re-derivarla. En cuanto la figura se completa, el anuncio queda
+ * agendado para el día 1 del mes siguiente; un mes que no completó jamás
+ * suena (silencio, no "a medias").
+ */
+export function useCycleSealInvite(figureComplete: boolean, signLabel: string): void {
+  const { data: profile } = useProfile()
+  const window = (profile ? (profile.notification_window ?? null) : undefined) as
+    | NotificationWindow
+    | null
+    | undefined
+
+  useEffect(() => {
+    if (window === undefined) return
+    void syncCycleSealInvite(window, figureComplete, signLabel)
+  }, [window, figureComplete, signLabel])
 }

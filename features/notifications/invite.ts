@@ -110,6 +110,52 @@ export const PATTERN_COPY = {
   body: 'Hay un patrón nuevo esperándote. Ábrelo cuando quieras.',
 } as const
 
+/*
+ * N5 · el sello del ciclo mensual — anuncio de hito, SOLO post-hoc y solo
+ * GANADO: se agenda cuando la figura del mes ya se completó (monotónico:
+ * los días con registro solo crecen dentro del mes) y suena el día 1 del
+ * mes siguiente en la ventana elegida. Un mes incompleto = silencio total;
+ * jamás la versión pre-hoc ("te faltan N días") — eso es countdown.
+ * (Pasa por voice-and-copy.)
+ */
+const CYCLE_MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+] as const
+
+/** `sealedMonth` = el mes que se sella (el vigente al agendar). El label
+ *  del signo llega en MAYÚSCULAS ("LEO") → title-case, como en las
+ *  ceremonias de transformación. */
+export function cycleCopy(signLabel: string, sealedMonth: Date): { title: string; body: string } {
+  const sign = signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
+  const month = CYCLE_MONTHS_ES[sealedMonth.getMonth()]
+  return {
+    // "quedó entero", no "quedó completo": "completo" es la palabra vetada
+    // de las ceremonias (suena a tarea-checkeada) y "quedó X" ecoa el
+    // patrón del sello semanal ("Tu semana quedó escrita"). El "entero"
+    // del body es refuerzo deliberado de la misma imagen.
+    title: `Tu ${sign} de ${month} quedó entero`,
+    body: 'Sostuviste un ciclo entero. Tu cielo lo guarda para siempre.',
+  }
+}
+
+/** El día 1 del mes SIGUIENTE, en la ventana elegida (el sello se anuncia
+ *  la mañana después de que el ciclo terminó, nunca antes). */
+export function nextCycleDate(now: Date, window: Exclude<NotificationWindow, 'not_yet'>): Date {
+  const t = WINDOW_TIME[window]
+  return new Date(now.getFullYear(), now.getMonth() + 1, 1, t.hour, t.minute, 0, 0)
+}
+
 /** ¿Caen el mismo día calendario local? (arbitraje patrón vs sello). */
 export function sameLocalDay(a: Date, b: Date): boolean {
   return (

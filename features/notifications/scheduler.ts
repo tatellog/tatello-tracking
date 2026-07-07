@@ -6,7 +6,9 @@ import { track } from '@/lib/analytics'
 
 import {
   CLOSE_COPY,
+  cycleCopy,
   INVITE_COPY,
+  nextCycleDate,
   nextInviteDate,
   nextReturnDate,
   nextSealDate,
@@ -21,7 +23,7 @@ import {
 /** Dónde aterriza el TAP de cada notificación (leído por el response
  *  router en features/notifications/response.ts). Sin destino, el tap
  *  aterrizaba frío en Hoy aunque el copy prometiera el sello de Órbita. */
-export type NotificationTarget = 'hoy' | 'orbit-semana'
+export type NotificationTarget = 'hoy' | 'orbit-semana' | 'orbit-mes'
 
 /*
  * El scheduler de la invitación — el lado imperativo (expo-notifications).
@@ -51,16 +53,19 @@ function trackScheduled(id: string, target: NotificationTarget, date: Date): voi
 
 /** El slot N3 · "Stelar encontró algo" — idempotente como los demás. */
 export const PATTERN_ID = 'stelar-pattern-found'
+/** El slot N5 · el sello del ciclo mensual — idempotente como los demás. */
+export const CYCLE_ID = 'stelar-cycle-seal'
 
-/** La fecha de disparo del push de patrón (si hay uno agendado): viaja en
+/** La fecha de disparo de un slot agendado (si existe): viaja en
  *  `data.fireAt` porque el trigger nativo no se puede leer de forma
- *  portable. Alimenta el arbitraje patrón > sello. */
-async function scheduledPatternFireAt(
+ *  portable. Alimenta los arbitrajes ciclo > patrón > sello > cierre. */
+async function scheduledFireAt(
   Notifications: typeof import('expo-notifications'),
+  id: string,
 ): Promise<Date | null> {
   const all = await Notifications.getAllScheduledNotificationsAsync().catch(() => [])
-  const pattern = all.find((r) => r.identifier === PATTERN_ID)
-  const fireAt = (pattern?.content.data as { fireAt?: unknown } | null)?.fireAt
+  const req = all.find((r) => r.identifier === id)
+  const fireAt = (req?.content.data as { fireAt?: unknown } | null)?.fireAt
   return typeof fireAt === 'string' ? new Date(fireAt) : null
 }
 
@@ -93,12 +98,15 @@ export async function syncNextStarInvite(
       })
     }
 
-    // Arbitraje patrón > invitación: ambos suenan mañana en la ventana. Si
-    // hay un patrón esperando, ese push ya hace el trabajo de la invitación
-    // (y con mejor contenido) — la invitación cede este re-armado.
-    const patternPending = (await scheduledPatternFireAt(Notifications)) != null
-    if (!patternPending) {
-      const inviteDate = nextInviteDate(new Date(), window)
+    // Arbitraje ciclo/patrón > invitación: si un anuncio mayor ya suena
+    // mañana en la ventana (patrón siempre cae ahí; el ciclo solo cuando
+    // hoy es fin de mes), ese push hace el trabajo de la invitación con
+    // mejor contenido — la invitación cede este re-armado.
+    const inviteDate = nextInviteDate(new Date(), window)
+    const patternPending = (await scheduledFireAt(Notifications, PATTERN_ID)) != null
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    const cycleTomorrow = cycleFireAt != null && sameLocalDay(cycleFireAt, inviteDate)
+    if (!patternPending && !cycleTomorrow) {
       await Notifications.scheduleNotificationAsync({
         identifier: INVITE_ID,
         content: {
@@ -161,11 +169,13 @@ export async function syncWeekSealInvite(
 
     const sealDate = nextSealDate(new Date(), window)
 
-    // Arbitraje patrón > sello: si el push de patrón cae ese mismo lunes
-    // (misma ventana, mismo minuto), el sello cede este re-armado — se
-    // volverá a armar en la siguiente apertura para el lunes que sigue.
-    const patternFireAt = await scheduledPatternFireAt(Notifications)
+    // Arbitraje ciclo/patrón > sello: si un anuncio mayor cae ese mismo
+    // lunes (misma ventana, mismo minuto), el sello cede este re-armado —
+    // se volverá a armar en la siguiente apertura para el lunes que sigue.
+    const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
     if (patternFireAt && sameLocalDay(patternFireAt, sealDate)) return
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (cycleFireAt && sameLocalDay(cycleFireAt, sealDate)) return
 
     await Notifications.scheduleNotificationAsync({
       identifier: SEAL_ID,
@@ -217,6 +227,13 @@ export async function syncDayCloseInvite(
     const date = todayCloseDate(new Date())
     if (date == null) return
 
+    // Arbitraje ciclo/patrón > cierre: si un anuncio mayor aún no disparado
+    // suena HOY (las ventanas van antes de las 20:15), el cierre cede.
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return
+    const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
+    if (patternFireAt && sameLocalDay(patternFireAt, date)) return
+
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
@@ -266,6 +283,11 @@ export async function syncPatternInvite(
     if (perm.status !== 'granted') return
 
     const date = nextInviteDate(new Date(), window)
+    // ciclo > patrón: si el sello del ciclo ya suena ese mismo día, el
+    // patrón cede este re-armado (volverá a armarse en la próxima apertura
+    // mientras siga esperando).
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return
     // patrón > invitación: mismo minuto de mañana — la invitación cede.
     await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
     // patrón > sello: si mañana es lunes, el sello cede (se re-arma en la
@@ -291,6 +313,78 @@ export async function syncPatternInvite(
       },
     })
     trackScheduled(PATTERN_ID, 'hoy', date)
+  } catch {
+    // Nunca romper la app por una notificación.
+  }
+}
+
+/**
+ * N5 · el sello del ciclo mensual: cuando la figura del mes se completa
+ * (monotónico dentro del mes), se agenda el anuncio para el día 1 del mes
+ * siguiente en la ventana elegida. SOLO post-hoc y solo ganado — un mes
+ * incompleto es silencio, jamás "quedó a medias" ni "te faltan N días".
+ *
+ * El día 1 el slot no se toca aunque `figureComplete` llegue en false (el
+ * mes nuevo ya reinició la figura): el anuncio de algo ganado se sostiene
+ * incluso si la usuaria abre la app antes de su ventana.
+ *
+ * Arbitraje 1/día (lo más escaso gana): si cae mañana (hoy es fin de mes)
+ * absorbe invitación y patrón; si cae lunes, desplaza al sello semanal.
+ */
+export async function syncCycleSealInvite(
+  window: NotificationWindow | null | undefined,
+  figureComplete: boolean,
+  signLabel: string,
+): Promise<void> {
+  if (isExpoGo) return
+  try {
+    const Notifications = await import('expo-notifications')
+
+    if (window == null || window === 'not_yet') {
+      await Notifications.cancelScheduledNotificationAsync(CYCLE_ID).catch(() => {})
+      return
+    }
+
+    // Suena HOY → no tocar (ver nota de arriba).
+    const existing = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (existing && sameLocalDay(existing, new Date())) return
+
+    await Notifications.cancelScheduledNotificationAsync(CYCLE_ID).catch(() => {})
+    if (!figureComplete || !signLabel) return
+
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status !== 'granted') return
+
+    const date = nextCycleDate(new Date(), window)
+    // ciclo > patrón/invitación: si el sello cae mañana (hoy es fin de
+    // mes), absorbe a los dos (mismo minuto, contenido mayor).
+    if (sameLocalDay(date, nextInviteDate(new Date(), window))) {
+      await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
+      await Notifications.cancelScheduledNotificationAsync(PATTERN_ID).catch(() => {})
+    }
+    // ciclo > sello semanal: si el día 1 es lunes, el sello cede (se
+    // re-arma en la próxima apertura para el lunes siguiente).
+    if (date.getDay() === 1) {
+      await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+    }
+
+    const copy = cycleCopy(signLabel, new Date())
+    await Notifications.scheduleNotificationAsync({
+      identifier: CYCLE_ID,
+      content: {
+        title: copy.title,
+        body: copy.body,
+        // El copy promete el ciclo guardado → el tap aterriza en Órbita
+        // Mes. fireAt alimenta los arbitrajes (el trigger nativo no se
+        // puede leer de forma portable).
+        data: { target: 'orbit-mes' satisfies NotificationTarget, fireAt: date.toISOString() },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+      },
+    })
+    trackScheduled(CYCLE_ID, 'orbit-mes', date)
   } catch {
     // Nunca romper la app por una notificación.
   }
