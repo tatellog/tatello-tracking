@@ -41,9 +41,12 @@ export const INVITE_COPY = {
 } as const
 
 /** La cita del lunes (Fase 7): el sello de la semana pasada la espera en
- *  Órbita. Invitación, jamás deuda ni score. (Pasa por voice-and-copy.) */
+ *  Órbita. Invitación, jamás deuda ni score. (Pasa por voice-and-copy.)
+ *  Política del ✦ (uxui jul 2026): la estrella marca "hay algo GANADO
+ *  esperándote" — la llevan N1 cierre, N4 sello y N5 ciclo; invitaciones
+ *  (N2/N6) y misterio (N3) van limpios. Emoji: nunca. */
 export const SEAL_COPY = {
-  title: 'Tu semana quedó escrita',
+  title: 'Tu semana quedó escrita ✦',
   body: 'Cuando quieras verla, tu cielo la guarda.',
 } as const
 
@@ -142,10 +145,13 @@ export function cycleCopy(signLabel: string, sealedMonth: Date): { title: string
   return {
     // "quedó entero", no "quedó completo": "completo" es la palabra vetada
     // de las ceremonias (suena a tarea-checkeada) y "quedó X" ecoa el
-    // patrón del sello semanal ("Tu semana quedó escrita"). El "entero"
-    // del body es refuerzo deliberado de la misma imagen.
-    title: `Tu ${sign} de ${month} quedó entero`,
-    body: 'Sostuviste un ciclo entero. Tu cielo lo guarda para siempre.',
+    // patrón del sello semanal ("Tu semana quedó escrita").
+    // El MES vive en el body, no en el title: "Tu Capricornio de
+    // septiembre quedó entero" (41 chars) se truncaba en el banner
+    // compacto justo en "entero", que es todo el veredicto. Peor caso del
+    // title ahora: "Tu Capricornio quedó entero ✦" = 29 ✓.
+    title: `Tu ${sign} quedó entero ✦`,
+    body: `Sostuviste ${month} entero. Tu cielo lo guarda para siempre.`,
   }
 }
 

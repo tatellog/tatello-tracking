@@ -43,6 +43,37 @@ export type NotificationTarget = 'hoy' | 'orbit-semana' | 'orbit-mes'
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient'
 
+/*
+ * Canales de Android (uxui jul 2026) — la ÚNICA forma en Android de darle
+ * a la usuaria control granular sin que apague todo:
+ *   · announcements (DEFAULT, suena): los ganados — cierre, patrón, sello,
+ *     ciclo. Acompañan, no interrumpen (nunca heads-up).
+ *   · invitations (LOW, silencioso): N2/N6 — la invitación espera en la
+ *     bandeja, no llama. Sonarle a quien pausó roza la presión prohibida.
+ * OJO: la importance de un canal creado no se puede cambiar sin reinstalar;
+ * decidido ANTES del primer build de beta a propósito. En iOS el espejo es
+ * interruptionLevel 'passive' en las invitaciones.
+ */
+export const CHANNEL_ANNOUNCEMENTS = 'announcements'
+export const CHANNEL_INVITATIONS = 'invitations'
+
+/** Idempotente y llamado por CADA sync antes de agendar: el canal viejo
+ *  'default' se creaba solo en syncNextStarInvite y otro sync podía
+ *  agendar antes de que existiera. */
+export async function ensureChannels(
+  Notifications: typeof import('expo-notifications'),
+): Promise<void> {
+  if (Platform.OS !== 'android') return
+  await Notifications.setNotificationChannelAsync(CHANNEL_ANNOUNCEMENTS, {
+    name: 'Tus anuncios',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  }).catch(() => {})
+  await Notifications.setNotificationChannelAsync(CHANNEL_INVITATIONS, {
+    name: 'Invitaciones de regreso',
+    importance: Notifications.AndroidImportance.LOW,
+  }).catch(() => {})
+}
+
 /** Telemetría del canal: sin "delivered" en notificaciones locales, el
  *  proxy de análisis es notif_scheduled (aquí) vs notif_opened (response
  *  router). `for` lleva la fecha agendada para poder cruzar con aperturas
@@ -91,12 +122,7 @@ export async function syncNextStarInvite(
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Stelar',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      })
-    }
+    await ensureChannels(Notifications)
 
     // Arbitraje ciclo/patrón > invitación: si un anuncio mayor ya suena
     // mañana en la ventana (patrón siempre cae ahí; el ciclo solo cuando
@@ -113,10 +139,14 @@ export async function syncNextStarInvite(
           title: INVITE_COPY.title,
           body: INVITE_COPY.body,
           data: { target: 'hoy' satisfies NotificationTarget },
+          // "Tu cielo está aquí cuando quieras", literal: la invitación
+          // espera en la bandeja sin encender pantalla ni sonar (iOS).
+          interruptionLevel: 'passive',
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: inviteDate,
+          channelId: CHANNEL_INVITATIONS,
         },
       })
       trackScheduled(INVITE_ID, 'hoy', inviteDate)
@@ -131,10 +161,12 @@ export async function syncNextStarInvite(
         title: RETURN_COPY.title,
         body: RETURN_COPY.body,
         data: { target: 'hoy' satisfies NotificationTarget },
+        interruptionLevel: 'passive',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: returnDate,
+        channelId: CHANNEL_INVITATIONS,
       },
     })
     trackScheduled(RETURN_ID, 'hoy', returnDate)
@@ -167,6 +199,8 @@ export async function syncWeekSealInvite(
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
+    await ensureChannels(Notifications)
+
     const sealDate = nextSealDate(new Date(), window)
 
     // Arbitraje ciclo/patrón > sello: si un anuncio mayor cae ese mismo
@@ -189,6 +223,7 @@ export async function syncWeekSealInvite(
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: sealDate,
+        channelId: CHANNEL_ANNOUNCEMENTS,
       },
     })
     trackScheduled(SEAL_ID, 'orbit-semana', sealDate)
@@ -237,6 +272,8 @@ export async function syncDayCloseInvite(
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
+    await ensureChannels(Notifications)
+
     await Notifications.scheduleNotificationAsync({
       identifier: DAY_CLOSE_ID,
       content: {
@@ -247,6 +284,7 @@ export async function syncDayCloseInvite(
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
       },
     })
     trackScheduled(DAY_CLOSE_ID, 'hoy', date)
@@ -282,6 +320,8 @@ export async function syncPatternInvite(
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
+    await ensureChannels(Notifications)
+
     const date = nextInviteDate(new Date(), window)
     // ciclo > patrón: si el sello del ciclo ya suena ese mismo día, el
     // patrón cede este re-armado (volverá a armarse en la próxima apertura
@@ -310,6 +350,7 @@ export async function syncPatternInvite(
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
       },
     })
     trackScheduled(PATTERN_ID, 'hoy', date)
@@ -355,6 +396,8 @@ export async function syncCycleSealInvite(
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
+    await ensureChannels(Notifications)
+
     const date = nextCycleDate(new Date(), window)
     // ciclo > patrón/invitación: si el sello cae mañana (hoy es fin de
     // mes), absorbe a los dos (mismo minuto, contenido mayor).
@@ -382,6 +425,7 @@ export async function syncCycleSealInvite(
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
       },
     })
     trackScheduled(CYCLE_ID, 'orbit-mes', date)

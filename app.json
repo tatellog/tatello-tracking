@@ -70,6 +70,13 @@
           "isAccessMediaLocationEnabled": false
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#E91E63"
+        }
+      ],
       "expo-web-browser"
     ],
     "extra": {

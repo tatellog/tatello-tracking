@@ -1,7 +1,7 @@
 import Constants from 'expo-constants'
 import { Stack } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { DevBackButton } from '@/components/DevBackButton'
@@ -14,7 +14,12 @@ import {
   RETURN_COPY,
   SEAL_COPY,
 } from '@/features/notifications/invite'
-import type { NotificationTarget } from '@/features/notifications/scheduler'
+import {
+  CHANNEL_ANNOUNCEMENTS,
+  CHANNEL_INVITATIONS,
+  ensureChannels,
+  type NotificationTarget,
+} from '@/features/notifications/scheduler'
 import { useProfile } from '@/features/profile/hooks'
 import { SkyBackground } from '@/features/tabs/components'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
@@ -22,15 +27,21 @@ import { colors, typography } from '@/theme'
 
 /*
  * Dev-only — dispara cada push del catálogo (N1..N6) on-demand para QA,
- * SIN pasar por los schedulers reales (ni sus gates, arbitrajes o
- * identifiers: usa ids `dev-test-*` para no pisar los slots agendados de
- * verdad). El payload `data.target` sí es el real, así que tocar el banner
- * también prueba el deep-link del response router. Se llega desde Ajustes
- * (gateado is_dev).
+ * SIN pasar por los schedulers reales (ni sus gates ni arbitrajes: usa ids
+ * `dev-test-*` para no pisar los slots agendados de verdad). Lo que SÍ es
+ * real: el copy (mismas constantes que los schedulers), el `data.target`
+ * (tocar el banner prueba el deep-link), el canal Android y el
+ * interruptionLevel de iOS de cada slot.
  *
- * Cómo ver el banner: la app NO define setNotificationHandler, así que en
- * foreground el OS no pinta nada (comportamiento real del canal). Programa
- * el aviso y cierra la app o bloquea el teléfono: llega a los ~5 s.
+ * La preview simula el banner del OS (chrome: ícono + STELAR + ahora;
+ * title 1 línea, body 2) para que el truncado se VEA aquí antes de sonar.
+ * Los contadores marcan los límites del banner compacto (~40 title /
+ * ~70 body) y se encienden en error al pasarse. El toggle "signo largo"
+ * previsualiza N5 con Capricornio, el peor caso de longitud.
+ *
+ * Cómo ver el banner real: la app NO define setNotificationHandler, así
+ * que en foreground el OS no pinta nada (comportamiento real del canal).
+ * Programa el aviso y cierra la app o bloquea el teléfono: llega a ~5 s.
  *
  * En Expo Go no existe el módulo nativo (mismo guard que scheduler.ts):
  * la pantalla lo dice y desactiva los botones.
@@ -44,6 +55,10 @@ const FIRE_DELAY_S = 5
 /** Separación entre avisos al probar todos en fila. */
 const STAGGER_S = 7
 
+/** Límites del banner compacto del OS (aprox, iOS/Android). */
+const TITLE_MAX = 40
+const BODY_MAX = 70
+
 type Slot = {
   id: string
   eyebrow: string
@@ -51,6 +66,9 @@ type Slot = {
   title: string
   body: string
   target: NotificationTarget
+  channelId: string
+  /** iOS: las invitaciones llegan sin encender pantalla ni sonar. */
+  passive?: boolean
 }
 
 export default withDevGuard(DevNotifications)
@@ -58,7 +76,12 @@ export default withDevGuard(DevNotifications)
 function DevNotifications() {
   const { data: profile } = useProfile()
   const sign = zodiacFromDate(profile?.date_of_birth)
-  const signLabel = ZODIAC[sign].label
+  const realSignLabel = ZODIAC[sign].label
+
+  // Peor caso de longitud para N5 — el bug de truncado solo aparece con
+  // signos largos, y el signo real de la dueña puede ser corto.
+  const [longSign, setLongSign] = useState(false)
+  const signLabel = longSign ? 'CAPRICORNIO' : realSignLabel
   const cycle = cycleCopy(signLabel, new Date())
 
   const [status, setStatus] = useState<string | null>(null)
@@ -74,6 +97,7 @@ function DevNotifications() {
       title: cycle.title,
       body: cycle.body,
       target: 'orbit-mes',
+      channelId: CHANNEL_ANNOUNCEMENTS,
     },
     {
       id: 'pattern',
@@ -82,6 +106,7 @@ function DevNotifications() {
       title: PATTERN_COPY.title,
       body: PATTERN_COPY.body,
       target: 'hoy',
+      channelId: CHANNEL_ANNOUNCEMENTS,
     },
     {
       id: 'seal',
@@ -90,6 +115,7 @@ function DevNotifications() {
       title: SEAL_COPY.title,
       body: SEAL_COPY.body,
       target: 'orbit-semana',
+      channelId: CHANNEL_ANNOUNCEMENTS,
     },
     {
       id: 'close',
@@ -98,22 +124,27 @@ function DevNotifications() {
       title: CLOSE_COPY.title,
       body: CLOSE_COPY.body,
       target: 'hoy',
+      channelId: CHANNEL_ANNOUNCEMENTS,
     },
     {
       id: 'invite',
       eyebrow: 'N2 · Tu siguiente estrella',
-      trigger: 'Mañana en tu ventana, solo si pausaste más de un día.',
+      trigger: 'Mañana en tu ventana, solo si pausaste más de un día. Silenciosa.',
       title: INVITE_COPY.title,
       body: INVITE_COPY.body,
       target: 'hoy',
+      channelId: CHANNEL_INVITATIONS,
+      passive: true,
     },
     {
       id: 'return',
       eyebrow: 'N6 · Regreso a 7 días',
-      trigger: 'A los 7 días de pausa. Después, silencio.',
+      trigger: 'A los 7 días de pausa. Silenciosa. Después, silencio total.',
       title: RETURN_COPY.title,
       body: RETURN_COPY.body,
       target: 'hoy',
+      channelId: CHANNEL_INVITATIONS,
+      passive: true,
     },
   ]
 
@@ -144,11 +175,13 @@ function DevNotifications() {
         title: slot.title,
         body: slot.body,
         data: { target: slot.target },
+        ...(slot.passive ? { interruptionLevel: 'passive' as const } : null),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: delaySeconds,
         repeats: false,
+        channelId: slot.channelId,
       },
     })
   }
@@ -158,6 +191,7 @@ function DevNotifications() {
     try {
       const Notifications = await import('expo-notifications')
       if (!(await ensurePermission(Notifications))) return
+      await ensureChannels(Notifications)
       await fire(slot, FIRE_DELAY_S)
       setStatus(`✓ ${slot.eyebrow} programada. Cierra la app: llega en ${FIRE_DELAY_S} segundos.`)
     } catch (err) {
@@ -170,6 +204,7 @@ function DevNotifications() {
     try {
       const Notifications = await import('expo-notifications')
       if (!(await ensurePermission(Notifications))) return
+      await ensureChannels(Notifications)
       for (let i = 0; i < slots.length; i++) {
         await fire(slots[i]!, FIRE_DELAY_S + i * STAGGER_S)
       }
@@ -190,8 +225,9 @@ function DevNotifications() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Notificaciones · QA</Text>
           <Text style={styles.subtitle}>
-            Copy real de cada push (N1..N6), con tu signo ({signLabel}). Toca Probar y cierra la
-            app: el banner llega en unos segundos. Tocar el banner prueba también su deep-link.
+            Copy real de cada push (N1..N6). La preview simula el banner del OS: title corta a 1
+            línea, body a 2. Toca Probar y cierra la app: llega en unos segundos; tocar el banner
+            prueba su deep-link.
           </Text>
 
           {isExpoGo ? (
@@ -218,14 +254,53 @@ function DevNotifications() {
             <Text style={styles.allButtonText}>✦ Probar todas en fila</Text>
           </Pressable>
 
+          {/* Peor caso de longitud: N5 con Capricornio (11 letras). */}
+          <View style={styles.longSignRow}>
+            <Text style={styles.longSignLabel}>
+              Simular signo largo en N5 (Capricornio, hoy: {titleCase(realSignLabel)})
+            </Text>
+            <Switch
+              value={longSign}
+              onValueChange={setLongSign}
+              trackColor={{ false: colors.bgCard2, true: colors.magenta }}
+              thumbColor={colors.leche}
+              ios_backgroundColor={colors.bgCard2}
+              accessibilityLabel="Simular signo largo en N5"
+            />
+          </View>
+
           {slots.map((slot) => (
             <View key={slot.id} style={styles.card}>
               <Text style={styles.eyebrow}>{slot.eyebrow}</Text>
-              {/* Preview del banner: título + body tal como los pinta el OS. */}
+
+              {/* Banner simulado: chrome del OS (ícono + app + ahora) y el
+                  MISMO truncado del banner compacto (title 1 línea, body 2).
+                  El bug de N5 ("...quedó ent…") se ve aquí, no en el device. */}
               <View style={styles.preview}>
-                <Text style={styles.previewTitle}>{slot.title}</Text>
-                <Text style={styles.previewBody}>{slot.body}</Text>
+                <View style={styles.previewHeader}>
+                  <Image source={require('@/assets/icon.png')} style={styles.previewAppIcon} />
+                  <Text style={styles.previewAppName}>STELAR</Text>
+                  <Text style={styles.previewNow}>ahora</Text>
+                </View>
+                <Text style={styles.previewTitle} numberOfLines={1}>
+                  {slot.title}
+                </Text>
+                <Text style={styles.previewBody} numberOfLines={2}>
+                  {slot.body}
+                </Text>
               </View>
+
+              {/* Contadores contra el banner compacto — error al pasarse. */}
+              <Text style={styles.counters}>
+                <Text style={slot.title.length > TITLE_MAX ? styles.counterOver : undefined}>
+                  title {slot.title.length}/{TITLE_MAX}
+                </Text>
+                {'   ·   '}
+                <Text style={slot.body.length > BODY_MAX ? styles.counterOver : undefined}>
+                  body {slot.body.length}/{BODY_MAX}
+                </Text>
+              </Text>
+
               <Text style={styles.trigger}>{slot.trigger}</Text>
               <Pressable
                 onPress={() => void testOne(slot)}
@@ -246,6 +321,10 @@ function DevNotifications() {
       </SafeAreaView>
     </View>
   )
+}
+
+function titleCase(label: string): string {
+  return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()
 }
 
 const styles = StyleSheet.create({
@@ -296,7 +375,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(217, 174, 111, 0.06)',
     paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   allButtonText: {
     fontFamily: typography.serifSemi,
@@ -304,6 +383,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0.6,
     color: colors.bone,
+  },
+  longSignRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+    paddingHorizontal: 2,
+  },
+  longSignLabel: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 16,
+    color: colors.niebla,
   },
   card: {
     backgroundColor: colors.bgCard,
@@ -321,7 +414,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.magenta,
   },
-  // El "banner": la simulación visual de cómo el OS pinta title + body.
+  // El "banner": simulación de cómo el OS pinta el aviso (chrome + copy).
   preview: {
     marginTop: 10,
     borderRadius: 12,
@@ -330,6 +423,29 @@ const styles = StyleSheet.create({
     borderColor: colors.hairlineStrong,
     paddingHorizontal: 14,
     paddingVertical: 11,
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  previewAppIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 4.5,
+  },
+  previewAppName: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.8,
+    color: colors.niebla,
+  },
+  previewNow: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.micro,
+    color: colors.bruma,
   },
   previewTitle: {
     fontFamily: typography.uiBold,
@@ -343,8 +459,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.bone,
   },
-  trigger: {
+  counters: {
     marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.4,
+    color: colors.bruma,
+  },
+  counterOver: {
+    color: colors.feedbackError,
+  },
+  trigger: {
+    marginTop: 6,
     fontFamily: typography.ui,
     fontSize: typography.sizes.label,
     lineHeight: 16,

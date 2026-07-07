@@ -110,10 +110,18 @@ describe('nextCycleDate — el día 1 del mes siguiente', () => {
 })
 
 describe('cycleCopy — N5, hito ganado', () => {
-  it('interpola signo (title-case desde MAYÚSCULAS) y mes sellado', () => {
+  it('signo (title-case desde MAYÚSCULAS) en el title, mes sellado en el body', () => {
     const copy = cycleCopy('TAURO', new Date(2026, 5, 20)) // sellando junio
     expect(copy.title).toContain('Tauro')
-    expect(copy.title).toContain('junio')
+    expect(copy.body).toContain('junio')
+  })
+
+  it('el title no se trunca en el banner compacto ni con el signo más largo', () => {
+    // "Tu Capricornio quedó entero ✦" — el banner corta a ~35-40 chars y
+    // el veredicto ("entero") debe sobrevivir siempre.
+    const copy = cycleCopy('CAPRICORNIO', new Date(2026, 8, 15))
+    expect(copy.title.length).toBeLessThanOrEqual(32)
+    expect(copy.title).toContain('entero')
   })
 
   it('celebra sin culpa: sin rachas, sin pérdida, sin conteos, sin "a medias"', () => {
