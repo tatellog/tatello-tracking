@@ -347,7 +347,7 @@ export default function NotificationsScreen() {
 
           {/* Honest priming micro-copy — only when a real window is chosen.
               Disarms the surprise of the iOS dialog. Hidden for 'not_yet' /
-              no selection. PENDING voice-and-copy sign-off. */}
+              no selection. Passed voice-and-copy review (jul 2026). */}
           {willAskPermission ? (
             <Text style={styles.priming}>
               Al continuar, tu teléfono te preguntará si Stelar puede avisarte.
