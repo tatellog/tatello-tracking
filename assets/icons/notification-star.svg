@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none">
+  <!-- SMALL ICON de notificación Android · MASTER vectorial.
+       Reglas del canal: silueta MONOCROMA blanca sobre transparente;
+       Android la tinta con notification.color y la renderiza a ~24dp
+       (status bar ~18dp). Por eso: UNA sola capa de fill, sin strokes
+       finos, sin gradientes, sin opacidades intermedias.
+       Exportar a PNG 96x96 → assets/notification-icon.png (referenciado
+       por el plugin expo-notifications en app.json).
+       Diseño: la estrella de 4 puntas ✦ (firma Stelar, hermana de
+       north-star-tint.svg) como SILUETA sólida — cintura cóncava pero
+       más carnosa que la versión line-art para que no adelgace a 24dp.
+       Eje vertical más largo que el horizontal + chispa compañera
+       arriba-derecha (regla de asimetría del art brief). -->
+  <path
+    fill="#FFFFFF"
+    d="M48 8 Q53 41 84 48 Q53 55 48 88 Q43 55 12 48 Q43 41 48 8 Z" />
+  <!-- Chispa compañera: rombo sólido, no cruz de líneas (una cruz de
+       trazos finos desaparece a 24dp; el rombo lee como estrella menor). -->
+  <path
+    fill="#FFFFFF"
+    d="M77 14 L82 21 L77 28 L72 21 Z" />
+</svg>

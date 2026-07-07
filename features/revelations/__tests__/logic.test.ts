@@ -2,6 +2,7 @@ import {
   selectRevelation,
   transformationCopy,
   patternRevelationCopy,
+  patternWaiting,
   RETURN_DEDUP_MS,
   PATTERN_RATE_LIMIT_MS,
   TRANSFORMATION_THRESHOLDS,
@@ -215,6 +216,63 @@ describe('selectRevelation — umbrales de transformación', () => {
 
     expect(result?.tier).toBe('transformation')
     expect(result?.kind).toBe('100')
+  })
+})
+
+// --- patternWaiting (alimenta el push N3) ---
+
+describe('patternWaiting — patrón elegible suprimido por un tier mayor', () => {
+  test('regreso gana el slot y hay patrón elegible → true (el push N3 se arma)', () => {
+    const input = baseInput({
+      returnSignal: true,
+      lastReturnAtMs: null,
+      pattern: samplePattern,
+      lastPatternAtMs: null,
+    })
+
+    const winner = selectRevelation(input)
+
+    expect(winner?.tier).toBe('return')
+    expect(patternWaiting(input, winner)).toBe(true)
+  })
+
+  test('transformación gana el slot y hay patrón elegible → true', () => {
+    const input = baseInput({
+      transformProgress: 30,
+      pattern: samplePattern,
+      lastPatternAtMs: null,
+    })
+
+    const winner = selectRevelation(input)
+
+    expect(winner?.tier).toBe('transformation')
+    expect(patternWaiting(input, winner)).toBe(true)
+  })
+
+  test('el patrón mismo gana el slot → false (se muestra, no espera)', () => {
+    const input = baseInput({ pattern: samplePattern, lastPatternAtMs: null })
+
+    const winner = selectRevelation(input)
+
+    expect(winner?.tier).toBe('pattern')
+    expect(patternWaiting(input, winner)).toBe(false)
+  })
+
+  test('patrón silenciado por rate-limit (1/7d) → false (no cuenta como esperando)', () => {
+    const input = baseInput({
+      returnSignal: true,
+      lastReturnAtMs: null,
+      pattern: samplePattern,
+      lastPatternAtMs: NOW_MS - PATTERN_RATE_LIMIT_MS + 1000,
+    })
+
+    expect(patternWaiting(input, selectRevelation(input))).toBe(false)
+  })
+
+  test('sin patrón detectado → false', () => {
+    const input = baseInput({ returnSignal: true, lastReturnAtMs: null, pattern: null })
+
+    expect(patternWaiting(input, selectRevelation(input))).toBe(false)
   })
 })
 

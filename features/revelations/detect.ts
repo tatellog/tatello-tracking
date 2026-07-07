@@ -14,6 +14,7 @@ import { requireUserId, supabase } from '@/lib/supabase'
 import { lastRevelationAt, shownTransformationKinds } from './api'
 import {
   patternRevelationCopy,
+  patternWaiting,
   selectRevelation,
   type OrchestratorPattern,
   type PendingRevelation,
@@ -96,10 +97,18 @@ function pickPattern(
   return null
 }
 
+export type PendingDetection = {
+  /** La revelación a mostrar esta sesión (o null). */
+  revelation: PendingRevelation | null
+  /** Un patrón elegible quedó suprimido por un tier mayor → alimenta el
+   *  push N3 ("Stelar encontró algo") vía syncPatternInvite. */
+  patternWaiting: boolean
+}
+
 export async function detectPendingRevelation(args: {
   transformProgress: number
   signLabel: string
-}): Promise<PendingRevelation | null> {
+}): Promise<PendingDetection> {
   const userId = await requireUserId()
   const nowMs = Date.now()
   const since = new Date(nowMs - OPENS_LOOKBACK_MS).toISOString()
@@ -123,7 +132,7 @@ export async function detectPendingRevelation(args: {
     ...new Set(((opensRes.data ?? []) as OpenRow[]).map((r) => r.created_at.slice(0, 10))),
   ]
 
-  return selectRevelation({
+  const input = {
     nowMs,
     transformProgress: args.transformProgress,
     shownTransformationKinds: shownKinds,
@@ -132,5 +141,7 @@ export async function detectPendingRevelation(args: {
     lastReturnAtMs: lastReturn?.getTime() ?? null,
     pattern: pickPattern(data, nowMs, lastNight?.getTime() ?? null),
     lastPatternAtMs: lastPattern?.getTime() ?? null,
-  })
+  }
+  const revelation = selectRevelation(input)
+  return { revelation, patternWaiting: patternWaiting(input, revelation) }
 }

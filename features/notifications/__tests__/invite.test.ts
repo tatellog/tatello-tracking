@@ -1,4 +1,15 @@
-import { INVITE_COPY, nextInviteDate, nextSealDate, SEAL_COPY, WINDOW_TIME } from '../invite'
+import {
+  cycleCopy,
+  INVITE_COPY,
+  nextCycleDate,
+  nextInviteDate,
+  nextSealDate,
+  PATTERN_COPY,
+  sameLocalDay,
+  SEAL_COPY,
+  sealAbsorbsClose,
+  WINDOW_TIME,
+} from '../invite'
 
 describe('nextInviteDate', () => {
   it('agenda para MAÑANA en la hora de la ventana, nunca hoy', () => {
@@ -52,6 +63,88 @@ describe('nextSealDate — la cita del lunes', () => {
     const d = nextSealDate(new Date(2026, 6, 6, 8, 0), 'midday')
     expect(d.getDay()).toBe(1)
     expect(d.getDate()).toBe(13)
+  })
+})
+
+describe('PATTERN_COPY — N3, el anuncio sin spoiler', () => {
+  it('invita sin culpa: sin rachas, sin pérdida, sin conteos', () => {
+    const all = `${PATTERN_COPY.title} ${PATTERN_COPY.body}`
+    expect(all).not.toMatch(/racha|pierd|romp|falta|debe|olvid/i)
+    expect(all).not.toMatch(/\d/)
+  })
+
+  it('no adelanta el contenido: ni el patrón concreto ni sus señales', () => {
+    const all = `${PATTERN_COPY.title} ${PATTERN_COPY.body}`
+    expect(all).not.toMatch(/prote|entren|sueño|dorm|noche|tarde|comida/i)
+  })
+})
+
+describe('sameLocalDay', () => {
+  it('mismo día calendario → true, días distintos → false', () => {
+    expect(sameLocalDay(new Date(2026, 6, 6, 9, 0), new Date(2026, 6, 6, 23, 59))).toBe(true)
+    expect(sameLocalDay(new Date(2026, 6, 6, 23, 59), new Date(2026, 6, 7, 0, 1))).toBe(false)
+    expect(sameLocalDay(new Date(2026, 6, 6), new Date(2026, 7, 6))).toBe(false)
+  })
+})
+
+describe('nextCycleDate — el día 1 del mes siguiente', () => {
+  it('a mitad de mes → día 1 del mes que viene, en la hora de la ventana', () => {
+    const d = nextCycleDate(new Date(2026, 6, 15, 10, 0), 'morning') // 15 jul
+    expect(d.getMonth()).toBe(7) // agosto
+    expect(d.getDate()).toBe(1)
+    expect(d.getHours()).toBe(WINDOW_TIME.morning.hour)
+  })
+
+  it('cruza fin de año: diciembre → 1 de enero', () => {
+    const d = nextCycleDate(new Date(2026, 11, 20, 10, 0), 'evening')
+    expect(d.getFullYear()).toBe(2027)
+    expect(d.getMonth()).toBe(0)
+    expect(d.getDate()).toBe(1)
+  })
+
+  it('el último día del mes agenda para mañana (nunca antes del cierre)', () => {
+    const d = nextCycleDate(new Date(2026, 6, 31, 22, 0), 'midday')
+    expect(d.getMonth()).toBe(7)
+    expect(d.getDate()).toBe(1)
+  })
+})
+
+describe('cycleCopy — N5, hito ganado', () => {
+  it('signo (title-case desde MAYÚSCULAS) en el title, mes sellado en el body', () => {
+    const copy = cycleCopy('TAURO', new Date(2026, 5, 20)) // sellando junio
+    expect(copy.title).toContain('Tauro')
+    expect(copy.body).toContain('junio')
+  })
+
+  it('el title no se trunca en el banner compacto ni con el signo más largo', () => {
+    // "Tu Capricornio quedó entero ✦" — el banner corta a ~35-40 chars y
+    // el veredicto ("entero") debe sobrevivir siempre.
+    const copy = cycleCopy('CAPRICORNIO', new Date(2026, 8, 15))
+    expect(copy.title.length).toBeLessThanOrEqual(32)
+    expect(copy.title).toContain('entero')
+  })
+
+  it('celebra sin culpa: sin rachas, sin pérdida, sin conteos, sin "a medias"', () => {
+    const copy = cycleCopy('LEO', new Date(2026, 6, 1))
+    const all = `${copy.title} ${copy.body}`
+    expect(all).not.toMatch(/racha|pierd|romp|falta|debe|olvid|medias/i)
+    expect(all).not.toMatch(/\d/)
+  })
+})
+
+describe('sealAbsorbsClose — techo 1/día', () => {
+  it('lunes con datos: el sello absorbe al cierre', () => {
+    expect(sealAbsorbsClose(new Date(2026, 6, 6, 12, 0), true)).toBe(true) // lun 6 jul
+  })
+
+  it('lunes sin datos: no hay sello que absorba, el cierre vive', () => {
+    expect(sealAbsorbsClose(new Date(2026, 6, 6, 12, 0), false)).toBe(false)
+  })
+
+  it('martes a domingo: el cierre vive', () => {
+    for (let day = 7; day <= 12; day++) {
+      expect(sealAbsorbsClose(new Date(2026, 6, day, 12, 0), true)).toBe(false) // mar..dom
+    }
   })
 })
 

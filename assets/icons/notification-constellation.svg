@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none">
+  <!-- SMALL ICON de notificación Android · ALTERNATIVA (no elegida).
+       Mini-constelación de 3 estrellas conectadas. Mismas reglas de
+       canal que notification-star.svg (blanco sobre transparente,
+       Android tinta y renderiza a ~24dp).
+       Layout en arco ∧ (no en < ) a propósito: 3 puntos + 2 líneas en
+       forma de < es EXACTAMENTE el ícono de "compartir" de Android.
+       Magnitudes decrecientes (grande → media → chica) como en
+       ZodiacStar.mag. Líneas a 6px (=1.5dp a escala 24) — el mínimo
+       que sobrevive en la status bar. -->
+  <!-- Líneas de constelación, debajo de las estrellas. -->
+  <path
+    stroke="#FFFFFF"
+    stroke-width="6"
+    stroke-linecap="round"
+    d="M24 66 L56 26 L82 62" />
+  <!-- Estrella mayor: la firma ✦ en silueta. -->
+  <path
+    fill="#FFFFFF"
+    d="M24 46 Q26.5 63 42 66 Q26.5 69 24 86 Q21.5 69 6 66 Q21.5 63 24 46 Z" />
+  <!-- Estrellas menores: rombos sólidos (a 24dp un ✦ chico se empasta). -->
+  <path fill="#FFFFFF" d="M56 15 L65 26 L56 37 L47 26 Z" />
+  <path fill="#FFFFFF" d="M82 53.5 L89 62 L82 70.5 L75 62 Z" />
+</svg>

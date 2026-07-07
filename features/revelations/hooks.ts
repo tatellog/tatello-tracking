@@ -2,6 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
 import { useTransformProgress } from '@/features/emblem'
+import { syncPatternInvite } from '@/features/notifications/scheduler'
+import type { NotificationWindow } from '@/features/profile/api'
+import { useProfile } from '@/features/profile/hooks'
 import { track } from '@/lib/analytics'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -59,11 +62,28 @@ export function useRevelationOrchestrator(signLabel: string): {
     refetchOnWindowFocus: false,
   })
 
+  // N3 · el push del patrón que quedó esperando: la detección dice si un
+  // patrón elegible fue suprimido por un tier mayor esta sesión; el slot
+  // local (mañana, ventana elegida) se arma/cancela en espejo. Cuando la
+  // ceremonia por fin se muestra, la re-detección lo apaga sola.
+  const { data: profile } = useProfile()
+  const window = (profile ? (profile.notification_window ?? null) : undefined) as
+    | NotificationWindow
+    | null
+    | undefined
+  const patternWaiting = detection.data?.patternWaiting
+  useEffect(() => {
+    // undefined = perfil o detección aún cargando: no cancelar lo agendado
+    // por un estado transitorio (misma convención que notifications/hooks).
+    if (window === undefined || patternWaiting === undefined) return
+    void syncPatternInvite(window, patternWaiting)
+  }, [window, patternWaiting])
+
   const [active, setActive] = useState<{ rev: PendingRevelation; id: string | null } | null>(null)
   const shownRef = useRef(false)
 
   useEffect(() => {
-    const pending = detection.data
+    const pending = detection.data?.revelation
     if (!pending || active || shownRef.current) return
     shownRef.current = true
     void recordRevelation({

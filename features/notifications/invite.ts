@@ -41,9 +41,12 @@ export const INVITE_COPY = {
 } as const
 
 /** La cita del lunes (Fase 7): el sello de la semana pasada la espera en
- *  Órbita. Invitación, jamás deuda ni score. (Pasa por voice-and-copy.) */
+ *  Órbita. Invitación, jamás deuda ni score. (Pasa por voice-and-copy.)
+ *  Política del ✦ (uxui jul 2026): la estrella marca "hay algo GANADO
+ *  esperándote" — la llevan N1 cierre, N4 sello y N5 ciclo; invitaciones
+ *  (N2/N6) y misterio (N3) van limpios. Emoji: nunca. */
 export const SEAL_COPY = {
-  title: 'Tu semana quedó escrita',
+  title: 'Tu semana quedó escrita ✦',
   body: 'Cuando quieras verla, tu cielo la guarda.',
 } as const
 
@@ -92,6 +95,91 @@ export const CLOSE_COPY = {
   title: 'Tu cierre de hoy está listo ✦',
   body: 'Tu día ya tiene su veredicto. Míralo cuando quieras.',
 } as const
+
+/*
+ * N3 · "Stelar encontró algo" — el anuncio del patrón que quedó esperando
+ * (detectado, elegible, pero otro tier ganó el slot de la sesión). Regla
+ * dura: el push NUNCA adelanta el patrón ni números — el misterio es el
+ * gancho y el contenido vive en la ceremonia in-app. Suena mañana en la
+ * ventana elegida y se cancela solo si la usuaria lo ve antes.
+ * (Pasa por voice-and-copy.)
+ */
+export const PATTERN_COPY = {
+  // Sujeto = tu cielo (no la marca), sin vocabulario de sistema ("tus
+  // datos") y SIN repetir el cierre del cierre diario ("Míralo cuando
+  // quieras") — el patrón es el momento raro del canal y merece su propia
+  // textura. El body se sostiene solo si el canal trunca el title.
+  title: 'Tu cielo tiene algo que mostrarte',
+  body: 'Hay un patrón nuevo esperándote. Ábrelo cuando quieras.',
+} as const
+
+/*
+ * N5 · el sello del ciclo mensual — anuncio de hito, SOLO post-hoc y solo
+ * GANADO: se agenda cuando la figura del mes ya se completó (monotónico:
+ * los días con registro solo crecen dentro del mes) y suena el día 1 del
+ * mes siguiente en la ventana elegida. Un mes incompleto = silencio total;
+ * jamás la versión pre-hoc ("te faltan N días") — eso es countdown.
+ * (Pasa por voice-and-copy.)
+ */
+const CYCLE_MONTHS_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+] as const
+
+/** `sealedMonth` = el mes que se sella (el vigente al agendar). El label
+ *  del signo llega en MAYÚSCULAS ("LEO") → title-case, como en las
+ *  ceremonias de transformación. */
+export function cycleCopy(signLabel: string, sealedMonth: Date): { title: string; body: string } {
+  const sign = signLabel.charAt(0).toUpperCase() + signLabel.slice(1).toLowerCase()
+  const month = CYCLE_MONTHS_ES[sealedMonth.getMonth()]
+  return {
+    // "quedó entero", no "quedó completo": "completo" es la palabra vetada
+    // de las ceremonias (suena a tarea-checkeada) y "quedó X" ecoa el
+    // patrón del sello semanal ("Tu semana quedó escrita").
+    // El MES vive en el body, no en el title: "Tu Capricornio de
+    // septiembre quedó entero" (41 chars) se truncaba en el banner
+    // compacto justo en "entero", que es todo el veredicto. Peor caso del
+    // title ahora: "Tu Capricornio quedó entero ✦" = 29 ✓.
+    title: `Tu ${sign} quedó entero ✦`,
+    body: `Sostuviste ${month} entero. Tu cielo lo guarda para siempre.`,
+  }
+}
+
+/** El día 1 del mes SIGUIENTE, en la ventana elegida (el sello se anuncia
+ *  la mañana después de que el ciclo terminó, nunca antes). */
+export function nextCycleDate(now: Date, window: Exclude<NotificationWindow, 'not_yet'>): Date {
+  const t = WINDOW_TIME[window]
+  return new Date(now.getFullYear(), now.getMonth() + 1, 1, t.hour, t.minute, 0, 0)
+}
+
+/** ¿Caen el mismo día calendario local? (arbitraje patrón vs sello). */
+export function sameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
+}
+
+/*
+ * Arbitraje del techo 1/día: el lunes que suena el sello, el cierre cede
+ * (lo escaso gana, lo diario cede). El OS no reporta si el sello ya SONÓ,
+ * así que la regla es determinística: lunes + sello elegible (hay datos)
+ * → sin cierre. Perder un cierre en lunes es más barato que dos toques.
+ */
+export function sealAbsorbsClose(now: Date, hasData: boolean): boolean {
+  return hasData && now.getDay() === 1
+}
 
 /** HOY a las 20:15, o null si ya pasó (el cierre tardío se vive en la app;
  *  no se agenda nada para mañana — mañana lo arma su propia comida). */

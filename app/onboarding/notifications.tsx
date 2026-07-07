@@ -25,6 +25,7 @@ import {
 } from '@/features/onboarding/components'
 import { type NotificationWindow } from '@/features/profile/api'
 import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
+import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
 const AnimatedG = Animated.createAnimatedComponent(G)
@@ -83,7 +84,7 @@ const OPTIONS: readonly ReadingOption[] = [
  *
  * PRIMING (uxui override — usability/ethics wins on permission flows):
  *   • The CTA label is DYNAMIC — picking a real time-window names the
- *     action ("Activar mi lectura"), so the OS dialog is no surprise;
+ *     action ("Activar mis avisos"), so the OS dialog is no surprise;
  *     'not_yet' / no selection keeps the neutral "Continuar".
  *   • A micro-copy below the cards ("Al continuar, tu teléfono te
  *     preguntará si Stelar puede avisarte.") disarms the iOS dialog
@@ -106,8 +107,8 @@ const OPTIONS: readonly ReadingOption[] = [
  * The tint is WARM MAGENTA. There is NO focal anchor star — parity with
  * the sibling steps: no single answer is celebrated with an astro.
  *
- * COPY NOTE: "Activar mi lectura" + the priming micro-copy are PENDING
- * behavioral / voice-and-copy sign-off (next in the chain). Kept clean.
+ * COPY NOTE: "Activar mis avisos" + question/hint (R7, honest promise) +
+ * priming micro-copy passed voice-and-copy review (jul 2026).
  *
  * SETTINGS RE-ENTRY (?source=settings): the same screen doubles as the
  * "Notificaciones" editor reachable from Ajustes. When fromSettings we
@@ -142,7 +143,7 @@ export default function NotificationsScreen() {
   const continueLabel = fromSettings
     ? 'Guardar'
     : willAskPermission
-      ? 'Activar mi lectura'
+      ? 'Activar mis avisos'
       : 'Continuar'
 
   // dotClock — slow 8 s ping-pong breath driving the resting state of
@@ -178,6 +179,11 @@ export default function NotificationsScreen() {
 
   const handleContinue = async () => {
     if (!canContinue || !window) return
+    // La ventana previa ancla notif_window_changed: from null en el
+    // onboarding, from real en la re-entrada desde Ajustes. Un cambio a
+    // 'not_yet' desde Ajustes es el "unsubscribe" de Stelar — la señal de
+    // fatiga más importante del canal.
+    const previousWindow = (profile?.notification_window as NotificationWindow | null) ?? null
     setRequestingPermission(true)
     try {
       // Only fire the OS prompt when the user actually wants notifications.
@@ -190,6 +196,10 @@ export default function NotificationsScreen() {
         // it never throws on screen mount in Expo Go (see isExpoGo note).
         const Notifications = await import('expo-notifications')
         const settings = await Notifications.getPermissionsAsync()
+        // Outcome of the priming flow — feeds notif_permission_result below
+        // (validates the warmup: % of OS grants after choosing a window).
+        let finalStatus = settings.status
+        let finalCanAskAgain = settings.canAskAgain
         if (settings.status !== 'granted' && settings.canAskAgain) {
           const result = await Notifications.requestPermissionsAsync({
             ios: {
@@ -198,6 +208,8 @@ export default function NotificationsScreen() {
               allowSound: true,
             },
           })
+          finalStatus = result.status
+          finalCanAskAgain = result.canAskAgain
           // DIGNIFIED handling — a 'denied' status is NOT an error. We do
           // NOT regañar, do NOT block: the user's WINDOW preference is
           // their intention and gets saved either way; the soft re-ask
@@ -215,8 +227,20 @@ export default function NotificationsScreen() {
           // DEBT: same as above — no schema flag, runtime check later.
           console.warn('notification permission cannot be re-asked (canAskAgain false)')
         }
+        track('notif_permission_result', {
+          granted: finalStatus === 'granted',
+          window,
+          can_ask_again: finalCanAskAgain,
+        })
       }
       await updateProfile.mutateAsync({ notification_window: window })
+      if (previousWindow !== window) {
+        track('notif_window_changed', {
+          from: previousWindow,
+          to: window,
+          source: fromSettings ? 'settings' : 'onboarding',
+        })
+      }
       // From Ajustes this is an edit: pop back to Settings. In the wizard,
       // advance to the next step.
       if (fromSettings) router.back()
@@ -281,12 +305,15 @@ export default function NotificationsScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* R7 · promesa honesta: el sistema calla los días sin nada que
+              anunciar, así que la pantalla no promete una "lectura diaria".
+              Promete avisos: máximo uno al día, solo cuando hay algo. */}
           <StepHeader
             eyebrow={eyebrow}
             eyebrowColor="magenta"
-            question="¿Cuándo quieres tu lectura del día?"
-            questionEmphasis="lectura"
-            hint="Una vez al día, en el momento que tú elijas. Puedes cambiarlo después."
+            question="¿Cuándo quieres que tu cielo te avise?"
+            questionEmphasis="cielo"
+            hint="Nunca más de una al día. Solo cuando haya algo que mostrarte. Puedes cambiarlo después."
           />
 
           {/* Single-select group — the four cards form ONE logical radiogroup
@@ -296,7 +323,7 @@ export default function NotificationsScreen() {
           <View
             style={styles.optionsBlock}
             accessibilityRole="radiogroup"
-            accessibilityLabel="¿Cuándo quieres tu lectura del día?"
+            accessibilityLabel="¿Cuándo quieres que tu cielo te avise?"
           >
             {OPTIONS.map((opt) => {
               const selected = window === opt.value
@@ -320,7 +347,7 @@ export default function NotificationsScreen() {
 
           {/* Honest priming micro-copy — only when a real window is chosen.
               Disarms the surprise of the iOS dialog. Hidden for 'not_yet' /
-              no selection. PENDING voice-and-copy sign-off. */}
+              no selection. Passed voice-and-copy review (jul 2026). */}
           {willAskPermission ? (
             <Text style={styles.priming}>
               Al continuar, tu teléfono te preguntará si Stelar puede avisarte.

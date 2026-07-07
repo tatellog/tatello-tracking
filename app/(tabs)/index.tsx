@@ -26,6 +26,7 @@ import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
+import { useCycleSealInvite } from '@/features/notifications/hooks'
 import { TransformationReveal, useRevelationOrchestrator } from '@/features/revelations'
 import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
@@ -410,6 +411,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // dejaste" (cacheado por useTransformProgress; misma fuente que el hero).
   const { progress: emblemProgress } = useTransformProgress()
   const figureCount = ZODIAC[sign].stars.length + ZODIAC[sign].lines.length
+
+  // N5 · sello del ciclo: en cuanto la figura del mes se completa (misma
+  // fuente trained/figureCount que pinta el hero), el anuncio queda
+  // agendado para el día 1 del mes siguiente en la ventana elegida.
+  useCycleSealInvite(figureCount > 0 && trainedThisMonth >= figureCount, signLabel)
 
   // "Tu {signo}" — el modal de progreso de la constelación, abierto desde el
   // hero compacto. % y conteo salen de la MISMA fuente (trained/figureCount)

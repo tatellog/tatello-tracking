@@ -209,3 +209,20 @@ export function selectRevelation(input: OrchestratorInput): PendingRevelation | 
 
   return null
 }
+
+/**
+ * ¿Quedó un patrón elegible SIN mostrarse esta sesión? Pasa cuando un tier
+ * mayor (Regreso / Transformación) ganó el slot de la sesión: el patrón
+ * persiste para una futura y ese "hay algo encontrado que aún no viste" es
+ * el gancho del push N3 (features/notifications). Hereda el rate-limit de
+ * 1/7d: un patrón silenciado por cadencia no cuenta como esperando.
+ */
+export function patternWaiting(
+  input: OrchestratorInput,
+  winner: PendingRevelation | null,
+): boolean {
+  if (!input.pattern || winner?.tier === 'pattern') return false
+  return (
+    input.lastPatternAtMs == null || input.nowMs - input.lastPatternAtMs >= PATTERN_RATE_LIMIT_MS
+  )
+}
