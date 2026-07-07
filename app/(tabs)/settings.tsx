@@ -616,6 +616,34 @@ function SettingsBody() {
                 </Text>
               </Pressable>
             ) : null}
+            {profile?.is_dev ? (
+              <Pressable
+                onPress={() => router.push('/dev-notifications')}
+                accessibilityRole="button"
+                style={{
+                  marginTop: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 18,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: 'rgba(217, 174, 111, 0.4)',
+                  backgroundColor: 'rgba(217, 174, 111, 0.06)',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: typography.serifSemi,
+                    fontStyle: 'italic',
+                    fontSize: typography.sizes.bodyLarge,
+                    color: colors.bone,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ✦ DEV · probar notificaciones
+                </Text>
+              </Pressable>
+            ) : null}
           </Animated.View>
 
           {/* Marca al cierre de Ajustes (patrón premium: lockup + versión al
