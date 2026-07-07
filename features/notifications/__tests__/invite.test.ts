@@ -1,4 +1,11 @@
-import { INVITE_COPY, nextInviteDate, nextSealDate, SEAL_COPY, WINDOW_TIME } from '../invite'
+import {
+  INVITE_COPY,
+  nextInviteDate,
+  nextSealDate,
+  SEAL_COPY,
+  sealAbsorbsClose,
+  WINDOW_TIME,
+} from '../invite'
 
 describe('nextInviteDate', () => {
   it('agenda para MAÑANA en la hora de la ventana, nunca hoy', () => {
@@ -52,6 +59,22 @@ describe('nextSealDate — la cita del lunes', () => {
     const d = nextSealDate(new Date(2026, 6, 6, 8, 0), 'midday')
     expect(d.getDay()).toBe(1)
     expect(d.getDate()).toBe(13)
+  })
+})
+
+describe('sealAbsorbsClose — techo 1/día', () => {
+  it('lunes con datos: el sello absorbe al cierre', () => {
+    expect(sealAbsorbsClose(new Date(2026, 6, 6, 12, 0), true)).toBe(true) // lun 6 jul
+  })
+
+  it('lunes sin datos: no hay sello que absorba, el cierre vive', () => {
+    expect(sealAbsorbsClose(new Date(2026, 6, 6, 12, 0), false)).toBe(false)
+  })
+
+  it('martes a domingo: el cierre vive', () => {
+    for (let day = 7; day <= 12; day++) {
+      expect(sealAbsorbsClose(new Date(2026, 6, day, 12, 0), true)).toBe(false) // mar..dom
+    }
   })
 })
 

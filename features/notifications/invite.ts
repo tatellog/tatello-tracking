@@ -93,6 +93,16 @@ export const CLOSE_COPY = {
   body: 'Tu día ya tiene su veredicto. Míralo cuando quieras.',
 } as const
 
+/*
+ * Arbitraje del techo 1/día: el lunes que suena el sello, el cierre cede
+ * (lo escaso gana, lo diario cede). El OS no reporta si el sello ya SONÓ,
+ * así que la regla es determinística: lunes + sello elegible (hay datos)
+ * → sin cierre. Perder un cierre en lunes es más barato que dos toques.
+ */
+export function sealAbsorbsClose(now: Date, hasData: boolean): boolean {
+  return hasData && now.getDay() === 1
+}
+
 /** HOY a las 20:15, o null si ya pasó (el cierre tardío se vive en la app;
  *  no se agenda nada para mañana — mañana lo arma su propia comida). */
 export function todayCloseDate(now: Date): Date | null {

@@ -2,6 +2,7 @@ import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
 import type { NotificationWindow } from '@/features/profile/api'
+import { track } from '@/lib/analytics'
 
 import {
   CLOSE_COPY,
@@ -11,6 +12,7 @@ import {
   nextSealDate,
   RETURN_COPY,
   SEAL_COPY,
+  sealAbsorbsClose,
   todayCloseDate,
 } from './invite'
 
@@ -36,6 +38,14 @@ export type NotificationTarget = 'hoy' | 'orbit-semana'
  */
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient'
+
+/** Telemetría del canal: sin "delivered" en notificaciones locales, el
+ *  proxy de análisis es notif_scheduled (aquí) vs notif_opened (response
+ *  router). `for` lleva la fecha agendada para poder cruzar con aperturas
+ *  orgánicas cercanas al horario. */
+function trackScheduled(id: string, target: NotificationTarget, date: Date): void {
+  track('notif_scheduled', { id, target, for: date.toISOString() })
+}
 
 /** Un solo slot de invitación — re-agendar SIEMPRE reemplaza. */
 export const INVITE_ID = 'stelar-next-star-invite'
@@ -66,6 +76,7 @@ export async function syncNextStarInvite(
       })
     }
 
+    const inviteDate = nextInviteDate(new Date(), window)
     await Notifications.scheduleNotificationAsync({
       identifier: INVITE_ID,
       content: {
@@ -75,12 +86,14 @@ export async function syncNextStarInvite(
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: nextInviteDate(new Date(), window),
+        date: inviteDate,
       },
     })
+    trackScheduled(INVITE_ID, 'hoy', inviteDate)
 
     // La red de 7 días: se re-arma junto con la de mañana, así que solo
     // alcanza a quien de verdad pausó una semana. Después de esta, nada.
+    const returnDate = nextReturnDate(new Date(), window)
     await Notifications.scheduleNotificationAsync({
       identifier: RETURN_ID,
       content: {
@@ -90,9 +103,10 @@ export async function syncNextStarInvite(
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: nextReturnDate(new Date(), window),
+        date: returnDate,
       },
     })
+    trackScheduled(RETURN_ID, 'hoy', returnDate)
   } catch {
     // Una invitación que no se pudo agendar jamás debe romper la app.
   }
@@ -122,6 +136,7 @@ export async function syncWeekSealInvite(
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
 
+    const sealDate = nextSealDate(new Date(), window)
     await Notifications.scheduleNotificationAsync({
       identifier: SEAL_ID,
       content: {
@@ -133,9 +148,10 @@ export async function syncWeekSealInvite(
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: nextSealDate(new Date(), window),
+        date: sealDate,
       },
     })
+    trackScheduled(SEAL_ID, 'orbit-semana', sealDate)
   } catch {
     // Nunca romper la app por una notificación.
   }
@@ -150,10 +166,15 @@ export const DAY_CLOSE_ID = 'stelar-day-close'
  * no se juzga y tampoco notifica). Se llama cada vez que las comidas del
  * día cambian; idempotente por identifier. Sin comida → cancela. Después
  * de las 20:15 → no agenda (el cierre tardío se descubre en la app).
+ *
+ * Techo 1/día: el lunes que el sello es elegible (`hasAnyData`), el cierre
+ * cede — ver sealAbsorbsClose en invite.ts. El cancel corre ANTES del
+ * arbitraje para que un cierre ya agendado ese lunes también se retire.
  */
 export async function syncDayCloseInvite(
   window: NotificationWindow | null | undefined,
   hasMealToday: boolean,
+  hasAnyData: boolean,
 ): Promise<void> {
   if (isExpoGo) return
   try {
@@ -161,6 +182,7 @@ export async function syncDayCloseInvite(
 
     await Notifications.cancelScheduledNotificationAsync(DAY_CLOSE_ID).catch(() => {})
     if (window == null || window === 'not_yet' || !hasMealToday) return
+    if (sealAbsorbsClose(new Date(), hasAnyData)) return
 
     const date = todayCloseDate(new Date())
     if (date == null) return
@@ -180,6 +202,7 @@ export async function syncDayCloseInvite(
         date,
       },
     })
+    trackScheduled(DAY_CLOSE_ID, 'hoy', date)
   } catch {
     // Nunca romper la app por una notificación.
   }

@@ -40,9 +40,13 @@ export function useNextStarInvite(): void {
  * que pinta Comidas, cero fetch extra). Primera comida del día → se agenda
  * el push de las 20:15; día sin comida → se cancela. El push solo existe
  * en días que lo GANARON, así que nunca es reproche.
+ *
+ * `hasAny` alimenta el arbitraje 1/día: el lunes que el sello es elegible,
+ * el cierre cede (misma query cacheada que ya usa useNextStarInvite).
  */
 export function useDayCloseInvite(): void {
   const { data: profile } = useProfile()
+  const hasAny = useHasAnySignals()
   const window = (profile ? (profile.notification_window ?? null) : undefined) as
     | NotificationWindow
     | null
@@ -51,7 +55,7 @@ export function useDayCloseInvite(): void {
   const mealCount = meals.data?.length
 
   useEffect(() => {
-    if (window === undefined || mealCount === undefined) return
-    void syncDayCloseInvite(window, mealCount > 0)
-  }, [window, mealCount])
+    if (window === undefined || mealCount === undefined || hasAny.data === undefined) return
+    void syncDayCloseInvite(window, mealCount > 0, hasAny.data === true)
+  }, [window, mealCount, hasAny.data])
 }

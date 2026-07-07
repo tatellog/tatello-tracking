@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
 
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
+import { track } from '@/lib/analytics'
 
 import type { NotificationTarget } from './scheduler'
 
@@ -26,15 +27,22 @@ const isExpoGo = Constants.executionEnvironment === 'storeClient'
 const COLD_START_MAX_AGE_MS = 60_000
 
 function landFactory(router: ReturnType<typeof useRouter>) {
-  return (data: unknown) => {
+  return (data: unknown, info: { id: string; coldStart: boolean }) => {
     const target = (data as { target?: NotificationTarget } | null)?.target
     if (target === 'orbit-semana') {
       requestOrbitSegment('semana')
       router.navigate('/(tabs)/orbit')
     } else if (target === 'hoy') {
       router.navigate('/(tabs)')
+    } else {
+      // Sin target (notificación vieja o ajena): no navegar a ciegas, no
+      // contaminar la telemetría del canal.
+      return
     }
-    // Sin target (notificación vieja o ajena): no navegar a ciegas.
+    // Telemetría del canal: el tap es la mitad "opened" del proxy
+    // scheduled/opened (ver trackScheduled en scheduler.ts). cold_start
+    // marca las aperturas atribuibles al push (la app nació de este tap).
+    track('notif_opened', { id: info.id, target, cold_start: info.coldStart })
   }
 }
 
@@ -60,12 +68,18 @@ export function useNotificationResponseRouter(): void {
           const raw = last.notification.date
           const deliveredMs = raw < 1e12 ? raw * 1000 : raw
           if (Date.now() - deliveredMs < COLD_START_MAX_AGE_MS) {
-            land(last.notification.request.content.data)
+            land(last.notification.request.content.data, {
+              id: last.notification.request.identifier,
+              coldStart: true,
+            })
           }
         }
 
         sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-          land(resp.notification.request.content.data)
+          land(resp.notification.request.content.data, {
+            id: resp.notification.request.identifier,
+            coldStart: false,
+          })
         })
       } catch {
         // Un canal de notificaciones roto jamás debe romper la app.
