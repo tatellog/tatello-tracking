@@ -2,6 +2,8 @@ import {
   INVITE_COPY,
   nextInviteDate,
   nextSealDate,
+  PATTERN_COPY,
+  sameLocalDay,
   SEAL_COPY,
   sealAbsorbsClose,
   WINDOW_TIME,
@@ -59,6 +61,27 @@ describe('nextSealDate — la cita del lunes', () => {
     const d = nextSealDate(new Date(2026, 6, 6, 8, 0), 'midday')
     expect(d.getDay()).toBe(1)
     expect(d.getDate()).toBe(13)
+  })
+})
+
+describe('PATTERN_COPY — N3, el anuncio sin spoiler', () => {
+  it('invita sin culpa: sin rachas, sin pérdida, sin conteos', () => {
+    const all = `${PATTERN_COPY.title} ${PATTERN_COPY.body}`
+    expect(all).not.toMatch(/racha|pierd|romp|falta|debe|olvid/i)
+    expect(all).not.toMatch(/\d/)
+  })
+
+  it('no adelanta el contenido: ni el patrón concreto ni sus señales', () => {
+    const all = `${PATTERN_COPY.title} ${PATTERN_COPY.body}`
+    expect(all).not.toMatch(/prote|entren|sueño|dorm|noche|tarde|comida/i)
+  })
+})
+
+describe('sameLocalDay', () => {
+  it('mismo día calendario → true, días distintos → false', () => {
+    expect(sameLocalDay(new Date(2026, 6, 6, 9, 0), new Date(2026, 6, 6, 23, 59))).toBe(true)
+    expect(sameLocalDay(new Date(2026, 6, 6, 23, 59), new Date(2026, 6, 7, 0, 1))).toBe(false)
+    expect(sameLocalDay(new Date(2026, 6, 6), new Date(2026, 7, 6))).toBe(false)
   })
 })
 

@@ -94,6 +94,32 @@ export const CLOSE_COPY = {
 } as const
 
 /*
+ * N3 · "Stelar encontró algo" — el anuncio del patrón que quedó esperando
+ * (detectado, elegible, pero otro tier ganó el slot de la sesión). Regla
+ * dura: el push NUNCA adelanta el patrón ni números — el misterio es el
+ * gancho y el contenido vive en la ceremonia in-app. Suena mañana en la
+ * ventana elegida y se cancela solo si la usuaria lo ve antes.
+ * (Pasa por voice-and-copy.)
+ */
+export const PATTERN_COPY = {
+  // Sujeto = tu cielo (no la marca), sin vocabulario de sistema ("tus
+  // datos") y SIN repetir el cierre del cierre diario ("Míralo cuando
+  // quieras") — el patrón es el momento raro del canal y merece su propia
+  // textura. El body se sostiene solo si el canal trunca el title.
+  title: 'Tu cielo tiene algo que mostrarte',
+  body: 'Hay un patrón nuevo esperándote. Ábrelo cuando quieras.',
+} as const
+
+/** ¿Caen el mismo día calendario local? (arbitraje patrón vs sello). */
+export function sameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
+}
+
+/*
  * Arbitraje del techo 1/día: el lunes que suena el sello, el cierre cede
  * (lo escaso gana, lo diario cede). El OS no reporta si el sello ya SONÓ,
  * así que la regla es determinística: lunes + sello elegible (hay datos)
