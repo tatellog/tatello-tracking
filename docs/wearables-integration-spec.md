@@ -203,13 +203,77 @@ cobro llega cuando el sync ya es confiable (fase 2, con trial).
 
 ## 7 · Roadmap
 
-| Fase             | Gate                                | Qué                                                                                                                                                                                             |
-| ---------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 · Groundwork   | ya                                  | Encuesta de reloj a las 4 usuarias · migración de tablas crudas + RLS · priming + copy · solicitar programa Garmin                                                                              |
-| 1 · Apple Health | dev build (cuenta Apple ya existe)  | Sueño + workouts (tipo/duración/kcal) + pasos ingest · view manual-gana · auto-sellado DayCheckIn · kcal del reloj en el aro interior del multiring · Conexiones en Ajustes · gratis para betas |
-| 2 · Profundizar  | 4-6 semanas de sync confiable       | Superficie de pasos (patrón semanal en Órbita) · background best-effort · paywall con trial · Health Connect (Android) si hay demanda                                                           |
-| 3 · Garmin       | aprobación + usuarias Garmin reales | Edge function webhook + OAuth · misma view, misma regla de dedup                                                                                                                                |
+| Fase                         | Gate                                                            | Qué                                                                                                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0 · Groundwork               | ya                                                              | Encuesta de reloj a las 4 usuarias · migración de tablas crudas + RLS · priming + copy · ~~solicitar programa Garmin~~ (programa suspendido, ver §8.2)                                                 |
+| 1 · Apple Health             | dev build (cuenta Apple ya existe)                              | ✅ CONSTRUIDA. Sueño + workouts (tipo/duración/kcal) + pasos ingest · view manual-gana · kcal del reloj en el multiring de Órbita Día · Conexiones en Ajustes + paso de onboarding · gratis para betas |
+| 2 · Health Connect (Android) | demanda real de usuarias Android                                | Espejo de fase 1 con `react-native-health-connect` (§8.1) · +`'health_connect'` al source · minSdkVersion 26 · superficie de pasos · paywall con trial                                                 |
+| 3 · Garmin directo           | BLOQUEADO (§8.2): programa suspendido + entidad legal + demanda | Diferido indefinidamente. Cobertura de Garmin HOY = rebote por Apple Health / Health Connect, costo cero.                                                                                              |
 
 **Pendiente técnico de fase 1:** elegir librería HealthKit para Expo
 (candidatas a evaluar con backend-specialist; requiere expo prebuild /
-dev client, nunca correrá en Expo Go).
+dev client, nunca correrá en Expo Go). — RESUELTO: fase 1 construida con
+`@kingstinct/react-native-healthkit` (ver §2).
+
+## 8 · Análisis de Android (Health Connect) y Garmin (jul 2026)
+
+### 8.1 · Health Connect (Android) — la fase 2 es un clon limpio de la 1
+
+Health Connect ES el "Apple Health de Android" (el agregador de
+plataforma, gratis, device-side). La integración es el ESPEJO de la de
+HealthKit: misma arquitectura, misma regla "manual gana", mismas tablas
+crudas — solo cambia el archivo wrapper.
+
+- **Librería:** `react-native-health-connect` (matinzd) v3.5.3, mantenida
+  (último publish may 2026), TypeScript, new architecture, con config
+  plugin para prebuild (`expo-health-connect`, mismo autor). Es la única
+  recomendable; la lógica de `features/wearables/logic.ts` ya es agnóstica
+  de fuente, así que enchufa sin refactor.
+- **Caveats de build (todos de config, ninguno de arquitectura):**
+  - `minSdkVersion = 26` (Health Connect lo exige); hoy el proyecto está
+    por debajo → subirlo vía `expo-build-properties` en `app.json`.
+  - No corre en Expo Go (igual que HealthKit): dev/preview build.
+  - Requiere que Health Connect esté instalado en el teléfono (Android 14+
+    lo trae de fábrica; Android 13 es una app de Play Store) → la UX del
+    estado "no disponible" ya existe y cubre este caso.
+- **Cambio de schema mínimo:** el CHECK de `source` hoy es
+  `('apple_health', 'garmin')`. Health Connect es una fuente nueva:
+  agregar `'health_connect'` al CHECK de las 3 tablas y al type
+  `WearableSource` (una micro-migración + una línea). El `workout_source`
+  de la view sigue devolviendo 'manual'/'wearable' — la fuente concreta
+  del reloj no cambia la leyenda del multiring, solo la provenance.
+- **Estructura:** `features/wearables/health-connect.ts` (espejo de
+  `healthkit.ts`, la única import de la lib Android) + un `hooks.ts`
+  extendido con `useHealthConnectSync` que decide plataforma. Los mapeos
+  de tipo de entreno / etapas de sueño de Health Connect difieren de los
+  de HK y se normalizan en `logic.ts` (funciones nuevas, mismos tests).
+- **Cuándo:** fase 2, gated en demanda real de usuarias Android (la beta
+  es toda iPhone hoy — validar con la encuesta antes de invertir).
+
+### 8.2 · Garmin directo — BLOQUEADO por Garmin, no por nosotros
+
+⚠ Hallazgo que cambia el plan: **el Garmin Connect Developer Program está
+SUSPENDIDO** (jul 2026). No acepta nuevas altas; el formulario de acceso
+está "under construction". Además, cuando reabra, exige aplicar como
+ENTIDAD LEGAL (empresa/universidad/hospital), no uso personal, con cuota
+administrativa de setup. Stelar hoy no califica ni podría aplicar aunque
+quisiera.
+
+Consecuencias para el roadmap:
+
+- **"Solicitar el programa Garmin ya" (fase 0) es imposible hoy.** La
+  puerta está cerrada por Garmin; no hay lead-time que correr en paralelo.
+- **La única vía directa hoy sería un agregador (Terra)** — y ya se
+  evaluó y descartó (§2): costo, tercero en datos de salud, lock-in. El
+  bloqueo de Garmin no cambia ese veredicto.
+- **La vía que SÍ funciona ya: rebote por la plataforma.** Garmin Connect
+  escribe workouts/sueño a Apple Health (iOS) y a Health Connect (Android)
+  si la usuaria activa el write-through en su app Garmin. Stelar captura a
+  la usuaria de Garmin SIN integrar Garmin — la card de Conexiones ya lo
+  explica. La provenance mostrará "Garmin Connect" desde el metadata.
+
+**Decisión: Garmin directo sale del roadmap** hasta que se cumplan TRES
+condiciones (todas): (a) Garmin reabra el programa, (b) Stelar sea una
+entidad legal que califique, (c) haya demanda real de usuarias Garmin que
+el rebote no cubra bien. Mientras tanto, el rebote por Apple Health /
+Health Connect es la cobertura de Garmin, a costo cero.
