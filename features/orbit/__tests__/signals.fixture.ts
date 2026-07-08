@@ -23,6 +23,8 @@ export function mkSig(day: string, o: Partial<DailySignals> = {}): DailySignals 
     water_glasses: null,
     weight_kg: null,
     wellbeing_checkins: null,
+    workout_kcal: null,
+    workout_source: null,
     workout_type: null,
     ...o,
   }
