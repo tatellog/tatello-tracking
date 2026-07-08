@@ -179,10 +179,15 @@ alimentan patrones de semanas, no juicios del minuto).
 
 - **Hogar canónico:** Ajustes → sección "Conexiones" (estado, fuente,
   último sync, desconectar en un toque + qué pasa con lo sincronizado).
-- **Invitación contextual (la que convierte):** en el lugar que
+- **Paso de onboarding (decisión de la dueña, jul 2026 — anula el "NO
+  en onboarding" del benchmark):** paso 11b tras notificaciones
+  (`app/onboarding/health-connect.tsx`), referencia visual YAZIO
+  traducida a voz Stelar (sin hype ni stats infladas). Priming completo
+  antes del prompt; "Ahora no" avanza sin re-asks; en Android/Expo Go el
+  CTA es solo "Continuar" (sin botón que promete y truena).
+- **Invitación contextual (fase 2, la que convierte):** en el lugar que
   automatiza (slide de sueño / DayCheckIn): "¿Entrenas con tu reloj?
-  Stelar puede anotarlo por ti." NO en el onboarding (12 pasos ya; el
-  prompt del OS se quema una sola vez).
+  Stelar puede anotarlo por ti."
 - **Priming antes del prompt del OS** (lección de notificaciones): qué
   lee · qué NO hace ("no te va a avisar, no te va a medir; solo te
   ahorra escribir") · reversible en un toque. Copy por voice-and-copy;
