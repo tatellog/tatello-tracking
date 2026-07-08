@@ -122,5 +122,8 @@ export const queryKeys = {
       ['orbit', 'history', uid, fromDate, toDate] as const,
     hasAny: (uid: string) => ['orbit', 'hasAny', uid] as const,
     totalDays: (uid: string) => ['orbit', 'totalDays', uid] as const,
+    // AI Foundation: la voz de IA por superficie + periodo (gateada por flag).
+    aiVoice: (uid: string, feature: string, periodStart: string, periodEnd: string) =>
+      ['orbit', 'aiVoice', uid, feature, periodStart, periodEnd] as const,
   },
 } as const
