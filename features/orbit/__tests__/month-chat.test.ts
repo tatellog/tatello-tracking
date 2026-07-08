@@ -86,3 +86,48 @@ describe('buildMonthChat — árbol de déficit', () => {
     expect(verCal.action).toEqual({ kind: 'openCalendar' })
   })
 })
+
+describe('buildMonthChat — otros temas', () => {
+  it('alimentación: proteína en X de Y días con meta', () => {
+    // 20 días con proteína 130 (≥120 meta) → hit=20, logged=20.
+    const signals = activeMonth(20, () => ({ protein_g: 130 }))
+    const chat = buildMonthChat(signals, CTX)
+    expect(chat.trees.alimentacion).toBeDefined()
+    expect(chat.trees.alimentacion!.nodes.intro!.bubbles[1]!.text).toContain('20 de 20')
+  })
+
+  it('sueño y entrenamiento aparecen con datos suficientes', () => {
+    const signals = activeMonth(20, () => ({ trained: true, sleep_minutes: 450 }))
+    const chat = buildMonthChat(signals, CTX)
+    expect(chat.trees.sueno).toBeDefined()
+    expect(chat.trees.entrenamiento).toBeDefined()
+    expect(chat.trees.entrenamiento!.nodes.intro!.bubbles[1]!.text).toContain('20 días')
+  })
+
+  it('la metacognición estándar guarda si/no/nunca', () => {
+    const signals = activeMonth(20, () => ({ protein_g: 130 }))
+    const notice = buildMonthChat(signals, CTX).trees.alimentacion!.nodes.notice!
+    expect(notice.choices!.map((c) => c.reflection?.answer)).toEqual(['si', 'no', 'nunca'])
+    expect(notice.choices!.every((c) => c.reflection?.questionKey === 'protein_adherence')).toBe(
+      true,
+    )
+  })
+
+  it('sorpréndeme reusa el tema más rico disponible', () => {
+    const chat = buildMonthChat(activeMonth(20), CTX)
+    expect(chat.trees.sorprendeme).toBeDefined()
+    expect(chat.trees.sorprendeme!.topic).toBe('sorprendeme')
+  })
+
+  it('el picker solo lista temas con datos reales (nunca relleno)', () => {
+    // Mes con déficit + sueño (para pasar readiness), pero SIN agua ni
+    // entreno → esos botones no aparecen.
+    const signals = activeMonth(20, () => ({ trained: false, water_glasses: 0 }))
+    const chat = buildMonthChat(signals, CTX)
+    const topics = chat.picker!.choices.map((c) => c.topic)
+    expect(topics).toContain('deficit')
+    expect(topics).toContain('sueno')
+    expect(topics).not.toContain('entrenamiento')
+    expect(topics).not.toContain('agua')
+  })
+})

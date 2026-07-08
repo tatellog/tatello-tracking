@@ -8,11 +8,13 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import {
   DayPresent,
   MonthSegment,
+  MonthSegmentIA,
   OrbitSegments,
   ScreenCosmos,
   WeekSegment,
   type OrbitSegment,
 } from '@/features/orbit/components'
+import { ORBITA_MES_IA_ENABLED } from '@/lib/featureFlags'
 import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -188,6 +190,15 @@ function OrbitBody() {
                   setSegment('dia')
                 }}
                 onScrollTop={scrollToTop}
+              />
+            ) : ORBITA_MES_IA_ENABLED ? (
+              <MonthSegmentIA
+                key="mes-ia"
+                onPickDay={(date) => {
+                  setViewedDay(date)
+                  setDayOrigin('mes')
+                  setSegment('dia')
+                }}
               />
             ) : (
               <MonthSegment

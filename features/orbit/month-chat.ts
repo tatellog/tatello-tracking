@@ -11,7 +11,7 @@
  * IA (opcional, cacheada) reescribe el texto de las burbujas si el flag lo pide.
  */
 import { isDeficitDay } from './deficit'
-import { daysInDeficit } from './month-built'
+import { daysInDeficit, proteinAdherence, WATER_GOAL_GLASSES } from './month-built'
 import type { DailySignals } from './api'
 
 /** Sueño "suficiente": ≥ 7 h (mismo umbral honesto que el Context Engine). */
@@ -139,7 +139,7 @@ function buildDeficitTree(signals: readonly DailySignals[], ctx: MonthChatCtx): 
     sleepCross: {
       id: 'sleepCross',
       bubbles: [
-        { text: 'Pero eso no fue lo más interesante.', tone: 'accent' },
+        { text: 'Y hay algo más ahí.', tone: 'accent' },
         { text: `Dormiste más de 7 horas en ${withSleep} de esos días.`, tone: 'strong' },
       ],
       choices: [
@@ -158,6 +158,128 @@ function buildDeficitTree(signals: readonly DailySignals[], ctx: MonthChatCtx): 
     },
   }
   return { topic: 'deficit', entry: 'intro', nodes }
+}
+
+/* ── Árboles genéricos (un hallazgo + metacognición) ─────────────────── */
+
+/** Una pregunta de metacognición reutilizable: guarda sí/no/nunca bajo su
+ *  clave. "Ver calendario" no guarda (es evidencia, no respuesta). */
+function metacognitionChoices(questionKey: string): ChatChoice[] {
+  return [
+    { label: 'Sí', action: { kind: 'end' }, reflection: { questionKey, answer: 'si' } },
+    { label: 'No', action: { kind: 'end' }, reflection: { questionKey, answer: 'no' } },
+    {
+      label: 'Nunca me había dado cuenta',
+      action: { kind: 'end' },
+      reflection: { questionKey, answer: 'nunca' },
+    },
+  ]
+}
+
+/**
+ * Árbol estándar de un tema: nodo `intro` con el hallazgo (burbujas del motor)
+ * → nodo `notice` con la pregunta de metacognición. Si `question` es null, el
+ * intro cierra ofreciendo el calendario como evidencia.
+ */
+function findingTree(
+  topic: ChatTopic,
+  finding: ChatBubble[],
+  question: { text: string; questionKey: string } | null,
+): ChatTree {
+  const nodes: Record<string, ChatNode> = {
+    intro: {
+      id: 'intro',
+      bubbles: finding,
+      choices: question
+        ? [{ label: 'Sigue', action: { kind: 'goto', node: 'notice' } }]
+        : [{ label: 'Ver el calendario', action: { kind: 'openCalendar' } }],
+    },
+  }
+  if (question) {
+    nodes.notice = {
+      id: 'notice',
+      bubbles: [{ text: question.text, tone: 'accent' }],
+      choices: metacognitionChoices(question.questionKey),
+    }
+  }
+  return { topic, entry: 'intro', nodes }
+}
+
+/* ── Hallazgos por tema (del motor, deterministas) ───────────────────── */
+
+function buildAlimentacionTree(
+  signals: readonly DailySignals[],
+  ctx: MonthChatCtx,
+): ChatTree | null {
+  const p = proteinAdherence(signals, { proteinTarget: ctx.proteinTarget })
+  if (p == null || p.logged < 3) return null
+  return findingTree(
+    'alimentacion',
+    [
+      { text: 'Elegiste alimentación.' },
+      {
+        text: `Alcanzaste tu proteína en ${p.hit} de ${p.logged} días con comida.`,
+        tone: 'strong',
+      },
+    ],
+    {
+      text: '¿Sentías que la proteína estaba ahí, o te sorprende?',
+      questionKey: 'protein_adherence',
+    },
+  )
+}
+
+function buildSuenoTree(signals: readonly DailySignals[]): ChatTree | null {
+  const nights = signals.filter((s) => s.sleep_minutes != null)
+  if (nights.length < 5) return null
+  const above7 = nights.filter((s) => (s.sleep_minutes ?? 0) >= SLEEP_ENOUGH_MINUTES).length
+  return findingTree(
+    'sueno',
+    [
+      { text: 'Elegiste sueño.' },
+      {
+        text: `Dormiste 7 horas o más en ${above7} de ${nights.length} noches registradas.`,
+        tone: 'strong',
+      },
+    ],
+    {
+      text: '¿Habías notado cómo cambia tu descanso a lo largo del mes?',
+      questionKey: 'sleep_variation',
+    },
+  )
+}
+
+function buildEntrenamientoTree(signals: readonly DailySignals[]): ChatTree | null {
+  const trained = signals.filter((s) => s.trained === true).length
+  if (trained < 3) return null
+  return findingTree(
+    'entrenamiento',
+    [
+      { text: 'Elegiste entrenamiento.' },
+      { text: `Te moviste ${trained} días este mes.`, tone: 'strong' },
+    ],
+    { text: '¿Esos días se sintieron distintos a los demás?', questionKey: 'training_feel' },
+  )
+}
+
+function buildAguaTree(signals: readonly DailySignals[]): ChatTree | null {
+  const daysWithWater = signals.filter((s) => (s.water_glasses ?? 0) > 0)
+  if (daysWithWater.length < 5) return null
+  const metGoal = daysWithWater.filter((s) => (s.water_glasses ?? 0) >= WATER_GOAL_GLASSES).length
+  return findingTree(
+    'agua',
+    [
+      { text: 'Elegiste agua.' },
+      {
+        text: `Llegaste a tu meta de agua en ${metGoal} de ${daysWithWater.length} días.`,
+        tone: 'strong',
+      },
+    ],
+    {
+      text: '¿El agua es algo en lo que piensas, o pasa sin darte cuenta?',
+      questionKey: 'water_awareness',
+    },
+  )
 }
 
 /* ── Ensamblado ──────────────────────────────────────────────────────── */
@@ -184,14 +306,27 @@ export function buildMonthChat(
   if (!monthChatReady(signals)) return { ready: false, picker: null, trees: {} }
 
   const trees: Partial<Record<ChatTopic, ChatTree>> = {}
+  // Orden de aparición en el picker = orden de relevancia (déficit = norte).
   const deficit = buildDeficitTree(signals, ctx)
   if (deficit) trees.deficit = deficit
+  const alimentacion = buildAlimentacionTree(signals, ctx)
+  if (alimentacion) trees.alimentacion = alimentacion
+  const entrenamiento = buildEntrenamientoTree(signals)
+  if (entrenamiento) trees.entrenamiento = entrenamiento
+  const sueno = buildSuenoTree(signals)
+  if (sueno) trees.sueno = sueno
+  const agua = buildAguaTree(signals)
+  if (agua) trees.agua = agua
 
-  // "Sorpréndeme" siempre disponible si hay al menos un árbol real: reusa el
-  // tema con más señal (fase 1: déficit). Se enriquecerá en la fase 2.
-  const available = Object.keys(trees) as ChatTopic[]
+  // Solo los temas con datos reales entran (nunca un tema vacío de relleno).
+  const available = (Object.keys(trees) as ChatTopic[]).filter((t) => t !== 'sorprendeme')
   const n = available.length
   if (n === 0) return { ready: false, picker: null, trees: {} }
+
+  // "Sorpréndeme" = el tema más rico disponible, presentado como sorpresa
+  // (fase: reusa el árbol; en el futuro elegirá el patrón menos obvio).
+  const surpriseSource = trees[available[0]!]
+  if (surpriseSource) trees.sorprendeme = { ...surpriseSource, topic: 'sorprendeme' }
 
   const picker: TopicPicker = {
     intro: [
@@ -208,8 +343,6 @@ export function buildMonthChat(
       { topic: 'sorprendeme' as ChatTopic, label: TOPIC_LABEL.sorprendeme },
     ],
   }
-  // Sorpréndeme apunta (fase 1) al árbol de mayor señal disponible.
-  trees.sorprendeme = deficit ? { ...deficit, topic: 'sorprendeme' } : undefined
 
   return { ready: true, picker, trees }
 }
