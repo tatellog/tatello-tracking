@@ -23,6 +23,7 @@ import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/compone
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
+import { ConnectionsCard } from '@/features/wearables/components/ConnectionsCard'
 import { useSession } from '@/hooks/useSession'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
@@ -358,6 +359,14 @@ function SettingsBody() {
             />
           </Animated.View>
 
+          {/* ── Conexiones — card DESTACADA (feedback dueña: la fila plana en
+              Cuenta no resaltaba). Vive alto, justo bajo "Tu camino", con el
+              tratamiento premium de la IdentityCard. ── */}
+          <Animated.View entering={enter(180)}>
+            <SectionHeader label="Conexiones" />
+            <ConnectionsCard onPress={openConnections} />
+          </Animated.View>
+
           {/* ── Acerca de Stelar — DOCUMENTACIÓN del producto, no ajustes.
               Separada de Cuenta a propósito: la usuaria entiende que esto explica
               Stelar, no que configura nada. ── */}
@@ -401,13 +410,6 @@ function SettingsBody() {
 
             {/* Primarias — lo más a mano. */}
             <View style={styles.accountCard}>
-              <AccountRow
-                label="Conexiones"
-                tagline="Tu reloj y Apple Health."
-                onPress={openConnections}
-                accessibilityLabel="Conexiones con tu reloj"
-              />
-              <View style={styles.accountDivider} />
               <AccountRow
                 label="Notificaciones"
                 tagline="Tú eliges cuándo aparecemos."
