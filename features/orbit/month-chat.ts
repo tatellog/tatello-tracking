@@ -11,7 +11,13 @@
  * IA (opcional, cacheada) reescribe el texto de las burbujas si el flag lo pide.
  */
 import { isDeficitDay } from './deficit'
-import { daysInDeficit, proteinAdherence, WATER_GOAL_GLASSES } from './month-built'
+import {
+  daysInDeficit,
+  detectMonthPatterns,
+  proteinAdherence,
+  WATER_GOAL_GLASSES,
+  type MonthPattern,
+} from './month-built'
 import type { DailySignals } from './api'
 
 /** Sueño "suficiente": ≥ 7 h (mismo umbral honesto que el Context Engine). */
@@ -282,6 +288,58 @@ function buildAguaTree(signals: readonly DailySignals[]): ChatTree | null {
   )
 }
 
+/* ── "Sorpréndeme" — el patrón menos obvio, con metacognición ────────── */
+
+/** Elige el patrón más "sorprendente": un patrón TEMPORAL/correlación
+ *  (kind 'pattern', lo menos obvio) antes que una constancia (kind
+ *  'discovery'). null si el motor no detecta ninguno. */
+function pickSurprisePattern(
+  signals: readonly DailySignals[],
+  ctx: MonthChatCtx,
+): MonthPattern | null {
+  const patterns = detectMonthPatterns(signals, {
+    calorieTarget: ctx.calorieTarget,
+    proteinTarget: ctx.proteinTarget,
+  })
+  if (patterns.length === 0) return null
+  return patterns.find((p) => p.kind === 'pattern') ?? patterns[0]!
+}
+
+/**
+ * "Sorpréndeme" abre el patrón menos obvio como conversación con
+ * metacognición ("¿también lo habías notado?" — el ejemplo de la spec). El
+ * `why` del patrón (la palanca observacional, ya validada) da el cierre.
+ * Fallback: si no hay patrón detectado, reusa el tema más rico disponible.
+ */
+function buildSorprendemeTree(
+  pattern: MonthPattern | null,
+  fallback: ChatTree | undefined,
+): ChatTree | undefined {
+  if (!pattern) return fallback ? { ...fallback, topic: 'sorprendeme' } : undefined
+  const bubbles: ChatBubble[] = [
+    { text: 'Esto lo guardé para el final.', tone: 'accent' },
+    { text: pattern.title, tone: 'strong' },
+  ]
+  const nodes: Record<string, ChatNode> = {
+    intro: {
+      id: 'intro',
+      bubbles,
+      choices: [{ label: 'Sigue', action: { kind: 'goto', node: 'notice' } }],
+    },
+    notice: {
+      id: 'notice',
+      bubbles: [{ text: '¿También lo habías notado?', tone: 'accent' }],
+      choices: metacognitionChoices(`pattern_${pattern.id}`),
+    },
+  }
+  if (pattern.why) {
+    // El "por qué importa" del motor como cierre observacional, tras responder.
+    nodes.why = { id: 'why', bubbles: [{ text: pattern.why, tone: 'accent' }] }
+    for (const c of nodes.notice!.choices!) c.action = { kind: 'goto', node: 'why' }
+  }
+  return { topic: 'sorprendeme', entry: 'intro', nodes }
+}
+
 /* ── Ensamblado ──────────────────────────────────────────────────────── */
 
 const TOPIC_LABEL: Record<ChatTopic, string> = {
@@ -323,10 +381,10 @@ export function buildMonthChat(
   const n = available.length
   if (n === 0) return { ready: false, picker: null, trees: {} }
 
-  // "Sorpréndeme" = el tema más rico disponible, presentado como sorpresa
-  // (fase: reusa el árbol; en el futuro elegirá el patrón menos obvio).
-  const surpriseSource = trees[available[0]!]
-  if (surpriseSource) trees.sorprendeme = { ...surpriseSource, topic: 'sorprendeme' }
+  // "Sorpréndeme" = el patrón menos obvio del motor como conversación con
+  // metacognición; si no hay patrón, reusa el tema más rico disponible.
+  const surprise = buildSorprendemeTree(pickSurprisePattern(signals, ctx), trees[available[0]!])
+  if (surprise) trees.sorprendeme = surprise
 
   // Apertura que ASOMA el hallazgo (product-benchmark): abre con la voz del
   // coach picando la curiosidad, no un menú frío. El premio es el

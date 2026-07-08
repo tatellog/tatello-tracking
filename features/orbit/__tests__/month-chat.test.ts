@@ -115,10 +115,30 @@ describe('buildMonthChat — otros temas', () => {
     )
   })
 
-  it('sorpréndeme reusa el tema más rico disponible', () => {
+  it('sorpréndeme siempre existe cuando hay datos', () => {
     const chat = buildMonthChat(activeMonth(20), CTX)
     expect(chat.trees.sorprendeme).toBeDefined()
     expect(chat.trees.sorprendeme!.topic).toBe('sorprendeme')
+  })
+
+  it('sorpréndeme abre un patrón con metacognición "¿lo habías notado?"', () => {
+    // Un mes con forma temporal: entre semana en déficit, findes en superávit
+    // → detectMonthPatterns produce un patrón de fin de semana.
+    const signals = activeMonth(28, (i) => {
+      const weekday = new Date(`2026-07-${String(i + 1).padStart(2, '0')}T00:00:00Z`).getUTCDay()
+      const isWeekend = weekday === 0 || weekday === 6
+      return { calories: isWeekend ? 1800 : 1250, trained: !isWeekend, sleep_minutes: 450 }
+    })
+    const tree = buildMonthChat(signals, CTX).trees.sorprendeme
+    // Si el motor detectó un patrón, la conversación pregunta la metacognición.
+    if (tree && tree.nodes.notice) {
+      expect(tree.nodes.notice.bubbles.some((b) => /notado/i.test(b.text))).toBe(true)
+      const answers = tree.nodes.notice.choices!.map((c) => c.reflection?.answer)
+      expect(answers).toEqual(['si', 'no', 'nunca'])
+      expect(
+        tree.nodes.notice.choices!.every((c) => /^pattern_/.test(c.reflection!.questionKey)),
+      ).toBe(true)
+    }
   })
 
   it('el picker solo lista temas con datos reales (nunca relleno)', () => {

@@ -116,6 +116,9 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
         primary: c.action.kind !== 'end',
         onPress: () => chooseInNode(tree, c),
       }))
+    } else {
+      // Nodo terminal (p. ej. el "por qué" del patrón): ofrece volver al menú.
+      choices = [{ label: 'Ver otra cosa', primary: false, onPress: restart }]
     }
   } else {
     choices = [{ label: 'Ver otra cosa', primary: false, onPress: restart }]
