@@ -26,7 +26,7 @@ export const AI_VOICE_ENABLED = true
  * Órbita Mes sigue siendo el de 4 tiempos que valida la beta; en true, el
  * nuevo flujo hero → picker → chat → calendario → patrones → presencia.
  *
- * En `false` por ahora: la beta valida el Mes actual. Se enciende cuando el
- * rediseño (copy revisado, trees completos) esté listo para validarse aparte.
+ * En `true` para PRUEBAS (jul 2026): la dueña valida el rediseño en Expo Go.
+ * Apagar para que la beta vea el Mes de 4 tiempos actual.
  */
-export const ORBITA_MES_IA_ENABLED = false
+export const ORBITA_MES_IA_ENABLED = true
