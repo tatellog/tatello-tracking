@@ -212,6 +212,10 @@ function SettingsBody() {
     router.push('/onboarding/notifications?source=settings')
   }
 
+  const openConnections = () => {
+    router.push('/connections')
+  }
+
   const openPrivacy = () => {
     router.push('/privacy')
   }
@@ -397,6 +401,13 @@ function SettingsBody() {
 
             {/* Primarias — lo más a mano. */}
             <View style={styles.accountCard}>
+              <AccountRow
+                label="Conexiones"
+                tagline="Tu reloj y Apple Health."
+                onPress={openConnections}
+                accessibilityLabel="Conexiones con tu reloj"
+              />
+              <View style={styles.accountDivider} />
               <AccountRow
                 label="Notificaciones"
                 tagline="Tú eliges cuándo aparecemos."
