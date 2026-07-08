@@ -78,10 +78,26 @@ atención" · "podrías observar esto". Mapea 1:1 con el manifiesto y
 ## Orden de construcción
 
 1. ✅ Context Engine puro (`context.ts`) + deficit centralizado + tests.
-2. Normalizar salida de detectores existentes a una forma "insight" común.
-3. Tabla `ai_insights` (`context_hash`/`prompt_version`/`expires_at`/`response`)
-   - RLS (rls-auditor, antes del 19 jul).
-4. Prompt Builder versionado (agnóstico de proveedor).
-5. Edge function `stelar-insight` (clona `scan-meal`, gpt-4o-mini, lee/escribe
-   caché).
-6. Enchufar a `VozParte`, tras el flag.
+2. ✅ (parcial) Los insights determinísticos ya existen; el Prompt Builder
+   acepta `insights: string[]` que el cliente pasa desde los detectores. Una
+   normalización más rica se puede hacer después.
+3. ✅ Tabla `ai_insights` aplicada en prod (RLS auditada) — antes del freeze.
+4. ✅ Prompt Builder versionado (`prompt-builder.ts`, `PROMPT_VERSION`) +
+   `context-hash.ts` para la clave del caché.
+5. ✅ Edge function `stelar-insight` (gpt-4o-mini, lee/escribe caché,
+   RLS-scoped). **Falta desplegarla:** `supabase functions deploy
+stelar-insight` (bundlea `_shared`; reutiliza el secret OPENAI_API_KEY de
+   scan-meal, sin secret nuevo).
+6. ✅ (plumbing) Cliente `ai-voice.ts` (hook `useAiVoice` + `fetchAiVoice`)
+   gateado por el flag, listo para enchufar a cualquier superficie. Pantalla
+   DEV `/dev-ai-insight` prueba el pipeline end-to-end. **Falta** conectar la
+   voz a una superficie de producción real (Órbita Mes/Semana/Progreso) — es
+   un cambio contenido, pendiente de decidir cuál encender primero.
+
+## Cómo probar (con el flag en true)
+
+1. Desplegar: `supabase functions deploy stelar-insight`.
+2. App (Expo Go sirve — es solo un fetch) → Ajustes → `✦ DEV · probar voz de
+IA` → elegir periodo. Requiere `is_dev` + datos reales en el periodo.
+3. La 2ª llamada al mismo periodo debe volver del caché (`cached: true`), sin
+   re-llamar a la IA — validando la regla del `context_hash`.
