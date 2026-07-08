@@ -10,6 +10,7 @@ import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
 import { ScanFeedbackToast } from '@/features/meal-scan/components/ScanFeedbackToast'
 import { useDayCloseInvite, useNextStarInvite } from '@/features/notifications/hooks'
+import { useAppleHealthSync } from '@/features/wearables/hooks'
 import {
   AppTabBar,
   CelebrationOverlay,
@@ -81,6 +82,9 @@ export default function TabsLayout() {
   // La cita del cierre: primera comida del día → push 20:15 "tu cierre
   // está listo". Solo días con comida; jamás reproche.
   useDayCloseInvite()
+  // Sync de Apple Health (si la usuaria conectó su reloj): foreground-first,
+  // ventana de 7 días, throttled. No-op en Expo Go / Android / sin conexión.
+  useAppleHealthSync()
   return (
     <View style={{ flex: 1 }}>
       <Tabs

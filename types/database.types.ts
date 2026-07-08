@@ -671,6 +671,117 @@ export type Database = {
         }
         Relationships: []
       }
+      wearable_sleep: {
+        Row: {
+          asleep_minutes: number
+          bedtime_at: string | null
+          created_at: string
+          external_id: string
+          id: string
+          sleep_date: string
+          source: string
+          updated_at: string
+          user_id: string
+          wake_at: string | null
+        }
+        Insert: {
+          asleep_minutes: number
+          bedtime_at?: string | null
+          created_at?: string
+          external_id: string
+          id?: string
+          sleep_date: string
+          source: string
+          updated_at?: string
+          user_id: string
+          wake_at?: string | null
+        }
+        Update: {
+          asleep_minutes?: number
+          bedtime_at?: string | null
+          created_at?: string
+          external_id?: string
+          id?: string
+          sleep_date?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+          wake_at?: string | null
+        }
+        Relationships: []
+      }
+      wearable_steps: {
+        Row: {
+          created_at: string
+          day_date: string
+          id: string
+          source: string
+          steps: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_date: string
+          id?: string
+          source: string
+          steps: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_date?: string
+          id?: string
+          source?: string
+          steps?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wearable_workouts: {
+        Row: {
+          created_at: string
+          duration_min: number | null
+          ended_at: string
+          energy_kcal: number | null
+          external_id: string
+          id: string
+          source: string
+          started_at: string
+          updated_at: string
+          user_id: string
+          workout_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_min?: number | null
+          ended_at: string
+          energy_kcal?: number | null
+          external_id: string
+          id?: string
+          source: string
+          started_at: string
+          updated_at?: string
+          user_id: string
+          workout_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_min?: number | null
+          ended_at?: string
+          energy_kcal?: number | null
+          external_id?: string
+          id?: string
+          source?: string
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+          workout_type?: string | null
+        }
+        Relationships: []
+      }
       wellbeing_checkins: {
         Row: {
           checked_at: string
@@ -758,6 +869,8 @@ export type Database = {
           water_glasses: number | null
           weight_kg: number | null
           wellbeing_checkins: number | null
+          workout_kcal: number | null
+          workout_source: string | null
           workout_type: string | null
         }
         Relationships: []

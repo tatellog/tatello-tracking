@@ -113,7 +113,7 @@ const OPTIONS: readonly ReadingOption[] = [
  * SETTINGS RE-ENTRY (?source=settings): the same screen doubles as the
  * "Notificaciones" editor reachable from Ajustes. When fromSettings we
  * SAVE the window and pop straight back (router.back()) instead of
- * advancing to /onboarding/attribution; we still fire the OS prompt for a
+ * advancing to /onboarding/health-connect; we still fire the OS prompt for a
  * real window (that's the whole point of re-entering), show a back chevron,
  * and the CTA reads "Guardar". This mirrors intention.tsx's re-entry.
  */
@@ -242,9 +242,9 @@ export default function NotificationsScreen() {
         })
       }
       // From Ajustes this is an edit: pop back to Settings. In the wizard,
-      // advance to the next step.
+      // advance to the next step (11b: conexión con el reloj).
       if (fromSettings) router.back()
-      else router.push('/onboarding/attribution')
+      else router.push('/onboarding/health-connect')
     } catch (err) {
       // Permission errors are not blocking — we save the preference either
       // way so the user reaches reveal (or returns to Settings) and the ask
@@ -256,7 +256,7 @@ export default function NotificationsScreen() {
         // Soft failure on the profile patch; reveal / Settings re-fetches.
       }
       if (fromSettings) router.back()
-      else router.push('/onboarding/attribution')
+      else router.push('/onboarding/health-connect')
     } finally {
       setRequestingPermission(false)
     }

@@ -23,6 +23,7 @@ import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/compone
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
+import { ConnectionsCard } from '@/features/wearables/components/ConnectionsCard'
 import { useSession } from '@/hooks/useSession'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
@@ -212,6 +213,10 @@ function SettingsBody() {
     router.push('/onboarding/notifications?source=settings')
   }
 
+  const openConnections = () => {
+    router.push('/connections')
+  }
+
   const openPrivacy = () => {
     router.push('/privacy')
   }
@@ -352,6 +357,14 @@ function SettingsBody() {
               value={countLiquids}
               onValueChange={toggleCountLiquids}
             />
+          </Animated.View>
+
+          {/* ── Conexiones — card DESTACADA (feedback dueña: la fila plana en
+              Cuenta no resaltaba). Vive alto, justo bajo "Tu camino", con el
+              tratamiento premium de la IdentityCard. ── */}
+          <Animated.View entering={enter(180)}>
+            <SectionHeader label="Conexiones" />
+            <ConnectionsCard onPress={openConnections} />
           </Animated.View>
 
           {/* ── Acerca de Stelar — DOCUMENTACIÓN del producto, no ajustes.

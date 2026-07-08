@@ -512,19 +512,21 @@ function RingStars({ dim, size = 100 }: { dim?: boolean; size?: number }) {
   )
 }
 
-/** Un punto de la leyenda de anillos: color + label. `dim` (entreno sin registrar)
- *  lo apaga → reposo, no reproche. */
 /** Una columna de la leyenda de anillos: punto + label arriba, el dato debajo
- *  (kcal / g / si entrenó). `dim` (entreno sin registrar) la apaga → reposo. */
+ *  (kcal / g / si entrenó). `dim` (entreno sin registrar) la apaga → reposo.
+ *  `caption` = procedencia del dato ("tu reloj"), estilo Apple Health: sutil,
+ *  bajo el valor, jamás un banner. */
 function LegendStat({
   color,
   label,
   value,
+  caption,
   dim,
 }: {
   color: string
   label: string
   value: string
+  caption?: string
   dim?: boolean
 }) {
   return (
@@ -534,6 +536,7 @@ function LegendStat({
         <Text style={[styles.legendLabel, dim && styles.legendLabelDim]}>{label}</Text>
       </View>
       <Text style={[styles.legendValue, dim && styles.legendValueDim]}>{value}</Text>
+      {caption ? <Text style={styles.legendCaption}>{caption}</Text> : null}
     </View>
   )
 }
@@ -843,10 +846,22 @@ export function DayPresent({
                 value={day.hero.proteinG != null ? `${day.hero.proteinG} g` : '—'}
               />
             ) : null}
+            {/* Entreno: con kcal del reloj muestra el dato ("~342 kcal · tu
+                reloj"); manual queda "Sí" como siempre. El "~" dice honesto
+                que es estimación. Display puro: jamás toca meta ni TDEE. */}
             <LegendStat
               color={TRAIN_COLOR}
               label="Entreno"
-              value={day.hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
+              value={
+                day.hero.trained
+                  ? day.hero.workoutKcal != null
+                    ? `~${day.hero.workoutKcal} kcal`
+                    : 'Sí'
+                  : isPast
+                    ? 'No'
+                    : 'Aún no'
+              }
+              caption={day.hero.trained && day.hero.workoutKcal != null ? 'tu reloj' : undefined}
               dim={!day.hero.trained}
             />
           </View>
@@ -1164,6 +1179,14 @@ const styles = StyleSheet.create({
   legendValueDim: {
     fontFamily: typography.uiMedium,
     color: colors.niebla,
+  },
+  // Procedencia del dato ("tu reloj") — nota al pie de la columna, más
+  // callada que el valor: la fuente es contexto, nunca protagonista.
+  legendCaption: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 0.3,
+    color: colors.bruma,
   },
   // ── La evidencia ─────────────────────────────────────────────────
   section: {

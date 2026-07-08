@@ -46,6 +46,13 @@ export type GoalHero = {
   proteinG: number | null
   /** Anillo de entreno (binario): entrenó hoy o no. */
   trained: boolean
+  /** kcal del entreno detectadas por el wearable (suma del día). null si el
+   *  entreno fue manual o no hubo — nunca 0 como deuda. SOLO display: jamás
+   *  toca el target de calorías ni el TDEE (spec wearables §3). */
+  workoutKcal: number | null
+  /** Procedencia del entreno: 'manual' | 'wearable' | null. La leyenda
+   *  muestra la kcal + "tu reloj" solo cuando es wearable. */
+  workoutSource: string | null
   /** "Vas en déficit" / "Sobre tu objetivo" / "Tu día aún se revela". */
   stateLabel: string
   /** Línea de apoyo bajo el anillo. Informa, nunca culpa ni celebra. */
@@ -124,6 +131,11 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
       : null
   const proteinG = s.protein_g != null ? Math.round(s.protein_g) : null
   const trained = s.trained === true
+  // La kcal del reloj solo acompaña a un día ENTRENADO; si el dato quedó
+  // huérfano (kcal sin trained, imposible por la view pero defensivo), se
+  // descarta para que la leyenda nunca hable de un entreno que no existe.
+  const workoutKcal = trained && s.workout_kcal != null ? Math.round(s.workout_kcal) : null
+  const workoutSource = trained ? (s.workout_source ?? null) : null
 
   // Sin comida o sin meta → no hay objetivo que juzgar. El día aún se revela.
   // stateLabel = la PALABRA-titular (héroe "Hoy estás en [Déficit]"); el matiz de
@@ -139,6 +151,8 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
       proteinFill,
       proteinG,
       trained,
+      workoutKcal,
+      workoutSource,
       stateLabel: 'Tu día aún se revela',
       line: past
         ? 'Ese día no quedó registro de comida.'
@@ -158,6 +172,8 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
       proteinFill,
       proteinG,
       trained,
+      workoutKcal,
+      workoutSource,
       stateLabel: 'Déficit',
       line: past
         ? 'Ese día cerró con margen bajo tu meta.'
@@ -175,6 +191,8 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
     proteinFill,
     proteinG,
     trained,
+    workoutKcal,
+    workoutSource,
     stateLabel: 'Sobre tu objetivo',
     line: past ? 'Ese día quedó sobre tu objetivo.' : 'Tu ritmo continúa mañana.',
   }
@@ -209,8 +227,15 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
     })
   }
 
-  if (s.trained === true) out.push({ key: 'train', label: 'Entrenaste', tone: 'cuerpo' })
-  else if (s.rested === true) out.push({ key: 'rest', label: 'Día de descanso', tone: 'sueno' })
+  if (s.trained === true) {
+    // La kcal del reloj como DATO de la evidencia (igual que proteína o
+    // sueño llevan el suyo). Solo con wearable; el entreno manual no tiene
+    // kcal y no se le inventa. El "~" dice honesto: es estimación del reloj.
+    const kcal = s.workout_kcal != null ? `~${Math.round(s.workout_kcal)} kcal` : undefined
+    out.push({ key: 'train', label: 'Entrenaste', detail: kcal, tone: 'cuerpo' })
+  } else if (s.rested === true) {
+    out.push({ key: 'rest', label: 'Día de descanso', tone: 'sueno' })
+  }
 
   // El conteo de comidas NO es evidencia (Regla #1: nunca contar registros como
   // logro). La nutrición ya la cuenta la proteína + el héroe del déficit.
@@ -291,6 +316,8 @@ export const REST_HERO: GoalHero = {
   proteinFill: null,
   proteinG: null,
   trained: false,
+  workoutKcal: null,
+  workoutSource: null,
   stateLabel: '',
   line: '',
 }

@@ -77,6 +77,14 @@
           "color": "#E91E63"
         }
       ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Stelar lee tus entrenos, tu sueño y tus pasos para anotarlos por ti. Nada sale de tu cuenta.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
       "expo-web-browser"
     ],
     "extra": {

@@ -81,6 +81,41 @@ describe('buildDayGoal — evidencia', () => {
   })
 })
 
+describe('buildDayGoal — entreno con kcal del wearable', () => {
+  it('entreno del reloj: hero lleva kcal redondeada + source, evidencia lleva el dato', () => {
+    const g = buildDayGoal(
+      mkSig(DAY, {
+        calories: 1280,
+        trained: true,
+        workout_kcal: 342.4,
+        workout_source: 'wearable',
+      }),
+      CTX,
+    )!
+    expect(g.hero.trained).toBe(true)
+    expect(g.hero.workoutKcal).toBe(342)
+    expect(g.hero.workoutSource).toBe('wearable')
+    expect(find(g.evidence, 'train')?.detail).toBe('~342 kcal')
+  })
+
+  it('entreno manual: sin kcal (null, nunca 0) y la evidencia sin detail', () => {
+    const g = buildDayGoal(
+      mkSig(DAY, { calories: 1280, trained: true, workout_source: 'manual' }),
+      CTX,
+    )!
+    expect(g.hero.workoutKcal).toBeNull()
+    expect(g.hero.workoutSource).toBe('manual')
+    expect(find(g.evidence, 'train')?.detail).toBeUndefined()
+  })
+
+  it('sin entreno: kcal huérfana se descarta (defensivo) y source queda null', () => {
+    const g = buildDayGoal(mkSig(DAY, { calories: 1280, workout_kcal: 300 }), CTX)!
+    expect(g.hero.trained).toBe(false)
+    expect(g.hero.workoutKcal).toBeNull()
+    expect(g.hero.workoutSource).toBeNull()
+  })
+})
+
 describe('buildDayGoal — lo que aún no aparece', () => {
   it('solo señales diarias; el ciclo nunca se pide como ausencia', () => {
     const g = buildDayGoal(mkSig(DAY, { meal_count: 2 }), CTX)!
