@@ -1,6 +1,7 @@
+import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { AtmosphericSky, StepHeader, WizardLayout } from '@/features/onboarding/components'
 import { HealthConnectHero } from '@/features/wearables/components/HealthConnectHero'
@@ -110,7 +111,9 @@ export default function HealthConnectScreen() {
 
         {available === false ? (
           <Text style={styles.priming}>
-            Disponible en iPhone. Podrás conectarlo cuando quieras desde Ajustes.
+            {Platform.OS === 'ios' && Constants.executionEnvironment === 'storeClient'
+              ? 'Expo Go no incluye Salud. En el build de desarrollo, este paso abre la hoja de permisos.'
+              : 'Disponible en iPhone. Podrás conectarlo cuando quieras desde Ajustes.'}
           </Text>
         ) : connected ? (
           <Text style={styles.connectedNote}>Conectado. Tu cielo ya está leyendo.</Text>

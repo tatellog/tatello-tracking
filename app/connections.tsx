@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons'
+import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -77,7 +78,11 @@ function ConnectionsBody() {
           <View style={styles.card}>
             {available === false ? (
               <Text style={styles.body}>
-                Disponible en iPhone. Cuando abras Stelar desde uno, aquí podrás conectar tu reloj.
+                {Platform.OS === 'ios' && Constants.executionEnvironment === 'storeClient'
+                  ? // Solo lo ve la dueña en desarrollo: Expo Go no incluye el
+                    // módulo de Salud; el prompt real vive en el dev build.
+                    'Expo Go no incluye Salud. En el build de desarrollo, este botón abre la hoja de permisos.'
+                  : 'Disponible en iPhone. Cuando abras Stelar desde uno, aquí podrás conectar tu reloj.'}
               </Text>
             ) : connected ? (
               <>
