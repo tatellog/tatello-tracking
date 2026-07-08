@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <!-- LA VOZ DE STELAR · el emisor de la burbuja del chat de Órbita.
+       No es un avatar de bot: es UNA estrella ✦ (la firma Stelar, hermana
+       de north-star-tint / notification-star) con halo, que "emite" la
+       burbuja. Se ancla arriba-izquierda de cada burbuja de Stelar; su
+       glow oro hace legible "el cielo te habla".
+       Tintable: el cuerpo y el halo son currentColor (tíntalo con oro
+       #EEDD91 / oroVect). El núcleo va en blanco cálido fijo para que
+       siempre haya un punto de luz vivo. -->
+  <!-- Halo exterior (bloom) — el aire de la estrella. -->
+  <circle cx="12" cy="12" r="11" fill="currentColor" opacity="0.05" />
+  <!-- Halo medio — el glow cercano. -->
+  <circle cx="12" cy="12" r="7.5" fill="currentColor" opacity="0.10" />
+  <!-- Cuerpo: estrella de 4 puntas ✦, eje vertical más largo (la firma). -->
+  <path
+    fill="currentColor"
+    d="M12 5 Q12.7 10.4 17 12 Q12.7 13.6 12 19 Q11.3 13.6 7 12 Q11.3 10.4 12 5 Z" />
+  <!-- Chispa compañera asimétrica (regla de asimetría del art brief). -->
+  <path fill="currentColor" opacity="0.65" d="M17.4 5.4 L18.6 6.9 L17.4 8.4 L16.2 6.9 Z" />
+  <!-- Núcleo: punto de luz cálido vivo, no tintable (siempre encendido). -->
+  <circle cx="12" cy="11.7" r="1.5" fill="#FFF6E5" />
+</svg>

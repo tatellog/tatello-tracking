@@ -8,11 +8,14 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import {
   DayPresent,
   MonthSegment,
+  MonthSegmentIA,
   OrbitSegments,
   ScreenCosmos,
   WeekSegment,
   type OrbitSegment,
 } from '@/features/orbit/components'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -47,6 +50,10 @@ function OrbitBody() {
       track('tab_changed', { tab: 'orbita' })
     }, []),
   )
+  // Órbita Mes IA gateado POR USUARIO: solo la cuenta dev vive el rediseño;
+  // la beta ve el Mes de 4 tiempos de siempre.
+  const { session } = useSession()
+  const mesIAEnabled = aiEnabledForEmail(session?.user?.email)
   // Al cruzar la medianoche con el tab montado, recalcula "hoy" → fetch limpio
   // (si no, Órbita seguiría mostrando los datos de ayer como hoy).
   useOrbitDayRollover()
@@ -188,6 +195,15 @@ function OrbitBody() {
                   setSegment('dia')
                 }}
                 onScrollTop={scrollToTop}
+              />
+            ) : mesIAEnabled ? (
+              <MonthSegmentIA
+                key="mes-ia"
+                onPickDay={(date) => {
+                  setViewedDay(date)
+                  setDayOrigin('mes')
+                  setSegment('dia')
+                }}
               />
             ) : (
               <MonthSegment
