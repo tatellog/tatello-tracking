@@ -19,3 +19,14 @@
  * beta valide el loop core con la voz determinística.
  */
 export const AI_VOICE_ENABLED = true
+
+/*
+ * Órbita Mes IA (docs/orbita-mes-ia-spec.md · Release 2) — el rediseño de
+ * Mes a descubrimiento guiado (chat con botones). Con el flag en false,
+ * Órbita Mes sigue siendo el de 4 tiempos que valida la beta; en true, el
+ * nuevo flujo hero → picker → chat → calendario → patrones → presencia.
+ *
+ * En `false` por ahora: la beta valida el Mes actual. Se enciende cuando el
+ * rediseño (copy revisado, trees completos) esté listo para validarse aparte.
+ */
+export const ORBITA_MES_IA_ENABLED = false

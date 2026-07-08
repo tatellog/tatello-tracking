@@ -455,6 +455,36 @@ export type Database = {
         }
         Relationships: []
       }
+      month_reflections: {
+        Row: {
+          answer: string
+          created_at: string
+          id: string
+          month: string
+          question_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          id?: string
+          month: string
+          question_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          id?: string
+          month?: string
+          question_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mood_checkins: {
         Row: {
           checked_at: string
