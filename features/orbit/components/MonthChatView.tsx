@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, shadows, typography } from '@/theme'
 
-import type { ChatBubble, ChatChoice, ChatTopic, ChatTree, MonthChat } from '../month-chat'
+import type { ChatBubble, MonthChat } from '../month-chat'
+import { initialTurns, onNodeChoice, onPickTopic, type Flow, type Turn } from '../month-chat-flow'
 
 /*
  * Órbita Mes IA · la conversación guiada (Release 2). Rediseño tras el
@@ -34,19 +35,13 @@ type Props = {
   aiIntro?: readonly ChatBubble[] | null
 }
 
-/** Un turno del hilo: lo que dijo Stelar, o lo que respondió la usuaria. */
-type Turn = { who: 'stelar'; bubbles: readonly ChatBubble[] } | { who: 'user'; text: string }
-
-type Flow =
-  | { kind: 'picker' }
-  | { kind: 'node'; topic: ChatTopic; nodeId: string }
-  | { kind: 'done' }
-
 export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro }: Props) {
-  const introBubbles: readonly ChatBubble[] =
-    aiIntro && aiIntro.length > 0 ? aiIntro : (chat.picker?.intro ?? [])
+  const introBubbles: readonly ChatBubble[] = useMemo(
+    () => (aiIntro && aiIntro.length > 0 ? aiIntro : (chat.picker?.intro ?? [])),
+    [aiIntro, chat.picker?.intro],
+  )
 
-  const [turns, setTurns] = useState<Turn[]>(() => [{ who: 'stelar', bubbles: introBubbles }])
+  const [turns, setTurns] = useState<Turn[]>(() => initialTurns(introBubbles))
   const [flow, setFlow] = useState<Flow>({ kind: 'picker' })
   // El último turno de Stelar se revela con "pensando"; al terminar, se
   // muestran los botones. `revealed` gatea ese turno.
@@ -63,54 +58,43 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
   useEffect(() => {
     if (aiApplied.current || !aiIntro || aiIntro.length === 0 || flow.kind !== 'picker') return
     aiApplied.current = true
-    setTurns((t) => (t.length === 1 ? [{ who: 'stelar', bubbles: aiIntro }] : t))
+    setTurns((t) => (t.length === 1 ? initialTurns(aiIntro) : t))
     setRevealed(false)
   }, [aiIntro, flow.kind])
 
-  if (!chat.ready || !chat.picker) return <EmptyLearning />
-
-  const say = (bubbles: readonly ChatBubble[]) => {
-    setRevealed(false)
-    setTurns((t) => [...t, { who: 'stelar', bubbles }])
-  }
-  const userSays = (text: string) => setTurns((t) => [...t, { who: 'user', text }])
-
-  const pickTopic = (topic: ChatTopic, label: string) => {
-    const tree = chat.trees[topic]
-    if (!tree) return
-    userSays(label)
-    const entry = tree.nodes[tree.entry]
-    if (entry) {
-      setFlow({ kind: 'node', topic, nodeId: tree.entry })
-      say(entry.bubbles)
-    }
-  }
-
-  const chooseInNode = (tree: ChatTree, choice: ChatChoice) => {
-    userSays(choice.label)
-    if (choice.reflection) onSaveReflection(choice.reflection.questionKey, choice.reflection.answer)
-    const a = choice.action
-    if (a.kind === 'goto') {
-      const next = tree.nodes[a.node]
-      if (next) {
-        setFlow((f) => (f.kind === 'node' ? { ...f, nodeId: a.node } : f))
-        say(next.bubbles)
-      }
-    } else if (a.kind === 'openCalendar') {
-      onOpenCalendar()
-      setFlow({ kind: 'done' })
-      say([{ text: 'Ahí está, en tu calendario abajo.', tone: 'accent' }])
-    } else {
-      setFlow({ kind: 'done' })
-      say([{ text: 'Aquí quedó. Tu cielo guarda lo que descubriste.', tone: 'accent' }])
-    }
-  }
-
-  const restart = () => {
-    setTurns([{ who: 'stelar', bubbles: introBubbles }])
+  // Despachadores delgados: la lógica de ramificación + efectos vive en
+  // month-chat-flow (pura y testeada); aquí solo se aplica al estado.
+  const applyPick = useCallback(
+    (topic: Parameters<typeof onPickTopic>[1], label: string) => {
+      const r = onPickTopic(chat, topic, label)
+      if (!r) return
+      setRevealed(false)
+      setTurns((t) => [...t, ...r.append])
+      setFlow(r.flow)
+    },
+    [chat],
+  )
+  const applyChoose = useCallback(
+    (topic: Parameters<typeof onPickTopic>[1], nodeId: string, choiceIndex: number) => {
+      const tree = chat.trees[topic]
+      const choice = tree?.nodes[nodeId]?.choices?.[choiceIndex]
+      if (!tree || !choice) return
+      const r = onNodeChoice(tree, choice)
+      if (r.reflection) onSaveReflection(r.reflection.questionKey, r.reflection.answer)
+      if (r.openCalendar) onOpenCalendar()
+      setRevealed(false)
+      setTurns((t) => [...t, ...r.append])
+      setFlow(r.flow)
+    },
+    [chat, onSaveReflection, onOpenCalendar],
+  )
+  const restart = useCallback(() => {
+    setTurns(initialTurns(introBubbles))
     setFlow({ kind: 'picker' })
     setRevealed(false)
-  }
+  }, [introBubbles])
+
+  if (!chat.ready || !chat.picker) return <EmptyLearning />
 
   // Los botones del turno vivo (solo cuando Stelar terminó de hablar).
   let choices: { label: string; onPress: () => void; primary: boolean }[] = []
@@ -118,17 +102,18 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
     choices = chat.picker.choices.map((c) => ({
       label: c.label,
       primary: true,
-      onPress: () => pickTopic(c.topic, c.label),
+      onPress: () => applyPick(c.topic, c.label),
     }))
   } else if (flow.kind === 'node') {
-    const tree = chat.trees[flow.topic]
-    const node = tree?.nodes[flow.nodeId]
-    if (tree && node?.choices) {
-      choices = node.choices.map((c) => ({
+    const nodeId = flow.nodeId
+    const node = chat.trees[flow.topic]?.nodes[nodeId]
+    if (node?.choices) {
+      const topic = flow.topic
+      choices = node.choices.map((c, ci) => ({
         label: c.label,
         // Primario = avanza (goto/openCalendar); secundario = rama sí/no.
         primary: c.action.kind !== 'end',
-        onPress: () => chooseInNode(tree, c),
+        onPress: () => applyChoose(topic, nodeId, ci),
       }))
     } else {
       // Nodo terminal (p. ej. el "por qué" del patrón): ofrece volver al menú.
@@ -246,7 +231,13 @@ function StelarTurn({
   )
 }
 
-function StelarBubble({ bubble, withStar }: { bubble: ChatBubble; withStar: boolean }) {
+const StelarBubble = memo(function StelarBubble({
+  bubble,
+  withStar,
+}: {
+  bubble: ChatBubble
+  withStar: boolean
+}) {
   const isAccent = bubble.tone === 'accent'
   const isStrong = bubble.tone === 'strong'
   return (
@@ -265,7 +256,7 @@ function StelarBubble({ bubble, withStar }: { bubble: ChatBubble; withStar: bool
       </View>
     </View>
   )
-}
+})
 
 function Thinking() {
   return (
@@ -284,7 +275,7 @@ function Thinking() {
 
 /* ── La estrella emisora (asset stelar-voice-star, inline para tinte) ─── */
 
-function StelarStar({ size }: { size: number }) {
+const StelarStar = memo(function StelarStar({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Circle cx={12} cy={12} r={11} fill={colors.oroVect} opacity={0.05} />
@@ -300,7 +291,7 @@ function StelarStar({ size }: { size: number }) {
       <Circle cx={12} cy={11.7} r={1.5} fill="#FFF6E5" />
     </Svg>
   )
-}
+})
 
 /* ── Botones ─────────────────────────────────────────────────────────── */
 

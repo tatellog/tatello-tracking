@@ -3,11 +3,12 @@
  * preguntas del chat guiado ("¿lo habías notado? sí/no/nunca"). Tabla
  * month_reflections (una respuesta por usuaria/mes/pregunta; upsert).
  *
- * api.ts + hooks juntos porque es una superficie chica. Nunca bloquea la UI:
- * un guardado fallido no rompe la conversación (fire-and-forget con
- * invalidación optimista).
+ * Solo el GUARDADO: la lectura (hilar conversaciones con respuestas pasadas)
+ * aún no se usa en ninguna superficie — cuando se necesite, se agrega un
+ * `useReflections(month)` que lea de la misma tabla. Nunca bloquea la UI: un
+ * guardado fallido no rompe la conversación.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 
 import { requireUserId, supabase } from '@/lib/supabase'
 
@@ -32,41 +33,9 @@ export async function saveReflection(
   if (error) throw error
 }
 
-/** Todas las respuestas de un mes, como mapa questionKey → answer. */
-export async function fetchReflections(month: MonthKey): Promise<Record<string, string>> {
-  const { data, error } = await supabase
-    .from('month_reflections')
-    .select('question_key, answer')
-    .eq('month', month)
-  if (error) throw error
-  const out: Record<string, string> = {}
-  for (const r of data ?? []) out[r.question_key] = r.answer
-  return out
-}
-
-const keyFor = (month: MonthKey) => ['orbit', 'reflections', month] as const
-
-/** Las respuestas ya dadas este mes (para no re-preguntar y para hilar
- *  conversaciones: "la vez pasada no lo habías notado…"). */
-export function useReflections(month: MonthKey) {
-  return useQuery({
-    queryKey: keyFor(month),
-    queryFn: () => fetchReflections(month),
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-/** Guarda una respuesta y refresca el mapa del mes. */
+/** Guarda una respuesta de metacognición (fire-and-forget desde el chat). */
 export function useSaveReflection(month: MonthKey) {
-  const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ questionKey, answer }: Reflection) => saveReflection(month, questionKey, answer),
-    onSuccess: (_data, vars) => {
-      // Optimista: mete la respuesta en el cache del mes al instante.
-      qc.setQueryData<Record<string, string>>(keyFor(month), (prev) => ({
-        ...(prev ?? {}),
-        [vars.questionKey]: vars.answer,
-      }))
-    },
   })
 }
