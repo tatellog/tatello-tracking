@@ -33,6 +33,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_insights: {
+        Row: {
+          context_hash: string
+          created_at: string
+          expires_at: string | null
+          feature: string
+          id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          prompt_version: string
+          response: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          context_hash: string
+          created_at?: string
+          expires_at?: string | null
+          feature: string
+          id?: string
+          period_end: string
+          period_start: string
+          period_type: string
+          prompt_version: string
+          response: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          context_hash?: string
+          created_at?: string
+          expires_at?: string | null
+          feature?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          prompt_version?: string
+          response?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       analytics_events: {
         Row: {
           created_at: string
@@ -78,6 +123,27 @@ export type Database = {
           message?: string
           screen?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      beta_signups: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          source?: string | null
         }
         Relationships: []
       }
