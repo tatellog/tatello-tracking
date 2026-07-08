@@ -53,6 +53,20 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
   const [revealed, setRevealed] = useState(false)
   const onRevealed = useCallback(() => setRevealed(true), [])
 
+  // La Voz de IA llega ASÍNCRONA (React Query resuelve después del mount), así
+  // que el turno inicial nace con la intro determinista. Cuando la IA aterriza
+  // y la usuaria sigue en la apertura intacta, se reemplaza el primer turno y
+  // Stelar "re-habla" con la voz cálida. Solo una vez (ref) y solo si aún no
+  // eligió tema — nunca interrumpe una conversación ya empezada. Sin esto, la
+  // llamada a gpt-4o-mini se pagaba pero jamás se mostraba.
+  const aiApplied = useRef(false)
+  useEffect(() => {
+    if (aiApplied.current || !aiIntro || aiIntro.length === 0 || flow.kind !== 'picker') return
+    aiApplied.current = true
+    setTurns((t) => (t.length === 1 ? [{ who: 'stelar', bubbles: aiIntro }] : t))
+    setRevealed(false)
+  }, [aiIntro, flow.kind])
+
   if (!chat.ready || !chat.picker) return <EmptyLearning />
 
   const say = (bubbles: readonly ChatBubble[]) => {

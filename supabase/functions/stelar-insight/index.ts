@@ -13,8 +13,12 @@
 // prompt se INLINE aquí en vez de importar de ../_shared/intelligence/. La
 // fuente de verdad para app + tests sigue siendo _shared/intelligence/
 // (context.ts, context-hash.ts, prompt-builder.ts, deficit.ts); si cambian,
-// actualizar esta copia. Se mantiene byte-por-byte la misma lógica (los
-// tests de _shared la cubren).
+// actualizar esta copia para que produzca el MISMO hash.
+//
+// GUARDA: features/orbit/__tests__/ai-prompt.test.ts tiene un "hash dorado"
+// tripwire — si tocas la agregación o el hash en _shared, ese test truena y
+// te recuerda re-sincronizar esta copia (si no, el context_hash cliente vs
+// server diverge y el caché nunca acierta).
 //
 // SECURITY: JWT del caller → client RLS-scoped. No service role. La
 // OPENAI_API_KEY vive solo como secret. Errores cálidos y genéricos.

@@ -30,6 +30,41 @@ describe('hashContext — fingerprint estable', () => {
   it('el orden de claves no cambia el hash (la clave del caché es estable)', () => {
     expect(hashContext({ a: 1, b: 2 })).toBe(hashContext({ b: 2, a: 1 }))
   })
+
+  /*
+   * TRIPWIRE de equivalencia con la copia INLINE de la edge function
+   * (supabase/functions/stelar-insight/index.ts). El edge runtime no bootea
+   * con imports de _shared, así que buildPeriodContext + hashContext están
+   * duplicados inline ahí. Si este hash dorado cambia (tocaste la agregación
+   * del Context Engine o el hash), la copia inline QUEDÓ DESINCRONIZADA: el
+   * context_hash del cliente y el del server divergen → el caché nunca acierta
+   * y se re-llama la IA en cada apertura. ACCIÓN: actualiza la copia inline de
+   * stelar-insight/index.ts para que produzca este mismo hash, y re-pínealo.
+   */
+  it('hash dorado de un contexto representativo (sincroniza la copia inline)', () => {
+    const ctx = buildPeriodContext({
+      period: 'month',
+      signals: [
+        mkSig('2026-07-01', {
+          calories: 1400,
+          protein_g: 120,
+          meal_count: 3,
+          trained: true,
+          sleep_minutes: 450,
+          weight_kg: 70,
+        }),
+        mkSig('2026-07-02', {
+          calories: 1600,
+          protein_g: 100,
+          meal_count: 3,
+          sleep_minutes: 400,
+          weight_kg: 69.5,
+        }),
+      ],
+      calorieTarget: 1500,
+    })
+    expect(hashContext(ctx)).toBe('ca6173ae')
+  })
 })
 
 describe('buildInsightPrompt — guardrails y contrato', () => {
