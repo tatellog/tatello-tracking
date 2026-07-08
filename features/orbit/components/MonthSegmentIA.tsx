@@ -115,9 +115,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── Lo que aprendimos este mes: el chat guiado ── */}
+      {/* ── El chat guiado. Sin eyebrow de reporte: la cabecera de Stelar
+          (dentro de MonthChatView) hace de encabezado — un chat no lleva
+          título de dashboard encima (uxui + usuaria). ── */}
       <View style={styles.section}>
-        <Text style={styles.eyebrow}>Lo que aprendimos este mes</Text>
         <MonthChatView
           chat={chat}
           aiIntro={aiVoice.data}

@@ -328,15 +328,19 @@ export function buildMonthChat(
   const surpriseSource = trees[available[0]!]
   if (surpriseSource) trees.sorprendeme = { ...surpriseSource, topic: 'sorprendeme' }
 
+  // Apertura que ASOMA el hallazgo (product-benchmark): abre con la voz del
+  // coach picando la curiosidad, no un menú frío. El premio es el
+  // cruce/patrón, nunca el peso (línea roja del manifiesto).
   const picker: TopicPicker = {
     intro: [
+      { text: 'Vi tu mes.', tone: 'accent' },
       {
         text:
           n === 1
-            ? 'Encontré algo que no era evidente.'
-            : `Encontré ${n} cosas que no eran evidentes.`,
+            ? 'Encontré algo que no habías notado.'
+            : `Encontré ${n} cosas que no habías notado.`,
+        tone: 'strong',
       },
-      { text: '¿Con cuál quieres empezar?', tone: 'accent' },
     ],
     choices: [
       ...available.map((topic) => ({ topic, label: TOPIC_LABEL[topic] })),

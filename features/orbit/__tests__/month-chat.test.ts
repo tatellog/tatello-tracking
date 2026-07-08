@@ -46,8 +46,10 @@ describe('buildMonthChat — picker', () => {
     const labels = chat.picker!.choices.map((c) => c.label)
     expect(labels).toContain('Mi déficit')
     expect(labels).toContain('Sorpréndeme')
-    // La intro nombra cuántas cosas encontró (sin exclamación ni hype).
-    expect(chat.picker!.intro[0]!.text).toMatch(/[Ee]ncontré/)
+    // La apertura abre picando la curiosidad ("Vi tu mes.") y nombra el hallazgo.
+    const introText = chat.picker!.intro.map((b) => b.text).join(' ')
+    expect(introText).toMatch(/Vi tu mes/)
+    expect(introText).toMatch(/[Ee]ncontré/)
   })
 })
 
