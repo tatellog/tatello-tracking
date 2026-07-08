@@ -346,3 +346,18 @@ export function buildMonthChat(
 
   return { ready: true, picker, trees }
 }
+
+/**
+ * Los hallazgos deterministas del mes como frases planas — lo que la Voz de IA
+ * EXPLICA (nunca inventa: solo redacta estos hechos con calidez). Se pasan a la
+ * edge function stelar-insight como `insights`.
+ */
+export function monthChatInsights(chat: MonthChat): string[] {
+  const out: string[] = []
+  for (const topic of Object.keys(chat.trees) as ChatTopic[]) {
+    if (topic === 'sorprendeme') continue
+    const strong = chat.trees[topic]?.nodes.intro?.bubbles.find((b) => b.tone === 'strong')
+    if (strong) out.push(strong.text)
+  }
+  return out
+}

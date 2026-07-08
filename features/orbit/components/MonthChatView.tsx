@@ -24,6 +24,10 @@ type Props = {
   chat: MonthChat
   onSaveReflection: (questionKey: string, answer: string) => void
   onOpenCalendar: () => void
+  /** Intro de la Voz de IA (gpt-4o-mini, cacheada) que EXPLICA los hallazgos
+   *  con calidez. Si está, reemplaza la intro determinista del picker; si no,
+   *  se usa la determinista (fallback siempre entero). */
+  aiIntro?: readonly ChatBubble[] | null
 }
 
 type Stage =
@@ -31,15 +35,17 @@ type Stage =
   | { kind: 'node'; topic: ChatTopic; nodeId: string }
   | { kind: 'done' }
 
-export function MonthChatView({ chat, onSaveReflection, onOpenCalendar }: Props) {
+export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro }: Props) {
   const [stage, setStage] = useState<Stage>({ kind: 'picker' })
 
   if (!chat.ready || !chat.picker) return <EmptyLearning />
 
   if (stage.kind === 'picker') {
+    // La Voz de IA redacta la apertura si está lista; si no, la determinista.
+    const intro = aiIntro && aiIntro.length > 0 ? aiIntro : chat.picker.intro
     return (
       <View style={styles.wrap}>
-        <BubbleColumn bubbles={chat.picker.intro} />
+        <BubbleColumn bubbles={intro} />
         <ChoiceRow>
           {chat.picker.choices.map((c) => (
             <ChoiceButton
