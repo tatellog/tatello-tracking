@@ -14,7 +14,8 @@ import {
   WeekSegment,
   type OrbitSegment,
 } from '@/features/orbit/components'
-import { ORBITA_MES_IA_ENABLED } from '@/lib/featureFlags'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
@@ -49,6 +50,10 @@ function OrbitBody() {
       track('tab_changed', { tab: 'orbita' })
     }, []),
   )
+  // Órbita Mes IA gateado POR USUARIO: solo la cuenta dev vive el rediseño;
+  // la beta ve el Mes de 4 tiempos de siempre.
+  const { session } = useSession()
+  const mesIAEnabled = aiEnabledForEmail(session?.user?.email)
   // Al cruzar la medianoche con el tab montado, recalcula "hoy" → fetch limpio
   // (si no, Órbita seguiría mostrando los datos de ayer como hoy).
   useOrbitDayRollover()
@@ -191,7 +196,7 @@ function OrbitBody() {
                 }}
                 onScrollTop={scrollToTop}
               />
-            ) : ORBITA_MES_IA_ENABLED ? (
+            ) : mesIAEnabled ? (
               <MonthSegmentIA
                 key="mes-ia"
                 onPickDay={(date) => {

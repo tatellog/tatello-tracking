@@ -1,32 +1,27 @@
 /*
- * Feature flags centralizados — interruptores de compilación para features
- * en construcción. Un flag apagado significa "el código existe pero no se
- * expone a la usuaria"; encenderlo lo activa sin más cambios.
+ * Feature flags centralizados — interruptores de features en construcción.
  *
- * Convención: constantes booleanas simples (mismo espíritu que los flags
- * USE_SKIA_* de la constelación). No es config remota; cambiar un flag
- * requiere rebuild del bundle.
+ * Las features de IA (AI Foundation + Órbita Mes IA) están gateadas POR
+ * USUARIO, no globalmente: mientras el rediseño se valida solo con la cuenta
+ * dev, la beta sigue viendo el Órbita Mes de 4 tiempos y la voz determinista.
+ * Cuando se quiera abrir a todas, basta poner AI_MASTER a "todos" o vaciar la
+ * lista de emails y devolver true.
  */
 
-/*
- * AI Foundation (docs/ai-foundation-spec.md) — la voz de IA que EXPLICA los
- * insights determinísticos del motor (nunca los detecta). Con el flag en
- * false, Órbita/Progreso siguen usando la voz determinística de siempre; en
- * true, la capa de IA (Context Engine → Prompt Builder → edge → caché) se
- * enchufa a la estructura VozParte existente.
- *
- * En `true` para PRUEBAS (decisión de la dueña, jul 2026). Apagar para que la
- * beta valide el loop core con la voz determinística.
- */
-export const AI_VOICE_ENABLED = true
+/** Kill-switch global. Si false, la IA queda apagada para TODOS sin importar
+ *  el email (para un apagón de emergencia). */
+const AI_MASTER_ENABLED = true
 
 /*
- * Órbita Mes IA (docs/orbita-mes-ia-spec.md · Release 2) — el rediseño de
- * Mes a descubrimiento guiado (chat con botones). Con el flag en false,
- * Órbita Mes sigue siendo el de 4 tiempos que valida la beta; en true, el
- * nuevo flujo hero → picker → chat → calendario → patrones → presencia.
- *
- * En `true` para PRUEBAS (jul 2026): la dueña valida el rediseño en Expo Go.
- * Apagar para que la beta vea el Mes de 4 tiempos actual.
+ * Emails con las features de IA encendidas (Órbita Mes IA · descubrimiento
+ * guiado + Voz de IA que EXPLICA los insights deterministas). Per-usuario:
+ * la beta ve lo de siempre; solo estas cuentas viven el rediseño y gastan
+ * OpenAI. Agregar un email aquí lo enciende sin más cambios.
  */
-export const ORBITA_MES_IA_ENABLED = true
+const AI_ENABLED_EMAILS = ['dev@local.test']
+
+/** ¿Este usuario tiene las features de IA encendidas? (Órbita Mes IA + Voz.) */
+export function aiEnabledForEmail(email: string | null | undefined): boolean {
+  if (!AI_MASTER_ENABLED || email == null) return false
+  return AI_ENABLED_EMAILS.includes(email.toLowerCase())
+}

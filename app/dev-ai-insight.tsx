@@ -9,7 +9,8 @@ import { withDevGuard } from '@/components/withDevGuard'
 import { fetchAiVoice, type AiVoiceFeature, type AiVoicePeriod } from '@/features/orbit/ai-voice'
 import type { VozParte } from '@/features/orbit/mock'
 import { SkyBackground } from '@/features/tabs/components'
-import { AI_VOICE_ENABLED } from '@/lib/featureFlags'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -70,6 +71,8 @@ const PRESETS: Preset[] = [
 export default withDevGuard(DevAiInsight)
 
 function DevAiInsight() {
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
   const [loading, setLoading] = useState<string | null>(null)
   const [result, setResult] = useState<{ voz: VozParte[]; meta: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -90,9 +93,7 @@ function DevAiInsight() {
     setLoading(null)
     if (!voz) {
       setError(
-        AI_VOICE_ENABLED
-          ? `Sin respuesta (${ms} ms). ¿Desplegaste stelar-insight? ¿Hay datos en ${start}…${end}?`
-          : 'El flag AI_VOICE_ENABLED está en false: la voz de IA está apagada.',
+        `Sin respuesta (${ms} ms). ¿Desplegaste stelar-insight? ¿Hay datos en ${start}…${end}?`,
       )
       return
     }
@@ -109,8 +110,8 @@ function DevAiInsight() {
           <Text style={styles.title}>Voz de IA · QA</Text>
           <Text style={styles.subtitle}>
             Prueba el pipeline completo (contexto → prompt → gpt-4o-mini → caché). La segunda
-            llamada al mismo periodo debe venir del caché. Flag AI_VOICE_ENABLED:{' '}
-            {AI_VOICE_ENABLED ? 'ON' : 'OFF'}.
+            llamada al mismo periodo debe venir del caché. IA para tu cuenta:{' '}
+            {aiOn ? 'ON' : 'OFF (esta cuenta no la ve en Órbita)'}.
           </Text>
 
           {PRESETS.map((p) => (

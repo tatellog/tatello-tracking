@@ -1,16 +1,17 @@
 /*
  * AI Voice — el cliente de la edge function stelar-insight (AI Foundation).
  *
- * La voz de IA que EXPLICA los insights determinísticos. Gateada por
- * AI_VOICE_ENABLED: con el flag apagado, el hook devuelve null y la UI usa la
- * voz determinística de siempre. La edge function construye el contexto
- * server-side y cachea; el cliente solo pide y cachea el resultado (React
- * Query). Nunca bloquea la UI: cualquier fallo → null, la app sigue entera.
+ * La voz de IA que EXPLICA los insights determinísticos. Gateada POR USUARIO
+ * (aiEnabledForEmail): para una cuenta no habilitada el hook devuelve null y
+ * la UI usa la voz determinística de siempre. La edge function construye el
+ * contexto server-side y cachea; el cliente solo pide y cachea el resultado
+ * (React Query). Nunca bloquea la UI: cualquier fallo → null, la app entera.
  */
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 
-import { AI_VOICE_ENABLED } from '@/lib/featureFlags'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 
@@ -44,7 +45,8 @@ export type AiVoiceRequest = {
 /** Llama a stelar-insight y devuelve las partes de voz, o null si el flag
  *  está apagado o algo falla (la UI cae a la voz determinística). */
 export async function fetchAiVoice(req: AiVoiceRequest): Promise<VozParte[] | null> {
-  if (!AI_VOICE_ENABLED) return null
+  // El gate por-usuario vive en useAiVoice (enabled); fetchAiVoice es la
+  // llamada cruda (la edge exige JWT válido). La pantalla DEV la usa directo.
   try {
     const { data, error } = await supabase.functions.invoke('stelar-insight', { body: req })
     if (error) return null
@@ -63,13 +65,15 @@ export async function fetchAiVoice(req: AiVoiceRequest): Promise<VozParte[] | nu
  * juntos evitan re-llamar la IA cuando nada cambió.
  */
 export function useAiVoice(uid: string | null, req: AiVoiceRequest | null) {
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
   return useQuery({
     queryKey:
       uid && req
         ? queryKeys.orbit.aiVoice(uid, req.feature, req.periodStart, req.periodEnd)
         : ['orbit', 'aiVoice', 'disabled'],
     queryFn: () => (req ? fetchAiVoice(req) : Promise.resolve(null)),
-    enabled: AI_VOICE_ENABLED && uid != null && req != null,
+    enabled: aiOn && uid != null && req != null,
     staleTime: 60 * 60 * 1000, // 1 h: la voz de un periodo no cambia seguido
     refetchOnWindowFocus: false,
     refetchOnMount: false,
