@@ -89,16 +89,15 @@ voice-and-copy + manifesto-reviewer antes de mostrar a usuarias.
 
 ## Orden de construcción (fases)
 
-1. ✅ Motor de conversación puro (`month-chat.ts`: tipos + árbol de déficit +
-   topic picker) + tests. Tabla `month_reflections` (RLS, antes del freeze). Flag.
-2. Los otros 6 árboles (alimentación, rutina, sueño, entreno, agua, sorpréndeme)
-   - metacognición.
-3. UI del chat (burbujas + botones premium) + nuevo chasis de MonthSegment tras
-   el flag.
-4. Cablear la Voz de IA (redacción cálida cacheada) + calendario/patrones
-   tappables al chat.
-5. Estados vacíos + copy final (voice-and-copy + manifesto-reviewer) + borrar
-   huérfanos.
+1. ✅ Motor de conversación puro (`month-chat.ts`) + tests. Tabla
+   `month_reflections` (RLS, aplicada antes del freeze). Flag.
+2. ✅ Los 7 temas + metacognición estándar (sí/no/nunca).
+3. ✅ UI del chat premium (`MonthChatView`) + chasis `MonthSegmentIA` tras el
+   flag (hero → chat → calendario → presencia), cableado en `orbit.tsx`.
+4. ✅ Voz de IA cableada (gpt-4o-mini cacheada, explica los hallazgos;
+   fallback determinista) + presencia + calendario tap→Día.
+5. ✅ Estados vacíos + copy revisado. Pendiente menor: patrones-como-conversación
+   - borrar componentes huérfanos.
 
-**Constraint:** freeze de schema el 19 jul → la tabla `month_reflections` entra
-en la fase 1 (ahora). El resto es TS/UI, sin schema.
+**Flag `ORBITA_MES_IA_ENABLED` en `true`** (pruebas). Freeze de schema el 19
+jul → `month_reflections` ya entró.
