@@ -5,13 +5,12 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import { colors, typography } from '@/theme'
 
 import { DiscoveryWave } from './DiscoveryWave'
-import { StelarOrb } from './StelarOrb'
 
 /*
  * MonthReading — "Pantalla 1": Stelar leyendo tu mes antes de mostrar los
- * hallazgos. El orbe de polvo estelar (vivo) + la onda dorada + un texto que
- * cicla ("Leyendo tu mes…" → "Analizando N días…" → "Encontrando relaciones…").
- * Dura ~3.5s y luego revela los patrones. Mientras, el motor ya los tiene.
+ * hallazgos. La onda dorada + un texto que cicla ("Leyendo tu mes…" →
+ * "Analizando N días…" → "Encontrando relaciones…"). Dura ~3.5s y luego revela
+ * los patrones. Mientras, el motor ya los tiene.
  */
 
 const STEP_MS = 1150
@@ -33,8 +32,7 @@ export function MonthReading({ days, onDone }: { days: number; onDone: () => voi
 
   return (
     <View style={styles.wrap}>
-      <StelarOrb size={150} />
-      <DiscoveryWave width={200} />
+      <DiscoveryWave width={220} />
       <Animated.Text key={step} entering={FadeIn.duration(360)} style={styles.line}>
         {lines[step]}
       </Animated.Text>
