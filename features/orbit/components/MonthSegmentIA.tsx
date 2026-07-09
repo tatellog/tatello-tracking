@@ -148,10 +148,12 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
             <Pressable
               onPress={() => setCardIdx((i) => i + 1)}
               accessibilityRole="button"
-              accessibilityLabel="Explorar otra cosa"
+              accessibilityLabel="Ver otro hallazgo"
               style={styles.explore}
             >
-              <Text style={styles.exploreText}>Explorar otra ✦</Text>
+              <Text style={styles.exploreText}>
+                Otro hallazgo · {(cardIdx % cards.length) + 1} de {cards.length} ✦
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -223,8 +225,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   section: { gap: 14 },
-  // "Explorar otra ✦" — opt-in, discreto (no un CTA que empuja).
-  explore: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
+  // "Otro hallazgo · N de M ✦" — paginación discreta (no un CTA que empuja).
+  explore: { alignSelf: 'center', paddingVertical: 13, paddingHorizontal: 18 },
   exploreText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
