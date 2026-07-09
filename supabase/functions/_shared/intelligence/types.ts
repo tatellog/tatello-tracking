@@ -4,6 +4,11 @@
  * (Deno). Pure TypeScript: no React Native, no Supabase client, no Deno
  * globals, only relative imports. Keep it that way.
  *
+ * SCOPE: this file holds the ÓRBITA/UI shapes (dimensions, week/day cards,
+ * Patron, etc.). The R1 Intelligence Engine DOMAIN MODEL (Fact, Finding,
+ * Story, Hypothesis, MonthlyReport) lives in `./engine.ts` — do NOT redefine
+ * those here. If a type is a pipeline contract, it goes in engine.ts.
+ *
  * `DailySignals` here is a STRUCTURAL subset of the daily_signals view row
  * (the columns the detectors read). The generated app type is a superset,
  * so app code passes it straight in.

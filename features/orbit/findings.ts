@@ -20,85 +20,14 @@ import { WATER_GOAL_GLASSES } from './month-built'
 import type { DailySignals } from './api'
 import type { PriorReflections } from './reflections'
 
-export type FindingCategory =
-  | 'deficit'
-  | 'movimiento'
-  | 'sueno'
-  | 'agua'
-  | 'proteina'
-  | 'alimentacion'
+// El MODELO DE DOMINIO (Finding, Chart, Metacognition, FollowUp, FindingCategory)
+// vive ahora en el Intelligence Engine compartido
+// (supabase/functions/_shared/intelligence/engine.ts, vía ./engine-types). Aquí
+// se importa para los detectores y se RE-EXPORTA para no romper a quien importa
+// estos tipos desde '../findings' (backward-compat). Ver epic 01 · T0.1.
+import type { Finding, FindingCategory, FollowUp, Metacognition } from './engine-types'
 
-/** Gráfica mínima de evidencia (no dashboard). */
-export type Chart =
-  | {
-      kind: 'weekdayBars'
-      unit: string
-      bars: { label: string; value: number; highlight: boolean }[]
-    }
-  | { kind: 'dotTimeline'; dots: ('off' | 'on' | 'strong')[]; caption?: string }
-
-/** Metacognición guiada (ramifica según la respuesta). */
-export type Metacognition = {
-  question: string
-  options: { label: string; answer: string }[]
-  /** answer → lo que Stelar responde. */
-  replies: Record<string, string>
-  /** Segunda pregunta guiada tras la primera respuesta. */
-  follow?: { question: string; options: { label: string; answer: string }[] }
-}
-
-export type FollowUp =
-  | { kind: 'observation'; label: string; text: string }
-  | { kind: 'days'; label: string; dates: string[] }
-  | { kind: 'next'; label: string }
-
-export type Finding = {
-  id: string
-  category: FindingCategory
-  /** 0–100. Cuánto sostuvo el patrón (semanas/ocasiones), no una probabilidad. */
-  confidence: number
-  /** El hallazgo, específico y con números. */
-  title: string
-  /** La dimensión en humano ("tus días con tu meta de agua"): la IA del chat
-   *  abre NOMBRÁNDOLA para que cada hallazgo se sienta distinto (no un molde). */
-  subject: string
-  /** El contenido de la card-constelación en 3 niveles: `lead` = la LECTURA /
-   *  palanca (Cormorant italic, voz del coach · el VALOR, no la coincidencia),
-   *  `support` = la evidencia con números (Hanken), `caption` = la
-   *  metacognición ("día a día no se ve; junto sí" · el diferenciador de Stelar,
-   *  hoy visible en la card, no escondido tras "Entender"). El italic jamás es
-   *  número crudo ni culpa. */
-  phrase: { lead: string; support: string; caption: string }
-  /** Muestra chica (pocas ocurrencias): se muestra como "Señal naciente" —
-   *  tentativa, sin sello de consistencia lleno. Honestidad sobre el N. */
-  emerging?: boolean
-  /** `true` = hallazgo de RUPTURA (dónde se te va: rompes la dieta, te saltas el
-   *  gym). Lo invisible que frena el mes. El reporte lo enmarca como oportunidad,
-   *  nunca como culpa; NO lleva northLink (romper no acerca al objetivo). */
-  isObstacle?: boolean
-  /** El CONTRAPUNTO en humano ("los días que NO"): caracteriza el reverso con
-   *  números, para responder de verdad "¿y los días que no?". */
-  contrast?: string
-  /** Contexto corto de por qué vale la pena, sin recetar. */
-  explanation: string
-  /** Conexión con su norte (déficit → objetivo), sin presión. undefined si el
-   *  hallazgo no acerca al objetivo (ej. comer más un día). */
-  northLink?: string
-  /** La HIPÓTESIS de Stelar: otra dimensión que coincidió en esos días
-   *  (determinística, tentativa, sin causalidad). undefined si no hay cruce. */
-  hypothesis?: string
-  /** Métrica de esquina ("18 de 21 entrenamientos"). */
-  metric: { value: string; label: string }
-  /** Las fechas reales relevantes del hallazgo (para "Ver esos días"). */
-  evidenceDates: string[]
-  evidenceTitle: string
-  charts: Chart[]
-  reflectionKey: string
-  /** Callback de continuidad entre meses ("En mayo no lo habías notado."). */
-  priorCallback?: string
-  metacognition: Metacognition
-  followUps: FollowUp[]
-}
+export type { Chart, Finding, FindingCategory, FollowUp, Metacognition } from './engine-types'
 
 export type FindingsCtx = {
   calorieTarget?: number | null
@@ -398,8 +327,8 @@ function detectWeekdayDietBreak(
   )
   if (rows.length < 12) return null
 
-  const total = Array(7).fill(0)
-  const deficit = Array(7).fill(0)
+  const total: number[] = new Array(7).fill(0)
+  const deficit: number[] = new Array(7).fill(0)
   for (const r of rows) {
     const wd = weekday(r.day)
     total[wd]!++
@@ -562,8 +491,13 @@ export function buildFindings(
  * Determinística (sin Date/random): mismo motor, mismo hash en cliente y edge.
  */
 export function hashFindings(findings: readonly Finding[]): string {
+  // Incluye subject + contrast: la IA del chat los recibe, así que un cambio en
+  // ellos DEBE invalidar el caché de la voz (si no, sirve el contrapunto viejo).
   const canon = findings
-    .map((f) => `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.phrase.support}`)
+    .map(
+      (f) =>
+        `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.subject}|${f.phrase.support}|${f.contrast ?? ''}`,
+    )
     .join('~')
   let h = 0x811c9dc5
   for (let i = 0; i < canon.length; i++) {
