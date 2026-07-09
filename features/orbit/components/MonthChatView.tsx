@@ -64,15 +64,16 @@ const styles = StyleSheet.create({
   introTitle: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.displaySm,
-    lineHeight: 30,
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 26,
     color: colors.leche,
   },
   introSubtitle: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.ui,
-    lineHeight: 22,
-    color: colors.bone,
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.niebla,
+    marginTop: 2,
   },
   introCaption: {
     fontFamily: typography.uiMedium,

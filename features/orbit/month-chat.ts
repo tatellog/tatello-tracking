@@ -76,16 +76,12 @@ export function buildMonthChat(
   // observaciones. Comunica que la IA eligió lo importante, no listó todo.
   const secondary = cards.length - 1
   const secText =
-    secondary <= 0
-      ? ''
-      : secondary === 1
-        ? ' y 1 observación secundaria'
-        : ` y ${secondary} observaciones secundarias`
+    secondary <= 0 ? '' : ` · ${secondary} ${secondary === 1 ? 'observación' : 'observaciones'}`
   return {
     ready: true,
     intro: [
       { text: `Analicé tus últimos ${signals.length} días.`, tone: 'accent' },
-      { text: `Encontré 1 hallazgo principal${secText}.`, tone: 'strong' },
+      { text: `1 hallazgo principal${secText}`, tone: 'strong' },
     ],
     cards,
   }

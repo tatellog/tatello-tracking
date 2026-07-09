@@ -141,10 +141,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         <MonthReading days={signals.length} onDone={() => setRead(true)} />
       ) : null}
 
-      {/* ── Pantalla 2: la apertura + las cards de patrón (Apple, una por
-          hallazgo). Cada card abre su detalle guiado. ── */}
+      {/* ── Pantalla 2: la apertura + las cards de patrón (sesión de
+          descubrimiento). Cada card abre su detalle guiado. ── */}
       {chat.ready && read ? (
-        <View style={styles.section}>
+        <View style={styles.antesala}>
           <StelarSpeaks bubbles={introBubbles} />
           <MonthPatternCards cards={cards} onPick={setOpenFinding} />
         </View>
@@ -216,6 +216,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   section: { gap: 16 },
+  antesala: { gap: 24 },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,

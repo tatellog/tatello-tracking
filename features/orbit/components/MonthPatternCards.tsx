@@ -56,7 +56,7 @@ export function MonthPatternCards({ cards, onPick }: Props) {
 
       {rest.length > 0 ? (
         <View style={styles.secondary}>
-          <Text style={styles.secTitle}>Otros hallazgos</Text>
+          <Text style={styles.secTitle}>Otras observaciones</Text>
           <View style={styles.rows}>
             {visible.map((f, i) => (
               <SecondaryRow
@@ -101,7 +101,7 @@ function HeroCard({ finding, onPress }: { finding: Finding; onPress: () => void 
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, { backgroundColor: `${tint}12` }]}
       />
-      <Text style={styles.heroEyebrow}>✦ LO QUE MÁS LLAMÓ MI ATENCIÓN</Text>
+      <Text style={[styles.heroEyebrow, { color: tint }]}>LO QUE MÁS LLAMÓ MI ATENCIÓN</Text>
       <Text style={styles.heroTitle}>{finding.title}</Text>
       <ConfidenceBar confidence={finding.confidence} tint={tint} />
       <View style={styles.heroCta}>
@@ -160,13 +160,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.4,
-    color: colors.oroSoft,
   },
+  // El hallazgo es un DATO → Hanken, no Cormorant (serif = solo voz del coach).
   heroTitle: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.displaySm,
-    lineHeight: 31,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.heading,
+    lineHeight: 24,
     color: colors.leche,
   },
   heroCta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
@@ -179,10 +178,9 @@ const styles = StyleSheet.create({
   // ── Secundarios ──
   secondary: { gap: 12 },
   secTitle: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.4,
     color: colors.niebla,
     marginLeft: 2,
   },

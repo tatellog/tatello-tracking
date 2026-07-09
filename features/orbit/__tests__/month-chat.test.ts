@@ -40,7 +40,7 @@ describe('buildMonthChat', () => {
     const chat = buildMonthChat(activeMonth(20), CTX)
     expect(chat.ready).toBe(true)
     expect(chat.intro[0]!.text).toMatch(/Analicé tus últimos \d+ días/)
-    expect(chat.intro[1]!.text).toMatch(/Encontré 1 hallazgo principal/)
+    expect(chat.intro[1]!.text).toMatch(/1 hallazgo principal/)
     expect(chat.cards.length).toBeGreaterThan(0)
     for (const f of chat.cards) {
       expect(f.title.length).toBeGreaterThan(0)
