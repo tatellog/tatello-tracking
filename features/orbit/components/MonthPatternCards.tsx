@@ -71,7 +71,7 @@ function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
       accessibilityLabel={`${finding.title}. Ver el detalle.`}
       style={({ pressed }) => [
         styles.card,
-        { borderColor: `${tint}3A` },
+        { borderColor: `${tint}73` },
         pressed && styles.cardPressed,
       ]}
     >
@@ -104,7 +104,7 @@ function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
       {weekChart ? <MiniWeek bars={weekChart.bars} tint={tint} /> : null}
 
       {/* Datum de evidencia (métrica) — lo que da confianza. */}
-      <View style={[styles.metric, { backgroundColor: `${tint}18` }]}>
+      <View style={[styles.metric, { backgroundColor: `${tint}26` }]}>
         <Text style={styles.metricValue}>{finding.metric.value}</Text>
         <Text style={styles.metricDot}>·</Text>
         <Text style={styles.metricLabel}>{finding.metric.label}</Text>
@@ -143,9 +143,12 @@ function MiniWeek({ bars, tint }: { bars: { label: string; highlight: boolean }[
 const styles = StyleSheet.create({
   stack: { gap: 12 },
   card: {
-    backgroundColor: colors.bgCard2,
+    // El fondo de Órbita Mes es un degradado VINO (no negro), y bgCard2 se
+    // camuflaba con él. Fondo casi-negro → la card contrasta como panel; el
+    // borde del color de la dimensión (~45% alpha) la define en cualquier zona.
+    backgroundColor: colors.bg,
     borderRadius: radius.cardLg,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingTop: 18,
     paddingBottom: 16,
     paddingLeft: 22,
