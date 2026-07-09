@@ -132,5 +132,9 @@ export const queryKeys = {
     // compute-facts) con fallback a compute-local. Key por (uid, periodo).
     facts: (uid: string, period: string, periodStart: string, periodEnd: string) =>
       ['orbit', 'facts', uid, period, periodStart, periodEnd] as const,
+    // Findings Engine (R1): los hallazgos de un periodo, del writer (edge
+    // compute-findings) con fallback a compute-local. Key por (uid, periodo).
+    findings: (uid: string, period: string, periodStart: string, periodEnd: string) =>
+      ['orbit', 'findings', uid, period, periodStart, periodEnd] as const,
   },
 } as const
