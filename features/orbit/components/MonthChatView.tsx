@@ -33,7 +33,7 @@ export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
       <ConversationHeader />
       <View style={styles.stelarCol}>
         {bubbles.map((b, i) => (
-          <StelarBubble key={i} bubble={b} withStar={i === 0} />
+          <StelarBubble key={i} bubble={b} />
         ))}
       </View>
     </View>
@@ -198,7 +198,7 @@ function StelarTurn({
           key={i}
           entering={animate ? FadeInDown.duration(320).springify().damping(18) : undefined}
         >
-          <StelarBubble bubble={b} withStar={i === 0} />
+          <StelarBubble bubble={b} />
         </Animated.View>
       ))}
       {animate && shown < bubbles.length ? <Thinking /> : null}
@@ -206,18 +206,12 @@ function StelarTurn({
   )
 }
 
-const StelarBubble = memo(function StelarBubble({
-  bubble,
-  withStar,
-}: {
-  bubble: ChatBubble
-  withStar: boolean
-}) {
+const StelarBubble = memo(function StelarBubble({ bubble }: { bubble: ChatBubble }) {
   const isAccent = bubble.tone === 'accent'
   const isStrong = bubble.tone === 'strong'
   return (
     <View style={styles.stelarRow}>
-      <View style={styles.starSlot}>{withStar ? <StelarStar size={20} /> : null}</View>
+      <Avatar />
       <View style={[styles.stelarBubble, isAccent && styles.stelarBubbleAccent]}>
         <Text
           style={[
@@ -233,17 +227,21 @@ const StelarBubble = memo(function StelarBubble({
   )
 })
 
+/** El avatar de Stelar: su estrella emisora ✦ en un círculo de cielo. Mismo
+ *  lenguaje que el mockup (avatar por mensaje), con la firma oro. */
+function Avatar() {
+  return (
+    <View style={styles.avatar}>
+      <StelarStar size={18} />
+    </View>
+  )
+}
+
 function Thinking() {
   return (
     <Animated.View entering={FadeIn.duration(220)} style={styles.thinkingRow}>
-      <View style={styles.starSlot}>
-        <StelarStar size={20} />
-      </View>
-      <View style={styles.thinking}>
-        <View style={styles.thinkingStar} />
-        <View style={[styles.thinkingStar, styles.thinkingStar2]} />
-        <View style={[styles.thinkingStar, styles.thinkingStar3]} />
-      </View>
+      <Avatar />
+      <Text style={styles.thinkingText}>Stelar está analizando tus patrones…</Text>
     </Animated.View>
   )
 }
@@ -300,7 +298,7 @@ function ChoiceButton({
   )
 }
 
-const STAR_SLOT = 26
+const STAR_SLOT = 34
 
 const styles = StyleSheet.create({
   speaks: { gap: 16 },
@@ -324,8 +322,19 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.5 },
   // ── Stelar (izquierda, oro) ──
   stelarCol: { gap: 8 },
-  stelarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  starSlot: { width: STAR_SLOT, alignItems: 'center', paddingTop: 8 },
+  stelarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  // Avatar por mensaje: la estrella emisora en un círculo de cielo.
+  avatar: {
+    width: STAR_SLOT,
+    height: STAR_SLOT,
+    borderRadius: STAR_SLOT / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgCard,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairlineSoft,
+    marginTop: 2,
+  },
   stelarBubble: {
     flex: 1,
     backgroundColor: colors.bgCard,
@@ -369,12 +378,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.leche,
   },
-  // ── "Pensando" — estrellas oro ──
-  thinkingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  thinking: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 13 },
-  thinkingStar: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.oroVect },
-  thinkingStar2: { opacity: 0.6 },
-  thinkingStar3: { opacity: 0.3 },
+  // ── "Analizando tus patrones…" — el diferenciador, no "escribiendo…" ──
+  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  thinkingText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
   // ── "Es tu turno" + botones ──
   choiceZone: { gap: 0 },
   turnHint: {

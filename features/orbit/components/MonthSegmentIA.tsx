@@ -152,6 +152,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         topic={openTopic}
         chat={chat}
         topicLabel={openLabel}
+        sign={sign}
         onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
         onOpenCalendar={() => setOpenTopic(null)}
         onClose={() => setOpenTopic(null)}
