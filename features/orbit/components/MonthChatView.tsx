@@ -5,7 +5,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, shadows, typography } from '@/theme'
 
-import type { ChatBubble, ChatTopic, MonthChat } from '../month-chat'
+import type { ChatBubble, ChatTree } from '../month-chat'
 import { initialTurns, onNodeChoice, type Flow, type Turn } from '../month-chat-flow'
 
 /*
@@ -43,33 +43,31 @@ export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
 /* ── Sala: la conversación de un tema (dentro del sheet) ─────────────── */
 
 type ConversationProps = {
-  chat: MonthChat
-  topic: ChatTopic
+  tree: ChatTree
   onSaveReflection: (questionKey: string, answer: string) => void
   onOpenCalendar: () => void
   onClose: () => void
 }
 
 export function MonthConversation({
-  chat,
-  topic,
+  tree,
   onSaveReflection,
   onOpenCalendar,
   onClose,
 }: ConversationProps) {
-  const tree = chat.trees[topic]
-  const entryBubbles = tree?.nodes[tree.entry]?.bubbles ?? []
+  const entryBubbles = tree.nodes[tree.entry]?.bubbles ?? []
 
   const [turns, setTurns] = useState<Turn[]>(() => initialTurns(entryBubbles))
-  const [flow, setFlow] = useState<Flow>(() =>
-    tree ? { kind: 'node', topic, nodeId: tree.entry } : { kind: 'done' },
-  )
+  const [flow, setFlow] = useState<Flow>(() => ({
+    kind: 'node',
+    topic: tree.topic,
+    nodeId: tree.entry,
+  }))
   const [revealed, setRevealed] = useState(false)
   const onRevealed = useCallback(() => setRevealed(true), [])
 
   const applyChoose = useCallback(
     (nodeId: string, choiceIndex: number) => {
-      if (!tree) return
       const choice = tree.nodes[nodeId]?.choices?.[choiceIndex]
       if (!choice) return
       const r = onNodeChoice(tree, choice)
@@ -81,8 +79,6 @@ export function MonthConversation({
     },
     [tree, onSaveReflection, onOpenCalendar],
   )
-
-  if (!tree) return null
 
   // Los botones del turno vivo (cuando Stelar terminó de hablar).
   let choices: { label: string; onPress: () => void; primary: boolean }[] = []
@@ -241,7 +237,7 @@ function Thinking() {
   return (
     <Animated.View entering={FadeIn.duration(220)} style={styles.thinkingRow}>
       <Avatar />
-      <Text style={styles.thinkingText}>Stelar está analizando tus patrones…</Text>
+      <Text style={styles.thinkingText}>Stelar está viendo tus patrones…</Text>
     </Animated.View>
   )
 }

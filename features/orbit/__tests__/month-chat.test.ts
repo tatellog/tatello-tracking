@@ -115,6 +115,18 @@ describe('buildMonthChat — otros temas', () => {
     )
   })
 
+  it('expone tarjetas de hallazgo (evidencia + conversación) cuando hay patrones', () => {
+    const chat = buildMonthChat(activeMonth(20), CTX)
+    expect(Array.isArray(chat.cards)).toBe(true)
+    expect(chat.cards.length).toBeLessThanOrEqual(3)
+    for (const card of chat.cards) {
+      expect(card.finding.length).toBeGreaterThan(0)
+      expect(card.colorKey.length).toBeGreaterThan(0)
+      // Cada tarjeta abre una conversación con nodo de entrada.
+      expect(card.tree.nodes[card.tree.entry]).toBeDefined()
+    }
+  })
+
   it('sorpréndeme siempre existe cuando hay datos', () => {
     const chat = buildMonthChat(activeMonth(20), CTX)
     expect(chat.trees.sorprendeme).toBeDefined()

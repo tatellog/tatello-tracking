@@ -13,13 +13,20 @@ import { colors, typography } from '@/theme'
 
 import { useAiVoice } from '../ai-voice'
 import { useSignalsHistory } from '../hooks'
-import { buildMonthChat, monthChatInsights, type ChatTopic } from '../month-chat'
+import {
+  buildMonthChat,
+  monthChatInsights,
+  type ChatTopic,
+  type ChatTree,
+  type PatternCard,
+} from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
 import { useSaveReflection } from '../reflections'
 
 import { MonthChatSheet } from './MonthChatSheet'
 import { StelarSpeaks } from './MonthChatView'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
+import { MonthPatternCards } from './MonthPatternCards'
 import { MonthTopicChips } from './MonthTopicChips'
 import { PresenceFinale } from './PresenceFinale'
 
@@ -86,10 +93,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
-  // La conversación se abre en su propia sala (sheet). `openTopic` = el tema
-  // elegido desde un chip; null = antesala.
-  const [openTopic, setOpenTopic] = useState<ChatTopic | null>(null)
-  const openLabel = chat.picker?.choices.find((c) => c.topic === openTopic)?.label ?? ''
+  // La conversación se abre en su propia sala (sheet), sea desde una tarjeta
+  // de hallazgo o desde un chip de tema. `open` = { árbol, etiqueta } | null.
+  const [open, setOpen] = useState<{ tree: ChatTree; label: string } | null>(null)
+  const openCard = (card: PatternCard) => setOpen({ tree: card.tree, label: card.label })
+  const openChip = (topic: ChatTopic) => {
+    const tree = chat.trees[topic]
+    const label = chat.picker?.choices.find((c) => c.topic === topic)?.label ?? ''
+    if (tree) setOpen({ tree, label })
+  }
   // La apertura de la antesala: la Voz de IA si llegó, si no la determinista.
   const introBubbles =
     aiVoice.data && aiVoice.data.length > 0 ? aiVoice.data : (chat.picker?.intro ?? [])
@@ -131,7 +143,8 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
       {chat.ready && chat.picker ? (
         <View style={styles.section}>
           <StelarSpeaks bubbles={introBubbles} />
-          <MonthTopicChips picker={chat.picker} onPick={setOpenTopic} />
+          <MonthPatternCards cards={chat.cards} onPick={openCard} />
+          <MonthTopicChips picker={chat.picker} onPick={openChip} />
         </View>
       ) : null}
 
@@ -149,13 +162,12 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
 
       {/* ── La sala: la conversación del tema elegido, full-screen. ── */}
       <MonthChatSheet
-        topic={openTopic}
-        chat={chat}
-        topicLabel={openLabel}
+        tree={open?.tree ?? null}
+        label={open?.label ?? ''}
         sign={sign}
         onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
-        onOpenCalendar={() => setOpenTopic(null)}
-        onClose={() => setOpenTopic(null)}
+        onOpenCalendar={() => setOpen(null)}
+        onClose={() => setOpen(null)}
       />
     </Animated.View>
   )

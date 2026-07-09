@@ -15,7 +15,7 @@ import { SkyBackground } from '@/features/tabs/components'
 import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, radius, typography } from '@/theme'
 
-import type { ChatTopic, MonthChat } from '../month-chat'
+import type { ChatTree } from '../month-chat'
 import { MonthConversation, StelarStar } from './MonthChatView'
 
 /*
@@ -34,9 +34,9 @@ const CLOSE_DRAG = 120 // px arrastrados para descartar
 const CLOSE_VELOCITY = 900 // o velocidad de flick
 
 type Props = {
-  topic: ChatTopic | null
-  chat: MonthChat
-  topicLabel: string
+  /** El árbol de conversación a abrir (de una tarjeta o de un chip); null = cerrado. */
+  tree: ChatTree | null
+  label: string
   sign: ZodiacSign | null
   onSaveReflection: (questionKey: string, answer: string) => void
   onOpenCalendar: () => void
@@ -44,9 +44,8 @@ type Props = {
 }
 
 export function MonthChatSheet({
-  topic,
-  chat,
-  topicLabel,
+  tree,
+  label,
   sign,
   onSaveReflection,
   onOpenCalendar,
@@ -54,7 +53,7 @@ export function MonthChatSheet({
 }: Props) {
   const insets = useSafeAreaInsets()
   const { progress } = useTransformProgress()
-  const open = topic != null
+  const open = tree != null
   const translateY = useSharedValue(0)
 
   // Al abrir, arranca asentado (la animación de entrada la da el Modal).
@@ -114,7 +113,7 @@ export function MonthChatSheet({
             <Text style={styles.closeGlyph}>✕</Text>
           </Pressable>
 
-          {topic ? (
+          {tree ? (
             <ScrollView
               contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
               showsVerticalScrollIndicator={false}
@@ -123,14 +122,13 @@ export function MonthChatSheet({
               <View style={styles.head}>
                 <StelarStar size={30} />
                 <View style={styles.headText}>
-                  <Text style={styles.headTopic}>{topicLabel}</Text>
+                  <Text style={styles.headTopic}>{label}</Text>
                   <Text style={styles.headWho}>Stelar · leyendo tu cielo</Text>
                 </View>
               </View>
 
               <MonthConversation
-                chat={chat}
-                topic={topic}
+                tree={tree}
                 onSaveReflection={onSaveReflection}
                 onOpenCalendar={onOpenCalendar}
                 onClose={onClose}

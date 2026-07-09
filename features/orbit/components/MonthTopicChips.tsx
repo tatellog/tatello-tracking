@@ -27,7 +27,7 @@ export function MonthTopicChips({ picker, onPick }: Props) {
 
   return (
     <View style={styles.shelf}>
-      <Text style={styles.invite}>¿Por dónde empezamos?</Text>
+      <Text style={styles.invite}>¿Qué quieres entender mejor?</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

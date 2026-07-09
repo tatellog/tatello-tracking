@@ -68,12 +68,30 @@ export type TopicPicker = {
   choices: { topic: ChatTopic; label: string }[]
 }
 
+/** Una tarjeta de hallazgo en la antesala: el patrón que el motor detectó,
+ *  mostrado con su evidencia a 0 taps. Al tocar "Ver más" abre su conversación
+ *  (el `tree`). Es lo que vuelve la antesala "3 cosas que encontré este mes",
+ *  no un menú de temas abstractos. */
+export type PatternCard = {
+  id: string
+  /** Encabezado corto ("Tu sueño", "Los viernes"). */
+  label: string
+  /** El hallazgo con evidencia — la frase que se lee en la tarjeta. */
+  finding: string
+  /** Dimensión para el ícono + tinte del avatar (sueno/agua/deficit/…). */
+  colorKey: string
+  /** La conversación guiada que abre la tarjeta. */
+  tree: ChatTree
+}
+
 export type MonthChat = {
   /** false → estado vacío ("todavía estoy aprendiendo"): no hay datos para
    *  una conversación honesta. */
   ready: boolean
   picker: TopicPicker | null
   trees: Partial<Record<ChatTopic, ChatTree>>
+  /** Los hallazgos del mes como tarjetas (top 3), cada uno abre su conversación. */
+  cards: PatternCard[]
 }
 
 export type MonthChatCtx = {
@@ -284,33 +302,16 @@ function buildAguaTree(signals: readonly DailySignals[]): ChatTree | null {
 /** Elige el patrón más "sorprendente": un patrón TEMPORAL/correlación
  *  (kind 'pattern', lo menos obvio) antes que una constancia (kind
  *  'discovery'). null si el motor no detecta ninguno. */
-function pickSurprisePattern(
-  signals: readonly DailySignals[],
-  ctx: MonthChatCtx,
-): MonthPattern | null {
-  const patterns = detectMonthPatterns(signals, {
-    calorieTarget: ctx.calorieTarget,
-    proteinTarget: ctx.proteinTarget,
-  })
-  if (patterns.length === 0) return null
-  return patterns.find((p) => p.kind === 'pattern') ?? patterns[0]!
-}
-
 /**
- * "Sorpréndeme" abre el patrón menos obvio como conversación con
- * metacognición ("¿también lo habías notado?" — el ejemplo de la spec). El
- * `why` del patrón (la palanca observacional, ya validada) da el cierre.
- * Fallback: si no hay patrón detectado, reusa el tema más rico disponible.
+ * Cualquier patrón del motor → una conversación con metacognición: el hallazgo
+ * (title, evidencia) → "¿lo habías notado?" (sí/no/nunca) → el `why` del motor
+ * (la palanca observacional, ya validada) como cierre. Lo reusan las TARJETAS
+ * de la antesala y "Sorpréndeme". `lead` = burbuja opcional antes del hallazgo.
  */
-function buildSorprendemeTree(
-  pattern: MonthPattern | null,
-  fallback: ChatTree | undefined,
-): ChatTree | undefined {
-  if (!pattern) return fallback ? { ...fallback, topic: 'sorprendeme' } : undefined
-  const bubbles: ChatBubble[] = [
-    { text: 'Este es el que menos se ve.' },
-    { text: pattern.title, tone: 'strong' },
-  ]
+function buildPatternTree(pattern: MonthPattern, lead?: string): ChatTree {
+  const bubbles: ChatBubble[] = lead
+    ? [{ text: lead }, { text: pattern.title, tone: 'strong' }]
+    : [{ text: pattern.title, tone: 'strong' }]
   const nodes: Record<string, ChatNode> = {
     intro: {
       id: 'intro',
@@ -352,7 +353,7 @@ export function buildMonthChat(
   signals: readonly DailySignals[],
   ctx: MonthChatCtx = {},
 ): MonthChat {
-  if (!monthChatReady(signals)) return { ready: false, picker: null, trees: {} }
+  if (!monthChatReady(signals)) return { ready: false, picker: null, trees: {}, cards: [] }
 
   const trees: Partial<Record<ChatTopic, ChatTree>> = {}
   // Orden de aparición en el picker = orden de relevancia (déficit = norte).
@@ -369,17 +370,38 @@ export function buildMonthChat(
 
   // Solo los temas con datos reales entran (nunca un tema vacío de relleno).
   const available = (Object.keys(trees) as ChatTopic[]).filter((t) => t !== 'sorprendeme')
-  const n = available.length
-  if (n === 0) return { ready: false, picker: null, trees: {} }
+  if (available.length === 0) return { ready: false, picker: null, trees: {}, cards: [] }
 
-  // "Sorpréndeme" = el patrón menos obvio del motor como conversación con
-  // metacognición; si no hay patrón, reusa el tema más rico disponible.
-  const surprise = buildSorprendemeTree(pickSurprisePattern(signals, ctx), trees[available[0]!])
+  // Los HALLAZGOS del mes → tarjetas (top 3). Cada patrón que el motor detecta
+  // se muestra con su evidencia y abre su propia conversación. Esto es lo que
+  // varía mes a mes (el cruce de sueño, los viernes, la hidratación), no un
+  // guion fijo por tema.
+  const patterns = detectMonthPatterns(signals, {
+    calorieTarget: ctx.calorieTarget,
+    proteinTarget: ctx.proteinTarget,
+  })
+  const cards: PatternCard[] = patterns.slice(0, 3).map((p) => ({
+    id: p.id,
+    label: p.label,
+    finding: p.title,
+    colorKey: p.evidence.bars[0]?.colorKey ?? 'deficit',
+    tree: buildPatternTree(p),
+  }))
+
+  // "Sorpréndeme" = el patrón menos obvio (temporal antes que constancia) como
+  // conversación; si no hay patrón, reusa el tema más rico disponible.
+  const surprisePattern = patterns.find((p) => p.kind === 'pattern') ?? patterns[0] ?? null
+  const surprise = surprisePattern
+    ? buildPatternTree(surprisePattern, 'Este es el que menos se ve.')
+    : trees[available[0]!]
+      ? { ...trees[available[0]!]!, topic: 'sorprendeme' as ChatTopic }
+      : undefined
   if (surprise) trees.sorprendeme = surprise
 
-  // Apertura que ASOMA el hallazgo (product-benchmark): abre con la voz del
-  // coach picando la curiosidad, no un menú frío. El premio es el
-  // cruce/patrón, nunca el peso (línea roja del manifiesto).
+  // Apertura de la antesala: la voz del coach picando la curiosidad. El número
+  // = las cosas que se muestran abajo (las tarjetas). Premio = el hallazgo,
+  // nunca el peso (línea roja del manifiesto).
+  const n = cards.length > 0 ? cards.length : available.length
   const picker: TopicPicker = {
     intro: [
       { text: 'Vi tu mes.', tone: 'accent' },
@@ -397,7 +419,7 @@ export function buildMonthChat(
     ],
   }
 
-  return { ready: true, picker, trees }
+  return { ready: true, picker, trees, cards }
 }
 
 /**
@@ -407,10 +429,12 @@ export function buildMonthChat(
  */
 export function monthChatInsights(chat: MonthChat): string[] {
   const out: string[] = []
+  // Los hallazgos de las tarjetas primero (son los patrones destacados del mes).
+  for (const card of chat.cards) out.push(card.finding)
   for (const topic of Object.keys(chat.trees) as ChatTopic[]) {
     if (topic === 'sorprendeme') continue
     const strong = chat.trees[topic]?.nodes.intro?.bubbles.find((b) => b.tone === 'strong')
-    if (strong) out.push(strong.text)
+    if (strong && !out.includes(strong.text)) out.push(strong.text)
   }
   return out
 }
