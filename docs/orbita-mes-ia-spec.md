@@ -1,5 +1,12 @@
 # Stelar Release 2 · Órbita Mes IA — spec
 
+> ⚠️ **SUPERSEDED (jul 2026).** Fuente de verdad: los 6 PRDs nuevos →
+> `docs/epics/epic-02-orbita-ai.md`. El modelo de ESTE doc (topic picker "Mi
+> déficit / Sorpréndeme" + 7 árboles de conversación) NO es lo que se construyó.
+> El Órbita Mes actual = **reporte de evidencia determinístico** (veredicto →
+> dónde se te va → puerta abierta) + **chat fact-led** (pivote de dueña
+> "hechos-primero"). Se conserva como histórico.
+
 **Estado:** aprobado por la dueña (jul 2026) · construcción por fases, bajo
 flag. **Rama:** `context-engine`. **Objetivo:** Órbita Mes deja de sentirse
 como dashboard y se vuelve **descubrimiento guiado**. La pregunta que responde:

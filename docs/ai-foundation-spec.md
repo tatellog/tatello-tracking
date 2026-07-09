@@ -1,5 +1,12 @@
 # Stelar Release 1 · AI Foundation — spec
 
+> ⚠️ **SUPERSEDED como definición de release (jul 2026).** La fuente de verdad
+> son los 6 PRDs nuevos → `docs/epics/`. Este documento ya NO define "Release 1"
+> (ahora "Release 1" = Intelligence Engine, `epics/epic-01-intelligence-engine.md`).
+> Su CONTENIDO TÉCNICO sigue vigente (IA solo explica, Context Engine, caché
+> `ai_insights`, `prompt_version`) y vive consolidado en
+> `docs/architecture/ai-philosophy.md` + `backend.md`. Se conserva como histórico.
+
 **Estado:** aprobado por la dueña (jul 2026) · construcción por fases, bajo
 flag. **Rama:** `context-engine`. **Objetivo:** base técnica para que Stelar
 use IA de forma barata, consistente y escalable — una **capa de explicación**,
