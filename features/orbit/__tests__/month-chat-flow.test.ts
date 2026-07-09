@@ -82,10 +82,11 @@ describe('onPickTopic', () => {
 describe('onNodeChoice', () => {
   const tree = chat.trees.deficit!
 
-  it('goto: anexa respuesta + siguiente burbuja y avanza el nodo', () => {
+  it('goto sin reflexión ("Sigue"): NO ecoa burbuja de usuaria, solo avanza', () => {
     const sigue = tree.nodes.intro!.choices![0]!
     const r = onNodeChoice(tree, sigue)
-    expect(r.append[0]).toEqual({ who: 'user', text: 'Sigue' })
+    // "Sigue" es avance puro → el hilo no se ensucia con un eco de la usuaria.
+    expect(r.append.every((t) => t.who === 'stelar')).toBe(true)
     expect(r.flow).toEqual({ kind: 'node', topic: 'deficit', nodeId: 'sleepCross' })
     expect(r.openCalendar).toBeUndefined()
   })

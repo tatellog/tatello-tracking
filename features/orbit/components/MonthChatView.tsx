@@ -28,14 +28,18 @@ import { initialTurns, onNodeChoice, type Flow, type Turn } from '../month-chat-
 /* ── Antesala: "Stelar habla" (identidad + apertura) ─────────────────── */
 
 export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
+  // La apertura NO es un chat: es un encabezado (título + subtítulo). El chat
+  // vive dentro de la conversación, no en la antesala (feedback dueña).
+  const title = bubbles[0]?.text ?? ''
+  const subtitle = bubbles[1]?.text ?? ''
   return (
-    <View style={styles.speaks}>
-      <ConversationHeader />
-      <View style={styles.stelarCol}>
-        {bubbles.map((b, i) => (
-          <StelarBubble key={i} bubble={b} />
-        ))}
+    <View style={styles.intro}>
+      <View style={styles.introBrandRow}>
+        <StelarStar size={16} />
+        <Text style={styles.introBrand}>STELAR · leyendo tu cielo</Text>
       </View>
+      {title ? <Text style={styles.introTitle}>{title}</Text> : null}
+      {subtitle ? <Text style={styles.introSubtitle}>{subtitle}</Text> : null}
     </View>
   )
 }
@@ -138,20 +142,6 @@ export function MonthConversation({
           </View>
         </Animated.View>
       ) : null}
-    </View>
-  )
-}
-
-/* ── Cabecera: quién habla ───────────────────────────────────────────── */
-
-function ConversationHeader() {
-  return (
-    <View style={styles.header} accessibilityRole="header">
-      <StelarStar size={26} />
-      <View>
-        <Text style={styles.headerName}>Stelar</Text>
-        <Text style={styles.headerStatus}>leyendo tu cielo</Text>
-      </View>
     </View>
   )
 }
@@ -297,22 +287,29 @@ function ChoiceButton({
 const STAR_SLOT = 34
 
 const styles = StyleSheet.create({
-  speaks: { gap: 16 },
   conversation: { gap: 18 },
-  // Cabecera del interlocutor.
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  headerName: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    color: colors.oroVect,
-    letterSpacing: 0.4,
+  // Apertura de la antesala como ENCABEZADO (título + subtítulo), no chat.
+  intro: { gap: 8 },
+  introBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  introBrand: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
   },
-  headerStatus: {
+  introTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.displaySm,
+    lineHeight: 30,
+    color: colors.leche,
+  },
+  introSubtitle: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.6,
-    color: colors.niebla,
+    fontSize: typography.sizes.ui,
+    lineHeight: 22,
+    color: colors.bone,
   },
   thread: { gap: 12 },
   dim: { opacity: 0.5 },

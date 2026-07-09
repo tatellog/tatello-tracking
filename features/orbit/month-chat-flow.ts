@@ -74,13 +74,16 @@ export type NodeChoiceResult = {
  *  la siguiente burbuja de Stelar, el flujo, y los efectos (guardado /
  *  calendario) como DATOS para que la UI los ejecute. */
 export function onNodeChoice(tree: ChatTree, choice: ChatChoice): NodeChoiceResult {
-  const userTurn: Turn = { who: 'user', text: choice.label }
   const reflection = choice.reflection
+  // Solo las RESPUESTAS (con reflexión: Sí/No/Nunca) se muestran como burbuja
+  // de la usuaria. Los botones de avance ("Sigue", "Ver calendario") no
+  // ensucian el hilo con un eco: solo avanzan.
+  const echo: Turn[] = reflection ? [{ who: 'user', text: choice.label }] : []
   const a = choice.action
   if (a.kind === 'goto') {
     const next = tree.nodes[a.node]
     return {
-      append: next ? [userTurn, { who: 'stelar', bubbles: next.bubbles }] : [userTurn],
+      append: next ? [...echo, { who: 'stelar', bubbles: next.bubbles }] : echo,
       flow: next ? { kind: 'node', topic: tree.topic, nodeId: a.node } : { kind: 'done' },
       reflection,
     }
@@ -88,7 +91,7 @@ export function onNodeChoice(tree: ChatTree, choice: ChatChoice): NodeChoiceResu
   if (a.kind === 'openCalendar') {
     return {
       append: [
-        userTurn,
+        ...echo,
         { who: 'stelar', bubbles: [{ text: 'Ahí está, en tu calendario abajo.', tone: 'accent' }] },
       ],
       flow: { kind: 'done' },
@@ -97,7 +100,7 @@ export function onNodeChoice(tree: ChatTree, choice: ChatChoice): NodeChoiceResu
     }
   }
   return {
-    append: [userTurn, { who: 'stelar', bubbles: [{ text: 'Listo, lo dejé anotado.' }] }],
+    append: [...echo, { who: 'stelar', bubbles: [{ text: 'Listo, lo dejé anotado.' }] }],
     flow: { kind: 'done' },
     reflection,
   }

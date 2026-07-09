@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, typography } from '@/theme'
 
@@ -7,12 +7,10 @@ import type { PatternCard } from '../month-chat'
 
 /*
  * Las TARJETAS de hallazgo de la antesala de Órbita Mes IA. Cada tarjeta es un
- * patrón que el motor detectó, mostrado con su evidencia a 0 taps (no un tema
- * abstracto). Al tocar "Ver más" abre su conversación guiada en la sala.
- *
- * Avatar tintado por dimensión (sueño=índigo/luna, agua=azul/gota, …); la firma
- * "STELAR" y el hallazgo en el cuerpo. Es lo que vuelve la antesala "las 3
- * cosas que encontré este mes" y cambia mes a mes.
+ * patrón que el motor detectó, mostrado con su evidencia a 0 taps. Es una CARD
+ * tapeable con contenedor visible + ícono de chat (indica "abre una
+ * conversación"); al tocar abre la sala. STELAR + el hallazgo + "Ver más ›".
+ * El borde toma un tinte de la dimensión (déficit=magenta, sueño=índigo, …).
  */
 
 type Props = {
@@ -20,7 +18,7 @@ type Props = {
   onPick: (card: PatternCard) => void
 }
 
-/** Color de la dimensión → tinte del avatar (paleta cerrada, no hex sueltos). */
+/** Color de la dimensión → tinte del borde (paleta cerrada, no hex sueltos). */
 const TINT: Record<string, string> = {
   deficit: colors.magenta,
   sueno: colors.dimension.sueno,
@@ -29,7 +27,7 @@ const TINT: Record<string, string> = {
   comida: colors.dimension.alimento,
   cuerpo: colors.dimension.cuerpo,
 }
-const tintFor = (k: string) => TINT[k] ?? colors.oroVect
+const tintFor = (k: string) => TINT[k] ?? colors.magenta
 
 export function MonthPatternCards({ cards, onPick }: Props) {
   if (cards.length === 0) return null
@@ -48,56 +46,35 @@ function Card({ card, onPress }: { card: PatternCard; onPress: () => void }) {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${card.label}: ${card.finding}`}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      accessibilityLabel={`${card.finding}. Ver más.`}
+      style={({ pressed }) => [
+        styles.card,
+        { borderColor: `${tint}55` },
+        pressed && styles.cardPressed,
+      ]}
     >
-      <View style={[styles.avatar, { borderColor: hairlineFor(tint) }]}>
-        <DimensionIcon colorKey={card.colorKey} color={tint} />
-      </View>
       <View style={styles.body}>
         <Text style={styles.brand}>STELAR</Text>
         <Text style={styles.finding}>{card.finding}</Text>
         <Text style={styles.more}>Ver más ›</Text>
       </View>
+      <ChatIcon color={colors.magentaHot} />
     </Pressable>
   )
 }
 
-/** Un halo tenue del color de la dimensión para el borde del avatar. */
-function hairlineFor(hex: string) {
-  return `${hex}44` // ~0.27 alpha
-}
-
-function DimensionIcon({ colorKey, color }: { colorKey: string; color: string }) {
-  if (colorKey === 'sueno') return <Moon color={color} />
-  if (colorKey === 'agua') return <Drop color={color} />
-  return <Star color={color} />
-}
-
-function Moon({ color }: { color: string }) {
+/** Globo de conversación con 3 puntos — señala "abre un chat". */
+function ChatIcon({ color }: { color: string }) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24">
-      <Path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z" fill={color} opacity={0.9} />
-    </Svg>
-  )
-}
-
-function Drop({ color }: { color: string }) {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24">
+    <Svg width={30} height={30} viewBox="0 0 24 24">
       <Path
-        d="M12 3 C12 3 5 11 5 15.5 A7 7 0 0 0 19 15.5 C19 11 12 3 12 3 Z"
+        d="M5 4 h13 a2.5 2.5 0 0 1 2.5 2.5 v7 a2.5 2.5 0 0 1 -2.5 2.5 h-7 l-5 3.5 v-3.5 h-1 a2.5 2.5 0 0 1 -2.5 -2.5 v-7 a2.5 2.5 0 0 1 2.5 -2.5 Z"
         fill={color}
         opacity={0.9}
       />
-    </Svg>
-  )
-}
-
-function Star({ color }: { color: string }) {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24">
-      <Path d="M12 3 Q13 10.5 21 12 Q13 13.5 12 21 Q11 13.5 3 12 Q11 10.5 12 3 Z" fill={color} />
+      <Circle cx={8.5} cy={10} r={1.15} fill={colors.bg} />
+      <Circle cx={12} cy={10} r={1.15} fill={colors.bg} />
+      <Circle cx={15.5} cy={10} r={1.15} fill={colors.bg} />
     </Svg>
   )
 }
@@ -106,26 +83,16 @@ const styles = StyleSheet.create({
   stack: { gap: 12 },
   card: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.cardLg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairlineSoft,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  cardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
+    gap: 12,
+    backgroundColor: colors.bgCard2,
+    borderRadius: radius.cardLg,
     borderWidth: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
   },
-  body: { flex: 1, gap: 4 },
+  cardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  body: { flex: 1, gap: 6 },
   brand: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -142,6 +109,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.magentaHot,
-    marginTop: 4,
+    marginTop: 2,
   },
 })

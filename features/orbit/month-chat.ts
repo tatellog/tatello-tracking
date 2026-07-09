@@ -432,14 +432,18 @@ export function buildMonthChat(
     calorieTarget: ctx.calorieTarget,
     proteinTarget: ctx.proteinTarget,
   })
-  // El déficit (el norte) primero si está entre los hallazgos; el resto en el
-  // orden de relevancia del motor.
-  const ranked = [...patterns].sort(
-    (a, b) =>
-      (a.evidence.bars[0]?.colorKey === 'deficit' ? 0 : 1) -
-      (b.evidence.bars[0]?.colorKey === 'deficit' ? 0 : 1),
-  )
-  const cards: PatternCard[] = ranked.slice(0, 3).map((p) => ({
+  // Prioriza PATRONES (correlaciones no obvias: "los viernes son distintos",
+  // "el finde te sostiene") sobre DESCUBRIMIENTOS (constancias que solo repiten
+  // lo que ya sabe: "fuiste constante" → no le dice nada). Dentro, el déficit
+  // (el norte) primero. Si hay ≥1 patrón real, se OCULTAN las constancias (no
+  // aportan). Fallback: si solo hay constancias, se muestran (mejor que vacío).
+  const rankOf = (p: MonthPattern) =>
+    (p.kind === 'pattern' ? 0 : 10) + (p.evidence.bars[0]?.colorKey === 'deficit' ? 0 : 1)
+  const ranked = [...patterns].sort((a, b) => rankOf(a) - rankOf(b))
+  const source = ranked.some((p) => p.kind === 'pattern')
+    ? ranked.filter((p) => p.kind === 'pattern')
+    : ranked
+  const cards: PatternCard[] = source.slice(0, 3).map((p) => ({
     id: p.id,
     label: p.label,
     finding: p.title,
