@@ -107,24 +107,25 @@ function priorCallback(key: string, prior: PriorReflections): string | undefined
   return undefined
 }
 
-/** La metacognición estándar: "¿Lo habías notado?" con respuestas guiadas y una
- *  segunda pregunta según categoría. `distributed` = el patrón se reparte en el
- *  mes (justifica el "no lo notaste"). */
+/** La metacognición estándar. Pregunta cálida (no de examen) y respuestas
+ *  centradas en ELLA, no en el producto. Los `answer` se mantienen si/no/nunca
+ *  para no romper el callback de continuidad (month_reflections).
+ *  `distributed` = el hallazgo se reparte en el mes. */
 function standardMetacognition(distributed: boolean): Metacognition {
   return {
-    question: '¿Lo habías notado?',
+    question: '¿Esto ya lo sabías?',
     options: [
       { label: 'Sí', answer: 'si' },
       { label: 'No', answer: 'no' },
-      { label: 'Nunca me había dado cuenta', answer: 'nunca' },
+      { label: 'Nunca lo había visto', answer: 'nunca' },
     ],
     replies: {
-      si: 'Entonces ya venías leyéndolo. Aquí queda con números.',
+      si: 'Entonces ya lo venías leyendo. Aquí queda con tus propios días.',
       no: distributed
-        ? 'Tiene sentido. Es un patrón difícil de ver porque ocurre repartido a lo largo del mes.'
-        : 'Tiene sentido. A veces se nota mejor con los días juntos, como aquí.',
+        ? 'Se ve mejor con el mes junto: día a día pasa desapercibido, pero al sumar los días aparece.'
+        : 'Se nota más con los días juntos, como aquí.',
       nunca:
-        'Tiene sentido. Es un patrón difícil de notar porque ocurre distribuido a lo largo del mes.',
+        'Tú ya lo estabas haciendo. Solo que mirando un día no se veía; se notó al juntar el mes.',
     },
     follow: {
       question: '¿Qué crees que influye?',
@@ -206,8 +207,7 @@ function detectTrainingDeficit(signals: readonly DailySignals[], ctx: FindingsCt
     category: 'movimiento',
     confidence: pct,
     title: `Los días que entrenaste, entraste en déficit el ${pct}% de las veces.`,
-    explanation:
-      'Moverte y tus días en déficit aparecieron juntos más de lo esperado. Esto llamó mi atención.',
+    explanation: 'Moverte y tus días en déficit coincidieron seguido. Esto llamó mi atención.',
     metric: { value: `${deficitTrained.length} de ${trained.length}`, label: 'entrenamientos' },
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [
@@ -240,7 +240,7 @@ function detectWaterDeficit(signals: readonly DailySignals[], ctx: FindingsCtx):
     category: 'agua',
     confidence: pct,
     title: `Cuando llegaste a tu meta de agua, estuviste en déficit ${overlap.length} de ${goalDays.length} días.`,
-    explanation: 'Tu hidratación y tus días en déficit aparecieron juntos más de lo esperado.',
+    explanation: 'Tu hidratación y tus días en déficit coincidieron seguido.',
     metric: { value: `${overlap.length} de ${goalDays.length}`, label: 'días con tu meta de agua' },
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [

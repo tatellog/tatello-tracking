@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { colors, radius, shadows, typography } from '@/theme'
 
 import type { Finding, FindingCategory, FollowUp } from '../findings'
+import { ConfidenceBar } from './ConfidenceBar'
 import { InsightChart } from './InsightCharts'
 
 /*
@@ -78,10 +79,7 @@ export function FindingView({ finding, onSaveReflection, onNext }: Props) {
         </View>
         <Text style={styles.title}>{finding.title}</Text>
         <Text style={styles.explanation}>{finding.explanation}</Text>
-        <View style={styles.confidenceRow}>
-          <Text style={styles.confidenceLabel}>Confianza</Text>
-          <Text style={[styles.confidenceValue, { color: tint }]}>{finding.confidence}%</Text>
-        </View>
+        <ConfidenceBar confidence={finding.confidence} tint={tint} />
       </View>
 
       {/* ── Evidencia ── */}
@@ -274,15 +272,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.bone,
   },
-  confidenceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  confidenceLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  confidenceValue: { fontFamily: typography.displaySemi, fontSize: typography.sizes.headingLg },
   // ── Cards ──
   card: {
     backgroundColor: colors.bgCard,

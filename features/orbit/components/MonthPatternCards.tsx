@@ -90,7 +90,7 @@ function HeroCard({ finding, onPress }: { finding: Finding; onPress: () => void 
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Lo que más llamó mi atención. ${finding.title}. Entender este hallazgo.`}
+      accessibilityLabel={`Lo que más llamó mi atención. ${finding.title}. Quiero entenderlo.`}
       style={({ pressed }) => [
         styles.hero,
         { borderColor: `${tint}B3`, shadowColor: tint },
@@ -105,7 +105,7 @@ function HeroCard({ finding, onPress }: { finding: Finding; onPress: () => void 
       <Text style={styles.heroTitle}>{finding.title}</Text>
       <ConfidenceBar confidence={finding.confidence} tint={tint} />
       <View style={styles.heroCta}>
-        <Text style={[styles.heroCtaText, { color: tint }]}>Entender este hallazgo</Text>
+        <Text style={[styles.heroCtaText, { color: tint }]}>Quiero entenderlo</Text>
         <Text style={[styles.heroCtaArrow, { color: tint }]}>→</Text>
       </View>
     </Pressable>

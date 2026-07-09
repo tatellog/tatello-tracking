@@ -44,7 +44,7 @@ describe('buildFindings — hallazgos específicos con confianza y evidencia', (
   it('el hallazgo trae metacognición ramificada y profundizaciones', () => {
     const signals = month(20, (i) => ({ trained: i < 8, calories: i < 8 ? 1200 : 1600 }))
     const f = buildFindings(signals, CTX)[0]!
-    expect(f.metacognition.question).toBe('¿Lo habías notado?')
+    expect(f.metacognition.question).toBe('¿Esto ya lo sabías?')
     expect(f.metacognition.follow?.question).toBe('¿Qué crees que influye?')
     // Siempre termina en "otro patrón".
     expect(f.followUps.some((u) => u.kind === 'next')).toBe(true)
