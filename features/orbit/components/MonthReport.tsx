@@ -33,7 +33,10 @@ export function MonthReport({ cards, onPickFact }: Props) {
   const verdict = cards.find((c) => c.id === 'deficit-summary') ?? null
   const obstacles = cards.filter((c) => c.isObstacle)
   const levers = cards.filter((c) => !c.isObstacle && c.id !== 'deficit-summary')
-  const deficitCount = verdict?.metric.value.split(' ')[0] ?? null
+  // El conteo de días en déficit para el cierre ("ya tienes 13 días"). Se extrae
+  // del primer número de la métrica ("13 de 24"); match defensivo (si el formato
+  // cambia, cae al cierre genérico en vez de romperse).
+  const deficitCount = verdict?.metric.value.match(/^\d+/)?.[0] ?? null
 
   return (
     <View style={styles.wrap}>

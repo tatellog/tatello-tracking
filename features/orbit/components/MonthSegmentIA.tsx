@@ -15,7 +15,7 @@ import { type Finding, hashFindings } from '../findings'
 import { useSignalsHistory } from '../hooks'
 import { buildMonthChat } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
-import { usePriorReflections } from '../reflections'
+import { usePriorReflections, useSaveReflection } from '../reflections'
 
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthDiscoveryTeaser } from './MonthDiscoveryTeaser'
@@ -71,6 +71,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   // "Cerrar el loop": respuestas de meses anteriores → Stelar recuerda lo que
   // dijiste la última vez. Vacío en el primer mes (sin pasado, sin callbacks).
   const prior = usePriorReflections(month, uid).data
+  // Persistir la metacognición (month_reflections): la semilla de continuidad
+  // entre meses (R6). La pregunta hoy solo la hace el chat scripteado de la beta
+  // (FindingView); en el flujo IA está apagada por decisión de producto.
+  const saveReflection = useSaveReflection(month)
 
   const chat = useMemo(
     () =>
@@ -173,7 +177,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         findingsHash={findingsHash}
         askMetacognition={false}
         hasMore={false}
-        onSaveReflection={() => {}}
+        onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
         onNext={() => setOpenFinding(null)}
         onClose={() => setOpenFinding(null)}
         onPickDay={(date) => {
