@@ -47,9 +47,11 @@ import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit'
 // Detección por TIPO de entreno — lógica en _shared/intelligence (fuente de
 // verdad del motor); aquí solo se adapta a las tarjetas de Mes.
 import { workoutTypeDeficitSplit, workoutTypeMix, workoutTypeMixPhrase } from './workout-type'
+// Meta de agua diaria: fuente única en _shared/intelligence/water.ts (T2.2).
+import { WATER_GOAL_GLASSES } from './water'
 
-/** Vasos para considerar el agua "alcanzada" ese día (meta diaria). */
-export const WATER_GOAL_GLASSES = 8
+/** Re-export para compatibilidad: la meta de agua vive en _shared (./water). */
+export { WATER_GOAL_GLASSES }
 
 // Re-export para compatibilidad: la definición vive en ./deficit (fuente única
 // del "día en déficit", compartida por Día/Semana/Mes).
