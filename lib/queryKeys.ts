@@ -128,5 +128,9 @@ export const queryKeys = {
     // Voz de IA de Órbita Mes, cacheada POR HALLAZGO: la key lleva el hash de
     // los hallazgos → si no cambian, React Query no re-pide (cero red).
     aiMonthVoice: (uid: string, hash: string) => ['orbit', 'aiVoice', 'month', uid, hash] as const,
+    // Facts Engine (R1): los hechos de un periodo, leídos del writer (edge
+    // compute-facts) con fallback a compute-local. Key por (uid, periodo).
+    facts: (uid: string, period: string, periodStart: string, periodEnd: string) =>
+      ['orbit', 'facts', uid, period, periodStart, periodEnd] as const,
   },
 } as const
