@@ -72,19 +72,20 @@ export function buildMonthChat(
   if (!monthChatReady(signals)) return { ready: false, intro: [], cards: [] }
   const cards = buildFindings(signals, ctx, prior)
   if (cards.length === 0) return { ready: false, intro: [], cards: [] }
-  const n = cards.length
+  // Copy de PRIORIDAD (no "encontré 6 patrones"): 1 hallazgo principal + N
+  // observaciones. Comunica que la IA eligió lo importante, no listó todo.
+  const secondary = cards.length - 1
+  const secText =
+    secondary <= 0
+      ? ''
+      : secondary === 1
+        ? ' y 1 observación secundaria'
+        : ` y ${secondary} observaciones secundarias`
   return {
     ready: true,
     intro: [
-      { text: 'Vi tu mes.', tone: 'accent' },
-      {
-        text:
-          n === 1
-            ? 'Encontré 1 patrón que no era evidente.'
-            : `Encontré ${n} patrones que no eran evidentes.`,
-        tone: 'strong',
-      },
-      { text: 'Estos fueron los más fuertes.' },
+      { text: `Analicé tus últimos ${signals.length} días.`, tone: 'accent' },
+      { text: `Encontré 1 hallazgo principal${secText}.`, tone: 'strong' },
     ],
     cards,
   }

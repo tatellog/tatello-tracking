@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { colors, radius, typography } from '@/theme'
@@ -6,11 +7,14 @@ import type { Finding, FindingCategory } from '../findings'
 import { ConfidenceBar } from './ConfidenceBar'
 
 /*
- * Las TARJETAS de hallazgo de la antesala ("Pantalla 2") — cards tipo Apple, una
- * por patrón: ícono de dimensión + nombre, el hallazgo, barra de confianza, y
- * CTA "Explorar". Highlighted por sí solas (el fondo de Órbita Mes es un
- * degradado vino→negro): borde del color de la dimensión + glow + lavado
- * interior + barra de acento lateral. Con aire (Apple), no amontonadas.
+ * Pantalla 2 como SESIÓN DE DESCUBRIMIENTO (no dashboard): divulgación
+ * progresiva.
+ *   Nivel 1 · HERO: un solo hallazgo (el de mayor confianza) en una card
+ *     grande, "Lo que más llamó mi atención" + CTA "Entender este hallazgo".
+ *   Nivel 2 · "Otros hallazgos": 2-3 observaciones secundarias como filas.
+ *   Nivel 3 · "Ver todos": revela el resto.
+ * La IA parece que ELIGIÓ lo importante, no que listó resultados. Menos carga
+ * cognitiva, más narrativa.
  */
 
 type Props = {
@@ -36,108 +40,187 @@ const LABEL: Record<FindingCategory, string> = {
 }
 const tintFor = (c: FindingCategory) => TINT[c] ?? colors.magenta
 
+const SECONDARY_PEEK = 3
+
 export function MonthPatternCards({ cards, onPick }: Props) {
+  const [showAll, setShowAll] = useState(false)
   if (cards.length === 0) return null
+
+  const hero = cards[0]!
+  const rest = cards.slice(1)
+  const visible = showAll ? rest : rest.slice(0, SECONDARY_PEEK)
+
   return (
-    <View style={styles.stack}>
-      {cards.map((f) => (
-        <Card key={f.id} finding={f} onPress={() => onPick(f)} />
-      ))}
+    <View style={styles.wrap}>
+      <HeroCard finding={hero} onPress={() => onPick(hero)} />
+
+      {rest.length > 0 ? (
+        <View style={styles.secondary}>
+          <Text style={styles.secTitle}>Otros hallazgos</Text>
+          <View style={styles.rows}>
+            {visible.map((f, i) => (
+              <SecondaryRow
+                key={f.id}
+                finding={f}
+                isLast={i === visible.length - 1}
+                onPress={() => onPick(f)}
+              />
+            ))}
+          </View>
+          {!showAll && rest.length > SECONDARY_PEEK ? (
+            <Pressable
+              onPress={() => setShowAll(true)}
+              accessibilityRole="button"
+              style={styles.seeAll}
+            >
+              <Text style={styles.seeAllText}>Ver todos</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   )
 }
 
-function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
+/* ── Nivel 1 · Hero ──────────────────────────────────────────────────── */
+
+function HeroCard({ finding, onPress }: { finding: Finding; onPress: () => void }) {
   const tint = tintFor(finding.category)
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${LABEL[finding.category]}. ${finding.title}. Explorar.`}
+      accessibilityLabel={`Lo que más llamó mi atención. ${finding.title}. Entender este hallazgo.`}
       style={({ pressed }) => [
-        styles.card,
+        styles.hero,
         { borderColor: `${tint}B3`, shadowColor: tint },
-        pressed && styles.cardPressed,
+        pressed && styles.pressed,
       ]}
     >
-      {/* Lavado interior del color de la dimensión — "encendida". */}
       <View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, { backgroundColor: `${tint}12` }]}
       />
-
-      {/* Ícono de dimensión + nombre. */}
-      <View style={styles.head}>
-        <View style={[styles.icon, { backgroundColor: `${tint}26`, borderColor: `${tint}80` }]}>
-          <Text style={[styles.iconGlyph, { color: tint }]}>✦</Text>
-        </View>
-        <Text style={[styles.dimension, { color: tint }]}>
-          {LABEL[finding.category].toUpperCase()}
-        </Text>
-      </View>
-
-      {/* El hallazgo. */}
-      <Text style={styles.title}>{finding.title}</Text>
-
-      {/* Confianza. */}
+      <Text style={styles.heroEyebrow}>✦ LO QUE MÁS LLAMÓ MI ATENCIÓN</Text>
+      <Text style={styles.heroTitle}>{finding.title}</Text>
       <ConfidenceBar confidence={finding.confidence} tint={tint} />
-
-      {/* CTA. */}
-      <View style={styles.cta}>
-        <Text style={[styles.ctaText, { color: tint }]}>Explorar</Text>
-        <Text style={[styles.ctaArrow, { color: tint }]}>→</Text>
+      <View style={styles.heroCta}>
+        <Text style={[styles.heroCtaText, { color: tint }]}>Entender este hallazgo</Text>
+        <Text style={[styles.heroCtaArrow, { color: tint }]}>→</Text>
       </View>
     </Pressable>
   )
 }
 
+/* ── Nivel 2 · Otros hallazgos (filas) ───────────────────────────────── */
+
+function SecondaryRow({
+  finding,
+  isLast,
+  onPress,
+}: {
+  finding: Finding
+  isLast: boolean
+  onPress: () => void
+}) {
+  const tint = tintFor(finding.category)
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${LABEL[finding.category]}. ${finding.title}.`}
+      style={({ pressed }) => [styles.row, isLast && styles.rowLast, pressed && styles.pressed]}
+    >
+      <View style={[styles.bullet, { backgroundColor: tint }]} />
+      <Text style={styles.rowText} numberOfLines={2}>
+        {finding.title}
+      </Text>
+      <Text style={styles.rowChevron}>›</Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
-  stack: { gap: 14 },
-  card: {
+  wrap: { gap: 22 },
+  pressed: { opacity: 0.9 },
+  // ── Hero ──
+  hero: {
     backgroundColor: colors.bgCard2,
     borderRadius: radius.cardLg,
     borderWidth: 1.5,
-    padding: 20,
-    gap: 14,
+    padding: 22,
+    gap: 16,
     overflow: 'hidden',
     shadowOpacity: 0.5,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 8,
   },
-  cardPressed: { opacity: 0.92, transform: [{ scale: 0.99 }] },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  icon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconGlyph: { fontSize: typography.sizes.body },
-  dimension: {
+  heroEyebrow: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
+    fontSize: typography.sizes.tinyLabel,
     letterSpacing: 1.4,
+    color: colors.oroSoft,
   },
-  title: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.title,
-    lineHeight: 23,
+  heroTitle: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.displaySm,
+    lineHeight: 31,
     color: colors.leche,
   },
-  cta: {
+  heroCta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  heroCtaText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    letterSpacing: 0.3,
+  },
+  heroCtaArrow: { fontFamily: typography.ui, fontSize: typography.sizes.heading },
+  // ── Secundarios ──
+  secondary: { gap: 12 },
+  secTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginLeft: 2,
+  },
+  rows: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.cardLg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairlineSoft,
+    overflow: 'hidden',
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    marginTop: 2,
+    gap: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
   },
-  ctaText: {
+  rowLast: { borderBottomWidth: 0 },
+  bullet: { width: 7, height: 7, borderRadius: 3.5 },
+  rowText: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 19,
+    color: colors.leche,
+  },
+  rowChevron: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+  },
+  seeAll: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+  seeAllText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
+    color: colors.oroSoft,
   },
-  ctaArrow: { fontFamily: typography.ui, fontSize: typography.sizes.bodyLarge },
 })
