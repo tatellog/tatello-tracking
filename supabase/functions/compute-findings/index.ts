@@ -16,6 +16,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
 import { buildFindings } from '../_shared/intelligence/findings'
+import { buildHypotheses } from '../_shared/intelligence/hypothesis'
 import { buildStories } from '../_shared/intelligence/stories'
 
 const corsHeaders: Record<string, string> = {
@@ -105,8 +106,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
       buildPrior(reflRes.data, currentMonth),
     )
-    // Story Engine (F3) plegado: historias derivadas de los hallazgos.
+    // Story Engine (F3) + Hypothesis Engine (F4) plegados: derivados de los
+    // hallazgos (+ historias).
     const stories = buildStories(findings)
+    const hypotheses = buildHypotheses(findings, stories)
 
     // Persistir hallazgos (idempotente por unique(user, period, finding_id)):
     // columnas de consulta (R6) + payload con el Finding completo.
@@ -147,7 +150,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (sErr) console.error('compute-findings: stories upsert failed', sErr.message)
     }
 
-    return json({ findings, stories })
+    // Persistir hipótesis con INSERT ... ON CONFLICT DO NOTHING (ignoreDuplicates)
+    // para NO re-pisar el `status` que R5 haya mutado en una hipótesis en curso.
+    if (hypotheses.length > 0) {
+      const hypRows = hypotheses.map((h) => ({
+        user_id: userId,
+        period_type: period,
+        period_start: periodStart,
+        period_end: periodEnd,
+        hypothesis_id: h.id,
+        text: h.text,
+        confidence: h.confidence,
+        status: h.status,
+        source_finding_id: h.sourceFindingId ?? null,
+        source_story_id: h.sourceStoryId ?? null,
+      }))
+      const { error: hErr } = await supabase.from('hypotheses').upsert(hypRows, {
+        onConflict: 'user_id,period_type,period_start,period_end,hypothesis_id',
+        ignoreDuplicates: true,
+      })
+      if (hErr) console.error('compute-findings: hypotheses upsert failed', hErr.message)
+    }
+
+    return json({ findings, stories, hypotheses })
   } catch (err) {
     console.error('[compute-findings]', err instanceof Error ? err.message : String(err))
     return json({ error: 'No pudimos calcular tus hallazgos ahora.' }, 500)
