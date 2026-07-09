@@ -1,5 +1,23 @@
-import { buildFindings, hashFindings } from '../findings'
+import { buildFindings, hashFindings, rankFindings } from '../findings'
+import type { Finding } from '../engine-types'
 import { mkSig } from './signals.fixture'
+
+/** Finding mínimo para tests de ranking (rellena los campos requeridos). */
+const mkFinding = (o: Partial<Finding> & { id: string; confidence: number }): Finding => ({
+  category: 'deficit',
+  title: '',
+  subject: '',
+  phrase: { lead: '', support: '', caption: '' },
+  explanation: '',
+  metric: { value: '', label: '' },
+  evidenceDates: [],
+  evidenceTitle: '',
+  charts: [],
+  reflectionKey: o.id,
+  metacognition: { question: '', options: [], replies: {} },
+  followUps: [],
+  ...o,
+})
 
 const CTX = { calorieTarget: 1500, proteinTarget: 120 }
 
@@ -122,5 +140,28 @@ describe('hashFindings — llave de caché de la voz de IA por hallazgo', () => 
 
   it('vacío es estable', () => {
     expect(hashFindings([])).toBe(hashFindings([]))
+  })
+})
+
+describe('rankFindings — Ranking Engine (Engine 4)', () => {
+  it('veredicto ancla primero, obstáculos antes que palancas', () => {
+    const verdict = mkFinding({ id: 'deficit-summary', confidence: 50 })
+    const obstacle = mkFinding({ id: 'weekday-diet-break', confidence: 80, isObstacle: true })
+    const lever = mkFinding({ id: 'training-deficit', confidence: 70, northLink: 'x' })
+    const ranked = rankFindings([lever, obstacle, verdict])
+    expect(ranked[0]!.id).toBe('deficit-summary') // el norte ancla
+    expect(ranked[1]!.id).toBe('weekday-diet-break') // obstáculo antes que palanca
+    expect(ranked.map((f) => f.id)).toContain('training-deficit')
+  })
+
+  it('cap 4 y máx una palanca sin norte', () => {
+    const ranked = rankFindings([
+      mkFinding({ id: 'deficit-summary', confidence: 50 }),
+      mkFinding({ id: 'o1', confidence: 90, isObstacle: true }),
+      mkFinding({ id: 'o2', confidence: 85, isObstacle: true }),
+      mkFinding({ id: 'o3', confidence: 82, isObstacle: true }),
+      mkFinding({ id: 'weekday-calories', confidence: 100 }), // palanca sin norte
+    ])
+    expect(ranked.length).toBeLessThanOrEqual(4)
   })
 })

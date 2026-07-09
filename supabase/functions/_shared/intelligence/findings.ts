@@ -429,10 +429,45 @@ function buildFollowUps(f: Finding): FollowUp[] {
 const scoreOf = (f: Finding): number => f.confidence + (f.northLink ? 15 : 0)
 
 /**
- * Los hallazgos del mes para el REPORTE: el VEREDICTO (déficit sostenido) como
- * ancla, luego los OBSTÁCULOS ("dónde se te va" — lo invisible que frena el
- * mes, el valor real), y al final alguna palanca positiva. El reporte los
- * ordena: veredicto arriba, obstáculos en medio, cierre positivo abajo. Cap 4.
+ * Ranking Engine (R1 · Engine 4) — ordena y capa los hallazgos del reporte.
+ * Modelo v1: el VEREDICTO (déficit) es el ancla; luego los OBSTÁCULOS ("dónde se
+ * te va") por confianza; luego las PALANCAS por score (confianza + bonus si
+ * acerca al norte); cap 4; máx 1 palanca "sin norte" (ej. comer más un día).
+ *
+ * Mapa al Engine 4 del PRD: `confianza` [usada], `impacto` [proxy: bonus de
+ * norte]. `frecuencia`/`repetición`/`cantidad de evidencia` quedan para una v2
+ * (pesar `evidenceDates.length`) — no se tocan ahora para no mover el orden.
+ */
+export function rankFindings(findings: readonly Finding[]): Finding[] {
+  const verdict = findings.find((f) => f.id === 'deficit-summary')
+  const obstacles = findings
+    .filter((f) => f.isObstacle && f.confidence >= 55)
+    .sort((a, b) => b.confidence - a.confidence)
+  const levers = findings
+    .filter((f) => !f.isObstacle && f.id !== 'deficit-summary' && f.confidence >= 60)
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
+
+  const picked: Finding[] = verdict ? [verdict] : []
+  for (const f of obstacles) {
+    if (picked.length >= 4) break
+    picked.push(f)
+  }
+  let noNorth = 0
+  for (const f of levers) {
+    if (picked.length >= 4) break
+    if (!f.northLink) {
+      if (noNorth >= 1) continue // máx una palanca "sin norte"
+      noNorth++
+    }
+    picked.push(f)
+  }
+  return picked
+}
+
+/**
+ * Los hallazgos del mes para el REPORTE: corre los detectores, los rankea
+ * (rankFindings) y los enriquece (callback de continuidad + hipótesis de cruce
+ * + followUps). El orden final: veredicto arriba, obstáculos en medio, palancas.
  */
 export function buildFindings(
   signals: readonly DailySignals[],
@@ -447,31 +482,7 @@ export function buildFindings(
     detectDeficitSummary(signals, ctx),
   ].filter((f): f is Finding => f != null)
 
-  const verdict = all.find((f) => f.id === 'deficit-summary')
-  // Obstáculos primero (lo invisible que pediste entender); luego palancas.
-  const obstacles = all
-    .filter((f) => f.isObstacle && f.confidence >= 55)
-    .sort((a, b) => b.confidence - a.confidence)
-  const levers = all
-    .filter((f) => !f.isObstacle && f.id !== 'deficit-summary' && f.confidence >= 60)
-    .sort((a, b) => scoreOf(b) - scoreOf(a))
-
-  const picked: Finding[] = verdict ? [verdict] : []
-  for (const f of obstacles) {
-    if (picked.length >= 4) break
-    picked.push(f)
-  }
-  let noNorth = 0
-  for (const f of levers) {
-    if (picked.length >= 4) break
-    if (!f.northLink) {
-      if (noNorth >= 1) continue // máx una palanca "sin norte" (ej. comer más un día)
-      noNorth++
-    }
-    picked.push(f)
-  }
-
-  return picked.map((f) => ({
+  return rankFindings(all).map((f) => ({
     ...f,
     priorCallback: priorCallback(f.reflectionKey, prior),
     hypothesis: crossHypothesis(f.evidenceDates, signals, f.category) ?? undefined,
