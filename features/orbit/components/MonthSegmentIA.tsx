@@ -12,8 +12,9 @@ import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 import { useSignalsHistory } from '../hooks'
-import { buildMonthChat, type ChatTree, type PatternCard } from '../month-chat'
+import { buildMonthChat, type PatternCard } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
+import type { InsightDetail } from '../month-insight'
 import { usePriorReflections, useSaveReflection } from '../reflections'
 
 import { MonthChatSheet } from './MonthChatSheet'
@@ -72,16 +73,28 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
-  // La conversación se abre en su propia sala (sheet), desde la tarjeta de
-  // hallazgo. `open` = { árbol, etiqueta } | null.
-  const [open, setOpen] = useState<{ tree: ChatTree; label: string } | null>(null)
-  const openCard = (card: PatternCard) => setOpen({ tree: card.tree, label: card.label })
+  // El detalle guiado se abre en su sala (sheet) desde la tarjeta de hallazgo.
+  // `open` = { detalle, título } | null.
+  const [open, setOpen] = useState<{ detail: InsightDetail; title: string } | null>(null)
+  const openCard = (card: PatternCard) => setOpen({ detail: card.detail, title: card.label })
 
   // "Una sola cosa": se muestra UNA tarjeta a la vez; "Explorar otra" avanza a
   // la siguiente (opt-in, no un muro). Con 1 mes de datos, casi siempre 1.
   const [cardIdx, setCardIdx] = useState(0)
   const cards = chat.cards
   const currentCard = cards.length > 0 ? cards[cardIdx % cards.length] : null
+
+  // "Explorar otro hallazgo" desde el detalle: avanza a la siguiente tarjeta y
+  // abre su detalle (una lectura continua, sin volver al muro).
+  const exploreOther = () => {
+    if (cards.length <= 1) {
+      setOpen(null)
+      return
+    }
+    const next = (cardIdx + 1) % cards.length
+    setCardIdx(next)
+    setOpen({ detail: cards[next]!.detail, title: cards[next]!.label })
+  }
 
   // Apertura de la antesala: gancho corto determinista (el párrafo largo de IA
   // abrumaba · feedback dueña). El detalle vive dentro de la conversación.
@@ -152,11 +165,11 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
 
       {/* ── La sala: la conversación del tema elegido, full-screen. ── */}
       <MonthChatSheet
-        tree={open?.tree ?? null}
-        label={open?.label ?? ''}
+        detail={open?.detail ?? null}
+        title={open?.title ?? ''}
         sign={sign}
         onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
-        onOpenCalendar={() => setOpen(null)}
+        onExploreOther={exploreOther}
         onClose={() => setOpen(null)}
       />
     </Animated.View>

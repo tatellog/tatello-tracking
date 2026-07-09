@@ -11,6 +11,7 @@
  * IA (opcional, cacheada) reescribe el texto de las burbujas si el flag lo pide.
  */
 import { isDeficitDay } from './deficit'
+import { buildInsightDetail, type InsightDetail } from './month-insight'
 import {
   daysInDeficit,
   detectMonthPatterns,
@@ -69,19 +70,18 @@ export type TopicPicker = {
 }
 
 /** Una tarjeta de hallazgo en la antesala: el patrón que el motor detectó,
- *  mostrado con su evidencia a 0 taps. Al tocar "Ver más" abre su conversación
- *  (el `tree`). Es lo que vuelve la antesala "3 cosas que encontré este mes",
- *  no un menú de temas abstractos. */
+ *  mostrado con su evidencia a 0 taps. Al tocar "Ver más" abre su DETALLE
+ *  (lectura guiada estructurada, no chat). */
 export type PatternCard = {
   id: string
   /** Encabezado corto ("Tu sueño", "Los viernes"). */
   label: string
   /** El hallazgo con evidencia — la frase que se lee en la tarjeta. */
   finding: string
-  /** Dimensión para el ícono + tinte del avatar (sueno/agua/deficit/…). */
+  /** Dimensión para el tinte del borde (sueno/agua/deficit/…). */
   colorKey: string
-  /** La conversación guiada que abre la tarjeta. */
-  tree: ChatTree
+  /** El detalle estructurado (lectura guiada) que abre la tarjeta. */
+  detail: InsightDetail
 }
 
 export type MonthChat = {
@@ -448,7 +448,7 @@ export function buildMonthChat(
     label: p.label,
     finding: p.title,
     colorKey: p.evidence.bars[0]?.colorKey ?? 'deficit',
-    tree: buildPatternTree(p),
+    detail: buildInsightDetail(p, signals, ctx, prior),
   }))
 
   // "Sorpréndeme" = el patrón menos obvio (temporal antes que constancia) como
@@ -475,9 +475,9 @@ export function buildMonthChat(
     ],
   }
 
-  // Cerrar el loop: Stelar recuerda lo que dijiste la última vez, en temas y
-  // tarjetas por igual. Vacío en el primer mes (no hay pasado → sin callbacks).
-  applyPriorCallbacks([...Object.values(trees), ...cards.map((c) => c.tree)], prior)
+  // Cerrar el loop en los árboles de tema. En las tarjetas de hallazgo el
+  // callback ya lo inyecta buildInsightDetail (prior). Vacío en el primer mes.
+  applyPriorCallbacks(Object.values(trees), prior)
 
   return { ready: true, picker, trees, cards }
 }

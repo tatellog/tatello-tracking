@@ -15,8 +15,9 @@ import { SkyBackground } from '@/features/tabs/components'
 import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, radius, typography } from '@/theme'
 
-import type { ChatTree } from '../month-chat'
-import { MonthConversation, StelarStar } from './MonthChatView'
+import type { InsightDetail } from '../month-insight'
+import { InsightDetailView } from './InsightDetailView'
+import { StelarStar } from './MonthChatView'
 
 /*
  * La "sala" de Órbita Mes IA — el sheet full-screen donde vive UNA conversación
@@ -34,26 +35,26 @@ const CLOSE_DRAG = 120 // px arrastrados para descartar
 const CLOSE_VELOCITY = 900 // o velocidad de flick
 
 type Props = {
-  /** El árbol de conversación a abrir (de una tarjeta o de un chip); null = cerrado. */
-  tree: ChatTree | null
-  label: string
+  /** El detalle a abrir (de una tarjeta de hallazgo); null = cerrado. */
+  detail: InsightDetail | null
+  title: string
   sign: ZodiacSign | null
   onSaveReflection: (questionKey: string, answer: string) => void
-  onOpenCalendar: () => void
+  onExploreOther: () => void
   onClose: () => void
 }
 
 export function MonthChatSheet({
-  tree,
-  label,
+  detail,
+  title,
   sign,
   onSaveReflection,
-  onOpenCalendar,
+  onExploreOther,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets()
   const { progress } = useTransformProgress()
-  const open = tree != null
+  const open = detail != null
   const translateY = useSharedValue(0)
 
   // Al abrir, arranca asentado (la animación de entrada la da el Modal).
@@ -113,25 +114,24 @@ export function MonthChatSheet({
             <Text style={styles.closeGlyph}>✕</Text>
           </Pressable>
 
-          {tree ? (
+          {detail ? (
             <ScrollView
               contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
               showsVerticalScrollIndicator={false}
             >
-              {/* Cabecera de la sala: quién habla + de qué tema. */}
+              {/* Cabecera fija: título del insight + quién lee. */}
               <View style={styles.head}>
                 <StelarStar size={30} />
                 <View style={styles.headText}>
-                  <Text style={styles.headTopic}>{label}</Text>
-                  <Text style={styles.headWho}>Stelar · leyendo tu cielo</Text>
+                  <Text style={styles.headTopic}>{title}</Text>
+                  <Text style={styles.headWho}>Stelar · leyendo tu mes</Text>
                 </View>
               </View>
 
-              <MonthConversation
-                tree={tree}
+              <InsightDetailView
+                detail={detail}
                 onSaveReflection={onSaveReflection}
-                onOpenCalendar={onOpenCalendar}
-                onClose={onClose}
+                onExploreOther={onExploreOther}
               />
             </ScrollView>
           ) : null}
