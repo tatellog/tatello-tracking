@@ -81,8 +81,7 @@ export function StelarOrb({ size = 150 }: { size?: number }) {
   return (
     <Canvas style={{ width: size, height: size }}>
       <Group transform={transform} origin={center}>
-        {/* Bloom suave detrás — el aire de la esfera. */}
-        <Circle cx={size / 2} cy={size / 2} r={size * 0.46} color={colors.oroBloom} opacity={0.5} />
+        {/* Sin disco/halo detrás: solo el polvo estelar flotando. */}
         {BY_BUCKET.map((particles, b) => (
           <Bucket key={b} t={t} index={b} size={size} particles={particles} />
         ))}
