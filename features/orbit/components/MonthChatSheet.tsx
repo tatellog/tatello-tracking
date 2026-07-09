@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
@@ -18,6 +18,7 @@ import { colors, radius, typography } from '@/theme'
 import type { InsightDetail } from '../month-insight'
 import { InsightDetailView } from './InsightDetailView'
 import { StelarStar } from './MonthChatView'
+import { StelarOrb } from './StelarOrb'
 
 /*
  * La "sala" de Órbita Mes IA — el sheet full-screen donde vive UNA conversación
@@ -56,6 +57,16 @@ export function MonthChatSheet({
   const { progress } = useTransformProgress()
   const open = detail != null
   const translateY = useSharedValue(0)
+
+  // Momento "Leyendo tu mes…": al abrir, Stelar (el orbe de polvo estelar)
+  // recorre tu mes ~1.4s antes de revelar el hallazgo. Anticipación cálida.
+  const [reading, setReading] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    setReading(true)
+    const id = setTimeout(() => setReading(false), 1400)
+    return () => clearTimeout(id)
+  }, [open, detail?.id])
 
   // Al abrir, arranca asentado (la animación de entrada la da el Modal).
   useEffect(() => {
@@ -128,11 +139,18 @@ export function MonthChatSheet({
                 </View>
               </View>
 
-              <InsightDetailView
-                detail={detail}
-                onSaveReflection={onSaveReflection}
-                onExploreOther={onExploreOther}
-              />
+              {reading ? (
+                <View style={styles.reading}>
+                  <StelarOrb size={168} />
+                  <Text style={styles.readingText}>Leyendo tu mes…</Text>
+                </View>
+              ) : (
+                <InsightDetailView
+                  detail={detail}
+                  onSaveReflection={onSaveReflection}
+                  onExploreOther={onExploreOther}
+                />
+              )}
             </ScrollView>
           ) : null}
         </Animated.View>
@@ -177,6 +195,13 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
   },
   content: { paddingHorizontal: 22, paddingTop: 6, gap: 22 },
+  reading: { alignItems: 'center', justifyContent: 'center', paddingTop: 40, gap: 18 },
+  readingText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.oroSoft,
+  },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headText: { flex: 1 },
   headTopic: {
