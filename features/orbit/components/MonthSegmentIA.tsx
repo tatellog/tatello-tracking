@@ -170,6 +170,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
         onNext={nextFinding}
         onClose={() => setOpenFinding(null)}
+        onPickDay={(date) => {
+          setOpenFinding(null)
+          onPickDay?.(date)
+        }}
       />
     </Animated.View>
   )

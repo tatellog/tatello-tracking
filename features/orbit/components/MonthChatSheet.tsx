@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
@@ -16,8 +16,13 @@ import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, radius, typography } from '@/theme'
 
 import type { Finding } from '../findings'
+import { DiscoveryWave } from './DiscoveryWave'
 import { FindingView } from './FindingView'
 import { StelarStar } from './MonthChatView'
+
+/** Transición IA (~500ms) SOLO la 1ª vez de la sesión, saltable con un tap
+ *  (uxui: por-hallazgo cansa; ya hay 2 momentos de "pensar"). Flag de módulo. */
+let seenTransition = false
 
 /*
  * La "sala" de Órbita Mes IA — el sheet full-screen donde vive UNA conversación
@@ -42,18 +47,34 @@ type Props = {
   onSaveReflection: (questionKey: string, answer: string) => void
   onNext: () => void
   onClose: () => void
+  onPickDay?: (date: string) => void
 }
 
-export function MonthChatSheet({ finding, title, sign, onSaveReflection, onNext, onClose }: Props) {
+export function MonthChatSheet({
+  finding,
+  title,
+  sign,
+  onSaveReflection,
+  onNext,
+  onClose,
+  onPickDay,
+}: Props) {
   const insets = useSafeAreaInsets()
   const { progress } = useTransformProgress()
   const open = finding != null
   const translateY = useSharedValue(0)
 
-  // Al abrir, arranca asentado (la animación de entrada la da el Modal).
+  // Transición IA breve solo la 1ª vez de la sesión, saltable.
+  const [transitioning, setTransitioning] = useState(false)
   useEffect(() => {
-    if (open) translateY.value = 0
-  }, [open, translateY])
+    if (!open) return
+    translateY.value = 0
+    if (seenTransition) return
+    setTransitioning(true)
+    seenTransition = true
+    const id = setTimeout(() => setTransitioning(false), 500)
+    return () => clearTimeout(id)
+  }, [open, finding?.id, translateY])
 
   const pan = Gesture.Pan()
     .onUpdate((e) => {
@@ -107,7 +128,17 @@ export function MonthChatSheet({ finding, title, sign, onSaveReflection, onNext,
             <Text style={styles.closeGlyph}>✕</Text>
           </Pressable>
 
-          {finding ? (
+          {finding && transitioning ? (
+            <Pressable
+              onPress={() => setTransitioning(false)}
+              style={[styles.transition, { paddingTop: insets.top + 80 }]}
+            >
+              <DiscoveryWave width={200} />
+              <Text style={styles.transitionText}>Encontrando conexiones…</Text>
+            </Pressable>
+          ) : null}
+
+          {finding && !transitioning ? (
             <ScrollView
               contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
               showsVerticalScrollIndicator={false}
@@ -121,7 +152,12 @@ export function MonthChatSheet({ finding, title, sign, onSaveReflection, onNext,
                 </View>
               </View>
 
-              <FindingView finding={finding} onSaveReflection={onSaveReflection} onNext={onNext} />
+              <FindingView
+                finding={finding}
+                onSaveReflection={onSaveReflection}
+                onNext={onNext}
+                onPickDay={onPickDay}
+              />
             </ScrollView>
           ) : null}
         </Animated.View>
@@ -166,6 +202,13 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
   },
   content: { paddingHorizontal: 22, paddingTop: 6, gap: 22 },
+  transition: { flex: 1, alignItems: 'center', gap: 20 },
+  transitionText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.segmentTitle,
+    color: colors.oroSoft,
+  },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headText: { flex: 1 },
   headTopic: {

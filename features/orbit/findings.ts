@@ -49,6 +49,7 @@ export type Metacognition = {
 
 export type FollowUp =
   | { kind: 'observation'; label: string; text: string }
+  | { kind: 'days'; label: string; dates: string[] }
   | { kind: 'next'; label: string }
 
 export type Finding = {
@@ -60,8 +61,13 @@ export type Finding = {
   title: string
   /** Contexto corto de por qué vale la pena, sin recetar. */
   explanation: string
+  /** Conexión con su norte (déficit → objetivo), sin presión. undefined si el
+   *  hallazgo no acerca al objetivo (ej. comer más un día). */
+  northLink?: string
   /** Métrica de esquina ("18 de 21 entrenamientos"). */
   metric: { value: string; label: string }
+  /** Las fechas reales relevantes del hallazgo (para "Ver esos días"). */
+  evidenceDates: string[]
   evidenceTitle: string
   charts: Chart[]
   reflectionKey: string
@@ -172,6 +178,9 @@ function detectWeekdayCalories(signals: readonly DailySignals[]): Finding | null
     value: byWd[wd]!.length ? Math.round(mean(byWd[wd]!)) : 0,
     highlight: wd === bestWd,
   }))
+  const evidenceDates = rows
+    .filter((r) => weekday(r.day) === bestWd && r.calories > overall)
+    .map((r) => r.day)
 
   return {
     id: 'weekday-calories',
@@ -180,7 +189,9 @@ function detectWeekdayCalories(signals: readonly DailySignals[]): Finding | null
     title: `Los ${WD_PLURAL[bestWd]} consumiste ${Math.round(bestDelta)} kcal más que tu promedio.`,
     explanation:
       'Un día de la semana se repitió por encima del resto. No siempre se ve de un vistazo.',
+    // Sin northLink: comer más un día no acerca al objetivo (no lo maquillamos).
     metric: { value: `${above} de ${occ.length}`, label: `${WD_PLURAL[bestWd]} por encima` },
+    evidenceDates,
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [{ kind: 'weekdayBars', unit: 'kcal promedio', bars }],
     reflectionKey: 'weekday-calories',
@@ -201,6 +212,7 @@ function detectTrainingDeficit(signals: readonly DailySignals[], ctx: FindingsCt
   const dots = signals
     .filter((s) => s.trained === true)
     .map((s): 'on' | 'strong' => (isDeficitDay(s.calories, ctx.calorieTarget) ? 'strong' : 'on'))
+  const evidenceDates = deficitTrained.map((s) => s.day).filter((d): d is string => !!d)
 
   return {
     id: 'training-deficit',
@@ -208,7 +220,9 @@ function detectTrainingDeficit(signals: readonly DailySignals[], ctx: FindingsCt
     confidence: pct,
     title: `Los días que entrenaste, entraste en déficit el ${pct}% de las veces.`,
     explanation: 'Moverte y tus días en déficit coincidieron seguido. Esto llamó mi atención.',
+    northLink: 'Y esos fueron días que te acercaron a tu objetivo.',
     metric: { value: `${deficitTrained.length} de ${trained.length}`, label: 'entrenamientos' },
+    evidenceDates,
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [
       {
@@ -234,6 +248,7 @@ function detectWaterDeficit(signals: readonly DailySignals[], ctx: FindingsCtx):
   const dots = goalDays.map((s): 'on' | 'strong' =>
     isDeficitDay(s.calories, ctx.calorieTarget) ? 'strong' : 'on',
   )
+  const evidenceDates = overlap.map((s) => s.day).filter((d): d is string => !!d)
 
   return {
     id: 'water-deficit',
@@ -241,7 +256,9 @@ function detectWaterDeficit(signals: readonly DailySignals[], ctx: FindingsCtx):
     confidence: pct,
     title: `Cuando llegaste a tu meta de agua, estuviste en déficit ${overlap.length} de ${goalDays.length} días.`,
     explanation: 'Tu hidratación y tus días en déficit coincidieron seguido.',
+    northLink: 'Varios de esos días también te acercaron a tu objetivo.',
     metric: { value: `${overlap.length} de ${goalDays.length}`, label: 'días con tu meta de agua' },
+    evidenceDates,
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [
       {
@@ -271,6 +288,10 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
     if (run > streak) streak = run
   }
   const pct = Math.round((count / withCal.length) * 100)
+  const evidenceDates = withCal
+    .filter((s, i) => flags[i])
+    .map((s) => s.day)
+    .filter((d): d is string => !!d)
 
   return {
     id: 'deficit-summary',
@@ -278,7 +299,9 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
     confidence: pct,
     title: `Estuviste en déficit ${count} de ${withCal.length} días con comida registrada.`,
     explanation: 'Tu norte del mes. Aquí está sin adornos.',
+    northLink: 'Cada uno de esos días te acercó a tu objetivo.',
     metric: { value: `${streak} días`, label: 'tu tramo seguido más largo' },
+    evidenceDates,
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [
       {
@@ -295,6 +318,25 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
 
 /* ── Profundizaciones (followUps) compartidas ────────────────────────── */
 
+/** Entre las fechas del hallazgo, qué OTRA dimensión coincidió más (cruce
+ *  determinístico, no IA · nunca inventa: solo cuenta coincidencias reales). */
+function crossConnection(
+  dates: readonly string[],
+  signals: readonly DailySignals[],
+): string | null {
+  if (dates.length < 2) return null
+  const set = new Set(dates)
+  const rows = signals.filter((s) => s.day && set.has(s.day))
+  const trained = rows.filter((s) => s.trained === true).length
+  const slept = rows.filter((s) => (s.sleep_minutes ?? 0) >= SLEEP_ENOUGH).length
+  const options: { count: number; text: string }[] = [
+    { count: trained, text: `En ${trained} de esos días también entrenaste.` },
+    { count: slept, text: `En ${slept} de esos días también dormiste 7 horas o más.` },
+  ]
+  const best = options.filter((o) => o.count >= 2).sort((a, b) => b.count - a.count)[0]
+  return best ? best.text : null
+}
+
 function buildFollowUps(
   f: Finding,
   signals: readonly DailySignals[],
@@ -302,57 +344,19 @@ function buildFollowUps(
 ): FollowUp[] {
   const ups: FollowUp[] = []
 
-  // ¿Cuándo ocurrió? — el día de la semana dominante de la categoría.
-  const pred = presenceFor(f.category, ctx)
-  const byWd = new Array(7).fill(0)
-  for (const s of signals) if (s.day && pred(s)) byWd[weekday(s.day)]++
-  const topWd = byWd.indexOf(Math.max(...byWd))
-  if (byWd[topWd] > 0) {
-    ups.push({
-      kind: 'observation',
-      label: '¿Cuándo ocurrió?',
-      text: `En tus registros, esto apareció más los ${WD_PLURAL[topWd]}.`,
-    })
+  // Ver esos días — las fechas reales (tap abre el Día).
+  if (f.evidenceDates.length > 0) {
+    ups.push({ kind: 'days', label: 'Ver esos días', dates: f.evidenceDates })
   }
 
-  // ¿Con qué se relaciona? — cruce con déficit (si no es el hallazgo de déficit).
-  if (f.category !== 'deficit') {
-    let overlap = 0
-    let base = 0
-    for (const s of signals) {
-      if (s.day && pred(s)) {
-        base++
-        if (isDeficitDay(s.calories, ctx.calorieTarget)) overlap++
-      }
-    }
-    if (overlap > 0) {
-      ups.push({
-        kind: 'observation',
-        label: '¿Con qué se relaciona?',
-        text: `En ${overlap} de esos ${base} días también estuviste en déficit. Esto llamó mi atención.`,
-      })
-    }
+  // ¿Se repitió con algo más? — cruce cross-dimensión (determinístico).
+  const cross = crossConnection(f.evidenceDates, signals)
+  if (cross) {
+    ups.push({ kind: 'observation', label: '¿Se repitió con algo más?', text: cross })
   }
 
-  ups.push({ kind: 'next', label: 'Muéstrame otro patrón' })
+  ups.push({ kind: 'next', label: 'Ver otro hallazgo' })
   return ups
-}
-
-function presenceFor(category: FindingCategory, ctx: FindingsCtx): (s: DailySignals) => boolean {
-  switch (category) {
-    case 'movimiento':
-      return (s) => s.trained === true
-    case 'sueno':
-      return (s) => (s.sleep_minutes ?? 0) >= SLEEP_ENOUGH
-    case 'agua':
-      return (s) => (s.water_glasses ?? 0) >= WATER_GOAL_GLASSES
-    case 'proteina':
-      return (s) => ctx.proteinTarget != null && (s.protein_g ?? 0) >= ctx.proteinTarget
-    case 'deficit':
-      return (s) => isDeficitDay(s.calories, ctx.calorieTarget)
-    case 'alimentacion':
-      return (s) => s.calories != null && s.calories > 0
-  }
 }
 
 /* ── Ensamblado ──────────────────────────────────────────────────────── */

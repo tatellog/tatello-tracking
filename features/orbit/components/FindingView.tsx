@@ -23,7 +23,14 @@ type Props = {
   finding: Finding
   onSaveReflection: (questionKey: string, answer: string) => void
   onNext: () => void
+  /** Abre el Día de una fecha (desde "Ver esos días"). */
+  onPickDay?: (date: string) => void
 }
+
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+/** 'YYYY-MM-DD' → "3 jul". */
+const fmtDate = (d: string): string =>
+  `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5, 7)) - 1] ?? ''}`
 
 const TINT: Record<FindingCategory, string> = {
   deficit: colors.magenta,
@@ -34,7 +41,7 @@ const TINT: Record<FindingCategory, string> = {
   alimentacion: colors.dimension.alimento,
 }
 
-export function FindingView({ finding, onSaveReflection, onNext }: Props) {
+export function FindingView({ finding, onSaveReflection, onNext, onPickDay }: Props) {
   const tint = TINT[finding.category] ?? colors.magenta
   // Revelado escalonado: 0 hero · 1 +evidencia · 2 +metacognición.
   const [step, setStep] = useState(0)
@@ -79,6 +86,9 @@ export function FindingView({ finding, onSaveReflection, onNext }: Props) {
         </View>
         <Text style={styles.title}>{finding.title}</Text>
         <Text style={styles.explanation}>{finding.explanation}</Text>
+        {finding.northLink ? (
+          <Text style={[styles.northLink, { color: tint }]}>{finding.northLink}</Text>
+        ) : null}
         <ConfidenceBar confidence={finding.confidence} tint={tint} />
       </View>
 
@@ -131,6 +141,7 @@ export function FindingView({ finding, onSaveReflection, onNext }: Props) {
                 item={f}
                 open={openObs === f.label}
                 tint={tint}
+                onPickDay={onPickDay}
                 onPress={() => {
                   if (f.kind === 'next') onNext()
                   else setOpenObs((o) => (o === f.label ? null : f.label))
@@ -188,11 +199,13 @@ function FollowUpRow({
   item,
   open,
   tint,
+  onPickDay,
   onPress,
 }: {
   item: FollowUp
   open: boolean
   tint: string
+  onPickDay?: (date: string) => void
   onPress: () => void
 }) {
   const isNext = item.kind === 'next'
@@ -217,6 +230,25 @@ function FollowUpRow({
         <Animated.Text entering={FadeIn.duration(240)} style={styles.observation}>
           {item.text}
         </Animated.Text>
+      ) : null}
+      {open && item.kind === 'days' ? (
+        <Animated.View entering={FadeIn.duration(240)} style={styles.dayChips}>
+          {item.dates.map((d) => (
+            <Pressable
+              key={d}
+              onPress={() => onPickDay?.(d)}
+              accessibilityRole="button"
+              accessibilityLabel={`Abrir ${fmtDate(d)}`}
+              style={({ pressed }) => [
+                styles.dayChip,
+                { borderColor: `${tint}66` },
+                pressed && styles.followPressed,
+              ]}
+            >
+              <Text style={[styles.dayChipText, { color: tint }]}>{fmtDate(d)}</Text>
+            </Pressable>
+          ))}
+        </Animated.View>
       ) : null}
     </View>
   )
@@ -271,6 +303,30 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 21,
     color: colors.bone,
+  },
+  northLink: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 20,
+  },
+  dayChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+  },
+  dayChip: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+  },
+  dayChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.2,
   },
   // ── Cards ──
   card: {
