@@ -7,25 +7,24 @@ import { colors, typography } from '@/theme'
 import { DiscoveryWave } from './DiscoveryWave'
 
 /*
- * MonthReading — "Pantalla 1": Stelar leyendo tu mes antes de mostrar los
- * hallazgos. La onda dorada + un texto que cicla ("Leyendo tu mes…" →
- * "Analizando N días…" → "Encontrando relaciones…"). Dura ~3.5s y luego revela
- * los patrones. Mientras, el motor ya los tiene.
+ * MonthReading — "Pantalla 1": Stelar juntando tus días antes de mostrar los
+ * hallazgos. PROMESA HONESTA: el motor es determinístico (lee lo que se repitió
+ * en TUS días), no una IA que "analiza profundo". Antes el copy ("Analizando…
+ * Encontrando relaciones…") sobre-prometía y el payoff se sentía fraude. Ahora
+ * dice lo que de verdad hace, en 2 beats cortos (~2.2s).
  */
 
-const STEP_MS = 1150
+const STEP_MS = 1050
 
 export function MonthReading({ days, onDone }: { days: number; onDone: () => void }) {
-  const lines = ['Leyendo tu mes…', `Analizando ${days} días…`, 'Encontrando relaciones…']
+  const lines = [`Junté tus últimos ${days} días…`, 'Esto es lo que se repitió.']
   const [step, setStep] = useState(0)
 
   useEffect(() => {
     const t1 = setTimeout(() => setStep(1), STEP_MS)
-    const t2 = setTimeout(() => setStep(2), STEP_MS * 2)
-    const done = setTimeout(onDone, STEP_MS * 3 + 150)
+    const done = setTimeout(onDone, STEP_MS * 2 + 150)
     return () => {
       clearTimeout(t1)
-      clearTimeout(t2)
       clearTimeout(done)
     }
   }, [onDone])

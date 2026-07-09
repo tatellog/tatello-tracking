@@ -72,17 +72,12 @@ export function buildMonthChat(
   if (!monthChatReady(signals)) return { ready: false, intro: [], cards: [] }
   const cards = buildFindings(signals, ctx, prior)
   if (cards.length === 0) return { ready: false, intro: [], cards: [] }
-  // Copy de PRIORIDAD (no "encontré 6 patrones"): 1 hallazgo principal + N
-  // observaciones. Comunica que la IA eligió lo importante, no listó todo.
-  const secondary = cards.length - 1
-  const secText =
-    secondary <= 0 ? '' : ` · ${secondary} ${secondary === 1 ? 'observación' : 'observaciones'}`
+  // Gancho de UNA línea que ancla en SUS datos (da confianza). Sin contar
+  // hallazgos: el tally imponía la jerarquía hero/secundaria que quitamos, y
+  // "1 hallazgo principal · N observaciones" sonaba a reporte.
   return {
     ready: true,
-    intro: [
-      { text: `Analicé tus últimos ${signals.length} días.`, tone: 'accent' },
-      { text: `1 hallazgo principal${secText}`, tone: 'strong' },
-    ],
+    intro: [{ text: `Esto es lo que vi en tus últimos ${signals.length} días.`, tone: 'accent' }],
     cards,
   }
 }

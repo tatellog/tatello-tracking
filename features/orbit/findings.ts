@@ -59,6 +59,16 @@ export type Finding = {
   confidence: number
   /** El hallazgo, específico y con números. */
   title: string
+  /** El contenido de la card-constelación en 3 niveles: `lead` = la LECTURA /
+   *  palanca (Cormorant italic, voz del coach · el VALOR, no la coincidencia),
+   *  `support` = la evidencia con números (Hanken), `caption` = la
+   *  metacognición ("día a día no se ve; junto sí" · el diferenciador de Stelar,
+   *  hoy visible en la card, no escondido tras "Entender"). El italic jamás es
+   *  número crudo ni culpa. */
+  phrase: { lead: string; support: string; caption: string }
+  /** Muestra chica (pocas ocurrencias): se muestra como "Señal naciente" —
+   *  tentativa, sin sello de consistencia lleno. Honestidad sobre el N. */
+  emerging?: boolean
   /** Contexto corto de por qué vale la pena, sin recetar. */
   explanation: string
   /** Conexión con su norte (déficit → objetivo), sin presión. undefined si el
@@ -184,6 +194,11 @@ function detectWeekdayCalories(signals: readonly DailySignals[]): Finding | null
     category: 'alimentacion',
     confidence,
     title: `Los ${WD_PLURAL[bestWd]} consumiste ${Math.round(bestDelta)} kcal más que tu promedio.`,
+    phrase: {
+      lead: `Los ${WD_PLURAL[bestWd]}, tu cuerpo pidió un poco más.`,
+      support: `${Math.round(bestDelta)} kcal por encima de tu promedio.`,
+      caption: 'No es un problema; es un ritmo tuyo que ahora ves.',
+    },
     explanation:
       'Un día de la semana se repitió por encima del resto. No siempre se ve de un vistazo.',
     // Sin northLink: comer más un día no acerca al objetivo (no lo maquillamos).
@@ -210,12 +225,23 @@ function detectTrainingDeficit(signals: readonly DailySignals[], ctx: FindingsCt
     .filter((s) => s.trained === true)
     .map((s): 'on' | 'strong' => (isDeficitDay(s.calories, ctx.calorieTarget) ? 'strong' : 'on'))
   const evidenceDates = deficitTrained.map((s) => s.day).filter((d): d is string => !!d)
+  const emerging = trained.length < 5 // pocas ocurrencias → señal naciente, no sello
 
   return {
     id: 'training-deficit',
     category: 'movimiento',
     confidence: pct,
+    emerging,
     title: `Los días que entrenaste, entraste en déficit el ${pct}% de las veces.`,
+    phrase: {
+      lead: 'Moverte y tu déficit fueron casi siempre juntos.',
+      support: emerging
+        ? `Pasó en ${deficitTrained.length} de tus ${trained.length} entrenamientos, pero son pocos días.`
+        : `${deficitTrained.length} de tus ${trained.length} entrenamientos cayeron en déficit.`,
+      caption: emerging
+        ? 'Lo sigo mirando. Con más días se confirma o se cae.'
+        : 'Tú ya lo hacías; en un solo día no se veía.',
+    },
     explanation: 'Moverte y tus días en déficit coincidieron seguido. Esto llamó mi atención.',
     northLink: 'Y esos fueron días que te acercaron a tu objetivo.',
     metric: { value: `${deficitTrained.length} de ${trained.length}`, label: 'entrenamientos' },
@@ -246,12 +272,23 @@ function detectWaterDeficit(signals: readonly DailySignals[], ctx: FindingsCtx):
     isDeficitDay(s.calories, ctx.calorieTarget) ? 'strong' : 'on',
   )
   const evidenceDates = overlap.map((s) => s.day).filter((d): d is string => !!d)
+  const emerging = goalDays.length < 5 // pocas ocurrencias → señal naciente, no sello
 
   return {
     id: 'water-deficit',
     category: 'agua',
     confidence: pct,
+    emerging,
     title: `Cuando llegaste a tu meta de agua, estuviste en déficit ${overlap.length} de ${goalDays.length} días.`,
+    phrase: {
+      lead: 'Los días que llegaste a tu agua, sostuviste el déficit.',
+      support: emerging
+        ? `Pasó en ${overlap.length} de esos ${goalDays.length} días, pero son pocos días.`
+        : `Pasó en ${overlap.length} de esos ${goalDays.length} días.`,
+      caption: emerging
+        ? 'Lo sigo mirando. Con más días se confirma o se cae.'
+        : 'Día a día no se nota; al juntar el mes, aparece.',
+    },
     explanation: 'Tu hidratación y tus días en déficit coincidieron seguido.',
     northLink: 'Varios de esos días también te acercaron a tu objetivo.',
     metric: { value: `${overlap.length} de ${goalDays.length}`, label: 'días con tu meta de agua' },
@@ -278,26 +315,34 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
   const flags = withCal.map((s) => isDeficitDay(s.calories, ctx.calorieTarget))
   const count = flags.filter(Boolean).length
   if (count === 0) return null
-  let streak = 0
-  let run = 0
-  for (const on of flags) {
-    run = on ? run + 1 : 0
-    if (run > streak) streak = run
-  }
   const pct = Math.round((count / withCal.length) * 100)
   const evidenceDates = withCal
     .filter((s, i) => flags[i])
     .map((s) => s.day)
     .filter((d): d is string => !!d)
 
+  // Veredicto de dirección (responde "¿voy bien?" de una mirada), sin culpa: con
+  // pocos días en déficit no regaña, dice que apenas toma forma.
+  const lead =
+    pct >= 60
+      ? 'Vas en buena dirección.'
+      : pct >= 40
+        ? 'Vas sumando tus días.'
+        : 'Tu mes apenas toma forma.'
+
   return {
     id: 'deficit-summary',
     category: 'deficit',
     confidence: pct,
     title: `Estuviste en déficit ${count} de ${withCal.length} días con comida registrada.`,
+    phrase: {
+      lead,
+      support: `Déficit ${count} de ${withCal.length} días con comida registrada.`,
+      caption: 'Un día no lo dice; el mes junto sí.',
+    },
     explanation: 'Tu norte del mes. Aquí está sin adornos.',
     northLink: 'Cada uno de esos días te acercó a tu objetivo.',
-    metric: { value: `${streak} días`, label: 'tu tramo seguido más largo' },
+    metric: { value: `${count} de ${withCal.length}`, label: 'días en déficit' },
     evidenceDates,
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [
@@ -388,7 +433,9 @@ export function buildFindings(
     }
     picked.push(f)
   }
-  picked.sort((a, b) => scoreOf(b) - scoreOf(a))
+  // NO re-ordenar: el ancla (déficit = el norte) queda en índice 0 como hero, y
+  // el resto conserva su orden por score. El re-sort anterior dejaba que una
+  // coincidencia de N chico con 100% (falso-preciso) robara el titular al norte.
 
   return picked.map((f) => ({
     ...f,

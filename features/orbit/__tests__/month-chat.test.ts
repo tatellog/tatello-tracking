@@ -36,11 +36,11 @@ describe('buildMonthChat', () => {
     expect(chat.intro).toEqual([])
   })
 
-  it('con datos: apertura de prioridad (analicé N días · 1 principal + secundarias)', () => {
+  it('con datos: apertura de UNA línea que ancla en sus días (sin tally)', () => {
     const chat = buildMonthChat(activeMonth(20), CTX)
     expect(chat.ready).toBe(true)
-    expect(chat.intro[0]!.text).toMatch(/Analicé tus últimos \d+ días/)
-    expect(chat.intro[1]!.text).toMatch(/1 hallazgo principal/)
+    expect(chat.intro).toHaveLength(1)
+    expect(chat.intro[0]!.text).toMatch(/Esto es lo que vi en tus últimos \d+ días/)
     expect(chat.cards.length).toBeGreaterThan(0)
     for (const f of chat.cards) {
       expect(f.title.length).toBeGreaterThan(0)

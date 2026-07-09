@@ -16,8 +16,20 @@ function tier(confidence: number): { dots: boolean[]; word: string } {
   return { dots: [true, false, false], word: 'Apareció varias veces' }
 }
 
-export function ConfidenceBar({ confidence, tint }: { confidence: number; tint: string }) {
-  const { dots, word } = tier(confidence)
+export function ConfidenceBar({
+  confidence,
+  tint,
+  emerging = false,
+}: {
+  confidence: number
+  tint: string
+  /** Muestra chica: honestidad sobre el N. Un solo punto + "Señal naciente",
+   *  sin importar el %, para no vender un 100% de 4 días como "muy consistente". */
+  emerging?: boolean
+}) {
+  const { dots, word } = emerging
+    ? { dots: [true, false, false], word: 'Apenas asoma' }
+    : tier(confidence)
   return (
     <View style={styles.wrap}>
       <View style={styles.dots}>
