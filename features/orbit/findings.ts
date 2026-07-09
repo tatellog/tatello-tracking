@@ -64,6 +64,9 @@ export type Finding = {
   /** Conexión con su norte (déficit → objetivo), sin presión. undefined si el
    *  hallazgo no acerca al objetivo (ej. comer más un día). */
   northLink?: string
+  /** La HIPÓTESIS de Stelar: otra dimensión que coincidió en esos días
+   *  (determinística, tentativa, sin causalidad). undefined si no hay cruce. */
+  hypothesis?: string
   /** Métrica de esquina ("18 de 21 entrenamientos"). */
   metric: { value: string; label: string }
   /** Las fechas reales relevantes del hallazgo (para "Ver esos días"). */
@@ -133,14 +136,8 @@ function standardMetacognition(distributed: boolean): Metacognition {
       nunca:
         'Tú ya lo estabas haciendo. Solo que mirando un día no se veía; se notó al juntar el mes.',
     },
-    follow: {
-      question: '¿Qué crees que influye?',
-      options: [
-        { label: 'Mis horarios', answer: 'horarios' },
-        { label: 'Mi trabajo', answer: 'trabajo' },
-        { label: 'No estoy segura', answer: 'no-segura' },
-      ],
-    },
+    // Sin `follow`: la encuesta "¿qué crees que influye?" le pasaba el trabajo a
+    // la usuaria. Ahora la hipótesis la arriesga Stelar (ver `hypothesis`).
   }
 }
 
@@ -161,14 +158,14 @@ function detectWeekdayCalories(signals: readonly DailySignals[]): Finding | null
   let bestDelta = 0
   for (let wd = 0; wd < 7; wd++) {
     const occ = byWd[wd]!
-    if (occ.length < 2) continue
+    if (occ.length < 3) continue // muestra real: ≥3 de ese día
     const delta = mean(occ) - overall
     if (delta > bestDelta) {
       bestDelta = delta
       bestWd = wd
     }
   }
-  if (bestWd < 0 || bestDelta < 150) return null
+  if (bestWd < 0 || bestDelta < 200) return null // delta con peso
 
   const occ = byWd[bestWd]!
   const above = occ.filter((c) => c > overall).length
@@ -318,67 +315,85 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
 
 /* ── Profundizaciones (followUps) compartidas ────────────────────────── */
 
-/** Entre las fechas del hallazgo, qué OTRA dimensión coincidió más (cruce
- *  determinístico, no IA · nunca inventa: solo cuenta coincidencias reales). */
-function crossConnection(
+/** La HIPÓTESIS de Stelar: entre las fechas del hallazgo, qué OTRA dimensión
+ *  coincidió más. Determinística (cuenta coincidencias REALES, nunca inventa) y
+ *  TENTATIVA (nota los dos hechos juntos, NUNCA afirma causa · manifiesto). La
+ *  arriesga Stelar en vez de pasarle a la usuaria un cuestionario. */
+function crossHypothesis(
   dates: readonly string[],
   signals: readonly DailySignals[],
+  category: FindingCategory,
 ): string | null {
   if (dates.length < 2) return null
   const set = new Set(dates)
   const rows = signals.filter((s) => s.day && set.has(s.day))
-  const trained = rows.filter((s) => s.trained === true).length
-  const slept = rows.filter((s) => (s.sleep_minutes ?? 0) >= SLEEP_ENOUGH).length
-  const options: { count: number; text: string }[] = [
-    { count: trained, text: `En ${trained} de esos días también entrenaste.` },
-    { count: slept, text: `En ${slept} de esos días también dormiste 7 horas o más.` },
-  ]
+  const options: { count: number; text: string }[] = []
+  if (category !== 'movimiento') {
+    const trained = rows.filter((s) => s.trained === true).length
+    options.push({ count: trained, text: `en ${trained} de esos días también entrenaste` })
+  }
+  if (category !== 'sueno') {
+    const slept = rows.filter((s) => (s.sleep_minutes ?? 0) >= SLEEP_ENOUGH).length
+    options.push({ count: slept, text: `en ${slept} de esos días también dormiste 7 horas o más` })
+  }
   const best = options.filter((o) => o.count >= 2).sort((a, b) => b.count - a.count)[0]
-  return best ? best.text : null
+  return best ? `Me llamó algo más: ${best.text}. No sé si va junto, pero ahí están los dos.` : null
 }
 
-function buildFollowUps(
-  f: Finding,
-  signals: readonly DailySignals[],
-  ctx: FindingsCtx,
-): FollowUp[] {
+/** Cierre del chat: ver esos días (fechas → abre el Día) + siguiente hallazgo. */
+function buildFollowUps(f: Finding): FollowUp[] {
   const ups: FollowUp[] = []
-
-  // Ver esos días — las fechas reales (tap abre el Día).
   if (f.evidenceDates.length > 0) {
     ups.push({ kind: 'days', label: 'Ver esos días', dates: f.evidenceDates })
   }
-
-  // ¿Se repitió con algo más? — cruce cross-dimensión (determinístico).
-  const cross = crossConnection(f.evidenceDates, signals)
-  if (cross) {
-    ups.push({ kind: 'observation', label: '¿Se repitió con algo más?', text: cross })
-  }
-
   ups.push({ kind: 'next', label: 'Ver otro hallazgo' })
   return ups
 }
 
 /* ── Ensamblado ──────────────────────────────────────────────────────── */
 
-/** Todos los hallazgos del mes, ordenados por confianza (el más sólido primero). */
+/** Score: confianza + bonus si acerca al norte (déficit→objetivo). */
+const scoreOf = (f: Finding): number => f.confidence + (f.northLink ? 15 : 0)
+
+/**
+ * Los hallazgos del mes: SOLO 2-3 que TENGAN SENTIDO (no un listado). El de
+ * déficit (el norte) es ancla si existe; el resto se filtra por confianza ≥ 60
+ * y se rankea por score; máx 1 hallazgo "sin norte" (ej. comer más un día).
+ * Cap 3, ordenados por score (el mejor es el hero).
+ */
 export function buildFindings(
   signals: readonly DailySignals[],
   ctx: FindingsCtx = {},
   prior: PriorReflections = {},
 ): Finding[] {
-  const raw = [
+  const all = [
     detectWeekdayCalories(signals),
     detectTrainingDeficit(signals, ctx),
     detectWaterDeficit(signals, ctx),
     detectDeficitSummary(signals, ctx),
   ].filter((f): f is Finding => f != null)
 
-  raw.sort((a, b) => b.confidence - a.confidence)
+  const anchor = all.find((f) => f.id === 'deficit-summary')
+  const rest = all
+    .filter((f) => f.id !== 'deficit-summary' && f.confidence >= 60)
+    .sort((a, b) => scoreOf(b) - scoreOf(a))
 
-  return raw.map((f) => ({
+  const picked: Finding[] = anchor ? [anchor] : []
+  let noNorth = 0
+  for (const f of rest) {
+    if (picked.length >= 3) break
+    if (!f.northLink) {
+      if (noNorth >= 1) continue // máx un hallazgo sin norte
+      noNorth++
+    }
+    picked.push(f)
+  }
+  picked.sort((a, b) => scoreOf(b) - scoreOf(a))
+
+  return picked.map((f) => ({
     ...f,
     priorCallback: priorCallback(f.reflectionKey, prior),
-    followUps: buildFollowUps(f, signals, ctx),
+    hypothesis: crossHypothesis(f.evidenceDates, signals, f.category) ?? undefined,
+    followUps: buildFollowUps(f),
   }))
 }

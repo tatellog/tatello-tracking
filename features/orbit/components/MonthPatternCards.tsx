@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { colors, radius, typography } from '@/theme'
@@ -40,15 +39,11 @@ const LABEL: Record<FindingCategory, string> = {
 }
 const tintFor = (c: FindingCategory) => TINT[c] ?? colors.magenta
 
-const SECONDARY_PEEK = 3
-
 export function MonthPatternCards({ cards, onPick }: Props) {
-  const [showAll, setShowAll] = useState(false)
   if (cards.length === 0) return null
 
   const hero = cards[0]!
-  const rest = cards.slice(1)
-  const visible = showAll ? rest : rest.slice(0, SECONDARY_PEEK)
+  const rest = cards.slice(1) // el motor ya capa a 2-3 con sentido; sin "ver todos".
 
   return (
     <View style={styles.wrap}>
@@ -58,24 +53,15 @@ export function MonthPatternCards({ cards, onPick }: Props) {
         <View style={styles.secondary}>
           <Text style={styles.secTitle}>Otras observaciones</Text>
           <View style={styles.rows}>
-            {visible.map((f, i) => (
+            {rest.map((f, i) => (
               <SecondaryRow
                 key={f.id}
                 finding={f}
-                isLast={i === visible.length - 1}
+                isLast={i === rest.length - 1}
                 onPress={() => onPick(f)}
               />
             ))}
           </View>
-          {!showAll && rest.length > SECONDARY_PEEK ? (
-            <Pressable
-              onPress={() => setShowAll(true)}
-              accessibilityRole="button"
-              style={styles.seeAll}
-            >
-              <Text style={styles.seeAllText}>Ver todos</Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : null}
     </View>
@@ -213,12 +199,5 @@ const styles = StyleSheet.create({
     fontFamily: typography.ui,
     fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
-  },
-  seeAll: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16 },
-  seeAllText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
-    color: colors.oroSoft,
   },
 })

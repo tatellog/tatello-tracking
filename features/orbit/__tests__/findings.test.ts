@@ -41,16 +41,43 @@ describe('buildFindings — hallazgos específicos con confianza y evidencia', (
     expect(f!.metric.value).toMatch(/\d+ de \d+/)
   })
 
-  it('el hallazgo trae metacognición ramificada y profundizaciones', () => {
+  it('metacognición cálida sin encuesta + cierre ver-días/otro-hallazgo', () => {
     const signals = month(20, (i) => ({ trained: i < 8, calories: i < 8 ? 1200 : 1600 }))
     const f = buildFindings(signals, CTX)[0]!
     expect(f.metacognition.question).toBe('¿Esto ya lo sabías?')
-    expect(f.metacognition.follow?.question).toBe('¿Qué crees que influye?')
-    // Siempre termina en "otro patrón".
+    // La encuesta "¿qué crees que influye?" se eliminó.
+    expect(f.metacognition.follow).toBeUndefined()
+    // El cierre son solo días + siguiente hallazgo (no observaciones).
     expect(f.followUps.some((u) => u.kind === 'next')).toBe(true)
-    // Las observaciones usan voz Observadora, no consejo.
-    for (const u of f.followUps) {
-      if (u.kind === 'observation') expect(u.text).not.toMatch(/deberías|tienes que/)
+    expect(f.followUps.every((u) => u.kind === 'days' || u.kind === 'next')).toBe(true)
+  })
+
+  it('Stelar arriesga una hipótesis cuando hay coincidencia real (no causal)', () => {
+    // Entrenó 10 días en déficit; en esos días también durmió 7h+.
+    const signals = month(24, (i) => ({
+      trained: i < 10,
+      calories: i < 10 ? 1200 : 1800,
+      sleep_minutes: i < 10 ? 450 : 300,
+    }))
+    const f = buildFindings(signals, CTX).find((x) => x.id === 'training-deficit')
+    if (f?.hypothesis) {
+      expect(f.hypothesis).toMatch(/también dormiste/)
+      expect(f.hypothesis).toMatch(/No sé si va junto/) // tentativa, sin causa
+      expect(f.hypothesis).not.toMatch(/porque|causa|debido a/)
+    }
+  })
+
+  it('muestra solo 2-3 hallazgos con sentido (cap + confianza)', () => {
+    const signals = month(28, (i) => ({
+      trained: i % 3 === 0,
+      water_glasses: i % 2 === 0 ? 9 : 3,
+      calories: i % 2 === 0 ? 1200 : 1700,
+    }))
+    const cards = buildFindings(signals, CTX)
+    expect(cards.length).toBeLessThanOrEqual(3)
+    // Todo lo que no es el ancla de déficit debe pasar el corte de confianza.
+    for (const f of cards) {
+      if (f.id !== 'deficit-summary') expect(f.confidence).toBeGreaterThanOrEqual(60)
     }
   })
 
