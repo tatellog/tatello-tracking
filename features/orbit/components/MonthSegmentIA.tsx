@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
@@ -13,12 +13,14 @@ import { colors, typography } from '@/theme'
 
 import { useAiVoice } from '../ai-voice'
 import { useSignalsHistory } from '../hooks'
-import { buildMonthChat, monthChatInsights } from '../month-chat'
+import { buildMonthChat, monthChatInsights, type ChatTopic } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
 import { useSaveReflection } from '../reflections'
 
-import { MonthChatView } from './MonthChatView'
+import { MonthChatSheet } from './MonthChatSheet'
+import { StelarSpeaks } from './MonthChatView'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
+import { MonthTopicChips } from './MonthTopicChips'
 import { PresenceFinale } from './PresenceFinale'
 
 /*
@@ -84,6 +86,14 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
+  // La conversación se abre en su propia sala (sheet). `openTopic` = el tema
+  // elegido desde un chip; null = antesala.
+  const [openTopic, setOpenTopic] = useState<ChatTopic | null>(null)
+  const openLabel = chat.picker?.choices.find((c) => c.topic === openTopic)?.label ?? ''
+  // La apertura de la antesala: la Voz de IA si llegó, si no la determinista.
+  const introBubbles =
+    aiVoice.data && aiVoice.data.length > 0 ? aiVoice.data : (chat.picker?.intro ?? [])
+
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
       {/* ── Hero: constelación + signo + % revelado ── */}
@@ -115,19 +125,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── El chat guiado. Sin eyebrow de reporte: la cabecera de Stelar
-          (dentro de MonthChatView) hace de encabezado — un chat no lleva
-          título de dashboard encima (uxui + usuaria). ── */}
-      <View style={styles.section}>
-        <MonthChatView
-          chat={chat}
-          aiIntro={aiVoice.data}
-          onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
-          onOpenCalendar={() => {
-            /* El calendario ya vive abajo como evidencia; el turno cierra. */
-          }}
-        />
-      </View>
+      {/* ── Antesala: Stelar habla (identidad + apertura de IA, el gancho a 0
+          taps) y los chips-puerta. Cada chip abre la conversación en su sala
+          (sheet) — no inline (uxui + product). ── */}
+      {chat.ready && chat.picker ? (
+        <View style={styles.section}>
+          <StelarSpeaks bubbles={introBubbles} />
+          <MonthTopicChips picker={chat.picker} onPick={setOpenTopic} />
+        </View>
+      ) : null}
 
       {/* ── Tu mes de un vistazo: el calendario (evidencia, tap→Día) ── */}
       {calendar ? (
@@ -140,6 +146,16 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
       {/* ── Presencia: cierre callado (reusa PresenceFinale). Se gana su lugar
           con ≥7 días de presencia (nunca presentado como progreso físico). ── */}
       {presence && presence.presentDays >= 7 ? <PresenceFinale presence={presence} /> : null}
+
+      {/* ── La sala: la conversación del tema elegido, full-screen. ── */}
+      <MonthChatSheet
+        topic={openTopic}
+        chat={chat}
+        topicLabel={openLabel}
+        onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
+        onOpenCalendar={() => setOpenTopic(null)}
+        onClose={() => setOpenTopic(null)}
+      />
     </Animated.View>
   )
 }

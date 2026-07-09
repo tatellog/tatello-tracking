@@ -97,13 +97,7 @@ export function onNodeChoice(tree: ChatTree, choice: ChatChoice): NodeChoiceResu
     }
   }
   return {
-    append: [
-      userTurn,
-      {
-        who: 'stelar',
-        bubbles: [{ text: 'Aquí quedó. Tu cielo guarda lo que descubriste.', tone: 'accent' }],
-      },
-    ],
+    append: [userTurn, { who: 'stelar', bubbles: [{ text: 'Listo, lo dejé anotado.' }] }],
     flow: { kind: 'done' },
     reflection,
   }

@@ -1,84 +1,77 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, shadows, typography } from '@/theme'
 
-import type { ChatBubble, MonthChat } from '../month-chat'
-import { initialTurns, onNodeChoice, onPickTopic, type Flow, type Turn } from '../month-chat-flow'
+import type { ChatBubble, ChatTopic, MonthChat } from '../month-chat'
+import { initialTurns, onNodeChoice, type Flow, type Turn } from '../month-chat-flow'
 
 /*
- * Órbita Mes IA · la conversación guiada (Release 2). Rediseño tras el
- * feedback de usuaria + uxui + illustrator + product:
+ * Órbita Mes IA · piezas de la conversación guiada (Release 2). Tras el
+ * feedback (los temas parecían un índice, no algo interactivo), el modelo es
+ * ANTESALA + SALA:
  *
- *   · HILO ACUMULADO: cada turno (Stelar y la respuesta de la usuaria) se
- *     QUEDA en pantalla — deja de ser "diapositiva que se reemplaza". Los
- *     turnos viejos se atenúan; solo el vivo respira.
- *   · IDENTIDAD: Stelar habla en ORO desde la izquierda, con su estrella
- *     emisora ✦; la usuaria responde en MAGENTA desde la derecha. Oro = el
- *     cielo; magenta = acción/ella. Nunca se confunde quién habla.
- *   · BOTONES CON JERARQUÍA: primario (magenta sólido + glow + chevron) para
- *     avanzar; secundario (borde vivo + texto magenta) para las ramas
- *     sí/no. "Elige una ✦" marca que es su turno.
+ *   · ANTESALA (vive en el body de Órbita Mes): `StelarSpeaks` — la identidad
+ *     de Stelar (estrella oro ✦ + nombre) y su párrafo de apertura (la Voz de
+ *     IA, el gancho a 0 taps). Debajo van los chips de tema (MonthTopicChips).
+ *   · SALA (sheet full-screen): `MonthConversation` — al tocar un chip se abre
+ *     la conversación de ESE tema, con foco: hilo de burbujas (Stelar oro a la
+ *     izquierda, la usuaria magenta a la derecha), "pensando", y los botones de
+ *     respuesta. La metacognición persiste; al cerrar se vuelve a la antesala.
  *
- * onSaveReflection persiste la metacognición; onOpenCalendar lleva a la
- * evidencia (el calendario vive abajo en el chasis).
+ * La lógica de ramificación es pura y testeada (month-chat-flow); aquí solo se
+ * renderiza y se despacha.
  */
 
-type Props = {
-  chat: MonthChat
-  onSaveReflection: (questionKey: string, answer: string) => void
-  onOpenCalendar: () => void
-  /** Intro de la Voz de IA (gpt-4o-mini, cacheada) que EXPLICA los hallazgos.
-   *  Si está, reemplaza la intro determinista del picker. */
-  aiIntro?: readonly ChatBubble[] | null
+/* ── Antesala: "Stelar habla" (identidad + apertura) ─────────────────── */
+
+export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
+  return (
+    <View style={styles.speaks}>
+      <ConversationHeader />
+      <View style={styles.stelarCol}>
+        {bubbles.map((b, i) => (
+          <StelarBubble key={i} bubble={b} withStar={i === 0} />
+        ))}
+      </View>
+    </View>
+  )
 }
 
-export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro }: Props) {
-  const introBubbles: readonly ChatBubble[] = useMemo(
-    () => (aiIntro && aiIntro.length > 0 ? aiIntro : (chat.picker?.intro ?? [])),
-    [aiIntro, chat.picker?.intro],
-  )
+/* ── Sala: la conversación de un tema (dentro del sheet) ─────────────── */
 
-  const [turns, setTurns] = useState<Turn[]>(() => initialTurns(introBubbles))
-  const [flow, setFlow] = useState<Flow>({ kind: 'picker' })
-  // El último turno de Stelar se revela con "pensando"; al terminar, se
-  // muestran los botones. `revealed` gatea ese turno.
+type ConversationProps = {
+  chat: MonthChat
+  topic: ChatTopic
+  onSaveReflection: (questionKey: string, answer: string) => void
+  onOpenCalendar: () => void
+  onClose: () => void
+}
+
+export function MonthConversation({
+  chat,
+  topic,
+  onSaveReflection,
+  onOpenCalendar,
+  onClose,
+}: ConversationProps) {
+  const tree = chat.trees[topic]
+  const entryBubbles = tree?.nodes[tree.entry]?.bubbles ?? []
+
+  const [turns, setTurns] = useState<Turn[]>(() => initialTurns(entryBubbles))
+  const [flow, setFlow] = useState<Flow>(() =>
+    tree ? { kind: 'node', topic, nodeId: tree.entry } : { kind: 'done' },
+  )
   const [revealed, setRevealed] = useState(false)
   const onRevealed = useCallback(() => setRevealed(true), [])
 
-  // La Voz de IA llega ASÍNCRONA (React Query resuelve después del mount), así
-  // que el turno inicial nace con la intro determinista. Cuando la IA aterriza
-  // y la usuaria sigue en la apertura intacta, se reemplaza el primer turno y
-  // Stelar "re-habla" con la voz cálida. Solo una vez (ref) y solo si aún no
-  // eligió tema — nunca interrumpe una conversación ya empezada. Sin esto, la
-  // llamada a gpt-4o-mini se pagaba pero jamás se mostraba.
-  const aiApplied = useRef(false)
-  useEffect(() => {
-    if (aiApplied.current || !aiIntro || aiIntro.length === 0 || flow.kind !== 'picker') return
-    aiApplied.current = true
-    setTurns((t) => (t.length === 1 ? initialTurns(aiIntro) : t))
-    setRevealed(false)
-  }, [aiIntro, flow.kind])
-
-  // Despachadores delgados: la lógica de ramificación + efectos vive en
-  // month-chat-flow (pura y testeada); aquí solo se aplica al estado.
-  const applyPick = useCallback(
-    (topic: Parameters<typeof onPickTopic>[1], label: string) => {
-      const r = onPickTopic(chat, topic, label)
-      if (!r) return
-      setRevealed(false)
-      setTurns((t) => [...t, ...r.append])
-      setFlow(r.flow)
-    },
-    [chat],
-  )
   const applyChoose = useCallback(
-    (topic: Parameters<typeof onPickTopic>[1], nodeId: string, choiceIndex: number) => {
-      const tree = chat.trees[topic]
-      const choice = tree?.nodes[nodeId]?.choices?.[choiceIndex]
-      if (!tree || !choice) return
+    (nodeId: string, choiceIndex: number) => {
+      if (!tree) return
+      const choice = tree.nodes[nodeId]?.choices?.[choiceIndex]
+      if (!choice) return
       const r = onNodeChoice(tree, choice)
       if (r.reflection) onSaveReflection(r.reflection.questionKey, r.reflection.answer)
       if (r.openCalendar) onOpenCalendar()
@@ -86,57 +79,42 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
       setTurns((t) => [...t, ...r.append])
       setFlow(r.flow)
     },
-    [chat, onSaveReflection, onOpenCalendar],
+    [tree, onSaveReflection, onOpenCalendar],
   )
-  const restart = useCallback(() => {
-    setTurns(initialTurns(introBubbles))
-    setFlow({ kind: 'picker' })
-    setRevealed(false)
-  }, [introBubbles])
 
-  if (!chat.ready || !chat.picker) return <EmptyLearning />
+  if (!tree) return null
 
-  // Los botones del turno vivo (solo cuando Stelar terminó de hablar).
+  // Los botones del turno vivo (cuando Stelar terminó de hablar).
   let choices: { label: string; onPress: () => void; primary: boolean }[] = []
-  if (flow.kind === 'picker') {
-    choices = chat.picker.choices.map((c) => ({
-      label: c.label,
-      primary: true,
-      onPress: () => applyPick(c.topic, c.label),
-    }))
-  } else if (flow.kind === 'node') {
+  if (flow.kind === 'node') {
     const nodeId = flow.nodeId
-    const node = chat.trees[flow.topic]?.nodes[nodeId]
+    const node = tree.nodes[nodeId]
     if (node?.choices) {
-      const topic = flow.topic
       choices = node.choices.map((c, ci) => ({
         label: c.label,
-        // Primario = avanza (goto/openCalendar); secundario = rama sí/no.
         primary: c.action.kind !== 'end',
-        onPress: () => applyChoose(topic, nodeId, ci),
+        onPress: () => applyChoose(nodeId, ci),
       }))
     } else {
-      // Nodo terminal (p. ej. el "por qué" del patrón): ofrece volver al menú.
-      choices = [{ label: 'Ver otra cosa', primary: false, onPress: restart }]
+      // Nodo terminal (p. ej. el "por qué" del patrón): cierra la sala.
+      choices = [{ label: 'Cerrar', primary: false, onPress: onClose }]
     }
   } else {
-    choices = [{ label: 'Ver otra cosa', primary: false, onPress: restart }]
+    choices = [{ label: 'Cerrar', primary: false, onPress: onClose }]
   }
 
   const lastIsStelar = turns[turns.length - 1]?.who === 'stelar'
   const showChoices = choices.length > 0 && (!lastIsStelar || revealed)
 
   return (
-    <View style={styles.wrap}>
-      <ConversationHeader />
+    <View style={styles.conversation}>
       <View style={styles.thread}>
         {turns.map((turn, i) => {
           const isLast = i === turns.length - 1
-          const dim = !isLast
           if (turn.who === 'user') {
             return (
               <Animated.View key={i} entering={FadeInDown.duration(220)} style={styles.userRow}>
-                <View style={[styles.userBubble, dim && styles.dim]}>
+                <View style={[styles.userBubble, !isLast && styles.dim]}>
                   <Text style={styles.userText}>{turn.text}</Text>
                 </View>
               </Animated.View>
@@ -147,7 +125,7 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
               key={i}
               bubbles={turn.bubbles}
               animate={isLast}
-              dim={dim}
+              dim={!isLast}
               onDone={isLast ? onRevealed : undefined}
             />
           )
@@ -155,10 +133,8 @@ export function MonthChatView({ chat, onSaveReflection, onOpenCalendar, aiIntro 
       </View>
 
       {showChoices ? (
-        <Animated.View entering={FadeInDown.duration(400).delay(120)}>
-          <Text style={styles.turnHint}>
-            {flow.kind === 'picker' ? '¿Por dónde empezamos?' : 'Elige una ✦'}
-          </Text>
+        <Animated.View entering={FadeInDown.duration(400).delay(120)} style={styles.choiceZone}>
+          <Text style={styles.turnHint}>Elige una ✦</Text>
           <View style={styles.choiceCol}>
             {choices.map((c, i) => (
               <ChoiceButton key={i} label={c.label} primary={c.primary} onPress={c.onPress} />
@@ -210,8 +186,7 @@ function StelarTurn({
     for (let i = 0; i < bubbles.length; i++) {
       timers.current.push(setTimeout(() => setShown(i + 1), 450 + i * 560))
     }
-    const doneAt = 450 + bubbles.length * 560
-    timers.current.push(setTimeout(() => onDone?.(), doneAt))
+    timers.current.push(setTimeout(() => onDone?.(), 450 + bubbles.length * 560))
     return () => timers.current.forEach(clearTimeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animate, bubbles])
@@ -275,7 +250,7 @@ function Thinking() {
 
 /* ── La estrella emisora (asset stelar-voice-star, inline para tinte) ─── */
 
-const StelarStar = memo(function StelarStar({ size }: { size: number }) {
+export const StelarStar = memo(function StelarStar({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Circle cx={12} cy={12} r={11} fill={colors.oroVect} opacity={0.05} />
@@ -293,7 +268,7 @@ const StelarStar = memo(function StelarStar({ size }: { size: number }) {
   )
 })
 
-/* ── Botones ─────────────────────────────────────────────────────────── */
+/* ── Botones de respuesta ────────────────────────────────────────────── */
 
 function ChoiceButton({
   label,
@@ -325,29 +300,13 @@ function ChoiceButton({
   )
 }
 
-/* ── Estado vacío ────────────────────────────────────────────────────── */
-
-function EmptyLearning() {
-  return (
-    <View style={styles.empty}>
-      <StelarStar size={30} />
-      <Text style={styles.emptyTitle}>Todavía estoy aprendiendo</Text>
-      <Text style={styles.emptyBody}>Cuando tenga más días contigo, voy a ver esto más claro.</Text>
-    </View>
-  )
-}
-
 const STAR_SLOT = 26
 
 const styles = StyleSheet.create({
-  wrap: { gap: 18 },
+  speaks: { gap: 16 },
+  conversation: { gap: 18 },
   // Cabecera del interlocutor.
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 2,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   headerName: {
     fontFamily: typography.serifSemi,
     fontStyle: 'italic',
@@ -365,16 +324,8 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.5 },
   // ── Stelar (izquierda, oro) ──
   stelarCol: { gap: 8 },
-  stelarRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-  },
-  starSlot: {
-    width: STAR_SLOT,
-    alignItems: 'center',
-    paddingTop: 8,
-  },
+  stelarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  starSlot: { width: STAR_SLOT, alignItems: 'center', paddingTop: 8 },
   stelarBubble: {
     flex: 1,
     backgroundColor: colors.bgCard,
@@ -385,10 +336,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
-  stelarBubbleAccent: {
-    backgroundColor: colors.oroTint,
-    borderColor: colors.oroHairline,
-  },
+  stelarBubbleAccent: { backgroundColor: colors.oroTint, borderColor: colors.oroHairline },
   stelarText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
@@ -403,10 +351,7 @@ const styles = StyleSheet.create({
     lineHeight: 27,
     color: colors.leche,
   },
-  stelarStrongText: {
-    fontFamily: typography.displaySemi,
-    color: colors.leche,
-  },
+  stelarStrongText: { fontFamily: typography.displaySemi, color: colors.leche },
   // ── Usuaria (derecha, magenta) ──
   userRow: { alignItems: 'flex-end' },
   userBubble: {
@@ -425,27 +370,13 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   // ── "Pensando" — estrellas oro ──
-  thinkingRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-  },
-  thinking: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  thinkingStar: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.oroVect,
-    opacity: 1,
-  },
+  thinkingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  thinking: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 13 },
+  thinkingStar: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.oroVect },
   thinkingStar2: { opacity: 0.6 },
   thinkingStar3: { opacity: 0.3 },
   // ── "Es tu turno" + botones ──
+  choiceZone: { gap: 0 },
   turnHint: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
@@ -465,61 +396,25 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 20,
   },
-  // Primario — magenta sólido + glow: la acción que avanza.
-  choicePrimary: {
-    backgroundColor: colors.magenta,
-    ...shadows.ctaMagenta,
-  },
-  choicePrimaryPressed: {
-    backgroundColor: colors.magentaDeep,
-    transform: [{ scale: 0.98 }],
-  },
-  choicePrimaryText: {
-    color: colors.blanco,
-  },
+  choicePrimary: { backgroundColor: colors.magenta, ...shadows.ctaMagenta },
+  choicePrimaryPressed: { backgroundColor: colors.magentaDeep, transform: [{ scale: 0.98 }] },
+  choicePrimaryText: { color: colors.blanco },
   chevron: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.bodyLarge,
     color: 'rgba(255,255,255,0.75)',
     marginTop: -2,
   },
-  // Secundario — borde vivo + texto magenta: las ramas sí/no.
   choiceSecondary: {
     backgroundColor: colors.magentaTint,
     borderWidth: 1.5,
     borderColor: colors.magentaGlow,
   },
-  choiceSecondaryPressed: {
-    backgroundColor: colors.magentaTint2,
-    transform: [{ scale: 0.98 }],
-  },
-  choiceSecondaryText: {
-    color: colors.magentaHot,
-  },
+  choiceSecondaryPressed: { backgroundColor: colors.magentaTint2, transform: [{ scale: 0.98 }] },
+  choiceSecondaryText: { color: colors.magentaHot },
   choiceText: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     letterSpacing: 0.2,
-  },
-  // ── Estado vacío ──
-  empty: {
-    alignItems: 'center',
-    paddingVertical: 36,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.leche,
-    textAlign: 'center',
-  },
-  emptyBody: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.niebla,
-    textAlign: 'center',
-    paddingHorizontal: 24,
   },
 })

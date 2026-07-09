@@ -145,7 +145,7 @@ function buildDeficitTree(signals: readonly DailySignals[], ctx: MonthChatCtx): 
     sleepCross: {
       id: 'sleepCross',
       bubbles: [
-        { text: 'Y hay algo más ahí.', tone: 'accent' },
+        { text: 'Crucé esos días con tu sueño.' },
         { text: `Dormiste más de 7 horas en ${withSleep} de esos días.`, tone: 'strong' },
       ],
       choices: [
@@ -228,10 +228,7 @@ function buildAlimentacionTree(
         tone: 'strong',
       },
     ],
-    {
-      text: '¿Sentías que la proteína estaba ahí, o te sorprende?',
-      questionKey: 'protein_adherence',
-    },
+    { text: '¿Ya lo sabías, o te sorprende?', questionKey: 'protein_adherence' },
   )
 }
 
@@ -248,10 +245,7 @@ function buildSuenoTree(signals: readonly DailySignals[]): ChatTree | null {
         tone: 'strong',
       },
     ],
-    {
-      text: '¿Habías notado cómo cambia tu descanso a lo largo del mes?',
-      questionKey: 'sleep_variation',
-    },
+    { text: '¿Lo habías notado?', questionKey: 'sleep_variation' },
   )
 }
 
@@ -264,7 +258,7 @@ function buildEntrenamientoTree(signals: readonly DailySignals[]): ChatTree | nu
       { text: 'Elegiste entrenamiento.' },
       { text: `Te moviste ${trained} días este mes.`, tone: 'strong' },
     ],
-    { text: '¿Esos días se sintieron distintos a los demás?', questionKey: 'training_feel' },
+    { text: '¿Lo habías notado?', questionKey: 'training_feel' },
   )
 }
 
@@ -281,10 +275,7 @@ function buildAguaTree(signals: readonly DailySignals[]): ChatTree | null {
         tone: 'strong',
       },
     ],
-    {
-      text: '¿El agua es algo en lo que piensas, o pasa sin darte cuenta?',
-      questionKey: 'water_awareness',
-    },
+    { text: '¿Ya lo sabías, o te sorprende?', questionKey: 'water_awareness' },
   )
 }
 
@@ -317,7 +308,7 @@ function buildSorprendemeTree(
 ): ChatTree | undefined {
   if (!pattern) return fallback ? { ...fallback, topic: 'sorprendeme' } : undefined
   const bubbles: ChatBubble[] = [
-    { text: 'Esto lo guardé para el final.', tone: 'accent' },
+    { text: 'Este es el que menos se ve.' },
     { text: pattern.title, tone: 'strong' },
   ]
   const nodes: Record<string, ChatNode> = {
@@ -328,13 +319,13 @@ function buildSorprendemeTree(
     },
     notice: {
       id: 'notice',
-      bubbles: [{ text: '¿También lo habías notado?', tone: 'accent' }],
+      bubbles: [{ text: '¿Lo habías notado?' }],
       choices: metacognitionChoices(`pattern_${pattern.id}`),
     },
   }
   if (pattern.why) {
-    // El "por qué importa" del motor como cierre observacional, tras responder.
-    nodes.why = { id: 'why', bubbles: [{ text: pattern.why, tone: 'accent' }] }
+    // El "por qué importa" del motor, como cierre con evidencia tras responder.
+    nodes.why = { id: 'why', bubbles: [{ text: pattern.why, tone: 'strong' }] }
     for (const c of nodes.notice!.choices!) c.action = { kind: 'goto', node: 'why' }
   }
   return { topic: 'sorprendeme', entry: 'intro', nodes }
