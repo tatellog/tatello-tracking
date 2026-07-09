@@ -15,9 +15,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
-import { buildFindings } from '../_shared/intelligence/findings'
-import { buildHypotheses } from '../_shared/intelligence/hypothesis'
-import { buildStories } from '../_shared/intelligence/stories'
+import { buildMonthlyReport } from '../_shared/intelligence/report'
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -98,7 +96,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     ])
     if (signalsRes.error) throw signalsRes.error
 
-    const findings = buildFindings(
+    // Integrador final (F5): corre el pipeline R1 COMPLETO una sola vez
+    // (Findings → Ranking → Story → Hypothesis) y ensambla el MonthlyReport.
+    // findings/stories/hypotheses salen del MISMO set (una fuente).
+    const report = buildMonthlyReport(
+      currentMonth,
       dedupeByDay(signalsRes.data),
       {
         calorieTarget: macrosRes.data?.calories ?? null,
@@ -106,10 +108,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
       buildPrior(reflRes.data, currentMonth),
     )
-    // Story Engine (F3) + Hypothesis Engine (F4) plegados: derivados de los
-    // hallazgos (+ historias).
-    const stories = buildStories(findings)
-    const hypotheses = buildHypotheses(findings, stories)
+    const { findings, stories, hypotheses } = report
 
     // Persistir hallazgos (idempotente por unique(user, period, finding_id)):
     // columnas de consulta (R6) + payload con el Finding completo.
@@ -172,7 +171,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (hErr) console.error('compute-findings: hypotheses upsert failed', hErr.message)
     }
 
-    return json({ findings, stories, hypotheses })
+    // Persistir el REPORTE ENSAMBLADO (F5): upsert idempotente por periodo. Es
+    // una proyección de daily_signals (sin estado mutable propio), así que se
+    // recomputa cada vez. Es lo que el flip (T5.3) leerá desde Órbita Mes.
+    const { error: rErr } = await supabase.from('monthly_reports').upsert(
+      {
+        user_id: userId,
+        period_type: period,
+        period_start: periodStart,
+        period_end: periodEnd,
+        month: currentMonth,
+        findings_hash: report.findingsHash,
+        payload: report,
+      },
+      { onConflict: 'user_id,period_type,period_start,period_end' },
+    )
+    if (rErr) console.error('compute-findings: monthly_reports upsert failed', rErr.message)
+
+    return json({ findings, stories, hypotheses, report })
   } catch (err) {
     console.error('[compute-findings]', err instanceof Error ? err.message : String(err))
     return json({ error: 'No pudimos calcular tus hallazgos ahora.' }, 500)

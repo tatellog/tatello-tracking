@@ -342,6 +342,144 @@ export type Database = {
         }
         Relationships: []
       }
+      facts: {
+        Row: {
+          created_at: string
+          evidence_count: number
+          id: string
+          kind: string
+          period_end: string
+          period_start: string
+          period_type: string
+          unit: string | null
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          evidence_count?: number
+          id?: string
+          kind: string
+          period_end: string
+          period_start: string
+          period_type: string
+          unit?: string | null
+          updated_at?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          evidence_count?: number
+          id?: string
+          kind?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      findings: {
+        Row: {
+          category: string
+          confidence: number
+          created_at: string
+          finding_id: string
+          id: string
+          is_obstacle: boolean
+          payload: Json
+          period_end: string
+          period_start: string
+          period_type: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          confidence: number
+          created_at?: string
+          finding_id: string
+          id?: string
+          is_obstacle?: boolean
+          payload: Json
+          period_end: string
+          period_start: string
+          period_type: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          confidence?: number
+          created_at?: string
+          finding_id?: string
+          id?: string
+          is_obstacle?: boolean
+          payload?: Json
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      hypotheses: {
+        Row: {
+          confidence: number
+          created_at: string
+          hypothesis_id: string
+          id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          source_finding_id: string | null
+          source_story_id: string | null
+          status: string
+          text: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence: number
+          created_at?: string
+          hypothesis_id: string
+          id?: string
+          period_end: string
+          period_start: string
+          period_type: string
+          source_finding_id?: string | null
+          source_story_id?: string | null
+          status?: string
+          text: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          hypothesis_id?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          source_finding_id?: string | null
+          source_story_id?: string | null
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       macro_targets: {
         Row: {
           calories: number
@@ -480,6 +618,45 @@ export type Database = {
           id?: string
           month?: string
           question_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      monthly_reports: {
+        Row: {
+          created_at: string
+          findings_hash: string
+          id: string
+          month: string
+          payload: Json
+          period_end: string
+          period_start: string
+          period_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          findings_hash: string
+          id?: string
+          month: string
+          payload: Json
+          period_end: string
+          period_start: string
+          period_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          findings_hash?: string
+          id?: string
+          month?: string
+          payload?: Json
+          period_end?: string
+          period_start?: string
+          period_type?: string
           updated_at?: string
           user_id?: string
         }
@@ -742,6 +919,48 @@ export type Database = {
           revealed_at?: string
           sign?: string
           source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stories: {
+        Row: {
+          chain: string[]
+          created_at: string
+          finding_ids: string[]
+          id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          score: number
+          story_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chain: string[]
+          created_at?: string
+          finding_ids: string[]
+          id?: string
+          period_end: string
+          period_start: string
+          period_type: string
+          score: number
+          story_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chain?: string[]
+          created_at?: string
+          finding_ids?: string[]
+          id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          score?: number
+          story_id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
