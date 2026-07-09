@@ -110,11 +110,9 @@ function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
         <Text style={styles.metricLabel}>{finding.metric.label}</Text>
       </View>
 
-      {/* Fila-CTA — abre el detalle guiado. */}
+      {/* Fila-CTA — abre el detalle guiado (texto + chevron juntos, izq). */}
       <View style={styles.cta}>
-        <View style={styles.ctaLeft}>
-          <Text style={[styles.ctaText, { color: tint }]}>Ver el detalle</Text>
-        </View>
+        <Text style={[styles.ctaText, { color: tint }]}>Ver el detalle</Text>
         <Text style={[styles.ctaChevron, { color: tint }]}>›</Text>
       </View>
     </Pressable>
@@ -148,11 +146,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard2,
     borderRadius: radius.cardLg,
     borderWidth: 1,
-    paddingTop: 15,
-    paddingBottom: 13,
-    paddingLeft: 20,
-    paddingRight: 16,
-    gap: 12,
+    paddingTop: 18,
+    paddingBottom: 16,
+    paddingLeft: 22,
+    paddingRight: 18,
+    gap: 15,
     overflow: 'hidden',
     // Sombra OSCURA: la despega del cielo estrellado (glow se fundía con él).
     shadowColor: colors.sombra,
@@ -162,7 +160,8 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   cardPressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
-  accent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3 },
+  // Barra inset + redondeada: acento limpio, no un canto cortado por el radio.
+  accent: { position: 'absolute', left: 10, top: 16, bottom: 16, width: 3, borderRadius: 2 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tag: {
     fontFamily: typography.uiBold,
@@ -219,16 +218,15 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.micro,
     color: colors.bone,
   },
-  // Fila-CTA.
+  // Fila-CTA: texto + chevron juntos a la izquierda, tras un divisor full-width.
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 5,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
-    paddingTop: 11,
+    paddingTop: 13,
   },
-  ctaLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ctaText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
