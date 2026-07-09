@@ -392,16 +392,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 2,
   },
-  choiceCol: { gap: 10 },
+  // Chips HORIZONTALES (se envuelven), no una lista vertical: Sí / No caben en
+  // una fila; una opción larga baja sola.
+  choiceCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   choice: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    minHeight: 48,
+    gap: 6,
+    minHeight: 44,
     borderRadius: radius.pill,
-    paddingVertical: 13,
-    paddingHorizontal: 20,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
   },
   choicePrimary: { backgroundColor: colors.magenta, ...shadows.ctaMagenta },
   choicePrimaryPressed: { backgroundColor: colors.magentaDeep, transform: [{ scale: 0.98 }] },

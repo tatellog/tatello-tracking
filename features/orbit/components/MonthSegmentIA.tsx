@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { useTransformProgress } from '@/features/emblem'
@@ -11,15 +11,8 @@ import { useSession } from '@/hooks/useSession'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-import { useAiVoice } from '../ai-voice'
 import { useSignalsHistory } from '../hooks'
-import {
-  buildMonthChat,
-  monthChatInsights,
-  type ChatTopic,
-  type ChatTree,
-  type PatternCard,
-} from '../month-chat'
+import { buildMonthChat, type ChatTree, type PatternCard } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
 import { usePriorReflections, useSaveReflection } from '../reflections'
 
@@ -27,7 +20,6 @@ import { MonthChatSheet } from './MonthChatSheet'
 import { StelarSpeaks } from './MonthChatView'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { MonthPatternCards } from './MonthPatternCards'
-import { MonthTopicChips } from './MonthTopicChips'
 import { PresenceFinale } from './PresenceFinale'
 
 /*
@@ -73,24 +65,6 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     [signals, targets?.calories, targets?.protein_g, prior],
   )
 
-  // Voz de IA (Release 1): gpt-4o-mini redacta la apertura EXPLICANDO los
-  // hallazgos deterministas del mes, cacheada por context_hash. Gateada por
-  // AI_VOICE_ENABLED dentro del hook; si falla o está apagada → null y el
-  // chat usa su intro determinista. Solo se llama con datos suficientes.
-  const insights = useMemo(() => monthChatInsights(chat), [chat])
-  const aiVoice = useAiVoice(
-    uid,
-    chat.ready
-      ? {
-          feature: 'orbita_mes',
-          periodType: 'month',
-          periodStart: `${month}-01`,
-          periodEnd: today,
-          insights,
-        }
-      : null,
-  )
-
   const firstDataDay = signals.length > 0 ? signals[0]!.day : null
   const calendar = useMemo(
     () => monthCalendar(signals, { today, calorieTarget: targets?.calories ?? null, firstDataDay }),
@@ -98,18 +72,20 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
-  // La conversación se abre en su propia sala (sheet), sea desde una tarjeta
-  // de hallazgo o desde un chip de tema. `open` = { árbol, etiqueta } | null.
+  // La conversación se abre en su propia sala (sheet), desde la tarjeta de
+  // hallazgo. `open` = { árbol, etiqueta } | null.
   const [open, setOpen] = useState<{ tree: ChatTree; label: string } | null>(null)
   const openCard = (card: PatternCard) => setOpen({ tree: card.tree, label: card.label })
-  const openChip = (topic: ChatTopic) => {
-    const tree = chat.trees[topic]
-    const label = chat.picker?.choices.find((c) => c.topic === topic)?.label ?? ''
-    if (tree) setOpen({ tree, label })
-  }
-  // La apertura de la antesala: la Voz de IA si llegó, si no la determinista.
-  const introBubbles =
-    aiVoice.data && aiVoice.data.length > 0 ? aiVoice.data : (chat.picker?.intro ?? [])
+
+  // "Una sola cosa": se muestra UNA tarjeta a la vez; "Explorar otra" avanza a
+  // la siguiente (opt-in, no un muro). Con 1 mes de datos, casi siempre 1.
+  const [cardIdx, setCardIdx] = useState(0)
+  const cards = chat.cards
+  const currentCard = cards.length > 0 ? cards[cardIdx % cards.length] : null
+
+  // Apertura de la antesala: gancho corto determinista (el párrafo largo de IA
+  // abrumaba · feedback dueña). El detalle vive dentro de la conversación.
+  const introBubbles = chat.picker?.intro ?? []
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -142,14 +118,23 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── Antesala: Stelar habla (identidad + apertura de IA, el gancho a 0
-          taps) y los chips-puerta. Cada chip abre la conversación en su sala
-          (sheet) — no inline (uxui + product). ── */}
+      {/* ── Antesala PODADA (feedback dueña: mes 1 abrumaba): gancho corto +
+          UNA tarjeta de hallazgo a la vez + "Explorar otra" opcional. Sin
+          párrafo largo de IA, sin fila de chips. ── */}
       {chat.ready && chat.picker ? (
         <View style={styles.section}>
           <StelarSpeaks bubbles={introBubbles} />
-          <MonthPatternCards cards={chat.cards} onPick={openCard} />
-          <MonthTopicChips picker={chat.picker} onPick={openChip} />
+          {currentCard ? <MonthPatternCards cards={[currentCard]} onPick={openCard} /> : null}
+          {cards.length > 1 ? (
+            <Pressable
+              onPress={() => setCardIdx((i) => i + 1)}
+              accessibilityRole="button"
+              accessibilityLabel="Explorar otra cosa"
+              style={styles.explore}
+            >
+              <Text style={styles.exploreText}>Explorar otra ✦</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -219,6 +204,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   section: { gap: 14 },
+  // "Explorar otra ✦" — opt-in, discreto (no un CTA que empuja).
+  explore: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
+  exploreText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.3,
+    color: colors.oroSoft,
+  },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,

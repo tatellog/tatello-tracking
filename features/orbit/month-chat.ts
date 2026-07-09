@@ -432,7 +432,14 @@ export function buildMonthChat(
     calorieTarget: ctx.calorieTarget,
     proteinTarget: ctx.proteinTarget,
   })
-  const cards: PatternCard[] = patterns.slice(0, 3).map((p) => ({
+  // El déficit (el norte) primero si está entre los hallazgos; el resto en el
+  // orden de relevancia del motor.
+  const ranked = [...patterns].sort(
+    (a, b) =>
+      (a.evidence.bars[0]?.colorKey === 'deficit' ? 0 : 1) -
+      (b.evidence.bars[0]?.colorKey === 'deficit' ? 0 : 1),
+  )
+  const cards: PatternCard[] = ranked.slice(0, 3).map((p) => ({
     id: p.id,
     label: p.label,
     finding: p.title,
@@ -450,20 +457,13 @@ export function buildMonthChat(
       : undefined
   if (surprise) trees.sorprendeme = surprise
 
-  // Apertura de la antesala: la voz del coach picando la curiosidad. El número
-  // = las cosas que se muestran abajo (las tarjetas). Premio = el hallazgo,
-  // nunca el peso (línea roja del manifiesto).
-  const n = cards.length > 0 ? cards.length : available.length
+  // Apertura de la antesala: gancho CORTO (no un resumen). "Una sola cosa
+  // clara" para no abrumar a una usuaria nueva — el detalle vive dentro de la
+  // conversación, no aquí. Nunca cuenta "N cosas" (invita al muro).
   const picker: TopicPicker = {
     intro: [
       { text: 'Vi tu mes.', tone: 'accent' },
-      {
-        text:
-          n === 1
-            ? 'Encontré algo que no habías notado.'
-            : `Encontré ${n} cosas que no habías notado.`,
-        tone: 'strong',
-      },
+      { text: 'Encontré algo que no era evidente.', tone: 'strong' },
     ],
     choices: [
       ...available.map((topic) => ({ topic, label: TOPIC_LABEL[topic] })),
