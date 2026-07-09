@@ -11,7 +11,8 @@ import { useSession } from '@/hooks/useSession'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-import type { Finding, FindingCategory } from '../findings'
+import { useMonthVoice } from '../ai-voice'
+import { type Finding, type FindingCategory, hashFindings } from '../findings'
 import { useSignalsHistory } from '../hooks'
 import { buildMonthChat } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
@@ -86,6 +87,24 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
 
   const cards = chat.cards
 
+  // Voz de IA POR HALLAZGO (gateada por usuario). La key es el hash de los
+  // hallazgos → si no cambian, cero red y cero GPT. El periodo se fija al mes
+  // (estable) para que el hash sea la única llave de regeneración. Si la IA está
+  // apagada o falla, `voice` es null y las cards usan su texto determinístico.
+  const findingsHash = useMemo(() => hashFindings(cards), [cards])
+  const monthInputs = useMemo(
+    () =>
+      cards.map((f) => ({
+        id: f.id,
+        lead: f.phrase.lead,
+        support: f.phrase.support,
+        caption: f.phrase.caption,
+      })),
+    [cards],
+  )
+  const monthKey = `${month}-01`
+  const { data: voice } = useMonthVoice(uid, monthKey, monthKey, monthInputs, findingsHash)
+
   // Pantalla 1: Stelar "lee tu mes" (orbe + onda + texto) antes de revelar los
   // hallazgos. Se muestra una vez por montaje cuando ya hay datos.
   const [read, setRead] = useState(false)
@@ -146,7 +165,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
       {chat.ready && read ? (
         <View style={styles.antesala}>
           <StelarSpeaks bubbles={introBubbles} />
-          <MonthPatternCards cards={cards} onPick={setOpenFinding} />
+          <MonthPatternCards cards={cards} onPick={setOpenFinding} voice={voice} />
         </View>
       ) : null}
 

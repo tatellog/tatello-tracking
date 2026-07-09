@@ -79,3 +79,71 @@ export function useAiVoice(uid: string | null, req: AiVoiceRequest | null) {
     refetchOnMount: false,
   })
 }
+
+/* ── Órbita Mes: voz POR HALLAZGO (la IA reformula lead/caption) ──────── */
+
+/** Lo que el cliente manda por hallazgo. La IA reescribe `lead` y `caption`
+ *  (la lectura y la nota); `support` (con NÚMEROS) NUNCA lo toca la IA. */
+export type MonthFindingInput = { id: string; lead: string; support: string; caption: string }
+
+/** Voz de IA de una card: solo la parte redactable. Los números viven en el
+ *  motor determinístico, no aquí. */
+export type MonthCardVoice = { lead: string; caption: string }
+
+const MonthVoiceResponseSchema = z.object({
+  cards: z
+    .array(z.object({ id: z.string().min(1), lead: z.string().min(1), caption: z.string().min(1) }))
+    .min(1),
+  cached: z.boolean().optional(),
+})
+
+/** Mapa id→voz, o null si el flag está apagado / algo falla (cae a la voz
+ *  determinística `finding.phrase`). Nunca lanza; nunca bloquea la UI. */
+export async function fetchMonthVoice(
+  periodStart: string,
+  periodEnd: string,
+  findings: MonthFindingInput[],
+): Promise<Record<string, MonthCardVoice> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stelar-insight', {
+      body: { feature: 'orbita_mes', periodType: 'month', periodStart, periodEnd, findings },
+    })
+    if (error) return null
+    if (data && (data as { error?: string }).error) return null
+    const parsed = MonthVoiceResponseSchema.safeParse(data)
+    if (!parsed.success) return null
+    const map: Record<string, MonthCardVoice> = {}
+    for (const c of parsed.data.cards) map[c.id] = { lead: c.lead, caption: c.caption }
+    return map
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Voz de IA de las cards del Mes, cacheada POR HALLAZGO. La query key lleva el
+ * `hash` de los hallazgos: si no cambian, React Query no re-pide (cero red). Y
+ * el edge, keyed por el mismo hash, no re-llama a GPT si los hallazgos son los
+ * mismos. Regenera solo cuando cambia lo que se muestra.
+ */
+export function useMonthVoice(
+  uid: string | null,
+  periodStart: string | null,
+  periodEnd: string | null,
+  findings: MonthFindingInput[],
+  hash: string,
+) {
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
+  const ready =
+    aiOn && uid != null && periodStart != null && periodEnd != null && findings.length > 0
+  return useQuery({
+    queryKey: uid ? queryKeys.orbit.aiMonthVoice(uid, hash) : ['orbit', 'aiVoice', 'month', 'off'],
+    queryFn: () =>
+      ready ? fetchMonthVoice(periodStart!, periodEnd!, findings) : Promise.resolve(null),
+    enabled: ready,
+    staleTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  })
+}

@@ -201,6 +201,60 @@ function buildInsightPrompt(context, insights) {
   return { system: SYSTEM_PROMPT, user: lines.join('\n') }
 }
 
+/* ── prompt de Órbita Mes: REFORMULAR hallazgos por id ────────────────── */
+// La IA no ve datos crudos ni detecta nada: recibe hallazgos YA detectados
+// (lead + support + caption determinísticos) y solo reescribe lead/caption en
+// voz Stelar, más cálidos/personales, SIN tocar `support` (que lleva números).
+const FINDINGS_SYSTEM_PROMPT = [
+  'Eres la Voz de Stelar, una app de pérdida de peso sostenible.',
+  'Recibes hallazgos que el sistema YA detectó en los registros de la usuaria.',
+  'Tu único trabajo es REESCRIBIR, por cada hallazgo, dos textos cortos:',
+  '- "lead": la lectura cálida (una frase, voz del coach).',
+  '- "caption": una nota breve que ayuda a verlo (una frase).',
+  'NO detectas patrones, NO agregas hallazgos, NO cambias su significado.',
+  '',
+  'REGLAS DURAS:',
+  'NO inventes números ni datos nuevos. NO pongas cifras en lead ni caption.',
+  'NO afirmes causa ("esto causó aquello"); son coincidencias observadas.',
+  'NUNCA digas "debes", "deberías", "tienes que", "intenta", "prueba", "come menos",',
+  '"come más", "duerme más", "sube tu proteína", ni ninguna sugerencia de cambiar',
+  'una conducta: describe lo que YA pasó, nunca lo que hacer después.',
+  'NO diagnostiques, NO uses lenguaje clínico ("atracón", "trastorno", "ansiedad"),',
+  'NO culpes. NO menciones un peso como meta ni compares con otras personas.',
+  'VOZ: cálida, segunda persona femenina, frases cortas, sin exclamaciones, sin',
+  'emojis, sin tecnicismos. Conserva el MISMO id de cada hallazgo.',
+  '',
+  'Responde SOLO con JSON válido, sin texto extra, con este formato exacto:',
+  '{"cards": [{"id": string, "lead": string, "caption": string}]}',
+].join('\n')
+
+function buildFindingsVoicePrompt(findings) {
+  const lines = ['Hallazgos ya detectados (reescribe lead y caption de cada uno, conserva el id):']
+  for (const f of findings) {
+    lines.push('')
+    lines.push(`id: ${f.id}`)
+    lines.push(`lead: ${f.lead}`)
+    lines.push(`dato (no lo repitas literal, no inventes otro): ${f.support}`)
+    lines.push(`caption: ${f.caption}`)
+  }
+  lines.push('')
+  lines.push('Devuelve el JSON pedido con un elemento por hallazgo, mismo id.')
+  return { system: FINDINGS_SYSTEM_PROMPT, user: lines.join('\n') }
+}
+
+const CardsSchema = z.object({
+  cards: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        lead: z.string().trim().min(1).max(240),
+        caption: z.string().trim().min(1).max(240),
+      }),
+    )
+    .min(1)
+    .max(4),
+})
+
 /* ── request / response ──────────────────────────────────────────────── */
 const RequestSchema = z.object({
   feature: z.enum(['orbita_dia', 'orbita_semana', 'orbita_mes', 'progreso']),
@@ -208,6 +262,18 @@ const RequestSchema = z.object({
   periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   insights: z.array(z.string().max(200)).max(8).optional(),
+  // Órbita Mes: hallazgos estructurados a reformular (voz por card).
+  findings: z
+    .array(
+      z.object({
+        id: z.string().max(60),
+        lead: z.string().max(200),
+        support: z.string().max(200),
+        caption: z.string().max(200),
+      }),
+    )
+    .max(4)
+    .optional(),
 })
 
 const VozSchema = z.object({
@@ -269,6 +335,38 @@ async function generateVoz(system: string, user: string, openaiKey: string) {
   return parsed.success ? parsed.data : null
 }
 
+async function generateCards(system: string, user: string, openaiKey: string) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 500,
+      temperature: 0.6,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    console.error('stelar-insight: OpenAI error (cards)', res.status)
+    return null
+  }
+  const completion = await res.json()
+  const content = completion?.choices?.[0]?.message?.content
+  if (typeof content !== 'string') return null
+  let raw
+  try {
+    raw = JSON.parse(content)
+  } catch {
+    return null
+  }
+  const parsed = CardsSchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -293,7 +391,61 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const parsed = RequestSchema.safeParse(await req.json().catch(() => ({})))
     if (!parsed.success) return json({ error: 'Petición inválida.' }, 400)
-    const { feature, periodType, periodStart, periodEnd, insights } = parsed.data
+    const { feature, periodType, periodStart, periodEnd, insights, findings } = parsed.data
+
+    // ── Órbita Mes: voz POR HALLAZGO. La IA solo reformula; la llave del caché
+    // es el hash de los hallazgos que manda el cliente (NO el Context Engine),
+    // así que no toca el hash dorado. Sin queries de señales: cero DB reads. ──
+    if (feature === 'orbita_mes' && findings && findings.length > 0) {
+      const findingsHash = fnv1aHex(stableStringify(findings))
+      const { data: cachedM } = await supabase
+        .from('ai_insights')
+        .select('response, context_hash, prompt_version, expires_at')
+        .eq('feature', feature)
+        .eq('period_type', periodType)
+        .eq('period_start', periodStart)
+        .eq('period_end', periodEnd)
+        .maybeSingle()
+      const freshM =
+        cachedM &&
+        cachedM.context_hash === findingsHash &&
+        cachedM.prompt_version === PROMPT_VERSION &&
+        (cachedM.expires_at == null || new Date(cachedM.expires_at).getTime() > Date.now())
+      if (freshM) return json({ ...cachedM.response, cached: true })
+
+      const prompt = buildFindingsVoicePrompt(findings)
+      const cardsVoice = await generateCards(prompt.system, prompt.user, openaiKey)
+      if (!cardsVoice) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
+      // BACKSTOP determinístico (el output se cachea → una mala generación
+      // persistiría): descarta cards con dígitos (número inventado) o con
+      // léxico prescriptivo/clínico. Un id descartado → el cliente cae a su
+      // texto determinístico para ESA card (voice?.[id] ?? finding.phrase).
+      const allowed = new Set(findings.map((f) => f.id)) // la IA nunca añade hallazgos
+      const BANNED =
+        /debes|deber[ií]as|tienes que|intenta|prueba|come m[aá]s|come menos|duerme|sube tu|baja tu|atrac[oó]n|trastorno|ansiedad|depres|diagn[oó]stic|terapia/i
+      const bad = (s: string) => /\d/.test(s) || BANNED.test(s)
+      const safe = cardsVoice.cards.filter(
+        (c) => allowed.has(c.id) && !bad(c.lead) && !bad(c.caption),
+      )
+      if (safe.length === 0) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
+      const responseM = { cards: safe }
+
+      const { error: upErr } = await supabase.from('ai_insights').upsert(
+        {
+          user_id: userId,
+          feature,
+          period_type: periodType,
+          period_start: periodStart,
+          period_end: periodEnd,
+          context_hash: findingsHash,
+          prompt_version: PROMPT_VERSION,
+          response: responseM,
+        },
+        { onConflict: 'user_id,feature,period_type,period_start,period_end' },
+      )
+      if (upErr) console.error('stelar-insight: cache upsert failed (mes)', upErr.message)
+      return json({ ...responseM, cached: false })
+    }
 
     const spanDays = Math.max(
       0,

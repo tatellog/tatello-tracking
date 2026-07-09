@@ -1,4 +1,4 @@
-import { buildFindings } from '../findings'
+import { buildFindings, hashFindings } from '../findings'
 import { mkSig } from './signals.fixture'
 
 const CTX = { calorieTarget: 1500, proteinTarget: 120 }
@@ -83,5 +83,25 @@ describe('buildFindings — hallazgos específicos con confianza y evidencia', (
 
   it('sin datos suficientes → sin hallazgos', () => {
     expect(buildFindings(month(3), CTX)).toEqual([])
+  })
+})
+
+describe('hashFindings — llave de caché de la voz de IA por hallazgo', () => {
+  const gen = (trainedUntil: number) =>
+    buildFindings(
+      month(24, (i) => ({ trained: i < trainedUntil, calories: i < trainedUntil ? 1200 : 1600 })),
+      CTX,
+    )
+
+  it('es estable para los mismos hallazgos', () => {
+    expect(hashFindings(gen(8))).toBe(hashFindings(gen(8)))
+  })
+
+  it('cambia cuando cambia lo que se muestra', () => {
+    expect(hashFindings(gen(8))).not.toBe(hashFindings(gen(12)))
+  })
+
+  it('vacío es estable', () => {
+    expect(hashFindings([])).toBe(hashFindings([]))
   })
 })

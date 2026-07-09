@@ -27,6 +27,9 @@ import {
 type Props = {
   cards: Finding[]
   onPick: (finding: Finding) => void
+  /** Voz de IA por hallazgo (id → {lead, caption}). Si falta o no trae un id,
+   *  la card cae a su texto determinístico. El soporte con números nunca es IA. */
+  voice?: Record<string, { lead: string; caption: string }> | null
 }
 
 /** Color de acento de cada hallazgo (nodo A + eyebrow + consistencia). */
@@ -71,12 +74,18 @@ function eyebrowFor(f: Finding): string {
   }
 }
 
-export function MonthPatternCards({ cards, onPick }: Props) {
+export function MonthPatternCards({ cards, onPick, voice }: Props) {
   if (cards.length === 0) return null
   return (
     <View style={styles.wrap}>
       {cards.map((f, i) => (
-        <FindingConstellationCard key={f.id} finding={f} hero={i === 0} onPress={() => onPick(f)} />
+        <FindingConstellationCard
+          key={f.id}
+          finding={f}
+          hero={i === 0}
+          voice={voice?.[f.id] ?? null}
+          onPress={() => onPick(f)}
+        />
       ))}
     </View>
   )
@@ -87,10 +96,12 @@ export function MonthPatternCards({ cards, onPick }: Props) {
 function FindingConstellationCard({
   finding,
   hero,
+  voice,
   onPress,
 }: {
   finding: Finding
   hero: boolean
+  voice: { lead: string; caption: string } | null
   onPress: () => void
 }) {
   const accent = accentFor(finding)
@@ -99,7 +110,10 @@ function FindingConstellationCard({
     const w = e.nativeEvent.layout.width
     if (w > 0 && Math.abs(w - bandW) > 1) setBandW(w)
   }
-  const { lead, support, caption } = finding.phrase
+  // La IA reformula lead/caption; el soporte (números) SIEMPRE determinístico.
+  const lead = voice?.lead ?? finding.phrase.lead
+  const caption = voice?.caption ?? finding.phrase.caption
+  const { support } = finding.phrase
 
   return (
     <Pressable

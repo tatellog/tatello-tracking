@@ -125,5 +125,8 @@ export const queryKeys = {
     // AI Foundation: la voz de IA por superficie + periodo (gateada por flag).
     aiVoice: (uid: string, feature: string, periodStart: string, periodEnd: string) =>
       ['orbit', 'aiVoice', uid, feature, periodStart, periodEnd] as const,
+    // Voz de IA de Órbita Mes, cacheada POR HALLAZGO: la key lleva el hash de
+    // los hallazgos → si no cambian, React Query no re-pide (cero red).
+    aiMonthVoice: (uid: string, hash: string) => ['orbit', 'aiVoice', 'month', uid, hash] as const,
   },
 } as const

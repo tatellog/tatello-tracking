@@ -444,3 +444,22 @@ export function buildFindings(
     followUps: buildFollowUps(f),
   }))
 }
+
+/**
+ * Huella estable de un set de hallazgos, para cachear la voz de IA POR
+ * HALLAZGO: mientras los hallazgos visibles no cambien (id + confianza +
+ * naciente + el texto con números), el hash no cambia y la IA NO se regenera.
+ * Registrar algo que no mueve ninguna card = mismo hash = cero llamadas a GPT.
+ * Determinística (sin Date/random): mismo motor, mismo hash en cliente y edge.
+ */
+export function hashFindings(findings: readonly Finding[]): string {
+  const canon = findings
+    .map((f) => `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.phrase.support}`)
+    .join('~')
+  let h = 0x811c9dc5
+  for (let i = 0; i < canon.length; i++) {
+    h ^= canon.charCodeAt(i)
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0
+  }
+  return h.toString(16).padStart(8, '0')
+}
