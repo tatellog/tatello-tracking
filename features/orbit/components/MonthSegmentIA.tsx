@@ -11,10 +11,10 @@ import { useSession } from '@/hooks/useSession'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
+import type { Finding, FindingCategory } from '../findings'
 import { useSignalsHistory } from '../hooks'
-import { buildMonthChat, type PatternCard } from '../month-chat'
+import { buildMonthChat } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
-import type { InsightDetail } from '../month-insight'
 import { usePriorReflections, useSaveReflection } from '../reflections'
 
 import { MonthChatSheet } from './MonthChatSheet'
@@ -38,6 +38,16 @@ const HERO_SIZE = 200
 /** Bajo este % el número deflaciona (anti-anillo de Apple): mismo umbral que
  *  el Mes actual. */
 const PCT_THRESHOLD = 8
+
+/** El título del header del detalle, por categoría del hallazgo. */
+const CATEGORY_LABEL: Record<FindingCategory, string> = {
+  deficit: 'Déficit',
+  movimiento: 'Movimiento',
+  sueno: 'Sueño',
+  agua: 'Agua',
+  proteina: 'Proteína',
+  alimentacion: 'Alimentación',
+}
 
 export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => void }) {
   const today = todayInTimezone()
@@ -73,10 +83,8 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
-  // El detalle guiado se abre en su sala (sheet) desde la tarjeta de hallazgo.
-  // `open` = { detalle, título } | null.
-  const [open, setOpen] = useState<{ detail: InsightDetail; title: string } | null>(null)
-  const openCard = (card: PatternCard) => setOpen({ detail: card.detail, title: card.label })
+  // El detalle guiado del hallazgo se abre en su sala (sheet).
+  const [openFinding, setOpenFinding] = useState<Finding | null>(null)
 
   // "Una sola cosa": se muestra UNA tarjeta a la vez; "Explorar otra" avanza a
   // la siguiente (opt-in, no un muro). Con 1 mes de datos, casi siempre 1.
@@ -84,21 +92,19 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const cards = chat.cards
   const currentCard = cards.length > 0 ? cards[cardIdx % cards.length] : null
 
-  // "Explorar otro hallazgo" desde el detalle: avanza a la siguiente tarjeta y
-  // abre su detalle (una lectura continua, sin volver al muro).
-  const exploreOther = () => {
+  // "Muéstrame otro patrón" desde el detalle: avanza al siguiente hallazgo y lo
+  // abre (lectura continua, sin volver al muro).
+  const nextFinding = () => {
     if (cards.length <= 1) {
-      setOpen(null)
+      setOpenFinding(null)
       return
     }
     const next = (cardIdx + 1) % cards.length
     setCardIdx(next)
-    setOpen({ detail: cards[next]!.detail, title: cards[next]!.label })
+    setOpenFinding(cards[next]!)
   }
 
-  // Apertura de la antesala: gancho corto determinista (el párrafo largo de IA
-  // abrumaba · feedback dueña). El detalle vive dentro de la conversación.
-  const introBubbles = chat.picker?.intro ?? []
+  const introBubbles = chat.intro
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -134,10 +140,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
       {/* ── Antesala PODADA (feedback dueña: mes 1 abrumaba): gancho corto +
           UNA tarjeta de hallazgo a la vez + "Explorar otra" opcional. Sin
           párrafo largo de IA, sin fila de chips. ── */}
-      {chat.ready && chat.picker ? (
+      {chat.ready ? (
         <View style={styles.section}>
           <StelarSpeaks bubbles={introBubbles} />
-          {currentCard ? <MonthPatternCards cards={[currentCard]} onPick={openCard} /> : null}
+          {currentCard ? <MonthPatternCards cards={[currentCard]} onPick={setOpenFinding} /> : null}
           {cards.length > 1 ? (
             <Pressable
               onPress={() => setCardIdx((i) => i + 1)}
@@ -163,14 +169,14 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           con ≥7 días de presencia (nunca presentado como progreso físico). ── */}
       {presence && presence.presentDays >= 7 ? <PresenceFinale presence={presence} /> : null}
 
-      {/* ── La sala: la conversación del tema elegido, full-screen. ── */}
+      {/* ── La sala: el detalle guiado del hallazgo, full-screen. ── */}
       <MonthChatSheet
-        detail={open?.detail ?? null}
-        title={open?.title ?? ''}
+        finding={openFinding}
+        title={openFinding ? CATEGORY_LABEL[openFinding.category] : ''}
         sign={sign}
         onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
-        onExploreOther={exploreOther}
-        onClose={() => setOpen(null)}
+        onNext={nextFinding}
+        onClose={() => setOpenFinding(null)}
       />
     </Animated.View>
   )

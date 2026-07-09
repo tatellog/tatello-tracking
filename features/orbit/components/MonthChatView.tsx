@@ -1,35 +1,21 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import { memo } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Path } from 'react-native-svg'
 
-import { colors, radius, shadows, typography } from '@/theme'
+import { colors, typography } from '@/theme'
 
-import type { ChatBubble, ChatTree } from '../month-chat'
-import { initialTurns, onNodeChoice, type Flow, type Turn } from '../month-chat-flow'
+import type { ChatBubble } from '../month-chat'
 
 /*
- * Órbita Mes IA · piezas de la conversación guiada (Release 2). Tras el
- * feedback (los temas parecían un índice, no algo interactivo), el modelo es
- * ANTESALA + SALA:
- *
- *   · ANTESALA (vive en el body de Órbita Mes): `StelarSpeaks` — la identidad
- *     de Stelar (estrella oro ✦ + nombre) y su párrafo de apertura (la Voz de
- *     IA, el gancho a 0 taps). Debajo van los chips de tema (MonthTopicChips).
- *   · SALA (sheet full-screen): `MonthConversation` — al tocar un chip se abre
- *     la conversación de ESE tema, con foco: hilo de burbujas (Stelar oro a la
- *     izquierda, la usuaria magenta a la derecha), "pensando", y los botones de
- *     respuesta. La metacognición persiste; al cerrar se vuelve a la antesala.
- *
- * La lógica de ramificación es pura y testeada (month-chat-flow); aquí solo se
- * renderiza y se despacha.
+ * Piezas compartidas de la antesala de Órbita Mes IA:
+ *   · StelarSpeaks — la apertura como ENCABEZADO (título + subtítulo), no chat.
+ *   · StelarStar — la estrella emisora ✦ (firma de Stelar), reusada en el
+ *     header del detalle.
  */
 
-/* ── Antesala: "Stelar habla" (identidad + apertura) ─────────────────── */
+/* ── Apertura: "Stelar habla" (título + subtítulo) ───────────────────── */
 
 export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
-  // La apertura NO es un chat: es un encabezado (título + subtítulo). El chat
-  // vive dentro de la conversación, no en la antesala (feedback dueña).
   const title = bubbles[0]?.text ?? ''
   const subtitle = bubbles[1]?.text ?? ''
   return (
@@ -41,194 +27,6 @@ export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
       {title ? <Text style={styles.introTitle}>{title}</Text> : null}
       {subtitle ? <Text style={styles.introSubtitle}>{subtitle}</Text> : null}
     </View>
-  )
-}
-
-/* ── Sala: la conversación de un tema (dentro del sheet) ─────────────── */
-
-type ConversationProps = {
-  tree: ChatTree
-  onSaveReflection: (questionKey: string, answer: string) => void
-  onOpenCalendar: () => void
-  onClose: () => void
-}
-
-export function MonthConversation({
-  tree,
-  onSaveReflection,
-  onOpenCalendar,
-  onClose,
-}: ConversationProps) {
-  const entryBubbles = tree.nodes[tree.entry]?.bubbles ?? []
-
-  const [turns, setTurns] = useState<Turn[]>(() => initialTurns(entryBubbles))
-  const [flow, setFlow] = useState<Flow>(() => ({
-    kind: 'node',
-    topic: tree.topic,
-    nodeId: tree.entry,
-  }))
-  const [revealed, setRevealed] = useState(false)
-  const onRevealed = useCallback(() => setRevealed(true), [])
-
-  const applyChoose = useCallback(
-    (nodeId: string, choiceIndex: number) => {
-      const choice = tree.nodes[nodeId]?.choices?.[choiceIndex]
-      if (!choice) return
-      const r = onNodeChoice(tree, choice)
-      if (r.reflection) onSaveReflection(r.reflection.questionKey, r.reflection.answer)
-      if (r.openCalendar) onOpenCalendar()
-      setRevealed(false)
-      setTurns((t) => [...t, ...r.append])
-      setFlow(r.flow)
-    },
-    [tree, onSaveReflection, onOpenCalendar],
-  )
-
-  // Los botones del turno vivo (cuando Stelar terminó de hablar).
-  let choices: { label: string; onPress: () => void; primary: boolean }[] = []
-  if (flow.kind === 'node') {
-    const nodeId = flow.nodeId
-    const node = tree.nodes[nodeId]
-    if (node?.choices) {
-      choices = node.choices.map((c, ci) => ({
-        label: c.label,
-        primary: c.action.kind !== 'end',
-        onPress: () => applyChoose(nodeId, ci),
-      }))
-    } else {
-      // Nodo terminal (p. ej. el "por qué" del patrón): cierra la sala.
-      choices = [{ label: 'Cerrar', primary: false, onPress: onClose }]
-    }
-  } else {
-    choices = [{ label: 'Cerrar', primary: false, onPress: onClose }]
-  }
-
-  const lastIsStelar = turns[turns.length - 1]?.who === 'stelar'
-  const showChoices = choices.length > 0 && (!lastIsStelar || revealed)
-
-  return (
-    <View style={styles.conversation}>
-      <View style={styles.thread}>
-        {turns.map((turn, i) => {
-          const isLast = i === turns.length - 1
-          if (turn.who === 'user') {
-            return (
-              <Animated.View key={i} entering={FadeInDown.duration(220)} style={styles.userRow}>
-                <View style={[styles.userBubble, !isLast && styles.dim]}>
-                  <Text style={styles.userText}>{turn.text}</Text>
-                </View>
-              </Animated.View>
-            )
-          }
-          return (
-            <StelarTurn
-              key={i}
-              bubbles={turn.bubbles}
-              animate={isLast}
-              dim={!isLast}
-              onDone={isLast ? onRevealed : undefined}
-            />
-          )
-        })}
-      </View>
-
-      {showChoices ? (
-        <Animated.View entering={FadeInDown.duration(400).delay(120)} style={styles.choiceZone}>
-          <Text style={styles.turnHint}>Elige una ✦</Text>
-          <View style={styles.choiceCol}>
-            {choices.map((c, i) => (
-              <ChoiceButton key={i} label={c.label} primary={c.primary} onPress={c.onPress} />
-            ))}
-          </View>
-        </Animated.View>
-      ) : null}
-    </View>
-  )
-}
-
-/* ── Un turno de Stelar (burbujas con fade escalonado + "pensando") ───── */
-
-function StelarTurn({
-  bubbles,
-  animate,
-  dim,
-  onDone,
-}: {
-  bubbles: readonly ChatBubble[]
-  animate: boolean
-  dim: boolean
-  onDone?: () => void
-}) {
-  const [shown, setShown] = useState(animate ? 0 : bubbles.length)
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-  useEffect(() => {
-    if (!animate) {
-      setShown(bubbles.length)
-      return
-    }
-    setShown(0)
-    timers.current.forEach(clearTimeout)
-    timers.current = []
-    for (let i = 0; i < bubbles.length; i++) {
-      timers.current.push(setTimeout(() => setShown(i + 1), 450 + i * 560))
-    }
-    timers.current.push(setTimeout(() => onDone?.(), 450 + bubbles.length * 560))
-    return () => timers.current.forEach(clearTimeout)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animate, bubbles])
-
-  return (
-    <View style={[styles.stelarCol, dim && styles.dim]}>
-      {bubbles.slice(0, shown).map((b, i) => (
-        <Animated.View
-          key={i}
-          entering={animate ? FadeInDown.duration(320).springify().damping(18) : undefined}
-        >
-          <StelarBubble bubble={b} />
-        </Animated.View>
-      ))}
-      {animate && shown < bubbles.length ? <Thinking /> : null}
-    </View>
-  )
-}
-
-const StelarBubble = memo(function StelarBubble({ bubble }: { bubble: ChatBubble }) {
-  const isAccent = bubble.tone === 'accent'
-  const isStrong = bubble.tone === 'strong'
-  return (
-    <View style={styles.stelarRow}>
-      <Avatar />
-      <View style={[styles.stelarBubble, isAccent && styles.stelarBubbleAccent]}>
-        <Text
-          style={[
-            styles.stelarText,
-            isAccent && styles.stelarAccentText,
-            isStrong && styles.stelarStrongText,
-          ]}
-        >
-          {bubble.text}
-        </Text>
-      </View>
-    </View>
-  )
-})
-
-/** El avatar de Stelar: su estrella emisora ✦ en un círculo de cielo. Mismo
- *  lenguaje que el mockup (avatar por mensaje), con la firma oro. */
-function Avatar() {
-  return (
-    <View style={styles.avatar}>
-      <StelarStar size={18} />
-    </View>
-  )
-}
-
-function Thinking() {
-  return (
-    <Animated.View entering={FadeIn.duration(220)} style={styles.thinkingRow}>
-      <Avatar />
-      <Text style={styles.thinkingText}>Stelar está viendo tus patrones…</Text>
-    </Animated.View>
   )
 }
 
@@ -244,51 +42,14 @@ export const StelarStar = memo(function StelarStar({ size }: { size: number }) {
         fill={colors.oroVect}
       />
       <Path d="M17.4 5.4 L18.6 6.9 L17.4 8.4 L16.2 6.9 Z" fill={colors.oroVect} opacity={0.65} />
-      {/* Núcleo cálido fijo — punto de luz vivo (pintura de escena del asset,
-          no rol de la paleta). */}
+      {/* Núcleo cálido fijo — punto de luz vivo (pintura de escena del asset). */}
       {/* eslint-disable-next-line no-restricted-syntax */}
       <Circle cx={12} cy={11.7} r={1.5} fill="#FFF6E5" />
     </Svg>
   )
 })
 
-/* ── Botones de respuesta ────────────────────────────────────────────── */
-
-function ChoiceButton({
-  label,
-  primary,
-  onPress,
-}: {
-  label: string
-  primary: boolean
-  onPress: () => void
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.choice,
-        primary ? styles.choicePrimary : styles.choiceSecondary,
-        pressed && (primary ? styles.choicePrimaryPressed : styles.choiceSecondaryPressed),
-      ]}
-    >
-      <Text
-        style={[styles.choiceText, primary ? styles.choicePrimaryText : styles.choiceSecondaryText]}
-      >
-        {label}
-      </Text>
-      {primary ? <Text style={styles.chevron}>›</Text> : null}
-    </Pressable>
-  )
-}
-
-const STAR_SLOT = 34
-
 const styles = StyleSheet.create({
-  conversation: { gap: 18 },
-  // Apertura de la antesala como ENCABEZADO (título + subtítulo), no chat.
   intro: { gap: 8 },
   introBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   introBrand: {
@@ -310,117 +71,5 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.bone,
-  },
-  thread: { gap: 12 },
-  dim: { opacity: 0.5 },
-  // ── Stelar (izquierda, oro) ──
-  stelarCol: { gap: 8 },
-  stelarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  // Avatar por mensaje: la estrella emisora en un círculo de cielo.
-  avatar: {
-    width: STAR_SLOT,
-    height: STAR_SLOT,
-    borderRadius: STAR_SLOT / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgCard,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairlineSoft,
-    marginTop: 2,
-  },
-  stelarBubble: {
-    flex: 1,
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.cardLg,
-    borderTopLeftRadius: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairlineSoft,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  stelarBubbleAccent: { backgroundColor: colors.oroTint, borderColor: colors.oroHairline },
-  stelarText: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 23,
-    color: colors.bone,
-  },
-  // Voz del coach — Cormorant italic, oro (el cielo, no magenta).
-  stelarAccentText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 27,
-    color: colors.leche,
-  },
-  stelarStrongText: { fontFamily: typography.displaySemi, color: colors.leche },
-  // ── Usuaria (derecha, magenta) ──
-  userRow: { alignItems: 'flex-end' },
-  userBubble: {
-    maxWidth: '82%',
-    backgroundColor: colors.magentaTint2,
-    borderRadius: radius.cardLg,
-    borderTopRightRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.magentaGlow,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-  },
-  userText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-  },
-  // ── "Analizando tus patrones…" — el diferenciador, no "escribiendo…" ──
-  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  thinkingText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  // ── "Es tu turno" + botones ──
-  choiceZone: { gap: 0 },
-  turnHint: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.oroSoft,
-    marginBottom: 10,
-    marginLeft: 2,
-  },
-  // Chips HORIZONTALES (se envuelven), no una lista vertical: Sí / No caben en
-  // una fila; una opción larga baja sola.
-  choiceCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  choice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
-    borderRadius: radius.pill,
-    paddingVertical: 11,
-    paddingHorizontal: 18,
-  },
-  choicePrimary: { backgroundColor: colors.magenta, ...shadows.ctaMagenta },
-  choicePrimaryPressed: { backgroundColor: colors.magentaDeep, transform: [{ scale: 0.98 }] },
-  choicePrimaryText: { color: colors.blanco },
-  chevron: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.bodyLarge,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: -2,
-  },
-  choiceSecondary: {
-    backgroundColor: colors.magentaTint,
-    borderWidth: 1.5,
-    borderColor: colors.magentaGlow,
-  },
-  choiceSecondaryPressed: { backgroundColor: colors.magentaTint2, transform: [{ scale: 0.98 }] },
-  choiceSecondaryText: { color: colors.magentaHot },
-  choiceText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.2,
   },
 })

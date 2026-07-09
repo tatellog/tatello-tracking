@@ -15,8 +15,8 @@ import { SkyBackground } from '@/features/tabs/components'
 import type { ZodiacSign } from '@/features/tabs/zodiac'
 import { colors, radius, typography } from '@/theme'
 
-import type { InsightDetail } from '../month-insight'
-import { InsightDetailView } from './InsightDetailView'
+import type { Finding } from '../findings'
+import { FindingView } from './FindingView'
 import { StelarStar } from './MonthChatView'
 import { StelarOrb } from './StelarOrb'
 
@@ -36,37 +36,30 @@ const CLOSE_DRAG = 120 // px arrastrados para descartar
 const CLOSE_VELOCITY = 900 // o velocidad de flick
 
 type Props = {
-  /** El detalle a abrir (de una tarjeta de hallazgo); null = cerrado. */
-  detail: InsightDetail | null
+  /** El hallazgo a abrir (de una tarjeta); null = cerrado. */
+  finding: Finding | null
   title: string
   sign: ZodiacSign | null
   onSaveReflection: (questionKey: string, answer: string) => void
-  onExploreOther: () => void
+  onNext: () => void
   onClose: () => void
 }
 
-export function MonthChatSheet({
-  detail,
-  title,
-  sign,
-  onSaveReflection,
-  onExploreOther,
-  onClose,
-}: Props) {
+export function MonthChatSheet({ finding, title, sign, onSaveReflection, onNext, onClose }: Props) {
   const insets = useSafeAreaInsets()
   const { progress } = useTransformProgress()
-  const open = detail != null
+  const open = finding != null
   const translateY = useSharedValue(0)
 
-  // Momento "Leyendo tu mes…": al abrir, Stelar (el orbe de polvo estelar)
-  // recorre tu mes ~1.4s antes de revelar el hallazgo. Anticipación cálida.
+  // Momento "Leyendo tu mes…": al abrir, el orbe de polvo estelar recorre tu
+  // mes ~2.4s antes de revelar el hallazgo (mientras el backend ya lo tiene).
   const [reading, setReading] = useState(false)
   useEffect(() => {
     if (!open) return
     setReading(true)
-    const id = setTimeout(() => setReading(false), 1400)
+    const id = setTimeout(() => setReading(false), 2400)
     return () => clearTimeout(id)
-  }, [open, detail?.id])
+  }, [open, finding?.id])
 
   // Al abrir, arranca asentado (la animación de entrada la da el Modal).
   useEffect(() => {
@@ -125,12 +118,12 @@ export function MonthChatSheet({
             <Text style={styles.closeGlyph}>✕</Text>
           </Pressable>
 
-          {detail ? (
+          {finding ? (
             <ScrollView
               contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
               showsVerticalScrollIndicator={false}
             >
-              {/* Cabecera fija: título del insight + quién lee. */}
+              {/* Cabecera fija: título + quién lee. */}
               <View style={styles.head}>
                 <StelarStar size={30} />
                 <View style={styles.headText}>
@@ -143,12 +136,15 @@ export function MonthChatSheet({
                 <View style={styles.reading}>
                   <StelarOrb size={168} />
                   <Text style={styles.readingText}>Leyendo tu mes…</Text>
+                  <Text style={styles.readingSub}>
+                    Buscando patrones que normalmente pasarían desapercibidos.
+                  </Text>
                 </View>
               ) : (
-                <InsightDetailView
-                  detail={detail}
+                <FindingView
+                  finding={finding}
                   onSaveReflection={onSaveReflection}
-                  onExploreOther={onExploreOther}
+                  onNext={onNext}
                 />
               )}
             </ScrollView>
@@ -195,12 +191,21 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
   },
   content: { paddingHorizontal: 22, paddingTop: 6, gap: 22 },
-  reading: { alignItems: 'center', justifyContent: 'center', paddingTop: 40, gap: 18 },
+  reading: { alignItems: 'center', justifyContent: 'center', paddingTop: 36, gap: 12 },
   readingText: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.segmentTitle,
     color: colors.oroSoft,
+    marginTop: 6,
+  },
+  readingSub: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.niebla,
+    textAlign: 'center',
+    paddingHorizontal: 30,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headText: { flex: 1 },

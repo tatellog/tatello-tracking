@@ -3,50 +3,48 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, typography } from '@/theme'
 
-import type { PatternCard } from '../month-chat'
+import type { Finding, FindingCategory } from '../findings'
 
 /*
- * Las TARJETAS de hallazgo de la antesala de Órbita Mes IA. Cada tarjeta es un
- * patrón que el motor detectó, mostrado con su evidencia a 0 taps. Es una CARD
- * tapeable con contenedor visible + ícono de chat (indica "abre una
- * conversación"); al tocar abre la sala. STELAR + el hallazgo + "Ver más ›".
- * El borde toma un tinte de la dimensión (déficit=magenta, sueño=índigo, …).
+ * Las TARJETAS de hallazgo de la antesala. Cada una es un `Finding` del motor,
+ * mostrado con su título específico a 0 taps. Card tapeable con contenedor
+ * visible + ícono de chat (abre el detalle guiado). El borde toma el tinte de
+ * la categoría.
  */
 
 type Props = {
-  cards: PatternCard[]
-  onPick: (card: PatternCard) => void
+  cards: Finding[]
+  onPick: (finding: Finding) => void
 }
 
-/** Color de la dimensión → tinte del borde (paleta cerrada, no hex sueltos). */
-const TINT: Record<string, string> = {
+const TINT: Record<FindingCategory, string> = {
   deficit: colors.magenta,
+  movimiento: colors.dimension.cuerpo,
   sueno: colors.dimension.sueno,
   agua: colors.signal.agua,
   proteina: colors.signal.proteina,
-  comida: colors.dimension.alimento,
-  cuerpo: colors.dimension.cuerpo,
+  alimentacion: colors.dimension.alimento,
 }
-const tintFor = (k: string) => TINT[k] ?? colors.magenta
+const tintFor = (c: FindingCategory) => TINT[c] ?? colors.magenta
 
 export function MonthPatternCards({ cards, onPick }: Props) {
   if (cards.length === 0) return null
   return (
     <View style={styles.stack}>
-      {cards.map((card) => (
-        <Card key={card.id} card={card} onPress={() => onPick(card)} />
+      {cards.map((f) => (
+        <Card key={f.id} finding={f} onPress={() => onPick(f)} />
       ))}
     </View>
   )
 }
 
-function Card({ card, onPress }: { card: PatternCard; onPress: () => void }) {
-  const tint = tintFor(card.colorKey)
+function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
+  const tint = tintFor(finding.category)
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${card.finding}. Ver más.`}
+      accessibilityLabel={`${finding.title}. Ver más.`}
       style={({ pressed }) => [
         styles.card,
         { borderColor: `${tint}55` },
@@ -55,7 +53,7 @@ function Card({ card, onPress }: { card: PatternCard; onPress: () => void }) {
     >
       <View style={styles.body}>
         <Text style={styles.brand}>STELAR</Text>
-        <Text style={styles.finding}>{card.finding}</Text>
+        <Text style={styles.finding}>{finding.title}</Text>
         <Text style={styles.more}>Ver más ›</Text>
       </View>
       <ChatIcon color={colors.magentaHot} />
