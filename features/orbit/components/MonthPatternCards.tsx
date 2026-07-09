@@ -3,17 +3,17 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, typography } from '@/theme'
 
-import type { Chart, Finding, FindingCategory } from '../findings'
+import type { Finding, FindingCategory } from '../findings'
 
 /*
- * Las TARJETAS de hallazgo de la antesala. La card se camuflaba con el fondo de
- * Órbita Mes (degradado VINO→casi-negro): NINGÚN tono fijo de fondo la separa en
- * todo el degradado. Solución: card HIGHLIGHTED que resalta por sí sola —
- *   · borde del color de la DIMENSIÓN a ~70% (contorno claro en cualquier zona),
- *   · glow suave de la dimensión (la zona baja del fondo es oscura, sí se ve),
- *   · lavado interior tenue del color (se siente "encendida" con su dimensión),
- *   · barra de acento lateral + ícono de burbuja de chat (abre el detalle).
- * Usa `metric` + `confidence` como evidencia; tag de dimensión (no "STELAR").
+ * Las TARJETAS de hallazgo de la antesala. Un TEASER simple, no un mini-detalle:
+ * solo TÍTULO (el patrón) + SUBTÍTULO (la descripción) + burbuja de chat +
+ * chevron. La evidencia (confianza, métrica, gráficas) vive en el detalle
+ * (FindingView) — meterla aquí amontonaba la card.
+ *
+ * Highlighted por sí sola (el fondo de Órbita Mes es un degradado vino→negro,
+ * ningún color de fondo fijo la separa): borde del color de la dimensión +
+ * glow + lavado interior tenue + barra de acento lateral.
  */
 
 type Props = {
@@ -29,22 +29,7 @@ const TINT: Record<FindingCategory, string> = {
   proteina: colors.signal.proteina,
   alimentacion: colors.dimension.alimento,
 }
-const LABEL: Record<FindingCategory, string> = {
-  deficit: 'Déficit',
-  movimiento: 'Movimiento',
-  sueno: 'Sueño',
-  agua: 'Agua',
-  proteina: 'Proteína',
-  alimentacion: 'Alimentación',
-}
 const tintFor = (c: FindingCategory) => TINT[c] ?? colors.magenta
-
-/** Solidez del patrón (cuánto se repitió), en palabras · nunca "% probable". */
-function tier(confidence: number): { dots: boolean[]; word: string } {
-  if (confidence >= 75) return { dots: [true, true, true], word: 'se repitió mucho' }
-  if (confidence >= 55) return { dots: [true, true, false], word: 'se repitió' }
-  return { dots: [true, false, false], word: 'empieza a asomar' }
-}
 
 export function MonthPatternCards({ cards, onPick }: Props) {
   if (cards.length === 0) return null
@@ -59,11 +44,6 @@ export function MonthPatternCards({ cards, onPick }: Props) {
 
 function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
   const tint = tintFor(finding.category)
-  const t = tier(finding.confidence)
-  const weekChart = finding.charts.find(
-    (c): c is Extract<Chart, { kind: 'weekdayBars' }> => c.kind === 'weekdayBars',
-  )
-
   return (
     <Pressable
       onPress={onPress}
@@ -83,69 +63,24 @@ function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
       {/* Barra de acento lateral. */}
       <View style={[styles.accent, { backgroundColor: tint }]} />
 
-      {/* Header: tag de dimensión + solidez del patrón. */}
-      <View style={styles.header}>
-        <Text style={[styles.tag, { color: tint }]}>✦ {LABEL[finding.category].toUpperCase()}</Text>
-        <View style={styles.tierRow}>
-          <View style={styles.dots}>
-            {t.dots.map((on, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  { backgroundColor: on ? tint : colors.bruma, opacity: on ? 1 : 0.5 },
-                ]}
-              />
-            ))}
-          </View>
-          <Text style={styles.tierWord}>{t.word}</Text>
-        </View>
+      {/* Título (el patrón) + subtítulo (la descripción). */}
+      <View style={styles.body}>
+        <Text style={styles.title}>{finding.title}</Text>
+        <Text style={styles.subtitle} numberOfLines={2}>
+          {finding.explanation}
+        </Text>
       </View>
 
-      {/* El hallazgo. */}
-      <Text style={styles.title}>{finding.title}</Text>
-
-      {/* Mini-semana (constelación) cuando es por día de semana. */}
-      {weekChart ? <MiniWeek bars={weekChart.bars} tint={tint} /> : null}
-
-      {/* Datum de evidencia (métrica). */}
-      <View style={[styles.metric, { backgroundColor: `${tint}2E` }]}>
-        <Text style={styles.metricValue}>{finding.metric.value}</Text>
-        <Text style={styles.metricDot}>·</Text>
-        <Text style={styles.metricLabel}>{finding.metric.label}</Text>
-      </View>
-
-      {/* Fila-CTA: "Ver el detalle" + burbuja de chat (abre el detalle guiado). */}
-      <View style={styles.cta}>
-        <Text style={[styles.ctaText, { color: tint }]}>Ver el detalle ›</Text>
+      {/* Burbuja de chat + chevron — abre el detalle guiado. */}
+      <View style={styles.open}>
         <ChatBubble color={tint} />
+        <Text style={[styles.chevron, { color: tint }]}>›</Text>
       </View>
     </Pressable>
   )
 }
 
-/** La semana como 7 nodos; el día del hallazgo, encendido. */
-function MiniWeek({ bars, tint }: { bars: { label: string; highlight: boolean }[]; tint: string }) {
-  return (
-    <View style={styles.week}>
-      {bars.map((b, i) => (
-        <View key={i} style={styles.weekCol}>
-          <View
-            style={[
-              styles.weekDot,
-              b.highlight
-                ? { backgroundColor: tint, width: 7, height: 7, borderRadius: 3.5 }
-                : styles.weekDotOff,
-            ]}
-          />
-          <Text style={[styles.weekLabel, b.highlight && { color: tint }]}>{b.label}</Text>
-        </View>
-      ))}
-    </View>
-  )
-}
-
-/** Burbuja de conversación con 3 puntos — abre el detalle guiado. */
+/** Burbuja de conversación con 3 puntos. */
 function ChatBubble({ color }: { color: string }) {
   return (
     <Svg width={30} height={30} viewBox="0 0 24 24">
@@ -163,17 +98,18 @@ function ChatBubble({ color }: { color: string }) {
 const styles = StyleSheet.create({
   stack: { gap: 12 },
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: colors.bgCard2,
     borderRadius: radius.cardLg,
     borderWidth: 1.5,
-    paddingTop: 18,
-    paddingBottom: 16,
+    paddingVertical: 18,
     paddingLeft: 22,
     paddingRight: 16,
-    gap: 15,
     overflow: 'hidden',
-    // Glow de la dimensión (shadowColor = tint, inyectado inline). La zona baja
-    // del fondo es oscura → el halo de color sí se ve (highlighted).
+    // Glow de la dimensión (shadowColor = tint, inline). La zona baja del fondo
+    // es oscura → el halo de color sí se ve (highlighted).
     shadowOpacity: 0.5,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
@@ -181,71 +117,19 @@ const styles = StyleSheet.create({
   },
   cardPressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
   accent: { position: 'absolute', left: 10, top: 16, bottom: 16, width: 3, borderRadius: 2 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tag: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.4,
-  },
-  tierRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dots: { flexDirection: 'row', gap: 3 },
-  dot: { width: 5, height: 5, borderRadius: 2.5 },
-  tierWord: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-  },
+  body: { flex: 1, gap: 6 },
   title: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.title,
-    lineHeight: 23,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    lineHeight: 21,
     color: colors.leche,
   },
-  week: { flexDirection: 'row', justifyContent: 'space-between', paddingRight: 30 },
-  weekCol: { alignItems: 'center', gap: 5 },
-  weekDot: { width: 4, height: 4, borderRadius: 2 },
-  weekDotOff: { backgroundColor: colors.leche, opacity: 0.18 },
-  weekLabel: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.nano,
-    letterSpacing: 0.5,
-    color: colors.niebla,
-  },
-  metric: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-  },
-  metricValue: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-  },
-  metricDot: {
+  subtitle: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
+    lineHeight: 18,
     color: colors.niebla,
   },
-  metricLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.bone,
-  },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    paddingTop: 12,
-  },
-  ctaText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.2,
-  },
+  open: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  chevron: { fontFamily: typography.ui, fontSize: typography.sizes.headingLg, marginTop: -2 },
 })
