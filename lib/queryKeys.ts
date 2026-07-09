@@ -136,5 +136,10 @@ export const queryKeys = {
     // compute-findings) con fallback a compute-local. Key por (uid, periodo).
     findings: (uid: string, period: string, periodStart: string, periodEnd: string) =>
       ['orbit', 'findings', uid, period, periodStart, periodEnd] as const,
+    // Monthly Report (R1 · integrador final): el reporte ensamblado del periodo
+    // (veredicto + findings + stories + hypotheses + findingsHash), del writer
+    // (edge compute-findings) con fallback a compute-local. Key por (uid, periodo).
+    monthlyReport: (uid: string, period: string, periodStart: string, periodEnd: string) =>
+      ['orbit', 'monthlyReport', uid, period, periodStart, periodEnd] as const,
   },
 } as const

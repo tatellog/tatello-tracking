@@ -25,3 +25,15 @@ export function aiEnabledForEmail(email: string | null | undefined): boolean {
   if (!AI_MASTER_ENABLED || email == null) return false
   return AI_ENABLED_EMAILS.includes(email.toLowerCase())
 }
+
+/*
+ * Intelligence Engine (Epic 01 · F5 · T5.3) — el "flip".
+ *
+ * Cuando es `true`, Órbita Mes toma sus hallazgos + findingsHash del REPORTE
+ * PERSISTIDO (writer compute-findings → tabla monthly_reports) en vez de
+ * computarlos en el cliente. Por construcción la salida es idéntica (mismo
+ * buildFindings/hashFindings, misma ventana de días) — hay un test de paridad
+ * que lo prueba. Default `false`: hasta que la paridad esté validada en device,
+ * la UI en vivo se queda EXACTAMENTE como hoy (compute-local, cero red nueva).
+ */
+export const USE_PERSISTED_MONTH_REPORT = false

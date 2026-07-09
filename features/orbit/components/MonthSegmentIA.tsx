@@ -8,6 +8,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import { useSession } from '@/hooks/useSession'
+import { USE_PERSISTED_MONTH_REPORT } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -16,6 +17,7 @@ import { useSignalsHistory } from '../hooks'
 import { buildMonthChat } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
 import { usePriorReflections, useSaveReflection } from '../reflections'
+import { useMonthlyReport } from '../report-hooks'
 
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthDiscoveryTeaser } from './MonthDiscoveryTeaser'
@@ -93,7 +95,24 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
-  const cards = chat.cards
+  // Flip (T5.3): con USE_PERSISTED_MONTH_REPORT ON, los hallazgos + el hash
+  // vienen del REPORTE persistido (writer compute-findings → monthly_reports).
+  // Por construcción son idénticos al compute-local (mismo motor, misma ventana
+  // de 31 días · hay test de paridad). OFF por default → el hook duerme (cero
+  // red) y todo sale de `chat` exactamente como hoy.
+  const persistedReport = useMonthlyReport({
+    uid,
+    month,
+    period: 'last30',
+    periodStart: firstDataDay ?? `${month}-01`,
+    periodEnd: today,
+    signals,
+    ctx: { calorieTarget: targets?.calories ?? null, proteinTarget: targets?.protein_g ?? null },
+    prior: prior ?? {},
+    enabled: USE_PERSISTED_MONTH_REPORT,
+  }).data
+  const source = USE_PERSISTED_MONTH_REPORT ? persistedReport : null
+  const cards = source?.findings ?? chat.cards
 
   // El teaser invita; al tocar, se revela el REPORTE de evidencia (los hechos).
   const [revealed, setRevealed] = useState(false)
@@ -101,7 +120,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   // reporte es el hub; la conversación cierra de vuelta a él (sin loop, sin
   // repetir la metacognición en cada hecho).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
-  const findingsHash = useMemo(() => hashFindings(cards), [cards])
+  // El hash sale del reporte cuando el flip está ON (no recomputa); si no, se
+  // computa local sobre los mismos hallazgos.
+  const localHash = useMemo(() => hashFindings(chat.cards), [chat.cards])
+  const findingsHash = source?.findingsHash ?? localHash
   const monthKey = `${month}-01`
   const factTitle = openFinding
     ? openFinding.subject.charAt(0).toUpperCase() + openFinding.subject.slice(1)
