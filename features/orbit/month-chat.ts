@@ -94,6 +94,10 @@ export type MonthChat = {
   cards: PatternCard[]
 }
 
+/** Respuestas de meses anteriores (question_key → mes + respuesta), para el
+ *  "cerrar el loop": Stelar recuerda lo que dijiste la última vez. */
+export type PriorReflections = Record<string, { month: string; answer: string }>
+
 export type MonthChatCtx = {
   calorieTarget?: number | null
   proteinTarget?: number | null
@@ -344,6 +348,53 @@ const TOPIC_LABEL: Record<ChatTopic, string> = {
   sorprendeme: 'Sorpréndeme',
 }
 
+const MONTH_NAMES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+]
+const monthName = (m: string): string => MONTH_NAMES[Number(m.slice(5, 7)) - 1] ?? m
+
+/** El "cerrar el loop": si esta pregunta ya se contestó en un mes anterior,
+ *  Stelar lo recuerda antes de volver a preguntar. Continuidad, sin culpa. */
+function callbackBubble(questionKey: string, prior: PriorReflections): ChatBubble | null {
+  const p = prior[questionKey]
+  if (!p) return null
+  const mes = monthName(p.month)
+  if (p.answer === 'nunca') return { text: `En ${mes} esto no lo habías notado.` }
+  if (p.answer === 'no') return { text: `En ${mes} me dijiste que no lo habías notado.` }
+  if (p.answer === 'si') return { text: `En ${mes} ya lo sabías.` }
+  return null
+}
+
+/** Antepone el callback de continuidad a cada nodo con metacognición cuya
+ *  pregunta ya se respondió antes. Un Set evita procesar dos veces un nodo
+ *  compartido (p. ej. sorpréndeme reusa el árbol de otro tema). */
+function applyPriorCallbacks(trees: (ChatTree | undefined)[], prior: PriorReflections): void {
+  if (Object.keys(prior).length === 0) return
+  const seen = new Set<ChatNode>()
+  for (const tree of trees) {
+    if (!tree) continue
+    for (const node of Object.values(tree.nodes)) {
+      if (seen.has(node)) continue
+      seen.add(node)
+      const qk = node.choices?.find((c) => c.reflection)?.reflection?.questionKey
+      if (!qk) continue
+      const cb = callbackBubble(qk, prior)
+      if (cb) node.bubbles = [cb, ...node.bubbles]
+    }
+  }
+}
+
 /**
  * Arma la conversación del mes: el picker + los árboles disponibles (solo los
  * que tienen datos reales). Fase 1: déficit implementado; los otros temas se
@@ -352,6 +403,7 @@ const TOPIC_LABEL: Record<ChatTopic, string> = {
 export function buildMonthChat(
   signals: readonly DailySignals[],
   ctx: MonthChatCtx = {},
+  prior: PriorReflections = {},
 ): MonthChat {
   if (!monthChatReady(signals)) return { ready: false, picker: null, trees: {}, cards: [] }
 
@@ -418,6 +470,10 @@ export function buildMonthChat(
       { topic: 'sorprendeme' as ChatTopic, label: TOPIC_LABEL.sorprendeme },
     ],
   }
+
+  // Cerrar el loop: Stelar recuerda lo que dijiste la última vez, en temas y
+  // tarjetas por igual. Vacío en el primer mes (no hay pasado → sin callbacks).
+  applyPriorCallbacks([...Object.values(trees), ...cards.map((c) => c.tree)], prior)
 
   return { ready: true, picker, trees, cards }
 }

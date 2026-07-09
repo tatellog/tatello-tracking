@@ -153,6 +153,23 @@ describe('buildMonthChat — otros temas', () => {
     }
   })
 
+  it('cierra el loop: recuerda una respuesta de un mes anterior', () => {
+    const signals = activeMonth(20, () => ({ protein_g: 130 }))
+    // La última vez (mayo) dijo que NO lo había notado.
+    const prior = { protein_adherence: { month: '2026-05', answer: 'no' } }
+    const chat = buildMonthChat(signals, CTX, prior)
+    const notice = chat.trees.alimentacion!.nodes.notice!
+    // El callback de continuidad va ANTES de la pregunta, y nombra el mes.
+    expect(notice.bubbles[0]!.text).toMatch(/mayo/)
+    expect(notice.bubbles[0]!.text).toMatch(/no lo habías notado/i)
+  })
+
+  it('sin reflexiones previas → sin callback (primer mes limpio)', () => {
+    const signals = activeMonth(20, () => ({ protein_g: 130 }))
+    const notice = buildMonthChat(signals, CTX).trees.alimentacion!.nodes.notice!
+    expect(notice.bubbles[0]!.text).not.toMatch(/mayo|había notado la última/i)
+  })
+
   it('el picker solo lista temas con datos reales (nunca relleno)', () => {
     // Mes con déficit + sueño (para pasar readiness), pero SIN agua ni
     // entreno → esos botones no aparecen.

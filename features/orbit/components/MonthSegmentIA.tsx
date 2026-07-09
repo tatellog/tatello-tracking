@@ -21,7 +21,7 @@ import {
   type PatternCard,
 } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
-import { useSaveReflection } from '../reflections'
+import { usePriorReflections, useSaveReflection } from '../reflections'
 
 import { MonthChatSheet } from './MonthChatSheet'
 import { StelarSpeaks } from './MonthChatView'
@@ -59,13 +59,18 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const { session } = useSession()
   const uid = session?.user?.id ?? null
 
+  // "Cerrar el loop": respuestas de meses anteriores → Stelar recuerda lo que
+  // dijiste la última vez. Vacío en el primer mes (sin pasado, sin callbacks).
+  const prior = usePriorReflections(month, uid).data
+
   const chat = useMemo(
     () =>
-      buildMonthChat(signals, {
-        calorieTarget: targets?.calories ?? null,
-        proteinTarget: targets?.protein_g ?? null,
-      }),
-    [signals, targets?.calories, targets?.protein_g],
+      buildMonthChat(
+        signals,
+        { calorieTarget: targets?.calories ?? null, proteinTarget: targets?.protein_g ?? null },
+        prior ?? {},
+      ),
+    [signals, targets?.calories, targets?.protein_g, prior],
   )
 
   // Voz de IA (Release 1): gpt-4o-mini redacta la apertura EXPLICANDO los
