@@ -18,6 +18,7 @@ import type { ChatBubble } from '../month-chat'
 export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
   const title = bubbles[0]?.text ?? ''
   const subtitle = bubbles[1]?.text ?? ''
+  const caption = bubbles[2]?.text ?? ''
   return (
     <View style={styles.intro}>
       <View style={styles.introBrandRow}>
@@ -26,6 +27,7 @@ export function StelarSpeaks({ bubbles }: { bubbles: readonly ChatBubble[] }) {
       </View>
       {title ? <Text style={styles.introTitle}>{title}</Text> : null}
       {subtitle ? <Text style={styles.introSubtitle}>{subtitle}</Text> : null}
+      {caption ? <Text style={styles.introCaption}>{caption}</Text> : null}
     </View>
   )
 }
@@ -71,5 +73,11 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.ui,
     lineHeight: 22,
     color: colors.bone,
+  },
+  introCaption: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    marginTop: 2,
   },
 })

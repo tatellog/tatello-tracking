@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { useTransformProgress } from '@/features/emblem'
@@ -21,6 +21,7 @@ import { MonthChatSheet } from './MonthChatSheet'
 import { StelarSpeaks } from './MonthChatView'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { MonthPatternCards } from './MonthPatternCards'
+import { MonthReading } from './MonthReading'
 import { PresenceFinale } from './PresenceFinale'
 
 /*
@@ -83,25 +84,23 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   )
   const presence = useMemo(() => presenceSummary(signals), [signals])
 
+  const cards = chat.cards
+
+  // Pantalla 1: Stelar "lee tu mes" (orbe + onda + texto) antes de revelar los
+  // hallazgos. Se muestra una vez por montaje cuando ya hay datos.
+  const [read, setRead] = useState(false)
+
   // El detalle guiado del hallazgo se abre en su sala (sheet).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
 
-  // "Una sola cosa": se muestra UNA tarjeta a la vez; "Explorar otra" avanza a
-  // la siguiente (opt-in, no un muro). Con 1 mes de datos, casi siempre 1.
-  const [cardIdx, setCardIdx] = useState(0)
-  const cards = chat.cards
-  const currentCard = cards.length > 0 ? cards[cardIdx % cards.length] : null
-
-  // "Muéstrame otro patrón" desde el detalle: avanza al siguiente hallazgo y lo
-  // abre (lectura continua, sin volver al muro).
+  // "Muéstrame otro patrón" desde el detalle: abre el siguiente hallazgo.
   const nextFinding = () => {
     if (cards.length <= 1) {
       setOpenFinding(null)
       return
     }
-    const next = (cardIdx + 1) % cards.length
-    setCardIdx(next)
-    setOpenFinding(cards[next]!)
+    const i = cards.findIndex((c) => c.id === openFinding?.id)
+    setOpenFinding(cards[(i + 1) % cards.length]!)
   }
 
   const introBubbles = chat.intro
@@ -137,25 +136,17 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── Antesala PODADA (feedback dueña: mes 1 abrumaba): gancho corto +
-          UNA tarjeta de hallazgo a la vez + "Explorar otra" opcional. Sin
-          párrafo largo de IA, sin fila de chips. ── */}
-      {chat.ready ? (
+      {/* ── Pantalla 1: Stelar leyendo tu mes (orbe + onda + texto cíclico). ── */}
+      {chat.ready && !read ? (
+        <MonthReading days={signals.length} onDone={() => setRead(true)} />
+      ) : null}
+
+      {/* ── Pantalla 2: la apertura + las cards de patrón (Apple, una por
+          hallazgo). Cada card abre su detalle guiado. ── */}
+      {chat.ready && read ? (
         <View style={styles.section}>
           <StelarSpeaks bubbles={introBubbles} />
-          {currentCard ? <MonthPatternCards cards={[currentCard]} onPick={setOpenFinding} /> : null}
-          {cards.length > 1 ? (
-            <Pressable
-              onPress={() => setCardIdx((i) => i + 1)}
-              accessibilityRole="button"
-              accessibilityLabel="Ver otro hallazgo"
-              style={styles.explore}
-            >
-              <Text style={styles.exploreText}>
-                Otro hallazgo · {(cardIdx % cards.length) + 1} de {cards.length} ✦
-              </Text>
-            </Pressable>
-          ) : null}
+          <MonthPatternCards cards={cards} onPick={setOpenFinding} />
         </View>
       ) : null}
 
@@ -224,15 +215,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 28,
   },
-  section: { gap: 14 },
-  // "Otro hallazgo · N de M ✦" — paginación discreta (no un CTA que empuja).
-  explore: { alignSelf: 'center', paddingVertical: 13, paddingHorizontal: 18 },
-  exploreText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
-    color: colors.oroSoft,
-  },
+  section: { gap: 16 },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,

@@ -72,13 +72,19 @@ export function buildMonthChat(
   if (!monthChatReady(signals)) return { ready: false, intro: [], cards: [] }
   const cards = buildFindings(signals, ctx, prior)
   if (cards.length === 0) return { ready: false, intro: [], cards: [] }
+  const n = cards.length
   return {
     ready: true,
-    // Gancho corto (no resumen): "una sola cosa clara" para no abrumar. El
-    // detalle vive dentro del hallazgo.
     intro: [
       { text: 'Vi tu mes.', tone: 'accent' },
-      { text: 'Encontré algo que no era evidente.', tone: 'strong' },
+      {
+        text:
+          n === 1
+            ? 'Encontré 1 patrón que no era evidente.'
+            : `Encontré ${n} patrones que no eran evidentes.`,
+        tone: 'strong',
+      },
+      { text: 'Estos fueron los más fuertes.' },
     ],
     cards,
   }

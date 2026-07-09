@@ -36,13 +36,12 @@ describe('buildMonthChat', () => {
     expect(chat.intro).toEqual([])
   })
 
-  it('con datos: apertura corta (título + subtítulo) + hallazgos', () => {
+  it('con datos: apertura (Vi tu mes · N patrones · más fuertes) + hallazgos', () => {
     const chat = buildMonthChat(activeMonth(20), CTX)
     expect(chat.ready).toBe(true)
-    expect(chat.intro.map((b) => b.text)).toEqual([
-      'Vi tu mes.',
-      'Encontré algo que no era evidente.',
-    ])
+    expect(chat.intro[0]!.text).toBe('Vi tu mes.')
+    expect(chat.intro[1]!.text).toMatch(/Encontré .*patr/)
+    expect(chat.intro[2]!.text).toBe('Estos fueron los más fuertes.')
     expect(chat.cards.length).toBeGreaterThan(0)
     for (const f of chat.cards) {
       expect(f.title.length).toBeGreaterThan(0)

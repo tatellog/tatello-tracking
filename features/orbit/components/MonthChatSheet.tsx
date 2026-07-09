@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
@@ -18,7 +18,6 @@ import { colors, radius, typography } from '@/theme'
 import type { Finding } from '../findings'
 import { FindingView } from './FindingView'
 import { StelarStar } from './MonthChatView'
-import { StelarOrb } from './StelarOrb'
 
 /*
  * La "sala" de Órbita Mes IA — el sheet full-screen donde vive UNA conversación
@@ -50,16 +49,6 @@ export function MonthChatSheet({ finding, title, sign, onSaveReflection, onNext,
   const { progress } = useTransformProgress()
   const open = finding != null
   const translateY = useSharedValue(0)
-
-  // Momento "Leyendo tu mes…": al abrir, el orbe de polvo estelar recorre tu
-  // mes ~2.4s antes de revelar el hallazgo (mientras el backend ya lo tiene).
-  const [reading, setReading] = useState(false)
-  useEffect(() => {
-    if (!open) return
-    setReading(true)
-    const id = setTimeout(() => setReading(false), 2400)
-    return () => clearTimeout(id)
-  }, [open, finding?.id])
 
   // Al abrir, arranca asentado (la animación de entrada la da el Modal).
   useEffect(() => {
@@ -132,21 +121,7 @@ export function MonthChatSheet({ finding, title, sign, onSaveReflection, onNext,
                 </View>
               </View>
 
-              {reading ? (
-                <View style={styles.reading}>
-                  <StelarOrb size={168} />
-                  <Text style={styles.readingText}>Leyendo tu mes…</Text>
-                  <Text style={styles.readingSub}>
-                    Buscando patrones que normalmente pasarían desapercibidos.
-                  </Text>
-                </View>
-              ) : (
-                <FindingView
-                  finding={finding}
-                  onSaveReflection={onSaveReflection}
-                  onNext={onNext}
-                />
-              )}
+              <FindingView finding={finding} onSaveReflection={onSaveReflection} onNext={onNext} />
             </ScrollView>
           ) : null}
         </Animated.View>
@@ -191,22 +166,6 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
   },
   content: { paddingHorizontal: 22, paddingTop: 6, gap: 22 },
-  reading: { alignItems: 'center', justifyContent: 'center', paddingTop: 36, gap: 12 },
-  readingText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.oroSoft,
-    marginTop: 6,
-  },
-  readingSub: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
-    textAlign: 'center',
-    paddingHorizontal: 30,
-  },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headText: { flex: 1 },
   headTopic: {
