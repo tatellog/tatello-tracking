@@ -6,17 +6,34 @@ const byKind = (facts: Fact[]) => Object.fromEntries(facts.map((f) => [f.kind, f
 
 describe('computeFacts — registros → hechos agregados (Facts Engine)', () => {
   it('sin señales → sin hechos', () => {
-    expect(computeFacts({ period: 'month', signals: [], calorieTarget: 1500 })).toEqual([])
+    expect(
+      computeFacts({
+        period: 'month',
+        periodStart: '2026-07-01',
+        periodEnd: '2026-07-31',
+        signals: [],
+        calorieTarget: 1500,
+      }),
+    ).toEqual([])
   })
 
-  it('produce los hechos base con evidenceCount honesto y el periodo real', () => {
-    // 20 días: 12 en déficit (1200), 8 no (1800); todos con comida; 10 entrenos.
+  it('produce los hechos base con evidenceCount honesto y la VENTANA estable', () => {
+    // 20 días con datos: 12 en déficit (1200), 8 no (1800); 10 entrenos. La
+    // ventana persistida es el MES completo, no el rango de datos (07-01..07-20).
     const signals = []
     for (let i = 0; i < 20; i++) {
       const day = `2026-07-${String(i + 1).padStart(2, '0')}`
       signals.push(mkSig(day, { calories: i < 12 ? 1200 : 1800, meal_count: 3, trained: i < 10 }))
     }
-    const f = byKind(computeFacts({ period: 'month', signals, calorieTarget: 1500 }))
+    const f = byKind(
+      computeFacts({
+        period: 'month',
+        periodStart: '2026-07-01',
+        periodEnd: '2026-07-31',
+        signals,
+        calorieTarget: 1500,
+      }),
+    )
 
     expect(f.deficit_days!.value).toBe(12)
     expect(f.deficit_days!.evidenceCount).toBe(20) // denominador = días con comida
@@ -26,8 +43,8 @@ describe('computeFacts — registros → hechos agregados (Facts Engine)', () =>
     // Sin sueño ni peso registrados → NO se inventan esos hechos.
     expect(f.avg_sleep_minutes).toBeUndefined()
     expect(f.weight_change_kg).toBeUndefined()
-    // El periodo sale del rango real de fechas.
-    expect(f.deficit_days!.period).toEqual({ start: '2026-07-01', end: '2026-07-20' })
+    // El periodo es la ventana ESTABLE (idempotencia del upsert), no el rango real.
+    expect(f.deficit_days!.period).toEqual({ start: '2026-07-01', end: '2026-07-31' })
   })
 
   it('emite sueño solo si hay noches, y peso solo con ≥2 pesajes', () => {
@@ -36,7 +53,15 @@ describe('computeFacts — registros → hechos agregados (Facts Engine)', () =>
       mkSig('2026-07-02', { calories: 1300, meal_count: 2, sleep_minutes: 400 }),
       mkSig('2026-07-03', { calories: 1400, meal_count: 2, weight_kg: 69.5 }),
     ]
-    const f = byKind(computeFacts({ period: 'week', signals, calorieTarget: 1500 }))
+    const f = byKind(
+      computeFacts({
+        period: 'week',
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        signals,
+        calorieTarget: 1500,
+      }),
+    )
 
     expect(f.avg_sleep_minutes!.value).toBe(425) // (450+400)/2
     expect(f.avg_sleep_minutes!.evidenceCount).toBe(2) // 2 noches
@@ -48,6 +73,8 @@ describe('computeFacts — registros → hechos agregados (Facts Engine)', () =>
   it('sin target de calorías → sin surplus_days y deficit_days = 0', () => {
     const facts = computeFacts({
       period: 'day',
+      periodStart: '2026-07-01',
+      periodEnd: '2026-07-01',
       signals: [mkSig('2026-07-01', { calories: 1200, meal_count: 2 })],
     })
     const kinds = facts.map((x) => x.kind)

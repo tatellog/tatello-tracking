@@ -13,6 +13,11 @@ import type { Fact, Period } from './engine'
 
 export type ComputeFactsInput = {
   period: ContextPeriod
+  /** La VENTANA ESTABLE del periodo (ej. el mes: '2026-07-01'..'2026-07-31').
+   *  Es el `Fact.period` persistido → llave idempotente del upsert. NO se deriva
+   *  del rango de datos (que crece día a día y rompería el conflict key). */
+  periodStart: string
+  periodEnd: string
   /** Filas del periodo, deduplicadas (una por día). */
   signals: readonly ContextRow[]
   calorieTarget?: number | null
@@ -24,15 +29,15 @@ export type ComputeFactsInput = {
  * `evidenceCount` es el denominador honesto de cada hecho (días que lo sostienen).
  */
 export function computeFacts(input: ComputeFactsInput): Fact[] {
+  // Sin filas → sin hechos (nada que agregar).
+  if (input.signals.length === 0) return []
+
   const ctx = buildPeriodContext({
     period: input.period,
     signals: input.signals,
     calorieTarget: input.calorieTarget,
   })
-  // Sin rango de fechas (sin filas) → sin hechos.
-  if (!ctx.dateRange) return []
-
-  const period: Period = ctx.dateRange
+  const period: Period = { start: input.periodStart, end: input.periodEnd }
   const signals = input.signals
   const activeDays = signals.length
   const daysLogged = ctx.nutrition.daysLogged
