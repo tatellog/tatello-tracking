@@ -1,19 +1,19 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { colors, radius, typography } from '@/theme'
 
 import type { Chart, Finding, FindingCategory } from '../findings'
 
 /*
- * Las TARJETAS de hallazgo de la antesala. Rediseño (target-user + uxui +
- * illustrator): la card ANTES no se veía (fondo casi igual al negro, borde
- * tenue) y todo flotaba suelto. Ahora existe como objeto premium:
- *   · SOMBRA oscura que la despega del cielo estrellado (no glow, que se fundía).
- *   · BARRA de acento lateral del color de la DIMENSIÓN (no magenta fijo).
- *   · tag de dimensión (fuera "STELAR", redundante con StelarSpeaks arriba).
- *   · usa `metric` + `confidence` (antes desperdiciados) como evidencia.
- *   · mini-semana (constelación) cuando el hallazgo es por día de semana.
- *   · fila-CTA clara "Ver el detalle ›".
+ * Las TARJETAS de hallazgo de la antesala. La card se camuflaba con el fondo de
+ * Órbita Mes (degradado VINO→casi-negro): NINGÚN tono fijo de fondo la separa en
+ * todo el degradado. Solución: card HIGHLIGHTED que resalta por sí sola —
+ *   · borde del color de la DIMENSIÓN a ~70% (contorno claro en cualquier zona),
+ *   · glow suave de la dimensión (la zona baja del fondo es oscura, sí se ve),
+ *   · lavado interior tenue del color (se siente "encendida" con su dimensión),
+ *   · barra de acento lateral + ícono de burbuja de chat (abre el detalle).
+ * Usa `metric` + `confidence` como evidencia; tag de dimensión (no "STELAR").
  */
 
 type Props = {
@@ -71,11 +71,16 @@ function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
       accessibilityLabel={`${finding.title}. Ver el detalle.`}
       style={({ pressed }) => [
         styles.card,
-        { borderColor: `${tint}73` },
+        { borderColor: `${tint}B3`, shadowColor: tint },
         pressed && styles.cardPressed,
       ]}
     >
-      {/* Barra de acento lateral — identidad de dimensión + ancla la card. */}
+      {/* Lavado interior del color de la dimensión — "encendida". */}
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: `${tint}12` }]}
+      />
+      {/* Barra de acento lateral. */}
       <View style={[styles.accent, { backgroundColor: tint }]} />
 
       {/* Header: tag de dimensión + solidez del patrón. */}
@@ -97,23 +102,23 @@ function Card({ finding, onPress }: { finding: Finding; onPress: () => void }) {
         </View>
       </View>
 
-      {/* El hallazgo — la lectura primaria. */}
+      {/* El hallazgo. */}
       <Text style={styles.title}>{finding.title}</Text>
 
-      {/* Mini-semana (constelación) cuando el patrón es por día de semana. */}
+      {/* Mini-semana (constelación) cuando es por día de semana. */}
       {weekChart ? <MiniWeek bars={weekChart.bars} tint={tint} /> : null}
 
-      {/* Datum de evidencia (métrica) — lo que da confianza. */}
-      <View style={[styles.metric, { backgroundColor: `${tint}26` }]}>
+      {/* Datum de evidencia (métrica). */}
+      <View style={[styles.metric, { backgroundColor: `${tint}2E` }]}>
         <Text style={styles.metricValue}>{finding.metric.value}</Text>
         <Text style={styles.metricDot}>·</Text>
         <Text style={styles.metricLabel}>{finding.metric.label}</Text>
       </View>
 
-      {/* Fila-CTA — abre el detalle guiado (texto + chevron juntos, izq). */}
+      {/* Fila-CTA: "Ver el detalle" + burbuja de chat (abre el detalle guiado). */}
       <View style={styles.cta}>
-        <Text style={[styles.ctaText, { color: tint }]}>Ver el detalle</Text>
-        <Text style={[styles.ctaChevron, { color: tint }]}>›</Text>
+        <Text style={[styles.ctaText, { color: tint }]}>Ver el detalle ›</Text>
+        <ChatBubble color={tint} />
       </View>
     </Pressable>
   )
@@ -140,30 +145,41 @@ function MiniWeek({ bars, tint }: { bars: { label: string; highlight: boolean }[
   )
 }
 
+/** Burbuja de conversación con 3 puntos — abre el detalle guiado. */
+function ChatBubble({ color }: { color: string }) {
+  return (
+    <Svg width={30} height={30} viewBox="0 0 24 24">
+      <Path
+        d="M5 4 h13 a2.6 2.6 0 0 1 2.6 2.6 v7.2 a2.6 2.6 0 0 1 -2.6 2.6 h-7 l-4.8 3.4 v-3.4 h-1.2 a2.6 2.6 0 0 1 -2.6 -2.6 v-7.2 a2.6 2.6 0 0 1 2.6 -2.6 Z"
+        fill={color}
+      />
+      <Circle cx={8.6} cy={10.2} r={1.2} fill={colors.bg} />
+      <Circle cx={12} cy={10.2} r={1.2} fill={colors.bg} />
+      <Circle cx={15.4} cy={10.2} r={1.2} fill={colors.bg} />
+    </Svg>
+  )
+}
+
 const styles = StyleSheet.create({
   stack: { gap: 12 },
   card: {
-    // El fondo de Órbita Mes es un degradado VINO (no negro), y bgCard2 se
-    // camuflaba con él. Fondo casi-negro → la card contrasta como panel; el
-    // borde del color de la dimensión (~45% alpha) la define en cualquier zona.
-    backgroundColor: colors.bg,
+    backgroundColor: colors.bgCard2,
     borderRadius: radius.cardLg,
     borderWidth: 1.5,
     paddingTop: 18,
     paddingBottom: 16,
     paddingLeft: 22,
-    paddingRight: 18,
+    paddingRight: 16,
     gap: 15,
     overflow: 'hidden',
-    // Sombra OSCURA: la despega del cielo estrellado (glow se fundía con él).
-    shadowColor: colors.sombra,
-    shadowOpacity: 0.55,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    // Glow de la dimensión (shadowColor = tint, inyectado inline). La zona baja
+    // del fondo es oscura → el halo de color sí se ve (highlighted).
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
   cardPressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
-  // Barra inset + redondeada: acento limpio, no un canto cortado por el radio.
   accent: { position: 'absolute', left: 10, top: 16, bottom: 16, width: 3, borderRadius: 2 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tag: {
@@ -185,7 +201,6 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: colors.leche,
   },
-  // Mini-semana.
   week: { flexDirection: 'row', justifyContent: 'space-between', paddingRight: 30 },
   weekCol: { alignItems: 'center', gap: 5 },
   weekDot: { width: 4, height: 4, borderRadius: 2 },
@@ -196,7 +211,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.niebla,
   },
-  // Métrica (evidencia).
   metric: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -221,19 +235,17 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.micro,
     color: colors.bone,
   },
-  // Fila-CTA: texto + chevron juntos a la izquierda, tras un divisor full-width.
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    justifyContent: 'space-between',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
-    paddingTop: 13,
+    paddingTop: 12,
   },
   ctaText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     letterSpacing: 0.2,
   },
-  ctaChevron: { fontFamily: typography.ui, fontSize: typography.sizes.bodyLarge, marginTop: -2 },
 })
