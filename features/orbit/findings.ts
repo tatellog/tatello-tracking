@@ -59,6 +59,9 @@ export type Finding = {
   confidence: number
   /** El hallazgo, específico y con números. */
   title: string
+  /** La dimensión en humano ("tus días con tu meta de agua"): la IA del chat
+   *  abre NOMBRÁNDOLA para que cada hallazgo se sienta distinto (no un molde). */
+  subject: string
   /** El contenido de la card-constelación en 3 niveles: `lead` = la LECTURA /
    *  palanca (Cormorant italic, voz del coach · el VALOR, no la coincidencia),
    *  `support` = la evidencia con números (Hanken), `caption` = la
@@ -69,6 +72,13 @@ export type Finding = {
   /** Muestra chica (pocas ocurrencias): se muestra como "Señal naciente" —
    *  tentativa, sin sello de consistencia lleno. Honestidad sobre el N. */
   emerging?: boolean
+  /** `true` = hallazgo de RUPTURA (dónde se te va: rompes la dieta, te saltas el
+   *  gym). Lo invisible que frena el mes. El reporte lo enmarca como oportunidad,
+   *  nunca como culpa; NO lleva northLink (romper no acerca al objetivo). */
+  isObstacle?: boolean
+  /** El CONTRAPUNTO en humano ("los días que NO"): caracteriza el reverso con
+   *  números, para responder de verdad "¿y los días que no?". */
+  contrast?: string
   /** Contexto corto de por qué vale la pena, sin recetar. */
   explanation: string
   /** Conexión con su norte (déficit → objetivo), sin presión. undefined si el
@@ -194,6 +204,7 @@ function detectWeekdayCalories(signals: readonly DailySignals[]): Finding | null
     category: 'alimentacion',
     confidence,
     title: `Los ${WD_PLURAL[bestWd]} consumiste ${Math.round(bestDelta)} kcal más que tu promedio.`,
+    subject: `los ${WD_PLURAL[bestWd]}`,
     phrase: {
       lead: `Los ${WD_PLURAL[bestWd]}, tu cuerpo pidió un poco más.`,
       support: `${Math.round(bestDelta)} kcal por encima de tu promedio.`,
@@ -227,12 +238,24 @@ function detectTrainingDeficit(signals: readonly DailySignals[], ctx: FindingsCt
   const evidenceDates = deficitTrained.map((s) => s.day).filter((d): d is string => !!d)
   const emerging = trained.length < 5 // pocas ocurrencias → señal naciente, no sello
 
+  // Contrapunto (el gym como ancla de la dieta): los días que NO entrenó.
+  const notTrained = signals.filter(
+    (s) => s.trained !== true && s.calories != null && s.calories > 0,
+  )
+  const notTrainedDef = notTrained.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget)).length
+  const contrast =
+    notTrained.length >= 3
+      ? `Los días que no entrenaste, ${notTrainedDef} de ${notTrained.length} en déficit.`
+      : undefined
+
   return {
     id: 'training-deficit',
     category: 'movimiento',
     confidence: pct,
     emerging,
+    contrast,
     title: `Los días que entrenaste, entraste en déficit el ${pct}% de las veces.`,
+    subject: 'tus días de entrenamiento',
     phrase: {
       lead: 'Moverte y tu déficit fueron casi siempre juntos.',
       support: emerging
@@ -280,6 +303,7 @@ function detectWaterDeficit(signals: readonly DailySignals[], ctx: FindingsCtx):
     confidence: pct,
     emerging,
     title: `Cuando llegaste a tu meta de agua, estuviste en déficit ${overlap.length} de ${goalDays.length} días.`,
+    subject: 'tus días con tu meta de agua',
     phrase: {
       lead: 'Los días que llegaste a tu agua, sostuviste el déficit.',
       support: emerging
@@ -335,11 +359,13 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
     category: 'deficit',
     confidence: pct,
     title: `Estuviste en déficit ${count} de ${withCal.length} días con comida registrada.`,
+    subject: 'tu déficit del mes',
     phrase: {
       lead,
       support: `Déficit ${count} de ${withCal.length} días con comida registrada.`,
       caption: 'Un día no lo dice; el mes junto sí.',
     },
+    contrast: `Los otros ${withCal.length - count} días con comida no llegaron a déficit.`,
     explanation: 'Tu norte del mes. Aquí está sin adornos.',
     northLink: 'Cada uno de esos días te acercó a tu objetivo.',
     metric: { value: `${count} de ${withCal.length}`, label: 'días en déficit' },
@@ -354,6 +380,83 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
     ],
     reflectionKey: 'deficit-summary',
     metacognition: standardMetacognition(false),
+    followUps: [],
+  }
+}
+
+/** E · OBSTÁCULO — el día de la semana donde más se te rompe la dieta. Lo
+ *  invisible que tu memoria no ve: la DB sí. Hecho, no culpa. Sin northLink
+ *  (romper no acerca al objetivo). */
+function detectWeekdayDietBreak(
+  signals: readonly DailySignals[],
+  ctx: FindingsCtx,
+): Finding | null {
+  if (ctx.calorieTarget == null) return null
+  const rows = signals.filter(
+    (s): s is DailySignals & { day: string; calories: number } =>
+      !!s.day && s.calories != null && s.calories > 0,
+  )
+  if (rows.length < 12) return null
+
+  const total = Array(7).fill(0)
+  const deficit = Array(7).fill(0)
+  for (const r of rows) {
+    const wd = weekday(r.day)
+    total[wd]!++
+    if (isDeficitDay(r.calories, ctx.calorieTarget)) deficit[wd]!++
+  }
+  const overallDef = rows.filter((r) => isDeficitDay(r.calories, ctx.calorieTarget)).length
+  const overallRate = overallDef / rows.length
+
+  let worst = -1
+  let worstRate = 1
+  for (let wd = 0; wd < 7; wd++) {
+    if (total[wd]! < 3) continue // muestra real de ese día
+    const rate = deficit[wd]! / total[wd]!
+    if (rate < worstRate) {
+      worstRate = rate
+      worst = wd
+    }
+  }
+  if (worst < 0) return null
+  if (overallRate - worstRate < 0.25) return null // la caída debe ser notable
+  if (worstRate > 0.5) return null // si aun el peor día suele estar en déficit, no hay ruptura
+
+  const occ = total[worst]!
+  const broke = occ - deficit[worst]!
+  const restTotal = rows.length - occ
+  const restDef = overallDef - deficit[worst]!
+  const wd = WD_PLURAL[worst]!
+  const evidenceDates = rows
+    .filter((r) => weekday(r.day) === worst && !isDeficitDay(r.calories, ctx.calorieTarget))
+    .map((r) => r.day)
+  const bars = WD_SHORT.map((label, i) => ({
+    label,
+    value: total[i]! ? Math.round((deficit[i]! / total[i]!) * 100) : 0,
+    highlight: i === worst,
+  }))
+
+  return {
+    id: 'weekday-diet-break',
+    category: 'deficit',
+    isObstacle: true,
+    confidence: Math.round((broke / occ) * 100),
+    emerging: occ < 4,
+    title: `Los ${wd} no llegaste a déficit ${broke} de ${occ} veces.`,
+    subject: `los ${wd}`,
+    phrase: {
+      lead: `Los ${wd} son distintos en tu semana.`,
+      support: `Los ${wd} no llegaste a déficit ${broke} de ${occ} veces.`,
+      caption: 'Un día suelto no se ve; el mes junto, sí.',
+    },
+    contrast: `El resto de la semana lo sostuviste ${restDef} de ${restTotal} días.`,
+    explanation: 'Un día de la semana concentró las roturas de tu déficit.',
+    metric: { value: `${broke} de ${occ}`, label: `${wd} fuera de déficit` },
+    evidenceDates,
+    evidenceTitle: '¿Por qué encontré esto?',
+    charts: [{ kind: 'weekdayBars', unit: '% en déficit', bars }],
+    reflectionKey: 'weekday-diet-break',
+    metacognition: standardMetacognition(true),
     followUps: [],
   }
 }
@@ -401,10 +504,10 @@ function buildFollowUps(f: Finding): FollowUp[] {
 const scoreOf = (f: Finding): number => f.confidence + (f.northLink ? 15 : 0)
 
 /**
- * Los hallazgos del mes: SOLO 2-3 que TENGAN SENTIDO (no un listado). El de
- * déficit (el norte) es ancla si existe; el resto se filtra por confianza ≥ 60
- * y se rankea por score; máx 1 hallazgo "sin norte" (ej. comer más un día).
- * Cap 3, ordenados por score (el mejor es el hero).
+ * Los hallazgos del mes para el REPORTE: el VEREDICTO (déficit sostenido) como
+ * ancla, luego los OBSTÁCULOS ("dónde se te va" — lo invisible que frena el
+ * mes, el valor real), y al final alguna palanca positiva. El reporte los
+ * ordena: veredicto arriba, obstáculos en medio, cierre positivo abajo. Cap 4.
  */
 export function buildFindings(
   signals: readonly DailySignals[],
@@ -415,27 +518,33 @@ export function buildFindings(
     detectWeekdayCalories(signals),
     detectTrainingDeficit(signals, ctx),
     detectWaterDeficit(signals, ctx),
+    detectWeekdayDietBreak(signals, ctx),
     detectDeficitSummary(signals, ctx),
   ].filter((f): f is Finding => f != null)
 
-  const anchor = all.find((f) => f.id === 'deficit-summary')
-  const rest = all
-    .filter((f) => f.id !== 'deficit-summary' && f.confidence >= 60)
+  const verdict = all.find((f) => f.id === 'deficit-summary')
+  // Obstáculos primero (lo invisible que pediste entender); luego palancas.
+  const obstacles = all
+    .filter((f) => f.isObstacle && f.confidence >= 55)
+    .sort((a, b) => b.confidence - a.confidence)
+  const levers = all
+    .filter((f) => !f.isObstacle && f.id !== 'deficit-summary' && f.confidence >= 60)
     .sort((a, b) => scoreOf(b) - scoreOf(a))
 
-  const picked: Finding[] = anchor ? [anchor] : []
+  const picked: Finding[] = verdict ? [verdict] : []
+  for (const f of obstacles) {
+    if (picked.length >= 4) break
+    picked.push(f)
+  }
   let noNorth = 0
-  for (const f of rest) {
-    if (picked.length >= 3) break
+  for (const f of levers) {
+    if (picked.length >= 4) break
     if (!f.northLink) {
-      if (noNorth >= 1) continue // máx un hallazgo sin norte
+      if (noNorth >= 1) continue // máx una palanca "sin norte" (ej. comer más un día)
       noNorth++
     }
     picked.push(f)
   }
-  // NO re-ordenar: el ancla (déficit = el norte) queda en índice 0 como hero, y
-  // el resto conserva su orden por score. El re-sort anterior dejaba que una
-  // coincidencia de N chico con 100% (falso-preciso) robara el titular al norte.
 
   return picked.map((f) => ({
     ...f,

@@ -11,18 +11,16 @@ import { useSession } from '@/hooks/useSession'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-import { useMonthVoice } from '../ai-voice'
-import { type Finding, type FindingCategory, hashFindings } from '../findings'
+import { type Finding, hashFindings } from '../findings'
 import { useSignalsHistory } from '../hooks'
 import { buildMonthChat } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
-import { usePriorReflections, useSaveReflection } from '../reflections'
+import { usePriorReflections } from '../reflections'
 
 import { MonthChatSheet } from './MonthChatSheet'
-import { StelarSpeaks } from './MonthChatView'
+import { MonthDiscoveryTeaser } from './MonthDiscoveryTeaser'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
-import { MonthPatternCards } from './MonthPatternCards'
-import { MonthReading } from './MonthReading'
+import { MonthReport } from './MonthReport'
 import { PresenceFinale } from './PresenceFinale'
 
 /*
@@ -41,14 +39,21 @@ const HERO_SIZE = 200
  *  el Mes actual. */
 const PCT_THRESHOLD = 8
 
-/** El título del header del detalle, por categoría del hallazgo. */
-const CATEGORY_LABEL: Record<FindingCategory, string> = {
-  deficit: 'Déficit',
-  movimiento: 'Movimiento',
-  sueno: 'Sueño',
-  agua: 'Agua',
-  proteina: 'Proteína',
-  alimentacion: 'Alimentación',
+/** La línea honesta del teaser híbrido: sobre qué es el hallazgo líder (para
+ *  que la promesa no sea una caja de misterio vacía). */
+function teaserDimension(f: Finding): string {
+  switch (f.id) {
+    case 'deficit-summary':
+      return 'sobre tu déficit del mes'
+    case 'water-deficit':
+      return 'sobre tus días con agua'
+    case 'training-deficit':
+      return 'sobre los días que entrenaste'
+    case 'weekday-calories':
+      return 'sobre un día de tu semana'
+    default:
+      return 'sobre tu mes'
+  }
 }
 
 export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => void }) {
@@ -60,7 +65,6 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const { data: profile } = useProfile()
   const sign = profile ? zodiacFromDate(profile.date_of_birth) : null
   const { progress } = useTransformProgress()
-  const saveReflection = useSaveReflection(month)
   const { session } = useSession()
   const uid = session?.user?.id ?? null
 
@@ -87,42 +91,17 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
 
   const cards = chat.cards
 
-  // Voz de IA POR HALLAZGO (gateada por usuario). La key es el hash de los
-  // hallazgos → si no cambian, cero red y cero GPT. El periodo se fija al mes
-  // (estable) para que el hash sea la única llave de regeneración. Si la IA está
-  // apagada o falla, `voice` es null y las cards usan su texto determinístico.
-  const findingsHash = useMemo(() => hashFindings(cards), [cards])
-  const monthInputs = useMemo(
-    () =>
-      cards.map((f) => ({
-        id: f.id,
-        lead: f.phrase.lead,
-        support: f.phrase.support,
-        caption: f.phrase.caption,
-      })),
-    [cards],
-  )
-  const monthKey = `${month}-01`
-  const { data: voice } = useMonthVoice(uid, monthKey, monthKey, monthInputs, findingsHash)
-
-  // Pantalla 1: Stelar "lee tu mes" (orbe + onda + texto) antes de revelar los
-  // hallazgos. Se muestra una vez por montaje cuando ya hay datos.
-  const [read, setRead] = useState(false)
-
-  // El detalle guiado del hallazgo se abre en su sala (sheet).
+  // El teaser invita; al tocar, se revela el REPORTE de evidencia (los hechos).
+  const [revealed, setRevealed] = useState(false)
+  // Profundizar: tocar un hecho abre una conversación corta (fact-led). El
+  // reporte es el hub; la conversación cierra de vuelta a él (sin loop, sin
+  // repetir la metacognición en cada hecho).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
-
-  // "Muéstrame otro patrón" desde el detalle: abre el siguiente hallazgo.
-  const nextFinding = () => {
-    if (cards.length <= 1) {
-      setOpenFinding(null)
-      return
-    }
-    const i = cards.findIndex((c) => c.id === openFinding?.id)
-    setOpenFinding(cards[(i + 1) % cards.length]!)
-  }
-
-  const introBubbles = chat.intro
+  const findingsHash = useMemo(() => hashFindings(cards), [cards])
+  const monthKey = `${month}-01`
+  const factTitle = openFinding
+    ? openFinding.subject.charAt(0).toUpperCase() + openFinding.subject.slice(1)
+    : ''
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -155,17 +134,18 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── Pantalla 1: Stelar leyendo tu mes (orbe + onda + texto cíclico). ── */}
-      {chat.ready && !read ? (
-        <MonthReading days={signals.length} onDone={() => setRead(true)} />
-      ) : null}
-
-      {/* ── Pantalla 2: la apertura + las cards de patrón (sesión de
-          descubrimiento). Cada card abre su detalle guiado. ── */}
-      {chat.ready && read ? (
+      {/* ── El teaser invita; al tocar, revela el reporte de evidencia (los
+          hechos: veredicto → dónde se te va → puerta abierta). ── */}
+      {chat.ready && cards.length > 0 ? (
         <View style={styles.antesala}>
-          <StelarSpeaks bubbles={introBubbles} />
-          <MonthPatternCards cards={cards} onPick={setOpenFinding} voice={voice} />
+          {revealed ? (
+            <MonthReport cards={cards} onPickFact={setOpenFinding} />
+          ) : (
+            <MonthDiscoveryTeaser
+              dimension={teaserDimension(cards[0]!)}
+              onStart={() => setRevealed(true)}
+            />
+          )}
         </View>
       ) : null}
 
@@ -181,13 +161,20 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           con ≥7 días de presencia (nunca presentado como progreso físico). ── */}
       {presence && presence.presentDays >= 7 ? <PresenceFinale presence={presence} /> : null}
 
-      {/* ── La sala: el detalle guiado del hallazgo, full-screen. ── */}
+      {/* ── Profundizar: la conversación corta sobre UN hecho (fact-led). El
+          reporte es el hub, así que cierra de vuelta (sin ciclo, sin metacognición
+          repetida por hecho). ── */}
       <MonthChatSheet
         finding={openFinding}
-        title={openFinding ? CATEGORY_LABEL[openFinding.category] : ''}
+        title={factTitle}
         sign={sign}
-        onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
-        onNext={nextFinding}
+        periodStart={monthKey}
+        periodEnd={monthKey}
+        findingsHash={findingsHash}
+        askMetacognition={false}
+        hasMore={false}
+        onSaveReflection={() => {}}
+        onNext={() => setOpenFinding(null)}
         onClose={() => setOpenFinding(null)}
         onPickDay={(date) => {
           setOpenFinding(null)

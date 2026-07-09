@@ -67,18 +67,37 @@ describe('buildFindings — hallazgos específicos con confianza y evidencia', (
     }
   })
 
-  it('muestra solo 2-3 hallazgos con sentido (cap + confianza)', () => {
+  it('muestra pocos hallazgos con sentido (cap + confianza)', () => {
     const signals = month(28, (i) => ({
       trained: i % 3 === 0,
       water_glasses: i % 2 === 0 ? 9 : 3,
       calories: i % 2 === 0 ? 1200 : 1700,
     }))
     const cards = buildFindings(signals, CTX)
-    expect(cards.length).toBeLessThanOrEqual(3)
-    // Todo lo que no es el ancla de déficit debe pasar el corte de confianza.
+    expect(cards.length).toBeLessThanOrEqual(4)
+    // Todo lo que no es el veredicto pasa un corte de confianza (obstáculo ≥55,
+    // palanca ≥60).
     for (const f of cards) {
-      if (f.id !== 'deficit-summary') expect(f.confidence).toBeGreaterThanOrEqual(60)
+      if (f.id === 'deficit-summary') continue
+      expect(f.confidence).toBeGreaterThanOrEqual(f.isObstacle ? 55 : 60)
     }
+  })
+
+  it('detecta el día que rompe tu dieta (obstáculo) con contrapunto', () => {
+    // Los viernes (2026-07-03/10/17/24) fuera de déficit; el resto en déficit.
+    const signals = month(28, (i) => {
+      const wd = new Date(`2026-07-${String(i + 1).padStart(2, '0')}T00:00:00Z`).getUTCDay()
+      return { calories: wd === 5 ? 2000 : 1200 }
+    })
+    const f = buildFindings(signals, CTX).find((x) => x.id === 'weekday-diet-break')
+    expect(f).toBeDefined()
+    expect(f!.isObstacle).toBe(true)
+    expect(f!.northLink).toBeUndefined() // romper no acerca al objetivo
+    expect(f!.phrase.support).toMatch(/viernes/)
+    expect(f!.phrase.support).toMatch(/\d+ de \d+/)
+    expect(f!.contrast).toMatch(/resto de la semana/)
+    // Hecho, no culpa.
+    expect(f!.phrase.support).not.toMatch(/fallas|fracas|débil/i)
   })
 
   it('sin datos suficientes → sin hallazgos', () => {

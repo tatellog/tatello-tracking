@@ -13,10 +13,13 @@ import { useTransformProgress } from '@/features/emblem'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { SkyBackground } from '@/features/tabs/components'
 import type { ZodiacSign } from '@/features/tabs/zodiac'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { colors, radius, typography } from '@/theme'
 
 import type { Finding } from '../findings'
 import { DiscoveryWave } from './DiscoveryWave'
+import { FindingChatView } from './FindingChatView'
 import { FindingView } from './FindingView'
 import { StelarStar } from './MonthChatView'
 
@@ -44,6 +47,14 @@ type Props = {
   finding: Finding | null
   title: string
   sign: ZodiacSign | null
+  /** Periodo + hash de hallazgos: para el chat guiado con IA (cache por hash). */
+  periodStart: string
+  periodEnd: string
+  findingsHash: string
+  /** Solo el hero de la sesión hace la metacognición (no se repite por card). */
+  askMetacognition: boolean
+  /** ¿Quedan hallazgos sin ver? (decide "otro hallazgo" vs "ver mi mes"). */
+  hasMore: boolean
   onSaveReflection: (questionKey: string, answer: string) => void
   onNext: () => void
   onClose: () => void
@@ -54,6 +65,11 @@ export function MonthChatSheet({
   finding,
   title,
   sign,
+  periodStart,
+  periodEnd,
+  findingsHash,
+  askMetacognition,
+  hasMore,
   onSaveReflection,
   onNext,
   onClose,
@@ -61,6 +77,8 @@ export function MonthChatSheet({
 }: Props) {
   const insets = useSafeAreaInsets()
   const { progress } = useTransformProgress()
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
   const open = finding != null
   const translateY = useSharedValue(0)
 
@@ -152,12 +170,28 @@ export function MonthChatSheet({
                 </View>
               </View>
 
-              <FindingView
-                finding={finding}
-                onSaveReflection={onSaveReflection}
-                onNext={onNext}
-                onPickDay={onPickDay}
-              />
+              {aiOn ? (
+                <FindingChatView
+                  key={finding.id}
+                  finding={finding}
+                  periodStart={periodStart}
+                  periodEnd={periodEnd}
+                  findingsHash={findingsHash}
+                  askMetacognition={askMetacognition}
+                  hasMore={hasMore}
+                  onSaveReflection={onSaveReflection}
+                  onNext={onNext}
+                  onFinish={onClose}
+                  onPickDay={onPickDay}
+                />
+              ) : (
+                <FindingView
+                  finding={finding}
+                  onSaveReflection={onSaveReflection}
+                  onNext={onNext}
+                  onPickDay={onPickDay}
+                />
+              )}
             </ScrollView>
           ) : null}
         </Animated.View>

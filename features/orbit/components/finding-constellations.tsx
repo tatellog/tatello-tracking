@@ -14,6 +14,8 @@ import Svg, { Circle, Defs, Path, RadialGradient, Stop, Text as SvgText } from '
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry'
 import { colors, typography } from '@/theme'
 
+import type { Finding } from '../findings'
+
 /*
  * OBJETOS DE CONSTELACIÓN de Órbita · Mes — cada hallazgo se DIBUJA como una
  * carta celeste (cartografía de una relación), no como un bloque de texto.
@@ -396,6 +398,50 @@ export const WeekStripConstellation = memo(function WeekStripConstellation({
     </View>
   )
 })
+
+/* ────────────────────────────────────────────────────────────────────────
+ * ROUTER · el objeto-constelación que corresponde a un hallazgo.
+ * Compartido por la antesala (cards) y el chat guiado (visual de apertura).
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const CONSTELLATION_ACCENT: Record<string, string> = {
+  'water-deficit': colors.signal.agua,
+  'training-deficit': colors.signal.entreno,
+  'deficit-summary': colors.magenta,
+  'weekday-calories': colors.oroSoft,
+}
+
+/** El acento (color del nodo A) de un hallazgo. */
+export function constellationAccent(f: Finding): string {
+  return CONSTELLATION_ACCENT[f.id] ?? colors.magenta
+}
+
+/** Enruta un hallazgo a su objeto-constelación, leyendo `finding.charts`. */
+export function FindingConstellation({ finding, width }: { finding: Finding; width: number }) {
+  const chart = finding.charts[0]
+  const accent = constellationAccent(finding)
+
+  if (finding.id === 'water-deficit' || finding.id === 'training-deficit') {
+    const days = chart?.kind === 'dotTimeline' ? (chart.dots as RelationDay[]) : []
+    return (
+      <RelationConstellation
+        colorA={accent}
+        labelA={finding.id === 'water-deficit' ? 'AGUA' : 'ENTRENO'}
+        days={days}
+        width={width}
+      />
+    )
+  }
+  if (finding.id === 'deficit-summary') {
+    const dots = chart?.kind === 'dotTimeline' ? chart.dots : []
+    const lit = dots.filter((d) => d === 'strong').length
+    return <DeficitBraceletConstellation lit={lit} total={dots.length} width={width} />
+  }
+  if (finding.id === 'weekday-calories' && chart?.kind === 'weekdayBars') {
+    return <WeekStripConstellation bars={chart.bars} width={width} />
+  }
+  return null
+}
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },

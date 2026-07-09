@@ -27,7 +27,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
 const MODEL = 'gpt-4o-mini'
-const PROMPT_VERSION = 'v1'
+// v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
+// Subirla invalida el caché viejo (respuestas genéricas de v1).
+const PROMPT_VERSION = 'v2'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -255,9 +257,92 @@ const CardsSchema = z.object({
     .max(4),
 })
 
+/* ── Órbita Mes · CHAT guiado: la IA conduce 3-4 turnos sobre UN hallazgo ─ */
+// La IA no detecta ni inventa: toma el hallazgo determinístico y, por turno,
+// redacta un mensaje corto + 3 chips de REACCIÓN de la usuaria (nunca acción).
+// El cliente controla el conteo y el cierre (isFinal); el turno de
+// metacognición si/no/nunca lo maneja el cliente, no la IA.
+const CHAT_SYSTEM_PROMPT = [
+  'Eres la Voz de Stelar, una app de pérdida de peso sostenible.',
+  'Conduces una charla CORTA (3-4 turnos) sobre UN hallazgo que el sistema YA',
+  'detectó en los registros de la usuaria. No detectas nada nuevo, no inventas.',
+  '',
+  'Cada turno devuelves: un "message" cálido (1-2 frases) y "chips": 3 posibles',
+  'REACCIONES de ELLA (en su voz) o preguntas sobre SUS propios datos.',
+  '',
+  'LOS CHIPS SON DE PERSPECTIVA / RECONOCIMIENTO / CURIOSIDAD, NUNCA DE ACCIÓN.',
+  'Chips válidos: "No lo había notado", "¿En cuántos días pasó?", "¿Y los días',
+  'que no?", "¿Es casualidad?", "Me gusta verlo así", "Muéstrame esos días".',
+  'PROHIBIDO como chip o mensaje: pedir o dar un plan/dieta/rutina, "¿qué hago?",',
+  '"debes/deberías/intenta/come menos/duerme más/sube tu proteína", cualquier',
+  'consejo de conducta, diagnóstico, lenguaje clínico ("atracón", "trastorno"),',
+  'culpa, comparación con otras personas, o un peso como meta. Chips de 2 a 6 palabras.',
+  '',
+  'VOZ: cálida, segunda persona femenina, frases cortas, sin exclamaciones, sin',
+  'emojis, sin tecnicismos. NO afirmes causa (son coincidencias observadas).',
+  'NO pongas cifras en message ni en chips (los números viven en el sistema).',
+  '',
+  'PROHIBIDO EL RELLENO: nunca uses "interesante", "algo especial", "cada día',
+  'cuenta", "sigue así". La frase "te acerca a tu objetivo" solo UNA vez, en el',
+  'cierre. Cada "message" DEBE nombrar algo CONCRETO del hallazgo (el día, la',
+  'dimensión o el contrapunto); un turno que no nombra nada concreto no sirve.',
+  '',
+  'Responde SOLO JSON válido, exacto:',
+  '{"message": {"text": string, "tone": "accent" | "strong" | null}, "chips": [string, string, string]}',
+  'Si te digo que es el CIERRE, "chips" debe ser [] (vacío).',
+].join('\n')
+
+function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
+  const lines = ['Hallazgo (verdad del sistema, no lo repitas literal ni con cifras):']
+  if (finding.subject) lines.push(`- es sobre: ${finding.subject}`)
+  if (finding.lead) lines.push(`- lectura semilla (no la copies literal): ${finding.lead}`)
+  lines.push(`- evidencia: ${finding.support}`)
+  if (finding.northLink) lines.push(`- conexión con su objetivo: ${finding.northLink}`)
+  if (finding.hypothesis) lines.push(`- otra coincidencia (tentativa): ${finding.hypothesis}`)
+  if (finding.contrast) lines.push(`- el contrapunto (los días que NO): ${finding.contrast}`)
+  lines.push('')
+  if (path && path.length > 0) {
+    lines.push(`Ella eligió antes: ${path.map((p) => `"${p}"`).join(' → ')}`)
+    lines.push('RESPONDE a su última elección de forma directa y específica; no la ignores.')
+    lines.push('Si pregunta por "los días que no" o el contrapunto, respóndelo con esa')
+    lines.push('frase, directo. PROHIBIDO esquivar repitiendo el lado positivo.')
+  }
+  lines.push('')
+  if (isFinal) {
+    lines.push('Este es el CIERRE. Nombra que este patrón es SUYO, quita toda tarea o')
+    lines.push('culpa, y conecta UNA vez con su objetivo. Sin preguntas. "chips": [].')
+  } else if (turnIndex === 0) {
+    const subj = finding.subject ?? 'lo que apareció en sus días'
+    lines.push(`Turno de APERTURA. Empieza NOMBRANDO ${subj} en la primera frase.`)
+    lines.push('PROHIBIDO abrir con frases genéricas tipo "he notado algo interesante en')
+    lines.push('tus días" o "algo interesante": nombra la dimensión concreta. Da 3 chips.')
+  } else {
+    lines.push('Sigue la charla, específico a lo que eligió. Si encaja, menciona la otra')
+    lines.push('coincidencia. Da 3 chips.')
+  }
+  return { system: CHAT_SYSTEM_PROMPT, user: lines.join('\n') }
+}
+
+const ChatTurnSchema = z.object({
+  message: z.object({
+    text: z.string().trim().min(1).max(320),
+    tone: z.enum(['accent', 'strong']).nullable().optional(),
+  }),
+  chips: z.array(z.string().trim().min(1).max(48)).max(3),
+})
+
+// Chips deterministas de reserva: rellenan si la IA devuelve <3 chips seguros.
+const SAFE_CHIPS = [
+  'Muéstrame esos días',
+  'No lo había notado',
+  '¿Y los días que no?',
+  '¿Es casualidad?',
+  'Me gusta verlo así',
+]
+
 /* ── request / response ──────────────────────────────────────────────── */
 const RequestSchema = z.object({
-  feature: z.enum(['orbita_dia', 'orbita_semana', 'orbita_mes', 'progreso']),
+  feature: z.enum(['orbita_dia', 'orbita_semana', 'orbita_mes', 'orbita_mes_chat', 'progreso']),
   periodType: z.enum(['day', 'week', 'month', 'last30']),
   periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -274,6 +359,22 @@ const RequestSchema = z.object({
     )
     .max(4)
     .optional(),
+  // Órbita Mes CHAT: el hallazgo + estado del turno (cliente controla conteo).
+  finding: z
+    .object({
+      id: z.string().max(60),
+      subject: z.string().max(120).optional(),
+      lead: z.string().max(200).optional(),
+      support: z.string().max(200),
+      northLink: z.string().max(200).nullable().optional(),
+      hypothesis: z.string().max(240).nullable().optional(),
+      contrast: z.string().max(240).nullable().optional(),
+    })
+    .optional(),
+  findingsHash: z.string().max(128).optional(),
+  turnIndex: z.number().int().min(0).max(3).optional(),
+  isFinal: z.boolean().optional(),
+  path: z.array(z.string().max(48)).max(4).optional(),
 })
 
 const VozSchema = z.object({
@@ -367,6 +468,78 @@ async function generateCards(system: string, user: string, openaiKey: string) {
   return parsed.success ? parsed.data : null
 }
 
+async function generateChatTurn(
+  system: string,
+  user: string,
+  openaiKey: string,
+  temperature = 0.6,
+) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 320,
+      temperature,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    console.error('stelar-insight: OpenAI error (chat)', res.status)
+    return null
+  }
+  const completion = await res.json()
+  const content = completion?.choices?.[0]?.message?.content
+  if (typeof content !== 'string') return null
+  let raw
+  try {
+    raw = JSON.parse(content)
+  } catch {
+    return null
+  }
+  const parsed = ChatTurnSchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
+
+// Backstop de contenido: descarta texto con dígitos (número inventado) o léxico
+// prescriptivo/clínico. Compartido por la voz-por-card y el chat.
+const BANNED_LEXICON =
+  /debes|deber[ií]as|tienes que|intenta|prueba|come m[aá]s|come menos|duerme|sube tu|baja tu|atrac[oó]n|trastorno|ansiedad|depres|diagn[oó]stic|terapia|tca|culpa|tu problema/i
+// Rechaza dígitos (número inventado), exclamaciones y emojis (Capa 2 los prohíbe:
+// generan ansiedad) y el léxico prescriptivo/clínico de la línea roja.
+const unsafeText = (s: string) =>
+  /\d/.test(s) || /!/.test(s) || /\p{Extended_Pictographic}/u.test(s) || BANNED_LEXICON.test(s)
+
+// Deja 3 chips seguros: filtra los prohibidos y rellena con SAFE_CHIPS.
+function safeChips(chips: string[]): string[] {
+  const out: string[] = []
+  for (const c of chips) if (!unsafeText(c) && !out.includes(c)) out.push(c)
+  for (const c of SAFE_CHIPS) {
+    if (out.length >= 3) break
+    if (!out.includes(c)) out.push(c)
+  }
+  return out.slice(0, 3)
+}
+
+// El chat NO puede rellenar: muletillas prohibidas + exigir que el mensaje
+// nombre algo CONCRETO del hallazgo (el día/dimensión, o "déficit").
+const CHAT_FILLER = /interesante|cada d[ií]a cuenta|sigue as[ií]|algo especial/i
+function chatAnchored(text: string, finding): boolean {
+  const low = text.toLowerCase()
+  const stop = new Set(['los', 'las', 'tus', 'del', 'con', 'meta', 'dias', 'días', 'que', 'una'])
+  const stems = String(finding?.subject ?? '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !stop.has(w))
+    .map((w) => w.slice(0, 5))
+  stems.push('défic', 'defic')
+  return stems.some((s) => low.includes(s))
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -392,6 +565,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const parsed = RequestSchema.safeParse(await req.json().catch(() => ({})))
     if (!parsed.success) return json({ error: 'Petición inválida.' }, 400)
     const { feature, periodType, periodStart, periodEnd, insights, findings } = parsed.data
+    const chatFinding = parsed.data.finding
+    const chatHash = parsed.data.findingsHash
+    const chatTurnIndex = parsed.data.turnIndex ?? 0
+    const chatIsFinal = parsed.data.isFinal === true
+    const chatPath = parsed.data.path ?? []
 
     // ── Órbita Mes: voz POR HALLAZGO. La IA solo reformula; la llave del caché
     // es el hash de los hallazgos que manda el cliente (NO el Context Engine),
@@ -421,11 +599,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // léxico prescriptivo/clínico. Un id descartado → el cliente cae a su
       // texto determinístico para ESA card (voice?.[id] ?? finding.phrase).
       const allowed = new Set(findings.map((f) => f.id)) // la IA nunca añade hallazgos
-      const BANNED =
-        /debes|deber[ií]as|tienes que|intenta|prueba|come m[aá]s|come menos|duerme|sube tu|baja tu|atrac[oó]n|trastorno|ansiedad|depres|diagn[oó]stic|terapia/i
-      const bad = (s: string) => /\d/.test(s) || BANNED.test(s)
       const safe = cardsVoice.cards.filter(
-        (c) => allowed.has(c.id) && !bad(c.lead) && !bad(c.caption),
+        (c) => allowed.has(c.id) && !unsafeText(c.lead) && !unsafeText(c.caption),
       )
       if (safe.length === 0) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
       const responseM = { cards: safe }
@@ -445,6 +620,67 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
       if (upErr) console.error('stelar-insight: cache upsert failed (mes)', upErr.message)
       return json({ ...responseM, cached: false })
+    }
+
+    // ── Órbita Mes CHAT: un turno de la charla guiada sobre UN hallazgo. La IA
+    // solo redacta message + 3 chips (reacción, nunca acción). Caché = árbol
+    // acumulativo de turnos visitados, keyed por findingsHash (si los hallazgos
+    // cambian, se descarta). El cliente controla el conteo y el cierre. ──
+    if (feature === 'orbita_mes_chat' && chatFinding && chatHash) {
+      const pathKey = `${chatFinding.id}|${chatPath.join('>')}`
+      const { data: cachedC } = await supabase
+        .from('ai_insights')
+        .select('response, context_hash, prompt_version, expires_at')
+        .eq('feature', feature)
+        .eq('period_type', periodType)
+        .eq('period_start', periodStart)
+        .eq('period_end', periodEnd)
+        .maybeSingle()
+      const treeFresh =
+        cachedC &&
+        cachedC.context_hash === chatHash &&
+        cachedC.prompt_version === PROMPT_VERSION &&
+        (cachedC.expires_at == null || new Date(cachedC.expires_at).getTime() > Date.now())
+      const tree =
+        treeFresh && cachedC.response && typeof cachedC.response === 'object'
+          ? (cachedC.response.turns ?? {})
+          : {}
+      if (tree[pathKey]) return json({ ...tree[pathKey], cached: true })
+
+      const prompt = buildChatTurnPrompt(chatFinding, chatPath, chatTurnIndex, chatIsFinal)
+      // Apertura (turno 0) con más variedad léxica para que no converja al molde.
+      const temp = chatTurnIndex === 0 ? 0.75 : 0.6
+      const turn = await generateChatTurn(prompt.system, prompt.user, openaiKey, temp)
+      // Backstop anti-relleno: rechaza muletillas, dígitos/clínico, y (salvo el
+      // cierre) mensajes que no anclan en el hallazgo → el cliente cae al beat.
+      const rejected =
+        !turn ||
+        unsafeText(turn.message.text) ||
+        CHAT_FILLER.test(turn.message.text) ||
+        (!chatIsFinal && !chatAnchored(turn.message.text, chatFinding))
+      if (rejected) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
+      const node = { message: turn.message, chips: chatIsFinal ? [] : safeChips(turn.chips) }
+
+      // Guarda de tamaño (response ≤ 20000 chars): si el árbol crece de más, lo
+      // reinicia con solo el nodo actual en vez de fallar el upsert.
+      let nextTree = { ...tree, [pathKey]: node }
+      if (JSON.stringify(nextTree).length > 18000) nextTree = { [pathKey]: node }
+
+      const { error: upErr } = await supabase.from('ai_insights').upsert(
+        {
+          user_id: userId,
+          feature,
+          period_type: periodType,
+          period_start: periodStart,
+          period_end: periodEnd,
+          context_hash: chatHash,
+          prompt_version: PROMPT_VERSION,
+          response: { turns: nextTree },
+        },
+        { onConflict: 'user_id,feature,period_type,period_start,period_end' },
+      )
+      if (upErr) console.error('stelar-insight: cache upsert failed (chat)', upErr.message)
+      return json({ ...node, cached: false })
     }
 
     const spanDays = Math.max(

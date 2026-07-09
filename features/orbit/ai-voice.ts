@@ -147,3 +147,70 @@ export function useMonthVoice(
     refetchOnMount: false,
   })
 }
+
+/* ── Órbita Mes: CHAT guiado (un turno a la vez, IA conduce) ──────────── */
+
+/** El hallazgo que la IA conversa (verdad determinística; nunca inventa). */
+export type ChatFindingInput = {
+  id: string
+  /** La dimensión en humano ("tus días con tu meta de agua"): la IA abre
+   *  nombrándola para que cada hallazgo se sienta distinto. */
+  subject: string
+  /** La lectura determinística (semilla de la apertura, no se copia literal). */
+  lead: string
+  support: string
+  northLink?: string | null
+  hypothesis?: string | null
+  /** El contrapunto ("los días que NO"): para responder de verdad esa pregunta. */
+  contrast?: string | null
+}
+
+export type MonthChatTurn = {
+  message: { text: string; tone?: 'accent' | 'strong' }
+  chips: string[]
+}
+
+const MonthChatTurnSchema = z.object({
+  message: z.object({ text: z.string().min(1), tone: z.enum(['accent', 'strong']).nullish() }),
+  chips: z.array(z.string()),
+  cached: z.boolean().optional(),
+})
+
+/** Pide UN turno de la charla guiada. Devuelve {message, chips} o null (→ el
+ *  chat cae al beat determinístico de ese turno). El cliente controla el conteo
+ *  y el cierre (isFinal); la metacognición si/no/nunca la maneja el cliente. */
+export async function fetchMonthChatTurn(params: {
+  periodStart: string
+  periodEnd: string
+  findingsHash: string
+  finding: ChatFindingInput
+  turnIndex: number
+  isFinal: boolean
+  path: string[]
+}): Promise<MonthChatTurn | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stelar-insight', {
+      body: {
+        feature: 'orbita_mes_chat',
+        periodType: 'month',
+        periodStart: params.periodStart,
+        periodEnd: params.periodEnd,
+        findingsHash: params.findingsHash,
+        finding: params.finding,
+        turnIndex: params.turnIndex,
+        isFinal: params.isFinal,
+        path: params.path,
+      },
+    })
+    if (error) return null
+    if (data && (data as { error?: string }).error) return null
+    const parsed = MonthChatTurnSchema.safeParse(data)
+    if (!parsed.success) return null
+    return {
+      message: { text: parsed.data.message.text, tone: parsed.data.message.tone ?? undefined },
+      chips: parsed.data.chips,
+    }
+  } catch {
+    return null
+  }
+}
