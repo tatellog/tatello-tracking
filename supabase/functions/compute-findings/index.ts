@@ -16,6 +16,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
 import { buildFindings } from '../_shared/intelligence/findings'
+import { buildStories } from '../_shared/intelligence/stories'
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -104,9 +105,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
       buildPrior(reflRes.data, currentMonth),
     )
+    // Story Engine (F3) plegado: historias derivadas de los hallazgos.
+    const stories = buildStories(findings)
 
-    // Persistir (idempotente por unique(user, period, finding_id)). Columnas de
-    // consulta (R6) + payload con el Finding completo.
+    // Persistir hallazgos (idempotente por unique(user, period, finding_id)):
+    // columnas de consulta (R6) + payload con el Finding completo.
     if (findings.length > 0) {
       const rows = findings.map((f) => ({
         user_id: userId,
@@ -123,10 +126,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { error: upErr } = await supabase
         .from('findings')
         .upsert(rows, { onConflict: 'user_id,period_type,period_start,period_end,finding_id' })
-      if (upErr) console.error('compute-findings: upsert failed', upErr.message)
+      if (upErr) console.error('compute-findings: findings upsert failed', upErr.message)
     }
 
-    return json({ findings })
+    // Persistir historias (idempotente por unique(user, period, story_id)).
+    if (stories.length > 0) {
+      const storyRows = stories.map((s) => ({
+        user_id: userId,
+        period_type: period,
+        period_start: periodStart,
+        period_end: periodEnd,
+        story_id: s.id,
+        finding_ids: s.findingIds,
+        chain: s.chain,
+        score: s.score,
+      }))
+      const { error: sErr } = await supabase
+        .from('stories')
+        .upsert(storyRows, { onConflict: 'user_id,period_type,period_start,period_end,story_id' })
+      if (sErr) console.error('compute-findings: stories upsert failed', sErr.message)
+    }
+
+    return json({ findings, stories })
   } catch (err) {
     console.error('[compute-findings]', err instanceof Error ? err.message : String(err))
     return json({ error: 'No pudimos calcular tus hallazgos ahora.' }, 500)
