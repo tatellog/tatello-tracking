@@ -33,10 +33,12 @@ export function aiEnabledForEmail(email: string | null | undefined): boolean {
  * PERSISTIDO (writer compute-findings → tabla monthly_reports) en vez de
  * computarlos en el cliente. Por construcción la salida es idéntica (mismo
  * buildFindings/hashFindings, misma ventana de días) — hay un test de paridad
- * que lo prueba. Default `false`: hasta que la paridad esté validada en device,
- * la UI en vivo se queda EXACTAMENTE como hoy (compute-local, cero red nueva).
+ * que lo prueba. Solo impacta la superficie IA (gateada a dev@local.test); la
+ * beta ve `MonthSegment`, ajeno a este flag. ON: Órbita Mes IA lee el reporte
+ * persistido (findings + stories + hypotheses + hash) y cae a compute-local si
+ * el edge falla (fallback en useMonthlyReport).
  */
-export const USE_PERSISTED_MONTH_REPORT = false
+export const USE_PERSISTED_MONTH_REPORT = true
 
 /*
  * Progress · Historia de hitos (Epic 03 · F-R3 · T-R3.3).

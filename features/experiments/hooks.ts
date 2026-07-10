@@ -5,9 +5,11 @@
  * hipótesis con su status real. Solo lectura; el ciclo de vida (start/close) lo
  * escribe la edge `experiment-lifecycle` (A2). Sin uid → deshabilitados.
  */
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { queryKeys } from '@/lib/queryKeys'
+import { supabase } from '@/lib/supabase'
+import { todayInTimezone } from '@/lib/time'
 
 import { fetchActiveExperiment, fetchHypotheses } from './api'
 
@@ -41,5 +43,54 @@ export function useHypotheses(params: {
     enabled: uid != null,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
+  })
+}
+
+/* ── Mutations del ciclo de vida (edge experiment-lifecycle · UI D) ────────── */
+
+/** Invoca una acción del edge. Devuelve el body; lanza con el error cálido. */
+async function callLifecycle(body: Record<string, unknown>): Promise<unknown> {
+  const { data, error } = await supabase.functions.invoke('experiment-lifecycle', { body })
+  if (error) throw error
+  if (data && (data as { error?: string }).error) throw new Error((data as { error: string }).error)
+  return data
+}
+
+/** Tras mutar, refresca el activo + las hipótesis (su status cambió). */
+function useLifecycleInvalidation(uid: string | null) {
+  const qc = useQueryClient()
+  return () => {
+    if (!uid) return
+    void qc.invalidateQueries({ queryKey: queryKeys.experiments.active(uid) })
+    void qc.invalidateQueries({ queryKey: queryKeys.hypotheses.all })
+  }
+}
+
+/** Arranca un experimento desde una hipótesis (su uuid de la tabla). */
+export function useStartExperiment(uid: string | null) {
+  const invalidate = useLifecycleInvalidation(uid)
+  return useMutation({
+    mutationFn: (hypothesisId: string) =>
+      callLifecycle({ action: 'start', hypothesisId, today: todayInTimezone() }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Cierra un experimento: el motor mide y escribe el resultado. */
+export function useCloseExperiment(uid: string | null) {
+  const invalidate = useLifecycleInvalidation(uid)
+  return useMutation({
+    mutationFn: (experimentId: string) =>
+      callLifecycle({ action: 'close', experimentId, today: todayInTimezone() }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Cancela un experimento en curso (reversible: sin resultado, hipótesis vuelve). */
+export function useCancelExperiment(uid: string | null) {
+  const invalidate = useLifecycleInvalidation(uid)
+  return useMutation({
+    mutationFn: (experimentId: string) => callLifecycle({ action: 'cancel', experimentId }),
+    onSuccess: invalidate,
   })
 }
