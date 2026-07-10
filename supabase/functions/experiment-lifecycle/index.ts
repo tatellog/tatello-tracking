@@ -57,6 +57,12 @@ const RequestSchema = z.union([
     experimentId: z.string().uuid(),
     today: z.string().regex(DAY),
   }),
+  // Cancelar = reversible de verdad: borra el experimento sin registrar un
+  // resultado engañoso y devuelve la hipótesis a 'open' (#14). No necesita today.
+  z.object({
+    action: z.literal('cancel'),
+    experimentId: z.string().uuid(),
+  }),
 ])
 
 /** today + n días, en ISO 'YYYY-MM-DD' (UTC, sin librería). */
@@ -101,6 +107,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (parsed.data.action === 'start') return await start(supabase, userId, parsed.data, ctx)
+    if (parsed.data.action === 'cancel') return await cancel(supabase, parsed.data)
     return await close(supabase, userId, parsed.data, ctx)
   } catch (err) {
     console.error('[experiment-lifecycle]', err instanceof Error ? err.message : String(err))
@@ -228,6 +235,42 @@ async function close(supabase, userId: string, body, ctx) {
   // null = otra llamada ganó la carrera y ya lo cerró entre el read y el update.
   if (!result) return json({ error: 'Ese experimento ya está cerrado.' }, 409)
   return json(result)
+}
+
+/**
+ * Cancela un experimento en curso: reversibilidad de verdad (#14). Borra la fila
+ * (libera el slot del índice parcial) y devuelve la hipótesis a 'open' — como si
+ * no hubiera pasado, sin un resultado engañoso. Solo aplica a uno running.
+ */
+async function cancel(supabase, body) {
+  const { experimentId } = body
+  const { data: exp, error } = await supabase
+    .from('experiments')
+    .select('id, status, hypothesis_id')
+    .eq('id', experimentId)
+    .maybeSingle()
+  if (error) throw error
+  if (!exp) return json({ error: 'No encontramos ese experimento.' }, 404)
+  if (exp.status !== 'running') return json({ error: 'Ese experimento ya está cerrado.' }, 409)
+
+  const { data: deleted, error: delErr } = await supabase
+    .from('experiments')
+    .delete()
+    .eq('id', experimentId)
+    .eq('status', 'running') // no borra uno que otra llamada acaba de cerrar
+    .select('id')
+    .maybeSingle()
+  if (delErr) throw delErr
+  if (!deleted) return json({ error: 'Ese experimento ya está cerrado.' }, 409)
+
+  // Mirror best-effort: la hipótesis vuelve a estar disponible.
+  const { error: hErr } = await supabase
+    .from('hypotheses')
+    .update({ status: 'open' })
+    .eq('id', exp.hypothesis_id)
+  if (hErr) console.error('experiment-lifecycle: hypothesis mirror failed', hErr.message)
+
+  return json({ cancelled: true })
 }
 
 /**

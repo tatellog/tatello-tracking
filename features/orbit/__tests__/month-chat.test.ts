@@ -34,7 +34,6 @@ describe('buildMonthChat', () => {
     expect(chat.ready).toBe(false)
     expect(chat.reason).toBe('insufficient-data')
     expect(chat.cards).toEqual([])
-    expect(chat.intro).toEqual([])
   })
 
   it('datos suficientes pero sin patrón → ready false, razón no-findings', () => {
@@ -54,11 +53,9 @@ describe('buildMonthChat', () => {
     expect(chat.reason).toBeNull()
   })
 
-  it('con datos: apertura de UNA línea que ancla en sus días (sin tally)', () => {
+  it('con datos: entrega hallazgos válidos (sin tally)', () => {
     const chat = buildMonthChat(activeMonth(20), CTX)
     expect(chat.ready).toBe(true)
-    expect(chat.intro).toHaveLength(1)
-    expect(chat.intro[0]!.text).toMatch(/Esto es lo que vi en tus últimos \d+ días/)
     expect(chat.cards.length).toBeGreaterThan(0)
     for (const f of chat.cards) {
       expect(f.title.length).toBeGreaterThan(0)

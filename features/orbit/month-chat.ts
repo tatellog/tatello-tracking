@@ -33,8 +33,6 @@ export type MonthChat = {
   ready: boolean
   /** Cuando `ready` es false, POR QUÉ (para el copy diferenciado). null si ready. */
   reason: MonthChatEmptyReason | null
-  /** Apertura de la antesala: gancho corto (no un chat). */
-  intro: ChatBubble[]
   /** Los hallazgos del mes (ordenados por confianza). */
   cards: Finding[]
 }
@@ -78,20 +76,11 @@ export function buildMonthChat(
   prior: PriorReflections = {},
 ): MonthChat {
   // Razón 1: aún faltan registros para una lectura honesta.
-  if (!monthChatReady(signals))
-    return { ready: false, reason: 'insufficient-data', intro: [], cards: [] }
+  if (!monthChatReady(signals)) return { ready: false, reason: 'insufficient-data', cards: [] }
   const cards = buildFindings(signals, ctx, prior)
   // Razón 2: hay datos suficientes, pero el motor no encontró un patrón claro.
-  if (cards.length === 0) return { ready: false, reason: 'no-findings', intro: [], cards: [] }
-  // Gancho de UNA línea que ancla en SUS datos (da confianza). Sin contar
-  // hallazgos: el tally imponía la jerarquía hero/secundaria que quitamos, y
-  // "1 hallazgo principal · N observaciones" sonaba a reporte.
-  return {
-    ready: true,
-    reason: null,
-    intro: [{ text: `Esto es lo que vi en tus últimos ${signals.length} días.`, tone: 'accent' }],
-    cards,
-  }
+  if (cards.length === 0) return { ready: false, reason: 'no-findings', cards: [] }
+  return { ready: true, reason: null, cards }
 }
 
 /** Los hallazgos como frases planas — lo que la Voz de IA EXPLICA (nunca
