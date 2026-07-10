@@ -93,6 +93,8 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
   const cancel = useCancelExperiment(uid)
   // El resultado que la usuaria ya cerró (para volver a los hilos).
   const [dismissedId, setDismissedId] = useState<string | null>(null)
+  // La fila del historial abierta: volver a ver un hilo cerrado (inline).
+  const [expandedTrailId, setExpandedTrailId] = useState<string | null>(null)
 
   // El más reciente: activo (running) o el recién cerrado con su resultado.
   const active = latest && latest.status === 'running' ? latest : null
@@ -299,28 +301,61 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
         </>
       ) : null}
 
-      {/* Historial: los hilos que ya seguiste, quietos (no desaparecen al cerrar). */}
+      {/* Historial: los hilos que ya seguiste. Cada fila se toca para VOLVER A
+          VERLO — despliega el resultado completo inline (sin sacar de pantalla). */}
       {trail.length > 0 ? (
         <View style={styles.trail}>
           <Text style={styles.trailTitle}>Hilos que ya seguiste</Text>
-          {trail.map((e) => (
-            <View key={e.id} style={styles.trailRow}>
-              <Text style={styles.trailDim}>
-                {humanMetric((e.plan as ExperimentPlanJson)?.metric, e.dimension)}
-              </Text>
-              <Text style={styles.trailMeta}>
-                <Text
-                  style={resultTone(e.status) === 'good' ? styles.resultGood : styles.resultSoft}
-                >
-                  {shortResult(
-                    e.status,
-                    (e.result as { daysMeasured?: number } | null)?.daysMeasured,
-                  )}
+          {trail.map((e) => {
+            const expanded = expandedTrailId === e.id
+            const days = (e.result as { daysMeasured?: number } | null)?.daysMeasured
+            // El hallazgo que originó el hilo, para "Quiero entenderlo" (si sigue
+            // en el periodo actual; si no, el link no aparece).
+            const trailHyp = hypotheses.find((h) => h.id === e.hypothesis_id)
+            return (
+              <Pressable
+                key={e.id}
+                style={styles.trailRow}
+                onPress={() => setExpandedTrailId(expanded ? null : e.id)}
+              >
+                <View style={styles.trailHead}>
+                  <Text style={styles.trailDim}>
+                    {humanMetric((e.plan as ExperimentPlanJson)?.metric, e.dimension)}
+                  </Text>
+                  <Text style={styles.trailCaret}>{expanded ? '⌄' : '›'}</Text>
+                </View>
+                <Text style={styles.trailMeta}>
+                  <Text
+                    style={resultTone(e.status) === 'good' ? styles.resultGood : styles.resultSoft}
+                  >
+                    {shortResult(e.status, days)}
+                  </Text>
+                  {formatShortDate(e.closed_at) ? `   ·   ${formatShortDate(e.closed_at)}` : ''}
                 </Text>
-                {formatShortDate(e.closed_at) ? `   ·   ${formatShortDate(e.closed_at)}` : ''}
-              </Text>
-            </View>
-          ))}
+                {expanded ? (
+                  <View style={styles.trailDetail}>
+                    <Text
+                      style={[
+                        styles.result,
+                        resultTone(e.status) === 'good' ? styles.resultGood : styles.resultSoft,
+                      ]}
+                    >
+                      {resultLine(e.status, days)}
+                    </Text>
+                    {onExplain && trailHyp?.source_finding_id ? (
+                      <Pressable
+                        style={styles.explainLink}
+                        onPress={() => onExplain(trailHyp.source_finding_id)}
+                      >
+                        <Text style={styles.explainText}>Quiero entenderlo</Text>
+                        <Text style={styles.explainArrow}> →</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+              </Pressable>
+            )
+          })}
         </View>
       ) : null}
     </View>
@@ -572,12 +607,26 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: 2,
   },
-  trailRow: { gap: 2 },
+  trailRow: { gap: 2, paddingVertical: 4 },
+  trailHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  trailCaret: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
   trailDim: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.leche,
+    flexShrink: 1,
   },
+  // Detalle que se despliega al tocar una fila del historial (volver a verlo).
+  trailDetail: { marginTop: 6, gap: 2 },
   trailMeta: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
