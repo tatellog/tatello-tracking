@@ -103,6 +103,12 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
   const [lastResult, setLastResult] = useState<string | null>(null)
 
   const open = hypotheses.filter((h) => h.status === 'open')
+  // El hilo fuerte (dos hallazgos que coincidieron · source_story_id) antes que
+  // el cabo suelto (un cruce tentativo · solo source_finding_id). Sort estable →
+  // conserva el orden por confianza dentro de cada nivel.
+  const sortedOpen = [...open].sort(
+    (a, b) => (a.source_story_id ? 0 : 1) - (b.source_story_id ? 0 : 1),
+  )
   // Nada que mostrar: sin hipótesis abiertas y sin experimento en curso.
   if (!active && open.length === 0 && !lastResult) return null
 
@@ -180,14 +186,20 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
           </View>
         </View>
       ) : (
-        // Aparece: las hipótesis abiertas. El spinner va SOLO en el botón tocado.
-        open.map((h) => {
+        // Aparece: las hipótesis abiertas, por nivel. Un HILO (dos hallazgos que
+        // coincidieron) pesa más que un CABO SUELTO (un cruce tentativo): el fuerte
+        // arriba, sólido; el tentativo, más callado. El spinner va SOLO en el tocado.
+        sortedOpen.map((h) => {
+          const loose = h.source_story_id == null // cruce tentativo (hyp-find)
           const starting = start.isPending && start.variables === h.id
           return (
-            <View key={h.id} style={styles.hypCard}>
+            <View key={h.id} style={[styles.hypCard, loose && styles.hypCardLoose]}>
+              <Text style={[styles.hypTier, loose && styles.hypTierLoose]}>
+                {loose ? 'Un cabo suelto' : 'Un hilo que ya se dejó ver'}
+              </Text>
               <Text style={styles.hypText}>{h.text}</Text>
               <Pressable
-                style={[styles.btn, styles.btnPrimary, styles.btnFull]}
+                style={[styles.btn, styles.btnFull, loose ? styles.btnOutline : styles.btnPrimary]}
                 disabled={start.isPending}
                 onPress={() => {
                   setLastResult(null)
@@ -195,9 +207,11 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
                 }}
               >
                 {starting ? (
-                  <ActivityIndicator color={colors.bg} size="small" />
+                  <ActivityIndicator color={loose ? colors.magenta : colors.bg} size="small" />
                 ) : (
-                  <Text style={styles.btnPrimaryText}>Seguir este hilo 2 semanas</Text>
+                  <Text style={loose ? styles.btnOutlineText : styles.btnPrimaryText}>
+                    Seguir este hilo 2 semanas
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -286,8 +300,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.bruma,
     padding: 16,
-    gap: 14,
+    gap: 12,
   },
+  // El cabo suelto se ve más callado: borde más tenue, sin acento.
+  hypCardLoose: { borderColor: colors.borderSubtle, backgroundColor: 'transparent' },
+  hypTier: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+  },
+  hypTierLoose: { color: colors.niebla },
   hypText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
@@ -344,6 +368,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
     color: colors.bg,
+  },
+  // CTA del cabo suelto: contorno, no relleno (empuja menos).
+  btnOutline: { borderWidth: 1, borderColor: colors.magentaDeep, backgroundColor: 'transparent' },
+  btnOutlineText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.magenta,
   },
   btnGhost: { paddingVertical: 12, paddingHorizontal: 8 },
   btnGhostText: {
