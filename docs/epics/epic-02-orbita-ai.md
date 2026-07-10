@@ -45,8 +45,11 @@ el paso opcional de profundizar. Ver `prd-chat-guiado-hallazgos` en memoria.
 
 Pendiente de desglosar en `../tasks/epic02/` (inline por ahora):
 
-1. Consolidar el reporte sobre los engines de R1 cuando existan. — **Infra hecha
-   en Epic 01 · F5** (flip tras flag, paridad probada). Falta encender el flag.
+1. Consolidar el reporte sobre los engines de R1 cuando existan. — **Hecho (dev):**
+   `USE_PERSISTED_MONTH_REPORT` = ON → Órbita Mes IA lee el reporte persistido
+   (findings + stories + hypotheses) con fallback a compute-local. Además
+   `MonthExperiments` renderiza las hipótesis (Engine 4) + el ciclo de
+   experimentos (R5). Falta abrir a la beta + validar en device.
 2. Afinar el prompt del chat con feedback de usuaria (tono, longitud). — Requiere
    usuaria en el loop.
 3. Métrica de uso (entró / descubrió / profundizó) para medir el loop. — **Hecho**

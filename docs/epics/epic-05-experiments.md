@@ -55,8 +55,15 @@ Pasar por `manifesto-reviewer` + `voice-and-copy`.
 - **B1** `buildExperimentScaffold` (spec medible, sin prosa) + máquina de estados + guard.
 - **B2** `measureExperiment` / `computeMetricRate` (el motor decide el resultado).
 
-**Diferido (gated · tras validar flip/IA en device):**
+**Hecho (UI · gateada a dev@local.test):**
 
-- **C** IA que redacta el experimento (`feature:'experimento'` en `stelar-insight`,
-  backstop + `manifesto-reviewer`/`voice-and-copy`).
-- **D** UI dentro de Órbita (proponer → activo → medición → resultado).
+- **D** UI en Órbita Mes (`MonthExperiments.tsx`): hipótesis abiertas → "Probar
+  esto" → experimento activo (días restantes + Cerrar/Cancelar) → resultado sin
+  culpa. Mutations `useStart/Close/CancelExperiment` → edge `experiment-lifecycle`.
+  Copy revisada (manifiesto + voz LIMPIO).
+
+**Diferido:**
+
+- **C** IA que redacta el experimento (`feature:'experimento'` en `stelar-insight`).
+  Hoy la UI muestra el `text` determinístico de la hipótesis.
+- Abrir la UI a la beta (hoy solo dev).
