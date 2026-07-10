@@ -87,6 +87,28 @@ describe('measureExperiment — el motor decide el resultado (T-B2)', () => {
     expect(m.daysMeasured).toBe(3)
   })
 
+  it('inconclusa si la línea base tiene muestra insuficiente (bug #1)', () => {
+    // Ventana clarísima (12/14 en déficit) pero baseline con solo 2 días medidos:
+    // sin base no se puede declarar "mejora" aunque la ventana se vea bien.
+    const signals = days(14, (i) => ({ calories: i < 12 ? 1200 : 1900 }))
+    const m = measureExperiment(plan('deficit_days'), signals, {
+      ...CTX,
+      baselineRate: 0,
+      baselineDaysMeasured: 2,
+    })
+    expect(m.status).toBe('inconclusive')
+  })
+
+  it('con base suficiente (≥4 días) sí juzga', () => {
+    const signals = days(14, (i) => ({ calories: i < 12 ? 1200 : 1900 }))
+    const m = measureExperiment(plan('deficit_days'), signals, {
+      ...CTX,
+      baselineRate: 0.3,
+      baselineDaysMeasured: 10,
+    })
+    expect(m.status).toBe('confirmed')
+  })
+
   it('direction maintain: confirma si se sostiene dentro del margen', () => {
     const signals = days(14, (i) => ({ calories: i < 8 ? 1200 : 1900 })) // rate ~.57
     const m = measureExperiment(plan('deficit_days', 'maintain'), signals, {

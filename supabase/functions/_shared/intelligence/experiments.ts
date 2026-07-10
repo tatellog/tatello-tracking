@@ -142,6 +142,10 @@ export function canStart(activeRunningCount: number): boolean {
 const SLEEP_7H_MIN = 420
 /** Mejora mínima (en proporción) para no confundir ruido con efecto. */
 export const RESULT_MARGIN = 0.1
+/** Días mínimos de LÍNEA BASE para arriesgar un veredicto: sin base no se puede
+ *  hablar de "mejora" (comparar contra 0 días haría pasar "no había datos" por
+ *  "mejoró"). Bajo esto → inconclusa. */
+export const MIN_BASELINE_DAYS = 4
 /** ¿Es un día registrado (hubo presencia)? Para métricas donde cada día es una
  *  oportunidad (entreno), no solo los días con ese valor puntual. */
 function isLoggedDay(s: DailySignals): boolean {
@@ -228,7 +232,7 @@ function minMeasured(durationDays: number): number {
 export function measureExperiment(
   plan: Pick<ExperimentPlan, 'metric' | 'direction' | 'durationDays'>,
   windowSignals: readonly DailySignals[],
-  opts: { baselineRate: number } & MetricCtx,
+  opts: { baselineRate: number; baselineDaysMeasured?: number } & MetricCtx,
 ): ExperimentMeasurement {
   const {
     hitDays,
@@ -238,7 +242,13 @@ export function measureExperiment(
   const baselineRate = opts.baselineRate
   const base = { hitDays, daysMeasured, windowRate, baselineRate }
 
+  // Sin muestra en la ventana → inconclusa (no se juzga con 2 días).
   if (daysMeasured < minMeasured(plan.durationDays)) {
+    return { ...base, status: 'inconclusive' }
+  }
+  // Sin línea base suficiente → inconclusa: comparar contra una base vacía haría
+  // pasar "no había datos antes" por "mejoró" (bug #1).
+  if (opts.baselineDaysMeasured != null && opts.baselineDaysMeasured < MIN_BASELINE_DAYS) {
     return { ...base, status: 'inconclusive' }
   }
 

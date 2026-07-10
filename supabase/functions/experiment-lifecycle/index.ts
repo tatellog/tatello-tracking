@@ -111,14 +111,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
 async function start(supabase, userId: string, body, ctx) {
   const { hypothesisId, today } = body
 
-  // La hipótesis (RLS: solo la propia). Trae el periodo y la fuente.
+  // Auto-cerrar un experimento VENCIDO antes de arrancar otro: sin cron, un
+  // activo que ya pasó su ends_on bloquearía el único slot para siempre (#13).
+  // Si el activo aún no vence, rebota claro (409) sin hacer el trabajo de abajo.
+  const { data: active } = await supabase
+    .from('experiments')
+    .select('*')
+    .eq('status', 'running')
+    .maybeSingle()
+  if (active) {
+    if (active.ends_on < today) {
+      await measureAndClose(supabase, active, today, ctx)
+    } else {
+      return json({ error: 'Ya tienes un experimento activo.' }, 409)
+    }
+  }
+
+  // La hipótesis (RLS: solo la propia). Debe seguir 'open': una hipótesis se
+  // experimenta UNA vez; no re-pisamos un resultado ya registrado (#2).
   const { data: hyp, error: hErr } = await supabase
     .from('hypotheses')
-    .select('id, period_type, period_start, period_end, source_finding_id, source_story_id')
+    .select('id, status, period_type, period_start, period_end, source_finding_id, source_story_id')
     .eq('id', hypothesisId)
     .maybeSingle()
   if (hErr) throw hErr
   if (!hyp) return json({ error: 'No encontramos esa hipótesis.' }, 404)
+  if (hyp.status !== 'open') return json({ error: 'Esta hipótesis ya tuvo su experimento.' }, 409)
 
   // Resolver el finding_id (slug) fuente: directo, o el primero de la historia.
   let sourceFindingSlug: string | null = hyp.source_finding_id ?? null
@@ -172,7 +190,9 @@ async function start(supabase, userId: string, body, ctx) {
       status: 'running',
       started_on: today,
       ends_on: endsOn,
-      plan: { ...plan, baselineRate: baseline.rate },
+      // Guardamos también el tamaño de la base para que el cierre pueda exigir
+      // muestra suficiente antes de dar un veredicto (#1).
+      plan: { ...plan, baselineRate: baseline.rate, baselineDaysMeasured: baseline.daysMeasured },
     })
     .select()
     .single()
@@ -204,6 +224,19 @@ async function close(supabase, userId: string, body, ctx) {
   if (!exp) return json({ error: 'No encontramos ese experimento.' }, 404)
   if (exp.status !== 'running') return json({ error: 'Ese experimento ya está cerrado.' }, 409)
 
+  const result = await measureAndClose(supabase, exp, today, ctx)
+  // null = otra llamada ganó la carrera y ya lo cerró entre el read y el update.
+  if (!result) return json({ error: 'Ese experimento ya está cerrado.' }, 409)
+  return json(result)
+}
+
+/**
+ * Mide un experimento running y escribe su cierre (resultado + espejo en la
+ * hipótesis). Idempotente por la guarda `.eq('status','running')`: si otra
+ * llamada ya lo cerró, devuelve null en vez de pisar el resultado (#3). Lo usan
+ * la acción `close` Y el auto-close de vencidos en `start` (#13).
+ */
+async function measureAndClose(supabase, exp, today: string, ctx) {
   const plan = exp.plan ?? {}
   // Ventana: de started_on hasta hoy (o hasta ends_on si ya pasó).
   const windowEnd = today < exp.ends_on ? today : exp.ends_on
@@ -217,7 +250,11 @@ async function close(supabase, userId: string, body, ctx) {
   const measurement = measureExperiment(
     { metric: plan.metric, direction: plan.direction, durationDays: plan.durationDays },
     dedupeByDay(windowRows),
-    { baselineRate: plan.baselineRate ?? 0, ...ctx },
+    {
+      baselineRate: plan.baselineRate ?? 0,
+      baselineDaysMeasured: plan.baselineDaysMeasured,
+      ...ctx,
+    },
   )
 
   const { data: closed, error: updErr } = await supabase
@@ -227,11 +264,12 @@ async function close(supabase, userId: string, body, ctx) {
       result: measurement,
       closed_at: new Date().toISOString(),
     })
-    .eq('id', experimentId)
+    .eq('id', exp.id)
     .eq('status', 'running') // no cierra dos veces (carrera)
     .select()
-    .single()
+    .maybeSingle()
   if (updErr) throw updErr
+  if (!closed) return null // otra llamada ya lo cerró
 
   // Mirror best-effort: la hipótesis toma el resultado.
   const { error: hUpdErr } = await supabase
@@ -240,5 +278,5 @@ async function close(supabase, userId: string, body, ctx) {
     .eq('id', exp.hypothesis_id)
   if (hUpdErr) console.error('experiment-lifecycle: hypothesis mirror failed', hUpdErr.message)
 
-  return json({ experiment: closed, measurement })
+  return { experiment: closed, measurement }
 }

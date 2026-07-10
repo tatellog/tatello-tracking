@@ -10,8 +10,6 @@ import { z } from 'zod'
 
 import { supabase } from '@/lib/supabase'
 
-import type { ExperimentStatus } from './logic'
-
 type Period = 'day' | 'week' | 'month' | 'last30'
 
 /** Fila de `experiments`. `plan`/`result` son jsonb → objeto laxo (passthrough).
@@ -72,11 +70,4 @@ export async function fetchHypotheses(
     const parsed = HypothesisRowSchema.safeParse(row)
     return parsed.success ? [parsed.data] : []
   })
-}
-
-/** Estados de hipótesis que ya "salieron" (tienen experimento o resultado). */
-export function isHypothesisActionable(
-  status: ExperimentStatus | HypothesisRow['status'],
-): boolean {
-  return status === 'open'
 }
