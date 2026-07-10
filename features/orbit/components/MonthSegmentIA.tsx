@@ -24,7 +24,6 @@ import { useMonthlyReport } from '../report-hooks'
 
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
-import { MonthDiscoveryTeaser } from './MonthDiscoveryTeaser'
 import { MonthExperiments } from './MonthExperiments'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PresenceFinale } from './PresenceFinale'
@@ -60,23 +59,6 @@ const EMPTY_COPY: Record<MonthChatEmptyReason, { eyebrow: string; body: string; 
     body: 'Tienes varios días registrados, pero todavía no aparece un patrón claro. No es un problema; a veces el mes necesita unos días más para mostrar su forma.',
     hint: 'En cuanto algo se repita lo suficiente, te lo muestro aquí.',
   },
-}
-
-/** La línea honesta del teaser híbrido: sobre qué es el hallazgo líder (para
- *  que la promesa no sea una caja de misterio vacía). */
-function teaserDimension(f: Finding): string {
-  switch (f.id) {
-    case 'deficit-summary':
-      return 'sobre tu déficit del mes'
-    case 'water-deficit':
-      return 'sobre tus días con agua'
-    case 'training-deficit':
-      return 'sobre los días que entrenaste'
-    case 'weekday-calories':
-      return 'sobre un día de tu semana'
-    default:
-      return 'sobre tu mes'
-  }
 }
 
 export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => void }) {
@@ -135,8 +117,6 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const source = USE_PERSISTED_MONTH_REPORT ? persistedReport : null
   const cards = source?.findings ?? chat.cards
 
-  // El teaser invita; al tocar, se revela el REPORTE de evidencia (los hechos).
-  const [revealed, setRevealed] = useState(false)
   // Profundizar: tocar un hecho abre una conversación corta (fact-led). El
   // reporte es el hub; la conversación cierra de vuelta a él (sin loop, sin
   // repetir la metacognición en cada hecho).
@@ -210,26 +190,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           hechos: veredicto → dónde se te va → puerta abierta). ── */}
       {chat.ready && cards.length > 0 ? (
         <View style={styles.antesala}>
-          {revealed ? (
-            // Al revelar: los hilos del motor (hipótesis · Engine 4) + el ciclo
-            // de experimentos (R5). El reporte de evidencia se retiró.
-            <MonthExperiments
-              uid={uid}
-              period="last30"
-              periodStart={firstDataDay ?? monthKey}
-              periodEnd={today}
-              today={today}
-            />
-          ) : (
-            <MonthDiscoveryTeaser
-              dimension={teaserDimension(cards[0]!)}
-              onStart={() => {
-                // "Descubrió": tocó el teaser y reveló el reporte de evidencia.
-                track('orbit_month_report_revealed', { dimension: cards[0]!.id })
-                setRevealed(true)
-              }}
-            />
-          )}
+          {/* Los hilos del motor (hipótesis · Engine 4) + el ciclo de
+              experimentos (R5), directo en el lugar del teaser. */}
+          <MonthExperiments
+            uid={uid}
+            period="last30"
+            periodStart={firstDataDay ?? monthKey}
+            periodEnd={today}
+            today={today}
+          />
         </View>
       ) : chat.reason ? (
         // Estado vacío HONESTO en vez de un hueco silencioso: una lectura cálida
