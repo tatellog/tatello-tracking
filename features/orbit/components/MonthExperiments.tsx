@@ -75,15 +75,6 @@ function baselineLine(rate: number | undefined): string {
   return `Antes pasaba unos ${n} de cada 10 días.`
 }
 
-/** Qué vas a saber, según la dirección (hoy siempre `increase`). Nunca receta. */
-function measureLine(direction: ExperimentPlanJson['direction']): string {
-  if (direction === 'decrease')
-    return 'Así vas a saber si aparece menos que en tus semanas de antes.'
-  if (direction === 'maintain')
-    return 'Así vas a saber si se sostiene como en tus semanas de antes.'
-  return 'Así vas a saber si aparece más seguido que en tus semanas de antes.'
-}
-
 /** Día actual dentro de la ventana (progreso, no cuenta regresiva). */
 function dayNumber(startedOn: string, today: string, durationDays: number): number {
   const a = new Date(`${startedOn}T00:00:00Z`).getTime()
@@ -125,6 +116,9 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
   const plan: ExperimentPlanJson = (active?.plan as ExperimentPlanJson) ?? {}
   const duration = plan.durationDays ?? 14
   const left = active ? daysLeft(active.ends_on, today) : 0
+  // El "por qué": la hipótesis que originó el experimento. RE-ANCLA la métrica a
+  // su relación con tu déficit (no es una meta de agua/sueño suelta · manifiesto).
+  const sourceHyp = active ? hypotheses.find((h) => h.id === active.hypothesis_id) : undefined
 
   return (
     <View style={styles.wrap}>
@@ -157,8 +151,8 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
         <View style={styles.activeCard}>
           <Text style={styles.activeLabel}>Estás siguiendo un hilo</Text>
           <Text style={styles.activeDim}>{humanMetric(plan.metric, active.dimension)}</Text>
+          {sourceHyp?.text ? <Text style={styles.activeWhy}>{sourceHyp.text}</Text> : null}
           <Text style={styles.activeBase}>{baselineLine(plan.baselineRate)}</Text>
-          <Text style={styles.activeMeasure}>{measureLine(plan.direction)}</Text>
           <Text style={styles.activeDay}>
             {left > 0
               ? `Día ${dayNumber(active.started_on, today, duration)} de ${duration}. Al cerrar, ves el resultado.`
@@ -345,13 +339,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.bone,
   },
-  activeMeasure: {
+  activeWhy: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
     lineHeight: 20,
     color: colors.leche,
-    marginTop: 2,
+    marginTop: 4,
+    marginBottom: 2,
   },
   activeDay: {
     fontFamily: typography.uiMedium,
