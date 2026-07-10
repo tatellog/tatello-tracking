@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v2'
+const PROMPT_VERSION = 'v3'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -282,6 +282,11 @@ const CHAT_SYSTEM_PROMPT = [
   'emojis, sin tecnicismos. NO afirmes causa (son coincidencias observadas).',
   'NO pongas cifras en message ni en chips (los números viven en el sistema).',
   '',
+  'NUNCA le atribuyas un estado mental que ella no dijo. Si su reacción fue "No lo',
+  'había notado", está PROHIBIDO responder "es bueno que lo hayas notado", "ya lo',
+  'sabías" o "lo veías": la contradice. Di lo contrario — día a día no se ve, junto',
+  'sí, y por eso se lo muestras. Jamás contradigas su reacción.',
+  '',
   'PROHIBIDO EL RELLENO: nunca uses "interesante", "algo especial", "cada día',
   'cuenta", "sigue así". La frase "te acerca a tu objetivo" solo UNA vez, en el',
   'cierre. Cada "message" DEBE nombrar algo CONCRETO del hallazgo (el día, la',
@@ -306,6 +311,11 @@ function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
     lines.push('RESPONDE a su última elección de forma directa y específica; no la ignores.')
     lines.push('Si pregunta por "los días que no" o el contrapunto, respóndelo con esa')
     lines.push('frase, directo. PROHIBIDO esquivar repitiendo el lado positivo.')
+    const last = path[path.length - 1] ?? ''
+    if (/no lo hab[ií]a notado/i.test(last)) {
+      lines.push('Su última reacción: NO lo había notado. PROHIBIDO decir que lo notó o que')
+      lines.push('ya lo sabía; reconoce lo contrario: día a día no se ve, junto sí.')
+    }
   }
   lines.push('')
   if (isFinal) {
@@ -628,6 +638,16 @@ function safeChips(chips: string[]): string[] {
 // El chat NO puede rellenar: muletillas prohibidas + exigir que el mensaje
 // nombre algo CONCRETO del hallazgo (el día/dimensión, o "déficit").
 const CHAT_FILLER = /interesante|cada d[ií]a cuenta|sigue as[ií]|algo especial/i
+// Nunca afirmar que ella lo notó / ya lo sabía si su última reacción fue que NO
+// lo había notado: el cierre "es bueno que lo hayas notado" contradice su
+// respuesta y rompe la credibilidad. Rechaza → el cliente cae al beat determinístico.
+const DIDNT_NOTICE = /no lo hab[ií]a notado/i
+const CLAIMS_AWARENESS =
+  /lo hayas notado|lo notaste|ya lo sab[ií]as|lo sab[ií]as|ya lo ve[ií]as|lo ve[ií]as/i
+function contradictsReaction(text: string, path: string[]): boolean {
+  const last = path[path.length - 1] ?? ''
+  return DIDNT_NOTICE.test(last) && CLAIMS_AWARENESS.test(text)
+}
 function chatAnchored(text: string, finding): boolean {
   const low = text.toLowerCase()
   const stop = new Set(['los', 'las', 'tus', 'del', 'con', 'meta', 'dias', 'días', 'que', 'una'])
@@ -758,6 +778,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         !turn ||
         unsafeText(turn.message.text) ||
         CHAT_FILLER.test(turn.message.text) ||
+        contradictsReaction(turn.message.text, chatPath) ||
         (!chatIsFinal && !chatAnchored(turn.message.text, chatFinding))
       if (rejected) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
       const node = { message: turn.message, chips: chatIsFinal ? [] : safeChips(turn.chips) }
