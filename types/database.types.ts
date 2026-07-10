@@ -342,6 +342,59 @@ export type Database = {
         }
         Relationships: []
       }
+      experiments: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          dimension: string
+          ends_on: string
+          hypothesis_id: string
+          id: string
+          plan: Json
+          result: Json | null
+          started_on: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          dimension: string
+          ends_on: string
+          hypothesis_id: string
+          id?: string
+          plan?: Json
+          result?: Json | null
+          started_on: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          dimension?: string
+          ends_on?: string
+          hypothesis_id?: string
+          id?: string
+          plan?: Json
+          result?: Json | null
+          started_on?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'experiments_hypothesis_same_user_fkey'
+            columns: ['hypothesis_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'hypotheses'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
       facts: {
         Row: {
           created_at: string
