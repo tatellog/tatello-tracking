@@ -142,4 +142,16 @@ export const queryKeys = {
     monthlyReport: (uid: string, period: string, periodStart: string, periodEnd: string) =>
       ['orbit', 'monthlyReport', uid, period, periodStart, periodEnd] as const,
   },
+  experiments: {
+    all: ['experiments'] as const,
+    // El experimento ACTIVO de una usuaria (≤1 por diseño). Scopeado por uid.
+    active: (uid: string) => ['experiments', 'active', uid] as const,
+  },
+  hypotheses: {
+    all: ['hypotheses'] as const,
+    // Las hipótesis de una usuaria en un periodo, con su STATUS real de la tabla
+    // (no el 'open' que trae el report). Scopeado por (uid, periodo).
+    forPeriod: (uid: string, period: string, periodStart: string, periodEnd: string) =>
+      ['hypotheses', uid, period, periodStart, periodEnd] as const,
+  },
 } as const
