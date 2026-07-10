@@ -1039,6 +1039,42 @@ export type Database = {
         }
         Relationships: []
       }
+      wearable_body_composition: {
+        Row: {
+          bmi: number | null
+          body_fat_pct: number | null
+          created_at: string
+          day_date: string
+          id: string
+          lean_body_mass_kg: number | null
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bmi?: number | null
+          body_fat_pct?: number | null
+          created_at?: string
+          day_date: string
+          id?: string
+          lean_body_mass_kg?: number | null
+          source: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bmi?: number | null
+          body_fat_pct?: number | null
+          created_at?: string
+          day_date?: string
+          id?: string
+          lean_body_mass_kg?: number | null
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       wearable_sleep: {
         Row: {
           asleep_minutes: number
