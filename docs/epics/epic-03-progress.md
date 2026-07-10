@@ -36,10 +36,26 @@ Card "MI TRANSFORMACIÓN" (antes/ahora + delta) aprobada por dueña. Pantalla
 
 ## Criterios de éxito
 
-- [ ] Tab Resumen con composición corporal + comparaciones
-- [ ] Tab Historia (timeline de hitos)
-- [ ] IA explica progreso sin generar métricas
+- [ ] Tab Resumen con composición corporal + comparaciones — **bloqueado por R4**
+      (grasa/músculo/visceral no se capturan; solo peso + fotos hoy). Media Resumen
+      ya existe (TuHistoria 30v30, SynthesisCard "Lectura", BeforeAfterPhotos).
+- [~] Tab Historia (timeline de hitos) — **motor de hitos listo** (spine); falta
+  la UI (tab en vivo, diferida) + encender `MILESTONES_ENABLED`.
+- [ ] IA explica progreso sin generar métricas — SynthesisCard ya es el puente
+      Progreso↔motor; la IA que explica es fase posterior.
 
-## Tasks
+## Tasks (F-R3 spine · convergencia en `revelations`)
 
-Pendiente de desglosar en `../tasks/epic03/`.
+**Hecho (spine de hitos determinístico · gated, cero UI en vivo):**
+
+- **T-R3.1** tier `milestone` en `revelations` (CHECK ampliado + índice único
+  parcial; rls-auditor limpio, en prod).
+- **T-R3.2** `detectMilestones` (\_shared/intelligence/milestones.ts): primer
+  déficit, primer mes en déficit (20d acumulados), primer pesaje, primer entreno.
+  Puro + tests; títulos revisados (manifiesto + voz).
+- **T-R3.3** `recordMilestones` + `useMilestoneSync` (GATED por
+  `MILESTONES_ENABLED` OFF, sin montar); `revelationRowSchema` tolerante a
+  `milestone` para no romper readers en vivo.
+
+**Diferido:** UI de Historia (tab en vivo) · Resumen-composición (R4) · hitos
+`best_streak` (recurre) y `first_wearable` (R4).
