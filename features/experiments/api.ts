@@ -52,6 +52,20 @@ export async function fetchActiveExperiment(): Promise<ExperimentRow | null> {
   return parsed.success ? parsed.data : null
 }
 
+/** El experimento MÁS RECIENTE de la usuaria (cualquier status), o null. Sirve
+ *  para mostrar el resultado recién cerrado leyéndolo de la DB. Nunca lanza. */
+export async function fetchLatestExperiment(): Promise<ExperimentRow | null> {
+  const { data, error } = await supabase
+    .from('experiments')
+    .select('id, hypothesis_id, dimension, status, started_on, ends_on, plan, result, closed_at')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  const parsed = ExperimentRowSchema.safeParse(data)
+  return parsed.success ? parsed.data : null
+}
+
 /** Las hipótesis de la usuaria en un periodo, con status real, por confianza. */
 export async function fetchHypotheses(
   period: Period,

@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import {
-  useActiveExperiment,
   useCancelExperiment,
   useCloseExperiment,
   useHypotheses,
+  useLatestExperiment,
   useStartExperiment,
 } from '@/features/experiments/hooks'
 import type { ExperimentMetric } from '@/features/experiments/logic'
@@ -42,12 +42,6 @@ type ExperimentPlanJson = {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
-
-const RESULT_COPY: Record<string, { label: string; tone: 'good' | 'soft' }> = {
-  confirmed: { label: 'Se sostuvo en tus días.', tone: 'good' },
-  discarded: { label: 'No se sostuvo esta vez.', tone: 'soft' },
-  inconclusive: { label: 'Aún no alcanza para saberlo.', tone: 'soft' },
-}
 
 /** La métrica del motor → "qué se mira", en humano. */
 function humanMetric(metric: ExperimentMetric | undefined, dimension: string): string {
@@ -88,11 +82,23 @@ const STAGES = ['Aparece', 'Lo sigues', 'Lo ves'] as const
 
 export function MonthExperiments({ uid, period, periodStart, periodEnd, today }: Props) {
   const { data: hypotheses = [] } = useHypotheses({ uid, period, periodStart, periodEnd })
-  const { data: active } = useActiveExperiment(uid)
+  const { data: latest } = useLatestExperiment(uid)
   const start = useStartExperiment(uid)
   const close = useCloseExperiment(uid)
   const cancel = useCancelExperiment(uid)
-  const [lastResult, setLastResult] = useState<string | null>(null)
+  // El resultado que la usuaria ya cerró (para volver a los hilos).
+  const [dismissedId, setDismissedId] = useState<string | null>(null)
+
+  // El más reciente: activo (running) o el recién cerrado con su resultado.
+  const active = latest && latest.status === 'running' ? latest : null
+  const closedRes = (latest?.result as { status?: string; daysMeasured?: number } | null) ?? null
+  const recentlyClosed = !!(
+    latest &&
+    latest.status !== 'running' &&
+    latest.id !== dismissedId &&
+    latest.closed_at &&
+    Date.now() - new Date(latest.closed_at).getTime() < 60 * 60 * 1000
+  )
 
   const open = hypotheses.filter((h) => h.status === 'open')
   // El hilo fuerte (dos hallazgos que coincidieron · source_story_id) antes que
@@ -119,20 +125,14 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
     cacheKey: active?.id ?? 'none',
   }).data
 
-  // Nada que mostrar: sin hipótesis abiertas y sin experimento en curso.
-  if (!active && open.length === 0 && !lastResult) return null
+  // Nada que mostrar: sin activo, sin resultado reciente y sin hipótesis.
+  if (!active && !recentlyClosed && open.length === 0) return null
 
-  const stage: 1 | 2 | 3 = active ? 2 : lastResult ? 3 : 1
+  const stage: 1 | 2 | 3 = active ? 2 : recentlyClosed ? 3 : 1
   const duration = plan.durationDays ?? 14
   const left = active ? daysLeft(active.ends_on, today) : 0
 
-  const onClose = (id: string) =>
-    close.mutate(id, {
-      onSuccess: (data) => {
-        const status = (data as { measurement?: { status?: string } })?.measurement?.status ?? null
-        setLastResult(status)
-      },
-    })
+  const onClose = (id: string) => close.mutate(id)
 
   return (
     <View style={styles.wrap}>
@@ -201,6 +201,29 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
             </Pressable>
           </View>
         </View>
+      ) : recentlyClosed && latest ? (
+        // Lo ves: el resultado del hilo recién cerrado, leído de la DB (sobrevive a
+        // remounts). Cálido, sin culpa. Botón para volver a los hilos abiertos.
+        <View style={styles.resultCard}>
+          <Text style={styles.resultEyebrow}>Lo que vio este hilo</Text>
+          <Text style={styles.activeDim}>
+            {humanMetric((latest.plan as ExperimentPlanJson)?.metric, latest.dimension)}
+          </Text>
+          <Text
+            style={[
+              styles.result,
+              resultTone(closedRes?.status) === 'good' ? styles.resultGood : styles.resultSoft,
+            ]}
+          >
+            {resultLine(closedRes?.status, closedRes?.daysMeasured)}
+          </Text>
+          <Pressable
+            style={[styles.btn, styles.btnFull, styles.btnOutline]}
+            onPress={() => setDismissedId(latest.id)}
+          >
+            <Text style={styles.btnOutlineText}>Ver mis hilos</Text>
+          </Pressable>
+        </View>
       ) : (
         // Aparece: las hipótesis abiertas, por nivel. Un HILO (dos hallazgos que
         // coincidieron) pesa más que un CABO SUELTO (un cruce tentativo): el fuerte
@@ -217,10 +240,7 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
               <Pressable
                 style={[styles.btn, styles.btnFull, loose ? styles.btnOutline : styles.btnPrimary]}
                 disabled={start.isPending}
-                onPress={() => {
-                  setLastResult(null)
-                  start.mutate(h.id)
-                }}
+                onPress={() => start.mutate(h.id)}
               >
                 {starting ? (
                   <ActivityIndicator color={loose ? colors.magenta : colors.bg} size="small" />
@@ -239,20 +259,22 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
       {start.isError ? (
         <Text style={styles.softNote}>Ese hilo todavía no se puede seguir.</Text>
       ) : null}
-
-      {/* Lo ves: el resultado del último experimento cerrado (cálido, sin culpa). */}
-      {lastResult && RESULT_COPY[lastResult] ? (
-        <Text
-          style={[
-            styles.result,
-            RESULT_COPY[lastResult]!.tone === 'good' ? styles.resultGood : styles.resultSoft,
-          ]}
-        >
-          {RESULT_COPY[lastResult]!.label}
-        </Text>
-      ) : null}
     </View>
   )
+}
+
+/** El resultado del motor → una frase cálida, sin culpa. El día-0 (cerrado muy
+ *  pronto) se dice como tal, no como fracaso. */
+function resultLine(status: string | undefined, daysMeasured: number | undefined): string {
+  if (status === 'confirmed') return 'Se sostuvo en tus días.'
+  if (status === 'discarded') return 'No se sostuvo esta vez, y eso también dice algo.'
+  if ((daysMeasured ?? 0) === 0)
+    return 'Lo cerraste muy pronto para leerlo. Otro día le damos tiempo.'
+  return 'Aún no alcanza para saberlo.'
+}
+
+function resultTone(status: string | undefined): 'good' | 'soft' {
+  return status === 'confirmed' ? 'good' : 'soft'
 }
 
 function daysLeft(endsOn: string, today: string): number {
@@ -406,12 +428,29 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.niebla,
   },
+  // Lo ves: la card del resultado (mismo lenguaje que el hilo activo, más quieta).
+  resultCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.magentaDeep,
+    padding: 16,
+    gap: 6,
+  },
+  resultEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
   result: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 22,
     marginTop: 4,
+    marginBottom: 8,
   },
   resultGood: { color: colors.leche },
   resultSoft: { color: colors.bone },

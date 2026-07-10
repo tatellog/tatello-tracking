@@ -11,7 +11,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 import { todayInTimezone } from '@/lib/time'
 
-import { fetchActiveExperiment, fetchHypotheses } from './api'
+import { fetchActiveExperiment, fetchHypotheses, fetchLatestExperiment } from './api'
 
 type Period = 'day' | 'week' | 'month' | 'last30'
 
@@ -22,6 +22,18 @@ export function useActiveExperiment(uid: string | null) {
     queryFn: fetchActiveExperiment,
     enabled: uid != null,
     staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/** El experimento MÁS RECIENTE (cualquier status): activo, o el recién cerrado
+ *  con su resultado. Leerlo de la DB hace el resultado robusto a remounts. */
+export function useLatestExperiment(uid: string | null) {
+  return useQuery({
+    queryKey: uid ? queryKeys.experiments.latest(uid) : ['experiments', 'latest', 'off'],
+    queryFn: fetchLatestExperiment,
+    enabled: uid != null,
+    staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
   })
 }
@@ -61,7 +73,8 @@ function useLifecycleInvalidation(uid: string | null) {
   const qc = useQueryClient()
   return () => {
     if (!uid) return
-    void qc.invalidateQueries({ queryKey: queryKeys.experiments.active(uid) })
+    // Prefijo 'experiments' → refresca active + latest de una.
+    void qc.invalidateQueries({ queryKey: queryKeys.experiments.all })
     void qc.invalidateQueries({ queryKey: queryKeys.hypotheses.all })
   }
 }

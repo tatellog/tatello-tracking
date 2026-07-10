@@ -149,6 +149,9 @@ export const queryKeys = {
     all: ['experiments'] as const,
     // El experimento ACTIVO de una usuaria (≤1 por diseño). Scopeado por uid.
     active: (uid: string) => ['experiments', 'active', uid] as const,
+    // El experimento MÁS RECIENTE (cualquier status) — para mostrar el resultado
+    // recién cerrado leyéndolo de la DB (sobrevive a remounts del cliente).
+    latest: (uid: string) => ['experiments', 'latest', uid] as const,
   },
   hypotheses: {
     all: ['hypotheses'] as const,
