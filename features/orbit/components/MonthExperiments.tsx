@@ -8,19 +8,21 @@ import {
   useHypotheses,
   useStartExperiment,
 } from '@/features/experiments/hooks'
+import type { ExperimentMetric } from '@/features/experiments/logic'
 import { colors, typography } from '@/theme'
 
 /*
  * Órbita Mes · Hipótesis + Experimentos (R1 Engine 4 → R5).
  *
- * Da entrada VISUAL a dos piezas que vivían solo en el backend:
- *   · las HIPÓTESIS del motor ("es posible que A y B vayan de la mano") — el
- *     hilo tentativo, nunca una afirmación.
- *   · el ciclo de EXPERIMENTOS (R5): elegir un hilo → seguirlo ≤2 semanas →
- *     el motor mide → resultado. Recomendación, no orden; reversible.
+ * El HILO en tres tiempos, siempre visibles (Aparece → Lo sigues → Lo ves), para
+ * que se sienta un recorrido y no tres pantallas sueltas:
+ *   · Aparece  — las HIPÓTESIS del motor (relación tentativa en tus datos).
+ *   · Lo sigues — un EXPERIMENTO activo (≤2 semanas, reversible). La card muestra
+ *     QUÉ se mira y TU ANTES (línea base) con puro dato determinístico — sin IA.
+ *   · Lo ves   — el resultado (el motor mide, no la IA): confirmada / no / inconclusa.
  *
- * Solo se muestra dentro de MonthSegmentIA (gateado a dev). Lee las hipótesis
- * persistidas (con su uuid + status real) y el experimento activo.
+ * Solo dentro de MonthSegmentIA (gateado a dev). Lee las hipótesis persistidas
+ * (uuid + status real) y el experimento activo.
  */
 
 type Props = {
@@ -31,17 +33,66 @@ type Props = {
   today: string
 }
 
+type ExperimentPlanJson = {
+  metric?: ExperimentMetric
+  direction?: 'increase' | 'decrease' | 'maintain'
+  durationDays?: number
+  baselineRate?: number
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
 const RESULT_COPY: Record<string, { label: string; tone: 'good' | 'soft' }> = {
   confirmed: { label: 'Se sostuvo en tus días.', tone: 'good' },
   discarded: { label: 'No se sostuvo esta vez.', tone: 'soft' },
   inconclusive: { label: 'Aún no alcanza para saberlo.', tone: 'soft' },
 }
 
-function daysLeft(endsOn: string, today: string): number {
-  const a = new Date(`${today}T00:00:00Z`).getTime()
-  const b = new Date(`${endsOn}T00:00:00Z`).getTime()
-  return Math.max(0, Math.round((b - a) / (24 * 60 * 60 * 1000)))
+/** La métrica del motor → "qué se mira", en humano. */
+function humanMetric(metric: ExperimentMetric | undefined, dimension: string): string {
+  switch (metric) {
+    case 'deficit_days':
+      return 'tus días en déficit'
+    case 'workout_days':
+      return 'tus días de entreno'
+    case 'days_slept_7h':
+      return 'tus noches de 7 horas o más'
+    case 'water_goal_days':
+      return 'tus días con tu meta de agua'
+    case 'protein_target_days':
+      return 'tus días con tu proteína'
+    default:
+      return humanDimension(dimension)
+  }
 }
+
+/** Línea base (tasa 0-1 → "tu antes"), sin números fríos ni culpa. */
+function baselineLine(rate: number | undefined): string {
+  if (rate == null || !Number.isFinite(rate) || rate <= 0) return 'Antes casi no pasaba.'
+  const n = Math.round(rate * 10)
+  if (n <= 0) return 'Antes casi no pasaba.'
+  if (n >= 10) return 'Antes pasaba casi todos los días.'
+  return `Antes pasaba unos ${n} de cada 10 días.`
+}
+
+/** Qué vas a saber, según la dirección (hoy siempre `increase`). Nunca receta. */
+function measureLine(direction: ExperimentPlanJson['direction']): string {
+  if (direction === 'decrease')
+    return 'Así vas a saber si aparece menos que en tus semanas de antes.'
+  if (direction === 'maintain')
+    return 'Así vas a saber si se sostiene como en tus semanas de antes.'
+  return 'Así vas a saber si aparece más seguido que en tus semanas de antes.'
+}
+
+/** Día actual dentro de la ventana (progreso, no cuenta regresiva). */
+function dayNumber(startedOn: string, today: string, durationDays: number): number {
+  const a = new Date(`${startedOn}T00:00:00Z`).getTime()
+  const b = new Date(`${today}T00:00:00Z`).getTime()
+  const elapsed = Math.floor((b - a) / DAY_MS)
+  return Math.min(durationDays, Math.max(1, elapsed + 1))
+}
+
+const STAGES = ['Aparece', 'Lo sigues', 'Lo ves'] as const
 
 export function MonthExperiments({ uid, period, periodStart, periodEnd, today }: Props) {
   const { data: hypotheses = [] } = useHypotheses({ uid, period, periodStart, periodEnd })
@@ -55,6 +106,8 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
   // Nada que mostrar: sin hipótesis abiertas y sin experimento en curso.
   if (!active && open.length === 0 && !lastResult) return null
 
+  const stage: 1 | 2 | 3 = active ? 2 : lastResult ? 3 : 1
+
   const onClose = (id: string) =>
     close.mutate(id, {
       onSuccess: (data) => {
@@ -63,22 +116,47 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
       },
     })
 
+  const plan: ExperimentPlanJson = (active?.plan as ExperimentPlanJson) ?? {}
+  const duration = plan.durationDays ?? 14
+  const left = active ? daysLeft(active.ends_on, today) : 0
+
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>Un hilo para seguir</Text>
+
+      {/* El hilo en tres tiempos: continuidad visible (Aparece → Lo sigues → Lo ves). */}
+      <View style={styles.spine}>
+        {STAGES.map((label, i) => (
+          <View key={label} style={styles.spineItem}>
+            <Text
+              style={[
+                styles.spineLabel,
+                i + 1 === stage && styles.spineLabelOn,
+                i + 1 < stage && styles.spineLabelDone,
+              ]}
+            >
+              {label}
+            </Text>
+            {i < STAGES.length - 1 ? <Text style={styles.spineArrow}>→</Text> : null}
+          </View>
+        ))}
+      </View>
+
       <Text style={styles.lead}>
         Si quieres, elige un hilo y lo seguimos un tiempo. Sin presión: puedes parar cuando quieras.
       </Text>
 
-      {/* Experimento en curso: uno a la vez. */}
+      {/* ── Lo sigues: el experimento activo, con QUÉ se mira + tu antes ── */}
       {active ? (
         <View style={styles.activeCard}>
           <Text style={styles.activeLabel}>Estás siguiendo un hilo</Text>
-          <Text style={styles.activeDim}>{humanDimension(active.dimension)}</Text>
-          <Text style={styles.activeMeta}>
-            {daysLeft(active.ends_on, today) > 0
-              ? `En ${daysLeft(active.ends_on, today)} días lo sabrás.`
-              : 'Ya puedes leer cómo te fue.'}
+          <Text style={styles.activeDim}>{humanMetric(plan.metric, active.dimension)}</Text>
+          <Text style={styles.activeBase}>{baselineLine(plan.baselineRate)}</Text>
+          <Text style={styles.activeMeasure}>{measureLine(plan.direction)}</Text>
+          <Text style={styles.activeDay}>
+            {left > 0
+              ? `Día ${dayNumber(active.started_on, today, duration)} de ${duration}. Al cerrar, ves el resultado.`
+              : 'Ya puedes ver cómo te fue.'}
           </Text>
           <View style={styles.row}>
             <Pressable
@@ -89,7 +167,7 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
               {close.isPending ? (
                 <ActivityIndicator color={colors.bg} size="small" />
               ) : (
-                <Text style={styles.btnPrimaryText}>Cerrar y ver cómo me fue</Text>
+                <Text style={styles.btnPrimaryText}>Cerrar y ver el resultado</Text>
               )}
             </Pressable>
             <Pressable
@@ -102,9 +180,7 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
           </View>
         </View>
       ) : (
-        // Sin activo: las hipótesis abiertas, cada una con su "Probar esto".
-        // El spinner va SOLO en el botón tocado (start.variables = la hipótesis
-        // en vuelo); los demás quedan deshabilitados pero sin spinner.
+        // Aparece: las hipótesis abiertas. El spinner va SOLO en el botón tocado.
         open.map((h) => {
           const starting = start.isPending && start.variables === h.id
           return (
@@ -121,7 +197,7 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
                 {starting ? (
                   <ActivityIndicator color={colors.bg} size="small" />
                 ) : (
-                  <Text style={styles.btnPrimaryText}>Probar esto</Text>
+                  <Text style={styles.btnPrimaryText}>Seguir este hilo 2 semanas</Text>
                 )}
               </Pressable>
             </View>
@@ -129,7 +205,12 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
         })
       )}
 
-      {/* Resultado del último experimento cerrado (cálido, sin culpa). */}
+      {/* Si arrancar falla (ej. dimensión no medible → 422), lectura suave. */}
+      {start.isError ? (
+        <Text style={styles.softNote}>Ese hilo todavía no se puede seguir.</Text>
+      ) : null}
+
+      {/* Lo ves: el resultado del último experimento cerrado (cálido, sin culpa). */}
       {lastResult && RESULT_COPY[lastResult] ? (
         <Text
           style={[
@@ -144,7 +225,13 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
   )
 }
 
-/** La dimensión técnica → humano (para la card del activo). */
+function daysLeft(endsOn: string, today: string): number {
+  const a = new Date(`${today}T00:00:00Z`).getTime()
+  const b = new Date(`${endsOn}T00:00:00Z`).getTime()
+  return Math.max(0, Math.round((b - a) / DAY_MS))
+}
+
+/** La dimensión técnica → humano (fallback cuando no hay métrica). */
 function humanDimension(dim: string): string {
   switch (dim) {
     case 'deficit':
@@ -170,6 +257,21 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.oroSoft,
+  },
+  spine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  spineItem: { flexDirection: 'row', alignItems: 'center' },
+  spineLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  spineLabelOn: { fontFamily: typography.uiBold, color: colors.magenta },
+  spineLabelDone: { color: colors.bone },
+  spineArrow: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bruma,
+    marginHorizontal: 8,
   },
   lead: {
     fontFamily: typography.serif,
@@ -211,12 +313,28 @@ const styles = StyleSheet.create({
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.title,
     color: colors.leche,
+    marginBottom: 2,
   },
-  activeMeta: {
+  activeBase: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 19,
+    color: colors.bone,
+  },
+  activeMeasure: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    color: colors.leche,
+    marginTop: 2,
+  },
+  activeDay: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.niebla,
-    marginBottom: 10,
+    marginTop: 6,
+    marginBottom: 12,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   btn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' },
@@ -229,6 +347,11 @@ const styles = StyleSheet.create({
   },
   btnGhost: { paddingVertical: 12, paddingHorizontal: 8 },
   btnGhostText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  softNote: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.niebla,
