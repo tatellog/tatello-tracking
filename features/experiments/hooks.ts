@@ -11,7 +11,12 @@ import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 import { todayInTimezone } from '@/lib/time'
 
-import { fetchActiveExperiment, fetchHypotheses, fetchLatestExperiment } from './api'
+import {
+  fetchActiveExperiment,
+  fetchClosedExperiments,
+  fetchHypotheses,
+  fetchLatestExperiment,
+} from './api'
 
 type Period = 'day' | 'week' | 'month' | 'last30'
 
@@ -32,6 +37,18 @@ export function useLatestExperiment(uid: string | null) {
   return useQuery({
     queryKey: uid ? queryKeys.experiments.latest(uid) : ['experiments', 'latest', 'off'],
     queryFn: fetchLatestExperiment,
+    enabled: uid != null,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/** Los experimentos ya cerrados (terminales) — el historial "Hilos que ya
+ *  seguiste" en Órbita Mes. Se refresca con el prefijo experiments.all. */
+export function useClosedExperiments(uid: string | null) {
+  return useQuery({
+    queryKey: uid ? queryKeys.experiments.closed(uid) : ['experiments', 'closed', 'off'],
+    queryFn: fetchClosedExperiments,
     enabled: uid != null,
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,

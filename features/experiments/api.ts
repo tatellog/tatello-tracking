@@ -66,6 +66,23 @@ export async function fetchLatestExperiment(): Promise<ExperimentRow | null> {
   return parsed.success ? parsed.data : null
 }
 
+/** Los experimentos YA CERRADOS de la usuaria (terminales), del más reciente al
+ *  más viejo. El historial "Hilos que ya seguiste": al cerrarse, un hilo baja
+ *  aquí en vez de desaparecer. Nunca lanza: ante error devuelve []. */
+export async function fetchClosedExperiments(): Promise<ExperimentRow[]> {
+  const { data, error } = await supabase
+    .from('experiments')
+    .select('id, hypothesis_id, dimension, status, started_on, ends_on, plan, result, closed_at')
+    .in('status', ['confirmed', 'discarded', 'inconclusive'])
+    .order('closed_at', { ascending: false })
+    .limit(20)
+  if (error || !data) return []
+  return data.flatMap((row) => {
+    const parsed = ExperimentRowSchema.safeParse(row)
+    return parsed.success ? [parsed.data] : []
+  })
+}
+
 /** Las hipótesis de la usuaria en un periodo, con status real, por confianza. */
 export async function fetchHypotheses(
   period: Period,
