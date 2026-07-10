@@ -62,8 +62,15 @@ Pasar por `manifesto-reviewer` + `voice-and-copy`.
   culpa. Mutations `useStart/Close/CancelExperiment` → edge `experiment-lifecycle`.
   Copy revisada (manifiesto + voz LIMPIO).
 
+**Hecho (IA · gateada a dev):**
+
+- **C** IA que redacta el FOCO del experimento (`feature:'experimento'` en
+  `stelar-insight`, gpt-4o-mini, caché `ai_insights`). Recibe solo métrica humana
+  - hipótesis, escribe UNA frase de foco ("pon un ojo en…"), NUNCA receta.
+    Blindaje: prompt reforzado + backstop propio `EXPERIMENT_PRESCRIPTIVE` (atrapa
+    verbos de conducta sin bloquear los de observación · hueco del `BANNED_LEXICON`
+    compartido que halló manifesto-reviewer). Fallback: la hipótesis determinística.
+
 **Diferido:**
 
-- **C** IA que redacta el experimento (`feature:'experimento'` en `stelar-insight`).
-  Hoy la UI muestra el `text` determinístico de la hipótesis.
 - Abrir la UI a la beta (hoy solo dev).
