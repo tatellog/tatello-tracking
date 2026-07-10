@@ -103,25 +103,30 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
         </View>
       ) : (
         // Sin activo: las hipótesis abiertas, cada una con su "Probar esto".
-        open.map((h) => (
-          <View key={h.id} style={styles.hypCard}>
-            <Text style={styles.hypText}>{h.text}</Text>
-            <Pressable
-              style={[styles.btn, styles.btnPrimary, styles.btnFull]}
-              disabled={start.isPending}
-              onPress={() => {
-                setLastResult(null)
-                start.mutate(h.id)
-              }}
-            >
-              {start.isPending ? (
-                <ActivityIndicator color={colors.bg} size="small" />
-              ) : (
-                <Text style={styles.btnPrimaryText}>Probar esto</Text>
-              )}
-            </Pressable>
-          </View>
-        ))
+        // El spinner va SOLO en el botón tocado (start.variables = la hipótesis
+        // en vuelo); los demás quedan deshabilitados pero sin spinner.
+        open.map((h) => {
+          const starting = start.isPending && start.variables === h.id
+          return (
+            <View key={h.id} style={styles.hypCard}>
+              <Text style={styles.hypText}>{h.text}</Text>
+              <Pressable
+                style={[styles.btn, styles.btnPrimary, styles.btnFull]}
+                disabled={start.isPending}
+                onPress={() => {
+                  setLastResult(null)
+                  start.mutate(h.id)
+                }}
+              >
+                {starting ? (
+                  <ActivityIndicator color={colors.bg} size="small" />
+                ) : (
+                  <Text style={styles.btnPrimaryText}>Probar esto</Text>
+                )}
+              </Pressable>
+            </View>
+          )
+        })
       )}
 
       {/* Resultado del último experimento cerrado (cálido, sin culpa). */}

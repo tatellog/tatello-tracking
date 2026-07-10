@@ -51,5 +51,16 @@ export function buildHypotheses(
     })
   }
 
-  return hyps.sort((a, b) => b.confidence - a.confidence).slice(0, 3)
+  // Dedup: dos findings distintos pueden cruzar a la MISMA dimensión (ej.
+  // "en N de esos días también entrenaste") con distinto número → leen repetido.
+  // Normalizamos quitando dígitos y nos quedamos con la de mayor confianza.
+  const seen = new Set<string>()
+  const deduped: Hypothesis[] = []
+  for (const h of hyps.sort((a, b) => b.confidence - a.confidence)) {
+    const key = h.text.replace(/\d+/g, '#').trim()
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(h)
+  }
+  return deduped.slice(0, 3)
 }

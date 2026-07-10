@@ -73,4 +73,26 @@ describe('buildHypotheses — Hypothesis Engine (Engine 5)', () => {
       buildHypotheses([mkFinding({ id: 'a', category: 'agua', confidence: 90, subject: 'x' })], []),
     ).toEqual([])
   })
+
+  it('deduplica cruces repetidos (misma frase, distinto número) por confianza', () => {
+    const a = mkFinding({
+      id: 'water-deficit',
+      category: 'agua',
+      confidence: 80,
+      subject: 'tu agua',
+      hypothesis: 'Me llamó algo más: en 4 de esos días también entrenaste. Ahí están los dos.',
+    })
+    const b = mkFinding({
+      id: 'deficit-summary',
+      category: 'deficit',
+      confidence: 60,
+      subject: 'tu déficit',
+      hypothesis: 'Me llamó algo más: en 2 de esos días también entrenaste. Ahí están los dos.',
+    })
+    const hyps = buildHypotheses([a, b], [])
+    // Un solo cruce a "entreno" (el de mayor confianza), no dos casi idénticos.
+    const entreno = hyps.filter((h) => h.text.includes('entrenaste'))
+    expect(entreno).toHaveLength(1)
+    expect(entreno[0]!.sourceFindingId).toBe('water-deficit')
+  })
 })
