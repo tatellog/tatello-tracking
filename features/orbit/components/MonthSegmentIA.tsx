@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { useTransformProgress } from '@/features/emblem'
+import { useClosedExperiments } from '@/features/experiments/hooks'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
@@ -117,6 +118,13 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const source = USE_PERSISTED_MONTH_REPORT ? persistedReport : null
   const cards = source?.findings ?? chat.cards
 
+  // El historial de hilos cerrados es data INDEPENDIENTE de los hallazgos del
+  // periodo: se lee aquí (cache compartida con MonthExperiments) para no ocultar
+  // el "Hilos que ya seguiste" cuando ya no hay hallazgos nuevos. Sin esto, al
+  // consumir todas las hipótesis el reporte quedaba en 0 cards y el trail
+  // desaparecía con la sección entera.
+  const { data: closedExp = [] } = useClosedExperiments(uid)
+
   // Profundizar: tocar un hecho abre una conversación corta (fact-led). El
   // reporte es el hub; la conversación cierra de vuelta a él (sin loop, sin
   // repetir la metacognición en cada hecho).
@@ -186,30 +194,30 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── El teaser invita; al tocar, revela el reporte de evidencia (los
-          hechos: veredicto → dónde se te va → puerta abierta). ── */}
-      {chat.ready && cards.length > 0 ? (
-        <View style={styles.antesala}>
-          {/* Los hilos del motor (hipótesis · Engine 4) + el ciclo de
-              experimentos (R5), directo en el lugar del teaser. */}
-          <MonthExperiments
-            uid={uid}
-            period="last30"
-            periodStart={firstDataDay ?? monthKey}
-            periodEnd={today}
-            today={today}
-            // "Quiero entenderlo →": abre el chat guiado del hallazgo que originó
-            // el hilo (la capa de ENTENDER, bajo la de actuar). El source_finding_id
-            // de la hipótesis === Finding.id del reporte.
-            onExplain={(fid) => {
-              const f = fid ? cards.find((c) => c.id === fid) : undefined
-              if (f) setOpenFinding(f)
-            }}
-          />
-        </View>
-      ) : chat.reason ? (
-        // Estado vacío HONESTO en vez de un hueco silencioso: una lectura cálida
-        // según por qué aún no hay hallazgos (faltan datos vs sin patrón claro).
+      {/* ── Los hilos del motor (hipótesis · Engine 4) + el ciclo de experimentos
+          (R5) + el historial. SIEMPRE montado: MonthExperiments se auto-oculta si
+          no hay nada, pero el historial NO debe depender de que haya hallazgos
+          nuevos del periodo (antes el trail desaparecía al agotar las hipótesis). ── */}
+      <View style={styles.antesala}>
+        <MonthExperiments
+          uid={uid}
+          period="last30"
+          periodStart={firstDataDay ?? monthKey}
+          periodEnd={today}
+          today={today}
+          // "Quiero entenderlo →": abre el chat guiado del hallazgo que originó
+          // el hilo (la capa de ENTENDER, bajo la de actuar). El source_finding_id
+          // de la hipótesis === Finding.id del reporte.
+          onExplain={(fid) => {
+            const f = fid ? cards.find((c) => c.id === fid) : undefined
+            if (f) setOpenFinding(f)
+          }}
+        />
+      </View>
+
+      {/* Estado vacío HONESTO: solo cuando NO hay hallazgos NI historial de hilos
+          (si ya seguiste hilos, "aún no hay datos" se contradiría con el trail). */}
+      {chat.reason && closedExp.length === 0 ? (
         <EmptySegmentCard {...EMPTY_COPY[chat.reason]} />
       ) : null}
 
