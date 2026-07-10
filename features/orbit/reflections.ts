@@ -52,6 +52,9 @@ export async function fetchPriorReflections(currentMonth: MonthKey): Promise<Pri
     .select('month, question_key, answer')
     .eq('user_id', userId)
     .lt('month', currentMonth)
+    // Los focos ("me lo quedo presente") comparten la tabla con un prefijo
+    // 'foco:'; no son respuestas de metacognición → fuera del loop de callbacks.
+    .not('question_key', 'like', 'foco:%')
     .order('month', { ascending: false })
   if (error) throw error
   const out: PriorReflections = {}

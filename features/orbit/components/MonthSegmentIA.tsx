@@ -16,6 +16,7 @@ import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 import { type Finding, hashFindings } from '../findings'
+import { useKeepFoco, useKeptFocos } from '../focos'
 import { useSignalsHistory } from '../hooks'
 import { buildMonthChat, type MonthChatEmptyReason } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
@@ -26,6 +27,7 @@ import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthDiscovery } from './MonthDiscovery'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
+import { MonthKeptFocos } from './MonthKeptFocos'
 import { PresenceFinale } from './PresenceFinale'
 
 /*
@@ -130,6 +132,13 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     )
   }, [cards])
 
+  // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. Los focos
+  // guardados + la memoria "Lo que fuiste mirando". El keep es idempotente.
+  const keep = useKeepFoco(month)
+  const { data: keptFocos = [] } = useKeptFocos(uid)
+  const mainKept = mainFinding ? keptFocos.some((f) => f.findingId === mainFinding.id) : false
+  const availableIds = useMemo(() => new Set(cards.map((c) => c.id)), [cards])
+
   // Profundizar: tocar el CTA abre la conversación guiada sobre el hallazgo. El
   // chat es la experiencia principal (el motor detecta, la IA comunica).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
@@ -203,11 +212,32 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           la usuaria opera). El motor detecta; la IA comunica. ── */}
       {mainFinding ? (
         <View style={styles.antesala}>
-          <MonthDiscovery finding={mainFinding} onExplore={() => setOpenFinding(mainFinding)} />
+          <MonthDiscovery
+            finding={mainFinding}
+            onExplore={() => setOpenFinding(mainFinding)}
+            kept={mainKept}
+            keeping={keep.isPending}
+            onKeep={() => keep.mutate({ id: mainFinding.id, subject: mainFinding.subject })}
+          />
         </View>
       ) : chat.reason ? (
         // Estado vacío HONESTO cuando aún no hay un hallazgo que conversar.
         <EmptySegmentCard {...EMPTY_COPY[chat.reason]} />
+      ) : null}
+
+      {/* "Lo que fuiste mirando": la memoria de focos, sin veredicto. Reabre el
+          chat del hallazgo si sigue disponible este mes. */}
+      {keptFocos.length > 0 ? (
+        <View style={styles.section}>
+          <MonthKeptFocos
+            focos={keptFocos}
+            availableIds={availableIds}
+            onReopen={(fid) => {
+              const f = cards.find((c) => c.id === fid)
+              if (f) setOpenFinding(f)
+            }}
+          />
+        </View>
       ) : null}
 
       {/* ── Tu mes de un vistazo: el calendario (evidencia, tap→Día) ── */}

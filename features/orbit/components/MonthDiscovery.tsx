@@ -20,9 +20,13 @@ import type { Finding } from '../findings'
 type Props = {
   finding: Finding
   onExplore: () => void
+  /** Ya está "presente" este mes (la usuaria se lo quedó mirando). */
+  kept?: boolean
+  keeping?: boolean
+  onKeep?: () => void
 }
 
-export function MonthDiscovery({ finding, onExplore }: Props) {
+export function MonthDiscovery({ finding, onExplore, kept, keeping, onKeep }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>Este mes encontré algo</Text>
@@ -39,6 +43,24 @@ export function MonthDiscovery({ finding, onExplore }: Props) {
         <Text style={styles.ctaText}>Entendamos por qué</Text>
         <Text style={styles.ctaArrow}> →</Text>
       </Pressable>
+
+      {/* "Me lo quedo presente": compromiso suave, sin ventana ni veredicto. Solo
+          Stelar recordando en qué te fijaste. No se puede "fallar". */}
+      {onKeep ? (
+        kept ? (
+          <Text style={styles.keptNote}>✦ Presente este mes</Text>
+        ) : (
+          <Pressable
+            style={styles.keepLink}
+            onPress={onKeep}
+            disabled={keeping}
+            accessibilityRole="button"
+            accessibilityLabel="Me lo quedo presente"
+          >
+            <Text style={styles.keepText}>{keeping ? 'Guardando…' : 'Me lo quedo presente'}</Text>
+          </Pressable>
+        )
+      ) : null}
     </View>
   )
 }
@@ -84,5 +106,20 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
     color: colors.bg,
+  },
+  keepLink: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 8 },
+  keepText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.bone,
+  },
+  keptNote: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.magenta,
   },
 })
