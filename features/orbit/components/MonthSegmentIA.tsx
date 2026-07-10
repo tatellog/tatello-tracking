@@ -198,6 +198,13 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
             periodStart={firstDataDay ?? monthKey}
             periodEnd={today}
             today={today}
+            // "Quiero entenderlo →": abre el chat guiado del hallazgo que originó
+            // el hilo (la capa de ENTENDER, bajo la de actuar). El source_finding_id
+            // de la hipótesis === Finding.id del reporte.
+            onExplain={(fid) => {
+              const f = fid ? cards.find((c) => c.id === fid) : undefined
+              if (f) setOpenFinding(f)
+            }}
           />
         </View>
       ) : chat.reason ? (

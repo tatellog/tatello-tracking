@@ -33,6 +33,9 @@ type Props = {
   periodStart: string
   periodEnd: string
   today: string
+  /** Abre el chat guiado del hallazgo que originó un hilo ("Quiero entenderlo →").
+   *  El padre lo resuelve a un Finding por su id. Sin él, el link no aparece. */
+  onExplain?: (sourceFindingId: string | null) => void
 }
 
 type ExperimentPlanJson = {
@@ -81,7 +84,7 @@ function dayNumber(startedOn: string, today: string, durationDays: number): numb
 
 const STAGES = ['Aparece', 'Lo sigues', 'Lo ves'] as const
 
-export function MonthExperiments({ uid, period, periodStart, periodEnd, today }: Props) {
+export function MonthExperiments({ uid, period, periodStart, periodEnd, today, onExplain }: Props) {
   const { data: hypotheses = [] } = useHypotheses({ uid, period, periodStart, periodEnd })
   const { data: latest } = useLatestExperiment(uid)
   const { data: closedAll = [] } = useClosedExperiments(uid)
@@ -192,6 +195,15 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
                   ? `Día ${dayNumber(active.started_on, today, duration)} de ${duration}. Al cerrar, ves el resultado.`
                   : 'Ya puedes ver cómo te fue.'}
               </Text>
+              {onExplain && sourceHyp?.source_finding_id ? (
+                <Pressable
+                  style={styles.explainLink}
+                  onPress={() => onExplain(sourceHyp?.source_finding_id ?? null)}
+                >
+                  <Text style={styles.explainText}>Quiero entenderlo</Text>
+                  <Text style={styles.explainArrow}> →</Text>
+                </Pressable>
+              ) : null}
               <View style={styles.row}>
                 <Pressable
                   style={[styles.btn, styles.btnPrimary]}
@@ -249,6 +261,15 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
                     {loose ? 'Un cabo suelto' : 'Un hilo que ya se dejó ver'}
                   </Text>
                   <Text style={styles.hypText}>{h.text}</Text>
+                  {onExplain && h.source_finding_id ? (
+                    <Pressable
+                      style={styles.explainLink}
+                      onPress={() => onExplain(h.source_finding_id)}
+                    >
+                      <Text style={styles.explainText}>Quiero entenderlo</Text>
+                      <Text style={styles.explainArrow}> →</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable
                     style={[
                       styles.btn,
@@ -475,6 +496,26 @@ const styles = StyleSheet.create({
   btnOutline: { borderWidth: 1, borderColor: colors.magentaDeep, backgroundColor: 'transparent' },
   btnOutlineText: {
     fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.magenta,
+  },
+  // "Quiero entenderlo →" — puerta al chat guiado del hallazgo (capa de entender,
+  // bajo la de actuar). Link, no botón: no compite con "Seguir este hilo".
+  explainLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  explainText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.bone,
+  },
+  explainArrow: {
+    fontFamily: typography.uiSemi,
     fontSize: typography.sizes.label,
     color: colors.magenta,
   },
