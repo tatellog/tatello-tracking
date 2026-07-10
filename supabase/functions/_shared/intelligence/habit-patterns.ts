@@ -8,8 +8,8 @@
  * the user; no clinical words; no guilt; no imperatives; no count in the
  * headline. Calories appear only as paired CONTEXT, never a verdict.
  */
-import type { DailySignals } from './types'
-import type { PairedData, Patron, WeekdayData } from './types'
+import type { DailySignals } from './types.ts'
+import type { PairedData, Patron, WeekdayData } from './types.ts'
 
 const MON_NAMES = [
   'lunes',

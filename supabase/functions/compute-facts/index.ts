@@ -15,7 +15,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
-import { computeFacts } from '../_shared/intelligence/facts'
+import { computeFacts } from '../_shared/intelligence/facts.ts'
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',

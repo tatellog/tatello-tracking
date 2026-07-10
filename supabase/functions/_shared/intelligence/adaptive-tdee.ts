@@ -22,7 +22,7 @@
  *   · Pura y testeable: sin side effects, corre en app y en server.
  */
 
-import type { DailySignals } from './types'
+import type { DailySignals } from './types.ts'
 
 /** ~kcal por kg de tejido corporal (constante estándar de balance). */
 const KCAL_PER_KG = 7700

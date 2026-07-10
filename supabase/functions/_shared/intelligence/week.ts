@@ -8,7 +8,12 @@
  *
  * Pattern detection lives in week-patterns.ts.
  */
-import { deriveDimensions, dimensionRegistered, TONE_BRILLANTE, TONE_FORMACION } from './dimensions'
+import {
+  deriveDimensions,
+  dimensionRegistered,
+  TONE_BRILLANTE,
+  TONE_FORMACION,
+} from './dimensions.ts'
 import type {
   DailySignals,
   DiaSemana,
@@ -20,7 +25,7 @@ import type {
   VozParte,
   WeekObservation,
   WeekRecap,
-} from './types'
+} from './types.ts'
 
 const WEEKDAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const
 const WEEKDAY_NAMES = [
@@ -565,7 +570,7 @@ export function buildWeekObservations(
  *  observation card + detail can label days from an observation's `days`. */
 export const WEEKDAY_NAMES_FULL = WEEKDAY_NAMES
 
-export type { DiaSemana, EnLuz, WeekObservation, WeekObservationEntry } from './types'
+export type { DiaSemana, EnLuz, WeekObservation, WeekObservationEntry } from './types.ts'
 
 /* ── Lo que viene — Semana's bridge to the Mes patterns ──────────────
  * A gentle heads-up for the SOONEST upcoming day this week that carries

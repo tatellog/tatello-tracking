@@ -17,7 +17,7 @@
  * (features/orbit/deficit.ts, fuente única); aquí se INYECTA como predicado
  * para no duplicarla.
  */
-import type { DailySignals } from './types'
+import type { DailySignals } from './types.ts'
 
 /** Etiquetas canónicas de workouts.type (los ids de los chips de Hoy). Un
  *  tipo fuera del catálogo cae a su propio texto capitalizado. */

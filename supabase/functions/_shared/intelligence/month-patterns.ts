@@ -5,11 +5,11 @@
  * Deterministic, no AI. Returns `Patron`s the existing card + detail
  * screen render. Voice rules per features/patterns/CLAUDE.md.
  */
-import type { DailySignals } from './types'
-import { deriveDimensions } from './dimensions'
-import type { DimensionContext } from './types'
-import type { PairedData, Patron, WeekdayData } from './types'
-import { dayBrightness } from './week'
+import type { DailySignals } from './types.ts'
+import { deriveDimensions } from './dimensions.ts'
+import type { DimensionContext } from './types.ts'
+import type { PairedData, Patron, WeekdayData } from './types.ts'
+import { dayBrightness } from './week.ts'
 
 const MON_NAMES = [
   'lunes',

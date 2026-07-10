@@ -4,19 +4,19 @@
  * payload the app renders (Día / Semana / Mes). Pure: shared by the Edge
  * Function (server) AND the app's local fallback. One source of truth.
  */
-import { buildArquetipoSemana } from './arquetipo'
-import { buildDayReadings } from './day-readings'
-import { buildDayIdentity, deriveDimensions } from './dimensions'
-import { detectHabitPatterns } from './habit-patterns'
+import { buildArquetipoSemana } from './arquetipo.ts'
+import { buildDayReadings } from './day-readings.ts'
+import { buildDayIdentity, deriveDimensions } from './dimensions.ts'
+import { detectHabitPatterns } from './habit-patterns.ts'
 import {
   buildMonthSatellites,
   buildMonthSummary,
   buildVozMes,
   monthDaysLogged,
   monthTheme,
-} from './month'
-import { detectMonthPatterns } from './month-patterns'
-import { detectNightPattern } from './night-pattern'
+} from './month.ts'
+import { detectMonthPatterns } from './month-patterns.ts'
+import { detectNightPattern } from './night-pattern.ts'
 import type {
   DailySignals,
   DayCard,
@@ -28,9 +28,9 @@ import type {
   MonthSatellite,
   Patron,
   VozParte,
-} from './types'
-import { buildVozSemanaReal, buildWeekAhead, buildWeekDaysReal } from './week'
-import { detectWeekPatterns } from './week-patterns'
+} from './types.ts'
+import { buildVozSemanaReal, buildWeekAhead, buildWeekDaysReal } from './week.ts'
+import { detectWeekPatterns } from './week-patterns.ts'
 
 export type IntelligenceInput = {
   history: readonly DailySignals[]

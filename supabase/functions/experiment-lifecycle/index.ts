@@ -30,7 +30,7 @@ import {
   buildExperimentScaffold,
   computeMetricRate,
   measureExperiment,
-} from '../_shared/intelligence/experiments'
+} from '../_shared/intelligence/experiments.ts'
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',

@@ -13,7 +13,7 @@
  *   • Sleep is NOT a goal → a plain figure, no progress bar.
  *   • Rest is valid; no number screams; no countdown.
  */
-import type { DailySignals } from './types'
+import type { DailySignals } from './types.ts'
 
 export type DayTone = 'win' | 'context' | 'over' | 'soft'
 export type DayMetricDisplay = 'bar' | 'plain' | 'dots' | 'chip'

@@ -6,6 +6,11 @@
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    // El motor compartido usa imports `.ts` explícitos (para que el edge Deno 2
+    // los resuelva). noEmit es requisito de allowImportingTsExtensions; la app
+    // nunca emite con tsc (Metro/babel construye), así que es inocuo.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]

@@ -9,11 +9,11 @@
  * The prose fields stay short and factual — the rich coach voice is the
  * AI engine's job; here we only state what the numbers show.
  */
-import type { DailySignals } from './types'
-import { deriveDimensions } from './dimensions'
-import type { DimensionContext } from './types'
-import type { PairedData, Patron, WeekdayData } from './types'
-import { dayBrightness } from './week'
+import type { DailySignals } from './types.ts'
+import { deriveDimensions } from './dimensions.ts'
+import type { DimensionContext } from './types.ts'
+import type { PairedData, Patron, WeekdayData } from './types.ts'
+import { dayBrightness } from './week.ts'
 
 /** Minimum samples of a weekday before we'll claim a recurrence. */
 const MIN_WEEKDAY_SAMPLES = 3

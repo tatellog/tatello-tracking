@@ -10,7 +10,7 @@
  *
  * Ref: docs/epics/epic-01-intelligence-engine.md (T3.2). Contrato: engine.ts.
  */
-import type { Finding, Story } from './engine'
+import type { Finding, Story } from './engine.ts'
 
 /** Días que dos hallazgos comparten en su evidencia. */
 function sharedDays(a: Finding, b: Finding): number {

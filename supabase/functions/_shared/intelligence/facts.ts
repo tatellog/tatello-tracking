@@ -8,8 +8,8 @@
  * Lo llama el WRITER backend (persiste en `facts`) y el fallback del cliente.
  * Ref: docs/epics/epic-01-intelligence-engine.md (T1.2), docs/adr/0001-*.
  */
-import { buildPeriodContext, type ContextPeriod, type ContextRow } from './context'
-import type { Fact, Period } from './engine'
+import { buildPeriodContext, type ContextPeriod, type ContextRow } from './context.ts'
+import type { Fact, Period } from './engine.ts'
 
 export type ComputeFactsInput = {
   period: ContextPeriod

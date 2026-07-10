@@ -18,7 +18,7 @@
  * baselinea: "distinto" sobre lo que comiste se leería como reproche, y eso es
  * línea roja del manifiesto.
  */
-import type { DailySignals, DimensionKey } from './types'
+import type { DailySignals, DimensionKey } from './types.ts'
 
 /** Mínimo de días con dato para que un baseline sea honesto (≈2 semanas).
  *  Por debajo → null: Stelar no infiere "lo típico en ti" sin evidencia. */

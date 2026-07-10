@@ -20,8 +20,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
-import { isCycleActive } from '../_shared/intelligence/cycle-gate'
-import { computeIntelligence } from '../_shared/intelligence/index'
+import { isCycleActive } from '../_shared/intelligence/cycle-gate.ts'
+import { computeIntelligence } from '../_shared/intelligence/index.ts'
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',

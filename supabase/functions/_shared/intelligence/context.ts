@@ -14,8 +14,8 @@
  * NOTA pasos: wearable_steps es ingest-only y NO vive en daily_signals (spec
  * wearables §1), así que avgSteps se difiere hasta decidir su superficie.
  */
-import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit'
-import type { DailySignals } from './types'
+import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit.ts'
+import type { DailySignals } from './types.ts'
 
 /** Una fila de contexto = daily_signals + la kcal del wearable (columna
  *  nueva de la view que el shared DailySignals aún no lista). Opcional para

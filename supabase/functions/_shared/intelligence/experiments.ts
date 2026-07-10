@@ -16,10 +16,10 @@
  *
  * Epic 05 · F-B · T-B1. Ref: engine.ts (Finding/Hypothesis), epic-05.
  */
-import { isDeficitDay } from './deficit'
-import type { Finding, FindingCategory, Hypothesis } from './engine'
-import type { DailySignals } from './types'
-import { WATER_GOAL_GLASSES } from './water'
+import { isDeficitDay } from './deficit.ts'
+import type { Finding, FindingCategory, Hypothesis } from './engine.ts'
+import type { DailySignals } from './types.ts'
+import { WATER_GOAL_GLASSES } from './water.ts'
 
 /** Estado del experimento (espejo del enum de la tabla `experiments`). */
 export type ExperimentStatus = 'running' | 'confirmed' | 'discarded' | 'inconclusive'

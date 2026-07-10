@@ -17,8 +17,8 @@
  * DEFERIDO en R3: `best_streak` (recurre, necesita diseño aparte) y
  * `first_wearable` (R4).
  */
-import { isDeficitDay } from './deficit'
-import type { DailySignals } from './types'
+import { isDeficitDay } from './deficit.ts'
+import type { DailySignals } from './types.ts'
 
 export type MilestoneKind = 'first_deficit' | 'deficit_month' | 'first_weight' | 'first_workout'
 

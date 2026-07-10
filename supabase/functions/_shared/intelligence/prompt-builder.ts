@@ -11,8 +11,8 @@
  *
  * Puro y compartido: sin React Native, sin Supabase, sin Deno globals.
  */
-import { stableStringify } from './context-hash'
-import type { PeriodContext } from './context'
+import { stableStringify } from './context-hash.ts'
+import type { PeriodContext } from './context.ts'
 
 /** Sube esto cuando cambie el system prompt, el contrato de salida o el
  *  modelo objetivo — el caché tratará las respuestas viejas como stale. */

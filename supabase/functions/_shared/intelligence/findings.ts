@@ -14,12 +14,12 @@
  * Migrado desde features/orbit/findings.ts (que ahora es un puente re-export).
  * Epic 01 · T2.2. Los tipos de dominio viven en ./engine (T0.1).
  */
-import { isDeficitDay } from './deficit'
-import type { Finding, FindingCategory, FollowUp, Metacognition } from './engine'
-import type { DailySignals } from './types'
-import { WATER_GOAL_GLASSES } from './water'
+import { isDeficitDay } from './deficit.ts'
+import type { Finding, FindingCategory, FollowUp, Metacognition } from './engine.ts'
+import type { DailySignals } from './types.ts'
+import { WATER_GOAL_GLASSES } from './water.ts'
 
-export type { Chart, Finding, FindingCategory, FollowUp, Metacognition } from './engine'
+export type { Chart, Finding, FindingCategory, FollowUp, Metacognition } from './engine.ts'
 
 export type FindingsCtx = {
   calorieTarget?: number | null

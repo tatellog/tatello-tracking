@@ -10,7 +10,7 @@ import type {
   DimensionContext,
   DimensionKey,
   DimensionLayout,
-} from './types'
+} from './types.ts'
 
 /* The six dimensions of the system — see docs/tu-orbita-design.md §3.
  *

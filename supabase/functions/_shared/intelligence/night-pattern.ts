@@ -13,9 +13,9 @@
  * Voice rules (features/patterns/CLAUDE.md): the subject is the night, not
  * the user; no clinical words; no duration counts in the headline.
  */
-import type { Meal } from './types'
+import type { Meal } from './types.ts'
 
-import type { Patron, WeekdayData } from './types'
+import type { Patron, WeekdayData } from './types.ts'
 
 /** Mexico City is fixed UTC-6 year-round (no DST since 2022). */
 const TZ_OFFSET_HOURS = -6

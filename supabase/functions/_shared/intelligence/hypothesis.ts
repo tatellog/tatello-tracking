@@ -12,7 +12,7 @@
  * `status: 'open'` es la semilla del ciclo de Experiments (R5). Ref: engine.ts,
  * docs/epics/epic-01-intelligence-engine.md (T4.2).
  */
-import type { Finding, Hypothesis, Story } from './engine'
+import type { Finding, Hypothesis, Story } from './engine.ts'
 
 /**
  * Hipótesis del mes (tentativas, status 'open'). Cap 3, por confianza. Vacío si

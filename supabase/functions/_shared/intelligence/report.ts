@@ -10,11 +10,11 @@
  *
  * Epic 01 · F5 · T5.2. La IA no participa: 100% reglas.
  */
-import type { DailySignals } from './types'
-import type { MonthlyReport } from './engine'
-import { buildFindings, hashFindings, type FindingsCtx, type PriorReflections } from './findings'
-import { buildHypotheses } from './hypothesis'
-import { buildStories } from './stories'
+import type { DailySignals } from './types.ts'
+import type { MonthlyReport } from './engine.ts'
+import { buildFindings, hashFindings, type FindingsCtx, type PriorReflections } from './findings.ts'
+import { buildHypotheses } from './hypothesis.ts'
+import { buildStories } from './stories.ts'
 
 /** El id del hallazgo que sostiene el veredicto del mes (déficit, el norte). */
 const VERDICT_FINDING_ID = 'deficit-summary'

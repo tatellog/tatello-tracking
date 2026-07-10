@@ -2,7 +2,7 @@
  * The week archetype — names the SHAPE of the week (its rhythm), never a
  * grade. Pure; shared by app + Edge Functions. Moved out of mock.ts.
  */
-import type { DiaSemana } from './types'
+import type { DiaSemana } from './types.ts'
 
 const EN_LUZ_THRESHOLD_WEEK = 0.7
 

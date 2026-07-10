@@ -12,7 +12,7 @@
  *     ("hoy menos que ayer" ✗). La ausencia simplemente calla.
  *   · Determinista, sin IA. Corre en backend y cliente (re-export).
  */
-import type { DailySignals } from './types'
+import type { DailySignals } from './types.ts'
 
 export type EarlyReading = {
   /** Observación corta, en UI upright (dato), no voz de coach. */

@@ -9,8 +9,8 @@
  * Mirrors the shape of week-logic.ts so MonthSegment can swap mock → real
  * the same way the Semana did.
  */
-import { deriveDimensions, dimensionsFor } from './dimensions'
-import type { DailySignals, DimensionContext, DimensionKey, EnLuz, VozParte } from './types'
+import { deriveDimensions, dimensionsFor } from './dimensions.ts'
+import type { DailySignals, DimensionContext, DimensionKey, EnLuz, VozParte } from './types.ts'
 
 /** A trend needs at least this much half-over-half change to be named. */
 const TREND_GAP = 0.08
