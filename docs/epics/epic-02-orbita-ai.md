@@ -37,13 +37,18 @@ el paso opcional de profundizar. Ver `prd-chat-guiado-hallazgos` en memoria.
 - [x] Chat guiado que explica, no detecta; cacheado; con backstop
 - [x] Responde "¿y los días que no?" con el contrapunto real
 - [ ] Validado con usuaria (en curso; iteración de tono del chat)
-- [ ] Engines de R1 como fuente (hoy `findings.ts` client-side)
+- [~] Engines de R1 como fuente: infra lista (Epic 01 · F5 → `useMonthlyReport`
+  lee del reporte persistido); **flip pendiente** tras validar paridad en device
+  (`USE_PERSISTED_MONTH_REPORT` = OFF).
 
 ## Tasks
 
 Pendiente de desglosar en `../tasks/epic02/` (inline por ahora):
 
-1. Consolidar el reporte sobre los engines de R1 cuando existan.
-2. Afinar el prompt del chat con feedback de usuaria (tono, longitud).
-3. Métrica de uso (entró / descubrió / profundizó) para medir el loop.
+1. Consolidar el reporte sobre los engines de R1 cuando existan. — **Infra hecha
+   en Epic 01 · F5** (flip tras flag, paridad probada). Falta encender el flag.
+2. Afinar el prompt del chat con feedback de usuaria (tono, longitud). — Requiere
+   usuaria en el loop.
+3. Métrica de uso (entró / descubrió / profundizó) para medir el loop. — **Hecho**
+   (eventos `orbit_month_teaser_seen` / `_report_revealed` / `_finding_opened`).
 4. Estados vacíos honestos (pocos datos → "aún no alcanza para una lectura").
