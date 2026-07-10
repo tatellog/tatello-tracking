@@ -51,4 +51,6 @@ Pendiente de desglosar en `../tasks/epic02/` (inline por ahora):
    usuaria en el loop.
 3. Métrica de uso (entró / descubrió / profundizó) para medir el loop. — **Hecho**
    (eventos `orbit_month_teaser_seen` / `_report_revealed` / `_finding_opened`).
-4. Estados vacíos honestos (pocos datos → "aún no alcanza para una lectura").
+4. Estados vacíos honestos (pocos datos → "aún no alcanza para una lectura"). —
+   **Hecho** (`EmptySegmentCard` cableado, diferenciado por `reason`:
+   `insufficient-data` vs `no-findings`; copy revisado voz + manifiesto).
