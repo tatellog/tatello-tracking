@@ -37,3 +37,14 @@ export function aiEnabledForEmail(email: string | null | undefined): boolean {
  * la UI en vivo se queda EXACTAMENTE como hoy (compute-local, cero red nueva).
  */
 export const USE_PERSISTED_MONTH_REPORT = false
+
+/*
+ * Progress · Historia de hitos (Epic 03 · F-R3 · T-R3.3).
+ *
+ * Cuando es `true`, el sync de hitos (useMilestoneSync) detecta los hitos de
+ * primera vez y los persiste en `revelations` (tier='milestone'). Default
+ * `false`: nada se escribe hasta que exista la UI de Historia que los muestre.
+ * Los tiers de ceremonia (Hoy) y el calendario ignoran 'milestone' por
+ * construcción, así que encenderlo NO agrega ceremonias ni marcas nuevas.
+ */
+export const MILESTONES_ENABLED = false

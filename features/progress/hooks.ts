@@ -1,6 +1,10 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { useMacroTargets } from '@/features/macros/hooks'
+import { useSignalsHistory } from '@/features/orbit/hooks'
 import { track } from '@/lib/analytics'
+import { MILESTONES_ENABLED } from '@/lib/featureFlags'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -17,9 +21,34 @@ import {
   getRecentWorkoutDates,
   getTotalTrainedDays,
   NewMeasurementInputSchema,
+  recordMilestones,
   type NewMeasurementInput,
 } from './api'
+import { detectMilestones } from './milestones'
 import { buildMockMeasurements } from './mock'
+
+// Ventana amplia = "todo el historial" (los hitos son la PRIMERA vez). La app es
+// reciente; 400 días cubre a cualquier usuaria de la beta.
+const MILESTONE_WINDOW_DAYS = 400
+
+/**
+ * Sync de hitos de Historia (R3 · T-R3.3), GATEADO por MILESTONES_ENABLED (hoy
+ * OFF) y aún SIN montar en ninguna pantalla. Detecta los hitos de primera vez
+ * desde el historial y los persiste en `revelations` (idempotente). Cuando exista
+ * la UI de Historia se monta ahí; ahí conviene además gatear el fetch por el flag.
+ */
+export function useMilestoneSync() {
+  const { data: history } = useSignalsHistory(MILESTONE_WINDOW_DAYS)
+  const targets = useMacroTargets().data
+  useEffect(() => {
+    if (!MILESTONES_ENABLED || !history || history.length === 0) return
+    const milestones = detectMilestones({
+      signals: history,
+      calorieTarget: targets?.calories ?? null,
+    })
+    if (milestones.length > 0) void recordMilestones(milestones)
+  }, [history, targets?.calories])
+}
 
 const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
 

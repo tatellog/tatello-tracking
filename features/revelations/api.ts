@@ -12,14 +12,22 @@ import type { Json } from '@/types/database.types'
  * el `title` ya viene resuelto en voz del coach al momento de revelar.
  */
 
+// Tiers de CEREMONIA (los que el orquestador de Hoy puede mostrar). No incluye
+// 'milestone': un hito (R3) solo vive en Historia, nunca es ceremonia.
 export const REVELATION_TIERS = ['transformation', 'return', 'pattern'] as const
 export type RevelationTier = (typeof REVELATION_TIERS)[number]
+
+// Todos los tiers que pueden APARECER en el log/Historia. Incluye 'milestone'
+// para que los readers en vivo (calendario, beta de Mes) parseen esas filas sin
+// romper — las ignoran para marcas/ceremonias por construcción.
+export const HISTORY_TIERS = ['transformation', 'return', 'pattern', 'milestone'] as const
+export type HistoryTier = (typeof HISTORY_TIERS)[number]
 
 const SELECT = 'id, tier, kind, title, shown_at, dismissed_at, metadata' as const
 
 export const revelationRowSchema = z.object({
   id: z.string(),
-  tier: z.enum(REVELATION_TIERS),
+  tier: z.enum(HISTORY_TIERS),
   kind: z.string(),
   title: z.string(),
   shown_at: z.string(),

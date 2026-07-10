@@ -1,8 +1,10 @@
 import { z } from 'zod'
 
 import { BodyMeasurementSchema, type BodyMeasurement } from '@/features/brief/api'
-import { supabase } from '@/lib/supabase'
+import { requireUserId, supabase } from '@/lib/supabase'
 import { withTimeout } from '@/lib/withTimeout'
+
+import type { Milestone } from './milestones'
 
 const MeasurementListSchema = z.array(BodyMeasurementSchema)
 
@@ -280,4 +282,27 @@ export async function getLastPeriodStart(): Promise<string | null> {
     .maybeSingle()
   if (error) throw error
   return (data?.event_date as string | undefined) ?? null
+}
+
+/**
+ * Persiste hitos de Historia en `revelations` (tier='milestone'), idempotente:
+ * el índice único parcial (user_id, kind) where tier='milestone' garantiza uno
+ * por usuaria; un duplicado lanza 23505 y se traga como no-op (mismo patrón que
+ * recordRevelation). Inserta uno por uno porque un INSERT en lote fallaría entero
+ * al primer conflicto. La fecha real del hito va en metadata.on (shown_at es
+ * cuándo se registró; la Historia ordena/etiqueta por metadata.on).
+ */
+export async function recordMilestones(milestones: readonly Milestone[]): Promise<void> {
+  if (milestones.length === 0) return
+  const userId = await requireUserId()
+  for (const m of milestones) {
+    const { error } = await supabase.from('revelations').insert({
+      user_id: userId,
+      tier: 'milestone',
+      kind: m.kind,
+      title: m.title,
+      metadata: { on: m.date },
+    })
+    if (error && error.code !== '23505') throw error
+  }
 }
