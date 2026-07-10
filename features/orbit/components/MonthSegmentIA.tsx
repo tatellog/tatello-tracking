@@ -4,7 +4,6 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { useTransformProgress } from '@/features/emblem'
-import { useClosedExperiments } from '@/features/experiments/hooks'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
@@ -25,7 +24,7 @@ import { useMonthlyReport } from '../report-hooks'
 
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
-import { MonthExperiments } from './MonthExperiments'
+import { MonthDiscovery } from './MonthDiscovery'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PresenceFinale } from './PresenceFinale'
 
@@ -118,16 +117,21 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const source = USE_PERSISTED_MONTH_REPORT ? persistedReport : null
   const cards = source?.findings ?? chat.cards
 
-  // El historial de hilos cerrados es data INDEPENDIENTE de los hallazgos del
-  // periodo: se lee aquí (cache compartida con MonthExperiments) para no ocultar
-  // el "Hilos que ya seguiste" cuando ya no hay hallazgos nuevos. Sin esto, al
-  // consumir todas las hipótesis el reporte quedaba en 0 cards y el trail
-  // desaparecía con la sección entera.
-  const { data: closedExp = [] } = useClosedExperiments(uid)
+  // El hallazgo que lidera la conversación: ANCLADO EN EL NORTE (déficit /
+  // objetivo), que es lo que la usuaria quiere saber ("¿voy bajando?"). Si no hay
+  // uno de déficit, el que conecta con su objetivo; si no, el top del motor.
+  const mainFinding = useMemo(() => {
+    if (cards.length === 0) return null
+    return (
+      cards.find((c) => c.category === 'deficit') ??
+      cards.find((c) => c.northLink) ??
+      cards[0] ??
+      null
+    )
+  }, [cards])
 
-  // Profundizar: tocar un hecho abre una conversación corta (fact-led). El
-  // reporte es el hub; la conversación cierra de vuelta a él (sin loop, sin
-  // repetir la metacognición en cada hecho).
+  // Profundizar: tocar el CTA abre la conversación guiada sobre el hallazgo. El
+  // chat es la experiencia principal (el motor detecta, la IA comunica).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
   // El hash sale del reporte cuando el flip está ON (no recomputa); si no, se
   // computa local sobre los mismos hallazgos.
@@ -194,30 +198,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         </Text>
       </View>
 
-      {/* ── Los hilos del motor (hipótesis · Engine 4) + el ciclo de experimentos
-          (R5) + el historial. SIEMPRE montado: MonthExperiments se auto-oculta si
-          no hay nada, pero el historial NO debe depender de que haya hallazgos
-          nuevos del periodo (antes el trail desaparecía al agotar las hipótesis). ── */}
-      <View style={styles.antesala}>
-        <MonthExperiments
-          uid={uid}
-          period="last30"
-          periodStart={firstDataDay ?? monthKey}
-          periodEnd={today}
-          today={today}
-          // "Quiero entenderlo →": abre el chat guiado del hallazgo que originó
-          // el hilo (la capa de ENTENDER, bajo la de actuar). El source_finding_id
-          // de la hipótesis === Finding.id del reporte.
-          onExplain={(fid) => {
-            const f = fid ? cards.find((c) => c.id === fid) : undefined
-            if (f) setOpenFinding(f)
-          }}
-        />
-      </View>
-
-      {/* Estado vacío HONESTO: solo cuando NO hay hallazgos NI historial de hilos
-          (si ya seguiste hilos, "aún no hay datos" se contradiría con el trail). */}
-      {chat.reason && closedExp.length === 0 ? (
+      {/* ── El hallazgo principal como evidencia serena + UN CTA que abre la
+          conversación (rediseño: el chat es la experiencia, no un experimento que
+          la usuaria opera). El motor detecta; la IA comunica. ── */}
+      {mainFinding ? (
+        <View style={styles.antesala}>
+          <MonthDiscovery finding={mainFinding} onExplore={() => setOpenFinding(mainFinding)} />
+        </View>
+      ) : chat.reason ? (
+        // Estado vacío HONESTO cuando aún no hay un hallazgo que conversar.
         <EmptySegmentCard {...EMPTY_COPY[chat.reason]} />
       ) : null}
 

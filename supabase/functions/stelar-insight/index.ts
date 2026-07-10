@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v3'
+const PROMPT_VERSION = 'v4'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -318,17 +318,27 @@ function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
     }
   }
   lines.push('')
+  // Regla transversal: cada turno AVANZA. La lectura y la evidencia ya se le
+  // mostraron en pantalla antes de abrir el chat; repetirlas (o repetir un turno
+  // anterior) hace que se sienta que "da vueltas". Cada mensaje aporta algo nuevo.
+  lines.push('NO repitas lo que ya está en la pantalla ni lo que dijiste en un turno')
+  lines.push('anterior. Cada turno AVANZA con algo nuevo (el contrapunto, la coincidencia')
+  lines.push('tentativa, o hacia dónde mirar). Si no tienes nada nuevo, ve al cierre.')
   if (isFinal) {
-    lines.push('Este es el CIERRE. Nombra que este patrón es SUYO, quita toda tarea o')
-    lines.push('culpa, y conecta UNA vez con su objetivo. Sin preguntas. "chips": [].')
+    lines.push('Este es el CIERRE. Aterriza en UNA palanca concreta y accionable: en QUÉ')
+    lines.push('enfocarse desde SUS datos (ej. "tu palanca este mes es cuidar el agua los')
+    lines.push('días de finde"). Recomendación, no orden. PROHIBIDO cerrar solo con "es un')
+    lines.push('patrón tuyo" o "te acerca a tu objetivo" sin una palanca concreta. Quita')
+    lines.push('toda tarea o culpa. Sin preguntas. "chips": [].')
   } else if (turnIndex === 0) {
     const subj = finding.subject ?? 'lo que apareció en sus días'
-    lines.push(`Turno de APERTURA. Empieza NOMBRANDO ${subj} en la primera frase.`)
-    lines.push('PROHIBIDO abrir con frases genéricas tipo "he notado algo interesante en')
-    lines.push('tus días" o "algo interesante": nombra la dimensión concreta. Da 3 chips.')
+    lines.push(`Turno de APERTURA. Empieza NOMBRANDO ${subj}, pero la lectura y la`)
+    lines.push('evidencia YA están en pantalla: NO las repitas — da un paso más (una matiz')
+    lines.push('o hacia el contrapunto). PROHIBIDO abrir con "he notado algo interesante" o')
+    lines.push('frases genéricas. Da 3 chips.')
   } else {
-    lines.push('Sigue la charla, específico a lo que eligió. Si encaja, menciona la otra')
-    lines.push('coincidencia. Da 3 chips.')
+    lines.push('Sigue la charla, específico a lo que eligió, con info NUEVA. Si encaja,')
+    lines.push('menciona la otra coincidencia o el contrapunto. Da 3 chips.')
   }
   return { system: CHAT_SYSTEM_PROMPT, user: lines.join('\n') }
 }
