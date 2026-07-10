@@ -125,7 +125,6 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
   const stage: 1 | 2 | 3 = active ? 2 : lastResult ? 3 : 1
   const duration = plan.durationDays ?? 14
   const left = active ? daysLeft(active.ends_on, today) : 0
-  const focus = aiFocus ?? sourceHyp?.text
 
   const onClose = (id: string) =>
     close.mutate(id, {
@@ -166,7 +165,15 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
         <View style={styles.activeCard}>
           <Text style={styles.activeLabel}>Estás siguiendo un hilo</Text>
           <Text style={styles.activeDim}>{activeMetricLabel}</Text>
-          {focus ? <Text style={styles.activeWhy}>{focus}</Text> : null}
+          {/* La IA (voz de Stelar) lleva el ✦; si cae al determinístico, sin marca. */}
+          {aiFocus ? (
+            <Text style={styles.activeWhy}>
+              <Text style={styles.aiMark}>✦ </Text>
+              {aiFocus}
+            </Text>
+          ) : sourceHyp?.text ? (
+            <Text style={styles.activeWhy}>{sourceHyp.text}</Text>
+          ) : null}
           <Text style={styles.activeBase}>{baselineLine(plan.baselineRate)}</Text>
           <Text style={styles.activeDay}>
             {left > 0
@@ -363,6 +370,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 2,
   },
+  // Marca de la voz de Stelar (la línea la escribió la IA).
+  aiMark: { fontStyle: 'normal', color: colors.magenta },
   activeDay: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
