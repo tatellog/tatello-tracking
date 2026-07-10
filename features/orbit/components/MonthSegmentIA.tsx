@@ -15,11 +15,12 @@ import { colors, typography } from '@/theme'
 
 import { type Finding, hashFindings } from '../findings'
 import { useSignalsHistory } from '../hooks'
-import { buildMonthChat } from '../month-chat'
+import { buildMonthChat, type MonthChatEmptyReason } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
 import { usePriorReflections, useSaveReflection } from '../reflections'
 import { useMonthlyReport } from '../report-hooks'
 
+import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthDiscoveryTeaser } from './MonthDiscoveryTeaser'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
@@ -41,6 +42,23 @@ const HERO_SIZE = 200
 /** Bajo este % el número deflaciona (anti-anillo de Apple): mismo umbral que
  *  el Mes actual. */
 const PCT_THRESHOLD = 8
+
+/** El estado vacío HONESTO de la antesala, diferenciado por la razón: no es lo
+ *  mismo "aún faltan registros" que "registraste harto pero no hay un patrón
+ *  claro todavía". Sin culpa, sin contar días (la frecuencia se siente, no se
+ *  cuenta · manifiesto). */
+const EMPTY_COPY: Record<MonthChatEmptyReason, { eyebrow: string; body: string; hint: string }> = {
+  'insufficient-data': {
+    eyebrow: 'Todavía estoy aprendiendo',
+    body: 'Cuando tengas más días registrados, podré mostrarte lo que se repite en tu mes. Con cada día que registras desde Hoy, el mes se va dibujando.',
+    hint: 'Tu constelación nunca se reinicia: lo que revelas, queda.',
+  },
+  'no-findings': {
+    eyebrow: 'Sigo mirando tu mes',
+    body: 'Tienes varios días registrados, pero todavía no aparece un patrón claro. No es un problema; a veces el mes necesita unos días más para mostrar su forma.',
+    hint: 'En cuanto algo se repita lo suficiente, te lo muestro aquí.',
+  },
+}
 
 /** La línea honesta del teaser híbrido: sobre qué es el hallazgo líder (para
  *  que la promesa no sea una caja de misterio vacía). */
@@ -199,6 +217,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
             />
           )}
         </View>
+      ) : chat.reason ? (
+        // Estado vacío HONESTO en vez de un hueco silencioso: una lectura cálida
+        // según por qué aún no hay hallazgos (faltan datos vs sin patrón claro).
+        <EmptySegmentCard {...EMPTY_COPY[chat.reason]} />
       ) : null}
 
       {/* ── Tu mes de un vistazo: el calendario (evidencia, tap→Día) ── */}

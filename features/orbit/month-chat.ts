@@ -21,10 +21,18 @@ export type MonthChatCtx = {
   proteinTarget?: number | null
 }
 
+/** Por qué NO hay lectura (para un estado vacío HONESTO y diferenciado). null
+ *  cuando sí hay lectura. `insufficient-data` = aún faltan registros;
+ *  `no-findings` = hay datos pero el motor no encontró un patrón claro (mostrar
+ *  eso mismo a quien SÍ registró sería deshonesto). */
+export type MonthChatEmptyReason = 'insufficient-data' | 'no-findings'
+
 export type MonthChat = {
   /** false → estado vacío ("todavía estoy aprendiendo"): sin datos para una
    *  lectura honesta. */
   ready: boolean
+  /** Cuando `ready` es false, POR QUÉ (para el copy diferenciado). null si ready. */
+  reason: MonthChatEmptyReason | null
   /** Apertura de la antesala: gancho corto (no un chat). */
   intro: ChatBubble[]
   /** Los hallazgos del mes (ordenados por confianza). */
@@ -69,14 +77,18 @@ export function buildMonthChat(
   ctx: MonthChatCtx = {},
   prior: PriorReflections = {},
 ): MonthChat {
-  if (!monthChatReady(signals)) return { ready: false, intro: [], cards: [] }
+  // Razón 1: aún faltan registros para una lectura honesta.
+  if (!monthChatReady(signals))
+    return { ready: false, reason: 'insufficient-data', intro: [], cards: [] }
   const cards = buildFindings(signals, ctx, prior)
-  if (cards.length === 0) return { ready: false, intro: [], cards: [] }
+  // Razón 2: hay datos suficientes, pero el motor no encontró un patrón claro.
+  if (cards.length === 0) return { ready: false, reason: 'no-findings', intro: [], cards: [] }
   // Gancho de UNA línea que ancla en SUS datos (da confianza). Sin contar
   // hallazgos: el tally imponía la jerarquía hero/secundaria que quitamos, y
   // "1 hallazgo principal · N observaciones" sonaba a reporte.
   return {
     ready: true,
+    reason: null,
     intro: [{ text: `Esto es lo que vi en tus últimos ${signals.length} días.`, tone: 'accent' }],
     cards,
   }

@@ -29,11 +29,29 @@ describe('monthChatReady — estados vacíos (criterios mínimos)', () => {
 })
 
 describe('buildMonthChat', () => {
-  it('datos insuficientes → ready false, sin hallazgos', () => {
+  it('datos insuficientes → ready false, razón insufficient-data', () => {
     const chat = buildMonthChat(activeMonth(8), CTX)
     expect(chat.ready).toBe(false)
+    expect(chat.reason).toBe('insufficient-data')
     expect(chat.cards).toEqual([])
     expect(chat.intro).toEqual([])
+  })
+
+  it('datos suficientes pero sin patrón → ready false, razón no-findings', () => {
+    // 16 días activos (pasa el gate), pero TODO en superávit constante y sin
+    // entreno/agua → ningún detector dispara → cards vacío por falta de patrón,
+    // no por falta de datos.
+    const flat = activeMonth(16, () => ({ calories: 2500, trained: false, water_glasses: 2 }))
+    const chat = buildMonthChat(flat, CTX)
+    expect(chat.ready).toBe(false)
+    expect(chat.reason).toBe('no-findings')
+    expect(chat.cards).toEqual([])
+  })
+
+  it('con datos y patrón → ready, razón null', () => {
+    const chat = buildMonthChat(activeMonth(20), CTX)
+    expect(chat.ready).toBe(true)
+    expect(chat.reason).toBeNull()
   })
 
   it('con datos: apertura de UNA línea que ancla en sus días (sin tally)', () => {
