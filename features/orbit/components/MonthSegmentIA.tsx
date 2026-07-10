@@ -27,7 +27,6 @@ import { MonthChatSheet } from './MonthChatSheet'
 import { MonthDiscoveryTeaser } from './MonthDiscoveryTeaser'
 import { MonthExperiments } from './MonthExperiments'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
-import { MonthReport } from './MonthReport'
 import { PresenceFinale } from './PresenceFinale'
 
 /*
@@ -212,28 +211,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
       {chat.ready && cards.length > 0 ? (
         <View style={styles.antesala}>
           {revealed ? (
-            <>
-              <MonthReport
-                cards={cards}
-                onPickFact={(f) => {
-                  // "Profundizó": abrió un hecho para entenderlo.
-                  track('orbit_month_finding_opened', {
-                    finding_id: f.id,
-                    is_obstacle: f.isObstacle ?? false,
-                  })
-                  setOpenFinding(f)
-                }}
-              />
-              {/* Hipótesis del motor (Engine 4) + ciclo de experimentos (R5):
-                  el hilo tentativo → probarlo ≤2 semanas → el motor mide. */}
-              <MonthExperiments
-                uid={uid}
-                period="last30"
-                periodStart={firstDataDay ?? monthKey}
-                periodEnd={today}
-                today={today}
-              />
-            </>
+            // Al revelar: los hilos del motor (hipótesis · Engine 4) + el ciclo
+            // de experimentos (R5). El reporte de evidencia se retiró.
+            <MonthExperiments
+              uid={uid}
+              period="last30"
+              periodStart={firstDataDay ?? monthKey}
+              periodEnd={today}
+              today={today}
+            />
           ) : (
             <MonthDiscoveryTeaser
               dimension={teaserDimension(cards[0]!)}
