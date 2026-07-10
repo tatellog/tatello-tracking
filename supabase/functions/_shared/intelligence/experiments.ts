@@ -16,7 +16,10 @@
  *
  * Epic 05 · F-B · T-B1. Ref: engine.ts (Finding/Hypothesis), epic-05.
  */
+import { isDeficitDay } from './deficit'
 import type { Finding, FindingCategory, Hypothesis } from './engine'
+import type { DailySignals } from './types'
+import { WATER_GOAL_GLASSES } from './water'
 
 /** Estado del experimento (espejo del enum de la tabla `experiments`). */
 export type ExperimentStatus = 'running' | 'confirmed' | 'discarded' | 'inconclusive'
@@ -124,4 +127,131 @@ export function canCloseTo(from: ExperimentStatus, to: ExperimentStatus): boolea
  */
 export function canStart(activeRunningCount: number): boolean {
   return activeRunningCount === 0
+}
+
+/* ── Medición del resultado (T-B2) ─────────────────────────────────────────
+ *
+ * El motor DECIDE confirmada/descartada/inconclusa comparando la tasa de la
+ * ventana del experimento contra una LÍNEA BASE (la tasa previa de esa misma
+ * métrica). La IA no participa. Cada métrica se cuenta con el MISMO criterio que
+ * el resto del motor (isDeficitDay, umbral de agua, 7h de sueño), para que un
+ * "día que cumple" signifique lo mismo en todo Stelar.
+ */
+
+/** Minutos de sueño que cuentan como "dormiste 7h o más" (igual que findings). */
+const SLEEP_7H_MIN = 420
+/** Mejora mínima (en proporción) para no confundir ruido con efecto. */
+export const RESULT_MARGIN = 0.1
+/** ¿Es un día registrado (hubo presencia)? Para métricas donde cada día es una
+ *  oportunidad (entreno), no solo los días con ese valor puntual. */
+function isLoggedDay(s: DailySignals): boolean {
+  return (
+    s.calories != null ||
+    (s.meal_count ?? 0) > 0 ||
+    s.sleep_minutes != null ||
+    s.trained != null ||
+    (s.water_glasses ?? 0) > 0
+  )
+}
+
+type MetricCtx = { calorieTarget?: number | null; proteinTarget?: number | null }
+/** Por métrica: qué día es EVALUABLE (tiene el dato) y cuál CUMPLE. */
+const METRIC_RULES: Record<
+  ExperimentMetric,
+  {
+    evaluable: (s: DailySignals, c: MetricCtx) => boolean
+    hit: (s: DailySignals, c: MetricCtx) => boolean
+  }
+> = {
+  deficit_days: {
+    evaluable: (s, c) => s.calories != null && s.calories > 0 && c.calorieTarget != null,
+    hit: (s, c) => isDeficitDay(s.calories, c.calorieTarget),
+  },
+  protein_target_days: {
+    evaluable: (s, c) => s.protein_g != null && c.proteinTarget != null,
+    hit: (s, c) => (s.protein_g ?? 0) >= (c.proteinTarget ?? Infinity),
+  },
+  days_slept_7h: {
+    evaluable: (s) => s.sleep_minutes != null,
+    hit: (s) => (s.sleep_minutes ?? 0) >= SLEEP_7H_MIN,
+  },
+  water_goal_days: {
+    evaluable: (s) => s.water_glasses != null,
+    hit: (s) => (s.water_glasses ?? 0) >= WATER_GOAL_GLASSES,
+  },
+  workout_days: {
+    evaluable: (s) => isLoggedDay(s),
+    hit: (s) => s.trained === true,
+  },
+}
+
+export type MetricRate = { hitDays: number; daysMeasured: number; rate: number }
+
+/**
+ * La tasa de una métrica sobre un set de días: cuántos días evaluables cumplen.
+ * Puro. Lo usa la ventana del experimento Y la línea base (mismo criterio en
+ * ambos lados de la comparación).
+ */
+export function computeMetricRate(
+  metric: ExperimentMetric,
+  signals: readonly DailySignals[],
+  ctx: MetricCtx = {},
+): MetricRate {
+  const rule = METRIC_RULES[metric]
+  const measured = signals.filter((s) => rule.evaluable(s, ctx))
+  const hitDays = measured.filter((s) => rule.hit(s, ctx)).length
+  const daysMeasured = measured.length
+  return { hitDays, daysMeasured, rate: daysMeasured > 0 ? hitDays / daysMeasured : 0 }
+}
+
+export type ExperimentMeasurement = {
+  /** Siempre un estado TERMINAL (nunca 'running'). */
+  status: Extract<ExperimentStatus, 'confirmed' | 'discarded' | 'inconclusive'>
+  hitDays: number
+  daysMeasured: number
+  windowRate: number
+  baselineRate: number
+}
+
+/** Mínimo de días evaluables para arriesgar un veredicto (si no, inconclusa:
+ *  honestidad sobre la muestra, no un juicio con 2 días). */
+function minMeasured(durationDays: number): number {
+  return Math.min(durationDays, Math.max(4, Math.ceil(durationDays / 2)))
+}
+
+/**
+ * Mide el experimento: compara la tasa de la ventana contra la línea base y
+ * decide el resultado. Sin muestra suficiente → inconclusa. `increase`/`decrease`
+ * confirman si la métrica se movió ≥ RESULT_MARGIN en la dirección buscada;
+ * `maintain` confirma si se sostuvo dentro del margen. Determinístico, sin IA.
+ */
+export function measureExperiment(
+  plan: Pick<ExperimentPlan, 'metric' | 'direction' | 'durationDays'>,
+  windowSignals: readonly DailySignals[],
+  opts: { baselineRate: number } & MetricCtx,
+): ExperimentMeasurement {
+  const {
+    hitDays,
+    daysMeasured,
+    rate: windowRate,
+  } = computeMetricRate(plan.metric, windowSignals, opts)
+  const baselineRate = opts.baselineRate
+  const base = { hitDays, daysMeasured, windowRate, baselineRate }
+
+  if (daysMeasured < minMeasured(plan.durationDays)) {
+    return { ...base, status: 'inconclusive' }
+  }
+
+  const delta = windowRate - baselineRate
+  if (plan.direction === 'maintain') {
+    return { ...base, status: Math.abs(delta) <= RESULT_MARGIN ? 'confirmed' : 'discarded' }
+  }
+  const effective = plan.direction === 'decrease' ? -delta : delta
+  const status =
+    effective >= RESULT_MARGIN
+      ? 'confirmed'
+      : effective <= -RESULT_MARGIN
+        ? 'discarded'
+        : 'inconclusive'
+  return { ...base, status }
 }
