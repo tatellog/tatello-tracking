@@ -9,6 +9,7 @@ import {
   useStartExperiment,
 } from '@/features/experiments/hooks'
 import type { ExperimentMetric } from '@/features/experiments/logic'
+import { useExperimentCopy } from '@/features/orbit/ai-voice'
 import { colors, typography } from '@/theme'
 
 /*
@@ -100,10 +101,31 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
   const sortedOpen = [...open].sort(
     (a, b) => (a.source_story_id ? 0 : 1) - (b.source_story_id ? 0 : 1),
   )
+
+  const plan: ExperimentPlanJson = (active?.plan as ExperimentPlanJson) ?? {}
+  // El "por qué": la hipótesis que originó el experimento. RE-ANCLA la métrica a
+  // su relación con tu déficit (no es una meta de agua/sueño suelta · manifiesto).
+  const sourceHyp = active ? hypotheses.find((h) => h.id === active.hypothesis_id) : undefined
+  const activeMetricLabel = active ? humanMetric(plan.metric, active.dimension) : ''
+  // La IA redacta el FOCO del hilo (gateado a dev, backstop anti-receta); si no
+  // está disponible o el backstop la rechaza, cae a la hipótesis determinística.
+  const aiFocus = useExperimentCopy({
+    uid,
+    periodStart,
+    periodEnd,
+    metricLabel: activeMetricLabel,
+    hypothesis: sourceHyp?.text ?? '',
+    subject: activeMetricLabel,
+    cacheKey: active?.id ?? 'none',
+  }).data
+
   // Nada que mostrar: sin hipótesis abiertas y sin experimento en curso.
   if (!active && open.length === 0 && !lastResult) return null
 
   const stage: 1 | 2 | 3 = active ? 2 : lastResult ? 3 : 1
+  const duration = plan.durationDays ?? 14
+  const left = active ? daysLeft(active.ends_on, today) : 0
+  const focus = aiFocus ?? sourceHyp?.text
 
   const onClose = (id: string) =>
     close.mutate(id, {
@@ -112,13 +134,6 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
         setLastResult(status)
       },
     })
-
-  const plan: ExperimentPlanJson = (active?.plan as ExperimentPlanJson) ?? {}
-  const duration = plan.durationDays ?? 14
-  const left = active ? daysLeft(active.ends_on, today) : 0
-  // El "por qué": la hipótesis que originó el experimento. RE-ANCLA la métrica a
-  // su relación con tu déficit (no es una meta de agua/sueño suelta · manifiesto).
-  const sourceHyp = active ? hypotheses.find((h) => h.id === active.hypothesis_id) : undefined
 
   return (
     <View style={styles.wrap}>
@@ -150,8 +165,8 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today }:
       {active ? (
         <View style={styles.activeCard}>
           <Text style={styles.activeLabel}>Estás siguiendo un hilo</Text>
-          <Text style={styles.activeDim}>{humanMetric(plan.metric, active.dimension)}</Text>
-          {sourceHyp?.text ? <Text style={styles.activeWhy}>{sourceHyp.text}</Text> : null}
+          <Text style={styles.activeDim}>{activeMetricLabel}</Text>
+          {focus ? <Text style={styles.activeWhy}>{focus}</Text> : null}
           <Text style={styles.activeBase}>{baselineLine(plan.baselineRate)}</Text>
           <Text style={styles.activeDay}>
             {left > 0

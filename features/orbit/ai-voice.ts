@@ -148,6 +148,81 @@ export function useMonthVoice(
   })
 }
 
+/* ── Experimento (R5): la IA redacta el FOCO del hilo ─────────────────── */
+
+/** El foco redactado por IA para un experimento, o null (flag off / error /
+ *  rechazo del backstop) → la UI cae al determinístico. Nunca lanza. */
+export async function fetchExperimentCopy(input: {
+  periodStart: string
+  periodEnd: string
+  metricLabel: string
+  hypothesis: string
+  subject?: string
+}): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stelar-insight', {
+      body: {
+        feature: 'experimento',
+        periodType: 'last30',
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        experiment: {
+          metricLabel: input.metricLabel,
+          hypothesis: input.hypothesis,
+          subject: input.subject,
+        },
+      },
+    })
+    if (error) return null
+    if (data && (data as { error?: string }).error) return null
+    const text = (data as { text?: unknown })?.text
+    return typeof text === 'string' ? text : null
+  } catch {
+    return null
+  }
+}
+
+/** El foco del experimento activo (gateado a dev). Cacheado por el id del
+ *  experimento; regenera solo si cambia. Fallback: la UI muestra la hipótesis. */
+export function useExperimentCopy(params: {
+  uid: string | null
+  periodStart: string | null
+  periodEnd: string | null
+  metricLabel: string
+  hypothesis: string
+  subject?: string
+  cacheKey: string
+}) {
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
+  const ready =
+    aiOn &&
+    params.uid != null &&
+    params.periodStart != null &&
+    params.periodEnd != null &&
+    params.metricLabel.length > 0 &&
+    params.hypothesis.length > 0
+  return useQuery({
+    queryKey: params.uid
+      ? queryKeys.orbit.aiExperiment(params.uid, params.cacheKey)
+      : ['orbit', 'aiVoice', 'experiment', 'off'],
+    queryFn: () =>
+      ready
+        ? fetchExperimentCopy({
+            periodStart: params.periodStart!,
+            periodEnd: params.periodEnd!,
+            metricLabel: params.metricLabel,
+            hypothesis: params.hypothesis,
+            subject: params.subject,
+          })
+        : Promise.resolve(null),
+    enabled: ready,
+    staleTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  })
+}
+
 /* ── Órbita Mes: CHAT guiado (un turno a la vez, IA conduce) ──────────── */
 
 /** El hallazgo que la IA conversa (verdad determinística; nunca inventa). */

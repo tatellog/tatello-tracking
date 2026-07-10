@@ -340,9 +340,69 @@ const SAFE_CHIPS = [
   'Me gusta verlo así',
 ]
 
+/* ── Experimento (R5): la IA redacta el FOCO del hilo elegido ──────────────
+ * La usuaria eligió seguir un hilo (2 semanas). La IA NO detecta ni receta:
+ * redacta UNA frase de foco que nombra la dimensión y la ata a su déficit.
+ * Recomendar un foco = sí; recetar conducta = NUNCA (línea roja). El backstop
+ * (unsafeText + BANNED_LEXICON) rechaza dígitos y prescriptivo → fallback. */
+const EXPERIMENT_SYSTEM_PROMPT = [
+  'Eres la Voz de Stelar, una app de pérdida de peso sostenible.',
+  'La usuaria eligió SEGUIR UN HILO: un experimento corto sobre una relación que',
+  'el sistema YA detectó en SUS datos. Tú NO detectas ni inventas nada.',
+  '',
+  'Escribe UNA sola frase cálida: en qué PONER UN OJO estas semanas, nombrando la',
+  'dimensión concreta y conectándola con su déficit (su objetivo).',
+  '',
+  'REGLA DURA: recomiendas un FOCO, NUNCA una orden ni una conducta. PROHIBIDO',
+  'decirle qué hacer ("toma más agua", "duerme antes", "come menos", "sube tu',
+  'proteína", "debes", "deberías", "intenta"). No es una receta ni un plan. Es',
+  '"mira si esto va de la mano con tu déficit".',
+  '',
+  'VOZ: cálida, segunda persona femenina, UNA frase corta, sin exclamaciones, sin',
+  'emojis, sin tecnicismos, SIN cifras (los números viven en el sistema). NO',
+  'afirmes causa (es una coincidencia por observar). No menciones días ni',
+  'porcentajes. No menciones el peso como meta ni compares con otras personas.',
+  'Nada de lenguaje clínico ni culpa. NOMBRA la dimensión; una frase que no la',
+  'nombra no sirve.',
+  '',
+  'La frase es de OBSERVACIÓN, no de acción. Bien: "pon un ojo en...", "mira si...",',
+  '"fíjate si...". Mal: cualquier verbo de conducta ("toma", "bebe", "come",',
+  '"duerme", "aumenta", "reduce", "prioriza", "evita", "camina", "entrena").',
+  '',
+  'Responde SOLO JSON válido, exacto: {"text": string}',
+].join('\n')
+
+function buildExperimentPrompt(exp: { metricLabel: string; hypothesis: string; subject?: string }) {
+  const lines = ['El hilo que sigue (verdad del sistema, no lo repitas literal):']
+  lines.push(`- sigue: ${exp.metricLabel}`)
+  lines.push(`- su relación tentativa con el déficit: ${exp.hypothesis}`)
+  if (exp.subject) lines.push(`- en humano: ${exp.subject}`)
+  lines.push('')
+  lines.push('Escribe UNA frase: en qué poner un ojo estas semanas, nombrando la')
+  lines.push('dimensión y su posible vínculo con su déficit. FOCO, no orden. Sin cifras.')
+  return { system: EXPERIMENT_SYSTEM_PROMPT, user: lines.join('\n') }
+}
+
+const ExperimentSchema = z.object({ text: z.string().trim().min(1).max(240) })
+
+// Backstop EXTRA solo del experimento (no toca el BANNED_LEXICON compartido para
+// no crear falsos positivos en chat/cards). Atrapa verbos de CONDUCTA que el
+// modelo podría parafrasear (imperativo + infinitivo), SIN bloquear los de
+// OBSERVACIÓN que el foco sí usa (pon/mira/fíjate/nota/observa). Si dispara →
+// 502 → el cliente cae al texto determinístico de la hipótesis.
+const EXPERIMENT_PRESCRIPTIVE =
+  /\b(toma|tomar|tom[aá]te|bebe|beber|come|comer|desayuna|cena|cenar|duerme|dormir|acu[eé]state|aumenta|aumentar|incrementa|incrementar|eleva|elevar|sube|subir|reduce|reducir|disminuye|disminuir|baja|bajar|agrega|agregar|a[ñn]ade|a[ñn]adir|evita|evitar|elimina|eliminar|deja de|prioriza|priorizar|enf[oó]cate|conc[eé]ntrate|procura|procurar|camina|caminar|mu[eé]vete|entrena|entrenar|ejerc[ií]tate|hidr[aá]tate|hidratarte|mant[eé]n|mantener|necesitas|hace falta|hay que|conviene)\b/i
+
 /* ── request / response ──────────────────────────────────────────────── */
 const RequestSchema = z.object({
-  feature: z.enum(['orbita_dia', 'orbita_semana', 'orbita_mes', 'orbita_mes_chat', 'progreso']),
+  feature: z.enum([
+    'orbita_dia',
+    'orbita_semana',
+    'orbita_mes',
+    'orbita_mes_chat',
+    'experimento',
+    'progreso',
+  ]),
   periodType: z.enum(['day', 'week', 'month', 'last30']),
   periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -375,6 +435,14 @@ const RequestSchema = z.object({
   turnIndex: z.number().int().min(0).max(3).optional(),
   isFinal: z.boolean().optional(),
   path: z.array(z.string().max(48)).max(4).optional(),
+  // Experimento (R5): la IA redacta el FOCO. Solo el dato humano, nunca la DB.
+  experiment: z
+    .object({
+      metricLabel: z.string().max(120),
+      hypothesis: z.string().max(240),
+      subject: z.string().max(120).optional(),
+    })
+    .optional(),
 })
 
 const VozSchema = z.object({
@@ -505,6 +573,38 @@ async function generateChatTurn(
   return parsed.success ? parsed.data : null
 }
 
+async function generateExperiment(system: string, user: string, openaiKey: string) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 120,
+      temperature: 0.6,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    console.error('stelar-insight: OpenAI error (experimento)', res.status)
+    return null
+  }
+  const completion = await res.json()
+  const content = completion?.choices?.[0]?.message?.content
+  if (typeof content !== 'string') return null
+  let raw
+  try {
+    raw = JSON.parse(content)
+  } catch {
+    return null
+  }
+  const parsed = ExperimentSchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
+
 // Backstop de contenido: descarta texto con dígitos (número inventado) o léxico
 // prescriptivo/clínico. Compartido por la voz-por-card y el chat.
 const BANNED_LEXICON =
@@ -570,6 +670,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const chatTurnIndex = parsed.data.turnIndex ?? 0
     const chatIsFinal = parsed.data.isFinal === true
     const chatPath = parsed.data.path ?? []
+    const experiment = parsed.data.experiment
 
     // ── Órbita Mes: voz POR HALLAZGO. La IA solo reformula; la llave del caché
     // es el hash de los hallazgos que manda el cliente (NO el Context Engine),
@@ -681,6 +782,64 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
       if (upErr) console.error('stelar-insight: cache upsert failed (chat)', upErr.message)
       return json({ ...node, cached: false })
+    }
+
+    // ── Experimento (R5): la IA redacta el FOCO del hilo. Solo recibe la métrica
+    // humana + la hipótesis (nunca la DB). Recomienda un foco, JAMÁS receta
+    // conducta (backstop unsafeText/BANNED_LEXICON). Fallback cliente = el
+    // determinístico. Caché = una fila directa por periodo, keyed por el hash del
+    // payload del experimento. ──
+    if (feature === 'experimento' && experiment) {
+      const expHash = fnv1aHex(stableStringify(experiment))
+      const { data: cachedE } = await supabase
+        .from('ai_insights')
+        .select('response, context_hash, prompt_version, expires_at')
+        .eq('feature', feature)
+        .eq('period_type', periodType)
+        .eq('period_start', periodStart)
+        .eq('period_end', periodEnd)
+        .maybeSingle()
+      const expFresh =
+        cachedE &&
+        cachedE.context_hash === expHash &&
+        cachedE.prompt_version === PROMPT_VERSION &&
+        (cachedE.expires_at == null || new Date(cachedE.expires_at).getTime() > Date.now())
+      if (
+        expFresh &&
+        cachedE.response &&
+        typeof cachedE.response === 'object' &&
+        cachedE.response.text
+      ) {
+        return json({ ...cachedE.response, cached: true })
+      }
+
+      const prompt = buildExperimentPrompt(experiment)
+      const out = await generateExperiment(prompt.system, prompt.user, openaiKey)
+      // Backstop: sin dígitos/prescriptivo (unsafeText) y DEBE nombrar la dimensión
+      // o el déficit (chatAnchored). Si no, cae al determinístico del cliente.
+      const rejected =
+        !out ||
+        unsafeText(out.text) ||
+        EXPERIMENT_PRESCRIPTIVE.test(out.text) ||
+        !chatAnchored(out.text, { subject: experiment.subject ?? experiment.metricLabel })
+      if (rejected) return json({ error: 'No pudimos redactar el hilo ahora.' }, 502)
+
+      const response = { text: out.text }
+      const { error: upErr } = await supabase.from('ai_insights').upsert(
+        {
+          user_id: userId,
+          feature,
+          period_type: periodType,
+          period_start: periodStart,
+          period_end: periodEnd,
+          context_hash: expHash,
+          prompt_version: PROMPT_VERSION,
+          response,
+        },
+        { onConflict: 'user_id,feature,period_type,period_start,period_end' },
+      )
+      if (upErr) console.error('stelar-insight: cache upsert failed (experimento)', upErr.message)
+      return json({ ...response, cached: false })
     }
 
     const spanDays = Math.max(
