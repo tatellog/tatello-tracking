@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
@@ -8,6 +8,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
 import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import { useSession } from '@/hooks/useSession'
+import { track } from '@/lib/analytics'
 import { USE_PERSISTED_MONTH_REPORT } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -129,6 +130,17 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     ? openFinding.subject.charAt(0).toUpperCase() + openFinding.subject.slice(1)
     : ''
 
+  // Analytics del loop de descubrimiento (T3): entró → descubrió → profundizó.
+  // "Entró" = el reporte quedó a la vista. Ref-guard por findingsHash → un evento
+  // por reporte distinto, no uno en cada render.
+  const seenHashRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!chat.ready || cards.length === 0) return
+    if (seenHashRef.current === findingsHash) return
+    seenHashRef.current = findingsHash
+    track('orbit_month_teaser_seen', { findings_count: cards.length, dimension: cards[0]!.id })
+  }, [chat.ready, cards, findingsHash])
+
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
       {/* ── Hero: constelación + signo + % revelado ── */}
@@ -165,11 +177,25 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
       {chat.ready && cards.length > 0 ? (
         <View style={styles.antesala}>
           {revealed ? (
-            <MonthReport cards={cards} onPickFact={setOpenFinding} />
+            <MonthReport
+              cards={cards}
+              onPickFact={(f) => {
+                // "Profundizó": abrió un hecho para entenderlo.
+                track('orbit_month_finding_opened', {
+                  finding_id: f.id,
+                  is_obstacle: f.isObstacle ?? false,
+                })
+                setOpenFinding(f)
+              }}
+            />
           ) : (
             <MonthDiscoveryTeaser
               dimension={teaserDimension(cards[0]!)}
-              onStart={() => setRevealed(true)}
+              onStart={() => {
+                // "Descubrió": tocó el teaser y reveló el reporte de evidencia.
+                track('orbit_month_report_revealed', { dimension: cards[0]!.id })
+                setRevealed(true)
+              }}
             />
           )}
         </View>
