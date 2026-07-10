@@ -79,7 +79,6 @@ function VerdictBlock({ finding }: { finding: Finding }) {
   }
   return (
     <View style={styles.verdict}>
-      <Text style={styles.verdictEyebrow}>TU MES</Text>
       <View style={styles.band} onLayout={onBand}>
         {w > 0 ? <FindingConstellation finding={finding} width={w} /> : null}
       </View>
@@ -121,12 +120,6 @@ const styles = StyleSheet.create({
   wrap: { gap: 28 },
   // ── Veredicto ──
   verdict: { gap: 8 },
-  verdictEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    color: colors.oroSoft,
-  },
   band: { alignSelf: 'stretch', marginVertical: 2 },
   verdictLine: {
     fontFamily: typography.uiSemi,
