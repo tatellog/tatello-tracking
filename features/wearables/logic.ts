@@ -42,6 +42,14 @@ export type WearableStepsRow = {
   steps: number
 }
 
+export type WearableBodyCompositionRow = {
+  source: WearableSource
+  day_date: string
+  body_fat_pct: number | null
+  lean_body_mass_kg: number | null
+  bmi: number | null
+}
+
 /** Lectura cruda de un workout, ya aplanada por el wrapper de la fuente. */
 export type RawWorkout = {
   uuid: string
@@ -67,6 +75,18 @@ export type RawSleepSample = {
 export type RawDailySteps = {
   start: Date
   steps: number
+}
+
+/** Las 3 métricas de composición que expone HealthKit (visceral / % agua NO son
+ *  tipos estándar de HK → fuera de alcance). */
+export type BodyCompositionMetric = 'body_fat_pct' | 'lean_body_mass_kg' | 'bmi'
+
+/** Una muestra cruda de composición, ya en UNIDAD CANÓNICA (pct 0-100, kg,
+ *  índice) — el wrapper de la fuente hace la conversión de unidad. */
+export type RawBodyComposition = {
+  metric: BodyCompositionMetric
+  value: number
+  date: Date
 }
 
 /** YYYY-MM-DD del instante `d` en la zona `tz` (en-CA formatea ISO nativo;
@@ -170,5 +190,54 @@ export function stepsToRows(
   }
   return [...byDay.entries()]
     .map(([day, steps]) => ({ source, day_date: day, steps: clamp(steps, 0, 200000) }))
+    .sort((a, b) => a.day_date.localeCompare(b.day_date))
+}
+
+const COMP_RANGE: Record<BodyCompositionMetric, [number, number]> = {
+  body_fat_pct: [0, 100],
+  lean_body_mass_kg: [0, 300],
+  bmi: [0, 100],
+}
+const round1 = (n: number): number => Math.round(n * 10) / 10
+
+/**
+ * Muestras crudas de composición → una fila por DÍA LOCAL (misma identidad que
+ * wearable_steps). Por cada métrica se toma la muestra MÁS RECIENTE del día (un
+ * snapshot diario, no un promedio). Descarta días sin ninguna métrica válida.
+ * Valores clampeados a los CHECK de la tabla.
+ */
+export function bodyCompositionToRows(
+  samples: readonly RawBodyComposition[],
+  tz: string,
+  source: WearableSource,
+): WearableBodyCompositionRow[] {
+  // day → métrica → { value, ms } (la más reciente gana).
+  const byDay = new Map<
+    string,
+    Partial<Record<BodyCompositionMetric, { value: number; ms: number }>>
+  >()
+  for (const s of samples) {
+    if (!Number.isFinite(s.value) || s.value <= 0) continue
+    const day = dayInTimezone(s.date, tz)
+    const ms = s.date.getTime()
+    const bucket = byDay.get(day) ?? {}
+    const prev = bucket[s.metric]
+    if (!prev || ms >= prev.ms) bucket[s.metric] = { value: s.value, ms }
+    byDay.set(day, bucket)
+  }
+  const pick = (
+    b: Partial<Record<BodyCompositionMetric, { value: number; ms: number }>>,
+    m: BodyCompositionMetric,
+  ): number | null => (b[m] ? round1(clamp(b[m]!.value, COMP_RANGE[m][0], COMP_RANGE[m][1])) : null)
+
+  return [...byDay.entries()]
+    .map(([day, b]) => ({
+      source,
+      day_date: day,
+      body_fat_pct: pick(b, 'body_fat_pct'),
+      lean_body_mass_kg: pick(b, 'lean_body_mass_kg'),
+      bmi: pick(b, 'bmi'),
+    }))
+    .filter((r) => r.body_fat_pct != null || r.lean_body_mass_kg != null || r.bmi != null)
     .sort((a, b) => a.day_date.localeCompare(b.day_date))
 }

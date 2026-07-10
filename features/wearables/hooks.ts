@@ -17,15 +17,21 @@ import { track } from '@/lib/analytics'
 import { queryKeys } from '@/lib/queryKeys'
 import { userTimezone } from '@/lib/time'
 
-import { upsertWearableSleep, upsertWearableSteps, upsertWearableWorkouts } from './api'
+import {
+  upsertWearableBodyComposition,
+  upsertWearableSleep,
+  upsertWearableSteps,
+  upsertWearableWorkouts,
+} from './api'
 import {
   isHealthKitAvailable,
+  readBodyComposition,
   readDailySteps,
   readSleepSamples,
   readWorkouts,
   requestHealthKitAuthorization,
 } from './healthkit'
-import { normalizeWorkout, sleepSamplesToRows, stepsToRows } from './logic'
+import { bodyCompositionToRows, normalizeWorkout, sleepSamplesToRows, stepsToRows } from './logic'
 
 /* Flag de conexión POR USUARIA (no por device): dos cuentas en el mismo
  * teléfono no heredan la conexión de la otra. */
@@ -48,25 +54,29 @@ const DAY_MS = 24 * 60 * 60 * 1000
  */
 export async function syncAppleHealth(
   windowDays: number,
-): Promise<{ workouts: number; sleepDays: number; stepDays: number } | null> {
+): Promise<{ workouts: number; sleepDays: number; stepDays: number; bodyDays: number } | null> {
   try {
     if (!(await isHealthKitAvailable())) return null
     const to = new Date()
     const from = new Date(to.getTime() - windowDays * DAY_MS)
     const tz = userTimezone()
 
-    const [rawWorkouts, rawSleep, rawSteps] = await Promise.all([
+    // readBodyComposition ya se auto-gatea por WEARABLE_BODY_COMPOSITION_ENABLED
+    // (devuelve [] con el flag OFF → no lee ni pide permiso).
+    const [rawWorkouts, rawSleep, rawSteps, rawBody] = await Promise.all([
       readWorkouts(from, to),
       readSleepSamples(from, to),
       readDailySteps(from, to),
+      readBodyComposition(from, to),
     ])
 
-    const [workouts, sleepDays, stepDays] = await Promise.all([
+    const [workouts, sleepDays, stepDays, bodyDays] = await Promise.all([
       upsertWearableWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health'))),
       upsertWearableSleep(sleepSamplesToRows(rawSleep, tz, 'apple_health')),
       upsertWearableSteps(stepsToRows(rawSteps, tz, 'apple_health')),
+      upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, 'apple_health')),
     ])
-    return { workouts, sleepDays, stepDays }
+    return { workouts, sleepDays, stepDays, bodyDays }
   } catch {
     return null
   }

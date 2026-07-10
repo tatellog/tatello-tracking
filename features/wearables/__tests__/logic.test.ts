@@ -1,4 +1,5 @@
 import {
+  bodyCompositionToRows,
   dayInTimezone,
   hkActivityToWorkoutType,
   normalizeWorkout,
@@ -126,5 +127,64 @@ describe('stepsToRows', () => {
       { source: 'apple_health', day_date: '2026-07-07', steps: 8433 },
       { source: 'apple_health', day_date: '2026-07-08', steps: 200000 },
     ])
+  })
+})
+
+describe('bodyCompositionToRows — snapshot diario de composición', () => {
+  it('agrupa por día local y toma la muestra MÁS RECIENTE por métrica', () => {
+    const rows = bodyCompositionToRows(
+      [
+        // 2026-07-07 (MX): dos lecturas de grasa, gana la más reciente.
+        { metric: 'body_fat_pct', value: 25, date: new Date('2026-07-07T14:00:00Z') },
+        { metric: 'body_fat_pct', value: 24.2, date: new Date('2026-07-07T22:00:00Z') },
+        { metric: 'lean_body_mass_kg', value: 48.6, date: new Date('2026-07-07T14:00:00Z') },
+        { metric: 'bmi', value: 23.4, date: new Date('2026-07-07T14:00:00Z') },
+      ],
+      TZ,
+      'apple_health',
+    )
+    expect(rows).toEqual([
+      {
+        source: 'apple_health',
+        day_date: '2026-07-07',
+        body_fat_pct: 24.2,
+        lean_body_mass_kg: 48.6,
+        bmi: 23.4,
+      },
+    ])
+  })
+
+  it('descarta valores <= 0 y días sin ninguna métrica', () => {
+    const rows = bodyCompositionToRows(
+      [{ metric: 'body_fat_pct', value: 0, date: new Date('2026-07-07T14:00:00Z') }],
+      TZ,
+      'apple_health',
+    )
+    expect(rows).toEqual([])
+  })
+
+  it('clampa fuera de rango y redondea a 1 decimal', () => {
+    const rows = bodyCompositionToRows(
+      [
+        { metric: 'body_fat_pct', value: 150, date: new Date('2026-07-07T14:00:00Z') },
+        { metric: 'lean_body_mass_kg', value: 45.678, date: new Date('2026-07-07T14:00:00Z') },
+      ],
+      TZ,
+      'apple_health',
+    )
+    expect(rows[0]!.body_fat_pct).toBe(100)
+    expect(rows[0]!.lean_body_mass_kg).toBe(45.7)
+  })
+
+  it('una fila por día, ordenadas cronológicamente', () => {
+    const rows = bodyCompositionToRows(
+      [
+        { metric: 'bmi', value: 23, date: new Date('2026-07-09T14:00:00Z') },
+        { metric: 'bmi', value: 22, date: new Date('2026-07-07T14:00:00Z') },
+      ],
+      TZ,
+      'apple_health',
+    )
+    expect(rows.map((r) => r.day_date)).toEqual(['2026-07-07', '2026-07-09'])
   })
 })

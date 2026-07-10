@@ -8,7 +8,12 @@ import { z } from 'zod'
 
 import { requireUserId, supabase } from '@/lib/supabase'
 
-import type { WearableSleepRow, WearableStepsRow, WearableWorkoutRow } from './logic'
+import type {
+  WearableBodyCompositionRow,
+  WearableSleepRow,
+  WearableStepsRow,
+  WearableWorkoutRow,
+} from './logic'
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
@@ -36,6 +41,19 @@ const stepsRowSchema = z.object({
   day_date: isoDay,
   steps: z.number().int().min(0).max(200000),
 })
+
+const bodyCompositionRowSchema = z
+  .object({
+    source: z.enum(['apple_health', 'garmin']),
+    day_date: isoDay,
+    body_fat_pct: z.number().min(0).max(100).nullable(),
+    lean_body_mass_kg: z.number().min(0).max(300).nullable(),
+    bmi: z.number().min(0).max(100).nullable(),
+  })
+  // Espeja el CHECK de la tabla: una fila sin ningún valor no aporta señal.
+  .refine((r) => r.body_fat_pct != null || r.lean_body_mass_kg != null || r.bmi != null, {
+    message: 'body composition row has no value',
+  })
 
 /** Upsert de workouts del reloj. Devuelve cuántas filas se escribieron. */
 export async function upsertWearableWorkouts(rows: WearableWorkoutRow[]): Promise<number> {
@@ -69,6 +87,21 @@ export async function upsertWearableSteps(rows: WearableStepsRow[]): Promise<num
   const userId = await requireUserId()
   const parsed = z.array(stepsRowSchema).parse(rows)
   const { error } = await supabase.from('wearable_steps').upsert(
+    parsed.map((r) => ({ ...r, user_id: userId })),
+    { onConflict: 'user_id,source,day_date' },
+  )
+  if (error) throw error
+  return parsed.length
+}
+
+/** Upsert de composición corporal (una fila por día · snapshot de la báscula). */
+export async function upsertWearableBodyComposition(
+  rows: WearableBodyCompositionRow[],
+): Promise<number> {
+  if (rows.length === 0) return 0
+  const userId = await requireUserId()
+  const parsed = z.array(bodyCompositionRowSchema).parse(rows)
+  const { error } = await supabase.from('wearable_body_composition').upsert(
     parsed.map((r) => ({ ...r, user_id: userId })),
     { onConflict: 'user_id,source,day_date' },
   )

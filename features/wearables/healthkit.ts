@@ -13,13 +13,40 @@
  */
 import { Platform } from 'react-native'
 
-import type { RawDailySteps, RawSleepSample, RawWorkout } from './logic'
+import { WEARABLE_BODY_COMPOSITION_ENABLED } from '@/lib/featureFlags'
 
-const READ_TYPES = [
+import type {
+  BodyCompositionMetric,
+  RawBodyComposition,
+  RawDailySteps,
+  RawSleepSample,
+  RawWorkout,
+} from './logic'
+
+const READ_TYPES_BASE = [
   'HKWorkoutTypeIdentifier',
   'HKCategoryTypeIdentifierSleepAnalysis',
   'HKQuantityTypeIdentifierStepCount',
 ] as const
+
+// Composición corporal: solo se piden si el flag está ON (no expandir el permiso
+// de HealthKit mientras no haya UI que muestre el dato).
+const READ_TYPES_WITH_COMPOSITION = [
+  ...READ_TYPES_BASE,
+  'HKQuantityTypeIdentifierBodyFatPercentage',
+  'HKQuantityTypeIdentifierLeanBodyMass',
+  'HKQuantityTypeIdentifierBodyMassIndex',
+] as const
+
+const READ_TYPES = WEARABLE_BODY_COMPOSITION_ENABLED ? READ_TYPES_WITH_COMPOSITION : READ_TYPES_BASE
+
+// Identificador HK → métrica canónica de composición. La conversión de UNIDAD
+// (fracción→pct, kg, índice) se hace al leer para que logic reciba lo canónico.
+const COMPOSITION_TYPES: { id: string; metric: BodyCompositionMetric; unit: string }[] = [
+  { id: 'HKQuantityTypeIdentifierBodyFatPercentage', metric: 'body_fat_pct', unit: '%' },
+  { id: 'HKQuantityTypeIdentifierLeanBodyMass', metric: 'lean_body_mass_kg', unit: 'kg' },
+  { id: 'HKQuantityTypeIdentifierBodyMassIndex', metric: 'bmi', unit: 'count' },
+]
 
 type HealthKitModule = typeof import('@kingstinct/react-native-healthkit')
 
@@ -135,4 +162,41 @@ export async function readDailySteps(from: Date, to: Date): Promise<RawDailyStep
   } catch {
     return []
   }
+}
+
+/**
+ * Composición corporal cruda del rango (% grasa, masa magra, IMC). Gateado por
+ * el flag: con OFF ni siquiera consulta (y el permiso nunca se pidió). % grasa:
+ * HealthKit guarda el porcentaje como FRACCIÓN (0.25 = 25%); se normaliza a
+ * 0-100 de forma defensiva (si ya viene >1, se asume pct). logic agrupa por día.
+ */
+export async function readBodyComposition(from: Date, to: Date): Promise<RawBodyComposition[]> {
+  if (!WEARABLE_BODY_COMPOSITION_ENABLED) return []
+  const mod = await hk()
+  if (!mod) return []
+  const out: RawBodyComposition[] = []
+  for (const t of COMPOSITION_TYPES) {
+    try {
+      const samples = await mod.queryQuantitySamples(
+        t.id as Parameters<typeof mod.queryQuantitySamples>[0],
+        {
+          filter: { date: { startDate: from, endDate: to } },
+          limit: 0,
+          ascending: true,
+          unit: t.unit,
+        },
+      )
+      for (const s of samples) {
+        const raw = s.quantity
+        if (raw == null || !Number.isFinite(raw) || raw <= 0 || s.startDate == null) continue
+        // % grasa llega como fracción (0-1); a pct. Defensivo si ya viene 0-100.
+        const value = t.metric === 'body_fat_pct' && raw <= 1 ? raw * 100 : raw
+        out.push({ metric: t.metric, value, date: new Date(s.startDate) })
+      }
+    } catch {
+      // Un tipo sin permiso/datos no tumba a los demás.
+      continue
+    }
+  }
+  return out
 }

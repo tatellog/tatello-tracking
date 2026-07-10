@@ -48,3 +48,13 @@ export const USE_PERSISTED_MONTH_REPORT = false
  * construcción, así que encenderlo NO agrega ceremonias ni marcas nuevas.
  */
 export const MILESTONES_ENABLED = false
+
+/*
+ * Wearables · composición corporal (Epic 04 · R4 · T-R4.x).
+ *
+ * Cuando es `true`, Stelar pide permiso de HealthKit para % grasa / masa magra /
+ * IMC y los sincroniza a `wearable_body_composition`. Default `false`: NO amplía
+ * el permiso de HealthKit (los tipos de composición no entran a READ_TYPES) ni
+ * sincroniza nada, hasta que exista la UI de Resumen (R3) que muestre el dato.
+ */
+export const WEARABLE_BODY_COMPOSITION_ENABLED = false
