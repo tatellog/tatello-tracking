@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { ChevronHint } from '@/components/ui/interaction'
 import {
   useCancelExperiment,
   useCloseExperiment,
@@ -241,7 +242,11 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
                   resultTone(closedRes?.status) === 'good' ? styles.resultGood : styles.resultSoft,
                 ]}
               >
-                {resultLine(closedRes?.status, closedRes?.daysMeasured)}
+                {resultLine(
+                  closedRes?.status,
+                  closedRes?.daysMeasured,
+                  (latest.plan as ExperimentPlanJson)?.durationDays,
+                )}
               </Text>
               <Pressable
                 style={[styles.btn, styles.btnFull, styles.btnOutline]}
@@ -315,20 +320,26 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
             return (
               <Pressable
                 key={e.id}
-                style={styles.trailRow}
+                style={({ pressed }) => [styles.trailRow, pressed && styles.trailRowPressed]}
                 onPress={() => setExpandedTrailId(expanded ? null : e.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Ver de nuevo: ${humanMetric((e.plan as ExperimentPlanJson)?.metric, e.dimension)}`}
               >
                 <View style={styles.trailHead}>
                   <Text style={styles.trailDim}>
                     {humanMetric((e.plan as ExperimentPlanJson)?.metric, e.dimension)}
                   </Text>
-                  <Text style={styles.trailCaret}>{expanded ? '⌄' : '›'}</Text>
+                  <ChevronHint
+                    direction={expanded ? 'up' : 'down'}
+                    size={16}
+                    color={colors.magenta}
+                  />
                 </View>
                 <Text style={styles.trailMeta}>
                   <Text
                     style={resultTone(e.status) === 'good' ? styles.resultGood : styles.resultSoft}
                   >
-                    {shortResult(e.status, days)}
+                    {shortResult(e.status, days, (e.plan as ExperimentPlanJson)?.durationDays)}
                   </Text>
                   {formatShortDate(e.closed_at) ? `   ·   ${formatShortDate(e.closed_at)}` : ''}
                 </Text>
@@ -340,7 +351,7 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
                         resultTone(e.status) === 'good' ? styles.resultGood : styles.resultSoft,
                       ]}
                     >
-                      {resultLine(e.status, days)}
+                      {resultLine(e.status, days, (e.plan as ExperimentPlanJson)?.durationDays)}
                     </Text>
                     {onExplain && trailHyp?.source_finding_id ? (
                       <Pressable
@@ -362,13 +373,34 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
   )
 }
 
-/** El resultado del motor → una frase cálida, sin culpa. El día-0 (cerrado muy
- *  pronto) se dice como tal, no como fracaso. */
-function resultLine(status: string | undefined, daysMeasured: number | undefined): string {
+// Espejo cliente de `minMeasured` del motor (_shared/intelligence/experiments.ts):
+// un hilo de 14 días necesita ≥7 días MEDIDOS (los que lo sigues, no el historial)
+// para dar veredicto. Debajo de eso, "inconclusa" NO es señal ambigua: es que lo
+// cerraste antes de vivir los días.
+function minMeasured(durationDays: number): number {
+  return Math.min(durationDays, Math.max(4, Math.ceil(durationDays / 2)))
+}
+
+/** El resultado del motor → una frase cálida, sin culpa. Distingue "lo cerraste
+ *  muy pronto" (pocos días medidos) de una señal genuinamente ambigua, para no
+ *  hacer creer que faltan datos tuyos cuando en realidad falta seguir el hilo. */
+function resultLine(
+  status: string | undefined,
+  daysMeasured: number | undefined,
+  durationDays: number | undefined,
+): string {
   if (status === 'confirmed') return 'Se sostuvo en tus días.'
   if (status === 'discarded') return 'No se sostuvo esta vez, y eso también dice algo.'
-  if ((daysMeasured ?? 0) === 0)
-    return 'Lo cerraste muy pronto para leerlo. Otro día le damos tiempo.'
+  const d = daysMeasured ?? 0
+  if (d < minMeasured(durationDays ?? 14)) {
+    const lead =
+      d === 0
+        ? 'Lo cerraste el mismo día'
+        : d === 1
+          ? 'Lo seguiste un solo día'
+          : `Lo seguiste ${d} días`
+    return `${lead}. El hilo mira los días que lo sigues, no los de antes.`
+  }
   return 'Aún no alcanza para saberlo.'
 }
 
@@ -377,10 +409,14 @@ function resultTone(status: string | undefined): 'good' | 'soft' {
 }
 
 /** El resultado en corto, para las filas del historial (sin frase larga). */
-function shortResult(status: string | undefined, daysMeasured: number | undefined): string {
+function shortResult(
+  status: string | undefined,
+  daysMeasured: number | undefined,
+  durationDays: number | undefined,
+): string {
   if (status === 'confirmed') return 'Se sostuvo'
   if (status === 'discarded') return 'No se sostuvo'
-  if ((daysMeasured ?? 0) === 0) return 'Cerrado pronto'
+  if ((daysMeasured ?? 0) < minMeasured(durationDays ?? 14)) return 'Muy pronto'
   return 'Sin señal aún'
 }
 
@@ -607,17 +643,13 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: 2,
   },
-  trailRow: { gap: 2, paddingVertical: 4 },
+  trailRow: { gap: 2, paddingVertical: 6 },
+  trailRowPressed: { opacity: 0.55 },
   trailHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-  },
-  trailCaret: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
   },
   trailDim: {
     fontFamily: typography.uiMedium,
