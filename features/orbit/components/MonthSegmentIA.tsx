@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
@@ -10,6 +11,7 @@ import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
 import { USE_PERSISTED_MONTH_REPORT } from '@/lib/featureFlags'
+import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -159,6 +161,20 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     seenHashRef.current = findingsHash
     track('orbit_month_teaser_seen', { findings_count: cards.length, dimension: cards[0]!.id })
   }, [chat.ready, cards, findingsHash])
+
+  // Cuando el reporte persistido carga, el writer YA escribió las hipótesis
+  // (compute-findings persiste y LUEGO responde). useHypotheses/useActiveExperiment
+  // pudieron montar antes con la tabla vacía → invalidamos para que refetcheen y
+  // aparezcan los "hilos" sin tener que salir y volver a entrar.
+  const qc = useQueryClient()
+  const invalidatedHashRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!persistedReport || !uid) return
+    if (invalidatedHashRef.current === persistedReport.findingsHash) return
+    invalidatedHashRef.current = persistedReport.findingsHash
+    void qc.invalidateQueries({ queryKey: queryKeys.hypotheses.all })
+    void qc.invalidateQueries({ queryKey: queryKeys.experiments.active(uid) })
+  }, [persistedReport, uid, qc])
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
