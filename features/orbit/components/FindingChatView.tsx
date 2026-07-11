@@ -176,8 +176,10 @@ export function FindingChatView({
     setFocus(null)
     setOpenDays(false)
     pathRef.current = []
-    // Fallback de apertura = el HECHO (support), no la poesía (fact-led).
-    void aiTurn(0, false, finding.phrase.support, false)
+    // Apertura = la LECTURA cálida (lead: "vas sumando tus días"), NO el número
+    // pelón (support). El número solo, de saludo, se sentía a ticket del súper y
+    // la dejaba calculando si iba bien o mal (→ culpa). La evidencia viene después.
+    void aiTurn(0, false, finding.phrase.lead, true)
     return () => {
       mounted.current = false
     }
