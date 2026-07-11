@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { colors, typography } from '@/theme'
 
 import type { Finding } from '../findings'
+import { StelarStar } from './MonthChatView'
 
 /*
  * MonthDiscovery — el lead-in de Órbita Mes (rediseño jul 2026).
@@ -38,7 +39,7 @@ export function MonthDiscovery({ finding, onExplore }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Hablémoslo con Stelar"
       >
-        <Text style={styles.ctaMark}>✦ </Text>
+        <StelarStar size={16} />
         <Text style={styles.ctaText}>Hablémoslo con Stelar</Text>
       </Pressable>
 
@@ -76,25 +77,26 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.bone,
   },
+  // Puerta celeste, no botón "de submit": tinte + borde magenta (la voz de
+  // Stelar), con su estrella oro adelante (con QUIÉN vas a hablar). Invita, no
+  // convierte.
   cta: {
     marginTop: 6,
-    backgroundColor: colors.magenta,
+    backgroundColor: colors.magentaTint,
+    borderWidth: 1.5,
+    borderColor: colors.magentaGlow,
     borderRadius: 14,
-    paddingVertical: 15,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   ctaText: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
-    color: colors.bg,
-  },
-  ctaMark: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.bg,
+    color: colors.magentaHot,
   },
   keptFoco: {
     marginTop: 2,

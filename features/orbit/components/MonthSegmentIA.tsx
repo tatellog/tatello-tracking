@@ -314,15 +314,17 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     marginTop: 6,
   },
+  // El % es CEREMONIA (progreso del cielo), no acción → oro, no magenta. Así el
+  // magenta queda solo para "aquí Stelar habla / actúas" (el CTA), sin competir.
   heroPct: {
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.title,
-    color: colors.magenta,
+    color: colors.oroSoft,
   },
   heroPctSign: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.magenta,
+    color: colors.oro,
   },
   heroLine: {
     fontFamily: typography.serif,
