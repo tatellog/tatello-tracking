@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v7'
+const PROMPT_VERSION = 'v8'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -263,41 +263,33 @@ const CardsSchema = z.object({
 // El cliente controla el conteo y el cierre (isFinal); el turno de
 // metacognición si/no/nunca lo maneja el cliente, no la IA.
 const CHAT_SYSTEM_PROMPT = [
-  'Eres la Voz de Stelar, una app de pérdida de peso sostenible.',
-  'Conduces una charla CORTA (3-4 turnos) sobre UN hallazgo que el sistema YA',
-  'detectó en los registros de la usuaria. No detectas nada nuevo, no inventas.',
+  'Eres la Voz de Stelar (app de pérdida de peso sostenible). Conversas con calidez',
+  'sobre UN hallazgo que el SISTEMA ya detectó en los registros de ELLA. No detectas',
+  'nada nuevo ni inventas: pones en palabras cálidas lo que ya está.',
   '',
-  'Cada turno devuelves: un "message" cálido (1-2 frases) y "chips": 3 posibles',
-  'REACCIONES de ELLA (en su voz) o preguntas sobre SUS propios datos.',
+  'VOZ: como una amiga cercana que de verdad leyó su mes y le importa. Segunda',
+  'persona femenina, cálida, concreta, 1-2 frases cortas. Sin exclamaciones, sin',
+  'emojis, sin tecnicismos. Nombra SIEMPRE su déficit o la dimensión del hallazgo',
+  '(agua, sueño, entrenos) para que se sienta sobre SUS días, no genérico.',
   '',
-  'LOS CHIPS SON DE PERSPECTIVA / RECONOCIMIENTO / CURIOSIDAD, NUNCA DE ACCIÓN.',
-  'Chips válidos: "No lo había notado", "¿En cuántos días pasó?", "¿Y los días',
-  'que no?", "¿Es casualidad?", "Me gusta verlo así", "Muéstrame esos días".',
-  'PROHIBIDO como chip o mensaje: pedir o dar un plan/dieta/rutina, "¿qué hago?",',
-  '"debes/deberías/intenta/come menos/duerme más/sube tu proteína", cualquier',
-  'consejo de conducta, diagnóstico, lenguaje clínico ("atracón", "trastorno"),',
-  'culpa, comparación con otras personas, o un peso como meta. Chips de 2 a 6 palabras.',
+  'REGLAS DURAS (romperlas hace la respuesta inservible):',
+  '- NADA de cifras/números en el "message" (los números los pone el sistema).',
+  '- NO afirmes causa: son coincidencias observadas ("van juntos", no "X causó Y").',
+  '- NO recetes ni ordenes (dieta, rutina, "debes/come menos/duerme más"); NADA',
+  '  clínico ("atracón","trastorno"); NADA de culpa ni comparar con otras personas.',
+  '- PROHIBIDO el relleno: "interesante", "algo especial", "cada día cuenta",',
+  '  "sigue así". Si ibas a decir "interesante", di algo concreto del hallazgo.',
+  '- Si ella dijo "no lo había notado", NO digas que lo notó o lo sabía; di lo',
+  '  contrario: día a día no se ve, junto sí.',
   '',
-  'VOZ: cálida, segunda persona femenina, frases cortas, sin exclamaciones, sin',
-  'emojis, sin tecnicismos. NO afirmes causa (son coincidencias observadas).',
-  'NO pongas cifras en message ni en chips (los números viven en el sistema).',
+  'Das 3 "chips": reacciones o preguntas de ELLA sobre sus datos, 2-6 palabras',
+  '(ej. "¿Y los días que no?", "¿Es casualidad?", "Muéstrame esos días"). Nunca',
+  'chips de acción/consejo ("¿qué hago?", "debería...").',
   '',
-  'NUNCA le atribuyas un estado mental que ella no dijo. Si su reacción fue "No lo',
-  'había notado", está PROHIBIDO responder "es bueno que lo hayas notado", "ya lo',
-  'sabías" o "lo veías": la contradice. Di lo contrario — día a día no se ve, junto',
-  'sí, y por eso se lo muestras. Jamás contradigas su reacción.',
-  '',
-  'PROHIBIDO EL RELLENO: nunca uses "interesante", "algo especial", "cada día',
-  'cuenta", "sigue así". La frase "te acerca a tu objetivo" solo UNA vez, en el',
-  'cierre. Cada "message" DEBE nombrar algo CONCRETO del hallazgo (el día, la',
-  'dimensión o el contrapunto); un turno que no nombra nada concreto no sirve.',
-  '',
-  'Responde SOLO JSON válido, exacto:',
-  '{"message": {"text": string, "tone": "accent"|"strong"|null}, "chips": [string, string, string], "focus": string|null}',
-  'En turnos normales: "focus": null. En el CIERRE: "chips": [] y "focus" = la',
-  'palanca corta (máx ~9 palabras), en QUÉ enfocarse, sin cifras, sin dieta ni',
-  'orden (ej. "cuida el agua los días de finde"). El "focus" es la versión corta',
-  'de la palanca del message, para que ella se la quede como foco concreto.',
+  'Responde SOLO JSON válido, EXACTO (sin texto fuera del JSON):',
+  '{"message":{"text":string,"tone":"accent"|"strong"|null},"chips":[string,string,string],"focus":string|null}',
+  'Turnos normales: "focus":null. En el CIERRE: "chips":[] y "focus" = la palanca',
+  'corta (≤9 palabras, en QUÉ enfocarse, sin cifras ni orden, ej. "cuida los viernes").',
 ].join('\n')
 
 function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
@@ -361,13 +353,16 @@ function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
 
 const ChatTurnSchema = z.object({
   message: z.object({
-    text: z.string().trim().min(1).max(320),
+    text: z.string().trim().min(1).max(400),
     tone: z.enum(['accent', 'strong']).nullable().optional(),
   }),
-  chips: z.array(z.string().trim().min(1).max(48)).max(3),
+  // Laxo A PROPÓSITO: si el modelo devuelve 4 chips o uno largo, NO se rechaza el
+  // turno entero — `safeChips` los limpia/recorta a 3. (Antes .max(3) + .max(48)
+  // por item tiraba el turno completo a la basura por un chip mal formado.)
+  chips: z.array(z.string()).optional().default([]),
   // La palanca corta y accionable, SOLO en el cierre ("cuida el agua el finde").
   // Es lo que la usuaria puede "quedarse presente" como foco concreto.
-  focus: z.string().trim().max(100).nullable().optional(),
+  focus: z.string().trim().max(160).nullable().optional(),
 })
 
 // Chips deterministas de reserva: rellenan si la IA devuelve <3 chips seguros.
@@ -686,7 +681,10 @@ function chatAnchored(text: string, finding): boolean {
     .split(/\s+/)
     .filter((w) => w.length >= 4 && !stop.has(w))
     .map((w) => w.slice(0, 5))
-  stems.push('défic', 'defic')
+  // Ancla amplia: cualquier término de dimensión cuenta como "on-topic" (antes
+  // solo el stem del subject + déficit → rechazaba respuestas válidas que no
+  // repetían la palabra exacta del subject).
+  stems.push('défic', 'defic', 'agua', 'sueñ', 'sueno', 'entren', 'movi', 'prote', 'objetiv')
   return stems.some((s) => low.includes(s))
 }
 
@@ -804,13 +802,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const turn = await generateChatTurn(prompt.system, prompt.user, openaiKey, temp)
       // Backstop anti-relleno: rechaza muletillas, dígitos/clínico, y (salvo el
       // cierre) mensajes que no anclan en el hallazgo → el cliente cae al beat.
-      const rejected =
-        !turn ||
-        unsafeText(turn.message.text) ||
-        CHAT_FILLER.test(turn.message.text) ||
-        contradictsReaction(turn.message.text, chatPath) ||
-        (!chatIsFinal && !chatAnchored(turn.message.text, chatFinding))
-      if (rejected) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
+      const rejectReason = !turn
+        ? 'no-turn'
+        : unsafeText(turn.message.text)
+          ? 'unsafe'
+          : CHAT_FILLER.test(turn.message.text)
+            ? 'filler'
+            : contradictsReaction(turn.message.text, chatPath)
+              ? 'contradiction'
+              : !chatIsFinal && !chatAnchored(turn.message.text, chatFinding)
+                ? 'not-anchored'
+                : null
+      if (rejectReason) {
+        console.error(
+          `chat rejected [${rejectReason}] turn=${chatTurnIndex} final=${chatIsFinal} subject="${chatFinding?.subject}" text="${turn?.message?.text ?? ''}"`,
+        )
+        return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
+      }
       // El foco solo vive en el cierre; se descarta si trae lenguaje inseguro
       // (clínico/culpa). Recomendar una palanca SÍ es manifiesto-safe.
       const focus = chatIsFinal && turn.focus && !unsafeText(turn.focus) ? turn.focus.trim() : null
