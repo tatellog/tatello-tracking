@@ -203,6 +203,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
               frameOpacity={0.6}
               glyphOpacity={0.78}
               bloomMaxOpacity={0.72}
+              breathe
             />
           ) : null}
         </View>

@@ -6,8 +6,17 @@ import {
   Paint,
   useImage,
 } from '@shopify/react-native-skia'
+import { useEffect } from 'react'
 import { Image, StyleSheet, View } from 'react-native'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  useDerivedValue,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -275,6 +284,10 @@ export type RevealedEmblemProps = {
   frameOpacity?: number
   glyphOpacity?: number
   bloomMaxOpacity?: number
+  /** El halo RESPIRA (opacidad en loop lento) para que el hero se sienta vivo,
+   *  no un sticker. Solo lo enciende Órbita Mes (donde el emblema es protagonista);
+   *  default OFF para no animar los emblemas que RECEDEN (Hoy). */
+  breathe?: boolean
 }
 
 export function RevealedEmblem({
@@ -285,6 +298,7 @@ export function RevealedEmblem({
   frameOpacity = FRAME_OPACITY,
   glyphOpacity = GLYPH_OPACITY,
   bloomMaxOpacity = BLOOM_MAX_OPACITY,
+  breathe = false,
 }: RevealedEmblemProps) {
   const frames = FRAMES_BY_SIGN[sign]
   const Glyph = GLYPH_BY_SIGN[sign]
@@ -293,6 +307,26 @@ export function RevealedEmblem({
   // Bloom (halo aditivo cerca del 100 %) sigue en Skia. Si la textura aún no
   // decodifica, simplemente NO hay bloom — nunca blanquea el emblema.
   const animalSkia = useImage(animalSrc ?? null)
+
+  // Respiración del halo: un shared value en loop lento (yoyo). Anima SOLO la
+  // opacidad del bloom (barato, sin re-blur por frame; nunca colores · crash
+  // conocido). El emblema "inhala". Los hooks van ANTES del early-return.
+  const breath = useSharedValue(0)
+  useEffect(() => {
+    if (!breathe) return
+    breath.value = withRepeat(
+      withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(breath)
+  }, [breathe, breath])
+  const bloomT = bloomTFor(transformProgress)
+  const bloomBase = bloomT * bloomMaxOpacity
+  // Pulsa entre ~72% y 100% del brillo base; estático si no respira.
+  const bloomOpacity = useDerivedValue(() =>
+    breathe ? bloomBase * (0.72 + 0.28 * breath.value) : bloomBase,
+  )
 
   if (size <= 0 || animalSrc == null) return null
 
@@ -315,7 +349,6 @@ export function RevealedEmblem({
   const lionY = LION_CY * size - lionH / 2
   const glyphSize = size * GLYPH_FRAC
 
-  const bloomT = bloomTFor(transformProgress)
   const bloomRadius = size * (0.02 + bloomT * 0.045)
 
   return (
@@ -362,7 +395,7 @@ export function RevealedEmblem({
           <Group opacity={masterOpacity}>
             <Group
               layer={
-                <Paint opacity={bloomT * bloomMaxOpacity} blendMode="screen">
+                <Paint opacity={bloomOpacity} blendMode="screen">
                   <Blur blur={bloomRadius} />
                 </Paint>
               }
