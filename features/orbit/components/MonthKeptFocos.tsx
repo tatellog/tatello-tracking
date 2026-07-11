@@ -1,14 +1,14 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 
 import { colors, typography } from '@/theme'
 
 import type { KeptFoco } from '../focos'
 
 /*
- * "Lo que fuiste mirando" — la memoria cálida de los focos que la usuaria se
- * quedó presente (Stage 2). NO es un historial de experimentos con veredicto:
- * cada fila es un foco, sin pass/fail, sin "muy pronto". Tocar una fila reabre
- * la conversación de ese hallazgo (si sigue en el mes actual).
+ * "Lo que fuiste mirando" — la memoria de focos de MESES ANTERIORES (Stage 2).
+ * El foco del mes actual ya vive en la discovery ("Tu foco: …"), así que aquí
+ * NO se repite: esto es la memoria a través del tiempo. Read-only a propósito —
+ * es un recuerdo, no otra puerta al mismo chat (que se sentía redundante).
  */
 
 const MESES = [
@@ -34,33 +34,22 @@ function monthLabel(month: string): string {
 
 type Props = {
   focos: KeptFoco[]
-  /** Reabre el chat del hallazgo si sigue disponible en el mes actual. */
-  onReopen: (findingId: string) => void
-  /** Ids de hallazgos disponibles ahora (para saber si la fila es tocable). */
-  availableIds: Set<string>
+  /** El mes actual (se excluye: su foco ya está en la discovery). */
+  currentMonth: string
 }
 
-export function MonthKeptFocos({ focos, onReopen, availableIds }: Props) {
-  if (focos.length === 0) return null
+export function MonthKeptFocos({ focos, currentMonth }: Props) {
+  const past = focos.filter((f) => f.month !== currentMonth)
+  if (past.length === 0) return null
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>Lo que fuiste mirando</Text>
-      {focos.map((f) => {
-        const canReopen = availableIds.has(f.findingId)
-        return (
-          <Pressable
-            key={`${f.month}:${f.findingId}`}
-            style={({ pressed }) => [styles.row, pressed && canReopen && styles.rowPressed]}
-            onPress={() => canReopen && onReopen(f.findingId)}
-            disabled={!canReopen}
-            accessibilityRole={canReopen ? 'button' : 'text'}
-            accessibilityLabel={f.foco}
-          >
-            <Text style={styles.subject}>{f.foco}</Text>
-            <Text style={styles.month}>{monthLabel(f.month)}</Text>
-          </Pressable>
-        )
-      })}
+      {past.map((f) => (
+        <View key={`${f.month}:${f.findingId}`} style={styles.row}>
+          <Text style={styles.foco}>{f.foco}</Text>
+          <Text style={styles.month}>{monthLabel(f.month)}</Text>
+        </View>
+      ))}
     </View>
   )
 }
@@ -74,9 +63,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.oroSoft,
   },
-  row: { gap: 2, paddingVertical: 4 },
-  rowPressed: { opacity: 0.55 },
-  subject: {
+  row: { gap: 2 },
+  foco: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.leche,

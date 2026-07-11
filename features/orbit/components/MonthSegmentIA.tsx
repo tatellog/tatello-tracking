@@ -142,7 +142,9 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     for (const f of keptFocos) if (!m.has(f.findingId)) m.set(f.findingId, f.foco)
     return m
   }, [keptFocos])
-  const availableIds = useMemo(() => new Set(cards.map((c) => c.id)), [cards])
+  // La memoria "Lo que fuiste mirando" solo muestra meses ANTERIORES (el actual
+  // ya vive en la discovery), así que solo aparece si hay focos de otros meses.
+  const hasPastFocos = keptFocos.some((f) => f.month !== month)
 
   // Profundizar: tocar el CTA abre la conversación guiada sobre el hallazgo. El
   // chat es la experiencia principal (el motor detecta, la IA comunica).
@@ -228,18 +230,12 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         <EmptySegmentCard {...EMPTY_COPY[chat.reason]} />
       ) : null}
 
-      {/* "Lo que fuiste mirando": la memoria de focos, sin veredicto. Reabre el
-          chat del hallazgo si sigue disponible este mes. */}
-      {keptFocos.length > 0 ? (
+      {/* "Lo que fuiste mirando": memoria de focos de meses ANTERIORES (el del mes
+          actual ya está en la discovery). Read-only: es un recuerdo, no otra
+          puerta al mismo chat. */}
+      {hasPastFocos ? (
         <View style={styles.section}>
-          <MonthKeptFocos
-            focos={keptFocos}
-            availableIds={availableIds}
-            onReopen={(fid) => {
-              const f = cards.find((c) => c.id === fid)
-              if (f) setOpenFinding(f)
-            }}
-          />
+          <MonthKeptFocos focos={keptFocos} currentMonth={month} />
         </View>
       ) : null}
 
