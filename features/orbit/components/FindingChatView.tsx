@@ -68,6 +68,31 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const fmtDate = (d: string): string =>
   `${Number(d.slice(8, 10))} ${MESES[Number(d.slice(5, 7)) - 1] ?? ''}`
 
+/**
+ * El fallback determinístico CONSCIENTE del chip: cada pregunta recibe SU
+ * respuesta del dato, no un mensaje "positivo" ciego (que se sentía como esquivar).
+ * Honesto y sin afirmar causa (manifiesto). Primero contesta; la calidez va en el
+ * chip de foco / la discovery, no en vez de la respuesta. Es el PISO cuando la IA
+ * falla o el backstop la rechaza — por eso tiene que contestar bien solo.
+ */
+function fallbackFor(label: string, finding: Finding): string {
+  const l = label.toLowerCase()
+  // "¿Y los días que no?" → el contrapunto, directo (los días que NO se dieron).
+  if (/d[ií]as que no|los que no|y los que|los otros/.test(l)) {
+    return finding.contrast ?? 'Los otros días no llegaron; ese es el otro lado del mes.'
+  }
+  // "¿Es casualidad?" → honesto: no afirmo causa, pero los dos van juntos. Contesta
+  // la pregunta (sí/no honesto) en vez de esquivar con una frase positiva.
+  if (/casualidad|coincidencia|de verdad|en serio/.test(l)) {
+    return 'No te lo puedo asegurar: no afirmo causas, solo lo que vi en tus días. Pero los dos se dieron juntos seguido, y por eso vale la pena mirarlo.'
+  }
+  // "¿En cuántos días pasó?" → el número, directo.
+  if (/cu[aá]nto/.test(l)) return `${finding.metric.value} — ${finding.metric.label}.`
+  // "No lo había notado" → por qué no se veía (día a día vs mes junto).
+  if (/no lo hab[ií]a notado|no me hab/.test(l)) return finding.phrase.caption
+  return finding.hypothesis ?? finding.northLink ?? finding.explanation
+}
+
 export function FindingChatView({
   finding,
   periodStart,
@@ -141,11 +166,6 @@ export function FindingChatView({
     setPending(false)
   }
 
-  const closeText = () =>
-    finding.metacognition.replies[metaAnswer ?? ''] ||
-    finding.northLink ||
-    'Eso es lo que vi. Es tuyo, y ya lo estás viendo.'
-
   // Arranca (y reinicia al cambiar de hallazgo; el key del padre remonta).
   useEffect(() => {
     mounted.current = true
@@ -172,12 +192,13 @@ export function FindingChatView({
     setChips([])
     if (phase === 'opening') {
       setPhase('reply1')
-      await aiTurn(1, false, finding.hypothesis ?? finding.northLink ?? finding.explanation, true)
+      // Fallback CONSCIENTE del chip: contesta lo que preguntó, no un mensaje ciego.
+      await aiTurn(1, false, fallbackFor(label, finding), true)
     } else if (phase === 'reply1') {
       if (askMetacognition) {
         // El hero: la IA responde tu 2º chip y LUEGO hace la metacognición.
         setPhase('reply2')
-        await aiTurn(2, false, finding.northLink ?? finding.explanation, true)
+        await aiTurn(2, false, fallbackFor(label, finding), true)
         if (!mounted.current) return
         setPending(true)
         setTimeout(() => {
@@ -187,9 +208,10 @@ export function FindingChatView({
           setPhase('meta')
         }, 450)
       } else {
-        // Los demás: la IA responde tu 2º chip Y cierra (sin metacognición).
+        // Cierre: contesta el 2º chip directo (fallback consciente). La palanca se
+        // entrega en el chip "Es tu foco" + la discovery, no encima de la respuesta.
         setPhase('closing')
-        await aiTurn(2, true, closeText(), true)
+        await aiTurn(2, true, fallbackFor(label, finding), true)
       }
     }
   }

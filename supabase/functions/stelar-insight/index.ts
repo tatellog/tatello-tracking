@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v6'
+const PROMPT_VERSION = 'v7'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -311,9 +311,12 @@ function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
   lines.push('')
   if (path && path.length > 0) {
     lines.push(`Ella eligió antes: ${path.map((p) => `"${p}"`).join(' → ')}`)
-    lines.push('RESPONDE a su última elección de forma directa y específica; no la ignores.')
+    lines.push('PRIMERO contesta su pregunta con el dato, DIRECTO; la calidez va DESPUÉS,')
+    lines.push('nunca en vez de contestar. No la esquives con una frase positiva.')
     lines.push('Si pregunta por "los días que no" o el contrapunto, respóndelo con esa')
-    lines.push('frase, directo. PROHIBIDO esquivar repitiendo el lado positivo.')
+    lines.push('frase, directo. Si pregunta "¿es casualidad?", contéstale honesto (no')
+    lines.push('afirmes causa, pero di que los dos van juntos y vale mirarlo); NO cambies')
+    lines.push('el tema al lado positivo.')
     const last = path[path.length - 1] ?? ''
     if (/no lo hab[ií]a notado/i.test(last)) {
       lines.push('Su última reacción: NO lo había notado. PROHIBIDO decir que lo notó o que')
