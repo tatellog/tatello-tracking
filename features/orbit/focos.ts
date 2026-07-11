@@ -15,21 +15,23 @@ import { requireUserId, supabase } from '@/lib/supabase'
  *  dentro de la misma tabla. La lectura de metacognición los excluye. */
 export const FOCO_PREFIX = 'foco:'
 
-export type KeptFoco = { findingId: string; subject: string; month: string }
+/** `foco` = la palanca concreta y accionable ("cuida el agua el finde"), NO el
+ *  tema. Es lo que hace útil quedárselo (un foco específico, no un gesto vago). */
+export type KeptFoco = { findingId: string; foco: string; month: string }
 
 /** Guarda (o reafirma) un foco para el mes. Idempotente: volver a guardarlo no
- *  duplica (upsert por user/mes/clave). */
+ *  duplica (upsert por user/mes/clave). Guarda la PALANCA concreta. */
 export async function keepFoco(
   month: string,
-  finding: { id: string; subject: string },
+  input: { findingId: string; foco: string },
 ): Promise<void> {
   const userId = await requireUserId()
   const { error } = await supabase.from('month_reflections').upsert(
     {
       user_id: userId,
       month,
-      question_key: `${FOCO_PREFIX}${finding.id}`,
-      answer: finding.subject,
+      question_key: `${FOCO_PREFIX}${input.findingId}`,
+      answer: input.foco,
     },
     { onConflict: 'user_id,month,question_key' },
   )
@@ -49,7 +51,7 @@ export async function fetchKeptFocos(): Promise<KeptFoco[]> {
   if (error || !data) return []
   return data.map((r) => ({
     findingId: r.question_key.slice(FOCO_PREFIX.length),
-    subject: r.answer,
+    foco: r.answer,
     month: r.month,
   }))
 }
@@ -58,7 +60,7 @@ export async function fetchKeptFocos(): Promise<KeptFoco[]> {
 export function useKeepFoco(month: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (finding: { id: string; subject: string }) => keepFoco(month, finding),
+    mutationFn: (input: { findingId: string; foco: string }) => keepFoco(month, input),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['orbit', 'focos'] }),
   })
 }

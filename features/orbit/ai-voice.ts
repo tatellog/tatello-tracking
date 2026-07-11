@@ -243,11 +243,15 @@ export type ChatFindingInput = {
 export type MonthChatTurn = {
   message: { text: string; tone?: 'accent' | 'strong' }
   chips: string[]
+  /** La palanca corta y accionable del cierre ("cuida el agua el finde"), para
+   *  que la usuaria se la quede como foco concreto. Solo en el turno final. */
+  focus?: string | null
 }
 
 const MonthChatTurnSchema = z.object({
   message: z.object({ text: z.string().min(1), tone: z.enum(['accent', 'strong']).nullish() }),
   chips: z.array(z.string()),
+  focus: z.string().nullish(),
   cached: z.boolean().optional(),
 })
 
@@ -284,6 +288,7 @@ export async function fetchMonthChatTurn(params: {
     return {
       message: { text: parsed.data.message.text, tone: parsed.data.message.tone ?? undefined },
       chips: parsed.data.chips,
+      focus: parsed.data.focus ?? null,
     }
   } catch {
     return null

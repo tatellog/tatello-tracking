@@ -56,6 +56,10 @@ type Props = {
   /** ¿Quedan hallazgos sin ver? (decide "otro hallazgo" vs "ver mi mes"). */
   hasMore: boolean
   onSaveReflection: (questionKey: string, answer: string) => void
+  /** "Me lo quedo presente": guarda la palanca concreta del cierre como foco. */
+  onKeepFoco?: (foco: string) => void
+  /** El hallazgo abierto ya es un foco guardado este mes. */
+  kept?: boolean
   onNext: () => void
   onClose: () => void
   onPickDay?: (date: string) => void
@@ -71,6 +75,8 @@ export function MonthChatSheet({
   askMetacognition,
   hasMore,
   onSaveReflection,
+  onKeepFoco,
+  kept,
   onNext,
   onClose,
   onPickDay,
@@ -180,6 +186,8 @@ export function MonthChatSheet({
                   askMetacognition={askMetacognition}
                   hasMore={hasMore}
                   onSaveReflection={onSaveReflection}
+                  onKeepFoco={onKeepFoco}
+                  kept={kept}
                   onNext={onNext}
                   onFinish={onClose}
                   onPickDay={onPickDay}

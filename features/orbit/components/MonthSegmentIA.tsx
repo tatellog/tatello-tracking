@@ -132,11 +132,16 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     )
   }, [cards])
 
-  // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. Los focos
-  // guardados + la memoria "Lo que fuiste mirando". El keep es idempotente.
+  // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. El keep
+  // guarda la PALANCA concreta del cierre del chat (no un gesto vago). El keep es
+  // idempotente. `focoByFinding` mapea hallazgo → su foco guardado (para pintarlo).
   const keep = useKeepFoco(month)
   const { data: keptFocos = [] } = useKeptFocos(uid)
-  const mainKept = mainFinding ? keptFocos.some((f) => f.findingId === mainFinding.id) : false
+  const focoByFinding = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const f of keptFocos) if (!m.has(f.findingId)) m.set(f.findingId, f.foco)
+    return m
+  }, [keptFocos])
   const availableIds = useMemo(() => new Set(cards.map((c) => c.id)), [cards])
 
   // Profundizar: tocar el CTA abre la conversación guiada sobre el hallazgo. El
@@ -215,9 +220,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           <MonthDiscovery
             finding={mainFinding}
             onExplore={() => setOpenFinding(mainFinding)}
-            kept={mainKept}
-            keeping={keep.isPending}
-            onKeep={() => keep.mutate({ id: mainFinding.id, subject: mainFinding.subject })}
+            keptFoco={focoByFinding.get(mainFinding.id)}
           />
         </View>
       ) : chat.reason ? (
@@ -265,6 +268,10 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         askMetacognition={false}
         hasMore={false}
         onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
+        // "Me lo quedo presente" desde el cierre del chat: guarda la palanca
+        // concreta que aterrizó la IA como foco de ESTE hallazgo.
+        onKeepFoco={(foco) => openFinding && keep.mutate({ findingId: openFinding.id, foco })}
+        kept={openFinding ? focoByFinding.has(openFinding.id) : false}
         onNext={() => setOpenFinding(null)}
         onClose={() => setOpenFinding(null)}
         onPickDay={(date) => {

@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v4'
+const PROMPT_VERSION = 'v5'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -293,8 +293,11 @@ const CHAT_SYSTEM_PROMPT = [
   'dimensión o el contrapunto); un turno que no nombra nada concreto no sirve.',
   '',
   'Responde SOLO JSON válido, exacto:',
-  '{"message": {"text": string, "tone": "accent" | "strong" | null}, "chips": [string, string, string]}',
-  'Si te digo que es el CIERRE, "chips" debe ser [] (vacío).',
+  '{"message": {"text": string, "tone": "accent"|"strong"|null}, "chips": [string, string, string], "focus": string|null}',
+  'En turnos normales: "focus": null. En el CIERRE: "chips": [] y "focus" = la',
+  'palanca corta (máx ~9 palabras), en QUÉ enfocarse, sin cifras, sin dieta ni',
+  'orden (ej. "cuida el agua los días de finde"). El "focus" es la versión corta',
+  'de la palanca del message, para que ella se la quede como foco concreto.',
 ].join('\n')
 
 function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
@@ -349,6 +352,9 @@ const ChatTurnSchema = z.object({
     tone: z.enum(['accent', 'strong']).nullable().optional(),
   }),
   chips: z.array(z.string().trim().min(1).max(48)).max(3),
+  // La palanca corta y accionable, SOLO en el cierre ("cuida el agua el finde").
+  // Es lo que la usuaria puede "quedarse presente" como foco concreto.
+  focus: z.string().trim().max(100).nullable().optional(),
 })
 
 // Chips deterministas de reserva: rellenan si la IA devuelve <3 chips seguros.
@@ -791,7 +797,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         contradictsReaction(turn.message.text, chatPath) ||
         (!chatIsFinal && !chatAnchored(turn.message.text, chatFinding))
       if (rejected) return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
-      const node = { message: turn.message, chips: chatIsFinal ? [] : safeChips(turn.chips) }
+      // El foco solo vive en el cierre; se descarta si trae lenguaje inseguro
+      // (clínico/culpa). Recomendar una palanca SÍ es manifiesto-safe.
+      const focus = chatIsFinal && turn.focus && !unsafeText(turn.focus) ? turn.focus.trim() : null
+      const node = {
+        message: turn.message,
+        chips: chatIsFinal ? [] : safeChips(turn.chips),
+        focus,
+      }
 
       // Guarda de tamaño (response ≤ 20000 chars): si el árbol crece de más, lo
       // reinicia con solo el nodo actual en vez de fallar el upsert.

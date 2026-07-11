@@ -41,6 +41,10 @@ type Props = {
   /** ¿Quedan hallazgos sin ver? Decide el botón de cierre (otro vs terminar). */
   hasMore: boolean
   onSaveReflection: (questionKey: string, answer: string) => void
+  /** "Me lo quedo presente": guarda la palanca concreta del cierre como foco. */
+  onKeepFoco?: (foco: string) => void
+  /** Este hallazgo ya es un foco guardado este mes. */
+  kept?: boolean
   onNext: () => void
   onFinish: () => void
   onPickDay?: (date: string) => void
@@ -72,6 +76,8 @@ export function FindingChatView({
   askMetacognition,
   hasMore,
   onSaveReflection,
+  onKeepFoco,
+  kept,
   onNext,
   onFinish,
   onPickDay,
@@ -83,6 +89,8 @@ export function FindingChatView({
   const [pending, setPending] = useState(true)
   const [phase, setPhase] = useState<Phase>('opening')
   const [metaAnswer, setMetaAnswer] = useState<string | null>(null)
+  // La palanca concreta del cierre ("cuida el agua el finde"), para quedársela.
+  const [focus, setFocus] = useState<string | null>(null)
   const [openDays, setOpenDays] = useState(false)
   const [bandW, setBandW] = useState(0)
   const pathRef = useRef<string[]>([])
@@ -125,6 +133,8 @@ export function FindingChatView({
     const voice = res ? res.message.tone === 'accent' : fallbackVoice
     setLog((l) => [...l, { who: 'stelar', text, voice }])
     setChips(isFinal ? [] : res?.chips.length ? res.chips : FALLBACK_CHIPS)
+    // El cierre trae la palanca corta; si la IA no la dio, cae al norte del hallazgo.
+    if (isFinal) setFocus(res?.focus || finding.northLink || finding.subject)
     setPending(false)
   }
 
@@ -141,6 +151,7 @@ export function FindingChatView({
     setPending(true)
     setPhase('opening')
     setMetaAnswer(null)
+    setFocus(null)
     setOpenDays(false)
     pathRef.current = []
     // Fallback de apertura = el HECHO (support), no la poesía (fact-led).
@@ -287,6 +298,19 @@ export function FindingChatView({
               ) : null}
             </View>
           ) : null}
+          {/* "Me lo quedo presente": guarda la PALANCA concreta del cierre como
+              foco. Sin veredicto, sin contador — solo Stelar recordándola. */}
+          {onKeepFoco && focus ? (
+            kept ? (
+              <Text style={styles.keptNote}>✦ Es tu foco este mes</Text>
+            ) : (
+              <ChoiceChip
+                label="Me lo quedo presente"
+                tint={tint}
+                onPress={() => onKeepFoco(focus)}
+              />
+            )
+          ) : null}
           {hasMore ? (
             <ChoiceChip label="Ver otro hallazgo" tint={tint} primary onPress={onNext} />
           ) : (
@@ -427,6 +451,13 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   closing: { gap: 10, marginLeft: AV + 8 },
+  keptNote: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.3,
+    color: colors.magenta,
+    paddingVertical: 6,
+  },
   choice: {
     flexDirection: 'row',
     alignItems: 'center',

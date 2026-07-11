@@ -54,9 +54,9 @@ export function MonthKeptFocos({ focos, onReopen, availableIds }: Props) {
             onPress={() => canReopen && onReopen(f.findingId)}
             disabled={!canReopen}
             accessibilityRole={canReopen ? 'button' : 'text'}
-            accessibilityLabel={f.subject}
+            accessibilityLabel={f.foco}
           >
-            <Text style={styles.subject}>{f.subject}</Text>
+            <Text style={styles.subject}>{f.foco}</Text>
             <Text style={styles.month}>{monthLabel(f.month)}</Text>
           </Pressable>
         )

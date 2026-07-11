@@ -20,13 +20,13 @@ import type { Finding } from '../findings'
 type Props = {
   finding: Finding
   onExplore: () => void
-  /** Ya está "presente" este mes (la usuaria se lo quedó mirando). */
-  kept?: boolean
-  keeping?: boolean
-  onKeep?: () => void
+  /** La palanca concreta que la usuaria ya se quedó como foco este mes ("cuida el
+   *  agua el finde"). Si existe, la mostramos como recordatorio accionable. El
+   *  "quedárselo" se hace DENTRO del chat (donde la IA aterriza la palanca). */
+  keptFoco?: string
 }
 
-export function MonthDiscovery({ finding, onExplore, kept, keeping, onKeep }: Props) {
+export function MonthDiscovery({ finding, onExplore, keptFoco }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>Este mes encontré algo</Text>
@@ -44,22 +44,12 @@ export function MonthDiscovery({ finding, onExplore, kept, keeping, onKeep }: Pr
         <Text style={styles.ctaArrow}> →</Text>
       </Pressable>
 
-      {/* "Me lo quedo presente": compromiso suave, sin ventana ni veredicto. Solo
-          Stelar recordando en qué te fijaste. No se puede "fallar". */}
-      {onKeep ? (
-        kept ? (
-          <Text style={styles.keptNote}>✦ Presente este mes</Text>
-        ) : (
-          <Pressable
-            style={styles.keepLink}
-            onPress={onKeep}
-            disabled={keeping}
-            accessibilityRole="button"
-            accessibilityLabel="Me lo quedo presente"
-          >
-            <Text style={styles.keepText}>{keeping ? 'Guardando…' : 'Me lo quedo presente'}</Text>
-          </Pressable>
-        )
+      {/* El foco concreto que se quedó (accionable y específico, no un gesto). */}
+      {keptFoco ? (
+        <Text style={styles.keptFoco}>
+          <Text style={styles.keptFocoMark}>✦ Tu foco: </Text>
+          {keptFoco}
+        </Text>
       ) : null}
     </View>
   )
@@ -107,19 +97,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.bg,
   },
-  keepLink: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 8 },
-  keepText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    letterSpacing: 0.3,
-    color: colors.bone,
+  keptFoco: {
+    marginTop: 2,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.leche,
   },
-  keptNote: {
-    alignSelf: 'center',
-    paddingVertical: 8,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    letterSpacing: 0.3,
-    color: colors.magenta,
-  },
+  keptFocoMark: { fontFamily: typography.uiBold, color: colors.magenta },
 })
