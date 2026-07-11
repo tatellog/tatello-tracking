@@ -511,9 +511,18 @@ export function buildFindings(
   // acción concreta, no una observación.
   const lever = monthLever(all)
 
+  // "¿Y los días que no?" no debe responder el complemento obvio ("los otros 12
+  // no llegaron" · lo calcula ella sola). Si hay un DÍA donde se te va el déficit
+  // (obstáculo sólido), el veredicto lo dice: "sobre todo los viernes" → el ajá.
+  const breakDay = all.find((f) => f.id === 'weekday-diet-break' && f.lever)
+  const verdictContrast = breakDay
+    ? `Los que más se te escaparon fueron ${breakDay.subject}.`
+    : undefined
+
   return rankFindings(all).map((f) => ({
     ...f,
     lever: f.id === 'deficit-summary' ? (lever ?? f.lever) : f.lever,
+    contrast: f.id === 'deficit-summary' && verdictContrast ? verdictContrast : f.contrast,
     priorCallback: priorCallback(f.reflectionKey, prior),
     hypothesis: crossHypothesis(f.evidenceDates, signals, f.category) ?? undefined,
     followUps: buildFollowUps(f),

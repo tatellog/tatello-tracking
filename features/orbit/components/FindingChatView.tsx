@@ -324,18 +324,26 @@ export function FindingChatView({
               ) : null}
             </View>
           ) : null}
-          {/* "Me lo quedo presente": guarda la PALANCA concreta del cierre como
-              foco. Sin veredicto, sin contador — solo Stelar recordándola. */}
-          {onKeepFoco && focus ? (
-            kept ? (
-              <Text style={styles.keptNote}>✦ Es tu foco este mes</Text>
-            ) : (
-              <ChoiceChip
-                label="Me lo quedo presente"
-                tint={tint}
-                onPress={() => onKeepFoco(focus)}
-              />
-            )
+          {/* El foco DICHO (no un titular pelón): la palanca concreta del motor.
+              Debajo, la acción de quedárselo (sin veredicto, sin contador). */}
+          {focus ? (
+            <View style={styles.focoBlock}>
+              <Text style={styles.focoLine}>
+                <Text style={styles.focoMark}>✦ Tu foco: </Text>
+                {focus}
+              </Text>
+              {onKeepFoco ? (
+                kept ? (
+                  <Text style={styles.keptNote}>Ya te lo quedaste este mes</Text>
+                ) : (
+                  <ChoiceChip
+                    label="Me lo quedo presente"
+                    tint={tint}
+                    onPress={() => onKeepFoco(focus)}
+                  />
+                )
+              ) : null}
+            </View>
           ) : null}
           {hasMore ? (
             <ChoiceChip label="Ver otro hallazgo" tint={tint} primary onPress={onNext} />
@@ -477,12 +485,20 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   closing: { gap: 10, marginLeft: AV + 8 },
+  // El foco DICHO: la palanca concreta ("cuida los viernes"), no un titular.
+  focoBlock: { gap: 8 },
+  focoLine: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.leche,
+  },
+  focoMark: { fontFamily: typography.uiBold, color: colors.magenta },
   keptNote: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.3,
-    color: colors.magenta,
-    paddingVertical: 6,
+    color: colors.niebla,
   },
   choice: {
     flexDirection: 'row',
