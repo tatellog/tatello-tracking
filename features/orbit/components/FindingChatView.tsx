@@ -6,7 +6,6 @@ import { colors, radius, typography } from '@/theme'
 
 import { fetchMonthChatTurn } from '../ai-voice'
 import type { Finding, FindingCategory } from '../findings'
-import { DiscoveryWave } from './DiscoveryWave'
 import { FindingConstellation } from './finding-constellations'
 import { StelarStar } from './MonthChatView'
 import { TypingDots } from './TypingDots'
@@ -231,7 +230,6 @@ export function FindingChatView({
   const showAiChips = (phase === 'opening' || phase === 'reply1') && chips.length > 0 && !pending
   const showMeta = phase === 'meta' && !metaAnswer && !pending
   const showClosing = phase === 'closing' && !pending
-  const openingWave = pending && log.length === 0
 
   return (
     <View style={styles.wrap}>
@@ -253,11 +251,14 @@ export function FindingChatView({
       )}
 
       {pending ? (
+        // Siempre los "…" (loop continuo) mientras Stelar escribe. La onda
+        // ceremonial de un solo tiro ("Encontrando conexiones…") ya la hace
+        // MonthChatSheet al abrir; aquí un one-shot dejaba un hueco en blanco.
         <View style={styles.typingRow}>
           <View style={styles.avatar}>
             <StelarStar size={18} />
           </View>
-          {openingWave ? <DiscoveryWave width={54} /> : <TypingDots />}
+          <TypingDots />
         </View>
       ) : null}
 
