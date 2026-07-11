@@ -83,7 +83,7 @@ function fallbackFor(label: string, finding: Finding): string {
   // "¿Es casualidad?" → honesto: no afirmo causa, pero los dos van juntos. Contesta
   // la pregunta (sí/no honesto) en vez de esquivar con una frase positiva.
   if (/casualidad|coincidencia|de verdad|en serio/.test(l)) {
-    return 'No te lo puedo asegurar: no afirmo causas, solo lo que vi en tus días. Pero los dos se dieron juntos seguido, y por eso vale la pena mirarlo.'
+    return 'No te lo puedo asegurar: no afirmo causas, solo leo tus días. Pero se repitió lo suficiente como para no dejarlo pasar.'
   }
   // "¿En cuántos días pasó?" → el número, directo.
   if (/cu[aá]nto/.test(l)) return `${finding.metric.value} — ${finding.metric.label}.`
@@ -159,9 +159,10 @@ export function FindingChatView({
     const voice = res ? res.message.tone === 'accent' : fallbackVoice
     setLog((l) => [...l, { who: 'stelar', text, voice }])
     setChips(isFinal ? [] : res?.chips.length ? res.chips : FALLBACK_CHIPS)
-    // El cierre trae la palanca; si la IA no la dio, cae a la palanca DEL MOTOR
-    // (determinística, accionable), no a una observación (northLink).
-    if (isFinal) setFocus(res?.focus || finding.lever || finding.northLink || finding.subject)
+    // El cierre trae la palanca (IA o motor). Si NO hay palanca real, NO
+    // inventamos un foco falso con el northLink (una observación disfrazada de
+    // instrucción): mejor no mostrar "Tu foco" que una palmadita que no es acción.
+    if (isFinal) setFocus(res?.focus || finding.lever || null)
     setPending(false)
   }
 
