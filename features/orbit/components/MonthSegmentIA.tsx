@@ -119,16 +119,13 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const source = USE_PERSISTED_MONTH_REPORT ? persistedReport : null
   const cards = source?.findings ?? chat.cards
 
-  // El hallazgo que lidera la conversación debe dar una PALANCA (un "haz X"), no
-  // el conteo de déficit pelón (que es el norte, no una acción). Preferimos un
-  // hallazgo de DIMENSIÓN (agua/sueño/movimiento) que CONECTA con el déficit
-  // (northLink) → "cuida el agua el finde". El déficit sigue centrado (el cruce
-  // lo nombra + el conteo vive en "Tu mes de un vistazo"), pero el foco es
-  // accionable. Último recurso: el déficit pelón, si no hay dimensión.
+  // El hero lidera con el VEREDICTO de déficit (el norte: "¿voy bajando?"), que
+  // es la estrella, no un cruce naciente de 3 días. Su palanca (el foco) la ARMA
+  // el motor (`lever`: "cuida los viernes"), no la IA. Si no hay veredicto aún
+  // (pocos días), cae al top del ranking.
   const mainFinding = useMemo(() => {
     if (cards.length === 0) return null
-    const dimensions = cards.filter((c) => c.category !== 'deficit')
-    return dimensions.find((c) => c.northLink) ?? dimensions[0] ?? cards[0] ?? null
+    return cards.find((c) => c.id === 'deficit-summary') ?? cards[0] ?? null
   }, [cards])
 
   // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. El keep
@@ -218,11 +215,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           la usuaria opera). El motor detecta; la IA comunica. ── */}
       {mainFinding ? (
         <View style={styles.antesala}>
-          <MonthDiscovery
-            finding={mainFinding}
-            onExplore={() => setOpenFinding(mainFinding)}
-            keptFoco={focoByFinding.get(mainFinding.id)}
-          />
+          <MonthDiscovery finding={mainFinding} onExplore={() => setOpenFinding(mainFinding)} />
         </View>
       ) : chat.reason ? (
         // Estado vacío HONESTO cuando aún no hay un hallazgo que conversar.

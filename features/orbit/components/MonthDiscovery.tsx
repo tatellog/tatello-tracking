@@ -20,13 +20,9 @@ import type { Finding } from '../findings'
 type Props = {
   finding: Finding
   onExplore: () => void
-  /** La palanca concreta que la usuaria ya se quedó como foco este mes ("cuida el
-   *  agua el finde"). Si existe, la mostramos como recordatorio accionable. El
-   *  "quedárselo" se hace DENTRO del chat (donde la IA aterriza la palanca). */
-  keptFoco?: string
 }
 
-export function MonthDiscovery({ finding, onExplore, keptFoco }: Props) {
+export function MonthDiscovery({ finding, onExplore }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>Este mes encontré algo</Text>
@@ -46,11 +42,12 @@ export function MonthDiscovery({ finding, onExplore, keptFoco }: Props) {
         <Text style={styles.ctaText}>Hablémoslo con Stelar</Text>
       </Pressable>
 
-      {/* El foco concreto que se quedó (accionable y específico, no un gesto). */}
-      {keptFoco ? (
+      {/* La PALANCA que armó el motor (accionable y específica, no una observación).
+          Determinística: siempre visible, no depende de la IA ni de guardarla. */}
+      {finding.lever ? (
         <Text style={styles.keptFoco}>
           <Text style={styles.keptFocoMark}>✦ Tu foco: </Text>
-          {keptFoco}
+          {finding.lever}
         </Text>
       ) : null}
     </View>

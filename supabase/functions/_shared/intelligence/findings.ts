@@ -178,6 +178,7 @@ function detectTrainingDeficit(signals: readonly DailySignals[], ctx: FindingsCt
     category: 'movimiento',
     confidence: pct,
     emerging,
+    lever: emerging ? undefined : 'mantén tus entrenos',
     contrast,
     title: `Los días que entrenaste, entraste en déficit el ${pct}% de las veces.`,
     subject: 'tus días de entrenamiento',
@@ -227,6 +228,9 @@ function detectWaterDeficit(signals: readonly DailySignals[], ctx: FindingsCtx):
     category: 'agua',
     confidence: pct,
     emerging,
+    // Palanca del motor (no de la IA). Muestra chica → sin palanca (no se receta
+    // desde 3 días · manifiesto).
+    lever: emerging ? undefined : 'cuida tu agua',
     title: `Cuando llegaste a tu meta de agua, estuviste en déficit ${overlap.length} de ${goalDays.length} días.`,
     subject: 'tus días con tu meta de agua',
     phrase: {
@@ -367,6 +371,8 @@ function detectWeekdayDietBreak(
     isObstacle: true,
     confidence: Math.round((broke / occ) * 100),
     emerging: occ < 4,
+    // La palanca más específica: el día donde se te rompe → "cuida los viernes".
+    lever: occ < 4 ? undefined : `cuida los ${wd}`,
     title: `Los ${wd} no llegaste a déficit ${broke} de ${occ} veces.`,
     subject: `los ${wd}`,
     phrase: {
@@ -428,6 +434,18 @@ function buildFollowUps(f: Finding): FollowUp[] {
 /** Score: confianza + bonus si acerca al norte (déficit→objetivo). */
 const scoreOf = (f: Finding): number => f.confidence + (f.northLink ? 15 : 0)
 
+/** La PALANCA del mes para el veredicto (el hero): la del OBSTÁCULO (el día donde
+ *  se te rompe · la más específica) antes que la de una DIMENSIÓN que ayuda.
+ *  Determinística, del motor. Sin palanca si solo hay muestras chicas. */
+function monthLever(findings: readonly Finding[]): string | undefined {
+  const obstacle = findings.find((f) => f.id === 'weekday-diet-break' && f.lever)
+  if (obstacle?.lever) return obstacle.lever
+  const dimension = findings.find(
+    (f) => (f.id === 'water-deficit' || f.id === 'training-deficit') && f.lever,
+  )
+  return dimension?.lever
+}
+
 /**
  * Ranking Engine (R1 · Engine 4) — ordena y capa los hallazgos del reporte.
  * Modelo v1: el VEREDICTO (déficit) es el ancla; luego los OBSTÁCULOS ("dónde se
@@ -439,13 +457,19 @@ const scoreOf = (f: Finding): number => f.confidence + (f.northLink ? 15 : 0)
  * (pesar `evidenceDates.length`) — no se tocan ahora para no mover el orden.
  */
 export function rankFindings(findings: readonly Finding[]): Finding[] {
+  // Los NACIENTES (muestra chica) nunca lideran a un hallazgo robusto: van
+  // después, aunque su % sea alto (3/3 = 100% no debe ganarle a un patrón sólido).
+  const byEmergingThen = (rank: (f: Finding) => number) => (a: Finding, b: Finding) => {
+    if (!!a.emerging !== !!b.emerging) return a.emerging ? 1 : -1
+    return rank(b) - rank(a)
+  }
   const verdict = findings.find((f) => f.id === 'deficit-summary')
   const obstacles = findings
     .filter((f) => f.isObstacle && f.confidence >= 55)
-    .sort((a, b) => b.confidence - a.confidence)
+    .sort(byEmergingThen((f) => f.confidence))
   const levers = findings
     .filter((f) => !f.isObstacle && f.id !== 'deficit-summary' && f.confidence >= 60)
-    .sort((a, b) => scoreOf(b) - scoreOf(a))
+    .sort(byEmergingThen(scoreOf))
 
   const picked: Finding[] = verdict ? [verdict] : []
   for (const f of obstacles) {
@@ -482,8 +506,14 @@ export function buildFindings(
     detectDeficitSummary(signals, ctx),
   ].filter((f): f is Finding => f != null)
 
+  // El veredicto (el hero) toma la palanca del mes: el motor la arma desde el
+  // obstáculo (cuándo se rompe) o la dimensión que ayuda. Así "Tu foco" es una
+  // acción concreta, no una observación.
+  const lever = monthLever(all)
+
   return rankFindings(all).map((f) => ({
     ...f,
+    lever: f.id === 'deficit-summary' ? (lever ?? f.lever) : f.lever,
     priorCallback: priorCallback(f.reflectionKey, prior),
     hypothesis: crossHypothesis(f.evidenceDates, signals, f.category) ?? undefined,
     followUps: buildFollowUps(f),
@@ -501,7 +531,7 @@ export function hashFindings(findings: readonly Finding[]): string {
   const canon = findings
     .map(
       (f) =>
-        `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.subject}|${f.phrase.support}|${f.contrast ?? ''}`,
+        `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.subject}|${f.phrase.support}|${f.contrast ?? ''}|${f.lever ?? ''}`,
     )
     .join('~')
   let h = 0x811c9dc5

@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v5'
+const PROMPT_VERSION = 'v6'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -328,11 +328,21 @@ function buildChatTurnPrompt(finding, path, turnIndex, isFinal) {
   lines.push('anterior. Cada turno AVANZA con algo nuevo (el contrapunto, la coincidencia')
   lines.push('tentativa, o hacia dónde mirar). Si no tienes nada nuevo, ve al cierre.')
   if (isFinal) {
-    lines.push('Este es el CIERRE. Aterriza en UNA palanca concreta y accionable: en QUÉ')
-    lines.push('enfocarse desde SUS datos (ej. "tu palanca este mes es cuidar el agua los')
-    lines.push('días de finde"). Recomendación, no orden. PROHIBIDO cerrar solo con "es un')
-    lines.push('patrón tuyo" o "te acerca a tu objetivo" sin una palanca concreta. Quita')
-    lines.push('toda tarea o culpa. Sin preguntas. "chips": [].')
+    if (finding.lever) {
+      // La palanca YA la decidió el motor. La IA solo la viste; no la reinventa.
+      lines.push(
+        `Este es el CIERRE. La PALANCA ya está decidida por el sistema: "${finding.lever}".`,
+      )
+      lines.push('Ciérrale vistiéndola con calidez y nombrando por qué (desde el hallazgo), SIN')
+      lines.push('cambiarle el sentido ni proponer otra. Recomendación, no orden.')
+      lines.push(`En "focus" devuelve EXACTAMENTE esa palanca: "${finding.lever}". Sin cifras,`)
+      lines.push('sin culpa. Sin preguntas. "chips": [].')
+    } else {
+      // Sin palanca (muestra chica / observación): NO inventar una.
+      lines.push('Este es el CIERRE. NO hay palanca clara (poca evidencia): NO inventes una ni')
+      lines.push('receta. Cierra observando con calidez ("lo sigo mirando contigo"). "focus":')
+      lines.push('null. Sin culpa. Sin preguntas. "chips": [].')
+    }
   } else if (turnIndex === 0) {
     const subj = finding.subject ?? 'lo que apareció en sus días'
     lines.push(`Turno de APERTURA. Empieza NOMBRANDO ${subj}, pero la lectura y la`)
@@ -455,6 +465,7 @@ const RequestSchema = z.object({
       northLink: z.string().max(200).nullable().optional(),
       hypothesis: z.string().max(240).nullable().optional(),
       contrast: z.string().max(240).nullable().optional(),
+      lever: z.string().max(120).nullable().optional(),
     })
     .optional(),
   findingsHash: z.string().max(128).optional(),

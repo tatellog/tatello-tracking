@@ -238,6 +238,8 @@ export type ChatFindingInput = {
   hypothesis?: string | null
   /** El contrapunto ("los días que NO"): para responder de verdad esa pregunta. */
   contrast?: string | null
+  /** La palanca del motor ("cuida los viernes"): la IA la VISTE en el cierre. */
+  lever?: string | null
 }
 
 export type MonthChatTurn = {

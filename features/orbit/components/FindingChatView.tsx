@@ -109,6 +109,8 @@ export function FindingChatView({
     northLink: finding.northLink ?? null,
     hypothesis: finding.hypothesis ?? null,
     contrast: finding.contrast ?? null,
+    // La palanca del motor: la IA la VISTE en el cierre, no la inventa.
+    lever: finding.lever ?? null,
   }
 
   // Pide un turno de IA y lo agrega (o cae al beat determinístico del turno).
@@ -133,8 +135,9 @@ export function FindingChatView({
     const voice = res ? res.message.tone === 'accent' : fallbackVoice
     setLog((l) => [...l, { who: 'stelar', text, voice }])
     setChips(isFinal ? [] : res?.chips.length ? res.chips : FALLBACK_CHIPS)
-    // El cierre trae la palanca corta; si la IA no la dio, cae al norte del hallazgo.
-    if (isFinal) setFocus(res?.focus || finding.northLink || finding.subject)
+    // El cierre trae la palanca; si la IA no la dio, cae a la palanca DEL MOTOR
+    // (determinística, accionable), no a una observación (northLink).
+    if (isFinal) setFocus(res?.focus || finding.lever || finding.northLink || finding.subject)
     setPending(false)
   }
 

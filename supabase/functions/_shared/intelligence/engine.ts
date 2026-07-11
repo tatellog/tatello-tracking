@@ -85,6 +85,12 @@ export type Finding = {
   /** La HIPÓTESIS de Stelar: otra dimensión que coincidió en esos días
    *  (determinística, tentativa, sin causalidad). undefined si no hay cruce. */
   hypothesis?: string
+  /** La PALANCA / foco accionable, ARMADA POR EL MOTOR (no por la IA): en QUÉ
+   *  enfocarse desde SUS datos ("cuida los viernes", "cuida tu agua"). Es una
+   *  recomendación (manifiesto: Órbita recomienda un foco), NUNCA una orden ni
+   *  receta. undefined si el hallazgo no da una palanca clara (observaciones,
+   *  muestras chicas). La IA solo la VISTE; nunca la inventa. */
+  lever?: string
   /** Métrica de esquina ("18 de 21 entrenamientos"). */
   metric: { value: string; label: string }
   /** Las fechas reales relevantes del hallazgo (para "Ver esos días"). */
