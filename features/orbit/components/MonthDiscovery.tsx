@@ -34,14 +34,16 @@ export function MonthDiscovery({ finding, onExplore, keptFoco }: Props) {
       <Text style={styles.lead}>{finding.phrase.lead}</Text>
       {/* La evidencia con números — claridad gratis, sin abrir nada. */}
       {finding.phrase.support ? <Text style={styles.support}>{finding.phrase.support}</Text> : null}
+      {/* CTA como CONVERSACIÓN (no acción): el ✦ es la voz de Stelar; "hablémoslo"
+          invita a charlar sobre el hallazgo, no a "guardar/empezar" algo. */}
       <Pressable
         style={styles.cta}
         onPress={onExplore}
         accessibilityRole="button"
-        accessibilityLabel="Entendamos por qué"
+        accessibilityLabel="Hablémoslo con Stelar"
       >
-        <Text style={styles.ctaText}>Entendamos por qué</Text>
-        <Text style={styles.ctaArrow}> →</Text>
+        <Text style={styles.ctaMark}>✦ </Text>
+        <Text style={styles.ctaText}>Hablémoslo con Stelar</Text>
       </Pressable>
 
       {/* El foco concreto que se quedó (accionable y específico, no un gesto). */}
@@ -92,8 +94,8 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.bg,
   },
-  ctaArrow: {
-    fontFamily: typography.uiBold,
+  ctaMark: {
+    fontFamily: typography.ui,
     fontSize: typography.sizes.label,
     color: colors.bg,
   },
