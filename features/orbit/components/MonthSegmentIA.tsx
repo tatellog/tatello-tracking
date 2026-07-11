@@ -119,17 +119,16 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const source = USE_PERSISTED_MONTH_REPORT ? persistedReport : null
   const cards = source?.findings ?? chat.cards
 
-  // El hallazgo que lidera la conversación: ANCLADO EN EL NORTE (déficit /
-  // objetivo), que es lo que la usuaria quiere saber ("¿voy bajando?"). Si no hay
-  // uno de déficit, el que conecta con su objetivo; si no, el top del motor.
+  // El hallazgo que lidera la conversación debe dar una PALANCA (un "haz X"), no
+  // el conteo de déficit pelón (que es el norte, no una acción). Preferimos un
+  // hallazgo de DIMENSIÓN (agua/sueño/movimiento) que CONECTA con el déficit
+  // (northLink) → "cuida el agua el finde". El déficit sigue centrado (el cruce
+  // lo nombra + el conteo vive en "Tu mes de un vistazo"), pero el foco es
+  // accionable. Último recurso: el déficit pelón, si no hay dimensión.
   const mainFinding = useMemo(() => {
     if (cards.length === 0) return null
-    return (
-      cards.find((c) => c.category === 'deficit') ??
-      cards.find((c) => c.northLink) ??
-      cards[0] ??
-      null
-    )
+    const dimensions = cards.filter((c) => c.category !== 'deficit')
+    return dimensions.find((c) => c.northLink) ?? dimensions[0] ?? cards[0] ?? null
   }, [cards])
 
   // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. El keep
