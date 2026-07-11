@@ -26,6 +26,7 @@ import { useMonthlyReport } from '../report-hooks'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthDiscovery } from './MonthDiscovery'
+import { MonthFocoCallback } from './MonthFocoCallback'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { MonthKeptFocos } from './MonthKeptFocos'
 import { PresenceFinale } from './PresenceFinale'
@@ -142,6 +143,15 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   // ya vive en la discovery), así que solo aparece si hay focos de otros meses.
   const hasPastFocos = keptFocos.some((f) => f.month !== month)
 
+  // Loop de regreso (Stage 3): el foco del mes PASADO reaparece arriba hasta que
+  // la usuaria se queda un foco de este mes (o lo posterga). `stillPresent` = si
+  // el patrón que lo originó volvió a asomar (observación, no examen).
+  const [callbackDismissed, setCallbackDismissed] = useState(false)
+  const prevFoco = keptFocos.find((f) => f.month < month) ?? null
+  const hasCurrentFoco = keptFocos.some((f) => f.month === month)
+  const showCallback = !!prevFoco && !hasCurrentFoco && !callbackDismissed
+  const focoStillPresent = prevFoco ? cards.some((c) => c.id === prevFoco.findingId) : false
+
   // Profundizar: tocar el CTA abre la conversación guiada sobre el hallazgo. El
   // chat es la experiencia principal (el motor detecta, la IA comunica).
   const [openFinding, setOpenFinding] = useState<Finding | null>(null)
@@ -209,6 +219,19 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           No es una meta. Es lo que tus acciones empezaron a construir.
         </Text>
       </View>
+
+      {/* ── Loop de regreso: el foco del mes pasado te recibe (Stelar recuerda). ── */}
+      {showCallback && prevFoco ? (
+        <View style={styles.section}>
+          <MonthFocoCallback
+            foco={prevFoco.foco}
+            stillPresent={focoStillPresent}
+            following={keep.isPending}
+            onFollow={() => keep.mutate({ findingId: prevFoco.findingId, foco: prevFoco.foco })}
+            onDismiss={() => setCallbackDismissed(true)}
+          />
+        </View>
+      ) : null}
 
       {/* ── El hallazgo principal como evidencia serena + UN CTA que abre la
           conversación (rediseño: el chat es la experiencia, no un experimento que
