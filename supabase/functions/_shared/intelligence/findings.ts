@@ -274,14 +274,15 @@ function detectDeficitSummary(signals: readonly DailySignals[], ctx: FindingsCtx
     .map((s) => s.day)
     .filter((d): d is string => !!d)
 
-  // Veredicto de dirección (responde "¿voy bien?" de una mirada), sin culpa: con
-  // pocos días en déficit no regaña, dice que apenas toma forma.
+  // Veredicto de dirección (responde "¿voy bien?" de una mirada), CLARO y sin
+  // culpa: dice explícito "en déficit" (no un poético vago tipo "vas sumando tus
+  // días") y afirma que es constancia, no casualidad. Con pocos días no regaña.
   const lead =
     pct >= 60
-      ? 'Vas en buena dirección.'
+      ? 'Estuviste en déficit la mayoría de tus días. Vas en buena dirección.'
       : pct >= 40
-        ? 'Vas sumando tus días.'
-        : 'Tu mes apenas toma forma.'
+        ? 'Estuviste en déficit buena parte de tus días. Eso ya es constancia.'
+        : 'Tu déficit apenas toma forma este mes. Ya diste los primeros pasos.'
 
   return {
     id: 'deficit-summary',
@@ -540,7 +541,7 @@ export function hashFindings(findings: readonly Finding[]): string {
   const canon = findings
     .map(
       (f) =>
-        `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.subject}|${f.phrase.support}|${f.contrast ?? ''}|${f.lever ?? ''}`,
+        `${f.id}|${f.confidence}|${f.emerging ? 1 : 0}|${f.subject}|${f.phrase.lead}|${f.phrase.support}|${f.contrast ?? ''}|${f.lever ?? ''}`,
     )
     .join('~')
   let h = 0x811c9dc5
