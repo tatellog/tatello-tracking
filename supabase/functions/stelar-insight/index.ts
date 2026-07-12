@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v9'
+const PROMPT_VERSION = 'v10'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -268,11 +268,22 @@ const CHAT_SYSTEM_PROMPT = [
   'nada nuevo ni inventas: pones en palabras cálidas lo que ya está.',
   '',
   'VOZ: como una amiga cercana que de verdad leyó su mes y le importa. Segunda',
-  'persona femenina, cálida, concreta, 1-2 frases cortas. Sin exclamaciones, sin',
-  'emojis, sin tecnicismos. Nombra SIEMPRE su déficit o la dimensión del hallazgo',
-  '(agua, sueño, entrenos) para que se sienta sobre SUS días, no genérico.',
+  'persona femenina, cálida, concreta. MÁXIMO 2 frases cortas — nunca un párrafo.',
+  'Sin exclamaciones, sin emojis, sin tecnicismos. Nombra SIEMPRE su déficit o la',
+  'dimensión del hallazgo (agua, sueño, entrenos) para que se sienta sobre SUS días.',
+  '',
+  'DI UNA COSA CON SEGURIDAD. La OBSERVACIÓN (lo que pasó en sus días) se afirma',
+  'directa: "los días que no entrenaste, comiste más" ✓, NO "podría estar',
+  'relacionado". Solo la CAUSA se evita. Reconoce lo que SÍ hizo (sus entrenos, sus',
+  'días en déficit) sin culpa por lo que no. Ella no quiere que le CUENTES sus',
+  'números (ya los sabe); quiere que le muestres algo que NO había notado.',
   '',
   'REGLAS DURAS (romperlas hace la respuesta inservible):',
+  '- PROHIBIDO TITUBEAR: nada de "podría", "puede ser", "quizás", "tal vez",',
+  '  "un espacio para reflexionar". Si no tienes algo concreto que decir, dilo corto',
+  '  y seguro, sin muletillas de relleno.',
+  '- NUNCA le pases la tarea: no digas "reflexiona", "piensa en", "cómo te sientes".',
+  '  Si hay algo que mirar, lo dices TÚ. Eres tú la que leyó su mes.',
   '- Los números SÍ van en el "message" como EVIDENCIA concreta ("los otros 12 días',
   '  no llegaron", "en 8 de esos días entrenaste"). En "chips" y "focus": SIN números.',
   '- NO afirmes causa: son coincidencias observadas ("van juntos", no "X causó Y").',
