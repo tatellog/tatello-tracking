@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useMacroTargets } from '@/features/macros/hooks'
@@ -24,8 +24,11 @@ import {
   recordMilestones,
   type NewMeasurementInput,
 } from './api'
+import { PROGRESS_COMPARE_WINDOW_DAYS } from './constants'
+import { compareHistory } from './logic'
 import { detectMilestones } from './milestones'
 import { buildMockMeasurements } from './mock'
+import { type HistorySummary, toProgressState, type ProgressState } from './types'
 
 // Ventana amplia = "todo el historial" (los hitos son la PRIMERA vez). La app es
 // reciente; 400 días cubre a cualquier usuaria de la beta.
@@ -48,6 +51,37 @@ export function useMilestoneSync() {
     })
     if (milestones.length > 0) void recordMilestones(milestones)
   }, [history, targets?.calories])
+}
+
+/**
+ * Epic 01 · Historia — "¿cómo cambiaron mis hábitos?" (30v30). Compone las
+ * lecturas (señales + medidas + metas) y corre el Comparison Engine puro,
+ * devolviendo un `ProgressState<HistorySummary>` para que la UI no combine
+ * isLoading/data/error a mano. Determinístico (el motor recibe `today`).
+ */
+export function useHistory(
+  windowDays = PROGRESS_COMPARE_WINDOW_DAYS,
+): ProgressState<HistorySummary> {
+  const signals = useSignalsHistory(windowDays * 2 + 5)
+  const measurements = useMeasurements(null)
+  const targets = useMacroTargets().data
+  const today = todayInTimezone()
+
+  const summary = useMemo<HistorySummary | undefined>(() => {
+    if (!signals.data) return undefined
+    return compareHistory(signals.data, measurements.data ?? [], {
+      today,
+      calorieTarget: targets?.calories ?? null,
+      proteinTarget: targets?.protein_g ?? null,
+      windowDays,
+    })
+  }, [signals.data, measurements.data, targets?.calories, targets?.protein_g, today, windowDays])
+
+  return toProgressState(
+    { isPending: signals.isPending, isError: signals.isError, error: signals.error, data: summary },
+    // Vacío = usuaria nueva sin nada que comparar (todas las métricas en 0/0).
+    (s) => s.metrics.every((m) => m.current === 0 && m.previous === 0),
+  )
 }
 
 const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'

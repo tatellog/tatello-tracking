@@ -1,4 +1,8 @@
 import type { BodyMeasurement } from '@/features/brief/api'
+import type { DailySignals } from '@/features/orbit/api'
+import { isDeficitDay } from '@/features/orbit/deficit'
+
+import type { HistorySummary, MetricComparison } from './types'
 
 export type WeightPoint = {
   /** Epoch ms — timestamp de la medida. */
@@ -164,4 +168,114 @@ export function formatTrendCopy(trend: Trend): string {
   if (abs > 0.5) return `Tu rumbo sube ${rate} por semana. Míralo sin juicio: es información.`
   if (abs >= 0.2) return `Subes ${rate} por semana, paso a paso.`
   return `Subes apenas ${rate} por semana: luz tibia.`
+}
+
+/* ─── Comparison Engine · Historia 30v30 (Epic 01) ─────────────────────
+ *
+ * Puro y testeable: compara los HÁBITOS de la ventana actual (últimos N días)
+ * contra la ventana anterior (los N previos). Responde "¿cómo cambiaron mis
+ * hábitos?" — QUÉ cambió, sin por qué (eso es Órbita). Reusa la regla canónica
+ * `isDeficitDay` para que "día en déficit" sea idéntico en toda la app.
+ *
+ * Recibe `today` (YYYY-MM-DD) como parámetro → determinístico (sin Date.now en la
+ * función pura, tests reproducibles). Las fechas de `daily_signals.day` son
+ * YYYY-MM-DD y se comparan como strings (orden lexicográfico = cronológico), sin
+ * parseo de Date (Hermes no parsea 'YYYY-MM-DD' confiable).
+ */
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Corre una fecha YYYY-MM-DD `days` días (mediodía evita bordes de DST). */
+function shiftIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
+  const dt = new Date(y, m - 1, d + days, 12)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+export type HistoryCtx = {
+  /** Hoy en YYYY-MM-DD (zona del usuario). */
+  today: string
+  calorieTarget: number | null
+  proteinTarget: number | null
+  /** Tamaño de cada ventana en días (default 30). */
+  windowDays?: number
+}
+
+function mkComparison(
+  key: MetricComparison['key'],
+  current: number,
+  previous: number,
+): MetricComparison {
+  const delta = Number((current - previous).toFixed(2))
+  const direction: MetricComparison['direction'] = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+  return { key, current, previous, delta, direction }
+}
+
+/** Delta de peso: última medición vs la más cercana a hace `win` días. */
+function weightComparison(
+  measurements: readonly BodyMeasurement[],
+  today: string,
+  win: number,
+): MetricComparison | null {
+  const withW = measurements
+    .filter((m): m is BodyMeasurement & { weight_kg: number } => m.weight_kg != null)
+    .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime())
+  const latest = withW[withW.length - 1]
+  if (!latest || withW.length < 2) return null
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number]
+  const targetTs = new Date(y, m - 1, d, 12).getTime() - win * DAY_MS
+  let prev: number | null = null
+  let best = Infinity
+  for (const row of withW) {
+    const dist = Math.abs(new Date(row.measured_at).getTime() - targetTs)
+    if (dist < best) {
+      best = dist
+      prev = row.weight_kg
+    }
+  }
+  if (prev == null) return null
+  return mkComparison('weight', Number(latest.weight_kg.toFixed(1)), Number(prev.toFixed(1)))
+}
+
+/**
+ * Compara los hábitos de las últimas `windowDays` vs las `windowDays` previas.
+ * Métricas de conteo (días): entrenos, proteína-en-meta, déficit, registro
+ * (días con comida). Más el delta de peso. Las que dependen de una meta
+ * (proteína/déficit) se omiten si no hay target — la UI las muestra como
+ * invitación, nunca inventa.
+ */
+export function compareHistory(
+  signals: readonly DailySignals[],
+  measurements: readonly BodyMeasurement[],
+  ctx: HistoryCtx,
+): HistorySummary {
+  const win = ctx.windowDays ?? 30
+  const curStart = shiftIso(ctx.today, -win)
+  const prevStart = shiftIso(ctx.today, -2 * win)
+  const inCur = (s: DailySignals) => s.day != null && s.day > curStart && s.day <= ctx.today
+  const inPrev = (s: DailySignals) => s.day != null && s.day > prevStart && s.day <= curStart
+  const cur = signals.filter(inCur)
+  const prev = signals.filter(inPrev)
+  const count = (rows: DailySignals[], pred: (s: DailySignals) => boolean) =>
+    rows.filter(pred).length
+
+  const trained = (s: DailySignals) => s.trained === true
+  const logged = (s: DailySignals) => (s.meal_count ?? 0) > 0
+  const inDeficit = (s: DailySignals) => isDeficitDay(s.calories, ctx.calorieTarget)
+  const proteinMet = (s: DailySignals) =>
+    ctx.proteinTarget != null && s.protein_g != null && s.protein_g >= ctx.proteinTarget
+
+  const metrics: (MetricComparison | null)[] = [
+    mkComparison('workouts', count(cur, trained), count(prev, trained)),
+    ctx.proteinTarget != null
+      ? mkComparison('protein', count(cur, proteinMet), count(prev, proteinMet))
+      : null,
+    ctx.calorieTarget != null
+      ? mkComparison('deficit', count(cur, inDeficit), count(prev, inDeficit))
+      : null,
+    mkComparison('logging', count(cur, logged), count(prev, logged)),
+    weightComparison(measurements, ctx.today, win),
+  ]
+
+  return { windowDays: win, metrics: metrics.filter((x): x is MetricComparison => x != null) }
 }
