@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { colors, radius, typography } from '@/theme'
 
 import { fetchMonthChatTurn } from '../ai-voice'
+import { makeTranscript, useFindingTranscript } from '../chat-transcript'
 import type { Finding, FindingCategory } from '../findings'
 import { ChatAurora } from './ChatAurora'
 import { StelarStar } from './MonthChatView'
@@ -31,6 +32,9 @@ type Phase = 'opening' | 'reply1' | 'reply2' | 'meta' | 'closing'
 
 type Props = {
   finding: Finding
+  /** Usuario actual: scopea el transcript cacheado (nunca cruza cuentas). null =
+   *  no se persiste (sesión sin usuario). */
+  uid: string | null
   periodStart: string
   periodEnd: string
   findingsHash: string
@@ -101,6 +105,7 @@ function fallbackFor(label: string, finding: Finding): string {
 
 export function FindingChatView({
   finding,
+  uid,
   periodStart,
   periodEnd,
   findingsHash,
@@ -124,8 +129,14 @@ export function FindingChatView({
   const [focus, setFocus] = useState<string | null>(null)
   const [openDays, setOpenDays] = useState(false)
   const [bandW, setBandW] = useState(0)
+  // ¿La conversación se rehidrató del cache (ya visitada)? Entonces aparece
+  // INSTANTÁNEA: sin aurora, sin typing, sin animar cada burbuja de nuevo.
+  const [restored, setRestored] = useState(false)
   const pathRef = useRef<string[]>([])
   const mounted = useRef(true)
+
+  // Persistencia del transcript renderizado (rehidrata al reabrir SIN red).
+  const { read, save } = useFindingTranscript(uid, finding.id, findingsHash)
 
   const onBand = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width
@@ -173,9 +184,28 @@ export function FindingChatView({
     setPending(false)
   }
 
-  // Arranca (y reinicia al cambiar de hallazgo; el key del padre remonta).
+  // Arranca (y reinicia al cambiar de hallazgo o de datos; el key del padre
+  // remonta). Si ya visitaste este chat con estos mismos datos, se REHIDRATA del
+  // cache al instante (cero red); si no, corre el flujo normal con IA.
   useEffect(() => {
     mounted.current = true
+    const cached = read()
+    if (cached) {
+      // Rehidratación: pinta la conversación ya generada, sin volver a pedirla.
+      setLog(cached.log)
+      setChips(cached.chips)
+      setPhase(cached.phase)
+      setMetaAnswer(cached.metaAnswer)
+      setFocus(cached.focus)
+      setOpenDays(false)
+      pathRef.current = cached.path
+      setPending(false)
+      setRestored(true)
+      return () => {
+        mounted.current = false
+      }
+    }
+    setRestored(false)
     setLog([])
     setChips([])
     setPending(true)
@@ -192,10 +222,29 @@ export function FindingChatView({
       mounted.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finding.id])
+  }, [finding.id, findingsHash])
+
+  // Persiste el transcript cuando un turno ATERRIZÓ completo (pending=false). El
+  // guard `pending` evita guardar algo a medio generar. No reescribe justo tras
+  // rehidratar (`restored`): eso lo reactiva la primera interacción nueva.
+  useEffect(() => {
+    if (pending || restored || log.length === 0) return
+    save(
+      makeTranscript({
+        log,
+        chips,
+        phase,
+        focus,
+        metaAnswer,
+        path: pathRef.current,
+      }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, restored, log, chips, phase, focus, metaAnswer])
 
   // Chip elegido en un turno de IA — SIEMPRE recibe una respuesta de la IA.
   const onChip = async (label: string) => {
+    setRestored(false) // interacción nueva: reactiva animaciones + persistencia
     setLog((l) => [...l, { who: 'user', label }])
     pathRef.current = [...pathRef.current, label]
     setChips([])
@@ -227,6 +276,7 @@ export function FindingChatView({
 
   // Metacognición (solo hero): se guarda para la continuidad entre meses.
   const onMeta = async (option: { label: string; answer: string }) => {
+    setRestored(false) // interacción nueva: reactiva animaciones + persistencia
     onSaveReflection(finding.reflectionKey, option.answer)
     setMetaAnswer(option.answer)
     setLog((l) => [...l, { who: 'user', label: option.label }])
@@ -245,11 +295,16 @@ export function FindingChatView({
     <View style={styles.wrap} onLayout={onBand}>
       {log.map((e, i) =>
         e.who === 'stelar' ? (
-          <Animated.View key={i} entering={FadeInDown.duration(340).springify().damping(18)}>
+          // Al rehidratar (restored) NO se anima: la conversación ya vivida
+          // aparece de golpe, no "se escribe" otra vez.
+          <Animated.View
+            key={i}
+            entering={restored ? undefined : FadeInDown.duration(340).springify().damping(18)}
+          >
             <StelarBubble text={e.text} voice={e.voice} />
           </Animated.View>
         ) : (
-          <Animated.View key={i} entering={FadeIn.duration(220)}>
+          <Animated.View key={i} entering={restored ? undefined : FadeIn.duration(220)}>
             <UserChip label={e.label} />
           </Animated.View>
         ),

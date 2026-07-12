@@ -21,9 +21,15 @@ import { StelarStar } from './MonthChatView'
 type Props = {
   finding: Finding
   onExplore: () => void
+  /** Ya abriste la conversación de este hallazgo (hay transcript guardado). El
+   *  CTA deja de INVITAR ("hablémoslo") y ofrece RETOMAR lo ya hablado: pedir
+   *  charlar de nuevo, cuando ya lo hiciste, se sentía a que Stelar no recuerda. */
+  talked?: boolean
 }
 
-export function MonthDiscovery({ finding, onExplore }: Props) {
+export function MonthDiscovery({ finding, onExplore, talked = false }: Props) {
+  // Ya hablado → retomar la charla guardada (se rehidrata al instante), no invitar.
+  const ctaLabel = talked ? 'Retomar con Stelar' : 'Hablémoslo con Stelar'
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>Este mes encontré algo</Text>
@@ -31,16 +37,16 @@ export function MonthDiscovery({ finding, onExplore }: Props) {
       <Text style={styles.lead}>{finding.phrase.lead}</Text>
       {/* La evidencia con números — claridad gratis, sin abrir nada. */}
       {finding.phrase.support ? <Text style={styles.support}>{finding.phrase.support}</Text> : null}
-      {/* CTA como CONVERSACIÓN (no acción): el ✦ es la voz de Stelar; "hablémoslo"
-          invita a charlar sobre el hallazgo, no a "guardar/empezar" algo. */}
+      {/* CTA como CONVERSACIÓN (no acción): el ✦ es la voz de Stelar. Invita la
+          primera vez ("hablémoslo"); una vez hablado, RETOMA (Stelar recuerda). */}
       <Pressable
         style={styles.cta}
         onPress={onExplore}
         accessibilityRole="button"
-        accessibilityLabel="Hablémoslo con Stelar"
+        accessibilityLabel={ctaLabel}
       >
         <StelarStar size={16} />
-        <Text style={styles.ctaText}>Hablémoslo con Stelar</Text>
+        <Text style={styles.ctaText}>{ctaLabel}</Text>
       </Pressable>
 
       {/* La PALANCA que armó el motor (accionable y específica, no una observación).

@@ -80,6 +80,7 @@ export function MonthChatSheet({
   const { progress } = useTransformProgress()
   const { session } = useSession()
   const aiOn = aiEnabledForEmail(session?.user?.email)
+  const uid = session?.user?.id ?? null
   const open = finding != null
   const translateY = useSharedValue(0)
 
@@ -159,6 +160,7 @@ export function MonthChatSheet({
                 <FindingChatView
                   key={finding.id}
                   finding={finding}
+                  uid={uid}
                   periodStart={periodStart}
                   periodEnd={periodEnd}
                   findingsHash={findingsHash}

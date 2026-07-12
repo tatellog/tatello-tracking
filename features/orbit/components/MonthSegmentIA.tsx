@@ -15,6 +15,7 @@ import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
+import { useFindingTranscript } from '../chat-transcript'
 import { type Finding, hashFindings } from '../findings'
 import { useKeepFoco, useKeptFocos } from '../focos'
 import { useSignalsHistory } from '../hooks'
@@ -160,6 +161,16 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
   const localHash = useMemo(() => hashFindings(chat.cards), [chat.cards])
   const findingsHash = source?.findingsHash ?? localHash
   const monthKey = `${month}-01`
+
+  // ¿Ya conversaste este hallazgo? Si hay transcript guardado (mismo hash), el
+  // CTA de la discovery pasa de invitar a RETOMAR. Se re-lee al cerrar el chat
+  // (setOpenFinding(null) re-renderiza) y en cada arranque (persistido 24 h).
+  const { read: readMainTranscript } = useFindingTranscript(
+    uid,
+    mainFinding?.id ?? '',
+    findingsHash,
+  )
+  const talkedToMain = mainFinding != null && readMainTranscript() != null
   const factTitle = openFinding
     ? openFinding.subject.charAt(0).toUpperCase() + openFinding.subject.slice(1)
     : ''
@@ -239,7 +250,11 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           la usuaria opera). El motor detecta; la IA comunica. ── */}
       {mainFinding ? (
         <View style={styles.antesala}>
-          <MonthDiscovery finding={mainFinding} onExplore={() => setOpenFinding(mainFinding)} />
+          <MonthDiscovery
+            finding={mainFinding}
+            talked={talkedToMain}
+            onExplore={() => setOpenFinding(mainFinding)}
+          />
         </View>
       ) : chat.reason ? (
         // Estado vacío HONESTO cuando aún no hay un hallazgo que conversar.

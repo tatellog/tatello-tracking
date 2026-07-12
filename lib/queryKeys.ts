@@ -128,6 +128,17 @@ export const queryKeys = {
     // Voz de IA de Órbita Mes, cacheada POR HALLAZGO: la key lleva el hash de
     // los hallazgos → si no cambian, React Query no re-pide (cero red).
     aiMonthVoice: (uid: string, hash: string) => ['orbit', 'aiVoice', 'month', uid, hash] as const,
+    // Transcript RENDERIZADO del chat guiado de UN hallazgo, cacheado en cliente
+    // para rehidratar al reabrir SIN red (se lee con getQueryData, sin queryFn).
+    // `findingsHash` bustea al cambiar los datos del mes; `promptVersion` (espejo
+    // del edge) bustea al subir el prompt. Bajo 'aiVoice' → una invalidación de la
+    // voz también lo limpia. Persiste 24 h (gcTime) y se limpia por cambio de user.
+    aiChatTranscript: (
+      uid: string,
+      findingId: string,
+      findingsHash: string,
+      promptVersion: string,
+    ) => ['orbit', 'aiVoice', 'chat', uid, findingId, findingsHash, promptVersion] as const,
     // Foco redactado por IA de un experimento (R5), cacheado por su id.
     aiExperiment: (uid: string, key: string) =>
       ['orbit', 'aiVoice', 'experiment', uid, key] as const,
