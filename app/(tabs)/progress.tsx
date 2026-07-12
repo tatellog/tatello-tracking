@@ -21,9 +21,11 @@ import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
+import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
+import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
@@ -58,6 +60,43 @@ const PERIOD_LABEL: Record<Period, string> = {
   ALL: 'Todo',
 }
 
+// Los dos segmentos de Progress (Epic 01): Historia (¿qué cambió en mis hábitos?)
+// y Body (¿qué cambió en mi cuerpo?, Epic 02 lo llena). Como Órbita Día/Semana/Mes.
+type ProgressSegment = 'historia' | 'body'
+
+/** Switcher Historia | Body — píldora de dos segmentos (mismo lenguaje que el
+ *  selector de periodo del peso). */
+function SegmentSwitcher({
+  value,
+  onChange,
+}: {
+  value: ProgressSegment
+  onChange: (s: ProgressSegment) => void
+}) {
+  const segs: { key: ProgressSegment; label: string }[] = [
+    { key: 'historia', label: 'Historia' },
+    { key: 'body', label: 'Body' },
+  ]
+  return (
+    <View style={styles.segmentPill}>
+      {segs.map((s) => {
+        const on = s.key === value
+        return (
+          <Pressable
+            key={s.key}
+            onPress={() => onChange(s.key)}
+            style={[styles.segmentSeg, on && styles.segmentSegOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+          >
+            <Text style={[styles.segmentLabel, on && styles.segmentLabelOn]}>{s.label}</Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
 // 4-point star — the shared glyph; here it marks the trajectory origin.
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
@@ -79,7 +118,13 @@ function ProgressBody() {
     }, []),
   )
   const router = useRouter()
+  const [segment, setSegment] = useState<ProgressSegment>('historia')
   const [period, setPeriod] = useState<Period>('30D')
+
+  const goBody = () => {
+    track(PROGRESS_EVENTS.body)
+    setSegment('body')
+  }
   const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
   const { data: profile } = useProfile()
 
@@ -125,181 +170,200 @@ function ProgressBody() {
             <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
 
-          {/* Hero — "Tu Historia": evidencia de transformación (Antes → Ahora)
-              en 5 métricas. Responde "¿qué ha cambiado desde que empecé?" antes
-              que nada. Reemplaza a Movimiento como primer elemento. */}
-          <TuHistoria />
+          <SegmentSwitcher value={segment} onChange={setSegment} />
 
-          {/* Síntesis — resultado → causa → qué intentar, la respuesta a
+          {segment === 'historia' ? (
+            <>
+              {/* Hero — "Tu Historia": transformación antes/ahora (coexiste con el
+                  Hero 30v30 · decisión de la dueña). */}
+              <TuHistoria />
+
+              {/* Hero 30v30 — "¿cómo cambiaron mis hábitos?" (Epic 01), driven por
+                  el Comparison Engine puro. */}
+              <View style={styles.divider} />
+              <ComparativaCard />
+
+              {/* Síntesis — resultado → causa → qué intentar, la respuesta a
               "¿está funcionando?" en el primer screenful (feedback beta).
               Absorbe la vieja ReadingCard + la línea déficit↔báscula; es el
               ÚNICO link saliente del tab (cuarto, no pasillo). La card del
               emblema se retiró de Progreso: su % junto a la báscula se leía
               como "% de mi meta de peso" (anti-patrón del manifiesto por
               contexto); el emblema vive en Hoy y en Órbita Mes. */}
-          <View style={styles.divider} />
-          <SynthesisCard />
+              <View style={styles.divider} />
+              <SynthesisCard />
 
-          {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
+              {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
               ahora en grande, con modo "Comparar" (slider de arrastrar).
               Responde "¿realmente cambio?". */}
-          <View style={styles.divider} />
-          <BeforeAfterPhotos />
+              <View style={styles.divider} />
+              <BeforeAfterPhotos />
 
-          {/* ── Tu cuerpo — weight + measurements. Demoted out of the
-              hero: one section among several, an outcome shown
-              calmly. The giant opening delta is gone; the number is
-              section-sized now. ── */}
-          <View style={styles.divider} />
-          <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
-            Tu cuerpo
-          </EyebrowLabel>
-          {hasFocus && !focusIsWeight ? (
-            <Text style={styles.focusNote}>
-              Tu enfoque este mes no es el peso. Esto es solo una referencia, sin metas.
-            </Text>
-          ) : hasTrajectory ? (
-            <Text style={styles.patientSub}>
-              El cuerpo cambia despacio. Mira la tendencia, no el número del día.
-            </Text>
-          ) : null}
-          {hasTrajectory ? (
-            <>
-              <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.weightHead}>
-                {/* Peso ACTUAL — calmo, no gigante: un indicador más, no la
-                    meta. El cambio total va como chip, la tendencia en la
-                    gráfica. */}
-                <View>
-                  <Text style={styles.weightLabel}>Peso actual</Text>
-                  <View style={styles.weightNowRow}>
-                    <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
-                    <Text style={styles.weightUnit}>kg</Text>
-                  </View>
-                </View>
-                {delta ? (
-                  <View style={styles.deltaChip}>
-                    <Text style={styles.deltaChipLabel}>Cambio total</Text>
-                    <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
-                  </View>
-                ) : null}
-              </Animated.View>
+              {/* CTA a Body — el cuerpo vive en su propio segmento (Epic 02). */}
+              <View style={styles.divider} />
+              <PrimaryCta label="Ver mi cuerpo →" onPress={goBody} />
 
-              {/* Comparación temporal — antes → ahora en el periodo elegido. */}
-              {first && last ? (
-                <Text style={styles.comparison}>
-                  <Text style={styles.compFrom}>{first.weight.toFixed(1)}</Text>
-                  <Text style={styles.compArrow}>{'  →  '}</Text>
-                  <Text style={styles.compTo}>{last.weight.toFixed(1)} kg</Text>
-                  <Text
-                    style={styles.compPeriod}
-                  >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
-                </Text>
-              ) : null}
-
-              {/* Period filter — only meaningful once there are 2+ marks. */}
-              <Animated.View entering={FadeIn.duration(320).delay(160)} style={styles.periodPill}>
-                {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
-                  const on = p === period
-                  return (
-                    <Pressable
-                      key={p}
-                      onPress={() => setPeriod(p)}
-                      style={[styles.periodSeg, on && styles.periodSegOn]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
-                    >
-                      <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
-                        {PERIOD_LABEL[p]}
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-              </Animated.View>
-
-              <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartSection}>
-                {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
-                    plan con fecha): cuando la realidad cambia, la línea cambia
-                    sin que nadie "incumpla". */}
-                <Text style={styles.chartCaption}>
-                  {count} mediciones · media de 7 días
-                  {trend ? ' · la punteada sigue tu ritmo real' : ''}
-                </Text>
-                <TrajectoryChart points={smoothed} trend={trend} />
-              </Animated.View>
-
-              {/* Cycle context — weight genuinely shifts with the
-                  cycle's water balance; the chart says so, so a
-                  luteal bump isn't read as a setback. */}
-              {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
-                <Animated.View entering={FadeIn.duration(360).delay(290)}>
-                  <Text style={styles.cycleNote}>
-                    {cycle.phase === 'lutea'
-                      ? 'La semana antes de tu período el cuerpo retiene agua. Lo que ves en la balanza no es lo que eres.'
-                      : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
-                  </Text>
-                </Animated.View>
-              ) : null}
-
-              {trend ? (
-                <Animated.View entering={FadeIn.duration(360).delay(320)}>
-                  <CoachLine text={formatTrendCopy(trend)} />
-                </Animated.View>
-              ) : null}
+              <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
             </>
           ) : (
-            <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.heroEmpty}>
-              {count === 1 && first ? (
-                <View style={styles.firstWeightRow}>
-                  <Text style={styles.firstWeightNum}>{first.weight.toFixed(1)}</Text>
-                  <Text style={styles.firstWeightUnit}>kg</Text>
-                </View>
-              ) : (
-                <Text style={styles.heroEmptyTitle}>
-                  Tu primera marca pone una estrella en el cielo.
+            <>
+              {/* ── Body: Tu cuerpo — peso + medidas + ciclo. Epic 02 agrega
+                  composición corporal y el comparador de fechas. ── */}
+              <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
+                Tu cuerpo
+              </EyebrowLabel>
+              {hasFocus && !focusIsWeight ? (
+                <Text style={styles.focusNote}>
+                  Tu enfoque este mes no es el peso. Esto es solo una referencia, sin metas.
                 </Text>
+              ) : hasTrajectory ? (
+                <Text style={styles.patientSub}>
+                  El cuerpo cambia despacio. Mira la tendencia, no el número del día.
+                </Text>
+              ) : null}
+              {hasTrajectory ? (
+                <>
+                  <Animated.View
+                    entering={FadeIn.duration(360).delay(80)}
+                    style={styles.weightHead}
+                  >
+                    {/* Peso ACTUAL — calmo, no gigante: un indicador más, no la
+                    meta. El cambio total va como chip, la tendencia en la
+                    gráfica. */}
+                    <View>
+                      <Text style={styles.weightLabel}>Peso actual</Text>
+                      <View style={styles.weightNowRow}>
+                        <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
+                        <Text style={styles.weightUnit}>kg</Text>
+                      </View>
+                    </View>
+                    {delta ? (
+                      <View style={styles.deltaChip}>
+                        <Text style={styles.deltaChipLabel}>Cambio total</Text>
+                        <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
+                      </View>
+                    ) : null}
+                  </Animated.View>
+
+                  {/* Comparación temporal — antes → ahora en el periodo elegido. */}
+                  {first && last ? (
+                    <Text style={styles.comparison}>
+                      <Text style={styles.compFrom}>{first.weight.toFixed(1)}</Text>
+                      <Text style={styles.compArrow}>{'  →  '}</Text>
+                      <Text style={styles.compTo}>{last.weight.toFixed(1)} kg</Text>
+                      <Text
+                        style={styles.compPeriod}
+                      >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
+                    </Text>
+                  ) : null}
+
+                  {/* Period filter — only meaningful once there are 2+ marks. */}
+                  <Animated.View
+                    entering={FadeIn.duration(320).delay(160)}
+                    style={styles.periodPill}
+                  >
+                    {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
+                      const on = p === period
+                      return (
+                        <Pressable
+                          key={p}
+                          onPress={() => setPeriod(p)}
+                          style={[styles.periodSeg, on && styles.periodSegOn]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                        >
+                          <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
+                            {PERIOD_LABEL[p]}
+                          </Text>
+                        </Pressable>
+                      )
+                    })}
+                  </Animated.View>
+
+                  <Animated.View
+                    entering={FadeIn.duration(360).delay(240)}
+                    style={styles.chartSection}
+                  >
+                    {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
+                    plan con fecha): cuando la realidad cambia, la línea cambia
+                    sin que nadie "incumpla". */}
+                    <Text style={styles.chartCaption}>
+                      {count} mediciones · media de 7 días
+                      {trend ? ' · la punteada sigue tu ritmo real' : ''}
+                    </Text>
+                    <TrajectoryChart points={smoothed} trend={trend} />
+                  </Animated.View>
+
+                  {/* Cycle context — weight genuinely shifts with the
+                  cycle's water balance; the chart says so, so a
+                  luteal bump isn't read as a setback. */}
+                  {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
+                    <Animated.View entering={FadeIn.duration(360).delay(290)}>
+                      <Text style={styles.cycleNote}>
+                        {cycle.phase === 'lutea'
+                          ? 'La semana antes de tu período el cuerpo retiene agua. Lo que ves en la balanza no es lo que eres.'
+                          : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
+                      </Text>
+                    </Animated.View>
+                  ) : null}
+
+                  {trend ? (
+                    <Animated.View entering={FadeIn.duration(360).delay(320)}>
+                      <CoachLine text={formatTrendCopy(trend)} />
+                    </Animated.View>
+                  ) : null}
+                </>
+              ) : (
+                <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.heroEmpty}>
+                  {count === 1 && first ? (
+                    <View style={styles.firstWeightRow}>
+                      <Text style={styles.firstWeightNum}>{first.weight.toFixed(1)}</Text>
+                      <Text style={styles.firstWeightUnit}>kg</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.heroEmptyTitle}>
+                      Tu primera marca pone una estrella en el cielo.
+                    </Text>
+                  )}
+
+                  <Text style={styles.heroEmptyHint}>
+                    {count === 0
+                      ? 'Marca tu peso para empezar a trazar tu trayectoria.'
+                      : 'Una segunda marca traza tu trayectoria.'}
+                  </Text>
+
+                  <View style={styles.heroCtaWrap}>
+                    <PrimaryCta
+                      label={count === 0 ? 'Marcar mi peso →' : 'Pesarme de nuevo →'}
+                      onPress={goLogMeasurement}
+                    />
+                  </View>
+                </Animated.View>
               )}
 
-              <Text style={styles.heroEmptyHint}>
-                {count === 0
-                  ? 'Marca tu peso para empezar a trazar tu trayectoria.'
-                  : 'Una segunda marca traza tu trayectoria.'}
-              </Text>
+              {/* (Comparativa 30 días se reemplazó por el hero "Tu Historia".) */}
 
-              <View style={styles.heroCtaWrap}>
-                <PrimaryCta
-                  label={count === 0 ? 'Marcar mi peso →' : 'Pesarme de nuevo →'}
-                  onPress={goLogMeasurement}
-                />
-              </View>
-            </Animated.View>
-          )}
-
-          {/* (Comparativa 30 días se reemplazó por el hero "Tu Historia".) */}
-
-          {/* ── Ciclo — solo si el perfil tiene ciclo activo (nunca hombres).
+              {/* ── Ciclo — solo si el perfil tiene ciclo activo (nunca hombres).
               El divisor se gatea junto a la card para no dejar una línea
               huérfana cuando CycleCard no se renderiza. ── */}
-          {cycleEnabled ? (
-            <>
-              <View style={styles.divider} />
-              <CycleCard />
-            </>
-          ) : null}
+              {cycleEnabled ? (
+                <>
+                  <View style={styles.divider} />
+                  <CycleCard />
+                </>
+              ) : null}
 
-          {/* ("Tu cambio visual" se movió arriba, bajo "Tu Historia".) */}
+              {/* ("Tu cambio visual" se movió arriba, bajo "Tu Historia".) */}
 
-          {/* Bottom CTA — only once the user already has a trajectory;
+              {/* Bottom CTA — only once the user already has a trajectory;
               the empty / first-weight states carry their own CTA. */}
-          {hasTrajectory ? (
-            <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
-              <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
-            </Animated.View>
-          ) : null}
-
-          {/* La coda del cuarto — lo único que se rescató de la card del
-              emblema (feedback beta: "esa frase me cuida; pero es una frase,
-              no una card"). Cierra el tab quitando el miedo a la mala semana. */}
-          <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
+              {hasTrajectory ? (
+                <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
+                  <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
+                </Animated.View>
+              ) : null}
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -684,6 +748,32 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
+  // Switcher Historia | Body — píldora de dos segmentos bajo el header.
+  segmentPill: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgCard2,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    borderRadius: 22,
+    padding: 4,
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  segmentSeg: {
+    flex: 1,
+    height: 38,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentSegOn: { backgroundColor: colors.magentaTint2 },
+  segmentLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.4,
+  },
+  segmentLabelOn: { color: colors.magentaHot },
   // Stadium pill — mirrors the quick-log meal-slot selector.
   periodPill: {
     flexDirection: 'row',
