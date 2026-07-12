@@ -28,6 +28,7 @@ import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
+import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
 import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
 import { useMeasurements } from '@/features/progress/hooks'
 import {
@@ -185,6 +186,10 @@ function ProgressBody() {
                   el Comparison Engine puro. */}
               <View style={styles.divider} />
               <ComparativaCard />
+
+              {/* Insight principal + chat guiado (Epic 04). Doble-gateado (flag +
+                  dev) y auto-oculto sin insights — trae su propio divisor. */}
+              <ProgressInsightCard />
 
               {/* Síntesis — resultado → causa → qué intentar, la respuesta a
               "¿está funcionando?" en el primer screenful (feedback beta).

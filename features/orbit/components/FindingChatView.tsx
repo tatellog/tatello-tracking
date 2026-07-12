@@ -43,6 +43,9 @@ type Props = {
   askMetacognition: boolean
   /** ¿Quedan hallazgos sin ver? Decide el botón de cierre (otro vs terminar). */
   hasMore: boolean
+  /** Label del cierre cuando NO hay más hallazgos. Default Órbita Mes; Progress
+   *  (Epic 04) pasa el suyo ("Ver mi progreso"). */
+  closeLabel?: string
   onSaveReflection: (questionKey: string, answer: string) => void
   /** "Me lo quedo presente": guarda la palanca concreta del cierre como foco. */
   onKeepFoco?: (foco: string) => void
@@ -111,6 +114,7 @@ export function FindingChatView({
   findingsHash,
   askMetacognition,
   hasMore,
+  closeLabel = 'Ver mi mes completo',
   onSaveReflection,
   onKeepFoco,
   kept,
@@ -413,7 +417,7 @@ export function FindingChatView({
           {hasMore ? (
             <ChoiceChip label="Ver otro hallazgo" tint={tint} primary onPress={onNext} />
           ) : (
-            <ChoiceChip label="Ver mi mes completo" tint={tint} primary onPress={onFinish} />
+            <ChoiceChip label={closeLabel} tint={tint} primary onPress={onFinish} />
           )}
         </Animated.View>
       ) : null}

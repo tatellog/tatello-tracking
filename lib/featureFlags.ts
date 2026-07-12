@@ -86,5 +86,7 @@ export const PATTERN_MEMORY_ENABLED = true
 export const PROGRESS_HISTORY_ENABLED = true
 export const PROGRESS_BODY_ENABLED = true
 export const PROGRESS_AI_ENABLED = false
-export const PROGRESS_CHAT_ENABLED = false
+// ON pero DOBLE-gateado: el chat de insights además exige aiEnabledForEmail
+// (dev) — la beta no lo ve hasta validar (mismo patrón que Órbita Mes IA).
+export const PROGRESS_CHAT_ENABLED = true
 export const PROGRESS_META_ENABLED = false

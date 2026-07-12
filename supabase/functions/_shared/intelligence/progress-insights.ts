@@ -128,7 +128,10 @@ function detectRecomposition(input: ProgressInsightInput): ProgressInsight | nul
   const confidence = Math.min(90, 60 + fat.length * 5 + Math.round(Math.abs(fatDelta) * 5))
   return {
     id: 'recomposition',
-    subject: 'tu composición',
+    // El subject lleva las palabras ancla ('peso','grasa'): el backstop del chat
+    // (chatAnchored) exige que la IA nombre algo del subject — y de esto va a
+    // hablar en esos términos, no diciendo "composición".
+    subject: 'tu peso y tu grasa',
     lead: 'Tu peso casi no se movió, pero tu grasa sí bajó. Ese cambio la báscula sola no lo cuenta.',
     support: `Peso ${fmtKg(wFirst.kg)} → ${fmtKg(wLast.kg)} · grasa ${fFirst.fatPct.toFixed(1)}% → ${fLast.fatPct.toFixed(1)}% en ${weeks} semanas.`,
     contrast: null,
