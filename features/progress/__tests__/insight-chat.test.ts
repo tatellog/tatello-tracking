@@ -33,6 +33,22 @@ describe('insightToFinding — el adaptador al chat de Órbita (Epic 04)', () =>
     expect(insightToFinding(insight).reflectionKey).toBe('progress:recomposition')
   })
 
+  it('metacognición (Epic 05): pregunta + opciones GUIADAS, cada una con reply', () => {
+    const m = insightToFinding(insight).metacognition
+    expect(m.question).toBe('¿Esperabas este cambio?')
+    expect(m.options.length).toBeGreaterThanOrEqual(2) // guiadas, nunca input libre
+    for (const o of m.options) {
+      expect(m.replies[o.answer]).toBeTruthy() // toda elección recibe respuesta
+    }
+  })
+
+  it('las replies reflexionan, no aconsejan ni diagnostican (manifiesto)', () => {
+    const m = insightToFinding(insight).metacognition
+    for (const reply of Object.values(m.replies)) {
+      expect(reply).not.toMatch(/debes|deber[ií]as|intenta|come |duerme|culpa|trastorno/i)
+    }
+  })
+
   it('contrast null → undefined (contrato del Finding)', () => {
     expect(insightToFinding({ ...insight, contrast: null }).contrast).toBeUndefined()
     expect(insightToFinding({ ...insight, contrast: 'el otro lado' }).contrast).toBe('el otro lado')

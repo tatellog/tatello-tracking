@@ -6,6 +6,7 @@ import { useFindingTranscript } from '@/features/orbit/chat-transcript'
 import type { Finding } from '@/features/orbit/findings'
 import { MonthChatSheet } from '@/features/orbit/components/MonthChatSheet'
 import { StelarStar } from '@/features/orbit/components/MonthChatView'
+import { useSaveReflection } from '@/features/orbit/reflections'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
 import { aiEnabledForEmail, PROGRESS_CHAT_ENABLED } from '@/lib/featureFlags'
@@ -59,9 +60,13 @@ export function ProgressInsightCard() {
   const { read } = useFindingTranscript(uid, main?.id ?? '', hash)
   const talked = main != null && read() != null
 
-  if (!aiOn || !main || !finding) return null
-
   const today = todayInTimezone()
+  // Epic 05 · la respuesta de metacognición se persiste en month_reflections
+  // (clave `progress:<insightId>`) — memoria para futuras conversaciones. No
+  // modifica el insight (inmutable).
+  const saveReflection = useSaveReflection(today.slice(0, 7))
+
+  if (!aiOn || !main || !finding) return null
   const ctaLabel = talked ? 'Retomar con Stelar' : 'Hablémoslo con Stelar'
 
   return (
@@ -94,9 +99,9 @@ export function ProgressInsightCard() {
         periodStart={shiftIso(today, -CHAT_WINDOW_DAYS)}
         periodEnd={today}
         findingsHash={hash}
-        askMetacognition={false}
+        askMetacognition
         hasMore={false}
-        onSaveReflection={() => {}}
+        onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
         onNext={() => setOpen(false)}
         onClose={() => setOpen(false)}
       />

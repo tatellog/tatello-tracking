@@ -16,9 +16,31 @@ import type { Finding } from '@/features/orbit/findings'
 
 import type { ProgressInsight } from './insights'
 
+/*
+ * Epic 05 · Metacognition — la pregunta que cierra el chat de un insight.
+ * SIEMPRE guiada (opciones, nunca input libre), respuestas determinísticas
+ * (aquí la IA ni adapta: cero interpretación). Reflexión, no consejo ni
+ * diagnóstico. Se persiste en month_reflections con la clave namespaced
+ * `progress:<insightId>` (no modifica el insight; es memoria para futuras
+ * conversaciones · R6).
+ */
+const PROGRESS_METACOGNITION = {
+  question: '¿Esperabas este cambio?',
+  options: [
+    { label: 'Sí, lo venía sintiendo', answer: 'expected' },
+    { label: 'No, me sorprende', answer: 'surprised' },
+    { label: 'No sabía qué esperar', answer: 'unsure' },
+  ],
+  replies: {
+    expected: 'Tu intuición y tus registros dicen lo mismo. Eso es conocerte.',
+    surprised: 'Para eso miras tus datos: ven lo que el día a día esconde.',
+    unsure: 'Ahora tienes una referencia real de ti. Ese es el punto de partida.',
+  },
+} as const
+
 /** Viste un insight de Progress como Finding para el chat guiado. Los campos
- *  que el chat no usa en Progress (metacognición apagada, sin palanca, sin
- *  días de evidencia) van vacíos a propósito — no inventamos contenido. */
+ *  que el chat no usa en Progress (sin palanca, sin días de evidencia) van
+ *  vacíos a propósito — no inventamos contenido. */
 export function insightToFinding(insight: ProgressInsight): Finding {
   return {
     id: insight.id,
@@ -44,7 +66,11 @@ export function insightToFinding(insight: ProgressInsight): Finding {
     evidenceTitle: '¿Por qué encontré esto?',
     charts: [],
     reflectionKey: `progress:${insight.id}`,
-    metacognition: { question: '', options: [], replies: {} },
+    metacognition: {
+      question: PROGRESS_METACOGNITION.question,
+      options: [...PROGRESS_METACOGNITION.options],
+      replies: { ...PROGRESS_METACOGNITION.replies },
+    },
     followUps: [],
   }
 }
