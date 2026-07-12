@@ -2,10 +2,13 @@ import { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
+import { useRouter } from 'expo-router'
+
 import { useFindingTranscript } from '@/features/orbit/chat-transcript'
 import type { Finding } from '@/features/orbit/findings'
 import { MonthChatSheet } from '@/features/orbit/components/MonthChatSheet'
 import { StelarStar } from '@/features/orbit/components/MonthChatView'
+import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useSaveReflection } from '@/features/orbit/reflections'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
@@ -65,9 +68,17 @@ export function ProgressInsightCard() {
   // (clave `progress:<insightId>`) — memoria para futuras conversaciones. No
   // modifica el insight (inmutable).
   const saveReflection = useSaveReflection(today.slice(0, 7))
+  const router = useRouter()
 
   if (!aiOn || !main || !finding) return null
   const ctaLabel = talked ? 'Retomar con Stelar' : 'Hablémoslo con Stelar'
+  // Epic 06 · el puente explícito al PORQUÉ: Progress muestra qué cambió; el
+  // comportamiento que lo acompañó vive en Órbita. Un link, no un duplicado.
+  const goOrbita = () => {
+    track(PROGRESS_EVENTS.openOrbita, { from: 'insight', id: main.id })
+    requestOrbitSegment('mes')
+    router.push('/orbit')
+  }
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(100)}>
@@ -88,6 +99,16 @@ export function ProgressInsightCard() {
       >
         <StelarStar size={16} />
         <Text style={styles.ctaText}>{ctaLabel}</Text>
+      </Pressable>
+
+      {/* El puente al porqué — link callado, no otra card. */}
+      <Pressable
+        onPress={goOrbita}
+        accessibilityRole="link"
+        accessibilityLabel="Entender el porqué en Órbita"
+        style={({ pressed }) => [styles.bridge, pressed && styles.bridgePressed]}
+      >
+        <Text style={styles.bridgeText}>El porqué vive en Órbita →</Text>
       </Pressable>
 
       <MonthChatSheet
@@ -151,5 +172,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
     color: colors.magentaHot,
+  },
+  bridge: { marginTop: 12, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
+  bridgePressed: { opacity: 0.6 },
+  bridgeText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
 })

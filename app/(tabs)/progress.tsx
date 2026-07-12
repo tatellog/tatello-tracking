@@ -211,6 +211,21 @@ function ProgressBody() {
               <View style={styles.divider} />
               <PrimaryCta label="Ver mi cuerpo →" onPress={goBody} />
 
+              {/* Epic 06 · puente al calendario: ver (y editar) los días detrás
+                  de estos números. "Tu constancia" ya trae DayHistorySheet →
+                  "Editar día" → Hoy; aquí solo la puerta, sin duplicar nada. */}
+              <Pressable
+                onPress={() => {
+                  track(PROGRESS_EVENTS.openCalendar)
+                  router.navigate('/movement-calendar')
+                }}
+                accessibilityRole="link"
+                accessibilityLabel="Ver tu constancia"
+                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.calendarBridgeText}>Ver los días detrás de esto →</Text>
+              </Pressable>
+
               <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
             </>
           ) : (
@@ -846,6 +861,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
+  },
+  // Puente callado al calendario (Epic 06) — link, no card.
+  calendarBridge: { marginTop: 16, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
+  calendarBridgeText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
   // Coda del tab — serif micro en niebla, mismo registro que las codas de Órbita.
   footerCoda: {

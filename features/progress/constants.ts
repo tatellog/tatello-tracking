@@ -22,6 +22,8 @@ export const PROGRESS_EVENTS = {
   cycle: 'progress_cycle',
   /** Cruzó el puente a Órbita desde Progress. */
   openOrbita: 'progress_open_orbita',
+  /** Abrió "Tu constancia" (calendario) desde Progress (Epic 06). */
+  openCalendar: 'progress_open_calendar',
   /** Abrió un insight (Epic 03/04). */
   openInsight: 'progress_open_insight',
 } as const
