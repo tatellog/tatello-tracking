@@ -393,6 +393,91 @@ function detectWeekdayDietBreak(
   }
 }
 
+/** F · EL RESCATE — qué DIMENSIÓN te sostiene el déficit. Compara tus días EN
+ *  déficit contra los que NO, y encuentra la dimensión (movimiento/agua/sueño)
+ *  presente cuando lo lograste y ausente cuando no: la palanca atada a lo que YA
+ *  te funciona ("los días que te moviste, sostuviste el déficit"). Observación
+ *  (sin causa) + un foco. NO inventa: exige muestra y una brecha real. */
+function detectRescue(signals: readonly DailySignals[], ctx: FindingsCtx): Finding | null {
+  if (ctx.calorieTarget == null) return null
+  const rows = signals.filter(
+    (s): s is DailySignals & { day: string; calories: number } =>
+      !!s.day && s.calories != null && s.calories > 0,
+  )
+  if (rows.length < 12) return null
+  const inDef = rows.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+  const outDef = rows.filter((s) => !isDeficitDay(s.calories, ctx.calorieTarget))
+  if (inDef.length < 4 || outDef.length < 4) return null
+
+  const dims = [
+    {
+      key: 'movimiento' as FindingCategory,
+      present: (s: DailySignals) => s.trained === true,
+      past: 'te moviste',
+      neg: 'no te moviste',
+      lever: 'muévete los días flojos',
+      subject: 'tus días de movimiento',
+    },
+    {
+      key: 'agua' as FindingCategory,
+      present: (s: DailySignals) => (s.water_glasses ?? 0) >= WATER_GOAL_GLASSES,
+      past: 'llegaste a tu agua',
+      neg: 'no llegaste a tu agua',
+      lever: 'cuida tu agua los días flojos',
+      subject: 'tus días con tu agua',
+    },
+    {
+      key: 'sueno' as FindingCategory,
+      present: (s: DailySignals) => (s.sleep_minutes ?? 0) >= SLEEP_ENOUGH,
+      past: 'dormiste tus 7 horas',
+      neg: 'no dormiste tus 7 horas',
+      lever: 'cuida tu descanso los días flojos',
+      subject: 'tus noches de 7 horas',
+    },
+  ]
+
+  let best: { dim: (typeof dims)[0]; inHit: number; outHit: number; gap: number } | null = null
+  for (const dim of dims) {
+    const inHit = inDef.filter(dim.present).length
+    const outHit = outDef.filter(dim.present).length
+    const rateIn = inHit / inDef.length
+    const gap = rateIn - outHit / outDef.length
+    if (rateIn < 0.5 || gap < 0.3) continue // presente en déficit, ausente fuera
+    if (!best || gap > best.gap) best = { dim, inHit, outHit, gap }
+  }
+  if (!best) return null
+
+  const { dim, inHit, outHit } = best
+  const evidenceDates = inDef
+    .filter(dim.present)
+    .map((s) => s.day)
+    .filter((d): d is string => !!d)
+
+  return {
+    id: 'rescue',
+    category: dim.key,
+    confidence: Math.round((inHit / inDef.length) * 100),
+    lever: dim.lever,
+    northLink: 'Eso es lo que te sostuvo el déficit.',
+    title: `Los días que ${dim.past}, entraste en déficit ${inHit} de ${inDef.length} veces.`,
+    subject: dim.subject,
+    phrase: {
+      lead: `Los días que ${dim.past}, sostuviste el déficit. Los que no, casi no.`,
+      support: `${inHit} de ${inDef.length} días que ${dim.past}, en déficit — contra ${outHit} de ${outDef.length} que no.`,
+      caption: 'Día a día no se nota; al juntar el mes aparece qué te sostiene.',
+    },
+    contrast: `Los días que ${dim.neg}, ${outHit} de ${outDef.length} en déficit.`,
+    explanation: 'La dimensión que separa tus días en déficit de los que no.',
+    metric: { value: `${inHit} de ${inDef.length}`, label: 'días que se sostuvieron' },
+    evidenceDates,
+    evidenceTitle: '¿Por qué encontré esto?',
+    charts: [],
+    reflectionKey: 'rescue',
+    metacognition: standardMetacognition(true),
+    followUps: [],
+  }
+}
+
 /* ── Profundizaciones (followUps) compartidas ────────────────────────── */
 
 /** La HIPÓTESIS de Stelar: entre las fechas del hallazgo, qué OTRA dimensión
@@ -441,6 +526,10 @@ const scoreOf = (f: Finding): number => f.confidence + (f.northLink ? 15 : 0)
  *  se te rompe · la más específica) antes que la de una DIMENSIÓN que ayuda.
  *  Determinística, del motor. Sin palanca si solo hay muestras chicas. */
 function monthLever(findings: readonly Finding[]): string | undefined {
+  // El RESCATE gana: es la palanca atada a lo que YA te sostiene (más motivadora
+  // que "cuida los domingos" · lo que pidió la usuaria).
+  const rescue = findings.find((f) => f.id === 'rescue' && f.lever)
+  if (rescue?.lever) return rescue.lever
   const obstacle = findings.find((f) => f.id === 'weekday-diet-break' && f.lever)
   if (obstacle?.lever) return obstacle.lever
   const dimension = findings.find(
@@ -506,12 +595,12 @@ export function buildFindings(
     detectTrainingDeficit(signals, ctx),
     detectWaterDeficit(signals, ctx),
     detectWeekdayDietBreak(signals, ctx),
+    detectRescue(signals, ctx),
     detectDeficitSummary(signals, ctx),
   ].filter((f): f is Finding => f != null)
 
   // El veredicto (el hero) toma la palanca del mes: el motor la arma desde el
-  // obstáculo (cuándo se rompe) o la dimensión que ayuda. Así "Tu foco" es una
-  // acción concreta, no una observación.
+  // RESCATE (lo que te sostiene), el obstáculo (cuándo se rompe) o una dimensión.
   const lever = monthLever(all)
 
   // "¿Y los días que no?" no debe responder el complemento obvio ("los otros 12
@@ -521,13 +610,19 @@ export function buildFindings(
   const verdictContrast = breakDay
     ? `Los que más se te escaparon fueron ${breakDay.subject}.`
     : undefined
+  // El cruce del veredicto: si hay RESCATE, el chat cuenta ESA historia ("los días
+  // que te moviste, sostuviste el déficit") — más valiosa que la coincidencia suelta.
+  const rescue = all.find((f) => f.id === 'rescue')
 
   return rankFindings(all).map((f) => ({
     ...f,
     lever: f.id === 'deficit-summary' ? (lever ?? f.lever) : f.lever,
     contrast: f.id === 'deficit-summary' && verdictContrast ? verdictContrast : f.contrast,
     priorCallback: priorCallback(f.reflectionKey, prior),
-    hypothesis: crossHypothesis(f.evidenceDates, signals, f.category) ?? undefined,
+    hypothesis:
+      f.id === 'deficit-summary' && rescue
+        ? rescue.phrase.lead
+        : (crossHypothesis(f.evidenceDates, signals, f.category) ?? undefined),
     followUps: buildFollowUps(f),
   }))
 }

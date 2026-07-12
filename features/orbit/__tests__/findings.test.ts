@@ -118,6 +118,32 @@ describe('buildFindings — hallazgos específicos con confianza y evidencia', (
     expect(f!.phrase.support).not.toMatch(/fallas|fracas|débil/i)
   })
 
+  it('detecta el RESCATE: la dimensión que sostiene el déficit, y su palanca gana', () => {
+    // Los días en déficit (1200) los entrenó; los que no (1800) no.
+    const signals = month(24, (i) =>
+      i % 2 === 0 ? { calories: 1200, trained: true } : { calories: 1800, trained: false },
+    )
+    const cards = buildFindings(signals, CTX)
+    const f = cards.find((x) => x.id === 'rescue')
+    expect(f).toBeDefined()
+    expect(f!.category).toBe('movimiento')
+    expect(f!.lever).toMatch(/muévete/)
+    expect(f!.phrase.lead).toMatch(/te moviste/)
+    expect(f!.phrase.lead).toMatch(/sostuviste el déficit/)
+    expect(f!.phrase.lead).not.toMatch(/porque|causa|debido a/i) // sin causa
+    // La palanca del rescate GANA: el veredicto la toma como "Tu foco".
+    const summary = cards.find((x) => x.id === 'deficit-summary')
+    expect(summary!.lever).toMatch(/muévete/)
+  })
+
+  it('NO inventa rescate si no hay brecha (misma dimensión en déficit y fuera)', () => {
+    // Entrenó igual en déficit y fuera → sin separación → sin rescate.
+    const signals = month(24, (i) =>
+      i % 2 === 0 ? { calories: 1200, trained: true } : { calories: 1800, trained: true },
+    )
+    expect(buildFindings(signals, CTX).find((x) => x.id === 'rescue')).toBeUndefined()
+  })
+
   it('sin datos suficientes → sin hallazgos', () => {
     expect(buildFindings(month(3), CTX)).toEqual([])
   })
