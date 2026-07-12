@@ -11,6 +11,7 @@
  * kcal del entreno viene DENTRO de cada workout (totalEnergyBurned) y el
  * eat-back queda bloqueado por arquitectura (spec §4).
  */
+import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
 import { WEARABLE_BODY_COMPOSITION_ENABLED } from '@/lib/featureFlags'
@@ -22,6 +23,13 @@ import type {
   RawSleepSample,
   RawWorkout,
 } from './logic'
+
+// Expo Go (storeClient) NO trae el módulo nativo Nitro de HealthKit. Importar
+// `@kingstinct/react-native-healthkit` allí evalúa react-native-nitro-modules,
+// que TIRA en su top-level ("Failed to get NitroModules") — y en el New
+// Architecture ese throw ESCAPA del try-catch del import dinámico (Uncaught).
+// Detectamos Expo Go y ni lo intentamos (mismo patrón que features/notifications).
+const isExpoGo = Constants.executionEnvironment === 'storeClient'
 
 const READ_TYPES_BASE = [
   'HKWorkoutTypeIdentifier',
@@ -51,11 +59,11 @@ const COMPOSITION_TYPES: { id: string; metric: BodyCompositionMetric; unit: stri
 type HealthKitModule = typeof import('@kingstinct/react-native-healthkit')
 
 async function hk(): Promise<HealthKitModule | null> {
-  if (Platform.OS !== 'ios') return null
+  if (Platform.OS !== 'ios' || isExpoGo) return null
   try {
     return await import('@kingstinct/react-native-healthkit')
   } catch {
-    // Expo Go / build sin el módulo nativo: el canal simplemente no existe.
+    // Build sin el módulo nativo: el canal simplemente no existe.
     return null
   }
 }
