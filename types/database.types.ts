@@ -147,6 +147,93 @@ export type Database = {
         }
         Relationships: []
       }
+      body_checkins: {
+        Row: {
+          bmi: number | null
+          bmr_kcal: number | null
+          body_fat_pct: number | null
+          bone_mass_kg: number | null
+          created_at: string
+          fat_arm_left_pct: number | null
+          fat_arm_right_pct: number | null
+          fat_leg_left_pct: number | null
+          fat_leg_right_pct: number | null
+          fat_trunk_pct: number | null
+          id: string
+          measured_on: string
+          metabolic_age: number | null
+          muscle_arm_left_kg: number | null
+          muscle_arm_right_kg: number | null
+          muscle_kg: number | null
+          muscle_leg_left_kg: number | null
+          muscle_leg_right_kg: number | null
+          muscle_trunk_kg: number | null
+          notes: string | null
+          source: string
+          updated_at: string
+          user_id: string
+          visceral_fat_index: number | null
+          water_pct: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          bmi?: number | null
+          bmr_kcal?: number | null
+          body_fat_pct?: number | null
+          bone_mass_kg?: number | null
+          created_at?: string
+          fat_arm_left_pct?: number | null
+          fat_arm_right_pct?: number | null
+          fat_leg_left_pct?: number | null
+          fat_leg_right_pct?: number | null
+          fat_trunk_pct?: number | null
+          id?: string
+          measured_on: string
+          metabolic_age?: number | null
+          muscle_arm_left_kg?: number | null
+          muscle_arm_right_kg?: number | null
+          muscle_kg?: number | null
+          muscle_leg_left_kg?: number | null
+          muscle_leg_right_kg?: number | null
+          muscle_trunk_kg?: number | null
+          notes?: string | null
+          source?: string
+          updated_at?: string
+          user_id: string
+          visceral_fat_index?: number | null
+          water_pct?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          bmi?: number | null
+          bmr_kcal?: number | null
+          body_fat_pct?: number | null
+          bone_mass_kg?: number | null
+          created_at?: string
+          fat_arm_left_pct?: number | null
+          fat_arm_right_pct?: number | null
+          fat_leg_left_pct?: number | null
+          fat_leg_right_pct?: number | null
+          fat_trunk_pct?: number | null
+          id?: string
+          measured_on?: string
+          metabolic_age?: number | null
+          muscle_arm_left_kg?: number | null
+          muscle_arm_right_kg?: number | null
+          muscle_kg?: number | null
+          muscle_leg_left_kg?: number | null
+          muscle_leg_right_kg?: number | null
+          muscle_trunk_kg?: number | null
+          notes?: string | null
+          source?: string
+          updated_at?: string
+          user_id?: string
+          visceral_fat_index?: number | null
+          water_pct?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
       body_measurements: {
         Row: {
           arm_cm: number | null

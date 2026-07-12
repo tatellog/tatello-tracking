@@ -15,6 +15,7 @@ import {
   deletePhoto,
   getAllWorkoutDates,
   getBeforeAfterPhotos,
+  getBodyCheckins,
   getBodyComposition,
   getLastPeriodStart,
   getMeasurements,
@@ -25,11 +26,19 @@ import {
   getTotalTrainedDays,
   NewMeasurementInputSchema,
   recordMilestones,
+  upsertBodyCheckin,
+  type BodyCheckinInput,
   type NewMeasurementInput,
 } from './api'
 import { PROGRESS_COMPARE_WINDOW_DAYS } from './constants'
 import { generateProgressInsights, type ProgressInsight, type WeightSample } from './insights'
-import { compareHistory, photoDatesFor, smoothWeightPoints, toWeightPoints } from './logic'
+import {
+  compareHistory,
+  mergeComposition,
+  photoDatesFor,
+  smoothWeightPoints,
+  toWeightPoints,
+} from './logic'
 import { detectMilestones } from './milestones'
 import { buildMockBodyComposition, buildMockMeasurements } from './mock'
 import { type HistorySummary, toProgressState, type ProgressState } from './types'
@@ -151,18 +160,48 @@ export function useBodyCompositionIsMock(): boolean {
   return WEARABLE_MOCK_DATA && aiEnabledForEmail(session?.user?.email)
 }
 
-/** Body (Epic 02): composición corporal de la ingesta wearable — o el mock
- *  dev-gated mientras no exista la funcionalidad final. Sin mock y sin ingesta,
- *  vacía → las cards se auto-ocultan. La key distingue mock/real para que un
- *  mock cacheado nunca sobreviva al apagar el flag. */
+/** F0 · check-ins manuales/del coach (composición completa + zonas). */
+export function useBodyCheckins() {
+  return useQuery({
+    queryKey: queryKeys.progress.bodyCheckins(),
+    queryFn: getBodyCheckins,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** F0 · guarda un check-in (upsert por día/fuente) e invalida las lecturas de
+ *  composición para que cards e insights se refresquen al toque. */
+export function useUpsertBodyCheckin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: BodyCheckinInput) => upsertBodyCheckin(input),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+    },
+  })
+}
+
+/** Body (Epic 02 + F0): composición corporal FUSIONADA — check-ins manuales/
+ *  del coach (ganan el día) + ingesta wearable (o su mock dev-gated). Sin
+ *  ninguna fuente, vacía → las cards se auto-ocultan. La key distingue
+ *  mock/real para que un mock cacheado nunca sobreviva al apagar el flag. */
 export function useBodyComposition(rangeDays: number | null = null) {
   const mock = useBodyCompositionIsMock()
-  return useQuery({
+  const checkins = useBodyCheckins()
+  const wearable = useQuery({
     queryKey: [...queryKeys.progress.bodyComposition(rangeDays), mock ? 'mock' : 'real'],
     queryFn: () =>
       mock ? Promise.resolve(buildMockBodyComposition(rangeDays)) : getBodyComposition(rangeDays),
     staleTime: 5 * 60_000,
   })
+  const data = useMemo(
+    () =>
+      checkins.data || wearable.data
+        ? mergeComposition(checkins.data ?? [], wearable.data ?? [])
+        : undefined,
+    [checkins.data, wearable.data],
+  )
+  return { ...wearable, data }
 }
 
 /** Body (Epic 02): todas las fotos (4 ángulos) con URLs firmadas — el

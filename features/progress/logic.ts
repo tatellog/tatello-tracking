@@ -2,7 +2,7 @@ import type { BodyMeasurement } from '@/features/brief/api'
 import type { DailySignals } from '@/features/orbit/api'
 import { isDeficitDay } from '@/features/orbit/deficit'
 
-import type { BodyComposition, PhotoAngle, TimelinePhoto } from './api'
+import type { BodyCheckin, BodyComposition, PhotoAngle, TimelinePhoto } from './api'
 import type { HistorySummary, MetricComparison } from './types'
 
 export type WeightPoint = {
@@ -276,6 +276,37 @@ export function compositionSummary(rows: readonly BodyComposition[]): Compositio
     out.push({ key, current: Number(current.toFixed(1)), delta, lastDate: last.day_date })
   }
   return out
+}
+
+/**
+ * Fusiona las DOS fuentes de composición (F0 · Progress 3.0): check-ins
+ * manuales/del coach + ingesta wearable, en una serie por día con el shape que
+ * ya consumen las cards y el insight engine. El CHECK-IN GANA el día en los
+ * campos que trae (es la medición deliberada); el wearable rellena lo que el
+ * manual no midió. Puro y testeable.
+ */
+export function mergeComposition(
+  checkins: readonly BodyCheckin[],
+  wearable: readonly BodyComposition[],
+): BodyComposition[] {
+  const byDay = new Map<string, BodyComposition>()
+  for (const w of wearable) byDay.set(w.day_date, { ...w })
+  for (const c of checkins) {
+    const base = byDay.get(c.measured_on) ?? {
+      day_date: c.measured_on,
+      body_fat_pct: null,
+      lean_body_mass_kg: null,
+      bmi: null,
+    }
+    byDay.set(c.measured_on, {
+      ...base,
+      body_fat_pct: c.body_fat_pct ?? base.body_fat_pct,
+      bmi: c.bmi ?? base.bmi,
+      // lean_body_mass_kg es métrica del wearable; el músculo del check-in
+      // (muscle_kg, escala InBody) es OTRA métrica — no se equiparan (honestidad).
+    })
+  }
+  return [...byDay.values()].sort((a, b) => (a.day_date < b.day_date ? -1 : 1))
 }
 
 /** Las fechas (YYYY-MM-DD, ascendentes, únicas) con foto de un ángulo. */

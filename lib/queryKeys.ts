@@ -55,6 +55,8 @@ export const queryKeys = {
     bodyComposition: (rangeDays: number | null) =>
       ['progress', 'bodyComposition', rangeDays] as const,
     photoTimeline: () => ['progress', 'photoTimeline'] as const,
+    // F0 · Progress 3.0: check-ins manuales/del coach (composición completa).
+    bodyCheckins: () => ['progress', 'bodyCheckins'] as const,
   },
   profile: {
     all: ['profile'] as const,

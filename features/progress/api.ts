@@ -172,6 +172,72 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
   return { before, after, count: rows.length }
 }
 
+/* ─── Body · check-ins manuales (F0 · Progress 3.0) ────────────────── */
+
+/** Rango numérico opcional (espeja los CHECK de la migración: la app falla
+ *  rápido en español en vez de un error de Postgres). */
+const bounded = (min: number, max: number, label: string) =>
+  z
+    .number()
+    .min(min, `${label}: mínimo ${min}`)
+    .max(max, `${label}: máximo ${max}`)
+    .nullable()
+    .optional()
+
+/** Un check-in de composición (registro del coach o captura manual). Todas las
+ *  métricas opcionales — capturas lo que tengas; la DB exige al menos una. */
+export const BodyCheckinInputSchema = z.object({
+  measured_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha en formato AAAA-MM-DD'),
+  source: z.enum(['manual', 'coach']).default('manual'),
+  weight_kg: bounded(20.1, 399, 'Peso'),
+  bmi: bounded(5, 100, 'IMC'),
+  bmr_kcal: bounded(500, 6000, 'TMB'),
+  water_pct: bounded(0, 100, 'Agua'),
+  bone_mass_kg: bounded(0, 20, 'Masa ósea'),
+  metabolic_age: bounded(10, 120, 'Edad metabólica'),
+  visceral_fat_index: bounded(0, 60, 'Visceral'),
+  muscle_kg: bounded(0, 100, 'Músculo'),
+  muscle_arm_right_kg: bounded(0, 20, 'Brazo der'),
+  muscle_arm_left_kg: bounded(0, 20, 'Brazo izq'),
+  muscle_trunk_kg: bounded(0, 60, 'Tronco'),
+  muscle_leg_right_kg: bounded(0, 30, 'Pierna der'),
+  muscle_leg_left_kg: bounded(0, 30, 'Pierna izq'),
+  body_fat_pct: bounded(0, 100, 'Grasa'),
+  fat_arm_right_pct: bounded(0, 100, 'Grasa brazo der'),
+  fat_arm_left_pct: bounded(0, 100, 'Grasa brazo izq'),
+  fat_trunk_pct: bounded(0, 100, 'Grasa tronco'),
+  fat_leg_right_pct: bounded(0, 100, 'Grasa pierna der'),
+  fat_leg_left_pct: bounded(0, 100, 'Grasa pierna izq'),
+  notes: z.string().max(500).nullable().optional(),
+})
+export type BodyCheckinInput = z.infer<typeof BodyCheckinInputSchema>
+
+export const BodyCheckinSchema = BodyCheckinInputSchema.extend({
+  id: z.string(),
+})
+export type BodyCheckin = z.infer<typeof BodyCheckinSchema>
+
+/** Guarda (o actualiza) un check-in. Upsert por (usuaria, día, fuente):
+ *  re-capturar el mismo día edita, no duplica. */
+export async function upsertBodyCheckin(input: BodyCheckinInput): Promise<void> {
+  const userId = await requireUserId()
+  const parsed = BodyCheckinInputSchema.parse(input)
+  const { error } = await supabase
+    .from('body_checkins')
+    .upsert({ user_id: userId, ...parsed }, { onConflict: 'user_id,measured_on,source' })
+  if (error) throw error
+}
+
+/** Todos los check-ins, ascendentes por fecha (RLS scopea a la usuaria). */
+export async function getBodyCheckins(): Promise<BodyCheckin[]> {
+  const { data, error } = await supabase
+    .from('body_checkins')
+    .select('*')
+    .order('measured_on', { ascending: true })
+  if (error) throw error
+  return z.array(BodyCheckinSchema).parse(data ?? [])
+}
+
 /* ─── Body (Epic 02): composición corporal + timeline de fotos ────── */
 
 /** Snapshot de composición de un día (de la báscula/HealthKit vía ingesta

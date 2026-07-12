@@ -364,6 +364,18 @@ function ProgressBody() {
                 </Animated.View>
               )}
 
+              {/* F0 · captura manual del check-in completo (el registro del
+                  coach: composición + zonas, con fecha retroactiva). Manual es
+                  fuente de primera clase — el wearable quizá no dé todo. */}
+              <Pressable
+                onPress={() => router.push('/log-checkin')}
+                accessibilityRole="link"
+                accessibilityLabel="Registrar medición completa"
+                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.calendarBridgeText}>Registrar medición completa →</Text>
+              </Pressable>
+
               {/* ── Body (Epic 02): composición corporal + comparador de fotos
                   por fechas. Ambos se auto-ocultan sin datos (la ingesta
                   wearable es opcional; el comparador pide ≥2 fechas). ── */}
