@@ -67,8 +67,12 @@ export const WEARABLE_BODY_COMPOSITION_ENABLED = false
  * Cuando es `true`, el writer (usePatternMemoryWriter) archiva los patrones que
  * POTENCIAN de Órbita Mes (rescate, señal naciente) en `revelations`
  * (tier='pattern') para que se vuelvan Historia aunque salgan de la ventana
- * rodante. Aparecen como marcador en "Tu constancia" (superficie reusada). ON
- * para beta: la idea es que construyan memoria desde el día 1. Killable a `false`
- * si algo se comporta raro (no borra lo ya archivado, solo deja de archivar).
+ * rodante. Aparecen como marcador en "Tu constancia" (superficie reusada).
+ *
+ * Master kill-switch. ADEMÁS, el writer se gatea a DEV (aiEnabledForEmail): todo
+ * el loop de descubrimiento (card IA + chat + memoria + N7) vive en dev hasta
+ * validarse en un dev build, para no escribir patrones ni disparar push a las
+ * beta sin validar. Killable a `false` (no borra lo ya archivado, deja de
+ * archivar). Para abrir a beta: quitar el gate devOnly del writer.
  */
 export const PATTERN_MEMORY_ENABLED = true

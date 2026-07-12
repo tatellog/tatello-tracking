@@ -23,7 +23,7 @@ import { z } from 'zod'
 
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useSession } from '@/hooks/useSession'
-import { PATTERN_MEMORY_ENABLED } from '@/lib/featureFlags'
+import { aiEnabledForEmail, PATTERN_MEMORY_ENABLED } from '@/lib/featureFlags'
 import { supabase } from '@/lib/supabase'
 
 import type { Finding } from './findings'
@@ -107,6 +107,11 @@ async function archivePatterns(uid: string, findings: readonly Finding[]): Promi
 export function usePatternMemoryWriter(): void {
   const { session } = useSession()
   const uid = session?.user?.id ?? null
+  // Todo el loop de descubrimiento (card IA + chat + memoria + N7) vive en DEV
+  // hasta validarse en un dev build. Sin este gate, el writer escribiría patrones
+  // y dispararía N7 a las beta (que ven el segmento viejo) sin validar. Mismo
+  // gate que Órbita Mes IA (aiEnabledForEmail).
+  const devOnly = aiEnabledForEmail(session?.user?.email)
   const { data: history } = useSignalsHistory(31)
   const signals = useMemo(() => history ?? [], [history])
   const targets = useMacroTargets().data
@@ -128,7 +133,7 @@ export function usePatternMemoryWriter(): void {
   const { data: archivedCount } = useQuery({
     queryKey: ['orbit', 'patternMemory', uid, hash],
     queryFn: () => (uid ? archivePatterns(uid, archivable) : Promise.resolve(0)),
-    enabled: PATTERN_MEMORY_ENABLED && uid != null && archivable.length > 0,
+    enabled: PATTERN_MEMORY_ENABLED && devOnly && uid != null && archivable.length > 0,
     staleTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -157,6 +162,9 @@ export function useRecentOrbitPattern(uid: string | null) {
         .select('id')
         .eq('user_id', uid!)
         .eq('tier', 'pattern')
+        // SOLO nuestros kinds de Órbita: un patrón viejo (night_eating de la
+        // ceremonia de Hoy) NO debe disparar N7 (que aterriza en Órbita Mes).
+        .in('kind', ['rescue', 'rising_signal'])
         .gte('shown_at', since)
         .limit(1)
       if (error) return false
