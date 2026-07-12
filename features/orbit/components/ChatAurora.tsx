@@ -6,6 +6,7 @@ import {
   Group,
   LinearGradient as SkiaLinearGradient,
   Path as SkiaPath,
+  Rect,
   Skia,
   vec,
 } from '@shopify/react-native-skia'
@@ -243,6 +244,19 @@ export function ChatAurora({ width, height = 90 }: { width: number; height?: num
         {ribbons.map((spec, i) => (
           <Ribbon key={i} t={t} width={width} height={height} spec={spec} />
         ))}
+        {/* Vignette: la aurora se DISUELVE en el negro del sheet arriba y abajo,
+            para que no se lea como una banda/contenedor con borde. Pinta el color
+            del fondo con alpha decreciente sobre los extremos — FUNDE, no recorta
+            la forma de las ondas (lo que hacía rara la máscara anterior). Colores
+            estáticos (nunca animar colores de gradiente Skia · crashea en device). */}
+        <Rect x={0} y={0} width={width} height={height}>
+          <SkiaLinearGradient
+            start={vec(0, 0)}
+            end={vec(0, height)}
+            colors={[colors.bg, fade(colors.bg), fade(colors.bg), colors.bg]}
+            positions={[0, 0.16, 0.84, 1]}
+          />
+        </Rect>
       </Canvas>
     </View>
   )
