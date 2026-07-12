@@ -7,7 +7,6 @@ import { colors, radius, typography } from '@/theme'
 import { fetchMonthChatTurn } from '../ai-voice'
 import type { Finding, FindingCategory } from '../findings'
 import { ChatAurora } from './ChatAurora'
-import { FindingConstellation } from './finding-constellations'
 import { StelarStar } from './MonthChatView'
 import { TypingDots } from './TypingDots'
 
@@ -236,16 +235,7 @@ export function FindingChatView({
   const showClosing = phase === 'closing' && !pending
 
   return (
-    <View style={styles.wrap}>
-      {/* La constelación del hallazgo. Se OCULTA durante la carga (la aurora ya es
-          el visual; las dos juntas chocan). El View se queda para medir el ancho
-          (onBand → bandW) que la aurora necesita. */}
-      <View style={styles.band} onLayout={onBand}>
-        {bandW > 0 && !(pending && log.length === 0) ? (
-          <FindingConstellation finding={finding} width={bandW} />
-        ) : null}
-      </View>
-
+    <View style={styles.wrap} onLayout={onBand}>
       {log.map((e, i) =>
         e.who === 'stelar' ? (
           <Animated.View key={i} entering={FadeInDown.duration(340).springify().damping(18)}>
@@ -428,7 +418,6 @@ const AV = 32
 
 const styles = StyleSheet.create({
   wrap: { gap: 12 },
-  band: { alignSelf: 'stretch', marginBottom: 4 },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   avatar: {
     width: AV,
