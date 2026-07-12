@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v8'
+const PROMPT_VERSION = 'v9'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -273,7 +273,8 @@ const CHAT_SYSTEM_PROMPT = [
   '(agua, sueño, entrenos) para que se sienta sobre SUS días, no genérico.',
   '',
   'REGLAS DURAS (romperlas hace la respuesta inservible):',
-  '- NADA de cifras/números en el "message" (los números los pone el sistema).',
+  '- Los números SÍ van en el "message" como EVIDENCIA concreta ("los otros 12 días',
+  '  no llegaron", "en 8 de esos días entrenaste"). En "chips" y "focus": SIN números.',
   '- NO afirmes causa: son coincidencias observadas ("van juntos", no "X causó Y").',
   '- NO recetes ni ordenes (dieta, rutina, "debes/come menos/duerme más"); NADA',
   '  clínico ("atracón","trastorno"); NADA de culpa ni comparar con otras personas.',
@@ -649,6 +650,12 @@ const BANNED_LEXICON =
 const unsafeText = (s: string) =>
   /\d/.test(s) || /!/.test(s) || /\p{Extended_Pictographic}/u.test(s) || BANNED_LEXICON.test(s)
 
+// El MENSAJE del chat SÍ puede llevar números: son EVIDENCIA concreta ("los otros
+// 12 días no llegaron"), que la usuaria pide. La IA los repite siempre → banearlos
+// rechazaba TODO turno. Chips y foco (palanca) siguen SIN dígitos (unsafeText).
+const unsafeMessage = (s: string) =>
+  /!/.test(s) || /\p{Extended_Pictographic}/u.test(s) || BANNED_LEXICON.test(s)
+
 // Deja 3 chips seguros: filtra los prohibidos y rellena con SAFE_CHIPS.
 function safeChips(chips: string[]): string[] {
   const out: string[] = []
@@ -804,7 +811,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // cierre) mensajes que no anclan en el hallazgo → el cliente cae al beat.
       const rejectReason = !turn
         ? 'no-turn'
-        : unsafeText(turn.message.text)
+        : unsafeMessage(turn.message.text)
           ? 'unsafe'
           : CHAT_FILLER.test(turn.message.text)
             ? 'filler'
