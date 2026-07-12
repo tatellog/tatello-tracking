@@ -21,7 +21,6 @@ import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
-import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
@@ -182,10 +181,11 @@ function ProgressBody() {
                   Hero 30v30 · decisión de la dueña). */}
               <TuHistoria />
 
-              {/* Hero 30v30 — "¿cómo cambiaron mis hábitos?" (Epic 01), driven por
-                  el Comparison Engine puro. */}
-              <View style={styles.divider} />
-              <ComparativaCard />
+              {/* (ComparativaCard se desmontó: duplicaba a TuHistoria — mismo
+                  30v30 con ventanas distintas → números en conflicto en la misma
+                  pantalla. El Comparison Engine se queda (useHistory alimenta
+                  insights y tests); follow-up: converger TuHistoria al engine
+                  para UNA sola matemática.) */}
 
               {/* Insight principal + chat guiado (Epic 04). Doble-gateado (flag +
                   dev) y auto-oculto sin insights — trae su propio divisor. */}
