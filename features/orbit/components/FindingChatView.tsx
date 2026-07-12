@@ -76,12 +76,18 @@ const fmtDate = (d: string): string =>
  */
 function fallbackFor(label: string, finding: Finding): string {
   const l = label.toLowerCase()
-  // "¿Y los días que no?" → el contrapunto, directo (los días que NO se dieron).
-  if (/d[ií]as que no|los que no|y los que|los otros/.test(l)) {
-    return finding.contrast ?? 'Los otros días no llegaron; ese es el otro lado del mes.'
+  // Preguntas sobre el DÍA / los días que fallaron ("¿y los días que no?", "¿y los
+  // domingos qué?", "¿qué pasa con esos días?") → el PATRÓN (contrast), directo. NO
+  // esquivar hacia el tangente de entrenos.
+  if (
+    /d[ií]as? que no|los que no|y los que|los otros|esos d[ií]as|qu[ée] pasa|domingo|lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|finde/.test(
+      l,
+    )
+  ) {
+    return finding.contrast ?? 'Ese es el otro lado del mes: ahí es donde se te fue.'
   }
-  // "¿Es casualidad?" → honesto: no afirmo causa, pero los dos van juntos. Contesta
-  // la pregunta (sí/no honesto) en vez de esquivar con una frase positiva.
+  // "¿Es casualidad?" → honesto: no afirmo causa, pero se dio seguido. Contesta la
+  // pregunta en vez de esquivar con una frase positiva.
   if (/casualidad|coincidencia|de verdad|en serio/.test(l)) {
     return 'No te lo puedo asegurar: no afirmo causas, solo leo tus días. Pero se repitió lo suficiente como para no dejarlo pasar.'
   }
@@ -89,7 +95,8 @@ function fallbackFor(label: string, finding: Finding): string {
   if (/cu[aá]nto/.test(l)) return `${finding.metric.value} — ${finding.metric.label}.`
   // "No lo había notado" → por qué no se veía (día a día vs mes junto).
   if (/no lo hab[ií]a notado|no me hab/.test(l)) return finding.phrase.caption
-  return finding.hypothesis ?? finding.northLink ?? finding.explanation
+  // Default: el PATRÓN antes que el tangente de entrenos (que esquivaba).
+  return finding.contrast ?? finding.northLink ?? finding.explanation
 }
 
 export function FindingChatView({

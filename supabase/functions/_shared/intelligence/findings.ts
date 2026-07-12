@@ -417,7 +417,9 @@ function crossHypothesis(
     options.push({ count: slept, text: `en ${slept} de esos días también dormiste 7 horas o más` })
   }
   const best = options.filter((o) => o.count >= 2).sort((a, b) => b.count - a.count)[0]
-  return best ? `Me llamó algo más: ${best.text}. No sé si va junto, pero ahí están los dos.` : null
+  // Sin el hedge "no sé si va junto" (le restaba: "si tú no estás segura, ¿por qué
+  // te creo?"). Nombra los dos hechos juntos, sin afirmar causa (manifiesto).
+  return best ? `Me llamó algo más: ${best.text}. Ahí se dieron los dos, juntos.` : null
 }
 
 /** Cierre del chat: ver esos días (fechas → abre el Día) + siguiente hallazgo. */

@@ -80,8 +80,8 @@ describe('buildFindings — hallazgos específicos con confianza y evidencia', (
     const f = buildFindings(signals, CTX).find((x) => x.id === 'training-deficit')
     if (f?.hypothesis) {
       expect(f.hypothesis).toMatch(/también dormiste/)
-      expect(f.hypothesis).toMatch(/No sé si va junto/) // tentativa, sin causa
-      expect(f.hypothesis).not.toMatch(/porque|causa|debido a/)
+      expect(f.hypothesis).toMatch(/juntos/) // nombra los dos hechos, sin hedge
+      expect(f.hypothesis).not.toMatch(/porque|causa|debido a|no sé si/i) // tentativa, sin causa ni titubeo
     }
   })
 

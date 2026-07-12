@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v10'
+const PROMPT_VERSION = 'v11'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -681,6 +681,11 @@ function safeChips(chips: string[]): string[] {
 // El chat NO puede rellenar: muletillas prohibidas + exigir que el mensaje
 // nombre algo CONCRETO del hallazgo (el día/dimensión, o "déficit").
 const CHAT_FILLER = /interesante|cada d[ií]a cuenta|sigue as[ií]|algo especial/i
+// Titubeo: le resta credibilidad ("si tú no estás segura, ¿por qué te creo?"). Se
+// rechaza → cae al determinístico, que afirma la observación con seguridad. (NO
+// baneamos "parece que": es el fraseo confiado-pero-honesto que la usuaria SÍ
+// quiere, "parece que moverte te sostiene".)
+const CHAT_HEDGE = /podr[ií]a|puede ser|quiz[áa]s|tal vez|no s[eé] si|no estoy segura/i
 // Nunca afirmar que ella lo notó / ya lo sabía si su última reacción fue que NO
 // lo había notado: el cierre "es bueno que lo hayas notado" contradice su
 // respuesta y rompe la credibilidad. Rechaza → el cliente cae al beat determinístico.
@@ -826,11 +831,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
           ? 'unsafe'
           : CHAT_FILLER.test(turn.message.text)
             ? 'filler'
-            : contradictsReaction(turn.message.text, chatPath)
-              ? 'contradiction'
-              : !chatIsFinal && !chatAnchored(turn.message.text, chatFinding)
-                ? 'not-anchored'
-                : null
+            : CHAT_HEDGE.test(turn.message.text)
+              ? 'hedge'
+              : contradictsReaction(turn.message.text, chatPath)
+                ? 'contradiction'
+                : !chatIsFinal && !chatAnchored(turn.message.text, chatFinding)
+                  ? 'not-anchored'
+                  : null
       if (rejectReason) {
         console.error(
           `chat rejected [${rejectReason}] turn=${chatTurnIndex} final=${chatIsFinal} subject="${chatFinding?.subject}" text="${turn?.message?.text ?? ''}"`,
