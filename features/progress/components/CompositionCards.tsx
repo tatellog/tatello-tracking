@@ -4,7 +4,7 @@ import Animated, { FadeIn } from 'react-native-reanimated'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
-import { useBodyComposition } from '../hooks'
+import { useBodyComposition, useBodyCompositionIsMock } from '../hooks'
 import { compositionSummary, type CompositionMetric } from '../logic'
 
 /*
@@ -29,6 +29,7 @@ function fmtDelta(d: number, unit: string): string {
 
 export function CompositionCards() {
   const { data } = useBodyComposition(null)
+  const isMock = useBodyCompositionIsMock()
   const cards = compositionSummary(data ?? [])
   if (cards.length === 0) return null
 
@@ -58,7 +59,11 @@ export function CompositionCards() {
           )
         })}
       </View>
-      <Text style={styles.note}>De tu báscula o salud conectada. Evidencia, no veredicto.</Text>
+      <Text style={styles.note}>
+        {isMock
+          ? 'Datos de ejemplo · así se verá cuando conectes tu báscula o salud.'
+          : 'De tu báscula o salud conectada. Evidencia, no veredicto.'}
+      </Text>
     </Animated.View>
   )
 }

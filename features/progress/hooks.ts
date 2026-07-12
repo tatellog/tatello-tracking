@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
+import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
-import { MILESTONES_ENABLED } from '@/lib/featureFlags'
+import { aiEnabledForEmail, MILESTONES_ENABLED, WEARABLE_MOCK_DATA } from '@/lib/featureFlags'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -30,7 +31,7 @@ import { PROGRESS_COMPARE_WINDOW_DAYS } from './constants'
 import { generateProgressInsights, type ProgressInsight, type WeightSample } from './insights'
 import { compareHistory, photoDatesFor, smoothWeightPoints, toWeightPoints } from './logic'
 import { detectMilestones } from './milestones'
-import { buildMockMeasurements } from './mock'
+import { buildMockBodyComposition, buildMockMeasurements } from './mock'
 import { type HistorySummary, toProgressState, type ProgressState } from './types'
 
 // Ventana amplia = "todo el historial" (los hitos son la PRIMERA vez). La app es
@@ -139,12 +140,27 @@ export function useProgressInsights(): ProgressState<ProgressInsight[]> {
   )
 }
 
-/** Body (Epic 02): composición corporal de la ingesta wearable. Vacía mientras
- *  la ingesta esté apagada — las cards se auto-ocultan sin datos. */
+/**
+ * ¿La composición corporal viene del MOCK? (WEARABLE_MOCK_DATA + dev). Mientras
+ * no exista la integración final, Body se valida con datos de ejemplo — SOLO
+ * dev; la beta jamás ve datos fabricados de su cuerpo. La UI etiqueta la
+ * sección como 'datos de ejemplo' con esta misma señal.
+ */
+export function useBodyCompositionIsMock(): boolean {
+  const { session } = useSession()
+  return WEARABLE_MOCK_DATA && aiEnabledForEmail(session?.user?.email)
+}
+
+/** Body (Epic 02): composición corporal de la ingesta wearable — o el mock
+ *  dev-gated mientras no exista la funcionalidad final. Sin mock y sin ingesta,
+ *  vacía → las cards se auto-ocultan. La key distingue mock/real para que un
+ *  mock cacheado nunca sobreviva al apagar el flag. */
 export function useBodyComposition(rangeDays: number | null = null) {
+  const mock = useBodyCompositionIsMock()
   return useQuery({
-    queryKey: queryKeys.progress.bodyComposition(rangeDays),
-    queryFn: () => getBodyComposition(rangeDays),
+    queryKey: [...queryKeys.progress.bodyComposition(rangeDays), mock ? 'mock' : 'real'],
+    queryFn: () =>
+      mock ? Promise.resolve(buildMockBodyComposition(rangeDays)) : getBodyComposition(rangeDays),
     staleTime: 5 * 60_000,
   })
 }
