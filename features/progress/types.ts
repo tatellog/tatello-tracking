@@ -60,21 +60,12 @@ export type CycleSummary = {
 }
 
 /**
- * Epic 03 · Progress Insight Engine — un cambio importante detectado, TODO
- * determinístico (sin IA). Espeja el `Finding` de Órbita para poder reutilizar el
- * chat guiado (Epic 04) y la metacognición (Epic 05). Responde QUÉ cambió, nunca
- * por qué (eso es Órbita).
+ * Epic 03 · Progress Insight Engine — el contrato REAL vive en el motor
+ * (`_shared/intelligence/progress-insights.ts`, puente `./insights`). Se
+ * re-exporta aquí para que el dominio de Progress tenga un solo punto de
+ * entrada (el forward-contract de Epic 00 se cumplió en Epic 03).
  */
-export type ProgressInsight = {
-  id: string
-  subject: string
-  lead: string // la lectura en voz del coach (QUÉ cambió)
-  support: string // la evidencia con números (del motor, NUNCA de IA)
-  contrast: string | null // el otro lado ("...mientras tu peso se mantuvo")
-  confidence: number // 0-100
-  relatedMetrics: string[] // ['weight','body_fat'] para enlazar cards
-  northLink: string | null // conexión con el objetivo (opcional)
-}
+export type { ProgressInsight } from './insights'
 
 // ── Estado compartido de pantalla (Epic 00) ─────────────────────────────────
 

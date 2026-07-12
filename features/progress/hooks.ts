@@ -27,7 +27,8 @@ import {
   type NewMeasurementInput,
 } from './api'
 import { PROGRESS_COMPARE_WINDOW_DAYS } from './constants'
-import { compareHistory } from './logic'
+import { generateProgressInsights, type ProgressInsight, type WeightSample } from './insights'
+import { compareHistory, photoDatesFor, smoothWeightPoints, toWeightPoints } from './logic'
 import { detectMilestones } from './milestones'
 import { buildMockMeasurements } from './mock'
 import { type HistorySummary, toProgressState, type ProgressState } from './types'
@@ -83,6 +84,58 @@ export function useHistory(
     { isPending: signals.isPending, isError: signals.isError, error: signals.error, data: summary },
     // Vacío = usuaria nueva sin nada que comparar (todas las métricas en 0/0).
     (s) => s.metrics.every((m) => m.current === 0 && m.previous === 0),
+  )
+}
+
+/**
+ * Epic 03 · Progress Insight Engine — los cambios importantes detectados
+ * (recomposición, proteína+músculo, tendencia, evidencia fotográfica), TODO
+ * determinístico. El peso entra SUAVIZADO (media móvil 7d) para que el ruido de
+ * báscula no fabrique ni esconda una tendencia. `ProgressState`: empty = sin
+ * insights dignos todavía (silencio honesto, no cascarones).
+ */
+export function useProgressInsights(): ProgressState<ProgressInsight[]> {
+  const measurements = useMeasurements(null)
+  const composition = useBodyComposition(null)
+  const signals = useSignalsHistory(60)
+  const targets = useMacroTargets().data
+  const photos = usePhotoTimeline()
+  const today = todayInTimezone()
+
+  const insights = useMemo<ProgressInsight[] | undefined>(() => {
+    if (!measurements.data || !signals.data) return undefined
+    const weights: WeightSample[] = smoothWeightPoints(toWeightPoints(measurements.data)).map(
+      (p) => ({ day: new Date(p.t).toISOString().slice(0, 10), kg: p.weight }),
+    )
+    const photoDays = [
+      ...new Set(
+        ['front', 'back', 'side_left', 'side_right'].flatMap((a) =>
+          photoDatesFor(photos.data ?? [], a as never),
+        ),
+      ),
+    ].sort()
+    return generateProgressInsights({
+      today,
+      weights,
+      composition: (composition.data ?? []).map((c) => ({
+        day: c.day_date,
+        fatPct: c.body_fat_pct,
+        leanKg: c.lean_body_mass_kg,
+      })),
+      signals: signals.data,
+      proteinTarget: targets?.protein_g ?? null,
+      photoDays,
+    })
+  }, [measurements.data, composition.data, signals.data, targets?.protein_g, photos.data, today])
+
+  return toProgressState(
+    {
+      isPending: measurements.isPending || signals.isPending,
+      isError: measurements.isError,
+      error: measurements.error,
+      data: insights,
+    },
+    (list) => list.length === 0,
   )
 }
 
