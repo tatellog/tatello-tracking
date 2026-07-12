@@ -6,6 +6,7 @@ import { colors, radius, typography } from '@/theme'
 
 import { fetchMonthChatTurn } from '../ai-voice'
 import type { Finding, FindingCategory } from '../findings'
+import { ChatAurora } from './ChatAurora'
 import { FindingConstellation } from './finding-constellations'
 import { StelarStar } from './MonthChatView'
 import { TypingDots } from './TypingDots'
@@ -253,10 +254,15 @@ export function FindingChatView({
         ),
       )}
 
-      {pending ? (
-        // Siempre los "…" (loop continuo) mientras Stelar escribe. La onda
-        // ceremonial de un solo tiro ("Encontrando conexiones…") ya la hace
-        // MonthChatSheet al abrir; aquí un one-shot dejaba un hueco en blanco.
+      {pending && log.length === 0 ? (
+        // APERTURA: las cintas de luz (aurora) corren a lo ancho mientras Stelar
+        // "lee tu mes", HASTA que la IA responde el primer turno.
+        <Animated.View entering={FadeIn.duration(300)} style={styles.aurora}>
+          <ChatAurora width={bandW > 0 ? bandW : 320} />
+          <Text style={styles.auroraText}>Encontrando conexiones…</Text>
+        </Animated.View>
+      ) : pending ? (
+        // Turnos siguientes: los "…" (loop) mientras Stelar escribe la respuesta.
         <View style={styles.typingRow}>
           <View style={styles.avatar}>
             <StelarStar size={18} />
@@ -455,6 +461,14 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  // Apertura: las cintas de luz a lo ancho + "Encontrando conexiones…".
+  aurora: { alignItems: 'center', gap: 12, paddingVertical: 24 },
+  auroraText: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.oroSoft,
+  },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginLeft: AV + 8 },
   pill: {
     minHeight: 44,
