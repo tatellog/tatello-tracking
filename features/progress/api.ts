@@ -172,6 +172,83 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
   return { before, after, count: rows.length }
 }
 
+/* ─── Body (Epic 02): composición corporal + timeline de fotos ────── */
+
+/** Snapshot de composición de un día (de la báscula/HealthKit vía ingesta
+ *  wearable). Solo las métricas que la ingesta trae HOY: grasa, masa magra,
+ *  IMC. Agua/visceral/edad metabólica/TMB llegarán con futuras fuentes. */
+export const BodyCompositionSchema = z.object({
+  day_date: z.string(),
+  body_fat_pct: z.number().nullable(),
+  lean_body_mass_kg: z.number().nullable(),
+  bmi: z.number().nullable(),
+})
+export type BodyComposition = z.infer<typeof BodyCompositionSchema>
+
+/** Composición corporal ascendente por día (RLS scopea a la usuaria). Con
+ *  varias fuentes el upsert es por (source, día); aquí se aplana por día
+ *  tomando la fila más reciente. */
+export async function getBodyComposition(rangeDays: number | null): Promise<BodyComposition[]> {
+  let query = supabase
+    .from('wearable_body_composition')
+    .select('day_date, body_fat_pct, lean_body_mass_kg, bmi, updated_at')
+    .order('day_date', { ascending: true })
+  if (rangeDays != null) {
+    const since = new Date()
+    since.setDate(since.getDate() - rangeDays)
+    query = query.gte('day_date', since.toISOString().slice(0, 10))
+  }
+  const { data, error } = await query
+  if (error) throw error
+  // Una fila por día: la última actualizada gana (fuentes múltiples).
+  const byDay = new Map<string, BodyComposition>()
+  for (const row of data ?? []) {
+    byDay.set(row.day_date as string, BodyCompositionSchema.parse(row))
+  }
+  return [...byDay.values()]
+}
+
+export type PhotoAngle = 'front' | 'back' | 'side_left' | 'side_right'
+
+/** Una foto del timeline (con URL firmada; null si falló la firma). */
+export type TimelinePhoto = {
+  id: string
+  taken_at: string
+  angle: PhotoAngle
+  signed_url: string | null
+}
+
+/** TODAS las fotos de progreso (4 ángulos) con URLs firmadas EN LOTE (una
+ *  llamada de storage, no una por foto). Alimenta el comparador por fechas. */
+export async function getPhotoTimeline(): Promise<TimelinePhoto[]> {
+  const { data, error } = await supabase
+    .from('photos')
+    .select('id, taken_at, angle, storage_path')
+    .order('taken_at', { ascending: true })
+  if (error) throw error
+  const rows = (data ?? []).filter(
+    (r): r is typeof r & { angle: PhotoAngle } =>
+      r.angle === 'front' ||
+      r.angle === 'back' ||
+      r.angle === 'side_left' ||
+      r.angle === 'side_right',
+  )
+  if (rows.length === 0) return []
+  const { data: signed, error: signErr } = await supabase.storage
+    .from('progress-photos')
+    .createSignedUrls(
+      rows.map((r) => r.storage_path as string),
+      PHOTO_URL_TTL,
+    )
+  if (signErr) console.warn('[progress] createSignedUrls failed', signErr.message)
+  return rows.map((r, i) => ({
+    id: r.id as string,
+    taken_at: r.taken_at as string,
+    angle: r.angle,
+    signed_url: signed?.[i]?.signedUrl ?? null,
+  }))
+}
+
 /*
  * Delete one progress photo — the row in `photos` plus its storage
  * object. RLS scopes both to the owner (auth.uid() = user_id on the

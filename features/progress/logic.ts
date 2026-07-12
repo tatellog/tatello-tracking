@@ -2,6 +2,7 @@ import type { BodyMeasurement } from '@/features/brief/api'
 import type { DailySignals } from '@/features/orbit/api'
 import { isDeficitDay } from '@/features/orbit/deficit'
 
+import type { BodyComposition, PhotoAngle, TimelinePhoto } from './api'
 import type { HistorySummary, MetricComparison } from './types'
 
 export type WeightPoint = {
@@ -244,6 +245,55 @@ function weightComparison(
  * (proteína/déficit) se omiten si no hay target — la UI las muestra como
  * invitación, nunca inventa.
  */
+/* ─── Body Engine (Epic 02) · composición + comparador de fotos ────────── */
+
+export type CompositionMetricKey = 'body_fat_pct' | 'lean_body_mass_kg' | 'bmi'
+
+/** Una card de composición: valor actual + delta vs la primera medición de la
+ *  ventana. Solo se emite si la métrica tiene AL MENOS un valor (sin cascarones
+ *  vacíos: la ingesta wearable es opcional). */
+export type CompositionMetric = {
+  key: CompositionMetricKey
+  current: number
+  /** null con una sola medición (no hay contra qué comparar). */
+  delta: number | null
+  lastDate: string
+}
+
+/** Resume la serie de composición en cards (grasa / masa magra / IMC).
+ *  Puro: el orden de entrada es ascendente por día (como lo da la api). */
+export function compositionSummary(rows: readonly BodyComposition[]): CompositionMetric[] {
+  const keys: CompositionMetricKey[] = ['body_fat_pct', 'lean_body_mass_kg', 'bmi']
+  const out: CompositionMetric[] = []
+  for (const key of keys) {
+    const serie = rows.filter((r) => r[key] != null)
+    const last = serie[serie.length - 1]
+    if (!last) continue
+    const first = serie[0]
+    const current = last[key] as number
+    const delta =
+      first && first !== last ? Number((current - (first[key] as number)).toFixed(1)) : null
+    out.push({ key, current: Number(current.toFixed(1)), delta, lastDate: last.day_date })
+  }
+  return out
+}
+
+/** Las fechas (YYYY-MM-DD, ascendentes, únicas) con foto de un ángulo. */
+export function photoDatesFor(photos: readonly TimelinePhoto[], angle: PhotoAngle): string[] {
+  const days = photos.filter((p) => p.angle === angle).map((p) => p.taken_at.slice(0, 10))
+  return [...new Set(days)].sort()
+}
+
+/** La foto de un ángulo en una fecha dada (la última del día si hay varias). */
+export function photoAt(
+  photos: readonly TimelinePhoto[],
+  angle: PhotoAngle,
+  day: string,
+): TimelinePhoto | null {
+  const match = photos.filter((p) => p.angle === angle && p.taken_at.slice(0, 10) === day)
+  return match[match.length - 1] ?? null
+}
+
 export function compareHistory(
   signals: readonly DailySignals[],
   measurements: readonly BodyMeasurement[],

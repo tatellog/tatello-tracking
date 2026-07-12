@@ -51,6 +51,10 @@ export const queryKeys = {
     monthWorkouts: (monthStart: string) => ['progress', 'monthWorkouts', monthStart] as const,
     sleep: (rangeDays: number) => ['progress', 'sleep', rangeDays] as const,
     lastPeriod: () => ['progress', 'cycle', 'last-period'] as const,
+    // Body (Epic 02): composición corporal (wearable) + timeline de fotos.
+    bodyComposition: (rangeDays: number | null) =>
+      ['progress', 'bodyComposition', rangeDays] as const,
+    photoTimeline: () => ['progress', 'photoTimeline'] as const,
   },
   profile: {
     all: ['profile'] as const,

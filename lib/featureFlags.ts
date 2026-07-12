@@ -84,7 +84,7 @@ export const PATTERN_MEMORY_ENABLED = true
  * OFF hasta que su épica los construya y valide.
  */
 export const PROGRESS_HISTORY_ENABLED = true
-export const PROGRESS_BODY_ENABLED = false
+export const PROGRESS_BODY_ENABLED = true
 export const PROGRESS_AI_ENABLED = false
 export const PROGRESS_CHAT_ENABLED = false
 export const PROGRESS_META_ENABLED = false

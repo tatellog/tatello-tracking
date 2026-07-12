@@ -22,10 +22,13 @@ import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { ComparativaCard } from '@/features/progress/components/ComparativaCard'
+import { CompositionCards } from '@/features/progress/components/CompositionCards'
+import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
+import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
 import { useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
@@ -341,7 +344,17 @@ function ProgressBody() {
                 </Animated.View>
               )}
 
-              {/* (Comparativa 30 días se reemplazó por el hero "Tu Historia".) */}
+              {/* ── Body (Epic 02): composición corporal + comparador de fotos
+                  por fechas. Ambos se auto-ocultan sin datos (la ingesta
+                  wearable es opcional; el comparador pide ≥2 fechas). ── */}
+              {PROGRESS_BODY_ENABLED ? (
+                <>
+                  {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
+                      datos), no deja una hairline huérfana. */}
+                  <CompositionCards />
+                  <PhotoCompare />
+                </>
+              ) : null}
 
               {/* ── Ciclo — solo si el perfil tiene ciclo activo (nunca hombres).
               El divisor se gatea junto a la card para no dejar una línea

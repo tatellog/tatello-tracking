@@ -14,9 +14,11 @@ import {
   deletePhoto,
   getAllWorkoutDates,
   getBeforeAfterPhotos,
+  getBodyComposition,
   getLastPeriodStart,
   getMeasurements,
   getMonthWorkoutDates,
+  getPhotoTimeline,
   getRecentSleepLogs,
   getRecentWorkoutDates,
   getTotalTrainedDays,
@@ -82,6 +84,26 @@ export function useHistory(
     // Vacío = usuaria nueva sin nada que comparar (todas las métricas en 0/0).
     (s) => s.metrics.every((m) => m.current === 0 && m.previous === 0),
   )
+}
+
+/** Body (Epic 02): composición corporal de la ingesta wearable. Vacía mientras
+ *  la ingesta esté apagada — las cards se auto-ocultan sin datos. */
+export function useBodyComposition(rangeDays: number | null = null) {
+  return useQuery({
+    queryKey: queryKeys.progress.bodyComposition(rangeDays),
+    queryFn: () => getBodyComposition(rangeDays),
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** Body (Epic 02): todas las fotos (4 ángulos) con URLs firmadas — el
+ *  comparador por fechas. */
+export function usePhotoTimeline() {
+  return useQuery({
+    queryKey: queryKeys.progress.photoTimeline(),
+    queryFn: getPhotoTimeline,
+    staleTime: 5 * 60_000,
+  })
 }
 
 const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
