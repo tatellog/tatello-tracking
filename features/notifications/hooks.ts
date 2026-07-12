@@ -6,6 +6,7 @@ import { useRecentOrbitPattern } from '@/features/orbit/pattern-memory'
 import type { NotificationWindow } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 
 import {
@@ -85,6 +86,10 @@ export function useDayCloseInvite(): void {
 export function useOrbitPatternInvite(): void {
   const { session } = useSession()
   const uid = session?.user?.id ?? null
+  // El loop de descubrimiento (incluido N7) vive en DEV hasta validarse. Fuera de
+  // dev, `devOnly=false` → syncOrbitPatternInvite recibe siempre false → cancela
+  // cualquier N7 agendado y no agenda nada. Mismo gate que Órbita Mes IA.
+  const devOnly = aiEnabledForEmail(session?.user?.email)
   const { data: profile } = useProfile()
   const window = (profile ? (profile.notification_window ?? null) : undefined) as
     | NotificationWindow
@@ -94,8 +99,8 @@ export function useOrbitPatternInvite(): void {
 
   useEffect(() => {
     if (window === undefined || fresh === undefined) return
-    void syncOrbitPatternInvite(window, fresh === true)
-  }, [window, fresh])
+    void syncOrbitPatternInvite(window, devOnly && fresh === true)
+  }, [window, fresh, devOnly])
 }
 
 export function useCycleSealInvite(figureComplete: boolean, signLabel: string): void {
