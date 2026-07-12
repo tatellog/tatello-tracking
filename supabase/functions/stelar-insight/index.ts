@@ -29,7 +29,7 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v11'
+const PROMPT_VERSION = 'v12'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -284,9 +284,15 @@ const CHAT_SYSTEM_PROMPT = [
   '  y seguro, sin muletillas de relleno.',
   '- NUNCA le pases la tarea: no digas "reflexiona", "piensa en", "cómo te sientes".',
   '  Si hay algo que mirar, lo dices TÚ. Eres tú la que leyó su mes.',
-  '- Los números SÍ van en el "message" como EVIDENCIA concreta ("los otros 12 días',
-  '  no llegaron", "en 8 de esos días entrenaste"). En "chips" y "focus": SIN números.',
-  '- NO afirmes causa: son coincidencias observadas ("van juntos", no "X causó Y").',
+  '- NÚMEROS: solo puedes citar los que aparecen en la EVIDENCIA que te doy abajo.',
+  '  PROHIBIDO inventar, estimar o redondear un conteo que no esté ahí (ni en cifra',
+  '  ni en palabra). Si te preguntan algo que la evidencia no trae (p. ej. cuántos',
+  '  días entrenaste, si no te di ese dato), NO inventes el número: dilo honesto',
+  '  ("eso no lo tengo medido en este hallazgo"). En "chips" y "focus": SIN números.',
+  '- NO inventes RELACIONES: si el sistema no te dio una coincidencia, no la crees',
+  '  tú. Nada de "van juntos" / "es buena señal" si la evidencia no lo afirma.',
+  '- NO afirmes causa: cuando el sistema SÍ marca una coincidencia, es observada',
+  '  ("van juntos", no "X causó Y").',
   '- NO recetes ni ordenes (dieta, rutina, "debes/come menos/duerme más"); NADA',
   '  clínico ("atracón","trastorno"); NADA de culpa ni comparar con otras personas.',
   '- PROHIBIDO el relleno: "interesante", "algo especial", "cada día cuenta",',
@@ -667,6 +673,24 @@ const unsafeText = (s: string) =>
 const unsafeMessage = (s: string) =>
   /!/.test(s) || /\p{Extended_Pictographic}/u.test(s) || BANNED_LEXICON.test(s)
 
+// "El motor piensa, la IA comunica": los ÚNICOS números que la IA puede decir son
+// los que el SISTEMA le pasó en la evidencia del hallazgo. Un número que no está
+// ahí = lo inventó (p. ej. "no entrenaste en 8" cuando ese dato no existe). Esto
+// caza la alucinación de conteos, que rompe la confianza (y el manifiesto).
+function groundedNumbers(finding: unknown): Set<string> {
+  const f = (finding ?? {}) as Record<string, unknown>
+  const src = [f.support, f.lead, f.northLink, f.hypothesis, f.contrast, f.lever]
+    .filter((v): v is string => typeof v === 'string')
+    .join(' ')
+  return new Set(src.match(/\d+/g) ?? [])
+}
+// ¿El mensaje introduce un número que el sistema NO le dio? → alucinación → se
+// rechaza y el cliente cae al beat determinístico (que solo usa números reales).
+function hasUngroundedNumber(text: string, finding: unknown): boolean {
+  const allowed = groundedNumbers(finding)
+  return (text.match(/\d+/g) ?? []).some((n) => !allowed.has(n))
+}
+
 // Deja 3 chips seguros: filtra los prohibidos y rellena con SAFE_CHIPS.
 function safeChips(chips: string[]): string[] {
   const out: string[] = []
@@ -835,9 +859,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
               ? 'hedge'
               : contradictsReaction(turn.message.text, chatPath)
                 ? 'contradiction'
-                : !chatIsFinal && !chatAnchored(turn.message.text, chatFinding)
-                  ? 'not-anchored'
-                  : null
+                : hasUngroundedNumber(turn.message.text, chatFinding)
+                  ? 'ungrounded-number'
+                  : !chatIsFinal && !chatAnchored(turn.message.text, chatFinding)
+                    ? 'not-anchored'
+                    : null
       if (rejectReason) {
         console.error(
           `chat rejected [${rejectReason}] turn=${chatTurnIndex} final=${chatIsFinal} subject="${chatFinding?.subject}" text="${turn?.message?.text ?? ''}"`,
