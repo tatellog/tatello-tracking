@@ -12,6 +12,7 @@ import {
   nextInviteDate,
   nextReturnDate,
   nextSealDate,
+  ORBIT_PATTERN_COPY,
   PATTERN_COPY,
   RETURN_COPY,
   sameLocalDay,
@@ -84,6 +85,9 @@ function trackScheduled(id: string, target: NotificationTarget, date: Date): voi
 
 /** El slot N3 · "Stelar encontró algo" — idempotente como los demás. */
 export const PATTERN_ID = 'stelar-pattern-found'
+/** El slot N7 · "Stelar encontró una señal" (patrón de Órbita) — aterriza en
+ *  Órbita Mes, a diferencia de N3 (que aterriza en Hoy). */
+export const ORBIT_PATTERN_ID = 'stelar-orbit-pattern'
 /** El slot N5 · el sello del ciclo mensual — idempotente como los demás. */
 export const CYCLE_ID = 'stelar-cycle-seal'
 
@@ -208,6 +212,9 @@ export async function syncWeekSealInvite(
     // se volverá a armar en la siguiente apertura para el lunes que sigue.
     const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
     if (patternFireAt && sameLocalDay(patternFireAt, sealDate)) return
+    // señal-órbita > sello: idem, el sello cede a un patrón de Órbita.
+    const orbitPatternFireAt = await scheduledFireAt(Notifications, ORBIT_PATTERN_ID)
+    if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, sealDate)) return
     const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
     if (cycleFireAt && sameLocalDay(cycleFireAt, sealDate)) return
 
@@ -268,6 +275,9 @@ export async function syncDayCloseInvite(
     if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return
     const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
     if (patternFireAt && sameLocalDay(patternFireAt, date)) return
+    // señal-órbita > cierre: el cierre diario cede a un patrón de Órbita.
+    const orbitPatternFireAt = await scheduledFireAt(Notifications, ORBIT_PATTERN_ID)
+    if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, date)) return
 
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
@@ -354,6 +364,73 @@ export async function syncPatternInvite(
       },
     })
     trackScheduled(PATTERN_ID, 'hoy', date)
+  } catch {
+    // Nunca romper la app por una notificación.
+  }
+}
+
+/**
+ * N7 · "Stelar encontró una señal": anuncia un patrón que el motor encontró en
+ * Órbita (rescate, señal naciente · archivados por el writer de memoria de
+ * patrones). A diferencia de N3, el tap aterriza en ÓRBITA MES (donde vive la
+ * card del hallazgo), no en Hoy.
+ *
+ * `hasFreshPattern=false` cancela (idempotente + self-healing): un patrón es
+ * "fresco" solo mientras se archivó hace <24h; cuando la usuaria entra a Órbita
+ * y lo ve, la re-sincronización de la próxima apertura lo apaga solo. Hereda el
+ * reposo de 14 días del writer (a lo más 1 push por patrón cada 14 días).
+ *
+ * Arbitraje: ciclo > señal-órbita > sello > cierre. Cede a ciclo y a N3 (el
+ * patrón de Hoy tiene ceremonia más rica); absorbe la invitación; el sello y el
+ * cierre le ceden a ella (ver sus syncs).
+ */
+export async function syncOrbitPatternInvite(
+  window: NotificationWindow | null | undefined,
+  hasFreshPattern: boolean,
+): Promise<void> {
+  if (isExpoGo) return
+  try {
+    const Notifications = await import('expo-notifications')
+
+    await Notifications.cancelScheduledNotificationAsync(ORBIT_PATTERN_ID).catch(() => {})
+    if (window == null || window === 'not_yet' || !hasFreshPattern) return
+
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status !== 'granted') return
+
+    await ensureChannels(Notifications)
+
+    const date = nextInviteDate(new Date(), window)
+    // ciclo > señal-órbita: si el sello del ciclo suena ese mismo día, cede.
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return
+    // N3 (patrón de Hoy) > señal-órbita: no duplicar "encontré algo" el mismo
+    // día · la ceremonia de Hoy tiene más contenido, así que esta cede.
+    const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
+    if (patternFireAt && sameLocalDay(patternFireAt, date)) return
+    // señal-órbita > invitación: mismo minuto de mañana — la invitación cede.
+    await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
+    // señal-órbita > sello: si mañana es lunes, el sello cede (se re-arma luego).
+    if (date.getDay() === 1) {
+      await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: ORBIT_PATTERN_ID,
+      content: {
+        title: ORBIT_PATTERN_COPY.title,
+        body: ORBIT_PATTERN_COPY.body,
+        // El hallazgo vive en Órbita Mes (la card "encontré algo") → el tap
+        // aterriza ahí (requestOrbitSegment('mes') en response.ts).
+        data: { target: 'orbit-mes' satisfies NotificationTarget, fireAt: date.toISOString() },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
+      },
+    })
+    trackScheduled(ORBIT_PATTERN_ID, 'orbit-mes', date)
   } catch {
     // Nunca romper la app por una notificación.
   }

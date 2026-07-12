@@ -2,14 +2,17 @@ import { useEffect } from 'react'
 
 import { useMealsForDate } from '@/features/macros/hooks'
 import { useHasAnySignals } from '@/features/orbit/hooks'
+import { useRecentOrbitPattern } from '@/features/orbit/pattern-memory'
 import type { NotificationWindow } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { useSession } from '@/hooks/useSession'
 import { todayInTimezone } from '@/lib/time'
 
 import {
   syncCycleSealInvite,
   syncDayCloseInvite,
   syncNextStarInvite,
+  syncOrbitPatternInvite,
   syncWeekSealInvite,
 } from './scheduler'
 
@@ -72,6 +75,29 @@ export function useDayCloseInvite(): void {
  * agendado para el día 1 del mes siguiente; un mes que no completó jamás
  * suena (silencio, no "a medias").
  */
+/*
+ * N7 · "Encontré algo en tus semanas": cuando el writer de memoria de patrones
+ * archiva un patrón NUEVO (fresco <24h), agenda el push para la ventana elegida,
+ * con destino Órbita Mes. `fresh=false` cancela (self-healing): cuando la usuaria
+ * entra a Órbita y lo ve, el flag caduca y el push muere solo. El reposo de 14d
+ * del writer evita spam (a lo más 1 push por patrón cada 14 días).
+ */
+export function useOrbitPatternInvite(): void {
+  const { session } = useSession()
+  const uid = session?.user?.id ?? null
+  const { data: profile } = useProfile()
+  const window = (profile ? (profile.notification_window ?? null) : undefined) as
+    | NotificationWindow
+    | null
+    | undefined
+  const { data: fresh } = useRecentOrbitPattern(uid)
+
+  useEffect(() => {
+    if (window === undefined || fresh === undefined) return
+    void syncOrbitPatternInvite(window, fresh === true)
+  }, [window, fresh])
+}
+
 export function useCycleSealInvite(figureComplete: boolean, signLabel: string): void {
   const { data: profile } = useProfile()
   const window = (profile ? (profile.notification_window ?? null) : undefined) as

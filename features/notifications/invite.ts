@@ -114,6 +114,23 @@ export const PATTERN_COPY = {
 } as const
 
 /*
+ * N7 · "Stelar encontró una señal" — el anuncio de una señal/patrón que el
+ * motor encontró en Órbita (rescate, señal naciente). Hermana de N3 pero para
+ * los patrones de Órbita Mes: el tap aterriza en Órbita (target orbit-mes),
+ * donde vive la card del hallazgo. Misma regla dura: NUNCA adelanta el patrón
+ * ni números — curiosidad + invitación, sin culpa, sin presión. Suena en la
+ * ventana elegida y se cancela solo si la usuaria lo ve antes.
+ * (Pasa por voice-and-copy.)
+ */
+export const ORBIT_PATTERN_COPY = {
+  // Primera persona (la voz de ELLA, no "Stelar" en tercera → eso sonaba a log de
+  // sistema) y hace ECO con la card destino ("Estas semanas encontré algo").
+  // Sin "señal" (choca con el nombre propio de la Reliquia "Señal Naciente").
+  title: 'Encontré algo en tus semanas',
+  body: 'Empezó a tomar forma. Cuando quieras, te lo muestro.',
+} as const
+
+/*
  * N5 · el sello del ciclo mensual — anuncio de hito, SOLO post-hoc y solo
  * GANADO: se agenda cuando la figura del mes ya se completó (monotónico:
  * los días con registro solo crecen dentro del mes) y suena el día 1 del
