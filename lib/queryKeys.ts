@@ -43,6 +43,14 @@ export const queryKeys = {
   progress: {
     all: ['progress'] as const,
     measurements: (rangeDays: number | null) => ['progress', 'measurements', rangeDays] as const,
+    // Centralizadas en Epic 00 (antes eran strings sueltos en features/progress/
+    // hooks.ts, violando la convención). Mismos valores → cero cambio de caché.
+    recentWorkouts: (rangeDays: number) => ['progress', 'workouts', rangeDays] as const,
+    trainedTotal: () => ['progress', 'trainedTotal'] as const,
+    allWorkouts: () => ['progress', 'allWorkouts'] as const,
+    monthWorkouts: (monthStart: string) => ['progress', 'monthWorkouts', monthStart] as const,
+    sleep: (rangeDays: number) => ['progress', 'sleep', rangeDays] as const,
+    lastPeriod: () => ['progress', 'cycle', 'last-period'] as const,
   },
   profile: {
     all: ['profile'] as const,

@@ -24,6 +24,35 @@ IA · insights · conversaciones · metacognición. (Todo eso llega en 03–05.)
 
 ---
 
+## Arquitectura (decisión · jul 2026)
+
+La versión larga del brief pedía carpetas `repository / mappers / domain-models /
+services / navigation / analytics`. Eso **contradice** la convención documentada
+del repo (`frontend.md`, `architecture.md`, ADR-0001, `CLAUDE.md`) y crearía un
+island divergente (anti-patrón que los docs marcan, ADR-0002). **Decisión: se
+cumple el MISMO objetivo (UI desacoplada de Supabase, SOLID, listo para crecer)
+mapeando a la convención existente**, sin capas nuevas:
+
+| Intención                 | Dónde vive en el repo                                                |
+| ------------------------- | -------------------------------------------------------------------- |
+| Repository (getHistory…)  | `features/progress/api.ts` (Zod+Supabase, único que conoce Supabase) |
+| Mapper (Supabase→dominio) | el `.parse()`/transform de Zod dentro de `api.ts`                    |
+| Domain models             | `features/progress/types.ts` (`z.infer` + forward-contracts)         |
+| Services / data access    | `hooks.ts` (React Query) + `logic.ts` (puro)                         |
+| Estados de pantalla       | `ProgressState<T>` en `types.ts`                                     |
+| Navigation / screens      | Expo Router file-based (`app/(tabs)/progress.tsx`)                   |
+| Analytics                 | catálogo en `constants.ts` sobre `lib/analytics.ts`                  |
+| Feature flags             | `lib/featureFlags.ts` (centralizado)                                 |
+| Query keys                | `lib/queryKeys.ts` (centralizado)                                    |
+
+**Entregado en Epic 00:** `types.ts` (domain models + `ProgressState` +
+forward-contracts de 01-07), `constants.ts` (catálogo de eventos + ventanas),
+flags `PROGRESS_*` (History ON, resto OFF), y las query keys de progress
+centralizadas (antes eran strings sueltos en `hooks.ts`). La UI y las
+funcionalidades existentes **no cambian**.
+
+---
+
 ## Frontend
 
 Componentes/pantallas a crear o consolidar (kebab-case archivos, PascalCase

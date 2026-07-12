@@ -76,3 +76,15 @@ export const WEARABLE_BODY_COMPOSITION_ENABLED = false
  * archivar). Para abrir a beta: quitar el gate devOnly del writer.
  */
 export const PATTERN_MEMORY_ENABLED = true
+
+/*
+ * Progress 3.0 · flags por capacidad (Epic 00 · Foundation).
+ * docs/progress-3.0/. Gatean features NUEVAS del rediseño; el tab actual sigue
+ * igual mientras estén como están. History ON (la primera capacidad); el resto
+ * OFF hasta que su épica los construya y valide.
+ */
+export const PROGRESS_HISTORY_ENABLED = true
+export const PROGRESS_BODY_ENABLED = false
+export const PROGRESS_AI_ENABLED = false
+export const PROGRESS_CHAT_ENABLED = false
+export const PROGRESS_META_ENABLED = false

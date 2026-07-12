@@ -124,7 +124,7 @@ export function useDeletePhoto() {
  */
 export function useRecentWorkoutDates(rangeDays: number) {
   return useQuery({
-    queryKey: ['progress', 'workouts', rangeDays] as const,
+    queryKey: queryKeys.progress.recentWorkouts(rangeDays),
     queryFn: () => getRecentWorkoutDates(rangeDays),
     staleTime: 60_000,
   })
@@ -133,7 +133,7 @@ export function useRecentWorkoutDates(rangeDays: number) {
 /** All-time distinct trained-day count — the "N días entrenados" stat. */
 export function useTotalTrainedDays() {
   return useQuery({
-    queryKey: ['progress', 'trainedTotal'] as const,
+    queryKey: queryKeys.progress.trainedTotal(),
     queryFn: getTotalTrainedDays,
     staleTime: 60_000,
   })
@@ -143,7 +143,7 @@ export function useTotalTrainedDays() {
  *  calendar (month navigation is a client-side slice). */
 export function useAllWorkoutDates() {
   return useQuery({
-    queryKey: ['progress', 'allWorkouts'] as const,
+    queryKey: queryKeys.progress.allWorkouts(),
     queryFn: getAllWorkoutDates,
     staleTime: 60_000,
   })
@@ -154,7 +154,7 @@ export function useAllWorkoutDates() {
 export function useMonthWorkoutDates() {
   const monthStart = `${todayInTimezone().slice(0, 7)}-01`
   return useQuery({
-    queryKey: ['progress', 'monthWorkouts', monthStart] as const,
+    queryKey: queryKeys.progress.monthWorkouts(monthStart),
     queryFn: () => getMonthWorkoutDates(monthStart),
     staleTime: 60_000,
   })
@@ -162,7 +162,7 @@ export function useMonthWorkoutDates() {
 
 export function useRecentSleepLogs(rangeDays: number) {
   return useQuery({
-    queryKey: ['progress', 'sleep', rangeDays] as const,
+    queryKey: queryKeys.progress.sleep(rangeDays),
     queryFn: () => getRecentSleepLogs(rangeDays),
     staleTime: 60_000,
   })
@@ -170,7 +170,7 @@ export function useRecentSleepLogs(rangeDays: number) {
 
 export function useLastPeriodStart() {
   return useQuery({
-    queryKey: ['progress', 'cycle', 'last-period'] as const,
+    queryKey: queryKeys.progress.lastPeriod(),
     queryFn: getLastPeriodStart,
     staleTime: 5 * 60_000,
   })
