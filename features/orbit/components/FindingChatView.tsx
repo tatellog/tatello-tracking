@@ -237,9 +237,13 @@ export function FindingChatView({
 
   return (
     <View style={styles.wrap}>
-      {/* Visual de apertura: el objeto-constelación del hallazgo. */}
+      {/* La constelación del hallazgo. Se OCULTA durante la carga (la aurora ya es
+          el visual; las dos juntas chocan). El View se queda para medir el ancho
+          (onBand → bandW) que la aurora necesita. */}
       <View style={styles.band} onLayout={onBand}>
-        {bandW > 0 ? <FindingConstellation finding={finding} width={bandW} /> : null}
+        {bandW > 0 && !(pending && log.length === 0) ? (
+          <FindingConstellation finding={finding} width={bandW} />
+        ) : null}
       </View>
 
       {log.map((e, i) =>
