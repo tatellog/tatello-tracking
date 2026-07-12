@@ -17,6 +17,7 @@ import {
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { useOrbitDayRollover } from '@/features/orbit/hooks'
+import { usePatternMemoryWriter } from '@/features/orbit/pattern-memory'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
 import { ScrollPauseContext } from '@/features/orbit/useScreenActive'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -57,6 +58,11 @@ function OrbitBody() {
   // Al cruzar la medianoche con el tab montado, recalcula "hoy" → fetch limpio
   // (si no, Órbita seguiría mostrando los datos de ayer como hoy).
   useOrbitDayRollover()
+  // Memoria de patrones: archiva los patrones que potencian (rescate, señal
+  // naciente) en Historia antes de que se evaporen de la ventana. Corre para
+  // TODAS las usuarias (beta ve MonthSegment; el writer es self-contained, no
+  // depende del segmento). Idempotente por el reposo de 14 días.
+  usePatternMemoryWriter()
   const [segment, setSegment] = useState<OrbitSegment>('dia')
   // Día visto en Órbita Día: null = hoy. Lo setea la tira de 7 días de Semana;
   // cambiar de segmento a mano (OrbitSegments) lo resetea a hoy.

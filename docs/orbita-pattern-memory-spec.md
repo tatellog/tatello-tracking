@@ -176,19 +176,26 @@ Historia de una usuaria nueva está legítimamente vacía — y eso es una prome
 
 ---
 
-## 9. Decisiones abiertas para la dueña
+## 9. Decisiones de la dueña (resueltas jul 2026)
 
-1. **¿El día que rompe (obstáculo) entra a Historia?** Propuesta: sí como
-   observación, NO como Reliquia celebrable. ¿O los obstáculos no se archivan y
-   Historia es solo de lo que potencia (Brillo/Ancla/Pausa/Naciente)?
-2. **Reposo antes de re-revelar:** ¿14 días fuera de la ventana antes de que un
-   patrón pueda volver a asomar como "regreso"? (evita el efecto yo-yo).
-3. **Snapshot vs. vivo:** confirmado congelar los números al detectar (inmutable).
-   ¿De acuerdo, o la dueña prefiere que la entrada de Historia muestre "cómo va
-   ahora"? (rompería inmutabilidad — no recomendado).
-4. **Timing:** ¿post-lanzamiento (27 jul)? La Fase 1 no necesita migración (la
-   tabla existe), pero toca el motor + un writer + UI — cae en feature-freeze
-   (19 jul) salvo que se considere parte del core de validación.
+1. **¿Dónde vive la memoria?** → **Reusar superficies actuales**: marcadores en
+   "Tu constancia" (calendario, ya consume `useRevelationHistory`) + re-ver en
+   Órbita. Sin UI/timeline nuevo. (No existe un timeline navegable de revelaciones;
+   "Tu Historia" de Progreso es la transformación antes/ahora, otra cosa.)
+2. **Reposo antes de re-revelar:** → **14 días fuera** de la ventana antes de que
+   un patrón pueda volver a asomar como "regreso" (evita el yo-yo).
+3. **Números (snapshot vs vivo):** → **Congelar el momento + capa viva "sigue
+   presente" SOLO si el patrón aún está en la ventana.** El registro guarda fijo
+   ("cuando lo vi: 11 de 11"); si sigue presente hoy, se puede mostrar un vivo
+   "sigue asomando"; si ya se fue, NUNCA "lo perdiste". Concilia inmutabilidad +
+   sensación de vivo.
+4. **Obstáculos (el día que rompe):** SIN decisión explícita. **Default MVP: NO se
+   archivan** — un marcador de "día malo" en el calendario roza la culpa. Solo se
+   archivan patrones que POTENCIAN (rescate, señal naciente). Revisable.
+5. **Timing/alcance:** → **Ahora (pre-freeze), mínimo: solo el writer**, reusando
+   los marcadores del calendario. OJO — corrección a esta spec: **SÍ requiere una
+   migración** (extender el CHECK de `revelations.kind` para los kinds nuevos). No
+   toca RLS, pero pasa por `rls-auditor` igual (regla de `supabase/CLAUDE.md`).
 
 ---
 

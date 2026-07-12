@@ -60,3 +60,15 @@ export const MILESTONES_ENABLED = false
  * sincroniza nada, hasta que exista la UI de Resumen (R3) que muestre el dato.
  */
 export const WEARABLE_BODY_COMPOSITION_ENABLED = false
+
+/*
+ * Órbita · memoria de patrones (Fase 1). docs/orbita-pattern-memory-spec.md.
+ *
+ * Cuando es `true`, el writer (usePatternMemoryWriter) archiva los patrones que
+ * POTENCIAN de Órbita Mes (rescate, señal naciente) en `revelations`
+ * (tier='pattern') para que se vuelvan Historia aunque salgan de la ventana
+ * rodante. Aparecen como marcador en "Tu constancia" (superficie reusada). ON
+ * para beta: la idea es que construyan memoria desde el día 1. Killable a `false`
+ * si algo se comporta raro (no borra lo ya archivado, solo deja de archivar).
+ */
+export const PATTERN_MEMORY_ENABLED = true
