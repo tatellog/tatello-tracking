@@ -1,25 +1,46 @@
-import { useMemo, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Dimensions,
+  Image,
+  Modal,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Line, Path } from 'react-native-svg'
+import { useRouter } from 'expo-router'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
-import type { PhotoAngle } from '../api'
+import type { PhotoAngle, TimelinePhoto } from '../api'
 import { PROGRESS_EVENTS } from '../constants'
 import { usePhotoTimeline } from '../hooks'
 import { photoAt, photoDatesFor } from '../logic'
 
 /*
- * Evolución visual (F2 · mockup dueña, el "slider de cuerpo") — MUEVE EL TIEMPO
- * y la fotografía cambia: una línea de tiempo con una estrella por fecha; tocas
- * una estrella y ves cómo te veías ese día, por ángulo. El gancho de retención
- * de largo plazo más fuerte de la categoría (Renpho/Withings), traducido al
- * cielo de Stelar. Cobra vida con el backdating (fotos del coach con su fecha).
- * Se gana su lugar con ≥2 fechas de algún ángulo.
+ * Evolución visual (rediseño · mockup dueña + uxui + benchmark) — la TIRA DE
+ * PELÍCULA: todas las fotos del ángulo lado a lado, cronológicas, aterrizando
+ * en la más reciente. La progresión está FRENTE a los ojos, no en la memoria
+ * (el slideshow de una foto obligaba a comparar de memoria). A este tamaño la
+ * silueta responde "¿cambió mi forma?"; el DETALLE vive a un tap: visor
+ * full-screen con swipe entre fechas.
+ *
+ * Scrubber arriba: línea con relleno magenta hasta la última foto + estrellas ✦
+ * equiespaciadas (equiespaciado a propósito: huecos temporales largos leerían
+ * como "aquí me abandoné" · anti-culpa) + "Hoy" anclado a la derecha, con el
+ * tramo sin foto en hairline — honesto, sin contar días. El RAIL completo es el
+ * touch target (44pt): tap → la tira salta a esa fecha (escala a 20 fechas).
+ * Tabs de ángulo ABAJO (píldoras, alcance de pulgar). Con <4 fechas, un tile
+ * fantasma "Agregar" invita (nunca "te faltan fotos"). Evidencia sin juicio:
+ * solo fechas sobre las fotos, jamás peso/medidas encima.
  */
 
 const ANGLES: { key: PhotoAngle; label: string }[] = [
@@ -29,34 +50,78 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
   { key: 'side_right', label: 'Perfil der' },
 ]
 
+const TILE_W = 74
+const TILE_GAP = 8
+const TILE_H = Math.round(TILE_W / 0.52)
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-const fmtDay = (iso: string): string =>
+const fmtShort = (iso: string): string => `${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`
+const fmtFull = (iso: string): string =>
   `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
 
 export function PhotoEvolution() {
+  const router = useRouter()
   const { data } = usePhotoTimeline()
   const photos = useMemo(() => data ?? [], [data])
 
-  // Ángulos con ≥2 fechas (los únicos donde "mover el tiempo" dice algo).
   const usable = useMemo(
     () => ANGLES.filter((a) => photoDatesFor(photos, a.key).length >= 2),
     [photos],
   )
   const [angle, setAngle] = useState<PhotoAngle | null>(null)
   const active = angle ?? usable[0]?.key ?? null
-
   const dates = useMemo(() => (active ? photoDatesFor(photos, active) : []), [photos, active])
-  const [selected, setSelected] = useState<string | null>(null)
-  const day = selected && dates.includes(selected) ? selected : dates[dates.length - 1]
 
-  if (!active || usable.length === 0 || !day) return null
-  const photo = photoAt(photos, active, day)
-  if (!photo?.signed_url) return null
+  const items = useMemo(
+    () =>
+      active
+        ? dates
+            .map((d) => ({ day: d, photo: photoAt(photos, active, d) }))
+            .filter((x): x is { day: string; photo: TimelinePhoto } => x.photo?.signed_url != null)
+        : [],
+    [dates, photos, active],
+  )
 
-  const pickDay = (d: string) => {
-    setSelected(d)
-    track(PROGRESS_EVENTS.photo, { kind: 'evolution' })
+  const stripRef = useRef<ScrollView>(null)
+  const [viewedIdx, setViewedIdx] = useState(0)
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null)
+  const [railW, setRailW] = useState(0)
+
+  // Aterriza en lo más reciente (tu yo de hoy; scrolleas hacia atrás para viajar).
+  useEffect(() => {
+    setViewedIdx(items.length - 1)
+    const t = setTimeout(() => stripRef.current?.scrollToEnd({ animated: false }), 50)
+    return () => clearTimeout(t)
+  }, [active, items.length])
+
+  if (!active || usable.length === 0 || items.length === 0) return null
+
+  const onStripScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement } = e.nativeEvent
+    const lastVisible = Math.floor(
+      (contentOffset.x + layoutMeasurement.width - TILE_W / 2) / (TILE_W + TILE_GAP),
+    )
+    setViewedIdx(Math.max(0, Math.min(items.length - 1, lastVisible)))
   }
+
+  const jumpTo = (idx: number) => {
+    stripRef.current?.scrollTo({ x: Math.max(0, idx * (TILE_W + TILE_GAP) - 40), animated: true })
+    setViewedIdx(idx)
+    track(PROGRESS_EVENTS.photo, { kind: 'scrub' })
+  }
+
+  // Rail completo como touch target: tap en cualquier x → la fecha más cercana.
+  const onRailPress = (x: number) => {
+    if (railW <= 0 || items.length < 2) return
+    const usableW = railW - 44 // reserva del label "Hoy"
+    const idx = Math.round((x / usableW) * (items.length - 1))
+    jumpTo(Math.max(0, Math.min(items.length - 1, idx)))
+  }
+
+  // Posición (0..1) de cada estrella sobre el rail (equiespaciado por índice).
+  const dotX = (i: number, w: number) =>
+    items.length > 1 ? (i / (items.length - 1)) * (w - 44) : 0
+
+  const showGhost = items.length < 4
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(140)}>
@@ -64,8 +129,116 @@ export function PhotoEvolution() {
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Evolución visual
       </EyebrowLabel>
-      <Text style={styles.sub}>Mueve el tiempo: la fotografía cambia</Text>
+      <Text style={styles.sub}>Tu evolución, de un vistazo</Text>
 
+      {/* ── Scrubber: rail + relleno magenta + estrellas + "Hoy" ── */}
+      <Pressable
+        onPress={(e) => onRailPress(e.nativeEvent.locationX)}
+        onLayout={(e) => setRailW(e.nativeEvent.layout.width)}
+        accessibilityRole="adjustable"
+        accessibilityLabel="Línea de tiempo de tus fotos"
+        style={styles.rail}
+      >
+        {railW > 0 ? (
+          <>
+            <Svg width={railW} height={44} style={StyleSheet.absoluteFill}>
+              {/* Hairline completo hasta "Hoy" (el tramo sin foto queda sin
+                  rellenar: honesto, sin contar días). */}
+              <Line
+                x1={4}
+                y1={22}
+                x2={railW - 4}
+                y2={22}
+                stroke={colors.oroHairline}
+                strokeWidth={1.4}
+              />
+              {/* Relleno magenta: del inicio a la última foto. */}
+              <Line
+                x1={4}
+                y1={22}
+                x2={4 + dotX(items.length - 1, railW)}
+                y2={22}
+                stroke={colors.magenta}
+                strokeWidth={2}
+              />
+              {items.map((it, i) => (
+                <Path
+                  key={it.day}
+                  d={fourPointStarPath(4 + dotX(i, railW), 22, i === viewedIdx ? 7 : 4.5)}
+                  fill={i === viewedIdx ? colors.oroLeche : colors.oroSoft}
+                  opacity={i === viewedIdx ? 1 : 0.75}
+                />
+              ))}
+            </Svg>
+            <Text style={styles.hoy}>Hoy</Text>
+            {/* Labels: primera fecha + la activa (evita encimar con 8+). */}
+            <Text style={[styles.railLabel, { left: 0 }]}>{fmtShort(items[0]!.day)}</Text>
+            {viewedIdx > 0 ? (
+              <Text
+                style={[
+                  styles.railLabel,
+                  styles.railLabelOn,
+                  { left: Math.min(railW - 70, Math.max(30, dotX(viewedIdx, railW) - 16)) },
+                ]}
+              >
+                {fmtShort(items[viewedIdx]!.day)}
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+      </Pressable>
+
+      {/* ── La tira: todas las fechas lado a lado ── */}
+      <ScrollView
+        ref={stripRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onScroll={onStripScroll}
+        scrollEventThrottle={32}
+      >
+        <View style={styles.strip}>
+          {items.map((it, i) => (
+            <Pressable
+              key={it.day}
+              onPress={() => {
+                setViewerIdx(i)
+                track(PROGRESS_EVENTS.photo, { kind: 'viewer' })
+              }}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={`Ver foto del ${fmtFull(it.day)} en grande`}
+              style={styles.tileWrap}
+            >
+              <View style={styles.tile}>
+                <Image
+                  source={{ uri: it.photo.signed_url! }}
+                  style={styles.tileImg}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={[styles.tileDate, i === viewedIdx && styles.tileDateOn]}>
+                {fmtShort(it.day)}
+              </Text>
+            </Pressable>
+          ))}
+          {showGhost ? (
+            <Pressable
+              onPress={() => router.push('/log-photos')}
+              accessibilityRole="button"
+              accessibilityLabel="Agregar fotos de otra fecha"
+              style={styles.tileWrap}
+            >
+              <View style={[styles.tile, styles.ghost]}>
+                <Svg width={26} height={26} viewBox="0 0 26 26">
+                  <Path d={fourPointStarPath(13, 13, 8)} fill={colors.bruma} />
+                </Svg>
+              </View>
+              <Text style={styles.tileDate}>Agregar</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
+
+      {/* ── Tabs de ángulo abajo (alcance de pulgar) ── */}
       {usable.length > 1 ? (
         <View style={styles.angleRow}>
           {usable.map((a) => {
@@ -73,10 +246,7 @@ export function PhotoEvolution() {
             return (
               <Pressable
                 key={a.key}
-                onPress={() => {
-                  setAngle(a.key)
-                  setSelected(null)
-                }}
+                onPress={() => setAngle(a.key)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 style={[styles.angleChip, on && styles.angleChipOn]}
@@ -88,46 +258,65 @@ export function PhotoEvolution() {
         </View>
       ) : null}
 
-      <View style={styles.photoFrame}>
-        {/* contain: la foto COMPLETA siempre visible (cover recortaba cabeza y
-            pies de las fotos de cuerpo entero · feedback dueña). */}
-        <Image source={{ uri: photo.signed_url }} style={styles.photo} resizeMode="contain" />
-        <Text style={styles.photoDate}>{fmtDay(day)}</Text>
-      </View>
-
-      {/* La línea de tiempo: una estrella por fecha; la elegida brilla. */}
-      <View style={styles.timeline}>
-        <Svg width="100%" height={2} style={styles.timelineRail}>
-          <Line x1="0" y1="1" x2="100%" y2="1" stroke={colors.oroHairline} strokeWidth={1.2} />
-        </Svg>
-        <View style={styles.stops}>
-          {dates.map((d) => {
-            const on = d === day
-            return (
-              <Pressable
-                key={d}
-                onPress={() => pickDay(d)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={`Ver foto del ${fmtDay(d)}`}
-                style={styles.stop}
-              >
-                <Svg width={26} height={26} viewBox="0 0 26 26">
-                  <Path
-                    d={fourPointStarPath(13, 13, on ? 8 : 5)}
-                    fill={on ? colors.oroLeche : colors.oroSoft}
-                    opacity={on ? 1 : 0.7}
-                  />
-                </Svg>
-                <Text style={[styles.stopLabel, on && styles.stopLabelOn]}>
-                  {`${MESES[Number(d.slice(5, 7)) - 1]} ${d.slice(2, 4)}`}
-                </Text>
-              </Pressable>
-            )
-          })}
+      {/* ── Visor full-screen: swipe entre fechas, foto completa ── */}
+      <Modal
+        visible={viewerIdx != null}
+        animationType="fade"
+        onRequestClose={() => setViewerIdx(null)}
+      >
+        <View style={styles.viewer}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: (viewerIdx ?? 0) * Dimensions.get('window').width, y: 0 }}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / Dimensions.get('window').width)
+              setViewerIdx(Math.max(0, Math.min(items.length - 1, idx)))
+              track(PROGRESS_EVENTS.photo, { kind: 'viewer-swipe' })
+            }}
+          >
+            {items.map((it) => (
+              <View key={it.day} style={styles.viewerPage}>
+                <Image
+                  source={{ uri: it.photo.signed_url! }}
+                  style={styles.viewerImg}
+                  resizeMode="contain"
+                />
+                <Text style={styles.viewerDate}>{fmtFull(it.day)}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          <Pressable
+            onPress={() => setViewerIdx(null)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar visor"
+            style={styles.viewerClose}
+          >
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M6 6 L18 18 M18 6 L6 18"
+                stroke={colors.leche}
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              />
+            </Svg>
+          </Pressable>
+          {/* Mini-scrubber del visor: posición entre fechas. */}
+          <View style={styles.viewerDots}>
+            {items.map((it, i) => (
+              <Svg key={it.day} width={16} height={16} viewBox="0 0 16 16">
+                <Path
+                  d={fourPointStarPath(8, 8, i === viewerIdx ? 6 : 3.5)}
+                  fill={i === viewerIdx ? colors.oroLeche : colors.oroSoft}
+                  opacity={i === viewerIdx ? 1 : 0.6}
+                />
+              </Svg>
+            ))}
+          </View>
         </View>
-      </View>
+      </Modal>
     </Animated.View>
   )
 }
@@ -140,9 +329,50 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
     color: colors.niebla,
-    marginBottom: 12,
+    marginBottom: 6,
   },
-  angleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  rail: { height: 44, justifyContent: 'center', marginBottom: 6 },
+  hoy: {
+    position: 'absolute',
+    right: 0,
+    top: 15,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    color: colors.oroLeche,
+  },
+  railLabel: {
+    position: 'absolute',
+    top: 32,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  railLabelOn: { color: colors.oroLeche, fontFamily: typography.uiBold },
+  strip: { flexDirection: 'row', gap: TILE_GAP, paddingTop: 8, paddingRight: 12 },
+  tileWrap: { width: TILE_W, alignItems: 'center' },
+  tile: {
+    width: TILE_W,
+    height: TILE_H,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.oroHairlineSoft,
+    backgroundColor: colors.bgCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileImg: { width: TILE_W, height: TILE_H },
+  ghost: { borderStyle: 'dashed', borderColor: colors.bruma },
+  tileDate: {
+    marginTop: 5,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  tileDateOn: { color: colors.oroLeche, fontFamily: typography.uiBold },
+  angleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
   angleChip: {
     paddingVertical: 7,
     paddingHorizontal: 14,
@@ -158,40 +388,37 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   angleLabelOn: { color: colors.magentaHot },
-  // Marco alto (~proporción de foto de cuerpo entero) — con contain, la foto
-  // se ve completa y el letterbox se funde en bgCard.
-  photoFrame: {
-    aspectRatio: 0.52,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.oroHairlineSoft,
+  viewer: { flex: 1, backgroundColor: colors.bg },
+  viewerPage: {
+    width: Dimensions.get('window').width,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerImg: { width: '100%', height: '86%' },
+  viewerDate: {
+    marginTop: 8,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  viewerClose: {
+    position: 'absolute',
+    top: 58,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.bgCard,
   },
-  photo: { ...StyleSheet.absoluteFillObject },
-  photoDate: {
+  viewerDots: {
     position: 'absolute',
-    bottom: 10,
+    bottom: 34,
     alignSelf: 'center',
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-    backgroundColor: 'rgba(10, 6, 8, 0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    overflow: 'hidden',
-    fontVariant: ['tabular-nums'],
+    flexDirection: 'row',
+    gap: 8,
   },
-  timeline: { marginTop: 14 },
-  timelineRail: { position: 'absolute', top: 12 },
-  stops: { flexDirection: 'row', justifyContent: 'space-between' },
-  stop: { alignItems: 'center', gap: 2 },
-  stopLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
-  },
-  stopLabelOn: { color: colors.oroLeche, fontFamily: typography.uiBold },
 })
