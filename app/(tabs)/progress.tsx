@@ -26,6 +26,7 @@ import { CheckinTimeline } from '@/features/progress/components/CheckinTimeline'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
+import { PhotoEvolution } from '@/features/progress/components/PhotoEvolution'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TransformationHero } from '@/features/progress/components/TransformationHero'
 import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
@@ -410,6 +411,9 @@ function ProgressBody() {
                   {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
                       datos), no deja una hairline huérfana. */}
                   <CompositionCards />
+                  {/* Evolución visual: mueve el tiempo, la foto cambia (el
+                      "slider de cuerpo" del mockup · vive del backdating). */}
+                  <PhotoEvolution />
                   {/* F4 · evolución por zona (segmental de los check-ins). */}
                   <ZonesEvolution />
                   {/* F3 · comparador de dos mediciones + historial timeline. */}
