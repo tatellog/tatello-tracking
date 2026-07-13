@@ -1,5 +1,5 @@
-import type { BodyComposition, TimelinePhoto } from '../api'
-import { compositionSummary, photoAt, photoDatesFor } from '../logic'
+import type { BodyCheckin, BodyComposition, TimelinePhoto } from '../api'
+import { compositionSeries, compositionSummary, photoAt, photoDatesFor } from '../logic'
 
 const comp = (day: string, o: Partial<BodyComposition> = {}): BodyComposition => ({
   day_date: day,
@@ -42,6 +42,32 @@ describe('compositionSummary — cards de composición (Epic 02)', () => {
 
   it('sin datos → sin cards', () => {
     expect(compositionSummary([])).toEqual([])
+  })
+})
+
+describe('compositionSeries — series por métrica, check-in gana el día (F2)', () => {
+  const checkin = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+
+  it('fusiona fuentes por métrica; el check-in pisa al wearable en su día', () => {
+    const wearable = [
+      comp('2026-07-01', { body_fat_pct: 31.0, lean_body_mass_kg: 48.0 }),
+      comp('2026-07-10', { body_fat_pct: 30.5 }),
+    ]
+    const checkins = [checkin('2026-07-01', { body_fat_pct: 32.0, muscle_kg: 43.2, water_pct: 51 })]
+    const s = compositionSeries(checkins, wearable)
+    // Grasa: el check-in gana el 07-01 (32.0), el wearable aporta el 07-10.
+    expect(s.body_fat_pct.map((p) => p.value)).toEqual([32.0, 30.5])
+    // Músculo (InBody) y masa magra (wearable) son series SEPARADAS.
+    expect(s.muscle_kg).toHaveLength(1)
+    expect(s.lean_kg.map((p) => p.value)).toEqual([48.0])
+    expect(s.water_pct[0]!.value).toBe(51)
+  })
+
+  it('sin datos → series vacías (las cards se auto-ocultan)', () => {
+    const s = compositionSeries([], [])
+    expect(s.body_fat_pct).toEqual([])
+    expect(s.muscle_kg).toEqual([])
   })
 })
 

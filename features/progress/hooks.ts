@@ -181,26 +181,31 @@ export function useUpsertBodyCheckin() {
   })
 }
 
-/** Body (Epic 02 + F0): composición corporal FUSIONADA — check-ins manuales/
- *  del coach (ganan el día) + ingesta wearable (o su mock dev-gated). Sin
- *  ninguna fuente, vacía → las cards se auto-ocultan. La key distingue
+/** La fuente WEARABLE de composición (o su mock dev-gated). La key distingue
  *  mock/real para que un mock cacheado nunca sobreviva al apagar el flag. */
-export function useBodyComposition(rangeDays: number | null = null) {
+export function useWearableComposition(rangeDays: number | null = null) {
   const mock = useBodyCompositionIsMock()
-  const checkins = useBodyCheckins()
-  const wearable = useQuery({
+  return useQuery({
     queryKey: [...queryKeys.progress.bodyComposition(rangeDays), mock ? 'mock' : 'real'],
     queryFn: () =>
       mock ? Promise.resolve(buildMockBodyComposition(rangeDays)) : getBodyComposition(rangeDays),
     staleTime: 5 * 60_000,
   })
-  const data = useMemo(
-    () =>
-      checkins.data || wearable.data
-        ? mergeComposition(checkins.data ?? [], wearable.data ?? [])
-        : undefined,
-    [checkins.data, wearable.data],
-  )
+}
+
+/** Body (Epic 02 + F0): composición corporal FUSIONADA — check-ins manuales/
+ *  del coach (ganan el día) + ingesta wearable (o su mock dev-gated). Sin
+ *  ninguna fuente, vacía → las cards se auto-ocultan. */
+export function useBodyComposition(rangeDays: number | null = null) {
+  const mock = useBodyCompositionIsMock()
+  const checkins = useBodyCheckins()
+  const wearable = useWearableComposition(rangeDays)
+  const data = useMemo(() => {
+    if (!checkins.data && !wearable.data) return undefined
+    // Con check-ins REALES, el mock no se mezcla (solo llena el vacío total).
+    const wearableRows = mock && (checkins.data?.length ?? 0) > 0 ? [] : (wearable.data ?? [])
+    return mergeComposition(checkins.data ?? [], wearableRows)
+  }, [checkins.data, wearable.data, mock])
   return { ...wearable, data }
 }
 

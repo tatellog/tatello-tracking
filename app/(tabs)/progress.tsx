@@ -25,6 +25,7 @@ import { CompositionCards } from '@/features/progress/components/CompositionCard
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
+import { TransformationHero } from '@/features/progress/components/TransformationHero'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
@@ -236,8 +237,13 @@ function ProgressBody() {
             </>
           ) : (
             <>
-              {/* ── Body: Tu cuerpo — peso + medidas + ciclo. Epic 02 agrega
-                  composición corporal y el comparador de fechas. ── */}
+              {/* F2 · hero "Tu transformación": primera marca → hoy con el arco
+                  dorado (peso suavizado). Se auto-oculta con <2 mediciones. */}
+              <TransformationHero />
+              <View style={styles.divider} />
+
+              {/* ── Body: Tu cuerpo — peso + medidas. Epic 02/F2: composición
+                  con sparklines + comparador de fechas. ── */}
               <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
                 Tu cuerpo
               </EyebrowLabel>

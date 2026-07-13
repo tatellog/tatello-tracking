@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Polyline } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useMacroTargets } from '@/features/macros/hooks'
@@ -18,6 +17,7 @@ import {
   smoothWeightPoints,
   toWeightPoints,
 } from '../logic'
+import { Sparkline } from './Sparkline'
 
 /*
  * "Tus últimos 30 días" (F1 · Progress 3.0, mockup dueña) — el 30v30 como GRID
@@ -147,35 +147,6 @@ export function HistoryChips() {
   )
 }
 
-/** Mini-sparkline: forma del arco, sin ejes ni juicio. Puntos normalizados. */
-function Sparkline({ data, hue }: { data: number[]; hue: string }) {
-  const W = 64
-  const H = 18
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const span = max - min || 1
-  const points = data
-    .map((v, i) => {
-      const x = data.length > 1 ? (i / (data.length - 1)) * W : W / 2
-      const y = H - 2 - ((v - min) / span) * (H - 4)
-      return `${x.toFixed(1)},${y.toFixed(1)}`
-    })
-    .join(' ')
-  return (
-    <Svg width={W} height={H} style={styles.spark}>
-      <Polyline
-        points={points}
-        fill="none"
-        stroke={hue}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.85}
-      />
-    </Svg>
-  )
-}
-
 const styles = StyleSheet.create({
   eyebrow: { marginBottom: 2 },
   sub: {
@@ -223,5 +194,4 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     fontVariant: ['tabular-nums'],
   },
-  spark: { marginTop: 8 },
 })

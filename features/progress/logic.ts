@@ -379,6 +379,53 @@ export function mergeComposition(
   return [...byDay.values()].sort((a, b) => (a.day_date < b.day_date ? -1 : 1))
 }
 
+/** Punto de una serie de composición: día + valor. */
+export type SeriesPoint = { day: string; value: number }
+
+export type CompositionSeriesKey = 'body_fat_pct' | 'muscle_kg' | 'water_pct' | 'bmi' | 'lean_kg'
+
+/**
+ * Series por métrica de composición (F2 · Cuerpo): fusiona check-ins (ganan el
+ * día) + wearable en una serie ascendente POR MÉTRICA, para cards con sparkline
+ * y delta primera→última. `muscle_kg` (InBody, check-ins) y `lean_kg` (HealthKit,
+ * wearable) se mantienen como series SEPARADAS — no son la misma métrica. Puro.
+ */
+export function compositionSeries(
+  checkins: readonly BodyCheckin[],
+  wearable: readonly BodyComposition[],
+): Record<CompositionSeriesKey, SeriesPoint[]> {
+  const out: Record<CompositionSeriesKey, Map<string, number>> = {
+    body_fat_pct: new Map(),
+    muscle_kg: new Map(),
+    water_pct: new Map(),
+    bmi: new Map(),
+    lean_kg: new Map(),
+  }
+  for (const w of wearable) {
+    if (w.body_fat_pct != null) out.body_fat_pct.set(w.day_date, w.body_fat_pct)
+    if (w.lean_body_mass_kg != null) out.lean_kg.set(w.day_date, w.lean_body_mass_kg)
+    if (w.bmi != null) out.bmi.set(w.day_date, w.bmi)
+  }
+  for (const c of checkins) {
+    // El check-in GANA el día (medición deliberada).
+    if (c.body_fat_pct != null) out.body_fat_pct.set(c.measured_on, c.body_fat_pct)
+    if (c.muscle_kg != null) out.muscle_kg.set(c.measured_on, c.muscle_kg)
+    if (c.water_pct != null) out.water_pct.set(c.measured_on, c.water_pct)
+    if (c.bmi != null) out.bmi.set(c.measured_on, c.bmi)
+  }
+  const toSeries = (m: Map<string, number>): SeriesPoint[] =>
+    [...m.entries()]
+      .map(([day, value]) => ({ day, value }))
+      .sort((a, b) => (a.day < b.day ? -1 : 1))
+  return {
+    body_fat_pct: toSeries(out.body_fat_pct),
+    muscle_kg: toSeries(out.muscle_kg),
+    water_pct: toSeries(out.water_pct),
+    bmi: toSeries(out.bmi),
+    lean_kg: toSeries(out.lean_kg),
+  }
+}
+
 /** Las fechas (YYYY-MM-DD, ascendentes, únicas) con foto de un ángulo. */
 export function photoDatesFor(photos: readonly TimelinePhoto[], angle: PhotoAngle): string[] {
   const days = photos.filter((p) => p.angle === angle).map((p) => p.taken_at.slice(0, 10))
