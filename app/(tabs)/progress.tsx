@@ -218,6 +218,17 @@ function ProgressBody() {
               <View style={styles.divider} />
               <BeforeAfterPhotos />
 
+              {/* A · el antojo: Historia delega la evolución completa a Cuerpo
+                  (un solo hogar para la tira — nunca duplicarla aquí). */}
+              <Pressable
+                onPress={goBody}
+                accessibilityRole="link"
+                accessibilityLabel="Ver tu evolución completa"
+                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.calendarBridgeText}>Ver tu evolución completa →</Text>
+              </Pressable>
+
               {/* CTA a Body — el cuerpo vive en su propio segmento (Epic 02). */}
               <View style={styles.divider} />
               <PrimaryCta label="Ver mi cuerpo →" onPress={goBody} />

@@ -6,9 +6,11 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
+import type { PhotoAngle } from '../api'
 import { PROGRESS_EVENTS } from '../constants'
-import { useBodyCheckins } from '../hooks'
-import { compareCheckins, compareSynthesis, type CheckinDeltaKey } from '../logic'
+import { useBodyCheckins, usePhotoTimeline } from '../hooks'
+import { compareCheckins, compareSynthesis, photoAt, type CheckinDeltaKey } from '../logic'
+import { BeforeAfterSlider } from './BeforeAfterSlider'
 
 /*
  * Comparador rápido (rediseño · feedback usuaria: "útil pero confunde y cansa;
@@ -44,11 +46,20 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const fmtDay = (iso: string): string =>
   `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`
 
+const ANGLES: { key: PhotoAngle; label: string }[] = [
+  { key: 'front', label: 'Frente' },
+  { key: 'back', label: 'Espalda' },
+  { key: 'side_left', label: 'Perfil izq' },
+  { key: 'side_right', label: 'Perfil der' },
+]
+
 const fmtVal = (v: number, unit: string) =>
   `${v % 1 === 0 ? v : v.toFixed(1)}${unit ? ` ${unit}` : ''}`
 
 export function CheckinCompare() {
   const { data } = useBodyCheckins()
+  const photosQ = usePhotoTimeline()
+  const photos = useMemo(() => photosQ.data ?? [], [photosQ.data])
   const checkins = useMemo(() => data ?? [], [data])
   const dates = useMemo(() => checkins.map((c) => c.measured_on), [checkins])
 
@@ -56,6 +67,7 @@ export function CheckinCompare() {
   const [dayB, setDayB] = useState<string | null>(null)
   const [picking, setPicking] = useState<'a' | 'b' | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [photoAngle, setPhotoAngle] = useState<PhotoAngle | null>(null)
 
   const a = dayA && dates.includes(dayA) ? dayA : dates[0]
   const b = dayB && dates.includes(dayB) ? dayB : dates[dates.length - 1]
@@ -128,6 +140,11 @@ export function CheckinCompare() {
       {/* La síntesis honesta PRIMERO: hechos duros + rescates, de su lado. */}
       {synthesis ? <Text style={styles.synthesis}>{synthesis}</Text> : null}
 
+      {/* CAMBIO VISUAL: la foto ES la evidencia; los números son contexto
+          (benchmark: sin esto, comparar fechas es la tabla de MFP). Un ángulo a
+          la vez; solo ángulos con foto en AMBAS fechas. Auto-oculto sin fotos. */}
+      <VisualChange photos={photos} a={a} b={b} angle={photoAngle} onAngle={setPhotoAngle} />
+
       <View style={styles.table}>
         {visible.map((r, i) => {
           const meta = LABEL[r.key]
@@ -168,6 +185,61 @@ export function CheckinCompare() {
         Stelar solo interpreta tus registros. No sustituye a un profesional de la salud.
       </Text>
     </Animated.View>
+  )
+}
+
+/** Las fotos de las dos fechas comparadas, con el slider de arrastre. */
+function VisualChange({
+  photos,
+  a,
+  b,
+  angle,
+  onAngle,
+}: {
+  photos: Parameters<typeof photoAt>[0]
+  a: string
+  b: string
+  angle: PhotoAngle | null
+  onAngle: (k: PhotoAngle) => void
+}) {
+  // Solo ángulos con foto en AMBAS fechas (comparar contra un hueco no dice nada).
+  const usable = ANGLES.filter(
+    (x) => photoAt(photos, x.key, a)?.signed_url && photoAt(photos, x.key, b)?.signed_url,
+  )
+  const active = angle && usable.some((u) => u.key === angle) ? angle : usable[0]?.key
+  if (!active) return null
+  const pA = photoAt(photos, active, a)!
+  const pB = photoAt(photos, active, b)!
+
+  return (
+    <View style={styles.visual}>
+      <Text style={styles.visualLabel}>CAMBIO VISUAL</Text>
+      {usable.length > 1 ? (
+        <View style={styles.visualAngles}>
+          {usable.map((x) => {
+            const on = x.key === active
+            return (
+              <Pressable
+                key={x.key}
+                onPress={() => onAngle(x.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                style={[styles.visualChip, on && styles.visualChipOn]}
+              >
+                <Text style={[styles.visualChipText, on && styles.visualChipTextOn]}>
+                  {x.label}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      ) : null}
+      <BeforeAfterSlider beforeUrl={pA.signed_url!} afterUrl={pB.signed_url!} />
+      <View style={styles.visualDates}>
+        <Text style={styles.visualDate}>{fmtDay(a)}</Text>
+        <Text style={styles.visualDate}>{fmtDay(b)}</Text>
+      </View>
+    </View>
   )
 }
 
@@ -296,6 +368,37 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.bodyLarge,
     color: colors.oroLight,
+    fontVariant: ['tabular-nums'],
+  },
+  visual: { marginTop: 16 },
+  visualLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 1.6,
+    color: colors.niebla,
+    marginBottom: 10,
+  },
+  visualAngles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  visualChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    backgroundColor: colors.bgCard2,
+  },
+  visualChipOn: { backgroundColor: colors.magentaTint2, borderColor: colors.magentaGlow },
+  visualChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  visualChipTextOn: { color: colors.magentaHot },
+  visualDates: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  visualDate: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
   moreBtn: { paddingVertical: 12, alignItems: 'center' },
