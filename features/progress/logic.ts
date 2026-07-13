@@ -474,6 +474,28 @@ export function compareCheckins(a: BodyCheckin, b: BodyCheckin): CheckinDelta[] 
  * Las seis flechas ↑ idénticas hacían que la ganancia de músculo se leyera
  * igual que la subida de grasa ("subió×6 = fallaste×6").
  */
+/** ¿Este cambio se movió A FAVOR? (músculo/agua subiendo; grasa/visceral/
+ *  peso/IMC bajando). La MISMA regla alimenta la síntesis y el análisis. */
+export function isFavorableDelta(key: CheckinDeltaKey, delta: number): boolean {
+  if (delta === 0) return false
+  const upIsGood = key === 'muscle_kg' || key === 'water_pct'
+  return upIsGood ? delta > 0 : delta < 0
+}
+
+/** Separa los cambios en rescates (a favor) y hechos duros. */
+export function compareBuckets(rows: readonly CheckinDelta[]): {
+  gains: CheckinDelta[]
+  hard: CheckinDelta[]
+} {
+  const gains: CheckinDelta[] = []
+  const hard: CheckinDelta[] = []
+  for (const r of rows) {
+    if (r.delta === 0) continue
+    ;(isFavorableDelta(r.key, r.delta) ? gains : hard).push(r)
+  }
+  return { gains, hard }
+}
+
 export function compareSynthesis(rows: readonly CheckinDelta[]): string | null {
   if (rows.length === 0) return null
   const rose: string[] = [] // hechos duros (en la dirección difícil)

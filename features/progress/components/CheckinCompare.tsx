@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
@@ -73,6 +74,7 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
   const [picking, setPicking] = useState<'a' | 'b' | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [photoAngle, setPhotoAngle] = useState<PhotoAngle | null>(null)
+  const router = useRouter()
 
   // El timeline preselecciona el "antes" (esa fecha vs la última).
   useEffect(() => {
@@ -193,6 +195,19 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
           </Pressable>
         ) : null}
       </View>
+
+      {/* D · el análisis guiado determinista (la película del tráiler ✦). */}
+      <Pressable
+        onPress={() => {
+          track(PROGRESS_EVENTS.openInsight, { from: 'compare' })
+          router.push({ pathname: '/progress-analysis', params: { a, b } })
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Ver análisis detallado"
+        style={({ pressed }) => [styles.analysisCta, pressed && { opacity: 0.85 }]}
+      >
+        <Text style={styles.analysisCtaText}>Ver análisis detallado →</Text>
+      </Pressable>
 
       {/* La protección del manifiesto. */}
       <Text style={styles.disclaimer}>
@@ -421,6 +436,21 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
     letterSpacing: 0.2,
+  },
+  analysisCta: {
+    marginTop: 14,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.magentaTint,
+    borderWidth: 1.5,
+    borderColor: colors.magentaGlow,
+  },
+  analysisCtaText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.magentaHot,
   },
   disclaimer: {
     marginTop: 10,
