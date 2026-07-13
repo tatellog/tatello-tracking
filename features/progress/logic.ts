@@ -239,6 +239,76 @@ function weightComparison(
 }
 
 /**
+ * Series semanales para las mini-sparklines de Historia (F1 · mockup dueña):
+ * el arco de ~9 semanas de cada hábito como conteo de días/semana. Identidad
+ * visual por métrica, nunca juicio — la sparkline muestra forma, no calificación.
+ * Puro: cubos de 7 días que TERMINAN en `today`, del más viejo al más nuevo.
+ */
+export function historySparklines(
+  signals: readonly DailySignals[],
+  ctx: HistoryCtx,
+): Record<'workouts' | 'protein' | 'deficit' | 'logging', number[]> {
+  const win = ctx.windowDays ?? 30
+  const weeks = Math.ceil((2 * win) / 7)
+  const preds: Record<
+    'workouts' | 'protein' | 'deficit' | 'logging',
+    (s: DailySignals) => boolean
+  > = {
+    workouts: (s) => s.trained === true,
+    protein: (s) =>
+      ctx.proteinTarget != null && s.protein_g != null && s.protein_g >= ctx.proteinTarget,
+    deficit: (s) => isDeficitDay(s.calories, ctx.calorieTarget),
+    logging: (s) => (s.meal_count ?? 0) > 0,
+  }
+  const out = {
+    workouts: new Array(weeks).fill(0) as number[],
+    protein: new Array(weeks).fill(0) as number[],
+    deficit: new Array(weeks).fill(0) as number[],
+    logging: new Array(weeks).fill(0) as number[],
+  }
+  for (const s of signals) {
+    if (s.day == null) continue
+    const back = daysBetween(s.day, ctx.today)
+    if (back < 0 || back >= weeks * 7) continue
+    const bucket = weeks - 1 - Math.floor(back / 7) // más nuevo al final
+    for (const key of Object.keys(preds) as (keyof typeof preds)[]) {
+      if (preds[key](s)) out[key][bucket] = (out[key][bucket] ?? 0) + 1
+    }
+  }
+  return out
+}
+
+/** Proteína PROMEDIO (g/día con registro) de la ventana actual vs la previa —
+ *  el lenguaje del registro del coach (el mockup usa gramos, no días-en-meta).
+ *  null si una ventana no tiene días con proteína registrada. */
+export function proteinAverageComparison(
+  signals: readonly DailySignals[],
+  ctx: HistoryCtx,
+): { current: number; previous: number } | null {
+  const win = ctx.windowDays ?? 30
+  const curStart = shiftIso(ctx.today, -win)
+  const prevStart = shiftIso(ctx.today, -2 * win)
+  const avg = (rows: DailySignals[]): number | null => {
+    const withP = rows.filter((s) => s.protein_g != null)
+    if (withP.length === 0) return null
+    return Math.round(withP.reduce((a, s) => a + (s.protein_g as number), 0) / withP.length)
+  }
+  const cur = avg(signals.filter((s) => s.day != null && s.day > curStart && s.day <= ctx.today))
+  const prev = avg(signals.filter((s) => s.day != null && s.day > prevStart && s.day <= curStart))
+  if (cur == null || prev == null) return null
+  return { current: cur, previous: prev }
+}
+
+/** Días entre dos YYYY-MM-DD sin parsear Date en caliente (Hermes). */
+function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number) as [number, number, number]
+  const [by, bm, bd] = b.split('-').map(Number) as [number, number, number]
+  return Math.round(
+    (new Date(by, bm - 1, bd, 12).getTime() - new Date(ay, am - 1, ad, 12).getTime()) / DAY_MS,
+  )
+}
+
+/**
  * Compara los hábitos de las últimas `windowDays` vs las `windowDays` previas.
  * Métricas de conteo (días): entrenos, proteína-en-meta, déficit, registro
  * (días con comida). Más el delta de peso. Las que dependen de una meta

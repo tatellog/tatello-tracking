@@ -22,9 +22,9 @@ import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
+import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
-import { TuHistoria } from '@/features/progress/components/TuHistoria'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
@@ -76,9 +76,11 @@ function SegmentSwitcher({
   value: ProgressSegment
   onChange: (s: ProgressSegment) => void
 }) {
+  // "Cuerpo" en la UI (Capa 2, español, coherente con Hoy/Comidas/Órbita);
+  // "Body" queda como nombre interno de la épica (Capa 3) — benchmark + mockup.
   const segs: { key: ProgressSegment; label: string }[] = [
     { key: 'historia', label: 'Historia' },
-    { key: 'body', label: 'Body' },
+    { key: 'body', label: 'Cuerpo' },
   ]
   return (
     <View style={styles.segmentPill}>
@@ -177,19 +179,23 @@ function ProgressBody() {
 
           {segment === 'historia' ? (
             <>
-              {/* Hero — "Tu Historia": transformación antes/ahora (coexiste con el
-                  Hero 30v30 · decisión de la dueña). */}
-              <TuHistoria />
-
-              {/* (ComparativaCard se desmontó: duplicaba a TuHistoria — mismo
-                  30v30 con ventanas distintas → números en conflicto en la misma
-                  pantalla. El Comparison Engine se queda (useHistory alimenta
-                  insights y tests); follow-up: converger TuHistoria al engine
-                  para UNA sola matemática.) */}
+              {/* F1 · "Tus últimos 30 días": chips 30v30 con sparklines, driven
+                  por el Comparison Engine (UNA matemática — reemplaza a
+                  TuHistoria, que calculaba su propia ventana). */}
+              <HistoryChips />
 
               {/* Insight principal + chat guiado (Epic 04). Doble-gateado (flag +
                   dev) y auto-oculto sin insights — trae su propio divisor. */}
               <ProgressInsightCard />
+
+              {/* Ciclo — vive en Historia (mockup dueña): contexto del mes, no
+                  del cuerpo. Solo con ciclo activo (nunca hombres). */}
+              {cycleEnabled ? (
+                <>
+                  <View style={styles.divider} />
+                  <CycleCard />
+                </>
+              ) : null}
 
               {/* Síntesis — resultado → causa → qué intentar, la respuesta a
               "¿está funcionando?" en el primer screenful (feedback beta).
@@ -388,17 +394,7 @@ function ProgressBody() {
                 </>
               ) : null}
 
-              {/* ── Ciclo — solo si el perfil tiene ciclo activo (nunca hombres).
-              El divisor se gatea junto a la card para no dejar una línea
-              huérfana cuando CycleCard no se renderiza. ── */}
-              {cycleEnabled ? (
-                <>
-                  <View style={styles.divider} />
-                  <CycleCard />
-                </>
-              ) : null}
-
-              {/* ("Tu cambio visual" se movió arriba, bajo "Tu Historia".) */}
+              {/* (Ciclo se movió a Historia · mockup dueña.) */}
 
               {/* Bottom CTA — only once the user already has a trajectory;
               the empty / first-weight states carry their own CTA. */}

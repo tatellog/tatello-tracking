@@ -1,7 +1,7 @@
 import type { BodyMeasurement } from '@/features/brief/api'
 import type { DailySignals } from '@/features/orbit/api'
 
-import { compareHistory } from '../logic'
+import { compareHistory, historySparklines, proteinAverageComparison } from '../logic'
 
 /** DailySignals mínimo para un día. */
 const sig = (day: string, o: Partial<DailySignals> = {}): DailySignals =>
@@ -91,5 +91,37 @@ describe('compareHistory — comparación 30v30 de hábitos', () => {
   it('sin ≥2 mediciones no hay card de peso', () => {
     const r = compareHistory([], [], CTX)
     expect(r.metrics.find((m) => m.key === 'weight')).toBeUndefined()
+  })
+})
+
+describe('historySparklines — series semanales para los chips (F1)', () => {
+  it('cubetea por semana, del más viejo al más nuevo', () => {
+    // windowDays 10 → 20 días → 3 cubos. Entrenos: 2 esta semana, 1 hace dos.
+    const signals = [
+      sig(day(1), { trained: true }),
+      sig(day(3), { trained: true }),
+      sig(day(15), { trained: true }),
+    ]
+    const s = historySparklines(signals, CTX)
+    expect(s.workouts).toHaveLength(3)
+    expect(s.workouts[2]).toBe(2) // la semana más reciente al final
+    expect(s.workouts[0]).toBe(1)
+  })
+})
+
+describe('proteinAverageComparison — gramos promedio (lenguaje del coach)', () => {
+  it('promedia solo días con proteína registrada, por ventana', () => {
+    const signals = [
+      sig(day(1), { protein_g: 120 }),
+      sig(day(3), { protein_g: 100 }), // actual: prom 110
+      sig(day(12), { protein_g: 90 }), // previa: prom 90
+    ]
+    const r = proteinAverageComparison(signals, CTX)!
+    expect(r.current).toBe(110)
+    expect(r.previous).toBe(90)
+  })
+
+  it('null si una ventana no tiene registros (no inventa)', () => {
+    expect(proteinAverageComparison([sig(day(1), { protein_g: 120 })], CTX)).toBeNull()
   })
 })
