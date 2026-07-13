@@ -465,6 +465,67 @@ export function compareCheckins(a: BodyCheckin, b: BodyCheckin): CheckinDelta[] 
   return out
 }
 
+/* ─── Evolución por zona (F4 · mockup dueña) ───────────────────────────── */
+
+export type ZoneKey = 'arms' | 'trunk' | 'legs'
+
+export type ZoneEvolution = {
+  key: ZoneKey
+  /** % de grasa de la zona en el primer y último check-in con dato. */
+  first: number
+  last: number
+  delta: number
+}
+
+/** Promedio de los lados presentes (izq/der); null si ninguno. */
+function sideAvg(a: number | null | undefined, b: number | null | undefined): number | null {
+  const vals = [a, b].filter((v): v is number => v != null)
+  if (vals.length === 0) return null
+  return Number((vals.reduce((x, y) => x + y, 0) / vals.length).toFixed(1))
+}
+
+/**
+ * Evolución del % de grasa POR ZONA (brazos = promedio izq/der, tronco,
+ * piernas = promedio izq/der) entre el primer y el último check-in que traen
+ * la zona. Puro. La zona de mayor |cambio| es la observación — un HECHO
+ * ("tu tronco fue donde más cambió"), nunca un elogio direccional
+ * ('excelente trabajo' = juicio simétrico implícito · benchmark).
+ */
+export function zoneEvolution(checkins: readonly BodyCheckin[]): {
+  zones: ZoneEvolution[]
+  highlight: ZoneKey | null
+} {
+  const zoneOf = (c: BodyCheckin): Partial<Record<ZoneKey, number>> => {
+    const out: Partial<Record<ZoneKey, number>> = {}
+    const arms = sideAvg(c.fat_arm_right_pct, c.fat_arm_left_pct)
+    const legs = sideAvg(c.fat_leg_right_pct, c.fat_leg_left_pct)
+    if (arms != null) out.arms = arms
+    if (c.fat_trunk_pct != null) out.trunk = c.fat_trunk_pct
+    if (legs != null) out.legs = legs
+    return out
+  }
+  const zones: ZoneEvolution[] = []
+  for (const key of ['arms', 'trunk', 'legs'] as ZoneKey[]) {
+    const serie = checkins
+      .map((c) => ({ day: c.measured_on, v: zoneOf(c)[key] }))
+      .filter((p): p is { day: string; v: number } => p.v != null)
+      .sort((a, b) => (a.day < b.day ? -1 : 1))
+    const first = serie[0]
+    const last = serie[serie.length - 1]
+    if (!first || !last || serie.length < 2) continue
+    zones.push({ key, first: first.v, last: last.v, delta: Number((last.v - first.v).toFixed(1)) })
+  }
+  let highlight: ZoneKey | null = null
+  let best = 0
+  for (const z of zones) {
+    if (Math.abs(z.delta) > best) {
+      best = Math.abs(z.delta)
+      highlight = z.key
+    }
+  }
+  return { zones, highlight }
+}
+
 /** Las fechas (YYYY-MM-DD, ascendentes, únicas) con foto de un ángulo. */
 export function photoDatesFor(photos: readonly TimelinePhoto[], angle: PhotoAngle): string[] {
   const days = photos.filter((p) => p.angle === angle).map((p) => p.taken_at.slice(0, 10))

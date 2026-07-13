@@ -5,6 +5,7 @@ import {
   compositionSummary,
   photoAt,
   photoDatesFor,
+  zoneEvolution,
 } from '../logic'
 
 const comp = (day: string, o: Partial<BodyComposition> = {}): BodyComposition => ({
@@ -96,6 +97,42 @@ describe('compareCheckins — cambios principales entre dos mediciones (F3)', ()
     const a = mk('2024-08-15', { metabolic_age: 47, weight_kg: 69 })
     const b = mk('2025-08-15', { metabolic_age: 52, weight_kg: 72 })
     expect(compareCheckins(a, b).map((r) => r.key)).toEqual(['weight_kg'])
+  })
+})
+
+describe('zoneEvolution — grasa por zona, primera → última (F4)', () => {
+  const mk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+
+  it('promedia lados, calcula deltas y marca la zona de mayor |cambio|', () => {
+    const checkins = [
+      mk('2024-08-15', {
+        fat_arm_right_pct: 31.0,
+        fat_arm_left_pct: 30.7,
+        fat_trunk_pct: 33.0,
+        fat_leg_right_pct: 40.4,
+        fat_leg_left_pct: 40.5,
+      }),
+      mk('2024-11-15', {
+        fat_arm_right_pct: 27.8,
+        fat_arm_left_pct: 27.4,
+        fat_trunk_pct: 28.4,
+        fat_leg_right_pct: 36.2,
+        fat_leg_left_pct: 36.5,
+      }),
+    ]
+    const { zones, highlight } = zoneEvolution(checkins)
+    const trunk = zones.find((z) => z.key === 'trunk')!
+    expect(trunk.delta).toBe(-4.6)
+    // Tronco −4.6 es el mayor cambio (brazos −3.3, piernas −4.1).
+    expect(highlight).toBe('trunk')
+    expect(zones.find((z) => z.key === 'arms')!.first).toBe(30.9) // promedio izq/der
+  })
+
+  it('sin ≥2 mediciones con esa zona, la zona no aparece (ni highlight)', () => {
+    const { zones, highlight } = zoneEvolution([mk('2024-08-15', { fat_trunk_pct: 33 })])
+    expect(zones).toEqual([])
+    expect(highlight).toBeNull()
   })
 })
 

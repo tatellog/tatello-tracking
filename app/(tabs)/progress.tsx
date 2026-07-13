@@ -28,6 +28,7 @@ import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TransformationHero } from '@/features/progress/components/TransformationHero'
+import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
 import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
@@ -398,6 +399,8 @@ function ProgressBody() {
                   {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
                       datos), no deja una hairline huérfana. */}
                   <CompositionCards />
+                  {/* F4 · evolución por zona (segmental de los check-ins). */}
+                  <ZonesEvolution />
                   {/* F3 · comparador de dos mediciones + historial timeline. */}
                   <CheckinCompare />
                   <CheckinTimeline />

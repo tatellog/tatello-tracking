@@ -97,6 +97,27 @@ export function CheckinCompare() {
           )
         })}
       </View>
+
+      {/* "En resumen" determinístico: los hechos en una línea, sin adjetivos
+          (nada de 'mejoró notablemente' — juicio). */}
+      {rows.length > 1 ? (
+        <Text style={styles.summary}>
+          Entre estas dos mediciones:{' '}
+          {rows
+            .filter((r) => r.delta !== 0)
+            .map((r) => {
+              const meta = LABEL[r.key]
+              return `${meta.name.toLowerCase()} ${r.delta > 0 ? '+' : '−'}${Math.abs(r.delta) % 1 === 0 ? Math.abs(r.delta) : Math.abs(r.delta).toFixed(1)}${meta.unit ? ` ${meta.unit}` : ''}`
+            })
+            .join(' · ')}
+          .
+        </Text>
+      ) : null}
+
+      {/* La protección del manifiesto (mockup + benchmark: perfecta tal cual). */}
+      <Text style={styles.disclaimer}>
+        Stelar solo interpreta tus registros. No sustituye a un profesional de la salud.
+      </Text>
     </Animated.View>
   )
 }
@@ -229,5 +250,20 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.bodyLarge,
     fontVariant: ['tabular-nums'],
+  },
+  summary: {
+    marginTop: 12,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  disclaimer: {
+    marginTop: 10,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
   },
 })
