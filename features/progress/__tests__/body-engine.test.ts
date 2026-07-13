@@ -1,11 +1,15 @@
 import type { BodyCheckin, BodyComposition, TimelinePhoto } from '../api'
+import type { BodyMeasurement } from '@/features/brief/api'
+
 import {
   compareCheckins,
   compareSynthesis,
   compositionSeries,
   compositionSummary,
+  mergeWeightSeries,
   photoAt,
   photoDatesFor,
+  photoNear,
   zoneEvolution,
 } from '../logic'
 
@@ -98,6 +102,42 @@ describe('compareCheckins — cambios principales entre dos mediciones (F3)', ()
     const a = mk('2024-08-15', { metabolic_age: 47, weight_kg: 69 })
     const b = mk('2025-08-15', { metabolic_age: 52, weight_kg: 72 })
     expect(compareCheckins(a, b).map((r) => r.key)).toEqual(['weight_kg'])
+  })
+})
+
+describe('mergeWeightSeries — UNA sola verdad de peso (app + coach)', () => {
+  const meas = (iso: string, kg: number): BodyMeasurement =>
+    ({ id: iso, measured_at: iso, weight_kg: kg }) as unknown as BodyMeasurement
+  const chk = (day: string, kg: number): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', weight_kg: kg }) as BodyCheckin
+
+  it('fusiona ambas fuentes en una serie ascendente', () => {
+    const fused = mergeWeightSeries(
+      [meas('2026-06-06T08:00:00Z', 67.1)],
+      [chk('2024-08-15', 69.3), chk('2025-08-15', 72.1)],
+    )
+    expect(fused.map((p) => p.weight)).toEqual([69.3, 72.1, 67.1])
+  })
+
+  it('mismo día: gana la medición propia (el ritual de la app)', () => {
+    const fused = mergeWeightSeries([meas('2024-08-15T08:00:00Z', 69.0)], [chk('2024-08-15', 69.3)])
+    expect(fused).toHaveLength(1)
+    expect(fused[0]!.weight).toBe(69.0)
+  })
+})
+
+describe('photoNear — tolerancia ±3 días para el cambio visual', () => {
+  const p = (day: string): TimelinePhoto => ({
+    id: day,
+    taken_at: `${day}T12:00:00Z`,
+    angle: 'front',
+    signed_url: `https://x/${day}`,
+  })
+
+  it('encuentra la foto a ≤3 días del check-in; rechaza más lejos', () => {
+    const photos = [p('2024-08-17')]
+    expect(photoNear(photos, 'front', '2024-08-15')?.id).toBe('2024-08-17')
+    expect(photoNear(photos, 'front', '2024-08-10')).toBeNull()
   })
 })
 

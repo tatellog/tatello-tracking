@@ -23,6 +23,13 @@ const ZONE_LABEL: Record<ZoneKey, string> = {
   legs: 'Piernas',
 }
 
+/** Evidencia primero, cero concordancia ("La grasa cambió más en tus brazos"). */
+const ZONE_IN: Record<ZoneKey, string> = {
+  arms: 'tus brazos',
+  trunk: 'tu tronco',
+  legs: 'tus piernas',
+}
+
 export function ZonesEvolution() {
   const { data } = useBodyCheckins()
   const { zones, highlight } = useMemo(() => zoneEvolution(data ?? []), [data])
@@ -63,9 +70,7 @@ export function ZonesEvolution() {
 
       {/* La observación: hecho, sin nota. */}
       {hl ? (
-        <Text style={styles.observation}>
-          Tu {ZONE_LABEL[hl.key].toLowerCase()} fue la zona donde más cambió el porcentaje de grasa.
-        </Text>
+        <Text style={styles.observation}>La grasa cambió más en {ZONE_IN[hl.key]}.</Text>
       ) : null}
     </Animated.View>
   )

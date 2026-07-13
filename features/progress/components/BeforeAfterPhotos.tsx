@@ -545,12 +545,14 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         </TouchableOpacity>
       ) : mode === 'slider' && canCompare ? (
         <>
-          <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
-          <Text style={styles.sliderDates}>
-            {formatDate(data.before!.taken_at)}
-            <Text style={styles.sliderArrow}>{'  →  '}</Text>
-            {formatAfterDate(data.after!, data.before)}
-          </Text>
+          {/* Fechas como etiquetas sobre la foto (hechos), no "Antes/Ahora"
+              (juicio de estado · benchmark). Un solo lugar para las fechas. */}
+          <BeforeAfterSlider
+            beforeUrl={beforeUrl}
+            afterUrl={afterUrl}
+            leftLabel={formatDate(data.before!.taken_at)}
+            rightLabel={formatAfterDate(data.after!, data.before)}
+          />
           <Text style={styles.sliderHint}>Arrastra el divisor para revelar tu cambio.</Text>
         </>
       ) : (

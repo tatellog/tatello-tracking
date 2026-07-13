@@ -10,7 +10,7 @@ import { colors, typography } from '@/theme'
 import type { PhotoAngle } from '../api'
 import { PROGRESS_EVENTS } from '../constants'
 import { useBodyCheckins, usePhotoTimeline } from '../hooks'
-import { compareCheckins, compareSynthesis, photoAt, type CheckinDeltaKey } from '../logic'
+import { compareCheckins, compareSynthesis, photoNear, type CheckinDeltaKey } from '../logic'
 import { BeforeAfterSlider } from './BeforeAfterSlider'
 
 /*
@@ -217,7 +217,9 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
   )
 }
 
-/** Las fotos de las dos fechas comparadas, con el slider de arrastre. */
+/** Las fotos de las dos fechas comparadas, con el slider de arrastre. Fechas
+ *  como etiquetas SOBRE la foto (hechos, no "Antes/Ahora" — juicio de estado).
+ *  photoNear ±3 días: la sesión de fotos del día siguiente al check-in cuenta. */
 function VisualChange({
   photos,
   a,
@@ -225,20 +227,20 @@ function VisualChange({
   angle,
   onAngle,
 }: {
-  photos: Parameters<typeof photoAt>[0]
+  photos: Parameters<typeof photoNear>[0]
   a: string
   b: string
   angle: PhotoAngle | null
   onAngle: (k: PhotoAngle) => void
 }) {
-  // Solo ángulos con foto en AMBAS fechas (comparar contra un hueco no dice nada).
+  // Solo ángulos con foto cerca de AMBAS fechas (contra un hueco no se compara).
   const usable = ANGLES.filter(
-    (x) => photoAt(photos, x.key, a)?.signed_url && photoAt(photos, x.key, b)?.signed_url,
+    (x) => photoNear(photos, x.key, a)?.signed_url && photoNear(photos, x.key, b)?.signed_url,
   )
   const active = angle && usable.some((u) => u.key === angle) ? angle : usable[0]?.key
   if (!active) return null
-  const pA = photoAt(photos, active, a)!
-  const pB = photoAt(photos, active, b)!
+  const pA = photoNear(photos, active, a)!
+  const pB = photoNear(photos, active, b)!
 
   return (
     <View style={styles.visual}>
@@ -263,11 +265,12 @@ function VisualChange({
           })}
         </View>
       ) : null}
-      <BeforeAfterSlider beforeUrl={pA.signed_url!} afterUrl={pB.signed_url!} />
-      <View style={styles.visualDates}>
-        <Text style={styles.visualDate}>{fmtDay(a)}</Text>
-        <Text style={styles.visualDate}>{fmtDay(b)}</Text>
-      </View>
+      <BeforeAfterSlider
+        beforeUrl={pA.signed_url!}
+        afterUrl={pB.signed_url!}
+        leftLabel={fmtDay(a)}
+        rightLabel={fmtDay(b)}
+      />
     </View>
   )
 }
@@ -423,13 +426,6 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   visualChipTextOn: { color: colors.magentaHot },
-  visualDates: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  visualDate: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
-  },
   moreBtn: { paddingVertical: 12, alignItems: 'center' },
   moreText: {
     fontFamily: typography.uiSemi,

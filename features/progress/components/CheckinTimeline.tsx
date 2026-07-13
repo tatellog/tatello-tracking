@@ -45,6 +45,7 @@ export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) 
         horizontal
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.railContent}
       >
         <View style={styles.rail}>
           {checkins.map((c, i) => {
@@ -127,8 +128,11 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: 14,
   },
-  rail: { flexDirection: 'row', paddingRight: 12 },
-  node: { width: 112 },
+  // El padding va en el contentContainer del ScrollView (en el View interno no
+  // aplicaba al final del scroll y el último nodo se cortaba).
+  railContent: { paddingRight: 32 },
+  rail: { flexDirection: 'row' },
+  node: { minWidth: 112, paddingRight: 6 },
   starRow: { flexDirection: 'row', alignItems: 'center' },
   thumb: {
     marginTop: 8,

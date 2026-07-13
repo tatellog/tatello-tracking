@@ -14,9 +14,16 @@ import { colors, typography } from '@/theme'
 export function BeforeAfterSlider({
   beforeUrl,
   afterUrl,
+  // FECHAS, no juicios de estado (benchmark: "Antes" declara que la de ayer era
+  // la versión incorrecta; la fecha es un hecho). Default = comportamiento
+  // legado del diptych de Historia hasta que también pase a fechas.
+  leftLabel = 'Antes',
+  rightLabel = 'Ahora',
 }: {
   beforeUrl: string
   afterUrl: string
+  leftLabel?: string
+  rightLabel?: string
 }) {
   const { width: screenW } = useWindowDimensions()
   const W = screenW - 40 // padding del contenido (20 por lado)
@@ -69,10 +76,10 @@ export function BeforeAfterSlider({
 
         {/* Etiquetas */}
         <View style={styles.tagAntes} pointerEvents="none">
-          <Text style={styles.tagText}>Antes</Text>
+          <Text style={styles.tagText}>{leftLabel}</Text>
         </View>
         <View style={styles.tagAhora} pointerEvents="none">
-          <Text style={styles.tagText}>Ahora</Text>
+          <Text style={styles.tagText}>{rightLabel}</Text>
         </View>
 
         {/* Divisor + asa */}

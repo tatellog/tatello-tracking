@@ -171,6 +171,53 @@ export function formatTrendCopy(trend: Trend): string {
   return `Subes apenas ${rate} por semana: luz tibia.`
 }
 
+/**
+ * UNA sola serie de peso (fix de confianza · target-user: "67 arriba y 72 abajo
+ * sin explicación → la tercera vez ya no le creo a nada"). Fusiona los pesos
+ * marcados en la app (body_measurements) con los de los check-ins del coach:
+ * una línea continua, como Apple Health. Mismo día: gana la medición propia
+ * (el ritual); los check-ins anclan el histórico. El suavizado 7d existente
+ * absorbe el salto entre básculas. Ascendente por t.
+ */
+export function mergeWeightSeries(
+  measurements: readonly BodyMeasurement[],
+  checkins: readonly BodyCheckin[],
+): WeightPoint[] {
+  const byDay = new Map<string, WeightPoint>()
+  for (const c of checkins) {
+    if (c.weight_kg == null) continue
+    const [y, m, d] = c.measured_on.split('-').map(Number) as [number, number, number]
+    byDay.set(c.measured_on, { t: new Date(y, m - 1, d, 8).getTime(), weight: c.weight_kg })
+  }
+  for (const m of measurements) {
+    if (m.weight_kg == null) continue
+    const day = m.measured_at.slice(0, 10)
+    byDay.set(day, { t: new Date(m.measured_at).getTime(), weight: m.weight_kg })
+  }
+  return [...byDay.values()].sort((a, b) => a.t - b.t)
+}
+
+/** La foto del ángulo MÁS CERCANA a un día (±tolDays): una sesión de fotos al
+ *  día siguiente del check-in no desaparece del comparador. */
+export function photoNear(
+  photos: readonly TimelinePhoto[],
+  angle: PhotoAngle,
+  day: string,
+  tolDays = 3,
+): TimelinePhoto | null {
+  let best: TimelinePhoto | null = null
+  let bestDist = Infinity
+  for (const p of photos) {
+    if (p.angle !== angle || p.signed_url == null) continue
+    const dist = Math.abs(daysBetween(p.taken_at.slice(0, 10), day))
+    if (dist < bestDist) {
+      bestDist = dist
+      best = p
+    }
+  }
+  return best && bestDist <= tolDays ? best : null
+}
+
 /* ─── Comparison Engine · Historia 30v30 (Epic 01) ─────────────────────
  *
  * Puro y testeable: compara los HÁBITOS de la ventana actual (últimos N días)

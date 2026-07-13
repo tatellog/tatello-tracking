@@ -7,8 +7,8 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { colors, typography } from '@/theme'
 
-import { useMeasurements } from '../hooks'
-import { smoothWeightPoints, toWeightPoints } from '../logic'
+import { useBodyCheckins, useMeasurements } from '../hooks'
+import { mergeWeightSeries, smoothWeightPoints } from '../logic'
 
 /*
  * "Tu transformación · Desde que comenzaste" (F2 · Cuerpo, mockup dueña) — el
@@ -24,16 +24,21 @@ const ARC_H = 64
 
 export function TransformationHero() {
   const measurements = useMeasurements(null)
+  const checkins = useBodyCheckins()
 
   const hero = useMemo(() => {
-    const smoothed = smoothWeightPoints(toWeightPoints(measurements.data ?? []))
+    // UNA sola serie (app + coach): "desde que comenzaste" es HONESTO — arranca
+    // en tu primera medición real, no en la primera que marcaste en la app.
+    // (target-user: dos verdades en la misma pantalla rompían toda la confianza.)
+    const fused = mergeWeightSeries(measurements.data ?? [], checkins.data ?? [])
+    const smoothed = smoothWeightPoints(fused)
     const first = smoothed[0]
     const last = smoothed[smoothed.length - 1]
     if (!first || !last || smoothed.length < 2) return null
     const deltaKg = Number((last.weight - first.weight).toFixed(1))
     const daysSince = Math.max(0, Math.round((Date.now() - last.t) / 86400000))
     return { from: first.weight, to: last.weight, deltaKg, count: smoothed.length, daysSince }
-  }, [measurements.data])
+  }, [measurements.data, checkins.data])
 
   if (!hero) return null
 

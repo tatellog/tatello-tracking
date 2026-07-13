@@ -25,7 +25,6 @@ import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
 import { CheckinTimeline } from '@/features/progress/components/CheckinTimeline'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
-import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
 import { PhotoEvolution } from '@/features/progress/components/PhotoEvolution'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TransformationHero } from '@/features/progress/components/TransformationHero'
@@ -34,13 +33,13 @@ import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
 import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
-import { useMeasurements } from '@/features/progress/hooks'
+import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
   computeTrend,
   formatTrendCopy,
+  mergeWeightSeries,
   smoothWeightPoints,
-  toWeightPoints,
   type Trend,
   type WeightPoint,
 } from '@/features/progress/logic'
@@ -137,13 +136,19 @@ function ProgressBody() {
   }
   // Fusión "detalle de medición": tap en el timeline preselecciona el comparador.
   const [comparePresetA, setComparePresetA] = useState<string | null>(null)
-  const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
+  const measurementsQuery = useMeasurements(null)
+  const checkinsQuery = useBodyCheckins()
   const { data: profile } = useProfile()
 
-  const points = useMemo(
-    () => toWeightPoints(measurementsQuery.data ?? []),
-    [measurementsQuery.data],
-  )
+  // UNA sola serie de peso (app + check-ins del coach) — la misma verdad que el
+  // hero. El periodo se recorta client-side sobre la serie fusionada.
+  const points = useMemo(() => {
+    const fused = mergeWeightSeries(measurementsQuery.data ?? [], checkinsQuery.data ?? [])
+    const days = PERIOD_DAYS[period]
+    if (days == null) return fused
+    const since = Date.now() - days * 24 * 60 * 60 * 1000
+    return fused.filter((p) => p.t >= since)
+  }, [measurementsQuery.data, checkinsQuery.data, period])
   // Weight is shown smoothed — a trailing 7-day moving average — so a
   // single noisy weigh-in never becomes the trend, the delta or the
   // headline number. The raw `points` are kept only for the count.
@@ -393,9 +398,35 @@ function ProgressBody() {
                 </Animated.View>
               )}
 
-              {/* F0 · captura manual del check-in completo (el registro del
-                  coach: composición + zonas, con fecha retroactiva). Manual es
-                  fuente de primera clase — el wearable quizá no dé todo. */}
+              {/* ── Orden producto: detalle numérico → evidencia visual →
+                  herramientas → ENTRADA al final. El comparador va DEBAJO del
+                  historial: el tap en una estrella aterriza donde sigues
+                  leyendo. PhotoCompare murió (duplicaba al comparador, que ya
+                  trae CAMBIO VISUAL). ── */}
+              {PROGRESS_BODY_ENABLED ? (
+                <>
+                  {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
+                      datos), no deja una hairline huérfana. */}
+                  <CompositionCards />
+                  {/* F4 · evolución por zona (segmental de los check-ins). */}
+                  <ZonesEvolution />
+                  {/* Evolución visual abre el bloque de fotos. */}
+                  <PhotoEvolution />
+                  {/* Historial → comparador (tap en estrella aterriza abajo). */}
+                  <CheckinTimeline onPick={setComparePresetA} />
+                  <CheckinCompare presetA={comparePresetA} />
+                </>
+              ) : null}
+
+              {/* (Ciclo se movió a Historia · mockup dueña.) */}
+
+              {/* ── Cluster de ENTRADA (un solo hogar para el input, al final,
+                  como el modelo de logging de Hoy). ── */}
+              {hasTrajectory ? (
+                <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
+                  <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
+                </Animated.View>
+              ) : null}
               <Pressable
                 onPress={() => router.push('/log-checkin')}
                 accessibilityRole="link"
@@ -404,9 +435,6 @@ function ProgressBody() {
               >
                 <Text style={styles.calendarBridgeText}>Registrar medición completa →</Text>
               </Pressable>
-
-              {/* Backdating de fotos: sube las históricas (sesiones del coach)
-                  con su fecha real → la evolución visual cobra línea de tiempo. */}
               <Pressable
                 onPress={() => router.push('/log-photos')}
                 accessibilityRole="link"
@@ -415,37 +443,6 @@ function ProgressBody() {
               >
                 <Text style={styles.calendarBridgeText}>Agregar fotos de otra fecha →</Text>
               </Pressable>
-
-              {/* ── Body (Epic 02): composición corporal + comparador de fotos
-                  por fechas. Ambos se auto-ocultan sin datos (la ingesta
-                  wearable es opcional; el comparador pide ≥2 fechas). ── */}
-              {PROGRESS_BODY_ENABLED ? (
-                <>
-                  {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
-                      datos), no deja una hairline huérfana. */}
-                  <CompositionCards />
-                  {/* Evolución visual: mueve el tiempo, la foto cambia (el
-                      "slider de cuerpo" del mockup · vive del backdating). */}
-                  <PhotoEvolution />
-                  {/* F4 · evolución por zona (segmental de los check-ins). */}
-                  <ZonesEvolution />
-                  {/* F3 · comparador de dos mediciones + historial timeline
-                      (tap en estrella → comparador preseleccionado). */}
-                  <CheckinCompare presetA={comparePresetA} />
-                  <CheckinTimeline onPick={setComparePresetA} />
-                  <PhotoCompare />
-                </>
-              ) : null}
-
-              {/* (Ciclo se movió a Historia · mockup dueña.) */}
-
-              {/* Bottom CTA — only once the user already has a trajectory;
-              the empty / first-weight states carry their own CTA. */}
-              {hasTrajectory ? (
-                <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
-                  <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
-                </Animated.View>
-              ) : null}
             </>
           )}
         </ScrollView>
