@@ -391,6 +391,17 @@ function ProgressBody() {
                 <Text style={styles.calendarBridgeText}>Registrar medición completa →</Text>
               </Pressable>
 
+              {/* Backdating de fotos: sube las históricas (sesiones del coach)
+                  con su fecha real → la evolución visual cobra línea de tiempo. */}
+              <Pressable
+                onPress={() => router.push('/log-photos')}
+                accessibilityRole="link"
+                accessibilityLabel="Agregar fotos de otra fecha"
+                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.calendarBridgeText}>Agregar fotos de otra fecha →</Text>
+              </Pressable>
+
               {/* ── Body (Epic 02): composición corporal + comparador de fotos
                   por fechas. Ambos se auto-ocultan sin datos (la ingesta
                   wearable es opcional; el comparador pide ≥2 fechas). ── */}
