@@ -6,6 +6,7 @@ import {
   compareSynthesis,
   compositionSeries,
   compositionSummary,
+  compositionSynthesis,
   mergeWeightSeries,
   photoAt,
   photoDatesFor,
@@ -138,6 +139,31 @@ describe('photoNear — tolerancia ±3 días para el cambio visual', () => {
     const photos = [p('2024-08-17')]
     expect(photoNear(photos, 'front', '2024-08-15')?.id).toBe('2024-08-17')
     expect(photoNear(photos, 'front', '2024-08-10')).toBeNull()
+  })
+})
+
+describe('compositionSynthesis — la lectura de las cards (misma voz que el comparador)', () => {
+  const chk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+
+  it('separa rescates de hechos duros (los 4 ↑ de la usuaria)', () => {
+    // Su caso real: grasa↑ + IMC↑ (duros) · músculo↑ + agua↑ (a favor).
+    const series = compositionSeries(
+      [
+        chk('2024-08-15', { body_fat_pct: 35.4, muscle_kg: 42.5, water_pct: 47.9, bmi: 24.2 }),
+        chk('2025-08-15', { body_fat_pct: 36.8, muscle_kg: 43.2, water_pct: 51, bmi: 25 }),
+      ],
+      [],
+    )
+    const s = compositionSynthesis(series)!
+    expect(s).toContain('tu grasa')
+    expect(s).toContain('ganaste músculo')
+    expect(s).toContain('no empiezas de cero')
+  })
+
+  it('con una sola medición por métrica → null (no hay lectura que dar)', () => {
+    const series = compositionSeries([chk('2024-08-15', { body_fat_pct: 35.4 })], [])
+    expect(compositionSynthesis(series)).toBeNull()
   })
 })
 

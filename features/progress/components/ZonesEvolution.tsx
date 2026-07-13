@@ -45,13 +45,14 @@ export function ZonesEvolution() {
       </EyebrowLabel>
       <Text style={styles.sub}>Grasa por zona, de tu primera a tu última medición</Text>
 
+      {/* Sin highlight dorado: se leía como PREMIO ("¿me felicitas por subir
+          grasa?" · target-user). La observación de abajo dirige la atención. */}
       <View style={styles.grid}>
         {zones.map((z) => {
-          const isHl = z.key === highlight
           const arrow = z.delta === 0 ? null : z.delta > 0 ? '↑' : '↓'
           return (
-            <View key={z.key} style={[styles.card, isHl && styles.cardHl]}>
-              <Text style={[styles.zone, isHl && styles.zoneHl]}>{ZONE_LABEL[z.key]}</Text>
+            <View key={z.key} style={styles.card}>
+              <Text style={styles.zone}>{ZONE_LABEL[z.key]}</Text>
               <View style={styles.valueRow}>
                 <Text style={styles.prev}>{z.first.toFixed(1)} %</Text>
                 <Text style={styles.arrowGlyph}>→</Text>
@@ -96,15 +97,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
-  // La zona de mayor cambio se marca en ORO (atención, no calificación).
-  cardHl: { borderColor: colors.oroHairline, backgroundColor: colors.oroTint },
   zone: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.micro,
     letterSpacing: 0.5,
     color: colors.niebla,
   },
-  zoneHl: { color: colors.oroSoft },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',

@@ -3,10 +3,17 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 import { useBodyCheckins, useBodyCompositionIsMock, useWearableComposition } from '../hooks'
-import { compositionSeries, type CompositionSeriesKey, type SeriesPoint } from '../logic'
+import {
+  compositionSeries,
+  compositionSynthesis,
+  type CompositionSeriesKey,
+  type SeriesPoint,
+} from '../logic'
 import { Sparkline } from './Sparkline'
 
 /*
@@ -50,6 +57,30 @@ export function CompositionCards() {
   const cards = METRICS.map((m) => ({ ...m, serie: series[m.key] })).filter(
     (c) => c.serie.length > 0,
   )
+
+  // La lectura ANTES de las flechas (misma frase honesta del comparador):
+  // "Subió tu grasa. También ganaste músculo: no empiezas de cero."
+  const synthesis = useMemo(() => compositionSynthesis(series), [series])
+
+  // Conexión con el ciclo, SOLO cuando es honesta: la última medición cayó en
+  // días de retención (lútea/menstrual) Y es reciente (≤7 días). Conectar el
+  // ciclo a un delta de un año sería endulzar el número.
+  const cycle = useCyclePhase()
+  const cycleNote = useMemo(() => {
+    if (!cycle || (cycle.phase !== 'lutea' && cycle.phase !== 'menstrual')) return null
+    const lastDay = Object.values(series)
+      .flat()
+      .reduce<string | null>((acc, p) => (acc == null || p.day > acc ? p.day : acc), null)
+    if (!lastDay) return null
+    const [y, m, d] = lastDay.split('-').map(Number) as [number, number, number]
+    const [ty, tm, td] = todayInTimezone().split('-').map(Number) as [number, number, number]
+    const diff = Math.round(
+      (new Date(ty, tm - 1, td, 12).getTime() - new Date(y, m - 1, d, 12).getTime()) / 86400000,
+    )
+    if (diff < 0 || diff > 7) return null
+    return 'Tu última medición cayó en días en que el cuerpo retiene agua por el ciclo. El agua y el peso pueden subir sin que nada esté mal.'
+  }, [cycle, series])
+
   if (cards.length === 0) return null
 
   return (
@@ -59,6 +90,8 @@ export function CompositionCards() {
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Composición corporal
       </EyebrowLabel>
+      {synthesis ? <Text style={styles.synthesis}>{synthesis}</Text> : null}
+      {cycleNote ? <Text style={styles.cycleNote}>{cycleNote}</Text> : null}
       <View style={styles.grid}>
         {cards.map((c) => (
           <MetricCard key={c.key} label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
@@ -113,7 +146,24 @@ function MetricCard({
 
 const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
-  eyebrow: { marginBottom: 12 },
+  eyebrow: { marginBottom: 10 },
+  // La lectura en voz del coach — antes de cualquier flecha.
+  synthesis: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.title,
+    lineHeight: 24,
+    color: colors.leche,
+    marginBottom: 12,
+  },
+  cycleNote: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.niebla,
+    marginBottom: 12,
+  },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     flexGrow: 1,

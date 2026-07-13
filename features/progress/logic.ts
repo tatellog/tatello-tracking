@@ -594,6 +594,37 @@ export function compareSynthesis(rows: readonly CheckinDelta[]): string | null {
   return null
 }
 
+/**
+ * La lectura de las cards de composición (target-user: "cuatro flechas hacia
+ * arriba y yo adivinando cuáles celebrar"). Convierte las series primera→última
+ * en deltas y REUSA compareSynthesis: la misma frase honesta del comparador
+ * (hechos duros + rescates), una sola voz en todo Cuerpo.
+ */
+export function compositionSynthesis(
+  series: Record<CompositionSeriesKey, SeriesPoint[]>,
+): string | null {
+  const keys: { from: CompositionSeriesKey; to: CheckinDeltaKey }[] = [
+    { from: 'body_fat_pct', to: 'body_fat_pct' },
+    { from: 'muscle_kg', to: 'muscle_kg' },
+    { from: 'water_pct', to: 'water_pct' },
+    { from: 'bmi', to: 'bmi' },
+  ]
+  const rows: CheckinDelta[] = []
+  for (const k of keys) {
+    const s = series[k.from]
+    const first = s[0]
+    const last = s[s.length - 1]
+    if (!first || !last || s.length < 2) continue
+    rows.push({
+      key: k.to,
+      a: first.value,
+      b: last.value,
+      delta: Number((last.value - first.value).toFixed(1)),
+    })
+  }
+  return compareSynthesis(rows)
+}
+
 /* ─── Evolución por zona (F4 · mockup dueña) ───────────────────────────── */
 
 export type ZoneKey = 'arms' | 'trunk' | 'legs'
