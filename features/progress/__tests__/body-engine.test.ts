@@ -1,6 +1,7 @@
 import type { BodyCheckin, BodyComposition, TimelinePhoto } from '../api'
 import {
   compareCheckins,
+  compareSynthesis,
   compositionSeries,
   compositionSummary,
   photoAt,
@@ -97,6 +98,40 @@ describe('compareCheckins — cambios principales entre dos mediciones (F3)', ()
     const a = mk('2024-08-15', { metabolic_age: 47, weight_kg: 69 })
     const b = mk('2025-08-15', { metabolic_age: 52, weight_kg: 72 })
     expect(compareCheckins(a, b).map((r) => r.key)).toEqual(['weight_kg'])
+  })
+})
+
+describe('compareSynthesis — la frase honesta del comparador', () => {
+  const mk = (key: string, a: number, b: number) =>
+    ({ key, a, b, delta: Number((b - a).toFixed(1)) }) as ReturnType<typeof compareCheckins>[number]
+
+  it('recaída con rescate: separa hechos duros de lo ganado (no empiezas de cero)', () => {
+    const s = compareSynthesis([
+      mk('weight_kg', 69.3, 72.1),
+      mk('body_fat_pct', 35.4, 36.8),
+      mk('muscle_kg', 42.5, 43.2),
+      mk('water_pct', 47.9, 51),
+    ])!
+    expect(s).toContain('Subió tu peso y tu grasa')
+    expect(s).toContain('ganaste músculo')
+    expect(s).toContain('no empiezas de cero')
+    expect(s).not.toMatch(/culpa|fallaste|mal/i)
+  })
+
+  it('todo a favor: lo nombra sin inflar', () => {
+    const s = compareSynthesis([mk('weight_kg', 72, 69), mk('body_fat_pct', 36, 32)])!
+    expect(s).toContain('a tu favor')
+  })
+
+  it('todo duro: punto de partida, sin sentencia', () => {
+    const s = compareSynthesis([mk('weight_kg', 69, 72), mk('body_fat_pct', 33, 36)])!
+    expect(s).toContain('punto de partida')
+    expect(s).not.toMatch(/fallaste|retroced|culpa/i)
+  })
+
+  it('sin cambios → null (silencio, no relleno)', () => {
+    expect(compareSynthesis([mk('weight_kg', 70, 70)])).toBeNull()
+    expect(compareSynthesis([])).toBeNull()
   })
 })
 

@@ -465,6 +465,66 @@ export function compareCheckins(a: BodyCheckin, b: BodyCheckin): CheckinDelta[] 
   return out
 }
 
+/**
+ * La SÍNTESIS del comparador (feedback usuaria: "no necesito seis flechas para
+ * saber que recaí; necesito saber qué rescato"). Separa los hechos duros de los
+ * rescates y los nombra en UNA frase honesta, de su lado. Determinística.
+ *
+ * Dirección "a favor": músculo/agua subiendo, grasa/visceral/peso/IMC bajando.
+ * Las seis flechas ↑ idénticas hacían que la ganancia de músculo se leyera
+ * igual que la subida de grasa ("subió×6 = fallaste×6").
+ */
+export function compareSynthesis(rows: readonly CheckinDelta[]): string | null {
+  if (rows.length === 0) return null
+  const rose: string[] = [] // hechos duros (en la dirección difícil)
+  const gains: string[] = [] // rescates (a su favor)
+  for (const r of rows) {
+    if (r.delta === 0) continue
+    switch (r.key) {
+      case 'weight_kg':
+        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu peso' : 'bajaste peso')
+        break
+      case 'body_fat_pct':
+        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu grasa' : 'bajaste grasa')
+        break
+      case 'visceral_fat_index':
+        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu visceral' : 'bajó tu visceral')
+        break
+      case 'bmi':
+        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu IMC' : 'bajó tu IMC')
+        break
+      case 'muscle_kg':
+        ;(r.delta > 0 ? gains : rose).push(r.delta > 0 ? 'ganaste músculo' : 'tu músculo bajó')
+        break
+      case 'water_pct':
+        ;(r.delta > 0 ? gains : rose).push(r.delta > 0 ? 'subió tu agua' : 'tu agua bajó')
+        break
+    }
+  }
+  const list = (xs: string[]) =>
+    xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`
+  // Los "rose" son sustantivos ("tu peso, tu grasa"); los verbos van en gains.
+  const roseNouns = rose.filter((x) => x.startsWith('tu '))
+  const roseVerbs = rose.filter((x) => !x.startsWith('tu '))
+  const roseSentence =
+    roseNouns.length > 0
+      ? `Subió ${list(roseNouns)}${roseVerbs.length ? ` y ${list(roseVerbs)}` : ''}`
+      : roseVerbs.length > 0
+        ? list(roseVerbs).charAt(0).toUpperCase() + list(roseVerbs).slice(1)
+        : ''
+
+  if (rose.length > 0 && gains.length > 0) {
+    return `${roseSentence}. También ${list(gains)}: no empiezas de cero.`
+  }
+  if (gains.length > 0) {
+    return `Entre estas fechas, todo se movió a tu favor: ${list(gains)}.`
+  }
+  if (rose.length > 0) {
+    return `${roseSentence}. Es tu punto de partida, en números reales.`
+  }
+  return null
+}
+
 /* ─── Evolución por zona (F4 · mockup dueña) ───────────────────────────── */
 
 export type ZoneKey = 'arms' | 'trunk' | 'legs'

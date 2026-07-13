@@ -8,26 +8,37 @@ import { colors, typography } from '@/theme'
 
 import { PROGRESS_EVENTS } from '../constants'
 import { useBodyCheckins } from '../hooks'
-import { compareCheckins, type CheckinDeltaKey } from '../logic'
+import { compareCheckins, compareSynthesis, type CheckinDeltaKey } from '../logic'
 
 /*
- * Comparador rápido (F3 · mockup dueña) — "compara dos mediciones": elige dos
- * fechas de check-in y mira los CAMBIOS PRINCIPALES como tabla. Anti-fricción
- * estilo MFP: cero pasos entre la pregunta ("¿cómo estaba en junio vs ahora?")
- * y la respuesta. Solo métricas presentes en AMBAS mediciones (compareCheckins,
- * puro). Deltas con hue de identidad por métrica — nunca verde/rojo, nunca
- * semáforo saludable/no-saludable (anti-patrón Renpho). Se gana su lugar con
- * ≥2 check-ins.
+ * Comparador rápido (rediseño · feedback usuaria: "útil pero confunde y cansa;
+ * mi única victoria escondida entre mis derrotas"):
+ *
+ * 1. La SÍNTESIS honesta va PRIMERO ("Subió tu peso y tu grasa. También ganaste
+ *    músculo: no empiezas de cero") — separa hechos duros de rescates. Las seis
+ *    flechas idénticas se leían como "fallaste×6".
+ * 2. Fechas como DOS PILLS compactas (Antes ▾ → Después ▾); tocar una despliega
+ *    solo sus fechas. Las dos filas de 8 chips eran "un acertijo, no un
+ *    comparador".
+ * 3. TRES métricas primero (peso/grasa/músculo: el norte, su lectura y la
+ *    esperanza) + "Ver más" para agua/visceral/IMC. 26 números cansaban a la
+ *    fila 3.
+ * 4. Tabla MONOCROMA, deltas en oro: los 6 colores eran "confeti en un funeral"
+ *    (decoración que parecía significado — visceral subiendo en verde).
+ * 5. Sin párrafo-eco (repetía la tabla). El disclaimer se queda.
  */
 
-const LABEL: Record<CheckinDeltaKey, { name: string; unit: string; hue: string }> = {
-  weight_kg: { name: 'Peso', unit: 'kg', hue: colors.oroSoft },
-  body_fat_pct: { name: 'Grasa corporal', unit: '%', hue: colors.signal.proteina },
-  muscle_kg: { name: 'Músculo', unit: 'kg', hue: colors.dimension.cuerpo },
-  water_pct: { name: 'Agua', unit: '%', hue: colors.signal.agua },
-  visceral_fat_index: { name: 'Visceral', unit: '', hue: colors.dimension.alimento },
-  bmi: { name: 'IMC', unit: '', hue: colors.oroSoft },
+const LABEL: Record<CheckinDeltaKey, { name: string; unit: string }> = {
+  weight_kg: { name: 'Peso', unit: 'kg' },
+  body_fat_pct: { name: 'Grasa corporal', unit: '%' },
+  muscle_kg: { name: 'Músculo', unit: 'kg' },
+  water_pct: { name: 'Agua', unit: '%' },
+  visceral_fat_index: { name: 'Visceral (índice)', unit: '' },
+  bmi: { name: 'IMC', unit: '' },
 }
+
+/** El norte, su lectura y la esperanza — lo que la usuaria lee de verdad. */
+const PRIMARY: CheckinDeltaKey[] = ['weight_kg', 'body_fat_pct', 'muscle_kg']
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const fmtDay = (iso: string): string =>
@@ -43,6 +54,9 @@ export function CheckinCompare() {
 
   const [dayA, setDayA] = useState<string | null>(null)
   const [dayB, setDayB] = useState<string | null>(null)
+  const [picking, setPicking] = useState<'a' | 'b' | null>(null)
+  const [showAll, setShowAll] = useState(false)
+
   const a = dayA && dates.includes(dayA) ? dayA : dates[0]
   const b = dayB && dates.includes(dayB) ? dayB : dates[dates.length - 1]
 
@@ -53,8 +67,15 @@ export function CheckinCompare() {
   const rows = compareCheckins(checkinA, checkinB)
   if (rows.length === 0) return null
 
-  const pick = (setter: (d: string) => void) => (d: string) => {
-    setter(d)
+  const synthesis = compareSynthesis(rows)
+  const primary = rows.filter((r) => PRIMARY.includes(r.key))
+  const secondary = rows.filter((r) => !PRIMARY.includes(r.key))
+  const visible = showAll ? [...primary, ...secondary] : primary
+
+  const pick = (side: 'a' | 'b', d: string) => {
+    if (side === 'a') setDayA(d)
+    else setDayB(d)
+    setPicking(null)
     track(PROGRESS_EVENTS.compare, { kind: 'checkin' })
   }
 
@@ -64,30 +85,62 @@ export function CheckinCompare() {
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Comparador rápido
       </EyebrowLabel>
-      <Text style={styles.sub}>Compara dos mediciones</Text>
 
-      <DateRow label="Antes" dates={dates} value={a} exclude={b} onPick={pick(setDayA)} />
-      <DateRow label="Después" dates={dates} value={b} exclude={a} onPick={pick(setDayB)} />
+      {/* Fechas: dos pills. Tocar una abre SOLO sus opciones (nunca 8 chips). */}
+      <View style={styles.pillRow}>
+        <DatePill
+          label={fmtDay(a)}
+          open={picking === 'a'}
+          onPress={() => setPicking(picking === 'a' ? null : 'a')}
+          a11y="Cambiar la fecha inicial"
+        />
+        <Text style={styles.pillArrow}>→</Text>
+        <DatePill
+          label={fmtDay(b)}
+          open={picking === 'b'}
+          onPress={() => setPicking(picking === 'b' ? null : 'b')}
+          a11y="Cambiar la fecha final"
+        />
+      </View>
+      {picking ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
+          <View style={styles.options}>
+            {dates
+              .filter((d) => (picking === 'a' ? d !== b : d !== a))
+              .map((d) => {
+                const on = d === (picking === 'a' ? a : b)
+                return (
+                  <Pressable
+                    key={d}
+                    onPress={() => pick(picking, d)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    style={[styles.option, on && styles.optionOn]}
+                  >
+                    <Text style={[styles.optionText, on && styles.optionTextOn]}>{fmtDay(d)}</Text>
+                  </Pressable>
+                )
+              })}
+          </View>
+        </ScrollView>
+      ) : null}
+
+      {/* La síntesis honesta PRIMERO: hechos duros + rescates, de su lado. */}
+      {synthesis ? <Text style={styles.synthesis}>{synthesis}</Text> : null}
 
       <View style={styles.table}>
-        <View style={styles.headRow}>
-          <Text style={styles.headLabel}>CAMBIOS PRINCIPALES</Text>
-          <Text style={styles.headDates}>
-            {fmtDay(a)} → {fmtDay(b)}
-          </Text>
-        </View>
-        {rows.map((r, i) => {
+        {visible.map((r, i) => {
           const meta = LABEL[r.key]
           const arrow = r.delta === 0 ? null : r.delta > 0 ? '↑' : '↓'
           return (
             <View key={r.key} style={[styles.row, i > 0 && styles.rowDivider]}>
-              <Text style={[styles.rowLabel, { color: meta.hue }]}>{meta.name}</Text>
+              <Text style={styles.rowLabel}>{meta.name}</Text>
               <View style={styles.rowValues}>
                 <Text style={styles.rowA}>{fmtVal(r.a, meta.unit)}</Text>
-                <Text style={[styles.rowArrow, { color: meta.hue }]}>→</Text>
+                <Text style={styles.rowArrow}>→</Text>
                 <Text style={styles.rowB}>{fmtVal(r.b, meta.unit)}</Text>
                 {arrow ? (
-                  <Text style={[styles.rowDelta, { color: meta.hue }]}>
+                  <Text style={styles.rowDelta}>
                     {arrow} {r.delta > 0 ? '+' : '−'}
                     {fmtVal(Math.abs(r.delta), meta.unit)}
                   </Text>
@@ -96,25 +149,21 @@ export function CheckinCompare() {
             </View>
           )
         })}
+        {secondary.length > 0 ? (
+          <Pressable
+            onPress={() => setShowAll((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showAll }}
+            style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={styles.moreText}>
+              {showAll ? 'Ver menos' : `Ver más métricas (${secondary.length})`}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      {/* "En resumen" determinístico: los hechos en una línea, sin adjetivos
-          (nada de 'mejoró notablemente' — juicio). */}
-      {rows.length > 1 ? (
-        <Text style={styles.summary}>
-          Entre estas dos mediciones:{' '}
-          {rows
-            .filter((r) => r.delta !== 0)
-            .map((r) => {
-              const meta = LABEL[r.key]
-              return `${meta.name.toLowerCase()} ${r.delta > 0 ? '+' : '−'}${Math.abs(r.delta) % 1 === 0 ? Math.abs(r.delta) : Math.abs(r.delta).toFixed(1)}${meta.unit ? ` ${meta.unit}` : ''}`
-            })
-            .join(' · ')}
-          .
-        </Text>
-      ) : null}
-
-      {/* La protección del manifiesto (mockup + benchmark: perfecta tal cual). */}
+      {/* La protección del manifiesto. */}
       <Text style={styles.disclaimer}>
         Stelar solo interpreta tus registros. No sustituye a un profesional de la salud.
       </Text>
@@ -122,111 +171,109 @@ export function CheckinCompare() {
   )
 }
 
-function DateRow({
+function DatePill({
   label,
-  dates,
-  value,
-  exclude,
-  onPick,
+  open,
+  onPress,
+  a11y,
 }: {
   label: string
-  dates: string[]
-  value: string
-  exclude: string
-  onPick: (d: string) => void
+  open: boolean
+  onPress: () => void
+  a11y: string
 }) {
   return (
-    <View style={styles.dateRow}>
-      <Text style={styles.dateLabel}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.dateChips}>
-          {dates.map((d) => {
-            const on = d === value
-            const disabled = d === exclude && !on
-            return (
-              <Pressable
-                key={d}
-                onPress={() => !disabled && onPick(d)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on, disabled }}
-                style={[styles.dateChip, on && styles.dateChipOn, disabled && styles.dateChipOff]}
-              >
-                <Text style={[styles.dateText, on && styles.dateTextOn]}>{fmtDay(d)}</Text>
-              </Pressable>
-            )
-          })}
-        </View>
-      </ScrollView>
-    </View>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      accessibilityState={{ expanded: open }}
+      style={[styles.pill, open && styles.pillOpen]}
+    >
+      <Text style={styles.pillText}>{label}</Text>
+      <Text style={[styles.pillCaret, open && styles.pillCaretOpen]}>▾</Text>
+    </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
-  eyebrow: { marginBottom: 2 },
-  sub: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    marginBottom: 12,
+  eyebrow: { marginBottom: 12 },
+  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    backgroundColor: colors.bgCard2,
   },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  dateLabel: {
-    width: 58,
+  pillOpen: { borderColor: colors.magentaGlow, backgroundColor: colors.magentaTint },
+  pillText: {
     fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  pillCaret: {
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
     color: colors.niebla,
   },
-  dateChips: { flexDirection: 'row', gap: 6 },
-  dateChip: {
+  pillCaretOpen: { color: colors.magentaHot },
+  pillArrow: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.oro,
+  },
+  optionsRow: { marginTop: 8 },
+  options: { flexDirection: 'row', gap: 6 },
+  option: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.bruma,
   },
-  dateChipOn: { backgroundColor: colors.magentaTint2, borderColor: colors.magentaGlow },
-  dateChipOff: { opacity: 0.35 },
-  dateText: {
+  optionOn: { backgroundColor: colors.magentaTint2, borderColor: colors.magentaGlow },
+  optionText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.bone,
     fontVariant: ['tabular-nums'],
   },
-  dateTextOn: { color: colors.magentaHot, fontFamily: typography.uiBold },
+  optionTextOn: { color: colors.magentaHot, fontFamily: typography.uiBold },
+  // La frase de su lado — voz del coach, antes de cualquier número.
+  synthesis: {
+    marginTop: 14,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.title,
+    lineHeight: 24,
+    color: colors.leche,
+  },
   table: {
-    marginTop: 8,
+    marginTop: 14,
     backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 4,
     paddingBottom: 4,
-  },
-  headRow: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8 },
-  headLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
-    color: colors.niebla,
-  },
-  headDates: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
   },
   row: { paddingVertical: 11 },
   rowDivider: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  // Monocromo: labels niebla, números leche, delta ORO — un solo lenguaje.
   rowLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
+    color: colors.niebla,
     marginBottom: 5,
   },
   rowValues: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
@@ -236,7 +283,7 @@ const styles = StyleSheet.create({
     color: colors.bone,
     fontVariant: ['tabular-nums'],
   },
-  rowArrow: { fontFamily: typography.uiMedium, fontSize: typography.sizes.body },
+  rowArrow: { fontFamily: typography.uiMedium, fontSize: typography.sizes.body, color: colors.oro },
   rowB: {
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.anchor,
@@ -244,20 +291,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     fontVariant: ['tabular-nums'],
   },
-  // Delta en el hue de la métrica (identidad, no juicio) — a la derecha.
   rowDelta: {
     marginLeft: 'auto',
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.bodyLarge,
+    color: colors.oroLight,
     fontVariant: ['tabular-nums'],
   },
-  summary: {
-    marginTop: 12,
-    fontFamily: typography.uiMedium,
+  moreBtn: { paddingVertical: 12, alignItems: 'center' },
+  moreText: {
+    fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.bone,
-    fontVariant: ['tabular-nums'],
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
   disclaimer: {
     marginTop: 10,
