@@ -1,5 +1,11 @@
 import type { BodyCheckin, BodyComposition, TimelinePhoto } from '../api'
-import { compositionSeries, compositionSummary, photoAt, photoDatesFor } from '../logic'
+import {
+  compareCheckins,
+  compositionSeries,
+  compositionSummary,
+  photoAt,
+  photoDatesFor,
+} from '../logic'
 
 const comp = (day: string, o: Partial<BodyComposition> = {}): BodyComposition => ({
   day_date: day,
@@ -68,6 +74,28 @@ describe('compositionSeries — series por métrica, check-in gana el día (F2)'
     const s = compositionSeries([], [])
     expect(s.body_fat_pct).toEqual([])
     expect(s.muscle_kg).toEqual([])
+  })
+})
+
+describe('compareCheckins — cambios principales entre dos mediciones (F3)', () => {
+  const mk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+
+  it('solo métricas presentes en AMBAS; delta después−antes', () => {
+    const a = mk('2024-08-15', { weight_kg: 69.3, body_fat_pct: 35.4, muscle_kg: 42.5 })
+    const b = mk('2024-11-15', { weight_kg: 66.8, body_fat_pct: 31.1, water_pct: 51 })
+    const rows = compareCheckins(a, b)
+    expect(rows.find((r) => r.key === 'weight_kg')!.delta).toBe(-2.5)
+    expect(rows.find((r) => r.key === 'body_fat_pct')!.delta).toBe(-4.3)
+    // Músculo solo en A y agua solo en B → no se comparan contra huecos.
+    expect(rows.find((r) => r.key === 'muscle_kg')).toBeUndefined()
+    expect(rows.find((r) => r.key === 'water_pct')).toBeUndefined()
+  })
+
+  it('sin edad metabólica en el comparador (decisión producto)', () => {
+    const a = mk('2024-08-15', { metabolic_age: 47, weight_kg: 69 })
+    const b = mk('2025-08-15', { metabolic_age: 52, weight_kg: 72 })
+    expect(compareCheckins(a, b).map((r) => r.key)).toEqual(['weight_kg'])
   })
 })
 

@@ -21,6 +21,8 @@ import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
+import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
+import { CheckinTimeline } from '@/features/progress/components/CheckinTimeline'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { PhotoCompare } from '@/features/progress/components/PhotoCompare'
@@ -396,6 +398,9 @@ function ProgressBody() {
                   {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
                       datos), no deja una hairline huérfana. */}
                   <CompositionCards />
+                  {/* F3 · comparador de dos mediciones + historial timeline. */}
+                  <CheckinCompare />
+                  <CheckinTimeline />
                   <PhotoCompare />
                 </>
               ) : null}

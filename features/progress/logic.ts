@@ -426,6 +426,45 @@ export function compositionSeries(
   }
 }
 
+/* ─── Comparador rápido de mediciones (F3 · mockup dueña) ──────────────── */
+
+export type CheckinDeltaKey =
+  | 'weight_kg'
+  | 'body_fat_pct'
+  | 'muscle_kg'
+  | 'water_pct'
+  | 'visceral_fat_index'
+  | 'bmi'
+
+export type CheckinDelta = {
+  key: CheckinDeltaKey
+  a: number
+  b: number
+  delta: number
+}
+
+/** Los "cambios principales" entre dos check-ins (A = antes, B = después):
+ *  solo métricas presentes en AMBOS (no se compara contra un hueco). Puro.
+ *  Sin edad metabólica (decisión producto: duele más de lo que informa). */
+export function compareCheckins(a: BodyCheckin, b: BodyCheckin): CheckinDelta[] {
+  const keys: CheckinDeltaKey[] = [
+    'weight_kg',
+    'body_fat_pct',
+    'muscle_kg',
+    'water_pct',
+    'visceral_fat_index',
+    'bmi',
+  ]
+  const out: CheckinDelta[] = []
+  for (const key of keys) {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null || vb == null) continue
+    out.push({ key, a: va, b: vb, delta: Number((vb - va).toFixed(1)) })
+  }
+  return out
+}
+
 /** Las fechas (YYYY-MM-DD, ascendentes, únicas) con foto de un ángulo. */
 export function photoDatesFor(photos: readonly TimelinePhoto[], angle: PhotoAngle): string[] {
   const days = photos.filter((p) => p.angle === angle).map((p) => p.taken_at.slice(0, 10))
