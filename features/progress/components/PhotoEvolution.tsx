@@ -89,7 +89,9 @@ export function PhotoEvolution() {
       ) : null}
 
       <View style={styles.photoFrame}>
-        <Image source={{ uri: photo.signed_url }} style={styles.photo} resizeMode="cover" />
+        {/* contain: la foto COMPLETA siempre visible (cover recortaba cabeza y
+            pies de las fotos de cuerpo entero · feedback dueña). */}
+        <Image source={{ uri: photo.signed_url }} style={styles.photo} resizeMode="contain" />
         <Text style={styles.photoDate}>{fmtDay(day)}</Text>
       </View>
 
@@ -156,8 +158,10 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   angleLabelOn: { color: colors.magentaHot },
+  // Marco alto (~proporción de foto de cuerpo entero) — con contain, la foto
+  // se ve completa y el letterbox se funde en bgCard.
   photoFrame: {
-    aspectRatio: 3 / 4,
+    aspectRatio: 0.52,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
