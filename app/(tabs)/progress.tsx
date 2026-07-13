@@ -135,6 +135,8 @@ function ProgressBody() {
     track(PROGRESS_EVENTS.body)
     setSegment('body')
   }
+  // Fusión "detalle de medición": tap en el timeline preselecciona el comparador.
+  const [comparePresetA, setComparePresetA] = useState<string | null>(null)
   const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
   const { data: profile } = useProfile()
 
@@ -427,9 +429,10 @@ function ProgressBody() {
                   <PhotoEvolution />
                   {/* F4 · evolución por zona (segmental de los check-ins). */}
                   <ZonesEvolution />
-                  {/* F3 · comparador de dos mediciones + historial timeline. */}
-                  <CheckinCompare />
-                  <CheckinTimeline />
+                  {/* F3 · comparador de dos mediciones + historial timeline
+                      (tap en estrella → comparador preseleccionado). */}
+                  <CheckinCompare presetA={comparePresetA} />
+                  <CheckinTimeline onPick={setComparePresetA} />
                   <PhotoCompare />
                 </>
               ) : null}

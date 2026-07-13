@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
@@ -56,7 +56,12 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
 const fmtVal = (v: number, unit: string) =>
   `${v % 1 === 0 ? v : v.toFixed(1)}${unit ? ` ${unit}` : ''}`
 
-export function CheckinCompare() {
+/**
+ * Fusión "detalle de medición" (decisión benchmark): NO hay pantalla de detalle
+ * de una fecha — tocar una estrella del timeline preselecciona esa fecha AQUÍ
+ * (vs la última). Misma necesidad, siempre en lenguaje de cambio.
+ */
+export function CheckinCompare({ presetA }: { presetA?: string | null }) {
   const { data } = useBodyCheckins()
   const photosQ = usePhotoTimeline()
   const photos = useMemo(() => photosQ.data ?? [], [photosQ.data])
@@ -68,6 +73,15 @@ export function CheckinCompare() {
   const [picking, setPicking] = useState<'a' | 'b' | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [photoAngle, setPhotoAngle] = useState<PhotoAngle | null>(null)
+
+  // El timeline preselecciona el "antes" (esa fecha vs la última).
+  useEffect(() => {
+    if (presetA) {
+      setDayA(presetA)
+      setDayB(null)
+      setPicking(null)
+    }
+  }, [presetA])
 
   const a = dayA && dates.includes(dayA) ? dayA : dates[0]
   const b = dayB && dates.includes(dayB) ? dayB : dates[dates.length - 1]
