@@ -3,7 +3,9 @@ import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
+  Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,31 +13,42 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import Animated, { FadeIn } from 'react-native-reanimated'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import Toast from 'react-native-toast-message'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { PrimaryCta } from '@/components/PrimaryCta'
+import { StarLoader } from '@/components/StarLoader'
 import { DateField } from '@/features/onboarding/components/DateField'
 import { processAndUploadFromUri } from '@/features/onboarding/photos/api'
 import type { PhotoAngle } from '@/features/onboarding/photos/hooks/usePhotosToday'
+import { PoseGlyph } from '@/features/progress/components/PoseGlyph'
 import { SkyBackground } from '@/features/tabs/components'
 import { queryKeys } from '@/lib/queryKeys'
 import { colors, typography } from '@/theme'
 
 /*
- * Sube tus fotos (Progress 3.0 + Epic 08) — el flujo de fotos con FECHA:
- * sirve para el capítulo de HOY y para el backdating (las sesiones del coach
- * con su fecha real). Elige fecha + los ángulos que tengas; cada foto se sube
- * con taken_at = esa fecha.
+ * Sube tus fotos (Progress 3.0 + Epic 08 · rediseño uxui+illustrator jul 2026)
+ * — el flujo de fotos con FECHA: sirve para el capítulo de HOY y para el
+ * backdating (las sesiones del coach con su fecha real).
  *
- * Fixes uxui (jul 2026): el layout de los slots vive en un View wrapper (el
- * layout directo en Pressable colapsa en este setup · patrón del repo);
- * DateField en vez de TextInput (adiós fechas imposibles/futuras y el
- * RangeError críptico); CTA anclado abajo, deshabilitado sin fotos y con
- * conteo; el retry solo re-envía lo que falló (cada foto sale de `picked` al
- * subirse — antes un fallo parcial duplicaba las ya subidas).
+ * Diseño: el alto de los slots se deriva del espacio VERTICAL disponible
+ * (fecha + 4 ángulos + CTA caben en una pantalla, cero scroll objetivo; el
+ * ScrollView queda de red de seguridad). "Un placeholder no necesita la
+ * proporción del contenido futuro; necesita la proporción de una invitación."
+ * Slot vacío: glifo de pose (cartografía, cero figura humana) + label + badge
+ * "+" de esquina. Slot lleno: thumb + borde encendido en magenta (mismo
+ * vocabulario que el hairline del DateField) + badge palomita; tap → Cambiar /
+ * Quitar. Subiendo: overlay con StarLoader por slot.
+ *
+ * Quirk del repo (3 rounds): ni layout, ni flex:1, ni aspectRatio+flexBasis%
+ * son confiables en Pressable — dimensiones EXPLÍCITAS en el View y el
+ * Pressable como capa táctil absoluta.
+ *
+ * Hint en Hanken (regla tipográfica: la itálica serif es SOLO voz de coach;
+ * esto es una instrucción).
  */
 
 const ANGLES: { key: PhotoAngle; label: string }[] = [
@@ -44,6 +57,10 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
   { key: 'side_left', label: 'Perfil izq' },
   { key: 'side_right', label: 'Perfil der' },
 ]
+
+const GAP = 10
+// Header + hint + DateField + zona CTA (aprox.): lo que NO es grid.
+const CHROME = 250
 
 const parseISODate = (v: string): Date | null => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
@@ -55,12 +72,14 @@ const parseISODate = (v: string): Date | null => {
 export default function LogPhotosScreen() {
   const router = useRouter()
   const qc = useQueryClient()
-  // Tamaño EXPLÍCITO de los slots: aspectRatio + flexBasis porcentual no
-  // resuelven altura en este setup (el grid salía plano en device). Dos
-  // columnas: ancho = (pantalla - padding 20×2 - gap 12) / 2; alto 4:3.
-  const { width: screenW } = useWindowDimensions()
-  const slotW = Math.floor((screenW - 40 - 12) / 2)
-  const slotH = Math.round((slotW * 4) / 3)
+  // Slots que CABEN: alto derivado del espacio disponible, con piso (touch
+  // target/legibilidad) y techo 4:5 (que no vuelvan a ser torres).
+  const { width: screenW, height: screenH } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const slotW = Math.floor((screenW - 40 - GAP) / 2)
+  const availH = screenH - insets.top - insets.bottom - CHROME
+  const slotH = Math.max(150, Math.min(Math.floor((availH - GAP) / 2), Math.round(slotW * 1.25)))
+
   // "Agregar fotos de esta fecha" (medición completa) manda su fecha; sin
   // param, hoy.
   const params = useLocalSearchParams<{ date?: string }>()
@@ -69,6 +88,7 @@ export default function LogPhotosScreen() {
   const [picked, setPicked] = useState<Partial<Record<PhotoAngle, string>>>({})
   const [saving, setSaving] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [uploadingAngle, setUploadingAngle] = useState<PhotoAngle | null>(null)
 
   const pick = async (angle: PhotoAngle) => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -76,7 +96,29 @@ export default function LogPhotosScreen() {
       quality: 0.9,
     })
     const uri = result.assets?.[0]?.uri
-    if (!result.canceled && uri) setPicked((p) => ({ ...p, [angle]: uri }))
+    if (!result.canceled && uri) {
+      Haptics.selectionAsync().catch(() => {})
+      setPicked((p) => ({ ...p, [angle]: uri }))
+    }
+  }
+
+  // Slot lleno: cambiar o quitar (antes el tap reemplazaba en silencio y no
+  // había forma de quitar una foto mal elegida).
+  const manage = (angle: PhotoAngle, label: string) => {
+    Alert.alert(`Foto de ${label.toLowerCase()}`, undefined, [
+      { text: 'Cambiar foto', onPress: () => void pick(angle) },
+      {
+        text: 'Quitar',
+        style: 'destructive',
+        onPress: () =>
+          setPicked((p) => {
+            const next = { ...p }
+            delete next[angle]
+            return next
+          }),
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ])
   }
 
   const pickedCount = Object.keys(picked).length
@@ -94,6 +136,7 @@ export default function LogPhotosScreen() {
       // y el retry no duplica lo ya subido.
       let done = 0
       for (const [angle, uri] of entries) {
+        setUploadingAngle(angle)
         await processAndUploadFromUri(uri, angle, takenAt)
         done += 1
         setProgress({ done, total: entries.length })
@@ -121,6 +164,7 @@ export default function LogPhotosScreen() {
     } finally {
       setSaving(false)
       setProgress(null)
+      setUploadingAngle(null)
     }
   }
 
@@ -152,43 +196,87 @@ export default function LogPhotosScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.hint}>
-            Elige la fecha y los ángulos que tengas. Sirve para fotos de hoy o de antes (las de tus
-            sesiones con coach, por ejemplo).
-          </Text>
+          {/* Instrucción, no voz de coach → Hanken recta (regla tipográfica). */}
+          <Text style={styles.hint}>Sube los ángulos que tengas · de hoy o de antes.</Text>
 
-          <DateField
-            label="Fecha de las fotos"
-            value={date}
-            onChange={setDate}
-            defaultDate={initial}
-            maxDate={new Date()}
-          />
+          <View style={styles.dateWrap}>
+            <DateField
+              label="Fecha de las fotos"
+              value={date}
+              onChange={setDate}
+              defaultDate={initial}
+              maxDate={new Date()}
+            />
+          </View>
 
           <View style={styles.grid}>
             {ANGLES.map((a) => {
               const uri = picked[a.key]
+              const filled = uri != null
+              const uploading = uploadingAngle === a.key && saving
               return (
-                /* El layout vive en el wrapper; el Pressable solo rellena
-                   (layout directo en Pressable colapsa · patrón del repo). */
-                <View key={a.key} style={{ width: slotW, height: slotH }}>
+                /* TODO el visual vive en el View; el Pressable es solo la capa
+                   táctil absoluta (quirk documentado del repo). */
+                <View
+                  key={a.key}
+                  style={[
+                    styles.slot,
+                    { width: slotW, height: slotH },
+                    filled && styles.slotFilled,
+                  ]}
+                >
+                  {filled ? (
+                    <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
+                      <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
+                    </Animated.View>
+                  ) : (
+                    <View style={styles.emptyBody}>
+                      <PoseGlyph pose={a.key} size={44} color={colors.bone} />
+                      <Text style={styles.emptyLabel}>{a.label}</Text>
+                    </View>
+                  )}
+
+                  {/* Label chip solo sobre foto (sobre bgCard no lo necesita). */}
+                  {filled ? <Text style={styles.filledLabel}>{a.label}</Text> : null}
+
+                  {/* Badge de esquina: "+" para invitar, palomita al elegir. */}
+                  <View style={[styles.badge, filled && styles.badgeFilled]}>
+                    {filled ? (
+                      <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+                        <Path
+                          d="M2.5 6.5 L5 9 L9.5 3.5"
+                          stroke={colors.bg}
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </Svg>
+                    ) : (
+                      <Text style={styles.badgePlus}>+</Text>
+                    )}
+                  </View>
+
+                  {/* Overlay de subida del slot en vuelo. */}
+                  {uploading ? (
+                    <Animated.View entering={FadeIn.duration(150)} style={styles.uploading}>
+                      <StarLoader size={20} />
+                    </Animated.View>
+                  ) : null}
+
                   <Pressable
-                    onPress={() => void pick(a.key)}
+                    onPress={() => (filled ? manage(a.key, a.label) : void pick(a.key))}
+                    disabled={saving}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      uri ? `Cambiar foto de ${a.label}` : `Elegir foto de ${a.label}`
+                      filled
+                        ? `Cambiar o quitar la foto de ${a.label}`
+                        : `Elegir foto de ${a.label}`
                     }
-                    style={({ pressed }) => [styles.slot, pressed && { opacity: 0.7 }]}
-                  >
-                    {uri ? (
-                      <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
-                    ) : (
-                      <Text style={styles.slotPlus}>+</Text>
-                    )}
-                    <Text style={[styles.slotLabel, uri != null && styles.slotLabelOn]}>
-                      {a.label}
-                    </Text>
-                  </Pressable>
+                    style={({ pressed }) => [
+                      StyleSheet.absoluteFill,
+                      pressed && { backgroundColor: 'rgba(255,255,255,0.06)' },
+                    ]}
+                  />
                 </View>
               )
             })}
@@ -236,46 +324,97 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   // flexGrow: el CTA ancla abajo (marginTop auto) y el hueco se vuelve aire.
-  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, flexGrow: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32, flexGrow: 1 },
   hint: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
-    marginBottom: 18,
+    marginBottom: 14,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 22 },
+  dateWrap: { marginBottom: 16 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   slot: {
-    flex: 1,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.10)',
     backgroundColor: colors.bgCard,
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
   },
-  thumb: { ...StyleSheet.absoluteFillObject },
-  slotPlus: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.displayMd,
-    color: colors.niebla,
+  // El borde se ENCIENDE al elegir — mismo vocabulario que el hairline del
+  // DateField de arriba (Android degrada a la línea magenta plana).
+  slotFilled: {
+    borderWidth: 1.5,
+    borderColor: colors.magenta,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.magentaHot,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.35,
+        shadowRadius: 4,
+      },
+      default: {},
+    }),
   },
-  slotLabel: {
-    position: 'absolute',
-    bottom: 8,
+  emptyBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -8,
+    gap: 10,
+  },
+  emptyLabel: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.micro,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: colors.bone,
-    backgroundColor: 'rgba(10, 6, 8, 0.55)',
+  },
+  thumb: { ...StyleSheet.absoluteFillObject },
+  filledLabel: {
+    position: 'absolute',
+    bottom: 8,
+    alignSelf: 'center',
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: colors.leche,
+    backgroundColor: 'rgba(10, 6, 8, 0.6)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     overflow: 'hidden',
   },
-  slotLabelOn: { color: colors.leche },
-  ctaWrap: { marginTop: 'auto', paddingTop: 26 },
+  badge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.magentaGlow,
+    backgroundColor: 'rgba(10, 6, 8, 0.45)',
+  },
+  badgeFilled: {
+    backgroundColor: colors.magenta,
+    borderColor: colors.magenta,
+  },
+  badgePlus: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.magenta,
+    marginTop: -1,
+  },
+  // Overlay del slot en vuelo (nunca "se borró": está subiendo).
+  uploading: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 6, 8, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaWrap: { marginTop: 'auto', paddingTop: 18 },
 })
