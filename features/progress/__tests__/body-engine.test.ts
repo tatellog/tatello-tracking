@@ -273,6 +273,19 @@ describe('compareSynthesis — la frase honesta del comparador', () => {
     expect(compareSynthesis([])).toBeNull()
   })
 
+  it('músculo bajando no se cuela en la lista de "Subió" (bug captura dueña)', () => {
+    // Su caso real (nov 24 → ago 25): peso↑ grasa↑ visceral↑ IMC↑ + músculo↓.
+    const s = compareSynthesis([
+      mk('weight_kg', 66.8, 72.1),
+      mk('body_fat_pct', 31.1, 36.8),
+      mk('visceral_fat_index', 3.5, 5),
+      mk('bmi', 22.8, 25),
+      mk('muscle_kg', 43.7, 43.2),
+    ])!
+    expect(s).toContain('Subió tu peso, tu grasa, tu visceral y tu IMC; tu músculo bajó')
+    expect(s).not.toContain('tu peso, tu grasa, tu músculo bajó, tu visceral')
+  })
+
   it('rescueCloser: false deja los hechos sin el cierre (vive una vez por scroll)', () => {
     const s = compareSynthesis([mk('body_fat_pct', 35.4, 36.8), mk('muscle_kg', 42.5, 43.2)], {
       rescueCloser: false,

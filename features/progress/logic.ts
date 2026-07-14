@@ -649,39 +649,49 @@ export function compareSynthesis(
 ): string | null {
   const rescueCloser = opts.rescueCloser ?? true
   if (rows.length === 0) return null
-  const rose: string[] = [] // hechos duros (en la dirección difícil)
+  // Cada hecho lleva su tipo EXPLÍCITO: los sustantivos se listan tras
+  // "Subió" ("tu peso, tu grasa"); las frases con verbo propio van aparte.
+  // (Antes se adivinaba por prefijo "tu " y "tu músculo bajó" se colaba en
+  // medio de la lista: "Subió tu peso, tu músculo bajó, tu visceral…")
+  type Fact = { kind: 'noun' | 'phrase'; text: string }
+  const rose: Fact[] = [] // hechos duros (en la dirección difícil)
   const gains: string[] = [] // rescates (a su favor)
   for (const r of rows) {
     if (r.delta === 0) continue
     switch (r.key) {
       case 'weight_kg':
-        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu peso' : 'bajaste peso')
+        if (r.delta > 0) rose.push({ kind: 'noun', text: 'tu peso' })
+        else gains.push('bajaste peso')
         break
       case 'body_fat_pct':
-        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu grasa' : 'bajaste grasa')
+        if (r.delta > 0) rose.push({ kind: 'noun', text: 'tu grasa' })
+        else gains.push('bajaste grasa')
         break
       case 'visceral_fat_index':
-        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu visceral' : 'bajó tu visceral')
+        if (r.delta > 0) rose.push({ kind: 'noun', text: 'tu visceral' })
+        else gains.push('bajó tu visceral')
         break
       case 'bmi':
-        ;(r.delta > 0 ? rose : gains).push(r.delta > 0 ? 'tu IMC' : 'bajó tu IMC')
+        if (r.delta > 0) rose.push({ kind: 'noun', text: 'tu IMC' })
+        else gains.push('bajó tu IMC')
         break
       case 'muscle_kg':
-        ;(r.delta > 0 ? gains : rose).push(r.delta > 0 ? 'ganaste músculo' : 'tu músculo bajó')
+        if (r.delta > 0) gains.push('ganaste músculo')
+        else rose.push({ kind: 'phrase', text: 'tu músculo bajó' })
         break
       case 'water_pct':
-        ;(r.delta > 0 ? gains : rose).push(r.delta > 0 ? 'subió tu agua' : 'tu agua bajó')
+        if (r.delta > 0) gains.push('subió tu agua')
+        else rose.push({ kind: 'phrase', text: 'tu agua bajó' })
         break
     }
   }
   const list = (xs: string[]) =>
     xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`
-  // Los "rose" son sustantivos ("tu peso, tu grasa"); los verbos van en gains.
-  const roseNouns = rose.filter((x) => x.startsWith('tu '))
-  const roseVerbs = rose.filter((x) => !x.startsWith('tu '))
+  const roseNouns = rose.filter((x) => x.kind === 'noun').map((x) => x.text)
+  const roseVerbs = rose.filter((x) => x.kind === 'phrase').map((x) => x.text)
   const roseSentence =
     roseNouns.length > 0
-      ? `Subió ${list(roseNouns)}${roseVerbs.length ? ` y ${list(roseVerbs)}` : ''}`
+      ? `Subió ${list(roseNouns)}${roseVerbs.length ? `; ${list(roseVerbs)}` : ''}`
       : roseVerbs.length > 0
         ? list(roseVerbs).charAt(0).toUpperCase() + list(roseVerbs).slice(1)
         : ''
