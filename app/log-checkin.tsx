@@ -267,6 +267,17 @@ export default function LogCheckinScreen() {
                 loadingLabel="Guardando…"
               />
             </View>
+
+            {/* Epic 08 · F3: las fotos de la sesión, a un tap (mismo flujo de
+                backdating; ahí eliges la fecha). */}
+            <Pressable
+              onPress={() => router.push('/log-photos')}
+              accessibilityRole="link"
+              accessibilityLabel="Agregar fotos de esta medición"
+              style={({ pressed }) => [styles.photosLink, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.photosLinkText}>Agregar fotos de esta fecha →</Text>
+            </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -399,4 +410,11 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   ctaWrap: { marginTop: 26 },
+  photosLink: { marginTop: 14, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
+  photosLinkText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+  },
 })
