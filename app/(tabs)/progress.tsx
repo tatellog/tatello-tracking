@@ -469,6 +469,16 @@ function ProgressBody() {
                   </View>
                   {/* El cierre emocional: la tira con "Capítulo de hoy". */}
                   <PhotoEvolution />
+
+                  {/* Epic 08 · F2: la lectura sin gráficas, en su pantalla. */}
+                  <Pressable
+                    onPress={() => router.push('/stelar-observes')}
+                    accessibilityRole="link"
+                    accessibilityLabel="Lo que Stelar observa de tus datos"
+                    style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
+                  >
+                    <Text style={styles.calendarBridgeText}>Lo que Stelar observa →</Text>
+                  </Pressable>
                 </>
               ) : null}
 

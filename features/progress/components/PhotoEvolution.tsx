@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Dimensions,
   Image,
-  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -30,8 +28,8 @@ import { photoAt, photoDatesFor } from '../logic'
  * PELÍCULA: todas las fotos del ángulo lado a lado, cronológicas, aterrizando
  * en la más reciente. La progresión está FRENTE a los ojos, no en la memoria
  * (el slideshow de una foto obligaba a comparar de memoria). A este tamaño la
- * silueta responde "¿cambió mi forma?"; el DETALLE vive a un tap: visor
- * full-screen con swipe entre fechas.
+ * silueta responde "¿cambió mi forma?"; el DETALLE vive a un tap: el CAPÍTULO
+ * de esa fecha (/photo-chapter · Epic 08), con sus datos y su contexto.
  *
  * Scrubber arriba: línea con relleno magenta hasta la última foto + estrellas ✦
  * equiespaciadas (equiespaciado a propósito: huecos temporales largos leerían
@@ -90,7 +88,6 @@ export function PhotoEvolution() {
 
   const stripRef = useRef<ScrollView>(null)
   const [viewedIdx, setViewedIdx] = useState(0)
-  const [viewerIdx, setViewerIdx] = useState<number | null>(null)
   const [railW, setRailW] = useState(0)
 
   // Aterriza en lo más reciente (tu yo de hoy; scrolleas hacia atrás para viajar).
@@ -219,11 +216,13 @@ export function PhotoEvolution() {
             <Pressable
               key={it.day}
               onPress={() => {
-                setViewerIdx(i)
-                track(PROGRESS_EVENTS.photo, { kind: 'viewer' })
+                // Epic 08: tocar una foto abre su CAPÍTULO (foto grande + los
+                // datos y el contexto de ese día), no un visor mudo.
+                router.push({ pathname: '/photo-chapter', params: { day: it.day, angle: active } })
+                track(PROGRESS_EVENTS.photo, { kind: 'chapter' })
               }}
               accessibilityRole="imagebutton"
-              accessibilityLabel={`Ver foto del ${fmtFull(it.day)} en grande`}
+              accessibilityLabel={`Abrir el capítulo del ${fmtFull(it.day)}`}
               style={styles.tileWrap}
             >
               <View style={styles.tile}>
@@ -277,66 +276,6 @@ export function PhotoEvolution() {
           })}
         </View>
       ) : null}
-
-      {/* ── Visor full-screen: swipe entre fechas, foto completa ── */}
-      <Modal
-        visible={viewerIdx != null}
-        animationType="fade"
-        onRequestClose={() => setViewerIdx(null)}
-      >
-        <View style={styles.viewer}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: (viewerIdx ?? 0) * Dimensions.get('window').width, y: 0 }}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / Dimensions.get('window').width)
-              setViewerIdx(Math.max(0, Math.min(items.length - 1, idx)))
-              track(PROGRESS_EVENTS.photo, { kind: 'viewer-swipe' })
-            }}
-          >
-            {items.map((it) => (
-              <View key={it.day} style={styles.viewerPage}>
-                <Image
-                  source={{ uri: it.photo.signed_url! }}
-                  style={styles.viewerImg}
-                  resizeMode="contain"
-                />
-                <Text style={styles.viewerDate}>{fmtFull(it.day)}</Text>
-              </View>
-            ))}
-          </ScrollView>
-          <Pressable
-            onPress={() => setViewerIdx(null)}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Cerrar visor"
-            style={styles.viewerClose}
-          >
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M6 6 L18 18 M18 6 L6 18"
-                stroke={colors.leche}
-                strokeWidth={2.2}
-                strokeLinecap="round"
-              />
-            </Svg>
-          </Pressable>
-          {/* Mini-scrubber del visor: posición entre fechas. */}
-          <View style={styles.viewerDots}>
-            {items.map((it, i) => (
-              <Svg key={it.day} width={16} height={16} viewBox="0 0 16 16">
-                <Path
-                  d={fourPointStarPath(8, 8, i === viewerIdx ? 6 : 3.5)}
-                  fill={i === viewerIdx ? colors.oroLeche : colors.oroSoft}
-                  opacity={i === viewerIdx ? 1 : 0.6}
-                />
-              </Svg>
-            ))}
-          </View>
-        </View>
-      </Modal>
     </Animated.View>
   )
 }
@@ -409,37 +348,4 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   angleLabelOn: { color: colors.magentaHot },
-  viewer: { flex: 1, backgroundColor: colors.bg },
-  viewerPage: {
-    width: Dimensions.get('window').width,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewerImg: { width: '100%', height: '86%' },
-  viewerDate: {
-    marginTop: 8,
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
-  viewerClose: {
-    position: 'absolute',
-    top: 58,
-    right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgCard,
-  },
-  viewerDots: {
-    position: 'absolute',
-    bottom: 34,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
 })

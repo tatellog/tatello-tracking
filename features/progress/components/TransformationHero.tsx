@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router'
 import { useEffect, useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
@@ -83,6 +84,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path)
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 export function TransformationHero() {
+  const router = useRouter()
   const measurements = useMeasurements(null)
   const checkins = useBodyCheckins()
 
@@ -247,6 +249,16 @@ export function TransformationHero() {
       <Text style={styles.meta}>
         {hero.count} {hero.count === 1 ? 'registro' : 'registros'} de peso · último {lastLabel}
       </Text>
+
+      {/* Epic 08: los capítulos completos viven en su pantalla. */}
+      <Pressable
+        onPress={() => router.push('/body-story')}
+        accessibilityRole="link"
+        accessibilityLabel="Ver la historia de tu transformación"
+        style={({ pressed }) => [styles.storyLink, pressed && { opacity: 0.6 }]}
+      >
+        <Text style={styles.storyLinkText}>Ver mi historia →</Text>
+      </Pressable>
     </Animated.View>
   )
 }
@@ -314,5 +326,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.bone,
+  },
+  storyLink: { marginTop: 8, paddingVertical: 6, paddingHorizontal: 8 },
+  storyLinkText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
 })
