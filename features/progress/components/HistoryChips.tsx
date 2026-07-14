@@ -38,9 +38,18 @@ type ChipDef = {
   prev: string
   curr: string
   spark: number[] | null
+  /** Cambio relativo |ahora−antes|/antes — decide quién lidera. */
+  significance: number
 }
 
 const fmtCount = (n: number) => `${n}`
+// Cambio relativo con dos guardas anti-ruido (manifesto-review): un delta
+// menor a `minAbs` no compite por el titular (2 entrenos más no son historia),
+// y el piso `floor` evita que un baseline chiquito infle el ratio (1→3 no
+// debe ganarle a 10→18). Chasing de ruido mes a mes ≠ "la paciencia es el
+// producto".
+const significance = (prev: number, curr: number, minAbs: number, floor: number) =>
+  Math.abs(curr - prev) >= minAbs ? Math.abs(curr - prev) / Math.max(prev, floor) : 0
 
 export function HistoryChips() {
   const windowDays = PROGRESS_COMPARE_WINDOW_DAYS
@@ -62,12 +71,10 @@ export function HistoryChips() {
     const byKey = new Map(summary.metrics.map((m) => [m.key, m]))
     const out: ChipDef[] = []
 
-    // Déficit primero (el chip LÍDER: es la métrica-causa de Stelar, el
-    // "marcador personal" de la usuaria); Entrenos al final del grid — sin
-    // meta propia es contexto, no marcador. Labels CON unidad ("Registro" a
-    // secas leía como "¿veces que abrí la app?" · target-user). Sin fila de
-    // delta: la misma flecha significaba cosas opuestas por chip (↓ peso
-    // bueno, ↓ déficit malo) y "antes/ahora" ya cuenta la dirección.
+    // Labels CON unidad ("Registro" a secas leía como "¿veces que abrí la
+    // app?" · target-user). Sin fila de delta: la misma flecha significaba
+    // cosas opuestas por chip (↓ peso bueno, ↓ déficit malo) y "antes/ahora"
+    // ya cuenta la dirección.
     const counts: { key: 'workouts' | 'deficit' | 'logging'; label: string; hue: string }[] = [
       { key: 'deficit', label: 'Días en déficit', hue: colors.magentaHot },
       { key: 'logging', label: 'Días con registro', hue: colors.dimension.alimento },
@@ -83,6 +90,7 @@ export function HistoryChips() {
         prev: fmtCount(m.previous),
         curr: fmtCount(m.current),
         spark: sparks[c.key],
+        significance: significance(m.previous, m.current, 3, 5),
       })
     }
 
@@ -96,10 +104,13 @@ export function HistoryChips() {
         prev: `${prot.previous} g`,
         curr: `${prot.current} g`,
         spark: sparks.protein,
+        significance: significance(prot.previous, prot.current, 10, 50),
       })
     }
 
     // Peso: suavizado (media 7d) para que el titular no sea ruido de báscula.
+    // significance 0: el peso NUNCA lidera el grid (jamás dominante en home
+    // ni en Historia · manifiesto); su historia vive en Cuerpo.
     const w = byKey.get('weight')
     if (w) {
       const smoothTail = smoothWeightPoints(toWeightPoints(measurements.data ?? []))
@@ -112,6 +123,7 @@ export function HistoryChips() {
         prev: `${w.previous.toFixed(1)} kg`,
         curr: `${w.current.toFixed(1)} kg`,
         spark: smoothTail.length >= 2 ? smoothTail : null,
+        significance: 0,
       })
     }
     return out
@@ -119,12 +131,22 @@ export function HistoryChips() {
 
   if (!chips || chips.length === 0) return null
 
-  // Jerarquía (patrón del anillo dominante de Apple, sin su presión): Déficit
-  // es EL número — full-width arriba; los demás en grid, Entrenos al final.
-  const lead = chips.find((c) => c.key === 'deficit') ?? null
-  const GRID_ORDER = ['logging', 'protein', 'weight', 'workouts']
+  // Jerarquía (patrón del anillo dominante de Apple, sin su presión): lidera
+  // el delta relativo MÁS SIGNIFICATIVO del mes (lo elige el motor, no el
+  // layout — un líder fijo servía la peor noticia en gigante aunque no fuera
+  // la historia). El peso nunca compite (significance 0); empate → gana el
+  // orden canónico del arreglo (déficit primero). Sin delta significativo,
+  // el default vuelve al déficit (la métrica-causa canónica).
+  const lead =
+    chips.reduce<ChipDef | null>(
+      (best, c) => (c.significance > (best?.significance ?? 0) ? c : best),
+      null,
+    ) ??
+    chips.find((c) => c.key === 'deficit') ??
+    null
+  const GRID_ORDER = ['deficit', 'logging', 'protein', 'weight', 'workouts']
   const rest = chips
-    .filter((c) => c.key !== 'deficit')
+    .filter((c) => c.key !== lead?.key)
     .sort((a, b) => GRID_ORDER.indexOf(a.key) - GRID_ORDER.indexOf(b.key))
 
   return (

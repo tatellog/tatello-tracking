@@ -17,7 +17,6 @@ import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
-import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
@@ -32,7 +31,6 @@ import { PhotoEvolution } from '@/features/progress/components/PhotoEvolution'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TransformationHero } from '@/features/progress/components/TransformationHero'
 import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
-import { CycleCard } from '@/features/progress/components/CycleCard'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
 import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
@@ -200,12 +198,9 @@ function ProgressBody() {
   }, [measurementsQuery.data, checkinsQuery.data, signals30.data, targets?.calories])
 
   // Cycle phase — used to caption the weight chart so a luteal
-  // water-weight bump reads as biology, not regression.
+  // water-weight bump reads as biology, not regression. (Único hogar del
+  // ciclo en este tab; la card standalone se fue de Historia.)
   const cycle = useCyclePhase()
-  // Gate de ciclo (sexo/situación): para hombres y perfiles sin ciclo activo
-  // NO se muestra la sección — ni la card ni su divisor. CycleCard ya se
-  // auto-oculta, pero el divisor quedaba huérfano sin este gate.
-  const cycleEnabled = useCycleEnabled()
 
   // The user's declared focus for the month. When it isn't weight,
   // the "Tu cuerpo" section says so — the number is reference, not a
@@ -246,24 +241,9 @@ function ProgressBody() {
                   dev) y auto-oculto sin insights — trae su propio divisor. */}
               <ProgressInsightCard />
 
-              {/* Ciclo — vive en Historia (mockup dueña): contexto del mes, no
-                  del cuerpo. Solo con ciclo activo (nunca hombres). */}
-              {cycleEnabled ? (
-                <>
-                  <View style={styles.divider} />
-                  <CycleCard />
-                </>
-              ) : null}
-
-              {/* Síntesis — resultado → causa → qué intentar, la respuesta a
-              "¿está funcionando?" en el primer screenful (feedback beta).
-              Absorbe la vieja ReadingCard + la línea déficit↔báscula; es el
-              ÚNICO link saliente del tab (cuarto, no pasillo). La card del
-              emblema se retiró de Progreso: su % junto a la báscula se leía
-              como "% de mi meta de peso" (anti-patrón del manifiesto por
-              contexto); el emblema vive en Hoy y en Órbita Mes. */}
-              <View style={styles.divider} />
-              <SynthesisCard />
+              {/* (La card de ciclo se fue de Historia: un concepto, un hogar —
+                  el ciclo vive en Hoy, y aquí solo como nota contextual bajo la
+                  gráfica de peso de Cuerpo, donde explica la báscula.) */}
 
               {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
               ahora en grande, con modo "Comparar" (slider de arrastrar).
@@ -282,13 +262,18 @@ function ProgressBody() {
                 <Text style={styles.calendarBridgeText}>Ver tu evolución completa →</Text>
               </Pressable>
 
-              {/* CTA a Body — el cuerpo vive en su propio segmento (Epic 02). */}
+              {/* Síntesis — resultado → causa → qué intentar. CIERRA Historia
+              (peak-end: el último sabor del scroll es la palanca abierta, la
+              razón de volver el domingo — nunca un dato triste). Absorbe la
+              vieja ReadingCard; su link a Órbita es el único saliente del tab.
+              La card del emblema se retiró: su % junto a la báscula se leía
+              como "% de mi meta de peso" (anti-patrón por contexto). */}
               <View style={styles.divider} />
-              <PrimaryCta label="Ver mi cuerpo →" onPress={goBody} />
+              <SynthesisCard />
 
               {/* Epic 06 · puente al calendario: ver (y editar) los días detrás
-                  de estos números. "Tu constancia" ya trae DayHistorySheet →
-                  "Editar día" → Hoy; aquí solo la puerta, sin duplicar nada. */}
+                  de estos números — el cierre único de Historia (dieta de CTAs:
+                  el segmento Cuerpo ya tiene su puerta en el switcher). */}
               <Pressable
                 onPress={() => {
                   track(PROGRESS_EVENTS.openCalendar)
@@ -470,12 +455,14 @@ function ProgressBody() {
               {PROGRESS_BODY_ENABLED ? (
                 <>
                   {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
-                      datos), no deja una hairline huérfana. */}
+                      datos), no deja una hairline huérfana. Orden peak-end:
+                      lo fechado/viejo (composición, comparador) primero y
+                      colapsado; el segmento CIERRA en la tira de fotos con
+                      "Capítulo de hoy" + el CTA de registro — el último sabor
+                      es futuro, nunca ago-2025. */}
                   <CompositionCards />
                   {/* F4 · evolución por zona (segmental de los check-ins). */}
                   <ZonesEvolution />
-                  {/* Evolución visual abre el bloque de fotos. */}
-                  <PhotoEvolution />
                   {/* Historial → comparador (tap en estrella aterriza abajo,
                       con scroll real hasta él). */}
                   <CheckinTimeline onPick={pickCompare} />
@@ -486,6 +473,8 @@ function ProgressBody() {
                   >
                     <CheckinCompare presetA={comparePresetA} />
                   </View>
+                  {/* El cierre emocional: la tira con "Capítulo de hoy". */}
+                  <PhotoEvolution />
                 </>
               ) : null}
 

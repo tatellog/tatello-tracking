@@ -11,12 +11,20 @@ import { useBodyCheckins, useMeasurements } from '../hooks'
 import { mergeWeightSeries, recoveryFact, smoothWeightPoints } from '../logic'
 
 /*
- * "Tu transformación · Desde que comenzaste" (F2 · Cuerpo, mockup dueña) — el
- * hero del segmento: primera marca → hoy, con el ARCO DORADO (una estrella en
- * cada extremo: donde empezaste y donde estás). Peso SUAVIZADO (media 7d):
- * el titular es la trayectoria, nunca el ruido de báscula de una mañana.
- * Delta en oro sin juicio. Se gana su lugar con ≥2 mediciones — con menos, el
- * empty state existente de "Tu cuerpo" hace su trabajo.
+ * "Tu transformación · Tu camino" (F2 · Cuerpo, mockup dueña) — el hero del
+ * segmento con UNA sola ancla (benchmark: tres verdades de peso en la misma
+ * pantalla rompían la definición de la métrica):
+ *
+ * - CON rebote (recoveryFact): el arco y los números van del PICO a hoy
+ *   (72.1 → 67.1) y la frase serif narra exactamente eso. El delta desde el
+ *   inicio del tracking desaparece: era la cifra que menos historia contaba
+ *   y la más visible.
+ * - SIN rebote: primera marca → hoy con su delta (la única historia).
+ *
+ * Peso SUAVIZADO (media 7d): el titular es la trayectoria, nunca el ruido de
+ * báscula de una mañana. Delta en oro sin juicio. Se gana su lugar con ≥2
+ * mediciones — con menos, el empty state de "Tu cuerpo" hace su trabajo.
+ * La ventana corta (30 días) vive SOLO en el chip "CAMBIO · 30 DÍAS" de abajo.
  */
 
 const ARC_W = 300
@@ -35,14 +43,16 @@ export function TransformationHero() {
     const first = smoothed[0]
     const last = smoothed[smoothed.length - 1]
     if (!first || !last || smoothed.length < 2) return null
-    const deltaKg = Number((last.weight - first.weight).toFixed(1))
     const daysSince = Math.max(0, Math.round((Date.now() - last.t) / 86400000))
     // La historia de recuperación (pico → hoy, sobre la serie suavizada): la
     // lectura que la usuaria pidió con sus propios datos. Narra lo recorrido,
-    // nunca lo que falta (cero countdown).
+    // nunca lo que falta (cero countdown). Cuando existe, ES el ancla del
+    // hero: arco, números y frase cuentan lo mismo.
     const recovery = recoveryFact(smoothed)
+    const from = recovery ? recovery.peakKg : first.weight
+    const deltaKg = Number((last.weight - from).toFixed(1))
     return {
-      from: first.weight,
+      from,
       to: last.weight,
       deltaKg,
       count: smoothed.length,
@@ -66,7 +76,9 @@ export function TransformationHero() {
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Tu transformación
       </EyebrowLabel>
-      <Text style={styles.sub}>Desde que comenzaste</Text>
+      {/* Ventana canónica larga ("Tu camino"); "desde que comenzaste" mentía
+          cuando el ancla es el pico del rebote. */}
+      <Text style={styles.sub}>{hero.recovery ? 'Tu camino, desde el pico' : 'Tu camino'}</Text>
 
       {/* El arco dorado: de tu primera estrella a la de hoy. Estático (cero
           animación nueva · cero riesgo de perf). */}
@@ -97,9 +109,9 @@ export function TransformationHero() {
         </Text>
       ) : null}
 
-      {/* La historia de recuperación, en voz de coach: el rebote nombrado sin
-          drama y lo ya recorrido desde ahí. Desaparece (no regaña) si la
-          tendencia se invierte. */}
+      {/* La historia de recuperación, en voz de coach: nombra el rebote sin
+          drama y narra EXACTAMENTE lo que el arco dibuja (misma ancla).
+          Desaparece (no regaña) si la tendencia se invierte. */}
       {hero.recovery ? (
         <Text style={styles.recovery}>
           Subiste hasta {hero.recovery.peakKg.toFixed(1)} kg. Desde ahí, ya bajaste{' '}

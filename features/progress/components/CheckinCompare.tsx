@@ -72,16 +72,22 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
   const [dayA, setDayA] = useState<string | null>(null)
   const [dayB, setDayB] = useState<string | null>(null)
   const [picking, setPicking] = useState<'a' | 'b' | null>(null)
-  const [showAll, setShowAll] = useState(false)
   const [photoAngle, setPhotoAngle] = useState<PhotoAngle | null>(null)
+  // Recencia = jerarquía: con la última medición vieja (>90 días), el
+  // comparador colapsa a su header por default — que el scroll del domingo no
+  // termine en "+5.3 kg" de hace un año (peak-end · benchmark). Tocar una
+  // estrella del historial lo abre.
+  const [openStale, setOpenStale] = useState(false)
   const router = useRouter()
 
-  // El timeline preselecciona el "antes" (esa fecha vs la última).
+  // El timeline preselecciona el "antes" (esa fecha vs la última) y abre la
+  // sección si estaba colapsada.
   useEffect(() => {
     if (presetA) {
       setDayA(presetA)
       setDayB(null)
       setPicking(null)
+      setOpenStale(true)
     } else {
       // El padre limpió el preset (salida del segmento): vuelve el default.
       setDayA(null)
@@ -103,10 +109,40 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
   const rows = compareCheckins(checkinA, checkinB)
   if (rows.length === 0) return null
 
+  // Última medición vieja → colapsado por default.
+  const lastDay = checkins[checkins.length - 1]?.measured_on
+  const stale =
+    lastDay != null &&
+    Date.now() - new Date(`${lastDay}T12:00:00`).getTime() > 90 * 24 * 60 * 60 * 1000
+
+  if (stale && !openStale) {
+    return (
+      <Animated.View entering={FadeIn.duration(360).delay(140)}>
+        <View style={styles.divider} />
+        <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
+          Comparador rápido
+        </EyebrowLabel>
+        <Pressable
+          onPress={() => setOpenStale(true)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: false }}
+          accessibilityLabel={`Comparar ${fmtDay(a)} contra ${fmtDay(b)}`}
+          style={({ pressed }) => [styles.collapsedRow, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.collapsedText}>
+            {fmtDay(a)} → {fmtDay(b)}
+          </Text>
+          <Text style={styles.collapsedCaret}>Ver ▸</Text>
+        </Pressable>
+      </Animated.View>
+    )
+  }
+
   const synthesis = compareSynthesis(rows)
-  const primary = rows.filter((r) => PRIMARY.includes(r.key))
-  const secondary = rows.filter((r) => !PRIMARY.includes(r.key))
-  const visible = showAll ? [...primary, ...secondary] : primary
+  // Tres métricas (el norte, su lectura y la esperanza) — el resto vive en
+  // "Ver análisis detallado" y en la Tabla completa (dieta de puertas: UNA
+  // entrada al detalle, no tres).
+  const visible = rows.filter((r) => PRIMARY.includes(r.key))
 
   const pick = (side: 'a' | 'b', d: string) => {
     if (side === 'a') setDayA(d)
@@ -201,18 +237,6 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
             </View>
           )
         })}
-        {secondary.length > 0 ? (
-          <Pressable
-            onPress={() => setShowAll((v) => !v)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showAll }}
-            style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={styles.moreText}>
-              {showAll ? 'Ver menos' : `Ver más métricas (${secondary.length})`}
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
 
       {/* D · el análisis guiado determinista (la película del tráiler ✦). */}
@@ -452,12 +476,23 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   visualChipTextOn: { color: colors.magentaHot },
-  moreBtn: { paddingVertical: 12, alignItems: 'center' },
-  moreText: {
+  // Fila colapsada (datos viejos): las fechas como resumen, a un tap.
+  collapsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  collapsedText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  collapsedCaret: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.niebla,
-    letterSpacing: 0.2,
   },
   analysisCta: {
     marginTop: 14,

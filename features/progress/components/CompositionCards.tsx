@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
@@ -105,6 +105,13 @@ export function CompositionCards() {
   // invitación sin presión. Nunca push, nunca badge de "vencida".
   const isStale = last != null && last.ageDays > STALE_DAYS
 
+  // Recencia = jerarquía (benchmark): con datos viejos, la sección colapsa a
+  // header + fecha por default; los números viven a un tap. No es esconder
+  // el baseline (sigue aquí, fechado): es no darle a ago-2025 el mismo peso
+  // visual que a lo fresco.
+  const [openStale, setOpenStale] = useState(false)
+  const collapsed = isStale && !openStale
+
   // Conexión con el ciclo, SOLO cuando es honesta: la última medición cayó en
   // días de retención (lútea/menstrual) Y es reciente (≤7 días). Conectar el
   // ciclo a un delta de un año sería endulzar el número.
@@ -127,24 +134,51 @@ export function CompositionCards() {
       {/* La fecha SIEMPRE visible: estos números son de cuando te mediste,
           no de hoy (patrón Apple: fechar todo). */}
       {last ? <Text style={styles.dateCaption}>Última medición · {last.label}</Text> : null}
-      {isStale ? (
-        <Text style={styles.staleNote}>
-          Estos números son de {last!.label}. Cuando quieras, los actualizas con una nueva medición.
-        </Text>
-      ) : synthesis ? (
-        <Text style={styles.synthesis}>{synthesis}</Text>
-      ) : null}
-      {cycleNote ? <Text style={styles.cycleNote}>{cycleNote}</Text> : null}
-      <View style={styles.grid}>
-        {cards.map((c) => (
-          <MetricCard key={c.key} label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
-        ))}
-      </View>
-      <Text style={styles.note}>
-        {isMock && !hasCheckins
-          ? 'Datos de ejemplo · así se verá cuando conectes tu báscula o salud.'
-          : 'De tus mediciones y salud conectada. Evidencia, no veredicto.'}
-      </Text>
+
+      {collapsed ? (
+        <Pressable
+          onPress={() => setOpenStale(true)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: false }}
+          accessibilityLabel="Ver tu composición corporal"
+          style={({ pressed }) => [styles.staleToggle, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.staleToggleText}>Ver estos números ▸</Text>
+        </Pressable>
+      ) : (
+        <>
+          {isStale ? (
+            <Text style={styles.staleNote}>
+              Estos números son de {last!.label}. Cuando quieras, los actualizas con una nueva
+              medición.
+            </Text>
+          ) : synthesis ? (
+            <Text style={styles.synthesis}>{synthesis}</Text>
+          ) : null}
+          {cycleNote ? <Text style={styles.cycleNote}>{cycleNote}</Text> : null}
+          <View style={styles.grid}>
+            {cards.map((c) => (
+              <MetricCard key={c.key} label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
+            ))}
+          </View>
+          <Text style={styles.note}>
+            {isMock && !hasCheckins
+              ? 'Datos de ejemplo · así se verá cuando conectes tu báscula o salud.'
+              : 'De tus mediciones y salud conectada. Evidencia, no veredicto.'}
+          </Text>
+          {isStale ? (
+            <Pressable
+              onPress={() => setOpenStale(false)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: true }}
+              accessibilityLabel="Ocultar tu composición corporal"
+              style={({ pressed }) => [styles.staleToggle, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.staleToggleText}>Ocultar ▴</Text>
+            </Pressable>
+          ) : null}
+        </>
+      )}
     </Animated.View>
   )
 }
@@ -213,6 +247,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     color: colors.niebla,
     marginBottom: 8,
+  },
+  staleToggle: { alignSelf: 'flex-start', paddingVertical: 8 },
+  staleToggleText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
   },
   // La invitación cuando la medición es vieja: hecho fechado, sin presión.
   staleNote: {
