@@ -35,12 +35,16 @@ import { photoAt, photoDatesFor } from '../logic'
  *
  * Scrubber arriba: línea con relleno magenta hasta la última foto + estrellas ✦
  * equiespaciadas (equiespaciado a propósito: huecos temporales largos leerían
- * como "aquí me abandoné" · anti-culpa) + "Hoy" anclado a la derecha, con el
- * tramo sin foto en hairline — honesto, sin contar días. El RAIL completo es el
- * touch target (44pt): tap → la tira salta a esa fecha (escala a 20 fechas).
- * Tabs de ángulo ABAJO (píldoras, alcance de pulgar). Con <4 fechas, un tile
- * fantasma "Agregar" invita (nunca "te faltan fotos"). Evidencia sin juicio:
- * solo fechas sobre las fotos, jamás peso/medidas encima.
+ * como "aquí me abandoné" · anti-culpa). El ancla "Hoy" a la derecha SOLO
+ * cuando la última foto es reciente (≤60 días): con fotos viejas, el tramo
+ * vacío hasta "Hoy" era el hueco acusador ("aquí desapareciste" · target-user)
+ * y deshacía el equiespaciado anti-culpa por la puerta de atrás — el riel
+ * termina donde termina la evidencia. El RAIL completo es el touch target
+ * (44pt): tap → la tira salta a esa fecha (escala a 20 fechas). Tabs de ángulo
+ * ABAJO (píldoras, alcance de pulgar). El tile fantasma dice "Capítulo de hoy"
+ * (invitación de inicio, no tarea pendiente: "Agregar era un examen y el
+ * examen lo pospongo"); aparece con <4 fechas o cuando las fotos son viejas.
+ * Evidencia sin juicio: solo fechas sobre las fotos, jamás peso/medidas encima.
  */
 
 const ANGLES: { key: PhotoAngle; label: string }[] = [
@@ -53,6 +57,9 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
 const TILE_W = 74
 const TILE_GAP = 8
 const TILE_H = Math.round(TILE_W / 0.52)
+// Misma ventana de frescura que el díptico: pasados 60 días, la última foto
+// deja de ser "hoy".
+const STALE_MS = 60 * 24 * 60 * 60 * 1000
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const fmtShort = (iso: string): string => `${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`
 const fmtFull = (iso: string): string =>
@@ -95,6 +102,12 @@ export function PhotoEvolution() {
 
   if (!active || usable.length === 0 || items.length === 0) return null
 
+  // Última foto vieja → el riel termina en su estrella (sin ancla "Hoy") y el
+  // tile fantasma invita a abrir el capítulo de hoy.
+  const lastItem = items[items.length - 1]
+  const stale =
+    lastItem != null && Date.now() - new Date(`${lastItem.day}T12:00:00`).getTime() > STALE_MS
+
   const onStripScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, layoutMeasurement } = e.nativeEvent
     const lastVisible = Math.floor(
@@ -109,19 +122,22 @@ export function PhotoEvolution() {
     track(PROGRESS_EVENTS.photo, { kind: 'scrub' })
   }
 
+  // Reserva a la derecha: espacio del label "Hoy" solo cuando existe.
+  const reserve = stale ? 8 : 44
+
   // Rail completo como touch target: tap en cualquier x → la fecha más cercana.
   const onRailPress = (x: number) => {
     if (railW <= 0 || items.length < 2) return
-    const usableW = railW - 44 // reserva del label "Hoy"
+    const usableW = railW - reserve
     const idx = Math.round((x / usableW) * (items.length - 1))
     jumpTo(Math.max(0, Math.min(items.length - 1, idx)))
   }
 
   // Posición (0..1) de cada estrella sobre el rail (equiespaciado por índice).
   const dotX = (i: number, w: number) =>
-    items.length > 1 ? (i / (items.length - 1)) * (w - 44) : 0
+    items.length > 1 ? (i / (items.length - 1)) * (w - reserve) : 0
 
-  const showGhost = items.length < 4
+  const showGhost = items.length < 4 || stale
 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(140)}>
@@ -142,12 +158,14 @@ export function PhotoEvolution() {
         {railW > 0 ? (
           <>
             <Svg width={railW} height={44} style={StyleSheet.absoluteFill}>
-              {/* Hairline completo hasta "Hoy" (el tramo sin foto queda sin
-                  rellenar: honesto, sin contar días). */}
+              {/* Con foto reciente, el hairline sigue hasta "Hoy" (tramo sin
+                  rellenar: honesto, sin contar días). Con fotos viejas, el
+                  riel TERMINA en la última estrella: el tramo vacío hasta un
+                  "Hoy" fantasma era el hueco acusador. */}
               <Line
                 x1={4}
                 y1={22}
-                x2={railW - 4}
+                x2={stale ? 4 + dotX(items.length - 1, railW) : railW - 4}
                 y2={22}
                 stroke={colors.oroHairline}
                 strokeWidth={1.4}
@@ -170,7 +188,7 @@ export function PhotoEvolution() {
                 />
               ))}
             </Svg>
-            <Text style={styles.hoy}>Hoy</Text>
+            {stale ? null : <Text style={styles.hoy}>Hoy</Text>}
             {/* Labels: primera fecha + la activa (evita encimar con 8+). */}
             <Text style={[styles.railLabel, { left: 0 }]}>{fmtShort(items[0]!.day)}</Text>
             {viewedIdx > 0 ? (
@@ -224,7 +242,7 @@ export function PhotoEvolution() {
             <Pressable
               onPress={() => router.push('/log-photos')}
               accessibilityRole="button"
-              accessibilityLabel="Agregar fotos de otra fecha"
+              accessibilityLabel="Abrir el capítulo de hoy con una foto nueva"
               style={styles.tileWrap}
             >
               <View style={[styles.tile, styles.ghost]}>
@@ -232,7 +250,9 @@ export function PhotoEvolution() {
                   <Path d={fourPointStarPath(13, 13, 8)} fill={colors.bruma} />
                 </Svg>
               </View>
-              <Text style={styles.tileDate}>Agregar</Text>
+              {/* Invitación de inicio, no tarea pendiente ("Agregar" leía
+                  como examen que se pospone). */}
+              <Text style={styles.tileDate}>Capítulo de hoy</Text>
             </Pressable>
           ) : null}
         </View>

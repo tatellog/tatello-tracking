@@ -122,11 +122,17 @@ const PHOTO_URL_TTL = 60 * 60
 
 /*
  * The before/after pair for the Progreso page. Uses the front-angle
- * photos only (the canonical comparison angle) and always spans the
- * full history — earliest vs latest — regardless of the page's range
+ * photos only (the canonical comparison angle) and spans the full
+ * history — earliest vs latest — regardless of the page's range
  * selector. RLS scopes the table to the caller.
+ *
+ * `sinceIso` (capítulos · decisión benchmark + target-user): cuando una foto
+ * nueva llega tras un gap largo, abre un CAPÍTULO — el par se deriva solo de
+ * las fotos desde esa fecha, para que la foto nueva sea el punto de partida
+ * de hoy y no el "después" automático contra el mejor momento de 2024. Si el
+ * capítulo quedó vacío (se borró su foto), cae al historial completo.
  */
-export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
+export async function getBeforeAfterPhotos(sinceIso?: string | null): Promise<BeforeAfter> {
   const { data, error } = await supabase
     .from('photos')
     .select('id, taken_at, storage_path')
@@ -134,7 +140,11 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
     .order('taken_at', { ascending: true })
   if (error) throw error
 
-  const rows = data ?? []
+  let rows = data ?? []
+  if (sinceIso) {
+    const chapter = rows.filter((r) => r.taken_at >= sinceIso)
+    if (chapter.length > 0) rows = chapter
+  }
   const firstRow = rows[0]
   if (!firstRow) return { before: null, after: null, count: 0 }
 

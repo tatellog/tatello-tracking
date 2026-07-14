@@ -246,10 +246,10 @@ export function useMeasurements(rangeDays: number | null, enabled = true) {
  * (onboarding / settings) aparece vía el invalidate de useTakePhoto;
  * el foco de la app cubre el caso de volver desde background.
  */
-export function useBeforeAfterPhotos() {
+export function useBeforeAfterPhotos(sinceIso?: string | null) {
   return useQuery({
-    queryKey: queryKeys.photos.beforeAfter(),
-    queryFn: getBeforeAfterPhotos,
+    queryKey: queryKeys.photos.beforeAfter(sinceIso ?? null),
+    queryFn: () => getBeforeAfterPhotos(sinceIso ?? null),
     // No refetchOnMount:'always' — tabs never unmount, so it only fired on
     // cold start. In-app uploads (useTakePhoto) invalidate photos.all with
     // refetchType:'all', which is what actually makes a fresh photo appear.

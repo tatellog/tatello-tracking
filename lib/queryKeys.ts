@@ -66,7 +66,7 @@ export const queryKeys = {
     all: ['photos'] as const,
     today: () => ['photos', 'today'] as const,
     latestSet: () => ['photos', 'latest-set'] as const,
-    beforeAfter: () => ['photos', 'before-after'] as const,
+    beforeAfter: (sinceIso: string | null = null) => ['photos', 'before-after', sinceIso] as const,
   },
   water: {
     all: ['water'] as const,
