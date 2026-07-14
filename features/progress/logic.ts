@@ -744,6 +744,22 @@ export function compositionSynthesis(
   return compareSynthesis(rows, { rescueCloser: false })
 }
 
+/* ─── Serie genérica de una métrica de check-in (Epic 08 · F1) ───────────
+ *
+ * Para los detalles por métrica que compositionSeries no cubre (visceral,
+ * IMC como serie propia): la columna numérica de body_checkins como
+ * {day, value}, ascendente, sin nulls.
+ */
+export function checkinSeries(
+  checkins: readonly BodyCheckin[],
+  key: keyof BodyCheckin,
+): SeriesPoint[] {
+  return checkins
+    .filter((c) => typeof c[key] === 'number')
+    .map((c) => ({ day: c.measured_on, value: c[key] as number }))
+    .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+}
+
 /* ─── Tabla completa de mediciones (la tabla del coach, decisión dueña) ──
  *
  * El expediente crudo: filas = métricas, columnas = fechas. Sin semáforo (el

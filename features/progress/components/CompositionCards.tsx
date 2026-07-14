@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
@@ -62,6 +63,7 @@ function fmt(v: number, unit: string): string {
 }
 
 export function CompositionCards() {
+  const router = useRouter()
   const checkins = useBodyCheckins()
   const wearable = useWearableComposition(null)
   const isMock = useBodyCompositionIsMock()
@@ -173,6 +175,15 @@ export function CompositionCards() {
               ? 'Datos de ejemplo · así se verá cuando conectes tu báscula o salud.'
               : 'De tus mediciones y salud conectada. Evidencia, no veredicto.'}
           </Text>
+          {/* Epic 08: el detalle por métrica vive en su pantalla. */}
+          <Pressable
+            onPress={() => router.push('/body-composition')}
+            accessibilityRole="link"
+            accessibilityLabel="Ver tu composición a detalle"
+            style={({ pressed }) => [styles.staleToggle, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={styles.staleToggleText}>Ver en detalle →</Text>
+          </Pressable>
           {isStale ? (
             <Pressable
               onPress={() => setOpenStale(false)}

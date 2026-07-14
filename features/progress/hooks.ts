@@ -34,6 +34,7 @@ import { PROGRESS_COMPARE_WINDOW_DAYS } from './constants'
 import { generateProgressInsights, type ProgressInsight, type WeightSample } from './insights'
 import {
   compareHistory,
+  compositionSeries,
   mergeComposition,
   photoDatesFor,
   smoothWeightPoints,
@@ -207,6 +208,20 @@ export function useBodyComposition(rangeDays: number | null = null) {
     return mergeComposition(checkins.data ?? [], wearableRows)
   }, [checkins.data, wearable.data, mock])
   return { ...wearable, data }
+}
+
+/** Epic 08 · F1: series por métrica de composición con el MISMO gating de
+ *  mock que CompositionCards (con check-ins reales, el mock no se mezcla).
+ *  Alimenta /body-composition y /metric/[key]. */
+export function useGatedCompositionSeries() {
+  const mock = useBodyCompositionIsMock()
+  const checkins = useBodyCheckins()
+  const wearable = useWearableComposition(null)
+  const series = useMemo(() => {
+    const wearableRows = mock && (checkins.data?.length ?? 0) > 0 ? [] : (wearable.data ?? [])
+    return compositionSeries(checkins.data ?? [], wearableRows)
+  }, [checkins.data, wearable.data, mock])
+  return { series, isPending: checkins.isPending || wearable.isPending, checkins }
 }
 
 /** Body (Epic 02): todas las fotos (4 ángulos) con URLs firmadas — el

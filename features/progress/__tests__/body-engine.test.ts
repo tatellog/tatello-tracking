@@ -2,6 +2,7 @@ import type { BodyCheckin, BodyComposition, TimelinePhoto } from '../api'
 import type { BodyMeasurement } from '@/features/brief/api'
 
 import {
+  checkinSeries,
   checkinTable,
   compareCheckins,
   compareSynthesis,
@@ -171,6 +172,30 @@ describe('compositionSynthesis — la lectura de las cards (misma voz que el com
   it('con una sola medición por métrica → null (no hay lectura que dar)', () => {
     const series = compositionSeries([chk('2024-08-15', { body_fat_pct: 35.4 })], [])
     expect(compositionSynthesis(series)).toBeNull()
+  })
+})
+
+describe('checkinSeries — serie genérica de una métrica (Epic 08)', () => {
+  const chk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+
+  it('extrae la columna como {day,value} ascendente, sin nulls', () => {
+    const s = checkinSeries(
+      [
+        chk('2025-08-15', { visceral_fat_index: 5 }),
+        chk('2024-08-15', { visceral_fat_index: 4.5 }),
+        chk('2024-11-15', {}), // sin visceral ese día → fuera
+      ],
+      'visceral_fat_index',
+    )
+    expect(s).toEqual([
+      { day: '2024-08-15', value: 4.5 },
+      { day: '2025-08-15', value: 5 },
+    ])
+  })
+
+  it('sin datos → vacía', () => {
+    expect(checkinSeries([chk('2024-08-15', {})], 'bmi')).toEqual([])
   })
 })
 
