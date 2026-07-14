@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg'
 import Toast from 'react-native-toast-message'
 
 import { PrimaryCta } from '@/components/PrimaryCta'
+import { DateField } from '@/features/onboarding/components/DateField'
 import { BodyCheckinInputSchema, type BodyCheckinInput } from '@/features/progress/api'
 import { useBodyCheckins, useUpsertBodyCheckin } from '@/features/progress/hooks'
 import { SkyBackground } from '@/features/tabs/components'
@@ -84,7 +85,21 @@ export default function LogCheckinScreen() {
   const editSource = params.source === 'manual' || params.source === 'coach' ? params.source : null
   const editing = editDay != null && editSource != null
 
-  const [date, setDate] = useState(editDay ?? todayInTimezone())
+  // La fecha como Date (DateField, fix uxui: el TextInput AAAA-MM-DD aceptaba
+  // fechas imposibles/futuras). `date` = el ISO derivado, que es lo que la DB
+  // y el flujo de fotos entienden.
+  const parseISO = (v: string): Date | null => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
+    if (!m) return null
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const [dateObj, setDateObj] = useState<Date>(
+    () => (editDay ? parseISO(editDay) : null) ?? parseISO(todayInTimezone()) ?? new Date(),
+  )
+  const date = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(
+    dateObj.getDate(),
+  ).padStart(2, '0')}`
   const [source, setSource] = useState<'manual' | 'coach'>(editSource ?? 'manual')
   const [values, setValues] = useState<Partial<Record<FieldKey, string>>>({})
 
@@ -148,11 +163,12 @@ export default function LogCheckinScreen() {
         })
         router.back()
       },
-      onError: (err) => {
+      onError: () => {
+        // Copy fijo y cálido: jamás el mensaje crudo del sistema en pantalla.
         Toast.show({
           type: 'error',
-          text1: 'No pudimos guardar',
-          text2: err instanceof Error ? err.message : 'Intenta de nuevo.',
+          text1: 'No pudimos guardar tu medición',
+          text2: 'Revisa tu conexión e intenta de nuevo.',
         })
       },
     })
@@ -199,20 +215,19 @@ export default function LogCheckinScreen() {
             {/* Fecha + fuente. Al editar quedan fijas: identifican el registro. */}
             <View style={styles.metaRow}>
               <View style={styles.dateWrap}>
-                <Text style={styles.fieldLabel}>Fecha</Text>
                 {editing ? (
-                  <View style={[styles.input, styles.inputLocked]}>
-                    <Text style={styles.lockedText}>{date}</Text>
-                  </View>
+                  <>
+                    <Text style={styles.fieldLabel}>Fecha</Text>
+                    <View style={[styles.input, styles.inputLocked]}>
+                      <Text style={styles.lockedText}>{date}</Text>
+                    </View>
+                  </>
                 ) : (
-                  <TextInput
-                    value={date}
-                    onChangeText={setDate}
-                    placeholder="AAAA-MM-DD"
-                    placeholderTextColor={colors.niebla}
-                    style={styles.input}
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                  <DateField
+                    label="Fecha"
+                    value={dateObj}
+                    onChange={setDateObj}
+                    maxDate={new Date()}
                   />
                 )}
               </View>
@@ -268,10 +283,10 @@ export default function LogCheckinScreen() {
               />
             </View>
 
-            {/* Epic 08 · F3: las fotos de la sesión, a un tap (mismo flujo de
-                backdating; ahí eliges la fecha). */}
+            {/* Epic 08 · F3: las fotos de la sesión, a un tap — la fecha del
+                form VIAJA (uxui: "esta fecha" tiene que ser esta fecha). */}
             <Pressable
-              onPress={() => router.push('/log-photos')}
+              onPress={() => router.push({ pathname: '/log-photos', params: { date } })}
               accessibilityRole="link"
               accessibilityLabel="Agregar fotos de esta medición"
               style={({ pressed }) => [styles.photosLink, pressed && { opacity: 0.6 }]}
