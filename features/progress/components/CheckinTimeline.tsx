@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useRouter } from 'expo-router'
+import { useMemo, useRef } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Line, Path } from 'react-native-svg'
@@ -27,6 +28,8 @@ const fmtDay = (iso: string): string =>
   `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
 
 export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) {
+  const router = useRouter()
+  const railRef = useRef<ScrollView>(null)
   const { data } = useBodyCheckins()
   const photosQ = usePhotoTimeline()
   const photos = useMemo(() => photosQ.data ?? [], [photosQ.data])
@@ -36,16 +39,35 @@ export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) 
   return (
     <Animated.View entering={FadeIn.duration(360).delay(160)}>
       <View style={styles.divider} />
-      <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-        Historial de mediciones
-      </EyebrowLabel>
-      <Text style={styles.sub}>Tu evolución completa · toca una para compararla</Text>
+      <View style={styles.headerRow}>
+        <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
+          Historial de mediciones
+        </EyebrowLabel>
+        {/* La tabla del coach (decisión dueña): todos los números, sin frases. */}
+        <Pressable
+          onPress={() => {
+            router.push('/progress-table')
+            track(PROGRESS_EVENTS.body, { kind: 'table' })
+          }}
+          hitSlop={10}
+          accessibilityRole="link"
+          accessibilityLabel="Ver la tabla completa de mediciones"
+        >
+          <Text style={styles.tableLink}>Ver tabla completa →</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.sub}>Tu evolución completa · toca una y compárala abajo</Text>
 
+      {/* Arranca en la medición MÁS RECIENTE (la que buscas primero): antes el
+          riel abría en "Inicio" y el último nodo salía rebanado al borde, que
+          se leía como bug. El peek parcial queda del lado del pasado. */}
       <ScrollView
+        ref={railRef}
         horizontal
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.railContent}
+        onContentSizeChange={() => railRef.current?.scrollToEnd({ animated: false })}
       >
         <View style={styles.rail}>
           {checkins.map((c, i) => {
@@ -120,7 +142,17 @@ export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) 
 
 const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   eyebrow: { marginBottom: 2 },
+  tableLink: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.micro,
+    color: colors.oroLight,
+  },
   sub: {
     fontFamily: typography.serif,
     fontStyle: 'italic',

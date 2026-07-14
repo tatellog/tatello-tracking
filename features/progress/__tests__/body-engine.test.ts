@@ -2,15 +2,18 @@ import type { BodyCheckin, BodyComposition, TimelinePhoto } from '../api'
 import type { BodyMeasurement } from '@/features/brief/api'
 
 import {
+  checkinTable,
   compareCheckins,
   compareSynthesis,
   compositionSeries,
   compositionSummary,
   compositionSynthesis,
+  measurementsCsv,
   mergeWeightSeries,
   photoAt,
   photoDatesFor,
   photoNear,
+  recoveryFact,
   zoneEvolution,
 } from '../logic'
 
@@ -146,8 +149,11 @@ describe('compositionSynthesis — la lectura de las cards (misma voz que el com
   const chk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
     ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
 
-  it('separa rescates de hechos duros (los 4 ↑ de la usuaria)', () => {
-    // Su caso real: grasa↑ + IMC↑ (duros) · músculo↑ + agua↑ (a favor).
+  it('separa rescates de hechos duros, SIN cierre-rescate y SIN IMC', () => {
+    // Su caso real: grasa↑ (duro) · músculo↑ + agua↑ (a favor). El cierre
+    // "no empiezas de cero" vive UNA vez (comparador); el IMC salió de las
+    // cards (vive en la Tabla completa) y la frase no menciona lo que no
+    // se muestra.
     const series = compositionSeries(
       [
         chk('2024-08-15', { body_fat_pct: 35.4, muscle_kg: 42.5, water_pct: 47.9, bmi: 24.2 }),
@@ -158,12 +164,79 @@ describe('compositionSynthesis — la lectura de las cards (misma voz que el com
     const s = compositionSynthesis(series)!
     expect(s).toContain('tu grasa')
     expect(s).toContain('ganaste músculo')
-    expect(s).toContain('no empiezas de cero')
+    expect(s).not.toContain('no empiezas de cero')
+    expect(s).not.toContain('IMC')
   })
 
   it('con una sola medición por métrica → null (no hay lectura que dar)', () => {
     const series = compositionSeries([chk('2024-08-15', { body_fat_pct: 35.4 })], [])
     expect(compositionSynthesis(series)).toBeNull()
+  })
+})
+
+describe('measurementsCsv — el expediente saliendo (propiedad de datos)', () => {
+  const chk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+  const meas = (iso: string, kg: number): BodyMeasurement =>
+    ({ id: iso, measured_at: iso, weight_kg: kg }) as unknown as BodyMeasurement
+
+  it('mezcla check-ins y pesajes de la app, ascendente, con fuente', () => {
+    const csv = measurementsCsv(
+      [chk('2024-08-15', { weight_kg: 69.3, body_fat_pct: 35.4 })],
+      [meas('2026-07-03T08:00:00Z', 67.1)],
+    )
+    const lines = csv.split('\n')
+    expect(lines[0]).toContain('fecha,fuente,peso_kg')
+    expect(lines[1]).toContain('2024-08-15,coach,69.3')
+    expect(lines[1]).toContain('35.4')
+    expect(lines[2]).toContain('2026-07-03,app,67.1')
+    // El pesaje de app no inventa columnas de composición.
+    expect(lines[2]!.split(',').filter((c) => c !== '')).toHaveLength(3)
+  })
+
+  it('escapa notas con comas/comillas (CSV válido)', () => {
+    const csv = measurementsCsv(
+      [chk('2024-08-15', { weight_kg: 69.3, notes: 'post viaje, con "antojos"' })],
+      [],
+    )
+    expect(csv).toContain('"post viaje, con ""antojos"""')
+  })
+
+  it('sin datos → solo el header', () => {
+    expect(measurementsCsv([], []).split('\n')).toHaveLength(1)
+  })
+})
+
+describe('recoveryFact — la historia de recuperación (pico → actual)', () => {
+  const pt = (day: string, weight: number) => ({ t: Date.parse(`${day}T08:00:00Z`), weight })
+
+  it('su caso real: subió a 72.1 y ya bajó 5.0 de eso', () => {
+    const fact = recoveryFact([
+      pt('2024-08-15', 69.3),
+      pt('2024-09-15', 65.9),
+      pt('2025-08-15', 72.1),
+      pt('2026-07-03', 67.1),
+    ])!
+    expect(fact.peakKg).toBe(72.1)
+    expect(fact.droppedKg).toBe(5.0)
+  })
+
+  it('sin rebote (bajando desde el día uno, pico = inicio) → null', () => {
+    expect(
+      recoveryFact([pt('2026-01-01', 70), pt('2026-02-01', 69), pt('2026-03-01', 68)]),
+    ).toBeNull()
+  })
+
+  it('en el pico ahora mismo (pico = último punto) → null, nunca regaño', () => {
+    expect(
+      recoveryFact([pt('2026-01-01', 68), pt('2026-02-01', 69), pt('2026-03-01', 71)]),
+    ).toBeNull()
+  })
+
+  it('recuperación menor a 1 kg → null (todavía no hay historia)', () => {
+    expect(
+      recoveryFact([pt('2026-01-01', 68), pt('2026-02-01', 71), pt('2026-03-01', 70.5)]),
+    ).toBeNull()
   })
 })
 
@@ -198,6 +271,53 @@ describe('compareSynthesis — la frase honesta del comparador', () => {
   it('sin cambios → null (silencio, no relleno)', () => {
     expect(compareSynthesis([mk('weight_kg', 70, 70)])).toBeNull()
     expect(compareSynthesis([])).toBeNull()
+  })
+
+  it('rescueCloser: false deja los hechos sin el cierre (vive una vez por scroll)', () => {
+    const s = compareSynthesis([mk('body_fat_pct', 35.4, 36.8), mk('muscle_kg', 42.5, 43.2)], {
+      rescueCloser: false,
+    })!
+    expect(s).toContain('ganaste músculo')
+    expect(s).not.toContain('no empiezas de cero')
+  })
+})
+
+describe('checkinTable — la tabla completa (fechas × métricas, sin frases)', () => {
+  const mk = (day: string, o: Partial<BodyCheckin>): BodyCheckin =>
+    ({ id: day, measured_on: day, source: 'coach', ...o }) as BodyCheckin
+
+  it('columnas ascendentes (día + fuente para editar); huecos null; spark sin nulls', () => {
+    const t = checkinTable([
+      mk('2024-11-15', { weight_kg: 66.8 }),
+      mk('2024-08-15', { weight_kg: 69.3, water_pct: 47.9 }),
+      mk('2025-08-15', { weight_kg: 72.1, water_pct: 51 }),
+    ])
+    expect(t.cols.map((c) => c.day)).toEqual(['2024-08-15', '2024-11-15', '2025-08-15'])
+    // Cada columna sabe su fuente: day+source identifican el check-in a editar.
+    expect(t.cols[0]!.source).toBe('coach')
+    const basicos = t.groups.find((g) => g.title === 'Básicos')!
+    const peso = basicos.rows.find((r) => r.key === 'weight_kg')!
+    expect(peso.values).toEqual([69.3, 66.8, 72.1])
+    const agua = basicos.rows.find((r) => r.key === 'water_pct')!
+    // El 11-15 no midió agua → null en su columna, pero el spark no salta.
+    expect(agua.values).toEqual([47.9, null, 51])
+    expect(agua.spark).toEqual([47.9, 51])
+  })
+
+  it('filas sin ningún valor no aparecen; grupos vacíos tampoco', () => {
+    const t = checkinTable([mk('2024-08-15', { weight_kg: 69.3, body_fat_pct: 35.4 })])
+    const basicos = t.groups.find((g) => g.title === 'Básicos')!
+    expect(basicos.rows.map((r) => r.key)).toEqual(['weight_kg'])
+    // Grasa total sí se midió → el grupo existe con solo esa fila.
+    expect(t.groups.find((g) => g.title === 'Grasa')!.rows.map((r) => r.key)).toEqual([
+      'body_fat_pct',
+    ])
+    // Nada de músculo → el grupo entero desaparece.
+    expect(t.groups.find((g) => g.title === 'Músculo')).toBeUndefined()
+  })
+
+  it('sin check-ins → tabla vacía', () => {
+    expect(checkinTable([])).toEqual({ cols: [], groups: [] })
   })
 })
 

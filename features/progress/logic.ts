@@ -197,6 +197,103 @@ export function mergeWeightSeries(
   return [...byDay.values()].sort((a, b) => a.t - b.t)
 }
 
+/* ─── Export CSV (propiedad de datos · decisión benchmark) ───────────────
+ *
+ * "El día que sienta que la tabla y las fotos son mías, le meto todo sin
+ * miedo" (target-user). Modelo Apple Health: la data sale libre y gratis; el
+ * valor vivo (Síntesis, patrones) es lo que te quedas. Nunca premium-gated.
+ */
+
+const CSV_COLUMNS: { header: string; key: keyof BodyCheckin }[] = [
+  { header: 'peso_kg', key: 'weight_kg' },
+  { header: 'imc', key: 'bmi' },
+  { header: 'tmb_kcal', key: 'bmr_kcal' },
+  { header: 'agua_pct', key: 'water_pct' },
+  { header: 'masa_osea_kg', key: 'bone_mass_kg' },
+  { header: 'edad_metabolica', key: 'metabolic_age' },
+  { header: 'grasa_visceral', key: 'visceral_fat_index' },
+  { header: 'musculo_kg', key: 'muscle_kg' },
+  { header: 'musculo_brazo_der_kg', key: 'muscle_arm_right_kg' },
+  { header: 'musculo_brazo_izq_kg', key: 'muscle_arm_left_kg' },
+  { header: 'musculo_tronco_kg', key: 'muscle_trunk_kg' },
+  { header: 'musculo_pierna_der_kg', key: 'muscle_leg_right_kg' },
+  { header: 'musculo_pierna_izq_kg', key: 'muscle_leg_left_kg' },
+  { header: 'grasa_pct', key: 'body_fat_pct' },
+  { header: 'grasa_brazo_der_pct', key: 'fat_arm_right_pct' },
+  { header: 'grasa_brazo_izq_pct', key: 'fat_arm_left_pct' },
+  { header: 'grasa_tronco_pct', key: 'fat_trunk_pct' },
+  { header: 'grasa_pierna_der_pct', key: 'fat_leg_right_pct' },
+  { header: 'grasa_pierna_izq_pct', key: 'fat_leg_left_pct' },
+]
+
+const csvField = (v: string | number | null | undefined): string => {
+  if (v == null) return ''
+  const s = String(v)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+/** Todas las mediciones (check-ins completos + pesajes de la app) como CSV,
+ *  ascendente por fecha. Crudo y completo: es SU expediente saliendo. */
+export function measurementsCsv(
+  checkins: readonly BodyCheckin[],
+  measurements: readonly BodyMeasurement[],
+): string {
+  const header = ['fecha', 'fuente', ...CSV_COLUMNS.map((c) => c.header), 'notas']
+  type Row = { date: string; cells: string[] }
+  const rows: Row[] = []
+  for (const c of checkins) {
+    rows.push({
+      date: c.measured_on,
+      cells: [
+        c.measured_on,
+        c.source === 'coach' ? 'coach' : 'manual',
+        ...CSV_COLUMNS.map((col) => csvField(c[col.key] as number | null)),
+        csvField(c.notes ?? null),
+      ],
+    })
+  }
+  for (const m of measurements) {
+    if (m.weight_kg == null) continue
+    const day = m.measured_at.slice(0, 10)
+    const cells = [day, 'app', ...CSV_COLUMNS.map(() => ''), '']
+    cells[2] = csvField(m.weight_kg) // peso_kg es la primera columna de datos
+    rows.push({ date: day, cells })
+  }
+  rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+  return [header.join(','), ...rows.map((r) => r.cells.join(','))].join('\n')
+}
+
+/* ─── Recuperación desde el pico (decisión benchmark + target-user) ──────
+ *
+ * El hecho que la usuaria pidió con sus propios datos: "llegaste a subir a
+ * 72.1 y ya bajaste 5 de eso". Determinístico, sobre la serie SUAVIZADA (el
+ * relato no retrocede con un pesaje ruidoso). Límites duros del manifiesto:
+ * narra la dirección recorrida, NUNCA la distancia restante (cero countdown,
+ * cero "te faltan X kg"). Solo existe si hubo pico DESPUÉS del inicio (subiste
+ * y ya bajaste); quien viene bajando desde el día uno ya tiene su historia en
+ * el hero. Si la tendencia se invierte, el hecho simplemente desaparece (el
+ * drop cae bajo el umbral) — nunca se convierte en regaño.
+ */
+
+export type RecoveryFact = { peakKg: number; droppedKg: number }
+
+export function recoveryFact(points: readonly WeightPoint[]): RecoveryFact | null {
+  if (points.length < 3) return null
+  let peakIdx = 0
+  for (let i = 1; i < points.length; i += 1) {
+    if ((points[i]?.weight ?? -Infinity) > (points[peakIdx]?.weight ?? -Infinity)) peakIdx = i
+  }
+  const peak = points[peakIdx]
+  const last = points[points.length - 1]
+  if (!peak || !last) return null
+  // Pico en el arranque = no hay rebote que contar; pico al final = está en
+  // el pico, no hay recuperación aún.
+  if (peakIdx === 0 || peakIdx === points.length - 1) return null
+  const droppedKg = Number((peak.weight - last.weight).toFixed(1))
+  if (droppedKg < 1) return null
+  return { peakKg: Number(peak.weight.toFixed(1)), droppedKg }
+}
+
 /** La foto del ángulo MÁS CERCANA a un día (±tolDays): una sesión de fotos al
  *  día siguiente del check-in no desaparece del comparador. */
 export function photoNear(
@@ -543,7 +640,14 @@ export function compareBuckets(rows: readonly CheckinDelta[]): {
   return { gains, hard }
 }
 
-export function compareSynthesis(rows: readonly CheckinDelta[]): string | null {
+/** La frase honesta (hechos duros + rescates). `rescueCloser: false` deja los
+ *  hechos sin el cierre "no empiezas de cero" — la frase-rescate vive UNA vez
+ *  por scroll (en el comparador); repetida sonaba a plantilla (uxui). */
+export function compareSynthesis(
+  rows: readonly CheckinDelta[],
+  opts: { rescueCloser?: boolean } = {},
+): string | null {
+  const rescueCloser = opts.rescueCloser ?? true
   if (rows.length === 0) return null
   const rose: string[] = [] // hechos duros (en la dirección difícil)
   const gains: string[] = [] // rescates (a su favor)
@@ -583,7 +687,9 @@ export function compareSynthesis(rows: readonly CheckinDelta[]): string | null {
         : ''
 
   if (rose.length > 0 && gains.length > 0) {
-    return `${roseSentence}. También ${list(gains)}: no empiezas de cero.`
+    return rescueCloser
+      ? `${roseSentence}. También ${list(gains)}: no empiezas de cero.`
+      : `${roseSentence}. También ${list(gains)}.`
   }
   if (gains.length > 0) {
     return `Entre estas fechas, todo se movió a tu favor: ${list(gains)}.`
@@ -603,11 +709,12 @@ export function compareSynthesis(rows: readonly CheckinDelta[]): string | null {
 export function compositionSynthesis(
   series: Record<CompositionSeriesKey, SeriesPoint[]>,
 ): string | null {
+  // Sin IMC: salió de las cards (vive solo en la Tabla completa, su hogar
+  // natural) y la frase no menciona lo que la sección no muestra.
   const keys: { from: CompositionSeriesKey; to: CheckinDeltaKey }[] = [
     { from: 'body_fat_pct', to: 'body_fat_pct' },
     { from: 'muscle_kg', to: 'muscle_kg' },
     { from: 'water_pct', to: 'water_pct' },
-    { from: 'bmi', to: 'bmi' },
   ]
   const rows: CheckinDelta[] = []
   for (const k of keys) {
@@ -622,7 +729,79 @@ export function compositionSynthesis(
       delta: Number((last.value - first.value).toFixed(1)),
     })
   }
-  return compareSynthesis(rows)
+  // Sin cierre-rescate: aquí solo hechos; "no empiezas de cero" vive en el
+  // comparador (una vez por scroll).
+  return compareSynthesis(rows, { rescueCloser: false })
+}
+
+/* ─── Tabla completa de mediciones (la tabla del coach, decisión dueña) ──
+ *
+ * El expediente crudo: filas = métricas, columnas = fechas. Sin semáforo (el
+ * rojo ×4 dolía: "reprobada, reprobada..."), sin frases, sin score. La única
+ * mejora vs el Excel: la mini-tendencia por fila ("que la fila me deje ver
+ * hacia dónde va — mi 66.8 de en medio es mi prueba de que puedo volver").
+ */
+
+export type TableRow = {
+  key: string
+  label: string
+  unit: string
+  /** Un valor por fecha (null = no medido ese día). */
+  values: (number | null)[]
+  /** La serie sin nulls, para la mini-tendencia. */
+  spark: number[]
+}
+
+export type TableGroup = { title: string; rows: TableRow[] }
+
+/** Una columna = un check-in; day+source lo identifican para editarlo. */
+export type TableCol = { day: string; source: BodyCheckin['source'] }
+
+export type CheckinTable = { cols: TableCol[]; groups: TableGroup[] }
+
+const TABLE_METRICS: { group: string; key: keyof BodyCheckin; label: string; unit: string }[] = [
+  { group: 'Básicos', key: 'weight_kg', label: 'Peso', unit: 'kg' },
+  { group: 'Básicos', key: 'bmi', label: 'IMC', unit: '' },
+  { group: 'Básicos', key: 'bmr_kcal', label: 'TMB', unit: 'kcal' },
+  { group: 'Básicos', key: 'water_pct', label: 'Agua', unit: '%' },
+  { group: 'Básicos', key: 'bone_mass_kg', label: 'M. ósea', unit: 'kg' },
+  { group: 'Básicos', key: 'metabolic_age', label: 'Edad metab.', unit: 'años' },
+  { group: 'Básicos', key: 'visceral_fat_index', label: 'Visceral', unit: '' },
+  { group: 'Músculo', key: 'muscle_kg', label: 'Total', unit: 'kg' },
+  { group: 'Músculo', key: 'muscle_arm_right_kg', label: 'Brazo der', unit: 'kg' },
+  { group: 'Músculo', key: 'muscle_arm_left_kg', label: 'Brazo izq', unit: 'kg' },
+  { group: 'Músculo', key: 'muscle_trunk_kg', label: 'Tronco', unit: 'kg' },
+  { group: 'Músculo', key: 'muscle_leg_right_kg', label: 'Pierna der', unit: 'kg' },
+  { group: 'Músculo', key: 'muscle_leg_left_kg', label: 'Pierna izq', unit: 'kg' },
+  { group: 'Grasa', key: 'body_fat_pct', label: 'Total', unit: '%' },
+  { group: 'Grasa', key: 'fat_arm_right_pct', label: 'Brazo der', unit: '%' },
+  { group: 'Grasa', key: 'fat_arm_left_pct', label: 'Brazo izq', unit: '%' },
+  { group: 'Grasa', key: 'fat_trunk_pct', label: 'Tronco', unit: '%' },
+  { group: 'Grasa', key: 'fat_leg_right_pct', label: 'Pierna der', unit: '%' },
+  { group: 'Grasa', key: 'fat_leg_left_pct', label: 'Pierna izq', unit: '%' },
+]
+
+/** Arma la tabla desde los check-ins (ascendentes). Solo filas con ≥1 valor y
+ *  grupos con ≥1 fila — el expediente muestra lo medido, no cascarones. */
+export function checkinTable(checkins: readonly BodyCheckin[]): CheckinTable {
+  const sorted = [...checkins].sort((x, y) => (x.measured_on < y.measured_on ? -1 : 1))
+  const cols = sorted.map((c) => ({ day: c.measured_on, source: c.source }))
+  const groups: TableGroup[] = []
+  for (const m of TABLE_METRICS) {
+    const values = sorted.map((c) => (c[m.key] as number | null | undefined) ?? null)
+    if (values.every((v) => v == null)) continue
+    const row: TableRow = {
+      key: m.key,
+      label: m.label,
+      unit: m.unit,
+      values,
+      spark: values.filter((v): v is number => v != null),
+    }
+    const g = groups.find((x) => x.title === m.group)
+    if (g) g.rows.push(row)
+    else groups.push({ title: m.group, rows: [row] })
+  }
+  return { cols, groups }
 }
 
 /* ─── Evolución por zona (F4 · mockup dueña) ───────────────────────────── */

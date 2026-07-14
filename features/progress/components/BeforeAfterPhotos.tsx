@@ -12,12 +12,14 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
+import Toast from 'react-native-toast-message'
 
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
 import { useProfile } from '@/features/profile/hooks'
 import type { ProgressPhoto } from '@/features/progress/api'
+import { trySaveUriToLibrary } from '@/features/progress/export'
 import { useBeforeAfterPhotos, useDeletePhoto, useMeasurements } from '@/features/progress/hooks'
 import { computeTrend, formatTrendCopy, toWeightPoints } from '@/features/progress/logic'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
@@ -408,6 +410,13 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
       // La foto nueva es la más reciente (Ahora) y el orden por fecha vuelve a
       // mandar; soltamos el slot sostenido.
       persistSoloAfter(null)
+      // Dual-save (propiedad de datos): la foto de cámara también vive en SU
+      // carrete — antes solo existía en el bucket y desinstalar la perdía.
+      // Si niega el permiso, silencio: el rescate masivo vive en Ajustes.
+      if (source === 'camera') {
+        const ok = await trySaveUriToLibrary(result.assets[0].uri)
+        if (ok) Toast.show({ type: 'success', text1: 'Guardada también en tu carrete' })
+      }
     } catch (err) {
       Alert.alert('No se pudo subir', err instanceof Error ? err.message : 'Intenta de nuevo.')
     }

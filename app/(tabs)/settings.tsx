@@ -14,8 +14,11 @@ import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
+import Toast from 'react-native-toast-message'
+
 import { track } from '@/lib/analytics'
 import { useTransformProgress } from '@/features/emblem'
+import { exportMeasurementsCsv, savePhotosToLibrary } from '@/features/progress/export'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { avatarUrl } from '@/features/profile/api'
 import { useDeleteAccount, useProfile, useUpdateProfile } from '@/features/profile/hooks'
@@ -101,6 +104,66 @@ function SettingsBody() {
     }, []),
   )
   const [feedbackVisible, setFeedbackVisible] = useState(false)
+
+  // Tus datos (propiedad · modelo Apple Health: la data sale libre, gratis,
+  // sin ceremonia; nunca premium-gated).
+  const [exporting, setExporting] = useState(false)
+  const [rescuingPhotos, setRescuingPhotos] = useState(false)
+
+  const handleExportCsv = async () => {
+    if (exporting) return
+    setExporting(true)
+    track('data_export_csv')
+    try {
+      const result = await exportMeasurementsCsv()
+      if (result === 'empty') {
+        Toast.show({ type: 'info', text1: 'Aún no hay mediciones que exportar' })
+      }
+    } catch {
+      Toast.show({
+        type: 'error',
+        text1: 'No pudimos preparar el archivo',
+        text2: 'Intenta de nuevo.',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleRescuePhotos = async () => {
+    if (rescuingPhotos) return
+    setRescuingPhotos(true)
+    track('data_rescue_photos')
+    try {
+      const result = await savePhotosToLibrary()
+      if (result.status === 'denied') {
+        Toast.show({
+          type: 'error',
+          text1: 'Necesitamos permiso de Fotos',
+          text2: 'Actívalo en los ajustes de tu teléfono.',
+        })
+      } else if (result.status === 'empty') {
+        Toast.show({ type: 'info', text1: 'Aún no hay fotos de progreso' })
+      } else {
+        Toast.show({
+          type: result.failed > 0 ? 'info' : 'success',
+          text1:
+            result.saved === 1
+              ? '1 foto guardada en tu carrete'
+              : `${result.saved} fotos guardadas en tu carrete`,
+          text2: result.failed > 0 ? `${result.failed} no se pudieron descargar.` : undefined,
+        })
+      }
+    } catch {
+      Toast.show({
+        type: 'error',
+        text1: 'No pudimos guardar tus fotos',
+        text2: 'Intenta de nuevo.',
+      })
+    } finally {
+      setRescuingPhotos(false)
+    }
+  }
   const router = useRouter()
   const qc = useQueryClient()
   const choose = useConfirm()
@@ -429,6 +492,28 @@ function SettingsBody() {
                 tagline="Qué es Stelar y qué no."
                 onPress={openTerms}
                 accessibilityLabel="Términos de uso"
+              />
+            </View>
+
+            {/* Tus datos — la puerta de salida abierta ES la confianza para
+                quedarse (target-user: "el día que sienta que la tabla y las
+                fotos son mías, le meto todo sin miedo"). Gratis, siempre. */}
+            <Text style={styles.groupLabel}>Tus datos</Text>
+            <View style={styles.accountCard}>
+              <AccountRow
+                label="Exportar mis mediciones"
+                tagline={exporting ? 'Preparando tu archivo…' : 'Tu tabla completa, en un archivo.'}
+                onPress={() => void handleExportCsv()}
+                accessibilityLabel="Exportar mis mediciones como archivo"
+              />
+              <View style={styles.accountDivider} />
+              <AccountRow
+                label="Guardar mis fotos en mi carrete"
+                tagline={
+                  rescuingPhotos ? 'Guardando tus fotos…' : 'Todas tus fotos de progreso, en Fotos.'
+                }
+                onPress={() => void handleRescuePhotos()}
+                accessibilityLabel="Guardar todas mis fotos de progreso en el carrete"
               />
             </View>
 

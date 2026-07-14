@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -19,6 +19,9 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
 import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { useMacroTargets } from '@/features/macros/hooks'
+import { useSignalsHistory } from '@/features/orbit/hooks'
+import { daysInDeficit } from '@/features/orbit/month-built'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
@@ -134,8 +137,20 @@ function ProgressBody() {
     track(PROGRESS_EVENTS.body)
     setSegment('body')
   }
-  // Fusión "detalle de medición": tap en el timeline preselecciona el comparador.
+  // Fusión "detalle de medición": tap en el timeline preselecciona el comparador
+  // Y hace scroll hasta él (sin el scroll, el tap no tenía ningún feedback
+  // visible). El preset se limpia al cambiar de segmento: pegado, servía "mejor
+  // momento vs peor momento" como default (casi hace cerrar la app · beta).
   const [comparePresetA, setComparePresetA] = useState<string | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
+  const compareY = useRef(0)
+  useEffect(() => {
+    if (segment !== 'body') setComparePresetA(null)
+  }, [segment])
+  const pickCompare = useCallback((day: string) => {
+    setComparePresetA(day)
+    scrollRef.current?.scrollTo({ y: compareY.current, animated: true })
+  }, [])
   const measurementsQuery = useMeasurements(null)
   const checkinsQuery = useBodyCheckins()
   const { data: profile } = useProfile()
@@ -160,6 +175,30 @@ function ProgressBody() {
   const last = smoothed[smoothed.length - 1]
   const count = points.length
 
+  // "Báscula quieta, esfuerzo presente" (benchmark · el momento exacto donde
+  // una abandona): cuando los 30 días RODANTES están planos pero hubo días en
+  // déficit, esa constatación vive AQUÍ, junto al peso — antes la usuaria
+  // tenía que armarla a mano cruzando a Historia. Hechos, cero promesa de
+  // resultado (línea roja: nunca "pronto se reflejará").
+  const targets = useMacroTargets().data
+  const signals30 = useSignalsHistory(30)
+  const plateauNote = useMemo(() => {
+    const fused = mergeWeightSeries(measurementsQuery.data ?? [], checkinsQuery.data ?? [])
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000
+    const smoothed30 = smoothWeightPoints(fused.filter((p) => p.t >= since))
+    const d = computeDelta(smoothed30)
+    // Plano = |cambio| < 0.3 kg con al menos 3 puntos (menos es "sin datos",
+    // no "sin movimiento").
+    if (!d || smoothed30.length < 3 || Math.abs(d.abs) >= 0.3) return null
+    const summary = daysInDeficit(signals30.data ?? [], {
+      calorieTarget: targets?.calories ?? null,
+    })
+    // Mismo umbral que la Síntesis (MIN_DEFICIT_DAYS): menos de 3 días en
+    // déficit no se nombra como esfuerzo.
+    if (summary == null || summary.deficitDays < 3) return null
+    return `La báscula casi no se movió estos 30 días. Tus ${summary.deficitDays} días en déficit sí quedaron registrados.`
+  }, [measurementsQuery.data, checkinsQuery.data, signals30.data, targets?.calories])
+
   // Cycle phase — used to caption the weight chart so a luteal
   // water-weight bump reads as biology, not regression.
   const cycle = useCyclePhase()
@@ -176,13 +215,20 @@ function ProgressBody() {
 
   const goLogMeasurement = () => router.push('/log-measurement')
   const hasTrajectory = count >= 2
+  // Mientras cargan las queries, count===0 se disfrazaba de "primera vez" y una
+  // veterana veía el empty-hero un instante (uxui: falso vacío = micro-traición).
+  const weightLoading = measurementsQuery.isPending || checkinsQuery.isPending
 
   return (
     <View style={styles.screen}>
       <SkyBackground />
 
       <SafeAreaView style={styles.flex} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           <Animated.View entering={FadeIn.duration(280)}>
             <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
@@ -255,7 +301,10 @@ function ProgressBody() {
                 <Text style={styles.calendarBridgeText}>Ver los días detrás de esto →</Text>
               </Pressable>
 
-              <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
+              {/* (La coda "Tu transformación nunca retrocede" se retiró: suelta
+                  sonaba a frase de taza y para quien rebotó era además falsa
+                  sobre el peso. Vuelve DESPUÉS de beta atada a la Historia de
+                  hitos inmutables, donde cada trofeo la respalda.) */}
             </>
           ) : (
             <>
@@ -278,7 +327,7 @@ function ProgressBody() {
                   El cuerpo cambia despacio. Mira la tendencia, no el número del día.
                 </Text>
               ) : null}
-              {hasTrajectory ? (
+              {weightLoading ? null : hasTrajectory ? (
                 <>
                   <Animated.View
                     entering={FadeIn.duration(360).delay(80)}
@@ -296,7 +345,14 @@ function ProgressBody() {
                     </View>
                     {delta ? (
                       <View style={styles.deltaChip}>
-                        <Text style={styles.deltaChipLabel}>Cambio total</Text>
+                        {/* "Total" SOLO cuando el periodo es Todo: la etiqueta fija
+                            contradecía al hero (−2.2 "total" vs −0.1 "total") y
+                            rompía la confianza en ambos números. */}
+                        <Text style={styles.deltaChipLabel}>
+                          {period === 'ALL'
+                            ? 'Cambio total'
+                            : `Cambio · ${PERIOD_LABEL[period].toLowerCase()}`}
+                        </Text>
                         <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
                       </View>
                     ) : null}
@@ -312,6 +368,14 @@ function ProgressBody() {
                         style={styles.compPeriod}
                       >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
                     </Text>
+                  ) : null}
+
+                  {/* Báscula quieta + esfuerzo presente, juntos (siempre sobre
+                      los 30 días rodantes, independiente del chip de periodo). */}
+                  {plateauNote ? (
+                    <Animated.View entering={FadeIn.duration(360).delay(200)}>
+                      <Text style={styles.plateauNote}>{plateauNote}</Text>
+                    </Animated.View>
                   ) : null}
 
                   {/* Period filter — only meaningful once there are 2+ marks. */}
@@ -412,9 +476,16 @@ function ProgressBody() {
                   <ZonesEvolution />
                   {/* Evolución visual abre el bloque de fotos. */}
                   <PhotoEvolution />
-                  {/* Historial → comparador (tap en estrella aterriza abajo). */}
-                  <CheckinTimeline onPick={setComparePresetA} />
-                  <CheckinCompare presetA={comparePresetA} />
+                  {/* Historial → comparador (tap en estrella aterriza abajo,
+                      con scroll real hasta él). */}
+                  <CheckinTimeline onPick={pickCompare} />
+                  <View
+                    onLayout={(e) => {
+                      compareY.current = e.nativeEvent.layout.y
+                    }}
+                  >
+                    <CheckinCompare presetA={comparePresetA} />
+                  </View>
                 </>
               ) : null}
 
@@ -422,18 +493,22 @@ function ProgressBody() {
 
               {/* ── Cluster de ENTRADA (un solo hogar para el input, al final,
                   como el modelo de logging de Hoy). ── */}
+              {/* Naming que distingue destino (target-user: "medición" y
+                  "medición completa" parecían el mismo botón dos veces): el CTA
+                  magenta es el peso rápido; "Medición completa" es la
+                  composición, mismo label aquí y en la tabla. */}
               {hasTrajectory ? (
                 <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
-                  <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
+                  <PrimaryCta label="Registrar mi peso" onPress={goLogMeasurement} />
                 </Animated.View>
               ) : null}
               <Pressable
                 onPress={() => router.push('/log-checkin')}
                 accessibilityRole="link"
-                accessibilityLabel="Registrar medición completa"
+                accessibilityLabel="Registrar una medición completa"
                 style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
               >
-                <Text style={styles.calendarBridgeText}>Registrar medición completa →</Text>
+                <Text style={styles.calendarBridgeText}>Medición completa →</Text>
               </Pressable>
               <Pressable
                 onPress={() => router.push('/log-photos')}
@@ -918,14 +993,15 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 0.2,
   },
-  // Coda del tab — serif micro en niebla, mismo registro que las codas de Órbita.
-  footerCoda: {
-    marginTop: 26,
+  // Báscula quieta + esfuerzo presente — mismo registro calmo que cycleNote.
+  plateauNote: {
+    marginTop: 10,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
-    color: colors.niebla,
-    textAlign: 'center',
+    lineHeight: 19,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
   },
   // Shown in "Tu cuerpo" when the month's focus isn't weight — the
   // section is reference, not a target to chase.

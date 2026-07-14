@@ -1,20 +1,23 @@
-import { useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
-import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { colors, typography } from '@/theme'
 
 import { useBodyCheckins } from '../hooks'
 import { zoneEvolution, type ZoneKey } from '../logic'
 
 /*
- * Evolución por zona (F4 · mockup dueña) — el % de grasa de brazos/tronco/
- * piernas entre tu primera y tu última medición con zonas (los check-ins del
- * coach las traen). La observación es un HECHO ("tu tronco fue la zona donde
- * más cambió"), nunca un elogio direccional — si Stelar felicita cuando baja,
- * su silencio cuando sube se vuelve reproche (benchmark). Se auto-oculta sin
- * ≥2 mediciones con zonas. La silueta ilustrada llega después (illustrator).
+ * Evolución por zona (F4 · mockup dueña; colapsada por decisión benchmark) —
+ * el % de grasa de brazos/tronco/piernas entre tu primera y tu última medición
+ * con zonas (los check-ins del coach las traen). Target-user: "¿qué hago con
+ * brazos 30.9 → 33.7? nada" — es dato de nicho, así que vive PLEGADO como cola
+ * de Composición (progressive disclosure estilo Apple: disponible ≠
+ * protagonista), no como sección propia con divisor.
+ *
+ * La observación es un HECHO ("la grasa cambió más en tu tronco"), nunca un
+ * elogio direccional — si Stelar felicita cuando baja, su silencio cuando sube
+ * se vuelve reproche (benchmark). Se auto-oculta sin ≥2 mediciones con zonas.
  */
 
 const ZONE_LABEL: Record<ZoneKey, string> = {
@@ -33,53 +36,82 @@ const ZONE_IN: Record<ZoneKey, string> = {
 export function ZonesEvolution() {
   const { data } = useBodyCheckins()
   const { zones, highlight } = useMemo(() => zoneEvolution(data ?? []), [data])
+  const [open, setOpen] = useState(false)
   if (zones.length === 0) return null
 
   const hl = zones.find((z) => z.key === highlight)
 
   return (
-    <Animated.View entering={FadeIn.duration(360).delay(150)}>
-      <View style={styles.divider} />
-      <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-        Evolución por zona
-      </EyebrowLabel>
-      <Text style={styles.sub}>Grasa por zona, de tu primera a tu última medición</Text>
+    <View style={styles.wrap}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel="Ver la grasa por zona"
+        style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.6 }]}
+      >
+        <Text style={styles.toggleText}>Grasa por zona</Text>
+        <Text style={styles.toggleCaret}>{open ? '▾' : '▸'}</Text>
+      </Pressable>
 
-      {/* Sin highlight dorado: se leía como PREMIO ("¿me felicitas por subir
-          grasa?" · target-user). La observación de abajo dirige la atención. */}
-      <View style={styles.grid}>
-        {zones.map((z) => {
-          const arrow = z.delta === 0 ? null : z.delta > 0 ? '↑' : '↓'
-          return (
-            <View key={z.key} style={styles.card}>
-              <Text style={styles.zone}>{ZONE_LABEL[z.key]}</Text>
-              <View style={styles.valueRow}>
-                <Text style={styles.prev}>{z.first.toFixed(1)} %</Text>
-                <Text style={styles.arrowGlyph}>→</Text>
-                <Text style={styles.curr}>{z.last.toFixed(1)} %</Text>
-              </View>
-              {arrow ? (
-                <Text style={styles.delta}>
-                  {arrow} {z.delta > 0 ? '+' : '−'}
-                  {Math.abs(z.delta).toFixed(1)} %
-                </Text>
-              ) : null}
-            </View>
-          )
-        })}
-      </View>
+      {open ? (
+        <Animated.View entering={FadeIn.duration(240)}>
+          <Text style={styles.sub}>De tu primera a tu última medición con datos de zonas</Text>
+          {/* Sin highlight dorado: se leía como PREMIO ("¿me felicitas por subir
+              grasa?" · target-user). La observación de abajo dirige la atención. */}
+          <View style={styles.grid}>
+            {zones.map((z) => {
+              const arrow = z.delta === 0 ? null : z.delta > 0 ? '↑' : '↓'
+              return (
+                <View key={z.key} style={styles.card}>
+                  <Text style={styles.zone}>{ZONE_LABEL[z.key]}</Text>
+                  <View style={styles.valueRow}>
+                    <Text style={styles.prev}>{z.first.toFixed(1)} %</Text>
+                    <Text style={styles.arrowGlyph}>→</Text>
+                    <Text style={styles.curr}>{z.last.toFixed(1)} %</Text>
+                  </View>
+                  {arrow ? (
+                    <Text style={styles.delta}>
+                      {arrow} {z.delta > 0 ? '+' : '−'}
+                      {Math.abs(z.delta).toFixed(1)} %
+                    </Text>
+                  ) : null}
+                </View>
+              )
+            })}
+          </View>
 
-      {/* La observación: hecho, sin nota. */}
-      {hl ? (
-        <Text style={styles.observation}>La grasa cambió más en {ZONE_IN[hl.key]}.</Text>
+          {/* La observación: hecho, sin nota. */}
+          {hl ? (
+            <Text style={styles.observation}>La grasa cambió más en {ZONE_IN[hl.key]}.</Text>
+          ) : null}
+        </Animated.View>
       ) : null}
-    </Animated.View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
-  eyebrow: { marginBottom: 2 },
+  // Cola de Composición: sin divisor propio (leería como sección aparte).
+  wrap: { marginTop: 6 },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+  },
+  toggleText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+  },
+  toggleCaret: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    color: colors.niebla,
+  },
   sub: {
     fontFamily: typography.serif,
     fontStyle: 'italic',

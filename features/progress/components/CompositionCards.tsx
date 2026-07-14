@@ -26,13 +26,36 @@ import { Sparkline } from './Sparkline'
  * no son la misma métrica. Evidencia, no veredicto (manifiesto).
  */
 
+// Sin IMC (decisión benchmark + target-user: "sé que 25 es la rayita mala, me
+// asusta y no me dice qué hacer"): es el número más cercano a lenguaje clínico
+// del tab y no tiene palanca. Vive solo en la Tabla completa, el expediente.
 const METRICS: { key: CompositionSeriesKey; label: string; unit: string; hue: string }[] = [
   { key: 'body_fat_pct', label: 'Grasa corporal', unit: '%', hue: colors.signal.proteina },
   { key: 'muscle_kg', label: 'Músculo', unit: 'kg', hue: colors.dimension.cuerpo },
   { key: 'water_pct', label: 'Agua', unit: '%', hue: colors.signal.agua },
-  { key: 'bmi', label: 'IMC', unit: '', hue: colors.oroSoft },
   { key: 'lean_kg', label: 'Masa magra', unit: 'kg', hue: colors.dimension.cuerpo },
 ]
+
+/** Días desde la última medición completa; null sin datos. */
+const MESES_LARGO = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+]
+
+/** Umbral de frescura: pasado esto, el veredicto en presente ("subió tu
+ *  grasa") se degrada a hecho fechado (patrón Apple: fechar y silenciar,
+ *  nunca presentar un dato viejo como el hoy). */
+const STALE_DAYS = 90
 
 function fmt(v: number, unit: string): string {
   return `${v % 1 === 0 ? v : v.toFixed(1)}${unit ? ` ${unit}` : ''}`
@@ -58,9 +81,29 @@ export function CompositionCards() {
     (c) => c.serie.length > 0,
   )
 
-  // La lectura ANTES de las flechas (misma frase honesta del comparador):
-  // "Subió tu grasa. También ganaste músculo: no empiezas de cero."
+  // La lectura ANTES de las flechas (misma frase honesta del comparador,
+  // sin cierre-rescate: esa frase vive una vez, en el comparador).
   const synthesis = useMemo(() => compositionSynthesis(series), [series])
+
+  // Fecha de la última medición y su edad en días: la frescura manda.
+  const last = useMemo(() => {
+    const lastDay = Object.values(series)
+      .flat()
+      .reduce<string | null>((acc, p) => (acc == null || p.day > acc ? p.day : acc), null)
+    if (!lastDay) return null
+    const [y, m, d] = lastDay.split('-').map(Number) as [number, number, number]
+    const [ty, tm, td] = todayInTimezone().split('-').map(Number) as [number, number, number]
+    const ageDays = Math.round(
+      (new Date(ty, tm - 1, td, 12).getTime() - new Date(y, m - 1, d, 12).getTime()) / 86400000,
+    )
+    const label = `${MESES_LARGO[m - 1]} ${y}`
+    return { day: lastDay, ageDays, label }
+  }, [series])
+
+  // Con la medición vieja, el veredicto en presente se calla (la usuaria se
+  // sentía "regañada con una foto vieja"): queda el hecho fechado + una
+  // invitación sin presión. Nunca push, nunca badge de "vencida".
+  const isStale = last != null && last.ageDays > STALE_DAYS
 
   // Conexión con el ciclo, SOLO cuando es honesta: la última medición cayó en
   // días de retención (lútea/menstrual) Y es reciente (≤7 días). Conectar el
@@ -68,18 +111,9 @@ export function CompositionCards() {
   const cycle = useCyclePhase()
   const cycleNote = useMemo(() => {
     if (!cycle || (cycle.phase !== 'lutea' && cycle.phase !== 'menstrual')) return null
-    const lastDay = Object.values(series)
-      .flat()
-      .reduce<string | null>((acc, p) => (acc == null || p.day > acc ? p.day : acc), null)
-    if (!lastDay) return null
-    const [y, m, d] = lastDay.split('-').map(Number) as [number, number, number]
-    const [ty, tm, td] = todayInTimezone().split('-').map(Number) as [number, number, number]
-    const diff = Math.round(
-      (new Date(ty, tm - 1, td, 12).getTime() - new Date(y, m - 1, d, 12).getTime()) / 86400000,
-    )
-    if (diff < 0 || diff > 7) return null
+    if (!last || last.ageDays < 0 || last.ageDays > 7) return null
     return 'Tu última medición cayó en días en que el cuerpo retiene agua por el ciclo. El agua y el peso pueden subir sin que nada esté mal.'
-  }, [cycle, series])
+  }, [cycle, last])
 
   if (cards.length === 0) return null
 
@@ -90,7 +124,16 @@ export function CompositionCards() {
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Composición corporal
       </EyebrowLabel>
-      {synthesis ? <Text style={styles.synthesis}>{synthesis}</Text> : null}
+      {/* La fecha SIEMPRE visible: estos números son de cuando te mediste,
+          no de hoy (patrón Apple: fechar todo). */}
+      {last ? <Text style={styles.dateCaption}>Última medición · {last.label}</Text> : null}
+      {isStale ? (
+        <Text style={styles.staleNote}>
+          Estos números son de {last!.label}. Cuando quieras, los actualizas con una nueva medición.
+        </Text>
+      ) : synthesis ? (
+        <Text style={styles.synthesis}>{synthesis}</Text>
+      ) : null}
       {cycleNote ? <Text style={styles.cycleNote}>{cycleNote}</Text> : null}
       <View style={styles.grid}>
         {cards.map((c) => (
@@ -164,10 +207,28 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: 12,
   },
+  dateCaption: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.4,
+    color: colors.niebla,
+    marginBottom: 8,
+  },
+  // La invitación cuando la medición es vieja: hecho fechado, sin presión.
+  staleNote: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.title,
+    lineHeight: 24,
+    color: colors.leche,
+    marginBottom: 12,
+  },
+  // Grid 2×2: con 30% la 4ª card se estiraba sola a todo el ancho (se leía
+  // rota) y los sparklines quedaban decorativos.
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     flexGrow: 1,
-    flexBasis: '30%',
+    flexBasis: '47%',
     backgroundColor: colors.bgCard,
     borderRadius: 14,
     borderWidth: 1,

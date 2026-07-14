@@ -8,7 +8,7 @@ import { fourPointStarPath } from '@/features/tabs/components/constellation/geom
 import { colors, typography } from '@/theme'
 
 import { useBodyCheckins, useMeasurements } from '../hooks'
-import { mergeWeightSeries, smoothWeightPoints } from '../logic'
+import { mergeWeightSeries, recoveryFact, smoothWeightPoints } from '../logic'
 
 /*
  * "Tu transformación · Desde que comenzaste" (F2 · Cuerpo, mockup dueña) — el
@@ -37,7 +37,18 @@ export function TransformationHero() {
     if (!first || !last || smoothed.length < 2) return null
     const deltaKg = Number((last.weight - first.weight).toFixed(1))
     const daysSince = Math.max(0, Math.round((Date.now() - last.t) / 86400000))
-    return { from: first.weight, to: last.weight, deltaKg, count: smoothed.length, daysSince }
+    // La historia de recuperación (pico → hoy, sobre la serie suavizada): la
+    // lectura que la usuaria pidió con sus propios datos. Narra lo recorrido,
+    // nunca lo que falta (cero countdown).
+    const recovery = recoveryFact(smoothed)
+    return {
+      from: first.weight,
+      to: last.weight,
+      deltaKg,
+      count: smoothed.length,
+      daysSince,
+      recovery,
+    }
   }, [measurements.data, checkins.data])
 
   if (!hero) return null
@@ -86,9 +97,21 @@ export function TransformationHero() {
         </Text>
       ) : null}
 
+      {/* La historia de recuperación, en voz de coach: el rebote nombrado sin
+          drama y lo ya recorrido desde ahí. Desaparece (no regaña) si la
+          tendencia se invierte. */}
+      {hero.recovery ? (
+        <Text style={styles.recovery}>
+          Subiste hasta {hero.recovery.peakKg.toFixed(1)} kg. Desde ahí, ya bajaste{' '}
+          {hero.recovery.droppedKg.toFixed(1)}.
+        </Text>
+      ) : null}
+
+      {/* "Registros de peso", no "mediciones": la tabla llama mediciones a los
+          check-ins (4) y este conteo incluye los pesajes de la app (9). Cada
+          palabra nombra UNA cosa (uxui: 9 vs 4 no cuadraba). */}
       <Text style={styles.meta}>
-        Has registrado {hero.count} {hero.count === 1 ? 'medición' : 'mediciones'} · última{' '}
-        {lastLabel}
+        {hero.count} {hero.count === 1 ? 'registro' : 'registros'} de peso · último {lastLabel}
       </Text>
     </Animated.View>
   )
@@ -128,6 +151,17 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.headingLg,
     color: colors.oroLight,
     fontVariant: ['tabular-nums'],
+  },
+  // La frase de recuperación — voz del coach, centrada bajo el delta.
+  recovery: {
+    marginTop: 10,
+    paddingHorizontal: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.title,
+    lineHeight: 24,
+    color: colors.leche,
+    textAlign: 'center',
   },
   meta: {
     marginTop: 10,

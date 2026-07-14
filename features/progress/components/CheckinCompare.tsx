@@ -82,10 +82,18 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
       setDayA(presetA)
       setDayB(null)
       setPicking(null)
+    } else {
+      // El padre limpió el preset (salida del segmento): vuelve el default.
+      setDayA(null)
+      setDayB(null)
     }
   }, [presetA])
 
-  const a = dayA && dates.includes(dayA) ? dayA : dates[0]
+  // Default: medición ANTERIOR → actual ("¿qué cambió desde la última vez que
+  // me medí?", el ancla de Apple/YAZIO). Primera→última respondía lo que ya
+  // responde el hero, y con un rebote en medio servía "mejor momento vs peor
+  // momento" de bienvenida (benchmark + target-user).
+  const a = dayA && dates.includes(dayA) ? dayA : dates[dates.length - 2]
   const b = dayB && dates.includes(dayB) ? dayB : dates[dates.length - 1]
 
   if (checkins.length < 2 || !a || !b || a === b) return null
@@ -151,6 +159,17 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
               })}
           </View>
         </ScrollView>
+      ) : null}
+      {/* Atajo a la comparación larga (la del hero), sin picker. */}
+      {!picking && a !== dates[0] ? (
+        <Pressable
+          onPress={() => pick('a', dates[0]!)}
+          accessibilityRole="button"
+          accessibilityLabel="Comparar desde tu primera medición"
+          style={({ pressed }) => [styles.fromStart, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.fromStartText}>Desde el inicio →</Text>
+        </Pressable>
       ) : null}
 
       {/* La síntesis honesta PRIMERO: hechos duros + rescates, de su lado. */}
@@ -335,6 +354,13 @@ const styles = StyleSheet.create({
   },
   optionsRow: { marginTop: 8 },
   options: { flexDirection: 'row', gap: 6 },
+  fromStart: { alignSelf: 'flex-start', paddingVertical: 6, marginTop: 2 },
+  fromStartText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+  },
   option: {
     paddingVertical: 6,
     paddingHorizontal: 10,

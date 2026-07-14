@@ -64,14 +64,20 @@ export function HistoryChips() {
     const byKey = new Map(summary.metrics.map((m) => [m.key, m]))
     const out: ChipDef[] = []
 
+    // Déficit primero (el chip LÍDER: es la métrica-causa de Stelar, el
+    // "marcador personal" de la usuaria); Entrenos al final del grid — sin
+    // meta propia es contexto, no marcador (ver render).
     const counts: { key: 'workouts' | 'deficit' | 'logging'; label: string; hue: string }[] = [
-      { key: 'workouts', label: 'Entrenos', hue: colors.dimension.cuerpo },
-      { key: 'logging', label: 'Registro', hue: colors.dimension.alimento },
       { key: 'deficit', label: 'Déficit', hue: colors.magentaHot },
+      { key: 'logging', label: 'Registro', hue: colors.dimension.alimento },
+      { key: 'workouts', label: 'Entrenos', hue: colors.dimension.cuerpo },
     ]
     for (const c of counts) {
       const m = byKey.get(c.key)
       if (!m) continue
+      // Entrenos con ambas ventanas < 3: la flecha de delta es ruido
+      // estadístico presentado como dirección — se calla (uxui + benchmark).
+      const tinyWorkouts = c.key === 'workouts' && m.previous < 3 && m.current < 3
       out.push({
         key: c.key,
         label: c.label,
@@ -79,7 +85,9 @@ export function HistoryChips() {
         prev: fmtCount(m.previous),
         curr: fmtCount(m.current),
         delta:
-          m.delta === 0 ? null : `${arrow(m.delta)} ${m.delta > 0 ? '+' : '−'}${Math.abs(m.delta)}`,
+          m.delta === 0 || tinyWorkouts
+            ? null
+            : `${arrow(m.delta)} ${m.delta > 0 ? '+' : '−'}${Math.abs(m.delta)}`,
         spark: sparks[c.key],
       })
     }
@@ -123,14 +131,37 @@ export function HistoryChips() {
 
   if (!chips || chips.length === 0) return null
 
+  // Jerarquía (patrón del anillo dominante de Apple, sin su presión): Déficit
+  // es EL número — full-width arriba; los demás en grid, Entrenos al final.
+  const lead = chips.find((c) => c.key === 'deficit') ?? null
+  const GRID_ORDER = ['logging', 'protein', 'weight', 'workouts']
+  const rest = chips
+    .filter((c) => c.key !== 'deficit')
+    .sort((a, b) => GRID_ORDER.indexOf(a.key) - GRID_ORDER.indexOf(b.key))
+
   return (
     <Animated.View entering={FadeIn.duration(360)}>
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Tus últimos 30 días
       </EyebrowLabel>
       <Text style={styles.sub}>vs los 30 anteriores</Text>
+      {lead ? (
+        <View style={[styles.chip, styles.leadChip]}>
+          <Text style={[styles.chipLabel, { color: lead.hue }]}>{lead.label}</Text>
+          <View style={styles.valueRow}>
+            <Text style={styles.prev}>{lead.prev}</Text>
+            <Text style={[styles.arrow, { color: lead.hue }]}>→</Text>
+            <Text style={[styles.curr, styles.leadCurr]}>{lead.curr}</Text>
+            <Text style={styles.leadUnit}>días</Text>
+          </View>
+          {lead.delta ? (
+            <Text style={[styles.delta, { color: lead.hue }]}>{lead.delta}</Text>
+          ) : null}
+          {lead.spark ? <Sparkline data={lead.spark} hue={lead.hue} width={120} /> : null}
+        </View>
+      ) : null}
       <View style={styles.grid}>
-        {chips.map((c) => (
+        {rest.map((c) => (
           <View key={c.key} style={styles.chip}>
             <Text style={[styles.chipLabel, { color: c.hue }]}>{c.label}</Text>
             <View style={styles.valueRow}>
@@ -157,9 +188,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  // El chip líder: full-width, número más grande, sparkline más ancha.
+  leadChip: { marginBottom: 10 },
+  leadCurr: { fontSize: typography.sizes.displayMd },
+  leadUnit: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  // 2×2 (antes 30%: con cuatro chips, el último quedaba solo y estirado —
+  // justo Entrenos, el que menos protagonismo debe tener).
   chip: {
     flexGrow: 1,
-    flexBasis: '30%',
+    flexBasis: '47%',
     backgroundColor: colors.bgCard,
     borderRadius: 14,
     borderWidth: 1,

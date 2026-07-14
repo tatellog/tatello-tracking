@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,7 +17,7 @@ import Toast from 'react-native-toast-message'
 
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { BodyCheckinInputSchema, type BodyCheckinInput } from '@/features/progress/api'
-import { useUpsertBodyCheckin } from '@/features/progress/hooks'
+import { useBodyCheckins, useUpsertBodyCheckin } from '@/features/progress/hooks'
 import { SkyBackground } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -32,6 +32,12 @@ import { colors, typography } from '@/theme'
  * métricas (decisión dueña jul 2026). Sin colores de juicio: es captura de
  * hechos. `metabolic_age` se captura (completitud del registro) aunque la UI
  * de lectura no la muestre por default.
+ *
+ * EDICIÓN (decisión dueña jul 2026): con params ?day&source la forma abre el
+ * check-in existente precargado. Fecha y fuente quedan FIJAS (identifican el
+ * registro que editas; el upsert por usuaria+día+fuente hace el resto) y al
+ * guardar se mandan null explícitos: vaciar un campo lo borra de verdad (el
+ * upsert de PostgREST no toca columnas ausentes del payload).
  */
 
 type FieldKey = keyof Omit<BodyCheckinInput, 'measured_on' | 'source' | 'notes'>
@@ -66,13 +72,36 @@ const ZONAS_GRASA: Field[] = [
   { key: 'fat_leg_left_pct', label: 'Pierna izq', unit: '%' },
 ]
 
+const ALL_FIELDS: Field[] = [...BASICOS, ...ZONAS_MUSCULO, ...ZONAS_GRASA]
+
 export default function LogCheckinScreen() {
   const router = useRouter()
   const upsert = useUpsertBodyCheckin()
+  const params = useLocalSearchParams<{ day?: string; source?: string }>()
 
-  const [date, setDate] = useState(todayInTimezone())
-  const [source, setSource] = useState<'manual' | 'coach'>('manual')
+  // Modo edición: ?day&source identifican el check-in a abrir precargado.
+  const editDay = typeof params.day === 'string' ? params.day : null
+  const editSource = params.source === 'manual' || params.source === 'coach' ? params.source : null
+  const editing = editDay != null && editSource != null
+
+  const [date, setDate] = useState(editDay ?? todayInTimezone())
+  const [source, setSource] = useState<'manual' | 'coach'>(editSource ?? 'manual')
   const [values, setValues] = useState<Partial<Record<FieldKey, string>>>({})
+
+  const { data: checkins } = useBodyCheckins()
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => {
+    if (!editing || hydrated || !checkins) return
+    const record = checkins.find((c) => c.measured_on === editDay && c.source === editSource)
+    if (!record) return
+    const initial: Partial<Record<FieldKey, string>> = {}
+    for (const f of ALL_FIELDS) {
+      const v = record[f.key]
+      if (v != null) initial[f.key] = String(v)
+    }
+    setValues(initial)
+    setHydrated(true)
+  }, [editing, hydrated, checkins, editDay, editSource])
 
   const setField = (key: FieldKey, raw: string) =>
     setValues((v) => ({ ...v, [key]: raw.replace(',', '.') }))
@@ -89,9 +118,16 @@ export default function LogCheckinScreen() {
       }
       numeric[key as FieldKey] = n
     }
+    // Al editar, los campos vacíos van como null EXPLÍCITO: vaciar = borrar
+    // (el upsert no toca columnas que no llegan en el payload).
+    const cleared: Partial<Record<FieldKey, null>> = {}
+    if (editing) {
+      for (const f of ALL_FIELDS) if (numeric[f.key] == null) cleared[f.key] = null
+    }
     const parsed = BodyCheckinInputSchema.safeParse({
       measured_on: date.trim(),
       source,
+      ...cleared,
       ...numeric,
     })
     if (!parsed.success) {
@@ -106,7 +142,10 @@ export default function LogCheckinScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     upsert.mutate(parsed.data, {
       onSuccess: () => {
-        Toast.show({ type: 'success', text1: 'Medición guardada' })
+        Toast.show({
+          type: 'success',
+          text1: editing ? 'Medición actualizada' : 'Medición guardada',
+        })
         router.back()
       },
       onError: (err) => {
@@ -124,7 +163,7 @@ export default function LogCheckinScreen() {
       <SkyBackground />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Text style={styles.title}>Nueva medición</Text>
+          <Text style={styles.title}>{editing ? 'Editar medición' : 'Nueva medición'}</Text>
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
@@ -152,44 +191,57 @@ export default function LogCheckinScreen() {
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.hint}>
-              Captura lo que tengas: todos los campos son opcionales. La fecha se puede cambiar para
-              registrar mediciones pasadas.
+              {editing
+                ? 'Corrige lo que necesites. Un campo vacío se borra de la medición.'
+                : 'Captura lo que tengas: todos los campos son opcionales. La fecha se puede cambiar para registrar mediciones pasadas.'}
             </Text>
 
-            {/* Fecha + fuente */}
+            {/* Fecha + fuente. Al editar quedan fijas: identifican el registro. */}
             <View style={styles.metaRow}>
               <View style={styles.dateWrap}>
                 <Text style={styles.fieldLabel}>Fecha</Text>
-                <TextInput
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="AAAA-MM-DD"
-                  placeholderTextColor={colors.niebla}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+                {editing ? (
+                  <View style={[styles.input, styles.inputLocked]}>
+                    <Text style={styles.lockedText}>{date}</Text>
+                  </View>
+                ) : (
+                  <TextInput
+                    value={date}
+                    onChangeText={setDate}
+                    placeholder="AAAA-MM-DD"
+                    placeholderTextColor={colors.niebla}
+                    style={styles.input}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                )}
               </View>
               <View style={styles.sourceWrap}>
                 <Text style={styles.fieldLabel}>Fuente</Text>
-                <View style={styles.sourcePill}>
-                  {(['manual', 'coach'] as const).map((s) => {
-                    const on = s === source
-                    return (
-                      <Pressable
-                        key={s}
-                        onPress={() => setSource(s)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: on }}
-                        style={[styles.sourceSeg, on && styles.sourceSegOn]}
-                      >
-                        <Text style={[styles.sourceLabel, on && styles.sourceLabelOn]}>
-                          {s === 'manual' ? 'Yo' : 'Mi coach'}
-                        </Text>
-                      </Pressable>
-                    )
-                  })}
-                </View>
+                {editing ? (
+                  <View style={[styles.input, styles.inputLocked]}>
+                    <Text style={styles.lockedText}>{source === 'manual' ? 'Yo' : 'Mi coach'}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.sourcePill}>
+                    {(['manual', 'coach'] as const).map((s) => {
+                      const on = s === source
+                      return (
+                        <Pressable
+                          key={s}
+                          onPress={() => setSource(s)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          style={[styles.sourceSeg, on && styles.sourceSegOn]}
+                        >
+                          <Text style={[styles.sourceLabel, on && styles.sourceLabelOn]}>
+                            {s === 'manual' ? 'Yo' : 'Mi coach'}
+                          </Text>
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+                )}
               </View>
             </View>
 
@@ -209,7 +261,7 @@ export default function LogCheckinScreen() {
 
             <View style={styles.ctaWrap}>
               <PrimaryCta
-                label="Guardar medición"
+                label={editing ? 'Guardar cambios' : 'Guardar medición'}
                 onPress={save}
                 loading={upsert.isPending}
                 loadingLabel="Guardando…"
@@ -338,6 +390,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
+  },
+  inputLocked: { justifyContent: 'center', opacity: 0.7 },
+  lockedText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
   },
   ctaWrap: { marginTop: 26 },
 })

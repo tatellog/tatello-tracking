@@ -1,3 +1,4 @@
+import type { StyleProp, ViewStyle } from 'react-native'
 import Svg, { Polyline } from 'react-native-svg'
 
 /*
@@ -10,11 +11,14 @@ export function Sparkline({
   hue,
   width = 64,
   height = 18,
+  style,
 }: {
   data: number[]
   hue: string
   width?: number
   height?: number
+  /** Por defecto respira bajo texto (marginTop 8); en celdas va centrada. */
+  style?: StyleProp<ViewStyle>
 }) {
   if (data.length === 0) return null
   const min = Math.min(...data)
@@ -28,7 +32,7 @@ export function Sparkline({
     })
     .join(' ')
   return (
-    <Svg width={width} height={height} style={{ marginTop: 8 }}>
+    <Svg width={width} height={height} style={style ?? { marginTop: 8 }}>
       <Polyline
         points={points}
         fill="none"
