@@ -37,12 +37,10 @@ type ChipDef = {
   hue: string
   prev: string
   curr: string
-  delta: string | null
   spark: number[] | null
 }
 
 const fmtCount = (n: number) => `${n}`
-const arrow = (d: number) => (d > 0 ? '↑' : d < 0 ? '↓' : '·')
 
 export function HistoryChips() {
   const windowDays = PROGRESS_COMPARE_WINDOW_DAYS
@@ -66,28 +64,24 @@ export function HistoryChips() {
 
     // Déficit primero (el chip LÍDER: es la métrica-causa de Stelar, el
     // "marcador personal" de la usuaria); Entrenos al final del grid — sin
-    // meta propia es contexto, no marcador (ver render).
+    // meta propia es contexto, no marcador. Labels CON unidad ("Registro" a
+    // secas leía como "¿veces que abrí la app?" · target-user). Sin fila de
+    // delta: la misma flecha significaba cosas opuestas por chip (↓ peso
+    // bueno, ↓ déficit malo) y "antes/ahora" ya cuenta la dirección.
     const counts: { key: 'workouts' | 'deficit' | 'logging'; label: string; hue: string }[] = [
-      { key: 'deficit', label: 'Déficit', hue: colors.magentaHot },
-      { key: 'logging', label: 'Registro', hue: colors.dimension.alimento },
+      { key: 'deficit', label: 'Días en déficit', hue: colors.magentaHot },
+      { key: 'logging', label: 'Días con registro', hue: colors.dimension.alimento },
       { key: 'workouts', label: 'Entrenos', hue: colors.dimension.cuerpo },
     ]
     for (const c of counts) {
       const m = byKey.get(c.key)
       if (!m) continue
-      // Entrenos con ambas ventanas < 3: la flecha de delta es ruido
-      // estadístico presentado como dirección — se calla (uxui + benchmark).
-      const tinyWorkouts = c.key === 'workouts' && m.previous < 3 && m.current < 3
       out.push({
         key: c.key,
         label: c.label,
         hue: c.hue,
         prev: fmtCount(m.previous),
         curr: fmtCount(m.current),
-        delta:
-          m.delta === 0 || tinyWorkouts
-            ? null
-            : `${arrow(m.delta)} ${m.delta > 0 ? '+' : '−'}${Math.abs(m.delta)}`,
         spark: sparks[c.key],
       })
     }
@@ -95,14 +89,12 @@ export function HistoryChips() {
     // Proteína en gramos promedio (el lenguaje del registro del coach).
     const prot = proteinAverageComparison(signals.data, ctx)
     if (prot) {
-      const d = prot.current - prot.previous
       out.push({
         key: 'protein',
-        label: 'Proteína prom.',
+        label: 'Proteína al día',
         hue: colors.signal.proteina,
         prev: `${prot.previous} g`,
         curr: `${prot.current} g`,
-        delta: d === 0 ? null : `${arrow(d)} ${d > 0 ? '+' : '−'}${Math.abs(d)} g`,
         spark: sparks.protein,
       })
     }
@@ -117,12 +109,8 @@ export function HistoryChips() {
         key: 'weight',
         label: 'Peso',
         hue: colors.oroSoft,
-        prev: `${w.previous.toFixed(1)}`,
+        prev: `${w.previous.toFixed(1)} kg`,
         curr: `${w.current.toFixed(1)} kg`,
-        delta:
-          w.delta === 0
-            ? null
-            : `${arrow(w.delta)} ${w.delta > 0 ? '+' : '−'}${Math.abs(w.delta).toFixed(1)} kg`,
         spark: smoothTail.length >= 2 ? smoothTail : null,
       })
     }
@@ -144,19 +132,18 @@ export function HistoryChips() {
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
         Tus últimos 30 días
       </EyebrowLabel>
-      <Text style={styles.sub}>vs los 30 anteriores</Text>
+      {/* En Hanken, NO cursiva: la cursiva es registro de coach y el ojo la
+          salta buscando números — y esta línea es la llave de la sección
+          (target-user: "la explicación estaba donde guardan la poesía"). */}
+      <Text style={styles.sub}>comparado con los 30 días de antes</Text>
       {lead ? (
         <View style={[styles.chip, styles.leadChip]}>
           <Text style={[styles.chipLabel, { color: lead.hue }]}>{lead.label}</Text>
-          <View style={styles.valueRow}>
-            <Text style={styles.prev}>{lead.prev}</Text>
-            <Text style={[styles.arrow, { color: lead.hue }]}>→</Text>
+          <Text style={styles.prevLine}>antes {lead.prev}</Text>
+          <View style={styles.currRow}>
+            <Text style={styles.nowWord}>ahora</Text>
             <Text style={[styles.curr, styles.leadCurr]}>{lead.curr}</Text>
-            <Text style={styles.leadUnit}>días</Text>
           </View>
-          {lead.delta ? (
-            <Text style={[styles.delta, { color: lead.hue }]}>{lead.delta}</Text>
-          ) : null}
           {lead.spark ? <Sparkline data={lead.spark} hue={lead.hue} width={120} /> : null}
         </View>
       ) : null}
@@ -164,13 +151,11 @@ export function HistoryChips() {
         {rest.map((c) => (
           <View key={c.key} style={styles.chip}>
             <Text style={[styles.chipLabel, { color: c.hue }]}>{c.label}</Text>
-            <View style={styles.valueRow}>
-              <Text style={styles.prev}>{c.prev}</Text>
-              <Text style={[styles.arrow, { color: c.hue }]}>→</Text>
+            <Text style={styles.prevLine}>antes {c.prev}</Text>
+            <View style={styles.currRow}>
+              <Text style={styles.nowWord}>ahora</Text>
               <Text style={styles.curr}>{c.curr}</Text>
             </View>
-            {c.delta ? <Text style={[styles.delta, { color: c.hue }]}>{c.delta}</Text> : null}
-            {c.spark ? <Sparkline data={c.spark} hue={c.hue} /> : null}
           </View>
         ))}
       </View>
@@ -180,22 +165,18 @@ export function HistoryChips() {
 
 const styles = StyleSheet.create({
   eyebrow: { marginBottom: 2 },
+  // Hanken upright: es DATO (la regla de la ventana), no voz de coach.
   sub: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
     marginBottom: 12,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  // El chip líder: full-width, número más grande, sparkline más ancha.
+  // El chip líder: full-width, número más grande, sparkline más ancha (la
+  // única que se queda: las mini de los chips eran decoración ilegible).
   leadChip: { marginBottom: 10 },
   leadCurr: { fontSize: typography.sizes.displayMd },
-  leadUnit: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
   // 2×2 (antes 30%: con cuatro chips, el último quedaba solo y estirado —
   // justo Entrenos, el que menos protagonismo debe tener).
   chip: {
@@ -213,26 +194,27 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.micro,
     letterSpacing: 0.5,
   },
-  valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 6 },
-  prev: {
+  // "antes 13 · ahora 10": dos palabritas y la confusión desaparece
+  // (target-user leyó "13 → 10" como "mi meta era 13"). Sin fila de delta ni
+  // flecha ambigua; sin verde/rojo (identidad por hue, nunca juicio).
+  prevLine: {
+    marginTop: 6,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
-  arrow: { fontFamily: typography.uiMedium, fontSize: typography.sizes.body },
+  currRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
+  nowWord: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
   curr: {
     fontFamily: typography.displayHeavy,
     fontSize: typography.sizes.headingLg,
     color: colors.leche,
     letterSpacing: -0.4,
-    fontVariant: ['tabular-nums'],
-  },
-  // Identidad por métrica (mismo hue suba o baje) — dirección solo tipográfica.
-  delta: {
-    marginTop: 3,
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
     fontVariant: ['tabular-nums'],
   },
 })
