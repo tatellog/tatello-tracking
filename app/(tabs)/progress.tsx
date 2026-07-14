@@ -296,7 +296,9 @@ function ProgressBody() {
               {/* F2 · hero "Tu transformación": primera marca → hoy con el arco
                   dorado (peso suavizado). Se auto-oculta con <2 mediciones. */}
               <TransformationHero />
-              <View style={styles.divider} />
+              {/* El espacio ES el separador (brief UI polish): en Cuerpo las
+                  secciones respiran sin hairlines. */}
+              <View style={styles.sectionGap} />
 
               {/* ── Body: Tu cuerpo — peso + medidas. Epic 02/F2: composición
                   con sparklines + comparador de fechas. ── */}
@@ -636,9 +638,10 @@ function TrajectoryChart({ points, trend }: ChartProps) {
         </SvgGradient>
       </Defs>
 
-      {/* Measurement stars — each logged weight, a point of light. */}
+      {/* Measurement stars — each logged weight, a point of light (pequeños:
+          el protagonista es el punto activo, no el historial). */}
       {points.slice(1, lastIdx).map((p, i) => (
-        <Circle key={`m${i}`} cx={sx(i + 1)} cy={sy(p.weight)} r={2.6} fill={colors.magenta} />
+        <Circle key={`m${i}`} cx={sx(i + 1)} cy={sy(p.weight)} r={2.1} fill={colors.magenta} />
       ))}
 
       {/* Origin — a faint star marking where the trajectory began. */}
@@ -652,12 +655,13 @@ function TrajectoryChart({ points, trend }: ChartProps) {
         fill={colors.magentaDeep}
       />
 
-      {/* The trajectory — a comet, drawing itself in on mount. */}
+      {/* The trajectory — a comet, drawing itself in on mount (más fina:
+          la línea sugiere, el punto activo brilla). */}
       <AnimatedPath
         d={linePath}
         fill="none"
         stroke="url(#comet)"
-        strokeWidth={2.8}
+        strokeWidth={2.2}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeDasharray={lineLen}
@@ -685,8 +689,10 @@ function TrajectoryChart({ points, trend }: ChartProps) {
             />
           </>
         ) : null}
-        <Circle cx={hx} cy={hy} r={13} fill={colors.magentaTint2} />
-        <Circle cx={hx} cy={hy} r={5.5} fill={colors.magentaHot} />
+        {/* Punto activo con glow en dos capas: hoy es lo que brilla. */}
+        <Circle cx={hx} cy={hy} r={20} fill={colors.magentaTint} />
+        <Circle cx={hx} cy={hy} r={12} fill={colors.magentaTint2} />
+        <Circle cx={hx} cy={hy} r={5} fill={colors.magentaHot} />
       </AnimatedG>
     </Svg>
   )
@@ -768,6 +774,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     marginVertical: 28,
   },
+  // Separación por AIRE (Cuerpo): sin línea, ~35% más respiro entre secciones.
+  sectionGap: { height: 44 },
   heroEyebrow: {
     marginBottom: 10,
   },
@@ -965,13 +973,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: 6,
   },
-  // Cycle context under the chart — quiet, reassuring, serif italic.
+  // Cycle context under the chart — quiet, reassuring, serif italic. Con
+  // aire de reflexión (nunca pegada al chart como caption).
   cycleNote: {
-    marginTop: 10,
+    marginTop: 24,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
-    lineHeight: 19,
+    lineHeight: 20,
     color: colors.niebla,
   },
   // Puente callado al calendario (Epic 06) — link, no card.
@@ -982,13 +991,14 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 0.2,
   },
-  // Báscula quieta + esfuerzo presente — mismo registro calmo que cycleNote.
+  // Báscula quieta + esfuerzo presente — una REFLEXIÓN, no un caption
+  // (brief: el texto interpretativo se separa y respira como cita).
   plateauNote: {
-    marginTop: 10,
+    marginTop: 30,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
     color: colors.bone,
     fontVariant: ['tabular-nums'],
   },

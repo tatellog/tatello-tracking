@@ -157,8 +157,15 @@ export function CompositionCards() {
           ) : null}
           {cycleNote ? <Text style={styles.cycleNote}>{cycleNote}</Text> : null}
           <View style={styles.grid}>
-            {cards.map((c) => (
-              <MetricCard key={c.key} label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
+            {/* Stagger de 60 ms: las cards llegan una a una, no de golpe. */}
+            {cards.map((c, i) => (
+              <Animated.View
+                key={c.key}
+                entering={FadeIn.duration(420).delay(i * 60)}
+                style={styles.gridItem}
+              >
+                <MetricCard label={c.label} unit={c.unit} hue={c.hue} serie={c.serie} />
+              </Animated.View>
             ))}
           </View>
           <Text style={styles.note}>
@@ -222,7 +229,8 @@ function MetricCard({
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
+  // El espacio ES el separador (brief): sin hairline, solo aire.
+  divider: { height: 0, marginVertical: 38 },
   eyebrow: { marginBottom: 10 },
   // La lectura en voz del coach — antes de cualquier flecha.
   synthesis: {
@@ -266,16 +274,17 @@ const styles = StyleSheet.create({
   },
   // Grid 2×2: con 30% la 4ª card se estiraba sola a todo el ancho (se leía
   // rota) y los sparklines quedaban decorativos.
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  gridItem: { flexGrow: 1, flexBasis: '47%' },
+  // Cards que casi desaparecen (brief): borde más tenue, más radio, más
+  // aire adentro — el contenido flota, la card solo lo sostiene.
   card: {
-    flexGrow: 1,
-    flexBasis: '47%',
     backgroundColor: colors.bgCard,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 15,
+    paddingVertical: 14,
   },
   cardLabel: {
     fontFamily: typography.uiSemi,

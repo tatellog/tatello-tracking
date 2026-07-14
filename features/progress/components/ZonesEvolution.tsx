@@ -120,14 +120,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   grid: { flexDirection: 'row', gap: 10 },
+  // Cards que casi desaparecen (brief): borde tenue, más radio, más aire.
   card: {
     flex: 1,
     backgroundColor: colors.bgCard,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   zone: {
     fontFamily: typography.uiSemi,

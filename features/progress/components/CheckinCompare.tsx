@@ -344,7 +344,8 @@ function DatePill({
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
+  // El espacio ES el separador (brief): sin hairline, solo aire.
+  divider: { height: 0, marginVertical: 38 },
   eyebrow: { marginBottom: 12 },
   pillRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pill: {
@@ -400,24 +401,25 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   optionTextOn: { color: colors.magentaHot, fontFamily: typography.uiBold },
-  // La frase de su lado — voz del coach, antes de cualquier número.
+  // La frase de su lado — voz del coach, antes de cualquier número, con aire.
   synthesis: {
-    marginTop: 14,
+    marginTop: 20,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.title,
     lineHeight: 24,
     color: colors.leche,
   },
+  // Card que casi desaparece: borde tenue, más radio, más aire.
   table: {
-    marginTop: 14,
+    marginTop: 16,
     backgroundColor: colors.bgCard,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
+    borderColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   row: { paddingVertical: 11 },
   rowDivider: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },

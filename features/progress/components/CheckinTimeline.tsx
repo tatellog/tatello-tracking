@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router'
 import { useMemo, useRef } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Line, Path } from 'react-native-svg'
+import Svg, { Circle, Line, Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
@@ -77,61 +77,65 @@ export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) 
               photoAt(photos, 'back', c.measured_on) ??
               photoAt(photos, 'side_right', c.measured_on) ??
               photoAt(photos, 'side_left', c.measured_on)
+            const isLast = i === checkins.length - 1
             return (
-              <Pressable
-                key={c.id}
-                onPress={() => {
-                  onPick?.(c.measured_on)
-                  track(PROGRESS_EVENTS.compare, { kind: 'timeline' })
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Comparar la medición del ${fmtDay(c.measured_on)}`}
-                style={({ pressed }) => [styles.node, pressed && { opacity: 0.7 }]}
-              >
-                {/* La estrella-punto + el hilo hacia el siguiente. */}
-                <View style={styles.starRow}>
-                  <Svg width={22} height={22} viewBox="0 0 22 22">
-                    <Path
-                      d={fourPointStarPath(11, 11, i === checkins.length - 1 ? 7 : 5.5)}
-                      fill={i === checkins.length - 1 ? colors.oroLeche : colors.oroSoft}
-                    />
-                  </Svg>
-                  {i < checkins.length - 1 ? (
-                    <Svg width={92} height={22} viewBox="0 0 92 22">
-                      <Line
-                        x1={2}
-                        y1={11}
-                        x2={90}
-                        y2={11}
-                        stroke={colors.oroHairline}
-                        strokeWidth={1.2}
+              /* Cada medición = un capítulo: reveal escalonado de izq a der. */
+              <Animated.View key={c.id} entering={FadeIn.duration(420).delay(i * 60)}>
+                <Pressable
+                  onPress={() => {
+                    onPick?.(c.measured_on)
+                    track(PROGRESS_EVENTS.compare, { kind: 'timeline' })
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Comparar la medición del ${fmtDay(c.measured_on)}`}
+                  style={({ pressed }) => [styles.node, pressed && { opacity: 0.7 }]}
+                >
+                  {/* La estrella-punto + el hilo hacia el siguiente. El capítulo
+                      más reciente lleva glow. */}
+                  <View style={styles.starRow}>
+                    <Svg width={22} height={22} viewBox="0 0 22 22">
+                      {isLast ? <Circle cx={11} cy={11} r={10} fill={colors.oroGlow} /> : null}
+                      <Path
+                        d={fourPointStarPath(11, 11, isLast ? 7 : 5.5)}
+                        fill={isLast ? colors.oroLeche : colors.oroSoft}
                       />
                     </Svg>
-                  ) : null}
-                </View>
-                {thumb?.signed_url ? (
-                  <View style={styles.thumb}>
-                    <Image
-                      source={{ uri: thumb.signed_url }}
-                      style={styles.thumbImg}
-                      resizeMode="contain"
-                    />
+                    {i < checkins.length - 1 ? (
+                      <Svg width={92} height={22} viewBox="0 0 92 22">
+                        <Line
+                          x1={2}
+                          y1={11}
+                          x2={90}
+                          y2={11}
+                          stroke={colors.oroHairline}
+                          strokeWidth={1.2}
+                        />
+                      </Svg>
+                    ) : null}
                   </View>
-                ) : null}
-                <Text style={styles.date}>{fmtDay(c.measured_on)}</Text>
-                {i === 0 ? <Text style={styles.badge}>Inicio</Text> : null}
-                <View style={styles.metrics}>
-                  {c.weight_kg != null ? (
-                    <Text style={styles.metric}>{c.weight_kg.toFixed(1)} kg</Text>
+                  {thumb?.signed_url ? (
+                    <View style={styles.thumb}>
+                      <Image
+                        source={{ uri: thumb.signed_url }}
+                        style={styles.thumbImg}
+                        resizeMode="contain"
+                      />
+                    </View>
                   ) : null}
-                  {c.body_fat_pct != null ? (
-                    <Text style={styles.metric}>{c.body_fat_pct.toFixed(1)} %</Text>
-                  ) : null}
-                  {c.muscle_kg != null ? (
-                    <Text style={styles.metric}>{c.muscle_kg.toFixed(1)} kg músc.</Text>
-                  ) : null}
-                </View>
-              </Pressable>
+                  <Text style={styles.date}>{fmtDay(c.measured_on)}</Text>
+                  {i === 0 ? <Text style={styles.badge}>Inicio</Text> : null}
+                  {/* Tres datos por capítulo, nada más (brief): fecha arriba,
+                      peso y grasa aquí. */}
+                  <View style={styles.metrics}>
+                    {c.weight_kg != null ? (
+                      <Text style={styles.metric}>{c.weight_kg.toFixed(1)} kg</Text>
+                    ) : null}
+                    {c.body_fat_pct != null ? (
+                      <Text style={styles.metric}>{c.body_fat_pct.toFixed(1)} % grasa</Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              </Animated.View>
             )
           })}
         </View>
@@ -141,7 +145,8 @@ export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) 
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
+  // El espacio ES el separador (brief): sin hairline, solo aire.
+  divider: { height: 0, marginVertical: 38 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -166,17 +171,18 @@ const styles = StyleSheet.create({
   rail: { flexDirection: 'row' },
   node: { minWidth: 112, paddingRight: 6 },
   starRow: { flexDirection: 'row', alignItems: 'center' },
+  // Foto ligeramente elevada (brief: cada capítulo con su retrato).
   thumb: {
     marginTop: 8,
-    width: 44,
-    height: 62,
-    borderRadius: 8,
+    width: 48,
+    height: 68,
+    borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.oroHairlineSoft,
+    borderColor: colors.oroHairline,
     backgroundColor: colors.bgCard,
   },
-  thumbImg: { width: 44, height: 62 },
+  thumbImg: { width: 48, height: 68 },
   date: {
     marginTop: 8,
     fontFamily: typography.uiSemi,

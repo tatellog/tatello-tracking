@@ -342,7 +342,8 @@ export function PhotoEvolution() {
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
+  // El espacio ES el separador (brief): sin hairline, solo aire.
+  divider: { height: 0, marginVertical: 38 },
   eyebrow: { marginBottom: 2 },
   sub: {
     fontFamily: typography.serif,
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
   tile: {
     width: TILE_W,
     height: TILE_H,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.oroHairlineSoft,
