@@ -61,6 +61,11 @@ export type BodyRegion = {
   y: number
   w: number
   h: number
+  /** Columna de la etiqueta satélite. Las zonas del EJE CENTRAL (cuello,
+   *  cintura…) caían todas a la derecha por geometría y la columna se
+   *  amontonaba (dueña): el lado se CURA por zona; sin side, decide el
+   *  centro geométrico. */
+  side?: 'left' | 'right'
 }
 
 // Orden de giro (tornamesa): frente → perfil der → espalda → perfil izq.
@@ -363,10 +368,10 @@ function resolveCallouts(
 ): { region: BodyRegion; side: 'left' | 'right'; top: number }[] {
   const items = regions.map((r) => ({
     region: r,
-    side: (r.x + r.w / 2 < 50 ? 'left' : 'right') as 'left' | 'right',
+    side: r.side ?? ((r.x + r.w / 2 < 50 ? 'left' : 'right') as 'left' | 'right'),
     top: ((r.y + r.h / 2) / 100) * figH - 12,
   }))
-  const MIN_GAP = 26
+  const MIN_GAP = 30
   for (const side of ['left', 'right'] as const) {
     const col = items.filter((i) => i.side === side).sort((a, b) => a.top - b.top)
     let prev = -Infinity
@@ -378,8 +383,8 @@ function resolveCallouts(
   return items
 }
 
-/** El punto de la etiqueta: anillo (pendiente) → magenta (activa) → estrella
- *  mínima (registrada). */
+/** La estrella de la etiqueta (adiós dianas circulares · dueña): tenue
+ *  (pendiente) → magenta (activa) → oro (registrada). */
 function CalloutDot({ active, completed }: { active: boolean; completed: boolean }) {
   if (completed && !active) {
     return (
@@ -388,7 +393,16 @@ function CalloutDot({ active, completed }: { active: boolean; completed: boolean
       </Svg>
     )
   }
-  return <View style={[styles.calloutRing, active && styles.calloutRingActive]} />
+  return (
+    <Svg width={12} height={12} viewBox="0 0 12 12">
+      <Path
+        d={fourPointStarPath(6, 6, active ? 5 : 4.2)}
+        fill={active ? colors.magentaHot : 'none'}
+        stroke={active ? colors.magentaHot : 'rgba(255,255,255,0.4)'}
+        strokeWidth={active ? 0 : 1}
+      />
+    </Svg>
+  )
 }
 
 function RegionHotspot({
@@ -560,10 +574,12 @@ function RegionHotspot({
           <Ellipse cx={gw / 2} cy={gh / 2} rx={2.8} ry={2.8} fill={colors.leche} opacity={0.95} />
         </Svg>
       </Animated.View>
-      {/* Marcador de zona medible: puntito que pulsa por turnos. */}
+      {/* Marcador de zona medible: ESTRELLA tenue que pulsa por turnos
+          (las dianas de anillo+punto no hablaban el idioma · dueña). */}
       <Animated.View style={[styles.marker, markerStyle]} pointerEvents="none">
-        <View style={styles.markerRing} />
-        <View style={styles.markerDot} />
+        <Svg width={16} height={16} viewBox="0 0 16 16">
+          <Path d={fourPointStarPath(8, 8, 5.5)} fill={colors.oroSoft} />
+        </Svg>
       </Animated.View>
       {/* Guardada: outline 20% + la estrella mínima que enciende el cuerpo. */}
       <Animated.View style={[styles.savedOutline, outlineStyle]} pointerEvents="none" />
@@ -624,8 +640,9 @@ const styles = StyleSheet.create({
   callout: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 4,
+    paddingHorizontal: 2,
   },
   calloutText: {
     fontFamily: typography.uiMedium,
@@ -635,17 +652,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   calloutTextActive: { color: colors.magentaHot, fontFamily: typography.uiBold },
-  calloutRing: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-  calloutRingActive: {
-    borderColor: colors.magentaHot,
-    backgroundColor: colors.magentaHot,
-  },
   savedOutline: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 18,
@@ -663,24 +669,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -7,
-    marginTop: -7,
-    width: 14,
-    height: 14,
+    marginLeft: -8,
+    marginTop: -8,
+    width: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  markerRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 7,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.7)',
-  },
-  markerDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.magentaHot,
   },
   spark: {
     position: 'absolute',

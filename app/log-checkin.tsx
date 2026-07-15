@@ -71,7 +71,7 @@ const BASICOS: MetricDef[] = [
 const ZONE_REGIONS: BodyRegion[] = [
   { key: 'arm_right', label: 'Brazo derecho', x: 25, y: 28, w: 12, h: 22 },
   { key: 'arm_left', label: 'Brazo izquierdo', x: 63, y: 28, w: 12, h: 22 },
-  { key: 'trunk', label: 'Tronco', x: 37, y: 22, w: 26, h: 26 },
+  { key: 'trunk', label: 'Tronco', x: 37, y: 22, w: 26, h: 26, side: 'right' },
   { key: 'leg_right', label: 'Pierna derecha', x: 35, y: 51, w: 15, h: 37 },
   { key: 'leg_left', label: 'Pierna izquierda', x: 50, y: 51, w: 15, h: 37 },
 ]
@@ -86,7 +86,7 @@ const ZONE_REGIONS_BACK: BodyRegion[] = [
   { key: 'arm_right', label: 'Brazo derecho', x: 74, y: 26, w: 13, h: 24 },
   // "Espalda" = la cara trasera del segmento TRONCO (la báscula no separa
   // espalda/glúteo; escribe muscle_trunk_kg). La caja baja hasta el glúteo.
-  { key: 'trunk', label: 'Espalda', x: 30, y: 19, w: 40, h: 33 },
+  { key: 'trunk', label: 'Espalda', x: 30, y: 19, w: 40, h: 33, side: 'left' },
   { key: 'leg_left', label: 'Pierna izquierda', x: 27, y: 53, w: 20, h: 35 },
   { key: 'leg_right', label: 'Pierna derecha', x: 53, y: 53, w: 20, h: 35 },
 ]
@@ -94,9 +94,9 @@ const ZONE_REGIONS_BACK: BodyRegion[] = [
 // Cintas vistas por detrás. "Glúteo" ES la medida de caderas (se toma en la
 // parte más ancha del glúteo); escribe hips_cm, solo cambia dónde se ve.
 const TAPE_REGIONS_BACK: BodyRegion[] = [
-  { key: 'neck', label: 'Cuello', x: 40, y: 12, w: 20, h: 5 },
-  { key: 'waist', label: 'Cintura', x: 34, y: 36, w: 32, h: 6 },
-  { key: 'hips', label: 'Glúteo', x: 32, y: 43, w: 36, h: 10 },
+  { key: 'neck', label: 'Cuello', x: 40, y: 12, w: 20, h: 5, side: 'right' },
+  { key: 'waist', label: 'Cintura', x: 34, y: 36, w: 32, h: 6, side: 'left' },
+  { key: 'hips', label: 'Glúteo', x: 32, y: 43, w: 36, h: 10, side: 'right' },
   { key: 'arm_left', label: 'Brazo izquierdo', x: 13, y: 26, w: 13, h: 22 },
   { key: 'arm_right', label: 'Brazo derecho', x: 74, y: 26, w: 13, h: 22 },
   { key: 'thigh_left', label: 'Muslo izquierdo', x: 30, y: 56, w: 18, h: 12 },
@@ -105,12 +105,14 @@ const TAPE_REGIONS_BACK: BodyRegion[] = [
   { key: 'calf_right', label: 'Pantorrilla derecha', x: 53, y: 74, w: 14, h: 12 },
 ]
 
+// Lados CURADOS para el eje central (las 5 zonas centradas caían todas a
+// la derecha por geometría y la columna se amontonaba · dueña).
 const TAPE_REGIONS: BodyRegion[] = [
-  { key: 'neck', label: 'Cuello', x: 43, y: 16, w: 14, h: 5 },
-  { key: 'chest', label: 'Pecho', x: 36, y: 23, w: 28, h: 8 },
-  { key: 'waist', label: 'Cintura', x: 38, y: 34.5, w: 24, h: 5 },
-  { key: 'abdomen', label: 'Abdomen', x: 38, y: 40, w: 24, h: 5.5 },
-  { key: 'hips', label: 'Caderas', x: 35, y: 46, w: 30, h: 7 },
+  { key: 'neck', label: 'Cuello', x: 43, y: 16, w: 14, h: 5, side: 'right' },
+  { key: 'chest', label: 'Pecho', x: 36, y: 23, w: 28, h: 8, side: 'left' },
+  { key: 'waist', label: 'Cintura', x: 38, y: 34.5, w: 24, h: 5, side: 'right' },
+  { key: 'abdomen', label: 'Abdomen', x: 38, y: 40, w: 24, h: 5.5, side: 'left' },
+  { key: 'hips', label: 'Caderas', x: 35, y: 46, w: 30, h: 7, side: 'right' },
   { key: 'arm_right', label: 'Brazo derecho', x: 25, y: 27, w: 11, h: 20 },
   { key: 'arm_left', label: 'Brazo izquierdo', x: 64, y: 27, w: 11, h: 20 },
   { key: 'thigh_right', label: 'Muslo derecho', x: 36, y: 54, w: 13, h: 13 },
