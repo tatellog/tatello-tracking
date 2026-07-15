@@ -736,6 +736,8 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // Switcher Historia | Body — píldora de dos segmentos bajo el header.
+  // Los márgenes verticales viven en la FILA (switcherRow), no aquí: dentro
+  // del row, el chip ＋ se centraba contra pill+márgenes y quedaba caído.
   segmentPill: {
     flexDirection: 'row',
     backgroundColor: colors.bgCard2,
@@ -743,8 +745,6 @@ const styles = StyleSheet.create({
     borderColor: colors.bruma,
     borderRadius: 22,
     padding: 4,
-    marginTop: 6,
-    marginBottom: 20,
   },
   segmentSeg: {
     flex: 1,
@@ -820,12 +820,20 @@ const styles = StyleSheet.create({
   // Puente callado al calendario (Epic 06) — link, no card.
   // Layout de los links puente (el touch vive en LinkCta · quirk-safe).
   bridgeLink: { marginTop: 10, alignSelf: 'center' },
-  switcherRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  switcherRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 20,
+  },
   switcherGrow: { flex: 1 },
+  // Misma altura y radio que el pill (stretch): un solo sistema, no un
+  // cuadrito flotando al lado.
   addChip: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 48,
+    height: '100%',
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.bruma,
     backgroundColor: colors.bgCard2,
