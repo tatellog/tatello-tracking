@@ -296,7 +296,9 @@ function VisualChange({
 
   return (
     <View style={styles.visual}>
-      <Text style={styles.visualLabel}>CAMBIO VISUAL</Text>
+      <EyebrowLabel tone="niebla" size={10} style={styles.visualLabel}>
+        Cambio visual
+      </EyebrowLabel>
       {usable.length > 1 ? (
         <View style={styles.visualAngles}>
           {usable.map((x) => {
@@ -354,7 +356,7 @@ function DatePill({
 
 const styles = StyleSheet.create({
   // El espacio ES el separador (brief): sin hairline, solo aire.
-  divider: { height: 0, marginVertical: 38 },
+  divider: { height: 0, marginVertical: 28 },
   eyebrow: { marginBottom: 12 },
   pillRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pill: {
@@ -419,13 +421,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.hairlineFaint,
     paddingHorizontal: 18,
     paddingTop: 6,
     paddingBottom: 6,
   },
   row: { paddingVertical: 11 },
-  rowDivider: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  rowDivider: { borderTopWidth: 1, borderTopColor: colors.hairlineFaint },
   // Monocromo: labels niebla, números leche, delta ORO — un solo lenguaje.
   rowLabel: {
     fontFamily: typography.uiMedium,
@@ -438,8 +440,8 @@ const styles = StyleSheet.create({
   rowValues: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
   rowA: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.ui,
-    color: colors.bone,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
   rowArrow: { fontFamily: typography.uiMedium, fontSize: typography.sizes.body, color: colors.oro },
@@ -453,18 +455,12 @@ const styles = StyleSheet.create({
   rowDelta: {
     marginLeft: 'auto',
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.body,
     color: colors.oroLight,
     fontVariant: ['tabular-nums'],
   },
   visual: { marginTop: 16 },
-  visualLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
-    color: colors.niebla,
-    marginBottom: 10,
-  },
+  visualLabel: { marginBottom: 10 },
   visualAngles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   visualChip: {
     paddingVertical: 6,
@@ -505,7 +501,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: colors.magentaTint,
     borderWidth: 1.5,
     borderColor: colors.magentaGlow,
@@ -519,7 +515,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
   },
 })

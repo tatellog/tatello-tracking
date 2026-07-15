@@ -12,6 +12,8 @@ import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useSaveReflection } from '@/features/orbit/reflections'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
+import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { LinkCta } from '@/features/progress/components/LinkCta'
 import { aiEnabledForEmail, PROGRESS_CHAT_ENABLED } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -84,7 +86,9 @@ export function ProgressInsightCard() {
     <Animated.View entering={FadeIn.duration(360).delay(100)}>
       {/* Divisor propio: sin insight (o sin gate) la sección no existe. */}
       <View style={styles.divider} />
-      <Text style={styles.eyebrow}>Estas semanas cambió algo</Text>
+      <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
+        Estas semanas cambió algo
+      </EyebrowLabel>
       <Text style={styles.lead}>{main.lead}</Text>
       <Text style={styles.support}>{main.support}</Text>
 
@@ -102,14 +106,12 @@ export function ProgressInsightCard() {
       </Pressable>
 
       {/* El puente al porqué — link callado, no otra card. */}
-      <Pressable
+      <LinkCta
+        label="El porqué vive en Órbita →"
         onPress={goOrbita}
-        accessibilityRole="link"
         accessibilityLabel="Entender el porqué en Órbita"
-        style={({ pressed }) => [styles.bridge, pressed && styles.bridgePressed]}
-      >
-        <Text style={styles.bridgeText}>El porqué vive en Órbita →</Text>
-      </Pressable>
+        style={styles.bridge}
+      />
 
       <MonthChatSheet
         finding={open ? finding : null}
@@ -131,20 +133,13 @@ export function ProgressInsightCard() {
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 28 },
-  eyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.oroSoft,
-    marginBottom: 12,
-  },
+  divider: { height: 1, backgroundColor: colors.hairlineFaint, marginVertical: 28 },
+  eyebrow: { marginBottom: 12 },
   lead: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.segmentTitle,
-    lineHeight: 30,
+    fontSize: typography.sizes.heading,
+    lineHeight: 25,
     color: colors.leche,
   },
   support: {
@@ -173,12 +168,5 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.magentaHot,
   },
-  bridge: { marginTop: 12, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
-  bridgePressed: { opacity: 0.6 },
-  bridgeText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-  },
+  bridge: { marginTop: 4, alignSelf: 'center' },
 })

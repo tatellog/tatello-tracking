@@ -802,8 +802,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
     textAlign: 'center',
   },
   emptyBusy: {
@@ -907,11 +907,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.niebla,
   },
-  // The same gesture as the hero's "76.6 → 75.0".
+  // The same gesture as the hero's "76.6 → 75.0" — y en su MISMO color:
+  // flecha de trayectoria = oro, siempre (auditoría).
   arrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.anchor,
-    color: colors.magenta,
+    color: colors.oro,
     marginHorizontal: 8,
   },
   caption: {
@@ -942,7 +943,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
-    color: colors.magenta,
+    color: colors.magentaHot,
   },
   // Fechas bajo el slider (inicial → actual).
   sliderDates: {
@@ -960,8 +961,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
   },
   // Compartir — link callado; vive en la fila de CTAs.
   shareBtn: {
@@ -1006,7 +1007,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   stashOpen: {
-    fontFamily: typography.uiBold,
+    fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.magenta,
   },

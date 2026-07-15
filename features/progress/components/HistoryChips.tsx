@@ -83,7 +83,10 @@ export function HistoryChips() {
       // "evidencia", no "registro": registro leía como asistencia escolar
       // (target-user) y "evidencia" es la palabra del hook del hero.
       { key: 'logging', label: 'Días con evidencia', hue: colors.dimension.alimento },
-      { key: 'workouts', label: 'Entrenos', hue: colors.dimension.cuerpo },
+      // signal.entreno, NO dimension.cuerpo: ese alias es el mismo hex que
+      // magentaHot y Entrenos clonaba el color de Días en déficit en el
+      // mismo grid (auditoría: color = identidad).
+      { key: 'workouts', label: 'Entrenos', hue: colors.signal.entreno },
     ]
     for (const c of counts) {
       const m = byKey.get(c.key)
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.hairline,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },

@@ -326,7 +326,9 @@ function ProgressBody() {
                     meta. El cambio total va como chip, la tendencia en la
                     gráfica. */}
                     <View>
-                      <Text style={styles.weightLabel}>Peso actual</Text>
+                      <EyebrowLabel tone="niebla" size={11} style={styles.weightLabel}>
+                        Peso actual
+                      </EyebrowLabel>
                       <View style={styles.weightNowRow}>
                         <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
                         <Text style={styles.weightUnit}>kg</Text>
@@ -633,11 +635,11 @@ const styles = StyleSheet.create({
   // beats instead of an undifferentiated dump.
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: colors.hairlineFaint,
     marginVertical: 28,
   },
   // Separación por AIRE (Cuerpo): sin línea, ~35% más respiro entre secciones.
-  sectionGap: { height: 44 },
+  sectionGap: { height: 56 },
   heroEyebrow: {
     marginBottom: 10,
   },
@@ -678,9 +680,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 18,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 20,
+    color: colors.bone,
   },
   // Cabecera del peso: PESO ACTUAL (calmo) a la izquierda, "cambio total" como
   // chip a la derecha — el número no domina, la tendencia vive en la gráfica.
@@ -690,14 +692,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 10,
   },
-  weightLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 2,
-  },
+  weightLabel: { marginBottom: 6 },
   weightNowRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -841,9 +836,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.bone,
   },
   // Puente callado al calendario (Epic 06) — link, no card.
   // Layout de los links puente (el touch vive en LinkCta · quirk-safe).
@@ -911,9 +906,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 21,
+    color: colors.bone,
   },
   chartEmpty: {
     paddingVertical: 26,

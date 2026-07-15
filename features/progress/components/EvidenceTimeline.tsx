@@ -152,18 +152,14 @@ export function EvidenceTimeline({ onPick }: { onPick?: (day: string) => void })
         </View>
         {/* La tabla del coach (decisión dueña): todos los números, sin frases. */}
         <View style={styles.tableLinkWrap}>
-          <Pressable
+          <LinkCta
+            label="Ver tabla completa →"
             onPress={() => {
               router.push('/progress-table')
               track(PROGRESS_EVENTS.body, { kind: 'table' })
             }}
-            hitSlop={10}
-            accessibilityRole="link"
             accessibilityLabel="Ver la tabla completa de mediciones"
-            style={({ pressed }) => pressed && { opacity: 0.6 }}
-          >
-            <Text style={styles.tableLink}>Ver tabla completa →</Text>
-          </Pressable>
+          />
         </View>
       </View>
       <Text style={styles.sub}>Fotos y mediciones · toca una y compárala abajo</Text>
@@ -325,7 +321,7 @@ export function EvidenceTimeline({ onPick }: { onPick?: (day: string) => void })
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 0, marginVertical: 38 },
+  divider: { height: 0, marginVertical: 28 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -336,18 +332,11 @@ const styles = StyleSheet.create({
   eyebrowShrink: { flexShrink: 1 },
   tableLinkWrap: { flexShrink: 0 },
   eyebrow: { marginBottom: 2 },
-  tableLink: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-    paddingVertical: 10,
-  },
   sub: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
     marginBottom: 6,
   },
   rail: { height: 44, justifyContent: 'center', marginBottom: 6 },

@@ -97,8 +97,8 @@ const styles = StyleSheet.create({
   sub: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
     marginBottom: 12,
   },
   grid: { flexDirection: 'row', gap: 10 },
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.hairlineFaint,
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
@@ -136,9 +136,10 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.oro,
   },
+  // anchor(17): el tier "valor compacto" (a 14 no se distinguía del prev).
   curr: {
     fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.anchor,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },

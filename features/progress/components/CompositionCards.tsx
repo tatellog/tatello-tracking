@@ -219,7 +219,9 @@ function MetricCard({
       <Text style={[styles.cardLabel, { color: hue }]}>{label}</Text>
       <View style={styles.valueRow}>
         {serie.length > 1 ? <Text style={styles.prev}>{fmt(first.value, unit)}</Text> : null}
-        {serie.length > 1 ? <Text style={[styles.arrowGlyph, { color: hue }]}>→</Text> : null}
+        {serie.length > 1 ? (
+          <Text style={[styles.arrowGlyph, { color: colors.oro }]}>→</Text>
+        ) : null}
         <Text style={styles.curr}>{fmt(last.value, unit)}</Text>
       </View>
       {delta != null && delta !== 0 ? (
@@ -239,7 +241,7 @@ function MetricCard({
 
 const styles = StyleSheet.create({
   // El espacio ES el separador (brief): sin hairline, solo aire.
-  divider: { height: 0, marginVertical: 38 },
+  divider: { height: 0, marginVertical: 28 },
   eyebrow: { marginBottom: 10 },
   // La lectura en voz del coach — antes de cualquier flecha.
   synthesis: {
@@ -266,14 +268,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   hideLink: { marginTop: 4 },
-  hideLinkText: { fontSize: typography.sizes.label, color: colors.bruma },
+  hideLinkText: { fontSize: typography.sizes.label, color: colors.niebla },
   // La invitación cuando la medición es vieja: hecho fechado, sin presión.
+  // Nivel NOTA (bodyLarge+bone), no protagonista: unificado con la
+  // staleNote de fotos (auditoría de coherencia).
   staleNote: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 24,
-    color: colors.leche,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.bone,
     marginBottom: 12,
   },
   // Grid 2×2: con 30% la 4ª card se estiraba sola a todo el ancho (se leía
@@ -286,7 +290,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.hairlineFaint,
     paddingHorizontal: 15,
     paddingVertical: 14,
   },
@@ -333,7 +337,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
   },
 })

@@ -143,7 +143,9 @@ export function SynthesisCard() {
               (causeLine), para que el foco no aparezca desconectado. */}
           {focoLabel && deficitDays != null ? (
             <View style={styles.focusBlock}>
-              <Text style={styles.focusEyebrow}>Tu foco</Text>
+              <EyebrowLabel tone="niebla" size={9}>
+                Tu foco
+              </EyebrowLabel>
               <Text style={styles.focusText}>Esta semana: sostener {focoLabel}.</Text>
             </View>
           ) : null}
@@ -217,13 +219,6 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   focusBlock: { marginTop: 14 },
-  focusEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.oroSoft,
-  },
   focusText: {
     marginTop: 3,
     fontFamily: typography.uiSemi,
