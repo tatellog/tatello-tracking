@@ -14,11 +14,10 @@ import { daysInDeficit } from '@/features/orbit/month-built'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
 import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
-import { CheckinTimeline } from '@/features/progress/components/CheckinTimeline'
+import { EvidenceTimeline } from '@/features/progress/components/EvidenceTimeline'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
 import { LinkCta } from '@/features/progress/components/LinkCta'
-import { PhotoEvolution } from '@/features/progress/components/PhotoEvolution'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TrajectoryChart } from '@/features/progress/components/TrajectoryChart'
 import { TransformationHero } from '@/features/progress/components/TransformationHero'
@@ -485,7 +484,10 @@ function ProgressBody() {
                   <ZonesEvolution />
                   {/* Historial → comparador (tap en estrella aterriza abajo,
                       con scroll real hasta él). */}
-                  <CheckinTimeline onPick={pickCompare} />
+                  {/* FUSIÓN (dueña): historial + evolución visual eran dos
+                      rieles gemelos — ahora UNA línea del tiempo con toda la
+                      evidencia (fotos + números). */}
+                  <EvidenceTimeline onPick={pickCompare} />
                   <View
                     onLayout={(e) => {
                       compareY.current = e.nativeEvent.layout.y
@@ -493,8 +495,6 @@ function ProgressBody() {
                   >
                     <CheckinCompare presetA={comparePresetA} />
                   </View>
-                  {/* El cierre emocional: la tira con "Capítulo de hoy". */}
-                  <PhotoEvolution />
                 </>
               ) : null}
 

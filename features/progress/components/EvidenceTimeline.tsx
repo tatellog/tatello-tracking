@@ -18,31 +18,33 @@ import { fourPointStarPath } from '@/features/tabs/components/constellation/geom
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
-import type { PhotoAngle, TimelinePhoto } from '../api'
+import type { PhotoAngle } from '../api'
 import { PROGRESS_EVENTS } from '../constants'
-import { usePhotoTimeline } from '../hooks'
+import { useBodyCheckins, usePhotoTimeline } from '../hooks'
 import { photoAt, photoDatesFor } from '../logic'
 
+import { LinkCta } from './LinkCta'
+
 /*
- * Evolución visual (rediseño · mockup dueña + uxui + benchmark) — la TIRA DE
- * PELÍCULA: todas las fotos del ángulo lado a lado, cronológicas, aterrizando
- * en la más reciente. La progresión está FRENTE a los ojos, no en la memoria
- * (el slideshow de una foto obligaba a comparar de memoria). A este tamaño la
- * silueta responde "¿cambió mi forma?"; el DETALLE vive a un tap: el CAPÍTULO
- * de esa fecha (/photo-chapter · Epic 08), con sus datos y su contexto.
+ * Historial (FUSIÓN dueña 15 jul 2026: "Historial de mediciones" y
+ * "Evolución visual" eran gemelos — dos rieles horizontales de fotos con
+ * fechas a media pantalla de distancia). UNA sola línea del tiempo con TODA
+ * la evidencia:
  *
- * Scrubber arriba: línea con relleno magenta hasta la última foto + estrellas ✦
- * equiespaciadas (equiespaciado a propósito: huecos temporales largos leerían
- * como "aquí me abandoné" · anti-culpa). El ancla "Hoy" a la derecha SOLO
- * cuando la última foto es reciente (≤60 días): con fotos viejas, el tramo
- * vacío hasta "Hoy" era el hueco acusador ("aquí desapareciste" · target-user)
- * y deshacía el equiespaciado anti-culpa por la puerta de atrás — el riel
- * termina donde termina la evidencia. El RAIL completo es el touch target
- * (44pt): tap → la tira salta a esa fecha (escala a 20 fechas). Tabs de ángulo
- * ABAJO (píldoras, alcance de pulgar). El tile fantasma dice "Capítulo de hoy"
- * (invitación de inicio, no tarea pendiente: "Agregar era un examen y el
- * examen lo pospongo"); aparece con <4 fechas o cuando las fotos son viejas.
- * Evidencia sin juicio: solo fechas sobre las fotos, jamás peso/medidas encima.
+ * - Cada fecha es un TILE: la foto del ángulo activo si ese día la tiene, o
+ *   una estrella sobre card si solo hay números. Debajo: fecha + kg + %grasa
+ *   (evidencia sin juicio: los números son caption, jamás encima de la foto).
+ * - UN solo tap: seleccionar la fecha ARMA EL COMPARADOR de abajo (el ritual
+ *   del coach: "toca una y compárala abajo"). El CAPÍTULO de la fecha (foto
+ *   grande + contexto) vive en un LinkCta contextual bajo la tira — aparece
+ *   cuando la fecha seleccionada tiene foto (un tap, un destino; nada de
+ *   gestos ocultos).
+ * - Scrubber arriba (equiespaciado anti-culpa; "Hoy" solo si la última
+ *   evidencia es reciente), tabs de ángulo abajo, tile fantasma "Capítulo de
+ *   hoy" como invitación. "Ver tabla completa →" sigue en el header (el
+ *   expediente crudo no cambia de casa).
+ *
+ * Reemplaza a CheckinTimeline + PhotoEvolution (borrados).
  */
 
 const ANGLES: { key: PhotoAngle; label: string }[] = [
@@ -55,58 +57,60 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
 const TILE_W = 74
 const TILE_GAP = 8
 const TILE_H = Math.round(TILE_W / 0.52)
-// Misma ventana de frescura que el díptico: pasados 60 días, la última foto
-// deja de ser "hoy".
+// Pasados 60 días, la última evidencia deja de ser "hoy".
 const STALE_MS = 60 * 24 * 60 * 60 * 1000
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const fmtShort = (iso: string): string => `${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`
 const fmtFull = (iso: string): string =>
   `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
 
-export function PhotoEvolution() {
+export function EvidenceTimeline({ onPick }: { onPick?: (day: string) => void }) {
   const router = useRouter()
-  const { data } = usePhotoTimeline()
-  const photos = useMemo(() => data ?? [], [data])
+  const { data: checkinsData } = useBodyCheckins()
+  const checkins = useMemo(() => checkinsData ?? [], [checkinsData])
+  const photosQ = usePhotoTimeline()
+  const photos = useMemo(() => photosQ.data ?? [], [photosQ.data])
 
-  const usable = useMemo(
-    () => ANGLES.filter((a) => photoDatesFor(photos, a.key).length >= 2),
+  const usableAngles = useMemo(
+    () => ANGLES.filter((a) => photoDatesFor(photos, a.key).length >= 1),
     [photos],
   )
   const [angle, setAngle] = useState<PhotoAngle | null>(null)
-  const active = angle ?? usable[0]?.key ?? null
-  const dates = useMemo(() => (active ? photoDatesFor(photos, active) : []), [photos, active])
+  const active = angle ?? usableAngles[0]?.key ?? null
 
-  const items = useMemo(
-    () =>
-      active
-        ? dates
-            .map((d) => ({ day: d, photo: photoAt(photos, active, d) }))
-            .filter((x): x is { day: string; photo: TimelinePhoto } => x.photo?.signed_url != null)
-        : [],
-    [dates, photos, active],
-  )
+  // La unión de TODAS las fechas con evidencia: mediciones y fotos del
+  // ángulo activo, cronológicas.
+  const items = useMemo(() => {
+    const byDay = new Map(checkins.map((c) => [c.measured_on, c]))
+    const photoDays = active ? photoDatesFor(photos, active) : []
+    const days = [...new Set([...checkins.map((c) => c.measured_on), ...photoDays])].sort()
+    return days
+      .map((day) => ({
+        day,
+        photo: active ? photoAt(photos, active, day) : null,
+        checkin: byDay.get(day) ?? null,
+      }))
+      .filter((x) => x.photo?.signed_url != null || x.checkin != null)
+  }, [checkins, photos, active])
 
   const stripRef = useRef<ScrollView>(null)
   const [viewedIdx, setViewedIdx] = useState(0)
   const [railW, setRailW] = useState(0)
 
-  // Aterriza en lo más reciente (tu yo de hoy; scrolleas hacia atrás para viajar).
+  // Aterriza en lo más reciente (tu yo de hoy; scrolleas hacia atrás).
   useEffect(() => {
     setViewedIdx(items.length - 1)
     const t = setTimeout(() => stripRef.current?.scrollToEnd({ animated: false }), 50)
     return () => clearTimeout(t)
   }, [active, items.length])
 
-  if (!active || usable.length === 0 || items.length === 0) return null
+  if (items.length < 2) return null
 
-  // El índice visto se CLAMPA en render: al cambiar de ángulo, viewedIdx aún
-  // trae el índice del ángulo anterior (el efecto que lo resetea corre
-  // DESPUÉS del render) y items[viewedIdx] explotaba con menos fotos en el
-  // ángulo nuevo (render error dueña 15 jul 2026).
+  // Clamp en render: al cambiar de ángulo, viewedIdx aún trae el índice del
+  // set anterior (el efecto corre después del render · aprendizaje 15 jul).
   const shownIdx = Math.max(0, Math.min(viewedIdx, items.length - 1))
+  const shown = items[shownIdx]!
 
-  // Última foto vieja → el riel termina en su estrella (sin ancla "Hoy") y el
-  // tile fantasma invita a abrir el capítulo de hoy.
   const lastItem = items[items.length - 1]
   const stale =
     lastItem != null && Date.now() - new Date(`${lastItem.day}T12:00:00`).getTime() > STALE_MS
@@ -122,49 +126,59 @@ export function PhotoEvolution() {
   const jumpTo = (idx: number) => {
     stripRef.current?.scrollTo({ x: Math.max(0, idx * (TILE_W + TILE_GAP) - 40), animated: true })
     setViewedIdx(idx)
-    track(PROGRESS_EVENTS.photo, { kind: 'scrub' })
   }
 
-  // Reserva a la derecha: espacio del label "Hoy" solo cuando existe.
   const reserve = stale ? 8 : 44
-
-  // Rail completo como touch target: tap en cualquier x → la fecha más cercana.
   const onRailPress = (x: number) => {
     if (railW <= 0 || items.length < 2) return
     const usableW = railW - reserve
     const idx = Math.round((x / usableW) * (items.length - 1))
     jumpTo(Math.max(0, Math.min(items.length - 1, idx)))
+    track(PROGRESS_EVENTS.photo, { kind: 'scrub' })
   }
-
-  // Posición (0..1) de cada estrella sobre el rail (equiespaciado por índice).
   const dotX = (i: number, w: number) =>
     items.length > 1 ? (i / (items.length - 1)) * (w - reserve) : 0
 
   const showGhost = items.length < 4 || stale
 
   return (
-    <Animated.View entering={FadeIn.duration(360).delay(140)}>
+    <Animated.View entering={FadeIn.duration(360).delay(160)}>
       <View style={styles.divider} />
-      <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-        Evolución visual
-      </EyebrowLabel>
-      <Text style={styles.sub}>Tu evolución, de un vistazo</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.eyebrowShrink}>
+          <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
+            Historial
+          </EyebrowLabel>
+        </View>
+        {/* La tabla del coach (decisión dueña): todos los números, sin frases. */}
+        <View style={styles.tableLinkWrap}>
+          <Pressable
+            onPress={() => {
+              router.push('/progress-table')
+              track(PROGRESS_EVENTS.body, { kind: 'table' })
+            }}
+            hitSlop={10}
+            accessibilityRole="link"
+            accessibilityLabel="Ver la tabla completa de mediciones"
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
+            <Text style={styles.tableLink}>Ver tabla completa →</Text>
+          </Pressable>
+        </View>
+      </View>
+      <Text style={styles.sub}>Fotos y mediciones · toca una y compárala abajo</Text>
 
       {/* ── Scrubber: rail + relleno magenta + estrellas + "Hoy" ── */}
       <Pressable
         onPress={(e) => onRailPress(e.nativeEvent.locationX)}
         onLayout={(e) => setRailW(e.nativeEvent.layout.width)}
         accessibilityRole="adjustable"
-        accessibilityLabel="Línea de tiempo de tus fotos"
+        accessibilityLabel="Línea de tiempo de tu evidencia"
         style={styles.rail}
       >
         {railW > 0 ? (
           <>
             <Svg width={railW} height={44} style={StyleSheet.absoluteFill}>
-              {/* Con foto reciente, el hairline sigue hasta "Hoy" (tramo sin
-                  rellenar: honesto, sin contar días). Con fotos viejas, el
-                  riel TERMINA en la última estrella: el tramo vacío hasta un
-                  "Hoy" fantasma era el hueco acusador. */}
               <Line
                 x1={4}
                 y1={22}
@@ -173,7 +187,6 @@ export function PhotoEvolution() {
                 stroke={colors.oroHairline}
                 strokeWidth={1.4}
               />
-              {/* Relleno magenta: del inicio a la última foto. */}
               <Line
                 x1={4}
                 y1={22}
@@ -192,7 +205,6 @@ export function PhotoEvolution() {
               ))}
             </Svg>
             {stale ? null : <Text style={styles.hoy}>Hoy</Text>}
-            {/* Labels: primera fecha + la activa (evita encimar con 8+). */}
             <Text style={[styles.railLabel, { left: 0 }]}>{fmtShort(items[0]!.day)}</Text>
             {shownIdx > 0 ? (
               <Text
@@ -209,7 +221,7 @@ export function PhotoEvolution() {
         ) : null}
       </Pressable>
 
-      {/* ── La tira: todas las fechas lado a lado ── */}
+      {/* ── La tira: cada fecha con su evidencia (foto o estrella) + números ── */}
       <ScrollView
         ref={stripRef}
         horizontal
@@ -222,25 +234,40 @@ export function PhotoEvolution() {
             <Pressable
               key={it.day}
               onPress={() => {
-                // Epic 08: tocar una foto abre su CAPÍTULO (foto grande + los
-                // datos y el contexto de ese día), no un visor mudo.
-                router.push({ pathname: '/photo-chapter', params: { day: it.day, angle: active } })
-                track(PROGRESS_EVENTS.photo, { kind: 'chapter' })
+                // UN tap = seleccionar: arma el comparador de abajo. El
+                // capítulo vive en el link contextual bajo la tira.
+                jumpTo(i)
+                onPick?.(it.day)
+                track(PROGRESS_EVENTS.compare, { kind: 'timeline' })
               }}
-              accessibilityRole="imagebutton"
-              accessibilityLabel={`Abrir el capítulo del ${fmtFull(it.day)}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Comparar la evidencia del ${fmtFull(it.day)}`}
               style={styles.tileWrap}
             >
-              <View style={styles.tile}>
-                <Image
-                  source={{ uri: it.photo.signed_url! }}
-                  style={styles.tileImg}
-                  resizeMode="contain"
-                />
+              <View style={[styles.tile, i === shownIdx && styles.tileOn]}>
+                {it.photo?.signed_url ? (
+                  <Image
+                    source={{ uri: it.photo.signed_url }}
+                    style={styles.tileImg}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  // Solo números ese día: la estrella sostiene el lugar.
+                  <Svg width={26} height={26} viewBox="0 0 26 26">
+                    <Path d={fourPointStarPath(13, 13, 8)} fill={colors.oroSoft} opacity={0.8} />
+                  </Svg>
+                )}
               </View>
               <Text style={[styles.tileDate, i === shownIdx && styles.tileDateOn]}>
+                {i === 0 ? 'Inicio · ' : ''}
                 {fmtShort(it.day)}
               </Text>
+              {it.checkin?.weight_kg != null ? (
+                <Text style={styles.tileMetric}>{it.checkin.weight_kg.toFixed(1)} kg</Text>
+              ) : null}
+              {it.checkin?.body_fat_pct != null ? (
+                <Text style={styles.tileMetric}>{it.checkin.body_fat_pct.toFixed(1)} %</Text>
+              ) : null}
             </Pressable>
           ))}
           {showGhost ? (
@@ -255,18 +282,29 @@ export function PhotoEvolution() {
                   <Path d={fourPointStarPath(13, 13, 8)} fill={colors.bruma} />
                 </Svg>
               </View>
-              {/* Invitación de inicio, no tarea pendiente ("Agregar" leía
-                  como examen que se pospone). */}
               <Text style={styles.tileDate}>Capítulo de hoy</Text>
             </Pressable>
           ) : null}
         </View>
       </ScrollView>
 
-      {/* ── Tabs de ángulo abajo (alcance de pulgar) ── */}
-      {usable.length > 1 ? (
+      {/* La puerta al capítulo de la fecha seleccionada (solo con foto). */}
+      {shown.photo?.signed_url != null && active ? (
+        <LinkCta
+          label={`Abrir el capítulo del ${fmtFull(shown.day)} →`}
+          onPress={() => {
+            router.push({ pathname: '/photo-chapter', params: { day: shown.day, angle: active } })
+            track(PROGRESS_EVENTS.photo, { kind: 'chapter' })
+          }}
+          accessibilityLabel={`Abrir el capítulo del ${fmtFull(shown.day)}`}
+          style={styles.chapterLink}
+        />
+      ) : null}
+
+      {/* ── Tabs de ángulo (cambian las fotos de la tira) ── */}
+      {usableAngles.length > 1 ? (
         <View style={styles.angleRow}>
-          {usable.map((a) => {
+          {usableAngles.map((a) => {
             const on = a.key === active
             return (
               <Pressable
@@ -287,9 +325,24 @@ export function PhotoEvolution() {
 }
 
 const styles = StyleSheet.create({
-  // El espacio ES el separador (brief): sin hairline, solo aire.
   divider: { height: 0, marginVertical: 38 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 44,
+  },
+  eyebrowShrink: { flexShrink: 1 },
+  tableLinkWrap: { flexShrink: 0 },
   eyebrow: { marginBottom: 2 },
+  tableLink: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+    paddingVertical: 10,
+  },
   sub: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
@@ -328,6 +381,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  tileOn: { borderColor: colors.oroGlow },
   tileImg: { width: TILE_W, height: TILE_H },
   ghost: { borderStyle: 'dashed', borderColor: colors.bruma },
   tileDate: {
@@ -338,7 +392,15 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   tileDateOn: { color: colors.oroLeche, fontFamily: typography.uiBold },
-  angleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  tileMetric: {
+    marginTop: 1,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.tinyLabel,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  chapterLink: { alignSelf: 'center', marginTop: 2 },
+  angleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   angleChip: {
     paddingVertical: 7,
     paddingHorizontal: 14,
