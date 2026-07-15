@@ -141,6 +141,14 @@ export default function ProgressTableScreen() {
                 </View>
               </Pressable>
             </View>
+            {/* Quien llega con historial del coach no debe teclearlo. */}
+            <View style={styles.emptyImportWrap}>
+              <LinkCta
+                label="Importar de foto o PDF →"
+                onPress={() => router.push('/import-measurements')}
+                accessibilityLabel="Importar mediciones desde una foto o PDF"
+              />
+            </View>
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -270,6 +278,15 @@ export default function ProgressTableScreen() {
             <Text style={styles.exportCaption}>
               {exporting ? 'Preparando tu archivo…' : 'Esta tabla es tuya'}
             </Text>
+            {/* Entrada Y salida bajo el mismo techo: la tabla del coach
+                entra por foto/PDF (scan-measurements) y sale por PDF/CSV. */}
+            <View style={styles.exportRow}>
+              <LinkCta
+                label="Importar de foto o PDF →"
+                onPress={() => router.push('/import-measurements')}
+                accessibilityLabel="Importar mediciones desde una foto o PDF"
+              />
+            </View>
             <View style={styles.exportRow}>
               <LinkCta
                 label="Exportar PDF →"
@@ -415,6 +432,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 18,
   },
+  emptyImportWrap: { alignSelf: 'center', marginTop: 4 },
   // Filas fantasma mientras carga (nunca el falso "no tienes nada").
   skeleton: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
   skeletonRow: {
