@@ -1,4 +1,4 @@
-import { pickLeadChip } from '../logic'
+import { elapsedLabel, pickLeadChip } from '../logic'
 
 /*
  * El titular del 30v30 solo se gana con MEJORA (feedback target-user 14 jul
@@ -46,5 +46,16 @@ describe('pickLeadChip', () => {
     // delta positivo pero significance 0 (bajo el umbral): cae al fallback.
     const lead = pickLeadChip([chip('workouts', 0, 2), chip('deficit', 0, 1)])
     expect(lead?.key).toBe('deficit')
+  })
+})
+
+describe('elapsedLabel', () => {
+  it('habla en días, semanas, meses y años', () => {
+    expect(elapsedLabel(0)).toBe('el mismo día')
+    expect(elapsedLabel(1)).toBe('1 día')
+    expect(elapsedLabel(10)).toBe('10 días')
+    expect(elapsedLabel(21)).toBe('3 semanas')
+    expect(elapsedLabel(274)).toBe('9 meses')
+    expect(elapsedLabel(800)).toBe('2 años')
   })
 })

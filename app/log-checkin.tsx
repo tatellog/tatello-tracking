@@ -476,7 +476,19 @@ export default function LogCheckinScreen() {
           type: 'success',
           text1: editing ? 'Medición actualizada' : 'Medición guardada',
         })
-        router.back()
+        // Ritual post-medición (benchmark, patrón summary de Apple): el
+        // Análisis aparece SOLO, ya abierto en anterior → recién guardada —
+        // el producto elige el momento. replace: volver atrás desde el
+        // Análisis regresa al tab, no al formulario. Sin medición anterior
+        // (o editando), vuelve como siempre.
+        if (!editing && previous) {
+          router.replace({
+            pathname: '/progress-analysis',
+            params: { a: previous.measured_on, b: date },
+          })
+        } else {
+          router.back()
+        }
       },
       onError: () => {
         Toast.show({

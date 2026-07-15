@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeIn } from 'react-native-reanimated'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle, Line, Path } from 'react-native-svg'
 
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
@@ -12,9 +12,11 @@ import {
   compareBuckets,
   compareCheckins,
   compareSynthesis,
+  elapsedLabel,
   type CheckinDelta,
   type CheckinDeltaKey,
 } from '@/features/progress/logic'
+import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { LinkCta } from '@/features/progress/components/LinkCta'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { SkyBackground } from '@/features/tabs/components'
@@ -54,10 +56,6 @@ export default function ProgressAnalysisScreen() {
   const checkins = useMemo(() => data ?? [], [data])
   const dates = useMemo(() => checkins.map((c) => c.measured_on), [checkins])
 
-  // "¿Qué cambió?" abre por DEFECTO: la pantalla aterrizaba con 70% de vacío
-  // y tres botones cerrados (screenshot dueña) — el primer contenido se
-  // regala, los demás se descubren.
-  const [openChanges, setOpenChanges] = useState(true)
   const [openPatterns, setOpenPatterns] = useState(false)
 
   // F3: las fechas se ELIGEN aquí (picker A→B); los params solo precargan.
@@ -67,19 +65,53 @@ export default function ProgressAnalysisScreen() {
 
   const paramA = typeof params.a === 'string' ? params.a : undefined
   const paramB = typeof params.b === 'string' ? params.b : undefined
-  const a =
+  let a =
     (dayA && dates.includes(dayA) ? dayA : undefined) ??
     (paramA && dates.includes(paramA) ? paramA : undefined) ??
     dates[dates.length - 2]
-  const b =
+  let b =
     (dayB && dates.includes(dayB) ? dayB : undefined) ??
     (paramB && dates.includes(paramB) ? paramB : undefined) ??
     dates[dates.length - 1]
+  // Normalización CRONOLÓGICA (uxui, bloqueante): con A posterior a B la
+  // síntesis se invertía ("bajaste" cuando subió). Nunca castigar por
+  // explorar: se reordena solo.
+  if (a && b && a > b) [a, b] = [b, a]
+  const elapsedDays =
+    a && b
+      ? Math.round(
+          (new Date(`${b}T12:00:00`).getTime() - new Date(`${a}T12:00:00`).getTime()) / 86400000,
+        )
+      : 0
+  const isLatest = b != null && b === dates[dates.length - 1]
+
+  // Atajos de rango CON historia (benchmark): el default sigue siendo
+  // penúltima→última; el pico alinea el Análisis con la historia del hero.
+  const peakDay = useMemo(() => {
+    let best: { day: string; w: number } | null = null
+    for (const c of checkins) {
+      if (c.weight_kg != null && (best == null || c.weight_kg > best.w)) {
+        best = { day: c.measured_on, w: c.weight_kg }
+      }
+    }
+    return best?.day ?? null
+  }, [checkins])
+  const lastDay = dates[dates.length - 1]
+  const ranges: { key: string; label: string; a: string; b: string }[] = []
+  if (dates.length >= 2 && lastDay) {
+    ranges.push({ key: 'last', label: 'Última', a: dates[dates.length - 2]!, b: lastDay })
+    if (peakDay && peakDay !== lastDay && peakDay !== dates[dates.length - 2]) {
+      ranges.push({ key: 'peak', label: 'Desde tu pico', a: peakDay, b: lastDay })
+    }
+    if (dates.length > 2 && dates[0] !== peakDay) {
+      ranges.push({ key: 'start', label: 'Desde el inicio', a: dates[0]!, b: lastDay })
+    }
+  }
 
   const checkinA = checkins.find((c) => c.measured_on === a)
   const checkinB = checkins.find((c) => c.measured_on === b)
   const rows = checkinA && checkinB && a !== b ? compareCheckins(checkinA, checkinB) : []
-  const synthesis = compareSynthesis(rows)
+  const synthesis = compareSynthesis(rows, { startingPointCloser: isLatest })
   const { gains, hard } = compareBuckets(rows)
 
   // Hallazgos del Progress Insight Engine (determinístico) — el puente
@@ -146,6 +178,36 @@ export default function ProgressAnalysisScreen() {
             </View>
           ) : (
             <>
+              {/* Rangos con historia (benchmark): cero taps a las tres
+                  comparaciones que significan algo. El picker manual queda
+                  para el caso libre. */}
+              {ranges.length > 1 ? (
+                <View style={styles.rangeRow}>
+                  {ranges.map((r) => {
+                    const on = r.a === a && r.b === b
+                    return (
+                      <Pressable
+                        key={r.key}
+                        onPress={() => {
+                          setDayA(r.a)
+                          setDayB(r.b)
+                          setPicking(null)
+                          track(PROGRESS_EVENTS.compare, { kind: `analysis-range-${r.key}` })
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        style={({ pressed }) => pressed && { opacity: 0.75 }}
+                      >
+                        <View style={[styles.option, on && styles.optionOn]}>
+                          <Text style={[styles.optionText, on && styles.optionTextOn]}>
+                            {r.label}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              ) : null}
               {/* F3 · el picker: tocar una fecha abre SOLO sus opciones. */}
               <View style={styles.pillRow}>
                 <DatePill
@@ -154,7 +216,7 @@ export default function ProgressAnalysisScreen() {
                   onPress={() => setPicking(picking === 'a' ? null : 'a')}
                   a11y="Cambiar la fecha inicial"
                 />
-                <Text style={styles.pillArrow}>→</Text>
+                <CompareThread />
                 <DatePill
                   label={fmtDay(b)}
                   open={picking === 'b'}
@@ -171,6 +233,8 @@ export default function ProgressAnalysisScreen() {
                   <View style={styles.options}>
                     {dates
                       .filter((d) => (picking === 'a' ? d !== b : d !== a))
+                      .slice()
+                      .reverse()
                       .map((d) => {
                         const on = d === (picking === 'a' ? a : b)
                         return (
@@ -193,9 +257,12 @@ export default function ProgressAnalysisScreen() {
                 </ScrollView>
               ) : null}
 
-              {/* Qué miró — texto plano de motor, SIN sello (✦ = solo chat IA). */}
+              {/* El contexto que reencuadra cada delta (+5.3 en 3 semanas no
+                  es +5.3 en 9 meses); las fechas ya viven en las pills. */}
               <Text style={styles.whoText}>
-                Lo que cambió entre el {fmtDay(a)} y el {fmtDay(b)}
+                {elapsedDays < 1
+                  ? 'Lo que cambió ese día'
+                  : `Lo que cambió en ${elapsedLabel(elapsedDays)}`}
               </Text>
 
               {rows.length === 0 ? (
@@ -208,45 +275,66 @@ export default function ProgressAnalysisScreen() {
 
               {rows.length > 0 ? (
                 <>
-                  {/* Botones guiados → cards reveladas (nunca input libre). */}
-                  <GuideButton
-                    label="¿Qué cambió?"
-                    open={openChanges}
-                    onPress={() => {
-                      setOpenChanges((v) => !v)
-                      track(PROGRESS_EVENTS.openInsight, { kind: 'analysis-changes' })
-                    }}
-                  />
-                  {openChanges ? (
-                    <Animated.View entering={FadeIn.duration(240)} style={styles.card}>
-                      {gains.map((r) => (
-                        <ChangeRow key={r.key} row={r} favorable />
-                      ))}
-                      {hard.map((r) => (
-                        <ChangeRow key={r.key} row={r} />
-                      ))}
-                      {/* Las sin cambio TAMBIÉN (uxui: una sola card que es
+                  {/* Umbral voz→expediente (illustrator): divider a media
+                      intensidad, sin halo — separa, no celebra. */}
+                  <View style={styles.ornamentRow} pointerEvents="none">
+                    <Svg width="100%" height={12} viewBox="0 0 320 12">
+                      <Line
+                        x1={40}
+                        y1={6}
+                        x2={148}
+                        y2={6}
+                        stroke={colors.oroHairlineSoft}
+                        strokeWidth={1}
+                      />
+                      <Line
+                        x1={172}
+                        y1={6}
+                        x2={280}
+                        y2={6}
+                        stroke={colors.oroHairlineSoft}
+                        strokeWidth={1}
+                      />
+                      <Path
+                        d={fourPointStarPath(160, 6, 3.2)}
+                        fill={colors.oroSoft}
+                        opacity={0.8}
+                      />
+                    </Svg>
+                  </View>
+                  {/* Header ESTÁTICO (uxui): el acordeón abierto por defecto
+                      solo servía para vaciar la pantalla. */}
+                  <Text style={styles.sectionHead}>¿Qué cambió?</Text>
+                  <Animated.View entering={FadeIn.duration(240)} style={styles.card}>
+                    {gains.map((r) => (
+                      <ChangeRow key={r.key} row={r} favorable />
+                    ))}
+                    {hard.map((r) => (
+                      <ChangeRow key={r.key} row={r} />
+                    ))}
+                    {/* Las sin cambio TAMBIÉN (uxui: una sola card que es
                           interpretación Y dato completo — la vieja card
                           "Muéstrame los datos" era esta misma lista sin los
                           deltas, acordeón de relleno). */}
-                      {rows
-                        .filter((r) => r.delta === 0)
-                        .map((r) => {
-                          const meta = LABEL[r.key]
-                          return (
-                            <View key={r.key} style={styles.changeRow}>
-                              <View style={styles.changeMain}>
-                                <Text style={styles.changeLabel}>{meta.name}</Text>
-                                <Text style={styles.changeValues}>
-                                  {fmtVal(r.a, meta.unit)} → {fmtVal(r.b, meta.unit)}
-                                </Text>
-                              </View>
-                              <Text style={styles.noChangeTag}>sin cambio</Text>
+                    {rows
+                      .filter((r) => r.delta === 0)
+                      .map((r) => {
+                        const meta = LABEL[r.key]
+                        return (
+                          <View key={r.key} style={styles.changeRow}>
+                            <View style={styles.changeMain}>
+                              <Text style={styles.changeLabel}>{meta.name}</Text>
+                              {/* Atenuadas: "51 → 51" no debe gritar igual
+                                    que "+5.3" (uxui). */}
+                              <Text style={[styles.changeValues, styles.changeValuesMuted]}>
+                                {fmtVal(r.a, meta.unit)} → {fmtVal(r.b, meta.unit)}
+                              </Text>
                             </View>
-                          )
-                        })}
-                    </Animated.View>
-                  ) : null}
+                            <Text style={styles.noChangeTag}>sin cambio</Text>
+                          </View>
+                        )
+                      })}
+                  </Animated.View>
 
                   {/* El "muéstrame los datos" DE VERDAD es la tabla cruda. */}
                   <LinkCta
@@ -308,6 +396,20 @@ export default function ProgressAnalysisScreen() {
  * Pressable solo envuelve con cosmética de pressed. Con los estilos directo
  * en el Pressable, las cards colapsaban a texto plano con el chevron
  * huérfano en otra línea (screenshot dueña 14 jul 2026). */
+
+/** El comparador como constelación de dos nodos (illustrator): el antes
+ *  apagado, el ahora encendido con halo. Decorativa: las pills llevan la
+ *  accesibilidad. Sin animación — es cartografía, no notificación. */
+function CompareThread() {
+  return (
+    <Svg width={38} height={20} viewBox="0 0 38 20" pointerEvents="none">
+      <Path d={fourPointStarPath(5.5, 10, 3)} fill={colors.bone} opacity={0.55} />
+      <Line x1={9.5} y1={10} x2={26} y2={10} stroke={colors.oroHairline} strokeWidth={1} />
+      <Circle cx={31.5} cy={10} r={6} fill={colors.oroGlow} opacity={0.5} />
+      <Path d={fourPointStarPath(31.5, 10, 4.2)} fill={colors.oroSoft} />
+    </Svg>
+  )
+}
 
 function DatePill({
   label,
@@ -441,16 +543,25 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   pillCaretOpen: { color: colors.magentaHot },
-  pillArrow: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.oro,
+  rangeRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  ornamentRow: { alignItems: 'center', marginBottom: 2 },
+  sectionHead: {
+    marginTop: 10,
+    marginBottom: 8,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
   },
+  changeValuesMuted: { color: colors.niebla, fontFamily: typography.uiMedium },
   optionsRow: { marginBottom: 12 },
   options: { flexDirection: 'row', gap: 6 },
   option: {
+    minHeight: 36,
+    justifyContent: 'center',
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.bruma,
@@ -476,7 +587,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.segmentTitle,
     lineHeight: 30,
     color: colors.leche,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   guideWrap: { marginTop: 10 },
   guide: {

@@ -683,9 +683,12 @@ export function compareBuckets(rows: readonly CheckinDelta[]): {
  *  por scroll (en el comparador); repetida sonaba a plantilla (uxui). */
 export function compareSynthesis(
   rows: readonly CheckinDelta[],
-  opts: { rescueCloser?: boolean } = {},
+  opts: { rescueCloser?: boolean; startingPointCloser?: boolean } = {},
 ): string | null {
   const rescueCloser = opts.rescueCloser ?? true
+  // "Es tu punto de partida" solo es verdad comparando contra la ÚLTIMA
+  // medición; en tramos históricos suena a plantilla (uxui).
+  const startingPointCloser = opts.startingPointCloser ?? true
   if (rows.length === 0) return null
   // Cada hecho lleva su tipo EXPLÍCITO: los sustantivos se listan tras
   // "Subió" ("tu peso, tu grasa"); las frases con verbo propio van aparte.
@@ -743,9 +746,26 @@ export function compareSynthesis(
     return `Entre estas fechas, todo se movió a tu favor: ${list(gains)}.`
   }
   if (rose.length > 0) {
-    return `${roseSentence}. Es tu punto de partida, en números reales.`
+    return startingPointCloser
+      ? `${roseSentence}. Es tu punto de partida, en números reales.`
+      : `${roseSentence}. Así se movió tu cuerpo en este tramo.`
   }
   return null
+}
+
+/** Tiempo transcurrido en el idioma de la usuaria: "23 días", "5 semanas",
+ *  "9 meses", "2 años" — el contexto que reencuadra un delta (+5.3 kg en
+ *  3 semanas no es lo mismo que en 9 meses · uxui). */
+export function elapsedLabel(days: number): string {
+  if (days < 1) return 'el mismo día'
+  if (days < 14) return days === 1 ? '1 día' : `${Math.round(days)} días`
+  if (days < 62) return `${Math.round(days / 7)} semanas`
+  if (days < 700) {
+    const m = Math.round(days / 30.4)
+    return m === 1 ? '1 mes' : `${m} meses`
+  }
+  const y = Math.round(days / 365.25)
+  return y === 1 ? '1 año' : `${y} años`
 }
 
 /**
