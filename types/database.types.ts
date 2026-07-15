@@ -149,16 +149,23 @@ export type Database = {
       }
       body_checkins: {
         Row: {
+          abdomen_cm: number | null
+          arm_left_cm: number | null
+          arm_right_cm: number | null
           bmi: number | null
           bmr_kcal: number | null
           body_fat_pct: number | null
           bone_mass_kg: number | null
+          calf_left_cm: number | null
+          calf_right_cm: number | null
+          chest_cm: number | null
           created_at: string
           fat_arm_left_pct: number | null
           fat_arm_right_pct: number | null
           fat_leg_left_pct: number | null
           fat_leg_right_pct: number | null
           fat_trunk_pct: number | null
+          hips_cm: number | null
           id: string
           measured_on: string
           metabolic_age: number | null
@@ -168,25 +175,36 @@ export type Database = {
           muscle_leg_left_kg: number | null
           muscle_leg_right_kg: number | null
           muscle_trunk_kg: number | null
+          neck_cm: number | null
           notes: string | null
           source: string
+          thigh_left_cm: number | null
+          thigh_right_cm: number | null
           updated_at: string
           user_id: string
           visceral_fat_index: number | null
+          waist_cm: number | null
           water_pct: number | null
           weight_kg: number | null
         }
         Insert: {
+          abdomen_cm?: number | null
+          arm_left_cm?: number | null
+          arm_right_cm?: number | null
           bmi?: number | null
           bmr_kcal?: number | null
           body_fat_pct?: number | null
           bone_mass_kg?: number | null
+          calf_left_cm?: number | null
+          calf_right_cm?: number | null
+          chest_cm?: number | null
           created_at?: string
           fat_arm_left_pct?: number | null
           fat_arm_right_pct?: number | null
           fat_leg_left_pct?: number | null
           fat_leg_right_pct?: number | null
           fat_trunk_pct?: number | null
+          hips_cm?: number | null
           id?: string
           measured_on: string
           metabolic_age?: number | null
@@ -196,25 +214,36 @@ export type Database = {
           muscle_leg_left_kg?: number | null
           muscle_leg_right_kg?: number | null
           muscle_trunk_kg?: number | null
+          neck_cm?: number | null
           notes?: string | null
           source?: string
+          thigh_left_cm?: number | null
+          thigh_right_cm?: number | null
           updated_at?: string
           user_id: string
           visceral_fat_index?: number | null
+          waist_cm?: number | null
           water_pct?: number | null
           weight_kg?: number | null
         }
         Update: {
+          abdomen_cm?: number | null
+          arm_left_cm?: number | null
+          arm_right_cm?: number | null
           bmi?: number | null
           bmr_kcal?: number | null
           body_fat_pct?: number | null
           bone_mass_kg?: number | null
+          calf_left_cm?: number | null
+          calf_right_cm?: number | null
+          chest_cm?: number | null
           created_at?: string
           fat_arm_left_pct?: number | null
           fat_arm_right_pct?: number | null
           fat_leg_left_pct?: number | null
           fat_leg_right_pct?: number | null
           fat_trunk_pct?: number | null
+          hips_cm?: number | null
           id?: string
           measured_on?: string
           metabolic_age?: number | null
@@ -224,11 +253,15 @@ export type Database = {
           muscle_leg_left_kg?: number | null
           muscle_leg_right_kg?: number | null
           muscle_trunk_kg?: number | null
+          neck_cm?: number | null
           notes?: string | null
           source?: string
+          thigh_left_cm?: number | null
+          thigh_right_cm?: number | null
           updated_at?: string
           user_id?: string
           visceral_fat_index?: number | null
+          waist_cm?: number | null
           water_pct?: number | null
           weight_kg?: number | null
         }

@@ -215,69 +215,68 @@ export default function LogPhotosScreen() {
               const filled = uri != null
               const uploading = uploadingAngle === a.key && saving
               return (
-                /* TODO el visual vive en el View; el Pressable es solo la capa
-                   táctil absoluta (quirk documentado del repo). */
-                <View
+                /* Patrón AccountRow (probado): el Pressable ENVUELVE al slot
+                   dimensionado — un Pressable sin hijos con absoluteFill queda
+                   en tamaño cero en este setup (quirk documentado). */
+                <Pressable
                   key={a.key}
-                  style={[
-                    styles.slot,
-                    { width: slotW, height: slotH },
-                    filled && styles.slotFilled,
-                  ]}
+                  onPress={() => (filled ? manage(a.key, a.label) : void pick(a.key))}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    filled ? `Cambiar o quitar la foto de ${a.label}` : `Elegir foto de ${a.label}`
+                  }
+                  style={({ pressed }) => pressed && { opacity: 0.75 }}
                 >
-                  {filled ? (
-                    <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
-                      <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
-                    </Animated.View>
-                  ) : (
-                    <View style={styles.emptyBody}>
-                      <PoseGlyph pose={a.key} size={44} color={colors.bone} />
-                      <Text style={styles.emptyLabel}>{a.label}</Text>
-                    </View>
-                  )}
-
-                  {/* Label chip solo sobre foto (sobre bgCard no lo necesita). */}
-                  {filled ? <Text style={styles.filledLabel}>{a.label}</Text> : null}
-
-                  {/* Badge de esquina: "+" para invitar, palomita al elegir. */}
-                  <View style={[styles.badge, filled && styles.badgeFilled]}>
-                    {filled ? (
-                      <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
-                        <Path
-                          d="M2.5 6.5 L5 9 L9.5 3.5"
-                          stroke={colors.bg}
-                          strokeWidth={1.8}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </Svg>
-                    ) : (
-                      <Text style={styles.badgePlus}>+</Text>
-                    )}
-                  </View>
-
-                  {/* Overlay de subida del slot en vuelo. */}
-                  {uploading ? (
-                    <Animated.View entering={FadeIn.duration(150)} style={styles.uploading}>
-                      <StarLoader size={20} />
-                    </Animated.View>
-                  ) : null}
-
-                  <Pressable
-                    onPress={() => (filled ? manage(a.key, a.label) : void pick(a.key))}
-                    disabled={saving}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      filled
-                        ? `Cambiar o quitar la foto de ${a.label}`
-                        : `Elegir foto de ${a.label}`
-                    }
-                    style={({ pressed }) => [
-                      StyleSheet.absoluteFill,
-                      pressed && { backgroundColor: 'rgba(255,255,255,0.06)' },
+                  <View
+                    style={[
+                      styles.slot,
+                      { width: slotW, height: slotH },
+                      filled && styles.slotFilled,
                     ]}
-                  />
-                </View>
+                  >
+                    {filled ? (
+                      <Animated.View
+                        entering={FadeIn.duration(200)}
+                        style={StyleSheet.absoluteFill}
+                      >
+                        <Image source={{ uri }} style={styles.thumb} resizeMode="cover" />
+                      </Animated.View>
+                    ) : (
+                      <View style={styles.emptyBody}>
+                        <PoseGlyph pose={a.key} size={44} color={colors.bone} />
+                        <Text style={styles.emptyLabel}>{a.label}</Text>
+                      </View>
+                    )}
+
+                    {/* Label chip solo sobre foto (sobre bgCard no lo necesita). */}
+                    {filled ? <Text style={styles.filledLabel}>{a.label}</Text> : null}
+
+                    {/* Badge de esquina: "+" para invitar, palomita al elegir. */}
+                    <View style={[styles.badge, filled && styles.badgeFilled]}>
+                      {filled ? (
+                        <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+                          <Path
+                            d="M2.5 6.5 L5 9 L9.5 3.5"
+                            stroke={colors.bg}
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </Svg>
+                      ) : (
+                        <Text style={styles.badgePlus}>+</Text>
+                      )}
+                    </View>
+
+                    {/* Overlay de subida del slot en vuelo. */}
+                    {uploading ? (
+                      <Animated.View entering={FadeIn.duration(150)} style={styles.uploading}>
+                        <StarLoader size={20} />
+                      </Animated.View>
+                    ) : null}
+                  </View>
+                </Pressable>
               )
             })}
           </View>

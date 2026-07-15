@@ -224,6 +224,19 @@ const CSV_COLUMNS: { header: string; key: keyof BodyCheckin }[] = [
   { header: 'grasa_tronco_pct', key: 'fat_trunk_pct' },
   { header: 'grasa_pierna_der_pct', key: 'fat_leg_right_pct' },
   { header: 'grasa_pierna_izq_pct', key: 'fat_leg_left_pct' },
+  // Medidas de cinta AL FINAL: measurementsCsv escribe el peso de la app en
+  // la primera columna de datos por índice — peso_kg debe seguir primero.
+  { header: 'cuello_cm', key: 'neck_cm' },
+  { header: 'pecho_cm', key: 'chest_cm' },
+  { header: 'cintura_cm', key: 'waist_cm' },
+  { header: 'abdomen_cm', key: 'abdomen_cm' },
+  { header: 'caderas_cm', key: 'hips_cm' },
+  { header: 'brazo_der_cm', key: 'arm_right_cm' },
+  { header: 'brazo_izq_cm', key: 'arm_left_cm' },
+  { header: 'muslo_der_cm', key: 'thigh_right_cm' },
+  { header: 'muslo_izq_cm', key: 'thigh_left_cm' },
+  { header: 'pantorrilla_der_cm', key: 'calf_right_cm' },
+  { header: 'pantorrilla_izq_cm', key: 'calf_left_cm' },
 ]
 
 const csvField = (v: string | number | null | undefined): string => {
@@ -261,6 +274,31 @@ export function measurementsCsv(
   }
   rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   return [header.join(','), ...rows.map((r) => r.cells.join(','))].join('\n')
+}
+
+/* ─── IMC y TMB calculados (Epic 08 · rediseño Nueva medición) ───────────
+ *
+ * "Calculado por Stelar": cuando el perfil tiene los datos, la app llena
+ * estos campos sola (la usuaria puede sobreescribirlos). Fórmulas estándar:
+ * IMC = kg / m²; TMB = Mifflin-St Jeor (la de básculas InBody/consultorio).
+ * Puros y redondeados a lo que la métrica sostiene.
+ */
+
+export function computeBmi(weightKg: number, heightCm: number): number | null {
+  if (weightKg <= 0 || heightCm <= 0) return null
+  const m = heightCm / 100
+  return Number((weightKg / (m * m)).toFixed(1))
+}
+
+export function computeTmb(
+  weightKg: number,
+  heightCm: number,
+  ageYears: number,
+  sex: 'female' | 'male',
+): number | null {
+  if (weightKg <= 0 || heightCm <= 0 || ageYears <= 0) return null
+  const base = 10 * weightKg + 6.25 * heightCm - 5 * ageYears
+  return Math.round(base + (sex === 'male' ? 5 : -161))
 }
 
 /* ─── Recuperación desde el pico (decisión benchmark + target-user) ──────
@@ -805,6 +843,17 @@ const TABLE_METRICS: { group: string; key: keyof BodyCheckin; label: string; uni
   { group: 'Grasa', key: 'fat_trunk_pct', label: 'Tronco', unit: '%' },
   { group: 'Grasa', key: 'fat_leg_right_pct', label: 'Pierna der', unit: '%' },
   { group: 'Grasa', key: 'fat_leg_left_pct', label: 'Pierna izq', unit: '%' },
+  { group: 'Medidas', key: 'neck_cm', label: 'Cuello', unit: 'cm' },
+  { group: 'Medidas', key: 'chest_cm', label: 'Pecho', unit: 'cm' },
+  { group: 'Medidas', key: 'waist_cm', label: 'Cintura', unit: 'cm' },
+  { group: 'Medidas', key: 'abdomen_cm', label: 'Abdomen', unit: 'cm' },
+  { group: 'Medidas', key: 'hips_cm', label: 'Caderas', unit: 'cm' },
+  { group: 'Medidas', key: 'arm_right_cm', label: 'Brazo der', unit: 'cm' },
+  { group: 'Medidas', key: 'arm_left_cm', label: 'Brazo izq', unit: 'cm' },
+  { group: 'Medidas', key: 'thigh_right_cm', label: 'Muslo der', unit: 'cm' },
+  { group: 'Medidas', key: 'thigh_left_cm', label: 'Muslo izq', unit: 'cm' },
+  { group: 'Medidas', key: 'calf_right_cm', label: 'Pantorrilla der', unit: 'cm' },
+  { group: 'Medidas', key: 'calf_left_cm', label: 'Pantorrilla izq', unit: 'cm' },
 ]
 
 /** Arma la tabla desde los check-ins (ascendentes). Solo filas con ≥1 valor y

@@ -218,6 +218,19 @@ export const BodyCheckinInputSchema = z.object({
   fat_trunk_pct: bounded(0, 100, 'Grasa tronco'),
   fat_leg_right_pct: bounded(0, 100, 'Grasa pierna der'),
   fat_leg_left_pct: bounded(0, 100, 'Grasa pierna izq'),
+  // Medidas de cinta (Epic 08 · rediseño Nueva medición): espejan los CHECK
+  // de la migración 20260714220000.
+  neck_cm: bounded(10.1, 99.9, 'Cuello'),
+  chest_cm: bounded(30.1, 249.9, 'Pecho'),
+  waist_cm: bounded(30.1, 249.9, 'Cintura'),
+  abdomen_cm: bounded(30.1, 249.9, 'Abdomen'),
+  hips_cm: bounded(30.1, 249.9, 'Caderas'),
+  arm_right_cm: bounded(10.1, 99.9, 'Brazo der'),
+  arm_left_cm: bounded(10.1, 99.9, 'Brazo izq'),
+  thigh_right_cm: bounded(20.1, 149.9, 'Muslo der'),
+  thigh_left_cm: bounded(20.1, 149.9, 'Muslo izq'),
+  calf_right_cm: bounded(10.1, 99.9, 'Pantorrilla der'),
+  calf_left_cm: bounded(10.1, 99.9, 'Pantorrilla izq'),
   notes: z.string().max(500).nullable().optional(),
 })
 export type BodyCheckinInput = z.infer<typeof BodyCheckinInputSchema>

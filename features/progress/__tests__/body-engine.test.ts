@@ -5,6 +5,8 @@ import {
   checkinSeries,
   checkinTable,
   compareCheckins,
+  computeBmi,
+  computeTmb,
   compareSynthesis,
   compositionSeries,
   compositionSummary,
@@ -229,6 +231,22 @@ describe('measurementsCsv — el expediente saliendo (propiedad de datos)', () =
 
   it('sin datos → solo el header', () => {
     expect(measurementsCsv([], []).split('\n')).toHaveLength(1)
+  })
+})
+
+describe('computeBmi / computeTmb — calculados por Stelar (Epic 08)', () => {
+  it('IMC = kg/m², una decimal', () => {
+    expect(computeBmi(67.1, 164)).toBe(24.9)
+    expect(computeBmi(0, 164)).toBeNull()
+    expect(computeBmi(67.1, 0)).toBeNull()
+  })
+
+  it('TMB Mifflin-St Jeor con sexo', () => {
+    // Mujer 67.1 kg · 164 cm · 33 años: 10*67.1 + 6.25*164 − 5*33 − 161 = 1370
+    expect(computeTmb(67.1, 164, 33, 'female')).toBe(1370)
+    // Hombre: mismo cuerpo, +5 en vez de −161.
+    expect(computeTmb(67.1, 164, 33, 'male')).toBe(1536)
+    expect(computeTmb(67.1, 164, 0, 'female')).toBeNull()
   })
 })
 
