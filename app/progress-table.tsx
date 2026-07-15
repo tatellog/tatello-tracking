@@ -6,9 +6,10 @@ import Svg, { Path } from 'react-native-svg'
 
 import Toast from 'react-native-toast-message'
 
-import { exportMeasurementsCsv } from '@/features/progress/export'
+import { exportMeasurementsCsv, exportMeasurementsPdf } from '@/features/progress/export'
 import { useBodyCheckins } from '@/features/progress/hooks'
 import { checkinTable } from '@/features/progress/logic'
+import { LinkCta } from '@/features/progress/components/LinkCta'
 import { Sparkline } from '@/features/progress/components/Sparkline'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
@@ -55,12 +56,15 @@ export default function ProgressTableScreen() {
   const openCheckin = (col: { day: string; source: string }) =>
     router.push({ pathname: '/log-checkin', params: { day: col.day, source: col.source } })
 
-  const [exporting, setExporting] = useState(false)
-  const handleExport = async () => {
+  const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null)
+  const handleExport = async (kind: 'pdf' | 'csv') => {
     if (exporting) return
-    setExporting(true)
+    setExporting(kind)
     try {
-      await exportMeasurementsCsv()
+      const result = kind === 'pdf' ? await exportMeasurementsPdf() : await exportMeasurementsCsv()
+      if (result === 'empty') {
+        Toast.show({ type: 'info', text1: 'Aún no hay mediciones que exportar' })
+      }
     } catch {
       Toast.show({
         type: 'error',
@@ -68,7 +72,7 @@ export default function ProgressTableScreen() {
         text2: 'Intenta de nuevo.',
       })
     } finally {
-      setExporting(false)
+      setExporting(null)
     }
   }
 
@@ -109,26 +113,34 @@ export default function ProgressTableScreen() {
         ) : isError ? (
           <View>
             <Text style={styles.empty}>No pudimos cargar tus mediciones.</Text>
-            <Pressable
-              onPress={() => refetch()}
-              accessibilityRole="button"
-              accessibilityLabel="Intentar de nuevo"
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.addBtnText}>Intentar de nuevo</Text>
-            </Pressable>
+            <View style={styles.addBtnWrap}>
+              <Pressable
+                onPress={() => refetch()}
+                accessibilityRole="button"
+                accessibilityLabel="Intentar de nuevo"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.addBtn}>
+                  <Text style={styles.addBtnText}>Intentar de nuevo</Text>
+                </View>
+              </Pressable>
+            </View>
           </View>
         ) : table.cols.length === 0 ? (
           <View>
             <Text style={styles.empty}>Aún no hay mediciones que mostrar.</Text>
-            <Pressable
-              onPress={() => router.push('/log-checkin')}
-              accessibilityRole="button"
-              accessibilityLabel="Registrar una medición completa"
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.addBtnText}>＋ Medición completa</Text>
-            </Pressable>
+            <View style={styles.addBtnWrap}>
+              <Pressable
+                onPress={() => router.push('/log-checkin')}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar una nueva medición"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.addBtn}>
+                  <Text style={styles.addBtnText}>＋ Nueva medición</Text>
+                </View>
+              </Pressable>
+            </View>
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -237,27 +249,39 @@ export default function ProgressTableScreen() {
               </ScrollView>
             </View>
 
-            <Pressable
-              onPress={() => router.push('/log-checkin')}
-              accessibilityRole="button"
-              accessibilityLabel="Registrar una medición completa"
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.addBtnText}>＋ Medición completa</Text>
-            </Pressable>
+            {/* Quirk-safe (View con layout + Pressable adentro): el label es
+                "Nueva medición", consistente con el CTA del tab (una puerta). */}
+            <View style={styles.addBtnWrap}>
+              <Pressable
+                onPress={() => router.push('/log-checkin')}
+                accessibilityRole="button"
+                accessibilityLabel="Registrar una nueva medición"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.addBtn}>
+                  <Text style={styles.addBtnText}>＋ Nueva medición</Text>
+                </View>
+              </Pressable>
+            </View>
 
             {/* Propiedad: la puerta de salida abierta es la confianza para
-                quedarse. Mata las "cinco capturas incómodas refunfuñando". */}
-            <Pressable
-              onPress={() => void handleExport()}
-              accessibilityRole="button"
-              accessibilityLabel="Exportar esta tabla como archivo"
-              style={({ pressed }) => [styles.exportLink, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={styles.exportLinkText}>
-                {exporting ? 'Preparando tu archivo…' : 'Esta tabla es tuya · exportar →'}
-              </Text>
-            </Pressable>
+                quedarse. PDF con el layout de la tabla del coach (pedido
+                dueña) + CSV para hojas de cálculo. */}
+            <Text style={styles.exportCaption}>
+              {exporting ? 'Preparando tu archivo…' : 'Esta tabla es tuya'}
+            </Text>
+            <View style={styles.exportRow}>
+              <LinkCta
+                label="Exportar PDF →"
+                onPress={() => void handleExport('pdf')}
+                accessibilityLabel="Exportar esta tabla como PDF"
+              />
+              <LinkCta
+                label="CSV →"
+                onPress={() => void handleExport('csv')}
+                accessibilityLabel="Exportar esta tabla como CSV"
+              />
+            </View>
 
             <Text style={styles.disclaimer}>
               Stelar solo interpreta tus registros. No sustituye a un profesional de la salud.
@@ -363,26 +387,33 @@ const styles = StyleSheet.create({
   },
   cellTextNow: { fontFamily: typography.uiBold, color: colors.oroLeche },
   sparkCell: { width: 56, justifyContent: 'center', alignItems: 'center' },
+  addBtnWrap: { marginTop: 22, alignSelf: 'center' },
   addBtn: {
-    marginTop: 22,
-    alignSelf: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     borderRadius: 14,
     paddingHorizontal: 18,
-    paddingVertical: 11,
+    paddingVertical: 12,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   addBtnText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.leche,
   },
-  exportLink: { marginTop: 14, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
-  exportLinkText: {
-    fontFamily: typography.uiSemi,
+  exportCaption: {
+    marginTop: 16,
+    alignSelf: 'center',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
-    letterSpacing: 0.2,
+  },
+  exportRow: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 18,
   },
   // Filas fantasma mientras carga (nunca el falso "no tienes nada").
   skeleton: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },

@@ -29,6 +29,14 @@ import { colors, typography } from '@/theme'
 const fmtVal = (v: number, unit: string) =>
   `${v % 1 === 0 ? v : v.toFixed(1)}${unit ? ` ${unit}` : ''}`
 
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const fmtDay = (iso: string): string =>
+  `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
+const fmtDayShort = (iso: string, ref: string): string =>
+  `${Number(iso.slice(8, 10))} ${MESES[Number(iso.slice(5, 7)) - 1]}${
+    iso.slice(0, 4) !== ref.slice(0, 4) ? ` ${iso.slice(2, 4)}` : ''
+  }`
+
 export default function BodyCompositionScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
@@ -96,16 +104,16 @@ export default function BodyCompositionScreen() {
           <View>
             <Text style={styles.empty}>Aún no hay mediciones de composición que mostrar.</Text>
             <View style={styles.emptyCta}>
-              <PrimaryCta label="Medición completa" onPress={() => router.push('/log-checkin')} />
+              <PrimaryCta label="Nueva medición" onPress={() => router.push('/log-checkin')} />
             </View>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {lastDay ? (
-              <Text style={styles.dateCaption}>
-                Última medición · {lastDay.slice(8, 10)}/{lastDay.slice(5, 7)}/{lastDay.slice(0, 4)}
-              </Text>
+              <Text style={styles.dateCaption}>Última medición · {fmtDay(lastDay)}</Text>
             ) : null}
+            {/* Enseña el gesto UNA vez (uxui): seis chevrons no lo gritan. */}
+            <Text style={styles.gestureHint}>Toca una métrica para ver su historia.</Text>
 
             <View style={styles.grid}>
               {cards.map((c, i) => {
@@ -130,26 +138,35 @@ export default function BodyCompositionScreen() {
                       }
                       accessibilityRole="button"
                       accessibilityLabel={`Ver el detalle de ${cfg.label}`}
-                      style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+                      style={({ pressed }) => pressed && { opacity: 0.8 }}
                     >
-                      <View style={styles.cardHead}>
-                        <Text style={[styles.cardLabel, { color: cfg.hue }]}>{cfg.label}</Text>
-                        <Text style={styles.chevron}>›</Text>
+                      {/* Quirk: el visual de la card vive en el View interno;
+                          con estilos en el Pressable el marco no renderizaba. */}
+                      <View style={styles.card}>
+                        <View style={styles.cardHead}>
+                          <Text style={[styles.cardLabel, { color: cfg.hue }]}>{cfg.label}</Text>
+                          <Text style={styles.chevron}>›</Text>
+                        </View>
+                        <Text style={styles.cardValue}>{fmtVal(last.value, cfg.unit)}</Text>
+                        {delta != null && delta !== 0 ? (
+                          <Text style={[styles.cardDelta, { color: cfg.hue }]}>
+                            {delta > 0 ? '+' : '−'}
+                            {fmtVal(Math.abs(delta), cfg.unit)}
+                          </Text>
+                        ) : (
+                          <Text style={styles.cardDeltaMuted}>
+                            {c.serie.length === 1 ? 'primera medición' : 'sin cambio'}
+                          </Text>
+                        )}
+                        {/* Métrica desfasada: su último dato NO es del día
+                            del caption global ("¿este 36.8 es de cuándo?"). */}
+                        {lastDay && last.day < lastDay ? (
+                          <Text style={styles.cardStale}>al {fmtDayShort(last.day, lastDay)}</Text>
+                        ) : null}
+                        {c.serie.length > 1 ? (
+                          <Sparkline data={c.serie.map((p) => p.value)} hue={cfg.hue} />
+                        ) : null}
                       </View>
-                      <Text style={styles.cardValue}>{fmtVal(last.value, cfg.unit)}</Text>
-                      {delta != null && delta !== 0 ? (
-                        <Text style={[styles.cardDelta, { color: cfg.hue }]}>
-                          {delta > 0 ? '+' : '−'}
-                          {fmtVal(Math.abs(delta), cfg.unit)}
-                        </Text>
-                      ) : (
-                        <Text style={styles.cardDeltaMuted}>
-                          {c.serie.length === 1 ? 'primera medición' : 'sin cambio'}
-                        </Text>
-                      )}
-                      {c.serie.length > 1 ? (
-                        <Sparkline data={c.serie.map((p) => p.value)} hue={cfg.hue} />
-                      ) : null}
                     </Pressable>
                   </Animated.View>
                 )
@@ -161,7 +178,7 @@ export default function BodyCompositionScreen() {
             </Text>
 
             <View style={styles.ctaWrap}>
-              <PrimaryCta label="Medición completa" onPress={() => router.push('/log-checkin')} />
+              <PrimaryCta label="Nueva medición" onPress={() => router.push('/log-checkin')} />
             </View>
           </ScrollView>
         )}
@@ -218,7 +235,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyCta: { marginTop: 22, paddingHorizontal: 20 },
-  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 48 },
+  // flexGrow + marginTop auto en el cierre: el vacío inferior se vuelve aire
+  // intencional (nota+CTA anclados abajo), no contenido que "no cargó".
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 48, flexGrow: 1 },
   dateCaption: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
@@ -245,8 +264,9 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.ui,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
+    marginTop: -2,
   },
   cardValue: {
     marginTop: 6,
@@ -268,12 +288,29 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
+  // La nota ancla el bloque de cierre (nota + CTA bajan juntos al borde).
   note: {
-    marginTop: 18,
+    marginTop: 'auto',
+    paddingTop: 24,
     fontFamily: typography.serif,
     fontStyle: 'italic',
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  ctaWrap: { marginTop: 28 },
+  ctaWrap: { marginTop: 20 },
+  gestureHint: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    marginTop: -6,
+    marginBottom: 14,
+  },
+  cardStale: {
+    marginTop: 2,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 0.3,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
 })

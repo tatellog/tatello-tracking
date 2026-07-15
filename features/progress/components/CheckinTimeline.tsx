@@ -40,21 +40,28 @@ export function CheckinTimeline({ onPick }: { onPick?: (day: string) => void }) 
     <Animated.View entering={FadeIn.duration(360).delay(160)}>
       <View style={styles.divider} />
       <View style={styles.headerRow}>
-        <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-          Historial de mediciones
-        </EyebrowLabel>
+        {/* El eyebrow CEDE (flexShrink) y el link NO: sin esto, en pantallas
+            angostas el link salía recortado contra el borde (bug dueña). */}
+        <View style={styles.eyebrowShrink}>
+          <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
+            Historial de mediciones
+          </EyebrowLabel>
+        </View>
         {/* La tabla del coach (decisión dueña): todos los números, sin frases. */}
-        <Pressable
-          onPress={() => {
-            router.push('/progress-table')
-            track(PROGRESS_EVENTS.body, { kind: 'table' })
-          }}
-          hitSlop={10}
-          accessibilityRole="link"
-          accessibilityLabel="Ver la tabla completa de mediciones"
-        >
-          <Text style={styles.tableLink}>Ver tabla completa →</Text>
-        </Pressable>
+        <View style={styles.tableLinkWrap}>
+          <Pressable
+            onPress={() => {
+              router.push('/progress-table')
+              track(PROGRESS_EVENTS.body, { kind: 'table' })
+            }}
+            hitSlop={10}
+            accessibilityRole="link"
+            accessibilityLabel="Ver la tabla completa de mediciones"
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
+            <Text style={styles.tableLink}>Ver tabla completa →</Text>
+          </Pressable>
+        </View>
       </View>
       <Text style={styles.sub}>Tu evolución completa · toca una y compárala abajo</Text>
 
@@ -151,12 +158,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 44,
   },
+  eyebrowShrink: { flexShrink: 1 },
+  tableLinkWrap: { flexShrink: 0 },
   eyebrow: { marginBottom: 2 },
+  // body + niebla: mismo affordance que el resto de links del tab (uxui);
+  // a 11pt oro parecía decoración.
   tableLink: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.micro,
-    color: colors.oroLight,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+    paddingVertical: 10,
   },
   sub: {
     fontFamily: typography.serif,

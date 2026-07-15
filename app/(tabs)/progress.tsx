@@ -17,6 +17,7 @@ import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
 import { CheckinTimeline } from '@/features/progress/components/CheckinTimeline'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
+import { LinkCta } from '@/features/progress/components/LinkCta'
 import { PhotoEvolution } from '@/features/progress/components/PhotoEvolution'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TrajectoryChart } from '@/features/progress/components/TrajectoryChart'
@@ -191,7 +192,10 @@ function ProgressBody() {
   const focusIsWeight = profile?.monthly_focus === 'weight'
   const hasFocus = profile?.monthly_focus != null
 
-  const goLogMeasurement = () => router.push('/log-measurement')
+  // UNA sola puerta de captura (uxui 14 jul 2026): log-checkin abre en modo
+  // Peso con la rueda lista, así que el caso común sigue siendo 0 fricción.
+  // El peso impulsivo de diario vive en ✦ QuickLog, que no se toca.
+  const goLogMeasurement = () => router.push('/log-checkin')
   const hasTrajectory = count >= 2
   // Mientras cargan las queries, count===0 se disfrazaba de "primera vez" y una
   // veterana veía el empty-hero un instante (uxui: falso vacío = micro-traición).
@@ -211,7 +215,26 @@ function ProgressBody() {
             <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
 
-          <SegmentSwitcher value={segment} onChange={setSegment} />
+          {/* El "＋" vive junto al switcher SOLO en Cuerpo: Progreso → Cuerpo
+              → ＋ = nueva medición sin scroll (uxui). Discreto: el CTA magenta
+              del cierre sigue siendo único. */}
+          <View style={styles.switcherRow}>
+            <View style={styles.switcherGrow}>
+              <SegmentSwitcher value={segment} onChange={setSegment} />
+            </View>
+            {segment === 'body' ? (
+              <Pressable
+                onPress={goLogMeasurement}
+                accessibilityRole="button"
+                accessibilityLabel="Nueva medición"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.addChip}>
+                  <Text style={styles.addChipGlyph}>＋</Text>
+                </View>
+              </Pressable>
+            ) : null}
+          </View>
 
           {segment === 'historia' ? (
             <>
@@ -236,14 +259,12 @@ function ProgressBody() {
 
               {/* A · el antojo: Historia delega la evolución completa a Cuerpo
                   (un solo hogar para la tira — nunca duplicarla aquí). */}
-              <Pressable
+              <LinkCta
+                label="Ver tu evolución completa →"
                 onPress={goBody}
-                accessibilityRole="link"
                 accessibilityLabel="Ver tu evolución completa"
-                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
-              >
-                <Text style={styles.calendarBridgeText}>Ver tu evolución completa →</Text>
-              </Pressable>
+                style={styles.bridgeLink}
+              />
 
               {/* Síntesis — resultado → causa → qué intentar. CIERRA Historia
               (peak-end: el último sabor del scroll es la palanca abierta, la
@@ -257,17 +278,15 @@ function ProgressBody() {
               {/* Epic 06 · puente al calendario: ver (y editar) los días detrás
                   de estos números — el cierre único de Historia (dieta de CTAs:
                   el segmento Cuerpo ya tiene su puerta en el switcher). */}
-              <Pressable
+              <LinkCta
+                label="Ver los días detrás de esto →"
                 onPress={() => {
                   track(PROGRESS_EVENTS.openCalendar)
                   router.navigate('/movement-calendar')
                 }}
-                accessibilityRole="link"
                 accessibilityLabel="Ver tu constancia"
-                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
-              >
-                <Text style={styles.calendarBridgeText}>Ver los días detrás de esto →</Text>
-              </Pressable>
+                style={styles.bridgeLink}
+              />
 
               {/* (La coda "Tu transformación nunca retrocede" se retiró: suelta
                   sonaba a frase de taza y para quien rebotó era además falsa
@@ -384,14 +403,11 @@ function ProgressBody() {
                     </Text>
                     <TrajectoryChart points={smoothed} trend={trend} />
                     {/* Epic 08: la tendencia completa vive en su pantalla. */}
-                    <Pressable
+                    <LinkCta
+                      label="Ver tendencia →"
                       onPress={() => router.push('/weight-trend')}
-                      accessibilityRole="link"
                       accessibilityLabel="Ver la tendencia completa de tu peso"
-                      style={({ pressed }) => [styles.trendLink, pressed && { opacity: 0.6 }]}
-                    >
-                      <Text style={styles.calendarBridgeText}>Ver tendencia →</Text>
-                    </Pressable>
+                    />
                   </Animated.View>
 
                   {/* Cycle context — weight genuinely shifts with the
@@ -471,14 +487,12 @@ function ProgressBody() {
                   <PhotoEvolution />
 
                   {/* Epic 08 · F2: la lectura sin gráficas, en su pantalla. */}
-                  <Pressable
+                  <LinkCta
+                    label="Lo que Stelar observa →"
                     onPress={() => router.push('/stelar-observes')}
-                    accessibilityRole="link"
                     accessibilityLabel="Lo que Stelar observa de tus datos"
-                    style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
-                  >
-                    <Text style={styles.calendarBridgeText}>Lo que Stelar observa →</Text>
-                  </Pressable>
+                    style={styles.bridgeLink}
+                  />
                 </>
               ) : null}
 
@@ -492,25 +506,15 @@ function ProgressBody() {
                   composición, mismo label aquí y en la tabla. */}
               {hasTrajectory ? (
                 <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
-                  <PrimaryCta label="Registrar mi peso" onPress={goLogMeasurement} />
+                  <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
                 </Animated.View>
               ) : null}
-              <Pressable
-                onPress={() => router.push('/log-checkin')}
-                accessibilityRole="link"
-                accessibilityLabel="Registrar una medición completa"
-                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
-              >
-                <Text style={styles.calendarBridgeText}>Medición completa →</Text>
-              </Pressable>
-              <Pressable
+              <LinkCta
+                label="Agregar fotos de otra fecha →"
                 onPress={() => router.push('/log-photos')}
-                accessibilityRole="link"
                 accessibilityLabel="Agregar fotos de otra fecha"
-                style={({ pressed }) => [styles.calendarBridge, pressed && { opacity: 0.6 }]}
-              >
-                <Text style={styles.calendarBridgeText}>Agregar fotos de otra fecha →</Text>
-              </Pressable>
+                style={styles.bridgeLink}
+              />
             </>
           )}
         </ScrollView>
@@ -812,14 +816,25 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // Puente callado al calendario (Epic 06) — link, no card.
-  calendarBridge: { marginTop: 16, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
-  // Link callado bajo la gráfica → /weight-trend (Epic 08).
-  trendLink: { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 6 },
-  calendarBridgeText: {
+  // Layout de los links puente (el touch vive en LinkCta · quirk-safe).
+  bridgeLink: { marginTop: 10, alignSelf: 'center' },
+  switcherRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  switcherGrow: { flex: 1 },
+  addChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    backgroundColor: colors.bgCard2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addChipGlyph: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
+    fontSize: typography.sizes.heading,
+    color: colors.magentaHot,
+    marginTop: -1,
   },
   // Báscula quieta + esfuerzo presente — una REFLEXIÓN, no un caption
   // (brief: el texto interpretativo se separa y respira como cita).

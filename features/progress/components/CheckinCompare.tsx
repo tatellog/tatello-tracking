@@ -7,6 +7,8 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
+import { LinkCta } from './LinkCta'
+
 import type { PhotoAngle } from '../api'
 import { PROGRESS_EVENTS } from '../constants'
 import { useBodyCheckins, usePhotoTimeline } from '../hooks'
@@ -122,18 +124,25 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
         <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
           Comparador rápido
         </EyebrowLabel>
-        <Pressable
-          onPress={() => setOpenStale(true)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: false }}
-          accessibilityLabel={`Comparar ${fmtDay(a)} contra ${fmtDay(b)}`}
-          style={({ pressed }) => [styles.collapsedRow, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.collapsedText}>
-            {fmtDay(a)} → {fmtDay(b)}
-          </Text>
-          <Text style={styles.collapsedCaret}>Ver ▸</Text>
-        </Pressable>
+        {/* Quirk-safe: el layout de fila vive en el View interno; el
+            Pressable solo envuelve. Target completo (44pt) en toda la fila. */}
+        <View style={styles.collapsedWrap}>
+          <Pressable
+            onPress={() => setOpenStale(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: false }}
+            accessibilityLabel={`Comparar ${fmtDay(a)} contra ${fmtDay(b)}`}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
+            <View style={styles.collapsedRow}>
+              <Text style={styles.collapsedText}>
+                {fmtDay(a)} → {fmtDay(b)}
+              </Text>
+              <Text style={styles.collapsedCaret}>Ver ▸</Text>
+            </View>
+          </Pressable>
+        </View>
       </Animated.View>
     )
   }
@@ -198,14 +207,14 @@ export function CheckinCompare({ presetA }: { presetA?: string | null }) {
       ) : null}
       {/* Atajo a la comparación larga (la del hero), sin picker. */}
       {!picking && a !== dates[0] ? (
-        <Pressable
+        /* Acción in-place (cambia el picker), no navegación: sin flecha → */
+        <LinkCta
+          label="Desde el inicio"
           onPress={() => pick('a', dates[0]!)}
-          accessibilityRole="button"
+          role="button"
           accessibilityLabel="Comparar desde tu primera medición"
-          style={({ pressed }) => [styles.fromStart, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.fromStartText}>Desde el inicio →</Text>
-        </Pressable>
+          style={styles.fromStart}
+        />
       ) : null}
 
       {/* La síntesis honesta PRIMERO: hechos duros + rescates, de su lado. */}
@@ -379,13 +388,7 @@ const styles = StyleSheet.create({
   },
   optionsRow: { marginTop: 8 },
   options: { flexDirection: 'row', gap: 6 },
-  fromStart: { alignSelf: 'flex-start', paddingVertical: 6, marginTop: 2 },
-  fromStartText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-  },
+  fromStart: { marginTop: 2 },
   option: {
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -479,11 +482,12 @@ const styles = StyleSheet.create({
   },
   visualChipTextOn: { color: colors.magentaHot },
   // Fila colapsada (datos viejos): las fechas como resumen, a un tap.
+  collapsedWrap: { minHeight: 44, justifyContent: 'center' },
   collapsedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 10,
   },
   collapsedText: {
     fontFamily: typography.uiSemi,

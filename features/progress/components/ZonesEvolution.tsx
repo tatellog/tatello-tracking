@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { colors, typography } from '@/theme'
 
 import { useBodyCheckins } from '../hooks'
+import { LinkCta } from './LinkCta'
 import { zoneEvolution, type ZoneKey } from '../logic'
 
 /*
@@ -43,16 +44,15 @@ export function ZonesEvolution() {
 
   return (
     <View style={styles.wrap}>
-      <Pressable
+      {/* El caret vive en el MISMO string del label (LinkCta): jamás puede
+          romper a otra línea, como pasaba en device. */}
+      <LinkCta
+        label={`Grasa por zona ${open ? '▾' : '▸'}`}
         onPress={() => setOpen((v) => !v)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+        role="button"
+        expanded={open}
         accessibilityLabel="Ver la grasa por zona"
-        style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={styles.toggleText}>Grasa por zona</Text>
-        <Text style={styles.toggleCaret}>{open ? '▾' : '▸'}</Text>
-      </Pressable>
+      />
 
       {open ? (
         <Animated.View entering={FadeIn.duration(240)}>
@@ -94,24 +94,6 @@ export function ZonesEvolution() {
 const styles = StyleSheet.create({
   // Cola de Composición: sin divisor propio (leería como sección aparte).
   wrap: { marginTop: 6 },
-  toggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-  },
-  toggleText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-  },
-  toggleCaret: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-  },
   sub: {
     fontFamily: typography.serif,
     fontStyle: 'italic',

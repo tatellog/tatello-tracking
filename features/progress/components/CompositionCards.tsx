@@ -1,12 +1,14 @@
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
+
+import { LinkCta } from './LinkCta'
 
 import { useBodyCheckins, useBodyCompositionIsMock, useWearableComposition } from '../hooks'
 import {
@@ -138,15 +140,13 @@ export function CompositionCards() {
       {last ? <Text style={styles.dateCaption}>Última medición · {last.label}</Text> : null}
 
       {collapsed ? (
-        <Pressable
+        <LinkCta
+          label="Ver estos números ▸"
           onPress={() => setOpenStale(true)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: false }}
+          role="button"
+          expanded={false}
           accessibilityLabel="Ver tu composición corporal"
-          style={({ pressed }) => [styles.staleToggle, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.staleToggleText}>Ver estos números ▸</Text>
-        </Pressable>
+        />
       ) : (
         <>
           {isStale ? (
@@ -176,24 +176,22 @@ export function CompositionCards() {
               : 'De tus mediciones y salud conectada. Evidencia, no veredicto.'}
           </Text>
           {/* Epic 08: el detalle por métrica vive en su pantalla. */}
-          <Pressable
+          <LinkCta
+            label="Ver en detalle →"
             onPress={() => router.push('/body-composition')}
-            accessibilityRole="link"
             accessibilityLabel="Ver tu composición a detalle"
-            style={({ pressed }) => [styles.staleToggle, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={styles.staleToggleText}>Ver en detalle →</Text>
-          </Pressable>
+          />
           {isStale ? (
-            <Pressable
+            /* Acción opuesta a navegar: más apagada y separada (uxui). */
+            <LinkCta
+              label="Ocultar ▴"
               onPress={() => setOpenStale(false)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: true }}
+              role="button"
+              expanded
               accessibilityLabel="Ocultar tu composición corporal"
-              style={({ pressed }) => [styles.staleToggle, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={styles.staleToggleText}>Ocultar ▴</Text>
-            </Pressable>
+              style={styles.hideLink}
+              textStyle={styles.hideLinkText}
+            />
           ) : null}
         </>
       )}
@@ -267,13 +265,8 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     marginBottom: 8,
   },
-  staleToggle: { alignSelf: 'flex-start', paddingVertical: 8 },
-  staleToggleText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-  },
+  hideLink: { marginTop: 4 },
+  hideLinkText: { fontSize: typography.sizes.label, color: colors.bruma },
   // La invitación cuando la medición es vieja: hecho fechado, sin presión.
   staleNote: {
     fontFamily: typography.serif,

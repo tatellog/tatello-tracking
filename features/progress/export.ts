@@ -1,9 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy'
 import * as MediaLibrary from 'expo-media-library'
+import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 
 import { getBodyCheckins, getMeasurements, getPhotoTimeline } from './api'
-import { measurementsCsv } from './logic'
+import { checkinTable, measurementsCsv } from './logic'
 
 /*
  * Propiedad de datos (decisión benchmark + target-user): "el día que sienta
@@ -48,6 +49,91 @@ export async function exportMeasurementsCsv(): Promise<'shared' | 'empty'> {
     mimeType: 'text/csv',
     dialogTitle: 'Tus mediciones',
     UTI: 'public.comma-separated-values-text',
+  })
+  return 'shared'
+}
+
+const MESES_PDF = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+]
+const fmtColPdf = (iso: string): string =>
+  `${Number(iso.slice(8, 10))} ${MESES_PDF[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`
+const fmtCellPdf = (v: number | null): string => {
+  if (v == null) return '·'
+  return v % 1 === 0 ? `${v}` : v.toFixed(1)
+}
+const escapeHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** Exporta la tabla completa como PDF con el MISMO layout que la tabla del
+ *  coach (pedido dueña 14 jul 2026): filas = métricas, columnas = fechas,
+ *  bandas por grupo. SIN semáforo de colores: marcar rangos "saludables/
+ *  altos" es juicio clínico (línea roja del manifiesto) — ese criterio es
+ *  del profesional, no de Stelar. */
+export async function exportMeasurementsPdf(): Promise<'shared' | 'empty'> {
+  const checkins = await getBodyCheckins()
+  if (checkins.length === 0) return 'empty'
+  const table = checkinTable(checkins)
+  if (table.cols.length === 0) return 'empty'
+
+  const headRow = `<tr><th class="corner"></th>${table.cols
+    .map((c) => `<th>${escapeHtml(fmtColPdf(c.day))}</th>`)
+    .join('')}</tr>`
+
+  const bodyRows = table.groups
+    .map((g) => {
+      const band =
+        g.title === 'Básicos'
+          ? ''
+          : `<tr class="band"><td colspan="${table.cols.length + 1}">${escapeHtml(g.title)}</td></tr>`
+      const rows = g.rows
+        .map(
+          (r) =>
+            `<tr><td class="label">${escapeHtml(r.label)}${
+              r.unit ? ` <span class="unit">${escapeHtml(r.unit)}</span>` : ''
+            }</td>${r.values.map((v) => `<td class="val">${fmtCellPdf(v)}</td>`).join('')}</tr>`,
+        )
+        .join('')
+      return band + rows
+    })
+    .join('')
+
+  const html = `
+    <style>
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1c1c1c; padding: 24px; }
+      h1 { font-size: 15px; margin: 0 0 2px; }
+      .sub { font-size: 10px; color: #777; margin: 0 0 14px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #c9c9c9; padding: 6px 8px; font-size: 11px; }
+      th { background: #efefef; text-align: right; font-weight: 700; }
+      th.corner { background: #efefef; }
+      td.label { font-weight: 700; text-align: left; }
+      td.label .unit { font-weight: 400; color: #888; font-size: 9px; }
+      td.val { text-align: right; font-variant-numeric: tabular-nums; }
+      tr.band td { background: #ead9c9; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; }
+      .foot { margin-top: 14px; font-size: 9px; color: #999; }
+    </style>
+    <h1>Mediciones</h1>
+    <p class="sub">Exportado de Stelar</p>
+    <table>${headRow}${bodyRows}</table>
+    <p class="foot">Stelar solo interpreta tus registros. No sustituye a un profesional de la salud.</p>`
+
+  const { uri } = await Print.printToFileAsync({ html })
+  await Sharing.shareAsync(uri, {
+    mimeType: 'application/pdf',
+    dialogTitle: 'Tus mediciones',
+    UTI: 'com.adobe.pdf',
   })
   return 'shared'
 }

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
+import { PrimaryCta } from '@/components/PrimaryCta'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useBodyCheckins, useProgressInsights } from '@/features/progress/hooks'
 import {
@@ -14,6 +15,7 @@ import {
   type CheckinDelta,
   type CheckinDeltaKey,
 } from '@/features/progress/logic'
+import { LinkCta } from '@/features/progress/components/LinkCta'
 import { PROGRESS_EVENTS } from '@/features/progress/constants'
 import { SkyBackground } from '@/features/tabs/components'
 import { track } from '@/lib/analytics'
@@ -48,12 +50,14 @@ const fmtVal = (v: number, unit: string) =>
 export default function ProgressAnalysisScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ a?: string; b?: string }>()
-  const { data } = useBodyCheckins()
+  const { data, isPending } = useBodyCheckins()
   const checkins = useMemo(() => data ?? [], [data])
   const dates = useMemo(() => checkins.map((c) => c.measured_on), [checkins])
 
-  const [openChanges, setOpenChanges] = useState(false)
-  const [openData, setOpenData] = useState(false)
+  // "¿Qué cambió?" abre por DEFECTO: la pantalla aterrizaba con 70% de vacío
+  // y tres botones cerrados (screenshot dueña) — el primer contenido se
+  // regala, los demás se descubren.
+  const [openChanges, setOpenChanges] = useState(true)
   const [openPatterns, setOpenPatterns] = useState(false)
 
   // F3: las fechas se ELIGEN aquí (picker A→B); los params solo precargan.
@@ -123,10 +127,23 @@ export default function ProgressAnalysisScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {!a || !b || dates.length < 2 ? (
-            <Text style={styles.empty}>
-              Necesitas dos mediciones para poder comparar. Registra la siguiente cuando quieras.
-            </Text>
+          {isPending ? (
+            /* Cargando NO es "no tienes suficientes mediciones": ese flash era
+               una micro-traición para quien lleva 20 (uxui). */
+            <View style={styles.skeleton}>
+              {Array.from({ length: 3 }, (_, i) => (
+                <View key={i} style={styles.skeletonCard} />
+              ))}
+            </View>
+          ) : !a || !b || dates.length < 2 ? (
+            <View>
+              <Text style={styles.empty}>
+                Necesitas dos mediciones para poder comparar. Registra la siguiente cuando quieras.
+              </Text>
+              <View style={styles.emptyCta}>
+                <PrimaryCta label="Nueva medición" onPress={() => router.push('/log-checkin')} />
+              </View>
+            </View>
           ) : (
             <>
               {/* F3 · el picker: tocar una fecha abre SOLO sus opciones. */}
@@ -162,11 +179,13 @@ export default function ProgressAnalysisScreen() {
                             onPress={() => pick(picking, d)}
                             accessibilityRole="button"
                             accessibilityState={{ selected: on }}
-                            style={[styles.option, on && styles.optionOn]}
+                            style={({ pressed }) => pressed && { opacity: 0.75 }}
                           >
-                            <Text style={[styles.optionText, on && styles.optionTextOn]}>
-                              {fmtDay(d)}
-                            </Text>
+                            <View style={[styles.option, on && styles.optionOn]}>
+                              <Text style={[styles.optionText, on && styles.optionTextOn]}>
+                                {fmtDay(d)}
+                              </Text>
+                            </View>
                           </Pressable>
                         )
                       })}
@@ -206,34 +225,36 @@ export default function ProgressAnalysisScreen() {
                       {hard.map((r) => (
                         <ChangeRow key={r.key} row={r} />
                       ))}
+                      {/* Las sin cambio TAMBIÉN (uxui: una sola card que es
+                          interpretación Y dato completo — la vieja card
+                          "Muéstrame los datos" era esta misma lista sin los
+                          deltas, acordeón de relleno). */}
+                      {rows
+                        .filter((r) => r.delta === 0)
+                        .map((r) => {
+                          const meta = LABEL[r.key]
+                          return (
+                            <View key={r.key} style={styles.changeRow}>
+                              <View style={styles.changeMain}>
+                                <Text style={styles.changeLabel}>{meta.name}</Text>
+                                <Text style={styles.changeValues}>
+                                  {fmtVal(r.a, meta.unit)} → {fmtVal(r.b, meta.unit)}
+                                </Text>
+                              </View>
+                              <Text style={styles.noChangeTag}>sin cambio</Text>
+                            </View>
+                          )
+                        })}
                     </Animated.View>
                   ) : null}
 
-                  <GuideButton
-                    label="Muéstrame los datos"
-                    open={openData}
-                    onPress={() => {
-                      setOpenData((v) => !v)
-                      track(PROGRESS_EVENTS.openInsight, { kind: 'analysis-data' })
-                    }}
+                  {/* El "muéstrame los datos" DE VERDAD es la tabla cruda. */}
+                  <LinkCta
+                    label="Ver todas tus mediciones →"
+                    onPress={() => router.push('/progress-table')}
+                    accessibilityLabel="Ver la tabla completa de mediciones"
+                    style={styles.tableLink}
                   />
-                  {openData ? (
-                    <Animated.View entering={FadeIn.duration(240)} style={styles.card}>
-                      {rows.map((r) => {
-                        const meta = LABEL[r.key]
-                        return (
-                          <View key={r.key} style={styles.dataRow}>
-                            <Text style={styles.dataLabel}>{meta.name}</Text>
-                            <Text style={styles.dataValues}>
-                              {fmtVal(r.a, meta.unit)}
-                              <Text style={styles.dataArrow}>{'  →  '}</Text>
-                              {fmtVal(r.b, meta.unit)}
-                            </Text>
-                          </View>
-                        )
-                      })}
-                    </Animated.View>
-                  ) : null}
                 </>
               ) : null}
 
@@ -262,7 +283,14 @@ export default function ProgressAnalysisScreen() {
                 </>
               ) : null}
 
-              <GuideButton label="Abrir en Órbita" chevron onPress={goOrbita} />
+              {/* La salida a Órbita respira aparte: es otra clase de acción
+                  (irse), no otra pregunta. */}
+              <GuideButton
+                label="Abrir en Órbita"
+                chevron
+                onPress={goOrbita}
+                style={styles.orbitaGuide}
+              />
               <Text style={styles.orbitaHint}>Aquí ves qué cambió. El porqué vive en Órbita.</Text>
 
               <Text style={styles.disclaimer}>
@@ -275,6 +303,11 @@ export default function ProgressAnalysisScreen() {
     </View>
   )
 }
+
+/* Quirk del repo en ambos: el layout/visual vive en el View INTERNO; el
+ * Pressable solo envuelve con cosmética de pressed. Con los estilos directo
+ * en el Pressable, las cards colapsaban a texto plano con el chevron
+ * huérfano en otra línea (screenshot dueña 14 jul 2026). */
 
 function DatePill({
   label,
@@ -293,10 +326,12 @@ function DatePill({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       accessibilityState={{ expanded: open }}
-      style={[styles.pill, open && styles.pillOpen]}
+      style={({ pressed }) => pressed && { opacity: 0.75 }}
     >
-      <Text style={styles.pillText}>{label}</Text>
-      <Text style={[styles.pillCaret, open && styles.pillCaretOpen]}>▾</Text>
+      <View style={[styles.pill, open && styles.pillOpen]}>
+        <Text style={styles.pillText}>{label}</Text>
+        <Text style={[styles.pillCaret, open && styles.pillCaretOpen]}>▾</Text>
+      </View>
     </Pressable>
   )
 }
@@ -306,22 +341,28 @@ function GuideButton({
   open,
   chevron,
   onPress,
+  style,
 }: {
   label: string
   open?: boolean
   chevron?: boolean
   onPress: () => void
+  style?: object
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={open != null ? { expanded: open } : undefined}
-      style={({ pressed }) => [styles.guide, pressed && { opacity: 0.75 }]}
-    >
-      <Text style={styles.guideText}>{label}</Text>
-      <Text style={styles.guideGlyph}>{chevron ? '→' : open ? '▾' : '▸'}</Text>
-    </Pressable>
+    <View style={[styles.guideWrap, style]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={open != null ? { expanded: open } : undefined}
+        style={({ pressed }) => pressed && { opacity: 0.75 }}
+      >
+        <View style={styles.guide}>
+          <Text style={styles.guideText}>{label}</Text>
+          <Text style={styles.guideGlyph}>{chevron ? '→' : open ? '▾' : '▸'}</Text>
+        </View>
+      </Pressable>
+    </View>
   )
 }
 
@@ -339,7 +380,7 @@ function ChangeRow({ row, favorable }: { row: CheckinDelta; favorable?: boolean 
         </Text>
       </View>
       <View style={styles.changeSide}>
-        <Text style={styles.changeDelta}>
+        <Text style={[styles.changeDelta, favorable && styles.changeDeltaFav]}>
           {arrow} {row.delta > 0 ? '+' : '−'}
           {fmtVal(Math.abs(row.delta), meta.unit)}
         </Text>
@@ -437,6 +478,7 @@ const styles = StyleSheet.create({
     color: colors.leche,
     marginBottom: 20,
   },
+  guideWrap: { marginTop: 10 },
   guide: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -447,7 +489,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.10)',
     backgroundColor: colors.bgCard,
-    marginTop: 10,
   },
   guideText: {
     fontFamily: typography.uiSemi,
@@ -491,12 +532,24 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   changeSide: { alignItems: 'flex-end' },
+  // Neutro (hecho, no premio): el ORO queda reservado a los rescates — con
+  // todos los deltas dorados, subir grasa brillaba igual que ganar músculo.
   changeDelta: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.oroLight,
+    color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
+  changeDeltaFav: { color: colors.oroLight },
+  noChangeTag: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  tableLink: { alignSelf: 'center', marginTop: 4 },
+  skeleton: { paddingTop: 8, gap: 12 },
+  skeletonCard: { height: 64, borderRadius: 14, backgroundColor: colors.bgCard, opacity: 0.6 },
+  emptyCta: { marginTop: 20 },
   favTag: {
     marginTop: 2,
     fontFamily: typography.uiBold,
@@ -505,24 +558,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.oroSoft,
   },
-  dataRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingVertical: 9,
-  },
-  dataLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  dataValues: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
-  dataArrow: { color: colors.oro },
   // Hallazgos del engine: lead en voz de coach + evidencia con números.
   insightRow: { paddingVertical: 10 },
   insightLead: {
@@ -540,25 +575,26 @@ const styles = StyleSheet.create({
     color: colors.bone,
     fontVariant: ['tabular-nums'],
   },
+  // Hanken: aviso funcional, no voz del coach.
   noShared: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 22,
     color: colors.bone,
     marginBottom: 14,
   },
+  orbitaGuide: { marginTop: 26 },
+  // Hanken, no serif: es explicación de producto, no voz del coach (regla
+  // italic = coach del design system).
   orbitaHint: {
     marginTop: 8,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
   disclaimer: {
     marginTop: 22,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
     color: colors.niebla,
   },
