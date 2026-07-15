@@ -1,6 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy'
 import * as MediaLibrary from 'expo-media-library'
-import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 
 import { getBodyCheckins, getMeasurements, getPhotoTimeline } from './api'
@@ -81,7 +80,18 @@ const escapeHtml = (s: string): string =>
  *  bandas por grupo. SIN semáforo de colores: marcar rangos "saludables/
  *  altos" es juicio clínico (línea roja del manifiesto) — ese criterio es
  *  del profesional, no de Stelar. */
-export async function exportMeasurementsPdf(): Promise<'shared' | 'empty'> {
+export async function exportMeasurementsPdf(): Promise<'shared' | 'empty' | 'unavailable'> {
+  // Import PEREZOSO: ExpoPrint no existe en el runtime de Expo Go (solo en
+  // builds instaladas) y el import estático tumbaba TODO el tab Progreso al
+  // cargar el módulo (error dueña 15 jul 2026). Así, en Expo Go solo el PDF
+  // se disculpa; el resto de la pantalla vive.
+  let Print: typeof import('expo-print')
+  try {
+    Print = await import('expo-print')
+  } catch {
+    return 'unavailable'
+  }
+
   const checkins = await getBodyCheckins()
   if (checkins.length === 0) return 'empty'
   const table = checkinTable(checkins)

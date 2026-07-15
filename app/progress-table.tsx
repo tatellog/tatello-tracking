@@ -64,6 +64,13 @@ export default function ProgressTableScreen() {
       const result = kind === 'pdf' ? await exportMeasurementsPdf() : await exportMeasurementsCsv()
       if (result === 'empty') {
         Toast.show({ type: 'info', text1: 'Aún no hay mediciones que exportar' })
+      } else if (result === 'unavailable') {
+        // Solo pasa en Expo Go (dev): el módulo nativo vive en la build.
+        Toast.show({
+          type: 'info',
+          text1: 'El PDF no está disponible en Expo Go',
+          text2: 'En la app instalada sí. Por ahora, usa CSV.',
+        })
       }
     } catch {
       Toast.show({
