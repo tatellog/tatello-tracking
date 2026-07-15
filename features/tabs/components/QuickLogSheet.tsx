@@ -579,26 +579,30 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       <Pressable
         onPress={handlePhotoLog}
         disabled={disabled}
-        style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
+        style={[styles.method, styles.methodTile, styles.methodAi, disabled && styles.methodDimmed]}
         accessibilityRole="button"
-        accessibilityLabel="Registrar una comida con foto"
+        accessibilityLabel="Registrar una comida con foto, con inteligencia artificial"
       >
         <View style={[styles.methodIcon, styles.methodIconPhoto]}>
           <CameraIcon color={colors.magenta} />
         </View>
-        <Text style={styles.methodLabel}>Con foto</Text>
+        <Text style={styles.methodLabel}>
+          <Text style={styles.methodAiStar}>✦ </Text>Con foto
+        </Text>
       </Pressable>
       <Pressable
         onPress={handleTextLog}
         disabled={disabled}
-        style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
+        style={[styles.method, styles.methodTile, styles.methodAi, disabled && styles.methodDimmed]}
         accessibilityRole="button"
-        accessibilityLabel="Registrar una comida escribiéndola"
+        accessibilityLabel="Registrar una comida escribiéndola, con inteligencia artificial"
       >
         <View style={[styles.methodIcon, styles.methodIconPhoto]}>
           <KeyboardIcon color={colors.magenta} />
         </View>
-        <Text style={styles.methodLabel}>Con texto</Text>
+        <Text style={styles.methodLabel}>
+          <Text style={styles.methodAiStar}>✦ </Text>Con texto
+        </Text>
       </Pressable>
     </View>
   )
@@ -1310,6 +1314,9 @@ const styles = StyleSheet.create({
   methodDimmed: {
     opacity: 0.4,
   },
+  // Piel IA (regla dueña): estos dos métodos escanean con gpt.
+  methodAi: { borderColor: colors.magentaGlow, backgroundColor: colors.magentaTint2 },
+  methodAiStar: { color: colors.magentaHot },
   methodIcon: {
     width: 40,
     height: 40,

@@ -88,12 +88,16 @@ function MethodTile({
   icon,
   onPress,
   active,
+  ai,
   accessibilityLabel,
 }: {
   label: string
   icon: React.ReactNode
   onPress: () => void
   active?: boolean
+  /** true = el método usa IA (scan): sello ✦ + borde encendido (regla
+   *  dueña: todo lo hecho con IA va highlighted + sparkles). */
+  ai?: boolean
   accessibilityLabel: string
 }) {
   const { onPressIn, onPressOut, animatedStyle } = usePressFeedback()
@@ -106,9 +110,14 @@ function MethodTile({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
     >
-      <Animated.View style={[styles.method, active && styles.methodActive, animatedStyle]}>
+      <Animated.View
+        style={[styles.method, ai && styles.methodAi, active && styles.methodActive, animatedStyle]}
+      >
         <View style={styles.methodIcon}>{icon}</View>
-        <Text style={styles.methodLabel}>{label}</Text>
+        <Text style={styles.methodLabel}>
+          {ai ? <Text style={styles.methodAiStar}>✦ </Text> : null}
+          {label}
+        </Text>
       </Animated.View>
     </Pressable>
   )
@@ -496,13 +505,15 @@ export function MealComposer({ onOpenMeal }: Props) {
               label="Foto"
               icon={<CameraIcon color={colors.magenta} size={20} />}
               onPress={handleScanPhoto}
-              accessibilityLabel="Registrar una comida con foto"
+              ai
+              accessibilityLabel="Registrar una comida con foto, con inteligencia artificial"
             />
             <MethodTile
               label="Escribir"
               icon={<KeyboardIcon color={colors.magenta} />}
               onPress={handleScanText}
-              accessibilityLabel="Registrar una comida escribiéndola"
+              ai
+              accessibilityLabel="Registrar una comida escribiéndola, con inteligencia artificial"
             />
           </View>
 
@@ -740,6 +751,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.magentaTint2,
   },
+  // Piel IA (regla dueña): borde encendido + sello.
+  methodAi: { borderColor: colors.magentaGlow, backgroundColor: colors.magentaTint2 },
+  methodAiStar: { color: colors.magentaHot },
   methodLabel: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,

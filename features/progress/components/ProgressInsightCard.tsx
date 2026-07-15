@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { useRouter } from 'expo-router'
@@ -7,11 +7,11 @@ import { useRouter } from 'expo-router'
 import { useFindingTranscript } from '@/features/orbit/chat-transcript'
 import type { Finding } from '@/features/orbit/findings'
 import { MonthChatSheet } from '@/features/orbit/components/MonthChatSheet'
-import { StelarStar } from '@/features/orbit/components/MonthChatView'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useSaveReflection } from '@/features/orbit/reflections'
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
+import { AiCta } from '@/components/AiCta'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { LinkCta } from '@/features/progress/components/LinkCta'
 import { aiEnabledForEmail, PROGRESS_CHAT_ENABLED } from '@/lib/featureFlags'
@@ -92,18 +92,17 @@ export function ProgressInsightCard() {
       <Text style={styles.lead}>{main.lead}</Text>
       <Text style={styles.support}>{main.support}</Text>
 
-      <Pressable
-        style={styles.cta}
+      {/* La piel IA canónica (AiCta): mismo look que importar tabla. */}
+      <AiCta
+        label={ctaLabel}
         onPress={() => {
           track(PROGRESS_EVENTS.openInsight, { id: main.id })
           setOpen(true)
         }}
-        accessibilityRole="button"
         accessibilityLabel={ctaLabel}
-      >
-        <StelarStar size={16} />
-        <Text style={styles.ctaText}>{ctaLabel}</Text>
-      </Pressable>
+        variant="block"
+        style={styles.cta}
+      />
 
       {/* El puente al porqué — link callado, no otra card. */}
       <LinkCta
@@ -150,23 +149,6 @@ const styles = StyleSheet.create({
     color: colors.bone,
     fontVariant: ['tabular-nums'],
   },
-  cta: {
-    marginTop: 20,
-    backgroundColor: colors.magentaTint,
-    borderWidth: 1.5,
-    borderColor: colors.magentaGlow,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  ctaText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    color: colors.magentaHot,
-  },
+  cta: { marginTop: 20 },
   bridge: { marginTop: 4, alignSelf: 'center' },
 })
