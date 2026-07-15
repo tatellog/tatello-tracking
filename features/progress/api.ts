@@ -122,11 +122,17 @@ const PHOTO_URL_TTL = 60 * 60
 
 /*
  * The before/after pair for the Progreso page. Uses the front-angle
- * photos only (the canonical comparison angle) and always spans the
- * full history — earliest vs latest — regardless of the page's range
+ * photos only (the canonical comparison angle) and spans the full
+ * history — earliest vs latest — regardless of the page's range
  * selector. RLS scopes the table to the caller.
+ *
+ * `sinceIso` (capítulos · decisión benchmark + target-user): cuando una foto
+ * nueva llega tras un gap largo, abre un CAPÍTULO — el par se deriva solo de
+ * las fotos desde esa fecha, para que la foto nueva sea el punto de partida
+ * de hoy y no el "después" automático contra el mejor momento de 2024. Si el
+ * capítulo quedó vacío (se borró su foto), cae al historial completo.
  */
-export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
+export async function getBeforeAfterPhotos(sinceIso?: string | null): Promise<BeforeAfter> {
   const { data, error } = await supabase
     .from('photos')
     .select('id, taken_at, storage_path')
@@ -134,7 +140,11 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
     .order('taken_at', { ascending: true })
   if (error) throw error
 
-  const rows = data ?? []
+  let rows = data ?? []
+  if (sinceIso) {
+    const chapter = rows.filter((r) => r.taken_at >= sinceIso)
+    if (chapter.length > 0) rows = chapter
+  }
   const firstRow = rows[0]
   if (!firstRow) return { before: null, after: null, count: 0 }
 
@@ -170,6 +180,162 @@ export async function getBeforeAfterPhotos(): Promise<BeforeAfter> {
   }
   const [before, after] = await Promise.all([sign(firstRow), sign(lastRow)])
   return { before, after, count: rows.length }
+}
+
+/* ─── Body · check-ins manuales (F0 · Progress 3.0) ────────────────── */
+
+/** Rango numérico opcional (espeja los CHECK de la migración: la app falla
+ *  rápido en español en vez de un error de Postgres). */
+const bounded = (min: number, max: number, label: string) =>
+  z
+    .number()
+    .min(min, `${label}: mínimo ${min}`)
+    .max(max, `${label}: máximo ${max}`)
+    .nullable()
+    .optional()
+
+/** Un check-in de composición (registro del coach o captura manual). Todas las
+ *  métricas opcionales — capturas lo que tengas; la DB exige al menos una. */
+export const BodyCheckinInputSchema = z.object({
+  measured_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha en formato AAAA-MM-DD'),
+  source: z.enum(['manual', 'coach']).default('manual'),
+  weight_kg: bounded(20.1, 399, 'Peso'),
+  bmi: bounded(5, 100, 'IMC'),
+  bmr_kcal: bounded(500, 6000, 'TMB'),
+  water_pct: bounded(0, 100, 'Agua'),
+  bone_mass_kg: bounded(0, 20, 'Masa ósea'),
+  metabolic_age: bounded(10, 120, 'Edad metabólica'),
+  visceral_fat_index: bounded(0, 60, 'Visceral'),
+  muscle_kg: bounded(0, 100, 'Músculo'),
+  muscle_arm_right_kg: bounded(0, 20, 'Brazo der'),
+  muscle_arm_left_kg: bounded(0, 20, 'Brazo izq'),
+  muscle_trunk_kg: bounded(0, 60, 'Tronco'),
+  muscle_leg_right_kg: bounded(0, 30, 'Pierna der'),
+  muscle_leg_left_kg: bounded(0, 30, 'Pierna izq'),
+  body_fat_pct: bounded(0, 100, 'Grasa'),
+  fat_arm_right_pct: bounded(0, 100, 'Grasa brazo der'),
+  fat_arm_left_pct: bounded(0, 100, 'Grasa brazo izq'),
+  fat_trunk_pct: bounded(0, 100, 'Grasa tronco'),
+  fat_leg_right_pct: bounded(0, 100, 'Grasa pierna der'),
+  fat_leg_left_pct: bounded(0, 100, 'Grasa pierna izq'),
+  // Medidas de cinta (Epic 08 · rediseño Nueva medición): espejan los CHECK
+  // de la migración 20260714220000.
+  neck_cm: bounded(10.1, 99.9, 'Cuello'),
+  chest_cm: bounded(30.1, 249.9, 'Pecho'),
+  waist_cm: bounded(30.1, 249.9, 'Cintura'),
+  abdomen_cm: bounded(30.1, 249.9, 'Abdomen'),
+  hips_cm: bounded(30.1, 249.9, 'Caderas'),
+  arm_right_cm: bounded(10.1, 99.9, 'Brazo der'),
+  arm_left_cm: bounded(10.1, 99.9, 'Brazo izq'),
+  thigh_right_cm: bounded(20.1, 149.9, 'Muslo der'),
+  thigh_left_cm: bounded(20.1, 149.9, 'Muslo izq'),
+  calf_right_cm: bounded(10.1, 99.9, 'Pantorrilla der'),
+  calf_left_cm: bounded(10.1, 99.9, 'Pantorrilla izq'),
+  notes: z.string().max(500).nullable().optional(),
+})
+export type BodyCheckinInput = z.infer<typeof BodyCheckinInputSchema>
+
+export const BodyCheckinSchema = BodyCheckinInputSchema.extend({
+  id: z.string(),
+})
+export type BodyCheckin = z.infer<typeof BodyCheckinSchema>
+
+/** Guarda (o actualiza) un check-in. Upsert por (usuaria, día, fuente):
+ *  re-capturar el mismo día edita, no duplica. */
+export async function upsertBodyCheckin(input: BodyCheckinInput): Promise<void> {
+  const userId = await requireUserId()
+  const parsed = BodyCheckinInputSchema.parse(input)
+  const { error } = await supabase
+    .from('body_checkins')
+    .upsert({ user_id: userId, ...parsed }, { onConflict: 'user_id,measured_on,source' })
+  if (error) throw error
+}
+
+/** Todos los check-ins, ascendentes por fecha (RLS scopea a la usuaria). */
+export async function getBodyCheckins(): Promise<BodyCheckin[]> {
+  const { data, error } = await supabase
+    .from('body_checkins')
+    .select('*')
+    .order('measured_on', { ascending: true })
+  if (error) throw error
+  return z.array(BodyCheckinSchema).parse(data ?? [])
+}
+
+/* ─── Body (Epic 02): composición corporal + timeline de fotos ────── */
+
+/** Snapshot de composición de un día (de la báscula/HealthKit vía ingesta
+ *  wearable). Solo las métricas que la ingesta trae HOY: grasa, masa magra,
+ *  IMC. Agua/visceral/edad metabólica/TMB llegarán con futuras fuentes. */
+export const BodyCompositionSchema = z.object({
+  day_date: z.string(),
+  body_fat_pct: z.number().nullable(),
+  lean_body_mass_kg: z.number().nullable(),
+  bmi: z.number().nullable(),
+})
+export type BodyComposition = z.infer<typeof BodyCompositionSchema>
+
+/** Composición corporal ascendente por día (RLS scopea a la usuaria). Con
+ *  varias fuentes el upsert es por (source, día); aquí se aplana por día
+ *  tomando la fila más reciente. */
+export async function getBodyComposition(rangeDays: number | null): Promise<BodyComposition[]> {
+  let query = supabase
+    .from('wearable_body_composition')
+    .select('day_date, body_fat_pct, lean_body_mass_kg, bmi, updated_at')
+    .order('day_date', { ascending: true })
+  if (rangeDays != null) {
+    const since = new Date()
+    since.setDate(since.getDate() - rangeDays)
+    query = query.gte('day_date', since.toISOString().slice(0, 10))
+  }
+  const { data, error } = await query
+  if (error) throw error
+  // Una fila por día: la última actualizada gana (fuentes múltiples).
+  const byDay = new Map<string, BodyComposition>()
+  for (const row of data ?? []) {
+    byDay.set(row.day_date as string, BodyCompositionSchema.parse(row))
+  }
+  return [...byDay.values()]
+}
+
+export type PhotoAngle = 'front' | 'back' | 'side_left' | 'side_right'
+
+/** Una foto del timeline (con URL firmada; null si falló la firma). */
+export type TimelinePhoto = {
+  id: string
+  taken_at: string
+  angle: PhotoAngle
+  signed_url: string | null
+}
+
+/** TODAS las fotos de progreso (4 ángulos) con URLs firmadas EN LOTE (una
+ *  llamada de storage, no una por foto). Alimenta el comparador por fechas. */
+export async function getPhotoTimeline(): Promise<TimelinePhoto[]> {
+  const { data, error } = await supabase
+    .from('photos')
+    .select('id, taken_at, angle, storage_path')
+    .order('taken_at', { ascending: true })
+  if (error) throw error
+  const rows = (data ?? []).filter(
+    (r): r is typeof r & { angle: PhotoAngle } =>
+      r.angle === 'front' ||
+      r.angle === 'back' ||
+      r.angle === 'side_left' ||
+      r.angle === 'side_right',
+  )
+  if (rows.length === 0) return []
+  const { data: signed, error: signErr } = await supabase.storage
+    .from('progress-photos')
+    .createSignedUrls(
+      rows.map((r) => r.storage_path as string),
+      PHOTO_URL_TTL,
+    )
+  if (signErr) console.warn('[progress] createSignedUrls failed', signErr.message)
+  return rows.map((r, i) => ({
+    id: r.id as string,
+    taken_at: r.taken_at as string,
+    angle: r.angle,
+    signed_url: signed?.[i]?.signedUrl ?? null,
+  }))
 }
 
 /*

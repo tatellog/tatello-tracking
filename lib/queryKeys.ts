@@ -43,6 +43,20 @@ export const queryKeys = {
   progress: {
     all: ['progress'] as const,
     measurements: (rangeDays: number | null) => ['progress', 'measurements', rangeDays] as const,
+    // Centralizadas en Epic 00 (antes eran strings sueltos en features/progress/
+    // hooks.ts, violando la convención). Mismos valores → cero cambio de caché.
+    recentWorkouts: (rangeDays: number) => ['progress', 'workouts', rangeDays] as const,
+    trainedTotal: () => ['progress', 'trainedTotal'] as const,
+    allWorkouts: () => ['progress', 'allWorkouts'] as const,
+    monthWorkouts: (monthStart: string) => ['progress', 'monthWorkouts', monthStart] as const,
+    sleep: (rangeDays: number) => ['progress', 'sleep', rangeDays] as const,
+    lastPeriod: () => ['progress', 'cycle', 'last-period'] as const,
+    // Body (Epic 02): composición corporal (wearable) + timeline de fotos.
+    bodyComposition: (rangeDays: number | null) =>
+      ['progress', 'bodyComposition', rangeDays] as const,
+    photoTimeline: () => ['progress', 'photoTimeline'] as const,
+    // F0 · Progress 3.0: check-ins manuales/del coach (composición completa).
+    bodyCheckins: () => ['progress', 'bodyCheckins'] as const,
   },
   profile: {
     all: ['profile'] as const,
@@ -52,7 +66,7 @@ export const queryKeys = {
     all: ['photos'] as const,
     today: () => ['photos', 'today'] as const,
     latestSet: () => ['photos', 'latest-set'] as const,
-    beforeAfter: () => ['photos', 'before-after'] as const,
+    beforeAfter: (sinceIso: string | null = null) => ['photos', 'before-after', sinceIso] as const,
   },
   water: {
     all: ['water'] as const,

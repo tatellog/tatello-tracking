@@ -41,6 +41,10 @@ type Props = {
   /** El hallazgo a abrir (de una tarjeta); null = cerrado. */
   finding: Finding | null
   title: string
+  /** Sub-línea de la cabecera. Default Órbita Mes; Progress pasa la suya. */
+  subtitle?: string
+  /** Label del cierre sin más hallazgos (se pasa a FindingChatView). */
+  closeLabel?: string
   sign: ZodiacSign | null
   /** Periodo + hash de hallazgos: para el chat guiado con IA (cache por hash). */
   periodStart: string
@@ -63,6 +67,8 @@ type Props = {
 export function MonthChatSheet({
   finding,
   title,
+  subtitle = 'Stelar · leyendo tu mes',
+  closeLabel,
   sign,
   periodStart,
   periodEnd,
@@ -152,7 +158,7 @@ export function MonthChatSheet({
                 <StelarStar size={30} />
                 <View style={styles.headText}>
                   <Text style={styles.headTopic}>{title}</Text>
-                  <Text style={styles.headWho}>Stelar · leyendo tu mes</Text>
+                  <Text style={styles.headWho}>{subtitle}</Text>
                 </View>
               </View>
 
@@ -161,6 +167,7 @@ export function MonthChatSheet({
                   key={finding.id}
                   finding={finding}
                   uid={uid}
+                  closeLabel={closeLabel}
                   periodStart={periodStart}
                   periodEnd={periodEnd}
                   findingsHash={findingsHash}

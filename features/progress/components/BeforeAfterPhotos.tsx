@@ -12,12 +12,14 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
+import Toast from 'react-native-toast-message'
 
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
 import { useProfile } from '@/features/profile/hooks'
 import type { ProgressPhoto } from '@/features/progress/api'
+import { trySaveUriToLibrary } from '@/features/progress/export'
 import { useBeforeAfterPhotos, useDeletePhoto, useMeasurements } from '@/features/progress/hooks'
 import { computeTrend, formatTrendCopy, toWeightPoints } from '@/features/progress/logic'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
@@ -33,6 +35,17 @@ import type { ShareCardStyle } from '../share-styles'
 
 // Persistencia del slot sostenido (ID de la foto que vive en "Ahora").
 const SOLO_AFTER_KEY = '@app:beforeafter_solo_after_id'
+// Inicio del capítulo actual (ISO): una foto tras un gap largo abre capítulo
+// y el par se deriva desde ahí (la foto nueva = punto de partida, no el
+// "después" automático contra 2024).
+const CHAPTER_KEY = '@app:photos_chapter_start'
+// Card guardada (el cajón con llave de la usuaria: "que exista y la abra yo").
+const STASH_KEY = '@app:visualchange_stashed'
+
+// Frescura: pasados 60 días (la ventana "el cuerpo cambia en 4-12 semanas"),
+// la foto más reciente deja de ser "Ahora" — la etiqueta mentía y la
+// corrección mental la hacía la usuaria ("no es ahora porque después subí").
+const STALE_MS = 60 * 24 * 60 * 60 * 1000
 
 const MESES_FMT = [
   'ene',
@@ -82,6 +95,12 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 function formatDate(iso: string): string {
   const d = new Date(iso)
   return `${d.getDate()} ${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
+}
+
+/** "nov 2024" — la etiqueta del marco cuando la foto ya no es "ahora". */
+function formatMonthYear(iso: string): string {
+  const d = new Date(iso)
+  return `${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
 }
 
 /** YYYY-MM-DD in local time — used to detect same-day pairs in the
@@ -270,7 +289,43 @@ function PhotoColumn({
  * placeholders, each tappable to upload a front photo.
  */
 export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
-  const { data } = useBeforeAfterPhotos()
+  // Capítulo actual: hidratado ANTES de pedir el par para no flashear la
+  // comparación completa contra 2024 mientras carga.
+  const [chapterStart, setChapterStart] = useState<string | null>(null)
+  const [chapterReady, setChapterReady] = useState(false)
+  useEffect(() => {
+    let active = true
+    AsyncStorage.getItem(CHAPTER_KEY)
+      .then((v) => {
+        if (!active) return
+        if (v) setChapterStart(v)
+        setChapterReady(true)
+      })
+      .catch(() => setChapterReady(true))
+    return () => {
+      active = false
+    }
+  }, [])
+  const persistChapter = (iso: string | null) => {
+    setChapterStart(iso)
+    if (iso) AsyncStorage.setItem(CHAPTER_KEY, iso).catch(() => {})
+    else AsyncStorage.removeItem(CHAPTER_KEY).catch(() => {})
+  }
+
+  // El cajón: card guardada por decisión de la usuaria (manual, reversible).
+  const [stashed, setStashed] = useState(false)
+  useEffect(() => {
+    AsyncStorage.getItem(STASH_KEY)
+      .then((v) => setStashed(v === '1'))
+      .catch(() => {})
+  }, [])
+  const persistStash = (on: boolean) => {
+    setStashed(on)
+    if (on) AsyncStorage.setItem(STASH_KEY, '1').catch(() => {})
+    else AsyncStorage.removeItem(STASH_KEY).catch(() => {})
+  }
+
+  const { data } = useBeforeAfterPhotos(chapterReady ? chapterStart : undefined)
   const measurements = useMeasurements(null)
   const brief = useHomeBrief()
   const profile = useProfile()
@@ -384,12 +439,18 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     ]
   }, [data?.before, data?.after, measurements.data, sign, dayCount])
 
-  if (!data) return null
+  if (!chapterReady || !data) return null
+
+  // Frescura del par MOSTRADO: pasado el umbral, "Ahora" deja de existir
+  // (etiquetas = fechas) y la comparación no se sirve como presente.
+  const lastShownIso = data.after?.taken_at ?? data.before?.taken_at ?? null
+  const stale = lastShownIso != null && Date.now() - new Date(lastShownIso).getTime() > STALE_MS
 
   // Pick from camera/library, then push it through the shared upload
-  // pipeline as a `front` photo — getBeforeAfterPhotos derives the
-  // before/after pair from the earliest/latest front photos, so a new
-  // upload always lands as the "ahora".
+  // pipeline as a `front` photo. Tras un gap largo (stale), la foto nueva NO
+  // aterriza como "Ahora" vs 2024: abre CAPÍTULO — se vuelve el punto de
+  // partida de hoy y comparar contra el pasado es acción que ella abre
+  // (target-user: "el número lo racionalizo; una foto no").
   const pickAndUpload = async (source: 'camera' | 'library') => {
     if (source === 'camera') {
       const perm = await ImagePicker.requestCameraPermissionsAsync()
@@ -403,11 +464,27 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
     if (result.canceled || !result.assets[0]) return
+    const opensChapter = stale
     try {
       await takePhoto.mutateAsync({ uri: result.assets[0].uri, angle: 'front' })
-      // La foto nueva es la más reciente (Ahora) y el orden por fecha vuelve a
+      // La foto nueva es la más reciente y el orden por fecha vuelve a
       // mandar; soltamos el slot sostenido.
       persistSoloAfter(null)
+      // Margen de 1 min para que el taken_at de la foto (ahora) quede dentro.
+      if (opensChapter) persistChapter(new Date(Date.now() - 60_000).toISOString())
+      // Dual-save (propiedad de datos): la foto de cámara también vive en SU
+      // carrete. Si niega el permiso, silencio: el rescate vive en Ajustes.
+      const savedToRoll =
+        source === 'camera' ? await trySaveUriToLibrary(result.assets[0].uri) : false
+      if (opensChapter) {
+        Toast.show({
+          type: 'success',
+          text1: 'Guardada. Aquí empieza este capítulo.',
+          text2: savedToRoll ? 'También en tu carrete.' : undefined,
+        })
+      } else if (savedToRoll) {
+        Toast.show({ type: 'success', text1: 'Guardada también en tu carrete' })
+      }
     } catch (err) {
       Alert.alert('No se pudo subir', err instanceof Error ? err.message : 'Intenta de nuevo.')
     }
@@ -477,7 +554,8 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     if (slot === 'after') {
       showActionSheet(
         {
-          title: 'Tu foto de ahora',
+          // "De ahora" solo si de verdad es de ahora (frescura honesta).
+          title: stale ? 'Tu foto más reciente' : 'Tu foto de ahora',
           options: ['Reemplazar foto', 'Eliminar foto', 'Cancelar'],
           cancelButtonIndex: 2,
           destructiveButtonIndex: 1,
@@ -508,6 +586,33 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     if (photo?.signed_url) return () => manage(slot, photo)
     return choosePhoto
   }
+
+  // El cajón cerrado que se ve: la card guardada colapsa a una fila (nunca
+  // desaparece — es SU evidencia; ella decide cuándo abrirla, patrón vitrina
+  // de Awards). Solo con fotos: el empty-state es invitación, no recuerdo.
+  if (stashed && data.count > 0) {
+    return (
+      <Animated.View entering={FadeIn.duration(240)} style={styles.stashRow}>
+        <Text style={styles.stashLabel}>Tu cambio visual · guardada</Text>
+        <TouchableOpacity
+          onPress={() => persistStash(false)}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir tu cambio visual"
+          hitSlop={8}
+        >
+          <Text style={styles.stashOpen}>Abrir</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    )
+  }
+
+  // Etiquetas: "Antes/Ahora" solo cuando la foto reciente ES reciente.
+  // Pasado el umbral, fechas ("ago 2024 → nov 2024") — las fechas no juzgan;
+  // "AHORA" sobre una foto vieja obligaba a la usuaria a explicar el hueco.
+  const beforeLabel = stale && antesPhoto ? formatMonthYear(antesPhoto.taken_at) : 'Antes'
+  const afterLabel = stale && ahoraPhoto ? formatMonthYear(ahoraPhoto.taken_at) : 'Ahora'
+  const chapterYear = lastShownIso ? new Date(lastShownIso).getFullYear() : null
 
   // Section eyebrow + empty-state header. The eyebrow ties this
   // section into the redesigned page architecture (each section
@@ -545,19 +650,21 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         </TouchableOpacity>
       ) : mode === 'slider' && canCompare ? (
         <>
-          <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
-          <Text style={styles.sliderDates}>
-            {formatDate(data.before!.taken_at)}
-            <Text style={styles.sliderArrow}>{'  →  '}</Text>
-            {formatAfterDate(data.after!, data.before)}
-          </Text>
+          {/* Fechas como etiquetas sobre la foto (hechos), no "Antes/Ahora"
+              (juicio de estado · benchmark). Un solo lugar para las fechas. */}
+          <BeforeAfterSlider
+            beforeUrl={beforeUrl}
+            afterUrl={afterUrl}
+            leftLabel={formatDate(data.before!.taken_at)}
+            rightLabel={formatAfterDate(data.after!, data.before)}
+          />
           <Text style={styles.sliderHint}>Arrastra el divisor para revelar tu cambio.</Text>
         </>
       ) : (
         <>
           <View style={styles.row}>
             <PhotoColumn
-              label="Antes"
+              label={beforeLabel}
               tone="niebla"
               photo={antesPhoto}
               onPress={onColumnPress('before', antesPhoto)}
@@ -568,10 +675,10 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
             />
             <Text style={styles.arrow}>→</Text>
             <PhotoColumn
-              label="Ahora"
-              tone="magenta"
+              label={afterLabel}
+              tone={stale ? 'niebla' : 'magenta'}
               photo={ahoraPhoto}
-              accent
+              accent={!stale}
               onPress={onColumnPress('after', ahoraPhoto)}
               uploading={
                 (takePhoto.isPending && data.count >= 1) ||
@@ -588,8 +695,19 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         </>
       )}
 
-      {/* CTAs — "Comparar" (abre el slider de arrastrar) como acción principal
-          de la sección; "Compartir mi cambio" como secundaria, callada. */}
+      {/* Frescura honesta (patrón de Composición): el recuerdo fechado + la
+          invitación de capítulo, sin presión. */}
+      {stale && chapterYear != null ? (
+        <Text style={styles.staleNote}>
+          Estas fotos son de {chapterYear}. Tu siguiente foto abre el capítulo de hoy.
+        </Text>
+      ) : null}
+
+      {/* CTAs — "Comparar" (abre el slider de arrastrar) como acción principal.
+          Compartir: con fotos frescas es "mi cambio" (presente); con fotos
+          viejas el botón vive SOLO dentro del modo Comparar (que ella abrió a
+          propósito) y se fecha — el share es celebración de algo vivo, no
+          exhibición permanente de un recuerdo ("la app vive en 2024 y yo no"). */}
       {canCompare ? (
         <View style={styles.ctaRow}>
           <TouchableOpacity
@@ -604,17 +722,35 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.shareBtn}
-            activeOpacity={0.6}
-            onPress={() => setShareOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Compartir mi cambio"
-          >
-            <ShareIcon />
-            <Text style={styles.shareLabel}>Compartir mi cambio</Text>
-          </TouchableOpacity>
+          {!stale || mode === 'slider' ? (
+            <TouchableOpacity
+              style={styles.shareBtn}
+              activeOpacity={0.6}
+              onPress={() => setShareOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={stale ? 'Compartir esta comparación' : 'Compartir mi cambio'}
+            >
+              <ShareIcon />
+              <Text style={styles.shareLabel}>
+                {stale ? 'Compartir esta comparación' : 'Compartir mi cambio'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
+      ) : null}
+
+      {/* El cajón, con la llave de ella: guardar la card (reversible) la
+          colapsa a una fila visible. Nunca auto-colapso por tiempo. */}
+      {data.count > 0 ? (
+        <TouchableOpacity
+          onPress={() => persistStash(true)}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel="Guardar esta tarjeta"
+          style={styles.stashBtn}
+        >
+          <Text style={styles.stashBtnText}>Guardar esta tarjeta</Text>
+        </TouchableOpacity>
       ) : null}
 
       {canCompare ? (
@@ -666,8 +802,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
     textAlign: 'center',
   },
   emptyBusy: {
@@ -771,11 +907,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     color: colors.niebla,
   },
-  // The same gesture as the hero's "76.6 → 75.0".
+  // The same gesture as the hero's "76.6 → 75.0" — y en su MISMO color:
+  // flecha de trayectoria = oro, siempre (auditoría).
   arrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.anchor,
-    color: colors.magenta,
+    color: colors.oro,
     marginHorizontal: 8,
   },
   caption: {
@@ -806,7 +943,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
-    color: colors.magenta,
+    color: colors.magentaHot,
   },
   // Fechas bajo el slider (inicial → actual).
   sliderDates: {
@@ -824,8 +961,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
   },
   // Compartir — link callado; vive en la fila de CTAs.
   shareBtn: {
@@ -835,6 +972,41 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   shareLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+  },
+  // Frescura fechada (mismo registro que la nota de Composición).
+  staleNote: {
+    marginTop: 12,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.niebla,
+  },
+  // "Guardar esta card" — link callado, centrado, bajo los CTAs.
+  stashBtn: { marginTop: 12, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 8 },
+  stashBtnText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+  },
+  // La fila del cajón cerrado: visible, de una línea, reversible.
+  stashRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  stashLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    letterSpacing: 0.2,
+  },
+  stashOpen: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.magenta,

@@ -43,6 +43,9 @@ const UPLOAD_TIMEOUT_MS = 30_000
 export async function processAndUploadFromUri(
   uri: string,
   angle: PhotoAngle,
+  /** ISO timestamp para BACKDATING (fotos del coach / históricas). Sin él, la
+   *  DB pone now() — el flujo normal de "foto de hoy" no cambia. */
+  takenAt?: string,
 ): Promise<UploadResult> {
   const userId = await requireUserId()
 
@@ -80,6 +83,8 @@ export async function processAndUploadFromUri(
         width: compressed.width,
         height: compressed.height,
         byte_size: compressed.byteSize,
+        // Backdating opcional (fotos históricas); sin él, default now() de la DB.
+        ...(takenAt ? { taken_at: takenAt } : {}),
       }),
     ),
     UPLOAD_TIMEOUT_MS,

@@ -9,7 +9,7 @@ type Props = {
   tone?: EyebrowTone
   /** 9 px (tightest, e.g. stat captions) / 10 px / 11 px (CTAs). */
   size?: 9 | 9.5 | 10 | 10.5 | 11 | 11.5
-  /** Letter-spacing override in raw points. Defaults to 2.2 (matches 0.22em on 10 px). */
+  /** Letter-spacing override in raw points. Defaults to the eyebrow token (2.2). */
   tracking?: number
   style?: TextStyle | TextStyle[]
 }
@@ -24,7 +24,7 @@ export function EyebrowLabel({
   children,
   tone = 'magenta',
   size = 10,
-  tracking = 2.2,
+  tracking = typography.letterSpacing.eyebrow,
   style,
 }: Props) {
   return (

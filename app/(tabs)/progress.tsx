@@ -1,38 +1,38 @@
 import { useFocusEffect, useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Animated, {
-  Easing,
-  Extrapolation,
-  FadeIn,
-  interpolate,
-  useAnimatedProps,
-  useSharedValue,
-  withDelay,
-  withTiming,
-} from 'react-native-reanimated'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { track } from '@/lib/analytics'
-import { useCycleEnabled } from '@/features/cycle/useCycleEnabled'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
+import { useMacroTargets } from '@/features/macros/hooks'
+import { useSignalsHistory } from '@/features/orbit/hooks'
+import { daysInDeficit } from '@/features/orbit/month-built'
 import { useProfile } from '@/features/profile/hooks'
 import { BeforeAfterPhotos } from '@/features/progress/components/BeforeAfterPhotos'
+import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
+import { EvidenceTimeline } from '@/features/progress/components/EvidenceTimeline'
+import { CompositionCards } from '@/features/progress/components/CompositionCards'
+import { HistoryChips } from '@/features/progress/components/HistoryChips'
+import { AiImportPill } from '@/features/progress/components/AiImportPill'
+import { LinkCta } from '@/features/progress/components/LinkCta'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
-import { TuHistoria } from '@/features/progress/components/TuHistoria'
-import { CycleCard } from '@/features/progress/components/CycleCard'
-import { useMeasurements } from '@/features/progress/hooks'
+import { TrajectoryChart } from '@/features/progress/components/TrajectoryChart'
+import { TransformationHero } from '@/features/progress/components/TransformationHero'
+import { ZonesEvolution } from '@/features/progress/components/ZonesEvolution'
+import { PROGRESS_EVENTS } from '@/features/progress/constants'
+import { ProgressInsightCard } from '@/features/progress/components/ProgressInsightCard'
+import { PROGRESS_BODY_ENABLED } from '@/lib/featureFlags'
+import { useBodyCheckins, useMeasurements } from '@/features/progress/hooks'
 import {
   computeDelta,
   computeTrend,
   formatTrendCopy,
+  mergeWeightSeries,
   smoothWeightPoints,
-  toWeightPoints,
-  type Trend,
-  type WeightPoint,
 } from '@/features/progress/logic'
 import { CoachLine, PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
@@ -58,11 +58,44 @@ const PERIOD_LABEL: Record<Period, string> = {
   ALL: 'Todo',
 }
 
-// 4-point star — the shared glyph; here it marks the trajectory origin.
-const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
+// Los dos segmentos de Progress (Epic 01): Historia (¿qué cambió en mis hábitos?)
+// y Body (¿qué cambió en mi cuerpo?, Epic 02 lo llena). Como Órbita Día/Semana/Mes.
+type ProgressSegment = 'historia' | 'body'
 
-const AnimatedPath = Animated.createAnimatedComponent(Path)
-const AnimatedG = Animated.createAnimatedComponent(G)
+/** Switcher Historia | Body — píldora de dos segmentos (mismo lenguaje que el
+ *  selector de periodo del peso). */
+function SegmentSwitcher({
+  value,
+  onChange,
+}: {
+  value: ProgressSegment
+  onChange: (s: ProgressSegment) => void
+}) {
+  // "Cuerpo" en la UI (Capa 2, español, coherente con Hoy/Comidas/Órbita);
+  // "Body" queda como nombre interno de la épica (Capa 3) — benchmark + mockup.
+  const segs: { key: ProgressSegment; label: string }[] = [
+    { key: 'historia', label: 'Historia' },
+    { key: 'body', label: 'Cuerpo' },
+  ]
+  return (
+    <View style={styles.segmentPill}>
+      {segs.map((s) => {
+        const on = s.key === value
+        return (
+          <Pressable
+            key={s.key}
+            onPress={() => onChange(s.key)}
+            style={[styles.segmentSeg, on && styles.segmentSegOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+          >
+            <Text style={[styles.segmentLabel, on && styles.segmentLabelOn]}>{s.label}</Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
 
 export default function ProgressScreen() {
   return (
@@ -79,14 +112,40 @@ function ProgressBody() {
     }, []),
   )
   const router = useRouter()
+  const [segment, setSegment] = useState<ProgressSegment>('historia')
   const [period, setPeriod] = useState<Period>('30D')
-  const measurementsQuery = useMeasurements(PERIOD_DAYS[period])
+
+  const goBody = () => {
+    track(PROGRESS_EVENTS.body)
+    setSegment('body')
+  }
+  // Fusión "detalle de medición": tap en el timeline preselecciona el comparador
+  // Y hace scroll hasta él (sin el scroll, el tap no tenía ningún feedback
+  // visible). El preset se limpia al cambiar de segmento: pegado, servía "mejor
+  // momento vs peor momento" como default (casi hace cerrar la app · beta).
+  const [comparePresetA, setComparePresetA] = useState<string | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
+  const compareY = useRef(0)
+  useEffect(() => {
+    if (segment !== 'body') setComparePresetA(null)
+  }, [segment])
+  const pickCompare = useCallback((day: string) => {
+    setComparePresetA(day)
+    scrollRef.current?.scrollTo({ y: compareY.current, animated: true })
+  }, [])
+  const measurementsQuery = useMeasurements(null)
+  const checkinsQuery = useBodyCheckins()
   const { data: profile } = useProfile()
 
-  const points = useMemo(
-    () => toWeightPoints(measurementsQuery.data ?? []),
-    [measurementsQuery.data],
-  )
+  // UNA sola serie de peso (app + check-ins del coach) — la misma verdad que el
+  // hero. El periodo se recorta client-side sobre la serie fusionada.
+  const points = useMemo(() => {
+    const fused = mergeWeightSeries(measurementsQuery.data ?? [], checkinsQuery.data ?? [])
+    const days = PERIOD_DAYS[period]
+    if (days == null) return fused
+    const since = Date.now() - days * 24 * 60 * 60 * 1000
+    return fused.filter((p) => p.t >= since)
+  }, [measurementsQuery.data, checkinsQuery.data, period])
   // Weight is shown smoothed — a trailing 7-day moving average — so a
   // single noisy weigh-in never becomes the trend, the delta or the
   // headline number. The raw `points` are kept only for the count.
@@ -98,13 +157,34 @@ function ProgressBody() {
   const last = smoothed[smoothed.length - 1]
   const count = points.length
 
+  // "Báscula quieta, esfuerzo presente" (benchmark · el momento exacto donde
+  // una abandona): cuando los 30 días RODANTES están planos pero hubo días en
+  // déficit, esa constatación vive AQUÍ, junto al peso — antes la usuaria
+  // tenía que armarla a mano cruzando a Historia. Hechos, cero promesa de
+  // resultado (línea roja: nunca "pronto se reflejará").
+  const targets = useMacroTargets().data
+  const signals30 = useSignalsHistory(30)
+  const plateauNote = useMemo(() => {
+    const fused = mergeWeightSeries(measurementsQuery.data ?? [], checkinsQuery.data ?? [])
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000
+    const smoothed30 = smoothWeightPoints(fused.filter((p) => p.t >= since))
+    const d = computeDelta(smoothed30)
+    // Plano = |cambio| < 0.3 kg con al menos 3 puntos (menos es "sin datos",
+    // no "sin movimiento").
+    if (!d || smoothed30.length < 3 || Math.abs(d.abs) >= 0.3) return null
+    const summary = daysInDeficit(signals30.data ?? [], {
+      calorieTarget: targets?.calories ?? null,
+    })
+    // Mismo umbral que la Síntesis (MIN_DEFICIT_DAYS): menos de 3 días en
+    // déficit no se nombra como esfuerzo.
+    if (summary == null || summary.deficitDays < 3) return null
+    return `La báscula casi no se movió estos 30 días. Tus ${summary.deficitDays} días en déficit sí quedaron registrados.`
+  }, [measurementsQuery.data, checkinsQuery.data, signals30.data, targets?.calories])
+
   // Cycle phase — used to caption the weight chart so a luteal
-  // water-weight bump reads as biology, not regression.
+  // water-weight bump reads as biology, not regression. (Único hogar del
+  // ciclo en este tab; la card standalone se fue de Historia.)
   const cycle = useCyclePhase()
-  // Gate de ciclo (sexo/situación): para hombres y perfiles sin ciclo activo
-  // NO se muestra la sección — ni la card ni su divisor. CycleCard ya se
-  // auto-oculta, pero el divisor quedaba huérfano sin este gate.
-  const cycleEnabled = useCycleEnabled()
 
   // The user's declared focus for the month. When it isn't weight,
   // the "Tu cuerpo" section says so — the number is reference, not a
@@ -112,194 +192,363 @@ function ProgressBody() {
   const focusIsWeight = profile?.monthly_focus === 'weight'
   const hasFocus = profile?.monthly_focus != null
 
-  const goLogMeasurement = () => router.push('/log-measurement')
+  // UNA sola puerta de captura (uxui 14 jul 2026): log-checkin abre en modo
+  // Peso con la rueda lista, así que el caso común sigue siendo 0 fricción.
+  // El peso impulsivo de diario vive en ✦ QuickLog, que no se toca.
+  const goLogMeasurement = () => router.push('/log-checkin')
   const hasTrajectory = count >= 2
+  // Mientras cargan las queries, count===0 se disfrazaba de "primera vez" y una
+  // veterana veía el empty-hero un instante (uxui: falso vacío = micro-traición).
+  const weightLoading = measurementsQuery.isPending || checkinsQuery.isPending
 
   return (
     <View style={styles.screen}>
       <SkyBackground />
 
       <SafeAreaView style={styles.flex} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           <Animated.View entering={FadeIn.duration(280)}>
             <TabHeader title="Tu progreso" titleEmphasis="Tu" />
           </Animated.View>
 
-          {/* Hero — "Tu Historia": evidencia de transformación (Antes → Ahora)
-              en 5 métricas. Responde "¿qué ha cambiado desde que empecé?" antes
-              que nada. Reemplaza a Movimiento como primer elemento. */}
-          <TuHistoria />
+          {/* El "＋" vive junto al switcher SOLO en Cuerpo: Progreso → Cuerpo
+              → ＋ = nueva medición sin scroll (uxui). Discreto: el CTA magenta
+              del cierre sigue siendo único. */}
+          <View style={styles.switcherRow}>
+            <View style={styles.switcherGrow}>
+              <SegmentSwitcher value={segment} onChange={setSegment} />
+            </View>
+            {segment === 'body' ? (
+              <Pressable
+                onPress={goLogMeasurement}
+                accessibilityRole="button"
+                accessibilityLabel="Nueva medición"
+                style={({ pressed }) => pressed && { opacity: 0.7 }}
+              >
+                <View style={styles.addChip}>
+                  <Text style={styles.addChipGlyph}>＋</Text>
+                </View>
+              </Pressable>
+            ) : null}
+          </View>
 
-          {/* Síntesis — resultado → causa → qué intentar, la respuesta a
-              "¿está funcionando?" en el primer screenful (feedback beta).
-              Absorbe la vieja ReadingCard + la línea déficit↔báscula; es el
-              ÚNICO link saliente del tab (cuarto, no pasillo). La card del
-              emblema se retiró de Progreso: su % junto a la báscula se leía
-              como "% de mi meta de peso" (anti-patrón del manifiesto por
-              contexto); el emblema vive en Hoy y en Órbita Mes. */}
-          <View style={styles.divider} />
-          <SynthesisCard />
+          {segment === 'historia' ? (
+            <>
+              {/* F1 · "Tus últimos 30 días": chips 30v30 con sparklines, driven
+                  por el Comparison Engine (UNA matemática — reemplaza a
+                  TuHistoria, que calculaba su propia ventana). */}
+              <HistoryChips />
 
-          {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
+              {/* Insight principal + chat guiado (Epic 04). Doble-gateado (flag +
+                  dev) y auto-oculto sin insights — trae su propio divisor. */}
+              <ProgressInsightCard />
+
+              {/* (La card de ciclo se fue de Historia: un concepto, un hogar —
+                  el ciclo vive en Hoy, y aquí solo como nota contextual bajo la
+                  gráfica de peso de Cuerpo, donde explica la báscula.) */}
+
+              {/* "Tu cambio visual" — la evidencia emocional más fuerte: antes →
               ahora en grande, con modo "Comparar" (slider de arrastrar).
               Responde "¿realmente cambio?". */}
-          <View style={styles.divider} />
-          <BeforeAfterPhotos />
+              <View style={styles.divider} />
+              <BeforeAfterPhotos />
 
-          {/* ── Tu cuerpo — weight + measurements. Demoted out of the
-              hero: one section among several, an outcome shown
-              calmly. The giant opening delta is gone; the number is
-              section-sized now. ── */}
-          <View style={styles.divider} />
-          <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
-            Tu cuerpo
-          </EyebrowLabel>
-          {hasFocus && !focusIsWeight ? (
-            <Text style={styles.focusNote}>
-              Tu enfoque este mes no es el peso. Esto es solo una referencia, sin metas.
-            </Text>
-          ) : hasTrajectory ? (
-            <Text style={styles.patientSub}>
-              El cuerpo cambia despacio. Mira la tendencia, no el número del día.
-            </Text>
-          ) : null}
-          {hasTrajectory ? (
-            <>
-              <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.weightHead}>
-                {/* Peso ACTUAL — calmo, no gigante: un indicador más, no la
-                    meta. El cambio total va como chip, la tendencia en la
-                    gráfica. */}
-                <View>
-                  <Text style={styles.weightLabel}>Peso actual</Text>
-                  <View style={styles.weightNowRow}>
-                    <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
-                    <Text style={styles.weightUnit}>kg</Text>
-                  </View>
-                </View>
-                {delta ? (
-                  <View style={styles.deltaChip}>
-                    <Text style={styles.deltaChipLabel}>Cambio total</Text>
-                    <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
-                  </View>
-                ) : null}
-              </Animated.View>
+              {/* A · el antojo: Historia delega la evolución completa a Cuerpo
+                  (un solo hogar para la tira — nunca duplicarla aquí). */}
+              <LinkCta
+                label="Ver tu evolución completa →"
+                onPress={goBody}
+                accessibilityLabel="Ver tu evolución completa"
+                style={styles.bridgeLink}
+              />
 
-              {/* Comparación temporal — antes → ahora en el periodo elegido. */}
-              {first && last ? (
-                <Text style={styles.comparison}>
-                  <Text style={styles.compFrom}>{first.weight.toFixed(1)}</Text>
-                  <Text style={styles.compArrow}>{'  →  '}</Text>
-                  <Text style={styles.compTo}>{last.weight.toFixed(1)} kg</Text>
-                  <Text
-                    style={styles.compPeriod}
-                  >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
-                </Text>
-              ) : null}
+              {/* Síntesis — resultado → causa → qué intentar. CIERRA Historia
+              (peak-end: el último sabor del scroll es la palanca abierta, la
+              razón de volver el domingo — nunca un dato triste). Absorbe la
+              vieja ReadingCard; su link a Órbita es el único saliente del tab.
+              La card del emblema se retiró: su % junto a la báscula se leía
+              como "% de mi meta de peso" (anti-patrón por contexto). */}
+              <View style={styles.divider} />
+              <SynthesisCard />
 
-              {/* Period filter — only meaningful once there are 2+ marks. */}
-              <Animated.View entering={FadeIn.duration(320).delay(160)} style={styles.periodPill}>
-                {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
-                  const on = p === period
-                  return (
-                    <Pressable
-                      key={p}
-                      onPress={() => setPeriod(p)}
-                      style={[styles.periodSeg, on && styles.periodSegOn]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
-                    >
-                      <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
-                        {PERIOD_LABEL[p]}
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-              </Animated.View>
+              {/* Epic 06 · puente al calendario: ver (y editar) los días detrás
+                  de estos números — el cierre único de Historia (dieta de CTAs:
+                  el segmento Cuerpo ya tiene su puerta en el switcher). */}
+              <LinkCta
+                label="Ver tu constancia, día por día →"
+                onPress={() => {
+                  track(PROGRESS_EVENTS.openCalendar)
+                  router.navigate('/movement-calendar')
+                }}
+                accessibilityLabel="Ver tu constancia"
+                style={styles.bridgeLink}
+              />
 
-              <Animated.View entering={FadeIn.duration(360).delay(240)} style={styles.chartSection}>
-                {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
-                    plan con fecha): cuando la realidad cambia, la línea cambia
-                    sin que nadie "incumpla". */}
-                <Text style={styles.chartCaption}>
-                  {count} mediciones · media de 7 días
-                  {trend ? ' · la punteada sigue tu ritmo real' : ''}
-                </Text>
-                <TrajectoryChart points={smoothed} trend={trend} />
-              </Animated.View>
-
-              {/* Cycle context — weight genuinely shifts with the
-                  cycle's water balance; the chart says so, so a
-                  luteal bump isn't read as a setback. */}
-              {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
-                <Animated.View entering={FadeIn.duration(360).delay(290)}>
-                  <Text style={styles.cycleNote}>
-                    {cycle.phase === 'lutea'
-                      ? 'La semana antes de tu período el cuerpo retiene agua. Lo que ves en la balanza no es lo que eres.'
-                      : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
-                  </Text>
-                </Animated.View>
-              ) : null}
-
-              {trend ? (
-                <Animated.View entering={FadeIn.duration(360).delay(320)}>
-                  <CoachLine text={formatTrendCopy(trend)} />
-                </Animated.View>
-              ) : null}
+              {/* (La coda "Tu transformación nunca retrocede" se retiró: suelta
+                  sonaba a frase de taza y para quien rebotó era además falsa
+                  sobre el peso. Vuelve DESPUÉS de beta atada a la Historia de
+                  hitos inmutables, donde cada trofeo la respalda.) */}
             </>
           ) : (
-            <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.heroEmpty}>
-              {count === 1 && first ? (
-                <View style={styles.firstWeightRow}>
-                  <Text style={styles.firstWeightNum}>{first.weight.toFixed(1)}</Text>
-                  <Text style={styles.firstWeightUnit}>kg</Text>
-                </View>
-              ) : (
-                <Text style={styles.heroEmptyTitle}>
-                  Tu primera marca pone una estrella en el cielo.
+            <>
+              {/* F2 · hero "Tu transformación": primera marca → hoy con el arco
+                  dorado (peso suavizado). Se auto-oculta con <2 mediciones. */}
+              <TransformationHero />
+              {/* El espacio ES el separador (brief UI polish): en Cuerpo las
+                  secciones respiran sin hairlines. */}
+              <View style={styles.sectionGap} />
+
+              {/* ── Body: Tu cuerpo — peso + medidas. Epic 02/F2: composición
+                  con sparklines + comparador de fechas. ── */}
+              <EyebrowLabel tone="magenta" size={10} style={styles.heroEyebrow}>
+                Tu cuerpo
+              </EyebrowLabel>
+              {hasFocus && !focusIsWeight ? (
+                <Text style={styles.focusNote}>
+                  Tu enfoque este mes no es el peso. Esto es solo una referencia, sin metas.
                 </Text>
+              ) : hasTrajectory ? (
+                <Text style={styles.patientSub}>
+                  El cuerpo cambia despacio. Mira la tendencia, no el número del día.
+                </Text>
+              ) : null}
+              {weightLoading ? null : hasTrajectory ? (
+                <>
+                  <Animated.View
+                    entering={FadeIn.duration(360).delay(80)}
+                    style={styles.weightHead}
+                  >
+                    {/* Peso ACTUAL — calmo, no gigante: un indicador más, no la
+                    meta. El cambio total va como chip, la tendencia en la
+                    gráfica. */}
+                    <View>
+                      <EyebrowLabel tone="niebla" size={11} style={styles.weightLabel}>
+                        Peso actual
+                      </EyebrowLabel>
+                      <View style={styles.weightNowRow}>
+                        <Text style={styles.weightNow}>{last?.weight.toFixed(1)}</Text>
+                        <Text style={styles.weightUnit}>kg</Text>
+                      </View>
+                    </View>
+                    {delta ? (
+                      <View style={styles.deltaChip}>
+                        {/* "Total" SOLO cuando el periodo es Todo: la etiqueta fija
+                            contradecía al hero (−2.2 "total" vs −0.1 "total") y
+                            rompía la confianza en ambos números. */}
+                        <Text style={styles.deltaChipLabel}>
+                          {period === 'ALL'
+                            ? 'Cambio total'
+                            : `Cambio · ${PERIOD_LABEL[period].toLowerCase()}`}
+                        </Text>
+                        <Text style={styles.deltaChipNum}>{formatDelta(delta.abs)} kg</Text>
+                      </View>
+                    ) : null}
+                  </Animated.View>
+
+                  {/* Comparación temporal — antes → ahora en el periodo elegido. */}
+                  {first && last ? (
+                    <Text style={styles.comparison}>
+                      <Text style={styles.compFrom}>{first.weight.toFixed(1)}</Text>
+                      <Text style={styles.compArrow}>{'  →  '}</Text>
+                      <Text style={styles.compTo}>{last.weight.toFixed(1)} kg</Text>
+                      <Text
+                        style={styles.compPeriod}
+                      >{`   ·   ${PERIOD_LABEL[period].toLowerCase()}`}</Text>
+                    </Text>
+                  ) : null}
+
+                  {/* Báscula quieta + esfuerzo presente, juntos (siempre sobre
+                      los 30 días rodantes, independiente del chip de periodo). */}
+                  {plateauNote ? (
+                    <Animated.View entering={FadeIn.duration(360).delay(200)}>
+                      <Text style={styles.plateauNote}>{plateauNote}</Text>
+                    </Animated.View>
+                  ) : null}
+
+                  {/* Period filter — only meaningful once there are 2+ marks. */}
+                  <Animated.View
+                    entering={FadeIn.duration(320).delay(160)}
+                    style={styles.periodPill}
+                  >
+                    {(Object.keys(PERIOD_DAYS) as Period[]).map((p) => {
+                      const on = p === period
+                      return (
+                        <Pressable
+                          key={p}
+                          onPress={() => setPeriod(p)}
+                          style={[styles.periodSeg, on && styles.periodSegOn]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                        >
+                          <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
+                            {PERIOD_LABEL[p]}
+                          </Text>
+                        </Pressable>
+                      )
+                    })}
+                  </Animated.View>
+
+                  <Animated.View
+                    entering={FadeIn.duration(360).delay(240)}
+                    style={styles.chartSection}
+                  >
+                    {/* La punteada proyecta desde el ritmo OBSERVADO (nunca desde un
+                    plan con fecha): cuando la realidad cambia, la línea cambia
+                    sin que nadie "incumpla". */}
+                    <Text style={styles.chartCaption}>
+                      {count} mediciones · la línea es tu promedio de la semana
+                      {trend ? ' · la punteada sigue tu ritmo real' : ''}
+                    </Text>
+                    <TrajectoryChart points={smoothed} trend={trend} />
+                    {/* Epic 08: la tendencia completa vive en su pantalla. */}
+                    <LinkCta
+                      label="Ver tendencia →"
+                      onPress={() => router.push('/weight-trend')}
+                      accessibilityLabel="Ver la tendencia completa de tu peso"
+                    />
+                  </Animated.View>
+
+                  {/* Cycle context — weight genuinely shifts with the
+                  cycle's water balance; the chart says so, so a
+                  luteal bump isn't read as a setback. */}
+                  {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
+                    <Animated.View entering={FadeIn.duration(360).delay(290)}>
+                      <Text style={styles.cycleNote}>
+                        {cycle.phase === 'lutea'
+                          ? 'La semana antes de tu período tu cuerpo retiene agua: la báscula sube por agua, no por grasa.'
+                          : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
+                      </Text>
+                    </Animated.View>
+                  ) : null}
+
+                  {trend ? (
+                    <Animated.View entering={FadeIn.duration(360).delay(320)}>
+                      <CoachLine text={formatTrendCopy(trend)} />
+                    </Animated.View>
+                  ) : null}
+                  {/* El "show more" pegado a su muestra (uxui): esta puerta
+                      era la más misteriosa al fondo del scroll. */}
+                  {PROGRESS_BODY_ENABLED ? (
+                    <LinkCta
+                      label="Más observaciones como esta →"
+                      onPress={() => router.push('/stelar-observes')}
+                      accessibilityLabel="Ver más observaciones de tus datos"
+                      style={styles.bridgeLink}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <Animated.View entering={FadeIn.duration(360).delay(80)} style={styles.heroEmpty}>
+                  {count === 1 && first ? (
+                    <View style={styles.firstWeightRow}>
+                      <Text style={styles.firstWeightNum}>{first.weight.toFixed(1)}</Text>
+                      <Text style={styles.firstWeightUnit}>kg</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.heroEmptyTitle}>
+                      Tu primera marca pone una estrella en el cielo.
+                    </Text>
+                  )}
+
+                  {/* La anticipación vive en el "cuándo" (mañana), no en un
+                      CTA de báscula: "Pesarme de nuevo" a minutos de pesarse
+                      era presión suave y su completación honesta era "vuelve
+                      mañana" (uxui). */}
+                  <Text style={styles.heroEmptyHint}>
+                    {count === 0
+                      ? 'Marca tu peso para empezar a trazar tu trayectoria.'
+                      : 'Tu primera marca ya está en el cielo. La siguiente dibuja la línea.'}
+                  </Text>
+
+                  <View style={styles.heroCtaWrap}>
+                    {/* Un nombre, un destino, siempre (igual que el chip ＋). */}
+                    <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
+                  </View>
+
+                  {/* El dead-end del día 1 (uxui): quien llega con meses de
+                      historial en el PDF del coach necesita su puerta AQUÍ,
+                      no escondida tras pantallas que piden datos. */}
+                  <Text style={styles.coachAsk}>¿Llevabas mediciones con tu coach?</Text>
+                  <AiImportPill
+                    onPress={() => {
+                      track(PROGRESS_EVENTS.body, { kind: 'import-from-empty' })
+                      router.push('/import-measurements')
+                    }}
+                  />
+                  <LinkCta
+                    label="Agregar fotos de otra fecha →"
+                    onPress={() => router.push('/log-photos')}
+                    accessibilityLabel="Agregar fotos de otra fecha"
+                    style={styles.bridgeLink}
+                  />
+
+                  {/* Cierre corto: el aire de abajo queda DESPUÉS de un
+                      cierre, no como pantalla incompleta. */}
+                  <Text style={styles.emptyCloser}>
+                    Cada marca enciende algo nuevo aquí. Este cielo se llena contigo.
+                  </Text>
+                </Animated.View>
               )}
 
-              <Text style={styles.heroEmptyHint}>
-                {count === 0
-                  ? 'Marca tu peso para empezar a trazar tu trayectoria.'
-                  : 'Una segunda marca traza tu trayectoria.'}
-              </Text>
+              {/* ── Orden producto: detalle numérico → evidencia visual →
+                  herramientas → ENTRADA al final. El comparador va DEBAJO del
+                  historial: el tap en una estrella aterriza donde sigues
+                  leyendo. PhotoCompare murió (duplicaba al comparador, que ya
+                  trae CAMBIO VISUAL). ── */}
+              {PROGRESS_BODY_ENABLED ? (
+                <>
+                  {/* Cada pieza trae su propio divisor: si se auto-oculta (sin
+                      datos), no deja una hairline huérfana. Orden peak-end:
+                      lo fechado/viejo (composición, comparador) primero y
+                      colapsado; el segmento CIERRA en la tira de fotos con
+                      "Capítulo de hoy" + el CTA de registro — el último sabor
+                      es futuro, nunca ago-2025. */}
+                  <CompositionCards />
+                  {/* F4 · evolución por zona (segmental de los check-ins). */}
+                  <ZonesEvolution />
+                  {/* Historial → comparador (tap en estrella aterriza abajo,
+                      con scroll real hasta él). */}
+                  {/* FUSIÓN (dueña): historial + evolución visual eran dos
+                      rieles gemelos — ahora UNA línea del tiempo con toda la
+                      evidencia (fotos + números). */}
+                  <EvidenceTimeline onPick={pickCompare} />
+                  <View
+                    onLayout={(e) => {
+                      compareY.current = e.nativeEvent.layout.y
+                    }}
+                  >
+                    <CheckinCompare presetA={comparePresetA} />
+                  </View>
+                </>
+              ) : null}
 
-              <View style={styles.heroCtaWrap}>
-                <PrimaryCta
-                  label={count === 0 ? 'Marcar mi peso →' : 'Pesarme de nuevo →'}
-                  onPress={goLogMeasurement}
+              {/* (Ciclo se movió a Historia · mockup dueña.) */}
+
+              {/* ── Cluster de ENTRADA (un solo hogar para el input, al final,
+                  como el modelo de logging de Hoy). ── */}
+              {/* Naming que distingue destino (target-user: "medición" y
+                  "medición completa" parecían el mismo botón dos veces): el CTA
+                  magenta es el peso rápido; "Medición completa" es la
+                  composición, mismo label aquí y en la tabla. */}
+              {hasTrajectory ? (
+                <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
+                  <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
+                </Animated.View>
+              ) : null}
+              {hasTrajectory ? (
+                <LinkCta
+                  label="Agregar fotos de otra fecha →"
+                  onPress={() => router.push('/log-photos')}
+                  accessibilityLabel="Agregar fotos de otra fecha"
+                  style={styles.bridgeLink}
                 />
-              </View>
-            </Animated.View>
-          )}
-
-          {/* (Comparativa 30 días se reemplazó por el hero "Tu Historia".) */}
-
-          {/* ── Ciclo — solo si el perfil tiene ciclo activo (nunca hombres).
-              El divisor se gatea junto a la card para no dejar una línea
-              huérfana cuando CycleCard no se renderiza. ── */}
-          {cycleEnabled ? (
-            <>
-              <View style={styles.divider} />
-              <CycleCard />
+              ) : null}
             </>
-          ) : null}
-
-          {/* ("Tu cambio visual" se movió arriba, bajo "Tu Historia".) */}
-
-          {/* Bottom CTA — only once the user already has a trajectory;
-              the empty / first-weight states carry their own CTA. */}
-          {hasTrajectory ? (
-            <Animated.View entering={FadeIn.duration(360).delay(400)} style={styles.ctaWrap}>
-              <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
-            </Animated.View>
-          ) : null}
-
-          {/* La coda del cuarto — lo único que se rescató de la card del
-              emblema (feedback beta: "esa frase me cuida; pero es una frase,
-              no una card"). Cierra el tab quitando el miedo a la mala semana. */}
-          <Text style={styles.footerCoda}>Tu transformación nunca retrocede.</Text>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -311,176 +560,6 @@ function formatDelta(kg: number | undefined): string {
   if (kg === 0) return '0.0'
   const sign = kg < 0 ? '−' : '+'
   return `${sign}${Math.abs(kg).toFixed(1)}`
-}
-
-/* ────────────────────────────────────────────────────────────────── */
-
-type ChartProps = {
-  points: readonly WeightPoint[]
-  trend: Trend | null
-}
-
-/*
- * The trajectory. X-axis is REAL TIME — points are placed by their
- * `measured_at` timestamp so the cadence of marks is visible: a 10-day
- * gap and a same-day pair both read truthfully. Same-day measurements
- * are separated by a small temporal nudge (epsilon ms) inside the
- * scale so they don't overlap, but the rest of the line breathes with
- * the actual rhythm.
- *
- * Read as a constellation forming: the measurement stars sit in the
- * sky, the comet line draws itself between them on mount, the current
- * weight blazes as the comet head, and — with enough points for a
- * trend — a dashed line projects the pace forward (capped to a
- * healthy ±1 kg/week so two volatile weeks don't draw a fantasy
- * 8-kg drop in 4 weeks).
- */
-function TrajectoryChart({ points, trend }: ChartProps) {
-  const W = 300
-  const H = 188
-  const padX = 18
-  const padY = 26
-
-  const lastIdx = points.length - 1
-  const last = points[lastIdx]
-  const first = points[0]
-  const hasProjection = trend != null && last != null
-
-  // Reserve the right slice of the chart for the forward projection.
-  const histEndX = hasProjection ? padX + (W - 2 * padX) * 0.64 : W - padX
-
-  // Projection cap — clamp weekly change to ±1 kg/week so two
-  // volatile weeks don't extrapolate to an alarming forecast. 1 kg/wk
-  // is the upper bound clinicians recommend for sustainable change.
-  const PROJECTION_WEEKS = 4
-  const MAX_WEEKLY_KG = 1
-  const cappedWeekly =
-    trend != null ? Math.max(-MAX_WEEKLY_KG, Math.min(MAX_WEEKLY_KG, trend.weeklyChange)) : 0
-  const projectedWeight = hasProjection ? last.weight + cappedWeekly * PROJECTION_WEEKS : null
-
-  const ys = points.map((p) => p.weight)
-  const domainYs = projectedWeight != null ? [...ys, projectedWeight] : ys
-  const minY = Math.min(...domainYs) - 0.7
-  const maxY = Math.max(...domainYs) + 0.7
-
-  // Temporal X-scale: map each point's timestamp into the historical
-  // band of the chart. Ties (same-day points) are nudged by their
-  // ordinal index so they don't collapse to a single column — about
-  // 1/12 of a day per duplicate, invisible at chart scale but enough
-  // for the line to draw between the dots.
-  const tFirst = first?.t ?? 0
-  const tLast = last?.t ?? 1
-  const tSpan = Math.max(1, tLast - tFirst)
-  const TIE_NUDGE_MS = (24 * 60 * 60 * 1000) / 12
-  const xByIndex = points.map((p, i) => {
-    // Count how many earlier points share this same timestamp; offset
-    // by that many nudges so duplicates fan out chronologically.
-    let dupes = 0
-    for (let j = 0; j < i; j += 1) {
-      if (points[j]?.t === p.t) dupes += 1
-    }
-    const tShifted = p.t + dupes * TIE_NUDGE_MS
-    return padX + ((tShifted - tFirst) / tSpan) * (histEndX - padX)
-  })
-  const sx = (i: number) => xByIndex[i] ?? padX
-  const sy = (y: number) => padY + ((maxY - y) / (maxY - minY)) * (H - 2 * padY)
-
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(i)} ${sy(p.weight)}`).join(' ')
-
-  // Total polyline length — drives the stroke draw-in.
-  let lineLen = 0
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1]
-    const b = points[i]
-    if (!a || !b) continue
-    lineLen += Math.hypot(sx(i) - sx(i - 1), sy(b.weight) - sy(a.weight))
-  }
-  lineLen = lineLen || 1
-
-  const draw = useSharedValue(0)
-  useEffect(() => {
-    draw.value = 0
-    draw.value = withDelay(150, withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) }))
-  }, [points, draw])
-
-  const lineProps = useAnimatedProps(() => ({
-    strokeDashoffset: lineLen * (1 - draw.value),
-  }))
-  const revealProps = useAnimatedProps(() => ({
-    opacity: interpolate(draw.value, [0.62, 1], [0, 1], Extrapolation.CLAMP),
-  }))
-
-  const originK = 12 / 24
-  const ox = sx(0)
-  const oy = sy(first?.weight ?? 0)
-  const hx = sx(lastIdx)
-  const hy = sy(last?.weight ?? 0)
-
-  return (
-    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
-      <Defs>
-        {/* Comet gradient — deep magenta tail receding into the bright
-            head, so the line itself carries depth. */}
-        <SvgGradient id="comet" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={colors.magentaDeep} />
-          <Stop offset="1" stopColor={colors.magentaHot} />
-        </SvgGradient>
-      </Defs>
-
-      {/* Measurement stars — each logged weight, a point of light. */}
-      {points.slice(1, lastIdx).map((p, i) => (
-        <Circle key={`m${i}`} cx={sx(i + 1)} cy={sy(p.weight)} r={2.6} fill={colors.magenta} />
-      ))}
-
-      {/* Origin — a faint star marking where the trajectory began. */}
-      <Path
-        d={STAR_PATH}
-        transform={[
-          { translateX: ox - 12 * originK },
-          { translateY: oy - 12 * originK },
-          { scale: originK },
-        ]}
-        fill={colors.magentaDeep}
-      />
-
-      {/* The trajectory — a comet, drawing itself in on mount. */}
-      <AnimatedPath
-        d={linePath}
-        fill="none"
-        stroke="url(#comet)"
-        strokeWidth={2.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray={lineLen}
-        animatedProps={lineProps}
-      />
-
-      {/* Comet head + forward projection — revealed once the line lands. */}
-      <AnimatedG animatedProps={revealProps}>
-        {hasProjection && projectedWeight != null ? (
-          <>
-            <Path
-              d={`M ${hx} ${hy} L ${W - padX} ${sy(projectedWeight)}`}
-              stroke={colors.magentaDeep}
-              strokeWidth={1.8}
-              strokeDasharray="3 5"
-              strokeLinecap="round"
-            />
-            <Circle
-              cx={W - padX}
-              cy={sy(projectedWeight)}
-              r={4.5}
-              fill="none"
-              stroke={colors.magentaDeep}
-              strokeWidth={1.6}
-            />
-          </>
-        ) : null}
-        <Circle cx={hx} cy={hy} r={13} fill={colors.magentaTint2} />
-        <Circle cx={hx} cy={hy} r={5.5} fill={colors.magentaHot} />
-      </AnimatedG>
-    </Svg>
-  )
 }
 
 const styles = StyleSheet.create({
@@ -554,11 +633,10 @@ const styles = StyleSheet.create({
   // Thin hairline between the page's three sections (cambio /
   // cambio visual / entreno) so the eye reads them as separate
   // beats instead of an undifferentiated dump.
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginVertical: 28,
-  },
+  // El espacio ES el separador (unificado con Cuerpo · decisión dueña).
+  divider: { height: 0, marginVertical: 28 },
+  // Separación por AIRE (Cuerpo): sin línea, ~35% más respiro entre secciones.
+  sectionGap: { height: 56 },
   heroEyebrow: {
     marginBottom: 10,
   },
@@ -599,9 +677,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 18,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 20,
+    color: colors.bone,
   },
   // Cabecera del peso: PESO ACTUAL (calmo) a la izquierda, "cambio total" como
   // chip a la derecha — el número no domina, la tendencia vive en la gráfica.
@@ -611,14 +689,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 10,
   },
-  weightLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 2,
-  },
+  weightLabel: { marginBottom: 6 },
   weightNowRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -649,7 +720,7 @@ const styles = StyleSheet.create({
   deltaChipLabel: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1,
+    letterSpacing: typography.letterSpacing.microCaption,
     textTransform: 'uppercase',
     color: colors.niebla,
   },
@@ -684,6 +755,32 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
+  // Switcher Historia | Body — píldora de dos segmentos bajo el header.
+  // Los márgenes verticales viven en la FILA (switcherRow), no aquí: dentro
+  // del row, el chip ＋ se centraba contra pill+márgenes y quedaba caído.
+  segmentPill: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgCard2,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    borderRadius: 22,
+    padding: 4,
+  },
+  segmentSeg: {
+    flex: 1,
+    height: 38,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentSegOn: { backgroundColor: colors.magentaTint2 },
+  segmentLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.4,
+  },
+  segmentLabelOn: { color: colors.magentaHot },
   // Stadium pill — mirrors the quick-log meal-slot selector.
   periodPill: {
     flexDirection: 'row',
@@ -730,23 +827,74 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: 6,
   },
-  // Cycle context under the chart — quiet, reassuring, serif italic.
+  // Cycle context under the chart — quiet, reassuring, serif italic. Con
+  // aire de reflexión (nunca pegada al chart como caption).
   cycleNote: {
-    marginTop: 10,
+    marginTop: 24,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.bone,
   },
-  // Coda del tab — serif micro en niebla, mismo registro que las codas de Órbita.
-  footerCoda: {
-    marginTop: 26,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+  // Puente callado al calendario (Epic 06) — link, no card.
+  // Layout de los links puente (el touch vive en LinkCta · quirk-safe).
+  bridgeLink: { marginTop: 10, alignSelf: 'center' },
+  coachAsk: {
+    marginTop: 22,
+    marginBottom: 8,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
     textAlign: 'center',
+  },
+  emptyCloser: {
+    marginTop: 26,
+    paddingHorizontal: 24,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.bone,
+    textAlign: 'center',
+  },
+  switcherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  switcherGrow: { flex: 1 },
+  // Misma altura que el pill, FIJA (38 del seg + 4×2 padding + bordes = 48):
+  // height '100%' dentro de un Pressable auto es dependencia circular en
+  // Yoga y el chip se estiraba a toda la pantalla.
+  addChip: {
+    width: 48,
+    height: 48,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    backgroundColor: colors.bgCard2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addChipGlyph: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.heading,
+    color: colors.magentaHot,
+    marginTop: -1,
+  },
+  // Báscula quieta + esfuerzo presente — una REFLEXIÓN, no un caption
+  // (brief: el texto interpretativo se separa y respira como cita).
+  plateauNote: {
+    marginTop: 30,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
   },
   // Shown in "Tu cuerpo" when the month's focus isn't weight — the
   // section is reference, not a target to chase.
@@ -755,9 +903,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 21,
+    color: colors.bone,
   },
   chartEmpty: {
     paddingVertical: 26,

@@ -76,3 +76,27 @@ export const WEARABLE_BODY_COMPOSITION_ENABLED = false
  * archivar). Para abrir a beta: quitar el gate devOnly del writer.
  */
 export const PATTERN_MEMORY_ENABLED = true
+
+/*
+ * Progress 3.0 · flags por capacidad (Epic 00 · Foundation).
+ * docs/progress-3.0/. Gatean features NUEVAS del rediseño; el tab actual sigue
+ * igual mientras estén como están. History ON (la primera capacidad); el resto
+ * OFF hasta que su épica los construya y valide.
+ */
+export const PROGRESS_HISTORY_ENABLED = true
+export const PROGRESS_BODY_ENABLED = true
+export const PROGRESS_AI_ENABLED = false
+// ON pero DOBLE-gateado: el chat de insights además exige aiEnabledForEmail
+// (dev) — la beta no lo ve hasta validar (mismo patrón que Órbita Mes IA).
+export const PROGRESS_CHAT_ENABLED = true
+
+/*
+ * Wearables · MOCK de composición corporal (decisión dueña jul 2026): mientras
+ * no exista la funcionalidad final (dev build + báscula/HealthKit), Body y el
+ * detector de recomposición se validan con datos de EJEMPLO. DOBLE-gateado a
+ * dev (aiEnabledForEmail) — fabricar datos del cuerpo de una usuaria real
+ * rompería la confianza — y la UI los etiqueta 'datos de ejemplo'. Quitar
+ * cuando la integración real esté validada.
+ */
+export const WEARABLE_MOCK_DATA = true
+export const PROGRESS_META_ENABLED = false

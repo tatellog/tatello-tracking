@@ -38,6 +38,9 @@ export const colors = {
 
   // ── Hairlines (alpha over leche) ───────────────────────────────
   hairline: 'rgba(244, 236, 222, 0.10)',
+  // Aún más tenue, para bordes de card/dividers dentro del cielo (reemplaza
+  // los rgba(255,255,255,…) blanco-frío que violaban la paleta cerrada).
+  hairlineFaint: 'rgba(244, 236, 222, 0.06)',
   hairlineStrong: 'rgba(244, 236, 222, 0.22)',
   // Barely-there leche surface for read-only cards/pills that need a hint of
   // body without becoming a panel (Órbita Día tablero, pills).
@@ -106,6 +109,7 @@ export const colors = {
   // agua era el único cian frío-saturado. Reubicadas y diferenciadas.
   signal: {
     proteina: '#E0AEA0', // coral cálido — nutrición, distinto del índigo
+    grasa: '#D9987B', // terracota — composición corporal; NO tomar el coral de proteína
     agua: '#8FBEDB', // azul cielo calmado — menos neón que el cian previo
     entreno: '#FF9E57', // naranja movimiento — antes copiado como hex en Semana/Mes
   },

@@ -35,8 +35,13 @@ import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
-import { useAddMeasurement, useLastPeriodStart, useMeasurements } from '@/features/progress/hooks'
-import { toWeightPoints } from '@/features/progress/logic'
+import {
+  useAddMeasurement,
+  useBodyCheckins,
+  useLastPeriodStart,
+  useMeasurements,
+} from '@/features/progress/hooks'
+import { mergeWeightSeries } from '@/features/progress/logic'
 import { useSetWater, useWaterFromMeals, useWaterToday } from '@/features/water/hooks'
 import { formatGlasses, glassesWord } from '@/features/water/liquid-detection'
 import {
@@ -418,10 +423,14 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // Shrink the glyphs as the count grows so they stay on one row.
   const glassSize = waterTarget <= 8 ? 20 : waterTarget <= 12 ? 16 : 13
 
+  // Semilla desde la serie FUSIONADA (pesajes rápidos + check-ins): un peso
+  // guardado vía Nueva medición también re-siembra esta rueda (consolidación
+  // de puertas · uxui 14 jul 2026).
+  const { data: bodyCheckins } = useBodyCheckins()
   const latestWeight = useMemo(() => {
-    const pts = toWeightPoints(measurements ?? [])
+    const pts = mergeWeightSeries(measurements ?? [], bodyCheckins ?? [])
     return pts.length > 0 ? (pts[pts.length - 1]?.weight ?? null) : null
-  }, [measurements])
+  }, [measurements, bodyCheckins])
 
   useEffect(() => {
     if (!visible) {
@@ -570,26 +579,30 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       <Pressable
         onPress={handlePhotoLog}
         disabled={disabled}
-        style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
+        style={[styles.method, styles.methodTile, styles.methodAi, disabled && styles.methodDimmed]}
         accessibilityRole="button"
-        accessibilityLabel="Registrar una comida con foto"
+        accessibilityLabel="Registrar una comida con foto, con inteligencia artificial"
       >
         <View style={[styles.methodIcon, styles.methodIconPhoto]}>
           <CameraIcon color={colors.magenta} />
         </View>
-        <Text style={styles.methodLabel}>Con foto</Text>
+        <Text style={styles.methodLabel}>
+          <Text style={styles.methodAiStar}>✦ </Text>Con foto
+        </Text>
       </Pressable>
       <Pressable
         onPress={handleTextLog}
         disabled={disabled}
-        style={[styles.method, styles.methodTile, disabled && styles.methodDimmed]}
+        style={[styles.method, styles.methodTile, styles.methodAi, disabled && styles.methodDimmed]}
         accessibilityRole="button"
-        accessibilityLabel="Registrar una comida escribiéndola"
+        accessibilityLabel="Registrar una comida escribiéndola, con inteligencia artificial"
       >
         <View style={[styles.methodIcon, styles.methodIconPhoto]}>
           <KeyboardIcon color={colors.magenta} />
         </View>
-        <Text style={styles.methodLabel}>Con texto</Text>
+        <Text style={styles.methodLabel}>
+          <Text style={styles.methodAiStar}>✦ </Text>Con texto
+        </Text>
       </Pressable>
     </View>
   )
@@ -1301,6 +1314,9 @@ const styles = StyleSheet.create({
   methodDimmed: {
     opacity: 0.4,
   },
+  // Piel IA (regla dueña): estos dos métodos escanean con gpt.
+  methodAi: { borderColor: colors.magentaGlow, backgroundColor: colors.magentaTint2 },
+  methodAiStar: { color: colors.magentaHot },
   methodIcon: {
     width: 40,
     height: 40,

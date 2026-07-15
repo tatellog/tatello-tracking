@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
+import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
-import { MILESTONES_ENABLED } from '@/lib/featureFlags'
+import { aiEnabledForEmail, MILESTONES_ENABLED, WEARABLE_MOCK_DATA } from '@/lib/featureFlags'
 import { requireUserId, supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 
@@ -14,18 +15,34 @@ import {
   deletePhoto,
   getAllWorkoutDates,
   getBeforeAfterPhotos,
+  getBodyCheckins,
+  getBodyComposition,
   getLastPeriodStart,
   getMeasurements,
   getMonthWorkoutDates,
+  getPhotoTimeline,
   getRecentSleepLogs,
   getRecentWorkoutDates,
   getTotalTrainedDays,
   NewMeasurementInputSchema,
   recordMilestones,
+  upsertBodyCheckin,
+  type BodyCheckinInput,
   type NewMeasurementInput,
 } from './api'
+import { PROGRESS_COMPARE_WINDOW_DAYS } from './constants'
+import { generateProgressInsights, type ProgressInsight, type WeightSample } from './insights'
+import {
+  compareHistory,
+  compositionSeries,
+  mergeComposition,
+  photoDatesFor,
+  smoothWeightPoints,
+  toWeightPoints,
+} from './logic'
 import { detectMilestones } from './milestones'
-import { buildMockMeasurements } from './mock'
+import { buildMockBodyComposition, buildMockMeasurements } from './mock'
+import { type HistorySummary, toProgressState, type ProgressState } from './types'
 
 // Ventana amplia = "todo el historial" (los hitos son la PRIMERA vez). La app es
 // reciente; 400 días cubre a cualquier usuaria de la beta.
@@ -48,6 +65,173 @@ export function useMilestoneSync() {
     })
     if (milestones.length > 0) void recordMilestones(milestones)
   }, [history, targets?.calories])
+}
+
+/**
+ * Epic 01 · Historia — "¿cómo cambiaron mis hábitos?" (30v30). Compone las
+ * lecturas (señales + medidas + metas) y corre el Comparison Engine puro,
+ * devolviendo un `ProgressState<HistorySummary>` para que la UI no combine
+ * isLoading/data/error a mano. Determinístico (el motor recibe `today`).
+ */
+export function useHistory(
+  windowDays = PROGRESS_COMPARE_WINDOW_DAYS,
+): ProgressState<HistorySummary> {
+  const signals = useSignalsHistory(windowDays * 2 + 5)
+  const measurements = useMeasurements(null)
+  const targets = useMacroTargets().data
+  const today = todayInTimezone()
+
+  const summary = useMemo<HistorySummary | undefined>(() => {
+    if (!signals.data) return undefined
+    return compareHistory(signals.data, measurements.data ?? [], {
+      today,
+      calorieTarget: targets?.calories ?? null,
+      proteinTarget: targets?.protein_g ?? null,
+      windowDays,
+    })
+  }, [signals.data, measurements.data, targets?.calories, targets?.protein_g, today, windowDays])
+
+  return toProgressState(
+    { isPending: signals.isPending, isError: signals.isError, error: signals.error, data: summary },
+    // Vacío = usuaria nueva sin nada que comparar (todas las métricas en 0/0).
+    (s) => s.metrics.every((m) => m.current === 0 && m.previous === 0),
+  )
+}
+
+/**
+ * Epic 03 · Progress Insight Engine — los cambios importantes detectados
+ * (recomposición, proteína+músculo, tendencia, evidencia fotográfica), TODO
+ * determinístico. El peso entra SUAVIZADO (media móvil 7d) para que el ruido de
+ * báscula no fabrique ni esconda una tendencia. `ProgressState`: empty = sin
+ * insights dignos todavía (silencio honesto, no cascarones).
+ */
+export function useProgressInsights(): ProgressState<ProgressInsight[]> {
+  const measurements = useMeasurements(null)
+  const composition = useBodyComposition(null)
+  const signals = useSignalsHistory(60)
+  const targets = useMacroTargets().data
+  const photos = usePhotoTimeline()
+  const today = todayInTimezone()
+
+  const insights = useMemo<ProgressInsight[] | undefined>(() => {
+    if (!measurements.data || !signals.data) return undefined
+    const weights: WeightSample[] = smoothWeightPoints(toWeightPoints(measurements.data)).map(
+      (p) => ({ day: new Date(p.t).toISOString().slice(0, 10), kg: p.weight }),
+    )
+    const photoDays = [
+      ...new Set(
+        ['front', 'back', 'side_left', 'side_right'].flatMap((a) =>
+          photoDatesFor(photos.data ?? [], a as never),
+        ),
+      ),
+    ].sort()
+    return generateProgressInsights({
+      today,
+      weights,
+      composition: (composition.data ?? []).map((c) => ({
+        day: c.day_date,
+        fatPct: c.body_fat_pct,
+        leanKg: c.lean_body_mass_kg,
+      })),
+      signals: signals.data,
+      proteinTarget: targets?.protein_g ?? null,
+      photoDays,
+    })
+  }, [measurements.data, composition.data, signals.data, targets?.protein_g, photos.data, today])
+
+  return toProgressState(
+    {
+      isPending: measurements.isPending || signals.isPending,
+      isError: measurements.isError,
+      error: measurements.error,
+      data: insights,
+    },
+    (list) => list.length === 0,
+  )
+}
+
+/**
+ * ¿La composición corporal viene del MOCK? (WEARABLE_MOCK_DATA + dev). Mientras
+ * no exista la integración final, Body se valida con datos de ejemplo — SOLO
+ * dev; la beta jamás ve datos fabricados de su cuerpo. La UI etiqueta la
+ * sección como 'datos de ejemplo' con esta misma señal.
+ */
+export function useBodyCompositionIsMock(): boolean {
+  const { session } = useSession()
+  return WEARABLE_MOCK_DATA && aiEnabledForEmail(session?.user?.email)
+}
+
+/** F0 · check-ins manuales/del coach (composición completa + zonas). */
+export function useBodyCheckins() {
+  return useQuery({
+    queryKey: queryKeys.progress.bodyCheckins(),
+    queryFn: getBodyCheckins,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** F0 · guarda un check-in (upsert por día/fuente) e invalida las lecturas de
+ *  composición para que cards e insights se refresquen al toque. */
+export function useUpsertBodyCheckin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: BodyCheckinInput) => upsertBodyCheckin(input),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+    },
+  })
+}
+
+/** La fuente WEARABLE de composición (o su mock dev-gated). La key distingue
+ *  mock/real para que un mock cacheado nunca sobreviva al apagar el flag. */
+export function useWearableComposition(rangeDays: number | null = null) {
+  const mock = useBodyCompositionIsMock()
+  return useQuery({
+    queryKey: [...queryKeys.progress.bodyComposition(rangeDays), mock ? 'mock' : 'real'],
+    queryFn: () =>
+      mock ? Promise.resolve(buildMockBodyComposition(rangeDays)) : getBodyComposition(rangeDays),
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** Body (Epic 02 + F0): composición corporal FUSIONADA — check-ins manuales/
+ *  del coach (ganan el día) + ingesta wearable (o su mock dev-gated). Sin
+ *  ninguna fuente, vacía → las cards se auto-ocultan. */
+export function useBodyComposition(rangeDays: number | null = null) {
+  const mock = useBodyCompositionIsMock()
+  const checkins = useBodyCheckins()
+  const wearable = useWearableComposition(rangeDays)
+  const data = useMemo(() => {
+    if (!checkins.data && !wearable.data) return undefined
+    // Con check-ins REALES, el mock no se mezcla (solo llena el vacío total).
+    const wearableRows = mock && (checkins.data?.length ?? 0) > 0 ? [] : (wearable.data ?? [])
+    return mergeComposition(checkins.data ?? [], wearableRows)
+  }, [checkins.data, wearable.data, mock])
+  return { ...wearable, data }
+}
+
+/** Epic 08 · F1: series por métrica de composición con el MISMO gating de
+ *  mock que CompositionCards (con check-ins reales, el mock no se mezcla).
+ *  Alimenta /body-composition y /metric/[key]. */
+export function useGatedCompositionSeries() {
+  const mock = useBodyCompositionIsMock()
+  const checkins = useBodyCheckins()
+  const wearable = useWearableComposition(null)
+  const series = useMemo(() => {
+    const wearableRows = mock && (checkins.data?.length ?? 0) > 0 ? [] : (wearable.data ?? [])
+    return compositionSeries(checkins.data ?? [], wearableRows)
+  }, [checkins.data, wearable.data, mock])
+  return { series, isPending: checkins.isPending || wearable.isPending, checkins }
+}
+
+/** Body (Epic 02): todas las fotos (4 ángulos) con URLs firmadas — el
+ *  comparador por fechas. */
+export function usePhotoTimeline() {
+  return useQuery({
+    queryKey: queryKeys.progress.photoTimeline(),
+    queryFn: getPhotoTimeline,
+    staleTime: 5 * 60_000,
+  })
 }
 
 const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === 'true'
@@ -77,10 +261,10 @@ export function useMeasurements(rangeDays: number | null, enabled = true) {
  * (onboarding / settings) aparece vía el invalidate de useTakePhoto;
  * el foco de la app cubre el caso de volver desde background.
  */
-export function useBeforeAfterPhotos() {
+export function useBeforeAfterPhotos(sinceIso?: string | null) {
   return useQuery({
-    queryKey: queryKeys.photos.beforeAfter(),
-    queryFn: getBeforeAfterPhotos,
+    queryKey: queryKeys.photos.beforeAfter(sinceIso ?? null),
+    queryFn: () => getBeforeAfterPhotos(sinceIso ?? null),
     // No refetchOnMount:'always' — tabs never unmount, so it only fired on
     // cold start. In-app uploads (useTakePhoto) invalidate photos.all with
     // refetchType:'all', which is what actually makes a fresh photo appear.
@@ -124,7 +308,7 @@ export function useDeletePhoto() {
  */
 export function useRecentWorkoutDates(rangeDays: number) {
   return useQuery({
-    queryKey: ['progress', 'workouts', rangeDays] as const,
+    queryKey: queryKeys.progress.recentWorkouts(rangeDays),
     queryFn: () => getRecentWorkoutDates(rangeDays),
     staleTime: 60_000,
   })
@@ -133,7 +317,7 @@ export function useRecentWorkoutDates(rangeDays: number) {
 /** All-time distinct trained-day count — the "N días entrenados" stat. */
 export function useTotalTrainedDays() {
   return useQuery({
-    queryKey: ['progress', 'trainedTotal'] as const,
+    queryKey: queryKeys.progress.trainedTotal(),
     queryFn: getTotalTrainedDays,
     staleTime: 60_000,
   })
@@ -143,7 +327,7 @@ export function useTotalTrainedDays() {
  *  calendar (month navigation is a client-side slice). */
 export function useAllWorkoutDates() {
   return useQuery({
-    queryKey: ['progress', 'allWorkouts'] as const,
+    queryKey: queryKeys.progress.allWorkouts(),
     queryFn: getAllWorkoutDates,
     staleTime: 60_000,
   })
@@ -154,7 +338,7 @@ export function useAllWorkoutDates() {
 export function useMonthWorkoutDates() {
   const monthStart = `${todayInTimezone().slice(0, 7)}-01`
   return useQuery({
-    queryKey: ['progress', 'monthWorkouts', monthStart] as const,
+    queryKey: queryKeys.progress.monthWorkouts(monthStart),
     queryFn: () => getMonthWorkoutDates(monthStart),
     staleTime: 60_000,
   })
@@ -162,7 +346,7 @@ export function useMonthWorkoutDates() {
 
 export function useRecentSleepLogs(rangeDays: number) {
   return useQuery({
-    queryKey: ['progress', 'sleep', rangeDays] as const,
+    queryKey: queryKeys.progress.sleep(rangeDays),
     queryFn: () => getRecentSleepLogs(rangeDays),
     staleTime: 60_000,
   })
@@ -170,7 +354,7 @@ export function useRecentSleepLogs(rangeDays: number) {
 
 export function useLastPeriodStart() {
   return useQuery({
-    queryKey: ['progress', 'cycle', 'last-period'] as const,
+    queryKey: queryKeys.progress.lastPeriod(),
     queryFn: getLastPeriodStart,
     staleTime: 5 * 60_000,
   })
