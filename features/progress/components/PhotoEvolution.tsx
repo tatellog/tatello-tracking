@@ -99,6 +99,12 @@ export function PhotoEvolution() {
 
   if (!active || usable.length === 0 || items.length === 0) return null
 
+  // El índice visto se CLAMPA en render: al cambiar de ángulo, viewedIdx aún
+  // trae el índice del ángulo anterior (el efecto que lo resetea corre
+  // DESPUÉS del render) y items[viewedIdx] explotaba con menos fotos en el
+  // ángulo nuevo (render error dueña 15 jul 2026).
+  const shownIdx = Math.max(0, Math.min(viewedIdx, items.length - 1))
+
   // Última foto vieja → el riel termina en su estrella (sin ancla "Hoy") y el
   // tile fantasma invita a abrir el capítulo de hoy.
   const lastItem = items[items.length - 1]
@@ -179,24 +185,24 @@ export function PhotoEvolution() {
               {items.map((it, i) => (
                 <Path
                   key={it.day}
-                  d={fourPointStarPath(4 + dotX(i, railW), 22, i === viewedIdx ? 7 : 4.5)}
-                  fill={i === viewedIdx ? colors.oroLeche : colors.oroSoft}
-                  opacity={i === viewedIdx ? 1 : 0.75}
+                  d={fourPointStarPath(4 + dotX(i, railW), 22, i === shownIdx ? 7 : 4.5)}
+                  fill={i === shownIdx ? colors.oroLeche : colors.oroSoft}
+                  opacity={i === shownIdx ? 1 : 0.75}
                 />
               ))}
             </Svg>
             {stale ? null : <Text style={styles.hoy}>Hoy</Text>}
             {/* Labels: primera fecha + la activa (evita encimar con 8+). */}
             <Text style={[styles.railLabel, { left: 0 }]}>{fmtShort(items[0]!.day)}</Text>
-            {viewedIdx > 0 ? (
+            {shownIdx > 0 ? (
               <Text
                 style={[
                   styles.railLabel,
                   styles.railLabelOn,
-                  { left: Math.min(railW - 70, Math.max(30, dotX(viewedIdx, railW) - 16)) },
+                  { left: Math.min(railW - 70, Math.max(30, dotX(shownIdx, railW) - 16)) },
                 ]}
               >
-                {fmtShort(items[viewedIdx]!.day)}
+                {fmtShort(items[shownIdx]!.day)}
               </Text>
             ) : null}
           </>
@@ -232,7 +238,7 @@ export function PhotoEvolution() {
                   resizeMode="contain"
                 />
               </View>
-              <Text style={[styles.tileDate, i === viewedIdx && styles.tileDateOn]}>
+              <Text style={[styles.tileDate, i === shownIdx && styles.tileDateOn]}>
                 {fmtShort(it.day)}
               </Text>
             </Pressable>
