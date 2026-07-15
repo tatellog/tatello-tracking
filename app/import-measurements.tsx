@@ -197,6 +197,7 @@ export default function ImportMeasurementsScreen() {
         {phase === 'idle' ? (
           <Animated.View entering={FadeIn.duration(240)} style={styles.content}>
             <Text style={styles.lead}>
+              <Text style={styles.leadStar}>✦ </Text>
               Elige una foto o un PDF de tu tabla. Stelar lee los números por ti y tú los revisas
               antes de guardar.
             </Text>
@@ -230,7 +231,9 @@ export default function ImportMeasurementsScreen() {
         ) : phase === 'scanning' ? (
           <View style={styles.scanning}>
             <ActivityIndicator color={colors.magentaHot} />
-            <Text style={styles.scanningText}>Leyendo tu tabla…</Text>
+            <Text style={styles.scanningText}>
+              <Text style={styles.leadStar}>✦ </Text>Leyendo tu tabla…
+            </Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -368,6 +371,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.title,
     color: colors.bone,
   },
+  leadStar: { color: colors.magentaHot },
   confidenceNote: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,

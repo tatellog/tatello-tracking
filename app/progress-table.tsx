@@ -152,12 +152,18 @@ export default function ProgressTableScreen() {
               </Pressable>
             </View>
             {/* Quien llega con historial del coach no debe teclearlo. */}
-            <View style={styles.emptyImportWrap}>
-              <LinkCta
-                label="Importar de foto o PDF →"
+            <View style={styles.aiImportWrap}>
+              <Pressable
                 onPress={() => router.push('/import-measurements')}
-                accessibilityLabel="Importar mediciones desde una foto o PDF"
-              />
+                accessibilityRole="button"
+                accessibilityLabel="Importar mediciones desde una foto o PDF, con inteligencia artificial"
+                style={({ pressed }) => pressed && { opacity: 0.8 }}
+              >
+                <View style={styles.aiImport}>
+                  <Text style={styles.aiImportStar}>✦</Text>
+                  <Text style={styles.aiImportText}>Importar de foto o PDF</Text>
+                </View>
+              </Pressable>
             </View>
           </View>
         ) : (
@@ -344,12 +350,19 @@ export default function ProgressTableScreen() {
             </Text>
             {/* Entrada Y salida bajo el mismo techo: la tabla del coach
                 entra por foto/PDF (scan-measurements) y sale por PDF/CSV. */}
-            <View style={styles.exportRow}>
-              <LinkCta
-                label="Importar de foto o PDF →"
+            <View style={styles.aiImportWrap}>
+              <Pressable
                 onPress={() => router.push('/import-measurements')}
-                accessibilityLabel="Importar mediciones desde una foto o PDF"
-              />
+                accessibilityRole="button"
+                accessibilityLabel="Importar mediciones desde una foto o PDF, con inteligencia artificial"
+                style={({ pressed }) => pressed && { opacity: 0.8 }}
+              >
+                {/* IA visible (regla dueña): sparkle + highlight magenta. */}
+                <View style={styles.aiImport}>
+                  <Text style={styles.aiImportStar}>✦</Text>
+                  <Text style={styles.aiImportText}>Importar de foto o PDF</Text>
+                </View>
+              </Pressable>
             </View>
             <View style={styles.exportRow}>
               <LinkCta
@@ -391,12 +404,14 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.5,
   },
+  // Cormorant a cuerpo chico se pierde en niebla: un tono arriba (bone) y
+  // un punto más (dueña: "las cursivas casi no se ven").
   sub: {
     marginTop: 2,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
   },
   empty: {
     marginTop: 30,
@@ -520,7 +535,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 18,
   },
-  emptyImportWrap: { alignSelf: 'center', marginTop: 4 },
+  aiImportWrap: { alignSelf: 'center', marginTop: 10, minHeight: 44, justifyContent: 'center' },
+  aiImport: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.magentaTint2,
+    borderWidth: 1,
+    borderColor: colors.magentaGlow,
+    borderRadius: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+  },
+  aiImportStar: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.magentaHot,
+  },
+  aiImportText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.magentaHot,
+    letterSpacing: 0.2,
+  },
   // Filas fantasma mientras carga (nunca el falso "no tienes nada").
   skeleton: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
   skeletonRow: {
@@ -534,8 +571,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontFamily: typography.serif,
     fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
     textAlign: 'center',
   },
 })
