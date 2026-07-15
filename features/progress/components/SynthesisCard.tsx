@@ -163,7 +163,14 @@ export function SynthesisCard() {
           </Pressable>
         </>
       ) : (
-        <Text style={styles.empty}>Sigo juntando tus días. Poco a poco voy a ver tus ritmos.</Text>
+        <Text style={styles.empty}>
+          {/* Mes callado ≠ olvido (target-user: al tercer mes "suena a que
+              la app me olvidó"). El silencio es del periodo, no de ella; y
+              "aquí sigo" responde al dolor real. SIN foco fallback: el
+              manifiesto vetó rellenar "Tu foco" sin patrón detectado
+              (personalización fabricada). */}
+          Este tramo fue más callado. Aquí sigo, leyendo lo que registres.
+        </Text>
       )}
     </Animated.View>
   )
