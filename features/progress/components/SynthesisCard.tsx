@@ -64,7 +64,7 @@ export function SynthesisCard() {
   }, [measurements.data])
 
   const rows = useMemo(() => signals.data ?? [], [signals.data])
-  const { lead, deficitDays, sideLabel } = useMemo(() => {
+  const { lead, deficitDays, sideLabel, focoLabel } = useMemo(() => {
     const patterns = detectMonthPatterns(rows, { proteinTarget, calorieTarget })
     // El titular: preferimos un PATRÓN (forma temporal / correlación: el "lever")
     // sobre un DESCUBRIMIENTO (constancia). El primero del orden ya es el más fuerte.
@@ -76,11 +76,19 @@ export function SynthesisCard() {
         ? 'entre semana'
         : 'el fin de semana'
       : null
+    // El FOCO es el lado contrario al fuerte: donde el déficit se suelta es
+    // donde vive la palanca (recomendación de foco, nunca de conducta).
+    const foco = daytype?.weekdayShape
+      ? daytype.weekdayShape.strongSide === 'weekday'
+        ? 'el fin de semana'
+        : 'entre semana'
+      : null
     return {
       lead: leadP,
       deficitDays:
         summary != null && summary.deficitDays >= MIN_DEFICIT_DAYS ? summary.deficitDays : null,
       sideLabel: side,
+      focoLabel: foco,
     }
   }, [rows, proteinTarget, calorieTarget])
 
@@ -125,6 +133,20 @@ export function SynthesisCard() {
         <>
           <Text style={styles.title}>{lead.title}</Text>
           {lead.why ? <Text style={styles.why}>{lead.why}</Text> : null}
+          {/* Beat 3 · TU FOCO (deseo target-user: "que el domingo cierre con
+              'esto es lo tuyo esta semana'"): SOLO cuando el patrón daytype
+              existe — sin patrón no se inventa foco. Verbo de foco
+              ("sostener"), jamás de conducta (la frontera del manifiesto:
+              recomendar foco ✓, recetar dieta/rutina ✗). Hanken upright:
+              es recomendación de motor, no poesía. Gate extra (manifesto-review,
+              advertencia de coherencia): solo si la card YA narró el déficit
+              (causeLine), para que el foco no aparezca desconectado. */}
+          {focoLabel && deficitDays != null ? (
+            <View style={styles.focusBlock}>
+              <Text style={styles.focusEyebrow}>Tu foco</Text>
+              <Text style={styles.focusText}>Esta semana: sostener {focoLabel}.</Text>
+            </View>
+          ) : null}
           <Pressable
             onPress={openOrbita}
             accessibilityRole="button"
@@ -193,6 +215,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.niebla,
+  },
+  focusBlock: { marginTop: 14 },
+  focusEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+  },
+  focusText: {
+    marginTop: 3,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
   },
   cta: {
     marginTop: 16,

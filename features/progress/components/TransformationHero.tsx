@@ -432,10 +432,13 @@ export function TransformationHero() {
       </Text>
 
       {/* Epic 08: los capítulos completos viven en su pantalla. */}
+      {/* "Capítulos", no "historia": Historia ya nombra el otro segmento del
+          tab y la misma palabra con dos destinos rompía el mapa mental
+          (target-user). "Capítulo" es el vocabulario que ella ya ama. */}
       <LinkCta
-        label="Ver mi historia →"
+        label="Ver tus capítulos →"
         onPress={() => router.push('/body-story')}
-        accessibilityLabel="Ver la historia de tu transformación"
+        accessibilityLabel="Ver los capítulos de tu peso"
         style={styles.storyLink}
       />
     </Animated.View>

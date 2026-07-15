@@ -197,7 +197,9 @@ export default function BodyStoryScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Tu historia</Text>
+            {/* "Tus capítulos" (no "Tu historia"): Historia es el segmento de
+                hábitos del tab — una palabra, un significado. */}
+            <Text style={styles.title}>Tus capítulos</Text>
             {/* "Camino", no "transformación": esa palabra queda reservada a la
                 share card ya aprobada (advertencia manifesto-review). */}
             <Text style={styles.sub}>Los capítulos de tu camino</Text>
@@ -229,7 +231,7 @@ export default function BodyStoryScreen() {
           /* Error con datos existentes NO es empty: decir "tu historia
              empieza…" a quien lleva meses duele (uxui). */
           <View style={styles.errorWrap}>
-            <Text style={styles.empty}>No pudimos traer tu historia. Está a salvo.</Text>
+            <Text style={styles.empty}>No pudimos traer tus capítulos. Están a salvo.</Text>
             <View style={styles.retryWrap}>
               <Pressable
                 onPress={() => {
@@ -238,7 +240,7 @@ export default function BodyStoryScreen() {
                 }}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel="Intentar cargar tu historia de nuevo"
+                accessibilityLabel="Intentar cargar tus capítulos de nuevo"
                 style={({ pressed }) => pressed && { opacity: 0.6 }}
               >
                 <Text style={styles.retryText}>Intentar de nuevo</Text>
@@ -246,7 +248,7 @@ export default function BodyStoryScreen() {
             </View>
           </View>
         ) : beats.length === 0 ? (
-          <Text style={styles.empty}>Tu historia empieza con tu primera marca de peso.</Text>
+          <Text style={styles.empty}>Tus capítulos empiezan con tu primera marca de peso.</Text>
         ) : (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.timeline}>

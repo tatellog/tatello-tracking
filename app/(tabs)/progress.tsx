@@ -279,7 +279,7 @@ function ProgressBody() {
                   de estos números — el cierre único de Historia (dieta de CTAs:
                   el segmento Cuerpo ya tiene su puerta en el switcher). */}
               <LinkCta
-                label="Ver los días detrás de esto →"
+                label="Ver tu constancia, día por día →"
                 onPress={() => {
                   track(PROGRESS_EVENTS.openCalendar)
                   router.navigate('/movement-calendar')
@@ -398,7 +398,7 @@ function ProgressBody() {
                     plan con fecha): cuando la realidad cambia, la línea cambia
                     sin que nadie "incumpla". */}
                     <Text style={styles.chartCaption}>
-                      {count} mediciones · media de 7 días
+                      {count} mediciones · la línea es tu promedio de la semana
                       {trend ? ' · la punteada sigue tu ritmo real' : ''}
                     </Text>
                     <TrajectoryChart points={smoothed} trend={trend} />
@@ -417,7 +417,7 @@ function ProgressBody() {
                     <Animated.View entering={FadeIn.duration(360).delay(290)}>
                       <Text style={styles.cycleNote}>
                         {cycle.phase === 'lutea'
-                          ? 'La semana antes de tu período el cuerpo retiene agua. Lo que ves en la balanza no es lo que eres.'
+                          ? 'La semana antes de tu período tu cuerpo retiene agua: la báscula sube por agua, no por grasa.'
                           : 'Estás menstruando: el peso se mueve por agua, no por grasa.'}
                       </Text>
                     </Animated.View>
@@ -427,6 +427,16 @@ function ProgressBody() {
                     <Animated.View entering={FadeIn.duration(360).delay(320)}>
                       <CoachLine text={formatTrendCopy(trend)} />
                     </Animated.View>
+                  ) : null}
+                  {/* El "show more" pegado a su muestra (uxui): esta puerta
+                      era la más misteriosa al fondo del scroll. */}
+                  {PROGRESS_BODY_ENABLED ? (
+                    <LinkCta
+                      label="Más observaciones como esta →"
+                      onPress={() => router.push('/stelar-observes')}
+                      accessibilityLabel="Ver más observaciones de tus datos"
+                      style={styles.bridgeLink}
+                    />
                   ) : null}
                 </>
               ) : (
@@ -485,14 +495,6 @@ function ProgressBody() {
                   </View>
                   {/* El cierre emocional: la tira con "Capítulo de hoy". */}
                   <PhotoEvolution />
-
-                  {/* Epic 08 · F2: la lectura sin gráficas, en su pantalla. */}
-                  <LinkCta
-                    label="Lo que Stelar observa →"
-                    onPress={() => router.push('/stelar-observes')}
-                    accessibilityLabel="Lo que Stelar observa de tus datos"
-                    style={styles.bridgeLink}
-                  />
                 </>
               ) : null}
 

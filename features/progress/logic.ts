@@ -856,6 +856,31 @@ const TABLE_METRICS: { group: string; key: keyof BodyCheckin; label: string; uni
   { group: 'Medidas', key: 'calf_left_cm', label: 'Pantorrilla izq', unit: 'cm' },
 ]
 
+/* ─── Chip líder de "Tus últimos 30 días" ─────────────────────────────── */
+
+export type LeadChipCandidate = {
+  key: string
+  /** Cambio relativo anti-ruido (0 = no compite). */
+  significance: number
+  /** ahora − antes (todas las métricas del grid mejoran subiendo). */
+  delta: number
+}
+
+/** El titular del 30v30 SOLO se gana con MEJORA (target-user: en mes flojo
+ *  el "más significativo" servía la peor noticia en gigante). Sin mejora
+ *  significativa: el déficit lidera solo si no retrocedió; si retrocedió,
+ *  NADIE lidera (grid plano, la Lectura narra el mes sin culpa). El dato
+ *  duro sigue visible a tamaño normal — honestidad sin amplificación. */
+export function pickLeadChip<T extends LeadChipCandidate>(chips: readonly T[]): T | null {
+  const best = chips.reduce<T | null>(
+    (acc, c) => (c.delta > 0 && c.significance > (acc?.significance ?? 0) ? c : acc),
+    null,
+  )
+  if (best) return best
+  const deficit = chips.find((c) => c.key === 'deficit')
+  return deficit && deficit.delta >= 0 ? deficit : null
+}
+
 /** Arma la tabla desde los check-ins (ascendentes). Solo filas con ≥1 valor y
  *  grupos con ≥1 fila — el expediente muestra lo medido, no cascarones. */
 export function checkinTable(checkins: readonly BodyCheckin[]): CheckinTable {

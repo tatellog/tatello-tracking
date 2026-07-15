@@ -13,6 +13,7 @@ import { useMeasurements } from '../hooks'
 import {
   compareHistory,
   historySparklines,
+  pickLeadChip,
   proteinAverageComparison,
   smoothWeightPoints,
   toWeightPoints,
@@ -40,6 +41,8 @@ type ChipDef = {
   spark: number[] | null
   /** Cambio relativo |ahora−antes|/antes — decide quién lidera. */
   significance: number
+  /** ahora − antes: solo una MEJORA puede ganar el titular. */
+  delta: number
 }
 
 const fmtCount = (n: number) => `${n}`
@@ -77,7 +80,9 @@ export function HistoryChips() {
     // ya cuenta la dirección.
     const counts: { key: 'workouts' | 'deficit' | 'logging'; label: string; hue: string }[] = [
       { key: 'deficit', label: 'Días en déficit', hue: colors.magentaHot },
-      { key: 'logging', label: 'Días con registro', hue: colors.dimension.alimento },
+      // "evidencia", no "registro": registro leía como asistencia escolar
+      // (target-user) y "evidencia" es la palabra del hook del hero.
+      { key: 'logging', label: 'Días con evidencia', hue: colors.dimension.alimento },
       { key: 'workouts', label: 'Entrenos', hue: colors.dimension.cuerpo },
     ]
     for (const c of counts) {
@@ -91,6 +96,7 @@ export function HistoryChips() {
         curr: fmtCount(m.current),
         spark: sparks[c.key],
         significance: significance(m.previous, m.current, 3, 5),
+        delta: m.current - m.previous,
       })
     }
 
@@ -105,6 +111,7 @@ export function HistoryChips() {
         curr: `${prot.current} g`,
         spark: sparks.protein,
         significance: significance(prot.previous, prot.current, 10, 50),
+        delta: prot.current - prot.previous,
       })
     }
 
@@ -124,6 +131,7 @@ export function HistoryChips() {
         curr: `${w.current.toFixed(1)} kg`,
         spark: smoothTail.length >= 2 ? smoothTail : null,
         significance: 0,
+        delta: 0,
       })
     }
     return out
@@ -131,19 +139,11 @@ export function HistoryChips() {
 
   if (!chips || chips.length === 0) return null
 
-  // Jerarquía (patrón del anillo dominante de Apple, sin su presión): lidera
-  // el delta relativo MÁS SIGNIFICATIVO del mes (lo elige el motor, no el
-  // layout — un líder fijo servía la peor noticia en gigante aunque no fuera
-  // la historia). El peso nunca compite (significance 0); empate → gana el
-  // orden canónico del arreglo (déficit primero). Sin delta significativo,
-  // el default vuelve al déficit (la métrica-causa canónica).
-  const lead =
-    chips.reduce<ChipDef | null>(
-      (best, c) => (c.significance > (best?.significance ?? 0) ? c : best),
-      null,
-    ) ??
-    chips.find((c) => c.key === 'deficit') ??
-    null
+  // Jerarquía (patrón del anillo dominante de Apple, sin su presión): el
+  // titular solo se GANA con mejora — en mes flojo no hay héroe y el grid
+  // queda plano (pickLeadChip · target-user: "me sirve mi peor dato de
+  // entrada, en gigante"). El peso nunca compite (significance 0).
+  const lead = pickLeadChip(chips)
   const GRID_ORDER = ['deficit', 'logging', 'protein', 'weight', 'workouts']
   const rest = chips
     .filter((c) => c.key !== lead?.key)
