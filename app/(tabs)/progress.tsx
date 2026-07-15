@@ -822,17 +822,18 @@ const styles = StyleSheet.create({
   bridgeLink: { marginTop: 10, alignSelf: 'center' },
   switcherRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'center',
     gap: 10,
     marginTop: 6,
     marginBottom: 20,
   },
   switcherGrow: { flex: 1 },
-  // Misma altura y radio que el pill (stretch): un solo sistema, no un
-  // cuadrito flotando al lado.
+  // Misma altura que el pill, FIJA (38 del seg + 4×2 padding + bordes = 48):
+  // height '100%' dentro de un Pressable auto es dependencia circular en
+  // Yoga y el chip se estiraba a toda la pantalla.
   addChip: {
     width: 48,
-    height: '100%',
+    height: 48,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.bruma,
