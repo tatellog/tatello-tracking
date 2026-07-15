@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message'
 import { exportMeasurementsCsv, exportMeasurementsPdf } from '@/features/progress/export'
 import { useBodyCheckins } from '@/features/progress/hooks'
 import { checkinTable } from '@/features/progress/logic'
+import { AiImportPill } from '@/features/progress/components/AiImportPill'
 import { LinkCta } from '@/features/progress/components/LinkCta'
 import { Sparkline } from '@/features/progress/components/Sparkline'
 import { SkyBackground } from '@/features/tabs/components'
@@ -152,19 +153,10 @@ export default function ProgressTableScreen() {
               </Pressable>
             </View>
             {/* Quien llega con historial del coach no debe teclearlo. */}
-            <View style={styles.aiImportWrap}>
-              <Pressable
-                onPress={() => router.push('/import-measurements')}
-                accessibilityRole="button"
-                accessibilityLabel="Importar mediciones desde una foto o PDF, con inteligencia artificial"
-                style={({ pressed }) => pressed && { opacity: 0.8 }}
-              >
-                <View style={styles.aiImport}>
-                  <Text style={styles.aiImportStar}>✦</Text>
-                  <Text style={styles.aiImportText}>Importar de foto o PDF</Text>
-                </View>
-              </Pressable>
-            </View>
+            <AiImportPill
+              onPress={() => router.push('/import-measurements')}
+              style={styles.aiImportSpace}
+            />
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -350,20 +342,11 @@ export default function ProgressTableScreen() {
             </Text>
             {/* Entrada Y salida bajo el mismo techo: la tabla del coach
                 entra por foto/PDF (scan-measurements) y sale por PDF/CSV. */}
-            <View style={styles.aiImportWrap}>
-              <Pressable
-                onPress={() => router.push('/import-measurements')}
-                accessibilityRole="button"
-                accessibilityLabel="Importar mediciones desde una foto o PDF, con inteligencia artificial"
-                style={({ pressed }) => pressed && { opacity: 0.8 }}
-              >
-                {/* IA visible (regla dueña): sparkle + highlight magenta. */}
-                <View style={styles.aiImport}>
-                  <Text style={styles.aiImportStar}>✦</Text>
-                  <Text style={styles.aiImportText}>Importar de foto o PDF</Text>
-                </View>
-              </Pressable>
-            </View>
+            {/* IA visible (regla dueña): sparkle + highlight magenta. */}
+            <AiImportPill
+              onPress={() => router.push('/import-measurements')}
+              style={styles.aiImportSpace}
+            />
             <View style={styles.exportRow}>
               <LinkCta
                 label="Exportar PDF →"
@@ -535,29 +518,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 18,
   },
-  aiImportWrap: { alignSelf: 'center', marginTop: 10, minHeight: 44, justifyContent: 'center' },
-  aiImport: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.magentaTint2,
-    borderWidth: 1,
-    borderColor: colors.magentaGlow,
-    borderRadius: 16,
-    paddingVertical: 11,
-    paddingHorizontal: 18,
-  },
-  aiImportStar: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.magentaHot,
-  },
-  aiImportText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.magentaHot,
-    letterSpacing: 0.2,
-  },
+  aiImportSpace: { marginTop: 10 },
   // Filas fantasma mientras carga (nunca el falso "no tienes nada").
   skeleton: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
   skeletonRow: {

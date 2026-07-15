@@ -17,6 +17,7 @@ import { CheckinCompare } from '@/features/progress/components/CheckinCompare'
 import { EvidenceTimeline } from '@/features/progress/components/EvidenceTimeline'
 import { CompositionCards } from '@/features/progress/components/CompositionCards'
 import { HistoryChips } from '@/features/progress/components/HistoryChips'
+import { AiImportPill } from '@/features/progress/components/AiImportPill'
 import { LinkCta } from '@/features/progress/components/LinkCta'
 import { SynthesisCard } from '@/features/progress/components/SynthesisCard'
 import { TrajectoryChart } from '@/features/progress/components/TrajectoryChart'
@@ -451,18 +452,43 @@ function ProgressBody() {
                     </Text>
                   )}
 
+                  {/* La anticipación vive en el "cuándo" (mañana), no en un
+                      CTA de báscula: "Pesarme de nuevo" a minutos de pesarse
+                      era presión suave y su completación honesta era "vuelve
+                      mañana" (uxui). */}
                   <Text style={styles.heroEmptyHint}>
                     {count === 0
                       ? 'Marca tu peso para empezar a trazar tu trayectoria.'
-                      : 'Una segunda marca traza tu trayectoria.'}
+                      : 'Tu primera marca ya está en el cielo. La siguiente dibuja la línea.'}
                   </Text>
 
                   <View style={styles.heroCtaWrap}>
-                    <PrimaryCta
-                      label={count === 0 ? 'Marcar mi peso →' : 'Pesarme de nuevo →'}
-                      onPress={goLogMeasurement}
-                    />
+                    {/* Un nombre, un destino, siempre (igual que el chip ＋). */}
+                    <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
                   </View>
+
+                  {/* El dead-end del día 1 (uxui): quien llega con meses de
+                      historial en el PDF del coach necesita su puerta AQUÍ,
+                      no escondida tras pantallas que piden datos. */}
+                  <Text style={styles.coachAsk}>¿Llevabas mediciones con tu coach?</Text>
+                  <AiImportPill
+                    onPress={() => {
+                      track(PROGRESS_EVENTS.body, { kind: 'import-from-empty' })
+                      router.push('/import-measurements')
+                    }}
+                  />
+                  <LinkCta
+                    label="Agregar fotos de otra fecha →"
+                    onPress={() => router.push('/log-photos')}
+                    accessibilityLabel="Agregar fotos de otra fecha"
+                    style={styles.bridgeLink}
+                  />
+
+                  {/* Cierre corto: el aire de abajo queda DESPUÉS de un
+                      cierre, no como pantalla incompleta. */}
+                  <Text style={styles.emptyCloser}>
+                    Cada marca enciende algo nuevo aquí. Este cielo se llena contigo.
+                  </Text>
                 </Animated.View>
               )}
 
@@ -511,12 +537,14 @@ function ProgressBody() {
                   <PrimaryCta label="Nueva medición" onPress={goLogMeasurement} />
                 </Animated.View>
               ) : null}
-              <LinkCta
-                label="Agregar fotos de otra fecha →"
-                onPress={() => router.push('/log-photos')}
-                accessibilityLabel="Agregar fotos de otra fecha"
-                style={styles.bridgeLink}
-              />
+              {hasTrajectory ? (
+                <LinkCta
+                  label="Agregar fotos de otra fecha →"
+                  onPress={() => router.push('/log-photos')}
+                  accessibilityLabel="Agregar fotos de otra fecha"
+                  style={styles.bridgeLink}
+                />
+              ) : null}
             </>
           )}
         </ScrollView>
@@ -820,6 +848,24 @@ const styles = StyleSheet.create({
   // Puente callado al calendario (Epic 06) — link, no card.
   // Layout de los links puente (el touch vive en LinkCta · quirk-safe).
   bridgeLink: { marginTop: 10, alignSelf: 'center' },
+  coachAsk: {
+    marginTop: 22,
+    marginBottom: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+    textAlign: 'center',
+  },
+  emptyCloser: {
+    marginTop: 26,
+    paddingHorizontal: 24,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 22,
+    color: colors.bone,
+    textAlign: 'center',
+  },
   switcherRow: {
     flexDirection: 'row',
     alignItems: 'center',
