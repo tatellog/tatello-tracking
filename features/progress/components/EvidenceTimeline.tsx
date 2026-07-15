@@ -57,8 +57,10 @@ const ANGLES: { key: PhotoAngle; label: string }[] = [
 const TILE_W = 74
 const TILE_GAP = 8
 const TILE_H = Math.round(TILE_W / 0.52)
-// Pasados 60 días, la última evidencia deja de ser "hoy".
-const STALE_MS = 60 * 24 * 60 * 60 * 1000
+// Pasadas ~4 semanas, la última evidencia deja de ser "hoy" (target-user:
+// el ancla "Hoy" apuntando a algo de hace 3 semanas fruncía el ceño; el
+// umbral de 60 días es de FOTOS viejas, no del riel).
+const STALE_MS = 28 * 24 * 60 * 60 * 1000
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const fmtShort = (iso: string): string => `${MESES[Number(iso.slice(5, 7)) - 1]} ${iso.slice(2, 4)}`
 const fmtFull = (iso: string): string =>
