@@ -844,13 +844,15 @@ export type TableCol = { day: string; source: BodyCheckin['source'] }
 export type CheckinTable = { cols: TableCol[]; groups: TableGroup[] }
 
 const TABLE_METRICS: { group: string; key: keyof BodyCheckin; label: string; unit: string }[] = [
+  // Lo MEDIDO arriba, lo DERIVADO abajo (benchmark: el orden de filas es la
+  // jerarquía en una tabla sin color; IMC/TMB se consultan, no se escanean).
   { group: 'Básicos', key: 'weight_kg', label: 'Peso', unit: 'kg' },
-  { group: 'Básicos', key: 'bmi', label: 'IMC', unit: '' },
-  { group: 'Básicos', key: 'bmr_kcal', label: 'TMB', unit: 'kcal' },
   { group: 'Básicos', key: 'water_pct', label: 'Agua', unit: '%' },
   { group: 'Básicos', key: 'bone_mass_kg', label: 'M. ósea', unit: 'kg' },
-  { group: 'Básicos', key: 'metabolic_age', label: 'Edad metab.', unit: 'años' },
   { group: 'Básicos', key: 'visceral_fat_index', label: 'Visceral', unit: '' },
+  { group: 'Básicos', key: 'bmi', label: 'IMC', unit: '' },
+  { group: 'Básicos', key: 'bmr_kcal', label: 'TMB', unit: 'kcal' },
+  { group: 'Básicos', key: 'metabolic_age', label: 'Edad metab.', unit: 'años' },
   { group: 'Músculo', key: 'muscle_kg', label: 'Total', unit: 'kg' },
   { group: 'Músculo', key: 'muscle_arm_right_kg', label: 'Brazo der', unit: 'kg' },
   { group: 'Músculo', key: 'muscle_arm_left_kg', label: 'Brazo izq', unit: 'kg' },
