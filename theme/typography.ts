@@ -65,8 +65,13 @@ export const typography = {
 
   letterSpacing: {
     uppercaseWide: 2.4,
+    // El tracking canónico de EyebrowLabel (antes literal 2.2 en el
+    // componente; promovido en la auditoría de coherencia).
+    eyebrow: 2.2,
     uppercaseMed: 1.8,
     uppercaseTight: 1.6,
+    // Micro-captions de dato (EL PICO/HOY, chips de delta).
+    microCaption: 1.2,
     displayTight: -2,
     displayMed: -1,
     default: 0,

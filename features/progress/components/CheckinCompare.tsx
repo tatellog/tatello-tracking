@@ -430,9 +430,9 @@ const styles = StyleSheet.create({
   rowDivider: { borderTopWidth: 1, borderTopColor: colors.hairlineFaint },
   // Monocromo: labels niebla, números leche, delta ORO — un solo lenguaje.
   rowLabel: {
-    fontFamily: typography.uiMedium,
+    fontFamily: typography.uiBold,
     fontSize: typography.sizes.label,
-    letterSpacing: 0.4,
+    letterSpacing: typography.letterSpacing.microCaption,
     textTransform: 'uppercase',
     color: colors.niebla,
     marginBottom: 5,

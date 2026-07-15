@@ -495,9 +495,9 @@ const styles = StyleSheet.create({
   },
   endLabel: {
     marginTop: 2,
-    fontFamily: typography.uiSemi,
+    fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.2,
+    letterSpacing: typography.letterSpacing.microCaption,
     textTransform: 'uppercase',
     color: colors.niebla,
   },

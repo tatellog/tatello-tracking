@@ -33,7 +33,7 @@ import { Sparkline } from './Sparkline'
 // asusta y no me dice qué hacer"): es el número más cercano a lenguaje clínico
 // del tab y no tiene palanca. Vive solo en la Tabla completa, el expediente.
 const METRICS: { key: CompositionSeriesKey; label: string; unit: string; hue: string }[] = [
-  { key: 'body_fat_pct', label: 'Grasa corporal', unit: '%', hue: colors.signal.proteina },
+  { key: 'body_fat_pct', label: 'Grasa corporal', unit: '%', hue: colors.signal.grasa },
   { key: 'muscle_kg', label: 'Músculo', unit: 'kg', hue: colors.dimension.cuerpo },
   { key: 'water_pct', label: 'Agua', unit: '%', hue: colors.signal.agua },
   { key: 'lean_kg', label: 'Masa magra', unit: 'kg', hue: colors.dimension.cuerpo },
@@ -225,7 +225,9 @@ function MetricCard({
         <Text style={styles.curr}>{fmt(last.value, unit)}</Text>
       </View>
       {delta != null && delta !== 0 ? (
-        <Text style={[styles.delta, { color: hue }]}>
+        /* Delta en ORO, no en el hue: monocromo+oro como el comparador (la
+           identidad vive en label+sparkline; el cambio es evidencia). */
+        <Text style={[styles.delta, { color: colors.oroLight }]}>
           {arrow} {delta > 0 ? '+' : '−'}
           {fmt(Math.abs(delta), unit)}
         </Text>

@@ -133,7 +133,7 @@ export function ProgressInsightCard() {
 }
 
 const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: colors.hairlineFaint, marginVertical: 28 },
+  divider: { height: 0, marginVertical: 28 },
   eyebrow: { marginBottom: 12 },
   lead: {
     fontFamily: typography.serif,

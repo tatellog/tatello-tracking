@@ -28,7 +28,7 @@ export const METRIC_CONFIG: Record<
   grasa: {
     label: 'Grasa corporal',
     unit: '%',
-    hue: colors.signal.proteina,
+    hue: colors.signal.grasa,
     question: 'De tu primera a tu última medición',
     explainer: null,
   },

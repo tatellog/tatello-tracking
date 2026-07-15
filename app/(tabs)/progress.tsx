@@ -633,11 +633,8 @@ const styles = StyleSheet.create({
   // Thin hairline between the page's three sections (cambio /
   // cambio visual / entreno) so the eye reads them as separate
   // beats instead of an undifferentiated dump.
-  divider: {
-    height: 1,
-    backgroundColor: colors.hairlineFaint,
-    marginVertical: 28,
-  },
+  // El espacio ES el separador (unificado con Cuerpo · decisión dueña).
+  divider: { height: 0, marginVertical: 28 },
   // Separación por AIRE (Cuerpo): sin línea, ~35% más respiro entre secciones.
   sectionGap: { height: 56 },
   heroEyebrow: {
@@ -723,7 +720,7 @@ const styles = StyleSheet.create({
   deltaChipLabel: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 1,
+    letterSpacing: typography.letterSpacing.microCaption,
     textTransform: 'uppercase',
     color: colors.niebla,
   },

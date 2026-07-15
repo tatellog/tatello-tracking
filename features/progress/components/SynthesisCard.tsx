@@ -97,6 +97,9 @@ export function SynthesisCard() {
   if (signals.isLoading) return null
   if (!lead && activeDays < MIN_ACTIVE) return null // muy pronto: ni ruido ni patrón inventado
 
+  // Contrato (auditoría de coherencia): ESTE es el único link saliente del
+  // tab en MAGENTA (la puerta canónica a Órbita); el puente de la card IA
+  // queda en niebla como salida secundaria. Un idioma por gesto.
   const openOrbita = () => {
     track('synthesis_open_orbita', { pattern: lead?.id ?? null })
     requestOrbitSegment('mes')

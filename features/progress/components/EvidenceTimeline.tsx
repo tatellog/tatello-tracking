@@ -164,7 +164,7 @@ export function EvidenceTimeline({ onPick }: { onPick?: (day: string) => void })
       </View>
       <Text style={styles.sub}>Fotos y mediciones · toca una y compárala abajo</Text>
 
-      {/* ── Scrubber: rail + relleno magenta + estrellas + "Hoy" ── */}
+      {/* ── Scrubber: rail + recorrido oro + estrellas + "Hoy" ── */}
       <Pressable
         onPress={(e) => onRailPress(e.nativeEvent.locationX)}
         onLayout={(e) => setRailW(e.nativeEvent.layout.width)}
@@ -183,12 +183,14 @@ export function EvidenceTimeline({ onPick }: { onPick?: (day: string) => void })
                 stroke={colors.oroHairline}
                 strokeWidth={1.4}
               />
+              {/* Recorrido en ORO: es "lo que ya recorriste", el mismo
+                  significado que el trail del hero (auditoría). */}
               <Line
                 x1={4}
                 y1={22}
                 x2={4 + dotX(items.length - 1, railW)}
                 y2={22}
-                stroke={colors.magenta}
+                stroke={colors.oro}
                 strokeWidth={2}
               />
               {items.map((it, i) => (
