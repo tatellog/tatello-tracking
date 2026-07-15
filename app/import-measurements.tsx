@@ -11,6 +11,7 @@ import Toast from 'react-native-toast-message'
 
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { upsertBodyCheckin, type BodyCheckinInput } from '@/features/progress/api'
+import { useBodyCheckins } from '@/features/progress/hooks'
 import {
   scanMeasurementsImage,
   scanMeasurementsPdf,
@@ -78,6 +79,7 @@ type Phase = 'idle' | 'scanning' | 'review' | 'saving'
 
 export default function ImportMeasurementsScreen() {
   const router = useRouter()
+  const checkinsQ = useBodyCheckins()
   const [phase, setPhase] = useState<Phase>('idle')
   const [checkins, setCheckins] = useState<ScannedCheckin[]>([])
   const [confidence, setConfidence] = useState<'alta' | 'media' | 'baja'>('alta')
@@ -165,7 +167,23 @@ export default function ImportMeasurementsScreen() {
       text1: saved === 1 ? 'Medición guardada' : `${saved} mediciones guardadas`,
       text2: saved < included.length ? 'Algunas no se guardaron. Intenta de nuevo.' : undefined,
     })
-    router.replace('/progress-table')
+    // El MISMO ritual del guardado manual (target-user: "ese es EL momento
+    // emocional del mes y me lo dejan en el paso más frío"): aterrizar en el
+    // Análisis con anterior → la más reciente importada. Con una sola fecha
+    // en total, la tabla sigue siendo el destino honesto.
+    const importedDays = included.map((c) => c.date).sort()
+    const newest = importedDays[importedDays.length - 1]!
+    const prior = [
+      ...new Set([...(checkinsQ.data ?? []).map((c) => c.measured_on), ...importedDays]),
+    ]
+      .sort()
+      .filter((d) => d < newest)
+      .pop()
+    if (prior) {
+      router.replace({ pathname: '/progress-analysis', params: { a: prior, b: newest } })
+    } else {
+      router.replace('/progress-table')
+    }
   }
 
   return (
