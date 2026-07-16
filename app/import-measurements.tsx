@@ -1,4 +1,3 @@
-import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
@@ -123,6 +122,21 @@ export default function ImportMeasurementsScreen() {
   }
 
   const pickPdf = async () => {
+    // Import PEREZOSO: ExpoDocumentPicker no existe en el runtime de Expo Go
+    // (igual que ExpoPrint) y el import estático tumbaba la pantalla entera
+    // al abrirla. En la build instalada funciona completo; en Expo Go el PDF
+    // se disculpa y la foto (o una captura del PDF) cubre el caso.
+    let DocumentPicker: typeof import('expo-document-picker')
+    try {
+      DocumentPicker = await import('expo-document-picker')
+    } catch {
+      Toast.show({
+        type: 'info',
+        text1: 'El PDF no está disponible en Expo Go',
+        text2: 'En la app instalada sí. Por ahora, usa una foto o captura del PDF.',
+      })
+      return
+    }
     const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' })
     const uri = res.assets?.[0]?.uri
     if (res.canceled || !uri) return

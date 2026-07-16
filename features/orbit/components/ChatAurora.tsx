@@ -241,22 +241,33 @@ export function ChatAurora({ width, height = 90 }: { width: number; height?: num
   return (
     <View style={{ width, height }} pointerEvents="none">
       <Canvas style={{ width, height }}>
-        {ribbons.map((spec, i) => (
-          <Ribbon key={i} t={t} width={width} height={height} spec={spec} />
-        ))}
-        {/* Vignette: la aurora se DISUELVE en el negro del sheet arriba y abajo,
-            para que no se lea como una banda/contenedor con borde. Pinta el color
-            del fondo con alpha decreciente sobre los extremos — FUNDE, no recorta
-            la forma de las ondas (lo que hacía rara la máscara anterior). Colores
-            estáticos (nunca animar colores de gradiente Skia · crashea en device). */}
-        <Rect x={0} y={0} width={width} height={height}>
-          <SkiaLinearGradient
-            start={vec(0, 0)}
-            end={vec(0, height)}
-            colors={[colors.bg, fade(colors.bg), fade(colors.bg), colors.bg]}
-            positions={[0, 0.16, 0.84, 1]}
-          />
-        </Rect>
+        {/* La aurora vive en su PROPIA capa y se disuelve por ALPHA (dstIn):
+            así funde sobre CUALQUIER fondo. La viñeta anterior pintaba
+            colors.bg en los extremos, pero el sheet del chat no es de ese
+            color y las franjas dibujaban un contenedor rectangular (dueña).
+            Dos pasadas de dstIn (vertical + horizontal) emploman los cuatro
+            bordes; colores estáticos (nunca animar gradientes Skia). */}
+        <Group layer>
+          {ribbons.map((spec, i) => (
+            <Ribbon key={i} t={t} width={width} height={height} spec={spec} />
+          ))}
+          <Rect x={0} y={0} width={width} height={height} blendMode="dstIn">
+            <SkiaLinearGradient
+              start={vec(0, 0)}
+              end={vec(0, height)}
+              colors={['transparent', 'white', 'white', 'transparent']}
+              positions={[0, 0.28, 0.72, 1]}
+            />
+          </Rect>
+          <Rect x={0} y={0} width={width} height={height} blendMode="dstIn">
+            <SkiaLinearGradient
+              start={vec(0, 0)}
+              end={vec(width, 0)}
+              colors={['transparent', 'white', 'white', 'transparent']}
+              positions={[0, 0.1, 0.9, 1]}
+            />
+          </Rect>
+        </Group>
       </Canvas>
     </View>
   )
