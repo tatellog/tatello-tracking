@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -24,6 +24,9 @@ import { colors, typography } from '@/theme'
 export default function CaptureMealScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  // El momento elegido en el QuickLog (✦ → Con foto) viaja hasta scan-meal;
+  // sin él, el snack de madrugada aterrizaba como dijera la hora.
+  const { mealType } = useLocalSearchParams<{ mealType?: string }>()
   const [permission, requestPermission] = useCameraPermissions()
   const cameraRef = useRef<CameraView>(null)
   const [flash, setFlash] = useState<'off' | 'on'>('off')
@@ -33,8 +36,12 @@ export default function CaptureMealScreen() {
   // Reemplaza esta pantalla por /scan-meal: así "atrás" desde scan-meal
   // regresa a Hoy, no a la cámara.
   const goScanWithUri = useCallback(
-    (uri: string) => router.replace({ pathname: '/scan-meal', params: { uri } }),
-    [router],
+    (uri: string) =>
+      router.replace({
+        pathname: '/scan-meal',
+        params: mealType ? { uri, mealType } : { uri },
+      }),
+    [router, mealType],
   )
 
   const handleShutter = useCallback(async () => {
@@ -61,8 +68,11 @@ export default function CaptureMealScreen() {
   }, [busy, goScanWithUri])
 
   const handleText = useCallback(() => {
-    router.replace({ pathname: '/scan-meal', params: { describe: '1' } })
-  }, [router])
+    router.replace({
+      pathname: '/scan-meal',
+      params: mealType ? { describe: '1', mealType } : { describe: '1' },
+    })
+  }, [router, mealType])
 
   const close = useCallback(() => router.back(), [router])
 

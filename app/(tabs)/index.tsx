@@ -54,6 +54,7 @@ import {
   CoachLine,
   DayCheckIn,
   DayCloseCard,
+  DayReadingStrip,
   type DayState,
   type WorkoutTypeId,
   LunarConstellation,
@@ -734,17 +735,25 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               })()}
             </Animated.View>
 
-            {/* El cierre de hoy — veredicto nocturno (≥20:00, ≥1 comida):
-                "¿quedé en déficit?" claro y sin poesía, con la misma
-                definición de déficit sano del calendario dorado del mes.
-                Solo para HOY (en modo ver-día no hay cierre que dar). */}
+            {/* La lectura del día + el cierre — la MISMA pregunta en dos
+                franjas: durante el día, "¿Cómo voy hoy?" (lectura de Órbita
+                Día asomada aquí, V-02); desde las 20:00 con ≥1 comida, el
+                veredicto nocturno toma su lugar (la tira se retira sola).
+                Solo para HOY (en modo ver-día no hay lectura que dar). */}
             {!viewingPast ? (
-              <DayCloseCard
-                consumedCalories={ctx.today_macros.calories}
-                targetCalories={ctx.targets?.calories}
-                mealCount={ctx.meal_count_today}
-                reading={closeReading}
-              />
+              <>
+                <DayReadingStrip
+                  consumedCalories={ctx.today_macros.calories}
+                  targetCalories={ctx.targets?.calories}
+                  mealCount={ctx.meal_count_today}
+                />
+                <DayCloseCard
+                  consumedCalories={ctx.today_macros.calories}
+                  targetCalories={ctx.targets?.calories}
+                  mealCount={ctx.meal_count_today}
+                  reading={closeReading}
+                />
+              </>
             ) : null}
 
             {/* Días en órbita — acumulado (no racha), lectura secundaria.

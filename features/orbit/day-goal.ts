@@ -118,24 +118,33 @@ const proteinReached = (s: DailySignals, ctx: DayGoalCtx): boolean =>
 
 /* ── Héroe — el estado del déficit del día ───────────────────────────── */
 
-function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
-  const target =
-    ctx.calorieTarget != null && ctx.calorieTarget > 0 ? Math.round(ctx.calorieTarget) : null
-  const consumed = s.calories != null && s.calories > 0 ? Math.round(s.calories) : null
+/** La lectura núcleo del día: estado + palabra-titular + línea, a partir de
+ *  consumo y meta. COMPARTIDA: el héroe de Órbita Día y la lectura asomada
+ *  en Hoy (V-02) dicen las MISMAS palabras con los MISMOS umbrales — una
+ *  sola fuente de verdad, cero copys divergentes. */
+export type DayReading = {
+  status: GoalStatus
+  /** kcal: margen bajo la meta (deficit) o excedente (over); null sin datos. */
+  deltaKcal: number | null
+  consumed: number | null
+  target: number | null
+  /** Llenado del anillo 0..1 (consumo / meta, tope 1). */
+  fill: number
+  /** Excedente sobre la meta 0..~ → el arco oro (solo over). */
+  over: number
+  stateLabel: string
+  line: string
+}
 
-  // Anillos de acompañamiento (proteína / entreno), independientes del de
-  // calorías: siempre presentes en el hero para los anillos concéntricos.
-  const proteinFill =
-    ctx.proteinTarget != null && ctx.proteinTarget > 0 && s.protein_g != null
-      ? Math.min(1, s.protein_g / ctx.proteinTarget)
-      : null
-  const proteinG = s.protein_g != null ? Math.round(s.protein_g) : null
-  const trained = s.trained === true
-  // La kcal del reloj solo acompaña a un día ENTRENADO; si el dato quedó
-  // huérfano (kcal sin trained, imposible por la view pero defensivo), se
-  // descarta para que la leyenda nunca hable de un entreno que no existe.
-  const workoutKcal = trained && s.workout_kcal != null ? Math.round(s.workout_kcal) : null
-  const workoutSource = trained ? (s.workout_source ?? null) : null
+export function dayReading(
+  consumedCalories: number | null | undefined,
+  calorieTarget: number | null | undefined,
+  opts: { past?: boolean } = {},
+): DayReading {
+  const past = opts.past === true
+  const target = calorieTarget != null && calorieTarget > 0 ? Math.round(calorieTarget) : null
+  const consumed =
+    consumedCalories != null && consumedCalories > 0 ? Math.round(consumedCalories) : null
 
   // Sin comida o sin meta → no hay objetivo que juzgar. El día aún se revela.
   // stateLabel = la PALABRA-titular (héroe "Hoy estás en [Déficit]"); el matiz de
@@ -148,11 +157,6 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
       target,
       fill: 0,
       over: 0,
-      proteinFill,
-      proteinG,
-      trained,
-      workoutKcal,
-      workoutSource,
       stateLabel: 'Tu día aún se revela',
       line: past
         ? 'Ese día no quedó registro de comida.'
@@ -169,11 +173,6 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
       target,
       fill: Math.min(1, consumed / target),
       over: 0,
-      proteinFill,
-      proteinG,
-      trained,
-      workoutKcal,
-      workoutSource,
       stateLabel: 'Déficit',
       line: past
         ? 'Ese día cerró con margen bajo tu meta.'
@@ -188,13 +187,42 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
     target,
     fill: 1,
     over: Math.min(0.45, (consumed - target) / target),
+    stateLabel: 'Sobre tu objetivo',
+    line: past ? 'Ese día quedó sobre tu objetivo.' : 'Tu ritmo continúa mañana.',
+  }
+}
+
+function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
+  const reading = dayReading(s.calories, ctx.calorieTarget, { past })
+
+  // Anillos de acompañamiento (proteína / entreno), independientes del de
+  // calorías: siempre presentes en el hero para los anillos concéntricos.
+  const proteinFill =
+    ctx.proteinTarget != null && ctx.proteinTarget > 0 && s.protein_g != null
+      ? Math.min(1, s.protein_g / ctx.proteinTarget)
+      : null
+  const proteinG = s.protein_g != null ? Math.round(s.protein_g) : null
+  const trained = s.trained === true
+  // La kcal del reloj solo acompaña a un día ENTRENADO; si el dato quedó
+  // huérfano (kcal sin trained, imposible por la view pero defensivo), se
+  // descarta para que la leyenda nunca hable de un entreno que no existe.
+  const workoutKcal = trained && s.workout_kcal != null ? Math.round(s.workout_kcal) : null
+  const workoutSource = trained ? (s.workout_source ?? null) : null
+
+  return {
+    status: reading.status,
+    deltaKcal: reading.deltaKcal,
+    consumed: reading.consumed,
+    target: reading.target,
+    fill: reading.fill,
+    over: reading.over,
     proteinFill,
     proteinG,
     trained,
     workoutKcal,
     workoutSource,
-    stateLabel: 'Sobre tu objetivo',
-    line: past ? 'Ese día quedó sobre tu objetivo.' : 'Tu ritmo continúa mañana.',
+    stateLabel: reading.stateLabel,
+    line: reading.line,
   }
 }
 

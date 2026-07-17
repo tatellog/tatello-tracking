@@ -47,10 +47,13 @@ import {
 import {
   useCreateMeal,
   useFrequentMeals,
+  useMacroTargets,
   useMealById,
+  useMealsForDate,
   useUpdateMeal,
 } from '@/features/macros/hooks'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
+import { microReading } from '@/features/macros/micro-reading'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
@@ -604,6 +607,9 @@ export default function ScanMealScreen() {
   // coach line, shown after a new log before returning to the tab.
   const [revealProtein, setRevealProtein] = useState(0)
   const [revealLine, setRevealLine] = useState(REVEAL_LINES[0] ?? '')
+  // Microlectura del MOTOR (V-01): el día acumulado tras esta comida —
+  // proteína vs meta o margen del día. null = silencio (jamás relleno).
+  const [revealReading, setRevealReading] = useState<string | null>(null)
   // Warm in-app note when the scan can't read the plate/text (replaces a
   // cold system Alert). Cleared once the user adds an ingredient.
   const [scanError, setScanError] = useState<string | null>(null)
@@ -917,10 +923,34 @@ export default function ScanMealScreen() {
     hadMealsBefore.current = frequent.data.length > 0
   }
 
+  // Datos para la microlectura del reveal (V-01): las comidas ya guardadas
+  // del día + las metas. Solo para registros nuevos (no ediciones).
+  const targetsQ = useMacroTargets()
+  const dayMealsQ = useMealsForDate(isEdit ? null : (activeLogDate ?? todayInTimezone()))
+
   // New logs land on the reveal (state C) before returning to the tab —
-  // a star joins the sky + the protein of this meal + a coach line.
-  const goToReveal = (protein: number) => {
+  // a star joins the sky + the protein of this meal + a coach line, y si
+  // el motor tiene algo computado que decir del DÍA, una microlectura.
+  const goToReveal = (protein: number, saved?: { id: string; calories: number }) => {
     setRevealProtein(Math.round(protein))
+    if (saved) {
+      // La suma excluye la comida recién creada por id (la caché puede o
+      // no traerla ya) y la agrega a mano: determinista siempre.
+      const others = (dayMealsQ.data ?? []).filter((m) => m.id !== saved.id)
+      const dayProteinG = others.reduce((sum, m) => sum + m.protein_g, 0) + protein
+      const dayCalories = others.reduce((sum, m) => sum + m.calories, 0) + saved.calories
+      const reading = microReading({
+        dayProteinG,
+        proteinTarget: targetsQ.data?.protein_g ?? null,
+        dayCalories,
+        calorieTarget: targetsQ.data?.calories ?? null,
+      })
+      setRevealReading(reading?.text ?? null)
+      // TTFI (V-04): cada insight mostrado deja huella con tier + fuente.
+      if (reading) {
+        track('insight_shown', { source: 'micro_reading', key: reading.key, tier: 'reflexion' })
+      }
+    }
     setRevealLine(
       // La primera comida de la vida cierra con la promesa del día 2, no
       // con una frase genérica: convierte el esfuerzo en compounding.
@@ -1146,7 +1176,10 @@ export default function ScanMealScreen() {
         {
           onSuccess: (meal) => {
             const protein = Math.min(500, Math.max(0, Number(proteinInput) || 0))
-            void presentLiquids(meal.id, intakeDateForNew(), false, () => goToReveal(protein))
+            const calories = Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0)))
+            void presentLiquids(meal.id, intakeDateForNew(), false, () =>
+              goToReveal(protein, { id: meal.id, calories }),
+            )
           },
           onError: (e) => {
             setSaving(false)
@@ -1243,7 +1276,7 @@ export default function ScanMealScreen() {
             emitScanFeedback({ id: meal.id, name: macros.name, confidence })
           }
           void presentLiquids(meal.id, intakeDateForNew(), false, () =>
-            goToReveal(macros.protein_g),
+            goToReveal(macros.protein_g, { id: meal.id, calories: macros.calories }),
           )
         },
         onError: (e) => {
@@ -1358,12 +1391,24 @@ export default function ScanMealScreen() {
                 ✦ +{energiaDelta} {ATTRIBUTE_LABEL.energia}
               </Animated.Text>
             ) : null}
+            {/* La microlectura del motor (V-01): el día acumulado tras esta
+                comida — dato en UI upright, no voz de coach. Con silencio
+                (null) el reveal se queda como está. */}
+            {revealReading ? (
+              <Animated.Text
+                entering={FadeInUp.duration(520).delay(1080)}
+                style={styles.revealReading}
+              >
+                {revealReading}
+              </Animated.Text>
+            ) : null}
             {/* El puente registro → significado: en el momento de máxima
                 atención, la respuesta a "¿cómo voy?" queda a un tap. La
                 evidencia vive en Órbita Día (sin semáforo en el home). */}
             <Animated.View entering={FadeInUp.duration(520).delay(1150)}>
               <Pressable
                 onPress={() => {
+                  track('insight_opened', { source: 'meal_reveal', target: 'orbit_dia' })
                   requestOrbitSegment('dia')
                   router.replace('/orbit')
                 }}
@@ -1532,6 +1577,26 @@ export default function ScanMealScreen() {
                 </>
               ) : (
                 <>
+                  {/* V-03 · confianza alta = la revisión deja de ser peaje:
+                      un tap registra tal cual (mismo guardado, con el loop
+                      "¿le atiné?" como red). El formulario sigue abajo para
+                      quien quiera ajustar. Solo scans nuevos. */}
+                  {!isEdit && !isManual && confidence === 'alta' && ingredients.length > 0 ? (
+                    <View style={styles.quickSave}>
+                      <PrimaryCta
+                        label={`Registrar tal cual · ${Math.round(totals.protein)} g · ${Math.round(totals.calories)} kcal`}
+                        onPress={() => void handleConfirm()}
+                        disabled={saving}
+                        loading={saving}
+                        transform="none"
+                        accessibilityLabel="Registrar la comida tal como se leyó"
+                      />
+                      <Text style={styles.quickSaveNote}>
+                        La lectura vino con confianza alta. Si algo no cuadra, ajústalo abajo.
+                      </Text>
+                    </View>
+                  ) : null}
+
                   <Text style={[styles.eyebrow, styles.eyebrowGap]}>
                     {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
                   </Text>
@@ -1805,6 +1870,17 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },
+  // La microlectura del motor — dato discreto (bone, upright), separada de
+  // la voz del coach; nunca compite con el número del reveal.
+  revealReading: {
+    marginTop: 14,
+    paddingHorizontal: 24,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
   // El puente a Órbita Día — secundario al check de "listo", nunca compite.
   revealOrbitaLink: {
     marginTop: 16,
@@ -2048,6 +2124,21 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 18,
     color: colors.bone,
+  },
+  // V-03 · guardar directo con confianza alta — el atajo va ARRIBA del
+  // desglose; la nota deja claro que revisar sigue disponible, no exigido.
+  quickSave: {
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  quickSaveNote: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.niebla,
+    textAlign: 'center',
   },
   // M1 · escalador de porción de un tap.
   portionRow: {

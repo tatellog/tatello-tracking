@@ -1,10 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Haptics from 'expo-haptics'
-import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert,
   Dimensions,
   type GestureResponderEvent,
   Modal,
@@ -32,7 +30,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { isCycleActive } from '@/features/cycle/phase'
 import type { FrequentMeal, MealInput } from '@/features/macros/api'
 import { MealGlyph } from '@/features/macros/components/meal-glyphs'
-import { useCreateMeal, useFrequentMeals } from '@/features/macros/hooks'
+import { useCreateMeal, useFrequentMeals, useMealsForDate } from '@/features/macros/hooks'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { useProfile, useRecordLastPeriodStart } from '@/features/profile/hooks'
 import {
@@ -446,6 +444,51 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     }
   }, [visible])
 
+  // "Como ayer" — el atajo de un tap a la comida de AYER en el momento
+  // seleccionado (mismo patrón que el composer de Comidas, ahora también
+  // aquí, donde la usuaria realmente está). "Ayer" es relativo al día que
+  // se está registrando (backfill incluido). Sin comida de ayer en ese
+  // momento, la fila simplemente no existe.
+  const yesterdayIso = useMemo(() => {
+    const [y, m, d] = logDate.split('-').map(Number) as [number, number, number]
+    const prev = new Date(y, m - 1, d - 1, 12)
+    const mm = String(prev.getMonth() + 1).padStart(2, '0')
+    const dd = String(prev.getDate()).padStart(2, '0')
+    return `${prev.getFullYear()}-${mm}-${dd}`
+  }, [logDate])
+  const yesterMeals = useMealsForDate(visible ? yesterdayIso : null)
+  const comoAyer = useMemo(
+    () => (yesterMeals.data ?? []).find((m) => m.meal_type === mealType) ?? null,
+    [yesterMeals.data, mealType],
+  )
+
+  const handleComoAyer = () => {
+    if (!comoAyer || confirmingName) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    createMeal.mutate(
+      {
+        name: comoAyer.name,
+        protein_g: comoAyer.protein_g,
+        calories: comoAyer.calories,
+        consumed_at: logConsumedAt(),
+        meal_type: mealType,
+        photo_storage_path: comoAyer.photo_storage_path,
+      },
+      {
+        onSuccess: (meal) => {
+          emitMealUndo({
+            id: meal.id,
+            name: comoAyer.name,
+            mealTypeLabel: MEAL_TYPES.find((t) => t.value === mealType)?.label ?? 'tu día',
+          })
+        },
+      },
+    )
+    setConfirmingName(comoAyer.name)
+    fireBurst(SCREEN_W / 2, SCREEN_H * 0.62, colors.magentaHot)
+    setTimeout(onClose, CONFIRM_HOLD_MS)
+  }
+
   const handleLogMeal = (item: FrequentMeal) => {
     if (confirmingName) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
@@ -526,40 +569,15 @@ export function QuickLogSheet({ visible, onClose }: Props) {
     addMeasurement.mutate({ weight_kg: Math.round(weightDraft * 10) / 10 }, { onSuccess: onClose })
   }
 
-  // Con foto — shoot or pick a photo, then hand off to the scan-meal
-  // flow which reads the plate and logs the meal.
-  const openPhoto = async (source: 'camera' | 'library') => {
-    if (source === 'camera') {
-      const perm = await ImagePicker.requestCameraPermissionsAsync()
-      if (!perm.granted) {
-        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
-        return
-      }
-    }
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
-    if (result.canceled || !result.assets[0]) return
-    onClose()
-    // El momento elegido en el sheet VIAJA al scan (antes se ignoraba y el
-    // "Snack" de madrugada aterrizaba como dijera la hora).
-    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri, mealType } })
-  }
-
+  // Con foto — directo a la cámara in-app (/capture-meal), que ya trae
+  // galería y texto adentro. El action sheet intermedio ("Tomar foto /
+  // Galería") cobraba un tap al camino más usado. El momento elegido en el
+  // sheet VIAJA por capture-meal hasta el scan (el "Snack" de madrugada
+  // aterriza en su momento, no como diga la hora).
   const handlePhotoLog = () => {
     if (confirmingName != null) return
-    showActionSheet(
-      {
-        title: 'Registrar comida con foto',
-        options: ['Tomar foto', 'Elegir de la galería', 'Cancelar'],
-        cancelButtonIndex: 2,
-      },
-      (index) => {
-        if (index === 0) void openPhoto('camera')
-        else if (index === 1) void openPhoto('library')
-      },
-    )
+    onClose()
+    router.push({ pathname: '/capture-meal', params: { mealType } })
   }
 
   // Con texto — the scan-meal screen in describe mode: type what you ate,
@@ -785,7 +803,8 @@ export function QuickLogSheet({ visible, onClose }: Props) {
 
               {items.length === 0 ? (
                 <Text style={styles.empty}>
-                  Lo que registres aparecerá aquí como “lo de siempre”, para sumarlo en un toque.
+                  Toca ✦ Con texto y escribe lo que comiste, tal cual: “dos huevos con pan”.
+                  Aparecerá aquí para sumarlo en un toque.
                 </Text>
               ) : (
                 <>
@@ -809,6 +828,34 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       )
                     })}
                   </View>
+
+                  {/* "Como ayer" — el camino más corto primero: repetir lo de
+                      ayer en este momento es un tap. */}
+                  {comoAyer ? (
+                    <Pressable
+                      onPress={handleComoAyer}
+                      disabled={confirmingName != null}
+                      style={[
+                        styles.comoAyer,
+                        confirmingName != null &&
+                          confirmingName !== comoAyer.name &&
+                          styles.methodDimmed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Como ayer: ${comoAyer.name}`}
+                    >
+                      <View style={styles.comoAyerText}>
+                        <Text style={styles.comoAyerLabel}>
+                          {confirmingName === comoAyer.name ? '✦ Registrada' : 'Como ayer'}
+                        </Text>
+                        <Text style={styles.comoAyerName} numberOfLines={1}>
+                          {comoAyer.name} · {Math.round(comoAyer.protein_g)} g ·{' '}
+                          {Math.round(comoAyer.calories)} kcal
+                        </Text>
+                      </View>
+                      <Text style={styles.comoAyerChevron}>›</Text>
+                    </Pressable>
+                  ) : null}
 
                   {/* "Lo de siempre" se gana con repetición: con puras comidas
                       de 1 vez la app exageraría lo que sabe de ti. */}
@@ -1243,6 +1290,41 @@ const styles = StyleSheet.create({
     color: colors.bone,
     marginTop: 14,
     marginBottom: 10,
+  },
+  // "Como ayer" — misma vestimenta que en el composer de Comidas.
+  comoAyer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.bgCard2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  comoAyerText: {
+    flex: 1,
+    gap: 2,
+  },
+  comoAyerLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.smallLabel,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.magenta,
+  },
+  comoAyerName: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  comoAyerChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
   },
   // "Ver N más / Ver menos" — a quiet magenta action below the preview.
   showMore: {

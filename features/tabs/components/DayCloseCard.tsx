@@ -3,9 +3,14 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
+import { track } from '@/lib/analytics'
 import { colors, typography } from '@/theme'
 
 import { dayCloseCopy, dayCloseVerdict } from '../day-close'
+
+// Huella TTFI (V-04): la micro-observación del cierre cuenta como insight
+// mostrado UNA vez por día (por sesión), no en cada re-render de Hoy.
+let readingTrackedDay: string | null = null
 
 /*
  * "El cierre de hoy" — la card del veredicto nocturno en Hoy. Desde las
@@ -38,6 +43,15 @@ export function DayCloseCard({
     const id = setInterval(() => setHour(new Date().getHours()), 60_000)
     return () => clearInterval(id)
   }, [])
+
+  const hasVerdict = dayCloseVerdict({ consumedCalories, targetCalories, mealCount, hour }) != null
+  useEffect(() => {
+    if (!reading || !hasVerdict) return
+    const day = new Date().toDateString()
+    if (readingTrackedDay === day) return
+    readingTrackedDay = day
+    track('insight_shown', { source: 'early_reading', tier: 'reflexion' })
+  }, [reading, hasVerdict])
 
   const verdict = dayCloseVerdict({ consumedCalories, targetCalories, mealCount, hour })
   if (!verdict) return null
