@@ -52,6 +52,8 @@ create policy "weekly_readings_update_own"
 create or replace function public.fn_weekly_readings_freeze()
 returns trigger
 language plpgsql
+-- search_path sellado (advisor 0011): la fn solo toca NEW/OLD.
+set search_path = ''
 as $$
 begin
   if new.user_id is distinct from old.user_id
