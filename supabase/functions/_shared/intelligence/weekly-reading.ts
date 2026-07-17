@@ -113,11 +113,11 @@ export function buildWeeklyReading(
 
   const body: string[] = []
   if (tdee && paceKgWeek != null) {
-    body.push(`Estas semanas tu cuerpo gastó alrededor de ${tdee.tdee} kcal al día.`)
+    body.push(`Últimamente tu cuerpo ha gastado alrededor de ${tdee.tdee} kcal al día.`)
     body.push(`Comiste en promedio ${kcalAvg} kcal en los días que registraste.`)
     body.push(
       tdee.quality === 'solida'
-        ? `Ese ritmo apunta a ${fmtPace(paceKgWeek)} por semana. Es un estimado, y sale de tus propios datos.`
+        ? `Ese ritmo apunta a ${fmtPace(paceKgWeek)} por semana. Es un estimado que sale de tus propios datos.`
         : `Ese ritmo apunta a ${fmtPace(paceKgWeek)} por semana. La lectura aún es temprana; con más días se afina sola.`,
     )
   } else {
@@ -168,7 +168,7 @@ function buildLever(
     if (weekendOver >= 1 && weekendOver >= weekdayOver) {
       return {
         kind: 'finde',
-        text: 'El finde fue lo más alto en calorías de tu semana. Ahí vive tu espacio para la que empieza.',
+        text: 'El fin de semana fue lo más alto en calorías. Ahí tienes espacio para la semana que empieza.',
       }
     }
     if (weekdayNear >= 3 && weekdayOver === 0) {

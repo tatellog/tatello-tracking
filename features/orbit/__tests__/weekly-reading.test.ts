@@ -56,7 +56,7 @@ describe('buildWeeklyReading — grados honestos', () => {
     expect(r!.grade).toBe('completa')
     expect(r!.tdee).not.toBeNull()
     expect(r!.paceKgWeek).not.toBeNull()
-    expect(r!.body.join(' ')).toContain('gastó alrededor de')
+    expect(r!.body.join(' ')).toContain('gastado alrededor de')
     expect(r!.body.join(' ')).toContain('por semana')
   })
 })
