@@ -1306,6 +1306,36 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_readings: {
+        Row: {
+          created_at: string
+          grade: string
+          id: string
+          opened_at: string | null
+          payload: Json
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          grade: string
+          id?: string
+          opened_at?: string | null
+          payload: Json
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string
+          id?: string
+          opened_at?: string | null
+          payload?: Json
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       wellbeing_checkins: {
         Row: {
           checked_at: string
