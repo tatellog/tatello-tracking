@@ -10,9 +10,13 @@ import Svg, {
   Stop as SvgStop,
 } from 'react-native-svg'
 
+import { useRouter } from 'expo-router'
+
 import { EmText } from '@/components/EmText'
 import { usePressFeedback } from '@/components/ui/interaction'
 import { useMacroTargets } from '@/features/macros/hooks'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, typography } from '@/theme'
 
 import { WEEK_BASELINE_COPY, weekBaselineObservations } from '../baseline'
@@ -42,6 +46,7 @@ import {
   type WeekLever,
 } from '../week-orbit-logic'
 import { consumeWeekFocus } from '../pending-week-focus'
+import { useWeeklyReading } from '../weekly-reading-hooks'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
 import { WeekProgressHero } from './WeekProgressHero'
@@ -156,6 +161,15 @@ export function WeekSegment({
   const lever = useMemo(() => weekLever(week, todayIso, ctx), [week, todayIso, ctx])
   const absences = useMemo(() => weekAbsences(week, todayIso), [week, todayIso])
 
+  // Tu lectura semanal (V-06) — DOBLE-gateada (flag + dev) mientras se
+  // valida. Sin lectura (null = silencio honesto del motor) no hay card.
+  const router = useRouter()
+  const { session } = useSession()
+  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const weeklyReadingQ = useWeeklyReading(readingOn)
+  const weeklyReading = weeklyReadingQ.data?.reading ?? null
+  const weeklyReadingOpened = weeklyReadingQ.data?.openedAt != null
+
   const hasEvidence = dims.some((d) => d.present > 0)
   // La galaxia muestra solo señales con presencia; las que nunca aparecieron
   // bajan a "La ausencia" (un planeta de 0 días se leería como falla).
@@ -237,6 +251,28 @@ export function WeekSegment({
           <WeekSilhouette cells={sealCells} />
           <Text style={styles.sealObservation}>{seal.observation}</Text>
           <Text style={styles.sealBridge}>Una semana nueva se abre.</Text>
+        </View>
+      ) : null}
+
+      {/* Tu lectura semanal (V-06) — el momento donde el motor te devuelve
+          algo de la semana cerrada. Determinístico: SIN ✦. Borde oro
+          mientras no se abre; ya abierta, queda como link tranquilo. */}
+      {weeklyReading ? (
+        <View style={[styles.readingCard, !weeklyReadingOpened && styles.readingCardNew]}>
+          <Pressable
+            onPress={() => router.push('/weekly-reading')}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir tu lectura semanal"
+            style={({ pressed }) => pressed && { opacity: 0.85 }}
+          >
+            <Text style={styles.sealEyebrow}>Tu lectura semanal</Text>
+            <Text style={styles.readingTitle}>
+              {weeklyReadingOpened ? 'Tu semana pasada, leída.' : 'Tu lectura está lista.'}
+            </Text>
+            <Text style={[styles.readingLink, { color: colors.oro }]}>
+              {weeklyReadingOpened ? 'Volver a leerla ›' : 'Abrirla ›'}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -876,6 +912,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.oroHairline,
     backgroundColor: colors.bgCard,
+  },
+  // Tu lectura semanal — misma vestimenta que el sello (son la pareja del
+  // lunes); el borde oro solo mientras está sin abrir.
+  readingCard: {
+    marginBottom: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  readingCardNew: {
+    borderColor: colors.oroHairline,
+  },
+  readingTitle: {
+    marginTop: 6,
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.heading,
+    color: colors.leche,
+  },
+  readingLink: {
+    marginTop: 10,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
   },
   sealEyebrow: {
     fontFamily: typography.uiBold,
