@@ -2,7 +2,11 @@
 
 > Documento vivo. Derivado de los 6 PRDs (Release 1–6) y el estado real del
 > código a jul 2026. La fuente de "qué NO hacer / cómo habla" sigue siendo
-> `features/docs/product-manifesto.md` (v3.0); esto es el "qué construir".
+> `docs/product-manifesto.md` (v3.0); esto es el "qué construir".
+>
+> **El ORDEN de ejecución ya no vive aquí:** lo marca
+> `docs/product-vision-roadmap.md` (fases V-01…V-19). Este doc queda como
+> índice de los releases R1–R6 del motor de inteligencia y sus dependencias.
 
 ## La tesis
 
@@ -15,14 +19,14 @@ Ver `../architecture/ai-philosophy.md` para el principio y sus barreras.
 
 ## Los releases
 
-| #   | Release                                                        | Objetivo en una línea                                                                 | Estado                                                                       |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| R1  | [Intelligence Engine](../epics/epic-01-intelligence-engine.md) | Motor determinístico: registros → hechos → findings → historias → ranking → hipótesis | En curso (implementación temprana fusionada en `features/orbit/findings.ts`) |
-| R2  | [Órbita AI](../epics/epic-02-orbita-ai.md)                     | Mostrar los hallazgos del mes como descubrimiento guiado; GPT solo explica            | En curso (teaser → reporte → chat fact-led ya en rama)                       |
-| R3  | [Progress](../epics/epic-03-progress.md)                       | La evolución completa (no solo peso): Resumen + Historia                              | Parcial (features/progress WIP congelado)                                    |
-| R4  | [Wearables](../epics/epic-04-wearables.md)                     | Apple Health/Garmin/Fitbit/Oura/… alimentan el Facts Engine                           | Planeado (spec en `docs/wearables-integration-spec.md`)                      |
-| R5  | [Experiments](../epics/epic-05-experiments.md)                 | Hipótesis → experimentos medibles y reversibles                                       | Planeado                                                                     |
-| R6  | [Stelar Intelligence](../epics/epic-06-stelar-intelligence.md) | Memoria mensual que aprende; la IA conecta meses                                      | Visión                                                                       |
+| #   | Release                                                        | Objetivo en una línea                                                                 | Estado                                                                                                                                                    |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | [Intelligence Engine](../epics/epic-01-intelligence-engine.md) | Motor determinístico: registros → hechos → findings → historias → ranking → hipótesis | Construido (pipeline en `_shared` + 5 tablas + writer `compute-findings`; flip ON solo en superficie dev; convergencia `month-built.ts` pendiente → V-10) |
+| R2  | [Órbita AI](../epics/epic-02-orbita-ai.md)                     | Mostrar los hallazgos del mes como descubrimiento guiado; GPT solo explica            | Construido · gated a dev (card IA + chat guiado + memoria de patrones F1 + N7; falta validar en dev build y abrir a beta)                                 |
+| R3  | [Progress](../epics/epic-03-progress.md)                       | La evolución completa (no solo peso): Resumen + Historia                              | Parcial (Progress 3.0 épicas 00–06 y 08 construidas, varias gated; milestones spine ✓; mapa corporal diferido)                                            |
+| R4  | [Wearables](../epics/epic-04-wearables.md)                     | Apple Health/Garmin/Fitbit/Oura/… alimentan el Facts Engine                           | Fase 1 construida (workouts/sueño/pasos); composición corporal gated OFF; Apple Health + Health Connect → V-14                                            |
+| R5  | [Experiments](../epics/epic-05-experiments.md)                 | Hipótesis → experimentos medibles y reversibles                                       | Spine construido (tabla + edge `experiment-lifecycle` + lógica pura); IA redactora y UI diferidas → V-12                                                  |
+| R6  | [Stelar Intelligence](../epics/epic-06-stelar-intelligence.md) | Memoria mensual que aprende; la IA conecta meses                                      | Visión                                                                                                                                                    |
 
 ## Dependencias
 
@@ -43,12 +47,14 @@ R1 (motor)  ──▶ R2 (Órbita AI)  ──▶ R6 (aprende con el tiempo)
 No se mide porque la usuaria converse más con la IA. Se mide porque **cada mes
 entiende mejor su comportamiento y toma mejores decisiones con menos esfuerzo**.
 
-## Estado a jul 2026 (honesto)
+## Estado a fines de jul 2026 (honesto)
 
-Lo construido estos días (Órbita Mes) es el **arranque real de R1 + R2**:
-
-- Findings + Ranking + Hypothesis viven **fusionados client-side** en `features/orbit/findings.ts` (no como 5 engines separados con tablas).
-- El reporte de evidencia (veredicto → dónde se te va → puerta abierta) y el
-  chat guiado fact-led (`stelar-insight` / `orbita_mes_chat`) ya existen.
-- **Falta** para cerrar R1: los engines separados (Facts, Story) y las tablas
-  `facts / findings / stories / hypothesis / monthly_reports / conversation_cache`.
+- **R1 cerró su construcción** (Epic 01): pipeline de 5 engines en
+  `_shared/intelligence/`, tablas persistidas y writer `compute-findings`.
+  `USE_PERSISTED_MONTH_REPORT` ya está ON, pero solo impacta la superficie
+  IA gateada a dev. Deuda declarada: `month-built.ts` sigue siendo motor
+  divergente (converge en V-10, ADR 0002).
+- **R2 está construido y gateado a dev** (`aiEnabledForEmail`): la beta ve
+  el Órbita Mes determinista de siempre.
+- Lo que corre en producción para la beta HOY sigue siendo el motor
+  client-side + la Lectura Semanal determinística (V-05, sin IA).

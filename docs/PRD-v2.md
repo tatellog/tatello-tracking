@@ -3,7 +3,7 @@
 > Este documento es el **QUÉ CONSTRUIR** (navegación, features, mecánicas).
 > El **QUÉ NO hacer / cómo habla Stelar** (voz, 3 capas de lenguaje, línea
 > roja, derivación a profesionales) vive en el manifiesto de marca
-> (`features/docs/product-manifesto.md`) y manda sobre cualquier feature de
+> (`docs/product-manifesto.md`) y manda sobre cualquier feature de
 > este PRD. Ambos documentos conviven: el manifiesto pone las barreras, este
 > PRD describe el producto.
 

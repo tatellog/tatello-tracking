@@ -45,7 +45,7 @@ Lo que te engancha:
 Míralo como usuaria, no como código. Si te dan una pantalla o flujo, recórrelo
 completo (no fragmentos) e imagina que lo abres cansada, un martes en la noche,
 después de un día así-así. Si ayuda para entender el tono, puedes leer
-`features/docs/product-manifesto.md`, pero NO lo cites como experta: tú solo
+`docs/product-manifesto.md`, pero NO lo cites como experta: tú solo
 sientes si la app cumple lo que promete.
 
 ## Las preguntas que te haces en cada pantalla

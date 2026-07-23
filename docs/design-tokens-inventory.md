@@ -1,7 +1,7 @@
 # Inventario de tokens · tabla de decisión (C0)
 
 Generado 5 jul 2026 (regenerable con el script de la sesión). Alimenta la
-migración C2 y los overrides de lint C3 del plan (mvp-improvement-plan
+migración C2 y los overrides de lint C3 del plan (archive/mvp-improvement-plan
 Parte 3).
 
 Cubetas: **(a)** el hex ES un token existente escrito a mano → migración

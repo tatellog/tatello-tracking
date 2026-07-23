@@ -15,7 +15,7 @@ visualízalo mentalmente.
 
 Lee los siguientes archivos antes de auditar:
 
-- `features/docs/product-manifesto.md` v3.0
+- `docs/product-manifesto.md` v3.0
 - `theme/colors.ts` y `theme/typography.ts`
 - El archivo de la view si es .tsx
 - Otras views del mismo flujo si las identificas

@@ -2,7 +2,7 @@
 
 > Este documento es el **HACIA DÓNDE** (posicionamiento, visión, métricas
 > norte, orden de construcción). Convive con `PRD-v2.md` (**QUÉ CONSTRUIR**)
-> y con el manifiesto (`features/docs/product-manifesto.md`, **QUÉ NO hacer /
+> y con el manifiesto (`docs/product-manifesto.md`, **QUÉ NO hacer /
 > cómo habla**), que manda sobre todo lo escrito aquí.
 >
 > Sin fechas a propósito: el launch ya ocurrió. El roadmap se ordena por
@@ -128,35 +128,39 @@ Orden de prioridad y dependencia. Una fase se abre cuando la anterior movió
 su métrica. Las épicas usan numeración **V-xx** (visión) para no chocar con
 las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 
-| Épica | Nombre                              | Fase | Prioridad |
-| ----- | ----------------------------------- | ---- | --------- |
-| V-01  | Microlecturas post-registro         | 1    | Crítica   |
-| V-02  | La lectura del día en Hoy           | 1    | Crítica   |
-| V-03  | Registro sin fricción               | 1    | Crítica   |
-| V-04  | Instrumentación TTFI                | 1    | Alta      |
-| V-05  | Lectura Semanal · motor             | 2    | Crítica   |
-| V-06  | Lectura Semanal · superficie + push | 2    | Crítica   |
-| V-07  | Lookup honesto de alimentos         | 3    | Crítica   |
-| V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      |
-| V-09  | Modelo de día parcial               | 3    | Alta      |
-| V-10  | Personal Evidence (flip R1)         | 4    | Alta      |
-| V-11  | Timeline de descubrimientos         | 4    | Media     |
-| V-12  | Experimentos · UI                   | 4    | Media     |
-| V-13  | Hero vivo                           | 4    | Media     |
-| V-14  | Apple Health + Health Connect       | 5    | Alta      |
-| V-15  | Smart Recovery                      | 5    | Media     |
-| V-16  | Insights predictivos                | 6    | Baja      |
-| V-17  | Memoria mensual (R6)                | 6    | Baja      |
-| V-18  | Comunidad de descubrimientos        | 6    | Explorat. |
-| V-19  | Monetización                        | 6    | Decisión  |
+| Épica | Nombre                              | Fase | Prioridad | Estado (jul 2026)      |
+| ----- | ----------------------------------- | ---- | --------- | ---------------------- |
+| V-01  | Microlecturas post-registro         | 1    | Crítica   | Construida (ver nota)  |
+| V-02  | La lectura del día en Hoy           | 1    | Crítica   | Construida             |
+| V-03  | Registro sin fricción               | 1    | Crítica   | Construida             |
+| V-04  | Instrumentación TTFI                | 1    | Alta      | Construida (ver nota)  |
+| V-05  | Lectura Semanal · motor             | 2    | Crítica   | Construida · gated dev |
+| V-06  | Lectura Semanal · superficie + push | 2    | Crítica   | Parcial · gated dev    |
+| V-07  | Lookup honesto de alimentos         | 3    | Crítica   | Pendiente              |
+| V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      | Pendiente              |
+| V-09  | Modelo de día parcial               | 3    | Alta      | Pendiente              |
+| V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Flip ON (solo dev)     |
+| V-11  | Timeline de descubrimientos         | 4    | Media     | Pendiente              |
+| V-12  | Experimentos · UI                   | 4    | Media     | Pendiente (spine ✓)    |
+| V-13  | Hero vivo                           | 4    | Media     | Pendiente              |
+| V-14  | Apple Health + Health Connect       | 5    | Alta      | Pendiente (R4 F1 ✓)    |
+| V-15  | Smart Recovery                      | 5    | Media     | Pendiente              |
+| V-16  | Insights predictivos                | 6    | Baja      | Pendiente              |
+| V-17  | Memoria mensual (R6)                | 6    | Baja      | Pendiente              |
+| V-18  | Comunidad de descubrimientos        | 6    | Explorat. | Pendiente              |
+| V-19  | Monetización                        | 6    | Decisión  | Pendiente              |
 
 ---
 
-### Fase 1 · El registro empieza a pagar de inmediato
+### Fase 1 · El registro empieza a pagar de inmediato · CONSTRUIDA
 
 Objetivo de fase: subir el retorno de cada registro sin construir sistemas
 nuevos. Métrica que abre la Fase 2: comidas/usuaria/día por método + primer
 tier de TTFI.
+
+> **Estado (jul 2026, rama `vision-fase-1`, commit `e0e8a44`):** V-01…V-04
+> construidas. Restos: microlectura aún no insertada en los modales de
+> Órbita Día (solo reveal del scan) y faltan las queries/reporte de TTFI.
 
 #### V-01 · Microlecturas post-registro
 
@@ -289,12 +293,20 @@ cualquier alimento del mundo: registrar TU comida, rápido.
 
 ---
 
-### Fase 2 · Lectura Semanal — EL feature
+### Fase 2 · Lectura Semanal — EL feature · EN VALIDACIÓN (dev)
 
 Objetivo de fase: el momento recurrente donde el motor TE DEVUELVE algo.
 Confirmado dos veces de forma independiente (panel de competencia +
 propuesta de visión). Es la compensación estructural de lo que el manifiesto
 decide no hacer (countdown, rachas, presión).
+
+> **Estado (jul 2026, commit `1e2d9eb` + fixes):** V-05 construida completa;
+> V-06 parcial (pantalla `/weekly-reading` + card en Órbita Semana). Todo
+> doble-gateado a dev (`WEEKLY_READING_ENABLED` + `aiEnabledForEmail`).
+> Migración `weekly_readings` aplicada (inmutable vía trigger, advisor
+> sellado). **Faltan de V-06:** N8 push, entrada desde Hoy, redacción IA
+> gated, y abrir a beta tras validar. Detalle en
+> `docs/weekly-reading-spec.md`.
 
 #### V-05 · Lectura Semanal · motor
 
@@ -481,8 +493,9 @@ estado visible de cada hallazgo.
 
 **Alcance.**
 
-- Flip de `USE_PERSISTED_MONTH_REPORT` tras validación (el flag existe,
-  OFF).
+- Flip de `USE_PERSISTED_MONTH_REPORT` tras validación (jul 2026: el flag
+  ya está ON, pero solo impacta la superficie IA gateada a dev; el resto de
+  V-10 sigue pendiente).
 - Estado del arco en la UI de patrones/hallazgos (Órbita + Progreso),
   derivado de findings/hypothesis del pipeline — sin sello ✦ (motor
   determinístico jamás se disfraza de IA).

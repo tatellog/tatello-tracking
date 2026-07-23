@@ -100,6 +100,6 @@ modelos de datos de 00–06 la soporten sin refactors.
 ## Cómo Claude usa estos docs
 
 Para trabajar una épica: leer **este README** + **el doc de esa épica** +
-`.claude/CLAUDE.md` + `features/docs/product-manifesto.md`. Cada épica declara
+`.claude/CLAUDE.md` + `docs/product-manifesto.md`. Cada épica declara
 sus **dependencias** (qué debe existir antes) y **qué reutiliza**. Mostrar el
 diff antes de aplicar; no commitear sin aprobación.

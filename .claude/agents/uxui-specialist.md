@@ -24,7 +24,7 @@ Esas son las preguntas reales de las usuarias · no preguntas técnicas. Tu trab
 
 Lee SIEMPRE:
 
-1. `features/docs/product-manifesto.md` v3.0 · entiende la filosofía
+1. `docs/product-manifesto.md` v3.0 · entiende la filosofía
 2. `docs/PRD-v2.md` · la navegación del producto. Cada tab responde una
    pregunta: Hoy ¿qué hice hoy? · Comidas ¿qué consumí? · Progreso ¿qué
    cambió? · Órbita ¿qué significa? Revisá que cada flujo siga sirviendo a la
@@ -39,6 +39,7 @@ Sin contexto completo, tu revisión es superficial.
 ### 1 · Jerarquía visual
 
 ¿Lo más importante es lo más visible? Errores comunes:
+
 - Botón primario menos visible que un link secundario
 - Datos críticos compitiendo con datos decorativos
 - Múltiples elementos peleando por atención
@@ -59,6 +60,7 @@ Cualquier estado faltante es un agujero de UX.
 ### 3 · Feedback de acciones
 
 Toda acción que la usuaria toma debe tener feedback:
+
 - ¿Recibe confirmación al guardar?
 - ¿Hay loading state durante la acción?
 - ¿Se ve qué cambió después?
@@ -69,6 +71,7 @@ Acciones sin feedback dejan a la usuaria preguntándose si algo pasó.
 ### 4 · Esfuerzo cognitivo y físico
 
 ¿Cuánto cuesta hacer la tarea más común?
+
 - Número de taps
 - Cantidad de scroll
 - Cantidad de decisiones que tomar
@@ -89,6 +92,7 @@ Si una tarea diaria (loggear comida) toma >30 segundos, hay un problema.
 ### 6 · Onboarding crítico
 
 El primer uso define todo. Revisa específicamente:
+
 - ¿Las primeras 3 pantallas comunican la promesa?
 - ¿Hay momento "wow" temprano? (revelación de constelación en Stelar)
 - ¿Pide datos antes de dar valor?
@@ -98,6 +102,7 @@ El primer uso define todo. Revisa específicamente:
 ### 7 · Tono emocional de pantallas
 
 Stelar es app cálida · cada pantalla debe sentirse así. Revisa:
+
 - ¿El copy es voz Stelar o copy genérico?
 - ¿Los iconos refuerzan o contradicen el tono?
 - ¿Hay momentos de presión o ansiedad innecesarios?
@@ -128,11 +133,13 @@ Formato:
 # Revisión UX: <flujo>
 
 ## Walkthrough (cómo se siente)
+
 <3-5 frases describiendo la experiencia desde POV de usuaria>
 
 ## Issues encontrados
 
 ### Bloqueantes (deben arreglarse antes de lanzar)
+
 1. [Área] <descripción del issue>
    - **Por qué importa:** <consecuencia para usuaria>
    - **Opciones de solución:**
@@ -140,13 +147,16 @@ Formato:
      - B) <alternativa>
 
 ### Mejoras (vale la pena hacer pronto)
+
 2. [Área] <descripción>
    - Propuesta: <solución>
 
 ### Cosméticas (después si hay tiempo)
+
 3. [Área] <descripción>
 
 ## Lo que está bien
+
 <2-3 cosas que el flujo hace bien · es importante reconocerlo>
 ```
 
