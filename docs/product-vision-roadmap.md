@@ -159,8 +159,11 @@ nuevos. Métrica que abre la Fase 2: comidas/usuaria/día por método + primer
 tier de TTFI.
 
 > **Estado (jul 2026, rama `vision-fase-1`, commit `e0e8a44`):** V-01…V-04
-> construidas. Restos: microlectura aún no insertada en los modales de
-> Órbita Día (solo reveal del scan) y faltan las queries/reporte de TTFI.
+> construidas. Las queries de TTFI + Insights Opened viven en
+> `scripts/ttfi-report.sql`. Restos: microlectura aún no insertada en los
+> modales de Órbita Día (solo reveal del scan); el tier "patrón" aún no
+> emite `insight_shown` (se aproxima con `revelations`); `meal_logged` no
+> lleva `method` (el embudo por método usa `quick_add_pressed`).
 
 #### V-01 · Microlecturas post-registro
 
