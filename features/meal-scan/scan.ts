@@ -5,7 +5,14 @@ import { supabase } from '@/lib/supabase'
 
 import { DISHES, type DishIngredient } from './dishes'
 
-export type ScannedIngredient = DishIngredient & { id: string }
+/** Procedencia de los macros de un ingrediente (V-07 · integridad de
+ *  inputs): 'ia' = estimados por el scan · 'manual' = los tecleó la
+ *  usuaria (sus números reales, nunca un placeholder) · 'base' /
+ *  'etiqueta' llegan con el lookup de alimentos y la foto-de-etiqueta
+ *  (Fase 3 B). Ausente en datos viejos = 'ia'. */
+export type IngredientSource = 'ia' | 'manual' | 'base' | 'etiqueta'
+
+export type ScannedIngredient = DishIngredient & { id: string; source?: IngredientSource }
 
 /** Cuánto confía el modelo en su lectura (M1: honestidad de evidencia).
  *  'media'/'baja' → la UI invita a revisar porciones en vez de fingir. */
@@ -79,14 +86,21 @@ const ScanResponseSchema = z.object({
   ),
 })
 
-function withIds(meal: {
-  name: string
-  ingredients: DishIngredient[]
-  confidence?: ScanConfidence
-}): ScannedMeal {
+function withIds(
+  meal: {
+    name: string
+    ingredients: DishIngredient[]
+    confidence?: ScanConfidence
+  },
+  source?: IngredientSource,
+): ScannedMeal {
   return {
     name: meal.name,
-    ingredients: meal.ingredients.map((ing, i) => ({ ...ing, id: `ing-${i}` })),
+    ingredients: meal.ingredients.map((ing, i) => ({
+      ...ing,
+      id: `ing-${i}`,
+      ...(source ? { source } : {}),
+    })),
     confidence: meal.confidence ?? 'alta',
   }
 }
@@ -118,8 +132,14 @@ async function scanMealFromTextMock(description: string): Promise<ScannedMeal> {
 
 /* ── REAL calls (activated in paso 3: USE_MOCK_SCAN=false + deploy) ───── */
 
-async function scanMealReal(photoUri: string): Promise<ScannedMeal> {
-  const processed = await ImageManipulator.manipulateAsync(photoUri, [{ resize: { width: 768 } }], {
+async function scanMealReal(
+  photoUri: string,
+  mode: 'plato' | 'etiqueta' = 'plato',
+): Promise<ScannedMeal> {
+  // Etiqueta a más resolución: la tabla nutrimental es letra chica y a 768
+  // se empasta (la edge la manda con detail 'high' por lo mismo).
+  const width = mode === 'etiqueta' ? 1024 : 768
+  const processed = await ImageManipulator.manipulateAsync(photoUri, [{ resize: { width } }], {
     compress: 0.7,
     format: ImageManipulator.SaveFormat.JPEG,
     base64: true,
@@ -127,13 +147,15 @@ async function scanMealReal(photoUri: string): Promise<ScannedMeal> {
   if (!processed.base64) throw new Error(SCAN_ERROR)
 
   const { data, error } = await supabase.functions.invoke('scan-meal', {
-    body: { imageBase64: processed.base64, mimeType: 'image/jpeg' },
+    body: { imageBase64: processed.base64, mimeType: 'image/jpeg', mode },
   })
   if (error) throw new Error(SCAN_ERROR)
 
   const parsed = ScanResponseSchema.safeParse(data)
   if (!parsed.success) throw new Error(SCAN_ERROR)
-  return withIds(parsed.data)
+  // Procedencia (V-07/V-08): los números de la etiqueta quedan marcados
+  // como suyos; el scan de plato queda sin marca (= estimado por IA).
+  return withIds(parsed.data, mode === 'etiqueta' ? 'etiqueta' : undefined)
 }
 
 async function scanMealFromTextReal(description: string): Promise<ScannedMeal> {
@@ -154,6 +176,26 @@ async function scanMealFromTextReal(description: string): Promise<ScannedMeal> {
 /** Scan a meal PHOTO → dish + ingredients. Mocked until paso 3. */
 export async function scanMeal(photoUri: string): Promise<ScannedMeal> {
   return USE_MOCK_SCAN ? scanMealMock() : scanMealReal(photoUri)
+}
+
+/** V-08 · lee la ETIQUETA NUTRIMENTAL de un empaque → el producto como un
+ *  solo ingrediente con los números de SU etiqueta (per-100 + porción del
+ *  envase), procedencia 'etiqueta' y confianza declarada. */
+export async function scanNutritionLabel(photoUri: string): Promise<ScannedMeal> {
+  if (USE_MOCK_SCAN) {
+    await delay(SCAN_DELAY_MS)
+    return withIds(
+      {
+        name: 'Yogurt griego natural',
+        ingredients: [
+          { name: 'Yogurt griego natural', grams: 150, proteinPer100: 9, kcalPer100: 97 },
+        ],
+        confidence: 'alta',
+      },
+      'etiqueta',
+    )
+  }
+  return scanMealReal(photoUri, 'etiqueta')
 }
 
 /** Parse a TEXT description ("2 huevos con pan") → dish + ingredients.

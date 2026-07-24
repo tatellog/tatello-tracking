@@ -128,27 +128,27 @@ Orden de prioridad y dependencia. Una fase se abre cuando la anterior movió
 su métrica. Las épicas usan numeración **V-xx** (visión) para no chocar con
 las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 
-| Épica | Nombre                              | Fase | Prioridad | Estado (jul 2026)      |
-| ----- | ----------------------------------- | ---- | --------- | ---------------------- |
-| V-01  | Microlecturas post-registro         | 1    | Crítica   | Construida (ver nota)  |
-| V-02  | La lectura del día en Hoy           | 1    | Crítica   | Construida             |
-| V-03  | Registro sin fricción               | 1    | Crítica   | Construida             |
-| V-04  | Instrumentación TTFI                | 1    | Alta      | Construida (ver nota)  |
-| V-05  | Lectura Semanal · motor             | 2    | Crítica   | Construida · gated dev |
-| V-06  | Lectura Semanal · superficie + push | 2    | Crítica   | Construida · gated dev |
-| V-07  | Lookup honesto de alimentos         | 3    | Crítica   | Pendiente              |
-| V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      | Pendiente              |
-| V-09  | Modelo de día parcial               | 3    | Alta      | Pendiente              |
-| V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Flip ON (solo dev)     |
-| V-11  | Timeline de descubrimientos         | 4    | Media     | Pendiente              |
-| V-12  | Experimentos · UI                   | 4    | Media     | Pendiente (spine ✓)    |
-| V-13  | Hero vivo                           | 4    | Media     | Pendiente              |
-| V-14  | Apple Health + Health Connect       | 5    | Alta      | Pendiente (R4 F1 ✓)    |
-| V-15  | Smart Recovery                      | 5    | Media     | Pendiente              |
-| V-16  | Insights predictivos                | 6    | Baja      | Pendiente              |
-| V-17  | Memoria mensual (R6)                | 6    | Baja      | Pendiente              |
-| V-18  | Comunidad de descubrimientos        | 6    | Explorat. | Pendiente              |
-| V-19  | Monetización                        | 6    | Decisión  | Pendiente              |
+| Épica | Nombre                              | Fase | Prioridad | Estado (jul 2026)        |
+| ----- | ----------------------------------- | ---- | --------- | ------------------------ |
+| V-01  | Microlecturas post-registro         | 1    | Crítica   | Construida (ver nota)    |
+| V-02  | La lectura del día en Hoy           | 1    | Crítica   | Construida               |
+| V-03  | Registro sin fricción               | 1    | Crítica   | Construida               |
+| V-04  | Instrumentación TTFI                | 1    | Alta      | Construida (ver nota)    |
+| V-05  | Lectura Semanal · motor             | 2    | Crítica   | Construida · gated dev   |
+| V-06  | Lectura Semanal · superficie + push | 2    | Crítica   | Construida · gated dev   |
+| V-07  | Lookup honesto de alimentos         | 3    | Crítica   | Parcial (ver nota)       |
+| V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      | Construida · por validar |
+| V-09  | Modelo de día parcial               | 3    | Alta      | Parcial (ver nota)       |
+| V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Flip ON (solo dev)       |
+| V-11  | Timeline de descubrimientos         | 4    | Media     | Pendiente                |
+| V-12  | Experimentos · UI                   | 4    | Media     | Pendiente (spine ✓)      |
+| V-13  | Hero vivo                           | 4    | Media     | Pendiente                |
+| V-14  | Apple Health + Health Connect       | 5    | Alta      | Pendiente (R4 F1 ✓)      |
+| V-15  | Smart Recovery                      | 5    | Media     | Pendiente                |
+| V-16  | Insights predictivos                | 6    | Baja      | Pendiente                |
+| V-17  | Memoria mensual (R6)                | 6    | Baja      | Pendiente                |
+| V-18  | Comunidad de descubrimientos        | 6    | Explorat. | Pendiente                |
+| V-19  | Monetización                        | 6    | Decisión  | Pendiente                |
 
 ---
 
@@ -388,10 +388,38 @@ regla ✦-solo-IA-real.
 
 ---
 
-### Fase 3 · Integridad de inputs
+### Fase 3 · Integridad de inputs · EN CURSO
 
 Objetivo de fase: que el motor coma verdad. Prerequisito duro para que las
 fases 4+ no amplifiquen basura.
+
+> **Estado (23 jul 2026):** arrancó con lo decision-free:
+>
+> - **V-07 parcial:** el placeholder 8 g/150 kcal MURIÓ — el ingrediente
+>   manual nace sin macros, pide los 2 números reales (kcal + proteína)
+>   en la fila y Confirmar se bloquea sin kcal. Procedencia por
+>   ingrediente persistida (`source`: ia/manual/base/etiqueta, jsonb
+>   retro-compatible). **Decisión dueña (23 jul):** el lookup será tabla
+>   propia en Supabase (OFF MX + lista curada) y se construye AL FINAL de
+>   la fase.
+> - **V-08 construida (por validar):** modo Etiqueta en el obturador
+>   (chips Platillo/Etiqueta), la edge `scan-meal` lee la tabla
+>   nutrimental (`mode: 'etiqueta'`, detail high, per-100 normalizado,
+>   porción del envase como gramos → los chips ½/¾/1/1½ escalan gratis),
+>   confianza declarada, procedencia visible ("de su etiqueta").
+>   Pendiente: deploy de la edge antes de merge + validar con etiquetas
+>   reales en device.
+> - **V-09 construida (como unificación + auditoría):** definición única
+>   en `_shared/intelligence/day-quality.ts` (completo ≥800 kcal · parcial
+>   · vacío); `adaptive-tdee` y `weekly-reading` la consumen con paridad
+>   exacta (test incluido). La auditoría encontró que casi todo ya estaba
+>   protegido: el piso 60% de `isDeficitDay` impide que un día muy corto
+>   cuente como déficit o infle la intensidad promedio, y el copy del
+>   cierre ya es sin exigencia. **Decisiones dueña (23 jul):** un parcial
+>   dentro del piso sí cuenta como déficit (ratifica el motor); el TDEE
+>   sigue excluyendo parciales; el promedio de kcal de la Lectura Semanal
+>   SE QUEDA con parciales incluidos (decisión dueña 23 jul — el copy ya
+>   declara "en los días que registraste").
 
 #### V-07 · Lookup honesto de alimentos
 

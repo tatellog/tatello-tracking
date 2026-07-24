@@ -32,10 +32,14 @@ function json(body: unknown, status = 200): Response {
 }
 
 // Two input shapes: a meal PHOTO (base64) OR a TEXT description. Exactly
-// one is required; the handler branches on whichever parses.
+// one is required; the handler branches on whichever parses. A photo can
+// declare mode 'etiqueta' (V-08): the model reads the NUTRITION FACTS
+// panel instead of guessing the dish — numbers from HER label, not
+// "typical" values.
 const PhotoRequestSchema = z.object({
   imageBase64: z.string().min(1).max(15_000_000),
   mimeType: z.string().default('image/jpeg'),
+  mode: z.enum(['plato', 'etiqueta']).default('plato'),
 })
 const TextRequestSchema = z.object({
   text: z.string().trim().min(2).max(500),
@@ -85,6 +89,29 @@ const PHOTO_SYSTEM_PROMPT = [
   'ingredientes principales con porciones estimadas.',
   'Si la imagen NO es comida ni bebida, devuelve {"name":"","ingredients":[]}.',
   JSON_CONTRACT,
+].join(' ')
+
+// V-08 · foto-de-etiqueta: el camino Stelar para empacados. El producto
+// entra como UN ingrediente con la porción del envase; así los chips de
+// porción del cliente (½/¾/1/1½) escalan gratis. Números NORMALIZADOS a
+// per-100 (las etiquetas MX declaran por 100 g/ml y/o por porción).
+const LABEL_SYSTEM_PROMPT = [
+  'Eres un nutricionista que LEE ETIQUETAS NUTRIMENTALES (tabla de información',
+  'nutricional de un empaque) y devuelve SOLO JSON válido.',
+  'Lee los números DE LA ETIQUETA, no valores típicos: kcal (energía), proteína y azúcares.',
+  'Devuelve UN solo elemento en "ingredients": el producto.',
+  'name = el nombre del producto si se ve en el empaque (si no, describe el tipo de producto).',
+  'grams = el contenido de UNA porción declarada en la etiqueta, en gramos (para líquidos usa',
+  'los mililitros como gramos). Si la etiqueta solo declara por 100 g/ml, usa 100.',
+  'proteinPer100 / kcalPer100 / sugarPer100 = los valores POR 100 g/ml. Si la etiqueta declara',
+  'solo por porción, normalízalos a 100 con la porción declarada.',
+  'confidence: "alta" SOLO si los números se leen con claridad; "media" si algunos se leen',
+  'borrosos o la porción es dudosa; "baja" si apenas se distinguen. Sé honesto: es mejor',
+  'declarar duda que inventar un número.',
+  'Si la imagen NO es una etiqueta nutrimental (es un plato, u otra cosa), devuelve',
+  '{"name":"","ingredients":[]}.',
+  'Responde con este formato exacto:',
+  '{"name": string, "confidence": "alta"|"media"|"baja", "ingredients": [{"name": string, "grams": number, "proteinPer100": number, "kcalPer100": number, "sugarPer100": number}]}',
 ].join(' ')
 
 const TEXT_SYSTEM_PROMPT = [
@@ -165,16 +192,28 @@ Deno.serve(async (req: Request) => {
 
     let messages: unknown[]
     if (photoReq.success) {
-      const { imageBase64, mimeType } = photoReq.data
+      const { imageBase64, mimeType, mode } = photoReq.data
+      const isLabel = mode === 'etiqueta'
       messages = [
-        { role: 'system', content: PHOTO_SYSTEM_PROMPT },
+        { role: 'system', content: isLabel ? LABEL_SYSTEM_PROMPT : PHOTO_SYSTEM_PROMPT },
         {
           role: 'user',
           content: [
-            { type: 'text', text: 'Analiza este plato y devuelve el JSON.' },
+            {
+              type: 'text',
+              text: isLabel
+                ? 'Lee esta etiqueta nutrimental y devuelve el JSON.'
+                : 'Analiza este plato y devuelve el JSON.',
+            },
             {
               type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'low' },
+              // detail high para etiquetas: los números de la tabla son
+              // letra chica y en 'low' se pierden (leer mal un 45 como 450
+              // es peor que unos tokens extra).
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`,
+                detail: isLabel ? 'high' : 'low',
+              },
             },
           ],
         },

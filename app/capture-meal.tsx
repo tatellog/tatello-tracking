@@ -17,6 +17,10 @@ import { colors, typography } from '@/theme'
  *   · Disparar (centro, obturador) → toma la foto → /scan-meal
  *   · Texto (der)    → descríbela y la IA la arma → /scan-meal modo describe
  *
+ * Dos encuadres (V-08): Platillo (estima el plato) o Etiqueta (lee la tabla
+ * nutrimental del empaque — los números de SU etiqueta, no típicos). El modo
+ * viaja a /scan-meal como `label`.
+ *
  * Nota: el Simulador de iOS no tiene cámara — el preview saldrá negro ahí;
  * Galería y Texto sí funcionan. Para probar el disparo, usar Expo Go en un
  * dispositivo físico.
@@ -31,6 +35,7 @@ export default function CaptureMealScreen() {
   const cameraRef = useRef<CameraView>(null)
   const [flash, setFlash] = useState<'off' | 'on'>('off')
   const [busy, setBusy] = useState(false)
+  const [frame, setFrame] = useState<'plato' | 'etiqueta'>('plato')
   const isWeb = Platform.OS === 'web'
 
   // Reemplaza esta pantalla por /scan-meal: así "atrás" desde scan-meal
@@ -39,9 +44,13 @@ export default function CaptureMealScreen() {
     (uri: string) =>
       router.replace({
         pathname: '/scan-meal',
-        params: mealType ? { uri, mealType } : { uri },
+        params: {
+          uri,
+          ...(mealType ? { mealType } : {}),
+          ...(frame === 'etiqueta' ? { label: '1' } : {}),
+        },
       }),
-    [router, mealType],
+    [router, mealType, frame],
   )
 
   const handleShutter = useCallback(async () => {
@@ -124,9 +133,39 @@ export default function CaptureMealScreen() {
         )}
       </View>
 
-      {/* Encuadre tenue al centro */}
-      <View pointerEvents="none" style={styles.frameHintWrap}>
-        <Text style={styles.frameHint}>Encuadra tu platillo</Text>
+      {/* Encuadre tenue al centro + selector de modo (V-08): Platillo
+          estima el plato; Etiqueta lee la tabla nutrimental del empaque. */}
+      <View style={styles.frameHintWrap}>
+        <Text style={styles.frameHint} pointerEvents="none">
+          {frame === 'etiqueta' ? 'Encuadra la tabla nutrimental' : 'Encuadra tu platillo'}
+        </Text>
+        <View style={styles.frameChips}>
+          {(
+            [
+              ['plato', 'Platillo'],
+              ['etiqueta', 'Etiqueta'],
+            ] as const
+          ).map(([key, chipLabel]) => {
+            const active = frame === key
+            return (
+              <Pressable
+                key={key}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {})
+                  setFrame(key)
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Modo ${chipLabel}`}
+                style={[styles.frameChip, active && styles.frameChipOn]}
+              >
+                <Text style={[styles.frameChipText, active && styles.frameChipTextOn]}>
+                  {chipLabel}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
       </View>
 
       {/* Barra inferior — Galería · Obturador · Texto */}
@@ -366,6 +405,32 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 6,
+  },
+  // ── Selector Platillo / Etiqueta (V-08) ──
+  frameChips: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  frameChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(244,236,222,0.25)',
+  },
+  frameChipOn: {
+    backgroundColor: 'rgba(244,236,222,0.92)',
+    borderColor: colors.leche,
+  },
+  frameChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.leche,
+  },
+  frameChipTextOn: {
+    color: colors.sombra,
   },
   // ── Barra inferior ──
   bottomBar: {
