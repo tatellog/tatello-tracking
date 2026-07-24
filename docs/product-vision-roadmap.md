@@ -140,7 +140,7 @@ las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 | V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      | Construida · por validar |
 | V-09  | Modelo de día parcial               | 3    | Alta      | Parcial (ver nota)       |
 | V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Parcial (ver nota)       |
-| V-11  | Timeline de descubrimientos         | 4    | Media     | Pendiente                |
+| V-11  | Timeline de descubrimientos         | 4    | Media     | Replanteada (ver nota)   |
 | V-12  | Experimentos · UI                   | 4    | Media     | Pendiente (spine ✓)      |
 | V-13  | Hero vivo                           | 4    | Media     | Pendiente                |
 | V-14  | Apple Health + Health Connect       | 5    | Alta      | Pendiente (R4 F1 ✓)      |
@@ -523,8 +523,23 @@ Objetivo de fase: que la usuaria vea el proceso de evidencia, no "IA dice".
 > `_shared`): observado → encontrado → en seguimiento → confirmado,
 > derivado del pipeline (hipótesis vivas + recurrencia contra un reporte
 > persistido ≥21 días atrás), pintado en la card del hallazgo de Órbita
-> Mes (sin ✦, copy llano). **Falta de V-10:** el arco en Progreso (chat
-> de insights) y validar el flip + el arco en device.
+> Mes (sin ✦, copy llano). **Arco en Progreso: DIFERIDO con razón** — los
+> ProgressInsights se computan al vuelo (sin historia persistida ni
+> hipótesis), así que su arco solo podría decir "encontrado" siempre
+> (ruido) o inventar estados (prohibido). Requiere persistir insights o
+> ligarlos al pipeline; decisión pendiente. **Falta de V-10:** validar
+> flip + arco en device.
+>
+> **V-11 REPLANTEADA (dueña, 23 jul):** se construyó y se MATÓ el mismo
+> día tras verla en device. Por qué falló el concepto tal como está
+> escrito arriba: (1) mostrar el log crudo de `revelations` produce
+> repetición — el rate-limit 1/7d re-escribe el mismo patrón cada semana
+> ("Un ritmo de movimiento" ×4) y eso lee a spam, no a aprendizaje; (2)
+> los `title` de ceremonia sueltos no cargan su evidencia; (3) el formato
+> riel-vertical duplica el lenguaje visual de Tus capítulos. Si se
+> retoma: como CATÁLOGO de lo aprendido (una entrada por patrón,
+> deduplicada por kind, "visto N veces desde <fecha>" + evidencia del
+> metadata; transformaciones aparte como sellos), no como timeline.
 
 #### V-10 · Personal Evidence (flip R1)
 
