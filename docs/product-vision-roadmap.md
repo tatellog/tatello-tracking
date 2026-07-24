@@ -139,7 +139,7 @@ las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 | V-07  | Lookup honesto de alimentos         | 3    | Crítica   | Parcial (ver nota)       |
 | V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      | Construida · por validar |
 | V-09  | Modelo de día parcial               | 3    | Alta      | Parcial (ver nota)       |
-| V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Flip ON (solo dev)       |
+| V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Parcial (ver nota)       |
 | V-11  | Timeline de descubrimientos         | 4    | Media     | Pendiente                |
 | V-12  | Experimentos · UI                   | 4    | Media     | Pendiente (spine ✓)      |
 | V-13  | Hero vivo                           | 4    | Media     | Pendiente                |
@@ -509,9 +509,19 @@ hueco).
 
 ---
 
-### Fase 4 · Hacer visible el motor
+### Fase 4 · Hacer visible el motor · EN CURSO
 
 Objetivo de fase: que la usuaria vea el proceso de evidencia, no "IA dice".
+
+> **Estado (23 jul 2026):** V-10 arrancó por la deuda declarada — la
+> **convergencia de `month-built.ts` está HECHA** (ADR 0002 cerrado con
+> addendum): `consistency.ts` y `month-built.ts` viven en
+> `_shared/intelligence/` con re-exports finos; los 3 motores del mes
+> quedaron **delimitados** (evidencia / narrativa / cadencia, decisión
+> dueña) en vez de unificados. Suite completa (1082 tests) en verde.
+> **Falta de V-10:** el arco visible observamos → encontramos →
+> investigando → confirmamos en la UI de patrones, y validar el flip en
+> device (el flag ya está ON en la superficie dev).
 
 #### V-10 · Personal Evidence (flip R1)
 

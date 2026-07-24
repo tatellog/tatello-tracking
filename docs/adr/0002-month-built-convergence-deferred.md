@@ -1,5 +1,15 @@
 # ADR 0002 · Convergencia de `month-built` — diferida, con guardrail
 
+> **ADDENDUM (23 jul 2026) · CONVERGENCIA EJECUTADA.** Las dos condiciones
+> de desbloqueo se cumplieron en V-10: (1) `consistency.ts` convergió a
+> `_shared/intelligence/` (re-export en `features/patterns/`); (2) la dueña
+> decidió **delimitar, no unificar** — `month-built.ts` = evidencia del mes
+> · `month.ts` = narrativa dimensional · `month-patterns.ts` = hábitos de
+> cadencia (delimitación documentada en la cabecera de cada módulo).
+> `month-built.ts` vive ahora en `_shared/intelligence/` con re-export fino
+> en `features/orbit/` (cero cambio a runtime; suite completa de 1082 tests
+> en verde). El guardrail de exports sigue vigente sin cambios.
+
 **Estado:** Aceptado (jul 2026, aprobado por la dueña) · **Epic:** 01 · F6 · T6.1
 **Supersede:** nada · **Relacionado:** ADR 0001 (punto 5 y 6),
 `docs/epics/epic-01-intelligence-engine.md`, `CLAUDE.md` (§ motor de patrones)

@@ -115,11 +115,14 @@ docs/PRD-v2.md     · qué construir (nav, Reliquias, Lecturas, Alma Celeste)
 
 La lógica de patrones/inteligencia de Órbita vive en
 `supabase/functions/_shared/intelligence/` — corre en el **backend** (edge
-function `daily-intelligence`) Y en el **cliente** (re-export). Órbita Día ya la
-consume. `features/orbit/month-built.ts` es un motor **solo-cliente divergente**
-que alimenta Órbita Mes ("Tus patrones") y debe **converger** a la lib
-compartida. **NO agregues detectores nuevos a `month-built.ts`** — van a
-`_shared/intelligence/` (la key de IA no puede ir en el cliente).
+function `daily-intelligence`) Y en el **cliente** (re-export). TODOS los
+detectores nacen ahí (la key de IA no puede ir en el cliente). Los 3 motores
+del mes conviven DELIMITADOS (V-10, ADR 0002 cerrado): `month-built.ts` =
+evidencia (KPI déficit, calendario, patrones accionables) · `month.ts` =
+narrativa dimensional · `month-patterns.ts` = hábitos de cadencia. La
+convergencia de `month-built` ya ocurrió (jul 2026): en `features/orbit/`
+solo queda su re-export, y el guardrail de exports vigila que ningún
+detector nuevo nazca fuera de `_shared`.
 
 **IA hoy (todo OpenAI gpt-4o-mini · la IA explica, NUNCA detecta):**
 `scan-meal` y `scan-measurements` (extracción de foto/texto) + `stelar-insight`
