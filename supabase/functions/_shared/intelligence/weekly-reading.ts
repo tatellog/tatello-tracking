@@ -1,4 +1,5 @@
 import { adaptiveTdee, type AdaptiveTdee } from './adaptive-tdee.ts'
+import { dayQuality } from './day-quality.ts'
 import { isDeficitDay } from './deficit.ts'
 import type { DailySignals } from './types.ts'
 
@@ -91,7 +92,10 @@ export function buildWeeklyReading(
     return signals.find((s) => s.day === day) ?? null
   })
 
-  const withFood = week.filter((s) => s != null && s.calories != null && s.calories > 0)
+  // "Día con comida" = no-vacío (la definición única de day-quality.ts):
+  // los parciales cuentan aquí a propósito — la lectura semanal habla de
+  // presencia y ritmo, no exige días completos (V-09, sin exigencia).
+  const withFood = week.filter((s) => s != null && dayQuality(s) !== 'vacio')
   const daysWithFood = withFood.length
   if (daysWithFood < WEEKLY_READING_MIN_DAYS) return null
 

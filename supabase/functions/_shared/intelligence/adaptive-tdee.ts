@@ -22,6 +22,7 @@
  *   · Pura y testeable: sin side effects, corre en app y en server.
  */
 
+import { dayQuality } from './day-quality.ts'
 import type { DailySignals } from './types.ts'
 
 /** ~kcal por kg de tejido corporal (constante estándar de balance). */
@@ -31,9 +32,6 @@ const KCAL_PER_KG = 7700
 const WINDOW_DAYS = 28
 /** Días con registro creíble requeridos dentro de la ventana. */
 const MIN_DATA_DAYS = 14
-/** Umbral de "día creíble": menos que esto lee a registro incompleto
- *  (un yogurt suelto), y un día a medias envenena el promedio. */
-const MIN_DAY_KCAL = 800
 /** Ancho del racimo de pesajes en cada extremo de la ventana. */
 const WEIGH_CLUSTER_DAYS = 10
 /** Separación mínima entre los centros de ambos racimos. */
@@ -103,8 +101,10 @@ export function adaptiveTdee(signals: DailySignals[], todayIso: string): Adaptiv
 
   const inWindow = signals.filter((s) => s.day != null && s.day >= start && s.day <= end)
 
-  // Días creíbles de comida.
-  const foodDays = inWindow.filter((s) => (s.calories ?? 0) >= MIN_DAY_KCAL)
+  // Días creíbles de comida — la definición única vive en day-quality.ts
+  // (V-09): un día parcial cuenta como presencia, pero no alimenta el
+  // promedio ni el balance (envenenaría el gasto estimado).
+  const foodDays = inWindow.filter((s) => dayQuality(s) === 'completo')
   if (foodDays.length < MIN_DATA_DAYS) return null
   const kcalAvg = foodDays.reduce((sum, s) => sum + (s.calories ?? 0), 0) / foodDays.length
 
