@@ -14,6 +14,7 @@ import {
   nextSealDate,
   ORBIT_PATTERN_COPY,
   PATTERN_COPY,
+  READING_COPY,
   RETURN_COPY,
   sameLocalDay,
   SEAL_COPY,
@@ -24,7 +25,7 @@ import {
 /** Dónde aterriza el TAP de cada notificación (leído por el response
  *  router en features/notifications/response.ts). Sin destino, el tap
  *  aterrizaba frío en Hoy aunque el copy prometiera el sello de Órbita. */
-export type NotificationTarget = 'hoy' | 'orbit-semana' | 'orbit-mes'
+export type NotificationTarget = 'hoy' | 'orbit-semana' | 'orbit-mes' | 'weekly-reading'
 
 /*
  * El scheduler de la invitación — el lado imperativo (expo-notifications).
@@ -90,6 +91,9 @@ export const PATTERN_ID = 'stelar-pattern-found'
 export const ORBIT_PATTERN_ID = 'stelar-orbit-pattern'
 /** El slot N5 · el sello del ciclo mensual — idempotente como los demás. */
 export const CYCLE_ID = 'stelar-cycle-seal'
+/** El slot N8 · la Lectura Semanal lista — el tap aterriza directo en
+ *  /weekly-reading (no en un tab). */
+export const READING_ID = 'stelar-weekly-reading'
 
 /** La fecha de disparo de un slot agendado (si existe): viaja en
  *  `data.fireAt` porque el trigger nativo no se puede leer de forma
@@ -217,6 +221,10 @@ export async function syncWeekSealInvite(
     if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, sealDate)) return
     const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
     if (cycleFireAt && sameLocalDay(cycleFireAt, sealDate)) return
+    // lectura > sello: si N8 ya anuncia la lectura ese lunes, el sello cede
+    // (la lectura ES el contenido del lunes, con más que "quedó escrita").
+    const readingFireAt = await scheduledFireAt(Notifications, READING_ID)
+    if (readingFireAt && sameLocalDay(readingFireAt, sealDate)) return
 
     await Notifications.scheduleNotificationAsync({
       identifier: SEAL_ID,
@@ -340,10 +348,11 @@ export async function syncPatternInvite(
     if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return
     // patrón > invitación: mismo minuto de mañana — la invitación cede.
     await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
-    // patrón > sello: si mañana es lunes, el sello cede (se re-arma en la
-    // próxima apertura para el lunes siguiente).
+    // patrón > sello/lectura: si mañana es lunes, ambos ceden (un solo
+    // anuncio ese día; se re-arman en la próxima apertura si siguen vivos).
     if (date.getDay() === 1) {
       await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+      await Notifications.cancelScheduledNotificationAsync(READING_ID).catch(() => {})
     }
 
     await Notifications.scheduleNotificationAsync({
@@ -410,9 +419,11 @@ export async function syncOrbitPatternInvite(
     if (patternFireAt && sameLocalDay(patternFireAt, date)) return
     // señal-órbita > invitación: mismo minuto de mañana — la invitación cede.
     await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
-    // señal-órbita > sello: si mañana es lunes, el sello cede (se re-arma luego).
+    // señal-órbita > sello/lectura: si mañana es lunes, ambos ceden (se
+    // re-arman en la próxima apertura si siguen vivos).
     if (date.getDay() === 1) {
       await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+      await Notifications.cancelScheduledNotificationAsync(READING_ID).catch(() => {})
     }
 
     await Notifications.scheduleNotificationAsync({
@@ -482,10 +493,11 @@ export async function syncCycleSealInvite(
       await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
       await Notifications.cancelScheduledNotificationAsync(PATTERN_ID).catch(() => {})
     }
-    // ciclo > sello semanal: si el día 1 es lunes, el sello cede (se
-    // re-arma en la próxima apertura para el lunes siguiente).
+    // ciclo > sello semanal/lectura: si el día 1 es lunes, ambos ceden (se
+    // re-arman en la próxima apertura para el lunes siguiente).
     if (date.getDay() === 1) {
       await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+      await Notifications.cancelScheduledNotificationAsync(READING_ID).catch(() => {})
     }
 
     const copy = cycleCopy(signLabel, new Date())
@@ -506,6 +518,72 @@ export async function syncCycleSealInvite(
       },
     })
     trackScheduled(CYCLE_ID, 'orbit-mes', date)
+  } catch {
+    // Nunca romper la app por una notificación.
+  }
+}
+
+/**
+ * N8 · "tu lectura está lista": anuncia la Lectura Semanal el LUNES en la
+ * ventana elegida, con el tap directo a /weekly-reading. Solo se agenda con
+ * `guaranteed=true` (la semana en curso ya juntó los días mínimos del motor
+ * — ver weeklyReadingGuaranteed): la promesa no puede romperse porque los
+ * días con comida solo crecen. `guaranteed=false` cancela (idempotente):
+ * gate apagado o semana aún corta → sin push, jamás recordatorio vacío.
+ *
+ * Arbitraje 1/día: ciclo > patrón (N3) > señal-órbita (N7) > LECTURA >
+ * sello > cierre. Cede a los tres mayores si caen el mismo lunes (raros:
+ * ellos se re-arman a diario, esta es la cita semanal); absorbe al sello
+ * (la lectura ES el contenido del lunes — el sello genérico cede, ver
+ * syncWeekSealInvite). Techo intacto: un solo anuncio ese día.
+ */
+export async function syncWeeklyReadingInvite(
+  window: NotificationWindow | null | undefined,
+  guaranteed: boolean,
+): Promise<void> {
+  if (isExpoGo) return
+  try {
+    const Notifications = await import('expo-notifications')
+
+    await Notifications.cancelScheduledNotificationAsync(READING_ID).catch(() => {})
+    if (window == null || window === 'not_yet' || !guaranteed) return
+
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status !== 'granted') return
+
+    await ensureChannels(Notifications)
+
+    const date = nextSealDate(new Date(), window)
+    // ciclo > lectura: si el sello del ciclo suena ese mismo lunes, cede.
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return
+    // patrón (N3) / señal-órbita (N7) > lectura: un solo anuncio ese día.
+    const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
+    if (patternFireAt && sameLocalDay(patternFireAt, date)) return
+    const orbitPatternFireAt = await scheduledFireAt(Notifications, ORBIT_PATTERN_ID)
+    if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, date)) return
+    // lectura > sello: mismo lunes, el sello genérico cede al contenido.
+    await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: READING_ID,
+      content: {
+        title: READING_COPY.title,
+        body: READING_COPY.body,
+        // El copy promete la lectura → el tap aterriza EN la lectura.
+        // fireAt alimenta los arbitrajes de los demás syncs.
+        data: {
+          target: 'weekly-reading' satisfies NotificationTarget,
+          fireAt: date.toISOString(),
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
+      },
+    })
+    trackScheduled(READING_ID, 'weekly-reading', date)
   } catch {
     // Nunca romper la app por una notificación.
   }

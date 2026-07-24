@@ -21,8 +21,8 @@
 | Pantalla `/weekly-reading` (beats, sin ✦)    | ✅ Construida                        |
 | Card en Órbita Semana (`WeekSegment`)        | ✅ Construida                        |
 | Gating                                       | 🔒 Doble-gate a dev (ver abajo)      |
-| N8 "tu lectura está lista" (push)            | ❌ Pendiente                         |
-| Entrada desde Hoy (lectura nueva sin abrir)  | ❌ Pendiente                         |
+| N8 "tu lectura está lista" (push)            | ✅ Construida (23 jul)               |
+| Entrada desde Hoy (lectura nueva sin abrir)  | ✅ Construida (23 jul)               |
 | Redacción IA opcional (gated)                | ❌ Pendiente                         |
 | Abrir a beta                                 | ❌ Pendiente de validación en device |
 
@@ -104,18 +104,30 @@ y la regresa. Si ya existe, devuelve la guardada tal cual (jamás recalcula).
 
 ---
 
+## N8 + entrada desde Hoy (construidas 23 jul 2026)
+
+- **N8 "tu lectura está lista"** (`features/notifications/`): slot
+  `stelar-weekly-reading`, suena el LUNES en la ventana elegida, tap
+  directo a `/weekly-reading` (target nuevo en `response.ts`). **Ganada
+  por construcción:** solo se agenda cuando `weeklyReadingGuaranteed`
+  confirma que la semana en curso ya juntó los días mínimos del motor
+  (monotónico: la promesa no puede romperse). Arbitraje 1/día: ciclo >
+  patrón (N3) > señal-órbita (N7) > **lectura** > sello > cierre — la
+  lectura absorbe al sello del lunes (es su contenido, mejorado) y cede a
+  los tres mayores. Doble-gateada a dev con el resto de la feature.
+- **Entrada desde Hoy** (`WeeklyReadingStrip`): tira junto a la lectura
+  del día, SOLO mientras hay lectura sin abrir; se retira sola al leerla
+  (la pantalla marca `opened_at` e invalida la query). Sin tracking
+  propio: `insight_opened` lo emite una sola vez la pantalla.
+
 ## Pendientes (el resto de V-06)
 
-1. **N8 "tu lectura está lista":** integrarla al catálogo N1-N7 y su
-   arbitraje de 1/día. Notificación **ganada** (solo dispara si la lectura
-   existe), nunca recordatorio vacío. Deep link a `/weekly-reading`.
-2. **Entrada desde Hoy** cuando hay lectura nueva sin abrir (`opened_at`
-   null).
-3. **Redacción IA opcional y gated:** la IA explica lo ya detectado
+1. **Redacción IA opcional y gated:** la IA explica lo ya detectado
    (patrón de `stelar-insight`); la lectura funciona 100% sin IA. Solo
    entonces aparecería el sello ✦.
-4. **Abrir a beta** tras validar en dev build. Criterio de éxito del
-   roadmap: ≥60% de lecturas abiertas en beta.
+2. **Abrir a beta** tras validar en dev build (pantalla, card, tira de Hoy
+   y N8 — las notificaciones necesitan dev build, no Expo Go). Criterio de
+   éxito del roadmap: ≥60% de lecturas abiertas en beta.
 
 ## Reglas que esta feature no puede romper
 

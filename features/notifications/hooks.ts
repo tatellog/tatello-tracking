@@ -1,19 +1,21 @@
 import { useEffect } from 'react'
 
 import { useMealsForDate } from '@/features/macros/hooks'
-import { useHasAnySignals } from '@/features/orbit/hooks'
+import { useHasAnySignals, useIsoWeekSignals } from '@/features/orbit/hooks'
 import { useRecentOrbitPattern } from '@/features/orbit/pattern-memory'
 import type { NotificationWindow } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useSession } from '@/hooks/useSession'
-import { aiEnabledForEmail } from '@/lib/featureFlags'
+import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { todayInTimezone } from '@/lib/time'
 
+import { weeklyReadingGuaranteed } from './invite'
 import {
   syncCycleSealInvite,
   syncDayCloseInvite,
   syncNextStarInvite,
   syncOrbitPatternInvite,
+  syncWeeklyReadingInvite,
   syncWeekSealInvite,
 } from './scheduler'
 
@@ -101,6 +103,32 @@ export function useOrbitPatternInvite(): void {
     if (window === undefined || fresh === undefined) return
     void syncOrbitPatternInvite(window, devOnly && fresh === true)
   }, [window, fresh, devOnly])
+}
+
+/*
+ * N8 · "tu lectura está lista": cuando la semana en curso ya garantiza que el
+ * lunes habrá lectura (≥ días mínimos con comida — monotónico, la promesa no
+ * se rompe), agenda el push del lunes con destino /weekly-reading. Lee la
+ * MISMA query de señales que Órbita (cacheada, cero fetch extra) y se
+ * re-sincroniza al cambiar la semana. DOBLE-gateada como toda la Lectura
+ * Semanal (flag + dev): fuera del gate, guaranteed=false → cancela cualquier
+ * N8 agendado y no agenda nada.
+ */
+export function useWeeklyReadingInvite(): void {
+  const { session } = useSession()
+  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const { data: profile } = useProfile()
+  const window = (profile ? (profile.notification_window ?? null) : undefined) as
+    | NotificationWindow
+    | null
+    | undefined
+  const { data: signals, todayIso } = useIsoWeekSignals()
+
+  useEffect(() => {
+    if (window === undefined || signals === undefined) return
+    const guaranteed = readingOn && weeklyReadingGuaranteed(signals, todayIso)
+    void syncWeeklyReadingInvite(window, guaranteed)
+  }, [window, signals, todayIso, readingOn])
 }
 
 export function useCycleSealInvite(figureComplete: boolean, signLabel: string): void {

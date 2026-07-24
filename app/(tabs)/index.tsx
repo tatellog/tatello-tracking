@@ -55,6 +55,7 @@ import {
   DayCheckIn,
   DayCloseCard,
   DayReadingStrip,
+  WeeklyReadingStrip,
   type DayState,
   type WorkoutTypeId,
   LunarConstellation,
@@ -753,6 +754,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   mealCount={ctx.meal_count_today}
                   reading={closeReading}
                 />
+                {/* La Lectura Semanal asomada en Hoy (V-06): solo mientras
+                    hay lectura sin abrir; se retira sola al leerla. Gated a
+                    dev junto con toda la Lectura Semanal. */}
+                <WeeklyReadingStrip />
               </>
             ) : null}
 

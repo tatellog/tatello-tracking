@@ -135,7 +135,7 @@ las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 | V-03  | Registro sin fricción               | 1    | Crítica   | Construida             |
 | V-04  | Instrumentación TTFI                | 1    | Alta      | Construida (ver nota)  |
 | V-05  | Lectura Semanal · motor             | 2    | Crítica   | Construida · gated dev |
-| V-06  | Lectura Semanal · superficie + push | 2    | Crítica   | Parcial · gated dev    |
+| V-06  | Lectura Semanal · superficie + push | 2    | Crítica   | Construida · gated dev |
 | V-07  | Lookup honesto de alimentos         | 3    | Crítica   | Pendiente              |
 | V-08  | Foto-de-etiqueta nutricional        | 3    | Alta      | Pendiente              |
 | V-09  | Modelo de día parcial               | 3    | Alta      | Pendiente              |
@@ -303,13 +303,13 @@ Confirmado dos veces de forma independiente (panel de competencia +
 propuesta de visión). Es la compensación estructural de lo que el manifiesto
 decide no hacer (countdown, rachas, presión).
 
-> **Estado (jul 2026, commit `1e2d9eb` + fixes):** V-05 construida completa;
-> V-06 parcial (pantalla `/weekly-reading` + card en Órbita Semana). Todo
-> doble-gateado a dev (`WEEKLY_READING_ENABLED` + `aiEnabledForEmail`).
-> Migración `weekly_readings` aplicada (inmutable vía trigger, advisor
-> sellado). **Faltan de V-06:** N8 push, entrada desde Hoy, redacción IA
-> gated, y abrir a beta tras validar. Detalle en
-> `docs/weekly-reading-spec.md`.
+> **Estado (jul 2026):** V-05 y V-06 construidas: motor + pantalla
+> `/weekly-reading` + card en Órbita Semana + entrada en Hoy + push N8
+> (ganada, con arbitraje). Todo doble-gateado a dev
+> (`WEEKLY_READING_ENABLED` + `aiEnabledForEmail`). Migración
+> `weekly_readings` aplicada (inmutable vía trigger, advisor sellado).
+> **Falta:** redacción IA opcional (gated) y abrir a beta tras validar en
+> dev build. Detalle en `docs/weekly-reading-spec.md`.
 
 #### V-05 · Lectura Semanal · motor
 

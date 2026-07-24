@@ -13,6 +13,7 @@ import {
   useDayCloseInvite,
   useNextStarInvite,
   useOrbitPatternInvite,
+  useWeeklyReadingInvite,
 } from '@/features/notifications/hooks'
 import { useAppleHealthSync } from '@/features/wearables/hooks'
 import {
@@ -89,6 +90,10 @@ export default function TabsLayout() {
   // N7 · patrón de Órbita: cuando el motor encuentra una señal nueva, un push la
   // trae de vuelta a Órbita Mes (self-healing, 1/14d por el reposo del writer).
   useOrbitPatternInvite()
+  // N8 · Lectura Semanal: el lunes que la lectura existe (garantizada por los
+  // días con comida de la semana en curso), un push la anuncia con destino
+  // directo a /weekly-reading. Gated a dev junto con toda la Lectura Semanal.
+  useWeeklyReadingInvite()
   // Sync de Apple Health (si la usuaria conectó su reloj): foreground-first,
   // ventana de 7 días, throttled. No-op en Expo Go / Android / sin conexión.
   useAppleHealthSync()
