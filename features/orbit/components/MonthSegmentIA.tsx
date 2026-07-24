@@ -22,7 +22,9 @@ import { useSignalsHistory } from '../hooks'
 import { buildMonthChat, type MonthChatEmptyReason } from '../month-chat'
 import { monthCalendar, presenceSummary } from '../month-built'
 import { usePriorReflections, useSaveReflection } from '../reflections'
-import { useMonthlyReport } from '../report-hooks'
+import { findingArcStage } from '../finding-arc'
+import type { FindingCategory } from '../engine-types'
+import { useMonthlyReport, usePriorFindingCategories } from '../report-hooks'
 
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
@@ -129,6 +131,20 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     if (cards.length === 0) return null
     return cards.find((c) => c.id === 'deficit-summary') ?? cards[0] ?? null
   }, [cards])
+
+  // El arco de evidencia (V-10): estado del hallazgo DERIVADO del pipeline
+  // (hipótesis vivas del reporte + recurrencia contra un reporte anterior
+  // persistido). Solo con el reporte persistido: el compute-local efímero no
+  // tiene historia con qué derivar "confirmado" y mentiría por omisión.
+  const priorCategories = usePriorFindingCategories({
+    uid,
+    todayIso: today,
+    enabled: USE_PERSISTED_MONTH_REPORT,
+  }).data
+  const mainArcStage = useMemo(() => {
+    if (!mainFinding || !source || priorCategories == null) return null
+    return findingArcStage(mainFinding, source, priorCategories as FindingCategory[])
+  }, [mainFinding, source, priorCategories])
 
   // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. El keep
   // guarda la PALANCA concreta del cierre del chat (no un gesto vago). El keep es
@@ -253,6 +269,7 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
           <MonthDiscovery
             finding={mainFinding}
             talked={talkedToMain}
+            arcStage={mainArcStage}
             onExplore={() => setOpenFinding(mainFinding)}
           />
         </View>

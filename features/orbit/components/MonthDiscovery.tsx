@@ -3,6 +3,12 @@ import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react
 
 import { colors, typography } from '@/theme'
 
+import {
+  FINDING_ARC_LABEL,
+  FINDING_ARC_STEPS,
+  findingArcIndex,
+  type FindingArcStage,
+} from '../finding-arc'
 import type { Finding } from '../findings'
 import { CardAura, CtaStar, FindingGlyph, SealDivider } from './discovery-ornaments'
 
@@ -32,9 +38,13 @@ type Props = {
    *  CTA deja de INVITAR ("hablémoslo") y ofrece RETOMAR lo ya hablado: pedir
    *  charlar de nuevo, cuando ya lo hiciste, se sentía a que Stelar no recuerda. */
   talked?: boolean
+  /** El arco de evidencia (V-10): estado derivado del pipeline (motor
+   *  determinístico, SIN ✦). null = no mostrar (p. ej. compute-local sin
+   *  hipótesis ni historia con qué derivarlo). */
+  arcStage?: FindingArcStage | null
 }
 
-export function MonthDiscovery({ finding, onExplore, talked = false }: Props) {
+export function MonthDiscovery({ finding, onExplore, talked = false, arcStage = null }: Props) {
   // Ya hablado → retomar la charla guardada (se rehidrata al instante), no invitar.
   const ctaLabel = talked ? 'Retomar con Stelar' : 'Hablémoslo con Stelar'
 
@@ -75,6 +85,11 @@ export function MonthDiscovery({ finding, onExplore, talked = false }: Props) {
         <Text style={styles.support}>{finding.phrase.support}</Text>
       ) : null}
 
+      {/* El arco de evidencia (V-10): observado → encontrado → en seguimiento
+          → confirmado. Estado DERIVADO del pipeline, mostrado llano (evidencia,
+          no logro); jamás lleva ✦ — el motor no se disfraza de IA. */}
+      {arcStage ? <FindingArcRow stage={arcStage} /> : null}
+
       {/* CTA como CONVERSACIÓN (no acción): la ✦ oro es un umbral iluminado (la
           voz de Stelar), no un ícono pegado. Invita la primera vez; una vez
           hablado, RETOMA (Stelar recuerda). */}
@@ -100,6 +115,34 @@ export function MonthDiscovery({ finding, onExplore, talked = false }: Props) {
           <SealDivider />
         </View>
       )}
+    </View>
+  )
+}
+
+/* El arco como camino de 4 pasos: puntos unidos por un hairline, lo andado
+ * encendido en oro suave, el paso activo con su nombre. Discreto a propósito:
+ * es una línea de estado, no una barra de progreso que presiona. */
+function FindingArcRow({ stage }: { stage: FindingArcStage }) {
+  const active = findingArcIndex(stage)
+  return (
+    <View style={styles.arcWrap} accessibilityLabel={`Estado: ${FINDING_ARC_LABEL[stage]}`}>
+      <View style={styles.arcSteps}>
+        {FINDING_ARC_STEPS.map((step, i) => (
+          // El primer paso no crece (solo su punto); los demás estiran su
+          // línea para repartir el camino a lo ancho de la card.
+          <View key={step} style={[styles.arcStep, i === 0 && styles.arcStepFirst]}>
+            {i > 0 ? <View style={[styles.arcLine, i <= active && styles.arcLineDone]} /> : null}
+            <View
+              style={[
+                styles.arcDot,
+                i < active && styles.arcDotDone,
+                i === active && styles.arcDotActive,
+              ]}
+            />
+          </View>
+        ))}
+      </View>
+      <Text style={styles.arcLabel}>{FINDING_ARC_LABEL[stage]}</Text>
     </View>
   )
 }
@@ -186,4 +229,53 @@ const styles = StyleSheet.create({
   },
   keptFocoMark: { fontFamily: typography.uiBold, color: colors.magenta },
   seal: { marginTop: 18, alignItems: 'center' },
+  // ── El arco de evidencia (V-10) ──
+  arcWrap: {
+    marginTop: 16,
+    gap: 7,
+  },
+  arcSteps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  arcStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexGrow: 1,
+  },
+  arcStepFirst: {
+    flexGrow: 0,
+  },
+  arcLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.hairlineStrong,
+    marginHorizontal: 5,
+  },
+  arcLineDone: {
+    backgroundColor: colors.oroSoft,
+  },
+  arcDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+  },
+  arcDotDone: {
+    borderColor: colors.oroSoft,
+    backgroundColor: colors.oroSoft,
+  },
+  arcDotActive: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    borderColor: colors.oroLight,
+    backgroundColor: colors.oroLight,
+  },
+  arcLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
 })

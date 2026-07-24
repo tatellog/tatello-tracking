@@ -519,9 +519,12 @@ Objetivo de fase: que la usuaria vea el proceso de evidencia, no "IA dice".
 > `_shared/intelligence/` con re-exports finos; los 3 motores del mes
 > quedaron **delimitados** (evidencia / narrativa / cadencia, decisión
 > dueña) en vez de unificados. Suite completa (1082 tests) en verde.
-> **Falta de V-10:** el arco visible observamos → encontramos →
-> investigando → confirmamos en la UI de patrones, y validar el flip en
-> device (el flag ya está ON en la superficie dev).
+> **El arco visible también está construido** (`finding-arc.ts` en
+> `_shared`): observado → encontrado → en seguimiento → confirmado,
+> derivado del pipeline (hipótesis vivas + recurrencia contra un reporte
+> persistido ≥21 días atrás), pintado en la card del hallazgo de Órbita
+> Mes (sin ✦, copy llano). **Falta de V-10:** el arco en Progreso (chat
+> de insights) y validar el flip + el arco en device.
 
 #### V-10 · Personal Evidence (flip R1)
 
