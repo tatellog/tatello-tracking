@@ -1,6 +1,6 @@
 # Epic 05 · Experiments (R5)
 
-**Estado:** Planeado · **PRD:** Release 5 · **Depende de:** R1 (Hypothesis Engine)
+**Estado:** Construido · gated dev (V-12, sep 2026) · **PRD:** Release 5 · **Depende de:** R1 (Hypothesis Engine)
 
 ## Objetivo
 
@@ -55,12 +55,22 @@ Pasar por `manifesto-reviewer` + `voice-and-copy`.
 - **B1** `buildExperimentScaffold` (spec medible, sin prosa) + máquina de estados + guard.
 - **B2** `measureExperiment` / `computeMetricRate` (el motor decide el resultado).
 
-**Hecho (UI · gateada a dev@local.test):**
+**Hecho (UI · gateada a dev · V-12 "la prueba nace del chat", decisión dueña):**
 
-- **D** UI en Órbita Mes (`MonthExperiments.tsx`): hipótesis abiertas → "Probar
-  esto" → experimento activo (días restantes + Cerrar/Cancelar) → resultado sin
-  culpa. Mutations `useStart/Close/CancelExperiment` → edge `experiment-lifecycle`.
-  Copy revisada (manifiesto + voz LIMPIO).
+- **D** La UI-laboratorio (`MonthExperiments.tsx`) se RECHAZÓ en device y quedó
+  huérfana (nadie la monta; su copy de veredicto vive en
+  `features/experiments/verdict.ts`). La superficie vigente es conversacional:
+  - El cierre del chat del hallazgo principal (`FindingChatView` vía
+    `MonthChatSheet`) ofrece "Probarlo unos días" si su hipótesis está `open`,
+    la dimensión es medible (espejo de `METRIC_BY_DIMENSION`) y no hay otra
+    prueba activa. "Dejar la prueba" vive en el mismo lugar (cancel reversible).
+  - El seguimiento es una línea en el arco de la card (`MonthDiscovery`):
+    "Lo estamos siguiendo · día 4 de tu prueba". Cero sección aparte.
+  - Al vencer, el experimento se AUTO-CIERRA en la siguiente visita a Mes
+    (`MonthSegmentIA`: el motor mide y decide); el veredicto es UNA línea en la
+    card durante 7 días. Hipótesis confirmada → el arco avanza a Confirmado.
+  - Mutations `useStart/Close/CancelExperiment` → edge `experiment-lifecycle`
+    (desplegada). Tests: `experiments-verdict.test.ts` cubre el veredicto.
 
 **Hecho (IA · gateada a dev):**
 
@@ -73,4 +83,10 @@ Pasar por `manifesto-reviewer` + `voice-and-copy`.
 
 **Diferido:**
 
-- Abrir la UI a la beta (hoy solo dev).
+- Abrir la UI a la beta (hoy solo dev, tras `aiEnabledForEmail`).
+- Validar en device el ciclo completo (ofrecer → correr → dejar / auto-cierre →
+  veredicto) y el avance del arco a Confirmado.
+- **C quedó desconectada:** `useExperimentCopy` (la IA que redacta el foco) solo
+  la consumía la UI huérfana; la superficie conversacional no la llama. Decidir
+  si se conecta a la oferta del chat o se retira.
+- Destino final de `MonthExperiments.tsx` (borrar o conservar como referencia).

@@ -141,7 +141,7 @@ las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 | V-09  | Modelo de día parcial               | 3    | Alta      | Parcial (ver nota)       |
 | V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Parcial (ver nota)       |
 | V-11  | Timeline de descubrimientos         | 4    | Media     | Replanteada (ver nota)   |
-| V-12  | Experimentos · UI                   | 4    | Media     | Pendiente (spine ✓)      |
+| V-12  | Experimentos · UI                   | 4    | Media     | Construida · gated dev   |
 | V-13  | Hero vivo                           | 4    | Media     | Pendiente                |
 | V-14  | Apple Health + Health Connect       | 5    | Alta      | Pendiente (R4 F1 ✓)      |
 | V-15  | Smart Recovery                      | 5    | Media     | Pendiente                |
@@ -540,6 +540,19 @@ Objetivo de fase: que la usuaria vea el proceso de evidencia, no "IA dice".
 > retoma: como CATÁLOGO de lo aprendido (una entrada por patrón,
 > deduplicada por kind, "visto N veces desde <fecha>" + evidencia del
 > metadata; transformaciones aparte como sellos), no como timeline.
+>
+> **V-12 construida (gated dev) · "la prueba nace del chat" (opción dueña,
+> 23 jul):** NO se remontó la UI-laboratorio rechazada (`MonthExperiments`
+> queda huérfana; su copy de veredicto se extrajo a
+> `features/experiments/verdict.ts`). En su lugar: el cierre del chat del
+> hallazgo ofrece "Probarlo unos días" (si su hipótesis está viva y la
+> dimensión es medible); el seguimiento vive en la línea del arco de la
+> card ("Lo estamos siguiendo · día 4 de tu prueba"); al vencer, el
+> experimento se AUTO-CIERRA en la siguiente visita a Mes (el motor mide y
+> decide) y el veredicto aparece como una línea en la card por 7 días
+> ("Se sostuvo en tus días." / sin culpa). Dejar la prueba se hace desde
+> el chat (cancel reversible). Hipótesis confirmada por el ciclo → el arco
+> avanza a Confirmado. Spine intacto: 1 activo, ≤14 días, motor decide.
 
 #### V-10 · Personal Evidence (flip R1)
 
@@ -567,7 +580,7 @@ estado visible de cada hallazgo.
 **Criterios de éxito.**
 
 - [ ] Un hallazgo se puede seguir de "observando" a "confirmado".
-- [ ] `month-built.ts` deja de ser motor divergente.
+- [x] `month-built.ts` deja de ser motor divergente (convergido 23 jul 2026, ADR 0002).
 
 **Gates.** `manifesto-reviewer` · regla ✦-solo-IA.
 

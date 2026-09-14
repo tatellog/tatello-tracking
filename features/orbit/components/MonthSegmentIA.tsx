@@ -4,6 +4,15 @@ import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { useTransformProgress } from '@/features/emblem'
+import {
+  useActiveExperiment,
+  useCancelExperiment,
+  useCloseExperiment,
+  useHypotheses,
+  useLatestExperiment,
+  useStartExperiment,
+} from '@/features/experiments/hooks'
+import { resultLine, resultTone } from '@/features/experiments/verdict'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useProfile } from '@/features/profile/hooks'
 import { RevealedEmblem } from '@/features/tabs/components/constellation/RevealedEmblem'
@@ -141,10 +150,118 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
     todayIso: today,
     enabled: USE_PERSISTED_MONTH_REPORT,
   }).data
+  // La prueba (V-12): el experimento del spine, sin dashboard. La hipótesis
+  // persistida de ESTE hallazgo decide si se ofrece ("open"), si corre
+  // (activa sobre su uuid) o si acaba de hablar el motor (veredicto).
+  const hypRows = useHypotheses({
+    uid,
+    period: 'last30',
+    periodStart: firstDataDay ?? `${month}-01`,
+    periodEnd: today,
+  }).data
+  const mainHyp = useMemo(
+    () =>
+      mainFinding ? (hypRows?.find((h) => h.source_finding_id === mainFinding.id) ?? null) : null,
+    [mainFinding, hypRows],
+  )
+  const activeExp = useActiveExperiment(uid).data ?? null
+  const latestExp = useLatestExperiment(uid).data ?? null
+  const startExp = useStartExperiment(uid)
+  const cancelExp = useCancelExperiment(uid)
+  const closeExp = useCloseExperiment(uid)
+
+  // Auto-cierre al vencer: nadie opera la maquinaria — el motor mide y
+  // escribe el veredicto la primera vez que la usuaria vuelve a Mes.
+  const autoClosedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeExp || closeExp.isPending) return
+    if (activeExp.ends_on >= today) return
+    if (autoClosedRef.current === activeExp.id) return
+    autoClosedRef.current = activeExp.id
+    closeExp.mutate(activeExp.id)
+  }, [activeExp, today, closeExp])
+
+  const dayDiff = (a: string, b: string): number => {
+    const [ay, am, ad] = a.split('-').map(Number) as [number, number, number]
+    const [by, bm, bd] = b.split('-').map(Number) as [number, number, number]
+    return Math.round(
+      (new Date(ay, am - 1, ad, 12).getTime() - new Date(by, bm - 1, bd, 12).getTime()) / 86400000,
+    )
+  }
+
+  // ¿La prueba activa es la de este hallazgo? (activa sobre SU hipótesis).
+  const trialForMain =
+    activeExp != null && mainHyp != null && activeExp.hypothesis_id === mainHyp.id
+  const trialDay = trialForMain ? Math.max(1, dayDiff(today, activeExp.started_on) + 1) : null
+  const trialLen = trialForMain ? dayDiff(activeExp.ends_on, activeExp.started_on) + 1 : null
+
+  // Dimensiones medibles (espejo de METRIC_BY_DIMENSION del motor):
+  // alimentación no da un experimento reversible limpio → no se ofrece.
+  const measurable =
+    mainFinding != null &&
+    ['deficit', 'movimiento', 'sueno', 'agua', 'proteina'].includes(mainFinding.category)
+
+  const mainTrial = useMemo(() => {
+    if (trialForMain && trialDay != null && trialLen != null) {
+      return {
+        state: 'running' as const,
+        day: trialDay,
+        days: trialLen,
+        busy: cancelExp.isPending,
+        onLeave: () => {
+          track('experiment_left', { dimension: mainFinding?.category ?? '' })
+          cancelExp.mutate(activeExp.id)
+        },
+      }
+    }
+    if (mainHyp?.status === 'open' && activeExp == null && measurable) {
+      return {
+        state: 'offer' as const,
+        busy: startExp.isPending,
+        onStart: () => {
+          track('experiment_started', { dimension: mainFinding?.category ?? '' })
+          startExp.mutate(mainHyp.id)
+        },
+      }
+    }
+    return null
+    // mutations son estables (react-query); las deps cubren el estado real.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    trialForMain,
+    trialDay,
+    trialLen,
+    mainHyp,
+    activeExp,
+    measurable,
+    mainFinding?.category,
+    cancelExp.isPending,
+    startExp.isPending,
+  ])
+
+  // El veredicto de la prueba de ESTE hallazgo, recién cerrada (≤7 días):
+  // una línea en la card y se retira sola con el tiempo.
+  const mainVerdict = useMemo(() => {
+    if (!latestExp || !mainHyp || latestExp.hypothesis_id !== mainHyp.id) return null
+    if (latestExp.status === 'running' || latestExp.closed_at == null) return null
+    const closedDay = latestExp.closed_at.slice(0, 10)
+    if (dayDiff(today, closedDay) > 7) return null
+    const res = latestExp.result as { daysMeasured?: number } | null
+    const plan = latestExp.plan as { durationDays?: number } | null
+    return {
+      text: resultLine(latestExp.status, res?.daysMeasured, plan?.durationDays),
+      tone: resultTone(latestExp.status),
+    }
+    // dayDiff es pura e inline; no es dep real.
+  }, [latestExp, mainHyp, today])
+
   const mainArcStage = useMemo(() => {
     if (!mainFinding || !source || priorCategories == null) return null
+    // La hipótesis confirmada por el ciclo de la prueba (tabla, no snapshot
+    // del reporte) avanza el arco aunque el reporte viejo no lo sepa aún.
+    if (mainHyp?.status === 'confirmed') return 'confirmado' as const
     return findingArcStage(mainFinding, source, priorCategories as FindingCategory[])
-  }, [mainFinding, source, priorCategories])
+  }, [mainFinding, source, priorCategories, mainHyp?.status])
 
   // "Me lo quedo presente" (Stage 2): compromiso suave, sin veredicto. El keep
   // guarda la PALANCA concreta del cierre del chat (no un gesto vago). El keep es
@@ -270,6 +387,8 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
             finding={mainFinding}
             talked={talkedToMain}
             arcStage={mainArcStage}
+            arcDetail={trialForMain && trialDay != null ? `día ${trialDay} de tu prueba` : null}
+            verdict={mainVerdict}
             onExplore={() => setOpenFinding(mainFinding)}
           />
         </View>
@@ -316,6 +435,8 @@ export function MonthSegmentIA({ onPickDay }: { onPickDay?: (date: string) => vo
         // concreta que aterrizó la IA como foco de ESTE hallazgo.
         onKeepFoco={(foco) => openFinding && keep.mutate({ findingId: openFinding.id, foco })}
         kept={openFinding ? focoByFinding.has(openFinding.id) : false}
+        // La prueba (V-12) solo aplica al hallazgo principal (su hipótesis).
+        trial={openFinding != null && openFinding.id === mainFinding?.id ? mainTrial : null}
         onNext={() => setOpenFinding(null)}
         onClose={() => setOpenFinding(null)}
         onPickDay={(date) => {

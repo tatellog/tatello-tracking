@@ -59,6 +59,11 @@ type Props = {
   onKeepFoco?: (foco: string) => void
   /** El hallazgo abierto ya es un foco guardado este mes. */
   kept?: boolean
+  /** La prueba (V-12) del hallazgo abierto — se pasa tal cual al chat. */
+  trial?:
+    | { state: 'offer'; onStart: () => void; busy?: boolean }
+    | { state: 'running'; day: number; days: number; onLeave: () => void; busy?: boolean }
+    | null
   onNext: () => void
   onClose: () => void
   onPickDay?: (date: string) => void
@@ -78,6 +83,7 @@ export function MonthChatSheet({
   onSaveReflection,
   onKeepFoco,
   kept,
+  trial,
   onNext,
   onClose,
   onPickDay,
@@ -176,6 +182,7 @@ export function MonthChatSheet({
                   onSaveReflection={onSaveReflection}
                   onKeepFoco={onKeepFoco}
                   kept={kept}
+                  trial={trial}
                   onNext={onNext}
                   onFinish={onClose}
                   onPickDay={onPickDay}

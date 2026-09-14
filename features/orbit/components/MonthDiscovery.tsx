@@ -42,9 +42,23 @@ type Props = {
    *  determinístico, SIN ✦). null = no mostrar (p. ej. compute-local sin
    *  hipótesis ni historia con qué derivarlo). */
   arcStage?: FindingArcStage | null
+  /** Sufijo del estado del arco (V-12): "día 4 de tu prueba" mientras corre
+   *  el experimento de ESTE hallazgo. El seguimiento vive aquí, no en una
+   *  sección aparte (cero maquinaria de laboratorio). */
+  arcDetail?: string | null
+  /** El veredicto del motor sobre la prueba recién cerrada (copy revisada,
+   *  sin culpa; "no cambió" también es respuesta). null = nada que decir. */
+  verdict?: { text: string; tone: 'good' | 'soft' } | null
 }
 
-export function MonthDiscovery({ finding, onExplore, talked = false, arcStage = null }: Props) {
+export function MonthDiscovery({
+  finding,
+  onExplore,
+  talked = false,
+  arcStage = null,
+  arcDetail = null,
+  verdict = null,
+}: Props) {
   // Ya hablado → retomar la charla guardada (se rehidrata al instante), no invitar.
   const ctaLabel = talked ? 'Retomar con Stelar' : 'Hablémoslo con Stelar'
 
@@ -87,8 +101,16 @@ export function MonthDiscovery({ finding, onExplore, talked = false, arcStage = 
 
       {/* El arco de evidencia (V-10): observado → encontrado → en seguimiento
           → confirmado. Estado DERIVADO del pipeline, mostrado llano (evidencia,
-          no logro); jamás lleva ✦ — el motor no se disfraza de IA. */}
-      {arcStage ? <FindingArcRow stage={arcStage} /> : null}
+          no logro); jamás lleva ✦ — el motor no se disfraza de IA. Con prueba
+          en curso (V-12), el detalle vive en la misma línea. */}
+      {arcStage ? <FindingArcRow stage={arcStage} detail={arcDetail} /> : null}
+
+      {/* El veredicto de la prueba recién cerrada: UNA línea, sin sección. */}
+      {verdict ? (
+        <Text style={[styles.verdictLine, verdict.tone === 'good' && styles.verdictLineGood]}>
+          {verdict.text}
+        </Text>
+      ) : null}
 
       {/* CTA como CONVERSACIÓN (no acción): la ✦ oro es un umbral iluminado (la
           voz de Stelar), no un ícono pegado. Invita la primera vez; una vez
@@ -122,10 +144,11 @@ export function MonthDiscovery({ finding, onExplore, talked = false, arcStage = 
 /* El arco como camino de 4 pasos: puntos unidos por un hairline, lo andado
  * encendido en oro suave, el paso activo con su nombre. Discreto a propósito:
  * es una línea de estado, no una barra de progreso que presiona. */
-function FindingArcRow({ stage }: { stage: FindingArcStage }) {
+function FindingArcRow({ stage, detail }: { stage: FindingArcStage; detail?: string | null }) {
   const active = findingArcIndex(stage)
+  const label = detail ? `${FINDING_ARC_LABEL[stage]} · ${detail}` : FINDING_ARC_LABEL[stage]
   return (
-    <View style={styles.arcWrap} accessibilityLabel={`Estado: ${FINDING_ARC_LABEL[stage]}`}>
+    <View style={styles.arcWrap} accessibilityLabel={`Estado: ${label}`}>
       <View style={styles.arcSteps}>
         {FINDING_ARC_STEPS.map((step, i) => (
           // El primer paso no crece (solo su punto); los demás estiran su
@@ -142,7 +165,7 @@ function FindingArcRow({ stage }: { stage: FindingArcStage }) {
           </View>
         ))}
       </View>
-      <Text style={styles.arcLabel}>{FINDING_ARC_LABEL[stage]}</Text>
+      <Text style={styles.arcLabel}>{label}</Text>
     </View>
   )
 }
@@ -277,5 +300,17 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.niebla,
+  },
+  // El veredicto de la prueba — una línea de coach, jamás un panel.
+  verdictLine: {
+    marginTop: 10,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    color: colors.niebla,
+  },
+  verdictLineGood: {
+    color: colors.oroLight,
   },
 })
