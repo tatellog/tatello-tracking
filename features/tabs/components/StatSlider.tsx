@@ -87,6 +87,10 @@ type Props = {
    *  the vertical-scroll pause doesn't fire for a sideways drag, so without
    *  this the swipe competed with all the cosmos animation and felt slow. */
   onSwipeStateChange?: (active: boolean) => void
+  /** V-15 Smart Recovery: minutos de sueño que llegaron del reloj SIN registro
+   *  manual encima (null si nada llegó). La slide de sueño nace llena con su
+   *  procedencia y el colapso de rituales lo cuenta como ritual cumplido. */
+  wearableSleepMinutes?: number | null
 }
 
 /**
@@ -97,7 +101,12 @@ type Props = {
  * weight are read-only views. Pagination dots track the position;
  * the title cross-fades as the slider pages.
  */
-export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
+export function StatSlider({
+  ctx,
+  targetSlide,
+  onSwipeStateChange,
+  wearableSleepMinutes = null,
+}: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
   // Un slide con arrastre horizontal propio (el slider de ánimo) bloquea el
@@ -172,7 +181,11 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   const sleepToday = useSleepLog(ctx.date)
   const moodToday =
     ctx.latest_mood?.checkin_date === ctx.date ? (ctx.latest_mood.value as MoodValue) : null
-  const ritualsDone = moodToday != null && sleepToday.data?.duration_minutes != null
+  // Manual gana; si no hay manual, la noche del reloj cuenta como ritual hecho
+  // (V-15: no pedir lo que ya llegó).
+  const sleepMinutesToday = sleepToday.data?.duration_minutes ?? wearableSleepMinutes ?? null
+  const sleepFromWatch = sleepToday.data?.duration_minutes == null && wearableSleepMinutes != null
+  const ritualsDone = moodToday != null && sleepMinutesToday != null
   const [expanded, setExpanded] = useState(false)
   // Otro día (navegación o medianoche) → vuelve al estado natural del día.
   useEffect(() => setExpanded(false), [ctx.date])
@@ -196,7 +209,11 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // may already be paged to (keeps scrollX / active in sync).
   const slides: { id: string; title: string; node: ReactNode }[] = [
     { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
-    { id: 'sleep', title: 'Sueño de anoche', node: <SleepSlide date={ctx.date} /> },
+    {
+      id: 'sleep',
+      title: 'Sueño de anoche',
+      node: <SleepSlide date={ctx.date} wearableMinutes={wearableSleepMinutes} />,
+    },
     {
       id: 'wellbeing',
       title: 'Cómo amaneciste',
@@ -272,20 +289,21 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   }
 
   if (ritualsDone && !expanded) {
-    const mins = sleepToday.data?.duration_minutes ?? 0
+    const mins = sleepMinutesToday ?? 0
     const hours = (mins / 60).toFixed(mins % 60 === 0 ? 0 : 1)
     const moodLabel = MOOD_SUMMARY_LABEL[moodToday]
     return (
       <Pressable
         onPress={openPager}
         accessibilityRole="button"
-        accessibilityLabel={`Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas. Toca para abrir el detalle.`}
+        accessibilityLabel={`Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas${sleepFromWatch ? ' según tu reloj' : ''}. Toca para abrir el detalle.`}
         style={({ pressed }) => pressed && styles.collapsedPressed}
       >
         <View style={styles.collapsedRow}>
           <Text style={styles.collapsedText} numberOfLines={1}>
             Ánimo: <Text style={styles.collapsedValue}>{moodLabel}</Text> · Dormiste{' '}
             <Text style={styles.collapsedValue}>{hours} h</Text>
+            {sleepFromWatch ? ' · tu reloj' : ''}
           </Text>
           <Text style={styles.collapsedChevron}>›</Text>
         </View>
@@ -763,9 +781,12 @@ function StepButton({
  * local state — the query only seeds them — so the UI is instant and
  * each change upserts in the background.
  */
-function SleepSlide({ date }: { date: string }) {
+function SleepSlide({ date, wearableMinutes }: { date: string; wearableMinutes: number | null }) {
   const { data: log, isLoading } = useSleepLog(date)
   const upsert = useUpsertSleep(date)
+  // V-15: sin fila manual, la noche del reloj siembra el draft y la slide nace
+  // registrada (con procedencia). Tocar − / + escribe manual → manual gana.
+  const fromWatch = log?.duration_minutes == null && wearableMinutes != null
 
   const [draft, setDraft] = useState<SleepDraft | null>(null)
   const [touched, setTouched] = useState(false)
@@ -779,17 +800,18 @@ function SleepSlide({ date }: { date: string }) {
   useEffect(() => {
     if (isLoading || touched) return
     setDraft({
-      durationMinutes: log?.duration_minutes ?? SLEEP_DEFAULT_MIN,
+      durationMinutes: log?.duration_minutes ?? wearableMinutes ?? SLEEP_DEFAULT_MIN,
       quality: log?.quality ?? null,
     })
-  }, [isLoading, log, touched])
+  }, [isLoading, log, touched, wearableMinutes])
 
   if (draft == null) {
     return <View style={[styles.slide, styles.card]} />
   }
 
-  // A row exists once the night is logged or the user has touched it.
-  const hasEntry = log != null || touched
+  // A row exists once the night is logged, the watch brought it, or the
+  // user has touched it.
+  const hasEntry = log != null || touched || fromWatch
   const h = Math.floor(draft.durationMinutes / 60)
   const m = draft.durationMinutes % 60
   const quality = qualityFromDuration(draft.durationMinutes)
@@ -861,6 +883,7 @@ function SleepSlide({ date }: { date: string }) {
         ) : (
           <Text style={styles.captionLine}>
             Sueño <Text style={styles.captionEm}>{QUALITY_WORDS[quality - 1]}</Text>
+            {fromWatch && !touched ? ' · desde tu reloj' : ''}
           </Text>
         )}
       </View>

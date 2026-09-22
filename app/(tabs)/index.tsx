@@ -31,6 +31,9 @@ import { TransformationReveal, useRevelationOrchestrator } from '@/features/reve
 import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
+import { useSleepLog } from '@/features/sleep/hooks'
+import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
+import { wearableDayFacts, workoutProvenanceLine } from '@/features/wearables/recovery'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
@@ -444,12 +447,45 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
-  // El estado del toggle es el del día VISTO (vctx), no el de hoy.
+  // V-15 Smart Recovery: lo que el reloj ya trajo del día VISTO (sin manual
+  // encima). Hoy sale de todaySignals (fresco, invalidado por el sync); un día
+  // pasado, de la historia de 45 días ya cargada (cero fetch extra). El manual
+  // de sueño del día permite inferir la procedencia con la view vieja.
+  const viewedSignals =
+    selectedDate === todayIsoLocal
+      ? todaySignals.data
+      : (monthSignals.data ?? []).find((r) => r.day === selectedDate)
+  const manualSleep = useSleepLog(selectedDate)
+  const wearable = wearableDayFacts(viewedSignals, {
+    manualSleepMinutes: manualSleep.data?.duration_minutes ?? null,
+  })
+  // Entreno sellado por el reloj: sin registro manual, sin descanso marcado.
+  const trainedByWearable =
+    !vctx.today_workout_completed && !restedToday && wearable.workout != null
+
+  // Criterio de éxito V-15 ("cero preguntas por datos que ya llegaron"): se
+  // instrumenta UNA vez por día lo que el reloj pre-llenó en Hoy.
+  const prefilledTracked = useRef<string | null>(null)
+  useEffect(() => {
+    if (viewingPast) return
+    const workout = trainedByWearable
+    const sleep = wearable.sleep != null
+    if (!workout && !sleep) return
+    const key = `${todayIsoLocal}:${workout ? 'w' : ''}${sleep ? 's' : ''}`
+    if (prefilledTracked.current === key) return
+    prefilledTracked.current = key
+    track('wearable_prefilled', { source: 'apple_health', workout, sleep })
+  }, [viewingPast, trainedByWearable, wearable.sleep, todayIsoLocal])
+
+  // El estado del toggle es el del día VISTO (vctx), no el de hoy. El reloj
+  // sella "entrenaste" igual que el manual: Stelar no pregunta lo que ya llegó.
   const dayState: DayState = vctx.today_workout_completed
     ? 'trained'
     : restedToday
       ? 'rested'
-      : 'undecided'
+      : trainedByWearable
+        ? 'trained'
+        : 'undecided'
 
   // Tipo de entreno de HOY para los chips post-confirmación. Solo consulta
   // cuando hoy ya está entrenado; en modo "ver día" los chips no existen.
@@ -600,9 +636,17 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 onChange={handleDayChange}
                 label={viewingPast ? viewingLabel : 'Hoy'}
                 question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
-                locked={viewingPast && vctx.today_workout_completed}
-                workoutType={viewingPast ? undefined : workoutTypeQ.data}
+                locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
+                // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
+                workoutType={
+                  viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
+                }
                 onWorkoutType={viewingPast ? undefined : handleWorkoutType}
+                wearable={
+                  !viewingPast && trainedByWearable && wearable.workout
+                    ? { line: workoutProvenanceLine(wearable.workout) }
+                    : null
+                }
                 saveFailed={
                   toggleToday.isError ||
                   setRest.isError ||
@@ -610,6 +654,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   setRestForDate.isError
                 }
               />
+              {/* Invitación contextual (spec wearables §5): solo con el día sin
+                  responder y el canal disponible pero no conectado. */}
+              {!viewingPast && dayState === 'undecided' ? <WearableInviteLine /> : null}
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre
@@ -710,6 +757,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   sign,
                   // Mañana real de HOY (no de un día visto): antes de mediodía.
                   !viewingPast && new Date().getHours() < 12,
+                  // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce.
+                  !viewingPast && wearable.sleep != null,
                 )}
               />
               {(() => {
@@ -793,7 +842,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 universeY.current = e.nativeEvent.layout.y
               }}
             >
-              <TodayUniverseRewards ctx={vctx} date={vctx.date} restedToday={restedToday} />
+              <TodayUniverseRewards
+                ctx={vctx}
+                date={vctx.date}
+                restedToday={restedToday}
+                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
+              />
             </Animated.View>
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
@@ -810,6 +864,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 ctx={vctx}
                 targetSlide={slideParam ?? null}
                 onSwipeStateChange={handleSlideSwipe}
+                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
               />
             </Animated.View>
 
@@ -940,6 +995,7 @@ function getCoachCopy(
   trainedToday: boolean,
   sign: ZodiacSign,
   morning = false,
+  nightFromWatch = false,
 ): CoachCopy {
   const lower = signLabel.toLowerCase()
 
@@ -993,7 +1049,12 @@ function getCoachCopy(
   if (morning) {
     const next = pickStarForCount(sign, count + 1)
     if (next) {
-      return { before: 'Hoy se enciende ', emphasis: next.name, after: ', si tú quieres.' }
+      // V-15: el reloj ya anotó la noche — se reconoce el dato recibido antes
+      // de la invitación (microlectura con dato, no relleno).
+      const lead = nightFromWatch
+        ? 'Tu reloj ya vio tu noche. Hoy se enciende '
+        : 'Hoy se enciende '
+      return { before: lead, emphasis: next.name, after: ', si tú quieres.' }
     }
   }
 

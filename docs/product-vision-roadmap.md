@@ -142,9 +142,9 @@ las Epic 01-06 existentes (`docs/epics/`), que se referencian donde aplica.
 | V-10  | Personal Evidence (flip R1)         | 4    | Alta      | Parcial (ver nota)       |
 | V-11  | Timeline de descubrimientos         | 4    | Media     | Replanteada (ver nota)   |
 | V-12  | Experimentos · UI                   | 4    | Media     | Construida · gated dev   |
-| V-13  | Hero vivo                           | 4    | Media     | Pendiente                |
+| V-13  | Hero vivo                           | 4    | Media     | Construida · flag ON     |
 | V-14  | Apple Health + Health Connect       | 5    | Alta      | Pendiente (R4 F1 ✓)      |
-| V-15  | Smart Recovery                      | 5    | Media     | Pendiente                |
+| V-15  | Smart Recovery                      | 5    | Media     | Construida · sin device  |
 | V-16  | Insights predictivos                | 6    | Baja      | Pendiente                |
 | V-17  | Memoria mensual (R6)                | 6    | Baja      | Pendiente                |
 | V-18  | Comunidad de descubrimientos        | 6    | Explorat. | Pendiente                |
@@ -541,6 +541,21 @@ Objetivo de fase: que la usuaria vea el proceso de evidencia, no "IA dice".
 > deduplicada por kind, "visto N veces desde <fecha>" + evidencia del
 > metadata; transformaciones aparte como sellos), no como timeline.
 >
+> **V-13 construida (14 sep 2026, `HERO_ALIVE_ENABLED`):** el emblema de Hoy
+> reacciona a cada registro exitoso de comida / agua / ánimo / sueño. Cero
+> bus nuevo: las mutations se marcan con `logMeta(kind)` (`lib/logMeta.ts`) y
+> `useHeroReaction` (en Hoy, no en la constelación) escucha el mutation cache
+> de React Query. La receta vive en `features/tabs/hero-reaction.ts` (puro,
+> testeado): comida = calor dorado desde el centro · agua = onda de leche
+> desde la estrella alfa · ánimo = la nebulosa respira · sueño = el campo
+> profundo titila; siempre 3-5 estrellas ambiente vibran. Capa Skia
+> (`skia-hero-reaction.tsx`) montada solo mientras corre (≤1.5 s), solo
+> `transform`/`opacity`, colores estáticos; en reposo cero nodos. Se ignora
+> sin foco y bajo reduce-motion. "Entrené" NO pasa por aquí: ya tiene su
+> ignición propia. Snapshots de la constelación intactos. **Falta:** validar
+> en device (Expo Go + release build por la regla de worklets/Android) y
+> afinar intensidades a ojo.
+>
 > **V-12 construida (gated dev) · "la prueba nace del chat" (opción dueña,
 > 23 jul):** NO se remontó la UI-laboratorio rechazada (`MonthExperiments`
 > queda huérfana; su copy de veredicto se extrajo a
@@ -651,7 +666,8 @@ recibió", no desbloqueo ni progreso falso.
 
 **Criterios de éxito.**
 
-- [ ] Registrar produce reacción visible < 1 s, sin caída de FPS.
+- [ ] Registrar produce reacción visible < 1 s, sin caída de FPS (construido;
+      pendiente medir en device).
 - [ ] Validado en release build (regla worklets/Android).
 
 **Gates.** `reanimated-guardian` obligatorio · validación en device
@@ -713,8 +729,32 @@ pregunta: QuickLog y Hoy dejan de ofrecer lo que ya llegó solo.
 
 **Criterios de éxito.**
 
-- [ ] Cero preguntas por datos que ya llegaron del dispositivo.
-- [ ] Cero dobles conteos en `daily_signals`.
+- [x] Cero preguntas por datos que ya llegaron del dispositivo.
+- [x] Cero dobles conteos en `daily_signals`.
+
+> **Estado (22 sep 2026):** construida a partir del feedback beta ("la app es
+> compleja; que el reloj pase el entreno y el sueño solos"). Sin flag: el
+> comportamiento solo se activa cuando hay dato del reloj sin manual encima.
+> Lógica pura en `features/wearables/recovery.ts` (`wearableDayFacts`, con
+> tests). Superficies: DayCheckIn de Hoy nace sellado con procedencia
+> ("desde tu reloj · 45 min · ~342 kcal"; "cambiar" solo abre el tipo, nunca
+> des-entrena contra el dispositivo) · slide de sueño nace llena ("Sueño
+> reparador · desde tu reloj"; tocar − / + escribe manual y manual gana) ·
+> el colapso de rituales y las recompensas del universo cuentan la noche del
+> reloj · el beat matinal del coach reconoce el dato ("Tu reloj ya vio tu
+> noche. Hoy se enciende X, si tú quieres") · Órbita Día marca "7 h · tu
+> reloj" en la evidencia · invitación contextual (spec wearables §5) bajo el
+> check-in cuando HealthKit existe y no está conectado ("¿Usas reloj? Puede
+> anotar tu entreno y tu sueño por ti"; "Ahora no" es definitivo). Migración
+> `20260922120000` (la view gana `sleep_source` y `workout_minutes`; el
+> cliente infiere la procedencia del sueño si la view vieja aún no la trae),
+> aplicada en prod el 22 sep 2026 con rls-auditor aprobada. Instrumentado:
+> `wearable_prefilled` (1/día), `wearable_invite_tap`,
+> `wearable_invite_dismissed`. QuickLog no cambia: nunca ofreció entreno ni
+> sueño. **Falta:** validar en dev build con reloj real (el build de la beta
+> va uno atrás y aún no trae HealthKit) · decisión aparte de la dueña sobre
+> un push "tu noche ya está en tu evidencia" (hoy la spec de wearables §3
+> prohíbe push por dato del reloj; foreground-first).
 
 ---
 

@@ -67,6 +67,13 @@ describe('buildDayGoal — evidencia', () => {
     expect(find(g.evidence, 'water')!.label).toBe('Agua completa')
   })
 
+  it('sueño del reloj lleva su procedencia en el detalle (V-15)', () => {
+    const g = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'wearable' }), CTX)!
+    expect(find(g.evidence, 'sleep')!.detail).toBe('7 h · tu reloj')
+    const manual = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'manual' }), CTX)!
+    expect(find(manual.evidence, 'sleep')!.detail).toBe('7 h')
+  })
+
   it('proteína en progreso conserva el dato real, sin "en objetivo"', () => {
     const g = buildDayGoal(mkSig(DAY, { calories: 1280, protein_g: 90 }), CTX)!
     expect(find(g.evidence, 'protein')!.label).toBe('Proteína')

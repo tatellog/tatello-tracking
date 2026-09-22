@@ -45,6 +45,11 @@ type Props = {
   /** La mutación optimista falló e hizo rollback: línea cálida de reintento
    *  en vez de apagar la estrella en silencio. */
   saveFailed?: boolean
+  /** V-15 Smart Recovery: el reloj ya selló el entreno de hoy (sin registro
+   *  manual encima). La fila nace confirmada con su procedencia ("desde tu
+   *  reloj · 45 min · ~342 kcal") y "cambiar" solo abre el tipo: el dato del
+   *  dispositivo manda, nunca se des-entrena contra él. */
+  wearable?: { line: string } | null
 }
 
 // Star = a trained day (the constellation's glyph). Vive SOLO en la fila
@@ -113,13 +118,17 @@ export function DayCheckIn({
   workoutType,
   onWorkoutType,
   saveFailed = false,
+  wearable = null,
 }: Props) {
   const [editing, setEditing] = useState(false)
   // El chip recién tocado — sostiene el bloque abierto CHIP_HOLD_MS para que
   // la selección se vea antes del colapso (fill → hold → recogida).
   const [justPicked, setJustPicked] = useState<WorkoutTypeId | null>(null)
   const answered = state !== 'undecided'
-  const showAnswers = !locked && (!answered || editing)
+  // Sellado por el reloj: las cápsulas Entrené / Fue descanso no aparecen ni
+  // en edición — lo único editable es el tipo (chips).
+  const sealedByWearable = wearable != null && state === 'trained'
+  const showAnswers = !locked && !sealedByWearable && (!answered || editing)
   const isHoy = label === 'Hoy'
   const typeLabel = WORKOUT_TYPES.find((t) => t.id === workoutType)?.label ?? null
 
@@ -159,6 +168,9 @@ export function DayCheckIn({
     !locked &&
     !!onWorkoutType &&
     (editing || !typeLabel || justPicked !== null)
+  // En modo reloj + edición, el bloque de chips lleva su propia puerta "Listo"
+  // (el editHeader de las cápsulas no se renderiza en este modo).
+  const chipsOwnClose = sealedByWearable && editing
 
   return (
     <Animated.View layout={layout} style={styles.wrap}>
@@ -213,8 +225,11 @@ export function DayCheckIn({
             {state === 'trained' && typeLabel ? (
               <Text style={styles.confirmedType}>{` · ${typeLabel}`}</Text>
             ) : null}
+            {sealedByWearable && wearable ? (
+              <Text style={styles.provenance}>{`\n${wearable.line}`}</Text>
+            ) : null}
           </Text>
-          {!locked ? (
+          {!locked && !(sealedByWearable && editing) ? (
             <Pressable
               onPress={() => setEditing(true)}
               hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
@@ -240,9 +255,21 @@ export function DayCheckIn({
         >
           {/* En edición los chips quedan bajo "Fue descanso" y el lead corto
               se leía "¿de qué tipo de descanso?" — nombrar el sujeto. */}
-          <Text style={styles.typeLead}>
-            {editing ? '¿De qué tipo fue tu entreno?' : '¿De qué tipo?'}
-          </Text>
+          <View style={chipsOwnClose ? styles.editHeader : undefined}>
+            <Text style={styles.typeLead}>
+              {editing ? '¿De qué tipo fue tu entreno?' : '¿De qué tipo?'}
+            </Text>
+            {chipsOwnClose ? (
+              <Pressable
+                onPress={() => setEditing(false)}
+                hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Listo, cerrar edición"
+              >
+                <Text style={styles.changeLink}>Listo</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <View style={styles.typeRow}>
             {WORKOUT_TYPES.map((t) => {
               const active = workoutType === t.id || justPicked === t.id
@@ -389,6 +416,14 @@ const styles = StyleSheet.create({
   confirmedType: {
     fontFamily: typography.uiSemi,
     color: colors.bone,
+  },
+  // Procedencia sutil estilo Apple Health (spec wearables §5): segunda línea
+  // de la fila, en niebla, junto al dato y en el mismo lugar del manual.
+  provenance: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.niebla,
   },
   changeLink: {
     fontFamily: typography.uiMedium,

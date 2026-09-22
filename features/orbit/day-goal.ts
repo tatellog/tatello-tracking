@@ -269,10 +269,13 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
   // logro). La nutrición ya la cuenta la proteína + el héroe del déficit.
 
   if (s.sleep_minutes != null) {
+    // Procedencia sutil (spec wearables §5): la noche del reloj se marca junto
+    // al dato, igual que la kcal del entreno lleva "tu reloj" en la leyenda.
+    const fromWatch = s.sleep_source === 'wearable'
     out.push({
       key: 'sleep',
       label: 'Dormiste',
-      detail: `${sleepHours(s.sleep_minutes)} h`,
+      detail: `${sleepHours(s.sleep_minutes)} h${fromWatch ? ' · tu reloj' : ''}`,
       tone: 'sueno',
     })
   }

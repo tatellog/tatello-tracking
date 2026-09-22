@@ -90,9 +90,16 @@ type Props = {
   /** ISO yyyy-mm-dd local de hoy. */
   date: string
   restedToday: boolean
+  /** V-15: noche del reloj sin manual encima (la pipa es pipa: cuenta igual). */
+  wearableSleepMinutes?: number | null
 }
 
-export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
+export function TodayUniverseRewards({
+  ctx,
+  date,
+  restedToday,
+  wearableSleepMinutes = null,
+}: Props) {
   const water = useWaterToday(date)
   // El agua derivada de comidas se lee aparte para no tocar el optimismo del
   // stepper directo; el total que ve la usuaria = directa + comidas.
@@ -147,7 +154,7 @@ export function TodayUniverseRewards({ ctx, date, restedToday }: Props) {
         waterGlasses: (water.data ?? 0) + (waterFromMeals.data ?? 0),
         waterGoalGlasses: Math.max(1, Math.round(goalMl / GLASS_ML)),
         waterFromMeals: waterFromMeals.data ?? 0,
-        sleepMinutes: sleep.data?.duration_minutes ?? null,
+        sleepMinutes: sleep.data?.duration_minutes ?? wearableSleepMinutes ?? null,
         restedToday,
         // Brillo ← el ánimo del día (lo que setea el slider de "Cómo
         // amaneciste"). Vive en el brief; useAddMoodCheckin lo invalida, así

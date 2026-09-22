@@ -1417,6 +1417,7 @@ export type Database = {
           rested: boolean | null
           sleep_minutes: number | null
           sleep_quality: number | null
+          sleep_source: string | null
           stress: number | null
           trained: boolean | null
           user_id: string | null
@@ -1424,6 +1425,7 @@ export type Database = {
           weight_kg: number | null
           wellbeing_checkins: number | null
           workout_kcal: number | null
+          workout_minutes: number | null
           workout_source: string | null
           workout_type: string | null
         }

@@ -220,3 +220,50 @@ export function useAppleHealthSync(): void {
     return () => sub.remove()
   }, [maybeSync])
 }
+
+/* ── Invitación contextual (spec §5 · "la que convierte") ─────────────────── */
+
+const inviteDismissedKey = (userId: string) => `stelar.wearables.invite_dismissed:${userId}`
+
+/**
+ * La invitación contextual a conectar el reloj, en el lugar que automatiza
+ * (el check-in de Hoy). Se muestra solo cuando el canal EXISTE en este build
+ * (HealthKit disponible), la usuaria NO lo conectó y no dijo "Ahora no". Un
+ * "Ahora no" es definitivo (sin re-asks); Ajustes → Conexiones sigue ahí.
+ */
+export function useWearableInvite(): {
+  show: boolean
+  dismiss: () => void
+} {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? null
+  const { available, connected } = useAppleHealthConnection()
+  const [dismissed, setDismissed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    void AsyncStorage.getItem(inviteDismissedKey(userId))
+      .then((v) => {
+        if (!cancelled) setDismissed(v === 'true')
+      })
+      .catch(() => {
+        if (!cancelled) setDismissed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  const dismiss = useCallback(() => {
+    if (!userId) return
+    setDismissed(true)
+    void AsyncStorage.setItem(inviteDismissedKey(userId), 'true').catch(() => {})
+    track('wearable_invite_dismissed', { source: 'apple_health' })
+  }, [userId])
+
+  return {
+    show: available === true && connected === false && dismissed === false,
+    dismiss,
+  }
+}
