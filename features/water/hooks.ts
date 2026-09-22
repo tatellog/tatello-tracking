@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { logMeta } from '@/lib/logMeta'
 import { queryKeys } from '@/lib/queryKeys'
 
 import {
@@ -30,6 +31,8 @@ export function useSetWater(date: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (glasses: number) => setWaterGlasses(date, glasses),
+    // Hero vivo (V-13): el emblema reacciona solo si el total SUBE.
+    meta: logMeta('agua', 'glasses-up'),
     onMutate: async (glasses) => {
       await qc.cancelQueries({ queryKey: queryKeys.water.day(date) })
       const prev = qc.getQueryData<number>(queryKeys.water.day(date))
@@ -107,6 +110,8 @@ export function useAddDirectWater() {
   return useMutation({
     mutationFn: ({ date, delta }: { date: string; delta: number }) =>
       addDirectWaterGlasses(date, delta),
+    // Hero vivo (V-13): reacciona solo con delta positivo.
+    meta: logMeta('agua', 'delta-up'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.water.all })
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })

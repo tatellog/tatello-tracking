@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { logMeta } from '@/lib/logMeta'
 import { queryKeys } from '@/lib/queryKeys'
 
 import { addMoodCheckin, getDailyNote, upsertDailyNote, type MoodValue } from './api'
@@ -20,6 +21,8 @@ export function useAddMoodCheckin() {
   return useMutation({
     mutationFn: ({ value, date }: { value: MoodValue; date?: string }) =>
       addMoodCheckin(value, date),
+    // Hero vivo (V-13): el emblema de Hoy reacciona al registro.
+    meta: logMeta('animo'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.brief.all })
       // Órbita lee el mood del día desde daily_signals → refrescar para que la

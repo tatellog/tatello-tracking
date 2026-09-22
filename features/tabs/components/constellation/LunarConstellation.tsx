@@ -122,6 +122,7 @@ export function LunarConstellation({
   pausedSV,
   transformProgressOverride,
   showStarLabels = false,
+  reaction = null,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -392,6 +393,8 @@ export function LunarConstellation({
               fieldStars={fieldStars}
               litKeys={litKeys}
               reduce={reduceMotion}
+              // Hero vivo (V-13): solo en pantalla y sin reduce-motion.
+              reaction={focused && !reduceMotion ? reaction : null}
             />
           </Animated.View>
         ) : null}

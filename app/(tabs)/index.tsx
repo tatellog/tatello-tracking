@@ -50,6 +50,7 @@ import {
   useWorkoutTypeToday,
 } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
+import { HERO_ALIVE_ENABLED } from '@/lib/featureFlags'
 import {
   CoachLine,
   DayCheckIn,
@@ -59,6 +60,7 @@ import {
   type DayState,
   type WorkoutTypeId,
   LunarConstellation,
+  useHeroReaction,
   SectionHeader,
   SkyBackground,
   StatSlider,
@@ -304,6 +306,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   useEffect(() => {
     constellationPaused.value = isScrolling || celebrating ? 1 : 0
   }, [isScrolling, celebrating, constellationPaused])
+  // Hero vivo (V-13): el emblema reacciona a cada registro exitoso (comida /
+  // agua / ánimo / sueño) que pase por React Query. Sin flag o con
+  // reduce-motion no se suscribe a nada.
+  const heroReaction = useHeroReaction(HERO_ALIVE_ENABLED && !reducedMotion)
   const todayIsoLocal = ctx.date
 
   // Una sola lectura de workouts (45 días) alimenta tanto el grid del mes
@@ -650,6 +656,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       committed={todayHasRegistro}
                       suppressBurst
                       pausedSV={constellationPaused}
+                      reaction={heroReaction}
                     />
 
                     {!reducedMotion && celebrateKey > 0 ? (

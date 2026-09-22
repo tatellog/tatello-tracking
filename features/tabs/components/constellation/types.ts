@@ -1,5 +1,7 @@
 import type { SharedValue } from 'react-native-reanimated'
 
+import type { HeroReaction } from '@/features/tabs/hero-reaction'
+
 import type { ZodiacSign } from '../../zodiac/types'
 
 export type Resolved = {
@@ -59,6 +61,10 @@ export type Props = {
   /** DEV-only: dibuja una etiqueta junto a cada estrella (su nombre si lo
    *  tiene, si no su índice) para identificarlas al afinar posiciones. */
   showStarLabels?: boolean
+  /** Hero vivo (V-13): la reacción en curso a un registro (la dispara el
+   *  padre vía `useHeroReaction`). null = en reposo. Se ignora sin foco y
+   *  bajo reduce-motion. */
+  reaction?: HeroReaction | null
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }
