@@ -1,5 +1,7 @@
 # Epic 05 · Experiments (R5)
 
+> **Nota (25 sep 2026):** la UI vieja `MonthExperiments.tsx` se retiró en la limpieza (huérfana). La única superficie de experimentos es `MonthSegmentIA` (gated dev).
+
 **Estado:** Construido · gated dev (V-12, sep 2026) · **PRD:** Release 5 · **Depende de:** R1 (Hypothesis Engine)
 
 ## Objetivo
