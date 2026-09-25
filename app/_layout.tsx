@@ -1,5 +1,3 @@
-import '@/global.css'
-
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   CormorantGaramond_500Medium_Italic,

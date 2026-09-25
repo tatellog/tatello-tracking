@@ -68,7 +68,6 @@
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "^15.0.11",
     "lottie-react-native": "~7.3.8",
-    "nativewind": "^4.2.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.76.1",
@@ -105,10 +104,8 @@
     "jest-expo": "^54.0.17",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
-    "prettier-plugin-tailwindcss": "0.0.0-insiders.f7d2598",
     "react-native-svg-transformer": "^1.5.3",
     "react-test-renderer": "19.1.0",
-    "tailwindcss": "^3.4.19",
     "tsx": "^4.22.3",
     "typescript": "~5.9.2"
   },
