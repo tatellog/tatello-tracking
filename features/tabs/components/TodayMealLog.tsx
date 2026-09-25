@@ -374,7 +374,6 @@ export function TodayMealLog({ date, onOpenMeal, onAddMeal }: Props) {
 
   const list = meals ?? []
   const hasMeals = list.length > 0
-  const totalKcal = list.reduce((sum, m) => sum + m.calories, 0)
 
   const openSheet = () => {
     Haptics.selectionAsync().catch(() => {})
@@ -417,10 +416,11 @@ export function TodayMealLog({ date, onOpenMeal, onAddMeal }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Ver el resumen"
         >
+          {/* Sin kcal (dirección de arte sep 2026): las calorías del día ya
+              viven en el anillo; aquí solo el conteo y la puerta a la lista. */}
           <Text style={styles.summary}>
-            <Text style={styles.summaryStrong}>{totalKcal.toLocaleString('es-MX')}</Text> kcal ·{' '}
             <Text style={styles.summaryStrong}>{list.length}</Text>{' '}
-            {list.length === 1 ? 'comida' : 'comidas'} en tu cielo
+            {list.length === 1 ? 'comida' : 'comidas'}
             {/* Chevron marks the line as tappable (opens the full list). */}
             <Text style={styles.summaryChevron}> ›</Text>
           </Text>

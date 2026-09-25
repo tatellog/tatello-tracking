@@ -51,10 +51,9 @@ import { SkiaHeroReaction } from './skia-hero-reaction'
  *
  * Z-order dentro del canvas (de atrás hacia adelante, igual que el SVG):
  *   deep → ambient → shooting → glow → nebula → dust → field.
- * La viñeta sigue siendo un <Rect> estático del SVG montado ENCIMA de este
- * canvas: oscurece todo el backdrop por composición alfa (incluidas las field
- * stars — antes quedaban sobre la viñeta; el cambio es mínimo y las field
- * viven en el dónut medio, lejos de las esquinas oscuras).
+ * La viñeta vive aquí como MÁSCARA (dstIn) sobre la capa del backdrop: el
+ * cielo del hero se disuelve en la página hacia los bordes (sin marco, pintar
+ * negro encima se leía como un rectángulo). Las field stars quedan fuera.
  *
  * reduce-motion: shooting + dust se suprimen (como en el SVG); el resto se
  * dibuja igual pero con los relojes parados (static), así queda quieto pero
@@ -97,67 +96,87 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
       <Group transform={scale}>
-        <SkiaDeepField drift={drift} />
-        <SkiaAmbientField t={t} drift={drift} />
-        {reduce ? null : (
-          <>
-            <SkiaShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
-            <SkiaShootingStar t={t} cycleDiv={1.6} phase={0.42} startY={H * 0.15} endY={H * 0.85} />
-            <SkiaShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
-          </>
-        )}
-        <SkiaAmbientGlow cx={W / 2} cy={H / 2} />
-        <SkiaNebula ax={ax} ay={ay} drift={drift} />
-        {reduce ? null : <SkiaCosmicDust t={t} />}
-        {/* Hero vivo (V-13): la reacción a un registro, montada solo mientras
-            corre (≈1 s). Va bajo la viñeta (su centro es transparente) y
-            sobre la nebulosa, para leerse como luz del cielo, no un overlay.
-            El toggle de `reaction` re-ejecuta este body 2× por registro; los
-            hermanos (deep/ambient/nebula/dust/field) no cambian de props y
-            el React Compiler memoiza su JSX → React los salta. */}
-        {reaction ? <SkiaHeroReaction reaction={reaction} ax={ax} ay={ay} /> : null}
-        {/* Viñeta — antes era un <Rect> del SVG montado encima de toda la
-            atmósfera; ahora vive aquí, DESPUÉS del backdrop pero ANTES de las
-            field stars (su z-order original). Oscurece el backdrop + el
-            emblema de abajo por composición alfa; las field stars quedan
-            encima, sin atenuar. Mover la viñeta acá deja al <Svg> sin trabajo
-            visible → se desmonta en el caso común. */}
-        <SkiaVignette />
+        {/* El backdrop (campo, fugaces, glow, nebulosa, polvo, reacción) se
+            dibuja en una CAPA propia y la viñeta lo enmascara (dstIn): el
+            cielo del hero se DISUELVE en la página hacia los bordes en vez de
+            pintar negro encima. Con el marco bronce (retirado en sep 2026) la
+            viñeta oscura pasaba por "card"; sin marco, sobre la bruma magenta
+            y las estrellas del fondo de Hoy, se leía como un rectángulo. */}
+        <Group layer>
+          <SkiaDeepField drift={drift} />
+          <SkiaAmbientField t={t} drift={drift} />
+          {reduce ? null : (
+            <>
+              <SkiaShootingStar t={t} cycleDiv={1.6} phase={0} startY={40} endY={H * 0.55} />
+              <SkiaShootingStar
+                t={t}
+                cycleDiv={1.6}
+                phase={0.42}
+                startY={H * 0.15}
+                endY={H * 0.85}
+              />
+              <SkiaShootingStar t={t} cycleDiv={1.6} phase={0.74} startY={H * 0.7} endY={H * 0.3} />
+            </>
+          )}
+          <SkiaAmbientGlow cx={W / 2} cy={H / 2} />
+          <SkiaNebula ax={ax} ay={ay} drift={drift} />
+          {reduce ? null : <SkiaCosmicDust t={t} />}
+          {/* Hero vivo (V-13): la reacción a un registro, montada solo mientras
+              corre (≈1 s). Va dentro de la máscara (su centro es opaco) y
+              sobre la nebulosa, para leerse como luz del cielo, no un overlay.
+              El toggle de `reaction` re-ejecuta este body 2× por registro; los
+              hermanos (deep/ambient/nebula/dust/field) no cambian de props y
+              el React Compiler memoiza su JSX → React los salta. */}
+          {reaction ? <SkiaHeroReaction reaction={reaction} ax={ax} ay={ay} /> : null}
+          <SkiaVignetteMask />
+        </Group>
+        {/* Las field stars quedan FUERA de la máscara (su z-order original,
+            encima de la viñeta): son estrellas como las de la página. */}
         <SkiaFieldStars fieldStars={fieldStars} litKeys={litKeys} t={t} />
       </Group>
     </Canvas>
   )
 })
 
-/* ── Viñeta — radial (esquinas) + edge-fade vertical (bordes sup/inf) ── */
-const BG = '10,6,8' // colors.bg #0A0608
+/* ── Viñeta como MÁSCARA — radial (esquinas) + vertical (bordes sup/inf) ──
+ * Dos Rects con blendMode dstIn sobre la capa del backdrop: donde el
+ * gradiente es opaco el cielo queda entero; hacia los bordes su alfa cae a 0
+ * y el backdrop desaparece, dejando ver el fondo de la página tal cual. Las
+ * mismas paradas que la viñeta oscura de antes (svg-gradients.tsx), invertidas:
+ * antes "cuánto negro encima", ahora "cuánto cielo queda". */
+const MASK = '255,255,255'
 
-function SkiaVignette() {
+function SkiaVignetteMask() {
   return (
     <>
-      {/* cardVignette — radial, transparente al centro, oscuro a los bordes. */}
-      <Rect x={0} y={0} width={W} height={H}>
+      {/* Radial: entero al centro, se va hacia las esquinas. */}
+      <Rect x={0} y={0} width={W} height={H} blendMode="dstIn">
         <RadialGradient
           c={vec(W / 2, H / 2)}
           r={W * 0.75}
-          colors={[`rgba(${BG},0)`, `rgba(${BG},0.14)`, `rgba(${BG},0.45)`, `rgba(${BG},0.85)`]}
+          colors={[
+            `rgba(${MASK},1)`,
+            `rgba(${MASK},0.86)`,
+            `rgba(${MASK},0.55)`,
+            `rgba(${MASK},0)`,
+          ]}
           positions={[0, 0.4, 0.7, 1]}
         />
       </Rect>
-      {/* cardEdgeFade — lineal vertical, disuelve sup/inf en el fondo. */}
-      <Rect x={0} y={0} width={W} height={H}>
+      {/* Vertical: disuelve la franja superior e inferior en la página. */}
+      <Rect x={0} y={0} width={W} height={H} blendMode="dstIn">
         <LinearGradient
           start={vec(0, 0)}
           end={vec(0, H)}
           colors={[
-            `rgba(${BG},1)`,
-            `rgba(${BG},0.85)`,
-            `rgba(${BG},0.45)`,
-            `rgba(${BG},0)`,
-            `rgba(${BG},0)`,
-            `rgba(${BG},0.45)`,
-            `rgba(${BG},0.85)`,
-            `rgba(${BG},1)`,
+            `rgba(${MASK},0)`,
+            `rgba(${MASK},0.15)`,
+            `rgba(${MASK},0.55)`,
+            `rgba(${MASK},1)`,
+            `rgba(${MASK},1)`,
+            `rgba(${MASK},0.55)`,
+            `rgba(${MASK},0.15)`,
+            `rgba(${MASK},0)`,
           ]}
           positions={[0, 0.06, 0.14, 0.24, 0.76, 0.86, 0.94, 1]}
         />

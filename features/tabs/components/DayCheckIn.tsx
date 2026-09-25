@@ -11,6 +11,8 @@ import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
+import type { CheckInMode } from '../checkin-turn'
+
 export type DayState = 'undecided' | 'trained' | 'rested'
 
 /** Catálogo de tipos de entreno. Describe (para el motor de patrones), no
@@ -28,34 +30,37 @@ export type WorkoutTypeId = (typeof WORKOUT_TYPES)[number]['id']
 
 type Props = {
   state: DayState
-  /** Next state — the parent maps it to the workout/rest mutations. */
-  onChange: (next: DayState) => void
+  /** Lo decide el padre con checkInTurn (puro): ask / answered / quiet. */
+  mode: CheckInMode
+  /** Un tap dice todo: el tipo elegido responde "entrené" y "de qué". */
+  onTrain: (type: WorkoutTypeId) => void
+  onRest: () => void
+  /** "anotar" (quieta) / "cambiar" (respondida) → abrir la pregunta. */
+  onOpen: () => void
+  /** "Listo" o respuesta dada → cerrar la pregunta. */
+  onClose: () => void
   /** Eyebrow — solo en modo "ver día" (la fecha vista). En Hoy no hay eyebrow:
    *  la pregunta ya dice "hoy" y la tab se llama Hoy. */
   label?: string
-  /** La pregunta que las cápsulas responden. Sin ella los botones se leían
-   *  como tabs/filtros (feedback beta): la pregunta convierte "Entrené" y
-   *  "Fue descanso" en respuestas. */
+  /** La pregunta que los chips responden. */
   question?: string
   /** Día pasado YA entrenado: la estrella está sellada (no retrocede). */
   locked?: boolean
-  /** Tipo de entreno del día. Con onWorkoutType presente, al confirmar
-   *  "Entrené" aparecen chips opcionales (progressive disclosure, skippable). */
+  /** Tipo de entreno del día (manual o del reloj). */
   workoutType?: string | null
-  onWorkoutType?: (type: WorkoutTypeId | null) => void
   /** La mutación optimista falló e hizo rollback: línea cálida de reintento
    *  en vez de apagar la estrella en silencio. */
   saveFailed?: boolean
   /** V-15 Smart Recovery: el reloj ya selló el entreno de hoy (sin registro
-   *  manual encima). La fila nace confirmada con su procedencia ("desde tu
-   *  reloj · 45 min · ~342 kcal") y "cambiar" solo abre el tipo: el dato del
-   *  dispositivo manda, nunca se des-entrena contra él. */
+   *  manual encima). La fila nace confirmada con su procedencia y "cambiar"
+   *  solo abre el tipo: el dato del dispositivo manda, nunca se des-entrena
+   *  contra él. */
   wearable?: { line: string } | null
 }
 
 // Star = a trained day (the constellation's glyph). Vive SOLO en la fila
-// confirmada — en las cápsulas de respuesta daba más peso visual a "Entrené"
-// y susurraba que era la respuesta buena. La estrella se gana, no se promete.
+// confirmada: en los chips daría más peso a "entrené" y susurraría que es la
+// respuesta buena. La estrella se gana, no se promete.
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
 function StarGlyph({ color, size = 16 }: { color: string; size?: number }) {
@@ -70,66 +75,71 @@ function StarGlyph({ color, size = 16 }: { color: string; size?: number }) {
 // cortarse, y la constelación de abajo se desliza en lugar de brincar.
 const LAYOUT = LinearTransition.duration(220)
 
-// Cuánto se queda visible el chip recién elegido antes de recogerse — sin
+// Cuánto se queda visible el chip recién elegido antes de recogerse: sin
 // este hold, el bloque colapsaba en el frame siguiente y la usuaria nunca
 // veía su chip pintarse de magenta.
 const CHIP_HOLD_MS = 450
 
-type AnswerProps = {
+type ChipProps = {
   label: string
   active: boolean
   onPress: () => void
+  a11y: string
+  style?: object
 }
 
-function Answer({ label, active, onPress }: AnswerProps) {
-  const tint = active ? colors.magenta : colors.niebla
+// Receta "control" (dirección de arte sep 2026): píldora fantasma, sin fill,
+// borde hairlineStrong; el estado activo solo cambia borde y texto a magenta.
+function Chip({ label, active, onPress, a11y, style }: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
-      // Press-down tick only — the anticipation beat. The reward fires from
-      // the Hoy screen's handleDayChange once the state actually commits.
-      onPressIn={() => Haptics.selectionAsync().catch(() => {})}
-      style={[styles.answer, active && styles.answerActive]}
+      hitSlop={{ top: 6, bottom: 6 }}
+      style={[styles.chip, active && styles.chipActive, style]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={active ? `${label}. Tu respuesta actual, toca para confirmar` : label}
+      accessibilityLabel={a11y}
     >
-      <Text style={[styles.answerText, { color: tint }]}>{label}</Text>
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   )
 }
 
 /**
- * The daily check-in. Tres estados:
- *   - undecided → pregunta en voz coach + dos cápsulas separadas (dos
- *     botones = dos acciones; la píldora segmentada se leía como filtro),
- *   - respondido → fila colapsada "✦ Entrenaste hoy · cambiar",
- *   - locked → día pasado sellado, solo lectura.
- * En edición ("cambiar"), tocar la respuesta activa CONFIRMA y cierra — no
- * borra (el gesto natural de "sí, esto" era pérdida de datos). Cambiar de
- * respuesta sigue siendo un tap sobre la otra cápsula.
- * Ambas respuestas son válidas — ninguna se lee como fallo.
+ * The daily check-in. "Un tap dice todo" (decisión dueña sep 2026): la
+ * pregunta "¿Entrenaste hoy?" se responde con el tipo (Fuerza · Cardio ·
+ * Caminata · Otro) o con "Fue descanso" en su propia línea, misma píldora.
+ * Un tap responde entreno Y tipo, y la estrella se enciende en ese tap.
+ *
+ * Tres modos (checkInTurn):
+ *   - ask → pregunta en voz coach + chips (o, ya respondido, el modo se
+ *     DECLARA "Cambiando tu respuesta · Listo"),
+ *   - answered → fila colapsada "✦ Entrenaste hoy · Fuerza · cambiar",
+ *   - quiet → línea "Entreno o descanso · anotar" (puerta, no pregunta).
+ * En edición, tocar la respuesta activa CONFIRMA y cierra, no borra.
+ * Ambas respuestas son válidas: ninguna se lee como fallo.
  */
 export function DayCheckIn({
   state,
-  onChange,
+  mode,
+  onTrain,
+  onRest,
+  onOpen,
+  onClose,
   label,
   question = '¿Entrenaste hoy?',
   locked = false,
   workoutType,
-  onWorkoutType,
   saveFailed = false,
   wearable = null,
 }: Props) {
-  const [editing, setEditing] = useState(false)
-  // El chip recién tocado — sostiene el bloque abierto CHIP_HOLD_MS para que
+  // El chip recién tocado: sostiene el bloque abierto CHIP_HOLD_MS para que
   // la selección se vea antes del colapso (fill → hold → recogida).
-  const [justPicked, setJustPicked] = useState<WorkoutTypeId | null>(null)
+  const [justPicked, setJustPicked] = useState<WorkoutTypeId | 'rested' | null>(null)
   const answered = state !== 'undecided'
-  // Sellado por el reloj: las cápsulas Entrené / Fue descanso no aparecen ni
-  // en edición — lo único editable es el tipo (chips).
+  // Sellado por el reloj: "Fue descanso" no aparece ni en edición; lo único
+  // editable es el tipo.
   const sealedByWearable = wearable != null && state === 'trained'
-  const showAnswers = !locked && !sealedByWearable && (!answered || editing)
   const isHoy = label == null
   const typeLabel = WORKOUT_TYPES.find((t) => t.id === workoutType)?.label ?? null
 
@@ -140,56 +150,92 @@ export function DayCheckIn({
   const fadeIn = reducedMotion ? undefined : FadeIn.duration(180)
   const fadeInSlow = reducedMotion ? undefined : FadeIn.duration(220)
   const fadeOut = reducedMotion ? undefined : FadeOut.duration(120)
-  const chipsEnter = reducedMotion
-    ? undefined
-    : editing
-      ? FadeIn.duration(180)
-      : FadeIn.delay(900).duration(250)
-  const chipsExit = reducedMotion ? undefined : FadeOut.duration(140)
 
   useEffect(() => {
     if (justPicked === null) return
-    const t = setTimeout(() => setJustPicked(null), CHIP_HOLD_MS)
-    return () => clearTimeout(t)
-  }, [justPicked])
-
-  const pick = (seg: 'trained' | 'rested') => {
-    if (locked) return
-    if (state === seg) {
-      // Tap sobre la respuesta activa = confirmar y salir de edición.
-      setEditing(false)
+    if (reducedMotion) {
+      setJustPicked(null)
+      onClose()
       return
     }
-    onChange(seg)
-    setEditing(false)
+    const t = setTimeout(() => {
+      setJustPicked(null)
+      onClose()
+    }, CHIP_HOLD_MS)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justPicked, reducedMotion])
+
+  const activeType =
+    justPicked === 'rested' ? null : (justPicked ?? (state === 'trained' ? workoutType : null))
+  const restActive = justPicked === 'rested' || (justPicked === null && state === 'rested')
+
+  const pickType = (type: WorkoutTypeId) => {
+    if (locked) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    if (state === 'trained' && workoutType === type && justPicked === null) {
+      // Afirmación, no borrado (patrón Apple de selección única): tocar lo
+      // prendido = "sí, esto" y cierra.
+      onClose()
+      return
+    }
+    onTrain(type)
+    setJustPicked(type)
   }
 
-  const showChips =
-    state === 'trained' &&
-    !locked &&
-    !!onWorkoutType &&
-    (editing || !typeLabel || justPicked !== null)
-  // En modo reloj + edición, el bloque de chips lleva su propia puerta "Listo"
-  // (el editHeader de las cápsulas no se renderiza en este modo).
-  const chipsOwnClose = sealedByWearable && editing
+  const pickRest = () => {
+    if (locked) return
+    Haptics.selectionAsync().catch(() => {})
+    if (state === 'rested' && justPicked === null) {
+      onClose()
+      return
+    }
+    onRest()
+    setJustPicked('rested')
+  }
+
+  // Mientras el chip recién elegido se sostiene, el bloque sigue abierto
+  // aunque el padre ya lo dé por respondido.
+  const showAsk = !locked && (mode === 'ask' || justPicked !== null)
+  const showQuiet = !locked && !showAsk && mode === 'quiet' && !answered
 
   return (
     <Animated.View layout={layout} style={styles.wrap}>
       {label ? <Text style={styles.eyebrow}>{label}</Text> : null}
 
-      {showAnswers ? (
+      {showQuiet ? (
+        <Animated.View layout={layout} entering={fadeIn} exiting={fadeOut}>
+          <Pressable
+            onPress={onOpen}
+            hitSlop={{ top: 10, bottom: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isHoy
+                ? 'Anotar tu entreno o descanso de hoy'
+                : 'Anotar el entreno o descanso de ese día'
+            }
+            style={({ pressed }) => [styles.quietRow, pressed && styles.pressed]}
+          >
+            <Text style={styles.quietText}>
+              Entreno o descanso
+              <Text style={styles.changeLink}> · anotar</Text>
+            </Text>
+          </Pressable>
+        </Animated.View>
+      ) : showAsk ? (
         <Animated.View layout={layout} entering={fadeIn} exiting={fadeOut}>
           {/* Flujo fresco: la pregunta coach. En edición: el modo se DECLARA
               (sin lead se veía idéntico a "te pregunto de nuevo") y tiene
-              puerta explícita "Listo" que cierra sin mutar nada (feedback
-              usuaria: "busco un listo o una X y no hay"). */}
+              puerta explícita "Listo" que cierra sin mutar nada. */}
           {!answered ? (
             <Text style={styles.question}>{question}</Text>
           ) : (
             <View style={styles.editHeader}>
-              <Text style={styles.editLead}>Cambiando tu respuesta</Text>
+              <Text style={styles.editLead}>
+                {sealedByWearable ? '¿De qué tipo fue tu entreno?' : 'Cambiando tu respuesta'}
+              </Text>
               <Pressable
-                onPress={() => setEditing(false)}
+                onPress={onClose}
                 hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
                 accessibilityRole="button"
                 accessibilityLabel="Listo, cerrar edición"
@@ -198,14 +244,36 @@ export function DayCheckIn({
               </Pressable>
             </View>
           )}
-          <View style={styles.answers}>
-            <Answer label="Entrené" active={state === 'trained'} onPress={() => pick('trained')} />
-            <Answer
-              label="Fue descanso"
-              active={state === 'rested'}
-              onPress={() => pick('rested')}
-            />
+          {/* Los tipos arriba (un tap = entrené + de qué) y "Fue descanso" en
+              su propia línea con la MISMA píldora: la otra respuesta a la
+              pregunta, nunca un quinto chip perdido ni un "no". */}
+          <View style={styles.typeRow}>
+            {WORKOUT_TYPES.map((t) => (
+              <Chip
+                key={t.id}
+                label={t.label}
+                active={activeType === t.id}
+                onPress={() => pickType(t.id)}
+                a11y={`Entrené hoy, ${t.label.toLowerCase()}`}
+                style={styles.typeChip}
+              />
+            ))}
           </View>
+          {sealedByWearable ? null : (
+            <View style={styles.restRow}>
+              <Chip
+                label="Fue descanso"
+                active={restActive}
+                onPress={pickRest}
+                a11y={
+                  restActive
+                    ? 'Fue descanso. Tu respuesta actual, toca para confirmar'
+                    : 'Fue descanso'
+                }
+                style={styles.restChip}
+              />
+            </View>
+          )}
         </Animated.View>
       ) : (
         <Animated.View
@@ -230,9 +298,9 @@ export function DayCheckIn({
               <Text style={styles.provenance}>{`\n${wearable.line}`}</Text>
             ) : null}
           </Text>
-          {!locked && !(sealedByWearable && editing) ? (
+          {!locked ? (
             <Pressable
-              onPress={() => setEditing(true)}
+              onPress={onOpen}
               hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
               accessibilityRole="button"
               accessibilityLabel="Cambiar tu respuesta de este día"
@@ -242,70 +310,6 @@ export function DayCheckIn({
           ) : null}
         </Animated.View>
       )}
-
-      {/* Chips de tipo — solo tras confirmar entreno, siempre opcionales (la
-          opcionalidad se comunica dejando pasar, no con etiqueta). Entran con
-          delay tras "Entrené" para no compartir beat con la celebración; una
-          vez elegido el tipo se recogen (la respuesta sube a la fila). */}
-      {showChips ? (
-        <Animated.View
-          layout={layout}
-          entering={chipsEnter}
-          exiting={chipsExit}
-          style={styles.typeBlock}
-        >
-          {/* En edición los chips quedan bajo "Fue descanso" y el lead corto
-              se leía "¿de qué tipo de descanso?" — nombrar el sujeto. */}
-          <View style={chipsOwnClose ? styles.editHeader : undefined}>
-            <Text style={styles.typeLead}>
-              {editing ? '¿De qué tipo fue tu entreno?' : '¿De qué tipo?'}
-            </Text>
-            {chipsOwnClose ? (
-              <Pressable
-                onPress={() => setEditing(false)}
-                hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Listo, cerrar edición"
-              >
-                <Text style={styles.changeLink}>Listo</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <View style={styles.typeRow}>
-            {WORKOUT_TYPES.map((t) => {
-              const active = workoutType === t.id || justPicked === t.id
-              return (
-                <Pressable
-                  key={t.id}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-                    if (active) {
-                      // Afirmación, no borrado (patrón Apple de selección
-                      // única): tocar lo prendido = "sí, esto" y cierra.
-                      // El mismo gesto borraba el tipo en silencio — la
-                      // trampa exacta que reportó la usuaria.
-                      setEditing(false)
-                      return
-                    }
-                    onWorkoutType?.(t.id)
-                    setJustPicked(t.id)
-                    setEditing(false)
-                  }}
-                  hitSlop={{ top: 6, bottom: 6 }}
-                  style={[styles.typeChip, active && styles.typeChipActive]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`Tipo de entreno: ${t.label}`}
-                >
-                  <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                    {t.label}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </View>
-        </Animated.View>
-      ) : null}
 
       {/* Sellado — un entreno pasado ya encendió su estrella y no retrocede. */}
       {locked ? (
@@ -318,7 +322,7 @@ export function DayCheckIn({
           Esta estrella ya está <Text style={styles.restEm}>encendida</Text>. Lo que enciendes,
           permanece.
         </Animated.Text>
-      ) : state === 'rested' && !editing ? (
+      ) : state === 'rested' && !showAsk ? (
         <Animated.Text
           layout={layout}
           entering={fadeInSlow}
@@ -342,6 +346,7 @@ const styles = StyleSheet.create({
   wrap: {
     marginBottom: 0,
   },
+  pressed: { opacity: 0.8 },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
@@ -365,7 +370,7 @@ const styles = StyleSheet.create({
     color: colors.bone,
     letterSpacing: 0.3,
   },
-  // Voz coach — la pregunta que el control responde.
+  // Voz coach — la pregunta que los chips responden.
   question: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
@@ -374,29 +379,42 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 2,
   },
-  // Dos cápsulas separadas (gap visible, borde propio) — dos acciones.
-  answers: {
+  typeRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
-  // Receta "control" (dirección de arte sep 2026): píldora fantasma, sin fill,
-  // borde hairlineStrong; el estado activo solo cambia el texto a magenta.
-  answer: {
-    flex: 1,
+  // "Fue descanso" debajo, misma píldora, a su propio ancho.
+  restRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  chip: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
   },
-  answerActive: {
+  typeChip: {
+    flex: 1,
+    paddingHorizontal: 6,
+  },
+  restChip: {
+    paddingHorizontal: 18,
+  },
+  chipActive: {
     borderColor: colors.magenta,
   },
-  answerText: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
+  chipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
     letterSpacing: 0.3,
+  },
+  chipTextActive: {
+    color: colors.magenta,
   },
   // Estado respondido — colapsado, con el deshacer como affordance visible.
   confirmedRow: {
@@ -432,41 +450,16 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 0.3,
   },
-  typeBlock: {
-    marginTop: 12,
+  // Línea quieta — no pregunta, solo deja la puerta abierta.
+  quietRow: {
+    paddingVertical: 8,
     marginLeft: 2,
   },
-  // Capa meta unificada a 12.5 — en niebla 11.5 el lead se leía apretado.
-  typeLead: {
+  quietText: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.bone,
+    fontSize: typography.sizes.body,
     letterSpacing: 0.3,
-    marginBottom: 8,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  typeChip: {
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.hairlineStrong,
-  },
-  typeChipActive: {
-    borderColor: colors.magenta,
-  },
-  typeChipText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
     color: colors.niebla,
-    letterSpacing: 0.3,
-  },
-  typeChipTextActive: {
-    color: colors.magenta,
   },
   // Editorial voice — serif italic, evidence not guilt.
   restMessage: {

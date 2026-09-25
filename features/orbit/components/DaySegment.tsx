@@ -59,7 +59,7 @@ const AFFORD_TEXT: Partial<Record<DimensionKey, string>> = {
   // mente / energia: sin afford desde sep 2026 (el ánimo dejó de pedirse).
 }
 
-/* Maps the focused dimension to the StatSlider slide id that owns
+/* Maps the focused dimension to the Hoy section (`slide` param) that owns
  * registering that signal — so tapping the CTA lands the user on
  * the right card, not at the top of Hoy where they'd have to swipe
  * looking for it. `cuerpo` has no slide (its check-in is the
