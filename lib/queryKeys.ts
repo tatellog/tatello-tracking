@@ -92,10 +92,6 @@ export const queryKeys = {
     all: ['sleep'] as const,
     day: (date: string) => ['sleep', date] as const,
   },
-  wellbeing: {
-    all: ['wellbeing'] as const,
-    day: (date: string) => ['wellbeing', date] as const,
-  },
   patterns: {
     all: ['patterns'] as const,
     // La detección (rate-limited a ~1 revelación / 7 días) se cachea bajo

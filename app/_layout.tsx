@@ -200,7 +200,6 @@ export default function RootLayout() {
                     (incluido movement-calendar) heredan el push de página
                     completa por defecto — "Tu constancia" es una página, no un
                     modal deslizante. */}
-                  <Stack.Screen name="log-measurement" options={{ presentation: 'modal' }} />
                 </Stack>
                 {/* Ceremonias de revelación/patrón (absoluteFill): viven en la RAÍZ,
                     ENCIMA del Stack, para cubrir TODAS las rutas — incluidas las
@@ -301,24 +300,11 @@ function RouteGuard() {
 
     // Finished users who hit a wizard route by stale tab / bookmark
     // get pushed back to /(tabs) — re-running the wizard would
-    // overwrite their profile data. The /onboarding/photos/* route
-    // is intentionally exempted because the 30-day reminder banner
-    // (Bloque G) deep-links there for re-takes.
+    // overwrite their profile data.
     //
     // In dev (__DEV__), leave the routing alone so individual screens
     // can be opened by URL for QA without `pnpm seed:dev --fresh`.
-    // segments is typed as a fixed-length tuple by expo-router's
-    // typed-routes feature, so we cast to string[] for the depth-2
-    // sniff. /onboarding/photos/* is the only nested wizard branch.
-    const inPhotoWizard = inOnboarding && (segments as readonly string[])[1] === 'photos'
-    if (
-      !__DEV__ &&
-      onboardingDone &&
-      visitedDayOne &&
-      inOnboarding &&
-      !inPhotoWizard &&
-      !fromSettings
-    ) {
+    if (!__DEV__ && onboardingDone && visitedDayOne && inOnboarding && !fromSettings) {
       router.replace('/(tabs)')
       return
     }
