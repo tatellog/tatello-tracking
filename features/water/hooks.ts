@@ -54,7 +54,7 @@ export function useSetWater(date: string) {
  * El agua que las comidas del día aportan (suma de aportes aceptados). Se
  * lee aparte del agua directa para que el stepper de QuickLog conserve su
  * optimismo intacto: el total que ve la usuaria = useWaterToday (directa) +
- * esto (comidas). Ver TodayUniverseRewards.
+ * esto (comidas).
  */
 export function useWaterFromMeals(date: string, enabled = true) {
   return useQuery({

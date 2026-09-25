@@ -47,7 +47,6 @@ import {
   consumeCalendarDay,
   subscribeCalendarDayRequest,
 } from '@/features/tabs/pending-calendar-day'
-import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
 import {
   useSetWorkoutTypeToday,
   useToggleWorkoutForDate,
@@ -72,7 +71,6 @@ import {
   StreakLine,
   TabHeader,
   TodayMealLog,
-  TodayUniverseRewards,
 } from '@/features/tabs/components'
 import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
 import { namedStarProgress } from '@/features/tabs/components/constellation/data/derive-progress'
@@ -243,12 +241,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
   }, [])
 
-  // Tap del toast de delta → además de abrir el detalle del atributo
-  // (lo hace TodayUniverseRewards), llevamos el scroll a "Tu universo
-  // hoy" para que el panel quede a la vista al aterrizar desde otra tab.
-  // El offset de la sección se captura por onLayout en su wrapper.
   const scrollRef = useRef<ScrollView>(null)
-  const universeY = useRef(0)
   // Offsets de las secciones a las que llega un deep-link desde Órbita
   // ("Todavía no vimos → registrar"): el slider de stats y las comidas del día.
   const slidesY = useRef(0)
@@ -267,11 +260,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     }, 260)
     return () => clearTimeout(id)
   }, [slideParam, router])
-  useEffect(() => {
-    return subscribeUniverseDetailRequest(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
-    })
-  }, [])
   // Llegada desde "Editar día →" (Historia de Progreso): pone Hoy en modo "ver
   // día" para esa fecha y sube al inicio, donde ahora vive TODO el día (universo,
   // macros, comidas reflejan el día visto). El banner de arriba avisa.
@@ -870,28 +858,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               />
             </Animated.View>
 
-            {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
-                "Tu universo hoy": lo que el esfuerzo reveló. No muta datos ni
-                navega de sorpresa. ("Tu transformación" se movió a Progreso,
-                bajo "Tu Historia".) */}
-
-            {/* "Tu universo hoy" — capa de recompensa para los registros
-                que NO encienden estrellas (comida/agua/sueño/check-in).
-                Autónoma: sus re-renders no tocan la constelación. */}
-            <Animated.View
-              entering={enter(470)}
-              onLayout={(e) => {
-                universeY.current = e.nativeEvent.layout.y
-              }}
-            >
-              <TodayUniverseRewards
-                ctx={vctx}
-                date={vctx.date}
-                restedToday={restedToday}
-                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
-                wearableWaterGlasses={wearable.water?.glasses ?? null}
-              />
-            </Animated.View>
+            {/* ("Tu universo hoy" se retiró el 25 sep 2026, decisión dueña: segundo
+                sistema de progreso que competía con la constelación, contador en
+                Hoy y sin efecto en motor ni emblema. El momento de recompensa por
+                registro vive en el hero vivo, V-13.) */}
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
                 Lo que la usuaria consulta cuando ya hizo lo principal:

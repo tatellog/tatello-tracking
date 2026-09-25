@@ -5,7 +5,6 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 import Svg, { Path } from 'react-native-svg'
 
 import { PrimaryCta } from '@/components/PrimaryCta'
-import { UNIVERSE_ACCENT, UNIVERSE_ICON_PATH, tint } from '@/features/tabs/universe-visuals'
 import { colors, spacing, typography } from '@/theme'
 
 import {
@@ -25,7 +24,13 @@ import {
  * que QuickLogSheet (este repo no usa @gorhom/bottom-sheet).
  */
 
-const WATER = UNIVERSE_ACCENT.claridad
+/** Color del agua (dimensión sueño/índigo). */
+const WATER = colors.dimension.sueno
+/** 8-digit-hex alpha sobre un acento — RN parsea #RRGGBBAA. */
+const tint = (hex: string, alpha: string) => `${hex}${alpha}`
+// Gota (glifo tintable, stroke-based; patrón del repo sin icon lib).
+const DROP_PATH =
+  'M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z'
 
 export type LiquidAcceptPayload = {
   items: DetectedLiquid[]
@@ -54,7 +59,7 @@ function Droplet({ size = 20, color = WATER }: { size?: number; color?: string }
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
-        d={UNIVERSE_ICON_PATH.claridad}
+        d={DROP_PATH}
         fill="none"
         stroke={color}
         strokeWidth={1.8}
