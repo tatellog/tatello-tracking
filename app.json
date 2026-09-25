@@ -81,7 +81,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Stelar lee tus entrenos, tu sueño y tus pasos para anotarlos por ti. Nada sale de tu cuenta.",
-          "NSHealthUpdateUsageDescription": false,
+          "NSHealthUpdateUsageDescription": "Stelar no modifica tus datos de Salud. Solo los lee para anotar tus entrenos y tu sueño por ti.",
           "background": false
         }
       ],
