@@ -87,17 +87,19 @@ export function DayCloseCard({
 }
 
 const styles = StyleSheet.create({
+  // Receta "vidrio" (dirección de arte sep 2026): translúcida, las estrellas
+  // del fondo siguen pasando por debajo; sin borde oro.
   card: {
-    marginTop: 14,
-    backgroundColor: colors.bgCard,
+    marginTop: 0,
+    backgroundColor: colors.lecheTint,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.hairline,
+    borderColor: colors.hairlineFaint,
     paddingHorizontal: 18,
     paddingVertical: 16,
   },
   cardGold: {
-    borderColor: colors.oroHairline,
+    borderColor: colors.hairlineFaint,
   },
   headRow: {
     flexDirection: 'row',

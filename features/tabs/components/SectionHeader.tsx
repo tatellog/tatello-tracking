@@ -19,7 +19,7 @@ type Props = {
 export function SectionHeader({ label, meta, metaEmphasis }: Props) {
   return (
     <View style={styles.row}>
-      <EyebrowLabel tone="magenta" style={styles.label}>
+      <EyebrowLabel tone="niebla" style={styles.label}>
         {label}
       </EyebrowLabel>
       {meta ? renderMeta(meta, metaEmphasis) : null}
@@ -53,8 +53,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: 12,
-    marginTop: 22,
-    marginBottom: 10,
+    marginTop: 40,
+    marginBottom: 12,
   },
   label: {
     flex: 1,

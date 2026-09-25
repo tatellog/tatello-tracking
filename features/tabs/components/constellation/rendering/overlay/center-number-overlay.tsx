@@ -17,15 +17,13 @@ import { H, TARGET_DAYS } from '../../constants'
  * AnimatedTextInput `text` prop trick (same pattern as StreakNumber)
  * so the integer climb runs on the UI thread without re-rendering
  * React. `marginTop: -22` biases the baseline upward to match the
- * old SvgText y = cy - 4. */
+ * old SvgText y = cy - 4. Sin ornamento ni countdown (dirección de arte sep 2026). */
 
 export function CenterNumberOverlay({
   displayedCount,
   numberPulse,
   plusOne,
   initialCount,
-  urgent = false,
-  remaining = 0,
   target = TARGET_DAYS,
 }: {
   displayedCount: SharedValue<number>
@@ -59,7 +57,7 @@ export function CenterNumberOverlay({
   // The digit flashes pale at the peak of the pop — magenta → near
   // white → magenta — so the eye catches the number *changing*.
   const colorStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(numberPulse.value, [0, 1], [colors.magenta, '#FFF3FA']),
+    color: interpolateColor(numberPulse.value, [0, 1], [colors.leche, '#FFF3FA']),
   }))
   // The "+1" ghost — rises ~22 px and fades. Appears fast, holds
   // briefly, gone by the end of the ramp.
@@ -81,8 +79,6 @@ export function CenterNumberOverlay({
   return (
     <View style={styles.numberOverlay} pointerEvents="none">
       <Animated.View style={[styles.numberRow, pulseStyle]}>
-        <View style={styles.chipFrameDot} />
-        <View style={styles.chipFrameLine} />
         <AnimatedTextInput
           editable={false}
           underlineColorAndroid="transparent"
@@ -90,15 +86,10 @@ export function CenterNumberOverlay({
           defaultValue={String(initialCount)}
           style={[styles.numberOverlayText, colorStyle]}
         />
-        <Text style={styles.numberDenominator}>/ {target} luces</Text>
-        <View style={styles.chipFrameLine} />
-        <View style={styles.chipFrameDot} />
+        {/* Una sola línea de dato en Hanken; el chevron ES el affordance del
+            tap al modal (antes había una pista aparte "toca para ver"). */}
+        <Text style={styles.numberDenominator}>de {target} luces ›</Text>
       </Animated.View>
-      {urgent && remaining > 0 ? (
-        <Text style={styles.urgencyHint}>
-          {remaining === 1 ? 'una más' : `faltan ${remaining}`}
-        </Text>
-      ) : null}
       <Animated.View style={[styles.plusOne, ghostStyle]} pointerEvents="none">
         <Text style={styles.plusOneText}>+1</Text>
       </Animated.View>
@@ -128,20 +119,15 @@ const styles = StyleSheet.create({
     color: colors.leche,
     letterSpacing: -0.6,
     textAlign: 'center',
-    // Soft pink textShadow kept for warmth, halved from before.
-    textShadowColor: 'rgba(233,30,99,0.32)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
     padding: 0,
     includeFontPadding: false,
     minWidth: 28,
   },
   numberDenominator: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.niebla,
-    letterSpacing: 1.0,
+    color: colors.bone,
+    letterSpacing: 0.3,
     marginLeft: 6,
   },
   // Estado vacío (0 encendidas) — voz del coach, invita sin presionar.
@@ -152,36 +138,6 @@ const styles = StyleSheet.create({
     color: colors.bone,
     textAlign: 'center',
     letterSpacing: 0.3,
-  },
-  // Decorative chip frame — thin niebla hairlines + bullet dots
-  // flanking the count, so the chip reads as a designed UI element
-  // rather than plain text floating in the constellation.
-  chipFrameLine: {
-    width: 18,
-    height: 1,
-    backgroundColor: colors.niebla,
-    opacity: 0.6,
-    marginHorizontal: 8,
-    alignSelf: 'center',
-  },
-  chipFrameDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.bone,
-    opacity: 0.85,
-    alignSelf: 'center',
-  },
-  // Urgency microcopy — appears only in the final 3 days. Tiny
-  // italic warm tag below the count chip ("una más" / "faltan 2").
-  urgencyHint: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.magenta,
-    letterSpacing: 0.6,
-    marginTop: 2,
-    textTransform: 'lowercase',
   },
   // The "+1" ghost — floats above the counter and rises out on each
   // commit. Absolute so it never shifts the centred number's layout.

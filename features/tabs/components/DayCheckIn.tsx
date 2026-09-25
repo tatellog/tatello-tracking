@@ -30,7 +30,8 @@ type Props = {
   state: DayState
   /** Next state — the parent maps it to the workout/rest mutations. */
   onChange: (next: DayState) => void
-  /** Eyebrow — "Hoy" por defecto; en modo "ver día" se pasa la fecha vista. */
+  /** Eyebrow — solo en modo "ver día" (la fecha vista). En Hoy no hay eyebrow:
+   *  la pregunta ya dice "hoy" y la tab se llama Hoy. */
   label?: string
   /** La pregunta que las cápsulas responden. Sin ella los botones se leían
    *  como tabs/filtros (feedback beta): la pregunta convierte "Entrené" y
@@ -112,7 +113,7 @@ function Answer({ label, active, onPress }: AnswerProps) {
 export function DayCheckIn({
   state,
   onChange,
-  label = 'Hoy',
+  label,
   question = '¿Entrenaste hoy?',
   locked = false,
   workoutType,
@@ -129,7 +130,7 @@ export function DayCheckIn({
   // en edición — lo único editable es el tipo (chips).
   const sealedByWearable = wearable != null && state === 'trained'
   const showAnswers = !locked && !sealedByWearable && (!answered || editing)
-  const isHoy = label === 'Hoy'
+  const isHoy = label == null
   const typeLabel = WORKOUT_TYPES.find((t) => t.id === workoutType)?.label ?? null
 
   // Accesibilidad: con "reducir movimiento" activo los estados cambian en
@@ -174,7 +175,7 @@ export function DayCheckIn({
 
   return (
     <Animated.View layout={layout} style={styles.wrap}>
-      <Text style={styles.eyebrow}>{label}</Text>
+      {label ? <Text style={styles.eyebrow}>{label}</Text> : null}
 
       {showAnswers ? (
         <Animated.View layout={layout} entering={fadeIn} exiting={fadeOut}>
@@ -324,8 +325,7 @@ export function DayCheckIn({
           exiting={fadeOut}
           style={styles.restMessage}
         >
-          El músculo se reconstruye en el reposo. Mañana vuelves{' '}
-          <Text style={styles.restEm}>más fuerte</Text>.
+          Descansar también cuenta. Mañana <Text style={styles.restEm}>sigues</Text>.
         </Animated.Text>
       ) : null}
 
@@ -340,12 +340,12 @@ export function DayCheckIn({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 18,
+    marginBottom: 0,
   },
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
-    color: colors.magenta,
+    color: colors.niebla,
     letterSpacing: 2.4,
     textTransform: 'uppercase',
     marginBottom: 8,
@@ -379,21 +379,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  // Receta "control" (dirección de arte sep 2026): píldora fantasma, sin fill,
+  // borde hairlineStrong; el estado activo solo cambia el texto a magenta.
   answer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 26,
+    paddingVertical: 11,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.hairline,
-    backgroundColor: colors.bgCard2,
+    borderColor: colors.hairlineStrong,
   },
   answerActive: {
-    backgroundColor: colors.magentaTint2,
+    borderColor: colors.magenta,
   },
   answerText: {
-    fontFamily: typography.uiBold,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
   },
@@ -449,15 +450,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typeChip: {
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 16,
-    borderRadius: 18,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.hairline,
-    backgroundColor: colors.bgCard2,
+    borderColor: colors.hairlineStrong,
   },
   typeChipActive: {
-    backgroundColor: colors.magentaTint2,
+    borderColor: colors.magenta,
   },
   typeChipText: {
     fontFamily: typography.uiSemi,

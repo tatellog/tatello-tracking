@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
@@ -68,7 +68,6 @@ import {
   SectionHeader,
   SkyBackground,
   StatSlider,
-  StreakLine,
   TabHeader,
   TodayMealLog,
 } from '@/features/tabs/components'
@@ -77,7 +76,7 @@ import { namedStarProgress } from '@/features/tabs/components/constellation/data
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
-import { colors, typography } from '@/theme'
+import { colors } from '@/theme'
 
 /*
  * The commit haptic — a designed two-beat "phrase", not a tick:
@@ -500,6 +499,37 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         ? 'trained'
         : 'undecided'
 
+  // La voz del coach bajo el cielo: una sola frase. Día 1 = la primera estrella;
+  // con registro de hoy, la frase cierra nombrando lo de mañana (open loop por
+  // deseo, nunca racha). Se calcula aquí para que el JSX quede en una línea.
+  const coachCopy: CoachCopy = (() => {
+    if (firstStarFired) {
+      return { before: 'Tu primera estrella. Así ', emphasis: 'empieza', after: ' un cielo.' }
+    }
+    const morning = !viewingPast && new Date().getHours() < 12
+    const base = getCoachCopy(
+      trainedThisMonth,
+      signLabel,
+      dayState === 'trained',
+      sign,
+      morning,
+      // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce, salvo
+      // que la línea "Tu reloj ya anotó" ya lo diga arriba.
+      !viewingPast && wearable.sleep != null && !hasArrived,
+    )
+    if (!todayHasRegistro || viewingPast || morning) return base
+    const tail =
+      trainedThisMonth >= figureCount
+        ? 'Mañana sumas luz extra.'
+        : trainedThisMonth + 1 >= figureCount
+          ? 'Mañana completas tu figura.'
+          : (() => {
+              const next = pickStarForCount(sign, trainedThisMonth + 1)
+              return next ? `Mañana, ${next.name}.` : null
+            })()
+    return tail ? { ...base, after: `${base.after.replace(/\s*$/, '')} ${tail}` } : base
+  })()
+
   // Tipo de entreno de HOY para los chips post-confirmación. Solo consulta
   // cuando hoy ya está entrenado; en modo "ver día" los chips no existen.
   const workoutTypeQ = useWorkoutTypeToday(!viewingPast && dayState === 'trained')
@@ -663,7 +693,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   key={selectedDate}
                   state={dayState}
                   onChange={handleDayChange}
-                  label={viewingPast ? viewingLabel : 'Hoy'}
+                  label={viewingPast ? viewingLabel : undefined}
                   question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
                   locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
                   // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
@@ -686,7 +716,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               )}
               {/* Invitación contextual (spec wearables §5): solo con el día sin
                   responder y el canal disponible pero no conectado. */}
-              {!viewingPast && dayState === 'undecided' ? <WearableInviteLine /> : null}
+              {!viewingPast && dayState !== 'undecided' && !hasArrived ? (
+                <WearableInviteLine />
+              ) : null}
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre
@@ -751,17 +783,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       </View>
                     ) : null}
                   </View>
-                  {/* Señal de tappable (el modal era invisible con solo
-                      press-scale). Texto sutil, NO el chevron flotante que se
-                      veía raro. Se oculta en el estado vacío — ahí el contador
-                      ya muestra su propia invitación. */}
-                  {/* Siempre montado: si esta línea aparece/desaparece cambia
-                      el ALTO de heroWrap y la layout transition animaría a la
-                      constelación como scale (la estira). Con el espacio
-                      reservado, el hero solo se desliza (translateY). */}
-                  <Text style={styles.heroTapHint}>
-                    {trainedThisMonth > 0 ? 'toca para ver tus estrellas ›' : ' '}
-                  </Text>
                 </Animated.View>
               </Pressable>
             </Animated.View>
@@ -771,55 +792,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               layout={reducedMotion ? undefined : LinearTransition.duration(220)}
               style={styles.coachLineWrap}
             >
-              {/* La línea de la primera estrella — visible el resto de la
-                  sesión del día 1; mañana el coach normal retoma. */}
-              {firstStarFired ? (
-                <Animated.Text entering={FadeIn.duration(600)} style={styles.firstStarLine}>
-                  Tu primera estrella. Así empieza un cielo.
-                </Animated.Text>
-              ) : null}
-              <CoachLine
-                align="center"
-                {...getCoachCopy(
-                  trainedThisMonth,
-                  signLabel,
-                  dayState === 'trained',
-                  sign,
-                  // Mañana real de HOY (no de un día visto): antes de mediodía.
-                  !viewingPast && new Date().getHours() < 12,
-                  // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce.
-                  !viewingPast && wearable.sleep != null,
-                )}
-              />
-              {(() => {
-                // El gancho del día 2 (Mecánica D): con la estrella de HOY ya
-                // encendida — por CUALQUIER registro, no solo «Entrené» — se
-                // nombra la que sigue. Open loop por deseo, nunca racha.
-                if (!todayHasRegistro || viewingPast) return null
-                if (trainedThisMonth >= figureCount) {
-                  return (
-                    <Text style={styles.tomorrowHint}>
-                      Mañana sumas <Text style={styles.tomorrowHintEmphasis}>luz extra</Text>.
-                    </Text>
-                  )
-                }
-                // Last star before the asterism is whole.
-                if (trainedThisMonth + 1 >= figureCount) {
-                  return (
-                    <Text style={styles.tomorrowHint}>
-                      Mañana <Text style={styles.tomorrowHintEmphasis}>completas tu figura</Text>.
-                    </Text>
-                  )
-                }
-                const next = pickStarForCount(sign, trainedThisMonth + 1)
-                if (!next) return null
-                return (
-                  <Text style={styles.tomorrowHint}>
-                    Mañana: <Text style={styles.tomorrowHintEmphasis}>{next.name}</Text>,{' '}
-                    {next.role}
-                  </Text>
-                )
-              })()}
+              {/* UNA sola voz bajo el cielo (dirección de arte sep 2026): la
+                  CoachLine absorbe la primera estrella y el gancho de mañana. */}
+              <CoachLine align="center" {...coachCopy} />
             </Animated.View>
 
             {/* La lectura del día + el cierre — la MISMA pregunta en dos
@@ -846,17 +821,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 <WeeklyReadingStrip />
               </>
             ) : null}
-
-            {/* Días en órbita — acumulado (no racha), lectura secundaria.
-                Tocable: abre el calendario del mes (la historia de esos
-                días). El hairline ya prometía tap; sin onPress era un link
-                vestido que no hacía nada. */}
-            <Animated.View entering={enter(360)}>
-              <StreakLine
-                streak={daysInOrbit}
-                onPress={() => router.navigate('/movement-calendar')}
-              />
-            </Animated.View>
 
             {/* ("Tu universo hoy" se retiró el 25 sep 2026, decisión dueña: segundo
                 sistema de progreso que competía con la constelación, contador en
@@ -888,7 +852,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 mealsY.current = e.nativeEvent.layout.y
               }}
             >
-              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas de hoy'} />
+              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
             </Animated.View>
             <Animated.View entering={enter(600)}>
               <TodayMealLog
@@ -915,6 +879,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           total={figureCount}
           litStars={litStars}
           nextStar={nextStar}
+          daysInOrbit={daysInOrbit}
         />
         {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
           El orquestador elige UNA (Regreso > Transformación > Patrón); se
@@ -1089,15 +1054,17 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
   // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
   // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,
   // centrada. Sigue siendo tappable (abre el modal).
+  // Ritmo 8/16/32/56 (dirección de arte sep 2026): el silencio más grande
+  // rodea al cielo. Check-in → hero 32; hero → coach 12; coach → lectura 32.
   heroWrap: {
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 32,
   },
   heroInner: {
     width: '100%',
@@ -1118,40 +1085,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // Pista sutil de que la figura abre el modal — niebla, minúscula.
-  heroTapHint: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginTop: 2,
-  },
   coachLineWrap: {
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  // La línea de la primera estrella — voz del coach, un tono más presente
-  // que el CoachLine normal porque ES el momento (una vez en la vida).
-  firstStarLine: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginBottom: 8,
-  },
-  tomorrowHint: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    textAlign: 'center',
-    marginTop: 4,
-    letterSpacing: 0.4,
-  },
-  tomorrowHintEmphasis: {
-    color: colors.bone,
+    marginTop: 12,
+    marginBottom: 32,
   },
 })

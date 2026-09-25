@@ -54,11 +54,11 @@ const styles = StyleSheet.create({
   // lecturas de Hoy); el borde oro marca lo GANADO sin abrir, igual que la
   // card de Órbita Semana.
   card: {
-    marginTop: 14,
-    backgroundColor: colors.bgCard,
+    marginTop: 12,
+    backgroundColor: colors.lecheTint,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.oroHairline,
+    borderColor: colors.hairlineFaint,
     paddingHorizontal: 18,
     paddingVertical: 16,
   },
@@ -83,8 +83,7 @@ const styles = StyleSheet.create({
   },
   line: {
     marginTop: 6,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },

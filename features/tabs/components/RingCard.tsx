@@ -144,10 +144,10 @@ const styles = StyleSheet.create({
     // (was previously floating against the page bg, competing with the
     // constellation hero above). Very low-alpha leche tint + hairline
     // bruma border give structure without adding visual weight.
-    backgroundColor: 'rgba(244,236,222,0.035)',
-    borderColor: colors.bruma,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
+    backgroundColor: colors.lecheTint,
+    borderColor: colors.hairlineFaint,
+    borderWidth: 1,
+    borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 14,
   },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   remaining: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.oro,
+    color: colors.bone,
     letterSpacing: 0.2,
     textAlign: 'center',
   },

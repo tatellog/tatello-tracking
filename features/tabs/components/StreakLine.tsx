@@ -12,7 +12,8 @@ import Animated, {
 import { colors, typography } from '@/theme'
 
 /*
- * "X días en órbita" — a compact line sat right under the Hoy check-in.
+ * "X días en órbita" — vive en el modal "Tu {signo}" (desde sep 2026; en Hoy
+ * era un tercer contador compitiendo con la constelación).
  *
  * The count is the LIFETIME total of days with any registro (decisión
  * dueña jul 2026, alineada a "cualquier registro enciende"): it only
@@ -46,7 +47,7 @@ export function StreakLine({ streak, onPress }: { streak: number; onPress?: () =
 
   const numStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + pop.value * 0.18 }],
-    color: interpolateColor(pop.value, [0, 1], [colors.magenta, colors.blanco]),
+    color: interpolateColor(pop.value, [0, 1], [colors.leche, colors.blanco]),
   }))
 
   if (streak < 2) return null
@@ -92,11 +93,9 @@ const styles = StyleSheet.create({
     // family as the constellation card's frame so the chip reads
     // as part of the same visual vocabulary, not an isolated UI
     // element. Tiny self-aligned to stay subtle.
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderBottomWidth: 0.8,
-    borderColor: 'rgba(217, 174, 111, 0.28)',
   },
   rowPressed: {
     opacity: 0.6,
@@ -111,19 +110,18 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: typography.sizes.smallLabel,
-    color: colors.magenta,
+    color: colors.bone,
   },
   num: {
     fontFamily: typography.displaySemi,
     fontSize: typography.sizes.ui,
-    color: colors.magenta,
+    color: colors.leche,
     letterSpacing: -0.3,
   },
-  // Serif italic — the cosmic register; "en órbita" is STELAR's voice.
+  // Dato en Hanken (italic solo para el coach).
   label: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    color: colors.niebla,
+    color: colors.bone,
   },
 })

@@ -1,4 +1,3 @@
-import { curveMonotoneX, line as d3Line } from 'd3-shape'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
@@ -27,10 +26,9 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withRepeat,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Path } from 'react-native-svg'
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
@@ -44,8 +42,6 @@ import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
-import { useMeasurements } from '@/features/progress/hooks'
-import { toWeightPoints, type WeightPoint } from '@/features/progress/logic'
 import type { SleepDraft } from '@/features/sleep/api'
 import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
 import { track } from '@/lib/analytics'
@@ -57,7 +53,6 @@ import { RingCard } from './RingCard'
 // rituals (sleep, check-in), the cycle phase (read-only, reframes
 // the rest), and the slow weight trend. Water lives in the QuickLog
 // (✦); registering it here too would duplicate that.
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 // How much of the NEXT slide peeks on the right edge — a persistent "hay más"
 // affordance. Slides are this much narrower than the viewport.
@@ -169,24 +164,9 @@ export function StatSlider({
   // Real cycle phase (null when the user has no active/anchored cycle).
   const cycle = useCyclePhase()
 
-  // ── Colapso post-ritual (edición de Hoy 5 jul 2026, veredicto dueña) ──
-  // Con los DOS rituales del día ya escritos (sueño + ánimo), el pager se
-  // comprime a una línea-resumen tocable ("Ánimo: Bien · Dormiste 7.5 h ›").
-  // Nada se pierde: el tap re-abre el pager completo (macros/ciclo/peso
-  // incluidos). Antes de registrar, el pager invita como siempre — el
-  // colapso es el premio de silencio por haber cumplido el ritual.
-  const sleepToday = useSleepLog(ctx.date)
-  // Manual gana; si no hay manual, la noche del reloj cuenta como ritual hecho
-  // (V-15: no pedir lo que ya llegó).
-  const sleepMinutesToday = sleepToday.data?.duration_minutes ?? wearableSleepMinutes ?? null
-  const sleepFromWatch = sleepToday.data?.duration_minutes == null && wearableSleepMinutes != null
-  // Sin el ánimo (retirado sep 2026, "registro cero"), el ritual de la mañana
-  // es solo el sueño. Si la noche ya vive en la línea "Tu reloj ya anotó", el
-  // pager no se colapsa (colapsaría sobre nada).
-  const ritualsDone = !hideSleepSlide && sleepMinutesToday != null
-  const [expanded, setExpanded] = useState(false)
-  // Otro día (navegación o medianoche) → vuelve al estado natural del día.
-  useEffect(() => setExpanded(false), [ctx.date])
+  // (El colapso post-ritual del pager se retiró en sep 2026: con el ánimo fuera
+  // y la noche del reloj en "Tu reloj ya anotó", no quedaba nada que premiar
+  // con silencio, y escondía los macros detrás de una línea de sueño.)
   // Un deep-link a una slide (pill de Órbita, etc.) siempre abre el pager;
   // el efecto de scroll de abajo lo honra en cuanto el layout mide. Mismos
   // resets que openPager: el ScrollView remonta en offset 0.
@@ -194,7 +174,6 @@ export function StatSlider({
     if (!targetSlide) return
     scrollX.value = 0
     setActive(0)
-    setExpanded(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSlide])
 
@@ -206,7 +185,7 @@ export function StatSlider({
   // appearing/disappearing never shifts the indices of slides the user
   // may already be paged to (keeps scrollX / active in sync).
   const slides: { id: string; title: string; node: ReactNode }[] = [
-    { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
+    { id: 'macros', title: 'Macros', node: <MacroSlide ctx={ctx} /> },
     ...(hideSleepSlide
       ? []
       : [
@@ -217,8 +196,6 @@ export function StatSlider({
           },
         ]),
     ...(cycle ? [{ id: 'cycle', title: 'Tu ciclo', node: <CycleSlide cycle={cycle} /> }] : []),
-    // Peso al final: es la tendencia lenta, no un ritual diario → cierra el pager.
-    { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
   ]
   const safeActive = Math.min(active, slides.length - 1)
 
@@ -263,43 +240,12 @@ export function StatSlider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSlide, slideW])
 
-  // Reabrir el pager tras el colapso: el ScrollView se REMONTA con offset
-  // nativo 0, así que scrollX y active deben volver a 0 juntos — si no, el
-  // título/dots muestran la slide vieja y la primera slide pinta un frame
-  // con la opacity/scale del scrollX rancio (hallazgo reanimated-guardian).
-  const openPager = () => {
-    scrollX.value = 0
-    setActive(0)
-    setExpanded(true)
-  }
-
-  if (ritualsDone && !expanded) {
-    const mins = sleepMinutesToday ?? 0
-    const hours = (mins / 60).toFixed(mins % 60 === 0 ? 0 : 1)
-    return (
-      <Pressable
-        onPress={openPager}
-        accessibilityRole="button"
-        accessibilityLabel={`Dormiste ${hours} horas${sleepFromWatch ? ' según tu reloj' : ''}. Toca para abrir el detalle.`}
-        style={({ pressed }) => pressed && styles.collapsedPressed}
-      >
-        <View style={styles.collapsedRow}>
-          <Text style={styles.collapsedText} numberOfLines={1}>
-            Dormiste <Text style={styles.collapsedValue}>{hours} h</Text>
-            {sleepFromWatch ? ' · tu reloj' : ''}
-          </Text>
-          <Text style={styles.collapsedChevron}>›</Text>
-        </View>
-      </Pressable>
-    )
-  }
-
   return (
     <View onLayout={onLayout}>
       <View style={styles.header}>
         {/* Re-keyed on `active` so the title cross-fades when paging. */}
         <Animated.View key={safeActive} entering={FadeIn.duration(280)}>
-          <EyebrowLabel tone="magenta">{slides[safeActive]?.title ?? ''}</EyebrowLabel>
+          <EyebrowLabel tone="niebla">{slides[safeActive]?.title ?? ''}</EyebrowLabel>
         </Animated.View>
         {/* Strategy chip — only on the macros slide. Ties today's numbers
             to the chosen enfoque ("Déficit moderado") as quiet context,
@@ -354,7 +300,6 @@ export function StatSlider({
       <Dots
         count={slides.length}
         active={safeActive}
-        showHint={active === 0 && !hasSwipedRef.current}
         onDotPress={(i) => {
           track('stat_slider_dot_pressed', { slide: i })
           scrollRef.current?.scrollTo({ x: i * slideW, animated: true })
@@ -484,7 +429,7 @@ function MacroSlide({ ctx }: { ctx: BriefContext }) {
           // el magenta pleno y la tarjeta grande. Calorías recede un tono
           // (magenta profundo) para que el ojo aterrice primero en proteína,
           // sin sacar el dato del sistema de marca.
-          ringColor={colors.magentaDeep}
+          ringColor={colors.niebla}
           ringDelay={600}
           small
           onPress={editTargets}
@@ -522,126 +467,6 @@ function MacroCardWrap({ enterDelay, children }: { enterDelay: number; children:
     >
       {children}
     </Animated.View>
-  )
-}
-
-/* ─── Slide 2 — weight trend ───────────────────────────────────────── */
-
-function fmtDelta(d: number): string {
-  const sign = d < 0 ? '−' : d > 0 ? '+' : ''
-  return `${sign}${Math.abs(d).toFixed(1)} kg`
-}
-
-function WeightSlide({ ctx }: { ctx: BriefContext }) {
-  const { data: measurements } = useMeasurements(90)
-
-  const points = useMemo<WeightPoint[]>(
-    () => (measurements ? toWeightPoints(measurements) : []),
-    [measurements],
-  )
-
-  const latest = points[points.length - 1]
-  const first = points[0]
-  const current = latest?.weight ?? ctx.latest_measurement?.weight_kg ?? null
-
-  // Total change since the first logged measurement.
-  const totalDelta = latest && first && points.length >= 2 ? latest.weight - first.weight : null
-
-  // Weekly delta — latest vs the measurement closest to 7 days back.
-  const weekDelta = useMemo<number | null>(() => {
-    if (!latest || points.length < 2) return null
-    const target = latest.t - WEEK_MS
-    let ref: WeightPoint | null = null
-    for (const p of points) {
-      if (p === latest) continue
-      if (ref == null || Math.abs(p.t - target) < Math.abs(ref.t - target)) ref = p
-    }
-    return ref ? latest.weight - ref.weight : null
-  }, [points, latest])
-
-  if (current == null) {
-    return (
-      <View style={[styles.slide, styles.emptyCard]}>
-        <Text style={styles.emptyText}>Registra tu peso para ver tu tendencia aquí.</Text>
-      </View>
-    )
-  }
-
-  return (
-    <View style={styles.slide}>
-      <View style={styles.card}>
-        <View style={styles.weightRow}>
-          {points.length >= 2 ? (
-            <WeightSparkline points={points} />
-          ) : (
-            <View style={styles.sparkPlaceholder} />
-          )}
-          <View style={styles.numberStack}>
-            <View style={styles.weightTop}>
-              <Text
-                style={styles.weightValue}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.6}
-              >
-                {current.toFixed(1)}
-              </Text>
-              <Text style={styles.weightUnit}>kg</Text>
-            </View>
-            {totalDelta != null ? (
-              <Text style={[styles.totalLine, totalDelta < 0 && styles.deltaGood]}>
-                {fmtDelta(totalDelta)} desde el inicio
-              </Text>
-            ) : (
-              <Text style={styles.weeklyLine}>aún sin tendencia</Text>
-            )}
-            {weekDelta != null ? (
-              <Text style={styles.weeklyLine}>{fmtDelta(weekDelta)} esta semana</Text>
-            ) : null}
-          </View>
-        </View>
-      </View>
-    </View>
-  )
-}
-
-const SPARK_W = 130
-const SPARK_H = 64
-const SPARK_PAD = 7
-
-/* Compact weight trend — a monotone magenta line with the current
- * weight marked by a dot at the tip. */
-function WeightSparkline({ points }: { points: WeightPoint[] }) {
-  const ts = points.map((p) => p.t)
-  const ws = points.map((p) => p.weight)
-  const tMin = Math.min(...ts)
-  const tMax = Math.max(...ts)
-  const wMin = Math.min(...ws)
-  const wMax = Math.max(...ws)
-  const tSpan = Math.max(1, tMax - tMin)
-  const wSpan = Math.max(0.1, wMax - wMin)
-  const x = (t: number) => SPARK_PAD + ((t - tMin) / tSpan) * (SPARK_W - 2 * SPARK_PAD)
-  const y = (w: number) => SPARK_PAD + (1 - (w - wMin) / wSpan) * (SPARK_H - 2 * SPARK_PAD)
-
-  const d =
-    d3Line<WeightPoint>()
-      .x((p) => x(p.t))
-      .y((p) => y(p.weight))
-      .curve(curveMonotoneX)(points) ?? ''
-  const last = points[points.length - 1]!
-
-  return (
-    <Svg width={SPARK_W} height={SPARK_H}>
-      <Path
-        d={d}
-        stroke={colors.magenta}
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Circle cx={x(last.t)} cy={y(last.weight)} r={3.2} fill={colors.magenta} />
-    </Svg>
   )
 }
 
@@ -821,13 +646,13 @@ function SleepSlide({ date, wearableMinutes }: { date: string; wearableMinutes: 
           <View style={styles.sleepGauge}>
             <SleepArc fraction={draft.durationMinutes / SLEEP_MAX} muted={!hasEntry} />
             <View style={styles.sleepValueWrap}>
-              <Text style={[styles.weightValue, !hasEntry && styles.sleepValueMuted]}>{h}</Text>
+              <Text style={[styles.gaugeValue, !hasEntry && styles.sleepValueMuted]}>{h}</Text>
               <Text style={styles.sleepUnit}>h</Text>
               {m > 0 ? (
                 <>
                   <Text
                     style={[
-                      styles.weightValue,
+                      styles.gaugeValue,
                       styles.sleepMinutes,
                       !hasEntry && styles.sleepValueMuted,
                     ]}
@@ -909,7 +734,6 @@ function CycleSlide({
 function Dots({
   count,
   active,
-  showHint,
   onDotPress,
 }: {
   count: number
@@ -917,7 +741,6 @@ function Dots({
   /** When true, a bouncing `›` is rendered to the right of the dots
    *  as a "swipe more" affordance. Hidden once the user has paged
    *  past the first slide. */
-  showHint: boolean
   /** Tap-to-jump: cada dot scrollea directo a su slide. */
   onDotPress: (index: number) => void
 }) {
@@ -935,10 +758,7 @@ function Dots({
             <Dot on={i === active} />
           </Pressable>
         ))}
-        {showHint ? <SwipeHint /> : null}
       </View>
-      {/* Temporary text hint — hides for good after the first swipe. */}
-      {showHint ? <Text style={styles.swipeHintText}>Desliza para ver más</Text> : null}
     </View>
   )
 }
@@ -963,64 +783,11 @@ function Dot({ on }: { on: boolean }) {
  * (still visible, just not moving). Color matches the dots' magenta
  * but at lower opacity so it doesn't compete with the active dot.
  */
-function SwipeHint() {
-  const reduce = useReducedMotion()
-  const x = useSharedValue(reduce ? 0.5 : 0)
-
-  useEffect(() => {
-    if (reduce) return
-    x.value = withRepeat(
-      withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-  }, [x, reduce])
-
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value * 4 }],
-    opacity: 0.55 + x.value * 0.35,
-  }))
-
-  return (
-    <Animated.Text style={[styles.hint, style]} accessibilityElementsHidden>
-      ›
-    </Animated.Text>
-  )
-}
 
 const styles = StyleSheet.create({
-  // ── Resumen colapsado post-ritual — una línea callada, tocable ──
-  collapsedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    backgroundColor: colors.bgCard,
-  },
-  collapsedPressed: {
-    opacity: 0.7,
-  },
-  collapsedText: {
-    flexShrink: 1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  collapsedValue: {
-    fontFamily: typography.uiSemi,
-    color: colors.bone,
-  },
-  collapsedChevron: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.title,
-    color: colors.niebla,
-  },
+  // Salto de capítulo (ritmo 8/16/32/56): el único hueco grande de la página.
   header: {
-    marginTop: 22,
+    marginTop: 56,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1073,22 +840,13 @@ const styles = StyleSheet.create({
   // read as one family.
   card: {
     flex: 1,
-    backgroundColor: 'rgba(244,236,222,0.035)',
-    borderColor: colors.bruma,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
+    backgroundColor: colors.lecheTint,
+    borderColor: colors.hairlineFaint,
+    borderWidth: 1,
+    borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 20,
     justifyContent: 'center',
-  },
-  weightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-  },
-  sparkPlaceholder: {
-    width: SPARK_W,
-    height: SPARK_H,
   },
   numberStack: {
     flex: 1,
@@ -1098,27 +856,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 5,
-  },
-  weightValue: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.gaugeNum,
-    color: colors.leche,
-    letterSpacing: -1.8,
-    lineHeight: 46,
-  },
-  weightUnit: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    color: colors.niebla,
-  },
-  // Total change — the headline of progress.
-  totalLine: {
-    marginTop: 6,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
   },
   deltaGood: {
     color: colors.magenta,
@@ -1131,10 +868,10 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   emptyCard: {
-    backgroundColor: 'rgba(244,236,222,0.035)',
-    borderColor: colors.bruma,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
+    backgroundColor: colors.lecheTint,
+    borderColor: colors.hairlineFaint,
+    borderWidth: 1,
+    borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 28,
     alignItems: 'center',
@@ -1170,11 +907,18 @@ const styles = StyleSheet.create({
     marginTop: -22,
   },
   // The h / m units — small, serif, tucked tight against their number.
+  // El número grande del gauge (horas de sueño).
+  gaugeValue: {
+    fontFamily: typography.displayHeavy,
+    fontSize: typography.sizes.gaugeNum,
+    color: colors.leche,
+    letterSpacing: -1.8,
+    lineHeight: 46,
+  },
   sleepUnit: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
+    color: colors.bone,
     marginLeft: 2,
   },
   // Space before the minutes number, separating the two h·m groups.
@@ -1244,26 +988,6 @@ const styles = StyleSheet.create({
   dot: {
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: colors.magenta,
-  },
-  swipeHintText: {
-    marginTop: 8,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    letterSpacing: 0.2,
-  },
-  // Swipe affordance — sits to the right of the dots, marginLeft 4
-  // so it reads as part of the pagination cluster, not detached.
-  // Magenta to tie to the dots; opacity is animated in JS-side.
-  hint: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.headingLg,
-    lineHeight: 20,
-    color: colors.magenta,
-    marginLeft: 6,
-    // Glyph metrics push it slightly low; nudge up so it lines up
-    // with the dot vertical centre.
-    marginTop: -8,
+    backgroundColor: colors.bone,
   },
 })
