@@ -322,11 +322,7 @@ const MISSING_CANDIDATES: {
   { key: 'sueno', label: 'Sueño', present: (s) => s.sleep_minutes != null },
   { key: 'comida', label: 'Comida', present: (s) => (s.meal_count ?? 0) > 0 },
   { key: 'agua', label: 'Agua', present: (s) => (s.water_glasses ?? 0) > 0 },
-  {
-    key: 'animo',
-    label: 'Ánimo',
-    present: (s) => s.mood != null || s.energy != null || s.motivation != null,
-  },
+  // Ánimo retirado del flujo diario (sep 2026, "registro cero"): ya no se pide.
 ]
 
 function buildMissing(s: DailySignals): GoalMissing[] {

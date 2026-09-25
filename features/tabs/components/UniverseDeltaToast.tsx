@@ -40,7 +40,6 @@ const REASON: Record<UniverseAttributeKey, string> = {
   energia: 'por tu comida',
   claridad: 'por tu agua',
   estabilidad: 'por tu sueño',
-  brillo: 'por tu ánimo',
 }
 
 type Moment = {

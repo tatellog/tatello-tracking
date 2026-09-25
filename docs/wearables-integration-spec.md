@@ -335,6 +335,14 @@ vasitos en "6 vasos · desde tu reloj · ajustar". "ajustar" devuelve los
 componentes de siempre, llenos, para corregir (manual gana). Por dimensión y
 por día: lo que no llegó sigue preguntando como siempre; sin reloj Hoy no
 cambia. Órbita Día no cambia (chips = lo que falta, evidencia = lo que llegó
-con procedencia). Pendiente: ciclo (solo período). Pendiente de
+con procedencia). **Ánimo retirado del flujo diario** (25 sep 2026, decisión
+dueña): el motor solo lo usaba como presencia (ningún detector lo cruzaba) y
+la beta lo registraba ~2 veces al mes por usuaria. Fuera: slide "Cómo
+amaneciste" (con la nota libre), chip/modal de ánimo en Órbita Día, affords
+de mente/energía en Día, y el atributo Brillo del universo (quedan Energía,
+Claridad, Estabilidad). Historial legible; `mood_checkins` y sus hooks
+siguen para un futuro ánimo BAJO DEMANDA en el cierre de un día que se rompe
+("Hoy tu cuerpo pidió más. ¿Algo pasó?"), decisión pendiente. Pendiente:
+ciclo (solo período). Pendiente de
 la dueña: ampliar `NSHealthShareUsageDescription` en app.json para nombrar
 el agua.

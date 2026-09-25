@@ -136,7 +136,7 @@ describe('buildDayGoal — lo que aún no aparece', () => {
     const keys = g.missing.map((m) => m.key)
     expect(keys).toContain('sueno')
     expect(keys).toContain('agua')
-    expect(keys).toContain('animo')
+    expect(keys).not.toContain('animo') // el ánimo ya no se pide (sep 2026)
     expect(keys).not.toContain('comida') // ya hay comida
     expect(keys).not.toContain('ciclo')
   })

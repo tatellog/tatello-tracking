@@ -74,7 +74,6 @@ const TONE_COLOR: Record<GoalTone, string> = {
 // regístralo"). Agua no tiene slide propio → cae a Hoy (quick-log ✦).
 const ABSENT_SLIDE: Record<string, string | null> = {
   sueno: 'sleep',
-  animo: 'wellbeing',
   comida: 'meals',
   agua: null,
 }
@@ -84,7 +83,6 @@ const ABSENT_TONE: Record<string, string> = {
   sueno: colors.dimension.sueno,
   comida: colors.dimension.alimento,
   agua: colors.signal.agua,
-  animo: colors.dimension.mente,
 }
 
 const RING_SIZE = 208
@@ -679,13 +677,13 @@ export function DayPresent({
     return reading ? { text: reading.text, gold: false } : null
   }, [isPast, history7.data, targetDay, ctx.calorieTarget])
 
-  // Señales que se registran EN CONTEXTO con su propio modal (agua/ánimo/sueño),
+  // Señales que se registran EN CONTEXTO con su propio modal (agua/sueño),
   // sin salir de Órbita. Comida (escaneo pesado) y los días pasados siguen yendo
   // a Hoy.
   const [logKey, setLogKey] = useState<DayLogKey | null>(null)
-  const MODAL_KEYS = new Set<string>(['agua', 'animo', 'sueno'])
+  const MODAL_KEYS = new Set<string>(['agua', 'sueno'])
 
-  // Tocar una señal ausente: agua/ánimo/sueño abren su modal EN CONTEXTO (hoy o
+  // Tocar una señal ausente: agua/sueño abren su modal EN CONTEXTO (hoy o
   // un día pasado). Comida abre la cámara AI / texto (/capture-meal → /scan-meal).
   const onMissingPress = (key: string) => {
     if (MODAL_KEYS.has(key)) {

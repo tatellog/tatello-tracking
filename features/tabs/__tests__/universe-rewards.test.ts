@@ -12,7 +12,6 @@ const base: UniverseInput = {
   waterFromMeals: 0,
   sleepMinutes: null,
   restedToday: false,
-  mood: null,
   localHour: 12,
 }
 
@@ -351,56 +350,19 @@ describe('Estabilidad — sueño y descanso', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Brillo
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Brillo — el ánimo (el slider de "Cómo amaneciste")', () => {
-  const brilloOf = (over: Partial<typeof base>) =>
-    calculateTodayUniverseRewards({ ...base, ...over }).find((a) => a.key === 'brillo')!
-
-  it('ánimo "bien" → 100 pct complete', () => {
-    const brillo = brilloOf({ mood: 'good' })
-    expect(brillo.pct).toBe(100)
-    expect(brillo.state).toBe('complete')
-  })
-
-  it('ánimo "neutral" → 55 pct partial (enciende, no castiga)', () => {
-    const brillo = brilloOf({ mood: 'neutral' })
-    expect(brillo.pct).toBe(55)
-    expect(brillo.state).toBe('partial')
-  })
-
-  it('ánimo "difícil" → 30 pct partial (bajo pero cuenta, sin culpa)', () => {
-    const brillo = brilloOf({ mood: 'struggle' })
-    expect(brillo.pct).toBe(30)
-    expect(brillo.state).toBe('partial')
-  })
-
-  it('cualquier ánimo registrado enciende Brillo (no queda en 0)', () => {
-    expect(brilloOf({ mood: 'struggle' }).pct).toBeGreaterThan(0)
-  })
-
-  it('sin ánimo → 0 pct empty (te espera)', () => {
-    const brillo = brilloOf({ mood: null })
-    expect(brillo.pct).toBe(0)
-    expect(brillo.state).toBe('empty')
-  })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
 // calculateTodayUniverseRewards — estructura del resultado
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('calculateTodayUniverseRewards — estructura y orden', () => {
-  it('devuelve los 4 atributos en orden energia, claridad, estabilidad, brillo con labels correctos', () => {
+  it('devuelve los 3 atributos en orden energia, claridad, estabilidad con labels correctos', () => {
     const result = calculateTodayUniverseRewards(base)
 
-    expect(result).toHaveLength(4)
-    expect(result.map((a) => a.key)).toEqual(['energia', 'claridad', 'estabilidad', 'brillo'])
-    expect(result.map((a) => a.label)).toEqual(['Energía', 'Claridad', 'Estabilidad', 'Brillo'])
+    expect(result).toHaveLength(3)
+    expect(result.map((a) => a.key)).toEqual(['energia', 'claridad', 'estabilidad'])
+    expect(result.map((a) => a.label)).toEqual(['Energía', 'Claridad', 'Estabilidad'])
   })
 
-  it('los cuatro atributos son esfuerzo proporcional (Brillo ahora es promedio)', () => {
+  it('los tres atributos son esfuerzo proporcional', () => {
     const byKey = Object.fromEntries(
       calculateTodayUniverseRewards(base).map((a) => [a.key, a.kind]),
     )
@@ -408,7 +370,6 @@ describe('calculateTodayUniverseRewards — estructura y orden', () => {
       energia: 'progress',
       claridad: 'progress',
       estabilidad: 'progress',
-      brillo: 'progress',
     })
   })
 })
@@ -476,21 +437,8 @@ describe('detailForAttribute', () => {
     ])
   })
 
-  it('brillo (Ánimo): muestra el ánimo registrado', () => {
-    expect(detailForAttribute('brillo', { ...base, mood: 'good' }).lines).toEqual([
-      { label: 'Ánimo', value: 'Bien' },
-    ])
-    expect(detailForAttribute('brillo', { ...base, mood: 'struggle' }).lines).toEqual([
-      { label: 'Ánimo', value: 'Difícil' },
-    ])
-    // Sin registro: no acusa.
-    expect(detailForAttribute('brillo', base).lines).toEqual([
-      { label: 'Ánimo', value: 'Sin registro' },
-    ])
-  })
-
   it('cada atributo trae su esencia en voz del coach', () => {
-    for (const key of ['energia', 'claridad', 'estabilidad', 'brillo'] as const) {
+    for (const key of ['energia', 'claridad', 'estabilidad'] as const) {
       expect(detailForAttribute(key, base).essence.length).toBeGreaterThan(0)
     }
   })

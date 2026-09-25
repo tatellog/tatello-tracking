@@ -54,10 +54,9 @@ import { StelarVoice } from './StelarVoice'
 // no afford (it's anchored when the period actually starts, not "today").
 const AFFORD_TEXT: Partial<Record<DimensionKey, string>> = {
   sueno: 'Registra tu sueño para encender esta estrella',
-  mente: 'Cuéntale a Stelar cómo te sentiste',
   cuerpo: 'Anota tu movimiento de hoy',
-  energia: 'Marca tu energía de hoy',
   alimento: 'Registra una comida',
+  // mente / energia: sin afford desde sep 2026 (el ánimo dejó de pedirse).
 }
 
 /* Maps the focused dimension to the StatSlider slide id that owns
@@ -68,8 +67,6 @@ const AFFORD_TEXT: Partial<Record<DimensionKey, string>> = {
  * straight to the Hoy root. */
 const SLIDE_FOR_DIM: Partial<Record<DimensionKey, string>> = {
   sueno: 'sleep',
-  mente: 'wellbeing',
-  energia: 'wellbeing',
   alimento: 'macros',
   ciclo: 'cycle',
 }

@@ -7,7 +7,9 @@
  *   Energía     ← comida (proteína vs objetivo; el macro más cuidado)
  *   Claridad    ← agua (vasos vs meta diaria)
  *   Estabilidad ← sueño (duración vs 7 h, ver SLEEP_FULL_MIN) + descanso
- *   Brillo      ← ánimo (el slider de "Cómo amaneciste")
+ *
+ * (Brillo ← ánimo se retiró el 25 sep 2026, decisión dueña "registro cero":
+ * el ánimo dejó de ser ritual diario; ver spec wearables §9.)
  *
  * PURO y determinístico — la UI anima lo que esto calcula. Manifiesto:
  * los estados nunca son de fallo ("en calma", no "incompleto"); el
@@ -22,28 +24,23 @@
  * Revisado por behavioral-specialist + voice-and-copy (jun 2026).
  */
 
-import type { MoodValue } from '@/features/moods/api'
-
-export type UniverseAttributeKey = 'energia' | 'claridad' | 'estabilidad' | 'brillo'
+export type UniverseAttributeKey = 'energia' | 'claridad' | 'estabilidad'
 
 /** Nombre del ATRIBUTO (la recompensa) — toast + "contribuye a" + detalle. */
 export const ATTRIBUTE_LABEL: Record<UniverseAttributeKey, string> = {
   energia: 'Energía',
   claridad: 'Claridad',
   estabilidad: 'Estabilidad',
-  brillo: 'Brillo',
 }
 
 /** Nombre de la ACCIÓN que alimenta cada atributo — lo que la card MUESTRA
  *  como título. La acción es concreta (la usuaria la entiende sin aprender
  *  vocabulario); la recompensa (ATTRIBUTE_LABEL) se descubre como secundaria.
- *  Mapeo oficial: Comida→Energía · Agua→Claridad · Sueño→Estabilidad ·
- *  Check-in→Brillo. */
+ *  Mapeo oficial: Comida→Energía · Agua→Claridad · Sueño→Estabilidad. */
 export const ACTION_LABEL: Record<UniverseAttributeKey, string> = {
   energia: 'Comida',
   claridad: 'Agua',
   estabilidad: 'Sueño',
-  brillo: 'Ánimo',
 }
 
 export type UniverseState = 'empty' | 'partial' | 'almost' | 'complete'
@@ -84,9 +81,6 @@ export type UniverseInput = {
   sleepMinutes: number | null
   /** "Descansé" marcado hoy — mejora Estabilidad ligeramente. */
   restedToday: boolean
-  /** Ánimo de hoy — lo que setea el slider de "Cómo amaneciste"; null = sin
-   *  registrar. Alimenta Brillo. */
-  mood: MoodValue | null
   /** Hora local (0–23) — gatea el faltante de proteína de noche. */
   localHour: number
 }
@@ -106,8 +100,8 @@ const REST_BONUS_PCT = 10
 const PROTEIN_HINT_MAX_G = 20
 const PROTEIN_HINT_LAST_HOUR = 21
 
-// Sin morfemas de género: el sujeto implícito alterna entre femenino
-// (Energía, Claridad, Estabilidad) y masculino (Brillo) — "quieto" o
+// Sin morfemas de género: el sujeto implícito es femenino (Energía,
+// Claridad, Estabilidad) — "quieta" o
 // "completo" chocaban con tres de los cuatro (voice-and-copy).
 // Exportado: la UI lo usa para saber si el microcopy es el genérico
 // del estado (y no duplicarlo con el chip de estado de la tarjeta).
@@ -199,34 +193,9 @@ function estabilidad(input: UniverseInput): UniverseAttribute {
   }
 }
 
-/* ── Brillo ← ánimo (el slider de "Cómo amaneciste") ────────────────── */
-
-/** El ánimo (1 eje) → % de Brillo. Registrar CUALQUIER ánimo enciende Brillo;
- *  un día difícil se ve más bajo (honesto) pero cuenta, y el copy del estado
- *  nunca juzga (manifiesto). Sin registro = 0 ("te espera"). */
-const MOOD_PCT: Record<MoodValue, number> = { good: 100, neutral: 55, struggle: 30 }
-const MOOD_WORD: Record<MoodValue, string> = {
-  good: 'Bien',
-  neutral: 'Neutral',
-  struggle: 'Difícil',
-}
-
-function brillo(input: UniverseInput): UniverseAttribute {
-  const pct = input.mood != null ? MOOD_PCT[input.mood] : 0
-  const state = stateForPct(pct)
-  return {
-    key: 'brillo',
-    label: ATTRIBUTE_LABEL.brillo,
-    pct,
-    state,
-    microcopy: STATE_COPY[state],
-    kind: 'progress',
-  }
-}
-
-/** Los cuatro atributos del universo de hoy, en orden de render. */
+/** Los tres atributos del universo de hoy, en orden de render. */
 export function calculateTodayUniverseRewards(input: UniverseInput): UniverseAttribute[] {
-  return [energia(input), claridad(input), estabilidad(input), brillo(input)]
+  return [energia(input), claridad(input), estabilidad(input)]
 }
 
 /* ── Detalle por atributo (tap en el card) ────────────────────────── */
@@ -248,13 +217,12 @@ const ESSENCE: Record<UniverseAttributeKey, string> = {
   energia: 'Lo que tu comida le dio a tu día.',
   claridad: 'El agua que acompañó tu día.',
   estabilidad: 'Cómo te sostuvo la noche.',
-  brillo: 'El gesto de escucharte.',
 }
 
 // "Cómo crece" — la regla mecánica de cada atributo, en voz UI (no coach):
 // el puente acción → recompensa que faltaba para que el símbolo se vuelva
 // información. Mapeo REAL diario (Energía←comida · Claridad←agua ·
-// Estabilidad←sueño de anoche · Brillo←check-in). Sin prescribir ("la
+// Estabilidad←sueño de anoche). Sin prescribir ("la
 // proteína" se omite para no leer como consejo nutricional).
 // Exportado: lo usan tanto la cara del card (subtítulo persistente) como
 // el detalle al tocar — una sola fuente para la evidencia.
@@ -262,7 +230,6 @@ export const ATTRIBUTE_GROWS: Record<UniverseAttributeKey, string> = {
   energia: 'Crece con cada comida que registras.',
   claridad: 'Crece con el agua que registras.',
   estabilidad: 'Crece con cómo dormiste anoche.',
-  brillo: 'Crece cuando registras cómo estás.',
 }
 
 const fmtSleep = (min: number): string => {
@@ -328,12 +295,6 @@ export function detailForAttribute(
       ]
       if (input.restedToday) lines.push({ label: 'Descanso', value: 'Hoy ✓' })
       return { essence, grows: ATTRIBUTE_GROWS.estabilidad, lines }
-    }
-    case 'brillo': {
-      const lines: UniverseDetailLine[] = [
-        { label: 'Ánimo', value: input.mood != null ? MOOD_WORD[input.mood] : 'Sin registro' },
-      ]
-      return { essence, grows: ATTRIBUTE_GROWS.brillo, lines }
     }
   }
 }

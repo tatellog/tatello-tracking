@@ -163,10 +163,6 @@ export function TodayUniverseRewards({
         waterFromMeals: waterFromMeals.data ?? 0,
         sleepMinutes: sleep.data?.duration_minutes ?? wearableSleepMinutes ?? null,
         restedToday,
-        // Brillo ← el ánimo del día (lo que setea el slider de "Cómo
-        // amaneciste"). Vive en el brief; useAddMoodCheckin lo invalida, así
-        // que Brillo se enciende al instante al setear el slider.
-        mood: ctx.latest_mood?.value ?? null,
         // Gatea el faltante de proteína de noche (no empujar comida tardía).
         localHour: new Date().getHours(),
       }
@@ -305,18 +301,6 @@ function sourceLineFor(key: UniverseAttributeKey, input: UniverseInput): string 
         return m > 0 ? `${h} h ${m} min de sueño` : `${h} h de sueño`
       }
       return input.restedToday ? 'Descanso hoy' : 'Aún sin sueño'
-    case 'brillo': {
-      // El ánimo del día (lo que setea el slider). Refleja tu estado, sin juicio.
-      const word =
-        input.mood == null
-          ? null
-          : input.mood === 'good'
-            ? 'Bien'
-            : input.mood === 'neutral'
-              ? 'Neutral'
-              : 'Difícil'
-      return word != null ? `Ánimo: ${word}` : 'Te espera'
-    }
   }
 }
 
