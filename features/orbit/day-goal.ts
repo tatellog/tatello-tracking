@@ -283,10 +283,12 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
   if ((s.water_glasses ?? 0) > 0) {
     const g = s.water_glasses!
     const goal = Math.max(1, ctx.waterGoalGlasses ?? 8)
+    // Procedencia sutil (spec §9): el agua que Salud trajo se marca junto al dato.
+    const fromWatch = s.water_source === 'wearable'
     out.push({
       key: 'water',
       label: g >= goal ? 'Agua completa' : 'Agua',
-      detail: `${g} / ${goal} vasos`,
+      detail: `${g} / ${goal} vasos${fromWatch ? ' · tu reloj' : ''}`,
       tone: 'agua',
     })
   }

@@ -7,9 +7,9 @@
  * en Android; importarlo a nivel de módulo reventaría el eval. Mismo patrón
  * que expo-notifications en features/notifications/scheduler.ts.
  *
- * Permisos: SOLO workouts + sueño + pasos. NUNCA Active Energy diaria — la
- * kcal del entreno viene DENTRO de cada workout (totalEnergyBurned) y el
- * eat-back queda bloqueado por arquitectura (spec §4).
+ * Permisos: workouts + sueño + pasos + agua bebida (spec §9). NUNCA Active
+ * Energy diaria — la kcal del entreno viene DENTRO de cada workout
+ * (totalEnergyBurned) y el eat-back queda bloqueado por arquitectura (spec §4).
  */
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
@@ -20,6 +20,7 @@ import type {
   BodyCompositionMetric,
   RawBodyComposition,
   RawDailySteps,
+  RawDailyWater,
   RawSleepSample,
   RawWorkout,
 } from './logic'
@@ -35,6 +36,9 @@ const READ_TYPES_BASE = [
   'HKWorkoutTypeIdentifier',
   'HKCategoryTypeIdentifierSleepAnalysis',
   'HKQuantityTypeIdentifierStepCount',
+  // Agua bebida (spec §9): lo que apps de hidratación o Garmin Connect
+  // escriben en Salud. Solo lectura; los vasitos manuales siguen ganando.
+  'HKQuantityTypeIdentifierDietaryWater',
 ] as const
 
 // Composición corporal: solo se piden si el flag está ON (no expandir el permiso
@@ -80,7 +84,7 @@ export async function isHealthKitAvailable(): Promise<boolean> {
 }
 
 /**
- * Dispara el prompt de permisos del OS (solo lectura, solo los 3 tipos).
+ * Dispara el prompt de permisos del OS (solo lectura, solo READ_TYPES).
  * OJO honestidad de iOS: que resuelva true NO significa que concedió — Apple
  * no distingue "denegado" de "sin datos" en lectura. El estado real se
  * descubre leyendo (spec §4: la UX del vacío es amable, nunca culpa).
@@ -165,6 +169,32 @@ export async function readDailySteps(from: Date, to: Date): Promise<RawDailyStep
       const steps = s.sumQuantity?.quantity
       if (steps == null || steps <= 0 || s.startDate == null) continue
       out.push({ start: new Date(s.startDate), steps })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+/** Agua bebida por día del rango, en mL — agregado pre-deduplicado por Apple
+ *  (misma técnica que los pasos: HKStatisticsCollection, jamás sumar samples). */
+export async function readDailyWater(from: Date, to: Date): Promise<RawDailyWater[]> {
+  const mod = await hk()
+  if (!mod) return []
+  try {
+    const anchor = new Date(from.getFullYear(), from.getMonth(), from.getDate(), 0, 0, 0, 0)
+    const stats = await mod.queryStatisticsCollectionForQuantity(
+      'HKQuantityTypeIdentifierDietaryWater',
+      ['cumulativeSum'],
+      anchor,
+      { day: 1 },
+      { filter: { date: { startDate: from, endDate: to } }, unit: 'mL' },
+    )
+    const out: RawDailyWater[] = []
+    for (const s of stats) {
+      const ml = s.sumQuantity?.quantity
+      if (ml == null || ml <= 0 || s.startDate == null) continue
+      out.push({ start: new Date(s.startDate), ml })
     }
     return out
   } catch {

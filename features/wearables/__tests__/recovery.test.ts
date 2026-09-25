@@ -68,6 +68,25 @@ describe('wearableDayFacts', () => {
   })
 })
 
+describe('wearableDayFacts · agua y pasos (spec §9)', () => {
+  it('agua de Salud sin manual → water; con manual → null', () => {
+    expect(
+      wearableDayFacts(mkSig(DAY, { water_glasses: 6, water_source: 'wearable' })).water,
+    ).toEqual({ glasses: 6 })
+    expect(
+      wearableDayFacts(mkSig(DAY, { water_glasses: 6, water_source: 'manual' })).water,
+    ).toBeNull()
+    // View vieja (sin water_source): no se asume nada del reloj.
+    expect(wearableDayFacts(mkSig(DAY, { water_glasses: 6 })).water).toBeNull()
+  })
+
+  it('pasos del día → steps; 0 o null → null', () => {
+    expect(wearableDayFacts(mkSig(DAY, { steps: 8432 })).steps).toBe(8432)
+    expect(wearableDayFacts(mkSig(DAY, { steps: 0 })).steps).toBeNull()
+    expect(wearableDayFacts(mkSig(DAY, {})).steps).toBeNull()
+  })
+})
+
 describe('workoutProvenanceLine', () => {
   it('solo dice lo que el reloj trajo', () => {
     expect(workoutProvenanceLine({ kcal: 342, minutes: 45, type: 'cardio' })).toBe(

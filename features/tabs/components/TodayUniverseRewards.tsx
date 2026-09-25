@@ -92,6 +92,8 @@ type Props = {
   restedToday: boolean
   /** V-15: noche del reloj sin manual encima (la pipa es pipa: cuenta igual). */
   wearableSleepMinutes?: number | null
+  /** Spec §9: vasos que Salud trajo SIN vasitos manuales encima. */
+  wearableWaterGlasses?: number | null
 }
 
 export function TodayUniverseRewards({
@@ -99,6 +101,7 @@ export function TodayUniverseRewards({
   date,
   restedToday,
   wearableSleepMinutes = null,
+  wearableWaterGlasses = null,
 }: Props) {
   const water = useWaterToday(date)
   // El agua derivada de comidas se lee aparte para no tocar el optimismo del
@@ -150,8 +153,12 @@ export function TodayUniverseRewards({
         proteinTarget: ctx.targets?.protein_g ?? null,
         caloriesToday: ctx.today_macros.calories,
         mealCount: ctx.meal_count_today,
-        // Total = agua directa (water_intake.glasses) + derivada de comidas.
-        waterGlasses: (water.data ?? 0) + (waterFromMeals.data ?? 0),
+        // Total = agua directa (water_intake.glasses; si no hay, la del reloj)
+        // + derivada de comidas. `wearableWaterGlasses` ya viene null cuando
+        // existe fila manual (manual gana, aunque sea 0).
+        waterGlasses:
+          ((water.data ?? 0) > 0 ? (water.data ?? 0) : (wearableWaterGlasses ?? 0)) +
+          (waterFromMeals.data ?? 0),
         waterGoalGlasses: Math.max(1, Math.round(goalMl / GLASS_ML)),
         waterFromMeals: waterFromMeals.data ?? 0,
         sleepMinutes: sleep.data?.duration_minutes ?? wearableSleepMinutes ?? null,

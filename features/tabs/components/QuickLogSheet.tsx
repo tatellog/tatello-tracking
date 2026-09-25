@@ -51,7 +51,9 @@ import {
   useWaterGoal,
 } from '@/features/water/useWaterGoal'
 import { showActionSheet } from '@/lib/actionSheet'
+import { useDaySignals, useTodaySignals } from '@/features/orbit/hooks'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { wearableDayFacts } from '@/features/wearables/recovery'
 import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -334,7 +336,17 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const createMeal = useCreateMeal()
   const { data: measurements } = useMeasurements(90, visible)
   const addMeasurement = useAddMeasurement()
-  const { data: glasses = 0 } = useWaterToday(logDate, visible)
+  const { data: manualGlasses = 0 } = useWaterToday(logDate, visible)
+  // Spec §9 · agua desde Salud: sin vasitos manuales, los vasos que trajo el
+  // reloj/las apps de hidratación pintan los vasitos (con procedencia). Tocar
+  // un vasito escribe manual y desde ahí manda lo tuyo. La fila del día en la
+  // view ya trae la fusión (water_source dice de quién es el dato).
+  const isTodayLog = logDate === today
+  const todaySignalsQ = useTodaySignals()
+  const daySignalsQ = useDaySignals(logDate, visible && !isTodayLog)
+  const wearableWater = wearableDayFacts(isTodayLog ? todaySignalsQ.data : daySignalsQ.data).water
+  const waterFromWatch = manualGlasses === 0 && wearableWater != null
+  const glasses = waterFromWatch ? wearableWater.glasses : manualGlasses
   // Agua derivada de comidas (líquidos detectados y aceptados) ese día. Los
   // vasitos siguen siendo el agua DIRECTA que tocas; esto se muestra como una
   // línea aparte para que el aporte de comidas se reconozca aquí también.
@@ -785,6 +797,11 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       })}
                     </View>
                   )}
+                  {/* Procedencia sutil (spec §9): los vasitos llenos vinieron de
+                      Salud; se retira en cuanto ella toca uno (manual gana). */}
+                  {!editingGoal && waterFromWatch ? (
+                    <Text style={styles.waterFromWatchNote}>desde tu reloj</Text>
+                  ) : null}
                   {/* El aporte de comidas: los vasitos rosa de arriba. Esta línea
                       lo nombra (mismo conteo redondeado que los vasitos). */}
                   {!editingGoal && mealCups > 0 ? (
@@ -1167,6 +1184,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
     color: 'rgba(233,30,99,0.85)',
+  },
+  // "desde tu reloj" — capa meta en niebla, junto al dato (spec wearables §5).
+  waterFromWatchNote: {
+    marginTop: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.micro,
+    letterSpacing: 0.3,
+    color: colors.niebla,
   },
   // Caption de agua + chevron → señala que la meta es editable.
   waterCaptionRow: {

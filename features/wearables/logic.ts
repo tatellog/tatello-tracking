@@ -42,6 +42,12 @@ export type WearableStepsRow = {
   steps: number
 }
 
+export type WearableWaterRow = {
+  source: WearableSource
+  day_date: string
+  water_ml: number
+}
+
 export type WearableBodyCompositionRow = {
   source: WearableSource
   day_date: string
@@ -75,6 +81,12 @@ export type RawSleepSample = {
 export type RawDailySteps = {
   start: Date
   steps: number
+}
+
+/** Agua bebida por día (agregado de HK, ya en mililitros). */
+export type RawDailyWater = {
+  start: Date
+  ml: number
 }
 
 /** Las 3 métricas de composición que expone HealthKit (visceral / % agua NO son
@@ -190,6 +202,28 @@ export function stepsToRows(
   }
   return [...byDay.entries()]
     .map(([day, steps]) => ({ source, day_date: day, steps: clamp(steps, 0, 200000) }))
+    .sort((a, b) => a.day_date.localeCompare(b.day_date))
+}
+
+/**
+ * Agua diaria del reloj/apps → una fila por DÍA LOCAL (misma identidad que
+ * wearable_steps). HK entrega el agregado en mL; se suma por día local por si
+ * el bucket cruza la medianoche del perfil. Sin fuente no hay fila.
+ */
+export function waterToRows(
+  buckets: readonly RawDailyWater[],
+  tz: string,
+  source: WearableSource,
+): WearableWaterRow[] {
+  const byDay = new Map<string, number>()
+  for (const b of buckets) {
+    const ml = Math.round(b.ml)
+    if (ml <= 0) continue
+    const day = dayInTimezone(b.start, tz)
+    byDay.set(day, (byDay.get(day) ?? 0) + ml)
+  }
+  return [...byDay.entries()]
+    .map(([day, ml]) => ({ source, day_date: day, water_ml: clamp(ml, 0, 10000) }))
     .sort((a, b) => a.day_date.localeCompare(b.day_date))
 }
 

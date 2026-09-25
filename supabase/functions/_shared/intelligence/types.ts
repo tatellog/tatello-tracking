@@ -32,6 +32,8 @@ export type DailySignals = {
   water_glasses: number | null
   rested: boolean | null
   on_period: boolean | null
+  /** Pasos del reloj (view ≥ 20260925). Opcional: fixtures viejas no lo traen. */
+  steps?: number | null
 }
 
 /** Slim meal shape — the night detector only needs the timestamp. */

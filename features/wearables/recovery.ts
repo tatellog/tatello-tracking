@@ -29,14 +29,28 @@ export type WearableSleepFacts = {
   minutes: number
 }
 
+export type WearableWaterFacts = {
+  /** Vasos (250 ml) que Salud trajo de apps de hidratación o del reloj. */
+  glasses: number
+}
+
 export type WearableDayFacts = {
   /** Entreno que llegó del reloj y NO tiene registro manual encima. */
   workout: WearableWorkoutFacts | null
   /** Noche que llegó del reloj y NO tiene registro manual encima. */
   sleep: WearableSleepFacts | null
+  /** Agua que llegó de Salud y NO tiene vasitos manuales encima (spec §9). */
+  water: WearableWaterFacts | null
+  /** Pasos del día (siempre del reloj; no hay registro manual de pasos). */
+  steps: number | null
 }
 
-export const NO_WEARABLE_FACTS: WearableDayFacts = { workout: null, sleep: null }
+export const NO_WEARABLE_FACTS: WearableDayFacts = {
+  workout: null,
+  sleep: null,
+  water: null,
+  steps: null,
+}
 
 type Opts = {
   /** Minutos del registro MANUAL de sueño del día (sleep_logs), si existe.
@@ -72,9 +86,17 @@ export function wearableDayFacts(
       // solo pudo venir del reloj (la view solo lee sleep_logs y wearable_sleep).
       (sleepSource == null && opts.manualSleepMinutes == null))
 
+  // Agua: solo con la view nueva (water_source); sin la columna, nada del reloj
+  // (los vasitos manuales siguen siendo la única fuente, como antes).
+  const waterGlasses = positiveOrNull(signals.water_glasses)
+  const water =
+    waterGlasses != null && signals.water_source === 'wearable' ? { glasses: waterGlasses } : null
+
   return {
     workout,
     sleep: sleepFromWearable ? { minutes: sleepMinutes } : null,
+    water,
+    steps: positiveOrNull(signals.steps),
   }
 }
 

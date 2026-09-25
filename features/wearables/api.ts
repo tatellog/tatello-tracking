@@ -12,6 +12,7 @@ import type {
   WearableBodyCompositionRow,
   WearableSleepRow,
   WearableStepsRow,
+  WearableWaterRow,
   WearableWorkoutRow,
 } from './logic'
 
@@ -40,6 +41,12 @@ const stepsRowSchema = z.object({
   source: z.enum(['apple_health', 'garmin']),
   day_date: isoDay,
   steps: z.number().int().min(0).max(200000),
+})
+
+const waterRowSchema = z.object({
+  source: z.enum(['apple_health', 'garmin']),
+  day_date: isoDay,
+  water_ml: z.number().int().min(0).max(10000),
 })
 
 const bodyCompositionRowSchema = z
@@ -87,6 +94,19 @@ export async function upsertWearableSteps(rows: WearableStepsRow[]): Promise<num
   const userId = await requireUserId()
   const parsed = z.array(stepsRowSchema).parse(rows)
   const { error } = await supabase.from('wearable_steps').upsert(
+    parsed.map((r) => ({ ...r, user_id: userId })),
+    { onConflict: 'user_id,source,day_date' },
+  )
+  if (error) throw error
+  return parsed.length
+}
+
+/** Upsert del agua bebida por día (mL) que Salud trae de apps o del reloj. */
+export async function upsertWearableWater(rows: WearableWaterRow[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const userId = await requireUserId()
+  const parsed = z.array(waterRowSchema).parse(rows)
+  const { error } = await supabase.from('wearable_water').upsert(
     parsed.map((r) => ({ ...r, user_id: userId })),
     { onConflict: 'user_id,source,day_date' },
   )

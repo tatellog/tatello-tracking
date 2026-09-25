@@ -5,6 +5,7 @@ import {
   normalizeWorkout,
   sleepSamplesToRows,
   stepsToRows,
+  waterToRows,
 } from '../logic'
 
 const TZ = 'America/Mexico_City' // UTC-6 en estas fechas
@@ -126,6 +127,24 @@ describe('stepsToRows', () => {
     expect(rows).toEqual([
       { source: 'apple_health', day_date: '2026-07-07', steps: 8433 },
       { source: 'apple_health', day_date: '2026-07-08', steps: 200000 },
+    ])
+  })
+})
+
+describe('waterToRows', () => {
+  it('bucket diario en mL → fila por día local, descarta 0 y clampa el techo', () => {
+    const rows = waterToRows(
+      [
+        { start: new Date('2026-07-07T06:00:00Z'), ml: 1499.6 },
+        { start: new Date('2026-07-08T06:00:00Z'), ml: 99999 },
+        { start: new Date('2026-07-09T06:00:00Z'), ml: 0 },
+      ],
+      TZ,
+      'apple_health',
+    )
+    expect(rows).toEqual([
+      { source: 'apple_health', day_date: '2026-07-07', water_ml: 1500 },
+      { source: 'apple_health', day_date: '2026-07-08', water_ml: 10000 },
     ])
   })
 })

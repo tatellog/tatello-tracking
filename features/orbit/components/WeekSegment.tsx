@@ -46,6 +46,7 @@ import {
   type WeekLever,
 } from '../week-orbit-logic'
 import { consumeWeekFocus } from '../pending-week-focus'
+import { stepsRhythm } from '../steps'
 import { useWeeklyReading } from '../weekly-reading-hooks'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
@@ -146,6 +147,12 @@ export function WeekSegment({
     [seal, week, ctx],
   )
   const emerging = useMemo(() => emergingEvidence(week, todayIso, ctx), [week, todayIso, ctx])
+  // Pasos del reloj (spec wearables §9): ritmo por día de semana + promedio como
+  // evidencia. Sin meta ni contador diario; calla sin 3 días de dato.
+  const steps = useMemo(
+    () => stepsRhythm(signals ?? [], mondayOf(todayIso), todayIso),
+    [signals, todayIso],
+  )
   // Baseline "esta semana vs tu costumbre" (sueño, energía) — necesita historial
   // más largo que la ventana de 2 semanas; el detector filtra a los días previos
   // al lunes de esta semana. Comparación SIEMPRE contigo misma (Apple "Typical").
@@ -417,6 +424,25 @@ export function WeekSegment({
                   </Animated.View>
                 ))}
               </View>
+            </View>
+          ) : null}
+
+          {/* Tus pasos (spec wearables §9) — la única superficie de los pasos:
+              qué días te moviste más y tu promedio, desde tu reloj. Nunca una
+              meta (nada de 10,000) ni un contador del día. */}
+          {steps ? (
+            <View style={styles.block}>
+              <Text style={styles.sectionEyebrow}>Tus pasos</Text>
+              <Animated.View entering={FadeIn.duration(360)} style={styles.list}>
+                <Text style={styles.listText}>
+                  {steps.topDays.length > 0
+                    ? `Tus días de más movimiento: ${steps.topDays.join(' y ')}.`
+                    : 'Tu movimiento fue parejo esta semana.'}
+                </Text>
+                <Text style={styles.stepsMeta}>
+                  {`Promedio ${steps.avgSteps.toLocaleString('es-MX')} pasos al día · tu reloj`}
+                </Text>
+              </Animated.View>
             </View>
           ) : null}
 
@@ -1187,6 +1213,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     lineHeight: typography.sizes.bodyLarge * 1.5,
+  },
+  // El promedio de pasos como evidencia + procedencia, capa meta en niebla.
+  stepsMeta: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.niebla,
+    marginTop: -4,
   },
   // La palanca (§8) es recomendación de coach → serif italic, cálida.
   leverText: {

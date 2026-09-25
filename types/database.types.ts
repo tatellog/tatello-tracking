@@ -1264,6 +1264,36 @@ export type Database = {
         }
         Relationships: []
       }
+      wearable_water: {
+        Row: {
+          created_at: string
+          day_date: string
+          id: string
+          source: string
+          updated_at: string
+          user_id: string
+          water_ml: number
+        }
+        Insert: {
+          created_at?: string
+          day_date: string
+          id?: string
+          source: string
+          updated_at?: string
+          user_id: string
+          water_ml: number
+        }
+        Update: {
+          created_at?: string
+          day_date?: string
+          id?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+          water_ml?: number
+        }
+        Relationships: []
+      }
       wearable_workouts: {
         Row: {
           created_at: string
@@ -1418,10 +1448,12 @@ export type Database = {
           sleep_minutes: number | null
           sleep_quality: number | null
           sleep_source: string | null
+          steps: number | null
           stress: number | null
           trained: boolean | null
           user_id: string | null
           water_glasses: number | null
+          water_source: string | null
           weight_kg: number | null
           wellbeing_checkins: number | null
           workout_kcal: number | null

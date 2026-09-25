@@ -470,12 +470,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (viewingPast) return
     const workout = trainedByWearable
     const sleep = wearable.sleep != null
-    if (!workout && !sleep) return
-    const key = `${todayIsoLocal}:${workout ? 'w' : ''}${sleep ? 's' : ''}`
+    const water = wearable.water != null
+    if (!workout && !sleep && !water) return
+    const key = `${todayIsoLocal}:${workout ? 'w' : ''}${sleep ? 's' : ''}${water ? 'a' : ''}`
     if (prefilledTracked.current === key) return
     prefilledTracked.current = key
-    track('wearable_prefilled', { source: 'apple_health', workout, sleep })
-  }, [viewingPast, trainedByWearable, wearable.sleep, todayIsoLocal])
+    track('wearable_prefilled', { source: 'apple_health', workout, sleep, water })
+  }, [viewingPast, trainedByWearable, wearable.sleep, wearable.water, todayIsoLocal])
 
   // El estado del toggle es el del día VISTO (vctx), no el de hoy. El reloj
   // sella "entrenaste" igual que el manual: Stelar no pregunta lo que ya llegó.
@@ -847,6 +848,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 date={vctx.date}
                 restedToday={restedToday}
                 wearableSleepMinutes={wearable.sleep?.minutes ?? null}
+                wearableWaterGlasses={wearable.water?.glasses ?? null}
               />
             </Animated.View>
 

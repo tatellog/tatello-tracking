@@ -67,6 +67,13 @@ describe('buildDayGoal — evidencia', () => {
     expect(find(g.evidence, 'water')!.label).toBe('Agua completa')
   })
 
+  it('agua de Salud lleva su procedencia en el detalle (spec §9)', () => {
+    const g = buildDayGoal(mkSig(DAY, { water_glasses: 6, water_source: 'wearable' }), CTX)!
+    expect(find(g.evidence, 'water')!.detail).toMatch(/vasos · tu reloj$/)
+    const manual = buildDayGoal(mkSig(DAY, { water_glasses: 6, water_source: 'manual' }), CTX)!
+    expect(find(manual.evidence, 'water')!.detail).toMatch(/vasos$/)
+  })
+
   it('sueño del reloj lleva su procedencia en el detalle (V-15)', () => {
     const g = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'wearable' }), CTX)!
     expect(find(g.evidence, 'sleep')!.detail).toBe('7 h · tu reloj')

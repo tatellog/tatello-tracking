@@ -278,3 +278,42 @@ condiciones (todas): (a) Garmin reabra el programa, (b) Stelar sea una
 entidad legal que califique, (c) haya demanda real de usuarias Garmin que
 el rebote no cubra bien. Mientras tanto, el rebote por Apple Health /
 Health Connect es la cobertura de Garmin, a costo cero.
+
+## 9 · Registro cero · las pipas que faltan (decisiones de la dueña · 25 sep 2026)
+
+**La idea:** Stelar se llena solo; la usuaria solo confirma lo que ningún
+reloj sabe (comida y ánimo). Cada pipa nueva reusa la plantilla de V-15:
+tabla cruda propia · "manual gana, la plataforma rellena" · procedencia
+junto al dato · dedupe en Hoy (no preguntar lo que ya llegó) · cero metas
+nuevas · nunca eat-back ni TDEE del reloj · lo tardío solo suma.
+
+Nota de plataforma: en iOS la fuente es Apple Salud (ya conectada); Health
+Connect es el espejo Android (§8.1), gateado en demanda real. Garmin
+sigue sin API directa (§8.2, confirmado sep 2026): entra por rebote.
+
+| Pipa    | Fuente en Salud                | Decisión de la dueña                                                                                                          | Superficie                                                                                                                                                                                                                       |
+| ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agua    | `dietaryWater` (apps, Garmin)  | Sí                                                                                                                            | Vasitos de Hoy/QuickLog nacen llenos con "desde tu reloj"; manual gana; el agua de comidas sigue sumando                                                                                                                         |
+| Pasos   | `stepCount` (ya se ingiere)    | Sí, en Semana                                                                                                                 | "Tus ritmos" de Órbita Semana: ritmo por día de semana + promedio como evidencia; sin meta, sin contador diario                                                                                                                  |
+| Báscula | `bodyMass` (app de la báscula) | **Opcional, opt-in.** Ícono propio en la cabecera de Hoy junto al calendario; muestra un punto cuando llega una lectura nueva | El ícono NUNCA muestra el número; el tap lleva a Progreso. Entra en silencio al motor de TDEE y a la tendencia. Manual gana                                                                                                      |
+| Ciclo   | `menstrualFlow` (Watch, apps)  | **Solo período, lo más sencillo.** Sin fases (nada de lútea / folicular / ovulación)                                          | Opt-in separado. Al conectar, una confirmación del historial; después silencio con "corregir". Órbita lee "esta semana tuviste tu período" / "semana antes de tu período" en Lectura Semanal y Mes; nunca predice ni diagnostica |
+
+Reglas fijas de esta fase: cada permiso nuevo con priming propio ·
+procedencia visible ("desde tu reloj", "desde tu báscula") · Día de Órbita
+no cambia por el ciclo (contexto, no hábito) · nada en Hoy muestra peso.
+
+**Orden:** validar V-15 con Garmin (build 17) → agua + pasos → báscula →
+ciclo → Health Connect cuando haya usuaria Android. Estado se anota aquí y
+en el roadmap (V-14/V-15).
+
+**Estado (25 sep 2026):** agua + pasos CONSTRUIDOS. Migración
+`20260925120000` (tabla `wearable_water` + view: `water_glasses =
+COALESCE(manual, reloj)`, `water_source`, `steps`), aplicada en prod con
+rls-auditor aprobada. HealthKit pide `dietaryWater`. QuickLog: vasitos nacen
+llenos + "desde tu reloj" (tocar uno escribe manual). Recompensas del
+universo y Órbita Día cuentan/marcan el agua de Salud. Pasos: `stepsRhythm`
+en `_shared/intelligence/steps.ts` (≥3 días, promedio a centenas, días que
+destacan ×1.2) y bloque "Tus pasos" en Órbita Semana. Pendiente: báscula
+(ícono en cabecera de Hoy con punto) → ciclo (solo período). Pendiente de
+la dueña: ampliar `NSHealthShareUsageDescription` en app.json para nombrar
+el agua.

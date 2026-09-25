@@ -21,17 +21,25 @@ import {
   upsertWearableBodyComposition,
   upsertWearableSleep,
   upsertWearableSteps,
+  upsertWearableWater,
   upsertWearableWorkouts,
 } from './api'
 import {
   isHealthKitAvailable,
   readBodyComposition,
   readDailySteps,
+  readDailyWater,
   readSleepSamples,
   readWorkouts,
   requestHealthKitAuthorization,
 } from './healthkit'
-import { bodyCompositionToRows, normalizeWorkout, sleepSamplesToRows, stepsToRows } from './logic'
+import {
+  bodyCompositionToRows,
+  normalizeWorkout,
+  sleepSamplesToRows,
+  stepsToRows,
+  waterToRows,
+} from './logic'
 
 /* Flag de conexión POR USUARIA (no por device): dos cuentas en el mismo
  * teléfono no heredan la conexión de la otra. */
@@ -52,9 +60,13 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * `windowDays`. Devuelve los conteos escritos, o null si el canal no está
  * disponible. Nunca lanza: un sync fallido jamás rompe la app.
  */
-export async function syncAppleHealth(
-  windowDays: number,
-): Promise<{ workouts: number; sleepDays: number; stepDays: number; bodyDays: number } | null> {
+export async function syncAppleHealth(windowDays: number): Promise<{
+  workouts: number
+  sleepDays: number
+  stepDays: number
+  waterDays: number
+  bodyDays: number
+} | null> {
   try {
     if (!(await isHealthKitAvailable())) return null
     const to = new Date()
@@ -63,20 +75,22 @@ export async function syncAppleHealth(
 
     // readBodyComposition ya se auto-gatea por WEARABLE_BODY_COMPOSITION_ENABLED
     // (devuelve [] con el flag OFF → no lee ni pide permiso).
-    const [rawWorkouts, rawSleep, rawSteps, rawBody] = await Promise.all([
+    const [rawWorkouts, rawSleep, rawSteps, rawWater, rawBody] = await Promise.all([
       readWorkouts(from, to),
       readSleepSamples(from, to),
       readDailySteps(from, to),
+      readDailyWater(from, to),
       readBodyComposition(from, to),
     ])
 
-    const [workouts, sleepDays, stepDays, bodyDays] = await Promise.all([
+    const [workouts, sleepDays, stepDays, waterDays, bodyDays] = await Promise.all([
       upsertWearableWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health'))),
       upsertWearableSleep(sleepSamplesToRows(rawSleep, tz, 'apple_health')),
       upsertWearableSteps(stepsToRows(rawSteps, tz, 'apple_health')),
+      upsertWearableWater(waterToRows(rawWater, tz, 'apple_health')),
       upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, 'apple_health')),
     ])
-    return { workouts, sleepDays, stepDays, bodyDays }
+    return { workouts, sleepDays, stepDays, waterDays, bodyDays }
   } catch {
     return null
   }
@@ -160,7 +174,7 @@ export function useAppleHealthConnection(): {
         await AsyncStorage.setItem(lastSyncKey(userId), now).catch(() => {})
         setLastSyncAt(now)
         track('wearable_sync', { source: 'apple_health', initial: true, ...counts })
-        if (counts.workouts + counts.sleepDays > 0) {
+        if (counts.workouts + counts.sleepDays + counts.waterDays > 0) {
           void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
         }
       }
@@ -204,7 +218,7 @@ export function useAppleHealthSync(): void {
       if (!counts) return
       await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
       track('wearable_sync', { source: 'apple_health', initial: false, ...counts })
-      if (counts.workouts + counts.sleepDays > 0) {
+      if (counts.workouts + counts.sleepDays + counts.waterDays > 0) {
         void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
       }
     } finally {
