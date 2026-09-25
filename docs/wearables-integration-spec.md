@@ -325,6 +325,16 @@ enlace a la tendencia). La serie de la báscula entra como relleno de menor
 prioridad en `mergeWeightSeries` (Progreso Body, tendencia, historia,
 composición, seeds de QuickLog y check-in) y en `useMacroInputs`; el TDEE
 adaptativo la recibe solo por la view. La slide "Tu peso" de Hoy sigue
-manual-only. Pendiente: ciclo (solo período). Pendiente de
+manual-only. **Modo confirmación de Hoy** (25 sep 2026, decisión dueña:
+"no quitar los componentes, quitar las preguntas"): lo que el reloj ya anotó
+hoy (sueño, entreno, agua; pasos y peso NO) se colapsa en la línea "Tu reloj
+ya anotó: 7 h 15 de sueño · 45 min de entreno · 6 vasos de agua · ajustar ›"
+(`ArrivedLine`, `arrivedSummary` en recovery.ts). Cerrada: el check-in de
+entreno y la slide de sueño desaparecen del flujo y QuickLog recoge los
+vasitos en "6 vasos · desde tu reloj · ajustar". "ajustar" devuelve los
+componentes de siempre, llenos, para corregir (manual gana). Por dimensión y
+por día: lo que no llegó sigue preguntando como siempre; sin reloj Hoy no
+cambia. Órbita Día no cambia (chips = lo que falta, evidencia = lo que llegó
+con procedencia). Pendiente: ciclo (solo período). Pendiente de
 la dueña: ampliar `NSHealthShareUsageDescription` en app.json para nombrar
 el agua.

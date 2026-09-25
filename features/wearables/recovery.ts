@@ -114,3 +114,26 @@ export function workoutProvenanceLine(w: WearableWorkoutFacts): string {
   if (w.kcal != null) parts.push(`~${w.kcal} kcal`)
   return parts.join(' · ')
 }
+
+/** "7 h" / "7 h 15" — la forma corta del sueño. */
+export function formatSleepShort(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m === 0 ? `${h} h` : `${h} h ${m}`
+}
+
+/**
+ * El resumen de "Lo que ya llegó" en Hoy (modo confirmación): solo sueño,
+ * entreno y agua, en ese orden, separados por " · ". Los pasos NO entran
+ * (decisión: sin contador en Hoy; viven en Semana) ni el peso (no vive en
+ * Hoy). Null cuando nada llegó → la línea no se renderiza.
+ */
+export function arrivedSummary(f: WearableDayFacts): string | null {
+  const parts: string[] = []
+  if (f.sleep) parts.push(`${formatSleepShort(f.sleep.minutes)} de sueño`)
+  if (f.workout) {
+    parts.push(f.workout.minutes != null ? `${f.workout.minutes} min de entreno` : 'entreno')
+  }
+  if (f.water) parts.push(`${f.water.glasses} ${f.water.glasses === 1 ? 'vaso' : 'vasos'} de agua`)
+  return parts.length > 0 ? parts.join(' · ') : null
+}

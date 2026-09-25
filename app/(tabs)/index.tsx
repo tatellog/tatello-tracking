@@ -32,6 +32,7 @@ import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/fe
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
+import { ArrivedLine } from '@/features/wearables/components/ArrivedLine'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
 import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
 import { wearableDayFacts, workoutProvenanceLine } from '@/features/wearables/recovery'
@@ -464,6 +465,23 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const trainedByWearable =
     !vctx.today_workout_completed && !restedToday && wearable.workout != null
 
+  // Modo confirmación (spec §9): lo que el reloj ya anotó HOY se colapsa en una
+  // línea y sus componentes dejan de preguntar; "ajustar" los devuelve llenos.
+  // Solo hoy (un día pasado se ve completo) y solo lo que no tiene manual encima.
+  const arrivedFacts = viewingPast
+    ? null
+    : {
+        ...wearable,
+        workout: trainedByWearable ? wearable.workout : null,
+      }
+  const hasArrived =
+    arrivedFacts != null &&
+    (arrivedFacts.sleep != null || arrivedFacts.workout != null || arrivedFacts.water != null)
+  const [arrivedOpen, setArrivedOpen] = useState(false)
+  useEffect(() => setArrivedOpen(false), [selectedDate])
+  const sleepCollapsed = hasArrived && arrivedFacts?.sleep != null && !arrivedOpen
+  const checkInCollapsed = hasArrived && arrivedFacts?.workout != null && !arrivedOpen
+
   // Báscula (spec §9): ícono en la cabecera solo cuando Salud existe en este
   // build; el punto avisa de una lectura nueva. Nunca muestra el número.
   const scaleConn = useScaleConnection()
@@ -644,31 +662,40 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
-              <DayCheckIn
-                // Resetea el modo "cambiar" interno al navegar entre días.
-                key={selectedDate}
-                state={dayState}
-                onChange={handleDayChange}
-                label={viewingPast ? viewingLabel : 'Hoy'}
-                question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
-                locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
-                // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
-                workoutType={
-                  viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
-                }
-                onWorkoutType={viewingPast ? undefined : handleWorkoutType}
-                wearable={
-                  !viewingPast && trainedByWearable && wearable.workout
-                    ? { line: workoutProvenanceLine(wearable.workout) }
-                    : null
-                }
-                saveFailed={
-                  toggleToday.isError ||
-                  setRest.isError ||
-                  toggleForDate.isError ||
-                  setRestForDate.isError
-                }
-              />
+              {hasArrived && arrivedFacts ? (
+                <ArrivedLine
+                  facts={arrivedFacts}
+                  expanded={arrivedOpen}
+                  onToggle={() => setArrivedOpen((v) => !v)}
+                />
+              ) : null}
+              {checkInCollapsed ? null : (
+                <DayCheckIn
+                  // Resetea el modo "cambiar" interno al navegar entre días.
+                  key={selectedDate}
+                  state={dayState}
+                  onChange={handleDayChange}
+                  label={viewingPast ? viewingLabel : 'Hoy'}
+                  question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
+                  locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
+                  // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
+                  workoutType={
+                    viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
+                  }
+                  onWorkoutType={viewingPast ? undefined : handleWorkoutType}
+                  wearable={
+                    !viewingPast && trainedByWearable && wearable.workout
+                      ? { line: workoutProvenanceLine(wearable.workout) }
+                      : null
+                  }
+                  saveFailed={
+                    toggleToday.isError ||
+                    setRest.isError ||
+                    toggleForDate.isError ||
+                    setRestForDate.isError
+                  }
+                />
+              )}
               {/* Invitación contextual (spec wearables §5): solo con el día sin
                   responder y el canal disponible pero no conectado. */}
               {!viewingPast && dayState === 'undecided' ? <WearableInviteLine /> : null}
@@ -881,6 +908,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 targetSlide={slideParam ?? null}
                 onSwipeStateChange={handleSlideSwipe}
                 wearableSleepMinutes={wearable.sleep?.minutes ?? null}
+                hideSleepSlide={sleepCollapsed}
               />
             </Animated.View>
 

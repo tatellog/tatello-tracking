@@ -91,6 +91,10 @@ type Props = {
    *  manual encima (null si nada llegó). La slide de sueño nace llena con su
    *  procedencia y el colapso de rituales lo cuenta como ritual cumplido. */
   wearableSleepMinutes?: number | null
+  /** Modo confirmación (spec §9): la noche ya vive en la línea "Tu reloj ya
+   *  anotó" de Hoy → la slide de sueño sale del pager y el colapso de rituales
+   *  solo necesita el ánimo. Vuelve al abrir "ajustar". */
+  hideSleepSlide?: boolean
 }
 
 /**
@@ -106,6 +110,7 @@ export function StatSlider({
   targetSlide,
   onSwipeStateChange,
   wearableSleepMinutes = null,
+  hideSleepSlide = false,
 }: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
@@ -185,7 +190,7 @@ export function StatSlider({
   // (V-15: no pedir lo que ya llegó).
   const sleepMinutesToday = sleepToday.data?.duration_minutes ?? wearableSleepMinutes ?? null
   const sleepFromWatch = sleepToday.data?.duration_minutes == null && wearableSleepMinutes != null
-  const ritualsDone = moodToday != null && sleepMinutesToday != null
+  const ritualsDone = moodToday != null && (hideSleepSlide || sleepMinutesToday != null)
   const [expanded, setExpanded] = useState(false)
   // Otro día (navegación o medianoche) → vuelve al estado natural del día.
   useEffect(() => setExpanded(false), [ctx.date])
@@ -207,13 +212,19 @@ export function StatSlider({
   // Stable ids (not titles) for keys, and the cycle slide LAST so it
   // appearing/disappearing never shifts the indices of slides the user
   // may already be paged to (keeps scrollX / active in sync).
+  // Con la slide de sueño fuera (modo confirmación), wellbeing baja al índice 1.
+  const wellbeingIndex = hideSleepSlide ? 1 : 2
   const slides: { id: string; title: string; node: ReactNode }[] = [
     { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
-    {
-      id: 'sleep',
-      title: 'Sueño de anoche',
-      node: <SleepSlide date={ctx.date} wearableMinutes={wearableSleepMinutes} />,
-    },
+    ...(hideSleepSlide
+      ? []
+      : [
+          {
+            id: 'sleep',
+            title: 'Sueño de anoche',
+            node: <SleepSlide date={ctx.date} wearableMinutes={wearableSleepMinutes} />,
+          },
+        ]),
     {
       id: 'wellbeing',
       title: 'Cómo amaneciste',
@@ -226,7 +237,7 @@ export function StatSlider({
           // frente). Con scrollX+índice+ancho el mood decide solo si está centrada:
           // así su track no roba el swipe cuando solo asoma en el peek de otra slide.
           scrollX={scrollX}
-          slideIndex={2}
+          slideIndex={wellbeingIndex}
           slideW={slideW}
         />
       ),
@@ -296,14 +307,23 @@ export function StatSlider({
       <Pressable
         onPress={openPager}
         accessibilityRole="button"
-        accessibilityLabel={`Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas${sleepFromWatch ? ' según tu reloj' : ''}. Toca para abrir el detalle.`}
+        accessibilityLabel={
+          hideSleepSlide
+            ? `Rituales del día: ánimo ${moodLabel}. Toca para abrir el detalle.`
+            : `Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas${sleepFromWatch ? ' según tu reloj' : ''}. Toca para abrir el detalle.`
+        }
         style={({ pressed }) => pressed && styles.collapsedPressed}
       >
         <View style={styles.collapsedRow}>
           <Text style={styles.collapsedText} numberOfLines={1}>
-            Ánimo: <Text style={styles.collapsedValue}>{moodLabel}</Text> · Dormiste{' '}
-            <Text style={styles.collapsedValue}>{hours} h</Text>
-            {sleepFromWatch ? ' · tu reloj' : ''}
+            Ánimo: <Text style={styles.collapsedValue}>{moodLabel}</Text>
+            {hideSleepSlide ? null : (
+              <>
+                {' '}
+                · Dormiste <Text style={styles.collapsedValue}>{hours} h</Text>
+                {sleepFromWatch ? ' · tu reloj' : ''}
+              </>
+            )}
           </Text>
           <Text style={styles.collapsedChevron}>›</Text>
         </View>

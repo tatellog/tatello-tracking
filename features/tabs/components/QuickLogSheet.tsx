@@ -348,6 +348,10 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   const wearableWater = wearableDayFacts(isTodayLog ? todaySignalsQ.data : daySignalsQ.data).water
   const waterFromWatch = manualGlasses === 0 && wearableWater != null
   const glasses = waterFromWatch ? wearableWater.glasses : manualGlasses
+  // Modo confirmación (spec §9): con agua del reloj, los vasitos se recogen en
+  // una línea; "ajustar" los devuelve llenos para corregir (manual gana).
+  const [waterAdjust, setWaterAdjust] = useState(false)
+  const waterCollapsed = waterFromWatch && !waterAdjust
   // Agua derivada de comidas (líquidos detectados y aceptados) ese día. Los
   // vasitos siguen siendo el agua DIRECTA que tocas; esto se muestra como una
   // línea aparte para que el aporte de comidas se reconozca aquí también.
@@ -775,6 +779,19 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                         <Text style={styles.goalDoneText}>Listo</Text>
                       </Pressable>
                     </View>
+                  ) : waterCollapsed ? (
+                    <Pressable
+                      onPress={() => setWaterAdjust(true)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Agua desde tu reloj, ${glasses} vasos. Toca para ajustar`}
+                      style={styles.waterCollapsedRow}
+                    >
+                      <Text style={styles.waterCollapsedText}>
+                        {glasses} {glasses === 1 ? 'vaso' : 'vasos'} · desde tu reloj
+                      </Text>
+                      <Text style={styles.waterCaptionEdit}>ajustar ›</Text>
+                    </Pressable>
                   ) : (
                     <View style={styles.dropletsCompact}>
                       {Array.from({ length: waterTarget }).map((_, i) => {
@@ -802,7 +819,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                   )}
                   {/* Procedencia sutil (spec §9): los vasitos llenos vinieron de
                       Salud; se retira en cuanto ella toca uno (manual gana). */}
-                  {!editingGoal && waterFromWatch ? (
+                  {!editingGoal && waterFromWatch && waterAdjust ? (
                     <Text style={styles.waterFromWatchNote}>desde tu reloj</Text>
                   ) : null}
                   {/* El aporte de comidas: los vasitos rosa de arriba. Esta línea
@@ -1187,6 +1204,19 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
     color: 'rgba(233,30,99,0.85)',
+  },
+  // Agua del reloj recogida en una línea (modo confirmación).
+  waterCollapsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  waterCollapsedText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    letterSpacing: 0.2,
+    color: colors.leche,
   },
   // "desde tu reloj" — capa meta en niebla, junto al dato (spec wearables §5).
   waterFromWatchNote: {

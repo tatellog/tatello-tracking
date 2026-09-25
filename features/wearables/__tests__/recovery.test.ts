@@ -1,6 +1,11 @@
 import { mkSig } from '@/features/orbit/__tests__/signals.fixture'
 
-import { NO_WEARABLE_FACTS, wearableDayFacts, workoutProvenanceLine } from '../recovery'
+import {
+  arrivedSummary,
+  NO_WEARABLE_FACTS,
+  wearableDayFacts,
+  workoutProvenanceLine,
+} from '../recovery'
 
 const DAY = '2026-09-22'
 
@@ -96,5 +101,28 @@ describe('workoutProvenanceLine', () => {
       'desde tu reloj · 30 min',
     )
     expect(workoutProvenanceLine({ kcal: null, minutes: null, type: null })).toBe('desde tu reloj')
+  })
+})
+
+describe('arrivedSummary (modo confirmación de Hoy)', () => {
+  it('null sin nada; sueño · entreno · agua en orden; pasos y peso fuera', () => {
+    expect(arrivedSummary(NO_WEARABLE_FACTS)).toBeNull()
+    expect(arrivedSummary({ ...NO_WEARABLE_FACTS, steps: 9000 })).toBeNull()
+    expect(
+      arrivedSummary({
+        workout: { kcal: 300, minutes: 45, type: 'cardio' },
+        sleep: { minutes: 435 },
+        water: { glasses: 6 },
+        steps: 9000,
+      }),
+    ).toBe('7 h 15 de sueño · 45 min de entreno · 6 vasos de agua')
+    expect(
+      arrivedSummary({
+        workout: { kcal: null, minutes: null, type: null },
+        sleep: null,
+        water: { glasses: 1 },
+        steps: null,
+      }),
+    ).toBe('entreno · 1 vaso de agua')
   })
 })
