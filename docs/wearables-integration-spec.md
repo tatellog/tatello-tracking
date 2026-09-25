@@ -313,7 +313,18 @@ rls-auditor aprobada. HealthKit pide `dietaryWater`. QuickLog: vasitos nacen
 llenos + "desde tu reloj" (tocar uno escribe manual). Recompensas del
 universo y Órbita Día cuentan/marcan el agua de Salud. Pasos: `stepsRhythm`
 en `_shared/intelligence/steps.ts` (≥3 días, promedio a centenas, días que
-destacan ×1.2) y bloque "Tus pasos" en Órbita Semana. Pendiente: báscula
-(ícono en cabecera de Hoy con punto) → ciclo (solo período). Pendiente de
+destacan ×1.2) y bloque "Tus pasos" en Órbita Semana. Báscula CONSTRUIDA (25 sep 2026): opt-in con permiso de Salud aparte
+(`requestScaleAuthorization`, `bodyMass` fuera de READ_TYPES); tabla
+`wearable_weight` (última lectura del día, 20–400 kg) y view `weight_kg =
+COALESCE(manual, báscula)::numeric(5,2)` + `weight_source` (migración
+`20260925150000`, aplicada en prod; el cast preserva el typmod, hallazgo
+rls-auditor). Ícono en la cabecera de Hoy (`TabHeader.scale`) con punto
+cuando hay lectura no vista, sin número; abre `app/scale.tsx` ("Tu
+báscula": priming, encender/apagar, última lectura con "desde tu báscula",
+enlace a la tendencia). La serie de la báscula entra como relleno de menor
+prioridad en `mergeWeightSeries` (Progreso Body, tendencia, historia,
+composición, seeds de QuickLog y check-in) y en `useMacroInputs`; el TDEE
+adaptativo la recibe solo por la view. La slide "Tu peso" de Hoy sigue
+manual-only. Pendiente: ciclo (solo período). Pendiente de
 la dueña: ampliar `NSHealthShareUsageDescription` en app.json para nombrar
 el agua.

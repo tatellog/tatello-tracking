@@ -179,11 +179,20 @@ export function formatTrendCopy(trend: Trend): string {
  * (el ritual); los check-ins anclan el histórico. El suavizado 7d existente
  * absorbe el salto entre básculas. Ascendente por t.
  */
+/** Punto de la báscula (wearable_weight): un día local, la última lectura. */
+export type ScaleWeightPoint = { day_date: string; measured_at: string; weight_kg: number }
+
 export function mergeWeightSeries(
   measurements: readonly BodyMeasurement[],
   checkins: readonly BodyCheckin[],
+  scale: readonly ScaleWeightPoint[] = [],
 ): WeightPoint[] {
   const byDay = new Map<string, WeightPoint>()
+  // La báscula (spec wearables §9) va PRIMERO = menor prioridad: rellena los
+  // días sin registro propio; cualquier manual del mismo día la pisa.
+  for (const s of scale) {
+    byDay.set(s.day_date, { t: new Date(s.measured_at).getTime(), weight: s.weight_kg })
+  }
   for (const c of checkins) {
     if (c.weight_kg == null) continue
     const [y, m, d] = c.measured_on.split('-').map(Number) as [number, number, number]

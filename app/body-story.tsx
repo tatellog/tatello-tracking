@@ -23,6 +23,7 @@ import { detectMilestones } from '@/features/progress/milestones'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 /*
  * Historia de la transformación (Epic 08 · F2) — la pregunta: "¿de dónde
@@ -72,12 +73,17 @@ export default function BodyStoryScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const checkins = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
   const signals = useSignalsHistory(STORY_WINDOW_DAYS)
   const targets = useMacroTargets().data
 
   const smoothed = useMemo(
-    () => smoothWeightPoints(mergeWeightSeries(measurements.data ?? [], checkins.data ?? [])),
-    [measurements.data, checkins.data],
+    () =>
+      smoothWeightPoints(
+        mergeWeightSeries(measurements.data ?? [], checkins.data ?? [], scaleWeights.data ?? []),
+      ),
+    [measurements.data, checkins.data, scaleWeights.data],
   )
   const recovery = useMemo(() => recoveryFact(smoothed), [smoothed])
 

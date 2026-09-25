@@ -33,6 +33,7 @@ import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
+import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
 import { wearableDayFacts, workoutProvenanceLine } from '@/features/wearables/recovery'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
@@ -463,6 +464,11 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const trainedByWearable =
     !vctx.today_workout_completed && !restedToday && wearable.workout != null
 
+  // Báscula (spec §9): ícono en la cabecera solo cuando Salud existe en este
+  // build; el punto avisa de una lectura nueva. Nunca muestra el número.
+  const scaleConn = useScaleConnection()
+  const scaleBadge = useScaleBadge()
+
   // Criterio de éxito V-15 ("cero preguntas por datos que ya llegaron"): se
   // instrumenta UNA vez por día lo que el reloj pre-llenó en Hoy.
   const prefilledTracked = useRef<string | null>(null)
@@ -618,7 +624,15 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             onMomentumScrollEnd={endScroll}
           >
             <Animated.View entering={enter(40)}>
-              <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
+              <TabHeader
+                greeting={`Hola, ${greetingName}.`}
+                greetingEmphasis={greetingName}
+                scale={
+                  scaleConn.available === true
+                    ? { hasNew: scaleBadge.hasNew, onPress: () => router.push('/scale') }
+                    : null
+                }
+              />
             </Animated.View>
 
             {/* El indicador de "modo ver día" ya no vive aquí: es una pill

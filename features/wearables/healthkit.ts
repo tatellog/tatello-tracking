@@ -19,6 +19,7 @@ import { WEARABLE_BODY_COMPOSITION_ENABLED } from '@/lib/featureFlags'
 import type {
   BodyCompositionMetric,
   RawBodyComposition,
+  RawBodyMass,
   RawDailySteps,
   RawDailyWater,
   RawSleepSample,
@@ -169,6 +170,45 @@ export async function readDailySteps(from: Date, to: Date): Promise<RawDailyStep
       const steps = s.sumQuantity?.quantity
       if (steps == null || steps <= 0 || s.startDate == null) continue
       out.push({ start: new Date(s.startDate), steps })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+/* ── Báscula (spec §9) · opt-in aparte: el permiso de peso NO va en READ_TYPES.
+ *    Solo se pide cuando la usuaria enciende "Peso desde tu báscula". ── */
+const SCALE_READ_TYPES = ['HKQuantityTypeIdentifierBodyMass'] as const
+
+/** Prompt del OS SOLO para peso (lectura). Misma honestidad que arriba. */
+export async function requestScaleAuthorization(): Promise<boolean> {
+  const mod = await hk()
+  if (!mod) return false
+  try {
+    return await mod.requestAuthorization({ toRead: SCALE_READ_TYPES })
+  } catch {
+    return false
+  }
+}
+
+/** Lecturas de peso (kg) del rango: lo que la app de la báscula escribió en
+ *  Salud. Sin permiso o sin datos devuelve [] (iOS no distingue). */
+export async function readBodyMass(from: Date, to: Date): Promise<RawBodyMass[]> {
+  const mod = await hk()
+  if (!mod) return []
+  try {
+    const samples = await mod.queryQuantitySamples('HKQuantityTypeIdentifierBodyMass', {
+      filter: { date: { startDate: from, endDate: to } },
+      limit: 0,
+      ascending: true,
+      unit: 'kg',
+    })
+    const out: RawBodyMass[] = []
+    for (const s of samples) {
+      const kg = s.quantity
+      if (kg == null || !Number.isFinite(kg) || kg <= 0 || s.startDate == null) continue
+      out.push({ date: new Date(s.startDate), kg })
     }
     return out
   } catch {

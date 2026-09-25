@@ -1,5 +1,6 @@
 import {
   bodyCompositionToRows,
+  bodyMassToRows,
   dayInTimezone,
   hkActivityToWorkoutType,
   normalizeWorkout,
@@ -145,6 +146,29 @@ describe('waterToRows', () => {
     expect(rows).toEqual([
       { source: 'apple_health', day_date: '2026-07-07', water_ml: 1500 },
       { source: 'apple_health', day_date: '2026-07-08', water_ml: 10000 },
+    ])
+  })
+})
+
+describe('bodyMassToRows — última lectura del día, rango sano', () => {
+  it('toma la lectura más reciente por día local y descarta fuera de 20–400 kg', () => {
+    const rows = bodyMassToRows(
+      [
+        { date: new Date('2026-07-07T12:00:00Z'), kg: 68.45 },
+        { date: new Date('2026-07-07T13:30:00Z'), kg: 68.2 },
+        { date: new Date('2026-07-08T12:00:00Z'), kg: 5 },
+        { date: new Date('2026-07-09T12:00:00Z'), kg: 900 },
+      ],
+      TZ,
+      'apple_health',
+    )
+    expect(rows).toEqual([
+      {
+        source: 'apple_health',
+        day_date: '2026-07-07',
+        measured_at: '2026-07-07T13:30:00.000Z',
+        weight_kg: 68.2,
+      },
     ])
   })
 })

@@ -48,6 +48,14 @@ export type WearableWaterRow = {
   water_ml: number
 }
 
+/** Peso de la báscula (spec §9): un snapshot por día local, manual gana. */
+export type WearableWeightRow = {
+  source: WearableSource
+  day_date: string
+  measured_at: string
+  weight_kg: number
+}
+
 export type WearableBodyCompositionRow = {
   source: WearableSource
   day_date: string
@@ -81,6 +89,12 @@ export type RawSleepSample = {
 export type RawDailySteps = {
   start: Date
   steps: number
+}
+
+/** Una lectura de peso cruda (kg) con su instante. */
+export type RawBodyMass = {
+  date: Date
+  kg: number
 }
 
 /** Agua bebida por día (agregado de HK, ya en mililitros). */
@@ -224,6 +238,33 @@ export function waterToRows(
   }
   return [...byDay.entries()]
     .map(([day, ml]) => ({ source, day_date: day, water_ml: clamp(ml, 0, 10000) }))
+    .sort((a, b) => a.day_date.localeCompare(b.day_date))
+}
+
+/**
+ * Lecturas de peso → una fila por DÍA LOCAL con la lectura MÁS RECIENTE del
+ * día (la báscula puede pesar varias veces; el último snapshot manda, igual
+ * que body_measurements en la view). Rango sano 20–400 kg; fuera, se descarta.
+ */
+export function bodyMassToRows(
+  samples: readonly RawBodyMass[],
+  tz: string,
+  source: WearableSource,
+): WearableWeightRow[] {
+  const byDay = new Map<string, RawBodyMass>()
+  for (const s of samples) {
+    if (!Number.isFinite(s.kg) || s.kg < 20 || s.kg > 400) continue
+    const day = dayInTimezone(s.date, tz)
+    const prev = byDay.get(day)
+    if (!prev || s.date.getTime() > prev.date.getTime()) byDay.set(day, s)
+  }
+  return [...byDay.entries()]
+    .map(([day, s]) => ({
+      source,
+      day_date: day,
+      measured_at: s.date.toISOString(),
+      weight_kg: round1(s.kg),
+    }))
     .sort((a, b) => a.day_date.localeCompare(b.day_date))
 }
 

@@ -1294,6 +1294,39 @@ export type Database = {
         }
         Relationships: []
       }
+      wearable_weight: {
+        Row: {
+          created_at: string
+          day_date: string
+          id: string
+          measured_at: string
+          source: string
+          updated_at: string
+          user_id: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          day_date: string
+          id?: string
+          measured_at: string
+          source: string
+          updated_at?: string
+          user_id: string
+          weight_kg: number
+        }
+        Update: {
+          created_at?: string
+          day_date?: string
+          id?: string
+          measured_at?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+          weight_kg?: number
+        }
+        Relationships: []
+      }
       wearable_workouts: {
         Row: {
           created_at: string
@@ -1455,6 +1488,7 @@ export type Database = {
           water_glasses: number | null
           water_source: string | null
           weight_kg: number | null
+          weight_source: string | null
           wellbeing_checkins: number | null
           workout_kcal: number | null
           workout_minutes: number | null

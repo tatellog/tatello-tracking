@@ -18,6 +18,7 @@ import { useProfile } from '@/features/profile/hooks'
 import { SkyBackground } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 /*
  * Nueva medición · UN SOLO CANVAS (rediseño v3 · brief dueña 14 jul 2026):
@@ -298,6 +299,8 @@ export default function LogCheckinScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const { data: checkins } = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
   // La rueda de peso también se siembra con los pesajes RÁPIDOS (✦): serie
   // fusionada, no solo check-ins (consolidación de puertas · uxui).
   const { data: quickWeights } = useMeasurements(null)
@@ -359,9 +362,13 @@ export default function LogCheckinScreen() {
   // fuentes (check-ins + pesajes rápidos).
   const lastKnownWeight = useMemo(() => {
     const cutoff = new Date(`${date}T23:59:59`).getTime()
-    const pts = mergeWeightSeries(quickWeights ?? [], checkins ?? []).filter((pt) => pt.t <= cutoff)
+    const pts = mergeWeightSeries(
+      quickWeights ?? [],
+      checkins ?? [],
+      scaleWeights.data ?? [],
+    ).filter((pt) => pt.t <= cutoff)
     return pts.length > 0 ? (pts[pts.length - 1]?.weight ?? null) : null
-  }, [quickWeights, checkins, date])
+  }, [quickWeights, checkins, scaleWeights.data, date])
 
   const seedFor = (m: MetricDef): number => {
     const manual = Number(values[m.key])

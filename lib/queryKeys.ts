@@ -177,6 +177,13 @@ export const queryKeys = {
     priorFindings: (uid: string, before: string) =>
       ['orbit', 'priorFindings', uid, before] as const,
   },
+  wearables: {
+    all: ['wearables'] as const,
+    // La lectura más reciente de la báscula (ícono de Hoy + pantalla Tu báscula).
+    latestWeight: (uid: string) => ['wearables', 'latestWeight', uid] as const,
+    // Toda la serie de la báscula (Progreso la fusiona con lo manual).
+    weights: (uid: string) => ['wearables', 'weights', uid] as const,
+  },
   experiments: {
     all: ['experiments'] as const,
     // El experimento ACTIVO de una usuaria (≤1 por diseño). Scopeado por uid.

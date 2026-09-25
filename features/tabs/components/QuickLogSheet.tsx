@@ -57,6 +57,7 @@ import { wearableDayFacts } from '@/features/wearables/recovery'
 import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 import { IgnitionBurst, IGNITION_LIFETIME_MS } from './IgnitionBurst'
 import { MealCard } from './MealCard'
@@ -437,10 +438,12 @@ export function QuickLogSheet({ visible, onClose }: Props) {
   // guardado vía Nueva medición también re-siembra esta rueda (consolidación
   // de puertas · uxui 14 jul 2026).
   const { data: bodyCheckins } = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
   const latestWeight = useMemo(() => {
-    const pts = mergeWeightSeries(measurements ?? [], bodyCheckins ?? [])
+    const pts = mergeWeightSeries(measurements ?? [], bodyCheckins ?? [], scaleWeights.data ?? [])
     return pts.length > 0 ? (pts[pts.length - 1]?.weight ?? null) : null
-  }, [measurements, bodyCheckins])
+  }, [measurements, bodyCheckins, scaleWeights.data])
 
   useEffect(() => {
     if (!visible) {

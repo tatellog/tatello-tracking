@@ -8,7 +8,7 @@
  * aterriza horas después) completa solo, sin background delivery (spec §5).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 
@@ -18,23 +18,29 @@ import { queryKeys } from '@/lib/queryKeys'
 import { userTimezone } from '@/lib/time'
 
 import {
+  getLatestWearableWeight,
+  getWearableWeights,
   upsertWearableBodyComposition,
   upsertWearableSleep,
   upsertWearableSteps,
   upsertWearableWater,
+  upsertWearableWeight,
   upsertWearableWorkouts,
 } from './api'
 import {
   isHealthKitAvailable,
   readBodyComposition,
+  readBodyMass,
   readDailySteps,
   readDailyWater,
   readSleepSamples,
   readWorkouts,
   requestHealthKitAuthorization,
+  requestScaleAuthorization,
 } from './healthkit'
 import {
   bodyCompositionToRows,
+  bodyMassToRows,
   normalizeWorkout,
   sleepSamplesToRows,
   stepsToRows,
@@ -45,6 +51,14 @@ import {
  * teléfono no heredan la conexión de la otra. */
 const connectedKey = (userId: string) => `stelar.wearables.apple_health.connected:${userId}`
 const lastSyncKey = (userId: string) => `stelar.wearables.apple_health.last_sync:${userId}`
+/* Báscula (spec §9): opt-in aparte del canal, con su propio permiso de Salud. */
+const scaleEnabledKey = (userId: string) => `stelar.wearables.scale.enabled:${userId}`
+/* Última lectura de la báscula que la usuaria YA VIO (para el punto del ícono). */
+const scaleSeenKey = (userId: string) => `stelar.wearables.scale.seen_at:${userId}`
+
+async function isScaleEnabled(userId: string): Promise<boolean> {
+  return (await AsyncStorage.getItem(scaleEnabledKey(userId)).catch(() => null)) === 'true'
+}
 
 /** Ventana de re-consulta en cada apertura (dato tardío + correcciones). */
 const SYNC_WINDOW_DAYS = 7
@@ -60,11 +74,15 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * `windowDays`. Devuelve los conteos escritos, o null si el canal no está
  * disponible. Nunca lanza: un sync fallido jamás rompe la app.
  */
-export async function syncAppleHealth(windowDays: number): Promise<{
+export async function syncAppleHealth(
+  windowDays: number,
+  opts: { scale?: boolean } = {},
+): Promise<{
   workouts: number
   sleepDays: number
   stepDays: number
   waterDays: number
+  weightDays: number
   bodyDays: number
 } | null> {
   try {
@@ -74,23 +92,26 @@ export async function syncAppleHealth(windowDays: number): Promise<{
     const tz = userTimezone()
 
     // readBodyComposition ya se auto-gatea por WEARABLE_BODY_COMPOSITION_ENABLED
-    // (devuelve [] con el flag OFF → no lee ni pide permiso).
-    const [rawWorkouts, rawSleep, rawSteps, rawWater, rawBody] = await Promise.all([
+    // (devuelve [] con el flag OFF → no lee ni pide permiso). El peso de la
+    // báscula solo se lee con el opt-in encendido (spec §9).
+    const [rawWorkouts, rawSleep, rawSteps, rawWater, rawWeight, rawBody] = await Promise.all([
       readWorkouts(from, to),
       readSleepSamples(from, to),
       readDailySteps(from, to),
       readDailyWater(from, to),
+      opts.scale ? readBodyMass(from, to) : Promise.resolve([]),
       readBodyComposition(from, to),
     ])
 
-    const [workouts, sleepDays, stepDays, waterDays, bodyDays] = await Promise.all([
+    const [workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays] = await Promise.all([
       upsertWearableWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health'))),
       upsertWearableSleep(sleepSamplesToRows(rawSleep, tz, 'apple_health')),
       upsertWearableSteps(stepsToRows(rawSteps, tz, 'apple_health')),
       upsertWearableWater(waterToRows(rawWater, tz, 'apple_health')),
+      upsertWearableWeight(bodyMassToRows(rawWeight, tz, 'apple_health')),
       upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, 'apple_health')),
     ])
-    return { workouts, sleepDays, stepDays, waterDays, bodyDays }
+    return { workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays }
   } catch {
     return null
   }
@@ -168,14 +189,20 @@ export function useAppleHealthConnection(): {
       setConnected(true)
       track('wearable_connected', { source: 'apple_health' })
 
-      const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS)
+      const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS, {
+        scale: await isScaleEnabled(userId),
+      })
       if (counts) {
         const now = new Date().toISOString()
         await AsyncStorage.setItem(lastSyncKey(userId), now).catch(() => {})
         setLastSyncAt(now)
         track('wearable_sync', { source: 'apple_health', initial: true, ...counts })
-        if (counts.workouts + counts.sleepDays + counts.waterDays > 0) {
+        if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
           void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
+        }
+        if (counts.weightDays > 0) {
+          void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
+          void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
         }
       }
       return true
@@ -214,12 +241,18 @@ export function useAppleHealthSync(): void {
       const last = await AsyncStorage.getItem(lastSyncKey(userId)).catch(() => null)
       if (last && Date.now() - new Date(last).getTime() < MIN_SYNC_INTERVAL_MS) return
 
-      const counts = await syncAppleHealth(SYNC_WINDOW_DAYS)
+      const counts = await syncAppleHealth(SYNC_WINDOW_DAYS, {
+        scale: await isScaleEnabled(userId),
+      })
       if (!counts) return
       await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
       track('wearable_sync', { source: 'apple_health', initial: false, ...counts })
-      if (counts.workouts + counts.sleepDays + counts.waterDays > 0) {
+      if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
         void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
+      }
+      if (counts.weightDays > 0) {
+        void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
+        void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
       }
     } finally {
       syncing.current = false
@@ -280,4 +313,145 @@ export function useWearableInvite(): {
     show: available === true && connected === false && dismissed === false,
     dismiss,
   }
+}
+
+/* ── Báscula (spec §9 · decisión dueña: opt-in, ícono en Hoy con punto) ──── */
+
+/**
+ * Opt-in de la báscula. `enable` pide el permiso de peso de Salud (aparte del
+ * canal) y corre un backfill de 30 días; `disable` deja de leer, lo escrito se
+ * queda. Requiere Apple Health conectado: sin canal no hay báscula.
+ */
+export function useScaleConnection(): {
+  available: boolean | null
+  enabled: boolean | null
+  busy: boolean
+  enable: () => Promise<boolean>
+  disable: () => Promise<void>
+} {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? null
+  const qc = useQueryClient()
+  const [available, setAvailable] = useState<boolean | null>(null)
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void isHealthKitAvailable().then((ok) => {
+      if (!cancelled) setAvailable(ok)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    void isScaleEnabled(userId).then((on) => {
+      if (!cancelled) setEnabled(on)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  const enable = useCallback(async (): Promise<boolean> => {
+    if (!userId || busy) return false
+    setBusy(true)
+    try {
+      const granted = await requestScaleAuthorization()
+      if (!granted) {
+        track('scale_enable_failed', { source: 'apple_health' })
+        return false
+      }
+      await AsyncStorage.setItem(scaleEnabledKey(userId), 'true').catch(() => {})
+      // El canal queda conectado también (la báscula vive dentro de Salud).
+      await AsyncStorage.setItem(connectedKey(userId), 'true').catch(() => {})
+      setEnabled(true)
+      track('scale_enabled', { source: 'apple_health' })
+      const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS, { scale: true })
+      if (counts) {
+        track('wearable_sync', { source: 'apple_health', initial: true, ...counts })
+        void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
+        void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+        void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
+      }
+      return true
+    } finally {
+      setBusy(false)
+    }
+  }, [userId, busy, qc])
+
+  const disable = useCallback(async (): Promise<void> => {
+    if (!userId) return
+    await AsyncStorage.setItem(scaleEnabledKey(userId), 'false').catch(() => {})
+    setEnabled(false)
+    track('scale_disabled', { source: 'apple_health' })
+  }, [userId])
+
+  return { available, enabled, busy, enable, disable }
+}
+
+/** La lectura más reciente de la báscula (null si nunca llegó nada). */
+export function useLatestWearableWeight(enabled = true) {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? ''
+  return useQuery({
+    queryKey: queryKeys.wearables.latestWeight(userId),
+    queryFn: getLatestWearableWeight,
+    enabled: enabled && userId !== '',
+    staleTime: 60_000,
+  })
+}
+
+/** Toda la serie de la báscula. Vacía (no error) si el opt-in nunca se encendió. */
+export function useWearableWeights() {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? ''
+  return useQuery({
+    queryKey: queryKeys.wearables.weights(userId),
+    queryFn: getWearableWeights,
+    enabled: userId !== '',
+    staleTime: 5 * 60_000,
+  })
+}
+
+/**
+ * El punto del ícono de la báscula en Hoy: hay una lectura que la usuaria aún
+ * no vio. `markSeen` lo apaga (se llama al abrir "Tu báscula"). El ícono
+ * NUNCA muestra el número (manifiesto: el peso no vive en Hoy).
+ */
+export function useScaleBadge(): { hasNew: boolean; markSeen: () => void } {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? null
+  const latest = useLatestWearableWeight(userId != null)
+  const [seenAt, setSeenAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    void AsyncStorage.getItem(scaleSeenKey(userId))
+      .then((v) => {
+        if (!cancelled) setSeenAt(v ?? '')
+      })
+      .catch(() => {
+        if (!cancelled) setSeenAt('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  const latestAt = latest.data?.measured_at ?? null
+  const hasNew = latestAt != null && seenAt != null && latestAt > seenAt
+
+  const markSeen = useCallback(() => {
+    if (!userId || !latestAt) return
+    setSeenAt(latestAt)
+    void AsyncStorage.setItem(scaleSeenKey(userId), latestAt).catch(() => {})
+  }, [userId, latestAt])
+
+  return { hasNew, markSeen }
 }
