@@ -37,6 +37,10 @@ function landFactory(router: ReturnType<typeof useRouter>) {
       router.navigate('/(tabs)/orbit')
     } else if (target === 'hoy') {
       router.navigate('/(tabs)')
+    } else if (target === 'weekly-reading') {
+      // N8 promete la lectura → aterriza EN /weekly-reading (la pantalla
+      // misma marca opened_at y emite insight_opened al mostrarla).
+      router.navigate('/weekly-reading')
     } else {
       // Sin target (notificación vieja o ajena): no navegar a ciegas, no
       // contaminar la telemetría del canal.

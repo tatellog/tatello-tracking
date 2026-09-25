@@ -25,6 +25,7 @@ import Svg, {
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 import { LinkCta } from './LinkCta'
 
@@ -101,10 +102,16 @@ export function TransformationHero() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const checkins = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
 
   const hero = useMemo(() => {
     // UNA sola serie (app + coach): arranca en tu primera medición real.
-    const fused = mergeWeightSeries(measurements.data ?? [], checkins.data ?? [])
+    const fused = mergeWeightSeries(
+      measurements.data ?? [],
+      checkins.data ?? [],
+      scaleWeights.data ?? [],
+    )
     const smoothed = smoothWeightPoints(fused)
     const first = smoothed[0]
     const last = smoothed[smoothed.length - 1]
@@ -145,7 +152,7 @@ export function TransformationHero() {
       recovery,
       sparkTs,
     }
-  }, [measurements.data, checkins.data])
+  }, [measurements.data, checkins.data, scaleWeights.data])
 
   // Geometría por modo: la FORMA del arco corresponde a la historia.
   const geom = useMemo<ArcGeom | null>(() => {

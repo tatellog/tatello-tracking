@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
-import { toWeightPoints } from '@/features/progress/logic'
+import { mergeWeightSeries } from '@/features/progress/logic'
 import { todayInTimezone } from '@/lib/time'
 
 import { adaptiveTdee, type AdaptiveTdee } from './adaptive-tdee'
@@ -12,6 +12,7 @@ import { clearVisitedDayOne } from '@/lib/onboardingFlags'
 import { queryPersister } from '@/lib/queryClient'
 import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 import {
   deleteAccount,
@@ -55,11 +56,14 @@ export function useProfile() {
 export function useMacroInputs(): { inputs: MacroInputs; isLoading: boolean } {
   const profile = useProfile()
   const measurements = useMeasurements(null)
+  // Báscula (spec wearables §9): el último peso también puede venir de Salud;
+  // el manual del mismo día gana.
+  const scaleWeights = useWearableWeights()
 
   const latestWeight = useMemo(() => {
-    const points = toWeightPoints(measurements.data ?? [])
+    const points = mergeWeightSeries(measurements.data ?? [], [], scaleWeights.data ?? [])
     return points.at(-1)?.weight ?? null
-  }, [measurements.data])
+  }, [measurements.data, scaleWeights.data])
 
   // The profile columns are enum-constrained in the DB but generated as
   // plain strings; cast to the engine's narrowed types at this seam.

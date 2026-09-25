@@ -36,6 +36,7 @@ import {
 } from '@/features/progress/logic'
 import { CoachLine, PrimaryCta, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 // `ALL` (not `TODO`) for the "todo el historial" option — the all-caps
 // Spanish word read as a dev-leftover marker in grep + tripped code
@@ -135,17 +136,23 @@ function ProgressBody() {
   }, [])
   const measurementsQuery = useMeasurements(null)
   const checkinsQuery = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
   const { data: profile } = useProfile()
 
   // UNA sola serie de peso (app + check-ins del coach) — la misma verdad que el
   // hero. El periodo se recorta client-side sobre la serie fusionada.
   const points = useMemo(() => {
-    const fused = mergeWeightSeries(measurementsQuery.data ?? [], checkinsQuery.data ?? [])
+    const fused = mergeWeightSeries(
+      measurementsQuery.data ?? [],
+      checkinsQuery.data ?? [],
+      scaleWeights.data ?? [],
+    )
     const days = PERIOD_DAYS[period]
     if (days == null) return fused
     const since = Date.now() - days * 24 * 60 * 60 * 1000
     return fused.filter((p) => p.t >= since)
-  }, [measurementsQuery.data, checkinsQuery.data, period])
+  }, [measurementsQuery.data, checkinsQuery.data, scaleWeights.data, period])
   // Weight is shown smoothed — a trailing 7-day moving average — so a
   // single noisy weigh-in never becomes the trend, the delta or the
   // headline number. The raw `points` are kept only for the count.
@@ -165,7 +172,11 @@ function ProgressBody() {
   const targets = useMacroTargets().data
   const signals30 = useSignalsHistory(30)
   const plateauNote = useMemo(() => {
-    const fused = mergeWeightSeries(measurementsQuery.data ?? [], checkinsQuery.data ?? [])
+    const fused = mergeWeightSeries(
+      measurementsQuery.data ?? [],
+      checkinsQuery.data ?? [],
+      scaleWeights.data ?? [],
+    )
     const since = Date.now() - 30 * 24 * 60 * 60 * 1000
     const smoothed30 = smoothWeightPoints(fused.filter((p) => p.t >= since))
     const d = computeDelta(smoothed30)
@@ -179,7 +190,13 @@ function ProgressBody() {
     // déficit no se nombra como esfuerzo.
     if (summary == null || summary.deficitDays < 3) return null
     return `La báscula casi no se movió estos 30 días. Tus ${summary.deficitDays} días en déficit sí quedaron registrados.`
-  }, [measurementsQuery.data, checkinsQuery.data, signals30.data, targets?.calories])
+  }, [
+    measurementsQuery.data,
+    checkinsQuery.data,
+    scaleWeights.data,
+    signals30.data,
+    targets?.calories,
+  ])
 
   // Cycle phase — used to caption the weight chart so a luteal
   // water-weight bump reads as biology, not regression. (Único hogar del

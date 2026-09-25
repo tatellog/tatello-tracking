@@ -12,7 +12,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { Gesture, GestureDetector, type NativeGesture } from 'react-native-gesture-handler'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   Easing,
   Extrapolation,
@@ -42,9 +42,6 @@ import {
 } from '@/features/cycle/components/CycleTimeline'
 import { PHASE_LABEL, type CyclePhase } from '@/features/cycle/phase'
 import { useCyclePhase } from '@/features/cycle/useCyclePhase'
-import type { MoodValue } from '@/features/moods/api'
-import { DailyNoteInline } from '@/features/moods/components/DailyNoteInline'
-import { MoodSliderInline } from '@/features/moods/components/MoodSliderInline'
 import { enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
 import { useMeasurements } from '@/features/progress/hooks'
@@ -66,13 +63,6 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 // affordance. Slides are this much narrower than the viewport.
 const SLIDE_PEEK = 22
 
-// Etiquetas del resumen colapsado (mismo vocabulario del slider de ánimo).
-const MOOD_SUMMARY_LABEL: Record<MoodValue, string> = {
-  struggle: 'Difícil',
-  neutral: 'Neutral',
-  good: 'Bien',
-}
-
 type Props = {
   ctx: BriefContext
   /** Slide id to auto-scroll to when set (e.g. 'sleep', 'wellbeing',
@@ -87,6 +77,14 @@ type Props = {
    *  the vertical-scroll pause doesn't fire for a sideways drag, so without
    *  this the swipe competed with all the cosmos animation and felt slow. */
   onSwipeStateChange?: (active: boolean) => void
+  /** V-15 Smart Recovery: minutos de sueño que llegaron del reloj SIN registro
+   *  manual encima (null si nada llegó). La slide de sueño nace llena con su
+   *  procedencia y el colapso de rituales lo cuenta como ritual cumplido. */
+  wearableSleepMinutes?: number | null
+  /** Modo confirmación (spec §9): la noche ya vive en la línea "Tu reloj ya
+   *  anotó" de Hoy → la slide de sueño sale del pager y el colapso de rituales
+   *  solo necesita el ánimo. Vuelve al abrir "ajustar". */
+  hideSleepSlide?: boolean
 }
 
 /**
@@ -97,14 +95,22 @@ type Props = {
  * weight are read-only views. Pagination dots track the position;
  * the title cross-fades as the slider pages.
  */
-export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
+export function StatSlider({
+  ctx,
+  targetSlide,
+  onSwipeStateChange,
+  wearableSleepMinutes = null,
+  hideSleepSlide = false,
+}: Props) {
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState(0)
-  // Un slide con arrastre horizontal propio (el slider de ánimo) bloquea el
-  // pager mientras dura su gesto, si no ambos compiten por el swipe horizontal.
-  const [pagerEnabled, setPagerEnabled] = useState(true)
+  // Un slide con arrastre horizontal propio bloquea el pager mientras dura su
+  // gesto, si no ambos compiten por el swipe horizontal. (Hoy ninguna slide lo
+  // usa: el slider de ánimo se retiró en sep 2026; el gancho queda para el
+  // siguiente control con arrastre.)
+  const [pagerEnabled] = useState(true)
 
-  // Gesto NATIVO del scroll del pager. El slider de ánimo hace
+  // Gesto NATIVO del scroll del pager. Un control con Pan propio hace
   // `blocksExternalGesture(pagerNative)` → cuando su Pan se activa (arrastre
   // horizontal), bloquea el scroll del carrusel de forma NATIVA (sin el race del
   // toggle scrollEnabled, que dejaba que el swipe robara el arrastre del mood).
@@ -170,9 +176,14 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // incluidos). Antes de registrar, el pager invita como siempre — el
   // colapso es el premio de silencio por haber cumplido el ritual.
   const sleepToday = useSleepLog(ctx.date)
-  const moodToday =
-    ctx.latest_mood?.checkin_date === ctx.date ? (ctx.latest_mood.value as MoodValue) : null
-  const ritualsDone = moodToday != null && sleepToday.data?.duration_minutes != null
+  // Manual gana; si no hay manual, la noche del reloj cuenta como ritual hecho
+  // (V-15: no pedir lo que ya llegó).
+  const sleepMinutesToday = sleepToday.data?.duration_minutes ?? wearableSleepMinutes ?? null
+  const sleepFromWatch = sleepToday.data?.duration_minutes == null && wearableSleepMinutes != null
+  // Sin el ánimo (retirado sep 2026, "registro cero"), el ritual de la mañana
+  // es solo el sueño. Si la noche ya vive en la línea "Tu reloj ya anotó", el
+  // pager no se colapsa (colapsaría sobre nada).
+  const ritualsDone = !hideSleepSlide && sleepMinutesToday != null
   const [expanded, setExpanded] = useState(false)
   // Otro día (navegación o medianoche) → vuelve al estado natural del día.
   useEffect(() => setExpanded(false), [ctx.date])
@@ -196,24 +207,15 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   // may already be paged to (keeps scrollX / active in sync).
   const slides: { id: string; title: string; node: ReactNode }[] = [
     { id: 'macros', title: 'Macros de hoy', node: <MacroSlide ctx={ctx} /> },
-    { id: 'sleep', title: 'Sueño de anoche', node: <SleepSlide date={ctx.date} /> },
-    {
-      id: 'wellbeing',
-      title: 'Cómo amaneciste',
-      node: (
-        <WellbeingSlide
-          date={ctx.date}
-          onLockPager={(locked) => setPagerEnabled(!locked)}
-          pagerGesture={pagerNative}
-          // wellbeing es SIEMPRE el índice 2 (macros·sleep·wellbeing van fijos al
-          // frente). Con scrollX+índice+ancho el mood decide solo si está centrada:
-          // así su track no roba el swipe cuando solo asoma en el peek de otra slide.
-          scrollX={scrollX}
-          slideIndex={2}
-          slideW={slideW}
-        />
-      ),
-    },
+    ...(hideSleepSlide
+      ? []
+      : [
+          {
+            id: 'sleep',
+            title: 'Sueño de anoche',
+            node: <SleepSlide date={ctx.date} wearableMinutes={wearableSleepMinutes} />,
+          },
+        ]),
     ...(cycle ? [{ id: 'cycle', title: 'Tu ciclo', node: <CycleSlide cycle={cycle} /> }] : []),
     // Peso al final: es la tendencia lenta, no un ritual diario → cierra el pager.
     { id: 'weight', title: 'Tu peso', node: <WeightSlide ctx={ctx} /> },
@@ -272,20 +274,19 @@ export function StatSlider({ ctx, targetSlide, onSwipeStateChange }: Props) {
   }
 
   if (ritualsDone && !expanded) {
-    const mins = sleepToday.data?.duration_minutes ?? 0
+    const mins = sleepMinutesToday ?? 0
     const hours = (mins / 60).toFixed(mins % 60 === 0 ? 0 : 1)
-    const moodLabel = MOOD_SUMMARY_LABEL[moodToday]
     return (
       <Pressable
         onPress={openPager}
         accessibilityRole="button"
-        accessibilityLabel={`Rituales del día: ánimo ${moodLabel}, dormiste ${hours} horas. Toca para abrir el detalle.`}
+        accessibilityLabel={`Dormiste ${hours} horas${sleepFromWatch ? ' según tu reloj' : ''}. Toca para abrir el detalle.`}
         style={({ pressed }) => pressed && styles.collapsedPressed}
       >
         <View style={styles.collapsedRow}>
           <Text style={styles.collapsedText} numberOfLines={1}>
-            Ánimo: <Text style={styles.collapsedValue}>{moodLabel}</Text> · Dormiste{' '}
-            <Text style={styles.collapsedValue}>{hours} h</Text>
+            Dormiste <Text style={styles.collapsedValue}>{hours} h</Text>
+            {sleepFromWatch ? ' · tu reloj' : ''}
           </Text>
           <Text style={styles.collapsedChevron}>›</Text>
         </View>
@@ -763,9 +764,12 @@ function StepButton({
  * local state — the query only seeds them — so the UI is instant and
  * each change upserts in the background.
  */
-function SleepSlide({ date }: { date: string }) {
+function SleepSlide({ date, wearableMinutes }: { date: string; wearableMinutes: number | null }) {
   const { data: log, isLoading } = useSleepLog(date)
   const upsert = useUpsertSleep(date)
+  // V-15: sin fila manual, la noche del reloj siembra el draft y la slide nace
+  // registrada (con procedencia). Tocar − / + escribe manual → manual gana.
+  const fromWatch = log?.duration_minutes == null && wearableMinutes != null
 
   const [draft, setDraft] = useState<SleepDraft | null>(null)
   const [touched, setTouched] = useState(false)
@@ -779,17 +783,18 @@ function SleepSlide({ date }: { date: string }) {
   useEffect(() => {
     if (isLoading || touched) return
     setDraft({
-      durationMinutes: log?.duration_minutes ?? SLEEP_DEFAULT_MIN,
+      durationMinutes: log?.duration_minutes ?? wearableMinutes ?? SLEEP_DEFAULT_MIN,
       quality: log?.quality ?? null,
     })
-  }, [isLoading, log, touched])
+  }, [isLoading, log, touched, wearableMinutes])
 
   if (draft == null) {
     return <View style={[styles.slide, styles.card]} />
   }
 
-  // A row exists once the night is logged or the user has touched it.
-  const hasEntry = log != null || touched
+  // A row exists once the night is logged, the watch brought it, or the
+  // user has touched it.
+  const hasEntry = log != null || touched || fromWatch
   const h = Math.floor(draft.durationMinutes / 60)
   const m = draft.durationMinutes % 60
   const quality = qualityFromDuration(draft.durationMinutes)
@@ -861,54 +866,9 @@ function SleepSlide({ date }: { date: string }) {
         ) : (
           <Text style={styles.captionLine}>
             Sueño <Text style={styles.captionEm}>{QUALITY_WORDS[quality - 1]}</Text>
+            {fromWatch && !touched ? ' · desde tu reloj' : ''}
           </Text>
         )}
-      </View>
-    </View>
-  )
-}
-
-/* ─── Slide — this morning's check-in ──────────────────────────────── */
-
-/*
- * This morning's check-in — el ánimo (MoodSliderInline, 1 eje) + una NOTA
- * libre opcional (daily_notes). Reemplazó el detalle de energía/motivación/
- * calma (3 ejes): decisión de producto (jul 2026) — la usuaria escribe una
- * nota en vez de calificar 3 escalas. Nota: Órbita ya no recibe energía/mente
- * desde esta tarjeta.
- */
-function WellbeingSlide({
-  date,
-  onLockPager,
-  pagerGesture,
-  scrollX,
-  slideIndex,
-  slideW,
-}: {
-  date: string
-  onLockPager?: (locked: boolean) => void
-  pagerGesture?: NativeGesture
-  /** Para gatear el gesto del mood a "slide centrada" (ver MoodSliderInline). */
-  scrollX?: SharedValue<number>
-  slideIndex?: number
-  slideW?: number
-}) {
-  return (
-    <View style={styles.slide}>
-      <View style={[styles.card, styles.wellbeingCard]}>
-        {/* Ánimo (1 eje) — el registro primario, MISMO gesto que Órbita. */}
-        <MoodSliderInline
-          date={date}
-          onDragActive={onLockPager}
-          pagerGesture={pagerGesture}
-          scrollX={scrollX}
-          slideIndex={slideIndex}
-          slideW={slideW}
-        />
-
-        {/* Nota libre del día (daily_notes) — SIEMPRE visible, reemplaza el
-            detalle de energía/motivación/calma. */}
-        <DailyNoteInline date={date} />
       </View>
     </View>
   )
@@ -1255,9 +1215,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   // ── Wellbeing slide ────────────────────────────────────────────
-  wellbeingCard: {
-    gap: 13,
-  },
   // ── Cycle slide ────────────────────────────────────────────────
   // The dial holds the day number stacked at its centre.
   // Cycle slide chrome lives in features/cycle/components/CycleTimeline

@@ -10,9 +10,13 @@ import Svg, {
   Stop as SvgStop,
 } from 'react-native-svg'
 
+import { useRouter } from 'expo-router'
+
 import { EmText } from '@/components/EmText'
 import { usePressFeedback } from '@/components/ui/interaction'
 import { useMacroTargets } from '@/features/macros/hooks'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, typography } from '@/theme'
 
 import { WEEK_BASELINE_COPY, weekBaselineObservations } from '../baseline'
@@ -42,6 +46,8 @@ import {
   type WeekLever,
 } from '../week-orbit-logic'
 import { consumeWeekFocus } from '../pending-week-focus'
+import { stepsRhythm } from '../steps'
+import { useWeeklyReading } from '../weekly-reading-hooks'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { WeekOrbitGalaxy } from './WeekOrbitGalaxy'
 import { WeekProgressHero } from './WeekProgressHero'
@@ -141,6 +147,12 @@ export function WeekSegment({
     [seal, week, ctx],
   )
   const emerging = useMemo(() => emergingEvidence(week, todayIso, ctx), [week, todayIso, ctx])
+  // Pasos del reloj (spec wearables §9): ritmo por día de semana + promedio como
+  // evidencia. Sin meta ni contador diario; calla sin 3 días de dato.
+  const steps = useMemo(
+    () => stepsRhythm(signals ?? [], mondayOf(todayIso), todayIso),
+    [signals, todayIso],
+  )
   // Baseline "esta semana vs tu costumbre" (sueño, energía) — necesita historial
   // más largo que la ventana de 2 semanas; el detector filtra a los días previos
   // al lunes de esta semana. Comparación SIEMPRE contigo misma (Apple "Typical").
@@ -155,6 +167,15 @@ export function WeekSegment({
   const timeline = useMemo(() => dayTimeline(week, todayIso, ctx), [week, todayIso, ctx])
   const lever = useMemo(() => weekLever(week, todayIso, ctx), [week, todayIso, ctx])
   const absences = useMemo(() => weekAbsences(week, todayIso), [week, todayIso])
+
+  // Tu lectura semanal (V-06) — DOBLE-gateada (flag + dev) mientras se
+  // valida. Sin lectura (null = silencio honesto del motor) no hay card.
+  const router = useRouter()
+  const { session } = useSession()
+  const readingOn = WEEKLY_READING_ENABLED && aiEnabledForEmail(session?.user?.email)
+  const weeklyReadingQ = useWeeklyReading(readingOn)
+  const weeklyReading = weeklyReadingQ.data?.reading ?? null
+  const weeklyReadingOpened = weeklyReadingQ.data?.openedAt != null
 
   const hasEvidence = dims.some((d) => d.present > 0)
   // La galaxia muestra solo señales con presencia; las que nunca aparecieron
@@ -237,6 +258,28 @@ export function WeekSegment({
           <WeekSilhouette cells={sealCells} />
           <Text style={styles.sealObservation}>{seal.observation}</Text>
           <Text style={styles.sealBridge}>Una semana nueva se abre.</Text>
+        </View>
+      ) : null}
+
+      {/* Tu lectura semanal (V-06) — el momento donde el motor te devuelve
+          algo de la semana cerrada. Determinístico: SIN ✦. Borde oro
+          mientras no se abre; ya abierta, queda como link tranquilo. */}
+      {weeklyReading ? (
+        <View style={[styles.readingCard, !weeklyReadingOpened && styles.readingCardNew]}>
+          <Pressable
+            onPress={() => router.push('/weekly-reading')}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir tu lectura semanal"
+            style={({ pressed }) => pressed && { opacity: 0.85 }}
+          >
+            <Text style={styles.sealEyebrow}>Tu lectura semanal</Text>
+            <Text style={styles.readingTitle}>
+              {weeklyReadingOpened ? 'Tu semana pasada, leída.' : 'Tu lectura está lista.'}
+            </Text>
+            <Text style={[styles.readingLink, { color: colors.oro }]}>
+              {weeklyReadingOpened ? 'Volver a leerla ›' : 'Abrirla ›'}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -381,6 +424,25 @@ export function WeekSegment({
                   </Animated.View>
                 ))}
               </View>
+            </View>
+          ) : null}
+
+          {/* Tus pasos (spec wearables §9) — la única superficie de los pasos:
+              qué días te moviste más y tu promedio, desde tu reloj. Nunca una
+              meta (nada de 10,000) ni un contador del día. */}
+          {steps ? (
+            <View style={styles.block}>
+              <Text style={styles.sectionEyebrow}>Tus pasos</Text>
+              <Animated.View entering={FadeIn.duration(360)} style={styles.list}>
+                <Text style={styles.listText}>
+                  {steps.topDays.length > 0
+                    ? `Tus días de más movimiento: ${steps.topDays.join(' y ')}.`
+                    : 'Tu movimiento fue parejo esta semana.'}
+                </Text>
+                <Text style={styles.stepsMeta}>
+                  {`Promedio ${steps.avgSteps.toLocaleString('es-MX')} pasos al día · tu reloj`}
+                </Text>
+              </Animated.View>
             </View>
           ) : null}
 
@@ -877,6 +939,32 @@ const styles = StyleSheet.create({
     borderColor: colors.oroHairline,
     backgroundColor: colors.bgCard,
   },
+  // Tu lectura semanal — misma vestimenta que el sello (son la pareja del
+  // lunes); el borde oro solo mientras está sin abrir.
+  readingCard: {
+    marginBottom: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  readingCardNew: {
+    borderColor: colors.oroHairline,
+  },
+  readingTitle: {
+    marginTop: 6,
+    fontFamily: typography.serifSemi,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.heading,
+    color: colors.leche,
+  },
+  readingLink: {
+    marginTop: 10,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+  },
   sealEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -1125,6 +1213,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.bone,
     lineHeight: typography.sizes.bodyLarge * 1.5,
+  },
+  // El promedio de pasos como evidencia + procedencia, capa meta en niebla.
+  stepsMeta: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.niebla,
+    marginTop: -4,
   },
   // La palanca (§8) es recomendación de coach → serif italic, cálida.
   leverText: {

@@ -63,6 +63,56 @@ async function fetchReportFromServer(
  * compute-local con `signals`/`ctx`/`prior` (no persiste). Pasa `enabled: false`
  * (o uid null) para dejarlo dormido mientras el flip está apagado.
  */
+/* ── Arco de evidencia (V-10) · el reporte ANTERIOR ─────────────────── */
+
+// Del reporte previo solo importan las categorías de sus findings (para el
+// estado "confirmado" por recurrencia); lo demás se ignora.
+const PriorReportSchema = z.object({
+  report: z.object({
+    findings: z.array(z.object({ category: z.string() }).passthrough()),
+  }),
+})
+
+/** Días de separación mínima para que un reporte cuente como "historia":
+ *  con ventanas rodantes (last30), un reporte de hace 3 días compartiría
+ *  casi todos los días con el actual y la "recurrencia" sería un espejismo. */
+const PRIOR_GAP_DAYS = 21
+
+/**
+ * Las categorías de findings del reporte persistido MÁS RECIENTE que cerró
+ * hace ≥21 días (historia real, no la misma ventana). `[]` sin historia.
+ * Alimenta `findingArcStage` (estado "confirmado" por recurrencia).
+ */
+export function usePriorFindingCategories(params: {
+  uid: string | null
+  todayIso: string
+  enabled?: boolean
+}) {
+  const { uid, todayIso, enabled } = params
+  const [y, m, d] = todayIso.split('-').map(Number) as [number, number, number]
+  const cut = new Date(y, m - 1, d - PRIOR_GAP_DAYS, 12)
+  const cutIso = `${cut.getFullYear()}-${String(cut.getMonth() + 1).padStart(2, '0')}-${String(cut.getDate()).padStart(2, '0')}`
+
+  return useQuery({
+    queryKey: uid ? queryKeys.orbit.priorFindings(uid, cutIso) : ['orbit', 'priorFindings', 'off'],
+    enabled: uid != null && enabled !== false,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('monthly_reports')
+        .select('report')
+        .lt('period_end', cutIso)
+        .order('period_end', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error || data == null) return []
+      const parsed = PriorReportSchema.safeParse(data)
+      if (!parsed.success) return []
+      return [...new Set(parsed.data.report.findings.map((f) => f.category))]
+    },
+  })
+}
+
 export function useMonthlyReport(params: {
   uid: string | null
   month: string

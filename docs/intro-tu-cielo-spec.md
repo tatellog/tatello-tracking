@@ -1,7 +1,7 @@
 # STELAR — Intro "Tu Cielo en Stelar"
 
 > Fuente de verdad para la **primera pantalla después del onboarding**.
-> Deriva del manifiesto (`features/docs/product-manifesto.md`). Si algo aquí
+> Deriva del manifiesto (`docs/product-manifesto.md`). Si algo aquí
 > choca con el manifiesto, gana el manifiesto.
 
 ## Objetivo

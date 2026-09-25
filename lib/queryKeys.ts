@@ -136,6 +136,9 @@ export const queryKeys = {
       ['orbit', 'history', uid, fromDate, toDate] as const,
     hasAny: (uid: string) => ['orbit', 'hasAny', uid] as const,
     totalDays: (uid: string) => ['orbit', 'totalDays', uid] as const,
+    // Lectura Semanal (V-05): una por usuaria+semana cerrada (inmutable).
+    weeklyReading: (uid: string, weekStart: string) =>
+      ['orbit', 'weeklyReading', uid, weekStart] as const,
     // AI Foundation: la voz de IA por superficie + periodo (gateada por flag).
     aiVoice: (uid: string, feature: string, periodStart: string, periodEnd: string) =>
       ['orbit', 'aiVoice', uid, feature, periodStart, periodEnd] as const,
@@ -169,6 +172,17 @@ export const queryKeys = {
     // (edge compute-findings) con fallback a compute-local. Key por (uid, periodo).
     monthlyReport: (uid: string, period: string, periodStart: string, periodEnd: string) =>
       ['orbit', 'monthlyReport', uid, period, periodStart, periodEnd] as const,
+    // Arco de evidencia (V-10): categorías de findings de un reporte ANTERIOR
+    // persistido — alimenta el estado "confirmado" por recurrencia.
+    priorFindings: (uid: string, before: string) =>
+      ['orbit', 'priorFindings', uid, before] as const,
+  },
+  wearables: {
+    all: ['wearables'] as const,
+    // La lectura más reciente de la báscula (ícono de Hoy + pantalla Tu báscula).
+    latestWeight: (uid: string) => ['wearables', 'latestWeight', uid] as const,
+    // Toda la serie de la báscula (Progreso la fusiona con lo manual).
+    weights: (uid: string) => ['wearables', 'weights', uid] as const,
   },
   experiments: {
     all: ['experiments'] as const,

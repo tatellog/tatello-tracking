@@ -19,13 +19,12 @@ import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
 
-import { MoodSky } from './MoodSky'
 import { SleepMoonSkia } from './SleepMoonSkia'
 import { WaterDropSkia } from './WaterDropSkia'
 
 /*
  * Registro en contexto de Órbita · Día. Al tocar una señal que "aún no aparece"
- * (agua / ánimo / sueño) se abre este modal full-screen para registrarla SIN
+ * (agua / sueño) se abre este modal full-screen para registrarla SIN
  * salir de Órbita. Reusa los mismos hooks de escritura que Hoy (un solo "home"
  * por input: misma lógica, surgida donde estás), así los puntos de
  * transformación suben solos al asentar (cada hook invalida orbit.all).
@@ -36,7 +35,7 @@ import { WaterDropSkia } from './WaterDropSkia'
  * Solo se abre para HOY; un día pasado sigue navegando a Hoy.
  */
 
-export type DayLogKey = 'agua' | 'animo' | 'sueno'
+export type DayLogKey = 'agua' | 'sueno'
 
 export function DayLogModal({
   signalKey,
@@ -51,13 +50,10 @@ export function DayLogModal({
   const insets = useSafeAreaInsets()
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      {/* GestureHandlerRootView: los gestos (slider de ánimo) NO funcionan dentro
-          de un <Modal> de RN sin este root propio (vive en otra jerarquía). */}
+      {/* GestureHandlerRootView: los gestos NO funcionan dentro de un <Modal>
+          de RN sin este root propio (vive en otra jerarquía). */}
       <GestureHandlerRootView style={styles.screen}>
-        {signalKey === 'animo' ? (
-          // Ánimo es una experiencia full-screen propia (fondo que morfea).
-          <MoodSky date={date} onClose={onClose} />
-        ) : (
+        {
           <>
             {/* Fondo cósmico compartido (estrellas + nebulosa) → profundidad. */}
             <SkyBackground />
@@ -72,7 +68,7 @@ export function DayLogModal({
               {signalKey === 'sueno' ? <SleepLog date={date} onDone={onClose} /> : null}
             </View>
           </>
-        )}
+        }
 
         {/* Cerrar — hijo directo del screen, en la capa MÁS alta (zIndex +
             elevation), fuera de cualquier SafeAreaView/Canvas Skia que pudiera

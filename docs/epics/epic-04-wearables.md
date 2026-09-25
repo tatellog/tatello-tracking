@@ -47,6 +47,10 @@ Spec en `docs/wearables-integration-spec.md`. Decisiones de dueña (jul 2026):
 - [~] Sync manual ✓ + foreground ✓; **background real** pendiente.
 - [x] La app funciona idéntica sin ningún wearable conectado (COALESCE, "manual
       gana", degradación grácil).
+- [x] Smart Recovery (V-15, sep 2026): Hoy no vuelve a preguntar entreno/sueño
+      que ya llegó del reloj (`features/wearables/recovery.ts` + DayCheckIn /
+      StatSlider / Órbita Día). Migración 20260922120000 aplicada en prod (22 sep 2026).
+      Invitación contextual (§5 spec) construida bajo el check-in de Hoy.
 
 ## Estado real (jul 2026 · corrige el "Planeado" anterior)
 

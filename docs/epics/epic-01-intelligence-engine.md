@@ -57,4 +57,4 @@ motor solo-cliente divergente. **No existen** los engines separados ni las tabla
 | 007 | [Hypothesis Engine · tabla + generación](../tasks/epic01/task007.md)                 | Parcial                     |
 | 008 | [monthly_reports · ensamblado + persistencia](../tasks/epic01/task008.md)            | Todo                        |
 | 009 | [conversation_cache · tabla](../tasks/epic01/task009.md)                             | Parcial (usa `ai_insights`) |
-| 010 | [Convergencia `month-built.ts` → `_shared/intelligence`](../tasks/epic01/task010.md) | Todo                        |
+| 010 | [Convergencia `month-built.ts` → `_shared/intelligence`](../tasks/epic01/task010.md) | Hecho (V-10)                |

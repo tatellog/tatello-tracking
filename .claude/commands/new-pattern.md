@@ -6,7 +6,7 @@ Vas a crear un detector de patrón nuevo: $ARGUMENTS
 
 ## Pre-requisitos · lee antes de empezar
 
-1. `features/docs/product-manifesto.md` (v3.0) · sección "La feature core" y "La línea roja".
+1. `docs/product-manifesto.md` (v3.0) · sección "La feature core" y "La línea roja".
 2. `features/patterns/CLAUDE.md` · convenciones locales.
 3. `features/patterns/logic.ts` · ver patrones existentes para seguir su estructura.
 4. `features/patterns/messages.ts` · ver tono de mensajes existentes.

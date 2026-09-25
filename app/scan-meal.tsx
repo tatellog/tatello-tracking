@@ -47,10 +47,13 @@ import {
 import {
   useCreateMeal,
   useFrequentMeals,
+  useMacroTargets,
   useMealById,
+  useMealsForDate,
   useUpdateMeal,
 } from '@/features/macros/hooks'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
+import { microReading } from '@/features/macros/micro-reading'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
 import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
@@ -63,6 +66,7 @@ import {
   mealTotals,
   scanMeal,
   scanMealFromText,
+  scanNutritionLabel,
   type ScanConfidence,
   type ScannedIngredient,
 } from '@/features/meal-scan/scan'
@@ -560,6 +564,7 @@ export default function ScanMealScreen() {
     editId,
     manual,
     describe,
+    label,
     photoPath,
     mealType: mealTypeParam,
   } = useLocalSearchParams<{
@@ -567,6 +572,9 @@ export default function ScanMealScreen() {
     editId?: string
     manual?: string
     describe?: string
+    /** V-08 · la foto es una ETIQUETA nutrimental: el scan lee sus números
+     *  (procedencia 'etiqueta') en vez de estimar el plato. */
+    label?: string
     /** Foto representativa del platillo (storage path) — fallback cuando la
      *  instancia editada no tiene foto propia (p.ej. un re-log sin foto). */
     photoPath?: string
@@ -582,6 +590,9 @@ export default function ScanMealScreen() {
   // Describe-by-AI — the user types what they ate; the AI parses it into
   // ingredients (same confirm form as the photo scan).
   const isDescribe = !!describe
+  // Label scan (V-08) — the photo is a nutrition facts panel; the numbers
+  // come from HER label, not from typical values.
+  const isLabel = !!label
   const createMeal = useCreateMeal()
   const updateMeal = useUpdateMeal()
   const editMeal = useMealById(editId)
@@ -604,6 +615,9 @@ export default function ScanMealScreen() {
   // coach line, shown after a new log before returning to the tab.
   const [revealProtein, setRevealProtein] = useState(0)
   const [revealLine, setRevealLine] = useState(REVEAL_LINES[0] ?? '')
+  // Microlectura del MOTOR (V-01): el día acumulado tras esta comida —
+  // proteína vs meta o margen del día. null = silencio (jamás relleno).
+  const [revealReading, setRevealReading] = useState<string | null>(null)
   // Warm in-app note when the scan can't read the plate/text (replaces a
   // cold system Alert). Cleared once the user adds an ingredient.
   const [scanError, setScanError] = useState<string | null>(null)
@@ -682,7 +696,9 @@ export default function ScanMealScreen() {
   useEffect(() => {
     if (isEdit || isManual || isDescribe || phase !== 'scanning') return
     let alive = true
-    scanMeal(photoUri ?? '')
+    // V-08: en modo etiqueta se leen los números del panel nutrimental; en
+    // modo plato se estima el platillo. Mismo teatro, mismo confirm.
+    ;(isLabel ? scanNutritionLabel(photoUri ?? '') : scanMeal(photoUri ?? ''))
       .then((meal) => {
         if (!alive) return
         setName(meal.name)
@@ -697,13 +713,17 @@ export default function ScanMealScreen() {
         // the user stuck in the scanning theatre. Fall to the confirm form
         // with a warm in-app note (not a cold system Alert).
         if (!alive) return
-        setScanError('Esta foto se me complicó. Cuéntame qué hay en tu plato y lo anotamos juntas.')
+        setScanError(
+          isLabel
+            ? 'Esta etiqueta se me complicó. Puedes agregar el producto con sus números a mano.'
+            : 'Esta foto se me complicó. Cuéntame qué hay en tu plato y lo anotamos juntas.',
+        )
         setPhase('confirm')
       })
     return () => {
       alive = false
     }
-  }, [isEdit, isManual, isDescribe, phase, photoUri])
+  }, [isEdit, isManual, isDescribe, isLabel, phase, photoUri])
 
   // Describe-by-AI submit — parse the typed description into ingredients,
   // then drop into the same confirm form. Reuses the scanning theatre.
@@ -853,10 +873,42 @@ export default function ScanMealScreen() {
     setScanError(null)
     setIngredients((prev) => [
       ...prev,
-      // Placeholder per-100 macros — a real food-database lookup
-      // wires in here later; for now the user edits name + grams.
-      { id: `ing-${Date.now()}`, name: '', grams: 100, proteinPer100: 8, kcalPer100: 150 },
+      // V-07 · integridad de inputs: el ingrediente manual nace SIN macros
+      // (murió el placeholder 8 g/150 kcal que entraba al motor como si
+      // fuera verdad). La fila pide los 2 números reales (kcal + proteína)
+      // y Confirmar se bloquea hasta que las kcal existan. El lookup de
+      // alimentos (Fase 3 B) se enchufa aquí después.
+      {
+        id: `ing-${Date.now()}`,
+        name: '',
+        grams: 100,
+        proteinPer100: 0,
+        kcalPer100: 0,
+        source: 'manual',
+      },
     ])
+  }
+
+  // Los 2 números del ingrediente manual, tecleados como los de SU porción
+  // (los gramos actuales). Se guardan normalizados a per-100 para que la
+  // fila escale igual que las del scan si luego ajusta los gramos.
+  const setIngredientKcal = (id: string, raw: string) => {
+    const kcal = Number(raw.replace(/[^0-9]/g, '')) || 0
+    setIngredients((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, kcalPer100: i.grams > 0 ? (kcal * 100) / i.grams : kcal } : i,
+      ),
+    )
+  }
+  const setIngredientProtein = (id: string, raw: string) => {
+    const protein = Number(raw.replace(/[^0-9]/g, '')) || 0
+    setIngredients((prev) =>
+      prev.map((i) =>
+        i.id === id
+          ? { ...i, proteinPer100: i.grams > 0 ? (protein * 100) / i.grams : protein }
+          : i,
+      ),
+    )
   }
 
   // Pick a photo. On a fresh scan it re-runs the scan; in edit mode it
@@ -917,10 +969,34 @@ export default function ScanMealScreen() {
     hadMealsBefore.current = frequent.data.length > 0
   }
 
+  // Datos para la microlectura del reveal (V-01): las comidas ya guardadas
+  // del día + las metas. Solo para registros nuevos (no ediciones).
+  const targetsQ = useMacroTargets()
+  const dayMealsQ = useMealsForDate(isEdit ? null : (activeLogDate ?? todayInTimezone()))
+
   // New logs land on the reveal (state C) before returning to the tab —
-  // a star joins the sky + the protein of this meal + a coach line.
-  const goToReveal = (protein: number) => {
+  // a star joins the sky + the protein of this meal + a coach line, y si
+  // el motor tiene algo computado que decir del DÍA, una microlectura.
+  const goToReveal = (protein: number, saved?: { id: string; calories: number }) => {
     setRevealProtein(Math.round(protein))
+    if (saved) {
+      // La suma excluye la comida recién creada por id (la caché puede o
+      // no traerla ya) y la agrega a mano: determinista siempre.
+      const others = (dayMealsQ.data ?? []).filter((m) => m.id !== saved.id)
+      const dayProteinG = others.reduce((sum, m) => sum + m.protein_g, 0) + protein
+      const dayCalories = others.reduce((sum, m) => sum + m.calories, 0) + saved.calories
+      const reading = microReading({
+        dayProteinG,
+        proteinTarget: targetsQ.data?.protein_g ?? null,
+        dayCalories,
+        calorieTarget: targetsQ.data?.calories ?? null,
+      })
+      setRevealReading(reading?.text ?? null)
+      // TTFI (V-04): cada insight mostrado deja huella con tier + fuente.
+      if (reading) {
+        track('insight_shown', { source: 'micro_reading', key: reading.key, tier: 'reflexion' })
+      }
+    }
     setRevealLine(
       // La primera comida de la vida cierra con la promesa del día 2, no
       // con una frase genérica: convierte el esfuerzo en compounding.
@@ -1146,7 +1222,10 @@ export default function ScanMealScreen() {
         {
           onSuccess: (meal) => {
             const protein = Math.min(500, Math.max(0, Number(proteinInput) || 0))
-            void presentLiquids(meal.id, intakeDateForNew(), false, () => goToReveal(protein))
+            const calories = Math.min(5000, Math.max(0, Math.round(Number(caloriesInput) || 0)))
+            void presentLiquids(meal.id, intakeDateForNew(), false, () =>
+              goToReveal(protein, { id: meal.id, calories }),
+            )
           },
           onError: (e) => {
             setSaving(false)
@@ -1158,12 +1237,15 @@ export default function ScanMealScreen() {
     }
 
     const storedIngredients: StoredIngredient[] = ingredients.map(
-      ({ name: ingName, grams, proteinPer100, kcalPer100, sugarPer100 }) => ({
+      ({ name: ingName, grams, proteinPer100, kcalPer100, sugarPer100, source }) => ({
         name: ingName,
         grams,
         proteinPer100,
         kcalPer100,
         sugarPer100,
+        // Procedencia (V-07): manual = números de la usuaria; ausente en
+        // filas del scan viejas = estimado por IA.
+        source,
       }),
     )
     const macros = {
@@ -1243,7 +1325,7 @@ export default function ScanMealScreen() {
             emitScanFeedback({ id: meal.id, name: macros.name, confidence })
           }
           void presentLiquids(meal.id, intakeDateForNew(), false, () =>
-            goToReveal(macros.protein_g),
+            goToReveal(macros.protein_g, { id: meal.id, calories: macros.calories }),
           )
         },
         onError: (e) => {
@@ -1358,12 +1440,24 @@ export default function ScanMealScreen() {
                 ✦ +{energiaDelta} {ATTRIBUTE_LABEL.energia}
               </Animated.Text>
             ) : null}
+            {/* La microlectura del motor (V-01): el día acumulado tras esta
+                comida — dato en UI upright, no voz de coach. Con silencio
+                (null) el reveal se queda como está. */}
+            {revealReading ? (
+              <Animated.Text
+                entering={FadeInUp.duration(520).delay(1080)}
+                style={styles.revealReading}
+              >
+                {revealReading}
+              </Animated.Text>
+            ) : null}
             {/* El puente registro → significado: en el momento de máxima
                 atención, la respuesta a "¿cómo voy?" queda a un tap. La
                 evidencia vive en Órbita Día (sin semáforo en el home). */}
             <Animated.View entering={FadeInUp.duration(520).delay(1150)}>
               <Pressable
                 onPress={() => {
+                  track('insight_opened', { source: 'meal_reveal', target: 'orbit_dia' })
                   requestOrbitSegment('dia')
                   router.replace('/orbit')
                 }}
@@ -1532,6 +1626,26 @@ export default function ScanMealScreen() {
                 </>
               ) : (
                 <>
+                  {/* V-03 · confianza alta = la revisión deja de ser peaje:
+                      un tap registra tal cual (mismo guardado, con el loop
+                      "¿le atiné?" como red). El formulario sigue abajo para
+                      quien quiera ajustar. Solo scans nuevos. */}
+                  {!isEdit && !isManual && confidence === 'alta' && ingredients.length > 0 ? (
+                    <View style={styles.quickSave}>
+                      <PrimaryCta
+                        label={`Registrar tal cual · ${Math.round(totals.protein)} g · ${Math.round(totals.calories)} kcal`}
+                        onPress={() => void handleConfirm()}
+                        disabled={saving}
+                        loading={saving}
+                        transform="none"
+                        accessibilityLabel="Registrar la comida tal como se leyó"
+                      />
+                      <Text style={styles.quickSaveNote}>
+                        La lectura vino con confianza alta. Si algo no cuadra, ajústalo abajo.
+                      </Text>
+                    </View>
+                  ) : null}
+
                   <Text style={[styles.eyebrow, styles.eyebrowGap]}>
                     {isEdit ? 'Ingredientes' : 'Ingredientes detectados'}
                   </Text>
@@ -1581,13 +1695,60 @@ export default function ScanMealScreen() {
                           placeholder="Ingrediente"
                           placeholderTextColor={colors.niebla}
                         />
-                        <Text style={styles.ingMacros}>
-                          {Math.round(ingredientProtein(ing))} g proteína ·{' '}
-                          {Math.round(ingredientKcal(ing))} kcal
-                          {ingredientSugar(ing) >= 1
-                            ? ` · ${Math.round(ingredientSugar(ing))} g azúcar`
-                            : ''}
-                        </Text>
+                        {ing.source === 'manual' ? (
+                          /* V-07 · los 2 números reales en vez del texto
+                             calculado: sin ellos, Confirmar no pasa. */
+                          <View style={styles.manualMacrosRow}>
+                            <TextInput
+                              style={styles.manualMacroInput}
+                              value={
+                                ingredientKcal(ing) > 0
+                                  ? String(Math.round(ingredientKcal(ing)))
+                                  : ''
+                              }
+                              onChangeText={(t) => setIngredientKcal(ing.id, t)}
+                              keyboardType="numeric"
+                              returnKeyType="done"
+                              placeholder="kcal"
+                              placeholderTextColor={colors.niebla}
+                              accessibilityLabel={`Calorías de ${ing.name || 'este ingrediente'}`}
+                            />
+                            <Text style={styles.manualMacroUnit}>kcal</Text>
+                            <TextInput
+                              style={styles.manualMacroInput}
+                              value={
+                                ingredientProtein(ing) > 0
+                                  ? String(Math.round(ingredientProtein(ing)))
+                                  : ''
+                              }
+                              onChangeText={(t) => setIngredientProtein(ing.id, t)}
+                              keyboardType="numeric"
+                              returnKeyType="done"
+                              placeholder="0"
+                              placeholderTextColor={colors.niebla}
+                              accessibilityLabel={`Proteína de ${ing.name || 'este ingrediente'}`}
+                            />
+                            <Text style={styles.manualMacroUnit}>g proteína</Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.ingMacros}>
+                            {Math.round(ingredientProtein(ing))} g proteína ·{' '}
+                            {Math.round(ingredientKcal(ing))} kcal
+                            {ingredientSugar(ing) >= 1
+                              ? ` · ${Math.round(ingredientSugar(ing))} g azúcar`
+                              : ''}
+                            {/* Procedencia visible (V-08): los números de la
+                                etiqueta se distinguen de los estimados. */}
+                            {ing.source === 'etiqueta' ? (
+                              <Text style={styles.ingSourceTag}> · de su etiqueta</Text>
+                            ) : null}
+                          </Text>
+                        )}
+                        {ing.source === 'manual' && ingredientKcal(ing) <= 0 ? (
+                          <Text style={styles.manualHint}>
+                            Sus kcal y proteína: de la etiqueta o tu mejor cálculo.
+                          </Text>
+                        ) : null}
                       </View>
                       <View style={styles.gramsBox}>
                         <TextInput
@@ -1662,7 +1823,10 @@ export default function ScanMealScreen() {
                 disabled={
                   isManual
                     ? !proteinInput.trim() || !caloriesInput.trim()
-                    : ingredients.length === 0
+                    : // Un ingrediente manual sin sus kcal reales no puede
+                      // entrar al motor (V-07: nunca inventar en silencio).
+                      ingredients.length === 0 ||
+                      ingredients.some((i) => i.source === 'manual' && ingredientKcal(i) <= 0)
                 }
                 loading={saving}
                 loadingLabel="Guardando…"
@@ -1804,6 +1968,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
+  },
+  // La microlectura del motor — dato discreto (bone, upright), separada de
+  // la voz del coach; nunca compite con el número del reveal.
+  revealReading: {
+    marginTop: 14,
+    paddingHorizontal: 24,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   // El puente a Órbita Día — secundario al check de "listo", nunca compite.
   revealOrbitaLink: {
@@ -2049,6 +2224,21 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.bone,
   },
+  // V-03 · guardar directo con confianza alta — el atajo va ARRIBA del
+  // desglose; la nota deja claro que revisar sigue disponible, no exigido.
+  quickSave: {
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  quickSaveNote: {
+    marginTop: 8,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.niebla,
+    textAlign: 'center',
+  },
   // M1 · escalador de porción de un tap.
   portionRow: {
     flexDirection: 'row',
@@ -2157,6 +2347,43 @@ const styles = StyleSheet.create({
   ingMacros: {
     marginTop: 2,
     fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // V-08 · procedencia: los números que vienen de SU etiqueta lo dicen.
+  ingSourceTag: {
+    color: colors.oroSoft,
+  },
+  // V-07 · los 2 números del ingrediente manual — inputs inline donde las
+  // filas del scan muestran su texto calculado; misma voz visual (números
+  // en leche, unidades en niebla).
+  manualMacrosRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  manualMacroInput: {
+    minWidth: 44,
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairlineStrong,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    textAlign: 'center',
+  },
+  manualMacroUnit: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    marginRight: 8,
+  },
+  manualHint: {
+    marginTop: 5,
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
     fontSize: typography.sizes.label,
     color: colors.niebla,
   },

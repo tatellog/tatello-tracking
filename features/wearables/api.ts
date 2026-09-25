@@ -12,6 +12,8 @@ import type {
   WearableBodyCompositionRow,
   WearableSleepRow,
   WearableStepsRow,
+  WearableWaterRow,
+  WearableWeightRow,
   WearableWorkoutRow,
 } from './logic'
 
@@ -41,6 +43,29 @@ const stepsRowSchema = z.object({
   day_date: isoDay,
   steps: z.number().int().min(0).max(200000),
 })
+
+const waterRowSchema = z.object({
+  source: z.enum(['apple_health', 'garmin']),
+  day_date: isoDay,
+  water_ml: z.number().int().min(0).max(10000),
+})
+
+const weightRowSchema = z.object({
+  source: z.enum(['apple_health', 'garmin']),
+  day_date: isoDay,
+  measured_at: z.string().datetime(),
+  weight_kg: z.number().min(20).max(400),
+})
+
+const latestWeightSchema = z.object({
+  measured_at: z.string(),
+  weight_kg: z.number(),
+  day_date: isoDay,
+})
+
+export type LatestWearableWeight = z.infer<typeof latestWeightSchema>
+/** Un punto de la báscula para la serie fusionada de Progreso. */
+export type WearableWeightPoint = LatestWearableWeight
 
 const bodyCompositionRowSchema = z
   .object({
@@ -92,6 +117,60 @@ export async function upsertWearableSteps(rows: WearableStepsRow[]): Promise<num
   )
   if (error) throw error
   return parsed.length
+}
+
+/** Upsert del agua bebida por día (mL) que Salud trae de apps o del reloj. */
+export async function upsertWearableWater(rows: WearableWaterRow[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const userId = await requireUserId()
+  const parsed = z.array(waterRowSchema).parse(rows)
+  const { error } = await supabase.from('wearable_water').upsert(
+    parsed.map((r) => ({ ...r, user_id: userId })),
+    { onConflict: 'user_id,source,day_date' },
+  )
+  if (error) throw error
+  return parsed.length
+}
+
+/** Upsert del peso de la báscula (una fila por día · última lectura del día). */
+export async function upsertWearableWeight(rows: WearableWeightRow[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const userId = await requireUserId()
+  const parsed = z.array(weightRowSchema).parse(rows)
+  const { error } = await supabase.from('wearable_weight').upsert(
+    parsed.map((r) => ({ ...r, user_id: userId })),
+    { onConflict: 'user_id,source,day_date' },
+  )
+  if (error) throw error
+  return parsed.length
+}
+
+/** La lectura más reciente de la báscula (para el ícono de Hoy y la pantalla
+ *  "Tu báscula"). Null si nunca llegó nada. */
+export async function getLatestWearableWeight(): Promise<LatestWearableWeight | null> {
+  const userId = await requireUserId()
+  const { data, error } = await supabase
+    .from('wearable_weight')
+    .select('measured_at, weight_kg, day_date')
+    .eq('user_id', userId)
+    .order('measured_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data ? latestWeightSchema.parse(data) : null
+}
+
+/** Toda la serie de la báscula (asc por día) — la tendencia de Progreso la
+ *  fusiona con lo manual (manual gana el día, la báscula rellena). */
+export async function getWearableWeights(): Promise<WearableWeightPoint[]> {
+  const userId = await requireUserId()
+  const { data, error } = await supabase
+    .from('wearable_weight')
+    .select('measured_at, weight_kg, day_date')
+    .eq('user_id', userId)
+    .order('measured_at', { ascending: true })
+  if (error) throw error
+  return z.array(latestWeightSchema).parse(data ?? [])
 }
 
 /** Upsert de composición corporal (una fila por día · snapshot de la báscula). */

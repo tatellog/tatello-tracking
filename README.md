@@ -1,16 +1,33 @@
 # STELAR
 
-App móvil para hábitos de recomposición corporal. Marcás tu día y tu constelación zodiacal se ilumina una estrella a la vez, hasta completar los 28 días. Cada pantalla muestra **cambio**, no solo datos (p.ej. "bajaste 1.8 kg en 4 semanas" en vez de "pesás 76.2 kg").
+App de pérdida de peso sostenible. Trackea calorías, macros, déficit y peso
+con rigor, pero los pone en contexto, no en el centro: un motor
+determinístico analiza los patrones en tus propios datos (qué rompe tus
+días, qué los sostiene) y te devuelve lecturas honestas — la Lectura del
+día en Hoy, la Lectura Semanal, los patrones de Órbita. Las constelaciones
+son el lenguaje visual del progreso; no hay countdown, rachas ni culpa. La
+IA solo explica lo que el motor ya detectó, nunca detecta ni inventa.
+
+## Documentación
+
+- `docs/product-manifesto.md` — QUÉ es Stelar, su voz y su línea
+  roja (v3.0, manda sobre todo).
+- `docs/PRD-v2.md` — QUÉ construir.
+- `docs/product-vision-roadmap.md` — HACIA DÓNDE: visión, métricas norte y
+  roadmap por fases (V-01…V-19) con su estado.
+- `docs/` — specs por feature · `docs/archive/` — histórico, no fuente de
+  verdad.
+- `.claude/CLAUDE.md` — reglas de trabajo del repo.
 
 ## Stack
 
-- [Expo](https://expo.dev) SDK 54 · React Native 0.81 · TypeScript 5.9 strict
-- [Expo Router v6](https://docs.expo.dev/router/introduction/) — file-based routing
+- [Expo](https://expo.dev) SDK 54 · React Native 0.81 · React 19 (React Compiler ON) · TypeScript 5.9 strict
+- [Expo Router](https://docs.expo.dev/router/introduction/) — file-based routing
 - [TanStack Query v5](https://tanstack.com/query) + AsyncStorage persistence
-- [Zustand v5](https://zustand-demo.pmnd.rs) — client state
-- [Supabase](https://supabase.com) — auth, Postgres, Storage
-- [Reanimated v4](https://docs.swmansion.com/react-native-reanimated/) + react-native-svg — la constelación viva
+- [Supabase](https://supabase.com) — auth, Postgres (RLS estricto), Storage, Edge Functions (Deno)
+- [Reanimated v4](https://docs.swmansion.com/react-native-reanimated/) + react-native-svg + [Skia](https://shopify.github.io/react-native-skia/) — la constelación viva
 - [NativeWind v4](https://www.nativewind.dev) + Tailwind CSS v3
+- [Zod](https://zod.dev) en los bordes (respuestas Supabase/RPC/edge)
 - pnpm
 
 ## Prerequisitos
@@ -50,23 +67,26 @@ Requiere `.env.local` con `SUPABASE_SERVICE_ROLE_KEY` y `DEV_USER_ID`.
 ## Estructura
 
 ```
-app/                  Expo Router (auth + onboarding + tabs)
-features/
-  brief/              get_brief_context RPC + zod schema
-  home/               Home screen + cadencia de entrada + grid 28 días
-  macros/             Targets de macros + meal log + sugerencias
-  moods/              Mood checkins
-  onboarding/         Wizard 5 pasos + captura de fotos
-  profile/            Datos del usuario
-  progress/           Body measurements + charts (d3-shape)
-  streak/             Toggle de workout (hoy o cualquier día del grid)
-  tabs/               Componentes compartidos (LunarConstellation, etc.)
-hooks/                Hooks de plataforma (magic-link, session, etc.)
-lib/                  Supabase client, query keys, briefCache, time helpers
-supabase/migrations/  Schema versionado (16 migraciones)
-theme/                Tokens Pearl Mauve (colors, spacing, typography, motion)
-scripts/              Seeds dev/real
+app/                  Expo Router: (tabs) Hoy · Comidas · Órbita · Progreso ·
+                      Ajustes + onboarding (12 pasos) + modales/pantallas
+features/             una carpeta por feature: api.ts (Zod+Supabase) +
+                      hooks.ts (React Query) + logic.ts (puro) + components/
+  orbit/              Órbita Día/Semana/Mes · lee de daily_signals
+  macros/             comidas + meal scan (IA)
+  progress/           Historia + Body + medidas
+  tabs/               bottom nav + componentes compartidos (constelación)
+hooks/                hooks de plataforma (session, magic-link, etc.)
+lib/                  cliente Supabase, queryKeys, featureFlags, analytics
+supabase/
+  migrations/         schema versionado · toda tabla con RLS
+  functions/          edge functions · _shared/intelligence/ = EL motor
+                      (corre en server y cliente vía re-export)
+theme/                design tokens (colors, spacing, typography, motion)
+scripts/              seeds dev/real
 ```
+
+El detalle completo (convenciones, reglas del motor, glosario) vive en
+`.claude/CLAUDE.md`.
 
 ## Scripts
 

@@ -41,7 +41,6 @@ const ATTRS: readonly Attr[] = [
   { key: 'energia', label: ATTRIBUTE_LABEL.energia },
   { key: 'claridad', label: ATTRIBUTE_LABEL.claridad },
   { key: 'estabilidad', label: ATTRIBUTE_LABEL.estabilidad },
-  { key: 'brillo', label: ATTRIBUTE_LABEL.brillo },
 ] as const
 
 /* Una fila de chips, uno por atributo, tintado de su acento. */

@@ -6,7 +6,7 @@ Vas a validar el feature en $ARGUMENTS (ej: `features/patterns` o `features/orbi
 
 ## Proceso
 
-1. Lee `features/docs/product-manifesto.md` para tener contexto. Verifica que esté en versión 3.0 o posterior.
+1. Lee `docs/product-manifesto.md` para tener contexto. Verifica que esté en versión 3.0 o posterior.
 2. Lee `CLAUDE.md` del root.
 3. Si existe `$ARGUMENTS/CLAUDE.md` local, léelo también.
 4. Lista los archivos modificados en este feature respecto a main:

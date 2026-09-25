@@ -1,7 +1,7 @@
 # STELAR — Órbita Semana (v2.2 · la ventana abierta · sin IA)
 
 > Fuente de verdad para la pestaña **Órbita › Semana**. Deriva del
-> manifiesto (`features/docs/product-manifesto.md`, v3.0) y convive con
+> manifiesto (`docs/product-manifesto.md`, v3.0) y convive con
 > `docs/PRD-v2.md` y `docs/tu-orbita-design.md`. Si algo aquí choca con el
 > manifiesto, gana el manifiesto.
 >

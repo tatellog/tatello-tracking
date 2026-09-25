@@ -295,12 +295,19 @@ export function MealComposer({ onOpenMeal }: Props) {
     setForcedType(null)
   }
 
+  // Al colapsar, lo TECLEADO se queda como borrador (V-03: no perder lo
+  // escrito al salir); solo se suelta lo efímero (momento forzado). El
+  // borrador muere al guardar (clear en log/submit) o al limpiar a mano.
+  const parkDraft = () => {
+    setForcedType(null)
+  }
+
   // CTA "+ Agregar comida" — despliega/colapsa el bloque de registro.
   const handleCta = () => {
     if (registroOpen) {
       setRegistroOpen(false)
       setSearchMode(false)
-      clear()
+      parkDraft()
     } else {
       setRegistroOpen(true)
     }
@@ -309,7 +316,7 @@ export function MealComposer({ onOpenMeal }: Props) {
   const handleSearchTile = () => {
     setSearchMode((s) => {
       const next = !s
-      if (!next) clear()
+      if (!next) parkDraft()
       return next
     })
     setTimeout(() => searchRef.current?.focus(), 60)

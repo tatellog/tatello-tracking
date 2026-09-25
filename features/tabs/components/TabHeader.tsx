@@ -35,6 +35,23 @@ function CalendarIcon({ color, size = 20 }: { color: string; size?: number }) {
   )
 }
 
+// Báscula (spec wearables §9 · decisión dueña): tercer botón en la cabecera de
+// Hoy, junto al calendario. Un punto avisa que llegó una lectura nueva; el
+// ícono NUNCA muestra el número (el peso no vive en Hoy).
+function ScaleIcon({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z M8.5 12.5a3.5 3.5 0 017 0 M12 12.5l1.6-2.2"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
 type Props = {
   /** "Hola, Anahí." — uses Hanken 28 px; emphasis word renders Cormorant italic 26 px magenta. */
   greeting?: string
@@ -48,6 +65,9 @@ type Props = {
    *  its own pill, so it never shows a gear pointing back at itself. */
   pillLabel?: string
   pillEmphasis?: string
+  /** Botón de la báscula (solo Hoy, solo con Salud disponible). `hasNew` pinta
+   *  el punto; el tap abre "Tu báscula". */
+  scale?: { hasNew: boolean; onPress: () => void } | null
 }
 
 export function TabHeader({
@@ -57,6 +77,7 @@ export function TabHeader({
   titleEmphasis,
   pillLabel,
   pillEmphasis,
+  scale = null,
 }: Props) {
   const router = useRouter()
   return (
@@ -80,6 +101,18 @@ export function TabHeader({
         ) : null}
       </View>
       <View style={styles.actions}>
+        {scale ? (
+          <Pressable
+            onPress={scale.onPress}
+            hitSlop={10}
+            style={styles.settingsBtn}
+            accessibilityRole="button"
+            accessibilityLabel={scale.hasNew ? 'Tu báscula, hay una lectura nueva' : 'Tu báscula'}
+          >
+            <ScaleIcon color={colors.niebla} />
+            {scale.hasNew ? <View style={styles.dot} /> : null}
+          </Pressable>
+        ) : null}
         {/* Calendario de movimiento — SIEMPRE visible (todas las tabs, con pill o
             con gear), independiente de la navegación. */}
         <Pressable
@@ -189,6 +222,18 @@ const styles = StyleSheet.create({
   },
   // Gear button — a bordered chip echoing the metadata pill, so the
   // right slot reads as one consistent surface across tabs.
+  // El punto de "llegó algo nuevo" — sin número, sin badge de conteo.
+  dot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.magenta,
+    borderWidth: 1.5,
+    borderColor: colors.bg,
+  },
   settingsBtn: {
     width: 40,
     height: 40,

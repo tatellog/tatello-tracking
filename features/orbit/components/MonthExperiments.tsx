@@ -11,6 +11,7 @@ import {
   useStartExperiment,
 } from '@/features/experiments/hooks'
 import type { ExperimentMetric } from '@/features/experiments/logic'
+import { minMeasured, resultLine, resultTone } from '@/features/experiments/verdict'
 import { useExperimentCopy } from '@/features/orbit/ai-voice'
 import { colors, typography } from '@/theme'
 
@@ -377,36 +378,9 @@ export function MonthExperiments({ uid, period, periodStart, periodEnd, today, o
 // un hilo de 14 días necesita ≥7 días MEDIDOS (los que lo sigues, no el historial)
 // para dar veredicto. Debajo de eso, "inconclusa" NO es señal ambigua: es que lo
 // cerraste antes de vivir los días.
-function minMeasured(durationDays: number): number {
-  return Math.min(durationDays, Math.max(4, Math.ceil(durationDays / 2)))
-}
-
-/** El resultado del motor → una frase cálida, sin culpa. Distingue "lo cerraste
- *  muy pronto" (pocos días medidos) de una señal genuinamente ambigua, para no
- *  hacer creer que faltan datos tuyos cuando en realidad falta seguir el hilo. */
-function resultLine(
-  status: string | undefined,
-  daysMeasured: number | undefined,
-  durationDays: number | undefined,
-): string {
-  if (status === 'confirmed') return 'Se sostuvo en tus días.'
-  if (status === 'discarded') return 'No se sostuvo esta vez, y eso también dice algo.'
-  const d = daysMeasured ?? 0
-  if (d < minMeasured(durationDays ?? 14)) {
-    const lead =
-      d === 0
-        ? 'Lo cerraste el mismo día'
-        : d === 1
-          ? 'Lo seguiste un solo día'
-          : `Lo seguiste ${d} días`
-    return `${lead}. El hilo mira los días que lo sigues, no los de antes.`
-  }
-  return 'Aún no alcanza para saberlo.'
-}
-
-function resultTone(status: string | undefined): 'good' | 'soft' {
-  return status === 'confirmed' ? 'good' : 'soft'
-}
+// (El veredicto en humano —resultLine/resultTone— vive ahora en
+// features/experiments/verdict.ts: esta UI vieja huérfana y la superficie
+// nueva de V-12 comparten la misma copy revisada.)
 
 /** El resultado en corto, para las filas del historial (sin frase larga). */
 function shortResult(

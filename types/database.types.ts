@@ -1264,6 +1264,69 @@ export type Database = {
         }
         Relationships: []
       }
+      wearable_water: {
+        Row: {
+          created_at: string
+          day_date: string
+          id: string
+          source: string
+          updated_at: string
+          user_id: string
+          water_ml: number
+        }
+        Insert: {
+          created_at?: string
+          day_date: string
+          id?: string
+          source: string
+          updated_at?: string
+          user_id: string
+          water_ml: number
+        }
+        Update: {
+          created_at?: string
+          day_date?: string
+          id?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+          water_ml?: number
+        }
+        Relationships: []
+      }
+      wearable_weight: {
+        Row: {
+          created_at: string
+          day_date: string
+          id: string
+          measured_at: string
+          source: string
+          updated_at: string
+          user_id: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          day_date: string
+          id?: string
+          measured_at: string
+          source: string
+          updated_at?: string
+          user_id: string
+          weight_kg: number
+        }
+        Update: {
+          created_at?: string
+          day_date?: string
+          id?: string
+          measured_at?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+          weight_kg?: number
+        }
+        Relationships: []
+      }
       wearable_workouts: {
         Row: {
           created_at: string
@@ -1303,6 +1366,36 @@ export type Database = {
           updated_at?: string
           user_id?: string
           workout_type?: string | null
+        }
+        Relationships: []
+      }
+      weekly_readings: {
+        Row: {
+          created_at: string
+          grade: string
+          id: string
+          opened_at: string | null
+          payload: Json
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          grade: string
+          id?: string
+          opened_at?: string | null
+          payload: Json
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string
+          id?: string
+          opened_at?: string | null
+          payload?: Json
+          user_id?: string
+          week_start?: string
         }
         Relationships: []
       }
@@ -1387,13 +1480,18 @@ export type Database = {
           rested: boolean | null
           sleep_minutes: number | null
           sleep_quality: number | null
+          sleep_source: string | null
+          steps: number | null
           stress: number | null
           trained: boolean | null
           user_id: string | null
           water_glasses: number | null
+          water_source: string | null
           weight_kg: number | null
+          weight_source: string | null
           wellbeing_checkins: number | null
           workout_kcal: number | null
+          workout_minutes: number | null
           workout_source: string | null
           workout_type: string | null
         }

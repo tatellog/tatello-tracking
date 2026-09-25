@@ -19,6 +19,7 @@ import {
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 /*
  * Tendencia del peso (Epic 08 · F1) — la pregunta de esta pantalla:
@@ -50,13 +51,15 @@ export default function WeightTrendScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const checkins = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
   // La pantalla abre en "Todo": su pregunta es el camino completo; el tab ya
   // cubre la ventana corta.
   const [period, setPeriod] = useState<Period>('ALL')
 
   const fused = useMemo(
-    () => mergeWeightSeries(measurements.data ?? [], checkins.data ?? []),
-    [measurements.data, checkins.data],
+    () => mergeWeightSeries(measurements.data ?? [], checkins.data ?? [], scaleWeights.data ?? []),
+    [measurements.data, checkins.data, scaleWeights.data],
   )
   const points = useMemo(() => {
     const days = PERIOD_DAYS[period]

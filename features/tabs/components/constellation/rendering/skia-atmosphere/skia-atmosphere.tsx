@@ -13,6 +13,7 @@ import { memo, useMemo } from 'react'
 import { StyleSheet } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 
+import type { HeroReaction } from '@/features/tabs/hero-reaction'
 import { colors } from '@/theme'
 
 import {
@@ -29,6 +30,7 @@ import {
 } from '../../constants'
 import { BUCKET_DRIFT, buildAmbientField, DEEP_STARS, DUST } from '../../data/scatter'
 import type { AmbientStar } from '../../types'
+import { SkiaHeroReaction } from './skia-hero-reaction'
 
 /*
  * SkiaAtmosphere — el "cielo vivo" (campo de estrellas + nebulosa + polvo +
@@ -76,6 +78,7 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
   fieldStars,
   litKeys,
   reduce,
+  reaction = null,
 }: {
   t: SharedValue<number>
   drift: SharedValue<number>
@@ -87,6 +90,8 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
   fieldStars: readonly { x: number; y: number }[]
   litKeys: Set<string>
   reduce: boolean
+  /** Hero vivo (V-13): reacción en curso a un registro; null = reposo. */
+  reaction?: HeroReaction | null
 }) {
   const scale = useMemo(() => [{ scale: k }], [k])
   return (
@@ -104,6 +109,13 @@ export const SkiaAtmosphere = memo(function SkiaAtmosphere({
         <SkiaAmbientGlow cx={W / 2} cy={H / 2} />
         <SkiaNebula ax={ax} ay={ay} drift={drift} />
         {reduce ? null : <SkiaCosmicDust t={t} />}
+        {/* Hero vivo (V-13): la reacción a un registro, montada solo mientras
+            corre (≈1 s). Va bajo la viñeta (su centro es transparente) y
+            sobre la nebulosa, para leerse como luz del cielo, no un overlay.
+            El toggle de `reaction` re-ejecuta este body 2× por registro; los
+            hermanos (deep/ambient/nebula/dust/field) no cambian de props y
+            el React Compiler memoiza su JSX → React los salta. */}
+        {reaction ? <SkiaHeroReaction reaction={reaction} ax={ax} ay={ay} /> : null}
         {/* Viñeta — antes era un <Rect> del SVG montado encima de toda la
             atmósfera; ahora vive aquí, DESPUÉS del backdrop pero ANTES de las
             field stars (su z-order original). Oscurece el backdrop + el

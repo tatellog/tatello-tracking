@@ -43,13 +43,21 @@ export const MealInputSchema = z.object({
 
 export type MealInput = z.infer<typeof MealInputSchema>
 
+/** Procedencia de los macros (V-07): de dónde salieron los números de este
+ *  ingrediente. Se persiste en el payload jsonb para que la honestidad del
+ *  scan sobreviva al guardado; ausente en datos viejos = estimado por IA. */
+export type StoredIngredientSource = 'ia' | 'manual' | 'base' | 'etiqueta'
+
 export type StoredIngredient = {
   name: string
   grams: number
   proteinPer100: number
   kcalPer100: number
   sugarPer100?: number
+  source?: StoredIngredientSource
 }
+
+const INGREDIENT_SOURCES: readonly string[] = ['ia', 'manual', 'base', 'etiqueta']
 
 export type CreateMealInput = MealInput & {
   photo_storage_path?: string | null
@@ -64,13 +72,16 @@ export type UpdateMealInput = MealInput & {
 function ingredientsPayload(ingredients?: StoredIngredient[]): Json {
   if (!ingredients || ingredients.length === 0) return null
   return {
-    ingredients: ingredients.map(({ name, grams, proteinPer100, kcalPer100, sugarPer100 }) => ({
-      name,
-      grams,
-      proteinPer100,
-      kcalPer100,
-      ...(typeof sugarPer100 === 'number' ? { sugarPer100 } : {}),
-    })),
+    ingredients: ingredients.map(
+      ({ name, grams, proteinPer100, kcalPer100, sugarPer100, source }) => ({
+        name,
+        grams,
+        proteinPer100,
+        kcalPer100,
+        ...(typeof sugarPer100 === 'number' ? { sugarPer100 } : {}),
+        ...(typeof source === 'string' ? { source } : {}),
+      }),
+    ),
   }
 }
 
@@ -94,6 +105,9 @@ function parseIngredients(raw: Json | null): StoredIngredient[] | null {
           proteinPer100: o.proteinPer100,
           kcalPer100: o.kcalPer100,
           ...(typeof o.sugarPer100 === 'number' ? { sugarPer100: o.sugarPer100 } : {}),
+          ...(typeof o.source === 'string' && INGREDIENT_SOURCES.includes(o.source)
+            ? { source: o.source as StoredIngredientSource }
+            : {}),
         })
       }
     }

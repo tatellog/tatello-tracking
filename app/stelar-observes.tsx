@@ -28,6 +28,7 @@ import {
 import { SkyBackground } from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 /*
  * Lo que Stelar observa (Epic 08 · F2) — la pantalla SIN gráficas: solo
@@ -61,13 +62,19 @@ export default function StelarObservesScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const checkinsQ = useBodyCheckins()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
   const { series } = useGatedCompositionSeries()
   const signals = useSignalsHistory(PROGRESS_COMPARE_WINDOW_DAYS * 2 + 5)
   const targets = useMacroTargets().data
 
   const observations = useMemo<Observation[]>(() => {
     const out: Observation[] = []
-    const fused = mergeWeightSeries(measurements.data ?? [], checkinsQ.data ?? [])
+    const fused = mergeWeightSeries(
+      measurements.data ?? [],
+      checkinsQ.data ?? [],
+      scaleWeights.data ?? [],
+    )
     const smoothedAll = smoothWeightPoints(fused)
 
     // 1 · La recuperación (tu camino): el rebote nombrado y lo recorrido.
@@ -169,7 +176,7 @@ export default function StelarObservesScreen() {
     }
 
     return out.slice(0, 5)
-  }, [measurements.data, checkinsQ.data, signals.data, targets, series])
+  }, [measurements.data, checkinsQ.data, scaleWeights.data, signals.data, targets, series])
 
   const isPending = measurements.isPending || checkinsQ.isPending || signals.isLoading
 

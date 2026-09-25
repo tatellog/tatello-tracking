@@ -31,6 +31,11 @@ import { TransformationReveal, useRevelationOrchestrator } from '@/features/reve
 import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/features/emblem'
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
+import { useSleepLog } from '@/features/sleep/hooks'
+import { ArrivedLine } from '@/features/wearables/components/ArrivedLine'
+import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
+import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
+import { wearableDayFacts, workoutProvenanceLine } from '@/features/wearables/recovery'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
@@ -50,13 +55,17 @@ import {
   useWorkoutTypeToday,
 } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
+import { HERO_ALIVE_ENABLED } from '@/lib/featureFlags'
 import {
   CoachLine,
   DayCheckIn,
   DayCloseCard,
+  DayReadingStrip,
+  WeeklyReadingStrip,
   type DayState,
   type WorkoutTypeId,
   LunarConstellation,
+  useHeroReaction,
   SectionHeader,
   SkyBackground,
   StatSlider,
@@ -302,6 +311,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   useEffect(() => {
     constellationPaused.value = isScrolling || celebrating ? 1 : 0
   }, [isScrolling, celebrating, constellationPaused])
+  // Hero vivo (V-13): el emblema reacciona a cada registro exitoso (comida /
+  // agua / ánimo / sueño) que pase por React Query. Sin flag o con
+  // reduce-motion no se suscribe a nada.
+  const heroReaction = useHeroReaction(HERO_ALIVE_ENABLED && !reducedMotion)
   const todayIsoLocal = ctx.date
 
   // Una sola lectura de workouts (45 días) alimenta tanto el grid del mes
@@ -436,12 +449,68 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const greetingName = (profile?.display_name ?? '').trim().split(' ')[0] || 'tú'
 
-  // El estado del toggle es el del día VISTO (vctx), no el de hoy.
+  // V-15 Smart Recovery: lo que el reloj ya trajo del día VISTO (sin manual
+  // encima). Hoy sale de todaySignals (fresco, invalidado por el sync); un día
+  // pasado, de la historia de 45 días ya cargada (cero fetch extra). El manual
+  // de sueño del día permite inferir la procedencia con la view vieja.
+  const viewedSignals =
+    selectedDate === todayIsoLocal
+      ? todaySignals.data
+      : (monthSignals.data ?? []).find((r) => r.day === selectedDate)
+  const manualSleep = useSleepLog(selectedDate)
+  const wearable = wearableDayFacts(viewedSignals, {
+    manualSleepMinutes: manualSleep.data?.duration_minutes ?? null,
+  })
+  // Entreno sellado por el reloj: sin registro manual, sin descanso marcado.
+  const trainedByWearable =
+    !vctx.today_workout_completed && !restedToday && wearable.workout != null
+
+  // Modo confirmación (spec §9): lo que el reloj ya anotó HOY se colapsa en una
+  // línea y sus componentes dejan de preguntar; "ajustar" los devuelve llenos.
+  // Solo hoy (un día pasado se ve completo) y solo lo que no tiene manual encima.
+  const arrivedFacts = viewingPast
+    ? null
+    : {
+        ...wearable,
+        workout: trainedByWearable ? wearable.workout : null,
+      }
+  const hasArrived =
+    arrivedFacts != null &&
+    (arrivedFacts.sleep != null || arrivedFacts.workout != null || arrivedFacts.water != null)
+  const [arrivedOpen, setArrivedOpen] = useState(false)
+  useEffect(() => setArrivedOpen(false), [selectedDate])
+  const sleepCollapsed = hasArrived && arrivedFacts?.sleep != null && !arrivedOpen
+  const checkInCollapsed = hasArrived && arrivedFacts?.workout != null && !arrivedOpen
+
+  // Báscula (spec §9): ícono en la cabecera solo cuando Salud existe en este
+  // build; el punto avisa de una lectura nueva. Nunca muestra el número.
+  const scaleConn = useScaleConnection()
+  const scaleBadge = useScaleBadge()
+
+  // Criterio de éxito V-15 ("cero preguntas por datos que ya llegaron"): se
+  // instrumenta UNA vez por día lo que el reloj pre-llenó en Hoy.
+  const prefilledTracked = useRef<string | null>(null)
+  useEffect(() => {
+    if (viewingPast) return
+    const workout = trainedByWearable
+    const sleep = wearable.sleep != null
+    const water = wearable.water != null
+    if (!workout && !sleep && !water) return
+    const key = `${todayIsoLocal}:${workout ? 'w' : ''}${sleep ? 's' : ''}${water ? 'a' : ''}`
+    if (prefilledTracked.current === key) return
+    prefilledTracked.current = key
+    track('wearable_prefilled', { source: 'apple_health', workout, sleep, water })
+  }, [viewingPast, trainedByWearable, wearable.sleep, wearable.water, todayIsoLocal])
+
+  // El estado del toggle es el del día VISTO (vctx), no el de hoy. El reloj
+  // sella "entrenaste" igual que el manual: Stelar no pregunta lo que ya llegó.
   const dayState: DayState = vctx.today_workout_completed
     ? 'trained'
     : restedToday
       ? 'rested'
-      : 'undecided'
+      : trainedByWearable
+        ? 'trained'
+        : 'undecided'
 
   // Tipo de entreno de HOY para los chips post-confirmación. Solo consulta
   // cuando hoy ya está entrenado; en modo "ver día" los chips no existen.
@@ -573,7 +642,15 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             onMomentumScrollEnd={endScroll}
           >
             <Animated.View entering={enter(40)}>
-              <TabHeader greeting={`Hola, ${greetingName}.`} greetingEmphasis={greetingName} />
+              <TabHeader
+                greeting={`Hola, ${greetingName}.`}
+                greetingEmphasis={greetingName}
+                scale={
+                  scaleConn.available === true
+                    ? { hasNew: scaleBadge.hasNew, onPress: () => router.push('/scale') }
+                    : null
+                }
+              />
             </Animated.View>
 
             {/* El indicador de "modo ver día" ya no vive aquí: es una pill
@@ -585,23 +662,43 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
-              <DayCheckIn
-                // Resetea el modo "cambiar" interno al navegar entre días.
-                key={selectedDate}
-                state={dayState}
-                onChange={handleDayChange}
-                label={viewingPast ? viewingLabel : 'Hoy'}
-                question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
-                locked={viewingPast && vctx.today_workout_completed}
-                workoutType={viewingPast ? undefined : workoutTypeQ.data}
-                onWorkoutType={viewingPast ? undefined : handleWorkoutType}
-                saveFailed={
-                  toggleToday.isError ||
-                  setRest.isError ||
-                  toggleForDate.isError ||
-                  setRestForDate.isError
-                }
-              />
+              {hasArrived && arrivedFacts ? (
+                <ArrivedLine
+                  facts={arrivedFacts}
+                  expanded={arrivedOpen}
+                  onToggle={() => setArrivedOpen((v) => !v)}
+                />
+              ) : null}
+              {checkInCollapsed ? null : (
+                <DayCheckIn
+                  // Resetea el modo "cambiar" interno al navegar entre días.
+                  key={selectedDate}
+                  state={dayState}
+                  onChange={handleDayChange}
+                  label={viewingPast ? viewingLabel : 'Hoy'}
+                  question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
+                  locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
+                  // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
+                  workoutType={
+                    viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
+                  }
+                  onWorkoutType={viewingPast ? undefined : handleWorkoutType}
+                  wearable={
+                    !viewingPast && trainedByWearable && wearable.workout
+                      ? { line: workoutProvenanceLine(wearable.workout) }
+                      : null
+                  }
+                  saveFailed={
+                    toggleToday.isError ||
+                    setRest.isError ||
+                    toggleForDate.isError ||
+                    setRestForDate.isError
+                  }
+                />
+              )}
+              {/* Invitación contextual (spec wearables §5): solo con el día sin
+                  responder y el canal disponible pero no conectado. */}
+              {!viewingPast && dayState === 'undecided' ? <WearableInviteLine /> : null}
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre
@@ -648,6 +745,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       committed={todayHasRegistro}
                       suppressBurst
                       pausedSV={constellationPaused}
+                      reaction={heroReaction}
                     />
 
                     {!reducedMotion && celebrateKey > 0 ? (
@@ -701,6 +799,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   sign,
                   // Mañana real de HOY (no de un día visto): antes de mediodía.
                   !viewingPast && new Date().getHours() < 12,
+                  // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce.
+                  !viewingPast && wearable.sleep != null,
                 )}
               />
               {(() => {
@@ -734,17 +834,29 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               })()}
             </Animated.View>
 
-            {/* El cierre de hoy — veredicto nocturno (≥20:00, ≥1 comida):
-                "¿quedé en déficit?" claro y sin poesía, con la misma
-                definición de déficit sano del calendario dorado del mes.
-                Solo para HOY (en modo ver-día no hay cierre que dar). */}
+            {/* La lectura del día + el cierre — la MISMA pregunta en dos
+                franjas: durante el día, "¿Cómo voy hoy?" (lectura de Órbita
+                Día asomada aquí, V-02); desde las 20:00 con ≥1 comida, el
+                veredicto nocturno toma su lugar (la tira se retira sola).
+                Solo para HOY (en modo ver-día no hay lectura que dar). */}
             {!viewingPast ? (
-              <DayCloseCard
-                consumedCalories={ctx.today_macros.calories}
-                targetCalories={ctx.targets?.calories}
-                mealCount={ctx.meal_count_today}
-                reading={closeReading}
-              />
+              <>
+                <DayReadingStrip
+                  consumedCalories={ctx.today_macros.calories}
+                  targetCalories={ctx.targets?.calories}
+                  mealCount={ctx.meal_count_today}
+                />
+                <DayCloseCard
+                  consumedCalories={ctx.today_macros.calories}
+                  targetCalories={ctx.targets?.calories}
+                  mealCount={ctx.meal_count_today}
+                  reading={closeReading}
+                />
+                {/* La Lectura Semanal asomada en Hoy (V-06): solo mientras
+                    hay lectura sin abrir; se retira sola al leerla. Gated a
+                    dev junto con toda la Lectura Semanal. */}
+                <WeeklyReadingStrip />
+              </>
             ) : null}
 
             {/* Días en órbita — acumulado (no racha), lectura secundaria.
@@ -772,7 +884,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 universeY.current = e.nativeEvent.layout.y
               }}
             >
-              <TodayUniverseRewards ctx={vctx} date={vctx.date} restedToday={restedToday} />
+              <TodayUniverseRewards
+                ctx={vctx}
+                date={vctx.date}
+                restedToday={restedToday}
+                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
+                wearableWaterGlasses={wearable.water?.glasses ?? null}
+              />
             </Animated.View>
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
@@ -789,6 +907,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 ctx={vctx}
                 targetSlide={slideParam ?? null}
                 onSwipeStateChange={handleSlideSwipe}
+                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
+                hideSleepSlide={sleepCollapsed}
               />
             </Animated.View>
 
@@ -919,6 +1039,7 @@ function getCoachCopy(
   trainedToday: boolean,
   sign: ZodiacSign,
   morning = false,
+  nightFromWatch = false,
 ): CoachCopy {
   const lower = signLabel.toLowerCase()
 
@@ -972,7 +1093,12 @@ function getCoachCopy(
   if (morning) {
     const next = pickStarForCount(sign, count + 1)
     if (next) {
-      return { before: 'Hoy se enciende ', emphasis: next.name, after: ', si tú quieres.' }
+      // V-15: el reloj ya anotó la noche — se reconoce el dato recibido antes
+      // de la invitación (microlectura con dato, no relleno).
+      const lead = nightFromWatch
+        ? 'Tu reloj ya vio tu noche. Hoy se enciende '
+        : 'Hoy se enciende '
+      return { before: lead, emphasis: next.name, after: ', si tú quieres.' }
     }
   }
 

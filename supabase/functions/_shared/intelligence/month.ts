@@ -8,6 +8,11 @@
  *
  * Mirrors the shape of week-logic.ts so MonthSegment can swap mock → real
  * the same way the Semana did.
+ *
+ * DELIMITACIÓN (V-10 · ADR 0002 cerrado): este módulo es solo la NARRATIVA
+ * DIMENSIONAL del mes (niveles, tendencia, tema, voz). La evidencia (KPI
+ * déficit, calendario, patrones accionables) vive en `month-built.ts`; los
+ * hábitos de cadencia en `month-patterns.ts`. No se solapan.
  */
 import { deriveDimensions, dimensionsFor } from './dimensions.ts'
 import type { DailySignals, DimensionContext, DimensionKey, EnLuz, VozParte } from './types.ts'

@@ -1,3 +1,4 @@
+import { WEEKLY_READING_MIN_DAYS } from '@/features/orbit/weekly-reading'
 import type { NotificationWindow } from '@/features/profile/api'
 
 /*
@@ -177,6 +178,48 @@ export function cycleCopy(signLabel: string, sealedMonth: Date): { title: string
 export function nextCycleDate(now: Date, window: Exclude<NotificationWindow, 'not_yet'>): Date {
   const t = WINDOW_TIME[window]
   return new Date(now.getFullYear(), now.getMonth() + 1, 1, t.hour, t.minute, 0, 0)
+}
+
+/*
+ * N8 · "tu lectura está lista" — el anuncio de la Lectura Semanal (V-06).
+ * GANADA por definición: solo se agenda cuando la lectura del próximo lunes
+ * ya está garantizada (ver weeklyReadingGuaranteed), nunca como recordatorio
+ * vacío. El push no adelanta números ni la palanca: el contenido vive en
+ * /weekly-reading, donde el tap aterriza directo. Lleva ✦ (política: la
+ * estrella marca "hay algo GANADO esperándote", como N1/N4/N5).
+ * (Pasa por voice-and-copy.)
+ */
+export const READING_COPY = {
+  // Hace eco con la card destino ("Tu lectura está lista."); el body se
+  // sostiene solo si el canal trunca el title, sin repetir el cierre de N1.
+  title: 'Tu lectura de la semana está lista ✦',
+  body: 'Tu semana pasada dejó algo que leer. Cuando quieras, aquí está.',
+} as const
+
+/**
+ * ¿La lectura del PRÓXIMO lunes ya está garantizada? Sí cuando la semana EN
+ * CURSO ya juntó los días mínimos con comida del motor compartido
+ * (WEEKLY_READING_MIN_DAYS). Monotónico dentro de la semana — los días con
+ * comida solo crecen — así que la promesa del push no puede romperse: al
+ * llegar el lunes, buildWeeklyReading emitirá lectura (completa o parcial),
+ * jamás silencio. `days` = filas de daily_signals (una por día).
+ */
+export function weeklyReadingGuaranteed(
+  days: readonly { day: string | null; calories: number | null }[],
+  todayIso: string,
+): boolean {
+  const [y, m, d] = todayIso.split('-').map(Number) as [number, number, number]
+  const dow = (new Date(y, m - 1, d, 12).getDay() + 6) % 7 // lunes = 0
+  const monday = new Date(y, m - 1, d - dow, 12)
+  const mm = String(monday.getMonth() + 1).padStart(2, '0')
+  const dd = String(monday.getDate()).padStart(2, '0')
+  const mondayIso = `${monday.getFullYear()}-${mm}-${dd}`
+  let withFood = 0
+  for (const s of days) {
+    if (s.day == null || s.day < mondayIso || s.day > todayIso) continue
+    if (s.calories != null && s.calories > 0) withFood += 1
+  }
+  return withFood >= WEEKLY_READING_MIN_DAYS
 }
 
 /** ¿Caen el mismo día calendario local? (arbitraje patrón vs sello). */

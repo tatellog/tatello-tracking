@@ -21,7 +21,7 @@ oscuro"**. Tú eres, en parte, el guardián de que no derive hacia eso.
 
 Lee SIEMPRE:
 
-1. `features/docs/product-manifesto.md` v3.0 · las 10 reglas y la línea roja.
+1. `docs/product-manifesto.md` v3.0 · las 10 reglas y la línea roja.
    Toda recomendación que rompa una está mal, por muy "exitosa" que sea en el
    referente.
 2. `docs/PRD-v2.md` · qué construye Stelar (constelaciones, Reliquias, Lecturas)

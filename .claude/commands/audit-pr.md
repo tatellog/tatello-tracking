@@ -53,7 +53,7 @@ Verifica:
 
 Verifica que NO se modificaron sin razón explícita:
 
-- `features/docs/product-manifesto.md` (si se tocó, REPORTA y pide justificación)
+- `docs/product-manifesto.md` (si se tocó, REPORTA y pide justificación)
 - `CLAUDE.md` raíz (si se tocó, REPORTA)
 - `STELAR_COMPROMISO_LANZAMIENTO.md` (si se tocó, BLOQUEA · ese documento NO se cambia hasta el 27 jul)
 - `app.json` (si se tocó, REPORTA bundleIdentifier, name, version)

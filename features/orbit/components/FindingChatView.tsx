@@ -51,6 +51,14 @@ type Props = {
   onKeepFoco?: (foco: string) => void
   /** Este hallazgo ya es un foco guardado este mes. */
   kept?: boolean
+  /** La prueba (V-12): probar la hipótesis viva de este hallazgo unos días.
+   *  El experimento nace y se deja DESDE la conversación (jamás un dashboard);
+   *  el estado vive en el arco de la card. null = no aplica (sin hipótesis
+   *  viva, dimensión no medible, u otra prueba ya corre). */
+  trial?:
+    | { state: 'offer'; onStart: () => void; busy?: boolean }
+    | { state: 'running'; day: number; days: number; onLeave: () => void; busy?: boolean }
+    | null
   onNext: () => void
   onFinish: () => void
   onPickDay?: (date: string) => void
@@ -118,6 +126,7 @@ export function FindingChatView({
   onSaveReflection,
   onKeepFoco,
   kept,
+  trial,
   onNext,
   onFinish,
   onPickDay,
@@ -414,6 +423,37 @@ export function FindingChatView({
               ) : null}
             </View>
           ) : null}
+          {/* La prueba (V-12): la acción voluntaria nace AQUÍ, de la charla —
+              no de un dashboard. Ofrecer nunca ordena; dejarla nunca culpa.
+              El seguimiento vive en el arco de la card, no en esta hoja. */}
+          {trial ? (
+            <View style={styles.trialBlock}>
+              {trial.state === 'offer' ? (
+                <>
+                  <Text style={styles.trialNote}>
+                    Si quieres, lo miramos de cerca unos días. Se mide sola, con tu registro.
+                    Dejarlo también está bien.
+                  </Text>
+                  <ChoiceChip
+                    label={trial.busy ? 'Abriendo tu prueba…' : 'Probarlo unos días'}
+                    tint={tint}
+                    onPress={trial.busy ? () => {} : trial.onStart}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.trialNote}>
+                    Día {trial.day} de {trial.days} en tu prueba. Se mide sola, con tu registro.
+                  </Text>
+                  <ChoiceChip
+                    label={trial.busy ? 'Cerrando…' : 'Dejar la prueba'}
+                    tint={tint}
+                    onPress={trial.busy ? () => {} : trial.onLeave}
+                  />
+                </>
+              )}
+            </View>
+          ) : null}
           {hasMore ? (
             <ChoiceChip label="Ver otro hallazgo" tint={tint} primary onPress={onNext} />
           ) : (
@@ -563,6 +603,15 @@ const styles = StyleSheet.create({
   closing: { gap: 10, marginLeft: AV + 8 },
   // El foco DICHO: la palanca concreta ("cuida los viernes"), no un titular.
   focoBlock: { gap: 8 },
+  // La prueba (V-12) — mismo aire que el foco: nota tenue + un chip.
+  trialBlock: { gap: 8, marginTop: 4 },
+  trialNote: {
+    fontFamily: typography.serif,
+    fontStyle: 'italic',
+    fontSize: typography.sizes.body,
+    lineHeight: 20,
+    color: colors.niebla,
+  },
   focoLine: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,

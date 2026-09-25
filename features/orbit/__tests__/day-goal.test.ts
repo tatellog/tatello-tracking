@@ -67,6 +67,20 @@ describe('buildDayGoal — evidencia', () => {
     expect(find(g.evidence, 'water')!.label).toBe('Agua completa')
   })
 
+  it('agua de Salud lleva su procedencia en el detalle (spec §9)', () => {
+    const g = buildDayGoal(mkSig(DAY, { water_glasses: 6, water_source: 'wearable' }), CTX)!
+    expect(find(g.evidence, 'water')!.detail).toMatch(/vasos · tu reloj$/)
+    const manual = buildDayGoal(mkSig(DAY, { water_glasses: 6, water_source: 'manual' }), CTX)!
+    expect(find(manual.evidence, 'water')!.detail).toMatch(/vasos$/)
+  })
+
+  it('sueño del reloj lleva su procedencia en el detalle (V-15)', () => {
+    const g = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'wearable' }), CTX)!
+    expect(find(g.evidence, 'sleep')!.detail).toBe('7 h · tu reloj')
+    const manual = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'manual' }), CTX)!
+    expect(find(manual.evidence, 'sleep')!.detail).toBe('7 h')
+  })
+
   it('proteína en progreso conserva el dato real, sin "en objetivo"', () => {
     const g = buildDayGoal(mkSig(DAY, { calories: 1280, protein_g: 90 }), CTX)!
     expect(find(g.evidence, 'protein')!.label).toBe('Proteína')
@@ -122,7 +136,7 @@ describe('buildDayGoal — lo que aún no aparece', () => {
     const keys = g.missing.map((m) => m.key)
     expect(keys).toContain('sueno')
     expect(keys).toContain('agua')
-    expect(keys).toContain('animo')
+    expect(keys).not.toContain('animo') // el ánimo ya no se pide (sep 2026)
     expect(keys).not.toContain('comida') // ya hay comida
     expect(keys).not.toContain('ciclo')
   })

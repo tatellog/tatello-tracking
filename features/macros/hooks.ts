@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 
 import { useBriefContext } from '@/features/brief/hooks'
 import { patchBriefCache, restoreBriefCache } from '@/lib/briefCache'
+import { logMeta } from '@/lib/logMeta'
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 
@@ -212,6 +213,8 @@ export function useCreateMeal() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateMealInput) => createMeal(input),
+    // Hero vivo (V-13): el emblema de Hoy reacciona al registro.
+    meta: logMeta('comida'),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: queryKeys.brief.all })
       return patchBriefCache(qc, (ctx) => ({

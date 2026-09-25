@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { logMeta } from '@/lib/logMeta'
 import { queryKeys } from '@/lib/queryKeys'
 
 import { getSleepLog, upsertSleepLog, type SleepDraft } from './api'
@@ -26,6 +27,8 @@ export function useUpsertSleep(date: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (draft: SleepDraft) => upsertSleepLog(date, draft),
+    // Hero vivo (V-13): el emblema de Hoy reacciona al registro.
+    meta: logMeta('sueno'),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.sleep.day(date) })
       // orbit.all (prefijo) cubre las keys de órbita ahora scopeadas por usuario.

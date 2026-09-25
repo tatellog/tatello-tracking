@@ -4,6 +4,11 @@
  * how often) and the recurring SHAPE of your week (weekdays vs weekend).
  * Deterministic, no AI. Returns `Patron`s the existing card + detail
  * screen render. Voice rules per features/patterns/CLAUDE.md.
+ *
+ * DELIMITACIÓN (V-10 · ADR 0002 cerrado): este módulo es solo HÁBITOS DE
+ * CADENCIA. La evidencia del mes (KPI déficit, calendario, patrones
+ * accionables) vive en `month-built.ts`; la narrativa dimensional en
+ * `month.ts`. No se solapan.
  */
 import type { DailySignals } from './types.ts'
 import { deriveDimensions } from './dimensions.ts'

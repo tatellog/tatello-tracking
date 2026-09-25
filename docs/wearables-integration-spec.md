@@ -203,12 +203,13 @@ cobro llega cuando el sync ya es confiable (fase 2, con trial).
 
 ## 7 · Roadmap
 
-| Fase                         | Gate                                                            | Qué                                                                                                                                                                                                    |
-| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0 · Groundwork               | ya                                                              | Encuesta de reloj a las 4 usuarias · migración de tablas crudas + RLS · priming + copy · ~~solicitar programa Garmin~~ (programa suspendido, ver §8.2)                                                 |
-| 1 · Apple Health             | dev build (cuenta Apple ya existe)                              | ✅ CONSTRUIDA. Sueño + workouts (tipo/duración/kcal) + pasos ingest · view manual-gana · kcal del reloj en el multiring de Órbita Día · Conexiones en Ajustes + paso de onboarding · gratis para betas |
-| 2 · Health Connect (Android) | demanda real de usuarias Android                                | Espejo de fase 1 con `react-native-health-connect` (§8.1) · +`'health_connect'` al source · minSdkVersion 26 · superficie de pasos · paywall con trial                                                 |
-| 3 · Garmin directo           | BLOQUEADO (§8.2): programa suspendido + entidad legal + demanda | Diferido indefinidamente. Cobertura de Garmin HOY = rebote por Apple Health / Health Connect, costo cero.                                                                                              |
+| Fase                         | Gate                                                            | Qué                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 · Groundwork               | ya                                                              | Encuesta de reloj a las 4 usuarias · migración de tablas crudas + RLS · priming + copy · ~~solicitar programa Garmin~~ (programa suspendido, ver §8.2)                                                                                                                                                                                                |
+| 1 · Apple Health             | dev build (cuenta Apple ya existe)                              | ✅ CONSTRUIDA. Sueño + workouts (tipo/duración/kcal) + pasos ingest · view manual-gana · kcal del reloj en el multiring de Órbita Día · Conexiones en Ajustes + paso de onboarding · gratis para betas                                                                                                                                                |
+| 1b · Smart Recovery (V-15)   | ya (sep 2026)                                                   | ✅ CONSTRUIDA. Hoy no pregunta lo que el reloj ya trajo: DayCheckIn sellado con procedencia · slide de sueño llena · rituales/recompensas cuentan la noche del reloj · Órbita Día "tu reloj" en sueño · view +`sleep_source`/`workout_minutes` (migración 20260922120000, aplicada en prod 22 sep 2026) · invitación contextual bajo el check-in (§5) |
+| 2 · Health Connect (Android) | demanda real de usuarias Android                                | Espejo de fase 1 con `react-native-health-connect` (§8.1) · +`'health_connect'` al source · minSdkVersion 26 · superficie de pasos · paywall con trial                                                                                                                                                                                                |
+| 3 · Garmin directo           | BLOQUEADO (§8.2): programa suspendido + entidad legal + demanda | Diferido indefinidamente. Cobertura de Garmin HOY = rebote por Apple Health / Health Connect, costo cero.                                                                                                                                                                                                                                             |
 
 **Pendiente técnico de fase 1:** elegir librería HealthKit para Expo
 (candidatas a evaluar con backend-specialist; requiere expo prebuild /
@@ -277,3 +278,71 @@ condiciones (todas): (a) Garmin reabra el programa, (b) Stelar sea una
 entidad legal que califique, (c) haya demanda real de usuarias Garmin que
 el rebote no cubra bien. Mientras tanto, el rebote por Apple Health /
 Health Connect es la cobertura de Garmin, a costo cero.
+
+## 9 · Registro cero · las pipas que faltan (decisiones de la dueña · 25 sep 2026)
+
+**La idea:** Stelar se llena solo; la usuaria solo confirma lo que ningún
+reloj sabe (comida y ánimo). Cada pipa nueva reusa la plantilla de V-15:
+tabla cruda propia · "manual gana, la plataforma rellena" · procedencia
+junto al dato · dedupe en Hoy (no preguntar lo que ya llegó) · cero metas
+nuevas · nunca eat-back ni TDEE del reloj · lo tardío solo suma.
+
+Nota de plataforma: en iOS la fuente es Apple Salud (ya conectada); Health
+Connect es el espejo Android (§8.1), gateado en demanda real. Garmin
+sigue sin API directa (§8.2, confirmado sep 2026): entra por rebote.
+
+| Pipa    | Fuente en Salud                | Decisión de la dueña                                                                                                          | Superficie                                                                                                                                                                                                                       |
+| ------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agua    | `dietaryWater` (apps, Garmin)  | Sí                                                                                                                            | Vasitos de Hoy/QuickLog nacen llenos con "desde tu reloj"; manual gana; el agua de comidas sigue sumando                                                                                                                         |
+| Pasos   | `stepCount` (ya se ingiere)    | Sí, en Semana                                                                                                                 | "Tus ritmos" de Órbita Semana: ritmo por día de semana + promedio como evidencia; sin meta, sin contador diario                                                                                                                  |
+| Báscula | `bodyMass` (app de la báscula) | **Opcional, opt-in.** Ícono propio en la cabecera de Hoy junto al calendario; muestra un punto cuando llega una lectura nueva | El ícono NUNCA muestra el número; el tap lleva a Progreso. Entra en silencio al motor de TDEE y a la tendencia. Manual gana                                                                                                      |
+| Ciclo   | `menstrualFlow` (Watch, apps)  | **Solo período, lo más sencillo.** Sin fases (nada de lútea / folicular / ovulación)                                          | Opt-in separado. Al conectar, una confirmación del historial; después silencio con "corregir". Órbita lee "esta semana tuviste tu período" / "semana antes de tu período" en Lectura Semanal y Mes; nunca predice ni diagnostica |
+
+Reglas fijas de esta fase: cada permiso nuevo con priming propio ·
+procedencia visible ("desde tu reloj", "desde tu báscula") · Día de Órbita
+no cambia por el ciclo (contexto, no hábito) · nada en Hoy muestra peso.
+
+**Orden:** validar V-15 con Garmin (build 17) → agua + pasos → báscula →
+ciclo → Health Connect cuando haya usuaria Android. Estado se anota aquí y
+en el roadmap (V-14/V-15).
+
+**Estado (25 sep 2026):** agua + pasos CONSTRUIDOS. Migración
+`20260925120000` (tabla `wearable_water` + view: `water_glasses =
+COALESCE(manual, reloj)`, `water_source`, `steps`), aplicada en prod con
+rls-auditor aprobada. HealthKit pide `dietaryWater`. QuickLog: vasitos nacen
+llenos + "desde tu reloj" (tocar uno escribe manual). Recompensas del
+universo y Órbita Día cuentan/marcan el agua de Salud. Pasos: `stepsRhythm`
+en `_shared/intelligence/steps.ts` (≥3 días, promedio a centenas, días que
+destacan ×1.2) y bloque "Tus pasos" en Órbita Semana. Báscula CONSTRUIDA (25 sep 2026): opt-in con permiso de Salud aparte
+(`requestScaleAuthorization`, `bodyMass` fuera de READ_TYPES); tabla
+`wearable_weight` (última lectura del día, 20–400 kg) y view `weight_kg =
+COALESCE(manual, báscula)::numeric(5,2)` + `weight_source` (migración
+`20260925150000`, aplicada en prod; el cast preserva el typmod, hallazgo
+rls-auditor). Ícono en la cabecera de Hoy (`TabHeader.scale`) con punto
+cuando hay lectura no vista, sin número; abre `app/scale.tsx` ("Tu
+báscula": priming, encender/apagar, última lectura con "desde tu báscula",
+enlace a la tendencia). La serie de la báscula entra como relleno de menor
+prioridad en `mergeWeightSeries` (Progreso Body, tendencia, historia,
+composición, seeds de QuickLog y check-in) y en `useMacroInputs`; el TDEE
+adaptativo la recibe solo por la view. La slide "Tu peso" de Hoy sigue
+manual-only. **Modo confirmación de Hoy** (25 sep 2026, decisión dueña:
+"no quitar los componentes, quitar las preguntas"): lo que el reloj ya anotó
+hoy (sueño, entreno, agua; pasos y peso NO) se colapsa en la línea "Tu reloj
+ya anotó: 7 h 15 de sueño · 45 min de entreno · 6 vasos de agua · ajustar ›"
+(`ArrivedLine`, `arrivedSummary` en recovery.ts). Cerrada: el check-in de
+entreno y la slide de sueño desaparecen del flujo y QuickLog recoge los
+vasitos en "6 vasos · desde tu reloj · ajustar". "ajustar" devuelve los
+componentes de siempre, llenos, para corregir (manual gana). Por dimensión y
+por día: lo que no llegó sigue preguntando como siempre; sin reloj Hoy no
+cambia. Órbita Día no cambia (chips = lo que falta, evidencia = lo que llegó
+con procedencia). **Ánimo retirado del flujo diario** (25 sep 2026, decisión
+dueña): el motor solo lo usaba como presencia (ningún detector lo cruzaba) y
+la beta lo registraba ~2 veces al mes por usuaria. Fuera: slide "Cómo
+amaneciste" (con la nota libre), chip/modal de ánimo en Órbita Día, affords
+de mente/energía en Día, y el atributo Brillo del universo (quedan Energía,
+Claridad, Estabilidad). Historial legible; `mood_checkins` y sus hooks
+siguen para un futuro ánimo BAJO DEMANDA en el cierre de un día que se rompe
+("Hoy tu cuerpo pidió más. ¿Algo pasó?"), decisión pendiente. Pendiente:
+ciclo (solo período). Pendiente de
+la dueña: ampliar `NSHealthShareUsageDescription` en app.json para nombrar
+el agua.

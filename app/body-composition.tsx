@@ -17,6 +17,7 @@ import {
 import { METRIC_CONFIG, METRIC_KEYS, type MetricKey } from '@/features/progress/metric-config'
 import { SkyBackground } from '@/features/tabs/components'
 import { colors, typography } from '@/theme'
+import { useWearableWeights } from '@/features/wearables/hooks'
 
 /*
  * Composición corporal (Epic 08 · F1) — la pregunta: "¿de qué está hecho mi
@@ -41,10 +42,12 @@ export default function BodyCompositionScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const { series, isPending, checkins } = useGatedCompositionSeries()
+  // Báscula (spec wearables §9): rellena los días sin registro propio.
+  const scaleWeights = useWearableWeights()
 
   const byKey = useMemo<Record<MetricKey, SeriesPoint[]>>(() => {
     const weightSerie = smoothWeightPoints(
-      mergeWeightSeries(measurements.data ?? [], checkins.data ?? []),
+      mergeWeightSeries(measurements.data ?? [], checkins.data ?? [], scaleWeights.data ?? []),
     ).map((p) => ({ day: new Date(p.t).toISOString().slice(0, 10), value: p.weight }))
     return {
       peso: weightSerie,
@@ -54,7 +57,7 @@ export default function BodyCompositionScreen() {
       visceral: checkinSeries(checkins.data ?? [], 'visceral_fat_index'),
       imc: checkinSeries(checkins.data ?? [], 'bmi'),
     }
-  }, [measurements.data, checkins.data, series])
+  }, [measurements.data, checkins.data, scaleWeights.data, series])
 
   const cards = METRIC_KEYS.map((key) => ({ key, serie: byKey[key] })).filter(
     (c) => c.serie.length > 0,

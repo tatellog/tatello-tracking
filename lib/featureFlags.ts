@@ -100,3 +100,26 @@ export const PROGRESS_CHAT_ENABLED = true
  */
 export const WEARABLE_MOCK_DATA = true
 export const PROGRESS_META_ENABLED = false
+
+/*
+ * Lectura Semanal (roadmap V-05/V-06) — EL loop de retorno: el domingo el
+ * motor te devuelve gasto real + ritmo + una palanca (100% determinístico,
+ * edge `weekly-reading`, tabla `weekly_readings` inmutable).
+ *
+ * DOBLE-gateada mientras se valida: este master + aiEnabledForEmail (dev).
+ * Para abrir a beta: quitar el gate devOnly en la superficie (el motor no
+ * gasta IA, así que abrirla no toca el presupuesto de OpenAI).
+ */
+export const WEEKLY_READING_ENABLED = true
+
+/*
+ * Hero vivo (roadmap V-13) — el emblema de Hoy reacciona (<1 s, sutil) cuando
+ * la usuaria registra comida / agua / ánimo / sueño: una onda, un calor, tres
+ * estrellas que vibran. Recompensa sensorial de "el sistema te recibió"; NO
+ * desbloqueo ni progreso. Capa Skia que se monta solo mientras corre; en
+ * reposo cuesta cero. Disparador: mutations marcadas con `logMeta` (lib/logMeta).
+ *
+ * ON para validar en device (Expo Go + release). Apagar acá lo vuelve a
+ * dejar quieto sin tocar nada más. Reduce-motion lo apaga solo.
+ */
+export const HERO_ALIVE_ENABLED = true
