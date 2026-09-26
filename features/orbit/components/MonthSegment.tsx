@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
 import { BlurView } from 'expo-blur'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useIsFocused } from '@react-navigation/native'
 
 import { colors, typography } from '@/theme'
@@ -397,6 +398,7 @@ export function MonthSegment({
         : null
     return {
       label: `${HABIT_LABEL[key]} → déficit${proof} · descubierto el ${when}`,
+      when,
       onReplay: () =>
         emitReplayReveal({
           tier: row.tier,
@@ -687,7 +689,18 @@ export function MonthSegment({
                     ? 'Empieza a asomar. Lo sigo mirando.'
                     : 'Lo que apareció junto en tus días.'}
                 </Text>
-                {combo ? (
+                {combo && view === 'patterns' ? (
+                  <PatternHero
+                    combo={combo}
+                    discoveredOn={provenance?.when ?? null}
+                    onUnderstand={aiOn && comboFinding ? () => setChatOpen(true) : undefined}
+                    onReveal={() => {
+                      const base = comboReveal(combo)
+                      setReveal({ ...base, takeaway: comboLever ?? base.takeaway })
+                    }}
+                  />
+                ) : null}
+                {combo && view !== 'patterns' ? (
                   <DominantPatternCard
                     combo={combo}
                     provenance={provenance}
@@ -1273,6 +1286,148 @@ const NODE_COLOR: Record<string, string> = {
   agua: colors.leche,
 }
 
+/* Cómo se nombra cada hábito dentro de la frase del hallazgo. */
+const HABIT_PHRASE: Record<string, string> = {
+  sueno: 'dormir 7 horas o más',
+  cuerpo: 'entrenar',
+  proteina: 'llegar a tu proteína',
+  agua: 'completar tu agua',
+}
+
+/** "Dormir 7 horas o más y entrenar el mismo día." */
+function comboSentence(combo: WinningComboData): string {
+  const parts = combo.signals.map((s) => HABIT_PHRASE[s.key] ?? s.label.toLowerCase())
+  const list =
+    parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}` : parts[0]!
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)} el mismo día.`
+}
+
+/* El patrón en el feed de Órbita (dirección de arte sep 2026): el hallazgo ES
+ * la frase; la constelación es su firma, chica y sin caja; la evidencia son
+ * dos barras finas que muestran que se separa de sus otros días; la IA es una
+ * sola acción clara ("✦ Pregúntale a Stelar", contorno aurora) y la
+ * revelación queda como link secundario (el "wow" guardado). */
+function PatternHero({
+  combo,
+  discoveredOn,
+  onUnderstand,
+  onReveal,
+}: {
+  combo: WinningComboData
+  discoveredOn: string | null
+  onUnderstand?: () => void
+  onReveal: () => void
+}) {
+  const nodes = [
+    ...combo.signals.map((s) => ({
+      label: NODE_LABEL[s.key] ?? s.label,
+      color: NODE_COLOR[s.key] ?? colors.leche,
+    })),
+    { label: 'Déficit', color: colors.oroSoft },
+  ]
+  const rate = combo.occurrences > 0 ? combo.deficits / combo.occurrences : 0
+  const restRate = combo.restDays > 0 ? combo.restDeficits / combo.restDays : 0
+  // "sueño y entreno": el combo corto para la etiqueta de la barra.
+  const shortParts = combo.signals.map((s) => (NODE_LABEL[s.key] ?? s.label).toLowerCase())
+  const comboShort =
+    shortParts.length > 1
+      ? `${shortParts.slice(0, -1).join(', ')} y ${shortParts[shortParts.length - 1]}`
+      : shortParts[0]!
+  return (
+    <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern}>
+      <PatternDiscovery nodes={nodes} height={112} />
+      <Text style={styles.heroPatternTitle}>{comboSentence(combo)}</Text>
+
+      {/* La evidencia dice DE QUÉ es: días que cerraste en déficit, contados
+          (no porcentajes), con esta combinación contra tus otros días. */}
+      <View
+        style={styles.heroBars}
+        accessible
+        accessibilityLabel={`Días que cerraste en déficit: ${combo.deficits} de ${combo.occurrences} con ${comboShort}; ${combo.restDeficits} de ${combo.restDays} en tus otros días.`}
+      >
+        <Text style={styles.heroBarsTitle}>Días que cerraste en déficit</Text>
+        <EvidenceLine
+          label={`Con ${comboShort}`}
+          value={rate}
+          count={`${combo.deficits} de ${combo.occurrences}`}
+          strong
+        />
+        <EvidenceLine
+          label="Tus otros días"
+          value={restRate}
+          count={`${combo.restDeficits} de ${combo.restDays}`}
+        />
+      </View>
+
+      <View style={styles.heroActions}>
+        {onUnderstand ? <AuroraCta label="Pregúntale a Stelar" onPress={onUnderstand} /> : null}
+        <Pressable
+          onPress={onReveal}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Ver la revelación"
+        >
+          <Text style={styles.heroRevealLink}>Ver la revelación ›</Text>
+        </Pressable>
+      </View>
+      {discoveredOn ? (
+        <Text style={styles.heroDiscovered}>{`Descubierto el ${discoveredOn}`}</Text>
+      ) : null}
+    </Animated.View>
+  )
+}
+
+/* Una barra fina de la evidencia: el porcentaje de días en déficit. */
+function EvidenceLine({
+  label,
+  value,
+  count,
+  strong,
+}: {
+  label: string
+  value: number
+  count: string
+  strong?: boolean
+}) {
+  return (
+    <View style={styles.evLine}>
+      <Text style={[styles.evLabel, strong && styles.evLabelStrong]}>{label}</Text>
+      <View style={styles.evTrack}>
+        <View
+          style={[
+            styles.evFill,
+            { width: `${Math.max(4, Math.round(value * 100))}%` },
+            strong ? styles.evFillStrong : null,
+          ]}
+        />
+      </View>
+      <Text style={[styles.evValue, strong && styles.evLabelStrong]}>{count}</Text>
+    </View>
+  )
+}
+
+/* La acción de IA: píldora con contorno aurora (el degradado del chat), sin
+ * relleno magenta — se lee IA sin competir con Registrar. ✦ solo aquí. */
+function AuroraCta({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      {({ pressed }) => (
+        <LinearGradient
+          colors={[colors.magenta, colors.oroSoft, colors.dimension.mente]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.auroraBorder, pressed && { opacity: 0.8 }]}
+        >
+          <View style={styles.auroraInner}>
+            <Text style={styles.auroraStar}>✦</Text>
+            <Text style={styles.auroraLabel}>{label}</Text>
+          </View>
+        </LinearGradient>
+      )}
+    </Pressable>
+  )
+}
+
 /* El patrón dominante: la combinación de hábitos que más fue de la mano con el
  * déficit. La card es una ESCENA DE DESCUBRIMIENTO (PatternDiscovery): una
  * constelación que Stelar traza sola + el insight. Sigue tappable → modal
@@ -1757,6 +1912,106 @@ function RevealEvidenceModal({
 }
 
 const styles = StyleSheet.create({
+  heroPattern: {
+    marginTop: 4,
+  },
+  heroPatternTitle: {
+    marginTop: 8,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 27,
+    color: colors.leche,
+  },
+  heroBars: {
+    marginTop: 18,
+    gap: 10,
+  },
+  heroBarsTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 2,
+  },
+  evLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  evLabel: {
+    width: 150,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  evLabelStrong: {
+    color: colors.leche,
+  },
+  evTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.hairline,
+    overflow: 'hidden',
+  },
+  evFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: colors.bruma,
+  },
+  evFillStrong: {
+    backgroundColor: colors.oroSoft,
+  },
+  evValue: {
+    width: 52,
+    textAlign: 'right',
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  heroActions: {
+    marginTop: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  heroRevealLink: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.oroSoft,
+    letterSpacing: 0.3,
+  },
+  heroDiscovered: {
+    marginTop: 14,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    color: colors.niebla,
+  },
+  auroraBorder: {
+    borderRadius: 999,
+    padding: 1,
+  },
+  auroraInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: colors.bg,
+  },
+  auroraStar: {
+    fontSize: typography.sizes.body,
+    color: colors.oroLight,
+  },
+  auroraLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.leche,
+    letterSpacing: 0.3,
+  },
   firstSignalEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,

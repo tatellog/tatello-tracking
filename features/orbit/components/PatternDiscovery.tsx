@@ -90,7 +90,16 @@ const bez = (a: number, c: number, b: number, t: number): number => {
   return mt * mt * a + 2 * mt * t * c + t * t * b
 }
 
-export function PatternDiscovery({ nodes }: { nodes: NodeInfo[] }) {
+export function PatternDiscovery({
+  nodes,
+  height = SCENE_H,
+}: {
+  nodes: NodeInfo[]
+  /** Alto de la escena. El feed de Órbita la usa compacta: la constelación es
+   *  la FIRMA del patrón, no el protagonista (el hallazgo es la frase). */
+  height?: number
+}) {
+  const sceneH = height
   const [w, setW] = useState(0)
   const onLayout = (e: LayoutChangeEvent): void => {
     const next = e.nativeEvent.layout.width
@@ -109,9 +118,9 @@ export function PatternDiscovery({ nodes }: { nodes: NodeInfo[] }) {
     const layout = LAYOUTS[n] ?? LAYOUTS[3]!
     const pos: Pt[] = nodes.map((_, i) => ({
       x: (layout[i]?.x ?? 0.5) * w,
-      y: (layout[i]?.y ?? 0.5) * SCENE_H,
+      y: (layout[i]?.y ?? 0.5) * sceneH,
     }))
-    const entry: Pt = { x: -0.08 * w, y: 0.46 * SCENE_H }
+    const entry: Pt = { x: -0.08 * w, y: 0.46 * sceneH }
     const waypoints: Pt[] = [entry, ...pos]
 
     const travelStart: number[] = []
@@ -173,7 +182,7 @@ export function PatternDiscovery({ nodes }: { nodes: NodeInfo[] }) {
     }
 
     return { pos, samples, lines, arrival }
-  }, [w, nodes, n])
+  }, [w, nodes, n, sceneH])
 
   const revealMs = n * REVEAL_PER
   const journeyStart = REVEAL_START + revealMs + JOURNEY_GAP
@@ -266,10 +275,10 @@ export function PatternDiscovery({ nodes }: { nodes: NodeInfo[] }) {
     // Decorativo: no captura toques → el tap llega al Pressable de la card y abre
     // el modal full-screen (la metáfora "línea de vida").
     <View style={styles.wrap} pointerEvents="none">
-      <View style={styles.scene} onLayout={onLayout}>
+      <View style={[styles.scene, { height: sceneH }]} onLayout={onLayout}>
         {w > 0 && geom ? (
           <>
-            <Canvas style={{ width: w, height: SCENE_H }}>
+            <Canvas style={{ width: w, height: sceneH }}>
               {geom.lines.map((ln, i) => (
                 <ConnLine key={i} path={ln.path} start={ln.start} end={ln.end} journey={journey} />
               ))}
