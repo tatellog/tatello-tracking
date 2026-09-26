@@ -46,6 +46,7 @@ import {
 } from '@/features/macros/api'
 import {
   useCreateMeal,
+  useDeleteMeal,
   useFrequentMeals,
   useMacroTargets,
   useMealById,
@@ -581,6 +582,25 @@ export default function ScanMealScreen() {
     mealType?: string
   }>()
   const isEdit = !!editId
+  // Borrar vive DENTRO del editor (sin gesto oculto): desde la lista del día
+  // de Comidas, tocar una comida la abre aquí y "Borrar comida" la quita.
+  const deleteMeal = useDeleteMeal()
+  const confirmDelete = () => {
+    if (!editId) return
+    Alert.alert('Borrar esta comida', undefined, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Borrar',
+        style: 'destructive',
+        onPress: () =>
+          deleteMeal.mutate(editId, {
+            onSuccess: () => router.back(),
+            onError: () =>
+              Alert.alert('No pudimos borrarla', 'Intenta de nuevo cuando tengas señal.'),
+          }),
+      },
+    ])
+  }
   // Manual log — no scan, no ingredient breakdown; the user types the
   // protein + calories. The photo and name stay optional.
   const isManual = !!manual
@@ -1806,6 +1826,17 @@ export default function ScanMealScreen() {
                 loading={saving}
                 loadingLabel="Guardando…"
               />
+              {isEdit ? (
+                <Pressable
+                  onPress={confirmDelete}
+                  hitSlop={{ top: 10, bottom: 10 }}
+                  style={styles.deleteLink}
+                  accessibilityRole="button"
+                  accessibilityLabel="Borrar esta comida"
+                >
+                  <Text style={styles.deleteLinkText}>Borrar comida</Text>
+                </Pressable>
+              ) : null}
             </View>
           </>
         )}
@@ -1843,6 +1874,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Aviso de backfill — la comida cae en el día visto, no en hoy.
+  // Borrar — link callado bajo Guardar (acción destructiva, nunca primaria).
+  deleteLink: {
+    alignSelf: 'center',
+    marginTop: 14,
+    paddingVertical: 6,
+  },
+  deleteLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.3,
+  },
   backfillNote: {
     textAlign: 'center',
     marginBottom: 10,

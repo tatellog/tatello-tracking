@@ -22,6 +22,8 @@ import { useCreateMeal, useFrequentMeals, useMealsForDate } from '@/features/mac
 import { emitMealLogged } from '@/features/macros/meal-logged-bus'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { subscribeRegistroIntent, type MealMoment } from '@/features/macros/registro-intent'
+import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { showActionSheet } from '@/lib/actionSheet'
 import { resizeForDisplay } from '@/lib/image'
@@ -32,7 +34,7 @@ import { AllyCard } from './AllyCard'
 const HISTORY_LIMIT = 24
 // Aliados compactos por defecto · muestra estos y "Ver todas" para el resto.
 const COLLAPSED_COUNT = 3
-const CONFIRM_MS = 1000
+const CONFIRM_MS = 1600
 // 4-point star — la chispa del preview de la nueva comida.
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 const PREVIEW_STAR = 19
@@ -113,6 +115,13 @@ function MethodPill({
   )
 }
 
+const MOMENT_LABEL: Record<string, string> = {
+  breakfast: 'Desayuno',
+  lunch: 'Comida',
+  dinner: 'Cena',
+  snack: 'Snack',
+}
+
 const MOMENT_TITLE: Record<string, string> = {
   breakfast: 'Agregar a tu desayuno',
   lunch: 'Agregar a tu comida',
@@ -168,20 +177,13 @@ function StarPreview({ progress, valid }: { progress: number; valid: boolean }) 
   )
 }
 
-type Props = {
-  /** Abre una comida en el editor (misma pantalla que el quick-log de Hoy). */
-  onOpenMeal: (id: string, photoPath?: string) => void
-}
-
 /*
- * El bloque de registro + aliados del Tab Comidas:
- *
- *   §2 CTA "+ Agregar comida" — la acción más visible; despliega…
- *   §4 "¿Cómo quieres registrar?" — Buscar · Foto · Escribir.
- *   §3 "Tus Aliados" — las comidas que más impulsan tu transformación:
- *      proteína como dato principal, "Repetir" para registrar en 1 tap.
+ * El bloque de registro + comidas frecuentes del Tab Comidas:
+ *   · registro abierto (al tocar un astro): buscador, Foto, Descríbela;
+ *   · "Tus comidas frecuentes": filas con "Repetir" (1 tap + Deshacer).
+ * Editar una comida del día vive en la lista del día (DayMealList).
  */
-export function MealComposer({ onOpenMeal }: Props) {
+export function MealComposer() {
   const { data: foods } = useFrequentMeals(HISTORY_LIMIT)
   const createMeal = useCreateMeal()
   const router = useRouter()
@@ -276,12 +278,6 @@ export function MealComposer({ onOpenMeal }: Props) {
     setTimeout(() => setConfirmed((c) => (c === comoAyer.name ? null : c)), CONFIRM_MS)
   }
 
-  // "Aliada" se gana con evidencia: repetición real o aporte de proteína
-  // que mueva la aguja. Con una comida de 2 g registrada 1 vez, llamar a la
-  // sección "lo que más impulsa tu transformación" enseña a descontar la
-  // voz del coach. En frío la sección se presenta sin promesa inflada.
-  const hasAliados = (foods ?? []).some((f) => f.freq >= 3 || f.protein_g >= 15)
-
   const clear = () => {
     setName('')
     setProtein('')
@@ -307,7 +303,19 @@ export function MealComposer({ onOpenMeal }: Props) {
     }
   }
 
+  // Viendo un día pasado ("modo ver día"), todo lo que se registra desde aquí
+  // se ancla a ESE día (mediodía local), igual que scan-meal. Antes Repetir y
+  // "Como ayer" escribían en HOY mientras la pantalla mostraba otro día.
+  const activeLogDate = useActiveLogDate()
+  const consumedAtNow = () => {
+    if (!activeLogDate) return new Date()
+    const [y, m, d] = activeLogDate.split('-').map(Number) as [number, number, number]
+    return new Date(y, m - 1, d, 12, 0, 0)
+  }
+
   // Re-loggear una comida conocida — camino rápido (1 tap), conserva su foto.
+  // Las partículas de la luna y el "Deshacer" salen al CONFIRMAR el guardado,
+  // no antes (un tap que falla no debe celebrar).
   const log = (meal: {
     name: string
     protein_g: number
@@ -315,16 +323,31 @@ export function MealComposer({ onOpenMeal }: Props) {
     photo_storage_path?: string | null
   }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    emitMealLogged() // §6 · la luna celebra (partículas) — un solo conteo (no toca el universo)
-    createMeal.mutate({
-      name: meal.name,
-      protein_g: meal.protein_g,
-      calories: meal.calories,
-      consumed_at: new Date(),
-      meal_type: forcedType ?? currentMealType(),
-      photo_storage_path: meal.photo_storage_path ?? undefined,
-    })
-    if (forcedType) setForcedType(null)
+    const mealType = forcedType ?? currentMealType()
+    createMeal.mutate(
+      {
+        name: meal.name,
+        protein_g: meal.protein_g,
+        calories: meal.calories,
+        consumed_at: consumedAtNow(),
+        meal_type: mealType,
+        photo_storage_path: meal.photo_storage_path ?? undefined,
+      },
+      {
+        onSuccess: (created) => {
+          emitMealLogged() // §6 · la luna celebra
+          emitMealUndo({
+            id: created.id,
+            name: created.name,
+            mealTypeLabel: MOMENT_LABEL[mealType] ?? 'tu día',
+          })
+        },
+      },
+    )
+    // Registrado: el bloque se cierra (la tarea terminó). Antes quedaba abierto
+    // y, sin el momento forzado, el título caía a la hora ("Agregar un snack").
+    setRegistroOpen(false)
+    setForcedType(null)
   }
 
   const handleRepeat = (item: FrequentMeal) => {
@@ -425,20 +448,21 @@ export function MealComposer({ onOpenMeal }: Props) {
       }
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    emitMealLogged() // §6 · la luna celebra
     createMeal.mutate(
       {
         name: name.trim(),
         protein_g: proteinNum,
         calories: caloriesNum,
-        consumed_at: new Date(),
+        consumed_at: consumedAtNow(),
         meal_type: forcedType ?? currentMealType(),
         photo_storage_path: photoPath,
       },
       {
         onSuccess: () => {
+          emitMealLogged() // §6 · la luna celebra, ya guardada
           clear()
           setSubmitting(false)
+          setRegistroOpen(false)
         },
         onError: () => setSubmitting(false),
       },
@@ -478,7 +502,7 @@ export function MealComposer({ onOpenMeal }: Props) {
             >
               <View style={styles.comoAyerText}>
                 <Text style={styles.comoAyerLabel}>
-                  {confirmed === comoAyer.name ? '✦ Registrada' : 'Como ayer'}
+                  {confirmed === comoAyer.name ? 'Registrada' : 'Como ayer'}
                 </Text>
                 <Text style={styles.comoAyerName} numberOfLines={1}>
                   {comoAyer.name} · {Math.round(comoAyer.protein_g)} g ·{' '}
@@ -621,12 +645,10 @@ export function MealComposer({ onOpenMeal }: Props) {
             key={item.name}
             name={item.name}
             protein={item.protein_g}
-            freq={item.freq}
             photoPath={item.photo_storage_path}
-            rank={composing || !hasAliados ? 99 : i}
             confirmed={confirmed === item.name}
             onRepeat={() => handleRepeat(item)}
-            onOpen={() => onOpenMeal(item.id, item.photo_storage_path ?? undefined)}
+            divider={i > 0}
           />
         ))}
 
@@ -648,9 +670,7 @@ export function MealComposer({ onOpenMeal }: Props) {
             expanded ? 'Mostrar menos comidas' : 'Mostrar todas tus comidas frecuentes'
           }
         >
-          <Text style={styles.showMoreText}>
-            {expanded ? 'Ver menos' : `Ver todas · ${history.length}`}
-          </Text>
+          <Text style={styles.showMoreText}>{expanded ? 'Ver menos' : 'Ver todas'}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -776,9 +796,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.niebla,
   },
-  list: {
-    gap: 10,
-  },
+  list: {},
   emptyHint: {
     fontFamily: typography.ui,
     fontSize: typography.sizes.body,
@@ -792,9 +810,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   showMoreText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    color: colors.magenta,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
     letterSpacing: 0.3,
   },
   // Editor de nueva comida.

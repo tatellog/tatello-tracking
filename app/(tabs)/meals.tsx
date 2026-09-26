@@ -8,7 +8,13 @@ import { track } from '@/lib/analytics'
 import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
 import { NutritionMoon } from '@/features/macros/components'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
-import { MealComposer, MomentsToday, SkyBackground, TabHeader } from '@/features/tabs/components'
+import {
+  DayMealList,
+  MealComposer,
+  MomentsToday,
+  SkyBackground,
+  TabHeader,
+} from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -92,16 +98,47 @@ function MealsBody() {
             </Text>
           ) : null}
 
-          {/* §1 · Hero nutricional — proteína + luna + honestidad de avance. */}
-          <NutritionMoon
-            proteinValue={summary.protein}
-            proteinTarget={targets?.protein_g}
-            isLoading={mealsQuery.isLoading}
-          />
+          {/* Error de carga: se DICE, nunca se pinta "0 g" (en una app de peso,
+              "no comiste nada" sería mentira). */}
+          {mealsQuery.isError && !mealsQuery.data ? (
+            <View style={styles.errorBlock}>
+              <Text style={styles.errorText}>No pudimos traer tus comidas.</Text>
+              <Pressable
+                onPress={() => mealsQuery.refetch()}
+                style={styles.retry}
+                accessibilityRole="button"
+                accessibilityLabel="Reintentar"
+              >
+                <Text style={styles.retryText}>Reintentar</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {/* §1 · Hero — proteína de hoy + luna (el medidor). */}
+              <NutritionMoon
+                proteinValue={summary.protein}
+                proteinTarget={targets?.protein_g}
+                isLoading={mealsQuery.isLoading}
+              />
 
-          {/* Momentos del día — el lado práctico: qué falta capturar hoy.
-              Refleja el día visto (mismas comidas que el hero). */}
-          {mealsQuery.isLoading ? null : <MomentsToday meals={meals} viewingPast={viewingPast} />}
+              {/* Los astros AGREGAN (tocar = registrar en ese momento) y la
+                  lista del día se lee y se edita (tocar = abrir el editor, donde
+                  también se borra). Reflejan el día visto. */}
+              {mealsQuery.isLoading ? null : (
+                <>
+                  <MomentsToday meals={meals} viewingPast={viewingPast} />
+                  <DayMealList
+                    meals={meals}
+                    viewingPast={viewingPast}
+                    onOpenMeal={(id) => {
+                      track('food_card_opened', { meal_id: id })
+                      router.push({ pathname: '/scan-meal', params: { editId: id } })
+                    }}
+                  />
+                </>
+              )}
+            </>
+          )}
 
           {targets ? null : (
             <Pressable
@@ -117,20 +154,8 @@ function MealsBody() {
             </Pressable>
           )}
 
-          {/* §2 CTA + §4 Registro + §3 Tus Aliados — todo en MealComposer,
-              la acción más visible justo bajo el hero. */}
-          <MealComposer
-            onOpenMeal={(id, photoPath) => {
-              track('food_card_opened', { meal_id: id })
-              router.push({
-                pathname: '/scan-meal',
-                params: { editId: id, ...(photoPath ? { photoPath } : {}) },
-              })
-            }}
-          />
-
-          {/* Adherencia por-día ("Lo que alimenta tu transformación") — abajo,
-              como contexto. ("Esta semana" se movió a Progreso: era análisis.) */}
+          {/* Registro abierto + "Tus comidas frecuentes". */}
+          <MealComposer />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -140,6 +165,30 @@ function MealsBody() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
+  },
+  errorBlock: {
+    marginTop: 24,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  errorText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  retry: {
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+  },
+  retryText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
   },
   screen: {
     flex: 1,

@@ -2,11 +2,8 @@ import {
   BlurMask,
   Canvas,
   Circle,
-  FractalNoise,
   Group,
-  LinearGradient as SkiaLinearGradient,
   RadialGradient as SkiaRadialGradient,
-  Rect as SkiaRect,
   vec,
 } from '@shopify/react-native-skia'
 import { useEffect, useState } from 'react'
@@ -48,6 +45,11 @@ const MOON_PHASES = [
 const PHASE_MAX = MOON_PHASES.length - 1
 
 const HERO_H = 210
+// El cielo de la luna (nebulosa + halos con blur) es más grande que el hero:
+// su Canvas SANGRA arriba y abajo para que los círculos se desvanezcan solos.
+// Antes el hero recortaba con overflow:hidden y el corte se leía como un
+// rectángulo oscuro (dirección de arte sep 2026).
+const SKY_BLEED = 90
 const GUTTER = 20
 const R_MOON = 67 // tamaño original
 const MOON_BOX = Math.round((R_MOON * 2) / 0.78) // disc fills ~78% of the PNG
@@ -58,7 +60,6 @@ const MOON_BOX = Math.round((R_MOON * 2) / 0.78) // disc fills ~78% of the PNG
 // Dos aros REDONDOS, juntos entre sí (outer 1.13). Concéntricos con la luna
 // (justificada a la derecha), así se extienden hacia la izquierda hasta donde
 // termina la barra de proteína.
-const RING_OUTER = 1.13 // escala del aro EXTERIOR respecto al interior
 const RING_RX = R_MOON * 1.34
 const RING_RY = R_MOON * 1.34
 const RING_ROT = -4
@@ -67,10 +68,6 @@ const RING_ROT = -4
 const RING_OFFSET = R_MOON * 0.18
 // Distancia de la luna al borde derecho. Más alto = luna más a la izquierda.
 const MOON_RIGHT_INSET = 32
-// Altura de la barra de proteína por debajo del centro del hero (la barra vive
-// abajo del número). Sirve para que la barra toque el aro A SU ALTURA, no en el
-// punto más a la izquierda del aro (donde no hay barra).
-const BAR_DY = 28
 const TAU = Math.PI * 2
 const FILL_EASE = Easing.bezier(0.2, 0.7, 0.2, 1)
 
@@ -139,10 +136,18 @@ function Sky({
   ])
 
   return (
-    <Canvas style={StyleSheet.absoluteFill}>
-      {/* No solid Fill: the canvas top stays transparent so the hero
-          continues the screen's SkyBackground seamlessly (no top seam).
-          The vignette + bottom fade still lay down bg where needed. */}
+    <Canvas
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: -SKY_BLEED,
+        width: W,
+        height: HERO_H + 2 * SKY_BLEED,
+      }}
+      pointerEvents="none"
+    >
+      {/* Sin Fill ni rects de viñeta/fade: solo círculos con BlurMask, que se
+          desvanecen solos sobre el SkyBackground de la pantalla. */}
 
       {/* Nebula — wide soft magenta field, slow drift. */}
       <Group transform={nebTransform}>
@@ -155,14 +160,6 @@ function Sky({
           />
           <BlurMask blur={28} style="normal" />
         </Circle>
-      </Group>
-
-      {/* Nebula filaments — fractal noise gives the flat gradient real
-          materia (very subtle; drifts with the nebula). */}
-      <Group transform={nebTransform} opacity={0.05} blendMode="overlay">
-        <SkiaRect x={0} y={0} width={W} height={HERO_H}>
-          <FractalNoise freqX={0.02} freqY={0.03} octaves={3} seed={7} />
-        </SkiaRect>
       </Group>
 
       {/* Additive bloom — the breathing magenta glow + a small warm core at
@@ -211,34 +208,6 @@ function Sky({
           <BlurMask blur={16} style="normal" />
         </Circle>
       </Group>
-
-      {/* Vignette — suave, solo cierra las esquinas. Subirla de tono
-          convertía el hero en un rectángulo más oscuro que el cielo de la
-          pantalla (costura visible en el borde superior). */}
-      <SkiaRect x={0} y={0} width={W} height={HERO_H}>
-        <SkiaRadialGradient
-          c={vec(W * 0.46, HERO_H * 0.46)}
-          r={W * 0.68}
-          colors={[rgba(colors.bg, 0), rgba(colors.bg, 0), rgba(colors.bg, 0.28)]}
-          positions={[0, 0.7, 1]}
-        />
-      </SkiaRect>
-
-      {/* NO top fade: el tope del Canvas queda transparente para que el
-          SkyBackground de la pantalla (haze magenta + estrellas) CONTINÚE sin
-          escalón hacia el hero. La nebula es casi nula en el borde superior
-          (≈0.02), así que no hay costura dura que esconder; pintar bg ahí era
-          justo lo que creaba la separación. */}
-
-      {/* Bottom fade — funde con la lista de comidas de abajo. Tenue y
-          gradual para no formar su propio escalón. */}
-      <SkiaRect x={0} y={0} width={W} height={HERO_H}>
-        <SkiaLinearGradient
-          start={vec(0, HERO_H * 0.72)}
-          end={vec(0, HERO_H)}
-          colors={[rgba(colors.bg, 0), rgba(colors.bg, 0.45)]}
-        />
-      </SkiaRect>
     </Canvas>
   )
 }
@@ -465,29 +434,16 @@ function OrbitRing({ W, cx, cy }: { W: number; cx: number; cy: number }) {
     y: cy + RING_RY * sx * Math.sin(a),
   })
   // Estrellas ✦ (ángulo, escala radial, tamaño, alpha).
+  // Menos es más (dirección de arte sep 2026): tres chispas y el aro; sin
+  // anillo punteado ni puntitos, que competían con los astros de abajo.
   const stars = [
-    { a: 1.95, sx: 1.0, s: 3.6, o: 0.95 },
-    { a: 2.55, sx: RING_OUTER, s: 4.6, o: 1 },
-    { a: 3.35, sx: 1.0, s: 3.0, o: 0.85 },
-    { a: 4.55, sx: RING_OUTER, s: 4.2, o: 0.95 },
-    { a: 5.5, sx: 1.0, s: 3.0, o: 0.85 },
+    { a: 2.55, sx: 1.0, s: 4.2, o: 0.9 },
+    { a: 4.55, sx: 1.0, s: 3.6, o: 0.8 },
+    { a: 5.6, sx: 1.0, s: 3.0, o: 0.7 },
   ]
-  // Puntitos sobre el aro exterior (entre las estrellas).
-  const dots = [0.5, 1.4, 2.2, 3.0, 3.9, 4.9, 5.9].map((a) => ({ ...at(a, RING_OUTER), r: 1 }))
   return (
     <Svg width={W} height={HERO_H} style={StyleSheet.absoluteFill} pointerEvents="none">
       <SvgG transform={`rotate(${RING_ROT} ${cx} ${cy})`}>
-        {/* Exterior — difuminado: trazo tenue + dash corto = punteado/roto. */}
-        <SvgEllipse
-          cx={cx}
-          cy={cy}
-          rx={RING_RX * RING_OUTER}
-          ry={RING_RY * RING_OUTER}
-          stroke={rgba(RING_GOLD, 0.24)}
-          strokeWidth={0.9}
-          strokeDasharray="2 9"
-          fill="none"
-        />
         {/* Interior — sólido. */}
         <SvgEllipse
           cx={cx}
@@ -498,9 +454,6 @@ function OrbitRing({ W, cx, cy }: { W: number; cx: number; cy: number }) {
           strokeWidth={1.1}
           fill="none"
         />
-        {dots.map((d, i) => (
-          <SvgCircle key={`d${i}`} cx={d.x} cy={d.y} r={d.r} fill={rgba(RING_GOLD, 0.7)} />
-        ))}
         {stars.map((sp, i) => {
           const c = at(sp.a, sp.sx)
           return (
@@ -542,8 +495,6 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
     return () => cancelAnimation(p)
   }, [p, phaseTarget, reduced])
 
-  const barStyle = useAnimatedStyle(() => ({ width: `${(p.value / PHASE_MAX) * 100}%` }))
-
   // ── Hero COMPACTO en estado 0 (patrón del colapso post-ritual de Hoy):
   // con 0 g, la luna gigante gastaba el primer screenful para decir "aún
   // nada". El compacto conserva número, copy y una luna dormida pequeña;
@@ -570,8 +521,7 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
               <Text style={styles.reference}> g</Text>
             )}
           </View>
-          <Text style={styles.coach}>{copy.phrase}</Text>
-          {copy.honest ? <Text style={styles.honest}>{copy.honest}</Text> : null}
+          {copy.phrase ? <Text style={styles.coach}>{copy.phrase}</Text> : null}
         </View>
         {/* Luna dormida — glifo estático pequeño, sin cielo Skia. */}
         <Svg width={52} height={52} viewBox="0 0 52 52" pointerEvents="none">
@@ -584,7 +534,7 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
 
   return (
     <View style={styles.hero}>
-      <Sky W={W} cx={cx} cy={cy} p={p} reduced={reduced} />
+      <Sky W={W} cx={cx} cy={cy + SKY_BLEED} p={p} reduced={reduced} />
       {/* Aros corridos a la izquierda (centro = cx - RING_OFFSET); la luna queda
           a la derecha del sistema orbital. */}
       <OrbitRing W={W} cx={cx - RING_OFFSET} cy={cy} />
@@ -624,21 +574,10 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
                 <Text style={styles.reference}> g registrados</Text>
               )}
             </View>
-            <Text style={styles.label}>proteína</Text>
-
-            {/* La barra ES la lectura del progreso (sin "%": el peso lo lleva
-                la línea honesta de abajo). */}
-            {reference != null ? (
-              <View style={styles.barRow}>
-                <View style={styles.barTrack}>
-                  <Animated.View style={[styles.barFill, barStyle]} />
-                </View>
-              </View>
-            ) : null}
-
-            {/* Frase de fase (cómo se siente) + línea honesta (cuánto falta). */}
-            <Text style={styles.coach}>{copy.phrase}</Text>
+            {/* Una sola línea (dirección de arte sep 2026): el faltante
+                honesto, o la luna llena. La luna ES el medidor (sin barra). */}
             {copy.honest ? <Text style={styles.honest}>{copy.honest}</Text> : null}
+            {copy.phrase ? <Text style={styles.coach}>{copy.phrase}</Text> : null}
           </>
         )}
       </View>
@@ -652,7 +591,6 @@ const styles = StyleSheet.create({
     marginHorizontal: -GUTTER,
     marginTop: 4,
     marginBottom: 8,
-    overflow: 'hidden',
   },
   // Estado 0: media altura, sin cielo Skia — el screenful se lo ganan los
   // Momentos y los Aliados (lo accionable) hasta que la luna tenga qué contar.
@@ -688,7 +626,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.smallLabel,
-    color: colors.magenta,
+    color: colors.niebla,
     letterSpacing: 2.4,
     textTransform: 'uppercase',
     marginBottom: 8,
@@ -710,37 +648,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.heading,
     color: colors.bone,
   },
-  label: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.smallLabel,
-    color: colors.bone,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    marginTop: 3,
-  },
-  barRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    // La barra TERMINA tocando el PRIMER círculo (el aro interior sólido) a la
-    // altura de la barra: x = ringCx - sqrt(RING_RX² - BAR_DY²). Desde la derecha
-    // = MOON_RIGHT_INSET + RING_OFFSET + sqrt(...); menos el paddingRight (R_MOON*2+8).
-    marginRight: Math.round(
-      MOON_RIGHT_INSET + RING_OFFSET + Math.sqrt(RING_RX * RING_RX - BAR_DY * BAR_DY) - R_MOON - 8,
-    ),
-  },
-  barTrack: {
-    flex: 1,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.hairline,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: colors.magenta,
-  },
   // Frase de fase — voz del coach (serif italic).
   coach: {
     marginTop: 12,
@@ -753,9 +660,9 @@ const styles = StyleSheet.create({
   // Línea honesta — el dato claro (cuánto falta). UI upright, callada pero
   // legible: el usuario quiere saber cómo va, sin que grite.
   honest: {
-    marginTop: 4,
+    marginTop: 10,
     fontFamily: typography.uiMedium,
-    fontSize: 12.5,
+    fontSize: typography.sizes.body,
     letterSpacing: 0.2,
     color: colors.bone,
   },

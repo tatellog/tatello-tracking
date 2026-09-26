@@ -1,84 +1,12 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Path } from 'react-native-svg'
 
 import { mealPhotoUrl } from '@/features/macros/api'
 import { colors, typography } from '@/theme'
 
-const PHOTO = 50
-const FRAME = PHOTO + 16
+const PHOTO = 40
 
-/* El medallón ornamentado de la foto: la imagen circular dentro de un marco de
- * oro con un anillo + una corona de perlas (beads) alrededor — la "medalla" de
- * la comida aliada. El #1 va en oro claro con un glow más marcado; los demás en
- * oro pleno. Reemplaza la estrella suelta por un marco como joya. */
-function MealMedallion({ photoPath, rank }: { photoPath?: string | null; rank: number }) {
-  const top = rank === 0
-  const ringColor = top ? colors.oroLight : colors.oro
-  const c = FRAME / 2
-  const photoR = PHOTO / 2
-  const ringR = photoR + 3
-  const beadR = ringR + 4
-  // Pocos puntitos, dispersos (no una corona densa). Ángulos asimétricos.
-  const dots = [-72, 6, 78, 150, 214, 288]
-  return (
-    <View style={styles.medallion}>
-      {photoPath ? (
-        <Image source={{ uri: mealPhotoUrl(photoPath) }} style={styles.photo} resizeMode="cover" />
-      ) : (
-        <View style={[styles.photo, styles.photoEmpty]}>
-          <BowlIcon color={colors.oroSoft} />
-        </View>
-      )}
-      <Svg width={FRAME} height={FRAME} style={StyleSheet.absoluteFill} pointerEvents="none">
-        {/* Aro DIFUMINADO: dos capas anchas de baja opacidad simulan el blur. */}
-        <Circle
-          cx={c}
-          cy={c}
-          r={ringR}
-          stroke={ringColor}
-          strokeWidth={top ? 7 : 6}
-          opacity={top ? 0.13 : 0.09}
-          fill="none"
-        />
-        <Circle
-          cx={c}
-          cy={c}
-          r={ringR}
-          stroke={ringColor}
-          strokeWidth={3.5}
-          opacity={0.12}
-          fill="none"
-        />
-        {/* El aro fino, SUAVE (no una línea dura). */}
-        <Circle
-          cx={c}
-          cy={c}
-          r={ringR}
-          stroke={ringColor}
-          strokeWidth={1}
-          opacity={top ? 0.6 : 0.42}
-          fill="none"
-        />
-        {/* Pocos puntitos dorados sobre el aro — sutiles. */}
-        {dots.map((deg) => {
-          const a = (deg * Math.PI) / 180
-          return (
-            <Circle
-              key={deg}
-              cx={c + beadR * Math.cos(a)}
-              cy={c + beadR * Math.sin(a)}
-              r={1}
-              fill={ringColor}
-              opacity={0.75}
-            />
-          )
-        })}
-      </Svg>
-    </View>
-  )
-}
-
-function BowlIcon({ color, size = 20 }: { color: string; size?: number }) {
+export function BowlIcon({ color, size = 18 }: { color: string; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M3 11 H21" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
@@ -102,60 +30,56 @@ function BowlIcon({ color, size = 20 }: { color: string; size?: number }) {
 type Props = {
   name: string
   protein: number
-  freq: number
   photoPath?: string | null
-  /** 0-based ranking; 0..2 muestran medalla. */
-  rank: number
-  /** true tras tocar "Repetir" — estampa el botón un instante. */
+  /** true tras tocar "Repetir" — estampa la píldora un instante ("Sumada"). */
   confirmed?: boolean
-  /** "Repetir" — re-loggea la comida ahora (1 tap). */
+  /** "Repetir" — re-registra la comida (1 tap). */
   onRepeat: () => void
-  /** Tap en el cuerpo — abre la comida en el editor. */
-  onOpen: () => void
+  /** Separador superior (todas menos la primera fila). */
+  divider?: boolean
 }
 
 /*
- * AllyCard — una "comida aliada" en el Tab Comidas. A diferencia del MealCard
- * (compartido con el quick-log de Hoy), aquí la PROTEÍNA es el dato principal
- * (lo que impulsa la transformación) y la frecuencia es secundaria; el ranking
- * lleva medalla y el CTA es "Repetir" (registro en 1 tap).
+ * Una comida frecuente en el Tab Comidas (dirección de arte + ux sep 2026):
+ * FILA, no card. Foto chica, nombre en leche, proteína en niebla y "Repetir"
+ * como píldora fantasma (receta "control"; el magenta solo estampa al
+ * confirmar). El cuerpo es INERTE a propósito: abrirlo editaba la comida
+ * original de otro día y reescribía la historia sin avisar.
  */
 export function AllyCard({
   name,
   protein,
   photoPath,
-  rank,
   confirmed = false,
   onRepeat,
-  onOpen,
+  divider,
 }: Props) {
   return (
-    <View style={styles.card}>
-      <Pressable
-        style={styles.body}
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel={`Abrir ${name}`}
-        accessibilityHint="Abre la comida en el editor"
-      >
-        <MealMedallion photoPath={photoPath} rank={rank} />
-
-        <View style={styles.textCol}>
-          <Text style={styles.name} numberOfLines={1}>
-            {name}
-          </Text>
-          <Text style={styles.protein}>{Math.round(protein)} g proteína</Text>
+    <View style={[styles.row, divider && styles.divider]}>
+      {photoPath ? (
+        <Image source={{ uri: mealPhotoUrl(photoPath) }} style={styles.photo} resizeMode="cover" />
+      ) : (
+        <View style={[styles.photo, styles.photoEmpty]}>
+          <BowlIcon color={colors.oroSoft} />
         </View>
-      </Pressable>
+      )}
+
+      <View style={styles.textCol}>
+        <Text style={styles.name} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.protein}>{Math.round(protein)} g proteína</Text>
+      </View>
 
       <Pressable
         style={[styles.repeat, confirmed && styles.repeatConfirmed]}
         onPress={onRepeat}
+        hitSlop={{ top: 6, bottom: 6 }}
         accessibilityRole="button"
-        accessibilityLabel={`Repetir ${name}`}
+        accessibilityLabel={confirmed ? `${name}, sumada` : `Repetir ${name}`}
       >
         <Text style={[styles.repeatText, confirmed && styles.repeatTextConfirmed]}>
-          {confirmed ? '✓ Listo' : 'Repetir'}
+          {confirmed ? 'Sumada' : 'Repetir'}
         </Text>
       </Pressable>
     </View>
@@ -163,35 +87,16 @@ export function AllyCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bgCard,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    paddingVertical: 10,
-    paddingLeft: 11,
-    paddingRight: 11,
-    shadowColor: colors.sombra,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  body: {
-    flex: 1,
-    minWidth: 0,
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minHeight: 56,
+    paddingVertical: 8,
   },
-  // El medallón — la foto en su marco de oro con perlas.
-  medallion: {
-    width: FRAME,
-    height: FRAME,
-    alignItems: 'center',
-    justifyContent: 'center',
+  divider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
   },
   photo: {
     width: PHOTO,
@@ -199,41 +104,38 @@ const styles = StyleSheet.create({
     borderRadius: PHOTO / 2,
   },
   photoEmpty: {
-    backgroundColor: colors.bgCard2,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.lecheTint,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
   },
   textCol: {
     flex: 1,
     minWidth: 0,
   },
   name: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
     color: colors.leche,
-    letterSpacing: -0.3,
   },
-  // Proteína = el dato PRINCIPAL (lo que impulsa la transformación).
   protein: {
     marginTop: 3,
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.oroLight,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
     letterSpacing: 0.2,
+    color: colors.niebla,
   },
-  // Frecuencia = contexto secundario.
-  // "Repetir" — el CTA de 1 tap. Píldora fantasma (receta "control" de la
-  // dirección de arte sep 2026); el magenta solo estampa al confirmar.
+  // Píldora fantasma con área táctil de 44 pt (minHeight 38 + hitSlop 6).
   repeat: {
-    marginLeft: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
   },
   repeatConfirmed: {
-    backgroundColor: colors.magenta,
     borderColor: colors.magenta,
   },
   repeatText: {
@@ -243,6 +145,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   repeatTextConfirmed: {
-    color: colors.leche,
+    color: colors.magenta,
   },
 })
