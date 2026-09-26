@@ -73,31 +73,20 @@ export function moonProgressCopy(
   reference: number | null,
 ): { phrase: string; honest: string | null } {
   if (reference == null || reference <= 0) {
-    return { phrase: 'Tu luna de hoy se va dibujando.', honest: null }
+    return { phrase: '', honest: null }
   }
-  const pct = Math.max(0, protein / reference)
   const remaining = Math.max(0, Math.round(reference - protein))
 
   // En CERO no hay honestidad que dar: "Faltan 160 g" a las 4pm sin nada
   // registrado se lee como montaña, no como invitación (target-user). El
   // faltante exacto vuelve con el primer gramo, cuando ya es progreso.
   if (protein <= 0) {
-    return {
-      phrase: 'Tu luna apenas despierta.',
-      honest: 'Tu primera comida empieza a encenderla.',
-    }
+    return { phrase: 'Tu primera comida empieza a encenderla.', honest: null }
   }
 
-  let phrase: string
-  if (pct < 0.25) phrase = 'Tu luna apenas despierta.'
-  else if (pct < 0.5) phrase = 'Tu luna va tomando luz.'
-  else if (pct < 0.75) phrase = 'Ya puedes verla crecer.'
-  else if (pct < 1) phrase = 'Está casi completa.'
-  else phrase = 'Tu luna brilla completa.'
-
-  // Honestidad: el faltante exacto. Al completar (o pasar) → no hay faltante;
-  // la frase ya celebra la luna llena.
-  const honest = remaining > 0 ? `Faltan ${remaining} g para completar tu luna.` : null
-
-  return { phrase, honest }
+  // Una sola línea (dirección de arte sep 2026): el faltante honesto
+  // ("Faltan 111 g", copy autorizado por la dueña) o, al llegar, la luna llena
+  // en voz coach. Sin frase de fase intermedia: repetía lo que la luna ya dice.
+  if (remaining > 0) return { phrase: '', honest: `Faltan ${remaining} g` }
+  return { phrase: 'Tu luna está llena.', honest: null }
 }

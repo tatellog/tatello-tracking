@@ -13,7 +13,7 @@ import { colors, typography } from '@/theme'
  * deshacer es corregir un dedo, no un fallo. El delete reusa
  * useDeleteMeal (optimista: el brief y las señales se ajustan solos).
  *
- * Convive con el UniverseDeltaToast (bottom 112): este vive un poco más
+ * Vive un poco más
  * abajo para no encimarse; si ambos aparecen, cuentan cosas distintas
  * (recompensa vs corrección) y se toleran.
  */

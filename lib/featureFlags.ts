@@ -83,9 +83,7 @@ export const PATTERN_MEMORY_ENABLED = true
  * igual mientras estén como están. History ON (la primera capacidad); el resto
  * OFF hasta que su épica los construya y valide.
  */
-export const PROGRESS_HISTORY_ENABLED = true
 export const PROGRESS_BODY_ENABLED = true
-export const PROGRESS_AI_ENABLED = false
 // ON pero DOBLE-gateado: el chat de insights además exige aiEnabledForEmail
 // (dev) — la beta no lo ve hasta validar (mismo patrón que Órbita Mes IA).
 export const PROGRESS_CHAT_ENABLED = true
@@ -99,8 +97,6 @@ export const PROGRESS_CHAT_ENABLED = true
  * cuando la integración real esté validada.
  */
 export const WEARABLE_MOCK_DATA = true
-export const PROGRESS_META_ENABLED = false
-
 /*
  * Lectura Semanal (roadmap V-05/V-06) — EL loop de retorno: el domingo el
  * motor te devuelve gasto real + ritmo + una palanca (100% determinístico,

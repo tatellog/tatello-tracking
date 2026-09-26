@@ -653,21 +653,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-complete 1`] = 
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -785,30 +770,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-complete 1`] = 
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -824,7 +785,7 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-complete 1`] = 
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -839,12 +800,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-complete 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -860,15 +815,9 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-complete 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -878,43 +827,18 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-complete 1`] = 
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         25
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -1630,21 +1554,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -2337,21 +2246,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -2469,30 +2363,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -2508,7 +2378,7 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -2523,12 +2393,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -2544,15 +2408,9 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -2562,43 +2420,18 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         25
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -3277,21 +3110,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -3409,30 +3227,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -3448,7 +3242,7 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -3463,12 +3257,6 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -3484,15 +3272,9 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -3502,43 +3284,18 @@ exports[`LunarConstellation · refactor-safety snapshots acuario-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         25
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -4107,21 +3864,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -4239,30 +3981,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -4278,7 +3996,7 @@ exports[`LunarConstellation · refactor-safety snapshots aries-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -4293,12 +4011,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -4314,15 +4026,9 @@ exports[`LunarConstellation · refactor-safety snapshots aries-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -4332,43 +4038,18 @@ exports[`LunarConstellation · refactor-safety snapshots aries-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         11
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -4922,21 +4603,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-empty 1`] = `
         />
       </View>
     </View>
-    <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
     <View
       accessibilityState={
         {
@@ -5520,21 +5186,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -5652,30 +5303,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -5691,7 +5318,7 @@ exports[`LunarConstellation · refactor-safety snapshots aries-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -5706,12 +5333,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -5727,15 +5348,9 @@ exports[`LunarConstellation · refactor-safety snapshots aries-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -5745,43 +5360,18 @@ exports[`LunarConstellation · refactor-safety snapshots aries-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         11
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -6401,21 +5991,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -6533,30 +6108,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -6572,7 +6123,7 @@ exports[`LunarConstellation · refactor-safety snapshots aries-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -6587,12 +6138,6 @@ exports[`LunarConstellation · refactor-safety snapshots aries-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -6608,15 +6153,9 @@ exports[`LunarConstellation · refactor-safety snapshots aries-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -6626,43 +6165,18 @@ exports[`LunarConstellation · refactor-safety snapshots aries-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         11
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -7277,21 +6791,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -7409,30 +6908,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -7448,7 +6923,7 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -7463,12 +6938,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -7484,15 +6953,9 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -7502,43 +6965,18 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         15
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -8138,21 +7576,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-empty 1`] = `
         />
       </View>
     </View>
-    <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
     <View
       accessibilityState={
         {
@@ -8796,21 +8219,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -8928,30 +8336,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -8967,7 +8351,7 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -8982,12 +8366,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -9003,15 +8381,9 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -9021,59 +8393,19 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         15
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
-    <Text
-      style={
-        {
-          "color": "#E91E63",
-          "fontFamily": "CormorantGaramond_600SemiBold_Italic",
-          "fontSize": 11,
-          "fontStyle": "italic",
-          "letterSpacing": 0.6,
-          "marginTop": 2,
-          "textTransform": "lowercase",
-        }
-      }
-    >
-      una más
-    </Text>
     <View
       collapsable={false}
       jestAnimatedProps={
@@ -9636,21 +8968,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -9768,30 +9085,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -9807,7 +9100,7 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -9822,12 +9115,6 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -9843,15 +9130,9 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -9861,43 +9142,18 @@ exports[`LunarConstellation · refactor-safety snapshots cancer-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         15
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -10604,21 +9860,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-complete 1`
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -10736,30 +9977,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-complete 1`
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -10775,7 +9992,7 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-complete 1`
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -10790,12 +10007,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-complete 1`
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -10811,15 +10022,9 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-complete 1`
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -10829,43 +10034,18 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-complete 1`
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         22
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -11558,21 +10738,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-empty 1`] =
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -12242,21 +11407,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-halfway 1`]
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -12374,30 +11524,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-halfway 1`]
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -12413,7 +11539,7 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-halfway 1`]
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -12428,12 +11554,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-halfway 1`]
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -12449,15 +11569,9 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-halfway 1`]
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -12467,43 +11581,18 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-halfway 1`]
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         22
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -13159,21 +12248,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-partial 1`]
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -13291,30 +12365,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-partial 1`]
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -13330,7 +12380,7 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-partial 1`]
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -13345,12 +12395,6 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-partial 1`]
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -13366,15 +12410,9 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-partial 1`]
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -13384,43 +12422,18 @@ exports[`LunarConstellation · refactor-safety snapshots capricornio-partial 1`]
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         22
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -14081,21 +13094,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-complete 1`] =
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -14213,30 +13211,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-complete 1`] =
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -14252,7 +13226,7 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-complete 1`] =
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -14267,12 +13241,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-complete 1`] =
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -14288,15 +13256,9 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-complete 1`] =
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -14306,43 +13268,18 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-complete 1`] =
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         19
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -14989,21 +13926,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -15627,21 +14549,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-halfway 1`] = 
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -15759,30 +14666,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-halfway 1`] = 
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -15798,7 +14681,7 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-halfway 1`] = 
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -15813,12 +14696,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-halfway 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -15834,15 +14711,9 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-halfway 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -15852,43 +14723,18 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-halfway 1`] = 
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         19
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -16498,21 +15344,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-partial 1`] = 
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -16630,30 +15461,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-partial 1`] = 
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -16669,7 +15476,7 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-partial 1`] = 
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -16684,12 +15491,6 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-partial 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -16705,15 +15506,9 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-partial 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -16723,43 +15518,18 @@ exports[`LunarConstellation · refactor-safety snapshots escorpio-partial 1`] = 
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         19
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -17443,21 +16213,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-complete 1`] = 
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -17575,30 +16330,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-complete 1`] = 
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -17614,7 +16345,7 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-complete 1`] = 
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -17629,12 +16360,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-complete 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -17650,15 +16375,9 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-complete 1`] = 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -17668,43 +16387,18 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-complete 1`] = 
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -18374,21 +17068,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -19035,21 +17714,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -19167,30 +17831,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -19206,7 +17846,7 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -19221,12 +17861,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -19242,15 +17876,9 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -19260,43 +17888,18 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -19929,21 +18532,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -20061,30 +18649,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -20100,7 +18664,7 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -20115,12 +18679,6 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -20136,15 +18694,9 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -20154,43 +18706,18 @@ exports[`LunarConstellation · refactor-safety snapshots geminis-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -20874,21 +19401,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -21006,30 +19518,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -21045,7 +19533,7 @@ exports[`LunarConstellation · refactor-safety snapshots leo-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -21060,12 +19548,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -21081,15 +19563,9 @@ exports[`LunarConstellation · refactor-safety snapshots leo-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -21099,43 +19575,18 @@ exports[`LunarConstellation · refactor-safety snapshots leo-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         19
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -21805,21 +20256,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -22466,21 +20902,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -22598,30 +21019,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -22637,7 +21034,7 @@ exports[`LunarConstellation · refactor-safety snapshots leo-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -22652,12 +21049,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -22673,15 +21064,9 @@ exports[`LunarConstellation · refactor-safety snapshots leo-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -22691,43 +21076,18 @@ exports[`LunarConstellation · refactor-safety snapshots leo-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         19
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -23360,21 +21720,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -23492,30 +21837,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -23531,7 +21852,7 @@ exports[`LunarConstellation · refactor-safety snapshots leo-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -23546,12 +21867,6 @@ exports[`LunarConstellation · refactor-safety snapshots leo-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -23567,15 +21882,9 @@ exports[`LunarConstellation · refactor-safety snapshots leo-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -23585,43 +21894,18 @@ exports[`LunarConstellation · refactor-safety snapshots leo-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         19
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -24259,21 +22543,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -24391,30 +22660,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -24430,7 +22675,7 @@ exports[`LunarConstellation · refactor-safety snapshots libra-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -24445,12 +22690,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -24466,15 +22705,9 @@ exports[`LunarConstellation · refactor-safety snapshots libra-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -24484,43 +22717,18 @@ exports[`LunarConstellation · refactor-safety snapshots libra-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         16
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -25143,21 +23351,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-empty 1`] = `
         />
       </View>
     </View>
-    <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
     <View
       accessibilityState={
         {
@@ -25824,21 +24017,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -25956,30 +24134,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -25995,7 +24149,7 @@ exports[`LunarConstellation · refactor-safety snapshots libra-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -26010,12 +24164,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -26031,15 +24179,9 @@ exports[`LunarConstellation · refactor-safety snapshots libra-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -26049,59 +24191,19 @@ exports[`LunarConstellation · refactor-safety snapshots libra-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         16
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
-    <Text
-      style={
-        {
-          "color": "#E91E63",
-          "fontFamily": "CormorantGaramond_600SemiBold_Italic",
-          "fontSize": 11,
-          "fontStyle": "italic",
-          "letterSpacing": 0.6,
-          "marginTop": 2,
-          "textTransform": "lowercase",
-        }
-      }
-    >
-      faltan 2
-    </Text>
     <View
       collapsable={false}
       jestAnimatedProps={
@@ -26687,21 +24789,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -26819,30 +24906,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -26858,7 +24921,7 @@ exports[`LunarConstellation · refactor-safety snapshots libra-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -26873,12 +24936,6 @@ exports[`LunarConstellation · refactor-safety snapshots libra-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -26894,15 +24951,9 @@ exports[`LunarConstellation · refactor-safety snapshots libra-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -26912,43 +24963,18 @@ exports[`LunarConstellation · refactor-safety snapshots libra-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         16
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -27632,21 +25658,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -27764,30 +25775,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -27803,7 +25790,7 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -27818,12 +25805,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -27839,15 +25820,9 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -27857,43 +25832,18 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -28563,21 +26513,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -29224,21 +27159,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -29356,30 +27276,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -29395,7 +27291,7 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -29410,12 +27306,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -29431,15 +27321,9 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -29449,43 +27333,18 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -30118,21 +27977,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -30250,30 +28094,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -30289,7 +28109,7 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -30304,12 +28124,6 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -30325,15 +28139,9 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -30343,43 +28151,18 @@ exports[`LunarConstellation · refactor-safety snapshots piscis-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -31155,21 +28938,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-complete 1`] 
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -31287,30 +29055,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-complete 1`] 
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -31326,7 +29070,7 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-complete 1`] 
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -31341,12 +29085,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-complete 1`] 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -31362,15 +29100,9 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-complete 1`] 
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -31380,43 +29112,18 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-complete 1`] 
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         28
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -32178,21 +29885,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -32931,21 +30623,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-halfway 1`] =
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -33063,30 +30740,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-halfway 1`] =
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -33102,7 +30755,7 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-halfway 1`] =
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -33117,12 +30770,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-halfway 1`] =
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -33138,15 +30785,9 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-halfway 1`] =
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -33156,43 +30797,18 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-halfway 1`] =
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         28
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -33917,21 +31533,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-partial 1`] =
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -34049,30 +31650,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-partial 1`] =
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -34088,7 +31665,7 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-partial 1`] =
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -34103,12 +31680,6 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-partial 1`] =
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -34124,15 +31695,9 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-partial 1`] =
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -34142,43 +31707,18 @@ exports[`LunarConstellation · refactor-safety snapshots sagitario-partial 1`] =
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         28
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -34862,21 +32402,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -34994,30 +32519,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -35033,7 +32534,7 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -35048,12 +32549,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -35069,15 +32564,9 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -35087,43 +32576,18 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -35793,21 +33257,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -36454,21 +33903,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -36586,30 +34020,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -36625,7 +34035,7 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -36640,12 +34050,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -36661,15 +34065,9 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -36679,43 +34077,18 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -37348,21 +34721,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -37480,30 +34838,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -37519,7 +34853,7 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -37534,12 +34868,6 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -37555,15 +34883,9 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -37573,43 +34895,18 @@ exports[`LunarConstellation · refactor-safety snapshots tauro-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         20
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -38339,21 +35636,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-complete 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -38471,30 +35753,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-complete 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="28"
@@ -38510,7 +35768,7 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-complete 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -38525,12 +35783,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -38546,15 +35798,9 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-complete 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -38564,43 +35810,18 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-complete 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         25
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -39316,21 +36537,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-empty 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -40023,21 +37229,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-halfway 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -40155,30 +37346,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-halfway 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="14"
@@ -40194,7 +37361,7 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-halfway 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -40209,12 +37376,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -40230,15 +37391,9 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-halfway 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -40248,43 +37403,18 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-halfway 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         25
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}
@@ -40963,21 +38093,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-partial 1`] = `
       </View>
     </View>
     <View
-      pointerEvents="none"
-      style={
-        {
-          "borderColor": "rgba(217, 174, 111, 0.32)",
-          "borderRadius": 22,
-          "borderWidth": 1.2,
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
-        }
-      }
-    />
-    <View
       accessibilityState={
         {
           "busy": undefined,
@@ -41095,30 +38210,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-partial 1`] = `
         ]
       }
     >
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
       <TextInput
         collapsable={false}
         defaultValue="7"
@@ -41134,7 +38225,7 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-partial 1`] = `
         jestAnimatedStyle={
           {
             "value": {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           }
         }
@@ -41149,12 +38240,6 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
           ]
         }
@@ -41170,15 +38255,9 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-partial 1`] = `
               "minWidth": 28,
               "padding": 0,
               "textAlign": "center",
-              "textShadowColor": "rgba(233,30,99,0.32)",
-              "textShadowOffset": {
-                "height": 0,
-                "width": 0,
-              },
-              "textShadowRadius": 10,
             },
             {
-              "color": "rgba(233, 30, 99, 1)",
+              "color": "rgba(244, 236, 222, 1)",
             },
           ]
         }
@@ -41188,43 +38267,18 @@ exports[`LunarConstellation · refactor-safety snapshots virgo-partial 1`] = `
       <Text
         style={
           {
-            "color": "#8A7570",
-            "fontFamily": "CormorantGaramond_600SemiBold_Italic",
+            "color": "#C9B8A5",
+            "fontFamily": "HankenGrotesk_500Medium",
             "fontSize": 13,
-            "fontStyle": "italic",
-            "letterSpacing": 1,
+            "letterSpacing": 0.3,
             "marginLeft": 6,
           }
         }
       >
-        / 
+        de 
         25
-         luces
+         luces ›
       </Text>
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#8A7570",
-            "height": 1,
-            "marginHorizontal": 8,
-            "opacity": 0.6,
-            "width": 18,
-          }
-        }
-      />
-      <View
-        style={
-          {
-            "alignSelf": "center",
-            "backgroundColor": "#C9B8A5",
-            "borderRadius": 1.5,
-            "height": 3,
-            "opacity": 0.85,
-            "width": 3,
-          }
-        }
-      />
     </View>
     <View
       collapsable={false}

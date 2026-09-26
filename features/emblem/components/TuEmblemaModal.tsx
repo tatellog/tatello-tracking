@@ -19,6 +19,7 @@ import {
 } from '@/features/tabs/components/constellation/RevealedEmblem'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, radius, spacing, typography } from '@/theme'
+import { StreakLine } from '@/features/tabs/components/StreakLine'
 
 export type EmblemStar = { name: string; role: string }
 
@@ -50,6 +51,9 @@ type TuEmblemaModalProps = {
   litStars: EmblemStar[]
   /** The next star to light (named, anticipation — not a countdown). */
   nextStar: EmblemStar | null
+  /** Días con registro, acumulado de por vida (nunca racha). Vive aquí desde
+   *  sep 2026: en Hoy era un tercer contador. */
+  daysInOrbit?: number
 }
 
 /**
@@ -91,6 +95,7 @@ export function TuEmblemaModal({
   total,
   litStars,
   nextStar,
+  daysInOrbit,
 }: TuEmblemaModalProps) {
   const pct = total > 0 ? Math.round((trained / total) * 100) : 0
   // El signo en title-case para leerlo dentro de una frase ("Tu Leo se
@@ -194,6 +199,7 @@ export function TuEmblemaModal({
                 bounces={false}
               >
                 <Text style={styles.eyebrow}>TU {signLabel.toUpperCase()}</Text>
+                {daysInOrbit != null ? <StreakLine streak={daysInOrbit} /> : null}
 
                 {/* El emblema REINA (el emblema del Tab Hoy, no el medallón viejo). */}
                 <View style={styles.emblemWrap}>

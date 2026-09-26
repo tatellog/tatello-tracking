@@ -12,7 +12,6 @@ import {
   deleteMeal,
   getFrequentMeals,
   getMealById,
-  getMealMacrosInRange,
   getMealsForDate,
   getMealsInRange,
   updateMeal,
@@ -23,10 +22,6 @@ import {
   type UpdateMealInput,
 } from './api'
 import { computeWeeklyMealStats, lastNDates, type WeeklyMealStats } from './logic'
-import { computeNourishmentConsistency, type NourishmentConsistency } from './nourishment'
-
-import { getWaterInRange } from '@/features/water/api'
-import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 
 import type { MacroTargetsRow } from '@/features/brief/api'
 
@@ -117,67 +112,6 @@ export function useWeeklyMealStats(): {
   )
 
   return { stats, isLoading: mealsQuery.isLoading, isError: mealsQuery.isError }
-}
-
-/* ─── nourishment consistency (the "Lo que alimenta tu transformación"
- *     rows in Comidas) ──────────────────────────────────────────────
- *
- * Days fulfilled over the last 10 days: Proteína (days that reached the
- * reference) and Agua (days the glass goal was met) — both real
- * nutrients. All read-only, manifesto-safe framing lives in the pure
- * computeNourishmentConsistency. */
-// 7, no 10: una semana mapea a memoria humana ("el martes salí") y las
-// iniciales L-D anclan cada barra a su día real (feedback beta).
-const NOURISH_WINDOW = 7
-
-export function useNourishmentConsistency(): {
-  data: NourishmentConsistency | null
-  isLoading: boolean
-  isError: boolean
-} {
-  const today = todayInTimezone()
-  const { dates, start } = useMemo(() => {
-    const d = lastNDates(today, NOURISH_WINDOW)
-    return { dates: d, start: d[0]! }
-  }, [today])
-
-  const targetsQuery = useMacroTargets()
-  const { goalMl } = useWaterGoal()
-  const goalGlasses = Math.max(1, Math.round(goalMl / GLASS_ML))
-
-  const mealsQuery = useQuery({
-    queryKey: queryKeys.macros.nourishment(today),
-    // Thin projection — only meal_date + protein_g (no heavy jsonb).
-    queryFn: () => getMealMacrosInRange(start, today),
-    // Same as weeklyStats above: 'always' was redundant (day-keyed key +
-    // mutation invalidation) and cost an extra request per cold start.
-    staleTime: 5 * 60_000,
-  })
-  const waterQuery = useQuery({
-    queryKey: queryKeys.water.range(start, today),
-    queryFn: () => getWaterInRange(start, today),
-    staleTime: 5 * 60_000,
-  })
-
-  const proteinTarget = targetsQuery.data?.protein_g ?? null
-  const data = useMemo(() => {
-    if (!mealsQuery.data || !waterQuery.data) return null
-    const waterByDate: Record<string, number> = {}
-    for (const w of waterQuery.data) waterByDate[w.intake_date] = w.glasses
-    return computeNourishmentConsistency({
-      dates,
-      meals: mealsQuery.data,
-      waterByDate,
-      proteinTarget,
-      waterGoalGlasses: goalGlasses,
-    })
-  }, [mealsQuery.data, waterQuery.data, dates, proteinTarget, goalGlasses])
-
-  return {
-    data,
-    isLoading: mealsQuery.isLoading || waterQuery.isLoading,
-    isError: mealsQuery.isError || waterQuery.isError,
-  }
 }
 
 export function useMealById(id: string | undefined) {

@@ -61,7 +61,6 @@ import { useWearableWeights } from '@/features/wearables/hooks'
 
 import { IgnitionBurst, IGNITION_LIFETIME_MS } from './IgnitionBurst'
 import { MealCard } from './MealCard'
-import { UniverseDeltaToast } from './UniverseDeltaToast'
 import { WeightWheel } from './WeightWheel'
 
 type MealType = MealInput['meal_type']
@@ -535,9 +534,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       },
     )
     setConfirmingName(item.name)
-    // Ignición inmediata cerca de las tarjetas de comida (Energía =
-    // magentaHot). El "+N Energía" + vuelo a Leo los emite la detección
-    // de deltas de TodayUniverseRewards al subir el atributo.
+    // Ignición inmediata cerca de las tarjetas de comida.
     fireBurst(SCREEN_W / 2, SCREEN_H * 0.62, colors.magentaHot)
     setTimeout(onClose, CONFIRM_HOLD_MS)
   }
@@ -1011,7 +1008,6 @@ export function QuickLogSheet({ visible, onClose }: Props) {
         {bursts.map((b) => (
           <IgnitionBurst key={b.id} x={b.x} y={b.y} color={b.color} />
         ))}
-        <UniverseDeltaToast placement="top" haptics={false} />
       </View>
     </Modal>
   )

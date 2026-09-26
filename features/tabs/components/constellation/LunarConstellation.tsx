@@ -636,7 +636,6 @@ export function LunarConstellation({
             rounded bronze hairline on top of the SVG + Skia layers without
             forcing a rounded `overflow:hidden` clip over the separate Skia
             surfaces (the Android scroll-swim cause). Non-interactive. */}
-        <View style={styles.frameOverlay} pointerEvents="none" />
         {/* Chip DEV del emblema: muestra el progreso vigente y cada tap
             cicla real → 0 → 25 → 50 → 75 → 100 → real. Solo __DEV__:
             el porcentaje es debug, nunca producto. */}
@@ -668,8 +667,6 @@ export function LunarConstellation({
           numberPulse={numberPulse}
           plusOne={plusOne}
           initialCount={trainedCount}
-          urgent={trainedCount >= figureCount - 3 && !figureComplete}
-          remaining={Math.max(0, figureCount - trainedCount)}
           target={figureCount}
         />
       ) : null}
@@ -723,12 +720,6 @@ const styles = StyleSheet.create({
   // Skia layers: the rounded bronze hairline reads exactly as before, but with
   // no children and no `overflow:'hidden'` it imposes no clip mask on the Skia
   // surfaces below — so they translate in lockstep with the scroll.
-  frameOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 22,
-    borderWidth: 1.2,
-    borderColor: 'rgba(217, 174, 111, 0.32)',
-  },
   svg: {
     width: '100%',
     height: '100%',

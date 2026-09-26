@@ -6,7 +6,7 @@
  *
  * Es la ÚNICA puerta de Progreso → edición: un solo lugar para editar un dato.
  *
- * Doble vía (mismo patrón que pending-universe-detail): `subscribe` reacciona
+ * Doble vía (mismo patrón que pending-week-focus): `subscribe` reacciona
  * al instante si Hoy ya está montado (lo está: detachInactiveScreens=false), y
  * `consume` es respaldo si la petición llegó antes de que existiera el oyente.
  */

@@ -189,7 +189,10 @@ function OrbitBody() {
                     scrollToTop()
                   }
                 }}
-                onScrollTop={scrollToTop}
+                onOpenWeek={() => {
+                  setSegment('semana')
+                  scrollToTop()
+                }}
               />
             ) : segment === 'semana' ? (
               <WeekSegment

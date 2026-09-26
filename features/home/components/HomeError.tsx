@@ -12,7 +12,7 @@ export function HomeError({ onRetry }: Props) {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.stack}>
         <Text style={styles.meta}>SIN CONEXIÓN</Text>
-        <Text style={styles.headline}>No pudimos traer tu brief</Text>
+        <Text style={styles.headline}>No pudimos cargar tu día</Text>
         <Text style={styles.editorial}>
           Revisa tu conexión o intenta de nuevo en un momento. Tus registros y tus medidas siguen a
           salvo.

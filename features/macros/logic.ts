@@ -151,8 +151,7 @@ export function computeWeeklyMealStats(
     proteinAvgPerLoggedDay:
       daysLogged === 0 ? null : perDay.reduce((a, b) => a + b, 0) / daysLogged,
     proteinTarget,
-    daysHitProtein:
-      proteinTarget == null ? null : perDay.filter((p) => p >= proteinTarget).length,
+    daysHitProtein: proteinTarget == null ? null : perDay.filter((p) => p >= proteinTarget).length,
     byMealType,
     totalMeals,
   }

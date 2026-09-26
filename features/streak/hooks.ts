@@ -109,11 +109,11 @@ export function useSetWorkoutTypeToday() {
 export function useToggleWorkoutForDate() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ date, complete }: { date: string; complete: boolean }) =>
+    mutationFn: ({ date, complete, type }: { date: string; complete: boolean; type?: string }) =>
       complete
         ? date === todayInTimezone()
           ? markWorkoutToday()
-          : markWorkoutForDate(date)
+          : markWorkoutForDate(date, type ?? null)
         : date === todayInTimezone()
           ? unmarkWorkoutToday()
           : unmarkWorkoutForDate(date),

@@ -1,5 +1,7 @@
 # Jerarquía CTA vs Card · Spec
 
+> **Nota (25 sep 2026):** "Tu universo hoy" (grid de atributos, detalle y toast "+N") se retiró de Hoy en la rama clean-features por decisión de la dueña: era un segundo sistema de progreso que competía con la constelación, metía un contador en Hoy y no alimentaba motor ni emblema. Las referencias de abajo quedan como historia.
+
 **Problema que resuelve:** en una UI dark y plana, una _card_ (contenedor) y un
 _CTA_ (acción) pueden verse idénticas (`bgCard` + hairline + radius chico, sin
 sombra). Si nada distingue lo tappable de lo decorativo, la usuaria no sabe qué

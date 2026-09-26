@@ -16,6 +16,9 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg'
 
 import { useMacroTargets } from '@/features/macros/hooks'
+import { useLocalHour } from '@/features/tabs/use-local-hour'
+import { MoonGlyph, StarGlyph } from '@/features/tabs/components/check-in-glyphs'
+import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
 
@@ -30,11 +33,12 @@ import {
   buildDayGoal,
   REST_HERO,
   restDayMissing,
+  type GoalEvidence,
   type GoalHero,
   type GoalStatus,
   type GoalTone,
-  type GoalWhy,
 } from '../day-goal'
+import { dayFocus, dayVerdict } from '../day-verdict'
 import { formatLongDate } from '../present-logic'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
@@ -86,9 +90,11 @@ const ABSENT_TONE: Record<string, string> = {
 }
 
 const RING_SIZE = 208
+// Tamaño en pantalla (dirección de arte + ux sep 2026): más compacto, con la
+// leyenda a su lado. El SVG conserva su viewBox de 208 y escala.
+const RING_DISPLAY = 150
 const CENTER = RING_SIZE / 2 // 104
 // El aura respira más allá del borde del anillo (bloom).
-const GLOW_SIZE = Math.round(RING_SIZE * 1.5)
 
 // Tres anillos concéntricos (radios de la línea media). Exterior = calorías (el
 // norte de la app), medio = proteína, interior = entreno (binario). sw 8, ~9px
@@ -130,6 +136,7 @@ const TRAIN_COLOR = colors.dimension.mente // #C18FFF
 // eslint-disable-next-line no-restricted-syntax
 const TRAIN_STOPS: [string, string, string] = ['#8E5FC7', '#C18FFF', '#DABBFF']
 const TRAIN_TRACK = 'rgba(193, 143, 255, 0.12)'
+const TRAIN_SOFT = 'rgba(193, 143, 255, 0.55)'
 
 type RingSpec = {
   r: number
@@ -182,52 +189,13 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
     return { cx: CENTER + r * Math.cos(t), cy: CENTER + r * Math.sin(t) }
   })
 
-  // Vida CONTINUA (no solo el trazo de entrada): el bloom respira (breath, seno
-  // ida-vuelta) y un latido pulsa desde la cabeza de cometa (beat, 0→1 en bucle).
-  // Gateado en pantalla activa + reduce-motion → fuera de foco todo queda quieto.
-  // Solo opacidad/radio en el worklet: no re-rasteriza el SVG.
-  const active = useScreenActive()
-  const breath = useSharedValue(0)
-  const beat = useSharedValue(0)
-  useEffect(() => {
-    if (reduce || !active) {
-      cancelAnimation(breath)
-      cancelAnimation(beat)
-      breath.value = 0.5
-      beat.value = 0
-      return
-    }
-    breath.value = withRepeat(
-      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-    beat.value = withRepeat(
-      withTiming(1, { duration: 2200, easing: Easing.out(Easing.quad) }),
-      -1,
-      false,
-    )
-    return () => {
-      cancelAnimation(breath)
-      cancelAnimation(beat)
-    }
-  }, [reduce, active, breath, beat])
-
-  // Bloom respirando: el arco (dasharray) + una opacidad que late lento.
+  // Sin vida continua (dirección de arte + ux sep 2026): el aura que respiraba
+  // y el latido en la punta eran tres animaciones detrás de un dato. El anillo
+  // se dibuja una vez al entrar y queda quieto.
   const bloomProps = useAnimatedProps(() => ({
     strokeDasharray: [c * progress.value, c],
-    opacity: spec.bloomOpacity * (0.6 + 0.7 * breath.value),
+    opacity: spec.bloomOpacity,
   }))
-  // Latido: un anillo que se expande y se desvanece desde la punta del cometa.
-  const beaconProps = useAnimatedProps(() => {
-    const t = progress.value * 2 * Math.PI
-    return {
-      cx: CENTER + r * Math.cos(t),
-      cy: CENTER + r * Math.sin(t),
-      r: 4 + beat.value * 12,
-      opacity: 0.4 * (1 - beat.value),
-    }
-  })
 
   return (
     <>
@@ -281,11 +249,6 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
               animatedProps={overflowProps}
             />
           ) : null}
-          {/* Latido — un anillo que pulsa desde la punta del cometa (exterior /
-              medio). El interior (binario, sin cometa) vive por el bloom. */}
-          {spec.comet !== 'none' ? (
-            <AnimatedCircle animatedProps={beaconProps} fill={spec.color} />
-          ) : null}
           {/* Cabeza de cometa — llena en el exterior, sobria en el medio, ausente
               en el interior (binario: un cometa sobre lleno/vacío sería ruido). */}
           {spec.comet === 'full' ? (
@@ -331,7 +294,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     gradId: isIncomplete ? null : 'grad-cal',
     trackColor: TRACK_COLOR[hero.status],
     bloomWidth: 16,
-    bloomOpacity: isIncomplete ? 0 : 0.16,
+    bloomOpacity: 0,
     comet: isIncomplete ? 'none' : 'full',
     show: !isIncomplete,
     delay: 160,
@@ -346,7 +309,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     gradId: 'grad-protein',
     trackColor: hasProtein ? PROTEIN_TRACK : colors.hairline,
     bloomWidth: 13,
-    bloomOpacity: hasProtein ? 0.12 : 0,
+    bloomOpacity: 0,
     comet: hasProtein ? 'soft' : 'none',
     show: hasProtein,
     delay: 320,
@@ -356,62 +319,24 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     c: C_INNER,
     sw: RING_SW,
     fill: trained ? 1 : 0,
-    color: TRAIN_COLOR,
-    gradId: 'grad-train',
+    // Binario (entrenó o no): va plano y más callado que calorías y proteína.
+    // Lleno al 100% con gradiente era lo que más brillaba siendo lo que menos
+    // dice del objetivo (producto + ux coinciden).
+    color: TRAIN_SOFT,
+    gradId: null,
     trackColor: trained ? TRAIN_TRACK : colors.hairline, // no entrenó = track en reposo
     bloomWidth: 13,
-    bloomOpacity: trained ? 0.12 : 0,
+    bloomOpacity: 0,
     comet: 'none', // binario: sin cometa
     show: trained,
     delay: 480,
   }
 
-  // Respiración del aura — vida continua SIN re-rasterizar el SVG (opacidad de una
-  // View = compositor). Color del estado de calorías = el norte manda. Gateada en
-  // pantalla activa + reduce-motion. Oculta en incompleto (en calma).
-  const active = useScreenActive()
-  const glow = useSharedValue(reduce ? 1 : 0)
-  useEffect(() => {
-    if (reduce || !active) {
-      cancelAnimation(glow)
-      glow.value = withTiming(0.6, { duration: 320, easing: Easing.out(Easing.quad) })
-      return
-    }
-    glow.value = withRepeat(
-      withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-    return () => cancelAnimation(glow)
-  }, [glow, active, reduce])
-  const glowStyle = useAnimatedStyle(() => ({ opacity: 0.32 + glow.value * 0.42 }))
-
   return (
-    <View style={[styles.ringWrap, { shadowColor: outerColor }]}>
-      {/* Aura que respira detrás de los anillos (color del estado de calorías). */}
-      {!isIncomplete ? (
-        <Animated.View style={[styles.ringGlow, glowStyle]} pointerEvents="none">
-          <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
-            <Defs>
-              <RadialGradient id="ring-bloom" cx="50%" cy="50%" r="50%">
-                <Stop offset="0.5" stopColor={outerColor} stopOpacity={0} />
-                <Stop offset="0.72" stopColor={outerColor} stopOpacity={0.3} />
-                <Stop offset="1" stopColor={outerColor} stopOpacity={0} />
-              </RadialGradient>
-            </Defs>
-            <Circle
-              cx={GLOW_SIZE / 2}
-              cy={GLOW_SIZE / 2}
-              r={GLOW_SIZE / 2}
-              fill="url(#ring-bloom)"
-            />
-          </Svg>
-        </Animated.View>
-      ) : null}
-
+    <View style={styles.ringWrap}>
       <Svg
-        width={RING_SIZE}
-        height={RING_SIZE}
+        width={RING_DISPLAY}
+        height={RING_DISPLAY}
         viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
         style={styles.ringSvg}
       >
@@ -451,7 +376,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
 
       {/* Centro — campo de estrellas (achicado para caber en el anillo interior). */}
       <View style={styles.ringCenter} pointerEvents="none">
-        <RingStars dim={isIncomplete} size={100} />
+        <RingStars dim={isIncomplete} size={Math.round((100 * RING_DISPLAY) / RING_SIZE)} />
       </View>
     </View>
   )
@@ -534,25 +459,36 @@ function LegendStat({
         <Text style={[styles.legendLabel, dim && styles.legendLabelDim]}>{label}</Text>
       </View>
       <Text style={[styles.legendValue, dim && styles.legendValueDim]}>{value}</Text>
-      {caption ? <Text style={styles.legendCaption}>{caption}</Text> : null}
+      {caption ? (
+        <View style={styles.legendCaptionRow}>
+          <WatchGlyph color={colors.niebla} size={11} />
+          <Text style={styles.legendCaption}>{caption}</Text>
+        </View>
+      ) : null}
     </View>
   )
 }
 
-/** La evidencia como ESTRELLA ENCENDIDA tintada a su dimensión: un halo tenue
- *  bajo el path la vuelve punto de luz, no icono plano. `major` (la primera
- *  evidencia del día) brilla un poco mayor → constelación, no checklist. La
- *  punta apunta arriba en el path (sin rotación → seguro en Android release). */
-function EvidenceStar({ color, major }: { color: string; major?: boolean }) {
-  const s = major ? 17 : 13
+/** Una fila de la evidencia. El glifo sigue la simbología del check-in de Hoy
+ *  (✦ entreno, ☾ sueño) y el color, la dimensión; el resto lleva la estrella
+ *  encendida de Órbita. La báscula dice su procedencia en texto. */
+function EvidenceRow({ item, index }: { item: GoalEvidence; index: number }) {
+  const color = TONE_COLOR[item.tone]
   return (
-    <Svg width={s} height={s} viewBox="0 0 18 18">
-      <Circle cx={9} cy={9} r={6.5} fill={color} opacity={0.16} />
-      <Path
-        d="M9 2.2 C9.5 6.7 11.3 8.5 15.8 9 C11.3 9.5 9.5 11.3 9 15.8 C8.5 11.3 6.7 9.5 2.2 9 C6.7 8.5 8.5 6.7 9 2.2 Z"
-        fill={color}
-      />
-    </Svg>
+    <Animated.View entering={FadeIn.duration(420).delay(index * 70)} style={styles.evidenceRow}>
+      <View style={styles.evidenceStar}>
+        {item.key === 'train' ? (
+          <StarGlyph color={color} size={16} />
+        ) : item.key === 'sleep' ? (
+          <MoonGlyph color={color} size={16} />
+        ) : (
+          <View style={[styles.evidenceDot, { backgroundColor: color }]} />
+        )}
+      </View>
+      <Text style={styles.evidenceLabel}>{item.label}</Text>
+      {item.detail ? <Text style={styles.evidenceDetail}>{item.detail}</Text> : null}
+      {item.source === 'scale' ? <Text style={styles.evidenceSourceText}>tu báscula</Text> : null}
+    </Animated.View>
   )
 }
 
@@ -608,23 +544,17 @@ function AbsentChip({
   )
 }
 
-/** Una pieza del "¿Por qué?": estrella (sostiene el rumbo) o punto oro hueco
- *  (lo que va en contra). Sin culpa: informa la causa, no la juzga. */
-function WhyMark({ item }: { item: GoalWhy }) {
-  if (item.supports) return <EvidenceStar color={TONE_COLOR[item.tone]} />
-  return <View style={styles.whyAgainst} />
-}
-
 export function DayPresent({
   viewedDay = null,
   onReturnToToday,
-  onScrollTop,
+  onOpenWeek,
   returnLabel,
 }: {
   /** Día a mostrar (ISO 'YYYY-MM-DD'); null = hoy. Lo setea la tira de Semana. */
   viewedDay?: string | null
   onReturnToToday?: () => void
-  onScrollTop?: () => void
+  /** "Ver cómo va tu semana ›" — el puente a Semana al final del día. */
+  onOpenWeek?: () => void
   /** Etiqueta del back cuando el día se abrió desde otro segmento
    *  ("Volver a tu mes"); default "Volver a hoy". */
   returnLabel?: string
@@ -648,11 +578,34 @@ export function DayPresent({
     waterGoalGlasses: Math.max(1, Math.round(goalMl / GLASS_ML)),
   }
   const day = buildDayGoal(signals, ctx, { past: isPast })
+  // El veredicto en palabras ("¿sigo en déficit?") y el foco del día: puros,
+  // con el mismo piso sano que el cierre de Hoy y el calendario de Mes.
+  const hour = useLocalHour()
+  const verdict = dayVerdict({
+    consumedCalories: day?.hero.consumed,
+    targetCalories: ctx.calorieTarget,
+    hour,
+    past: isPast,
+  })
+  const focus = dayFocus({
+    verdict,
+    proteinG: day?.hero.proteinG,
+    proteinTarget: ctx.proteinTarget,
+    past: isPast,
+  })
   // La evidencia ya NO repite calorías / proteína / entreno: eso vive en los
   // anillos del hero. Aquí solo el resto (sueño, agua, ánimo, ciclo, peso...).
+  // Fuera también el peso: no vive en la lectura del día (manifiesto; en Hoy
+  // la báscula es un ícono sin número). Su casa es Progreso.
   const evidenceShown = (day?.evidence ?? []).filter(
-    (e) => e.key !== 'protein' && e.key !== 'train',
+    (e) => e.key !== 'protein' && e.key !== 'train' && e.key !== 'weight',
   )
+  // Lo del reloj primero, agrupado bajo su eyebrow; lo demás después.
+  const evidenceWatch = evidenceShown.filter((e) => e.source === 'wearable')
+  const evidenceRest = evidenceShown.filter((e) => e.source !== 'wearable')
+  // En un día pasado, "Comida" abriría la captura sin fecha y registraría en
+  // HOY: se esconde ahí (agua y sueño sí llevan la fecha en su modal).
+  const missingShown = (day?.missing ?? []).filter((m) => !(isPast && m.key === 'comida'))
 
   const router = useRouter()
   const settled = !isLoading
@@ -804,122 +757,121 @@ export function DayPresent({
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
       {header}
 
-      {/* Hero — el anillo (con la constelación dentro) y, debajo, el estado del
-          objetivo: "Hoy estás en / Déficit / −785 kcal / Aún tienes margen…".
-          El número (consumido − meta) es negativo en déficit = vas bajo tu meta. */}
-      <View style={styles.hero}>
-        <GoalRing hero={day.hero} />
-        <View style={styles.heroText}>
-          {/* El eyebrow "Hoy estás en ___" solo cuando el estado COMPLETA la frase
-              (Déficit / Sobre tu objetivo). En incompleto, "Tu día aún se revela"
-              se lee sola (si no, "Hoy estás en tu día aún se revela" no parsea). */}
-          {day.hero.status !== 'incomplete' ? (
-            <Text style={styles.heroEyebrow}>{isPast ? 'Ese día estabas en' : 'Hoy estás en'}</Text>
-          ) : null}
-          <Text style={[styles.heroWord, day.hero.status === 'incomplete' && styles.heroWordDim]}>
-            {day.hero.stateLabel}
-          </Text>
-          {day.hero.deltaKcal != null ? (
-            // Sin signo: la palabra ("Déficit" / "Sobre tu objetivo") da el rumbo;
-            // el número es la magnitud, siempre en positivo (nunca un negativo).
-            <Text style={[styles.heroNumber, { color: STATUS_COLOR[day.hero.status] }]}>
-              {day.hero.deltaKcal}
-              <Text style={styles.heroNumberUnit}> kcal</Text>
-            </Text>
-          ) : null}
-          <Text style={styles.heroLine}>{day.hero.line}</Text>
-
-          {/* Leyenda — qué anillo es cuál + su dato del día (kcal / g / entreno).
-              Proteína solo si hay dato; entreno tenue si no entrenó (reposo). */}
-          <View style={styles.legend}>
+      {/* Hero — el anillo (con la constelación dentro) y el VEREDICTO en
+          palabras: "¿sigo en déficit?". Sin número grande de margen (era el
+          "te quedan X"; mientras menos comía, más grande y más magenta). El
+          color del anillo sigue al veredicto: bajo el piso sano, niebla. */}
+      {/* Hero — el anillo compacto con la LEYENDA a su lado, en el mismo orden
+          de afuera hacia adentro (patrón Apple Fitness): la posición dice qué
+          anillo es cuál. El color del anillo de calorías sigue al veredicto. */}
+      <View style={styles.heroRow}>
+        <GoalRing hero={{ ...day.hero, status: verdict.ringTone }} />
+        <View style={styles.legendCol}>
+          <LegendStat
+            color={STATUS_COLOR[verdict.ringTone]}
+            label="Calorías"
+            value={
+              day.hero.consumed != null
+                ? day.hero.target != null
+                  ? `${day.hero.consumed.toLocaleString('es-MX')} de ${day.hero.target.toLocaleString('es-MX')} kcal`
+                  : `${day.hero.consumed.toLocaleString('es-MX')} kcal`
+                : '—'
+            }
+          />
+          {day.hero.proteinFill != null ? (
             <LegendStat
-              color={STATUS_COLOR[day.hero.status]}
-              label="Calorías"
-              value={day.hero.consumed != null ? `${day.hero.consumed} kcal` : '—'}
-            />
-            {day.hero.proteinFill != null ? (
-              <LegendStat
-                color={colors.signal.proteina}
-                label="Proteína"
-                value={day.hero.proteinG != null ? `${day.hero.proteinG} g` : '—'}
-              />
-            ) : null}
-            {/* Entreno: con kcal del reloj muestra el dato ("~342 kcal · tu
-                reloj"); manual queda "Sí" como siempre. El "~" dice honesto
-                que es estimación. Display puro: jamás toca meta ni TDEE. */}
-            <LegendStat
-              color={TRAIN_COLOR}
-              label="Entreno"
+              color={colors.signal.proteina}
+              label="Proteína"
               value={
-                day.hero.trained
-                  ? day.hero.workoutKcal != null
-                    ? `~${day.hero.workoutKcal} kcal`
-                    : 'Sí'
-                  : isPast
-                    ? 'No'
-                    : 'Aún no'
+                day.hero.proteinG != null && ctx.proteinTarget != null
+                  ? `${day.hero.proteinG} de ${Math.round(ctx.proteinTarget)} g`
+                  : '—'
               }
-              caption={day.hero.trained && day.hero.workoutKcal != null ? 'tu reloj' : undefined}
-              dim={!day.hero.trained}
             />
-          </View>
+          ) : null}
+          <LegendStat
+            color={TRAIN_COLOR}
+            label="Entreno"
+            value={day.hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
+            caption={
+              day.hero.trained && day.hero.workoutSource === 'wearable'
+                ? 'tu smartwatch'
+                : undefined
+            }
+            dim={!day.hero.trained}
+          />
         </View>
       </View>
 
-      {/* HACIA DÓNDE VA TU DÍA — la síntesis (lo más importante después del
-          héroe): responde "¿cómo voy?" antes de mostrar el detalle. */}
-      <View style={styles.directionCard}>
-        <Text style={styles.eyebrowCard}>
-          {isPast ? 'Hacia dónde fue ese día' : 'Hacia dónde va tu día'}
-        </Text>
-        <Text style={styles.direction}>{day.direction}</Text>
-        {day.why.length > 0 ? (
-          <View style={styles.whyBlock}>
-            <Text style={styles.whyEyebrow}>¿Por qué?</Text>
-            {day.why.map((w) => (
-              <View key={w.key} style={styles.whyRow}>
-                <View style={styles.whyMark}>
-                  <WhyMark item={w} />
-                </View>
-                <Text style={[styles.whyLabel, !w.supports && styles.whyLabelAgainst]}>
-                  {w.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+      {/* El veredicto en palabras: "¿sigo en déficit?". */}
+      <View style={styles.verdictBlock}>
+        <Text style={styles.verdictTitle}>{verdict.title}</Text>
+        <Text style={styles.verdictLine}>{verdict.line}</Text>
+        {verdict.cta ? (
+          <Pressable
+            style={styles.verdictCta}
+            onPress={() =>
+              router.push(
+                verdict.cta === 'target'
+                  ? '/onboarding/macro-targets?source=banner'
+                  : '/capture-meal',
+              )
+            }
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+          >
+            <Text style={styles.verdictCtaText}>
+              {verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
+
+      {/* TU FOCO DE HOY — la palanca desde tus datos (recomendación, nunca
+          orden; nunca dieta ni rutina). Solo cuando hay un foco honesto. */}
+      {focus ? (
+        <View style={styles.section}>
+          <Text style={styles.eyebrowQuiet}>Tu foco de hoy</Text>
+          <Text style={styles.focusTitle}>{focus.title}</Text>
+          <Text style={styles.focusBody}>{focus.body}</Text>
+        </View>
+      ) : null}
 
       {/* LA EVIDENCIA — solo lo que YA apareció hoy, como respaldo del rumbo. La
           primera estrella brilla mayor (jerarquía, no checklist). */}
       {evidenceShown.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.eyebrow}>
-            {isPast ? 'La evidencia de ese día' : 'La evidencia de hoy'}
-          </Text>
-          {evidenceShown.map((e, i) => (
-            <Animated.View
-              key={e.key}
-              entering={FadeIn.duration(420).delay(i * 70)}
-              style={styles.evidenceRow}
-            >
-              <View style={styles.evidenceStar}>
-                <EvidenceStar color={TONE_COLOR[e.tone]} major={i === 0} />
+          <Text style={styles.eyebrowQuiet}>{isPast ? 'También ese día' : 'También hoy'}</Text>
+          {/* Lo que vino del reloj va AGRUPADO bajo su propio eyebrow (la
+              misma firma "⌚ DESDE TU RELOJ" del check-in de Hoy), y después
+              lo demás. Misma simbología que Hoy: ✦ entreno, ☾ sueño. */}
+          {evidenceWatch.length > 0 ? (
+            <View style={styles.watchGroup}>
+              <View style={styles.watchEyebrow} accessibilityRole="text">
+                <View style={styles.evidenceStar}>
+                  <WatchGlyph color={colors.niebla} size={13} />
+                </View>
+                <Text style={styles.watchEyebrowText}>Desde tu smartwatch</Text>
               </View>
-              <Text style={styles.evidenceLabel}>{e.label}</Text>
-              {e.detail ? <Text style={styles.evidenceDetail}>{e.detail}</Text> : null}
-            </Animated.View>
+              {evidenceWatch.map((e, i) => (
+                <EvidenceRow key={e.key} item={e} index={i} />
+              ))}
+            </View>
+          ) : null}
+          {evidenceRest.map((e, i) => (
+            <EvidenceRow key={e.key} item={e} index={evidenceWatch.length + i} />
           ))}
         </View>
       ) : null}
 
       {/* LO QUE AÚN NO APARECE — ausencia, no error. Cada una un CTA suave. */}
-      {day.missing.length > 0 ? (
+      {missingShown.length > 0 ? (
         <View style={styles.sectionAbsent}>
           <Text style={styles.eyebrowQuiet}>Lo que aún no aparece</Text>
           <Text style={styles.absentHint}>Tócalas para sumarlas a tu día.</Text>
           <View style={styles.absentRow}>
-            {day.missing.map((a) => (
+            {missingShown.map((a) => (
               <AbsentChip
                 key={a.key}
                 label={a.label}
@@ -931,19 +883,17 @@ export function DayPresent({
         </View>
       ) : null}
 
-      {/* Cierre — conecta con Órbita Semana (voz del coach). */}
-      <Text style={styles.closing}>{day.closing}</Text>
-
-      {/* Fin del recorrido: volver al inicio sin hacer scroll a mano. */}
-      {onScrollTop ? (
+      {/* El puente a Semana (antes: una frase rotativa + "Volver arriba", que
+          existían porque la pantalla era demasiado larga). */}
+      {onOpenWeek && !isPast ? (
         <Pressable
-          style={styles.backTop}
-          onPress={onScrollTop}
+          onPress={onOpenWeek}
+          hitSlop={8}
+          style={styles.weekLink}
           accessibilityRole="button"
-          accessibilityLabel="Volver arriba"
+          accessibilityLabel="Ver cómo va tu semana"
         >
-          <Text style={styles.backTopArrow}>↑</Text>
-          <Text style={styles.backTopText}>Volver arriba</Text>
+          <Text style={styles.weekLinkText}>Ver cómo va tu semana ›</Text>
         </Pressable>
       ) : null}
 
@@ -1059,21 +1009,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   ringWrap: {
-    width: RING_SIZE,
-    height: RING_SIZE,
+    width: RING_DISPLAY,
+    height: RING_DISPLAY,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-  },
-  // El aura que respira, centrada sobre el anillo (desborda el ringWrap).
-  ringGlow: {
-    position: 'absolute',
-    top: (RING_SIZE - GLOW_SIZE) / 2,
-    left: (RING_SIZE - GLOW_SIZE) / 2,
-    width: GLOW_SIZE,
-    height: GLOW_SIZE,
   },
   ringSvg: {
     transform: [{ rotate: '-90deg' }],
@@ -1088,6 +1027,78 @@ const styles = StyleSheet.create({
     marginTop: 16,
     alignItems: 'center',
     paddingHorizontal: 24,
+  },
+  // El veredicto — upright (dato, no voz de coach), la respuesta directa a
+  // "¿sigo en déficit?".
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 22,
+    marginTop: 8,
+  },
+  // La leyenda en filas a la derecha del anillo.
+  legendCol: {
+    flex: 1,
+    gap: 14,
+  },
+  verdictBlock: {
+    marginTop: 24,
+  },
+  verdictTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+  },
+  verdictLine: {
+    marginTop: 6,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
+  },
+  verdictCta: {
+    alignSelf: 'flex-start',
+    marginTop: 14,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+  },
+  verdictCtaText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
+  },
+  focusTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.anchor,
+    color: colors.leche,
+  },
+  focusBody: {
+    marginTop: 4,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
+  },
+  evidenceDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  weekLink: {
+    alignSelf: 'center',
+    marginTop: 32,
+    paddingVertical: 10,
+  },
+  weekLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.3,
   },
   heroEyebrow: {
     fontFamily: typography.uiBold,
@@ -1142,8 +1153,8 @@ const styles = StyleSheet.create({
   },
   // Cada stat es una columna: [punto + label] arriba, el número debajo.
   legendItem: {
-    alignItems: 'center',
-    gap: 4,
+    alignItems: 'flex-start',
+    gap: 3,
   },
   legendHead: {
     flexDirection: 'row',
@@ -1178,13 +1189,19 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     color: colors.niebla,
   },
-  // Procedencia del dato ("tu reloj") — nota al pie de la columna, más
-  // callada que el valor: la fuente es contexto, nunca protagonista.
+  // Procedencia del dato ("tu reloj") — nota al pie de la columna con el
+  // ícono del reloj: clara (niebla), pero más callada que el valor.
+  legendCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
   legendCaption: {
-    fontFamily: typography.ui,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 0.3,
-    color: colors.bruma,
+    color: colors.niebla,
   },
   // ── La evidencia ─────────────────────────────────────────────────
   section: {
@@ -1217,6 +1234,30 @@ const styles = StyleSheet.create({
   evidenceDetail: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // El grupo del reloj: su eyebrow (misma receta que la firma de Hoy, en
+  // niebla para subordinarse al eyebrow oro de la sección) y sus filas.
+  watchGroup: {
+    marginBottom: 6,
+  },
+  watchEyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginBottom: 12,
+  },
+  watchEyebrowText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  evidenceSourceText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 0.3,
     color: colors.niebla,
   },
   // ── Hacia dónde va tu día (dirección + por qué) ──────────────────

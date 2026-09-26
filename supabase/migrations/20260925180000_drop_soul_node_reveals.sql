@@ -1,0 +1,22 @@
+-- =====================================================================
+-- 2026-09-25 — drop soul_node_reveals (limpieza clean-features)
+--
+-- Tabla del experimento de "nodos" de Alma Celeste (jun 2026), descartado
+-- por la spec (la figura ya completa + 6 sistemas de región, no overlay de
+-- nodos). Cero referencias en app, edge functions ni migraciones del repo;
+-- en prod solo había 3 filas de un día de pruebas (18 jun 2026, dev).
+-- Decisión de la dueña, 25 sep 2026.
+--
+-- Revertir (estructura; los 3 registros de prueba no se restauran):
+--   create table public.soul_node_reveals (
+--     id uuid not null default gen_random_uuid() primary key,
+--     user_id uuid not null references auth.users(id) on delete cascade,
+--     sign text not null, node_id text not null, source text not null,
+--     config_version integer not null default 1,
+--     revealed_at timestamptz not null default now()
+--   );
+--   alter table public.soul_node_reveals enable row level security;
+--   + policies auth.uid() = user_id.
+-- =====================================================================
+
+drop table if exists public.soul_node_reveals;

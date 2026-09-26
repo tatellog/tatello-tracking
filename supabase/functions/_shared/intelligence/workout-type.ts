@@ -104,6 +104,10 @@ export function workoutTypeDeficitSplit(
 
   let best: { type: string; def: number; total: number; rate: number } | null = null
   for (const [type, days] of byType) {
+    // "Otro" es la salida para lo que no clasifica (pilates, yoga, baile):
+    // cuenta en `others`, pero nunca protagoniza el patrón ("Otro acompaña
+    // tu déficit" sería copy vacío).
+    if (type === 'otro') continue
     if (days.length < PAIR_MIN) continue
     const def = days.filter((s) => isDeficit(s.calories, target)).length
     const rate = def / days.length

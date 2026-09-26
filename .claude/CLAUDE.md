@@ -50,7 +50,8 @@ meditación, horóscopo decorativo, quick-fix de peso.
 - **Backend:** Supabase (Postgres + Auth + Storage), RLS estricto
 - **Data layer:** TanStack Query (React Query) v5
 - **Animación:** Reanimated 4
-- **Estilos:** NativeWind
+- **Estilos:** StyleSheet de React Native con tokens de `theme/` (NativeWind se
+  retiró en sep 2026: cero `className` en la app)
 - **Validación:** Zod (en los bordes · parsea respuestas Supabase/RPC)
 - **Lenguaje:** TypeScript estricto
 - **Package manager:** pnpm

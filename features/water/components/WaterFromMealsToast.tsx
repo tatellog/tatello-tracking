@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 
-import { UNIVERSE_ACCENT, tint } from '@/features/tabs/universe-visuals'
 import { colors, typography } from '@/theme'
 
 import { formatGlasses, glassesWord } from '../liquid-detection'
@@ -17,7 +16,10 @@ import { formatGlasses, glassesWord } from '../liquid-detection'
  * detrás de esa ruta full-screen).
  */
 
-const WATER = UNIVERSE_ACCENT.claridad
+/** Color del agua (dimensión sueño/índigo, el mismo de siempre). */
+const WATER = colors.dimension.sueno
+/** 8-digit-hex alpha sobre un acento — RN parsea #RRGGBBAA. */
+const tint = (hex: string, alpha: string) => `${hex}${alpha}`
 const VISIBLE_MS = 2000
 
 export function WaterFromMealsToast({ glasses, seq }: { glasses: number; seq: number }) {

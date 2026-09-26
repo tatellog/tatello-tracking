@@ -46,6 +46,7 @@ import {
 } from '@/features/macros/api'
 import {
   useCreateMeal,
+  useDeleteMeal,
   useFrequentMeals,
   useMacroTargets,
   useMealById,
@@ -56,9 +57,6 @@ import { mealMomentByHour } from '@/features/macros/meal-moment'
 import { microReading } from '@/features/macros/micro-reading'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
-import { subscribeUniverseDelta } from '@/features/tabs/universe-delta-bus'
-import { ATTRIBUTE_LABEL } from '@/features/tabs/universe-rewards'
-import { UNIVERSE_ACCENT } from '@/features/tabs/universe-visuals'
 import {
   ingredientKcal,
   ingredientProtein,
@@ -584,6 +582,25 @@ export default function ScanMealScreen() {
     mealType?: string
   }>()
   const isEdit = !!editId
+  // Borrar vive DENTRO del editor (sin gesto oculto): desde la lista del día
+  // de Comidas, tocar una comida la abre aquí y "Borrar comida" la quita.
+  const deleteMeal = useDeleteMeal()
+  const confirmDelete = () => {
+    if (!editId) return
+    Alert.alert('Borrar esta comida', undefined, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Borrar',
+        style: 'destructive',
+        onPress: () =>
+          deleteMeal.mutate(editId, {
+            onSuccess: () => router.back(),
+            onError: () =>
+              Alert.alert('No pudimos borrarla', 'Intenta de nuevo cuando tengas señal.'),
+          }),
+      },
+    ])
+  }
   // Manual log — no scan, no ingredient breakdown; the user types the
   // protein + calories. The photo and name stay optional.
   const isManual = !!manual
@@ -622,18 +639,6 @@ export default function ScanMealScreen() {
   // cold system Alert). Cleared once the user adds an ingredient.
   const [scanError, setScanError] = useState<string | null>(null)
 
-  // El delta de Energía que el universo emitió por ESTA comida. El
-  // optimistic patch de useCreateMeal lo dispara desde Hoy (montado bajo
-  // esta ruta), y lo mostramos en el reveal: cierra la cadena comida →
-  // universo en el flujo principal, donde el toast global queda detrás de
-  // esta pantalla y no se ve. Una comida = una subida de Energía, así que
-  // acumular el único delta de la sesión basta (no hay re-log aquí).
-  const [energiaDelta, setEnergiaDelta] = useState(0)
-  useEffect(() => {
-    return subscribeUniverseDelta(({ key, delta }) => {
-      if (key === 'energia' && delta > 0) setEnergiaDelta((d) => d + delta)
-    })
-  }, [])
   const [description, setDescription] = useState('')
   const [photoUri, setPhotoUri] = useState(uri)
   const [aspect, setAspect] = useState(1.4)
@@ -1430,16 +1435,6 @@ export default function ScanMealScreen() {
               <Text style={styles.revealMacroLabel}>Proteína · </Text>
               <Text style={styles.revealMacroValue}>{revealProtein}g</Text>
             </Animated.View>
-            {/* "✦ +N Energía" — ata esta comida a tu universo, aquí donde
-                el toast global queda detrás de la pantalla del reveal. */}
-            {energiaDelta > 0 ? (
-              <Animated.Text
-                entering={FadeInUp.duration(520).delay(1000)}
-                style={[styles.revealEnergia, { color: UNIVERSE_ACCENT.energia }]}
-              >
-                ✦ +{energiaDelta} {ATTRIBUTE_LABEL.energia}
-              </Animated.Text>
-            ) : null}
             {/* La microlectura del motor (V-01): el día acumulado tras esta
                 comida — dato en UI upright, no voz de coach. Con silencio
                 (null) el reveal se queda como está. */}
@@ -1831,6 +1826,17 @@ export default function ScanMealScreen() {
                 loading={saving}
                 loadingLabel="Guardando…"
               />
+              {isEdit ? (
+                <Pressable
+                  onPress={confirmDelete}
+                  hitSlop={{ top: 10, bottom: 10 }}
+                  style={styles.deleteLink}
+                  accessibilityRole="button"
+                  accessibilityLabel="Borrar esta comida"
+                >
+                  <Text style={styles.deleteLinkText}>Borrar comida</Text>
+                </Pressable>
+              ) : null}
             </View>
           </>
         )}
@@ -1868,6 +1874,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Aviso de backfill — la comida cae en el día visto, no en hoy.
+  // Borrar — link callado bajo Guardar (acción destructiva, nunca primaria).
+  deleteLink: {
+    alignSelf: 'center',
+    marginTop: 14,
+    paddingVertical: 6,
+  },
+  deleteLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.3,
+  },
   backfillNote: {
     textAlign: 'center',
     marginBottom: 10,
@@ -1961,14 +1979,6 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   // El delta del universo — "✦ +N Energía", tintado del atributo.
-  revealEnergia: {
-    marginTop: 8,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
-    fontVariant: ['tabular-nums'],
-    textAlign: 'center',
-  },
   // La microlectura del motor — dato discreto (bone, upright), separada de
   // la voz del coach; nunca compite con el número del reveal.
   revealReading: {

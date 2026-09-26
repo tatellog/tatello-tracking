@@ -1,5 +1,7 @@
 # Epic 01 · Historia
 
+> **Nota (25 sep 2026):** `TuHistoria.tsx` y su flag `PROGRESS_HISTORY_ENABLED` se retiraron en la limpieza (sin importadores). La Historia vive hoy como la card 30v30 y los capítulos de Progreso.
+
 **Status:** Draft · **Priority:** P1 · **Depende de:** Epic 00
 
 ---

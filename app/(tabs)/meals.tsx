@@ -1,22 +1,20 @@
-import * as Haptics from 'expo-haptics'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useMemo } from 'react'
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import NorthStar from '@/assets/icons/north-star.svg'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { track } from '@/lib/analytics'
-import {
-  useMacroTargets,
-  useMealsForDate,
-  useNourishmentConsistency,
-} from '@/features/macros/hooks'
-import { NourishmentConsistency, NutritionMoon } from '@/features/macros/components'
+import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
+import { NutritionMoon } from '@/features/macros/components'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
-import { useSetWater, useWaterToday } from '@/features/water/hooks'
-import { MealComposer, MomentsToday, SkyBackground, TabHeader } from '@/features/tabs/components'
+import {
+  DayMealList,
+  MealComposer,
+  MomentsToday,
+  SkyBackground,
+  TabHeader,
+} from '@/features/tabs/components'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -76,21 +74,10 @@ function MealsBody() {
     [meals],
   )
 
-  const nourish = useNourishmentConsistency()
-  // La fila de Agua de la card es ACCIÓN, no espejo: "vi mi tira floja →
-  // sumé un vaso aquí mismo". Reusa el write hook optimista de Hoy.
-  const todayWater = useWaterToday(today)
-  const setWater = useSetWater(today)
-  const addGlass = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    setWater.mutate((todayWater.data ?? 0) + 1)
-  }
-
-  // Sticky "Agregar entrada" → abre la cámara de captura (/capture-meal).
-  const openCapture = () => {
-    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {})
-    router.push('/capture-meal')
-  }
+  // (Dirección de arte sep 2026: Comidas responde "¿qué comí hoy?". Se
+  // retiraron la card de 7 días proteína+agua, la fila de agua (vive en el
+  // registro rápido) y la barra fija "Agregar entrada", que duplicaba el
+  // botón global Registrar.)
 
   return (
     <View style={styles.screen}>
@@ -111,16 +98,47 @@ function MealsBody() {
             </Text>
           ) : null}
 
-          {/* §1 · Hero nutricional — proteína + luna + honestidad de avance. */}
-          <NutritionMoon
-            proteinValue={summary.protein}
-            proteinTarget={targets?.protein_g}
-            isLoading={mealsQuery.isLoading}
-          />
+          {/* Error de carga: se DICE, nunca se pinta "0 g" (en una app de peso,
+              "no comiste nada" sería mentira). */}
+          {mealsQuery.isError && !mealsQuery.data ? (
+            <View style={styles.errorBlock}>
+              <Text style={styles.errorText}>No pudimos traer tus comidas.</Text>
+              <Pressable
+                onPress={() => mealsQuery.refetch()}
+                style={styles.retry}
+                accessibilityRole="button"
+                accessibilityLabel="Reintentar"
+              >
+                <Text style={styles.retryText}>Reintentar</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {/* §1 · Hero — proteína de hoy + luna (el medidor). */}
+              <NutritionMoon
+                proteinValue={summary.protein}
+                proteinTarget={targets?.protein_g}
+                isLoading={mealsQuery.isLoading}
+              />
 
-          {/* Momentos del día — el lado práctico: qué falta capturar hoy.
-              Refleja el día visto (mismas comidas que el hero). */}
-          {mealsQuery.isLoading ? null : <MomentsToday meals={meals} viewingPast={viewingPast} />}
+              {/* Los astros AGREGAN (tocar = registrar en ese momento) y la
+                  lista del día se lee y se edita (tocar = abrir el editor, donde
+                  también se borra). Reflejan el día visto. */}
+              {mealsQuery.isLoading ? null : (
+                <>
+                  <MomentsToday meals={meals} viewingPast={viewingPast} />
+                  <DayMealList
+                    meals={meals}
+                    viewingPast={viewingPast}
+                    onOpenMeal={(id) => {
+                      track('food_card_opened', { meal_id: id })
+                      router.push({ pathname: '/scan-meal', params: { editId: id } })
+                    }}
+                  />
+                </>
+              )}
+            </>
+          )}
 
           {targets ? null : (
             <Pressable
@@ -136,58 +154,10 @@ function MealsBody() {
             </Pressable>
           )}
 
-          {/* §2 CTA + §4 Registro + §3 Tus Aliados — todo en MealComposer,
-              la acción más visible justo bajo el hero. */}
-          <MealComposer
-            onOpenMeal={(id, photoPath) => {
-              track('food_card_opened', { meal_id: id })
-              router.push({
-                pathname: '/scan-meal',
-                params: { editId: id, ...(photoPath ? { photoPath } : {}) },
-              })
-            }}
-          />
-
-          {/* Adherencia por-día ("Lo que alimenta tu transformación") — abajo,
-              como contexto. ("Esta semana" se movió a Progreso: era análisis.) */}
-          <NourishmentConsistency
-            data={nourish.data}
-            isLoading={nourish.isLoading}
-            isError={nourish.isError}
-            onAddReference={() => router.push('/onboarding/macro-targets?source=banner')}
-            todayGlasses={todayWater.data ?? 0}
-            onAddGlass={addGlass}
-          />
+          {/* Registro abierto + "Tus comidas frecuentes". */}
+          <MealComposer />
         </ScrollView>
       </SafeAreaView>
-
-      {/* Scrim bajo el sticky: el contenido se DESVANECE al pasar por
-          debajo en vez de decapitarse contra la card (feedback dueña: el
-          tercer aliado se veía cortado a mitad de scroll). */}
-      <LinearGradient
-        colors={['transparent', colors.bg]}
-        locations={[0, 0.72]}
-        style={styles.stickyScrim}
-        pointerEvents="none"
-      />
-      {/* Sticky "Agregar entrada" — flota sobre la tab bar; la acción más
-          visible del tab (reemplaza el CTA "Agregar comida" inline). Sin
-          ícono de código de barras. */}
-      <Pressable
-        onPress={openCapture}
-        style={[styles.sticky, { bottom: 6 }]}
-        accessibilityRole="button"
-        accessibilityLabel="Agregar entrada. Registra lo que alimenta tu universo."
-      >
-        <View style={styles.stickyStarWrap} pointerEvents="none">
-          <View style={styles.stickyStarGlow} />
-          <NorthStar width={30} height={30} color={colors.magenta} />
-        </View>
-        <View style={styles.stickyTextCol}>
-          <Text style={styles.stickyTitle}>Agregar entrada</Text>
-          <Text style={styles.stickySubtitle}>Registra lo que alimenta tu universo.</Text>
-        </View>
-      </Pressable>
     </View>
   )
 }
@@ -195,6 +165,30 @@ function MealsBody() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
+  },
+  errorBlock: {
+    marginTop: 24,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  errorText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  retry: {
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+  },
+  retryText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
   },
   screen: {
     flex: 1,
@@ -236,61 +230,4 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // ── Sticky "Agregar entrada" ──────────────────────────────────────
-  stickyScrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 132,
-  },
-  sticky: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 22,
-    backgroundColor: colors.bgNav,
-    borderWidth: 1,
-    // Superficie CALMA: el borde/glow magenta competía con el FAB ✦ a 70px
-    // (dos fuentes de luz de acción en el mismo viewport = tell de indie,
-    // auditoría visual). El magenta vive en el texto; la luz, en el FAB.
-    borderColor: colors.hairlineStrong,
-    shadowColor: colors.sombra,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  stickyStarWrap: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stickyStarGlow: {
-    position: 'absolute',
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.magentaTint2,
-  },
-  stickyTextCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  stickyTitle: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.magenta,
-  },
-  stickySubtitle: {
-    marginTop: 2,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
 })

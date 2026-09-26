@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
@@ -32,10 +32,10 @@ import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/fe
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
-import { ArrivedLine } from '@/features/wearables/components/ArrivedLine'
+import { WearableSignature } from '@/features/wearables/components/WearableSignature'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
 import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
-import { wearableDayFacts, workoutProvenanceLine } from '@/features/wearables/recovery'
+import { wearableDayFacts } from '@/features/wearables/recovery'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
@@ -47,7 +47,6 @@ import {
   consumeCalendarDay,
   subscribeCalendarDayRequest,
 } from '@/features/tabs/pending-calendar-day'
-import { subscribeUniverseDetailRequest } from '@/features/tabs/pending-universe-detail'
 import {
   useSetWorkoutTypeToday,
   useToggleWorkoutForDate,
@@ -59,27 +58,26 @@ import { HERO_ALIVE_ENABLED } from '@/lib/featureFlags'
 import {
   CoachLine,
   DayCheckIn,
-  DayCloseCard,
-  DayReadingStrip,
-  WeeklyReadingStrip,
   type DayState,
   type WorkoutTypeId,
   LunarConstellation,
+  MacroRings,
   useHeroReaction,
   SectionHeader,
   SkyBackground,
-  StatSlider,
-  StreakLine,
+  SleepCheckIn,
   TabHeader,
   TodayMealLog,
-  TodayUniverseRewards,
+  TuDiaCard,
 } from '@/features/tabs/components'
+import { checkInTurn } from '@/features/tabs/checkin-turn'
+import { useLocalHour } from '@/features/tabs/use-local-hour'
 import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
 import { namedStarProgress } from '@/features/tabs/components/constellation/data/derive-progress'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
-import { colors, typography } from '@/theme'
+import { colors } from '@/theme'
 
 /*
  * The commit haptic — a designed two-beat "phrase", not a tick:
@@ -161,10 +159,9 @@ type ContentProps = {
 function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const qc = useQueryClient()
   const router = useRouter()
-  // The `slide` query param tells StatSlider which slide to land on.
-  // Set by the Órbita focus CTA (DaySegment) so tapping "Marca tu
-  // energía" lands the user directly on the wellbeing card instead
-  // of at the top of Hoy.
+  // El param `slide` es el deep-link desde Órbita ("no apareció → regístralo"):
+  // 'sleep' abre la pregunta de sueño arriba; 'macros' / 'cycle' bajan a los
+  // anillos; 'meals' a las comidas.
   const { slide: slideParam } = useLocalSearchParams<{ slide?: string }>()
 
   const toggleToday = useToggleWorkoutToday()
@@ -243,35 +240,50 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
   }, [])
 
-  // Tap del toast de delta → además de abrir el detalle del atributo
-  // (lo hace TodayUniverseRewards), llevamos el scroll a "Tu universo
-  // hoy" para que el panel quede a la vista al aterrizar desde otra tab.
-  // El offset de la sección se captura por onLayout en su wrapper.
   const scrollRef = useRef<ScrollView>(null)
-  const universeY = useRef(0)
   // Offsets de las secciones a las que llega un deep-link desde Órbita
-  // ("Todavía no vimos → registrar"): el slider de stats y las comidas del día.
-  const slidesY = useRef(0)
+  // ("Todavía no vimos → registrar"): los anillos de macros y las comidas.
+  const macrosY = useRef(0)
   const mealsY = useRef(0)
 
-  // Deep-link desde Órbita: además de que StatSlider enfoque el slide horizontal,
-  // hay que BAJAR la página a esa sección (si no, aterrizas arriba y no la ves).
-  // 'meals' apunta a "Comidas de hoy"; el resto, al slider. Se limpia el param al
-  // terminar para que volver a tocar el mismo chip vuelva a enfocar.
+  // Las dos filas del check-in (entreno / sueño): la usuaria puede abrir una
+  // ("cambiar" / "anotar") o cerrarla ("Listo" / "Después"); null = lo decide
+  // la hora (checkInTurn). Abrir una cierra la otra: una pregunta viva a la
+  // vez. Se resetean al cambiar de día visto. `sleepTouched` cubre el hueco
+  // entre anotar y que la query traiga la fila.
+  const [workoutOpen, setWorkoutOpen] = useState<boolean | null>(null)
+  const [sleepOpen, setSleepOpen] = useState<boolean | null>(null)
+  const [sleepTouched, setSleepTouched] = useState(false)
+  useEffect(() => {
+    setWorkoutOpen(null)
+    setSleepOpen(null)
+    setSleepTouched(false)
+  }, [selectedDate])
+  const openWorkout = () => {
+    setWorkoutOpen(true)
+    setSleepOpen((v) => (v === true ? false : v))
+  }
+  const openSleep = () => {
+    setSleepOpen(true)
+    setWorkoutOpen((v) => (v === true ? false : v))
+  }
+
+  // Deep-link desde Órbita: 'sleep' abre la pregunta arriba (y sube); el resto
+  // BAJA la página a su sección. Se limpia el param al terminar para que volver
+  // a tocar el mismo chip vuelva a enfocar.
   useEffect(() => {
     if (!slideParam) return
-    const targetY = slideParam === 'meals' ? mealsY : slidesY
+    if (slideParam === 'sleep') openSleep()
+    const targetY = slideParam === 'meals' ? mealsY : slideParam === 'sleep' ? null : macrosY
     const id = setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(0, targetY.current - 80), animated: true })
+      scrollRef.current?.scrollTo({
+        y: targetY ? Math.max(0, targetY.current - 80) : 0,
+        animated: true,
+      })
       router.setParams({ slide: undefined })
     }, 260)
     return () => clearTimeout(id)
   }, [slideParam, router])
-  useEffect(() => {
-    return subscribeUniverseDetailRequest(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(0, universeY.current - 80), animated: true })
-    })
-  }, [])
   // Llegada desde "Editar día →" (Historia de Progreso): pone Hoy en modo "ver
   // día" para esa fecha y sube al inicio, donde ahora vive TODO el día (universo,
   // macros, comidas reflejan el día visto). El banner de arriba avisa.
@@ -285,18 +297,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     const pendingDate = consumeCalendarDay()
     if (pendingDate) handle(pendingDate)
     return subscribeCalendarDayRequest(handle)
-  }, [])
-  // Same pause, but driven by the macros slider's HORIZONTAL drag — the
-  // vertical-scroll handler above never fires for a sideways swipe, so the
-  // cosmos kept animating and competed with the swipe (felt slow). Hold the
-  // pause for the whole drag; release ~140 ms after it settles.
-  const handleSlideSwipe = useCallback((active: boolean) => {
-    if (scrollIdle.current) clearTimeout(scrollIdle.current)
-    if (active) {
-      setIsScrolling((s) => (s ? s : true))
-    } else {
-      scrollIdle.current = setTimeout(() => setIsScrolling(false), 140)
-    }
   }, [])
   // The constellation's pause is driven as a SharedValue, NOT the `paused`
   // boolean it used to take: a boolean prop re-rendered the whole heavy
@@ -465,22 +465,25 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const trainedByWearable =
     !vctx.today_workout_completed && !restedToday && wearable.workout != null
 
-  // Modo confirmación (spec §9): lo que el reloj ya anotó HOY se colapsa en una
-  // línea y sus componentes dejan de preguntar; "ajustar" los devuelve llenos.
-  // Solo hoy (un día pasado se ve completo) y solo lo que no tiene manual encima.
-  const arrivedFacts = viewingPast
-    ? null
-    : {
-        ...wearable,
-        workout: trainedByWearable ? wearable.workout : null,
-      }
-  const hasArrived =
-    arrivedFacts != null &&
-    (arrivedFacts.sleep != null || arrivedFacts.workout != null || arrivedFacts.water != null)
-  const [arrivedOpen, setArrivedOpen] = useState(false)
-  useEffect(() => setArrivedOpen(false), [selectedDate])
-  const sleepCollapsed = hasArrived && arrivedFacts?.sleep != null && !arrivedOpen
-  const checkInCollapsed = hasArrived && arrivedFacts?.workout != null && !arrivedOpen
+  // Modo confirmación (spec §9): lo que el reloj ya trajo NO se pregunta. Las
+  // filas de entreno y sueño nacen respondidas, con la misma gramática del
+  // camino manual (misma estrella), y una sola firma debajo dice qué vino del
+  // reloj y hace cuánto. "cambiar" por fila corrige; manual gana.
+  const sleepFromWearable = wearable.sleep != null
+  const anyFromWearable = trainedByWearable || sleepFromWearable
+  // "ajustar" en el eyebrow del reloj abre a la vez lo que vino del reloj
+  // (tipo de entreno, horas de sueño); cada bloque cierra por su cuenta
+  // (Cancelar · Listo), así que el ajuste se sigue por bloque.
+  const [adjustWorkout, setAdjustWorkout] = useState(false)
+  const [adjustSleep, setAdjustSleep] = useState(false)
+  useEffect(() => {
+    setAdjustWorkout(false)
+    setAdjustSleep(false)
+  }, [selectedDate])
+
+  const hour = useLocalHour()
+  const hasSleep =
+    manualSleep.data?.duration_minutes != null || wearable.sleep != null || sleepTouched
 
   // Báscula (spec §9): ícono en la cabecera solo cuando Salud existe en este
   // build; el punto avisa de una lectura nueva. Nunca muestra el número.
@@ -512,114 +515,103 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         ? 'trained'
         : 'undecided'
 
-  // Tipo de entreno de HOY para los chips post-confirmación. Solo consulta
-  // cuando hoy ya está entrenado; en modo "ver día" los chips no existen.
+  // La voz del coach bajo el cielo: una sola frase. Día 1 = la primera estrella;
+  // con registro de hoy, la frase cierra nombrando lo de mañana (open loop por
+  // deseo, nunca racha). Se calcula aquí para que el JSX quede en una línea.
+  const coachCopy: CoachCopy = (() => {
+    if (firstStarFired) {
+      return { before: 'Tu primera estrella. Así ', emphasis: 'empieza', after: ' un cielo.' }
+    }
+    const morning = !viewingPast && hour < 12
+    const base = getCoachCopy(
+      trainedThisMonth,
+      signLabel,
+      dayState === 'trained',
+      sign,
+      morning,
+      // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce.
+      !viewingPast && sleepFromWearable,
+    )
+    if (!todayHasRegistro || viewingPast || morning) return base
+    const tail =
+      trainedThisMonth >= figureCount
+        ? 'Mañana sumas luz extra.'
+        : trainedThisMonth + 1 >= figureCount
+          ? 'Mañana completas tu figura.'
+          : (() => {
+              const next = pickStarForCount(sign, trainedThisMonth + 1)
+              return next ? `Mañana, ${next.name}.` : null
+            })()
+    return tail ? { ...base, after: `${base.after.replace(/\s*$/, '')} ${tail}` } : base
+  })()
+
+  // Tipo de entreno de HOY (para la fila colapsada y el chip activo). Solo
+  // consulta cuando hoy ya está entrenado; en modo "ver día" viene del brief.
   const workoutTypeQ = useWorkoutTypeToday(!viewingPast && dayState === 'trained')
 
-  const handleWorkoutType = (type: WorkoutTypeId | null) => {
-    setWorkoutType.mutate(type)
-    track('workout_type_selected', { type: type ?? 'cleared' })
-  }
+  // El turno del check-in (decisión dueña sep 2026): dos filas fijas, UNA
+  // pregunta viva a la vez, la hora decide cuál (mañana: sueño; desde el
+  // mediodía: entreno, y al responderlo el sueño abre una vez si sigue
+  // pendiente). Sellado por el reloj cuenta como respondido.
+  const turn = checkInTurn({
+    hour,
+    workoutAnswered: dayState !== 'undecided',
+    sleepAnswered: hasSleep,
+    workoutOpen,
+    sleepOpen,
+    past: viewingPast,
+  })
 
-  // Memoria de sesión del tipo: cambiar entreno→descanso BORRA la fila de
-  // workouts (y su type con ella). Si en la misma sesión regresa a entreno,
-  // su "Fuerza" se restaura sola — la app se acuerda de lo que ELLA dijo
-  // hoy (memoria de sesión sí; presunción de hábito, nunca).
-  const stashedWorkoutType = useRef<string | null>(null)
-
-  const handleDayChange = (next: DayState) => {
+  // "Un tap dice todo": el tipo responde entrené + de qué en un solo gesto.
+  const handleTrain = (type: WorkoutTypeId) => {
+    track('workout_type_selected', { type })
     // Día PASADO: backfill sin celebración. GUARD — la constelación NO retrocede
-    // (memoria immutable-vs-recalculable): una estrella de entreno ya encendida
-    // queda SELLADA; el backfill solo puede ENCENDER (entreno/descanso en un día
-    // sin entreno) o limpiar un descanso (no apaga estrellas). Nunca des-entrena.
+    // (memoria immutable-vs-recalculable): una estrella ya encendida queda
+    // SELLADA; el backfill solo ENCIENDE. Solo persiste + haptic suave.
     if (viewingPast) {
-      if (vctx.today_workout_completed) return // sellado: nada lo apaga
-      if (next === 'trained') markTrained(selectedDate)
-      else if (next === 'rested') markRested(selectedDate)
-      else if (restedToday) clearRested(selectedDate)
+      if (vctx.today_workout_completed) return
+      setRestForDate.mutate({ date: selectedDate, rested: false })
+      toggleForDate.mutate({ date: selectedDate, complete: true, type })
+      playCommitHaptic('backfill')
+      track('calendar_day_marked', { date: selectedDate, status: 'trained', source: 'calendar' })
       return
     }
-    if (next === 'trained') {
-      const wasFirstDay = isFirstDay
-      if (restedToday) setRest.mutate(false)
-      toggleToday.mutate(true)
-      // Restaura el tipo que dijo hoy antes de pasar por descanso.
-      if (stashedWorkoutType.current) {
-        setWorkoutType.mutate(stashedWorkoutType.current as WorkoutTypeId)
-        stashedWorkoutType.current = null
-      }
-      playCommitHaptic('trained')
-      // Only gate on the reward when it actually plays (reduced motion shows
-      // no Lottie → onAnimationFinish would never fire → stuck paused).
-      if (!reducedMotion) setCelebrating(true)
-      setCelebrateKey((k) => k + 1)
-      // Flash dorado full-screen (global, cubre la tab bar). El celebrateKey
-      // local sigue manejando el Lottie de fuegos sobre la constelación.
-      if (!reducedMotion) emitCelebrate()
-      if (wasFirstDay) {
-        qc.invalidateQueries({ queryKey: queryKeys.profile.all })
-      }
-    } else if (next === 'rested') {
-      if (ctx.today_workout_completed) {
-        // El unmark destruye la fila de workouts (y el type): guárdalo
-        // para el arrepentimiento de la misma sesión.
-        stashedWorkoutType.current = workoutTypeQ.data ?? null
-        toggleToday.mutate(false)
-      }
-      setRest.mutate(true)
-      playCommitHaptic('rested')
-    } else {
-      // Cleared back to undecided — undo whichever was set.
-      if (ctx.today_workout_completed) toggleToday.mutate(false)
-      if (restedToday) setRest.mutate(false)
+    const alreadyTrained = ctx.today_workout_completed || trainedByWearable
+    if (restedToday) setRest.mutate(false)
+    if (!ctx.today_workout_completed) toggleToday.mutate(true)
+    // Upsert: fija el tipo aunque el insert de arriba siga en vuelo.
+    setWorkoutType.mutate(type)
+    // Cambiar solo el tipo de un día ya entrenado no vuelve a celebrar.
+    if (alreadyTrained) return
+    const wasFirstDay = isFirstDay
+    playCommitHaptic('trained')
+    // Only gate on the reward when it actually plays (reduced motion shows
+    // no Lottie → onAnimationFinish would never fire → stuck paused).
+    if (!reducedMotion) setCelebrating(true)
+    setCelebrateKey((k) => k + 1)
+    // Flash dorado full-screen (global, cubre la tab bar). El celebrateKey
+    // local sigue manejando el Lottie de fuegos sobre la constelación.
+    if (!reducedMotion) emitCelebrate()
+    if (wasFirstDay) {
+      qc.invalidateQueries({ queryKey: queryKeys.profile.all })
     }
   }
 
-  // Backfill de un día pasado (desde el toggle del hero al ver ese día). NUNCA
-  // celebra (sin fireworks/reward) — solo persiste + haptic suave.
-  const isToday = useCallback((date: string) => date === todayIsoLocal, [todayIsoLocal])
-
-  const markTrained = useCallback(
-    (date: string) => {
-      // Si ese día estaba marcado como descanso, lo retiramos (mutuamente
-      // excluyentes: la constelación se llena solo con entreno).
-      setRestForDate.mutate({ date, rested: false })
-      if (isToday(date)) toggleToday.mutate(true)
-      else toggleForDate.mutate({ date, complete: true })
-      playCommitHaptic('backfill')
-      track('calendar_day_marked', { date, status: 'trained', source: 'calendar' })
-    },
-    [setRestForDate, isToday, toggleToday, toggleForDate],
-  )
-
-  // (No hay clearTrained: la constelación no retrocede — una estrella de
-  // entreno ya encendida queda sellada, ni en hoy ni en backfill se apaga.)
-
-  const markRested = useCallback(
-    (date: string) => {
-      // Descanso no llena estrella; si estaba entrenado lo quitamos.
-      if (isToday(date)) {
-        if (ctx.today_workout_completed) toggleToday.mutate(false)
-        setRest.mutate(true)
-      } else {
-        toggleForDate.mutate({ date, complete: false })
-        setRestForDate.mutate({ date, rested: true })
-      }
+  const handleRest = () => {
+    if (viewingPast) {
+      if (vctx.today_workout_completed) return // sellado: nada lo apaga
+      toggleForDate.mutate({ date: selectedDate, complete: false })
+      setRestForDate.mutate({ date: selectedDate, rested: true })
       playCommitHaptic('rested')
-      track('calendar_day_marked', { date, status: 'rested', source: 'calendar' })
-    },
-    [isToday, ctx.today_workout_completed, toggleToday, toggleForDate, setRest, setRestForDate],
-  )
-
-  const clearRested = useCallback(
-    (date: string) => {
-      if (isToday(date)) setRest.mutate(false)
-      else setRestForDate.mutate({ date, rested: false })
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-      track('calendar_day_cleared', { date, was: 'rested' })
-    },
-    [isToday, setRest, setRestForDate],
-  )
+      track('calendar_day_marked', { date: selectedDate, status: 'rested', source: 'calendar' })
+      return
+    }
+    // Descanso no llena estrella; si estaba entrenado a mano lo quitamos (el
+    // unmark borra la fila y su tipo; volver a entrenar vuelve a elegir tipo).
+    if (ctx.today_workout_completed) toggleToday.mutate(false)
+    setRest.mutate(true)
+    playCommitHaptic('rested')
+  }
 
   const enter = makeEnter(cadence)
 
@@ -662,43 +654,76 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
-              {hasArrived && arrivedFacts ? (
-                <ArrivedLine
-                  facts={arrivedFacts}
-                  expanded={arrivedOpen}
-                  onToggle={() => setArrivedOpen((v) => !v)}
+              {/* La firma del reloj: el eyebrow que agrupa las dos filas. */}
+              {anyFromWearable ? (
+                <WearableSignature
+                  workout={trainedByWearable}
+                  sleep={sleepFromWearable}
+                  past={viewingPast}
+                  adjusting={adjustWorkout || adjustSleep}
+                  onAdjust={() => {
+                    setAdjustWorkout(trainedByWearable)
+                    setAdjustSleep(sleepFromWearable)
+                  }}
                 />
               ) : null}
-              {checkInCollapsed ? null : (
-                <DayCheckIn
-                  // Resetea el modo "cambiar" interno al navegar entre días.
-                  key={selectedDate}
-                  state={dayState}
-                  onChange={handleDayChange}
-                  label={viewingPast ? viewingLabel : 'Hoy'}
-                  question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
-                  locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
-                  // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
-                  workoutType={
-                    viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
-                  }
-                  onWorkoutType={viewingPast ? undefined : handleWorkoutType}
-                  wearable={
-                    !viewingPast && trainedByWearable && wearable.workout
-                      ? { line: workoutProvenanceLine(wearable.workout) }
-                      : null
-                  }
-                  saveFailed={
-                    toggleToday.isError ||
-                    setRest.isError ||
-                    toggleForDate.isError ||
-                    setRestForDate.isError
-                  }
+              <DayCheckIn
+                // Resetea el hold interno al navegar entre días.
+                key={selectedDate}
+                state={dayState}
+                mode={adjustWorkout && trainedByWearable ? 'ask' : turn.workout}
+                onTrain={handleTrain}
+                onRest={handleRest}
+                onOpen={openWorkout}
+                onClose={() => {
+                  setWorkoutOpen(false)
+                  setAdjustWorkout(false)
+                }}
+                label={viewingPast ? viewingLabel : undefined}
+                question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
+                locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
+                // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
+                workoutType={
+                  viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
+                }
+                wearable={
+                  trainedByWearable && wearable.workout
+                    ? { minutes: wearable.workout.minutes, kcal: wearable.workout.kcal }
+                    : null
+                }
+                saveFailed={
+                  toggleToday.isError ||
+                  setRest.isError ||
+                  toggleForDate.isError ||
+                  setRestForDate.isError
+                }
+              />
+              {/* La fila del sueño, siempre presente (pregunta, línea quieta o
+                  respondida). */}
+              {
+                <SleepCheckIn
+                  key={`sleep-${selectedDate}`}
+                  date={selectedDate}
+                  mode={adjustSleep && sleepFromWearable ? 'ask' : turn.sleep}
+                  wearableMinutes={wearable.sleep?.minutes ?? null}
+                  past={viewingPast}
+                  onOpen={openSleep}
+                  onClose={(touched) => {
+                    if (touched) setSleepTouched(true)
+                    setSleepOpen(false)
+                    setAdjustSleep(false)
+                  }}
                 />
-              )}
-              {/* Invitación contextual (spec wearables §5): solo con el día sin
-                  responder y el canal disponible pero no conectado. */}
-              {!viewingPast && dayState === 'undecided' ? <WearableInviteLine /> : null}
+              }
+              {/* Invitación contextual (spec wearables §5): solo con el día
+                  respondido, el sueño ya no preguntando, y el canal disponible
+                  pero no conectado. */}
+              {!viewingPast &&
+              dayState !== 'undecided' &&
+              !anyFromWearable &&
+              turn.sleep !== 'ask' ? (
+                <WearableInviteLine />
+              ) : null}
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre
@@ -763,17 +788,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       </View>
                     ) : null}
                   </View>
-                  {/* Señal de tappable (el modal era invisible con solo
-                      press-scale). Texto sutil, NO el chevron flotante que se
-                      veía raro. Se oculta en el estado vacío — ahí el contador
-                      ya muestra su propia invitación. */}
-                  {/* Siempre montado: si esta línea aparece/desaparece cambia
-                      el ALTO de heroWrap y la layout transition animaría a la
-                      constelación como scale (la estira). Con el espacio
-                      reservado, el hero solo se desliza (translateY). */}
-                  <Text style={styles.heroTapHint}>
-                    {trainedThisMonth > 0 ? 'toca para ver tus estrellas ›' : ' '}
-                  </Text>
                 </Animated.View>
               </Pressable>
             </Animated.View>
@@ -783,115 +797,28 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               layout={reducedMotion ? undefined : LinearTransition.duration(220)}
               style={styles.coachLineWrap}
             >
-              {/* La línea de la primera estrella — visible el resto de la
-                  sesión del día 1; mañana el coach normal retoma. */}
-              {firstStarFired ? (
-                <Animated.Text entering={FadeIn.duration(600)} style={styles.firstStarLine}>
-                  Tu primera estrella. Así empieza un cielo.
-                </Animated.Text>
-              ) : null}
-              <CoachLine
-                align="center"
-                {...getCoachCopy(
-                  trainedThisMonth,
-                  signLabel,
-                  dayState === 'trained',
-                  sign,
-                  // Mañana real de HOY (no de un día visto): antes de mediodía.
-                  !viewingPast && new Date().getHours() < 12,
-                  // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce.
-                  !viewingPast && wearable.sleep != null,
-                )}
-              />
-              {(() => {
-                // El gancho del día 2 (Mecánica D): con la estrella de HOY ya
-                // encendida — por CUALQUIER registro, no solo «Entrené» — se
-                // nombra la que sigue. Open loop por deseo, nunca racha.
-                if (!todayHasRegistro || viewingPast) return null
-                if (trainedThisMonth >= figureCount) {
-                  return (
-                    <Text style={styles.tomorrowHint}>
-                      Mañana sumas <Text style={styles.tomorrowHintEmphasis}>luz extra</Text>.
-                    </Text>
-                  )
-                }
-                // Last star before the asterism is whole.
-                if (trainedThisMonth + 1 >= figureCount) {
-                  return (
-                    <Text style={styles.tomorrowHint}>
-                      Mañana <Text style={styles.tomorrowHintEmphasis}>completas tu figura</Text>.
-                    </Text>
-                  )
-                }
-                const next = pickStarForCount(sign, trainedThisMonth + 1)
-                if (!next) return null
-                return (
-                  <Text style={styles.tomorrowHint}>
-                    Mañana: <Text style={styles.tomorrowHintEmphasis}>{next.name}</Text>,{' '}
-                    {next.role}
-                  </Text>
-                )
-              })()}
+              {/* UNA sola voz bajo el cielo (dirección de arte sep 2026): la
+                  CoachLine absorbe la primera estrella y el gancho de mañana. */}
+              <CoachLine align="center" {...coachCopy} />
             </Animated.View>
 
-            {/* La lectura del día + el cierre — la MISMA pregunta en dos
-                franjas: durante el día, "¿Cómo voy hoy?" (lectura de Órbita
-                Día asomada aquí, V-02); desde las 20:00 con ≥1 comida, el
-                veredicto nocturno toma su lugar (la tira se retira sola).
-                Solo para HOY (en modo ver-día no hay lectura que dar). */}
+            {/* "Tu día" — la ÚNICA tarjeta de lectura: de día la lectura sin
+                número (V-02), desde las 20:00 el cierre con la cifra, y la
+                Lectura Semanal (V-06) cuando hay una sin abrir. Solo para HOY
+                (en modo ver-día no hay lectura que dar); sin comida, no existe. */}
             {!viewingPast ? (
-              <>
-                <DayReadingStrip
-                  consumedCalories={ctx.today_macros.calories}
-                  targetCalories={ctx.targets?.calories}
-                  mealCount={ctx.meal_count_today}
-                />
-                <DayCloseCard
-                  consumedCalories={ctx.today_macros.calories}
-                  targetCalories={ctx.targets?.calories}
-                  mealCount={ctx.meal_count_today}
-                  reading={closeReading}
-                />
-                {/* La Lectura Semanal asomada en Hoy (V-06): solo mientras
-                    hay lectura sin abrir; se retira sola al leerla. Gated a
-                    dev junto con toda la Lectura Semanal. */}
-                <WeeklyReadingStrip />
-              </>
+              <TuDiaCard
+                consumedCalories={ctx.today_macros.calories}
+                targetCalories={ctx.targets?.calories}
+                mealCount={ctx.meal_count_today}
+                closeReading={closeReading}
+              />
             ) : null}
 
-            {/* Días en órbita — acumulado (no racha), lectura secundaria.
-                Tocable: abre el calendario del mes (la historia de esos
-                días). El hairline ya prometía tap; sin onPress era un link
-                vestido que no hacía nada. */}
-            <Animated.View entering={enter(360)}>
-              <StreakLine
-                streak={daysInOrbit}
-                onPress={() => router.navigate('/movement-calendar')}
-              />
-            </Animated.View>
-
-            {/* ── Nivel 2 · Consecuencia (lectura, no acción) ──────────────
-                "Tu universo hoy": lo que el esfuerzo reveló. No muta datos ni
-                navega de sorpresa. ("Tu transformación" se movió a Progreso,
-                bajo "Tu Historia".) */}
-
-            {/* "Tu universo hoy" — capa de recompensa para los registros
-                que NO encienden estrellas (comida/agua/sueño/check-in).
-                Autónoma: sus re-renders no tocan la constelación. */}
-            <Animated.View
-              entering={enter(470)}
-              onLayout={(e) => {
-                universeY.current = e.nativeEvent.layout.y
-              }}
-            >
-              <TodayUniverseRewards
-                ctx={vctx}
-                date={vctx.date}
-                restedToday={restedToday}
-                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
-                wearableWaterGlasses={wearable.water?.glasses ?? null}
-              />
-            </Animated.View>
+            {/* ("Tu universo hoy" se retiró el 25 sep 2026, decisión dueña: segundo
+                sistema de progreso que competía con la constelación, contador en
+                Hoy y sin efecto en motor ni emblema. El momento de recompensa por
+                registro vive en el hero vivo, V-13.) */}
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
                 Lo que la usuaria consulta cuando ya hizo lo principal:
@@ -900,16 +827,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             <Animated.View
               entering={enter(520)}
               onLayout={(e) => {
-                slidesY.current = e.nativeEvent.layout.y
+                macrosY.current = e.nativeEvent.layout.y
               }}
             >
-              <StatSlider
-                ctx={vctx}
-                targetSlide={slideParam ?? null}
-                onSwipeStateChange={handleSlideSwipe}
-                wearableSleepMinutes={wearable.sleep?.minutes ?? null}
-                hideSleepSlide={sleepCollapsed}
-              />
+              {/* Los dos anillos, siempre visibles, sin pager: el sueño subió a
+                  la pregunta del día y el peso no vive en Hoy. */}
+              <MacroRings ctx={vctx} />
             </Animated.View>
 
             <Animated.View
@@ -918,7 +841,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 mealsY.current = e.nativeEvent.layout.y
               }}
             >
-              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas de hoy'} />
+              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
             </Animated.View>
             <Animated.View entering={enter(600)}>
               <TodayMealLog
@@ -945,6 +868,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           total={figureCount}
           litStars={litStars}
           nextStar={nextStar}
+          daysInOrbit={daysInOrbit}
         />
         {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
           El orquestador elige UNA (Regreso > Transformación > Patrón); se
@@ -1119,15 +1043,17 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
   // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
   // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,
   // centrada. Sigue siendo tappable (abre el modal).
+  // Ritmo 8/16/32/56 (dirección de arte sep 2026): el silencio más grande
+  // rodea al cielo. Check-in → hero 32; hero → coach 12; coach → lectura 32.
   heroWrap: {
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 32,
   },
   heroInner: {
     width: '100%',
@@ -1148,40 +1074,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // Pista sutil de que la figura abre el modal — niebla, minúscula.
-  heroTapHint: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginTop: 2,
-  },
   coachLineWrap: {
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  // La línea de la primera estrella — voz del coach, un tono más presente
-  // que el CoachLine normal porque ES el momento (una vez en la vida).
-  firstStarLine: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginBottom: 8,
-  },
-  tomorrowHint: {
-    fontFamily: typography.serifSemi,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.micro,
-    color: colors.niebla,
-    textAlign: 'center',
-    marginTop: 4,
-    letterSpacing: 0.4,
-  },
-  tomorrowHintEmphasis: {
-    color: colors.bone,
+    marginTop: 12,
+    marginBottom: 32,
   },
 })

@@ -59,7 +59,16 @@ export type GoalHero = {
   line: string
 }
 
-export type GoalEvidence = { key: string; label: string; detail?: string; tone: GoalTone }
+/** `source` = procedencia del dato cuando NO fue la usuaria: 'wearable' (el
+ *  reloj, lleva el ícono de smartwatch) o 'scale' (la báscula vía Salud). La
+ *  UI la pinta como marca junto al dato; el texto nunca la lleva embebida. */
+export type GoalEvidence = {
+  key: string
+  label: string
+  detail?: string
+  tone: GoalTone
+  source?: 'wearable' | 'scale'
+}
 export type GoalMissing = { key: string; label: string }
 /** Una pieza del "¿Por qué?": `supports` true empuja hacia "dentro del objetivo",
  *  false es lo que va en contra (déficit perdido). Honesto en ambos sentidos. */
@@ -260,7 +269,13 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
     // sueño llevan el suyo). Solo con wearable; el entreno manual no tiene
     // kcal y no se le inventa. El "~" dice honesto: es estimación del reloj.
     const kcal = s.workout_kcal != null ? `~${Math.round(s.workout_kcal)} kcal` : undefined
-    out.push({ key: 'train', label: 'Entrenaste', detail: kcal, tone: 'cuerpo' })
+    out.push({
+      key: 'train',
+      label: 'Entrenaste',
+      detail: kcal,
+      tone: 'cuerpo',
+      source: s.workout_source === 'wearable' ? 'wearable' : undefined,
+    })
   } else if (s.rested === true) {
     out.push({ key: 'rest', label: 'Día de descanso', tone: 'sueno' })
   }
@@ -271,12 +286,12 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
   if (s.sleep_minutes != null) {
     // Procedencia sutil (spec wearables §5): la noche del reloj se marca junto
     // al dato, igual que la kcal del entreno lleva "tu reloj" en la leyenda.
-    const fromWatch = s.sleep_source === 'wearable'
     out.push({
       key: 'sleep',
       label: 'Dormiste',
-      detail: `${sleepHours(s.sleep_minutes)} h${fromWatch ? ' · tu reloj' : ''}`,
+      detail: `${sleepHours(s.sleep_minutes)} h`,
       tone: 'sueno',
+      source: s.sleep_source === 'wearable' ? 'wearable' : undefined,
     })
   }
 
@@ -284,12 +299,12 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
     const g = s.water_glasses!
     const goal = Math.max(1, ctx.waterGoalGlasses ?? 8)
     // Procedencia sutil (spec §9): el agua que Salud trajo se marca junto al dato.
-    const fromWatch = s.water_source === 'wearable'
     out.push({
       key: 'water',
       label: g >= goal ? 'Agua completa' : 'Agua',
-      detail: `${g} / ${goal} vasos${fromWatch ? ' · tu reloj' : ''}`,
+      detail: `${g} / ${goal} vasos`,
       tone: 'agua',
+      source: s.water_source === 'wearable' ? 'wearable' : undefined,
     })
   }
 
@@ -299,11 +314,14 @@ function buildEvidence(s: DailySignals, ctx: DayGoalCtx): GoalEvidence[] {
   }
 
   if (s.weight_kg != null) {
+    // La báscula (spec §9) anota sola: "registraste" sería mentira.
+    const fromScale = s.weight_source === 'wearable'
     out.push({
       key: 'weight',
-      label: 'Registraste tu peso',
+      label: fromScale ? 'Tu báscula anotó tu peso' : 'Registraste tu peso',
       detail: `${s.weight_kg.toFixed(1)} kg`,
       tone: 'leche',
+      source: fromScale ? 'scale' : undefined,
     })
   }
 
@@ -364,9 +382,21 @@ function buildDirection(hero: GoalHero, s: DailySignals, ctx: DayGoalCtx, past: 
   const cap = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
 
   if (hero.status === 'incomplete') {
-    return past
-      ? `${cap(when)} quedó incompleta.`
-      : `${when} aún está incompleta. Conforme avance el día, habrá más.`
+    if (past) return `${cap(when)} quedó incompleta.`
+    // Sin comida no hay dirección (el norte es el déficit), pero lo que ya
+    // existe cuenta: se nombra lo que suma y lo único que falta. Sin nada,
+    // cadena vacía → la tarjeta no se pinta (el hero ya dice "aún se revela").
+    const train = s.trained === true
+    const sleep = s.sleep_minutes != null
+    const counts =
+      train && sleep
+        ? 'El entreno y la noche ya cuentan a tu favor.'
+        : train
+          ? 'El entreno ya cuenta a tu favor.'
+          : sleep
+            ? 'La noche ya cuenta a tu favor.'
+            : null
+    return counts ? `${counts} La comida dirá hacia dónde va el día.` : ''
   }
   if (hero.status === 'over') {
     return `${past ? cap(when) : when} muestra que ${past ? 'estuviste' : 'estás'} sobre tu objetivo.`
@@ -387,7 +417,24 @@ function buildDirection(hero: GoalHero, s: DailySignals, ctx: DayGoalCtx, past: 
 
 function buildWhy(hero: GoalHero, s: DailySignals, ctx: DayGoalCtx): GoalWhy[] {
   const out: GoalWhy[] = []
-  if (hero.status === 'incomplete') return out
+  if (hero.status === 'incomplete') {
+    // Incompleto: lo que ya suma (entreno, noche, proteína), sin veredicto.
+    if (s.trained === true) {
+      out.push({ key: 'train', label: 'Entrenamiento', tone: 'cuerpo', supports: true })
+    }
+    if (s.sleep_minutes != null) {
+      out.push({
+        key: 'sleep',
+        label: `Sueño ${sleepHours(s.sleep_minutes)} h`,
+        tone: 'sueno',
+        supports: true,
+      })
+    }
+    if (proteinReached(s, ctx)) {
+      out.push({ key: 'protein', label: 'Proteína en objetivo', tone: 'proteina', supports: true })
+    }
+    return out
+  }
 
   if (hero.status === 'over') {
     out.push({
