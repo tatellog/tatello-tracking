@@ -64,6 +64,8 @@ import {
 import { isDeficitDay } from '../deficit'
 import { weeklyMovementLever } from '../week-orbit-logic'
 import { comboChatHash, comboToFinding } from '../combo-chat'
+import { earlyReading } from '../early-readings'
+import { dataMaturity } from '../maturity'
 import { useSaveReflection } from '../reflections'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { MonthChatSheet } from './MonthChatSheet'
@@ -265,6 +267,14 @@ export function MonthSegment({
   const patternDataDays = useMemo(
     () => patternSignals.filter((s) => s.day != null).length,
     [patternSignals],
+  )
+
+  // Madurez de datos (docs/orbita-maturity-spec.md): la sección promete solo
+  // lo que sus días sostienen. Etapa por días CON DATOS, por dimensión.
+  const maturity = useMemo(() => dataMaturity(patternSignals), [patternSignals])
+  const firstSignal = useMemo(
+    () => (maturity.stage >= 1 ? earlyReading(patternSignals, todayInTimezone()) : null),
+    [maturity.stage, patternSignals],
   )
 
   const targets = useMacroTargets().data
@@ -672,7 +682,11 @@ export function MonthSegment({
             <Text style={styles.eyebrow}>Tus patrones</Text>
             {combo || supportPatterns.length > 0 ? (
               <>
-                <Text style={styles.sectionLede}>Lo que apareció junto en tus días.</Text>
+                <Text style={styles.sectionLede}>
+                  {maturity.stage <= 2
+                    ? 'Empieza a asomar. Lo sigo mirando.'
+                    : 'Lo que apareció junto en tus días.'}
+                </Text>
                 {combo ? (
                   <DominantPatternCard
                     combo={combo}
@@ -718,17 +732,20 @@ export function MonthSegment({
                   />
                 ))}
               </>
-            ) : patternDataDays < 14 ? (
-              /* Semanas 1-2: el diferenciador entero de Stelar aún no puede
-               hablar. Un "no hay nada" sin forma se lee como "esta sección no
-               sirve"; lo bloqueado-pero-visible (siluetas de QUÉ va a
-               descubrir) convierte la ausencia en anticipación. Umbral
-               aproximado, sin countdown (retention-spec · Mecánica C). */
+            ) : maturity.stage < 3 ? (
+              /* Etapas 0 a 2 sin patrón todavía: nunca "nada". En la 0, qué
+               podrá encontrar (siluetas, sin conteo de días); desde la 1, la
+               primera señal DESCRIPTIVA de sus días (early-readings), nunca una
+               correlación. */
               <View style={styles.patternsEmpty}>
-                <Text style={styles.patternsEmptyLede}>Todavía te estoy conociendo.</Text>
-                {/* El marcador de anticipación (Mecánica C): progresa con DÍAS
-                  CON DATOS, nunca con fechas — la usuaria ve que su registro
-                  alimenta algo que se está gestando (Zeigarnik sin countdown). */}
+                {maturity.stage >= 1 && firstSignal ? (
+                  <>
+                    <Text style={styles.firstSignalEyebrow}>Primera señal</Text>
+                    <Text style={styles.firstSignalText}>{firstSignal.text}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.patternsEmptyLede}>Todavía te estoy conociendo.</Text>
+                )}
                 <Text style={styles.patternsEmptyBody}>
                   Un patrón aparece cuando algo se repite en tus días. Sigue registrando como
                   siempre y aquí verás lo primero que encuentre. Cosas como:
@@ -745,19 +762,22 @@ export function MonthSegment({
                     </View>
                   ))}
                 </View>
-                {/* El horizonte honesto (GAP 5): el umbral concreto que abre la
-                  puerta, sin countdown ni prometer CUÁL patrón llega primero
-                  (eso depende de sus datos, no lo fingimos). */}
-                <Text style={styles.patternsEmptyHorizon}>
-                  Un patrón nace cuando algo se repite unas tres veces en tus datos.
-                </Text>
+                {maturity.deficitBlockedByFood ? (
+                  <Text style={styles.patternsEmptyHorizon}>
+                    Para ver qué mueve tu déficit necesito tus comidas.
+                  </Text>
+                ) : null}
               </View>
             ) : (
+              /* Etapa 3 o más sin patrón: honesto, nunca forzado. */
               <View style={styles.patternsEmpty}>
-                <Text style={styles.patternsEmptyLede}>Aún no emerge un patrón claro.</Text>
+                <Text style={styles.patternsEmptyLede}>
+                  Tus días se parecieron entre sí; todavía no encontré algo nuevo.
+                </Text>
                 <Text style={styles.patternsEmptyBody}>
-                  Stelar solo te muestra un patrón cuando tus datos lo sostienen. Con más días,
-                  aparecerá.
+                  {maturity.deficitBlockedByFood
+                    ? 'Para ver qué mueve tu déficit necesito tus comidas.'
+                    : 'Stelar solo te muestra un patrón cuando tus datos lo sostienen.'}
                 </Text>
               </View>
             )}
@@ -1737,6 +1757,21 @@ function RevealEvidenceModal({
 }
 
 const styles = StyleSheet.create({
+  firstSignalEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+    marginBottom: 8,
+  },
+  firstSignalText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.anchor,
+    lineHeight: 24,
+    color: colors.leche,
+    marginBottom: 14,
+  },
   understandCta: {
     alignSelf: 'center',
     marginTop: 14,

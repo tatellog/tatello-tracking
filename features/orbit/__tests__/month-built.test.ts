@@ -471,19 +471,46 @@ describe('habitReveal', () => {
 
 describe('winningCombo', () => {
   it('encuentra la fórmula más grande que coincidió y terminó en déficit', () => {
-    // 12 días con sueño≥7h + proteína en meta + entrenó; 9 en déficit, 3 superávit.
-    const signals = month(12, (i) => ({
-      meal_count: 2,
-      calories: i < 9 ? 1400 : 2400,
-      sleep_minutes: 450,
-      protein_g: 140,
-      trained: true,
-    }))
+    // 12 días con sueño≥7h + proteína en meta + entrenó (9 en déficit) y 6 días
+    // sin esos hábitos (3 en déficit): 75% contra 50%, se separa.
+    const signals = month(18, (i) =>
+      i < 12
+        ? {
+            meal_count: 2,
+            calories: i < 9 ? 1400 : 2400,
+            sleep_minutes: 450,
+            protein_g: 140,
+            trained: true,
+          }
+        : { meal_count: 2, calories: i < 15 ? 1400 : 2400, sleep_minutes: 360, protein_g: 60 },
+    )
     const c = winningCombo(signals, { calorieTarget: TARGET, proteinTarget: 130 })!
     expect(c).toBeTruthy()
     expect(c.signals.map((s) => s.key).sort()).toEqual(['cuerpo', 'proteina', 'sueno'])
     expect(c.occurrences).toBe(12)
     expect(c.deficits).toBe(9)
+    expect(c.restDays).toBe(6)
+    expect(c.restDeficits).toBe(3)
+  })
+
+  it('null si la combinación no se separa del resto de sus días (decisión dueña)', () => {
+    // Combo 6/10 en déficit; resto 6/10 también: no es "lo que te sostiene".
+    const signals = month(20, (i) =>
+      i < 10
+        ? { meal_count: 2, calories: i < 6 ? 1400 : 2400, sleep_minutes: 450, trained: true }
+        : { meal_count: 2, calories: i < 16 ? 1400 : 2400, sleep_minutes: 360 },
+    )
+    expect(winningCombo(signals, { calorieTarget: TARGET })).toBeNull()
+  })
+
+  it('null sin días fuera de la combinación (no hay contra qué compararse)', () => {
+    const signals = month(10, () => ({
+      meal_count: 2,
+      calories: 1400,
+      sleep_minutes: 450,
+      trained: true,
+    }))
+    expect(winningCombo(signals, { calorieTarget: TARGET })).toBeNull()
   })
 
   it('null si la combinación no terminó en déficit la mayoría de las veces', () => {

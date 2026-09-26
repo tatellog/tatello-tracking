@@ -1602,9 +1602,17 @@ export type WinningCombo = {
   /** Las fechas (ISO) en que la combinación coincidió — el ancla de la evidencia
    *  ("¿de dónde salen las N veces?"). Ordenadas. */
   days: string[]
+  /** El punto de comparación: el resto de sus días con comida (sin la
+   *  combinación) y cuántos de esos cerraron en déficit. */
+  restDays: number
+  restDeficits: number
 }
 
 const COMBO_MIN_OCCUR = 3
+/** El combo tiene que SEPARARSE del resto de sus días (decisión dueña 26 sep
+ *  2026): su tasa de déficit supera la del resto por al menos 15 puntos. Si sus
+ *  días normales ya cierran en déficit casi igual, no es "lo que te sostiene". */
+const COMBO_MIN_ADVANTAGE = 0.15
 
 /* Verbos naturales por hábito para NOMBRAR el combo en la frase (no etiquetas
  * sueltas): "Entrenar e hidratarte fueron de la mano con tu déficit." */
@@ -1765,8 +1773,14 @@ export function winningCombo(
   ]
 
   const n = candidates.length
-  let best: { combo: typeof candidates; occ: number; deficits: number; days: string[] } | null =
-    null
+  let best: {
+    combo: typeof candidates
+    occ: number
+    deficits: number
+    days: string[]
+    restDays: number
+    restDeficits: number
+  } | null = null
   // Subconjuntos por bitmask (n ≤ 4 → ≤ 16). Solo combinaciones (size ≥ 2).
   for (let mask = 1; mask < 1 << n; mask++) {
     const combo = candidates.filter((_, i) => (mask & (1 << i)) !== 0)
@@ -1775,11 +1789,19 @@ export function winningCombo(
     if (comboDays.length < COMBO_MIN_OCCUR) continue
     const deficits = comboDays.filter((s) => isDeficitDay(s.calories, target)).length
     if (deficits / comboDays.length < 0.5) continue // tiene que HABER funcionado
+    // Punto de comparación: el resto de sus días con comida. Sin ≥ 3 días del
+    // otro lado no hay contra qué separarse.
+    const rest = food.filter((s) => !combo.every((c) => c.has(s)))
+    if (rest.length < COMBO_MIN_OCCUR) continue
+    const restDeficits = rest.filter((s) => isDeficitDay(s.calories, target)).length
+    if (deficits / comboDays.length - restDeficits / rest.length < COMBO_MIN_ADVANTAGE) continue
     const cand = {
       combo,
       occ: comboDays.length,
       deficits,
       days: comboDays.map((s) => s.day!).sort(),
+      restDays: rest.length,
+      restDeficits,
     }
     // Preferir la fórmula MÁS GRANDE (más rica); desempate por más días en
     // déficit, luego por más apariciones.
@@ -1800,6 +1822,8 @@ export function winningCombo(
     occurrences: best.occ,
     deficits: best.deficits,
     days: best.days,
+    restDays: best.restDays,
+    restDeficits: best.restDeficits,
   }
 }
 

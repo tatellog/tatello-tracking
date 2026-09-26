@@ -9,6 +9,8 @@ const combo: WinningCombo = {
   occurrences: 11,
   deficits: 6,
   days: ['2026-09-01', '2026-09-03'],
+  restDays: 30,
+  restDeficits: 9,
 }
 
 describe('comboToFinding', () => {
