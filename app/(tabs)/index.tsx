@@ -822,10 +822,28 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
                 Lo que la usuaria consulta cuando ya hizo lo principal:
-                macros, comidas, y el calendario (historia/editor) al final. */}
+                comidas, macros, y el calendario (historia/editor) al final. */}
 
+            {/* Comidas ANTES que macros (dueña 26 sep 2026): registrar es lo que
+                haces; los anillos son el resultado. Con el día vacío, unos
+                anillos en cero arriba no decían nada. */}
             <Animated.View
               entering={enter(520)}
+              onLayout={(e) => {
+                mealsY.current = e.nativeEvent.layout.y
+              }}
+            >
+              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
+            </Animated.View>
+            <Animated.View entering={enter(560)}>
+              <TodayMealLog
+                date={vctx.date}
+                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+                onAddMeal={() => router.push({ pathname: '/capture-meal' })}
+              />
+            </Animated.View>
+            <Animated.View
+              entering={enter(600)}
               onLayout={(e) => {
                 macrosY.current = e.nativeEvent.layout.y
               }}
@@ -833,22 +851,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               {/* Los dos anillos, siempre visibles, sin pager: el sueño subió a
                   la pregunta del día y el peso no vive en Hoy. */}
               <MacroRings ctx={vctx} />
-            </Animated.View>
-
-            <Animated.View
-              entering={enter(560)}
-              onLayout={(e) => {
-                mealsY.current = e.nativeEvent.layout.y
-              }}
-            >
-              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
-            </Animated.View>
-            <Animated.View entering={enter(600)}>
-              <TodayMealLog
-                date={vctx.date}
-                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
-                onAddMeal={() => router.push({ pathname: '/capture-meal' })}
-              />
             </Animated.View>
           </ScrollView>
         </SafeAreaView>
