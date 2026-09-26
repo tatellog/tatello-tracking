@@ -90,9 +90,11 @@ const ABSENT_TONE: Record<string, string> = {
 }
 
 const RING_SIZE = 208
+// Tamaño en pantalla (dirección de arte + ux sep 2026): más compacto, con la
+// leyenda a su lado. El SVG conserva su viewBox de 208 y escala.
+const RING_DISPLAY = 150
 const CENTER = RING_SIZE / 2 // 104
 // El aura respira más allá del borde del anillo (bloom).
-const GLOW_SIZE = Math.round(RING_SIZE * 1.5)
 
 // Tres anillos concéntricos (radios de la línea media). Exterior = calorías (el
 // norte de la app), medio = proteína, interior = entreno (binario). sw 8, ~9px
@@ -134,6 +136,7 @@ const TRAIN_COLOR = colors.dimension.mente // #C18FFF
 // eslint-disable-next-line no-restricted-syntax
 const TRAIN_STOPS: [string, string, string] = ['#8E5FC7', '#C18FFF', '#DABBFF']
 const TRAIN_TRACK = 'rgba(193, 143, 255, 0.12)'
+const TRAIN_SOFT = 'rgba(193, 143, 255, 0.55)'
 
 type RingSpec = {
   r: number
@@ -186,52 +189,13 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
     return { cx: CENTER + r * Math.cos(t), cy: CENTER + r * Math.sin(t) }
   })
 
-  // Vida CONTINUA (no solo el trazo de entrada): el bloom respira (breath, seno
-  // ida-vuelta) y un latido pulsa desde la cabeza de cometa (beat, 0→1 en bucle).
-  // Gateado en pantalla activa + reduce-motion → fuera de foco todo queda quieto.
-  // Solo opacidad/radio en el worklet: no re-rasteriza el SVG.
-  const active = useScreenActive()
-  const breath = useSharedValue(0)
-  const beat = useSharedValue(0)
-  useEffect(() => {
-    if (reduce || !active) {
-      cancelAnimation(breath)
-      cancelAnimation(beat)
-      breath.value = 0.5
-      beat.value = 0
-      return
-    }
-    breath.value = withRepeat(
-      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-    beat.value = withRepeat(
-      withTiming(1, { duration: 2200, easing: Easing.out(Easing.quad) }),
-      -1,
-      false,
-    )
-    return () => {
-      cancelAnimation(breath)
-      cancelAnimation(beat)
-    }
-  }, [reduce, active, breath, beat])
-
-  // Bloom respirando: el arco (dasharray) + una opacidad que late lento.
+  // Sin vida continua (dirección de arte + ux sep 2026): el aura que respiraba
+  // y el latido en la punta eran tres animaciones detrás de un dato. El anillo
+  // se dibuja una vez al entrar y queda quieto.
   const bloomProps = useAnimatedProps(() => ({
     strokeDasharray: [c * progress.value, c],
-    opacity: spec.bloomOpacity * (0.6 + 0.7 * breath.value),
+    opacity: spec.bloomOpacity,
   }))
-  // Latido: un anillo que se expande y se desvanece desde la punta del cometa.
-  const beaconProps = useAnimatedProps(() => {
-    const t = progress.value * 2 * Math.PI
-    return {
-      cx: CENTER + r * Math.cos(t),
-      cy: CENTER + r * Math.sin(t),
-      r: 4 + beat.value * 12,
-      opacity: 0.4 * (1 - beat.value),
-    }
-  })
 
   return (
     <>
@@ -285,11 +249,6 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
               animatedProps={overflowProps}
             />
           ) : null}
-          {/* Latido — un anillo que pulsa desde la punta del cometa (exterior /
-              medio). El interior (binario, sin cometa) vive por el bloom. */}
-          {spec.comet !== 'none' ? (
-            <AnimatedCircle animatedProps={beaconProps} fill={spec.color} />
-          ) : null}
           {/* Cabeza de cometa — llena en el exterior, sobria en el medio, ausente
               en el interior (binario: un cometa sobre lleno/vacío sería ruido). */}
           {spec.comet === 'full' ? (
@@ -335,7 +294,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     gradId: isIncomplete ? null : 'grad-cal',
     trackColor: TRACK_COLOR[hero.status],
     bloomWidth: 16,
-    bloomOpacity: isIncomplete ? 0 : 0.16,
+    bloomOpacity: 0,
     comet: isIncomplete ? 'none' : 'full',
     show: !isIncomplete,
     delay: 160,
@@ -350,7 +309,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     gradId: 'grad-protein',
     trackColor: hasProtein ? PROTEIN_TRACK : colors.hairline,
     bloomWidth: 13,
-    bloomOpacity: hasProtein ? 0.12 : 0,
+    bloomOpacity: 0,
     comet: hasProtein ? 'soft' : 'none',
     show: hasProtein,
     delay: 320,
@@ -360,62 +319,24 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     c: C_INNER,
     sw: RING_SW,
     fill: trained ? 1 : 0,
-    color: TRAIN_COLOR,
-    gradId: 'grad-train',
+    // Binario (entrenó o no): va plano y más callado que calorías y proteína.
+    // Lleno al 100% con gradiente era lo que más brillaba siendo lo que menos
+    // dice del objetivo (producto + ux coinciden).
+    color: TRAIN_SOFT,
+    gradId: null,
     trackColor: trained ? TRAIN_TRACK : colors.hairline, // no entrenó = track en reposo
     bloomWidth: 13,
-    bloomOpacity: trained ? 0.12 : 0,
+    bloomOpacity: 0,
     comet: 'none', // binario: sin cometa
     show: trained,
     delay: 480,
   }
 
-  // Respiración del aura — vida continua SIN re-rasterizar el SVG (opacidad de una
-  // View = compositor). Color del estado de calorías = el norte manda. Gateada en
-  // pantalla activa + reduce-motion. Oculta en incompleto (en calma).
-  const active = useScreenActive()
-  const glow = useSharedValue(reduce ? 1 : 0)
-  useEffect(() => {
-    if (reduce || !active) {
-      cancelAnimation(glow)
-      glow.value = withTiming(0.6, { duration: 320, easing: Easing.out(Easing.quad) })
-      return
-    }
-    glow.value = withRepeat(
-      withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-    return () => cancelAnimation(glow)
-  }, [glow, active, reduce])
-  const glowStyle = useAnimatedStyle(() => ({ opacity: 0.32 + glow.value * 0.42 }))
-
   return (
-    <View style={[styles.ringWrap, { shadowColor: outerColor }]}>
-      {/* Aura que respira detrás de los anillos (color del estado de calorías). */}
-      {!isIncomplete ? (
-        <Animated.View style={[styles.ringGlow, glowStyle]} pointerEvents="none">
-          <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
-            <Defs>
-              <RadialGradient id="ring-bloom" cx="50%" cy="50%" r="50%">
-                <Stop offset="0.5" stopColor={outerColor} stopOpacity={0} />
-                <Stop offset="0.72" stopColor={outerColor} stopOpacity={0.3} />
-                <Stop offset="1" stopColor={outerColor} stopOpacity={0} />
-              </RadialGradient>
-            </Defs>
-            <Circle
-              cx={GLOW_SIZE / 2}
-              cy={GLOW_SIZE / 2}
-              r={GLOW_SIZE / 2}
-              fill="url(#ring-bloom)"
-            />
-          </Svg>
-        </Animated.View>
-      ) : null}
-
+    <View style={styles.ringWrap}>
       <Svg
-        width={RING_SIZE}
-        height={RING_SIZE}
+        width={RING_DISPLAY}
+        height={RING_DISPLAY}
         viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
         style={styles.ringSvg}
       >
@@ -455,7 +376,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
 
       {/* Centro — campo de estrellas (achicado para caber en el anillo interior). */}
       <View style={styles.ringCenter} pointerEvents="none">
-        <RingStars dim={isIncomplete} size={100} />
+        <RingStars dim={isIncomplete} size={Math.round((100 * RING_DISPLAY) / RING_SIZE)} />
       </View>
     </View>
   )
@@ -840,71 +761,71 @@ export function DayPresent({
           palabras: "¿sigo en déficit?". Sin número grande de margen (era el
           "te quedan X"; mientras menos comía, más grande y más magenta). El
           color del anillo sigue al veredicto: bajo el piso sano, niebla. */}
-      <View style={styles.hero}>
+      {/* Hero — el anillo compacto con la LEYENDA a su lado, en el mismo orden
+          de afuera hacia adentro (patrón Apple Fitness): la posición dice qué
+          anillo es cuál. El color del anillo de calorías sigue al veredicto. */}
+      <View style={styles.heroRow}>
         <GoalRing hero={{ ...day.hero, status: verdict.ringTone }} />
-        <View style={styles.heroText}>
-          <Text style={styles.verdictTitle}>{verdict.title}</Text>
-          <Text style={styles.verdictLine}>{verdict.line}</Text>
-          {verdict.cta ? (
-            <Pressable
-              style={styles.verdictCta}
-              onPress={() =>
-                router.push(
-                  verdict.cta === 'target'
-                    ? '/onboarding/macro-targets?source=banner'
-                    : '/capture-meal',
-                )
-              }
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
-            >
-              <Text style={styles.verdictCtaText}>
-                {verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {/* Leyenda — qué anillo es cuál, con su dato como "X de Y" (la
-              cifra de calorías vive aquí, como contexto, una sola vez). El
-              entreno va SIN kcal: junto a las de comida invitaba a restarlas
-              (eat-back, prohibido por la spec de wearables). */}
-          <View style={styles.legend}>
+        <View style={styles.legendCol}>
+          <LegendStat
+            color={STATUS_COLOR[verdict.ringTone]}
+            label="Calorías"
+            value={
+              day.hero.consumed != null
+                ? day.hero.target != null
+                  ? `${day.hero.consumed.toLocaleString('es-MX')} de ${day.hero.target.toLocaleString('es-MX')} kcal`
+                  : `${day.hero.consumed.toLocaleString('es-MX')} kcal`
+                : '—'
+            }
+          />
+          {day.hero.proteinFill != null ? (
             <LegendStat
-              color={STATUS_COLOR[verdict.ringTone]}
-              label="Calorías"
+              color={colors.signal.proteina}
+              label="Proteína"
               value={
-                day.hero.consumed != null
-                  ? day.hero.target != null
-                    ? `${day.hero.consumed.toLocaleString('es-MX')} de ${day.hero.target.toLocaleString('es-MX')} kcal`
-                    : `${day.hero.consumed.toLocaleString('es-MX')} kcal`
+                day.hero.proteinG != null && ctx.proteinTarget != null
+                  ? `${day.hero.proteinG} de ${Math.round(ctx.proteinTarget)} g`
                   : '—'
               }
             />
-            {day.hero.proteinFill != null ? (
-              <LegendStat
-                color={colors.signal.proteina}
-                label="Proteína"
-                value={
-                  day.hero.proteinG != null && ctx.proteinTarget != null
-                    ? `${day.hero.proteinG} de ${Math.round(ctx.proteinTarget)} g`
-                    : '—'
-                }
-              />
-            ) : null}
-            <LegendStat
-              color={TRAIN_COLOR}
-              label="Entreno"
-              value={day.hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
-              caption={
-                day.hero.trained && day.hero.workoutSource === 'wearable'
-                  ? 'tu smartwatch'
-                  : undefined
-              }
-              dim={!day.hero.trained}
-            />
-          </View>
+          ) : null}
+          <LegendStat
+            color={TRAIN_COLOR}
+            label="Entreno"
+            value={day.hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
+            caption={
+              day.hero.trained && day.hero.workoutSource === 'wearable'
+                ? 'tu smartwatch'
+                : undefined
+            }
+            dim={!day.hero.trained}
+          />
         </View>
+      </View>
+
+      {/* El veredicto en palabras: "¿sigo en déficit?". */}
+      <View style={styles.verdictBlock}>
+        <Text style={styles.verdictTitle}>{verdict.title}</Text>
+        <Text style={styles.verdictLine}>{verdict.line}</Text>
+        {verdict.cta ? (
+          <Pressable
+            style={styles.verdictCta}
+            onPress={() =>
+              router.push(
+                verdict.cta === 'target'
+                  ? '/onboarding/macro-targets?source=banner'
+                  : '/capture-meal',
+              )
+            }
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+          >
+            <Text style={styles.verdictCtaText}>
+              {verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* TU FOCO DE HOY — la palanca desde tus datos (recomendación, nunca
@@ -1088,21 +1009,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   ringWrap: {
-    width: RING_SIZE,
-    height: RING_SIZE,
+    width: RING_DISPLAY,
+    height: RING_DISPLAY,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-  },
-  // El aura que respira, centrada sobre el anillo (desborda el ringWrap).
-  ringGlow: {
-    position: 'absolute',
-    top: (RING_SIZE - GLOW_SIZE) / 2,
-    left: (RING_SIZE - GLOW_SIZE) / 2,
-    width: GLOW_SIZE,
-    height: GLOW_SIZE,
   },
   ringSvg: {
     transform: [{ rotate: '-90deg' }],
@@ -1120,11 +1030,24 @@ const styles = StyleSheet.create({
   },
   // El veredicto — upright (dato, no voz de coach), la respuesta directa a
   // "¿sigo en déficit?".
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 22,
+    marginTop: 8,
+  },
+  // La leyenda en filas a la derecha del anillo.
+  legendCol: {
+    flex: 1,
+    gap: 14,
+  },
+  verdictBlock: {
+    marginTop: 24,
+  },
   verdictTitle: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.headingLg,
     color: colors.leche,
-    textAlign: 'center',
   },
   verdictLine: {
     marginTop: 6,
@@ -1132,9 +1055,9 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     lineHeight: 19,
     color: colors.bone,
-    textAlign: 'center',
   },
   verdictCta: {
+    alignSelf: 'flex-start',
     marginTop: 14,
     minHeight: 40,
     justifyContent: 'center',
@@ -1230,8 +1153,8 @@ const styles = StyleSheet.create({
   },
   // Cada stat es una columna: [punto + label] arriba, el número debajo.
   legendItem: {
-    alignItems: 'center',
-    gap: 4,
+    alignItems: 'flex-start',
+    gap: 3,
   },
   legendHead: {
     flexDirection: 'row',
