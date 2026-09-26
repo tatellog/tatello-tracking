@@ -346,6 +346,17 @@ describe('detectMonthPatterns · patrones accionables (correlaciones)', () => {
     expect(we.title).toMatch(/fin de semana/)
   })
 
+  it('superávit concentrado NO dispara sin comida registrada en ambos lados', () => {
+    // Solo días entre semana con comida (el finde sin registro): "el 100% cae
+    // entre semana" sería un artefacto de la falta de datos, no un patrón.
+    const signals = month(14, (i) => {
+      const wd = monIdxUTC(addDays(BASE, i))
+      return wd < 5 ? { meal_count: 2, calories: 2400 } : { meal_count: 0, calories: null }
+    })
+    const ps = detectMonthPatterns(signals, { calorieTarget: TARGET })
+    expect(ps.some((p) => p.id === 'surplus-concentration')).toBe(false)
+  })
+
   it('sueño ≥7h × déficit cuando el efecto es marcado', () => {
     // 6 días bien dormidos en déficit, 6 mal dormidos en superávit.
     const signals = month(12, (i) => ({

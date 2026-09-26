@@ -1216,7 +1216,11 @@ export function detectMonthPatterns(
   if (target != null && target > 0 && !daytypeFired) {
     let wdSurplus = 0
     let weSurplus = 0
+    let wdDays = 0
+    let weDays = 0
     for (const s of food) {
+      if (weekdayMon(s.day!) < 5) wdDays++
+      else weDays++
       const over = s.calories! - target
       if (over <= 0) continue
       if (weekdayMon(s.day!) < 5) wdSurplus += over
@@ -1225,7 +1229,10 @@ export function detectMonthPatterns(
     const total = wdSurplus + weSurplus
     const weekendHeavy = weSurplus >= wdSurplus
     const heavy = weekendHeavy ? weSurplus : wdSurplus
-    if (total >= 1000 && heavy / total >= 0.6) {
+    // Guard: ambos lados con comida registrada (≥ 3 días cada uno). Sin días
+    // de fin de semana registrados, "el 100% cae entre semana" es un artefacto
+    // de la falta de datos, no un patrón.
+    if (wdDays >= 3 && weDays >= 3 && total >= 1000 && heavy / total >= 0.6) {
       const pct = Math.round((heavy / total) * 100)
       out.push({
         id: 'surplus-concentration',

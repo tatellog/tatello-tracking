@@ -35,6 +35,9 @@ import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
+import { AiCta } from '@/components/AiCta'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
@@ -60,7 +63,10 @@ import {
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
 import { weeklyMovementLever } from '../week-orbit-logic'
+import { comboChatHash, comboToFinding } from '../combo-chat'
+import { useSaveReflection } from '../reflections'
 import { EmptySegmentCard } from './EmptySegmentCard'
+import { MonthChatSheet } from './MonthChatSheet'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PatternDiscovery } from './PatternDiscovery'
 import { PatternRevealModal } from './PatternRevealModal'
@@ -230,10 +236,15 @@ function DayStars({ count, total, color }: { count: number; total: number; color
 export function MonthSegment({
   onPickDay,
   onScrollTop,
+  view = 'full',
 }: {
   onPickDay?: (date: string) => void
   /** Volver al inicio del scroll de Órbita (botón al final del Mes). */
   onScrollTop?: () => void
+  /** Órbita de un solo scroll (ORBITA_SINGLE_FEED): 'patterns' pinta solo
+   *  "Tus patrones" (el protagonista del feed); 'month' pinta el mes sin sus
+   *  patrones (detrás de "Tu mes de un vistazo ›"). 'full' = el Mes de siempre. */
+  view?: 'full' | 'patterns' | 'month'
 } = {}) {
   const { data: hasAny } = useHasAnySignals()
   const {
@@ -463,6 +474,28 @@ export function MonthSegment({
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
   const [reveal, setReveal] = useState<ComboReveal | null>(null)
+  // "✦ Quiero entenderlo": la IA explica el patrón dominante que el motor ya
+  // encontró (combo-chat.ts viste el combo como Finding). Solo con IA real.
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
+  const [chatOpen, setChatOpen] = useState(false)
+  const comboLever = useMemo(
+    () =>
+      combo
+        ? weeklyComboLever(
+            patternSignals,
+            combo,
+            { calorieTarget, proteinTarget, waterGoalGlasses },
+            today,
+          )
+        : null,
+    [combo, patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, today],
+  )
+  const comboFinding = useMemo(
+    () => (combo ? comboToFinding(combo, comboLever) : null),
+    [combo, comboLever],
+  )
+  const saveReflection = useSaveReflection(today.slice(0, 7))
   const [revealDetail, setRevealDetail] = useState<RevealDetail | null>(null)
   const openReveal = (item: MonthReveals['revealed'][number], revealed: boolean) =>
     setRevealDetail({
@@ -480,6 +513,8 @@ export function MonthSegment({
 
   // 9.4 · carga y error explícitos (mismo par cálido de Día): sin esto, un
   // fetch fallido dejaba el Mes en blanco sin salida.
+  // En el feed, los patrones cargan en silencio (el feed ya tiene su hero).
+  if (view === 'patterns' && history == null) return null
   if (historyLoading && history == null) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -511,7 +546,7 @@ export function MonthSegment({
     )
   }
 
-  if (hasAny === false) {
+  if (hasAny === false && view !== 'patterns') {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         <HeroHeader />
@@ -535,175 +570,200 @@ export function MonthSegment({
 
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* 1 · Hero — la pregunta + la constelación revelada. */}
-      <HeroHeader />
-      {sign ? (
-        <EmblemHero
-          sign={sign}
-          progress={progress}
-          delta={delta}
-          message={withSign(stage.message, signName(sign))}
-          reveals={reveals}
-          deficitTrendUp={deficitTrendUp}
-          onOpenReveal={openReveal}
-        />
-      ) : null}
+      {view !== 'patterns' ? (
+        <>
+          {/* 1 · Hero — la pregunta + la constelación revelada. */}
+          <HeroHeader />
+          {sign ? (
+            <EmblemHero
+              sign={sign}
+              progress={progress}
+              delta={delta}
+              message={withSign(stage.message, signName(sign))}
+              reveals={reveals}
+              deficitTrendUp={deficitTrendUp}
+              onOpenReveal={openReveal}
+            />
+          ) : null}
 
-      {/* La pantalla se lee como una HISTORIA de 4 tiempos, no un dashboard:
+          {/* La pantalla se lee como una HISTORIA de 4 tiempos, no un dashboard:
           T1 ¿avanzo? (el héroe) → T2 ¿qué lo movió? → T3 ¿qué hago distinto? →
           T4 ¿sigo así? Cada tiempo abre con su pregunta humana. El detalle
           (calendario, patrones, parrilla) baja a "ver más" contextual (slice 2). */}
 
-      {/* ── Tiempo 2 · El calendario de déficit, con navegador de mes (‹ mes ›)
+          {/* ── Tiempo 2 · El calendario de déficit, con navegador de mes (‹ mes ›)
           para ojear meses pasados. Si el mes seleccionado no tiene registro, un
           estado de inicio (con hint para retroceder). */}
-      <View style={[styles.beat, styles.glancePanel]}>
-        {/* Un solo encabezado apilado en el riel izquierdo: categoría → el MES (el
+          <View style={[styles.beat, styles.glancePanel]}>
+            {/* Un solo encabezado apilado en el riel izquierdo: categoría → el MES (el
             título, navegable) → qué muestran los puntos. Igual para lleno y vacío. */}
-        <View style={styles.calHeader}>
-          <Text style={styles.eyebrow}>Tu mes de un vistazo</Text>
-          <View style={styles.monthPagerRow}>
-            <Pressable
-              onPress={() => setMonthOffset((o) => o - 1)}
-              disabled={!canPrevMonth}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Mes anterior"
-            >
-              <Text style={[styles.monthArrow, !canPrevMonth && styles.monthArrowOff]}>‹</Text>
-            </Pressable>
-            <Text style={styles.monthTitle} accessibilityRole="header">
-              {monthLabelOf(selectedMonth, today)}
-            </Text>
-            <Pressable
-              onPress={() => setMonthOffset((o) => o + 1)}
-              disabled={!canNextMonth}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Mes siguiente"
-            >
-              <Text style={[styles.monthArrow, !canNextMonth && styles.monthArrowOff]}>›</Text>
-            </Pressable>
-          </View>
-          {/* "El oro son tus días en déficit" se enseñaba 3 veces (aquí, la
+            <View style={styles.calHeader}>
+              <Text style={styles.eyebrow}>Tu mes de un vistazo</Text>
+              <View style={styles.monthPagerRow}>
+                <Pressable
+                  onPress={() => setMonthOffset((o) => o - 1)}
+                  disabled={!canPrevMonth}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="Mes anterior"
+                >
+                  <Text style={[styles.monthArrow, !canPrevMonth && styles.monthArrowOff]}>‹</Text>
+                </Pressable>
+                <Text style={styles.monthTitle} accessibilityRole="header">
+                  {monthLabelOf(selectedMonth, today)}
+                </Text>
+                <Pressable
+                  onPress={() => setMonthOffset((o) => o + 1)}
+                  disabled={!canNextMonth}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="Mes siguiente"
+                >
+                  <Text style={[styles.monthArrow, !canNextMonth && styles.monthArrowOff]}>›</Text>
+                </Pressable>
+              </View>
+              {/* "El oro son tus días en déficit" se enseñaba 3 veces (aquí, la
               leyenda y la silueta de Semana). Relevo: este sub enseña mientras
               la leyenda aún no aparece (<5 días); con ≥5 la leyenda toma el
               lugar y el sub se retira. Un solo maestro a la vez. */}
-          {(glance?.dataDays ?? 0) < 5 ? (
-            <Text style={styles.calQuestion}>
-              El oro son tus días en déficit. Lo que el mes fue construyendo.
-            </Text>
-          ) : null}
-        </View>
+              {(glance?.dataDays ?? 0) < 5 ? (
+                <Text style={styles.calQuestion}>
+                  El oro son tus días en déficit. Lo que el mes fue construyendo.
+                </Text>
+              ) : null}
+            </View>
 
-        {glance ? (
-          <>
-            <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
-            {/* Arranque de mes (pocos días): NO dejar a la usuaria sola frente al
+            {glance ? (
+              <>
+                <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
+                {/* Arranque de mes (pocos días): NO dejar a la usuaria sola frente al
                 conteo bajo — junio, con historia real, a un tap. */}
-            {monthOffset === 0 && glance.dataDays < 5 && canPrevMonth ? (
-              <Text style={styles.monthEmptyHint}>
-                Este mes va empezando. Usa ‹ para ver meses anteriores.
-              </Text>
-            ) : null}
-          </>
-        ) : (
-          <View style={styles.monthEmpty}>
-            <Text style={styles.monthEmptyBody}>
-              {monthOffset === 0
-                ? 'El calendario se irá encendiendo conforme registres tus días.'
-                : 'Aún no hay días con comida en este mes.'}
-            </Text>
-            {monthOffset === 0 && canPrevMonth ? (
-              <Text style={styles.monthEmptyHint}>Usa las flechas para ver meses anteriores.</Text>
-            ) : null}
+                {monthOffset === 0 && glance.dataDays < 5 && canPrevMonth ? (
+                  <Text style={styles.monthEmptyHint}>
+                    Este mes va empezando. Usa ‹ para ver meses anteriores.
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <View style={styles.monthEmpty}>
+                <Text style={styles.monthEmptyBody}>
+                  {monthOffset === 0
+                    ? 'El calendario se irá encendiendo conforme registres tus días.'
+                    : 'Aún no hay días con comida en este mes.'}
+                </Text>
+                {monthOffset === 0 && canPrevMonth ? (
+                  <Text style={styles.monthEmptyHint}>
+                    Usa las flechas para ver meses anteriores.
+                  </Text>
+                ) : null}
+              </View>
+            )}
           </View>
-        )}
-      </View>
+        </>
+      ) : null}
 
       {/* ── Tiempo 3 · Tus patrones — lo que Stelar encontró. La usuaria ya tiene
           datos (el guard de arriba lo asegura), así que la sección SIEMPRE está: con
           patrón probado, lo muestra; sin uno, un estado vacío HONESTO — nunca un
           patrón débil de relleno (Apple/Yazio: jamás fingir). */}
-      <View style={styles.beat}>
-        <View style={styles.section}>
-          <Text style={styles.eyebrow}>Tus patrones</Text>
-          {combo || supportPatterns.length > 0 ? (
-            <>
-              <Text style={styles.sectionLede}>Lo que apareció junto en tus días.</Text>
-              {combo ? (
-                <DominantPatternCard
-                  combo={combo}
-                  provenance={provenance}
-                  onOpen={() => {
-                    const base = comboReveal(combo)
-                    // La palanca de esta semana reemplaza al cierre retrospectivo.
-                    const lever = weeklyComboLever(
-                      patternSignals,
-                      combo,
-                      { calorieTarget, proteinTarget, waterGoalGlasses },
-                      today,
-                    )
-                    setReveal({ ...base, takeaway: lever ?? base.takeaway })
-                  }}
-                />
-              ) : null}
-              {supportPatterns.map((p, i) => (
-                <PatternFindingCard
-                  key={p.id}
-                  pattern={p}
-                  index={i}
-                  leading={!combo && i === 0}
-                  onOpen={() => setEvidence(p)}
-                />
-              ))}
-            </>
-          ) : patternDataDays < 14 ? (
-            /* Semanas 1-2: el diferenciador entero de Stelar aún no puede
+      {view !== 'month' ? (
+        <View style={styles.beat}>
+          <View style={styles.section}>
+            <Text style={styles.eyebrow}>Tus patrones</Text>
+            {combo || supportPatterns.length > 0 ? (
+              <>
+                <Text style={styles.sectionLede}>Lo que apareció junto en tus días.</Text>
+                {combo ? (
+                  <DominantPatternCard
+                    combo={combo}
+                    provenance={provenance}
+                    onUnderstand={aiOn && comboFinding ? () => setChatOpen(true) : undefined}
+                    onOpen={() => {
+                      const base = comboReveal(combo)
+                      // La palanca de esta semana reemplaza al cierre retrospectivo.
+                      const lever = weeklyComboLever(
+                        patternSignals,
+                        combo,
+                        { calorieTarget, proteinTarget, waterGoalGlasses },
+                        today,
+                      )
+                      setReveal({ ...base, takeaway: lever ?? base.takeaway })
+                    }}
+                  />
+                ) : null}
+                {view === 'patterns' && combo && supportPatterns.length > 0 ? (
+                  <View style={styles.alsoFound}>
+                    <Text style={styles.alsoFoundEyebrow}>También encontré</Text>
+                    {supportPatterns.map((p) => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => setEvidence(p)}
+                        style={({ pressed }) => [styles.alsoFoundRow, pressed && { opacity: 0.75 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${p.title} Ver la evidencia.`}
+                      >
+                        <Text style={styles.alsoFoundText}>{p.title}</Text>
+                        <Text style={styles.alsoFoundChevron}>›</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {(view === 'patterns' && combo ? [] : supportPatterns).map((p, i) => (
+                  <PatternFindingCard
+                    key={p.id}
+                    pattern={p}
+                    index={i}
+                    leading={!combo && i === 0}
+                    onOpen={() => setEvidence(p)}
+                  />
+                ))}
+              </>
+            ) : patternDataDays < 14 ? (
+              /* Semanas 1-2: el diferenciador entero de Stelar aún no puede
                hablar. Un "no hay nada" sin forma se lee como "esta sección no
                sirve"; lo bloqueado-pero-visible (siluetas de QUÉ va a
                descubrir) convierte la ausencia en anticipación. Umbral
                aproximado, sin countdown (retention-spec · Mecánica C). */
-            <View style={styles.patternsEmpty}>
-              <Text style={styles.patternsEmptyLede}>Tus patrones se están formando.</Text>
-              {/* El marcador de anticipación (Mecánica C): progresa con DÍAS
+              <View style={styles.patternsEmpty}>
+                <Text style={styles.patternsEmptyLede}>Todavía te estoy conociendo.</Text>
+                {/* El marcador de anticipación (Mecánica C): progresa con DÍAS
                   CON DATOS, nunca con fechas — la usuaria ve que su registro
                   alimenta algo que se está gestando (Zeigarnik sin countdown). */}
-              <Text style={styles.patternsEmptyBody}>
-                {patternDataDays > 0
-                  ? `Stelar ya leyó ${patternDataDays} ${patternDataDays === 1 ? 'día tuyo' : 'días tuyos'}. Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:`
-                  : 'Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:'}
-              </Text>
-              <View style={styles.patternSilhouettes}>
-                {[
-                  'Qué días son distintos en tu rutina',
-                  'Qué acompaña tus mejores días',
-                  'Qué combinación te sostiene en déficit',
-                ].map((t) => (
-                  <View key={t} style={styles.patternSilhouetteRow}>
-                    <View style={styles.patternSilhouetteStar} />
-                    <Text style={styles.patternSilhouetteText}>{t}</Text>
-                  </View>
-                ))}
-              </View>
-              {/* El horizonte honesto (GAP 5): el umbral concreto que abre la
+                <Text style={styles.patternsEmptyBody}>
+                  Un patrón aparece cuando algo se repite en tus días. Sigue registrando como
+                  siempre y aquí verás lo primero que encuentre. Cosas como:
+                </Text>
+                <View style={styles.patternSilhouettes}>
+                  {[
+                    'Qué días son distintos en tu rutina',
+                    'Qué acompaña tus mejores días',
+                    'Qué combinación te sostiene en déficit',
+                  ].map((t) => (
+                    <View key={t} style={styles.patternSilhouetteRow}>
+                      <View style={styles.patternSilhouetteStar} />
+                      <Text style={styles.patternSilhouetteText}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+                {/* El horizonte honesto (GAP 5): el umbral concreto que abre la
                   puerta, sin countdown ni prometer CUÁL patrón llega primero
                   (eso depende de sus datos, no lo fingimos). */}
-              <Text style={styles.patternsEmptyHorizon}>
-                Un patrón nace cuando algo se repite unas tres veces en tus datos.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.patternsEmpty}>
-              <Text style={styles.patternsEmptyLede}>Aún no emerge un patrón claro.</Text>
-              <Text style={styles.patternsEmptyBody}>
-                Stelar solo te muestra un patrón cuando tus datos lo sostienen. Con más días,
-                aparecerá.
-              </Text>
-            </View>
-          )}
+                <Text style={styles.patternsEmptyHorizon}>
+                  Un patrón nace cuando algo se repite unas tres veces en tus datos.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.patternsEmpty}>
+                <Text style={styles.patternsEmptyLede}>Aún no emerge un patrón claro.</Text>
+                <Text style={styles.patternsEmptyBody}>
+                  Stelar solo te muestra un patrón cuando tus datos lo sostienen. Con más días,
+                  aparecerá.
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       {/* ── Tiempo 4 · ¿Sigo así? — el cierre emocional (volver sin culpa). */}
       {/* 9.6 · la coda de presencia se gana su lugar con ≥7 días de datos:
@@ -711,10 +771,12 @@ export function MonthSegment({
           puertas cerradas ("Apenas empieza"); sin historia de regresos que
           contar, la promesa de patrones (con siluetas + horizonte) ya cierra
           el recorrido. */}
-      {presence && patternDataDays >= 7 ? <PresenceFinale presence={presence} /> : null}
+      {view === 'full' && presence && patternDataDays >= 7 ? (
+        <PresenceFinale presence={presence} />
+      ) : null}
 
       {/* Fin del recorrido: volver al inicio sin tener que hacer scroll a mano. */}
-      {onScrollTop ? (
+      {view === 'full' && onScrollTop ? (
         <Pressable
           style={styles.backTop}
           onPress={onScrollTop}
@@ -727,6 +789,23 @@ export function MonthSegment({
       ) : null}
 
       <EvidenceModal pattern={evidence} onClose={() => setEvidence(null)} />
+      {aiOn && comboFinding ? (
+        <MonthChatSheet
+          finding={chatOpen ? comboFinding : null}
+          title="Tu patrón dominante"
+          subtitle="Stelar · leyendo tus patrones"
+          closeLabel="Volver a tu órbita"
+          sign={sign}
+          periodStart={patternSignals.find((x) => x.day != null)?.day ?? today}
+          periodEnd={today}
+          findingsHash={combo ? comboChatHash(combo) : ''}
+          askMetacognition
+          hasMore={false}
+          onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
+          onNext={() => setChatOpen(false)}
+          onClose={() => setChatOpen(false)}
+        />
+      ) : null}
       {/* Modal cinemático del patrón dominante (se monta al abrir → replaya). */}
       {reveal ? (
         <PatternRevealModal
@@ -1182,9 +1261,12 @@ function DominantPatternCard({
   combo,
   onOpen,
   provenance,
+  onUnderstand,
 }: {
   combo: WinningComboData
   onOpen: () => void
+  /** "✦ Quiero entenderlo": abre el chat de IA sobre este patrón (solo con IA real). */
+  onUnderstand?: () => void
   /** Procedencia factual: la pieza del combo que ya se reveló y guardó, con su
    *  fecha. Toca → revive la ceremonia real. `null` si ninguna pieza se reveló. */
   provenance?: { label: string; onReplay: () => void } | null
@@ -1235,6 +1317,16 @@ function DominantPatternCard({
         <Text style={styles.discoverCtaText}>Ver la revelación</Text>
         <Animated.Text style={[styles.discoverCtaArrow, ctaStyle]}>→</Animated.Text>
       </View>
+      {/* ✦ Quiero entenderlo — la IA explica el patrón (Pressable anidado: el
+          padre no abre la revelación). El sello ✦ solo aquí, donde abre chat. */}
+      {onUnderstand ? (
+        <AiCta
+          label="Quiero entenderlo"
+          onPress={onUnderstand}
+          accessibilityLabel="Quiero entenderlo: habla con Stelar sobre este patrón"
+          style={styles.understandCta}
+        />
+      ) : null}
       {/* Procedencia: acción SECUNDARIA (Pressable anidado → captura el toque, el
           padre no abre el combo). Revive la ceremonia fechada de esa pieza. */}
       {provenance ? (
@@ -1645,6 +1737,42 @@ function RevealEvidenceModal({
 }
 
 const styles = StyleSheet.create({
+  understandCta: {
+    alignSelf: 'center',
+    marginTop: 14,
+  },
+  alsoFound: {
+    marginTop: 24,
+  },
+  alsoFoundEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 6,
+  },
+  alsoFoundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 48,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  alsoFoundText: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.ui,
+    lineHeight: 21,
+    color: colors.leche,
+  },
+  alsoFoundChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+  },
   wrap: {
     marginTop: 10,
   },

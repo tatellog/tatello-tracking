@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Dimensions, ScrollView, StyleSheet, View } from 'react-native'
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
@@ -15,7 +15,7 @@ import {
   type OrbitSegment,
 } from '@/features/orbit/components'
 import { useSession } from '@/hooks/useSession'
-import { aiEnabledForEmail } from '@/lib/featureFlags'
+import { aiEnabledForEmail, ORBITA_SINGLE_FEED } from '@/lib/featureFlags'
 import { useOrbitDayRollover } from '@/features/orbit/hooks'
 import { usePatternMemoryWriter } from '@/features/orbit/pattern-memory'
 import { consumeOrbitSegment } from '@/features/orbit/pending-segment'
@@ -24,7 +24,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { LoadingView } from '@/components/LoadingView'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { track } from '@/lib/analytics'
-import { colors } from '@/theme'
+import { colors, typography } from '@/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
 
@@ -72,16 +72,27 @@ function OrbitBody() {
   // "Volver" regresa a Mes, no te deja varada en Día-hoy.
   const [dayOrigin, setDayOrigin] = useState<Exclude<OrbitSegment, 'dia'> | null>(null)
 
+  // Órbita de un solo scroll: 'feed' (anillos + patrones + mes) o el detalle
+  // de hoy / del mes, abierto desde el feed con su "‹ Volver".
+  const [feedView, setFeedView] = useState<'feed' | 'day' | 'month'>('feed')
+
   useFocusEffect(
     useCallback(() => {
       const pending = consumeOrbitSegment()
-      if (pending) setSegment(pending)
+      if (!pending) return
+      if (ORBITA_SINGLE_FEED) {
+        // Los enlaces viejos a un segmento aterrizan en el feed (patrones),
+        // salvo 'dia', que abre el detalle de hoy.
+        setFeedView(pending === 'dia' ? 'day' : 'feed')
+        return
+      }
+      setSegment(pending)
     }, []),
   )
 
   useEffect(() => {
-    track('orbit_viewed', { segment })
-  }, [segment])
+    track('orbit_viewed', { segment: ORBITA_SINGLE_FEED ? feedView : segment })
+  }, [segment, feedView])
 
   // Pause every screen-active-gated loop (OrbitalSystem, ScreenCosmos, …) while
   // the page is actively scrolling — the orbit diagram is the heaviest tab, so
@@ -152,78 +163,106 @@ function OrbitBody() {
               <TabHeader title="Tu Órbita" titleEmphasis="Tu" />
             </Animated.View>
 
-            <Animated.View entering={FadeIn.duration(320).delay(80)}>
-              <OrbitSegments
-                value={segment}
-                onChange={(seg) => {
-                  setViewedDay(null) // navegar a mano vuelve a hoy
-                  setDayOrigin(null)
-                  setSegment(seg)
+            {ORBITA_SINGLE_FEED ? (
+              <OrbitFeed
+                view={feedView}
+                viewedDay={viewedDay}
+                onOpenDay={() => {
+                  setViewedDay(null)
+                  setFeedView('day')
+                  scrollToTop()
+                }}
+                onOpenMonth={() => {
+                  setFeedView('month')
+                  scrollToTop()
+                }}
+                onBack={() => {
+                  setViewedDay(null)
+                  setFeedView('feed')
+                  scrollToTop()
+                }}
+                onPickDay={(date) => {
+                  setViewedDay(date)
+                  setFeedView('day')
+                  scrollToTop()
                 }}
               />
-            </Animated.View>
+            ) : (
+              <>
+                <Animated.View entering={FadeIn.duration(320).delay(80)}>
+                  <OrbitSegments
+                    value={segment}
+                    onChange={(seg) => {
+                      setViewedDay(null) // navegar a mano vuelve a hoy
+                      setDayOrigin(null)
+                      setSegment(seg)
+                    }}
+                  />
+                </Animated.View>
 
-            {/* Only the active segment is mounted — so only ONE constellation's
+                {/* Only the active segment is mounted — so only ONE constellation's
               Reanimated loops + Skia canvas exist at a time. (Keeping all three
               mounted + frozen does NOT pause Reanimated loops — react-freeze
               only suspends React renders, the withRepeat timers keep running on
               the UI thread — so it would TRIPLE the animation load. Conditional
               mount is the cheaper baseline.) The `key` replays the fade-in.
               Semana hands the segment switch back for its "Abrir Día" CTA. */}
-            {segment === 'dia' ? (
-              <DayPresent
-                key="dia"
-                viewedDay={viewedDay}
-                returnLabel={
-                  dayOrigin === 'mes'
-                    ? 'Volver a tu mes'
-                    : dayOrigin === 'semana'
-                      ? 'Volver a tu semana'
-                      : undefined
-                }
-                onReturnToToday={() => {
-                  setViewedDay(null)
-                  if (dayOrigin) {
-                    setSegment(dayOrigin)
-                    setDayOrigin(null)
-                    scrollToTop()
-                  }
-                }}
-                onOpenWeek={() => {
-                  setSegment('semana')
-                  scrollToTop()
-                }}
-              />
-            ) : segment === 'semana' ? (
-              <WeekSegment
-                key="semana"
-                onOpenMes={() => setSegment('mes')}
-                onPickDay={(date) => {
-                  setViewedDay(date)
-                  setDayOrigin('semana')
-                  setSegment('dia')
-                }}
-                onScrollTop={scrollToTop}
-              />
-            ) : mesIAEnabled ? (
-              <MonthSegmentIA
-                key="mes-ia"
-                onPickDay={(date) => {
-                  setViewedDay(date)
-                  setDayOrigin('mes')
-                  setSegment('dia')
-                }}
-              />
-            ) : (
-              <MonthSegment
-                key="mes"
-                onPickDay={(date) => {
-                  setViewedDay(date)
-                  setDayOrigin('mes')
-                  setSegment('dia')
-                }}
-                onScrollTop={scrollToTop}
-              />
+                {segment === 'dia' ? (
+                  <DayPresent
+                    key="dia"
+                    viewedDay={viewedDay}
+                    returnLabel={
+                      dayOrigin === 'mes'
+                        ? 'Volver a tu mes'
+                        : dayOrigin === 'semana'
+                          ? 'Volver a tu semana'
+                          : undefined
+                    }
+                    onReturnToToday={() => {
+                      setViewedDay(null)
+                      if (dayOrigin) {
+                        setSegment(dayOrigin)
+                        setDayOrigin(null)
+                        scrollToTop()
+                      }
+                    }}
+                    onOpenWeek={() => {
+                      setSegment('semana')
+                      scrollToTop()
+                    }}
+                  />
+                ) : segment === 'semana' ? (
+                  <WeekSegment
+                    key="semana"
+                    onOpenMes={() => setSegment('mes')}
+                    onPickDay={(date) => {
+                      setViewedDay(date)
+                      setDayOrigin('semana')
+                      setSegment('dia')
+                    }}
+                    onScrollTop={scrollToTop}
+                  />
+                ) : mesIAEnabled ? (
+                  <MonthSegmentIA
+                    key="mes-ia"
+                    onPickDay={(date) => {
+                      setViewedDay(date)
+                      setDayOrigin('mes')
+                      setSegment('dia')
+                    }}
+                  />
+                ) : (
+                  <MonthSegment
+                    key="mes"
+                    onPickDay={(date) => {
+                      setViewedDay(date)
+                      setDayOrigin('mes')
+                      setSegment('dia')
+                    }}
+                    onScrollTop={scrollToTop}
+                  />
+                )}
+              </>
             )}
           </ScrollView>
         </SafeAreaView>
@@ -232,7 +271,106 @@ function OrbitBody() {
   )
 }
 
+/*
+ * La Órbita de un solo scroll (ORBITA_SINGLE_FEED · fase A). Responde lo que
+ * la usuaria viene a buscar: "qué encontró Stelar de mí". Arriba, hoy en
+ * compacto (los anillos que le gustan + "¿sigo en déficit?"); al centro, Tus
+ * patrones (el motor del Mes, sin tocar backend); al pie, el mes completo.
+ * El detalle de hoy y el del mes se abren desde aquí, con "‹ Volver".
+ */
+function OrbitFeed({
+  view,
+  viewedDay,
+  onOpenDay,
+  onOpenMonth,
+  onBack,
+  onPickDay,
+}: {
+  view: 'feed' | 'day' | 'month'
+  viewedDay: string | null
+  onOpenDay: () => void
+  onOpenMonth: () => void
+  onBack: () => void
+  onPickDay: (date: string) => void
+}) {
+  if (view === 'day') {
+    // Un día pasado trae su propio "‹ Volver a tu órbita" (DayPresent); hoy no.
+    return (
+      <View>
+        {viewedDay ? null : <BackLink onPress={onBack} />}
+        <DayPresent
+          key="feed-day"
+          viewedDay={viewedDay}
+          onReturnToToday={onBack}
+          returnLabel="Volver a tu órbita"
+        />
+      </View>
+    )
+  }
+  if (view === 'month') {
+    return (
+      <View>
+        <BackLink onPress={onBack} />
+        <MonthSegment key="feed-month" view="month" onPickDay={onPickDay} />
+      </View>
+    )
+  }
+  return (
+    <Animated.View entering={FadeIn.duration(320).delay(60)}>
+      <Text style={styles.feedLede}>Lo que tus datos dicen de ti.</Text>
+      <DayPresent key="feed-today" compact onOpenDay={onOpenDay} />
+      <MonthSegment key="feed-patterns" view="patterns" />
+      <Pressable
+        onPress={onOpenMonth}
+        hitSlop={8}
+        style={styles.feedLink}
+        accessibilityRole="button"
+        accessibilityLabel="Tu mes de un vistazo"
+      >
+        <Text style={styles.feedLinkText}>Tu mes de un vistazo ›</Text>
+      </Pressable>
+    </Animated.View>
+  )
+}
+
+function BackLink({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={styles.backLink}
+      accessibilityRole="button"
+      accessibilityLabel="Volver a tu órbita"
+    >
+      <Text style={styles.feedLinkText}>‹ Volver a tu órbita</Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
+  feedLede: {
+    marginTop: -6,
+    marginBottom: 20,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  feedLink: {
+    alignSelf: 'center',
+    marginTop: 32,
+    paddingVertical: 10,
+  },
+  feedLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.niebla,
+  },
+  backLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

@@ -548,6 +548,8 @@ export function DayPresent({
   viewedDay = null,
   onReturnToToday,
   onOpenWeek,
+  compact = false,
+  onOpenDay,
   returnLabel,
 }: {
   /** Día a mostrar (ISO 'YYYY-MM-DD'); null = hoy. Lo setea la tira de Semana. */
@@ -555,6 +557,10 @@ export function DayPresent({
   onReturnToToday?: () => void
   /** "Ver cómo va tu semana ›" — el puente a Semana al final del día. */
   onOpenWeek?: () => void
+  /** Órbita de un solo scroll: solo anillos + leyenda + veredicto, sin
+   *  encabezado ni detalle, con "Ver tu día ›" (onOpenDay) al pie. */
+  compact?: boolean
+  onOpenDay?: () => void
   /** Etiqueta del back cuando el día se abrió desde otro segmento
    *  ("Volver a tu mes"); default "Volver a hoy". */
   returnLabel?: string
@@ -669,6 +675,102 @@ export function DayPresent({
     </View>
   )
 
+  // Anillos + leyenda + veredicto: el hero de Día y el bloque "hoy" del feed
+  // de Órbita (compact). Sin registros, los anillos en reposo.
+  const hero: GoalHero = day?.hero ?? REST_HERO
+  const heroSection = (
+    <>
+      {/* Hero — el anillo (con la constelación dentro) y el VEREDICTO en
+          palabras: "¿sigo en déficit?". Sin número grande de margen (era el
+          "te quedan X"; mientras menos comía, más grande y más magenta). El
+          color del anillo sigue al veredicto: bajo el piso sano, niebla. */}
+      {/* Hero — el anillo compacto con la LEYENDA a su lado, en el mismo orden
+          de afuera hacia adentro (patrón Apple Fitness): la posición dice qué
+          anillo es cuál. El color del anillo de calorías sigue al veredicto. */}
+      <View style={styles.heroRow}>
+        <GoalRing hero={{ ...hero, status: verdict.ringTone }} />
+        <View style={styles.legendCol}>
+          <LegendStat
+            color={STATUS_COLOR[verdict.ringTone]}
+            label="Calorías"
+            value={
+              hero.consumed != null
+                ? hero.target != null
+                  ? `${hero.consumed.toLocaleString('es-MX')} de ${hero.target.toLocaleString('es-MX')} kcal`
+                  : `${hero.consumed.toLocaleString('es-MX')} kcal`
+                : '—'
+            }
+          />
+          {hero.proteinFill != null ? (
+            <LegendStat
+              color={colors.signal.proteina}
+              label="Proteína"
+              value={
+                hero.proteinG != null && ctx.proteinTarget != null
+                  ? `${hero.proteinG} de ${Math.round(ctx.proteinTarget)} g`
+                  : '—'
+              }
+            />
+          ) : null}
+          <LegendStat
+            color={TRAIN_COLOR}
+            label="Entreno"
+            value={hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
+            caption={
+              hero.trained && hero.workoutSource === 'wearable' ? 'tu smartwatch' : undefined
+            }
+            dim={!hero.trained}
+          />
+        </View>
+      </View>
+
+      {/* El veredicto en palabras: "¿sigo en déficit?". */}
+      <View style={styles.verdictBlock}>
+        <Text style={styles.verdictTitle}>{verdict.title}</Text>
+        <Text style={styles.verdictLine}>{verdict.line}</Text>
+        {verdict.cta ? (
+          <Pressable
+            style={styles.verdictCta}
+            onPress={() =>
+              router.push(
+                verdict.cta === 'target'
+                  ? '/onboarding/macro-targets?source=banner'
+                  : '/capture-meal',
+              )
+            }
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+          >
+            <Text style={styles.verdictCtaText}>
+              {verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </>
+  )
+
+  if (compact) {
+    if (!settled && signals == null) return null
+    return (
+      <Animated.View entering={FadeIn.duration(320)} style={styles.compactWrap}>
+        {heroSection}
+        {onOpenDay ? (
+          <Pressable
+            onPress={onOpenDay}
+            hitSlop={8}
+            style={styles.openDay}
+            accessibilityRole="button"
+            accessibilityLabel="Ver tu día"
+          >
+            <Text style={styles.weekLinkText}>Ver tu día ›</Text>
+          </Pressable>
+        ) : null}
+      </Animated.View>
+    )
+  }
+
   // Primera carga sin caché — placeholder cálido, no pantalla en blanco.
   if (!settled && signals == null) {
     return (
@@ -757,76 +859,7 @@ export function DayPresent({
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
       {header}
 
-      {/* Hero — el anillo (con la constelación dentro) y el VEREDICTO en
-          palabras: "¿sigo en déficit?". Sin número grande de margen (era el
-          "te quedan X"; mientras menos comía, más grande y más magenta). El
-          color del anillo sigue al veredicto: bajo el piso sano, niebla. */}
-      {/* Hero — el anillo compacto con la LEYENDA a su lado, en el mismo orden
-          de afuera hacia adentro (patrón Apple Fitness): la posición dice qué
-          anillo es cuál. El color del anillo de calorías sigue al veredicto. */}
-      <View style={styles.heroRow}>
-        <GoalRing hero={{ ...day.hero, status: verdict.ringTone }} />
-        <View style={styles.legendCol}>
-          <LegendStat
-            color={STATUS_COLOR[verdict.ringTone]}
-            label="Calorías"
-            value={
-              day.hero.consumed != null
-                ? day.hero.target != null
-                  ? `${day.hero.consumed.toLocaleString('es-MX')} de ${day.hero.target.toLocaleString('es-MX')} kcal`
-                  : `${day.hero.consumed.toLocaleString('es-MX')} kcal`
-                : '—'
-            }
-          />
-          {day.hero.proteinFill != null ? (
-            <LegendStat
-              color={colors.signal.proteina}
-              label="Proteína"
-              value={
-                day.hero.proteinG != null && ctx.proteinTarget != null
-                  ? `${day.hero.proteinG} de ${Math.round(ctx.proteinTarget)} g`
-                  : '—'
-              }
-            />
-          ) : null}
-          <LegendStat
-            color={TRAIN_COLOR}
-            label="Entreno"
-            value={day.hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
-            caption={
-              day.hero.trained && day.hero.workoutSource === 'wearable'
-                ? 'tu smartwatch'
-                : undefined
-            }
-            dim={!day.hero.trained}
-          />
-        </View>
-      </View>
-
-      {/* El veredicto en palabras: "¿sigo en déficit?". */}
-      <View style={styles.verdictBlock}>
-        <Text style={styles.verdictTitle}>{verdict.title}</Text>
-        <Text style={styles.verdictLine}>{verdict.line}</Text>
-        {verdict.cta ? (
-          <Pressable
-            style={styles.verdictCta}
-            onPress={() =>
-              router.push(
-                verdict.cta === 'target'
-                  ? '/onboarding/macro-targets?source=banner'
-                  : '/capture-meal',
-              )
-            }
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
-          >
-            <Text style={styles.verdictCtaText}>
-              {verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+      {heroSection}
 
       {/* TU FOCO DE HOY — la palanca desde tus datos (recomendación, nunca
           orden; nunca dieta ni rutina). Solo cuando hay un foco honesto. */}
@@ -1088,6 +1121,14 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
+  },
+  compactWrap: {
+    marginTop: 4,
+  },
+  openDay: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingVertical: 6,
   },
   weekLink: {
     alignSelf: 'center',
