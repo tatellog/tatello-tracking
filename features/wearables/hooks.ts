@@ -455,3 +455,39 @@ export function useScaleBadge(): { hasNew: boolean; markSeen: () => void } {
 
   return { hasNew, markSeen }
 }
+
+/*
+ * Cuándo sincronizó el reloj por última vez (para la firma "desde tu reloj ·
+ * hace 2 h" bajo las filas de Hoy). Se relee en cada vuelta a foreground,
+ * que es cuando el sync de fondo lo actualiza.
+ */
+export function useWearableLastSync(): string | null {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? null
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!userId) {
+      setLastSyncAt(null)
+      return
+    }
+    let cancelled = false
+    const read = () => {
+      void AsyncStorage.getItem(lastSyncKey(userId))
+        .then((v) => {
+          if (!cancelled) setLastSyncAt(v)
+        })
+        .catch(() => {})
+    }
+    read()
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') read()
+    })
+    return () => {
+      cancelled = true
+      sub.remove()
+    }
+  }, [userId])
+
+  return lastSyncAt
+}

@@ -52,10 +52,10 @@ type Props = {
    *  en vez de apagar la estrella en silencio. */
   saveFailed?: boolean
   /** V-15 Smart Recovery: el reloj ya selló el entreno de hoy (sin registro
-   *  manual encima). La fila nace confirmada con su procedencia y "cambiar"
+   *  manual encima). La fila nace confirmada (con sus minutos) y "cambiar"
    *  solo abre el tipo: el dato del dispositivo manda, nunca se des-entrena
-   *  contra él. */
-  wearable?: { line: string } | null
+   *  contra él. La procedencia la dice la firma de Hoy, no esta fila. */
+  wearable?: { minutes: number | null; kcal: number | null } | null
 }
 
 // Star = a trained day (the constellation's glyph). Vive SOLO en la fila
@@ -136,6 +136,9 @@ export function DayCheckIn({
   // El chip recién tocado: sostiene el bloque abierto CHIP_HOLD_MS para que
   // la selección se vea antes del colapso (fill → hold → recogida).
   const [justPicked, setJustPicked] = useState<WorkoutTypeId | 'rested' | null>(null)
+  // En EDICIÓN los chips eligen en borrador: nada se guarda hasta "Listo", y
+  // "Cancelar" descarta. En el flujo fresco un tap anota de inmediato.
+  const [draft, setDraft] = useState<WorkoutTypeId | 'rested' | null>(null)
   const answered = state !== 'undecided'
   // Sellado por el reloj: "Fue descanso" no aparece ni en edición; lo único
   // editable es el tipo.
@@ -166,17 +169,22 @@ export function DayCheckIn({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [justPicked, reducedMotion])
 
-  const activeType =
-    justPicked === 'rested' ? null : (justPicked ?? (state === 'trained' ? workoutType : null))
-  const restActive = justPicked === 'rested' || (justPicked === null && state === 'rested')
+  const editing = answered && !locked
+  const current: WorkoutTypeId | 'rested' | null =
+    state === 'rested'
+      ? 'rested'
+      : state === 'trained'
+        ? ((workoutType as WorkoutTypeId) ?? null)
+        : null
+  const shown = justPicked ?? (editing ? (draft ?? current) : null)
+  const activeType = shown === 'rested' ? null : shown
+  const restActive = shown === 'rested'
 
   const pickType = (type: WorkoutTypeId) => {
     if (locked) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    if (state === 'trained' && workoutType === type && justPicked === null) {
-      // Afirmación, no borrado (patrón Apple de selección única): tocar lo
-      // prendido = "sí, esto" y cierra.
-      onClose()
+    if (editing) {
+      setDraft(type)
       return
     }
     onTrain(type)
@@ -186,12 +194,27 @@ export function DayCheckIn({
   const pickRest = () => {
     if (locked) return
     Haptics.selectionAsync().catch(() => {})
-    if (state === 'rested' && justPicked === null) {
-      onClose()
+    if (editing) {
+      setDraft('rested')
       return
     }
     onRest()
     setJustPicked('rested')
+  }
+
+  // "Listo" guarda el borrador si cambió; "Cancelar" lo descarta. Ambos cierran.
+  const commitEdit = () => {
+    const next = draft
+    setDraft(null)
+    if (next != null && next !== current) {
+      if (next === 'rested') onRest()
+      else onTrain(next)
+    }
+    onClose()
+  }
+  const cancelEdit = () => {
+    setDraft(null)
+    onClose()
   }
 
   // Mientras el chip recién elegido se sostiene, el bloque sigue abierto
@@ -234,14 +257,24 @@ export function DayCheckIn({
               <Text style={styles.editLead}>
                 {sealedByWearable ? '¿De qué tipo fue tu entreno?' : 'Cambiando tu respuesta'}
               </Text>
-              <Pressable
-                onPress={onClose}
-                hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Listo, cerrar edición"
-              >
-                <Text style={styles.changeLink}>Listo</Text>
-              </Pressable>
+              <View style={styles.editDoors}>
+                <Pressable
+                  onPress={cancelEdit}
+                  hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar, cerrar sin cambiar"
+                >
+                  <Text style={styles.changeLink}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={commitEdit}
+                  hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Listo, guardar y cerrar"
+                >
+                  <Text style={styles.doneLink}>Listo</Text>
+                </Pressable>
+              </View>
             </View>
           )}
           {/* Los tipos arriba (un tap = entrené + de qué) y "Fue descanso" en
@@ -259,7 +292,14 @@ export function DayCheckIn({
               />
             ))}
           </View>
-          {sealedByWearable ? null : (
+          {/* Ajustando lo que trajo el reloj: se nombra el dato y se deja elegir. */}
+          {sealedByWearable ? (
+            <Text style={styles.hint}>
+              {wearable?.minutes != null
+                ? `Tu reloj anotó ${wearable.minutes} min · elige el tipo si fue distinto`
+                : 'Tu reloj anotó tu entreno · elige el tipo si fue distinto'}
+            </Text>
+          ) : (
             <View style={styles.restRow}>
               <Chip
                 label="Fue descanso"
@@ -294,11 +334,16 @@ export function DayCheckIn({
             {state === 'trained' && typeLabel ? (
               <Text style={styles.confirmedType}>{` · ${typeLabel}`}</Text>
             ) : null}
-            {sealedByWearable && wearable ? (
-              <Text style={styles.provenance}>{`\n${wearable.line}`}</Text>
+            {/* Lo que el reloj trajo, como contexto (spec wearables §3): la
+                quema nunca infla el presupuesto de comida ni entra al TDEE. */}
+            {sealedByWearable && wearable?.minutes != null ? (
+              <Text style={styles.confirmedType}>{` · ${wearable.minutes} min`}</Text>
+            ) : null}
+            {sealedByWearable && wearable?.kcal != null ? (
+              <Text style={styles.confirmedType}>{` · ~${wearable.kcal} kcal`}</Text>
             ) : null}
           </Text>
-          {!locked ? (
+          {!locked && !sealedByWearable ? (
             <Pressable
               onPress={onOpen}
               hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
@@ -370,6 +415,18 @@ const styles = StyleSheet.create({
     color: colors.bone,
     letterSpacing: 0.3,
   },
+  // Las dos puertas de la edición: Cancelar (niebla) · Listo (bone, la que guarda).
+  editDoors: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  doneLink: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
+  },
   // Voz coach — la pregunta que los chips responden.
   question: {
     fontFamily: typography.serif,
@@ -436,9 +493,9 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     color: colors.bone,
   },
-  // Procedencia sutil estilo Apple Health (spec wearables §5): segunda línea
-  // de la fila, en niebla, junto al dato y en el mismo lugar del manual.
-  provenance: {
+  hint: {
+    marginTop: 8,
+    marginLeft: 2,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     letterSpacing: 0.3,

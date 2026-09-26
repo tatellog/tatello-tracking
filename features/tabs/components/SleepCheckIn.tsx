@@ -64,6 +64,9 @@ export function SleepCheckIn({
   // colapsada nunca muestra un dato viejo tras el tap).
   const [picked, setPicked] = useState<number | null>(null)
   const [justPicked, setJustPicked] = useState<number | null>(null)
+  // En EDICIÓN los chips eligen en borrador: nada se guarda hasta "Listo", y
+  // "Cancelar" descarta. En el flujo fresco un tap anota de inmediato.
+  const [draft, setDraft] = useState<number | null>(null)
 
   const reducedMotion = useReducedMotion()
   const layout = reducedMotion ? undefined : LAYOUT
@@ -76,7 +79,8 @@ export function SleepCheckIn({
   const fromWatch = manualMinutes == null && wearableMinutes != null
   const minutes = manualMinutes ?? wearableMinutes
   const hasEntry = minutes != null
-  const activeChip = justPicked ?? (hasEntry ? nearestSleepChip(minutes)?.minutes : null)
+  const currentChip = hasEntry ? (nearestSleepChip(minutes)?.minutes ?? null) : null
+  const activeChip = justPicked ?? (hasEntry ? (draft ?? currentChip) : null)
 
   // Tras elegir, sostener el chip en magenta y colapsar (en seco con reduce
   // motion, igual que DayCheckIn).
@@ -95,17 +99,31 @@ export function SleepCheckIn({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [justPicked, reducedMotion])
 
+  const save = (chipMinutes: number) => {
+    setPicked(chipMinutes)
+    upsert.mutate({ durationMinutes: chipMinutes, quality: null })
+  }
+
   const pick = (chipMinutes: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    if (chipMinutes === activeChip && hasEntry && justPicked === null) {
-      // Afirmación, no borrado (regla de los chips de tipo): tocar lo prendido
-      // = "sí, esto" y cierra sin escribir de nuevo.
-      onClose(true)
+    if (hasEntry) {
+      setDraft(chipMinutes)
       return
     }
-    setPicked(chipMinutes)
+    save(chipMinutes)
     setJustPicked(chipMinutes)
-    upsert.mutate({ durationMinutes: chipMinutes, quality: null })
+  }
+
+  // "Listo" guarda el borrador si cambió; "Cancelar" lo descarta. Ambos cierran.
+  const commitEdit = () => {
+    const next = draft
+    setDraft(null)
+    if (next != null && next !== currentChip) save(next)
+    onClose(true)
+  }
+  const cancelEdit = () => {
+    setDraft(null)
+    onClose(true)
   }
 
   // ── Línea quieta: pospuesta ("Después") o día pasado sin anotar. ──
@@ -142,16 +160,18 @@ export function SleepCheckIn({
         </Svg>
         <Text style={styles.confirmedText}>
           {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
-          {fromWatch ? <Text style={styles.provenance}>{'\ndesde tu reloj'}</Text> : null}
         </Text>
-        <Pressable
-          onPress={onOpen}
-          hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Cambiar cuánto dormiste"
-        >
-          <Text style={styles.link}>cambiar</Text>
-        </Pressable>
+        {/* Del reloj, la puerta vive en el eyebrow del bloque ("ajustar"). */}
+        {fromWatch ? null : (
+          <Pressable
+            onPress={onOpen}
+            hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Cambiar cuánto dormiste"
+          >
+            <Text style={styles.link}>cambiar</Text>
+          </Pressable>
+        )}
       </Animated.View>
     )
   }
@@ -170,14 +190,35 @@ export function SleepCheckIn({
             {past ? '¿Cuánto dormiste esa noche?' : '¿Cuánto dormiste anoche?'}
           </Text>
         )}
-        <Pressable
-          onPress={() => onClose(editing)}
-          hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel={editing ? 'Listo, cerrar edición' : 'Después, responder más tarde'}
-        >
-          <Text style={styles.link}>{editing ? 'Listo' : 'Después'}</Text>
-        </Pressable>
+        {editing ? (
+          <View style={styles.editDoors}>
+            <Pressable
+              onPress={cancelEdit}
+              hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar, cerrar sin cambiar"
+            >
+              <Text style={styles.link}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              onPress={commitEdit}
+              hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Listo, guardar y cerrar"
+            >
+              <Text style={styles.doneLink}>Listo</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => onClose(false)}
+            hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Después, responder más tarde"
+          >
+            <Text style={styles.link}>Después</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.chipRow}>
@@ -246,6 +287,17 @@ const styles = StyleSheet.create({
     color: colors.niebla,
     letterSpacing: 0.3,
   },
+  editDoors: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  doneLink: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
+  },
   // Siete píldoras fantasma a lo ancho (receta "control", igual que los chips
   // de tipo); el activo solo cambia borde y texto a magenta.
   chipRow: {
@@ -294,12 +346,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
     color: colors.leche,
-  },
-  provenance: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    letterSpacing: 0.3,
-    color: colors.niebla,
   },
   // Línea quieta — no pregunta, solo deja la puerta abierta.
   quietRow: {

@@ -104,17 +104,6 @@ function positiveOrNull(n: number | null | undefined): number | null {
   return n != null && Number.isFinite(n) && n > 0 ? Math.round(n) : null
 }
 
-/**
- * La línea de procedencia del entreno sellado por el reloj:
- * "desde tu reloj · 45 min · ~342 kcal". Solo dice lo que el reloj trajo.
- */
-export function workoutProvenanceLine(w: WearableWorkoutFacts): string {
-  const parts = ['desde tu reloj']
-  if (w.minutes != null) parts.push(`${w.minutes} min`)
-  if (w.kcal != null) parts.push(`~${w.kcal} kcal`)
-  return parts.join(' · ')
-}
-
 /** "7 h" / "7 h 15" — la forma corta del sueño. */
 export function formatSleepShort(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -123,17 +112,37 @@ export function formatSleepShort(minutes: number): string {
 }
 
 /**
- * El resumen de "Lo que ya llegó" en Hoy (modo confirmación): solo sueño,
- * entreno y agua, en ese orden, separados por " · ". Los pasos NO entran
- * (decisión: sin contador en Hoy; viven en Semana) ni el peso (no vive en
- * Hoy). Null cuando nada llegó → la línea no se renderiza.
+ * "hace un rato" / "hace 2 h" / "ayer" — cuándo sincronizó el reloj por
+ * última vez, en tiempo relativo (nunca hora de reloj ni lenguaje técnico).
+ * Null sin dato o si fue hace más de dos días (una firma vieja miente).
  */
-export function arrivedSummary(f: WearableDayFacts): string | null {
-  const parts: string[] = []
-  if (f.sleep) parts.push(`${formatSleepShort(f.sleep.minutes)} de sueño`)
-  if (f.workout) {
-    parts.push(f.workout.minutes != null ? `${f.workout.minutes} min de entreno` : 'entreno')
-  }
-  if (f.water) parts.push(`${f.water.glasses} ${f.water.glasses === 1 ? 'vaso' : 'vasos'} de agua`)
-  return parts.length > 0 ? parts.join(' · ') : null
+export function relativeSyncLabel(lastSyncAt: string | null | undefined, now: Date): string | null {
+  if (!lastSyncAt) return null
+  const ms = now.getTime() - new Date(lastSyncAt).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return null
+  const hours = ms / 3_600_000
+  if (hours < 1) return 'hace un rato'
+  if (hours < 24) return `hace ${Math.floor(hours)} h`
+  if (hours < 48) return 'ayer'
+  return null
+}
+
+/**
+ * La firma del reloj bajo las filas del check-in: dice UNA sola vez qué vino
+ * del dispositivo ("desde tu reloj" si ambas; "sueño desde tu reloj" /
+ * "entreno desde tu reloj" si solo una) y hace cuánto sincronizó. Null si
+ * nada del día vino del reloj (agua y pasos no cuentan: no viven en las
+ * filas de Hoy).
+ */
+export function wearableSignature(
+  input: { workout: boolean; sleep: boolean },
+  lastSyncAt: string | null | undefined,
+  now: Date,
+): string | null {
+  const { workout, sleep } = input
+  if (!workout && !sleep) return null
+  const what =
+    workout && sleep ? 'desde tu reloj' : sleep ? 'sueño desde tu reloj' : 'entreno desde tu reloj'
+  const when = relativeSyncLabel(lastSyncAt, now)
+  return when ? `${what} · ${when}` : what
 }

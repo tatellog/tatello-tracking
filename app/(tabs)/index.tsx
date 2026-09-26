@@ -32,10 +32,10 @@ import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/fe
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
-import { ArrivedLine } from '@/features/wearables/components/ArrivedLine'
+import { WearableSignature } from '@/features/wearables/components/WearableSignature'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
 import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
-import { wearableDayFacts, workoutProvenanceLine } from '@/features/wearables/recovery'
+import { wearableDayFacts } from '@/features/wearables/recovery'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
@@ -465,22 +465,21 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const trainedByWearable =
     !vctx.today_workout_completed && !restedToday && wearable.workout != null
 
-  // Modo confirmación (spec §9): lo que el reloj ya anotó HOY se colapsa en una
-  // línea y sus componentes dejan de preguntar; "ajustar" los devuelve llenos.
-  // Solo hoy (un día pasado se ve completo) y solo lo que no tiene manual encima.
-  const arrivedFacts = viewingPast
-    ? null
-    : {
-        ...wearable,
-        workout: trainedByWearable ? wearable.workout : null,
-      }
-  const hasArrived =
-    arrivedFacts != null &&
-    (arrivedFacts.sleep != null || arrivedFacts.workout != null || arrivedFacts.water != null)
-  const [arrivedOpen, setArrivedOpen] = useState(false)
-  useEffect(() => setArrivedOpen(false), [selectedDate])
-  const sleepCollapsed = hasArrived && arrivedFacts?.sleep != null && !arrivedOpen
-  const checkInCollapsed = hasArrived && arrivedFacts?.workout != null && !arrivedOpen
+  // Modo confirmación (spec §9): lo que el reloj ya trajo NO se pregunta. Las
+  // filas de entreno y sueño nacen respondidas, con la misma gramática del
+  // camino manual (misma estrella), y una sola firma debajo dice qué vino del
+  // reloj y hace cuánto. "cambiar" por fila corrige; manual gana.
+  const sleepFromWearable = wearable.sleep != null
+  const anyFromWearable = trainedByWearable || sleepFromWearable
+  // "ajustar" en el eyebrow del reloj abre a la vez lo que vino del reloj
+  // (tipo de entreno, horas de sueño); cada bloque cierra por su cuenta
+  // (Cancelar · Listo), así que el ajuste se sigue por bloque.
+  const [adjustWorkout, setAdjustWorkout] = useState(false)
+  const [adjustSleep, setAdjustSleep] = useState(false)
+  useEffect(() => {
+    setAdjustWorkout(false)
+    setAdjustSleep(false)
+  }, [selectedDate])
 
   const hour = useLocalHour()
   const hasSleep =
@@ -530,9 +529,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
       dayState === 'trained',
       sign,
       morning,
-      // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce, salvo
-      // que la línea "Tu reloj ya anotó" ya lo diga arriba.
-      !viewingPast && wearable.sleep != null && !hasArrived,
+      // V-15: la noche ya llegó del reloj → el beat matinal lo reconoce.
+      !viewingPast && sleepFromWearable,
     )
     if (!todayHasRegistro || viewingPast || morning) return base
     const tail =
@@ -557,7 +555,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // pendiente). Sellado por el reloj cuenta como respondido.
   const turn = checkInTurn({
     hour,
-    workoutAnswered: dayState !== 'undecided' || checkInCollapsed,
+    workoutAnswered: dayState !== 'undecided',
     sleepAnswered: hasSleep,
     workoutOpen,
     sleepOpen,
@@ -656,64 +654,74 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
-              {hasArrived && arrivedFacts ? (
-                <ArrivedLine
-                  facts={arrivedFacts}
-                  expanded={arrivedOpen}
-                  onToggle={() => setArrivedOpen((v) => !v)}
+              {/* La firma del reloj: el eyebrow que agrupa las dos filas. */}
+              {anyFromWearable ? (
+                <WearableSignature
+                  workout={trainedByWearable}
+                  sleep={sleepFromWearable}
+                  past={viewingPast}
+                  adjusting={adjustWorkout || adjustSleep}
+                  onAdjust={() => {
+                    setAdjustWorkout(trainedByWearable)
+                    setAdjustSleep(sleepFromWearable)
+                  }}
                 />
               ) : null}
-              {checkInCollapsed ? null : (
-                <DayCheckIn
-                  // Resetea el hold interno al navegar entre días.
-                  key={selectedDate}
-                  state={dayState}
-                  mode={turn.workout}
-                  onTrain={handleTrain}
-                  onRest={handleRest}
-                  onOpen={openWorkout}
-                  onClose={() => setWorkoutOpen(false)}
-                  label={viewingPast ? viewingLabel : undefined}
-                  question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
-                  locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
-                  // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
-                  workoutType={
-                    viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
-                  }
-                  wearable={
-                    !viewingPast && trainedByWearable && wearable.workout
-                      ? { line: workoutProvenanceLine(wearable.workout) }
-                      : null
-                  }
-                  saveFailed={
-                    toggleToday.isError ||
-                    setRest.isError ||
-                    toggleForDate.isError ||
-                    setRestForDate.isError
-                  }
-                />
-              )}
+              <DayCheckIn
+                // Resetea el hold interno al navegar entre días.
+                key={selectedDate}
+                state={dayState}
+                mode={adjustWorkout && trainedByWearable ? 'ask' : turn.workout}
+                onTrain={handleTrain}
+                onRest={handleRest}
+                onOpen={openWorkout}
+                onClose={() => {
+                  setWorkoutOpen(false)
+                  setAdjustWorkout(false)
+                }}
+                label={viewingPast ? viewingLabel : undefined}
+                question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
+                locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
+                // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
+                workoutType={
+                  viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
+                }
+                wearable={
+                  trainedByWearable && wearable.workout
+                    ? { minutes: wearable.workout.minutes, kcal: wearable.workout.kcal }
+                    : null
+                }
+                saveFailed={
+                  toggleToday.isError ||
+                  setRest.isError ||
+                  toggleForDate.isError ||
+                  setRestForDate.isError
+                }
+              />
               {/* La fila del sueño, siempre presente (pregunta, línea quieta o
-                  respondida). Si la noche ya vive en "Tu reloj ya anotó", el
-                  bloque sale (vuelve al abrir "ajustar"). */}
-              {!sleepCollapsed ? (
+                  respondida). */}
+              {
                 <SleepCheckIn
                   key={`sleep-${selectedDate}`}
                   date={selectedDate}
-                  mode={turn.sleep}
+                  mode={adjustSleep && sleepFromWearable ? 'ask' : turn.sleep}
                   wearableMinutes={wearable.sleep?.minutes ?? null}
                   past={viewingPast}
                   onOpen={openSleep}
                   onClose={(touched) => {
                     if (touched) setSleepTouched(true)
                     setSleepOpen(false)
+                    setAdjustSleep(false)
                   }}
                 />
-              ) : null}
+              }
               {/* Invitación contextual (spec wearables §5): solo con el día
                   respondido, el sueño ya no preguntando, y el canal disponible
                   pero no conectado. */}
-              {!viewingPast && dayState !== 'undecided' && !hasArrived && turn.sleep !== 'ask' ? (
+              {!viewingPast &&
+              dayState !== 'undecided' &&
+              !anyFromWearable &&
+              turn.sleep !== 'ask' ? (
                 <WearableInviteLine />
               ) : null}
             </Animated.View>
