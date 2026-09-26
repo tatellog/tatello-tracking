@@ -24,6 +24,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { LoadingView } from '@/components/LoadingView'
 import { SkyBackground, TabHeader } from '@/features/tabs/components'
 import { track } from '@/lib/analytics'
+import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
@@ -75,6 +76,9 @@ function OrbitBody() {
   // Órbita de un solo scroll: 'feed' (anillos + patrones + mes) o el detalle
   // de hoy / del mes, abierto desde el feed con su "‹ Volver".
   const [feedView, setFeedView] = useState<'feed' | 'day' | 'month'>('feed')
+  // Un día abierto desde el chat del patrón vuelve a la conversación, no al feed.
+  const [dayFromChat, setDayFromChat] = useState(false)
+  const [resumeChat, setResumeChat] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -178,14 +182,31 @@ function OrbitBody() {
                 }}
                 onBack={() => {
                   setViewedDay(null)
+                  setDayFromChat(false)
                   setFeedView('feed')
                   scrollToTop()
                 }}
                 onPickDay={(date) => {
                   setViewedDay(date)
+                  setDayFromChat(false)
                   setFeedView('day')
                   scrollToTop()
                 }}
+                dayFromChat={dayFromChat}
+                onPickDayFromChat={(date) => {
+                  setViewedDay(date)
+                  setDayFromChat(true)
+                  setFeedView('day')
+                  scrollToTop()
+                }}
+                onBackToChat={() => {
+                  setViewedDay(null)
+                  setDayFromChat(false)
+                  setFeedView('feed')
+                  setResumeChat(true)
+                }}
+                resumeChat={resumeChat}
+                onChatResumed={() => setResumeChat(false)}
               />
             ) : (
               <>
@@ -285,6 +306,11 @@ function OrbitFeed({
   onOpenMonth,
   onBack,
   onPickDay,
+  dayFromChat,
+  onPickDayFromChat,
+  onBackToChat,
+  resumeChat,
+  onChatResumed,
 }: {
   view: 'feed' | 'day' | 'month'
   viewedDay: string | null
@@ -292,17 +318,28 @@ function OrbitFeed({
   onOpenMonth: () => void
   onBack: () => void
   onPickDay: (date: string) => void
+  dayFromChat: boolean
+  onPickDayFromChat: (date: string) => void
+  onBackToChat: () => void
+  resumeChat: boolean
+  onChatResumed: () => void
 }) {
   if (view === 'day') {
-    // Un día pasado trae su propio "‹ Volver a tu órbita" (DayPresent); hoy no.
+    // Un día pasado trae su propio "‹ Volver…" (DayPresent); hoy no, así que
+    // aquí va el nuestro (a la conversación si el día se abrió desde el chat).
+    const pastDay = viewedDay != null && viewedDay !== todayInTimezone()
     return (
       <View>
-        {viewedDay ? null : <BackLink onPress={onBack} />}
+        {pastDay ? null : dayFromChat ? (
+          <BackLink onPress={onBackToChat} label="Volver a la conversación" />
+        ) : (
+          <BackLink onPress={onBack} />
+        )}
         <DayPresent
           key="feed-day"
           viewedDay={viewedDay}
-          onReturnToToday={onBack}
-          returnLabel="Volver a tu órbita"
+          onReturnToToday={dayFromChat ? onBackToChat : onBack}
+          returnLabel={dayFromChat ? 'Volver a la conversación' : 'Volver a tu órbita'}
         />
       </View>
     )
@@ -319,7 +356,13 @@ function OrbitFeed({
     <Animated.View entering={FadeIn.duration(320).delay(60)}>
       <Text style={styles.feedLede}>Lo que tus datos dicen de ti.</Text>
       <DayPresent key="feed-today" compact onOpenDay={onOpenDay} />
-      <MonthSegment key="feed-patterns" view="patterns" />
+      <MonthSegment
+        key="feed-patterns"
+        view="patterns"
+        onPickDayFromChat={onPickDayFromChat}
+        resumeChat={resumeChat}
+        onChatResumed={onChatResumed}
+      />
       <Pressable
         onPress={onOpenMonth}
         hitSlop={8}
@@ -333,16 +376,22 @@ function OrbitFeed({
   )
 }
 
-function BackLink({ onPress }: { onPress: () => void }) {
+function BackLink({
+  onPress,
+  label = 'Volver a tu órbita',
+}: {
+  onPress: () => void
+  label?: string
+}) {
   return (
     <Pressable
       onPress={onPress}
       hitSlop={8}
       style={styles.backLink}
       accessibilityRole="button"
-      accessibilityLabel="Volver a tu órbita"
+      accessibilityLabel={label}
     >
-      <Text style={styles.feedLinkText}>‹ Volver a tu órbita</Text>
+      <Text style={styles.feedLinkText}>{`‹ ${label}`}</Text>
     </Pressable>
   )
 }

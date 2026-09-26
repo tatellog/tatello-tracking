@@ -155,7 +155,12 @@ Regreso), memoria de patrones, `day-quality.ts`, chat guiado con backstops.
    entreno, pasos contra déficit.
 3. El ranker de sorpresa con deduplicación y memoria de lo ya mostrado.
 4. La superficie por etapa en el feed de Órbita.
-5. El chat con paquete de hechos (propuesta del 26 sep) sobre el protagonista.
+5. ~~El chat con paquete de hechos~~ **construido (26 sep 2026) sobre el patrón
+   dominante**: `combo-facts.ts` (hechos, apertura, foco, semana, día tocado),
+   rama `orbita_combo_chat` del edge `stelar-insight` (v13: chips atados a un
+   hecho + respuesta con SU hecho; backstops de temas no medidos, causalidad y
+   números), `ComboChatView` y memoria en AsyncStorage (`combo-transcript.ts`).
+   Falta moverlo al protagonista cuando exista el ranker.
 6. Meta vigente por día para el déficit histórico.
 
 ## Orden de construcción

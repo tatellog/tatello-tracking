@@ -58,6 +58,7 @@ import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit.ts'
 import { workoutTypeDeficitSplit, workoutTypeMix, workoutTypeMixPhrase } from './workout-type.ts'
 // Meta de agua diaria: fuente única en _shared/intelligence/water.ts (T2.2).
 import { WATER_GOAL_GLASSES } from './water.ts'
+import { comboWeek } from './combo-facts.ts'
 
 /** Re-export para compatibilidad: la meta de agua vive en _shared (./water). */
 export { WATER_GOAL_GLASSES }
@@ -1698,38 +1699,15 @@ export function weeklyComboLever(
   },
   todayIso: string,
 ): string | null {
-  const target = opts.calorieTarget ?? null
-  if (target == null || target <= 0) return null
-  const matches = comboMatcher(combo, opts)
-  const monday = mondayIso(todayIso)
-  const w = signals.filter(
-    (s) =>
-      s.day != null &&
-      s.day >= monday &&
-      s.day <= todayIso &&
-      s.calories != null &&
-      s.calories > 0 &&
-      matches(s),
-  ).length
-  // typical = días-de-combo por semana en sus semanas fuertes en déficit.
-  const byWeek = new Map<string, { combo: number; food: number; deficit: number }>()
-  for (const s of signals) {
-    if (!s.day || s.calories == null || s.calories <= 0) continue
-    const wk = mondayIso(s.day)
-    const e = byWeek.get(wk) ?? { combo: 0, food: 0, deficit: 0 }
-    e.food += 1
-    if (matches(s)) e.combo += 1
-    if (isDeficitDay(s.calories, target)) e.deficit += 1
-    byWeek.set(wk, e)
-  }
-  const strong = [...byWeek.values()].filter(
-    (e) => e.food >= 3 && e.combo >= 1 && e.deficit / e.food >= 0.5,
-  )
-  if (strong.length < 2) {
+  // Fuente única del estado de la semana: combo-facts.comboWeek (el chat del
+  // patrón usa el mismo cálculo para su cierre).
+  const week = comboWeek(signals, combo, opts, todayIso)
+  if (!week) return null
+  const w = week.done
+  if (week.typical == null) {
     return `Esta semana ya coincidieron ${w} ${w === 1 ? 'día' : 'días'}.`
   }
-  const counts = strong.map((e) => e.combo).sort((a, b) => a - b)
-  const typical = Math.max(1, counts[Math.floor(counts.length / 2)]!)
+  const typical = week.typical
   if (w >= typical) {
     return `Esta semana ya coincidieron ${w} días. Vas en tu mejor forma de déficit.`
   }

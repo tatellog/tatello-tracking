@@ -296,3 +296,75 @@ export async function fetchMonthChatTurn(params: {
     return null
   }
 }
+
+/* ── Chat del patrón dominante (paquete de hechos) ────────────────────── */
+
+/** Lo que el chat manda de cada hecho: el texto determinista (con números) y su
+ *  pregunta de reserva. La IA solo pone en palabras; nunca ve registros. */
+export type ComboFactInput = { id: string; text: string; question: string }
+
+export type ComboChatRequest = {
+  periodStart: string
+  periodEnd: string
+  chatHash: string
+  combo: { id: string; sentence: string; facts: ComboFactInput[] }
+}
+
+export type ComboChip = { factId: string; label: string }
+
+const ComboChipsResponseSchema = z.object({
+  chips: z.array(z.object({ factId: z.string().min(1), label: z.string().min(1) })),
+})
+const ComboAnswerResponseSchema = z.object({ message: z.object({ text: z.string().min(1) }) })
+
+function comboBody(req: ComboChatRequest) {
+  return {
+    feature: 'orbita_combo_chat',
+    periodType: 'last30',
+    periodStart: req.periodStart,
+    periodEnd: req.periodEnd,
+    findingsHash: req.chatHash,
+    combo: req.combo,
+  }
+}
+
+/** Preguntas redactadas por IA, cada una atada a un hecho. null → el chat usa
+ *  las preguntas deterministas de los hechos. Nunca lanza. */
+export async function fetchComboChips(
+  req: ComboChatRequest,
+  usedFactIds: string[],
+): Promise<ComboChip[] | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stelar-insight', {
+      body: { ...comboBody(req), mode: 'chips', usedFactIds },
+    })
+    if (error) return null
+    if (data && (data as { error?: string }).error) return null
+    const parsed = ComboChipsResponseSchema.safeParse(data)
+    if (!parsed.success) return null
+    const allowed = new Set(req.combo.facts.map((f) => f.id))
+    return parsed.data.chips.filter((c) => allowed.has(c.factId) && !usedFactIds.includes(c.factId))
+  } catch {
+    return null
+  }
+}
+
+/** La respuesta de IA a una pregunta, con SU hecho. null → el chat muestra el
+ *  texto determinista del hecho. Nunca lanza. */
+export async function fetchComboAnswer(
+  req: ComboChatRequest,
+  factId: string,
+  question: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stelar-insight', {
+      body: { ...comboBody(req), mode: 'answer', factId, question },
+    })
+    if (error) return null
+    if (data && (data as { error?: string }).error) return null
+    const parsed = ComboAnswerResponseSchema.safeParse(data)
+    return parsed.success ? parsed.data.message.text : null
+  } catch {
+    return null
+  }
+}

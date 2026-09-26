@@ -64,11 +64,26 @@ import {
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
 import { weeklyMovementLever } from '../week-orbit-logic'
-import { comboChatHash, comboToFinding } from '../combo-chat'
+import { comboChatHash, comboId, comboToFinding } from '../combo-chat'
+import {
+  comboDayDetail,
+  comboFacts,
+  comboFocus,
+  comboHabitList,
+  comboOpening,
+  comboGroupLabel,
+  comboHeadline,
+  comboWeek,
+  comboWeekHook,
+  comboWeekLine,
+  evidenceDots,
+} from '../combo-facts'
+import { useComboTranscript } from '../combo-transcript'
 import { earlyReading } from '../early-readings'
 import { dataMaturity } from '../maturity'
 import { useSaveReflection } from '../reflections'
 import { EmptySegmentCard } from './EmptySegmentCard'
+import { ComboChatView } from './ComboChatView'
 import { MonthChatSheet } from './MonthChatSheet'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PatternDiscovery } from './PatternDiscovery'
@@ -240,8 +255,17 @@ export function MonthSegment({
   onPickDay,
   onScrollTop,
   view = 'full',
+  onPickDayFromChat,
+  resumeChat,
+  onChatResumed,
 }: {
   onPickDay?: (date: string) => void
+  /** Un día tocado dentro del chat del patrón: abre el día completo y deja
+   *  volver a la conversación. */
+  onPickDayFromChat?: (date: string) => void
+  /** Reabrir el chat del patrón al volver del día (y avisar que ya se abrió). */
+  resumeChat?: boolean
+  onChatResumed?: () => void
   /** Volver al inicio del scroll de Órbita (botón al final del Mes). */
   onScrollTop?: () => void
   /** Órbita de un solo scroll (ORBITA_SINGLE_FEED): 'patterns' pinta solo
@@ -508,6 +532,51 @@ export function MonthSegment({
     [combo, comboLever],
   )
   const saveReflection = useSaveReflection(today.slice(0, 7))
+  // El chat del patrón con paquete de hechos (combo-facts): apertura, hechos,
+  // foco y semana los calcula el motor; la IA solo redacta preguntas y respuestas.
+  const comboOpts = { calorieTarget, proteinTarget, waterGoalGlasses }
+  const facts = useMemo(
+    () =>
+      combo
+        ? comboFacts(
+            patternSignals,
+            combo,
+            { calorieTarget, proteinTarget, waterGoalGlasses },
+            today,
+          )
+        : [],
+    [combo, patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, today],
+  )
+  const week = useMemo(
+    () =>
+      combo
+        ? comboWeek(
+            patternSignals,
+            combo,
+            { calorieTarget, proteinTarget, waterGoalGlasses },
+            today,
+          )
+        : null,
+    [combo, patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, today],
+  )
+  const weekLine = comboWeekLine(week)
+  // La tarjeta abre el chat ya contestando la pregunta que tocó (o sin pregunta).
+  const [chatAsk, setChatAsk] = useState<string | null>(null)
+  const openChat = (factId: string | null) => {
+    setChatAsk(factId)
+    setChatOpen(true)
+  }
+  const chatHash = combo ? comboChatHash(combo) : null
+  const uid = session?.user?.id ?? null
+  const comboTalk = useComboTranscript(uid, chatHash)
+  // Volver del día a la conversación: se reabre sola.
+  useEffect(() => {
+    if (resumeChat && comboFinding) {
+      setChatAsk(null)
+      setChatOpen(true)
+      onChatResumed?.()
+    }
+  }, [resumeChat, comboFinding, onChatResumed])
   const [revealDetail, setRevealDetail] = useState<RevealDetail | null>(null)
   const openReveal = (item: MonthReveals['revealed'][number], revealed: boolean) =>
     setRevealDetail({
@@ -681,19 +750,34 @@ export function MonthSegment({
       {view !== 'month' ? (
         <View style={styles.beat}>
           <View style={styles.section}>
-            <Text style={styles.eyebrow}>Tus patrones</Text>
+            {combo && view === 'patterns' ? null : <Text style={styles.eyebrow}>Tus patrones</Text>}
             {combo || supportPatterns.length > 0 ? (
               <>
-                <Text style={styles.sectionLede}>
-                  {maturity.stage <= 2
-                    ? 'Empieza a asomar. Lo sigo mirando.'
-                    : 'Lo que apareció junto en tus días.'}
-                </Text>
+                {combo && view === 'patterns' ? null : (
+                  <Text style={styles.sectionLede}>
+                    {maturity.stage <= 2
+                      ? 'Empieza a asomar. Lo sigo mirando.'
+                      : 'Lo que apareció junto en tus días.'}
+                  </Text>
+                )}
                 {combo && view === 'patterns' ? (
                   <PatternHero
                     combo={combo}
                     discoveredOn={provenance?.when ?? null}
-                    onUnderstand={aiOn && comboFinding ? () => setChatOpen(true) : undefined}
+                    early={maturity.stage <= 2}
+                    weekHook={comboWeekHook(week)}
+                    // Preguntas que aún no se hablaron: un toque entra al chat contestando.
+                    questions={
+                      aiOn && comboFinding
+                        ? facts
+                            .filter(
+                              (f) => !(comboTalk.transcript?.usedFactIds ?? []).includes(f.id),
+                            )
+                            .slice(0, 2)
+                        : []
+                    }
+                    talked={comboTalk.transcript != null}
+                    onAsk={aiOn && comboFinding ? openChat : undefined}
                     onReveal={() => {
                       const base = comboReveal(combo)
                       setReveal({ ...base, takeaway: comboLever ?? base.takeaway })
@@ -704,7 +788,7 @@ export function MonthSegment({
                   <DominantPatternCard
                     combo={combo}
                     provenance={provenance}
-                    onUnderstand={aiOn && comboFinding ? () => setChatOpen(true) : undefined}
+                    onUnderstand={aiOn && comboFinding ? () => openChat(null) : undefined}
                     onOpen={() => {
                       const base = comboReveal(combo)
                       // La palanca de esta semana reemplaza al cierre retrospectivo.
@@ -822,21 +906,63 @@ export function MonthSegment({
       ) : null}
 
       <EvidenceModal pattern={evidence} onClose={() => setEvidence(null)} />
-      {aiOn && comboFinding ? (
+      {aiOn && comboFinding && combo ? (
         <MonthChatSheet
-          finding={chatOpen ? comboFinding : null}
+          finding={chatOpen && !comboTalk.loading ? comboFinding : null}
           title="Tu patrón dominante"
           subtitle="Stelar · leyendo tus patrones"
           closeLabel="Volver a tu órbita"
           sign={sign}
-          periodStart={patternSignals.find((x) => x.day != null)?.day ?? today}
-          periodEnd={today}
-          findingsHash={combo ? comboChatHash(combo) : ''}
+          periodStart={combo.days[0] ?? today}
+          periodEnd={combo.days[combo.days.length - 1] ?? today}
+          findingsHash={chatHash ?? ''}
           askMetacognition
           hasMore={false}
           onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
           onNext={() => setChatOpen(false)}
           onClose={() => setChatOpen(false)}
+          body={
+            <ComboChatView
+              key={chatHash ?? 'combo'}
+              opening={comboOpening(combo)}
+              facts={facts}
+              focus={comboFocus(combo)}
+              weekLine={weekLine}
+              comboDays={combo.days}
+              request={{
+                // El periodo se ancla al último día del patrón: la fila de caché
+                // es estable mientras el patrón no cambie.
+                periodStart: combo.days[0] ?? today,
+                periodEnd: combo.days[combo.days.length - 1] ?? today,
+                chatHash: chatHash ?? '',
+                combo: {
+                  id: comboId(combo),
+                  sentence: comboSentence(combo),
+                  facts: facts.map((f) => ({ id: f.id, text: f.text, question: f.question })),
+                },
+              }}
+              meta={comboFinding.metacognition}
+              reflectionKey={comboFinding.reflectionKey}
+              today={today}
+              transcript={comboTalk.transcript}
+              onSaveTranscript={comboTalk.save}
+              dayDetail={(date) => comboDayDetail(patternSignals, combo, comboOpts, date)}
+              onSaveReflection={(questionKey, answer) =>
+                saveReflection.mutate({ questionKey, answer })
+              }
+              onOpenDay={
+                onPickDayFromChat
+                  ? (date) => {
+                      setChatOpen(false)
+                      onPickDayFromChat(date)
+                    }
+                  : undefined
+              }
+              onFinish={() => setChatOpen(false)}
+              finishLabel="Volver a tu órbita"
+              initialFactId={chatAsk}
+            />
+          }
         />
       ) : null}
       {/* Modal cinemático del patrón dominante (se monta al abrir → replaya). */}
@@ -1287,35 +1413,37 @@ const NODE_COLOR: Record<string, string> = {
 }
 
 /* Cómo se nombra cada hábito dentro de la frase del hallazgo. */
-const HABIT_PHRASE: Record<string, string> = {
-  sueno: 'dormir 7 horas o más',
-  cuerpo: 'entrenar',
-  proteina: 'llegar a tu proteína',
-  agua: 'completar tu agua',
-}
-
-/** "Dormir 7 horas o más y entrenar el mismo día." */
+/** "Dormir 7 horas o más y entrenar el mismo día." (vocabulario en combo-facts). */
 function comboSentence(combo: WinningComboData): string {
-  const parts = combo.signals.map((s) => HABIT_PHRASE[s.key] ?? s.label.toLowerCase())
-  const list =
-    parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}` : parts[0]!
+  const list = comboHabitList(combo)
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} el mismo día.`
 }
 
-/* El patrón en el feed de Órbita (dirección de arte sep 2026): el hallazgo ES
- * la frase; la constelación es su firma, chica y sin caja; la evidencia son
- * dos barras finas que muestran que se separa de sus otros días; la IA es una
- * sola acción clara ("✦ Pregúntale a Stelar", contorno aurora) y la
- * revelación queda como link secundario (el "wow" guardado). */
+/* El patrón en el feed de Órbita (sep 2026 · "casi nadie lee"): se entiende
+ * en dos segundos. Arriba, de qué se trata (kicker + la constelación mini, que
+ * abre la revelación); el titular DICE el hallazgo; la evidencia son puntos, un
+ * día cada uno (lleno = déficit), sin cuentas; un gancho con esta semana; y
+ * las preguntas del chat directo en la tarjeta: un toque y ya te contesta. */
 function PatternHero({
   combo,
   discoveredOn,
-  onUnderstand,
+  early,
+  weekHook,
+  questions,
+  talked,
+  onAsk,
   onReveal,
 }: {
   combo: WinningComboData
   discoveredOn: string | null
-  onUnderstand?: () => void
+  /** Muestra chica: se marca como señal temprana (sin titubear en el texto). */
+  early: boolean
+  weekHook: string | null
+  questions: { id: string; question: string }[]
+  /** Ya hablaron de este patrón. */
+  talked?: boolean
+  /** Abre el chat; con factId, ya contestando esa pregunta. */
+  onAsk?: (factId: string | null) => void
   onReveal: () => void
 }) {
   const nodes = [
@@ -1325,83 +1453,114 @@ function PatternHero({
     })),
     { label: 'Déficit', color: colors.oroSoft },
   ]
-  const rate = combo.occurrences > 0 ? combo.deficits / combo.occurrences : 0
-  const restRate = combo.restDays > 0 ? combo.restDeficits / combo.restDays : 0
-  // "sueño y entreno": el combo corto para la etiqueta de la barra.
-  const shortParts = combo.signals.map((s) => (NODE_LABEL[s.key] ?? s.label).toLowerCase())
-  const comboShort =
-    shortParts.length > 1
-      ? `${shortParts.slice(0, -1).join(', ')} y ${shortParts[shortParts.length - 1]}`
-      : shortParts[0]!
+  const kicker = discoveredOn ? `Patrón encontrado · ${discoveredOn}` : 'Patrón encontrado'
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern}>
-      <PatternDiscovery nodes={nodes} height={112} />
-      <Text style={styles.heroPatternTitle}>{comboSentence(combo)}</Text>
+      <View style={styles.heroTop}>
+        <View style={styles.heroKickerCol}>
+          <Text style={styles.heroKicker}>{kicker}</Text>
+          {early ? <Text style={styles.heroEarly}>Señal temprana</Text> : null}
+        </View>
+        <View style={styles.heroMini}>
+          <Pressable
+            onPress={onReveal}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Ver la revelación del patrón"
+          >
+            <View pointerEvents="none">
+              <PatternDiscovery nodes={nodes} height={104} showLabels={false} inset={26} />
+            </View>
+          </Pressable>
+        </View>
+      </View>
 
-      {/* La evidencia dice DE QUÉ es: días que cerraste en déficit, contados
-          (no porcentajes), con esta combinación contra tus otros días. */}
+      <Text style={styles.heroPatternTitle}>{comboHeadline(combo)}</Text>
+
       <View
-        style={styles.heroBars}
+        style={styles.heroDots}
         accessible
-        accessibilityLabel={`Días que cerraste en déficit: ${combo.deficits} de ${combo.occurrences} con ${comboShort}; ${combo.restDeficits} de ${combo.restDays} en tus otros días.`}
+        accessibilityLabel={`Días en déficit: ${combo.deficits} de ${combo.occurrences} ${comboGroupLabel(combo).toLowerCase()}; ${combo.restDeficits} de ${combo.restDays} en tus otros días.`}
       >
-        <Text style={styles.heroBarsTitle}>Días que cerraste en déficit</Text>
-        <EvidenceLine
-          label={`Con ${comboShort}`}
-          value={rate}
-          count={`${combo.deficits} de ${combo.occurrences}`}
+        <DotsLine
+          label={comboGroupLabel(combo)}
+          total={combo.occurrences}
+          filled={combo.deficits}
           strong
         />
-        <EvidenceLine
-          label="Tus otros días"
-          value={restRate}
-          count={`${combo.restDeficits} de ${combo.restDays}`}
-        />
+        <DotsLine label="Otros días" total={combo.restDays} filled={combo.restDeficits} />
+        <View style={styles.dotLegendRow}>
+          <View style={[styles.dot, styles.dotOn]} />
+          <Text style={styles.dotLegend}>cerraste en déficit</Text>
+        </View>
       </View>
 
-      <View style={styles.heroActions}>
-        {onUnderstand ? <AuroraCta label="Pregúntale a Stelar" onPress={onUnderstand} /> : null}
-        <Pressable
-          onPress={onReveal}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Ver la revelación"
-        >
-          <Text style={styles.heroRevealLink}>Ver la revelación ›</Text>
-        </Pressable>
-      </View>
-      {discoveredOn ? (
-        <Text style={styles.heroDiscovered}>{`Descubierto el ${discoveredOn}`}</Text>
+      {weekHook ? <Text style={styles.heroWeek}>{weekHook}</Text> : null}
+
+      {onAsk ? (
+        <View style={styles.heroAsk}>
+          {questions.length > 0 ? (
+            questions.map((q) => (
+              <Pressable
+                key={q.id}
+                onPress={() => onAsk(q.id)}
+                accessibilityRole="button"
+                accessibilityLabel={q.question}
+                style={({ pressed }) => [styles.heroQ, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={styles.heroQStar}>✦</Text>
+                <Text style={styles.heroQText}>{q.question}</Text>
+              </Pressable>
+            ))
+          ) : (
+            <AuroraCta
+              label={talked ? 'Retomar con Stelar' : 'Pregúntale a Stelar'}
+              onPress={() => onAsk(null)}
+            />
+          )}
+          {questions.length > 0 && talked ? (
+            <Pressable
+              onPress={() => onAsk(null)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Retomar con Stelar"
+            >
+              <Text style={styles.heroRevealLink}>Retomar la conversación ›</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </Animated.View>
   )
 }
 
-/* Una barra fina de la evidencia: el porcentaje de días en déficit. */
-function EvidenceLine({
+/* Una fila de evidencia: un punto por día, lleno si cerró en déficit. El conteo
+ * real al final (cuando hay más días que puntos, los puntos se escalan). */
+function DotsLine({
   label,
-  value,
-  count,
+  total,
+  filled,
   strong,
 }: {
   label: string
-  value: number
-  count: string
+  total: number
+  filled: number
   strong?: boolean
 }) {
   return (
-    <View style={styles.evLine}>
-      <Text style={[styles.evLabel, strong && styles.evLabelStrong]}>{label}</Text>
-      <View style={styles.evTrack}>
-        <View
-          style={[
-            styles.evFill,
-            { width: `${Math.max(4, Math.round(value * 100))}%` },
-            strong ? styles.evFillStrong : null,
-          ]}
-        />
+    <View style={styles.dotLine}>
+      <Text style={[styles.dotLabel, strong && styles.dotLabelStrong]}>{label}</Text>
+      <View style={styles.dotRow}>
+        {evidenceDots(total, filled).map((on, i) => (
+          <View
+            key={i}
+            style={[styles.dot, on ? (strong ? styles.dotOn : styles.dotOnSoft) : null]}
+          />
+        ))}
       </View>
-      <Text style={[styles.evValue, strong && styles.evLabelStrong]}>{count}</Text>
+      <Text style={[styles.dotCount, strong && styles.dotLabelStrong]}>
+        {`${filled} de ${total}`}
+      </Text>
     </View>
   )
 }
@@ -1915,79 +2074,130 @@ const styles = StyleSheet.create({
   heroPattern: {
     marginTop: 4,
   },
-  heroPatternTitle: {
-    marginTop: 8,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.headingLg,
-    lineHeight: 27,
-    color: colors.leche,
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  heroBars: {
-    marginTop: 18,
-    gap: 10,
-  },
-  heroBarsTitle: {
+  heroKickerCol: { flex: 1, gap: 4 },
+  heroKicker: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 2,
+    color: colors.oroSoft,
   },
-  evLine: {
+  heroEarly: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    color: colors.niebla,
+  },
+  heroMini: { width: 164, marginVertical: -26, marginRight: -26 },
+  heroPatternTitle: {
+    marginTop: 14,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 29,
+    color: colors.leche,
+  },
+  heroDots: {
+    marginTop: 20,
+    gap: 12,
+  },
+  dotLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
-  evLabel: {
-    width: 150,
+  dotLabel: {
+    width: 92,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.niebla,
   },
-  evLabelStrong: {
+  dotLabelStrong: {
     color: colors.leche,
   },
-  evTrack: {
+  dotRow: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.hairline,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  evFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: colors.bruma,
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: colors.bruma,
   },
-  evFillStrong: {
+  dotOn: {
     backgroundColor: colors.oroSoft,
+    borderColor: colors.oroSoft,
   },
-  evValue: {
-    width: 52,
+  dotOnSoft: {
+    backgroundColor: colors.bruma,
+    borderColor: colors.bruma,
+  },
+  dotCount: {
+    width: 48,
     textAlign: 'right',
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.label,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
-  heroActions: {
-    marginTop: 22,
+  dotLegendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 6,
+    marginLeft: 104,
+  },
+  dotLegend: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.caption,
+    color: colors.niebla,
+  },
+  heroWeek: {
+    marginTop: 18,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 21,
+    color: colors.leche,
+  },
+  heroAsk: {
+    marginTop: 18,
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  heroQ: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: colors.magentaTint,
+    borderWidth: 1.5,
+    borderColor: colors.magentaGlow,
+  },
+  heroQStar: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.magentaHot,
+  },
+  heroQText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.body,
+    color: colors.magentaHot,
   },
   heroRevealLink: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     color: colors.oroSoft,
     letterSpacing: 0.3,
-  },
-  heroDiscovered: {
-    marginTop: 14,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.caption,
-    color: colors.niebla,
   },
   auroraBorder: {
     borderRadius: 999,

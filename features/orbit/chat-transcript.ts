@@ -25,7 +25,7 @@ import { queryKeys } from '@/lib/queryKeys'
  * prompt viejo) se rehidrataría en vez de regenerarse. Hay un test
  * (chat-transcript.test.ts) que truena si divergen.
  */
-export const CHAT_PROMPT_VERSION = 'v12'
+export const CHAT_PROMPT_VERSION = 'v13'
 
 /** Sube esto si cambia el SHAPE del transcript: fuerza miss de los guardados con
  *  el shape viejo (safeParse abajo ya los descarta, esto lo hace explícito). */

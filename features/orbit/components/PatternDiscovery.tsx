@@ -93,8 +93,15 @@ const bez = (a: number, c: number, b: number, t: number): number => {
 export function PatternDiscovery({
   nodes,
   height = SCENE_H,
+  showLabels = true,
+  inset = 0,
 }: {
   nodes: NodeInfo[]
+  /** Sin nombres de nodo: la firma mini de la tarjeta del patrón. */
+  showLabels?: boolean
+  /** Margen interno donde NO caen nodos: deja que el halo se desvanezca antes del
+   *  borde del canvas (Skia recorta; sin margen el brillo dibuja un recuadro). */
+  inset?: number
   /** Alto de la escena. El feed de Órbita la usa compacta: la constelación es
    *  la FIRMA del patrón, no el protagonista (el hallazgo es la frase). */
   height?: number
@@ -116,11 +123,13 @@ export function PatternDiscovery({
   const geom = useMemo(() => {
     if (w <= 0) return null
     const layout = LAYOUTS[n] ?? LAYOUTS[3]!
+    const iw = Math.max(1, w - 2 * inset)
+    const ih = Math.max(1, sceneH - 2 * inset)
     const pos: Pt[] = nodes.map((_, i) => ({
-      x: (layout[i]?.x ?? 0.5) * w,
-      y: (layout[i]?.y ?? 0.5) * sceneH,
+      x: inset + (layout[i]?.x ?? 0.5) * iw,
+      y: inset + (layout[i]?.y ?? 0.5) * ih,
     }))
-    const entry: Pt = { x: -0.08 * w, y: 0.46 * sceneH }
+    const entry: Pt = { x: inset - 0.08 * iw, y: inset + 0.46 * ih }
     const waypoints: Pt[] = [entry, ...pos]
 
     const travelStart: number[] = []
@@ -182,7 +191,7 @@ export function PatternDiscovery({
     }
 
     return { pos, samples, lines, arrival }
-  }, [w, nodes, n, sceneH])
+  }, [w, nodes, n, sceneH, inset])
 
   const revealMs = n * REVEAL_PER
   const journeyStart = REVEAL_START + revealMs + JOURNEY_GAP
@@ -274,7 +283,7 @@ export function PatternDiscovery({
   return (
     // Decorativo: no captura toques → el tap llega al Pressable de la card y abre
     // el modal full-screen (la metáfora "línea de vida").
-    <View style={styles.wrap} pointerEvents="none">
+    <View style={[styles.wrap, inset > 0 && { marginTop: 0 }]} pointerEvents="none">
       <View style={[styles.scene, { height: sceneH }]} onLayout={onLayout}>
         {w > 0 && geom ? (
           <>
@@ -310,7 +319,7 @@ export function PatternDiscovery({
               </SkiaGroup>
             </Canvas>
 
-            {geom.pos.map((p, i) => (
+            {(showLabels ? geom.pos : []).map((p, i) => (
               <Animated.Text
                 key={`l-${i}`}
                 entering={FadeIn.duration(300).delay(REVEAL_START + i * REVEAL_PER)}
