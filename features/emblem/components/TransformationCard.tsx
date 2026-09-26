@@ -142,7 +142,7 @@ export function TransformationCard({ compact = false }: Props) {
             <Pressable
               hitSlop={8}
               accessibilityRole="link"
-              accessibilityLabel="Ver tu evolución en Órbita"
+              accessibilityLabel="Ver tu evolución en Descubre"
               accessibilityHint="Abre la línea de evolución"
               onPress={openOrbita}
               onPressIn={orbitPress.onPressIn}

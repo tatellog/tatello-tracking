@@ -126,7 +126,7 @@ export function MonthGlanceCalendar({
                         onPress={() => onPickDay!(c!.date)}
                         hitSlop={4}
                         accessibilityRole="button"
-                        accessibilityLabel={`Abrir el día ${c!.day} en Órbita Día`}
+                        accessibilityLabel={`Abrir el día ${c!.day}`}
                         style={({ pressed }) => [styles.cellFill, pressed && styles.cellPressed]}
                       >
                         {inner}

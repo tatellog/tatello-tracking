@@ -56,7 +56,7 @@ export function StreakLine({ streak, onPress }: { streak: number; onPress?: () =
     <>
       <Text style={styles.star}>✦</Text>
       <Animated.Text style={[styles.num, numStyle]}>{streak}</Animated.Text>
-      <Text style={styles.label}>días en órbita</Text>
+      <Text style={styles.label}>días conociéndote</Text>
       {/* Persistent affordance: the chevron marks the chip as tappable
           (it opens the month calendar — the streak's own history). */}
       {onPress ? <Text style={styles.chevron}>›</Text> : null}
@@ -72,7 +72,7 @@ export function StreakLine({ streak, onPress }: { streak: number; onPress?: () =
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${streak} días en órbita. Ver tu mes.`}
+      accessibilityLabel={`${streak} días conociéndote. Ver tu mes.`}
       style={({ pressed }) => pressed && styles.rowPressed}
     >
       <View style={styles.row}>{inner}</View>

@@ -813,7 +813,7 @@ function DayFocusPanel({
           onPress={() => onPick(row.date)}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={`Ver el ${row.weekdayLabel.toLowerCase()} en Órbita Día`}
+          accessibilityLabel={`Ver el ${row.weekdayLabel.toLowerCase()}`}
         >
           {/* 9.3 · tint fijo de navegación (oro), no el acento del arquetipo. */}
           <Text style={[styles.dayFocusLink, { color: colors.oro }]}>

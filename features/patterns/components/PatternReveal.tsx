@@ -751,7 +751,7 @@ function RevealBody({ pattern, onClose }: { pattern: RevealedPattern; onClose: (
                 <Pressable
                   onPress={goToOrbit}
                   accessibilityRole="button"
-                  accessibilityLabel="Verlo en mi órbita"
+                  accessibilityLabel="Verlo en Descubre"
                 >
                   {({ pressed }) => (
                     <View

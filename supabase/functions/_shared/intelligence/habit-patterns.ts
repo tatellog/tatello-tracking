@@ -162,7 +162,7 @@ function detectWeekendFood(history: readonly DailySignals[]): Patron | null {
     confidence: confidenceFor(Math.min(wd.length, we.length)),
     caption: 'Tu mesa, entre semana y fin de semana.',
     legend: 'Tus fines de semana suelen pedir más en la mesa que tus días entre semana.',
-    voz: 'El finde afloja el ritmo de la semana. Es parte de tu órbita, no una falla.',
+    voz: 'El finde afloja el ritmo de la semana. Es parte de tu ritmo, no una falla.',
     correlacion: 'El fin de semana tu mesa pide más que entre semana.',
     experimento: {
       hint: 'El finde tiene otro pulso. Verlo sin corregirlo ya dice mucho.',

@@ -142,7 +142,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="orbit"
           options={{
-            title: 'Órbita',
+            title: 'Descubre',
             tabBarIcon: ({ focused }) => <SvgTabIcon Icon={Orbits} focused={focused} />,
           }}
         />

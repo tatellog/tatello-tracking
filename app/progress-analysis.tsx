@@ -374,12 +374,14 @@ export default function ProgressAnalysisScreen() {
               {/* La salida a Órbita respira aparte: es otra clase de acción
                   (irse), no otra pregunta. */}
               <GuideButton
-                label="Abrir en Órbita"
+                label="Abrir en Descubre"
                 chevron
                 onPress={goOrbita}
                 style={styles.orbitaGuide}
               />
-              <Text style={styles.orbitaHint}>Aquí ves qué cambió. El porqué vive en Órbita.</Text>
+              <Text style={styles.orbitaHint}>
+                Aquí ves qué cambió. El porqué vive en Descubre.
+              </Text>
 
               <Text style={styles.disclaimer}>
                 Stelar solo interpreta tus registros. No sustituye a un profesional de la salud.

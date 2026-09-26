@@ -459,7 +459,7 @@ function buildWhy(hero: GoalHero, s: DailySignals, ctx: DayGoalCtx): GoalWhy[] {
 /* ── Cierre — rota por fecha, estable ────────────────────────────────── */
 
 const CLOSING_LINES = [
-  'Cada señal de hoy formará parte de tu órbita semanal.',
+  'Cada señal de hoy suma a lo que descubro de ti.',
   'Mañana tu historia continuará.',
   'Una señal por sí sola dice poco. Varias comienzan a mostrar un patrón.',
 ] as const

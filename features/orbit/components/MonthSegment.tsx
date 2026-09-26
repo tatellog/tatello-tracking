@@ -911,7 +911,7 @@ export function MonthSegment({
           finding={chatOpen && !comboTalk.loading ? comboFinding : null}
           title="Tu patrón dominante"
           subtitle="Stelar · leyendo tus patrones"
-          closeLabel="Volver a tu órbita"
+          closeLabel="Volver a Descubre"
           sign={sign}
           periodStart={combo.days[0] ?? today}
           periodEnd={combo.days[combo.days.length - 1] ?? today}
@@ -959,7 +959,7 @@ export function MonthSegment({
                   : undefined
               }
               onFinish={() => setChatOpen(false)}
-              finishLabel="Volver a tu órbita"
+              finishLabel="Volver a Descubre"
               initialFactId={chatAsk}
             />
           }

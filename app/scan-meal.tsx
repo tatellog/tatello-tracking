@@ -1458,7 +1458,7 @@ export default function ScanMealScreen() {
                 }}
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel="Ver cómo va tu día en Órbita"
+                accessibilityLabel="Ver cómo va tu día en Descubre"
               >
                 <Text style={styles.revealOrbitaLink}>Ver cómo va tu día ›</Text>
               </Pressable>

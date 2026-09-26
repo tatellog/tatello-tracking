@@ -106,9 +106,9 @@ export function ProgressInsightCard() {
 
       {/* El puente al porqué — link callado, no otra card. */}
       <LinkCta
-        label="El porqué vive en Órbita →"
+        label="El porqué vive en Descubre →"
         onPress={goOrbita}
-        accessibilityLabel="Entender el porqué en Órbita"
+        accessibilityLabel="Entender el porqué en Descubre"
         style={styles.bridge}
       />
 

@@ -164,7 +164,7 @@ function OrbitBody() {
             scrollEventThrottle={16}
           >
             <Animated.View entering={FadeIn.duration(280)}>
-              <TabHeader title="Tu Órbita" titleEmphasis="Tu" />
+              <TabHeader title="Descubre" />
             </Animated.View>
 
             {ORBITA_SINGLE_FEED ? (
@@ -339,7 +339,7 @@ function OrbitFeed({
           key="feed-day"
           viewedDay={viewedDay}
           onReturnToToday={dayFromChat ? onBackToChat : onBack}
-          returnLabel={dayFromChat ? 'Volver a la conversación' : 'Volver a tu órbita'}
+          returnLabel={dayFromChat ? 'Volver a la conversación' : 'Volver a Descubre'}
         />
       </View>
     )
@@ -378,7 +378,7 @@ function OrbitFeed({
 
 function BackLink({
   onPress,
-  label = 'Volver a tu órbita',
+  label = 'Volver a Descubre',
 }: {
   onPress: () => void
   label?: string

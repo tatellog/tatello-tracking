@@ -186,7 +186,7 @@ function ProfileBody() {
                 onPress={openEmblem}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Ver tu emblema en Órbita"
+                accessibilityLabel="Ver tu emblema en Descubre"
               >
                 <Text style={styles.transform}>
                   {transformPct < 8 ? (

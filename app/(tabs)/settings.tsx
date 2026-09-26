@@ -442,7 +442,7 @@ function SettingsBody() {
                 onPress={() => router.push('/about/how-it-works')}
               />
               <AboutRow
-                label="Cómo se construye tu Órbita"
+                label="Cómo funciona Descubre"
                 caption="Cómo se teje tu transformación."
                 onPress={() => router.push('/about/orbit')}
               />

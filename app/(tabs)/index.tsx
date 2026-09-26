@@ -934,7 +934,6 @@ const COACH_PHASE_POOLS: { min: number; lines: CoachCopy[] }[] = [
       { before: 'El cuerpo aprende cuando ', emphasis: 'insistes', after: '.' },
       { before: 'Ya no es esfuerzo. Empieza a ser ', emphasis: 'tuyo', after: '.' },
       { before: 'La constancia se está volviendo ', emphasis: 'gravedad', after: '.' },
-      { before: 'Tu órbita ya tiene ', emphasis: 'forma', after: '.' },
     ],
   },
   {

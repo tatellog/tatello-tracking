@@ -50,11 +50,11 @@ const DOCS: Record<string, Doc> = {
     ],
   },
   orbit: {
-    title: 'Cómo se construye tu Órbita',
+    title: 'Cómo funciona Descubre',
     blocks: [
       {
         kind: 'lead',
-        text: 'Tu Órbita se teje con lo que registras, día a día. No predice ni diagnostica: observa y te devuelve tus propios patrones.',
+        text: 'Descubre se arma con lo que registras, día a día. No predice ni diagnostica: encuentra tus propios patrones y te los muestra.',
       },
       {
         kind: 'section',
@@ -64,7 +64,7 @@ const DOCS: Record<string, Doc> = {
       {
         kind: 'section',
         eyebrow: 'Las lecturas',
-        body: 'Tu Órbita observa y describe (Diaria, Semanal, Mensual). Nunca aconseja ni prescribe: te muestra lo que se repite, para que tú decidas.',
+        body: 'Descubre te muestra lo que se repite en tus días y en qué te conviene enfocarte. Nunca receta dietas ni rutinas: tú decides.',
       },
       {
         kind: 'section',
