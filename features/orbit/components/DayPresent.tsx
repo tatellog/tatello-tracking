@@ -16,6 +16,8 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg'
 
 import { useMacroTargets } from '@/features/macros/hooks'
+import { MoonGlyph, StarGlyph } from '@/features/tabs/components/check-in-glyphs'
+import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
 
@@ -30,6 +32,7 @@ import {
   buildDayGoal,
   REST_HERO,
   restDayMissing,
+  type GoalEvidence,
   type GoalHero,
   type GoalStatus,
   type GoalTone,
@@ -534,8 +537,36 @@ function LegendStat({
         <Text style={[styles.legendLabel, dim && styles.legendLabelDim]}>{label}</Text>
       </View>
       <Text style={[styles.legendValue, dim && styles.legendValueDim]}>{value}</Text>
-      {caption ? <Text style={styles.legendCaption}>{caption}</Text> : null}
+      {caption ? (
+        <View style={styles.legendCaptionRow}>
+          <WatchGlyph color={colors.niebla} size={11} />
+          <Text style={styles.legendCaption}>{caption}</Text>
+        </View>
+      ) : null}
     </View>
+  )
+}
+
+/** Una fila de la evidencia. El glifo sigue la simbología del check-in de Hoy
+ *  (✦ entreno, ☾ sueño) y el color, la dimensión; el resto lleva la estrella
+ *  encendida de Órbita. La báscula dice su procedencia en texto. */
+function EvidenceRow({ item, index }: { item: GoalEvidence; index: number }) {
+  const color = TONE_COLOR[item.tone]
+  return (
+    <Animated.View entering={FadeIn.duration(420).delay(index * 70)} style={styles.evidenceRow}>
+      <View style={styles.evidenceStar}>
+        {item.key === 'train' ? (
+          <StarGlyph color={color} size={16} />
+        ) : item.key === 'sleep' ? (
+          <MoonGlyph color={color} size={16} />
+        ) : (
+          <EvidenceStar color={color} major={index === 0} />
+        )}
+      </View>
+      <Text style={styles.evidenceLabel}>{item.label}</Text>
+      {item.detail ? <Text style={styles.evidenceDetail}>{item.detail}</Text> : null}
+      {item.source === 'scale' ? <Text style={styles.evidenceSourceText}>tu báscula</Text> : null}
+    </Animated.View>
   )
 }
 
@@ -611,8 +642,12 @@ function AbsentChip({
 /** Una pieza del "¿Por qué?": estrella (sostiene el rumbo) o punto oro hueco
  *  (lo que va en contra). Sin culpa: informa la causa, no la juzga. */
 function WhyMark({ item }: { item: GoalWhy }) {
-  if (item.supports) return <EvidenceStar color={TONE_COLOR[item.tone]} />
-  return <View style={styles.whyAgainst} />
+  if (!item.supports) return <View style={styles.whyAgainst} />
+  // Misma simbología que el check-in de Hoy: ✦ entreno, ☾ sueño.
+  const color = TONE_COLOR[item.tone]
+  if (item.key === 'train') return <StarGlyph color={color} size={14} />
+  if (item.key === 'sleep') return <MoonGlyph color={color} size={14} />
+  return <EvidenceStar color={color} />
 }
 
 export function DayPresent({
@@ -653,6 +688,9 @@ export function DayPresent({
   const evidenceShown = (day?.evidence ?? []).filter(
     (e) => e.key !== 'protein' && e.key !== 'train',
   )
+  // Lo del reloj primero, agrupado bajo su eyebrow; lo demás después.
+  const evidenceWatch = evidenceShown.filter((e) => e.source === 'wearable')
+  const evidenceRest = evidenceShown.filter((e) => e.source !== 'wearable')
 
   const router = useRouter()
   const settled = !isLoading
@@ -859,7 +897,9 @@ export function DayPresent({
                     ? 'No'
                     : 'Aún no'
               }
-              caption={day.hero.trained && day.hero.workoutKcal != null ? 'tu reloj' : undefined}
+              caption={
+                day.hero.trained && day.hero.workoutKcal != null ? 'tu smartwatch' : undefined
+              }
               dim={!day.hero.trained}
             />
           </View>
@@ -867,28 +907,32 @@ export function DayPresent({
       </View>
 
       {/* HACIA DÓNDE VA TU DÍA — la síntesis (lo más importante después del
-          héroe): responde "¿cómo voy?" antes de mostrar el detalle. */}
-      <View style={styles.directionCard}>
-        <Text style={styles.eyebrowCard}>
-          {isPast ? 'Hacia dónde fue ese día' : 'Hacia dónde va tu día'}
-        </Text>
-        <Text style={styles.direction}>{day.direction}</Text>
-        {day.why.length > 0 ? (
-          <View style={styles.whyBlock}>
-            <Text style={styles.whyEyebrow}>¿Por qué?</Text>
-            {day.why.map((w) => (
-              <View key={w.key} style={styles.whyRow}>
-                <View style={styles.whyMark}>
-                  <WhyMark item={w} />
+          héroe): responde "¿cómo voy?" antes de mostrar el detalle. Sin
+          dirección ni evidencia que sume, no se pinta (el hero ya dice "aún
+          se revela"; repetirlo era ruido). */}
+      {day.direction === '' ? null : (
+        <View style={styles.directionCard}>
+          <Text style={styles.eyebrowCard}>
+            {isPast ? 'Hacia dónde fue ese día' : 'Hacia dónde va tu día'}
+          </Text>
+          <Text style={styles.direction}>{day.direction}</Text>
+          {day.why.length > 0 ? (
+            <View style={styles.whyBlock}>
+              <Text style={styles.whyEyebrow}>¿Por qué?</Text>
+              {day.why.map((w) => (
+                <View key={w.key} style={styles.whyRow}>
+                  <View style={styles.whyMark}>
+                    <WhyMark item={w} />
+                  </View>
+                  <Text style={[styles.whyLabel, !w.supports && styles.whyLabelAgainst]}>
+                    {w.label}
+                  </Text>
                 </View>
-                <Text style={[styles.whyLabel, !w.supports && styles.whyLabelAgainst]}>
-                  {w.label}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      )}
 
       {/* LA EVIDENCIA — solo lo que YA apareció hoy, como respaldo del rumbo. La
           primera estrella brilla mayor (jerarquía, no checklist). */}
@@ -897,18 +941,24 @@ export function DayPresent({
           <Text style={styles.eyebrow}>
             {isPast ? 'La evidencia de ese día' : 'La evidencia de hoy'}
           </Text>
-          {evidenceShown.map((e, i) => (
-            <Animated.View
-              key={e.key}
-              entering={FadeIn.duration(420).delay(i * 70)}
-              style={styles.evidenceRow}
-            >
-              <View style={styles.evidenceStar}>
-                <EvidenceStar color={TONE_COLOR[e.tone]} major={i === 0} />
+          {/* Lo que vino del reloj va AGRUPADO bajo su propio eyebrow (la
+              misma firma "⌚ DESDE TU RELOJ" del check-in de Hoy), y después
+              lo demás. Misma simbología que Hoy: ✦ entreno, ☾ sueño. */}
+          {evidenceWatch.length > 0 ? (
+            <View style={styles.watchGroup}>
+              <View style={styles.watchEyebrow} accessibilityRole="text">
+                <View style={styles.evidenceStar}>
+                  <WatchGlyph color={colors.niebla} size={13} />
+                </View>
+                <Text style={styles.watchEyebrowText}>Desde tu smartwatch</Text>
               </View>
-              <Text style={styles.evidenceLabel}>{e.label}</Text>
-              {e.detail ? <Text style={styles.evidenceDetail}>{e.detail}</Text> : null}
-            </Animated.View>
+              {evidenceWatch.map((e, i) => (
+                <EvidenceRow key={e.key} item={e} index={i} />
+              ))}
+            </View>
+          ) : null}
+          {evidenceRest.map((e, i) => (
+            <EvidenceRow key={e.key} item={e} index={evidenceWatch.length + i} />
           ))}
         </View>
       ) : null}
@@ -1178,13 +1228,19 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiMedium,
     color: colors.niebla,
   },
-  // Procedencia del dato ("tu reloj") — nota al pie de la columna, más
-  // callada que el valor: la fuente es contexto, nunca protagonista.
+  // Procedencia del dato ("tu reloj") — nota al pie de la columna con el
+  // ícono del reloj: clara (niebla), pero más callada que el valor.
+  legendCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
   legendCaption: {
-    fontFamily: typography.ui,
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 0.3,
-    color: colors.bruma,
+    color: colors.niebla,
   },
   // ── La evidencia ─────────────────────────────────────────────────
   section: {
@@ -1217,6 +1273,30 @@ const styles = StyleSheet.create({
   evidenceDetail: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  // El grupo del reloj: su eyebrow (misma receta que la firma de Hoy, en
+  // niebla para subordinarse al eyebrow oro de la sección) y sus filas.
+  watchGroup: {
+    marginBottom: 6,
+  },
+  watchEyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginBottom: 12,
+  },
+  watchEyebrowText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  evidenceSourceText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 0.3,
     color: colors.niebla,
   },
   // ── Hacia dónde va tu día (dirección + por qué) ──────────────────

@@ -7,7 +7,6 @@ import Animated, {
   LinearTransition,
   useReducedMotion,
 } from 'react-native-reanimated'
-import Svg, { Path } from 'react-native-svg'
 
 import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
 import { formatSleepShort } from '@/features/wearables/recovery'
@@ -15,6 +14,7 @@ import { colors, typography } from '@/theme'
 
 import type { CheckInMode } from '../checkin-turn'
 import { nearestSleepChip, SLEEP_CHIPS, sleepAnsweredText } from '../sleep-question'
+import { MoonGlyph } from './check-in-glyphs'
 
 /*
  * La pregunta de sueño de Hoy — "¿Cuánto dormiste anoche?". Tercer beat del
@@ -40,9 +40,6 @@ type Props = {
   /** Modo "ver día": la línea dice "esa noche", no "anoche". */
   past?: boolean
 }
-
-// A crescent — same moon glyph as the dinner meal slot.
-const MOON = 'M15.8 3.2 A 9 9 0 1 0 15.8 20.8 A 7 7 0 1 1 15.8 3.2 Z'
 
 const LAYOUT = LinearTransition.duration(220)
 
@@ -155,9 +152,7 @@ export function SleepCheckIn({
         exiting={fadeOut}
         style={styles.confirmedRow}
       >
-        <Svg width={16} height={16} viewBox="0 0 24 24">
-          <Path d={MOON} fill={colors.magenta} />
-        </Svg>
+        <MoonGlyph color={colors.magenta} />
         <Text style={styles.confirmedText}>
           {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
         </Text>
@@ -243,7 +238,7 @@ export function SleepCheckIn({
       {/* Ajustando lo que trajo el reloj: se nombra el dato y se deja elegir. */}
       {fromWatch && wearableMinutes != null ? (
         <Text style={styles.hint}>
-          {`Tu reloj anotó ${formatSleepShort(wearableMinutes)} · elige si fue distinto`}
+          {`Tu smartwatch anotó ${formatSleepShort(wearableMinutes)} · elige si fue distinto`}
         </Text>
       ) : null}
 

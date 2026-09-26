@@ -7,11 +7,11 @@ import Animated, {
   LinearTransition,
   useReducedMotion,
 } from 'react-native-reanimated'
-import Svg, { Path } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 import type { CheckInMode } from '../checkin-turn'
+import { StarGlyph } from './check-in-glyphs'
 
 export type DayState = 'undecided' | 'trained' | 'rested'
 
@@ -60,16 +60,7 @@ type Props = {
 
 // Star = a trained day (the constellation's glyph). Vive SOLO en la fila
 // confirmada: en los chips daría más peso a "entrené" y susurraría que es la
-// respuesta buena. La estrella se gana, no se promete.
-const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
-
-function StarGlyph({ color, size = 16 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={STAR_PATH} fill={color} />
-    </Svg>
-  )
-}
+// respuesta buena. La estrella se gana, no se promete. (check-in-glyphs.tsx)
 
 // Una sola curva de layout para el bloque: los estados se funden en vez de
 // cortarse, y la constelación de abajo se desliza en lugar de brincar.
@@ -296,8 +287,8 @@ export function DayCheckIn({
           {sealedByWearable ? (
             <Text style={styles.hint}>
               {wearable?.minutes != null
-                ? `Tu reloj anotó ${wearable.minutes} min · elige el tipo si fue distinto`
-                : 'Tu reloj anotó tu entreno · elige el tipo si fue distinto'}
+                ? `Tu smartwatch anotó ${wearable.minutes} min · elige el tipo si fue distinto`
+                : 'Tu smartwatch anotó tu entreno · elige el tipo si fue distinto'}
             </Text>
           ) : (
             <View style={styles.restRow}>

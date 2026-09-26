@@ -82,10 +82,7 @@ export function moonProgressCopy(
   // registrado se lee como montaña, no como invitación (target-user). El
   // faltante exacto vuelve con el primer gramo, cuando ya es progreso.
   if (protein <= 0) {
-    return {
-      phrase: 'Tu luna apenas despierta.',
-      honest: 'Tu primera comida empieza a encenderla.',
-    }
+    return { phrase: 'Tu primera comida empieza a encenderla.', honest: null }
   }
 
   let phrase: string

@@ -67,18 +67,38 @@ describe('buildDayGoal — evidencia', () => {
     expect(find(g.evidence, 'water')!.label).toBe('Agua completa')
   })
 
-  it('agua de Salud lleva su procedencia en el detalle (spec §9)', () => {
+  it('agua de Salud lleva su procedencia como marca, no en el texto (spec §9)', () => {
     const g = buildDayGoal(mkSig(DAY, { water_glasses: 6, water_source: 'wearable' }), CTX)!
-    expect(find(g.evidence, 'water')!.detail).toMatch(/vasos · tu reloj$/)
+    expect(find(g.evidence, 'water')!.detail).toBe('6 / 8 vasos')
+    expect(find(g.evidence, 'water')!.source).toBe('wearable')
     const manual = buildDayGoal(mkSig(DAY, { water_glasses: 6, water_source: 'manual' }), CTX)!
-    expect(find(manual.evidence, 'water')!.detail).toMatch(/vasos$/)
+    expect(find(manual.evidence, 'water')!.source).toBeUndefined()
   })
 
-  it('sueño del reloj lleva su procedencia en el detalle (V-15)', () => {
-    const g = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'wearable' }), CTX)!
-    expect(find(g.evidence, 'sleep')!.detail).toBe('7 h · tu reloj')
+  it('sueño y entreno del reloj llevan su procedencia como marca (V-15)', () => {
+    const g = buildDayGoal(
+      mkSig(DAY, {
+        sleep_minutes: 420,
+        sleep_source: 'wearable',
+        trained: true,
+        workout_source: 'wearable',
+        workout_kcal: 342,
+      }),
+      CTX,
+    )!
+    expect(find(g.evidence, 'sleep')!.detail).toBe('7 h')
+    expect(find(g.evidence, 'sleep')!.source).toBe('wearable')
+    expect(find(g.evidence, 'train')!.source).toBe('wearable')
     const manual = buildDayGoal(mkSig(DAY, { sleep_minutes: 420, sleep_source: 'manual' }), CTX)!
-    expect(find(manual.evidence, 'sleep')!.detail).toBe('7 h')
+    expect(find(manual.evidence, 'sleep')!.source).toBeUndefined()
+  })
+
+  it('el peso de la báscula no dice "registraste" y lleva su marca', () => {
+    const g = buildDayGoal(mkSig(DAY, { weight_kg: 64.3, weight_source: 'wearable' }), CTX)!
+    expect(find(g.evidence, 'weight')!.label).toBe('Tu báscula anotó tu peso')
+    expect(find(g.evidence, 'weight')!.source).toBe('scale')
+    const manual = buildDayGoal(mkSig(DAY, { weight_kg: 64.3, weight_source: 'manual' }), CTX)!
+    expect(find(manual.evidence, 'weight')!.label).toBe('Registraste tu peso')
   })
 
   it('proteína en progreso conserva el dato real, sin "en objetivo"', () => {
@@ -157,10 +177,35 @@ describe('buildDayGoal — dirección y porqué', () => {
     expect(find(g.why, 'over')!.supports).toBe(false)
   })
 
-  it('incompleto → sin porqué', () => {
-    const g = buildDayGoal(mkSig(DAY, { sleep_minutes: 420 }), CTX)!
-    expect(g.direction).toContain('incompleta')
+  it('incompleto con evidencia → nombra lo que ya suma y lo que falta, sin veredicto', () => {
+    const sleepOnly = buildDayGoal(mkSig(DAY, { sleep_minutes: 420 }), CTX)!
+    expect(sleepOnly.direction).toBe(
+      'La noche ya cuenta a tu favor. La comida dirá hacia dónde va el día.',
+    )
+    expect(sleepOnly.why.map((w) => w.key)).toEqual(['sleep'])
+    expect(find(sleepOnly.why, 'sleep')!.label).toBe('Sueño 7 h')
+
+    const both = buildDayGoal(
+      mkSig(DAY, { sleep_minutes: 450, trained: true, workout_source: 'wearable' }),
+      CTX,
+    )!
+    expect(both.direction).toContain('El entreno y la noche ya cuentan a tu favor.')
+    expect(both.why.map((w) => w.key)).toEqual(['train', 'sleep'])
+    expect(both.direction).not.toMatch(/déficit|objetivo/)
+
+    const trainOnly = buildDayGoal(mkSig(DAY, { trained: true }), CTX)!
+    expect(trainOnly.direction).toContain('El entreno ya cuenta a tu favor.')
+  })
+
+  it('incompleto sin evidencia que sume → sin dirección (la tarjeta no se pinta)', () => {
+    const g = buildDayGoal(mkSig(DAY, { water_glasses: 3 }), CTX)!
+    expect(g.direction).toBe('')
     expect(g.why).toHaveLength(0)
+  })
+
+  it('incompleto en un día pasado → "quedó incompleta"', () => {
+    const g = buildDayGoal(mkSig(DAY, { sleep_minutes: 420 }), CTX, { past: true })!
+    expect(g.direction).toContain('quedó incompleta')
   })
 
   it('bajo el piso (restricción) no se valida como dentro del objetivo', () => {

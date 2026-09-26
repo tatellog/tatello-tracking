@@ -553,7 +553,7 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
     return (
       <View style={styles.heroCompact}>
         <View style={styles.compactText}>
-          <Text style={styles.eyebrow}>Tu cielo nutricional</Text>
+          <Text style={styles.eyebrow}>Proteína de hoy</Text>
           <View
             style={styles.readout}
             accessibilityRole="text"
@@ -599,7 +599,7 @@ export function NutritionMoon({ proteinValue, proteinTarget, isLoading = false }
 
       {/* ── Content (text), left column over the sky ── */}
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>Tu cielo nutricional</Text>
+        <Text style={styles.eyebrow}>Proteína de hoy</Text>
 
         {isLoading ? (
           <>

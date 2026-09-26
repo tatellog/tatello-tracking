@@ -7,12 +7,12 @@
  * eyebrow de fecha del modo "ver día". Sin caja, sin verbo, sin ✦.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Svg, { Path, Rect } from 'react-native-svg'
 
 import { colors, typography } from '@/theme'
 
 import { useWearableLastSync } from '../hooks'
 import { wearableSignature } from '../recovery'
+import { WatchGlyph } from './WatchGlyph'
 
 type Props = {
   workout: boolean
@@ -25,16 +25,6 @@ type Props = {
    *  no llevan "cambiar" propio. */
   adjusting: boolean
   onAdjust: () => void
-}
-
-/* Un smartwatch: caja redondeada con dos tramos de correa. Tintable. */
-function WatchGlyph({ color, size = 14 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x={6} y={6} width={12} height={12} rx={3.5} stroke={color} strokeWidth={1.8} />
-      <Path d="M9 6 V3.5 H15 V6 M9 18 V20.5 H15 V18" stroke={color} strokeWidth={1.8} />
-    </Svg>
-  )
 }
 
 export function WearableSignature({ workout, sleep, past = false, adjusting, onAdjust }: Props) {
@@ -55,7 +45,7 @@ export function WearableSignature({ workout, sleep, past = false, adjusting, onA
           onPress={onAdjust}
           hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
           accessibilityRole="button"
-          accessibilityLabel="Ajustar lo que anotó tu reloj"
+          accessibilityLabel="Ajustar lo que anotó tu smartwatch"
         >
           <Text style={styles.link}>ajustar</Text>
         </Pressable>

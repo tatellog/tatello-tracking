@@ -129,8 +129,8 @@ export function relativeSyncLabel(lastSyncAt: string | null | undefined, now: Da
 
 /**
  * La firma del reloj bajo las filas del check-in: dice UNA sola vez qué vino
- * del dispositivo ("desde tu reloj" si ambas; "sueño desde tu reloj" /
- * "entreno desde tu reloj" si solo una) y hace cuánto sincronizó. Null si
+ * del dispositivo ("desde tu smartwatch" si ambas; "sueño desde tu smartwatch" /
+ * "entreno desde tu smartwatch" si solo una) y hace cuánto sincronizó. Null si
  * nada del día vino del reloj (agua y pasos no cuentan: no viven en las
  * filas de Hoy).
  */
@@ -142,7 +142,11 @@ export function wearableSignature(
   const { workout, sleep } = input
   if (!workout && !sleep) return null
   const what =
-    workout && sleep ? 'desde tu reloj' : sleep ? 'sueño desde tu reloj' : 'entreno desde tu reloj'
+    workout && sleep
+      ? 'desde tu smartwatch'
+      : sleep
+        ? 'sueño desde tu smartwatch'
+        : 'entreno desde tu smartwatch'
   const when = relativeSyncLabel(lastSyncAt, now)
   return when ? `${what} · ${when}` : what
 }

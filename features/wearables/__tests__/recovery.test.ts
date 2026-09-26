@@ -120,13 +120,13 @@ describe('wearableSignature (la firma bajo las filas de Hoy)', () => {
 
   it('dice una sola vez qué vino y hace cuánto', () => {
     expect(wearableSignature({ workout: true, sleep: true }, '2026-09-25T17:30:00Z', now)).toBe(
-      'desde tu reloj · hace 2 h',
+      'desde tu smartwatch · hace 2 h',
     )
     expect(wearableSignature({ workout: false, sleep: true }, '2026-09-25T19:40:00Z', now)).toBe(
-      'sueño desde tu reloj · hace un rato',
+      'sueño desde tu smartwatch · hace un rato',
     )
     expect(wearableSignature({ workout: true, sleep: false }, null, now)).toBe(
-      'entreno desde tu reloj',
+      'entreno desde tu smartwatch',
     )
   })
 })

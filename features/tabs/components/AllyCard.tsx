@@ -123,7 +123,6 @@ type Props = {
 export function AllyCard({
   name,
   protein,
-  freq,
   photoPath,
   rank,
   confirmed = false,
@@ -145,10 +144,7 @@ export function AllyCard({
           <Text style={styles.name} numberOfLines={1}>
             {name}
           </Text>
-          <Text style={styles.protein}>+{Math.round(protein)} g proteína</Text>
-          <Text style={styles.freq}>
-            {freq} {freq === 1 ? 'vez' : 'veces'}
-          </Text>
+          <Text style={styles.protein}>{Math.round(protein)} g proteína</Text>
         </View>
       </Pressable>
 
@@ -226,30 +222,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   // Frecuencia = contexto secundario.
-  freq: {
-    marginTop: 1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.caption,
-    color: colors.niebla,
-  },
-  // "Repetir" — el CTA de 1 tap. Pill magenta suave; estampa al confirmar.
+  // "Repetir" — el CTA de 1 tap. Píldora fantasma (receta "control" de la
+  // dirección de arte sep 2026); el magenta solo estampa al confirmar.
   repeat: {
     marginLeft: 10,
-    paddingVertical: 9,
+    paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 11,
-    backgroundColor: colors.magentaTint,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.magentaTint2,
+    borderColor: colors.hairlineStrong,
   },
   repeatConfirmed: {
     backgroundColor: colors.magenta,
     borderColor: colors.magenta,
   },
   repeatText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    color: colors.magenta,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
     letterSpacing: 0.3,
   },
   repeatTextConfirmed: {
