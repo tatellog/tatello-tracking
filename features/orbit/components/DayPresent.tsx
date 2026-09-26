@@ -16,6 +16,7 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg'
 
 import { useMacroTargets } from '@/features/macros/hooks'
+import { useLocalHour } from '@/features/tabs/use-local-hour'
 import { MoonGlyph, StarGlyph } from '@/features/tabs/components/check-in-glyphs'
 import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
@@ -36,8 +37,8 @@ import {
   type GoalHero,
   type GoalStatus,
   type GoalTone,
-  type GoalWhy,
 } from '../day-goal'
+import { dayFocus, dayVerdict } from '../day-verdict'
 import { formatLongDate } from '../present-logic'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
@@ -560,30 +561,13 @@ function EvidenceRow({ item, index }: { item: GoalEvidence; index: number }) {
         ) : item.key === 'sleep' ? (
           <MoonGlyph color={color} size={16} />
         ) : (
-          <EvidenceStar color={color} major={index === 0} />
+          <View style={[styles.evidenceDot, { backgroundColor: color }]} />
         )}
       </View>
       <Text style={styles.evidenceLabel}>{item.label}</Text>
       {item.detail ? <Text style={styles.evidenceDetail}>{item.detail}</Text> : null}
       {item.source === 'scale' ? <Text style={styles.evidenceSourceText}>tu báscula</Text> : null}
     </Animated.View>
-  )
-}
-
-/** La evidencia como ESTRELLA ENCENDIDA tintada a su dimensión: un halo tenue
- *  bajo el path la vuelve punto de luz, no icono plano. `major` (la primera
- *  evidencia del día) brilla un poco mayor → constelación, no checklist. La
- *  punta apunta arriba en el path (sin rotación → seguro en Android release). */
-function EvidenceStar({ color, major }: { color: string; major?: boolean }) {
-  const s = major ? 17 : 13
-  return (
-    <Svg width={s} height={s} viewBox="0 0 18 18">
-      <Circle cx={9} cy={9} r={6.5} fill={color} opacity={0.16} />
-      <Path
-        d="M9 2.2 C9.5 6.7 11.3 8.5 15.8 9 C11.3 9.5 9.5 11.3 9 15.8 C8.5 11.3 6.7 9.5 2.2 9 C6.7 8.5 8.5 6.7 9 2.2 Z"
-        fill={color}
-      />
-    </Svg>
   )
 }
 
@@ -639,27 +623,17 @@ function AbsentChip({
   )
 }
 
-/** Una pieza del "¿Por qué?": estrella (sostiene el rumbo) o punto oro hueco
- *  (lo que va en contra). Sin culpa: informa la causa, no la juzga. */
-function WhyMark({ item }: { item: GoalWhy }) {
-  if (!item.supports) return <View style={styles.whyAgainst} />
-  // Misma simbología que el check-in de Hoy: ✦ entreno, ☾ sueño.
-  const color = TONE_COLOR[item.tone]
-  if (item.key === 'train') return <StarGlyph color={color} size={14} />
-  if (item.key === 'sleep') return <MoonGlyph color={color} size={14} />
-  return <EvidenceStar color={color} />
-}
-
 export function DayPresent({
   viewedDay = null,
   onReturnToToday,
-  onScrollTop,
+  onOpenWeek,
   returnLabel,
 }: {
   /** Día a mostrar (ISO 'YYYY-MM-DD'); null = hoy. Lo setea la tira de Semana. */
   viewedDay?: string | null
   onReturnToToday?: () => void
-  onScrollTop?: () => void
+  /** "Ver cómo va tu semana ›" — el puente a Semana al final del día. */
+  onOpenWeek?: () => void
   /** Etiqueta del back cuando el día se abrió desde otro segmento
    *  ("Volver a tu mes"); default "Volver a hoy". */
   returnLabel?: string
@@ -683,14 +657,34 @@ export function DayPresent({
     waterGoalGlasses: Math.max(1, Math.round(goalMl / GLASS_ML)),
   }
   const day = buildDayGoal(signals, ctx, { past: isPast })
+  // El veredicto en palabras ("¿sigo en déficit?") y el foco del día: puros,
+  // con el mismo piso sano que el cierre de Hoy y el calendario de Mes.
+  const hour = useLocalHour()
+  const verdict = dayVerdict({
+    consumedCalories: day?.hero.consumed,
+    targetCalories: ctx.calorieTarget,
+    hour,
+    past: isPast,
+  })
+  const focus = dayFocus({
+    verdict,
+    proteinG: day?.hero.proteinG,
+    proteinTarget: ctx.proteinTarget,
+    past: isPast,
+  })
   // La evidencia ya NO repite calorías / proteína / entreno: eso vive en los
   // anillos del hero. Aquí solo el resto (sueño, agua, ánimo, ciclo, peso...).
+  // Fuera también el peso: no vive en la lectura del día (manifiesto; en Hoy
+  // la báscula es un ícono sin número). Su casa es Progreso.
   const evidenceShown = (day?.evidence ?? []).filter(
-    (e) => e.key !== 'protein' && e.key !== 'train',
+    (e) => e.key !== 'protein' && e.key !== 'train' && e.key !== 'weight',
   )
   // Lo del reloj primero, agrupado bajo su eyebrow; lo demás después.
   const evidenceWatch = evidenceShown.filter((e) => e.source === 'wearable')
   const evidenceRest = evidenceShown.filter((e) => e.source !== 'wearable')
+  // En un día pasado, "Comida" abriría la captura sin fecha y registraría en
+  // HOY: se esconde ahí (agua y sueño sí llevan la fecha en su modal).
+  const missingShown = (day?.missing ?? []).filter((m) => !(isPast && m.key === 'comida'))
 
   const router = useRouter()
   const settled = !isLoading
@@ -842,63 +836,70 @@ export function DayPresent({
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
       {header}
 
-      {/* Hero — el anillo (con la constelación dentro) y, debajo, el estado del
-          objetivo: "Hoy estás en / Déficit / −785 kcal / Aún tienes margen…".
-          El número (consumido − meta) es negativo en déficit = vas bajo tu meta. */}
+      {/* Hero — el anillo (con la constelación dentro) y el VEREDICTO en
+          palabras: "¿sigo en déficit?". Sin número grande de margen (era el
+          "te quedan X"; mientras menos comía, más grande y más magenta). El
+          color del anillo sigue al veredicto: bajo el piso sano, niebla. */}
       <View style={styles.hero}>
-        <GoalRing hero={day.hero} />
+        <GoalRing hero={{ ...day.hero, status: verdict.ringTone }} />
         <View style={styles.heroText}>
-          {/* El eyebrow "Hoy estás en ___" solo cuando el estado COMPLETA la frase
-              (Déficit / Sobre tu objetivo). En incompleto, "Tu día aún se revela"
-              se lee sola (si no, "Hoy estás en tu día aún se revela" no parsea). */}
-          {day.hero.status !== 'incomplete' ? (
-            <Text style={styles.heroEyebrow}>{isPast ? 'Ese día estabas en' : 'Hoy estás en'}</Text>
+          <Text style={styles.verdictTitle}>{verdict.title}</Text>
+          <Text style={styles.verdictLine}>{verdict.line}</Text>
+          {verdict.cta ? (
+            <Pressable
+              style={styles.verdictCta}
+              onPress={() =>
+                router.push(
+                  verdict.cta === 'target'
+                    ? '/onboarding/macro-targets?source=banner'
+                    : '/capture-meal',
+                )
+              }
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+            >
+              <Text style={styles.verdictCtaText}>
+                {verdict.cta === 'target' ? 'Añadir mi meta' : 'Registrar comida'}
+              </Text>
+            </Pressable>
           ) : null}
-          <Text style={[styles.heroWord, day.hero.status === 'incomplete' && styles.heroWordDim]}>
-            {day.hero.stateLabel}
-          </Text>
-          {day.hero.deltaKcal != null ? (
-            // Sin signo: la palabra ("Déficit" / "Sobre tu objetivo") da el rumbo;
-            // el número es la magnitud, siempre en positivo (nunca un negativo).
-            <Text style={[styles.heroNumber, { color: STATUS_COLOR[day.hero.status] }]}>
-              {day.hero.deltaKcal}
-              <Text style={styles.heroNumberUnit}> kcal</Text>
-            </Text>
-          ) : null}
-          <Text style={styles.heroLine}>{day.hero.line}</Text>
 
-          {/* Leyenda — qué anillo es cuál + su dato del día (kcal / g / entreno).
-              Proteína solo si hay dato; entreno tenue si no entrenó (reposo). */}
+          {/* Leyenda — qué anillo es cuál, con su dato como "X de Y" (la
+              cifra de calorías vive aquí, como contexto, una sola vez). El
+              entreno va SIN kcal: junto a las de comida invitaba a restarlas
+              (eat-back, prohibido por la spec de wearables). */}
           <View style={styles.legend}>
             <LegendStat
-              color={STATUS_COLOR[day.hero.status]}
+              color={STATUS_COLOR[verdict.ringTone]}
               label="Calorías"
-              value={day.hero.consumed != null ? `${day.hero.consumed} kcal` : '—'}
+              value={
+                day.hero.consumed != null
+                  ? day.hero.target != null
+                    ? `${day.hero.consumed.toLocaleString('es-MX')} de ${day.hero.target.toLocaleString('es-MX')} kcal`
+                    : `${day.hero.consumed.toLocaleString('es-MX')} kcal`
+                  : '—'
+              }
             />
             {day.hero.proteinFill != null ? (
               <LegendStat
                 color={colors.signal.proteina}
                 label="Proteína"
-                value={day.hero.proteinG != null ? `${day.hero.proteinG} g` : '—'}
+                value={
+                  day.hero.proteinG != null && ctx.proteinTarget != null
+                    ? `${day.hero.proteinG} de ${Math.round(ctx.proteinTarget)} g`
+                    : '—'
+                }
               />
             ) : null}
-            {/* Entreno: con kcal del reloj muestra el dato ("~342 kcal · tu
-                reloj"); manual queda "Sí" como siempre. El "~" dice honesto
-                que es estimación. Display puro: jamás toca meta ni TDEE. */}
             <LegendStat
               color={TRAIN_COLOR}
               label="Entreno"
-              value={
-                day.hero.trained
-                  ? day.hero.workoutKcal != null
-                    ? `~${day.hero.workoutKcal} kcal`
-                    : 'Sí'
-                  : isPast
-                    ? 'No'
-                    : 'Aún no'
-              }
+              value={day.hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
               caption={
-                day.hero.trained && day.hero.workoutKcal != null ? 'tu smartwatch' : undefined
+                day.hero.trained && day.hero.workoutSource === 'wearable'
+                  ? 'tu smartwatch'
+                  : undefined
               }
               dim={!day.hero.trained}
             />
@@ -906,41 +907,21 @@ export function DayPresent({
         </View>
       </View>
 
-      {/* HACIA DÓNDE VA TU DÍA — la síntesis (lo más importante después del
-          héroe): responde "¿cómo voy?" antes de mostrar el detalle. Sin
-          dirección ni evidencia que sume, no se pinta (el hero ya dice "aún
-          se revela"; repetirlo era ruido). */}
-      {day.direction === '' ? null : (
-        <View style={styles.directionCard}>
-          <Text style={styles.eyebrowCard}>
-            {isPast ? 'Hacia dónde fue ese día' : 'Hacia dónde va tu día'}
-          </Text>
-          <Text style={styles.direction}>{day.direction}</Text>
-          {day.why.length > 0 ? (
-            <View style={styles.whyBlock}>
-              <Text style={styles.whyEyebrow}>¿Por qué?</Text>
-              {day.why.map((w) => (
-                <View key={w.key} style={styles.whyRow}>
-                  <View style={styles.whyMark}>
-                    <WhyMark item={w} />
-                  </View>
-                  <Text style={[styles.whyLabel, !w.supports && styles.whyLabelAgainst]}>
-                    {w.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
+      {/* TU FOCO DE HOY — la palanca desde tus datos (recomendación, nunca
+          orden; nunca dieta ni rutina). Solo cuando hay un foco honesto. */}
+      {focus ? (
+        <View style={styles.section}>
+          <Text style={styles.eyebrowQuiet}>Tu foco de hoy</Text>
+          <Text style={styles.focusTitle}>{focus.title}</Text>
+          <Text style={styles.focusBody}>{focus.body}</Text>
         </View>
-      )}
+      ) : null}
 
       {/* LA EVIDENCIA — solo lo que YA apareció hoy, como respaldo del rumbo. La
           primera estrella brilla mayor (jerarquía, no checklist). */}
       {evidenceShown.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.eyebrow}>
-            {isPast ? 'La evidencia de ese día' : 'La evidencia de hoy'}
-          </Text>
+          <Text style={styles.eyebrowQuiet}>{isPast ? 'También ese día' : 'También hoy'}</Text>
           {/* Lo que vino del reloj va AGRUPADO bajo su propio eyebrow (la
               misma firma "⌚ DESDE TU RELOJ" del check-in de Hoy), y después
               lo demás. Misma simbología que Hoy: ✦ entreno, ☾ sueño. */}
@@ -964,12 +945,12 @@ export function DayPresent({
       ) : null}
 
       {/* LO QUE AÚN NO APARECE — ausencia, no error. Cada una un CTA suave. */}
-      {day.missing.length > 0 ? (
+      {missingShown.length > 0 ? (
         <View style={styles.sectionAbsent}>
           <Text style={styles.eyebrowQuiet}>Lo que aún no aparece</Text>
           <Text style={styles.absentHint}>Tócalas para sumarlas a tu día.</Text>
           <View style={styles.absentRow}>
-            {day.missing.map((a) => (
+            {missingShown.map((a) => (
               <AbsentChip
                 key={a.key}
                 label={a.label}
@@ -981,19 +962,17 @@ export function DayPresent({
         </View>
       ) : null}
 
-      {/* Cierre — conecta con Órbita Semana (voz del coach). */}
-      <Text style={styles.closing}>{day.closing}</Text>
-
-      {/* Fin del recorrido: volver al inicio sin hacer scroll a mano. */}
-      {onScrollTop ? (
+      {/* El puente a Semana (antes: una frase rotativa + "Volver arriba", que
+          existían porque la pantalla era demasiado larga). */}
+      {onOpenWeek && !isPast ? (
         <Pressable
-          style={styles.backTop}
-          onPress={onScrollTop}
+          onPress={onOpenWeek}
+          hitSlop={8}
+          style={styles.weekLink}
           accessibilityRole="button"
-          accessibilityLabel="Volver arriba"
+          accessibilityLabel="Ver cómo va tu semana"
         >
-          <Text style={styles.backTopArrow}>↑</Text>
-          <Text style={styles.backTopText}>Volver arriba</Text>
+          <Text style={styles.weekLinkText}>Ver cómo va tu semana ›</Text>
         </Pressable>
       ) : null}
 
@@ -1138,6 +1117,65 @@ const styles = StyleSheet.create({
     marginTop: 16,
     alignItems: 'center',
     paddingHorizontal: 24,
+  },
+  // El veredicto — upright (dato, no voz de coach), la respuesta directa a
+  // "¿sigo en déficit?".
+  verdictTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
+    color: colors.leche,
+    textAlign: 'center',
+  },
+  verdictLine: {
+    marginTop: 6,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
+    textAlign: 'center',
+  },
+  verdictCta: {
+    marginTop: 14,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+  },
+  verdictCtaText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
+  },
+  focusTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.anchor,
+    color: colors.leche,
+  },
+  focusBody: {
+    marginTop: 4,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
+  },
+  evidenceDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  weekLink: {
+    alignSelf: 'center',
+    marginTop: 32,
+    paddingVertical: 10,
+  },
+  weekLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    letterSpacing: 0.3,
   },
   heroEyebrow: {
     fontFamily: typography.uiBold,
