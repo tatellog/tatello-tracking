@@ -80,6 +80,8 @@ import {
   evidenceDots,
 } from '../combo-facts'
 import { useComboTranscript } from '../combo-transcript'
+import { comboKey, combosBornRecently } from '../combo-memory'
+import { useSeenCombos } from '../combo-seen'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
 import { earlyReading } from '../early-readings'
@@ -358,10 +360,41 @@ export function MonthSegment({
   // "Tus patrones": el patrón dominante = la combinación de hábitos que más
   // coincidió y mejor terminó en déficit. ACUMULATIVO (ventana larga, no el mes)
   // → un patrón es de tu historia, no se borra el día 1.
-  const combo = useMemo(
-    () => winningCombo(patternSignals, { calorieTarget, proteinTarget, waterGoalGlasses }),
+  // Histéresis (dueña 26 sep 2026): un patrón que ya se mostró sigue vivo con
+  // la vara de permanencia. "Ya mostrado" = nació en las últimas 2 semanas o
+  // quedó guardado en el teléfono cuando se vio.
+  const seenUid = useSession().session?.user?.id ?? null
+  const seenCombos = useSeenCombos(seenUid)
+  const recentCombos = useMemo(
+    () =>
+      combosBornRecently(
+        patternSignals,
+        { calorieTarget, proteinTarget, waterGoalGlasses },
+        todayInTimezone(),
+      ),
     [patternSignals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
+  const seenKeys = seenCombos.keys
+  const keepCombos = useMemo(
+    () => [...new Set([...seenKeys, ...recentCombos])],
+    [seenKeys, recentCombos],
+  )
+  const combo = useMemo(
+    () =>
+      winningCombo(patternSignals, {
+        calorieTarget,
+        proteinTarget,
+        waterGoalGlasses,
+        keep: keepCombos,
+      }),
+    [patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, keepCombos],
+  )
+  // Lo que se muestra queda guardado: mañana sigue con la vara de permanencia.
+  const shownKey = combo ? comboKey(combo.signals.map((x) => x.key)) : null
+  useEffect(() => {
+    if (shownKey) seenCombos.mark(shownKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownKey])
   // Patrones de apoyo: correlaciones demostrables del motor (kind 'pattern'). Se
   // excluye lo que ya dijo el combo (sin redundancia) y se ordena por relevancia
   // (déficit es el norte). Tope: 2 con combo, 3 sin él (el astrónomo no abruma).

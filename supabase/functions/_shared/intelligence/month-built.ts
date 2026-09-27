@@ -1614,6 +1614,15 @@ const COMBO_MIN_OCCUR = 3
  *  2026): su tasa de déficit supera la del resto por al menos 15 puntos. Si sus
  *  días normales ya cierran en déficit casi igual, no es "lo que te sostiene". */
 const COMBO_MIN_ADVANTAGE = 0.15
+/** Histéresis (dueña 26 sep 2026): un patrón que YA se mostró no muere por un
+ *  solo día. Para NACER pide 15 puntos de ventaja; para SEGUIR VIVO, 5 (y la
+ *  mitad de sus días en déficit, como siempre). Si cae debajo, se desvanece. */
+const COMBO_KEEP_ADVANTAGE = 0.05
+
+/** Id estable de una combinación: sus keys ordenadas ("cuerpo+sueno"). */
+function comboKeyOf(keys: readonly string[]): string {
+  return [...keys].sort().join('+')
+}
 
 /* Verbos naturales por hábito para NOMBRAR el combo en la frase (no etiquetas
  * sueltas): "Entrenar e hidratarte fueron de la mano con tu déficit." */
@@ -1722,12 +1731,16 @@ export function winningCombo(
     calorieTarget?: number | null
     proteinTarget?: number | null
     waterGoalGlasses?: number | null
+    /** Combinaciones que ya se le mostraron ("cuerpo+sueno"): siguen vivas con
+     *  la vara de permanencia (COMBO_KEEP_ADVANTAGE), no la de nacimiento. */
+    keep?: readonly string[]
   },
 ): WinningCombo | null {
   const target = opts.calorieTarget ?? null
   if (target == null || target <= 0) return null
   const food = foodDays(signals)
   if (food.length < COMBO_MIN_OCCUR) return null
+  const keep = new Set((opts.keep ?? []).map((k) => comboKeyOf(k.split('+'))))
   const pt = opts.proteinTarget ?? null
   const wg = Math.max(1, opts.waterGoalGlasses ?? WATER_GOAL_GLASSES)
 
@@ -1772,7 +1785,10 @@ export function winningCombo(
     const rest = food.filter((s) => !combo.every((c) => c.has(s)))
     if (rest.length < COMBO_MIN_OCCUR) continue
     const restDeficits = rest.filter((s) => isDeficitDay(s.calories, target)).length
-    if (deficits / comboDays.length - restDeficits / rest.length < COMBO_MIN_ADVANTAGE) continue
+    const minAdvantage = keep.has(comboKeyOf(combo.map((c) => c.key)))
+      ? COMBO_KEEP_ADVANTAGE
+      : COMBO_MIN_ADVANTAGE
+    if (deficits / comboDays.length - restDeficits / rest.length < minAdvantage) continue
     const cand = {
       combo,
       occ: comboDays.length,

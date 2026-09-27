@@ -55,9 +55,13 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 // Color por estado del objetivo: déficit = magenta (rumbo), sobre objetivo =
 // oro cálido (nunca rojo), aún se revela = niebla (en calma).
+// El anillo de calorías es magenta en déficit Y sobre la meta (dueña 26 sep
+// 2026): el oro ya significa "lo que hiciste" y pasarse no es un logro; el
+// veredicto en palabras dice cuál de los dos es. Comer muy poco sigue en niebla
+// (jamás se celebra en magenta).
 const STATUS_COLOR: Record<GoalStatus, string> = {
   deficit: colors.magenta,
-  over: colors.oro,
+  over: colors.magenta,
   incomplete: colors.niebla,
 }
 
@@ -111,7 +115,7 @@ const C_INNER = 2 * Math.PI * RING_INNER_R
 // "aún tienes espacio" hecho visual, en vez de un hairline neutro que se pierde.
 const TRACK_COLOR: Record<GoalStatus, string> = {
   deficit: colors.magentaTint,
-  over: colors.oroTint,
+  over: colors.magentaTint,
   incomplete: colors.hairline,
 }
 
@@ -119,7 +123,7 @@ const TRACK_COLOR: Record<GoalStatus, string> = {
 // el trazo plano en materia luminosa. La energía se concentra hacia la punta.
 const RING_STOPS: Record<GoalStatus, [string, string, string]> = {
   deficit: [colors.magentaDeep, colors.magenta, colors.magentaHot],
-  over: [colors.oro, colors.oroSoft, colors.oroLight],
+  over: [colors.magentaDeep, colors.magenta, colors.magentaHot],
   incomplete: [colors.niebla, colors.niebla, colors.niebla],
 }
 
@@ -151,7 +155,7 @@ type RingSpec = {
   comet: 'full' | 'soft' | 'none'
   show: boolean // dibujar arco / bloom / cometa (track siempre se dibuja)
   delay: number
-  overflow?: number // solo exterior: arco oro de sobre-objetivo
+  overflow?: number // solo exterior: segunda vuelta de sobre-objetivo
 }
 
 /** Un anillo concéntrico completo: track (siempre) + bloom + arco con gradiente +
@@ -235,14 +239,15 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
             strokeLinecap="round"
             animatedProps={arcProps}
           />
-          {/* Sobre-objetivo (solo exterior) — arco oro corto, sin rojo ni alarma */}
+          {/* Sobre-objetivo (solo exterior) — la segunda vuelta en magenta claro,
+              como Apple: se ve cuánto pasó sin rojo ni alarma (ni oro: no es logro). */}
           {spec.overflow != null ? (
             <AnimatedCircle
               cx={CENTER}
               cy={CENTER}
               r={r}
               fill="none"
-              stroke={colors.oroLight}
+              stroke={colors.magentaHot}
               strokeWidth={spec.sw}
               strokeLinecap="round"
               opacity={0.9}
