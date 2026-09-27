@@ -24,6 +24,8 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
+import { useNotifyOffer } from '@/features/notifications/offer'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { useCycleSealInvite } from '@/features/notifications/hooks'
@@ -434,6 +436,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // hero compacto. % y conteo salen de la MISMA fuente (trained/figureCount)
   // que pinta el hero, así nunca se contradicen.
   const [tuEmblemaOpen, setTuEmblemaOpen] = useState(false)
+  // Avisos en contexto (dueña 26 sep 2026): se ofrecen al guardar la primera
+  // comida, nunca en el onboarding. Espera a que Hoy esté libre de ceremonias.
+  const notifyOffer = useNotifyOffer(
+    'meal',
+    !viewingPast && ctx.meal_count_today >= 1 && !revelation && !tuEmblemaOpen,
+  )
   const heroPct = figureCount > 0 ? Math.round((trainedThisMonth / figureCount) * 100) : 0
   const heroPress = usePressFeedback()
   // Estrellas con nombre ya encendidas + la que sigue — derivadas de la
@@ -871,6 +879,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           litStars={litStars}
           nextStar={nextStar}
           daysInOrbit={daysInOrbit}
+        />
+        <NotifyOfferSheet
+          visible={notifyOffer.visible}
+          trigger="meal"
+          onAccept={notifyOffer.accept}
+          onDecline={notifyOffer.decline}
         />
         {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
           El orquestador elige UNA (Regreso > Transformación > Patrón); se

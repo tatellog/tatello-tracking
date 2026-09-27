@@ -1,12 +1,14 @@
 import { Feather } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { useProfile, useUpdateProfile } from '@/features/profile/hooks'
 import { SkyBackground } from '@/features/tabs/components'
 import { GLASS_ML, mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
+import { track } from '@/lib/analytics'
 import { colors, radius, typography } from '@/theme'
 
 const WATER_PRESETS_ML = [1500, 2000, 2500, 3000] as const
@@ -23,6 +25,16 @@ function WaterGoalBody() {
   const router = useRouter()
   const { goalMl, updateGoal } = useWaterGoal()
   const glasses = Math.max(1, Math.round(goalMl / GLASS_ML))
+  // Contar líquidos de las comidas como agua (ON por defecto). Vivía como fila
+  // suelta en Ajustes; es un detalle del agua, así que vive aquí.
+  const { data: profile } = useProfile()
+  const updateProfile = useUpdateProfile()
+  const countLiquids = profile?.count_liquids_from_meals !== false
+  const toggleCountLiquids = (value: boolean) => {
+    Haptics.selectionAsync().catch(() => {})
+    updateProfile.mutate({ count_liquids_from_meals: value })
+    track('settings_count_liquids_toggled', { enabled: value })
+  }
 
   return (
     <View style={styles.screen}>
@@ -86,6 +98,23 @@ function WaterGoalBody() {
                 </Pressable>
               )
             })}
+          </View>
+
+          <View style={styles.toggleCard}>
+            <View style={styles.toggleText}>
+              <Text style={styles.toggleLabel}>Contar líquidos de tus comidas</Text>
+              <Text style={styles.toggleDesc}>
+                Stelar detecta bebidas en tus comidas y te propone sumarlas a tu agua del día.
+              </Text>
+            </View>
+            <Switch
+              value={countLiquids}
+              onValueChange={toggleCountLiquids}
+              trackColor={{ false: colors.bgCard2, true: colors.magenta }}
+              thumbColor={colors.leche}
+              ios_backgroundColor={colors.bgCard2}
+              accessibilityLabel="Contar líquidos de tus comidas"
+            />
           </View>
 
           <Text style={styles.note}>
@@ -181,6 +210,30 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   chipTextActive: { color: colors.magentaHot },
+  toggleCard: {
+    marginTop: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.bgCard2,
+  },
+  toggleText: { flex: 1, gap: 4 },
+  toggleLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+  },
+  toggleDesc: {
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
   note: {
     marginTop: 22,
     fontFamily: typography.serif,
