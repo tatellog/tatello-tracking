@@ -4,7 +4,7 @@ import { View } from 'react-native'
 import { type SvgProps } from 'react-native-svg'
 
 import FoodVect from '@/assets/icons/food-vect.svg'
-import Orbits from '@/assets/icons/orbits.svg'
+import Descubre from '@/assets/icons/descubre.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
 import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
@@ -143,7 +143,7 @@ export default function TabsLayout() {
           name="orbit"
           options={{
             title: 'Descubre',
-            tabBarIcon: ({ focused }) => <SvgTabIcon Icon={Orbits} focused={focused} />,
+            tabBarIcon: ({ focused }) => <SvgTabIcon Icon={Descubre} focused={focused} />,
           }}
         />
         <Tabs.Screen
