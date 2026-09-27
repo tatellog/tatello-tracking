@@ -678,6 +678,7 @@ export function DayPresent({
   // Anillos + leyenda + veredicto: el hero de Día y el bloque "hoy" del feed
   // de Órbita (compact). Sin registros, los anillos en reposo.
   const hero: GoalHero = day?.hero ?? REST_HERO
+  const emptyCompact = compact && verdict.kind === 'empty'
   const heroSection = (
     <>
       {/* Hero — el anillo (con la constelación dentro) y el VEREDICTO en
@@ -725,12 +726,16 @@ export function DayPresent({
       </View>
 
       {/* El veredicto en palabras: "¿sigo en déficit?". */}
-      <View style={styles.verdictBlock}>
-        <Text style={styles.verdictTitle}>{verdict.title}</Text>
-        <Text style={styles.verdictLine}>{verdict.line}</Text>
+      <View style={[styles.verdictBlock, emptyCompact && styles.verdictRow]}>
+        <Text style={[styles.verdictTitle, emptyCompact && styles.verdictTitleRow]}>
+          {verdict.title}
+        </Text>
+        {/* En el feed, sin comida, basta el título y el botón: la explicación
+            larga no la leía nadie (dueña 26 sep 2026). */}
+        {emptyCompact ? null : <Text style={styles.verdictLine}>{verdict.line}</Text>}
         {verdict.cta ? (
           <Pressable
-            style={styles.verdictCta}
+            style={[styles.verdictCta, emptyCompact && styles.verdictCtaRow]}
             onPress={() =>
               router.push(
                 verdict.cta === 'target'
@@ -756,7 +761,7 @@ export function DayPresent({
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.compactWrap}>
         {heroSection}
-        {onOpenDay ? (
+        {onOpenDay && !emptyCompact ? (
           <Pressable
             onPress={onOpenDay}
             hitSlop={8}
@@ -1077,6 +1082,13 @@ const styles = StyleSheet.create({
   verdictBlock: {
     marginTop: 24,
   },
+  verdictRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  verdictTitleRow: { flex: 1 },
   verdictTitle: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.headingLg,
@@ -1099,6 +1111,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
   },
+  verdictCtaRow: { marginTop: 0 },
   verdictCtaText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.label,

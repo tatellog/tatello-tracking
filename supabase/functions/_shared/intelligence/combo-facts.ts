@@ -206,6 +206,39 @@ export function comboLift(combo: ComboShape): string {
   return 'más seguido'
 }
 
+/** El número grande de la tarjeta: cuántas veces más seguido cierra en déficit
+ *  con el patrón. Honesto: "2×" solo si de verdad es el doble; debajo de 1.6
+ *  se dice la razón exacta ("1,4×"), nunca se redondea hacia arriba. */
+export function comboLiftBadge(combo: ComboShape): string {
+  const rate = combo.occurrences > 0 ? combo.deficits / combo.occurrences : 0
+  const rest = combo.restDays > 0 ? combo.restDeficits / combo.restDays : 0
+  if (rest <= 0) return 'mucho más'
+  const ratio = rate / rest
+  if (ratio >= 2.5) return 'más de 2×'
+  if (ratio >= 1.95) return '2×'
+  if (ratio >= 1.6) return 'casi 2×'
+  return `${(Math.floor(ratio * 10) / 10).toFixed(1).replace('.', ',')}×`
+}
+
+/** La semana dicha con palabras (la usuaria leía los puntos de la semana como
+ *  días en déficit): cuántos días lo juntaste y cuántos suelen tener tus
+ *  mejores semanas. Sin referencia, solo lo hecho; sin nada, no se dice. */
+export function comboWeekSummary(week: ComboWeek | null, combo: ComboShape): string | null {
+  if (!week) return null
+  const group = comboGroupLabel(combo).toLowerCase()
+  const done = `${week.done} ${dias(week.done)} ${group}`
+  if (week.typical == null) return week.done > 0 ? `Esta semana: ${done}` : null
+  return `Esta semana: ${done} · tus mejores semanas, ${week.typical}`
+}
+
+/** La semana en puntos: llenos = días que ya lo juntaste; el total es lo que
+ *  suelen tener tus mejores semanas. Sin referencia, solo lo hecho. Máx. 7. */
+export function comboWeekDots(week: ComboWeek | null): boolean[] {
+  if (!week) return []
+  const total = Math.min(7, Math.max(week.typical ?? 0, week.done))
+  return Array.from({ length: total }, (_, i) => i < week.done)
+}
+
 /** El titular: el hallazgo dicho, no el hábito. */
 export function comboHeadline(combo: ComboShape): string {
   const list = joinList(combo.signals.map((s) => HABIT_PRESENT[s.key] ?? s.label.toLowerCase()))

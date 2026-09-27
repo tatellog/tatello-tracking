@@ -68,6 +68,9 @@ type Props = {
   /** Botón de la báscula (solo Hoy, solo con Salud disponible). `hasNew` pinta
    *  el punto; el tap abre "Tu báscula". */
   scale?: { hasNew: boolean; onPress: () => void } | null
+  /** Sin el atajo a "Tu constancia" (Descubre ya tiene su calendario de déficit:
+   *  dos calendarios en la misma pestaña confundían). */
+  hideCalendar?: boolean
 }
 
 export function TabHeader({
@@ -78,6 +81,7 @@ export function TabHeader({
   pillLabel,
   pillEmphasis,
   scale = null,
+  hideCalendar = false,
 }: Props) {
   const router = useRouter()
   return (
@@ -115,15 +119,17 @@ export function TabHeader({
         ) : null}
         {/* Calendario de movimiento — SIEMPRE visible (todas las tabs, con pill o
             con gear), independiente de la navegación. */}
-        <Pressable
-          onPress={() => router.navigate('/movement-calendar')}
-          hitSlop={10}
-          style={styles.settingsBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Tu constancia"
-        >
-          <CalendarIcon color={colors.niebla} />
-        </Pressable>
+        {hideCalendar ? null : (
+          <Pressable
+            onPress={() => router.navigate('/movement-calendar')}
+            hitSlop={10}
+            style={styles.settingsBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Tu constancia"
+          >
+            <CalendarIcon color={colors.niebla} />
+          </Pressable>
+        )}
         {pillLabel ? (
           <View style={styles.pill}>
             <EmText

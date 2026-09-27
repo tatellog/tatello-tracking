@@ -5,8 +5,11 @@ import {
   comboGroupLabel,
   comboHeadline,
   comboLift,
+  comboLiftBadge,
   comboOpening,
   comboWeek,
+  comboWeekDots,
+  comboWeekSummary,
   comboWeekHook,
   comboWeekLine,
   evidenceDots,
@@ -203,5 +206,66 @@ describe('la tarjeta del patrón', () => {
       'como tus mejores semanas',
     )
     expect(comboWeekHook({ done: 0, typical: null, daysLeft: 4, state: 'noRef' })).toBeNull()
+  })
+})
+
+describe('la tarjeta visual', () => {
+  const base = {
+    signals: [
+      { key: 'sueno', label: 'Sueño' },
+      { key: 'cuerpo', label: 'Entreno' },
+    ],
+    days: [],
+    occurrences: 8,
+    deficits: 5,
+    restDays: 9,
+    restDeficits: 3,
+  }
+  it('el número grande nunca redondea hacia arriba', () => {
+    expect(comboLiftBadge(base)).toBe('casi 2×')
+    expect(comboLiftBadge({ ...base, deficits: 6 })).toBe('2×')
+    expect(comboLiftBadge({ ...base, deficits: 8, restDeficits: 2 })).toBe('más de 2×')
+    expect(comboLiftBadge({ ...base, restDeficits: 4 })).toBe('1,4×')
+    expect(comboLiftBadge({ ...base, restDeficits: 0 })).toBe('mucho más')
+  })
+  it('la semana en puntos: lo hecho contra tus mejores semanas', () => {
+    expect(comboWeekDots({ done: 1, typical: 3, daysLeft: 3, state: 'onTrack' })).toEqual([
+      true,
+      false,
+      false,
+    ])
+    expect(comboWeekDots({ done: 4, typical: 3, daysLeft: 1, state: 'reached' })).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ])
+    expect(comboWeekDots({ done: 0, typical: null, daysLeft: 5, state: 'noRef' })).toEqual([])
+    expect(comboWeekDots(null)).toEqual([])
+  })
+})
+
+describe('la semana con palabras', () => {
+  const combo = {
+    signals: [
+      { key: 'sueno', label: 'Sueño' },
+      { key: 'cuerpo', label: 'Entreno' },
+    ],
+    days: [],
+    occurrences: 8,
+    deficits: 5,
+    restDays: 9,
+    restDeficits: 3,
+  }
+  it('dice qué cuenta y contra qué', () => {
+    expect(comboWeekSummary({ done: 1, typical: 3, daysLeft: 3, state: 'onTrack' }, combo)).toBe(
+      'Esta semana: 1 día con los dos · tus mejores semanas, 3',
+    )
+    expect(comboWeekSummary({ done: 2, typical: null, daysLeft: 3, state: 'noRef' }, combo)).toBe(
+      'Esta semana: 2 días con los dos',
+    )
+    expect(
+      comboWeekSummary({ done: 0, typical: null, daysLeft: 3, state: 'noRef' }, combo),
+    ).toBeNull()
   })
 })

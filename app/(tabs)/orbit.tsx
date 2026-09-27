@@ -75,7 +75,7 @@ function OrbitBody() {
 
   // Órbita de un solo scroll: 'feed' (anillos + patrones + mes) o el detalle
   // de hoy / del mes, abierto desde el feed con su "‹ Volver".
-  const [feedView, setFeedView] = useState<'feed' | 'day' | 'month'>('feed')
+  const [feedView, setFeedView] = useState<'feed' | 'day'>('feed')
   // Un día abierto desde el chat del patrón vuelve a la conversación, no al feed.
   const [dayFromChat, setDayFromChat] = useState(false)
   const [resumeChat, setResumeChat] = useState(false)
@@ -164,7 +164,7 @@ function OrbitBody() {
             scrollEventThrottle={16}
           >
             <Animated.View entering={FadeIn.duration(280)}>
-              <TabHeader title="Descubre" />
+              <TabHeader title="Descubre" hideCalendar />
             </Animated.View>
 
             {ORBITA_SINGLE_FEED ? (
@@ -174,10 +174,6 @@ function OrbitBody() {
                 onOpenDay={() => {
                   setViewedDay(null)
                   setFeedView('day')
-                  scrollToTop()
-                }}
-                onOpenMonth={() => {
-                  setFeedView('month')
                   scrollToTop()
                 }}
                 onBack={() => {
@@ -303,7 +299,6 @@ function OrbitFeed({
   view,
   viewedDay,
   onOpenDay,
-  onOpenMonth,
   onBack,
   onPickDay,
   dayFromChat,
@@ -312,10 +307,9 @@ function OrbitFeed({
   resumeChat,
   onChatResumed,
 }: {
-  view: 'feed' | 'day' | 'month'
+  view: 'feed' | 'day'
   viewedDay: string | null
   onOpenDay: () => void
-  onOpenMonth: () => void
   onBack: () => void
   onPickDay: (date: string) => void
   dayFromChat: boolean
@@ -344,34 +338,17 @@ function OrbitFeed({
       </View>
     )
   }
-  if (view === 'month') {
-    return (
-      <View>
-        <BackLink onPress={onBack} />
-        <MonthSegment key="feed-month" view="month" onPickDay={onPickDay} />
-      </View>
-    )
-  }
   return (
     <Animated.View entering={FadeIn.duration(320).delay(60)}>
-      <Text style={styles.feedLede}>Lo que tus datos dicen de ti.</Text>
       <DayPresent key="feed-today" compact onOpenDay={onOpenDay} />
       <MonthSegment
         key="feed-patterns"
         view="patterns"
+        onPickDay={onPickDay}
         onPickDayFromChat={onPickDayFromChat}
         resumeChat={resumeChat}
         onChatResumed={onChatResumed}
       />
-      <Pressable
-        onPress={onOpenMonth}
-        hitSlop={8}
-        style={styles.feedLink}
-        accessibilityRole="button"
-        accessibilityLabel="Tu mes de un vistazo"
-      >
-        <Text style={styles.feedLinkText}>Tu mes de un vistazo ›</Text>
-      </Pressable>
     </Animated.View>
   )
 }
@@ -397,18 +374,6 @@ function BackLink({
 }
 
 const styles = StyleSheet.create({
-  feedLede: {
-    marginTop: -6,
-    marginBottom: 20,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  feedLink: {
-    alignSelf: 'center',
-    marginTop: 32,
-    paddingVertical: 10,
-  },
   feedLinkText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
