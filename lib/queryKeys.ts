@@ -152,6 +152,9 @@ export const queryKeys = {
       findingsHash: string,
       promptVersion: string,
     ) => ['orbit', 'aiVoice', 'chat', uid, findingId, findingsHash, promptVersion] as const,
+    // La conversación del patrón dominante (memoria al reabrir), por su hash.
+    comboTranscript: (uid: string, chatHash: string) =>
+      ['orbit', 'comboChat', uid, chatHash] as const,
     // Foco redactado por IA de un experimento (R5), cacheado por su id.
     aiExperiment: (uid: string, key: string) =>
       ['orbit', 'aiVoice', 'experiment', uid, key] as const,

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
@@ -67,6 +67,9 @@ type Props = {
   onNext: () => void
   onClose: () => void
   onPickDay?: (date: string) => void
+  /** Cuerpo propio del chat (el del patrón dominante): reemplaza al chat de
+   *  hallazgo sin tocarlo. La cabecera, el fondo y el gesto siguen siendo estos. */
+  body?: ReactNode
 }
 
 export function MonthChatSheet({
@@ -87,6 +90,7 @@ export function MonthChatSheet({
   onNext,
   onClose,
   onPickDay,
+  body,
 }: Props) {
   const insets = useSafeAreaInsets()
   const { progress } = useTransformProgress()
@@ -168,7 +172,9 @@ export function MonthChatSheet({
                 </View>
               </View>
 
-              {aiOn ? (
+              {body ? (
+                body
+              ) : aiOn ? (
                 <FindingChatView
                   key={finding.id}
                   finding={finding}

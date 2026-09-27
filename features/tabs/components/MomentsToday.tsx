@@ -1,4 +1,16 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import * as Haptics from 'expo-haptics'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useEffect } from 'react'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
 import Svg, { Circle } from 'react-native-svg'
 
 import { MealGlyph } from '@/features/macros/components/meal-glyphs'
@@ -13,77 +25,98 @@ const MOMENTS: { type: MealMoment; label: string }[] = [
   { type: 'snack', label: 'Snack' },
 ]
 
-/** El momento que "toca" por hora — el héroe visual de la estela. */
-const momentByHour = (): MealMoment => mealMomentByHour()
+const NODE = 56
+const ZONE = 74
 
-/* El glifo celeste de cada momento vive en el módulo CANÓNICO compartido
- * (sol/planeta/luna/cometa) — una sola familia en toda la app. */
-
-/* El aro del nodo, dibujado en SVG para lograr el look de la referencia:
- *   · una capa ancha de baja opacidad = el "blur"/glow del aro;
- *   · el aro fino encima;
- *   · puntitos (cuentas de luz) repartidos sobre la circunferencia, asimétricos.
- * `tone` = color del oro; `active` lo hace más brillante y grueso. */
-function NodeRing({
-  size,
-  tone,
-  active,
-  dim,
-}: {
-  size: number
-  tone: string
-  active: boolean
-  dim: boolean
-}) {
-  const c = size / 2
-  const r = c - (active ? 3 : 2)
+/* El aro del astro: un halo ancho y tenue (el "blur") + el aro fino encima.
+ * `active` (el momento que toca) lo hace más brillante y grueso. */
+function NodeRing({ tone, active, dim }: { tone: string; active: boolean; dim: boolean }) {
+  const c = NODE / 2
+  const r = c - (active ? 2.5 : 1.5)
   return (
-    <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* glow (el "blur" del aro) */}
+    <Svg width={NODE} height={NODE} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Circle
         cx={c}
         cy={c}
         r={r}
         stroke={tone}
-        strokeWidth={active ? 6 : 4}
-        opacity={active ? 0.18 : 0.1}
+        strokeWidth={active ? 5 : 3}
+        opacity={active ? 0.2 : 0.08}
         fill="none"
       />
-      {/* el aro fino */}
       <Circle
         cx={c}
         cy={c}
         r={r}
         stroke={tone}
-        strokeWidth={active ? 2 : 1.2}
-        opacity={active ? 0.95 : dim ? 0.4 : 0.62}
+        strokeWidth={active ? 2 : 1}
+        opacity={active ? 0.95 : dim ? 0.35 : 0.6}
         fill="none"
       />
     </Svg>
   )
 }
 
-/* Un nodo de la estela: el disco con su astro. Dos estados, dos señales
- * (dirección de arte + ux sep 2026; antes "ahora" y "registrado" se veían
- * iguales y un badge magenta de conteo se leía como notificación):
- *   lit (registrado) → disco LLENO en oro tenue, astro oro claro.
- *   current (el momento que toca por la hora Y aún vacío) → anillo claro.
- *   pendiente → contorno tenue, astro apagado. */
-function MomentNode({ type, lit, current }: { type: MealMoment; lit: boolean; current: boolean }) {
-  const size = NODE_BASE
-  const glyphColor = lit || current ? colors.oroLight : colors.oroSoft
-  const ringTone = current || lit ? colors.oroLight : colors.oro
+/* El brillo lento del momento que toca: invita sin gritar. Quieto con
+ * "reducir movimiento". */
+function CurrentGlow() {
+  const reduce = useReducedMotion() ?? false
+  const t = useSharedValue(0)
+  useEffect(() => {
+    if (reduce) {
+      t.value = 0.5
+      return
+    }
+    t.value = withRepeat(
+      withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    )
+    return () => cancelAnimation(t)
+  }, [reduce, t])
+  const style = useAnimatedStyle(() => ({ opacity: 0.25 + t.value * 0.35 }))
+  return <Animated.View pointerEvents="none" style={[styles.currentGlow, style]} />
+}
+
+/*
+ * Un astro como BOTÓN (dueña 26 sep 2026: "no parecen botones"; el "+" en la
+ * esquina se leía como globo de notificación). Lo que dice "tócame" es el
+ * CUERPO: disco relleno con brillo arriba y sombra abajo, como una tecla, que
+ * se hunde al presionar. El "+" vive en la etiqueta del momento que toca.
+ *   registrado → el disco se llena de oro tenue, astro oro claro (lo hecho).
+ *   ahora (toca por la hora y está vacío) → aro magenta grueso + halo lento.
+ *   pendiente → aro neutro tenue, astro hueso.
+ */
+function MomentNode({
+  type,
+  lit,
+  current,
+  pressed,
+}: {
+  type: MealMoment
+  lit: boolean
+  current: boolean
+  pressed: boolean
+}) {
+  // Magenta = lo que puedes hacer (el momento que toca); oro = lo que ya
+  // hiciste (registrado); pendiente, neutro (dueña 26 sep 2026: "todo muy gold").
+  const glyphColor = lit ? colors.oroLight : current ? colors.leche : colors.bone
+  const ringTone = lit ? colors.oroLight : current ? colors.magenta : colors.bone
   return (
-    <View style={styles.nodeZone}>
-      <View
-        style={[
-          styles.node,
-          { width: size, height: size, borderRadius: size / 2 },
-          lit && styles.nodeLit,
-        ]}
-      >
-        <NodeRing size={size} tone={ringTone} active={current} dim={!lit && !current} />
-        <MealGlyph type={type} size={Math.round(size * 0.5)} color={glyphColor} />
+    <View style={styles.zone}>
+      {current ? <CurrentGlow /> : null}
+      <View style={[styles.disc, pressed && styles.discPressed]}>
+        {lit ? <View style={styles.litFill} pointerEvents="none" /> : null}
+        {/* El brillo de arriba: la luz que le da volumen de tecla. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(255, 240, 220, 0.10)', 'rgba(255, 240, 220, 0)']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 0.6 }}
+          style={styles.sheen}
+        />
+        <NodeRing tone={ringTone} active={current} dim={!lit && !current} />
+        <MealGlyph type={type} size={Math.round(NODE * 0.46)} color={glyphColor} />
       </View>
     </View>
   )
@@ -98,15 +131,14 @@ type Props = {
 
 /*
  * "HOY" — los momentos del día como una ESTELA de astros (sol/planeta/luna/
- * cometa). Los astros AGREGAN: tocar cualquiera abre el registro con ese
- * momento preseleccionado. Qué comiste se lee en la lista de abajo
- * (DayMealList), no en un conteo sobre el astro.
+ * cometa). Tocar cualquiera abre el registro con ese momento preseleccionado.
+ * Qué comiste se lee en la lista de abajo (DayMealList), no en un conteo.
  */
 export function MomentsToday({ meals, viewingPast }: Props) {
   const registered = new Set(
     MOMENTS.filter((m) => meals.some((meal) => meal.meal_type === m.type)).map((m) => m.type),
   )
-  const byHour = momentByHour()
+  const byHour = mealMomentByHour()
 
   return (
     <View style={styles.section}>
@@ -118,40 +150,54 @@ export function MomentsToday({ meals, viewingPast }: Props) {
 
         {MOMENTS.map((m) => {
           const lit = registered.has(m.type)
-          // "Ahora" solo en el momento que toca por la hora y aún está vacío:
-          // lleno gana. En un día pasado no hay "ahora".
+          // "Ahora" solo en el momento que toca por la hora y aún está vacío.
           const current = !viewingPast && !lit && m.type === byHour
-          const inner = (
-            <>
-              <MomentNode type={m.type} lit={lit} current={current} />
-              <Text style={[styles.label, lit || current ? styles.labelLit : styles.labelOff]}>
-                {m.label}
-              </Text>
-            </>
-          )
-          return viewingPast ? (
-            <View
-              key={m.type}
-              style={styles.chip}
-              accessibilityLabel={`${m.label}, ${lit ? 'registrada' : 'sin registro'}`}
+          const label = (
+            <Text
+              style={[
+                styles.label,
+                lit ? styles.labelLit : current ? styles.labelNow : styles.labelOff,
+              ]}
             >
-              {inner}
-            </View>
-          ) : (
+              {current ? <Text style={styles.labelPlus}>+ </Text> : null}
+              {m.label}
+            </Text>
+          )
+          if (viewingPast) {
+            return (
+              <View
+                key={m.type}
+                style={styles.chip}
+                accessibilityLabel={`${m.label}, ${lit ? 'registrada' : 'sin registro'}`}
+              >
+                <View style={styles.chipInner}>
+                  <MomentNode type={m.type} lit={lit} current={false} pressed={false} />
+                  {label}
+                </View>
+              </View>
+            )
+          }
+          return (
             <Pressable
               key={m.type}
               style={styles.chip}
-              onPress={() => emitRegistroIntent(m.type)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+                emitRegistroIntent(m.type)
+              }}
               accessibilityRole="button"
               accessibilityLabel={
                 lit
                   ? `${m.label}, registrada. Toca para agregar otra.`
-                  : current
-                    ? `${m.label}, ahora, sin registrar. Toca para registrar.`
-                    : `${m.label}, sin registrar. Toca para registrar.`
+                  : `Registrar ${m.label.toLowerCase()}${current ? ', ahora' : ''}.`
               }
             >
-              {inner}
+              {({ pressed }) => (
+                <View style={styles.chipInner}>
+                  <MomentNode type={m.type} lit={lit} current={current} pressed={pressed} />
+                  {label}
+                </View>
+              )}
             </Pressable>
           )
         })}
@@ -165,9 +211,6 @@ export function MomentsToday({ meals, viewingPast }: Props) {
     </View>
   )
 }
-
-const NODE_BASE = 44
-const NODE_ZONE = 66
 
 const styles = StyleSheet.create({
   section: {
@@ -186,14 +229,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     position: 'relative',
   },
-  // Backbone de constelación entre los 4 astros (centros a 1/8 y 7/8), a la
-  // altura del centro de los nodos.
-  // Backbone de constelación entre los 4 astros (centros a 1/8 y 7/8), a la
-  // altura del centro de los nodos (el zone los centra a todos por igual aunque
-  // el activo sea más grande).
+  // La estela entre los 4 astros (centros a 1/8 y 7/8), a la altura de su centro.
   connector: {
     position: 'absolute',
-    top: NODE_ZONE / 2,
+    top: ZONE / 2,
     left: '12.5%',
     right: '12.5%',
     height: StyleSheet.hairlineWidth,
@@ -203,28 +242,60 @@ const styles = StyleSheet.create({
   chip: {
     flex: 1,
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 2,
   },
-  // ── Nodo (disco + astro + badge) ──────────────────────────────────
-  // Zona de tamaño fijo: centra el nodo (chico o grande) en la MISMA línea, así
-  // el activo crece sin desalinear la estela.
-  nodeZone: {
-    width: NODE_BASE + 14,
-    height: NODE_ZONE,
+  chipInner: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  // Zona fija: todos los astros en la misma línea, con aire para la sombra.
+  zone: {
+    width: ZONE,
+    height: ZONE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // El disco: solo el fondo de la página (recorta la estela) + centra. El aro y
-  // los puntitos los dibuja NodeRing (SVG), no un border.
-  node: {
+  // La tecla: relleno opaco (recorta la estela), sombra abajo = volumen.
+  disc: {
+    width: NODE,
+    height: NODE,
+    borderRadius: NODE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.bg,
+    backgroundColor: colors.bgCard2,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.sombra,
+        shadowOpacity: 0.55,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 5 },
+      },
+      default: { elevation: 6 },
+    }),
   },
-  // Registrado: el disco se LLENA de oro tenue (el astro ya "encendió").
-  nodeLit: {
+  // Al presionar, la tecla se hunde: baja, se achica y la sombra se acorta.
+  discPressed: {
+    transform: [{ translateY: 2 }, { scale: 0.94 }],
+    ...Platform.select({
+      ios: { shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } },
+      default: { elevation: 2 },
+    }),
+  },
+  litFill: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: NODE / 2,
     backgroundColor: colors.oroGlow,
+  },
+  sheen: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: NODE / 2,
+  },
+  // El halo del momento que toca, detrás de la tecla.
+  currentGlow: {
+    position: 'absolute',
+    width: NODE + 14,
+    height: NODE + 14,
+    borderRadius: (NODE + 14) / 2,
+    backgroundColor: colors.magentaGlow,
   },
   label: {
     fontFamily: typography.uiMedium,
@@ -234,12 +305,16 @@ const styles = StyleSheet.create({
   labelLit: {
     color: colors.oroLight,
   },
-  // Los pendientes en un oro cálido tenue (no gris), como la referencia.
+  labelNow: {
+    color: colors.magentaHot,
+  },
   labelOff: {
     color: colors.bone,
   },
-  // Hint de uso — enseña que se registra TOCANDO un astro. Callado, invitación
-  // (no botón, no presión).
+  // El "+" dice "agregar" una vez, en el momento que toca (magenta = registrar).
+  labelPlus: {
+    fontFamily: typography.uiBold,
+  },
   hint: {
     marginTop: 14,
     fontFamily: typography.uiMedium,

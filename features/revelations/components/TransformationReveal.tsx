@@ -251,11 +251,11 @@ export function TransformationReveal({
                 <Pressable
                   onPress={goToOrbit}
                   accessibilityRole="button"
-                  accessibilityLabel="Verlo en mi órbita"
+                  accessibilityLabel="Verlo en Descubre"
                 >
                   {({ pressed }) => (
                     <View style={[styles.ctaPrimary, pressed && styles.pressed]}>
-                      <Text style={styles.ctaPrimaryText}>Verlo en mi órbita</Text>
+                      <Text style={styles.ctaPrimaryText}>Verlo en Descubre</Text>
                     </View>
                   )}
                 </Pressable>

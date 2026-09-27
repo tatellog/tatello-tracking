@@ -21,6 +21,7 @@ import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { StarLoader } from '@/components/StarLoader'
 import { useTransformProgress } from '@/features/emblem'
 import { avatarUrl } from '@/features/profile/api'
+import { FOCUS_LABEL } from '@/features/profile/focus-labels'
 import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SkyBackground } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
@@ -109,6 +110,11 @@ function ProfileBody() {
     router.push('/(tabs)/orbit')
   }
   const editTargets = () => router.push('/onboarding/macro-targets?source=settings')
+  // Tu objetivo — vivía como fila de primer nivel en Ajustes; casi nunca se
+  // edita, así que vive con el resto de tu carta (dueña 26 sep 2026).
+  const editIntention = () => router.push('/onboarding/intention?source=settings')
+  const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
+  const moreFocus = (profile?.monthly_focus_secondary ?? []).filter((v) => FOCUS_LABEL[v]).length
 
   return (
     <View style={styles.screen}>
@@ -186,7 +192,7 @@ function ProfileBody() {
                 onPress={openEmblem}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Ver tu emblema en Órbita"
+                accessibilityLabel="Ver tu emblema en Descubre"
               >
                 <Text style={styles.transform}>
                   {transformPct < 8 ? (
@@ -258,6 +264,21 @@ function ProfileBody() {
             >
               <Text style={styles.cardLink}>Revisar mis metas ›</Text>
             </Pressable>
+          </Animated.View>
+
+          <Animated.View entering={enter(185)}>
+            <Text style={styles.groupLabel}>Tu objetivo</Text>
+            <View style={styles.card}>
+              <Row
+                label="Lo que buscas"
+                value={intention ? intention.label : 'Añadir'}
+                onPress={editIntention}
+                last={moreFocus === 0}
+              />
+              {moreFocus > 0 ? (
+                <Row label="También" value={`${moreFocus} más`} onPress={editIntention} last />
+              ) : null}
+            </View>
           </Animated.View>
 
           {/* El remate de la carta — une la constelación del fondo con la

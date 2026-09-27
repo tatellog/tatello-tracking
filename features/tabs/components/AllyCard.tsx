@@ -42,8 +42,8 @@ type Props = {
 /*
  * Una comida frecuente en el Tab Comidas (dirección de arte + ux sep 2026):
  * FILA, no card. Foto chica, nombre en leche, proteína en niebla y "Repetir"
- * como píldora fantasma (receta "control"; el magenta solo estampa al
- * confirmar). El cuerpo es INERTE a propósito: abrirlo editaba la comida
+ * en magenta de contorno (dueña 26 sep 2026: magenta = lo que puedes hacer, oro
+ * = lo que ya hiciste); al confirmar, "Sumada" se rellena. El cuerpo es INERTE a propósito: abrirlo editaba la comida
  * original de otro día y reescribía la historia sin avisar.
  */
 export function AllyCard({
@@ -132,19 +132,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.hairlineStrong,
+    borderWidth: 1.5,
+    borderColor: colors.magentaGlow,
+    backgroundColor: colors.magentaTint,
   },
   repeatConfirmed: {
     borderColor: colors.magenta,
+    backgroundColor: colors.magenta,
   },
   repeatText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.label,
-    color: colors.bone,
+    color: colors.magentaHot,
     letterSpacing: 0.3,
   },
   repeatTextConfirmed: {
-    color: colors.magenta,
+    color: colors.blanco,
   },
 })

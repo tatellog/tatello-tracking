@@ -29,7 +29,8 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 const MODEL = 'gpt-4o-mini'
 // v2: prompt del chat fact-led (nombra la dimensión, contrapunto, sin relleno).
 // Subirla invalida el caché viejo (respuestas genéricas de v1).
-const PROMPT_VERSION = 'v12'
+// v13: chat del patrón dominante con paquete de hechos (orbita_combo_chat).
+const PROMPT_VERSION = 'v13'
 const DEFICIT_FLOOR_RATIO = 0.6
 const SLEEP_ENOUGH_MINUTES = 420
 
@@ -392,6 +393,114 @@ const SAFE_CHIPS = [
   'Me gusta verlo así',
 ]
 
+/* ── Chat del patrón dominante (paquete de hechos) ─────────────────────────
+ * El motor ya calculó los HECHOS (combo-facts.ts) con sus números. La IA hace
+ * dos cosas chicas: (1) redacta las preguntas que ELLA haría, cada una atada a
+ * un hecho (factId); (2) contesta UNA pregunta con SU hecho. No ve registros,
+ * no detecta, no abre ni cierra la charla (eso es fijo en el cliente). */
+const COMBO_CHIPS_SYSTEM_PROMPT = [
+  'Eres la voz de Stelar, una app de pérdida de peso sostenible.',
+  'El sistema YA encontró un patrón en los días de la usuaria y calculó unos hechos.',
+  'Tu tarea: por cada hecho, escribe la pregunta corta que ELLA haría para',
+  'descubrirlo. Primera persona, 2 a 7 palabras, termina en "?".',
+  '',
+  'REGLAS: la pregunta NO revela la respuesta. Sin cifras. Sin consejo ni acción',
+  '("¿qué hago?", "¿debería...?"). Sin lenguaje clínico. Solo sobre lo que el hecho',
+  'cuenta: nunca energía, ánimo, estrés, emociones, bienestar, motivación, peso ni',
+  'hambre.',
+  '',
+  'Responde SOLO JSON válido:',
+  '{"chips":[{"factId":string,"label":string}]}',
+].join('\n')
+
+function buildComboChipsPrompt(sentence: string, facts) {
+  const lines = [`El patrón: ${sentence}`, '', 'Hechos (id → lo que responde):']
+  for (const f of facts) lines.push(`- ${f.id} → ${f.text}`)
+  lines.push('', 'Una pregunta por hecho, con su factId exacto.')
+  return { system: COMBO_CHIPS_SYSTEM_PROMPT, user: lines.join('\n') }
+}
+
+const COMBO_ANSWER_SYSTEM_PROMPT = [
+  'Eres la voz de Stelar, una app de pérdida de peso sostenible. Hablas con la',
+  'usuaria sobre un patrón que el sistema YA encontró en sus días.',
+  '',
+  'Contesta su pregunta usando SOLO el hecho que te paso. Una o dos frases.',
+  'Primero el dato, con sus números EXACTOS; después, una lectura breve y cálida.',
+  '',
+  'REGLAS DURAS:',
+  '- Ningún número que no esté en el hecho. No calcules porcentajes.',
+  '- No afirmes causa: nada de "te dio", "te brindó", "gracias a", "hizo que",',
+  '  "por eso", "provocó". Los hábitos COINCIDEN con el déficit, no lo causan.',
+  '- No hables de energía, ánimo, estrés, emociones, bienestar, motivación, peso ni',
+  '  hambre: Stelar no midió eso en este patrón.',
+  '- Sin consejo ni orden ("debes", "intenta", "procura"). Sin culpa. Sin lenguaje',
+  '  clínico. Sin exclamaciones ni emojis. Sin "interesante" ni frases de relleno.',
+  '- Segunda persona, tuteo, femenino.',
+  '',
+  'Responde SOLO JSON válido: {"text": string}',
+].join('\n')
+
+function buildComboAnswerPrompt(sentence: string, question: string, fact) {
+  return {
+    system: COMBO_ANSWER_SYSTEM_PROMPT,
+    user: [
+      `El patrón: ${sentence}`,
+      `Su pregunta: "${question}"`,
+      `El hecho (verdad del sistema): ${fact.text}`,
+    ].join('\n'),
+  }
+}
+
+const ComboChipsSchema = z.object({
+  chips: z.array(z.object({ factId: z.string(), label: z.string() })).default([]),
+})
+const ComboAnswerSchema = z.object({ text: z.string().trim().min(1).max(320) })
+
+// Temas que Stelar NO mide en el patrón: nombrarlos es alucinar ("energía y
+// bienestar" fue el bug que motivó este chat).
+const COMBO_UNSUPPORTED =
+  /energ[ií]a|[aá]nimo|estr[eé]s|emoci[oó]n|emocional|bienestar|motivaci[oó]n|\bpeso\b|hambre|ansiedad|humor|felicidad|vitalidad/i
+// Causalidad: el patrón es coincidencia, nunca causa.
+const COMBO_CAUSAL =
+  /te dio|te di[oó]|te brind|gracias a|hizo que|hace que|provoc|caus[oó]|\bcausa\b|por eso|te permiti[oó]|te ayud[oó] a|lograste gracias/i
+
+async function generateJson(system: string, user: string, openaiKey: string, maxTokens: number) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: maxTokens,
+      temperature: 0.5,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    console.error('stelar-insight: OpenAI error (combo)', res.status)
+    return null
+  }
+  const completion = await res.json()
+  const content = completion?.choices?.[0]?.message?.content
+  if (typeof content !== 'string') return null
+  try {
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+}
+
+/** ¿La respuesta usa solo los números de SU hecho y al menos uno de ellos? */
+function comboNumbersOk(text: string, factText: string): boolean {
+  const allowed = new Set(factText.match(/\d+/g) ?? [])
+  const used = text.match(/\d+/g) ?? []
+  if (used.some((n) => !allowed.has(n))) return false
+  return allowed.size === 0 || used.some((n) => allowed.has(n))
+}
+
 /* ── Experimento (R5): la IA redacta el FOCO del hilo elegido ──────────────
  * La usuaria eligió seguir un hilo (2 semanas). La IA NO detecta ni receta:
  * redacta UNA frase de foco que nombra la dimensión y la ata a su déficit.
@@ -452,6 +561,7 @@ const RequestSchema = z.object({
     'orbita_semana',
     'orbita_mes',
     'orbita_mes_chat',
+    'orbita_combo_chat',
     'experimento',
     'progreso',
   ]),
@@ -488,6 +598,26 @@ const RequestSchema = z.object({
   turnIndex: z.number().int().min(0).max(3).optional(),
   isFinal: z.boolean().optional(),
   path: z.array(z.string().max(48)).max(4).optional(),
+  // Chat del patrón dominante: el paquete de hechos que calculó el motor.
+  combo: z
+    .object({
+      id: z.string().max(60),
+      sentence: z.string().max(200),
+      facts: z
+        .array(
+          z.object({
+            id: z.string().max(40),
+            text: z.string().max(240),
+            question: z.string().max(60),
+          }),
+        )
+        .max(8),
+    })
+    .optional(),
+  mode: z.enum(['chips', 'answer']).optional(),
+  factId: z.string().max(40).optional(),
+  question: z.string().max(60).optional(),
+  usedFactIds: z.array(z.string().max(40)).max(8).optional(),
   // Experimento (R5): la IA redacta el FOCO. Solo el dato humano, nunca la DB.
   experiment: z
     .object({
@@ -899,6 +1029,127 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
       if (upErr) console.error('stelar-insight: cache upsert failed (chat)', upErr.message)
       return json({ ...node, cached: false })
+    }
+
+    // ── Chat del patrón dominante: chips (preguntas atadas a un hecho) o la
+    // respuesta a UNA pregunta con SU hecho. La apertura, la metacognición y el
+    // cierre son fijos en el cliente. Caché = una fila por periodo, keyed por el
+    // hash del chat + el de los hechos (si un número cambia, se regenera). ──
+    if (feature === 'orbita_combo_chat' && parsed.data.combo && chatHash) {
+      const combo = parsed.data.combo
+      const mode = parsed.data.mode ?? 'chips'
+      const cacheHash = `${chatHash}|${fnv1aHex(stableStringify(combo.facts))}`.slice(0, 128)
+      const { data: cachedK } = await supabase
+        .from('ai_insights')
+        .select('response, context_hash, prompt_version, expires_at')
+        .eq('feature', feature)
+        .eq('period_type', periodType)
+        .eq('period_start', periodStart)
+        .eq('period_end', periodEnd)
+        .maybeSingle()
+      const kFresh =
+        cachedK &&
+        cachedK.context_hash === cacheHash &&
+        cachedK.prompt_version === PROMPT_VERSION &&
+        (cachedK.expires_at == null || new Date(cachedK.expires_at).getTime() > Date.now())
+      const store =
+        kFresh && cachedK.response && typeof cachedK.response === 'object'
+          ? { chips: cachedK.response.chips ?? {}, answers: cachedK.response.answers ?? {} }
+          : { chips: {}, answers: {} }
+
+      let out
+      let storeKey: string
+      if (mode === 'answer') {
+        const fact = combo.facts.find((f) => f.id === parsed.data.factId)
+        if (!fact) return json({ error: 'Petición inválida.' }, 400)
+        storeKey = fact.id
+        if (store.answers[storeKey]) return json({ ...store.answers[storeKey], cached: true })
+        const question = parsed.data.question ?? fact.question
+        const prompt = buildComboAnswerPrompt(combo.sentence, question, fact)
+        const raw = await generateJson(prompt.system, prompt.user, openaiKey, 200)
+        const ans = ComboAnswerSchema.safeParse(raw)
+        const text = ans.success ? ans.data.text : ''
+        const reject = !ans.success
+          ? 'no-answer'
+          : unsafeMessage(text)
+            ? 'unsafe'
+            : CHAT_FILLER.test(text)
+              ? 'filler'
+              : CHAT_HEDGE.test(text)
+                ? 'hedge'
+                : COMBO_UNSUPPORTED.test(text)
+                  ? 'unsupported'
+                  : COMBO_CAUSAL.test(text)
+                    ? 'causal'
+                    : !comboNumbersOk(text, fact.text)
+                      ? 'numbers'
+                      : null
+        if (reject) {
+          console.error(`combo answer rejected [${reject}] fact=${fact.id} text="${text}"`)
+          return json({ error: 'No pudimos leer tu voz ahora.' }, 502)
+        }
+        out = { message: { text } }
+        store.answers[storeKey] = out
+      } else {
+        const used = new Set(parsed.data.usedFactIds ?? [])
+        const offer = combo.facts.filter((f) => !used.has(f.id)).slice(0, 3)
+        if (offer.length === 0) return json({ chips: [], cached: false })
+        storeKey = offer
+          .map((f) => f.id)
+          .sort()
+          .join(',')
+        if (store.chips[storeKey]) return json({ ...store.chips[storeKey], cached: true })
+        const prompt = buildComboChipsPrompt(combo.sentence, offer)
+        const raw = await generateJson(prompt.system, prompt.user, openaiKey, 220)
+        const got = ComboChipsSchema.safeParse(raw)
+        const byFact = new Map()
+        if (got.success) {
+          for (const c of got.data.chips) {
+            const label = c.label.trim().replace(/\?*$/, '?')
+            const ok =
+              offer.some((f) => f.id === c.factId) &&
+              !byFact.has(c.factId) &&
+              label.length >= 4 &&
+              label.length <= 48 &&
+              !unsafeText(label) &&
+              !COMBO_UNSUPPORTED.test(label) &&
+              !/deber[ií]a|qu[eé] hago/i.test(label)
+            if (ok) byFact.set(c.factId, label)
+          }
+        }
+        // Un chip rechazado cae a la pregunta determinista de SU hecho: siempre
+        // hay una pregunta por hecho ofrecido, y cada una sabe qué contestar.
+        const chips = offer.map((f) => ({
+          factId: f.id,
+          label: byFact.get(f.id) ?? f.question,
+          voice: byFact.has(f.id),
+        }))
+        out = { chips }
+        store.chips[storeKey] = out
+      }
+
+      let nextStore = store
+      if (JSON.stringify(nextStore).length > 18000) {
+        nextStore =
+          mode === 'answer'
+            ? { chips: {}, answers: { [storeKey]: out } }
+            : { chips: { [storeKey]: out }, answers: {} }
+      }
+      const { error: upErr } = await supabase.from('ai_insights').upsert(
+        {
+          user_id: userId,
+          feature,
+          period_type: periodType,
+          period_start: periodStart,
+          period_end: periodEnd,
+          context_hash: cacheHash,
+          prompt_version: PROMPT_VERSION,
+          response: nextStore,
+        },
+        { onConflict: 'user_id,feature,period_type,period_start,period_end' },
+      )
+      if (upErr) console.error('stelar-insight: cache upsert failed (combo)', upErr.message)
+      return json({ ...out, cached: false })
     }
 
     // ── Experimento (R5): la IA redacta el FOCO del hilo. Solo recibe la métrica

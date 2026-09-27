@@ -633,7 +633,8 @@ export default function RevealScreen() {
       // Día 1 re-fetches the profile on mount — transient patch failure
       // doesn't strand the user here.
     }
-    router.replace('/onboarding/notifications')
+    // Los avisos ya no se piden aquí: se ofrecen al guardar la primera comida.
+    router.replace('/onboarding/health-connect')
   }
 
   // A11Y — announce WHAT was revealed (the SVG stage is otherwise

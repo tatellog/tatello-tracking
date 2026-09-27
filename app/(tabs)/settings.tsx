@@ -2,15 +2,13 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useCallback, useState, type ReactNode } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import FoodVect from '@/assets/icons/food-vect.svg'
-import NorthStarTint from '@/assets/icons/north-star-tint.svg'
 import WaterTint from '@/assets/icons/water-tint.svg'
 import { StelarLogo } from '@/components/brand/StelarLogo'
-import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
@@ -21,12 +19,13 @@ import { useTransformProgress } from '@/features/emblem'
 import { exportMeasurementsCsv, savePhotosToLibrary } from '@/features/progress/export'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { avatarUrl } from '@/features/profile/api'
-import { useDeleteAccount, useProfile, useUpdateProfile } from '@/features/profile/hooks'
+import { useDeleteAccount, useProfile } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { mlToLitresLabel, useWaterGoal } from '@/features/water/useWaterGoal'
 import { ConnectionsCard } from '@/features/wearables/components/ConnectionsCard'
+import { NotificationsCard } from '@/features/notifications/components/NotificationsCard'
 import { useSession } from '@/hooks/useSession'
 import { confirmBinary, useConfirm } from '@/lib/confirm'
 import { clearVisitedDayOne } from '@/lib/onboardingFlags'
@@ -46,24 +45,6 @@ const ICON_GOLD = colors.oroVect
 // disabled hasta que estas páginas estén hospedadas. Cuando existan,
 // agregar las URLs y reactivar la fila (onPress → Linking.openURL).
 // Feedback se canaliza por el BetaFeedbackSheet, no por mailto.
-
-/** monthly_focus → settings display, mirrors the wizard's intention
- *  step. The 5 ACTIVE options (weight/energy/food/patterns/other) carry
- *  the EXACT same label + tagline the user saw in the wizard, so Settings
- *  reads as a continuation of that voice. sleep/cycle/mind are INERT —
- *  pruned from the wizard UI but kept here so legacy rows that still carry
- *  those values render a label instead of falling through to null. */
-const FOCUS_LABEL: Record<string, { label: string; tagline: string }> = {
-  weight: { label: 'Bajar de peso', tagline: 'Stelar trabaja para que se sostenga.' },
-  energy: { label: 'Recuperar mi energía', tagline: 'De tu energía nace la constancia.' },
-  food: { label: 'Entender cómo me alimento', tagline: 'Qué se repite alrededor de comer.' },
-  patterns: { label: 'Entender mis patrones', tagline: 'Qué hace los viernes distintos.' },
-  other: { label: 'Algo más', tagline: 'La nombras tú.' },
-  // ── Inert: pruned from the wizard UI, kept for legacy rows only. ──
-  sleep: { label: 'Dormir profundo', tagline: 'La noche se vuelve descanso' },
-  cycle: { label: 'Conocer mi ciclo', tagline: 'Tu cuerpo va a hablarte' },
-  mind: { label: 'Calmar la mente', tagline: 'Menos ruido por dentro' },
-}
 
 /*
  * Settings hub, in the app's celestial-editorial language. Sections:
@@ -103,7 +84,6 @@ function SettingsBody() {
       track('tab_changed', { tab: 'ajustes' })
     }, []),
   )
-  const [feedbackVisible, setFeedbackVisible] = useState(false)
 
   // Tus datos (propiedad · modelo Apple Health: la data sale libre, gratis,
   // sin ceremonia; nunca premium-gated).
@@ -174,7 +154,6 @@ function SettingsBody() {
     data: profile,
     isLoading: profileLoading,
     isError: profileError,
-    isSuccess: profileLoaded,
     refetch: refetchProfile,
   } = useProfile()
   // useMacroTargets is derived from the brief query and exposes only
@@ -182,14 +161,6 @@ function SettingsBody() {
   // "resolved" as "not loading".
   const { data: targets, isLoading: targetsLoading } = useMacroTargets()
   const { goalMl } = useWaterGoal()
-  // Ajuste: contar líquidos de las comidas como hidratación (ON por defecto).
-  const updateProfile = useUpdateProfile()
-  const countLiquids = profile?.count_liquids_from_meals !== false
-  const toggleCountLiquids = (value: boolean) => {
-    Haptics.selectionAsync().catch(() => {})
-    updateProfile.mutate({ count_liquids_from_meals: value })
-    track('settings_count_liquids_toggled', { enabled: value })
-  }
   // % de transformación del emblema — la identidad CONSTRUIDA en Stelar, el
   // dato emocional de la card de perfil (no la ficha médica).
   const { progress: transformPct } = useTransformProgress()
@@ -264,16 +235,23 @@ function SettingsBody() {
     router.push('/profile')
   }
 
-  const editIntention = () => {
-    router.push('/onboarding/intention?source=settings')
-  }
-
   const editWater = () => {
     router.push('/water-goal')
   }
 
-  const editNotifications = () => {
-    router.push('/onboarding/notifications?source=settings')
+  // Tus datos: una fila, dos salidas (antes dos filas de primer nivel).
+  const openYourData = async () => {
+    const pick = await choose({
+      title: 'Tus datos',
+      description: 'Son tuyos. Llévatelos cuando quieras, gratis.',
+      actions: [
+        { id: 'csv', label: 'Exportar mis mediciones', style: 'default' },
+        { id: 'photos', label: 'Guardar mis fotos en el carrete', style: 'default' },
+        { id: 'cancel', label: 'Cancelar', style: 'cancel' },
+      ],
+    })
+    if (pick === 'csv') void handleExportCsv()
+    else if (pick === 'photos') void handleRescuePhotos()
   }
 
   const openConnections = () => {
@@ -289,14 +267,6 @@ function SettingsBody() {
   }
 
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
-  const intention = profile?.monthly_focus ? (FOCUS_LABEL[profile.monthly_focus] ?? null) : null
-  // Secondary focuses (the picks AFTER the priority in the intention
-  // wizard). Each one resolves to its label via FOCUS_LABEL; values we
-  // don't know how to label (a hypothetical out-of-enum row) drop out.
-  const secondaryIntentionLabels: string[] = (profile?.monthly_focus_secondary ?? [])
-    .map((v) => FOCUS_LABEL[v]?.label)
-    .filter((s): s is string => typeof s === 'string')
-
   // Celestial identity line — sign comes from the same source as the
   // Hoy-tab constellation, so the two screens agree.
   const zodiacSign = profile?.date_of_birth ? zodiacFromDate(profile.date_of_birth) : null
@@ -306,17 +276,6 @@ function SettingsBody() {
   const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
   const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
 
-  // ── Tu camino — los valores de las sub-secciones (route config). ──
-  // UNA fila para el objetivo (antes dos filas → el MISMO destino, que
-  // desorientaba: "toqué Secundarios y caí en la pantalla completa"). El
-  // valor compone prioridad + "· N más" (regla Apple: una fila, un destino).
-  const objetivo = profileLoaded
-    ? intention?.label
-      ? secondaryIntentionLabels.length > 0
-        ? `${intention.label}   ·   ${secondaryIntentionLabels.length} más`
-        : intention.label
-      : 'Aún sin definir'
-    : 'Tu objetivo del mes'
   const nutricion = targetsLoading
     ? 'Cargando…'
     : targets
@@ -375,20 +334,6 @@ function SettingsBody() {
             <View style={styles.caminoList}>
               <CaminoRow
                 icon={
-                  <NorthStarTint
-                    width={26}
-                    height={26}
-                    color={ICON_GOLD}
-                    preserveAspectRatio="xMidYMid meet"
-                  />
-                }
-                featured
-                label="Tu objetivo"
-                value={objetivo}
-                onPress={editIntention}
-              />
-              <CaminoRow
-                icon={
                   <FoodVect
                     width={32}
                     height={32}
@@ -414,120 +359,42 @@ function SettingsBody() {
                 onPress={editWater}
               />
             </View>
-            <ToggleRow
-              label="Contar líquidos de tus comidas"
-              description="Stelar detecta bebidas en tus comidas y te propone sumarlas a tu agua del día."
-              value={countLiquids}
-              onValueChange={toggleCountLiquids}
-            />
           </Animated.View>
 
-          {/* ── Conexiones — card DESTACADA (feedback dueña: la fila plana en
-              Cuenta no resaltaba). Vive alto, justo bajo "Tu camino", con el
-              tratamiento premium de la IdentityCard. ── */}
-          <Animated.View entering={enter(180)}>
-            <SectionHeader label="Conexiones" />
+          {/* ── Conexiones y avisos — sin encabezado de sección: la tarjeta de
+              Conexiones ya se nombra (dueña 26 sep 2026: el encabezado repetía
+              el título). Los avisos se prenden y se cambian aquí mismo, sin
+              abrir otra pantalla. ── */}
+          <Animated.View entering={enter(180)} style={styles.deviceGroup}>
             <ConnectionsCard onPress={openConnections} />
+            <NotificationsCard />
           </Animated.View>
 
-          {/* ── Acerca de Stelar — DOCUMENTACIÓN del producto, no ajustes.
-              Separada de Cuenta a propósito: la usuaria entiende que esto explica
-              Stelar, no que configura nada. ── */}
-          <Animated.View entering={enter(200)}>
-            <SectionHeader label="Acerca de Stelar" />
+          {/* ── Más — la documentación y la salida de tus datos, una fila cada
+              una (antes siete filas). Feedback vive en la pastilla flotante. ── */}
+          <Animated.View entering={enter(220)}>
+            <SectionHeader label="Más" />
             <View style={styles.caminoList}>
               <AboutRow
-                label="Cómo funciona Stelar"
-                caption="La idea detrás de tu cielo."
-                onPress={() => router.push('/about/how-it-works')}
+                label="Acerca de Stelar"
+                caption="Cómo funciona, Descubre y preguntas."
+                onPress={() => router.push('/about')}
               />
               <AboutRow
-                label="Cómo se construye tu Órbita"
-                caption="Cómo se teje tu transformación."
-                onPress={() => router.push('/about/orbit')}
-              />
-              <AboutRow
-                label="Preguntas frecuentes"
-                caption="Lo que más nos preguntan."
-                onPress={() => router.push('/about/faq')}
-              />
-              <AboutRow
-                label="Versión"
-                caption="Stelar · v1.0.0"
-                onPress={() => router.push('/about/changelog')}
+                label="Tus datos"
+                caption={
+                  exporting
+                    ? 'Preparando tu archivo…'
+                    : rescuingPhotos
+                      ? 'Guardando tus fotos…'
+                      : 'Tus mediciones y tus fotos son tuyas.'
+                }
+                onPress={() => void openYourData()}
               />
             </View>
           </Animated.View>
 
-          {/* ── Cuenta — configuraciones reales en JERARQUÍA: primarias →
-              secundarias → zona destructiva. Sin objetivos/macros (viven en "Tu
-              camino") ni info de producto (qué lee Stelar vive en Privacidad).
-              Así la usuaria encuentra ajustes reales rápido. ── */}
           <Animated.View entering={enter(260)}>
-            <SectionHeader label="Cuenta" />
-
-            <BetaFeedbackSheet
-              visible={feedbackVisible}
-              onClose={() => setFeedbackVisible(false)}
-            />
-
-            {/* Primarias — lo más a mano. */}
-            <View style={styles.accountCard}>
-              <AccountRow
-                label="Notificaciones"
-                tagline="Tú eliges cuándo aparecemos."
-                onPress={editNotifications}
-                accessibilityLabel="Editar notificaciones"
-              />
-              <View style={styles.accountDivider} />
-              <AccountRow
-                label="Privacidad"
-                tagline="Tus datos son tuyos."
-                onPress={openPrivacy}
-                accessibilityLabel="Privacidad y tus datos"
-              />
-              <View style={styles.accountDivider} />
-              <AccountRow
-                label="Términos de uso"
-                tagline="Qué es Stelar y qué no."
-                onPress={openTerms}
-                accessibilityLabel="Términos de uso"
-              />
-            </View>
-
-            {/* Tus datos — la puerta de salida abierta ES la confianza para
-                quedarse (target-user: "el día que sienta que la tabla y las
-                fotos son mías, le meto todo sin miedo"). Gratis, siempre. */}
-            <Text style={styles.groupLabel}>Tus datos</Text>
-            <View style={styles.accountCard}>
-              <AccountRow
-                label="Exportar mis mediciones"
-                tagline={exporting ? 'Preparando tu archivo…' : 'Tu tabla completa, en un archivo.'}
-                onPress={() => void handleExportCsv()}
-                accessibilityLabel="Exportar mis mediciones como archivo"
-              />
-              <View style={styles.accountDivider} />
-              <AccountRow
-                label="Guardar mis fotos en mi carrete"
-                tagline={
-                  rescuingPhotos ? 'Guardando tus fotos…' : 'Todas tus fotos de progreso, en Fotos.'
-                }
-                onPress={() => void handleRescuePhotos()}
-                accessibilityLabel="Guardar todas mis fotos de progreso en el carrete"
-              />
-            </View>
-
-            {/* Secundarias — soporte e info, más calladas. */}
-            <Text style={styles.groupLabel}>Más</Text>
-            <View style={styles.accountCard}>
-              <AccountRow
-                label="Feedback"
-                tagline="Lo que sea, lo leemos."
-                onPress={() => setFeedbackVisible(true)}
-                accessibilityLabel="Danos tu feedback"
-              />
-            </View>
-
             {/* Destructivas — separadas del resto (hairline + aire), al fondo.
                 Cerrar sesión arriba; Eliminar cuenta en COLOR ERROR, con doble
                 confirmación (confirmBinary). */}
@@ -572,6 +439,16 @@ function SettingsBody() {
                   No pudimos eliminar tu cuenta ahora. Toca para reintentar.
                 </Text>
               ) : null}
+              {/* Legales: obligatorios, pero no son ajustes. Links discretos. */}
+              <View style={styles.legalRow}>
+                <Pressable onPress={openPrivacy} hitSlop={8} accessibilityRole="link">
+                  <Text style={styles.legalLink}>Privacidad</Text>
+                </Pressable>
+                <Text style={styles.legalDot}>·</Text>
+                <Pressable onPress={openTerms} hitSlop={8} accessibilityRole="link">
+                  <Text style={styles.legalLink}>Términos de uso</Text>
+                </Pressable>
+              </View>
             </View>
 
             {profile?.is_dev ? (
@@ -895,39 +772,6 @@ function CaminoRow({
   )
 }
 
-/* Una fila con interruptor — para ajustes booleanos (ON/OFF). Misma card
- * compacta que CaminoRow, pero con un Switch en lugar de chevron: la usuaria
- * cambia el valor aquí mismo, sin navegar. El Switch nativo ya es accesible
- * (role + estado), así que la fila no lo duplica. */
-function ToggleRow({
-  label,
-  description,
-  value,
-  onValueChange,
-}: {
-  label: string
-  description: string
-  value: boolean
-  onValueChange: (value: boolean) => void
-}) {
-  return (
-    <View style={styles.toggleCard}>
-      <View style={styles.toggleText}>
-        <Text style={styles.caminoLabel}>{label}</Text>
-        <Text style={styles.toggleDesc}>{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.bgCard2, true: colors.magenta }}
-        thumbColor={colors.leche}
-        ios_backgroundColor={colors.bgCard2}
-        accessibilityLabel={label}
-      />
-    </View>
-  )
-}
-
 /* Una fila de "Acerca de Stelar" — card compacta de DOCUMENTACIÓN (sin emoji):
  * etiqueta + descripción + chevron + press feedback. Toca → pantalla de doc.
  * Misma forma que CaminoRow para que la sección se sienta hermana, pero su
@@ -959,56 +803,6 @@ function AboutRow({
         </View>
         <ChevronHint direction="right" size={16} color={colors.niebla} />
       </Animated.View>
-    </Pressable>
-  )
-}
-
-/* A "Cuenta" action row — a single tappable line inside the account card:
- * a bold label, an optional tagline beneath it, and a chevron. Rows are
- * separated by a hairline divider rendered by the parent. onLongPress is an
- * optional secondary action (used so "Términos y privacidad" can also reach
- * the privacy URL). minHeight keeps a 44pt+ target even without a tagline. */
-function AccountRow({
-  label,
-  tagline,
-  onPress,
-  onLongPress,
-  accessibilityLabel,
-  disabled,
-}: {
-  label: string
-  tagline?: string
-  onPress?: () => void
-  onLongPress?: () => void
-  accessibilityLabel: string
-  // Dimmed, non-tappable, no chevron — e.g. Términos until the pages exist.
-  disabled?: boolean
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: !!disabled }}
-      style={({ pressed }) => pressed && !disabled && styles.rowPressed}
-    >
-      {/* Row layout lives on this inner View, not the Pressable — same
-          reason PlanRow does it: flex doesn't render reliably when applied
-          straight to a Pressable in this RN setup, which left the chevron
-          stacking below the text instead of aligning right. */}
-      <View style={[styles.accountRow, disabled && styles.accountRowDisabled]}>
-        <View style={styles.metaMain}>
-          <Text style={styles.accountLabel}>{label}</Text>
-          {tagline ? <Text style={styles.accountTagline}>{tagline}</Text> : null}
-        </View>
-        {disabled ? null : (
-          <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
-            ›
-          </Text>
-        )}
-      </View>
     </Pressable>
   )
 }
@@ -1078,6 +872,22 @@ function calculateAge(iso: string): number {
 }
 
 const styles = StyleSheet.create({
+  // Conexiones + avisos: dos tarjetas juntas, con el aire de una sección.
+  deviceGroup: { marginTop: 28, gap: 12 },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 22,
+  },
+  legalLink: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    textDecorationLine: 'underline',
+  },
+  legalDot: { fontFamily: typography.ui, fontSize: typography.sizes.label, color: colors.niebla },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -1239,28 +1049,6 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // Fila de interruptor — hermana de caminoCard, separada del list con aire.
-  toggleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 10,
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  toggleText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  toggleDesc: {
-    marginTop: 2,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
   // The identity block — name as title, sign + age beneath.
   identity: {
     flexDirection: 'row',
@@ -1293,77 +1081,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.hairline,
     borderColor: colors.hairline,
   },
-  avatarImg: {
-    width: 52,
-    height: 52,
-  },
-  avatarInitial: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.magenta,
-  },
-  name: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.leche,
-    letterSpacing: -0.6,
-  },
-  signAge: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
-    marginTop: 4,
-  },
   cardDivider: {
     height: 1,
     backgroundColor: colors.hairline,
   },
   // Hint line under the Altura / Sexo detail rows — names the whole-card
   // gesture so those rows don't read as an orphaned static list.
-  cardHint: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.3,
-    color: colors.bruma,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 13,
-  },
   // ── Cómo te lee Stelar ─────────────────────────────────────────
-  stelarCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    overflow: 'hidden',
-  },
-  stelarBody: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 21,
-    color: colors.bone,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  stelarAccent: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    color: colors.magenta,
-  },
   // ── Cuenta — privacy line ──────────────────────────────────────
-  privacyLine: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
-    marginBottom: 14,
-    paddingHorizontal: 2,
-  },
-  privacyStrong: {
-    fontFamily: typography.displaySemi,
-    color: colors.bone,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1372,78 +1097,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  rowLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.ui,
-    color: colors.niebla,
-  },
-  rowValue: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.ui,
-    color: colors.bone,
-    letterSpacing: -0.2,
-    flexShrink: 1,
-    textAlign: 'right',
-  },
   // ── Tu plan ────────────────────────────────────────────────────
-  planWrap: {
-    marginBottom: 10,
-  },
-  planWrapLast: {
-    marginBottom: 0,
-  },
-  planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-  },
   // Whole-card press feedback — used by every tappable surface.
   rowPressed: {
     opacity: 0.6,
   },
-  metaMain: {
-    flex: 1,
-  },
-  metaLabel: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    letterSpacing: -0.3,
-  },
-  metaValue: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
-    marginTop: 4,
-  },
   // Secondary line under the priority tagline — dimmer + smaller so the
   // priority pick stays the visual read. Upright (not italic): the serif
   // italic is reserved for the coach/poetic voice; this is meta.
-  metaSecondary: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    lineHeight: 16,
-    letterSpacing: 0.2,
-    color: colors.bruma,
-    marginTop: 6,
-  },
-  metaNum: {
-    fontFamily: typography.displaySemi,
-    fontStyle: 'normal',
-    color: colors.bone,
-  },
-  chevron: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.niebla,
-  },
   // ── Skeleton primitives ────────────────────────────────────────
   // A dim filled pill standing in for text while a query loads. Calm,
   // static (no shimmer) — reads as "loading", never as "empty".
@@ -1476,34 +1137,11 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.bone,
   },
-  inlineError: {
-    marginTop: 10,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.feedbackError,
-    paddingHorizontal: 2,
-  },
   // ── Cuenta — account-action list ───────────────────────────────
   // One card holding the tappable account rows (notificaciones, feedback,
   // términos), same vocabulary as the plan cards but grouped with internal
   // hairline dividers since they're a related cluster, not separate levers.
-  accountCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    overflow: 'hidden',
-    marginBottom: 18,
-  },
   // Sub-encabezado de grupo (secundarias) — separa jerarquía sin gritar.
-  groupLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: colors.bruma,
-    marginBottom: 8,
-  },
   // Zona destructiva — separada del resto con un hairline + aire arriba, así
   // "Cerrar sesión" y "Eliminar cuenta" no se confunden con la configuración.
   dangerZone: {
@@ -1512,37 +1150,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
-  accountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    // Min 44pt touch target even when there's no tagline.
-    minHeight: 56,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
   // Disabled row (e.g. Términos until pages are hosted) — dimmed, no chevron.
-  accountRowDisabled: {
-    opacity: 0.4,
-  },
-  accountDivider: {
-    height: 1,
-    backgroundColor: colors.hairline,
-    marginLeft: 16,
-  },
-  accountLabel: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.title,
-    color: colors.leche,
-    letterSpacing: -0.3,
-  },
-  accountTagline: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
-    marginTop: 4,
-  },
   // ── Cuenta — sign out ──────────────────────────────────────────
   // Ghost PILL — the shape is the signal: cards are never pill-shaped, so a
   // pill can't be mistaken for a container. Transparent fill + hairline

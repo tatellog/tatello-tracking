@@ -119,3 +119,12 @@ export const WEEKLY_READING_ENABLED = true
  * dejar quieto sin tocar nada más. Reduce-motion lo apaga solo.
  */
 export const HERO_ALIVE_ENABLED = true
+
+/**
+ * Órbita de un solo scroll (sep 2026, rama orbita-patrones · fase A): sin
+ * los segmentos Día / Semana / Mes. Arriba los anillos de hoy (compactos),
+ * al centro "Tus patrones" (el protagonista: lo que Stelar encontró de ti) y
+ * al pie "Tu mes de un vistazo ›". Mismo motor de patrones que el Mes de la
+ * beta (month-built), sin tocar backend. false = la Órbita de tres segmentos.
+ */
+export const ORBITA_SINGLE_FEED = true

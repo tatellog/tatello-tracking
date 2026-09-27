@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, {
   Circle,
@@ -12,10 +12,7 @@ import Svg, {
 } from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 
-import {
-  buildMonthGrid,
-  effectiveTrainingPhrase,
-} from '@/features/tabs/components/constellation/data/month-grid'
+import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
@@ -56,36 +53,6 @@ export type DayMark = 'transformation' | 'revelation' | 'pattern'
  *  CalendarDay (recientes); meses viejos quedan sin meta (degradación suave). */
 export type DayMeta = { rested: boolean; marks: DayMark[] }
 
-/** Reconoce la CONSTANCIA del movimiento (all-time). Voz de coach cálida, sin
- *  racha rígida, sin countdown, sin culpa: el número solo crece. */
-function constancyLine(count: number): string {
-  if (count >= 30) return 'Tu cuerpo ya tiene su ritmo. La constancia se ve en tu cielo.'
-  if (count >= 12) return 'Vas tejiendo tu constancia, un día a la vez.'
-  if (count >= 4) return 'Cada día en movimiento suma. Tu cielo los guarda.'
-  return 'Tu constelación de movimiento apenas empieza.'
-}
-
-/** Puente de continuidad: los primeros días del mes el cielo se ve vacío por
- *  calendario, no por ausencia. Esta línea ancla ese vacío al mes anterior
- *  PROPIO (el principio de Apple Trends: contra tu historial, nunca una vara:
- *  aquí no hay meta ni "¿puedes con más?"). */
-function continuityLine(prevCount: number, prevMonth: string, currentMonth: string): string {
-  const cap = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)
-  if (prevCount === 1) {
-    return `La estrella de ${prevMonth} sigue en tu cielo. ${cap} apenas amanece.`
-  }
-  return `Las ${prevCount} estrellas de ${prevMonth} siguen en tu cielo. ${cap} apenas amanece.`
-}
-
-/** Fecha ISO `n` días antes de `today` (medianoche local, sin drift UTC). */
-function isoDaysAgo(today: string, n: number): string {
-  const [y, m, d] = today.split('-').map(Number) as [number, number, number]
-  const dt = new Date(y, m - 1, d - n)
-  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getDate()).padStart(2, '0')
-  return `${dt.getFullYear()}-${mm}-${dd}`
-}
-
 /*
  * Movement hero — the all-time trained-days counter PLUS a browsable
  * month rendered as a night sky: each trained day is a lit STAR (a 4-point
@@ -111,6 +78,13 @@ export function MovementConstellation({
 
   // 0 = current month, 1 = last month, … — how far back we're browsing.
   const [monthsBack, setMonthsBack] = useState(0)
+  // El cielo ocupa TODO el ancho de la tarjeta (dueña 26 sep 2026: "súper
+  // pequeño"): antes el lienzo medía 7×34 px fijos y quedaba centrado y chico.
+  const [gridW, setGridW] = useState(0)
+  const onGridLayout = (e: LayoutChangeEvent): void => {
+    const next = e.nativeEvent.layout.width
+    setGridW((p) => (Math.abs(p - next) < 1 ? p : next))
+  }
 
   const { month, firstWeekday, rows, monthLabel, isCurrentMonth } = useMemo(() => {
     const [ty, tm] = today.split('-').map(Number) as [number, number]
@@ -142,32 +116,9 @@ export function MovementConstellation({
   }
 
   const trained = month.trainedThisMonth
-  // Warm, no-guilt month line — never "0/30". A quiet month is a pause.
-  const monthLine =
-    trained > 0
-      ? `${trained} ${trained === 1 ? 'día entrenado' : 'días entrenados'}`
-      : isCurrentMonth
-        ? 'tu mes empieza'
-        : 'un mes en pausa'
-
-  // El "ahora" junto al total vitalicio: una ventana propia de 4 semanas. Solo
-  // aparece si hay algo que susurrar; si el ritmo bajó a cero, silencio (nunca
-  // se señala el descenso). Redundante si el total ES la ventana (usuaria nueva).
-  const recentCount = (allWorkouts.data ?? []).filter((d) => d >= isoDaysAgo(today, 27)).length
-  const recentLine =
-    recentCount > 0 && count > recentCount ? `${recentCount} en las últimas 4 semanas` : null
-
-  // Puente de continuidad los primeros 7 días del mes: el cierre deja de hablar
-  // del all-time y recuerda que el mes pasado sigue ahí. Después, constancia.
-  const dayOfMonth = Number(today.slice(8, 10))
-  const [ty, tm] = today.split('-').map(Number) as [number, number]
-  const prevRef = new Date(ty, tm - 2, 1)
-  const prevPrefix = `${prevRef.getFullYear()}-${String(prevRef.getMonth() + 1).padStart(2, '0')}`
-  const prevMonthCount = (allWorkouts.data ?? []).filter((d) => d.startsWith(prevPrefix)).length
-  const closingLine =
-    dayOfMonth <= 7 && prevMonthCount > 0
-      ? continuityLine(prevMonthCount, MONTHS[prevRef.getMonth()] ?? '', MONTHS[tm - 1] ?? '')
-      : constancyLine(count)
+  // Escala real: una celda = ancho/7; el viewBox sigue en unidades CELL.
+  const cellPx = gridW > 0 ? gridW / COLS : CELL
+  const monthTitle = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
 
   // Leyenda viva: solo los estados que EXISTEN en el mes visible. Una marca
   // que nunca aparece no merece renglón (el primer dorado se estrena solo).
@@ -195,32 +146,26 @@ export function MovementConstellation({
           <View style={styles.countRow}>
             <Text style={styles.bigNum}>{count}</Text>
             <Text style={styles.countLabel}>
-              {count === 1 ? 'día entrenado en total' : 'días entrenados en total'}
+              {count === 1 ? 'día entrenado' : 'días entrenados'}
             </Text>
           </View>
         ) : (
           <Text style={styles.startLine}>Tu constancia empieza con tu primer entreno.</Text>
         )}
-        {/* El "ahora": ventana propia de 4 semanas, en susurro bajo el héroe. */}
-        {recentLine ? <Text style={styles.recentLine}>{recentLine}</Text> : null}
-        {/* Human milestone, once a full month of effective training is in. */}
-        {count >= 30 ? (
-          <Text style={styles.milestone}>{effectiveTrainingPhrase(count)} de entreno efectivo</Text>
-        ) : null}
 
         {/* Browsable month header — ‹ MONTH ◇ count › */}
         <View style={styles.monthHead}>
           <Pressable onPress={() => step(1)} hitSlop={12} style={styles.navHit}>
             <Text style={styles.navArrow}>‹</Text>
           </Pressable>
-          <View style={styles.monthLabelWrap}>
-            <Text style={styles.monthName}>{monthLabel}</Text>
-            <View style={styles.monthCountRow}>
-              <View style={styles.gem} />
-              <Text style={styles.monthCount}>{monthLine}</Text>
-              <View style={styles.gem} />
-            </View>
-          </View>
+          <Text style={styles.monthName}>
+            {monthTitle}
+            {trained > 0 ? (
+              <Text
+                style={styles.monthCount}
+              >{`  ·  ${trained} ${trained === 1 ? 'entrenado' : 'entrenados'}`}</Text>
+            ) : null}
+          </Text>
           <Pressable
             onPress={() => step(-1)}
             disabled={isCurrentMonth}
@@ -231,120 +176,118 @@ export function MovementConstellation({
           </Pressable>
         </View>
 
-        <View style={styles.weekdayRow}>
-          {WD.map((w, i) => (
-            <Text key={`wd-${i}`} style={styles.weekdayLabel}>
-              {w}
-            </Text>
-          ))}
-        </View>
+        <View onLayout={onGridLayout}>
+          <View style={styles.weekdayRow}>
+            {WD.map((w, i) => (
+              <Text key={`wd-${i}`} style={[styles.weekdayLabel, { width: cellPx }]}>
+                {w}
+              </Text>
+            ))}
+          </View>
 
-        <Svg
-          width="100%"
-          height={canvasH}
-          viewBox={`0 0 ${canvasW} ${canvasH}`}
-          preserveAspectRatio="xMidYMid meet"
-        >
-          <Defs>
-            {/* Feathered magenta halo around a lit star. */}
-            <RadialGradient id="mov-aura" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor={MAGENTA} stopOpacity={0.42} />
-              <Stop offset="38%" stopColor={MAGENTA} stopOpacity={0.2} />
-              <Stop offset="72%" stopColor="#FBD7E3" stopOpacity={0.07} />
-              <Stop offset="100%" stopColor={MAGENTA} stopOpacity={0} />
-            </RadialGradient>
-            {/* White-hot bloom → magenta, the "blown-out" core glow. */}
-            <RadialGradient id="mov-bloom" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.92} />
-              <Stop offset="30%" stopColor="#FFE9D6" stopOpacity={0.55} />
-              <Stop offset="70%" stopColor={MAGENTA} stopOpacity={0.18} />
-              <Stop offset="100%" stopColor={MAGENTA} stopOpacity={0} />
-            </RadialGradient>
-            {/* Feathered streak — stretches to each ellipse's bbox to
+          <Svg
+            width={gridW > 0 ? gridW : canvasW}
+            height={(gridW > 0 ? cellPx / CELL : 1) * canvasH}
+            viewBox={`0 0 ${canvasW} ${canvasH}`}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <Defs>
+              {/* Feathered magenta halo around a lit star. */}
+              <RadialGradient id="mov-aura" cx="50%" cy="50%" r="50%">
+                <Stop offset="0%" stopColor={MAGENTA} stopOpacity={0.42} />
+                <Stop offset="38%" stopColor={MAGENTA} stopOpacity={0.2} />
+                <Stop offset="72%" stopColor="#FBD7E3" stopOpacity={0.07} />
+                <Stop offset="100%" stopColor={MAGENTA} stopOpacity={0} />
+              </RadialGradient>
+              {/* White-hot bloom → magenta, the "blown-out" core glow. */}
+              <RadialGradient id="mov-bloom" cx="50%" cy="50%" r="50%">
+                <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.92} />
+                <Stop offset="30%" stopColor="#FFE9D6" stopOpacity={0.55} />
+                <Stop offset="70%" stopColor={MAGENTA} stopOpacity={0.18} />
+                <Stop offset="100%" stopColor={MAGENTA} stopOpacity={0} />
+              </RadialGradient>
+              {/* Feathered streak — stretches to each ellipse's bbox to
                 draw an anamorphic light spike. */}
-            <RadialGradient id="mov-streak" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.9} />
-              <Stop offset="40%" stopColor="#FFFFFF" stopOpacity={0.35} />
-              <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
-            </RadialGradient>
-            {/* Faint sky well behind the grid — turns "panel" into
+              <RadialGradient id="mov-streak" cx="50%" cy="50%" r="50%">
+                <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.9} />
+                <Stop offset="40%" stopColor="#FFFFFF" stopOpacity={0.35} />
+                <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+              </RadialGradient>
+              {/* Faint sky well behind the grid — turns "panel" into
                 "window onto the night". */}
-            <RadialGradient id="mov-sky" cx="50%" cy="50%" r="62%">
-              <Stop offset="0%" stopColor="#1F0E13" stopOpacity={0.5} />
-              <Stop offset="100%" stopColor="#1F0E13" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
+              <RadialGradient id="mov-sky" cx="50%" cy="50%" r="62%">
+                <Stop offset="0%" stopColor="#1F0E13" stopOpacity={0.5} />
+                <Stop offset="100%" stopColor="#1F0E13" stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
 
-          <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mov-sky)" />
+            <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mov-sky)" />
 
-          {month.cells.map((cell, i) => {
-            const k = firstWeekday + i
-            const col = k % COLS
-            const row = Math.floor(k / COLS)
-            const cx = col * CELL + CELL / 2
-            const cy = row * CELL + CELL / 2
-            const meta = metaByDate?.get(cell.date)
-            const dayNum = Number(cell.date.slice(8, 10))
-            return (
-              <Fragment key={cell.date}>
-                <DayDot
-                  cx={cx}
-                  cy={cy}
-                  lit={cell.trained}
-                  isToday={cell.isToday}
-                  isFuture={cell.isFuture}
-                  rested={meta?.rested ?? false}
-                  marks={meta?.marks ?? []}
-                />
-                {/* Número del día, tenue, debajo de la estrella — para ubicarte
+            {month.cells.map((cell, i) => {
+              const k = firstWeekday + i
+              const col = k % COLS
+              const row = Math.floor(k / COLS)
+              const cx = col * CELL + CELL / 2
+              const cy = row * CELL + CELL / 2
+              const meta = metaByDate?.get(cell.date)
+              const dayNum = Number(cell.date.slice(8, 10))
+              return (
+                <Fragment key={cell.date}>
+                  <DayDot
+                    cx={cx}
+                    cy={cy}
+                    lit={cell.trained}
+                    isToday={cell.isToday}
+                    isFuture={cell.isFuture}
+                    rested={meta?.rested ?? false}
+                    marks={meta?.marks ?? []}
+                  />
+                  {/* Número del día, tenue, debajo de la estrella — para ubicarte
                     ("¿qué día toqué?") sin competir con la constelación. */}
-                <SvgText
-                  x={cx}
-                  y={cy + CELL / 2 - 1}
-                  fill={LECHE}
-                  opacity={cell.isFuture ? 0.18 : 0.5}
-                  fontSize={8.5}
-                  fontFamily={typography.uiMedium}
-                  textAnchor="middle"
-                >
-                  {dayNum}
-                </SvgText>
-              </Fragment>
-            )
-          })}
+                  <SvgText
+                    x={cx}
+                    y={cy + CELL / 2 - 1}
+                    fill={LECHE}
+                    opacity={cell.isFuture ? 0.22 : 0.72}
+                    fontSize={9.5}
+                    fontFamily={typography.uiMedium}
+                    textAnchor="middle"
+                  >
+                    {dayNum}
+                  </SvgText>
+                </Fragment>
+              )
+            })}
 
-          {/* Zonas de toque transparentes ENCIMA de las estrellas (orden del
+            {/* Zonas de toque transparentes ENCIMA de las estrellas (orden del
               documento = z-order). Una por día NO futuro: tap → detalle de
               Historia (observación, no edición). El futuro no se toca. */}
-          {onDayPress
-            ? month.cells.map((cell, i) => {
-                if (cell.isFuture) return null
-                const k = firstWeekday + i
-                const col = k % COLS
-                const row = Math.floor(k / COLS)
-                return (
-                  <Rect
-                    key={`hit-${cell.date}`}
-                    x={col * CELL}
-                    y={row * CELL}
-                    width={CELL}
-                    height={CELL}
-                    fill="transparent"
-                    accessible
-                    accessibilityLabel={`Ver el día ${Number(cell.date.slice(8, 10))}`}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {})
-                      onDayPress(cell.date, cell.trained)
-                    }}
-                  />
-                )
-              })
-            : null}
-        </Svg>
-
-        {/* Pista de interacción — los días son tappables pero las estrellas no
-            lo gritan; una línea callada lo invita (mismo patrón que Semana/Día). */}
-        {onDayPress ? <Text style={styles.tapHint}>Toca un día para ver su detalle</Text> : null}
+            {onDayPress
+              ? month.cells.map((cell, i) => {
+                  if (cell.isFuture) return null
+                  const k = firstWeekday + i
+                  const col = k % COLS
+                  const row = Math.floor(k / COLS)
+                  return (
+                    <Rect
+                      key={`hit-${cell.date}`}
+                      x={col * CELL}
+                      y={row * CELL}
+                      width={CELL}
+                      height={CELL}
+                      fill="transparent"
+                      accessible
+                      accessibilityLabel={`Ver el día ${Number(cell.date.slice(8, 10))}`}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {})
+                        onDayPress(cell.date, cell.trained)
+                      }}
+                    />
+                  )
+                })
+              : null}
+          </Svg>
+        </View>
 
         {/* Leyenda — cómo se lee el cielo. Solo cuando hay tap (Historia). */}
         {onDayPress ? (
@@ -355,11 +298,6 @@ export function MovementConstellation({
             pattern={legendPattern}
           />
         ) : null}
-
-        {/* Cierre: reconoce la CONSTANCIA (no un entreno de hoy). Voz de coach,
-            sin racha rígida ni presión — el número solo crece. Al abrir el mes,
-            el puente de continuidad con el mes anterior toma su lugar. */}
-        {count >= 1 ? <Text style={styles.constancy}>{closingLine}</Text> : null}
       </View>
     </Animated.View>
   )
@@ -568,9 +506,6 @@ function FlareStar({ cx, cy, hero }: { cx: number; cy: number; hero: boolean }) 
 }
 
 const styles = StyleSheet.create({
-  eyebrow: {
-    marginBottom: 14,
-  },
   card: {
     backgroundColor: colors.bgCard,
     borderRadius: 16,
@@ -593,9 +528,8 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   countLabel: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.title,
     color: colors.leche,
   },
   // Hero antes del primer entreno — invitación, sin número.
@@ -606,22 +540,7 @@ const styles = StyleSheet.create({
     color: colors.leche,
     paddingVertical: 6,
   },
-  milestone: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.bone,
-    marginTop: 4,
-  },
   // El "ahora" bajo el total vitalicio — susurro, nunca compite con el héroe.
-  recentLine: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.bone,
-    marginTop: 4,
-    opacity: 0.85,
-  },
   monthHead: {
     marginTop: 18,
     marginBottom: 12,
@@ -642,75 +561,31 @@ const styles = StyleSheet.create({
   navArrowOff: {
     opacity: 0.18,
   },
-  monthLabelWrap: {
-    alignItems: 'center',
-  },
   monthName: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.smallLabel,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  monthCountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 3,
+    fontSize: typography.sizes.title,
+    color: colors.leche,
   },
   // Tiny magenta rhombus flanking the month line — the art-deco /
   // star-chart motif reused from the constellation tooltip.
-  gem: {
-    width: 4,
-    height: 4,
-    backgroundColor: colors.magenta,
-    opacity: 0.7,
-    transform: [{ rotate: '45deg' }],
-  },
   monthCount: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.bone,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
   },
   weekdayRow: {
     flexDirection: 'row',
-    // Mismo ancho que la grilla del SVG (viewBox 7×CELL, centrado por
-    // xMidYMid): a ancho completo con space-around las letras derivaban
-    // de sus columnas y el domingo se leía bajo S.
-    alignSelf: 'center',
-    width: COLS * CELL,
-    marginBottom: 6,
-    opacity: 0.55, // labels are cartography — they whisper, not shout.
+    marginBottom: 4,
   },
   weekdayLabel: {
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
+    fontSize: typography.sizes.smallLabel,
     color: colors.niebla,
     letterSpacing: 1.2,
-    width: CELL,
     textAlign: 'center',
   },
   // Pista de toque — callada, centrada, bajo el cielo (igual que Semana/Día).
-  tapHint: {
-    marginTop: 10,
-    textAlign: 'center',
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
   // Cierre del card: reconoce la constancia. Voz de coach (serif italic).
-  constancy: {
-    marginTop: 16,
-    textAlign: 'center',
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 24,
-    color: colors.bone,
-    paddingHorizontal: 8,
-  },
   // Leyenda — fila envolvente de marcas, bajo el cielo.
   legend: {
     flexDirection: 'row',
@@ -718,10 +593,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     columnGap: 14,
     rowGap: 6,
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    marginTop: 12,
   },
   legendItem: {
     flexDirection: 'row',
@@ -735,7 +607,7 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.tinyLabel,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
 })

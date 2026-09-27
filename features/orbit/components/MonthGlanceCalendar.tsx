@@ -1,54 +1,42 @@
 import { useState } from 'react'
-import { Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
 
 import { colors, typography } from '@/theme'
 
 import type { CalendarDay, MonthCalendar } from '../month-built'
 
 /*
- * "Tu mes de un vistazo" — el mapa estelar del mes. Responde "¿en qué días
- * estuviste en déficit?". Reescrito tras la auditoría de uxui + illustrator:
+ * "Tu mes" — el calendario del déficit. Responde "¿en qué días estuviste en
+ * déficit?" de un vistazo.
  *
- * El reencuadre clave: NO es "verde=bien / rosa=malo" (gramática de fitness que
- * roza la culpa), sino "días ENCENDIDOS vs cielo en reposo". El déficit es el
- * único día que emite luz (estrella oro con halo); el superávit es una brasa
- * NEUTRA que descansa (sin halo, sin el magenta de marca); "comiste muy poco", un
- * anillo frío distinto del oro (cuidado, no logro); sin datos, polvo. La distinción
- * es por LUMINANCIA + FORMA, no por hue alarmante → coherente con la familia
- * warm-gold de Stelar y manifiesto-safe (ni premia ni castiga).
- *
- * Calendario full-width (lee como calendario: cabecera L-M-X-J-V-S-D + hoy
- * marcado); el conteo va como caption debajo. Lógica en `monthCalendar`.
+ * El NÚMERO vive dentro de su marca (dueña 26 sep 2026, a lo Apple Fitness): con
+ * un punto diminuto sobre el número el mes se leía vacío. Gramática por LUMINANCIA
+ * + FORMA, nunca verde/rojo (manifiesto-safe, ni premia ni castiga):
+ *   déficit       → círculo oro relleno (el único que brilla)
+ *   sobre tu meta → círculo apagado relleno (descansa, sin magenta)
+ *   comiste poco  → solo aro frío (cuidado, no logro)
+ *   sin registro  → el número tenue, sin marca
+ *   futuro        → el número aún más tenue
+ * Lógica en `monthCalendar`.
  */
 
 const WD_INITIALS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
-const DUST = colors.bruma
+const MARK_MAX = 34
 
-/** Un día = un punto de luz (o su ausencia). Centrado en su celda. */
-function DayMark({ day }: { day: CalendarDay }) {
-  if (day.status === 'deficit') {
-    // Estrella encendida: bloom + glow + cuerpo + núcleo especular. El único
-    // día que emite luz.
-    return (
-      <View style={styles.bloom}>
-        <View style={styles.glow}>
-          <View style={styles.starBody}>
-            <View style={styles.starCore} />
-          </View>
-        </View>
-      </View>
-    )
-  }
-  if (day.status === 'surplus') {
-    // Brasa NEUTRA que descansa, SIN halo (recede). No magenta (color de marca).
-    return <View style={styles.ember} />
-  }
-  if (day.status === 'low') {
-    // Comiste muy poco: anillo FRÍO, distinto del oro (señal de cuidado, no logro).
-    return <View style={styles.lowRing} />
-  }
-  // Sin datos: polvo cósmico que se hunde en el negro. El futuro, aún más.
-  return <View style={[styles.dust, day.future ? styles.dustFuture : null]} />
+type Mark = { box: object | null; text: object }
+
+function markFor(status: CalendarDay['status'], future: boolean): Mark {
+  if (status === 'deficit') return { box: styles.markDeficit, text: styles.numDeficit }
+  if (status === 'surplus') return { box: styles.markSurplus, text: styles.numSurplus }
+  if (status === 'low') return { box: styles.markLow, text: styles.numLow }
+  return { box: null, text: future ? styles.numFuture : styles.numNone }
+}
+
+const STATUS_LABEL: Record<CalendarDay['status'], string> = {
+  deficit: 'en déficit',
+  surplus: 'sobre tu meta',
+  low: 'comiste poco',
+  none: 'sin registro',
 }
 
 export function MonthGlanceCalendar({
@@ -56,7 +44,7 @@ export function MonthGlanceCalendar({
   onPickDay,
 }: {
   data: MonthCalendar
-  /** Tocar un día (no futuro) lo abre en Órbita · Día. */
+  /** Tocar un día (no futuro) lo abre en el día completo. */
   onPickDay?: (date: string) => void
 }) {
   const [w, setW] = useState(0)
@@ -65,33 +53,21 @@ export function MonthGlanceCalendar({
     setW((p) => (Math.abs(p - next) < 1 ? p : next))
   }
   const cell = w > 0 ? w / 7 : 0
+  const mark = Math.min(MARK_MAX, Math.max(0, cell - 10))
   const cells: (CalendarDay | null)[] = [...Array(data.leadOffset).fill(null), ...data.days]
-  const pct = data.dataDays > 0 ? Math.round((data.deficitDays / data.dataDays) * 100) : 0
-  // Un verdicto CÁLIDO (no un número frío): la usuaria quiere saber "¿voy bien?",
-  // no interpretar un % sola. Aliento, nunca calificación ni culpa.
-  const verdict =
-    pct >= 70
-      ? 'La mayor parte de tu mes, en déficit. Eso se construye.'
-      : pct >= 50
-        ? 'Más días en déficit que fuera de él. Vas en camino.'
-        : pct >= 30
-          ? 'Ya vas armando el ritmo, un día a la vez.'
-          : 'Cada día en déficit suma. Lo vas construyendo.'
 
   return (
-    <View
-      style={styles.section}
-      accessible
-      accessibilityLabel={
-        data.dataDays < 5
-          ? `Llevas ${data.dataDays} ${data.dataDays === 1 ? 'día registrado' : 'días registrados'} este mes.`
-          : `${data.deficitDays} de ${data.dataDays} días en déficit este mes, ${pct} por ciento.`
-      }
-    >
+    <View style={styles.section}>
+      {/* Leyenda: la misma forma que las marcas, en miniatura. */}
+      <View style={styles.legend}>
+        <LegendItem kind="deficit" label="déficit" />
+        <LegendItem kind="surplus" label="sobre tu meta" />
+        {data.hasLow ? <LegendItem kind="low" label="poco" /> : null}
+      </View>
+
       <View style={styles.calendar} onLayout={onLayout}>
         {cell > 0 ? (
           <>
-            {/* Cabecera de días: 7 letras tenues (sin cajas → no es Excel). */}
             <View style={styles.weekHead}>
               {WD_INITIALS.map((d, i) => (
                 <Text key={i} style={[styles.weekInitial, { width: cell }]}>
@@ -102,136 +78,91 @@ export function MonthGlanceCalendar({
 
             <View style={styles.grid}>
               {cells.map((c, i) => {
-                // Cada día (no futuro) es tappable → abre ese día en Órbita Día.
-                // El Pressable va DENTRO de la celda de ancho fijo: así la grilla
-                // (flexWrap por `width: cell`) no cambia su layout, solo se vuelve
-                // tappable la marca de adentro.
-                const tappable = c != null && !c.future && onPickDay != null
-                const inner = (
-                  <>
-                    {/* Hoy: aro tenue de orientación temporal, detrás de la marca. */}
-                    {c?.isToday ? <View style={styles.todayRing} /> : null}
-                    {c ? <DayMark day={c} /> : null}
-                    {/* El número del día — para saber QUÉ día estás tocando. Tenue,
-                        bajo la estrella; en hoy, más claro. */}
-                    {c ? (
-                      <Text style={[styles.dayNum, c.isToday && styles.dayNumToday]}>{c.day}</Text>
-                    ) : null}
-                  </>
+                if (!c) return <View key={i} style={{ width: cell, height: cell }} />
+                const m = markFor(c.status, c.future)
+                const tappable = !c.future && onPickDay != null
+                const circle = (
+                  <View
+                    style={[
+                      styles.mark,
+                      { width: mark, height: mark, borderRadius: mark / 2 },
+                      m.box,
+                      c.isToday && styles.markToday,
+                    ]}
+                  >
+                    <Text style={[styles.num, m.text, c.isToday && styles.numToday]}>{c.day}</Text>
+                  </View>
                 )
                 return (
                   <View key={i} style={[styles.cellBox, { width: cell, height: cell }]}>
                     {tappable ? (
                       <Pressable
-                        onPress={() => onPickDay!(c!.date)}
-                        hitSlop={4}
+                        onPress={() => onPickDay!(c.date)}
+                        hitSlop={2}
                         accessibilityRole="button"
-                        accessibilityLabel={`Abrir el día ${c!.day} en Órbita Día`}
+                        accessibilityLabel={`Día ${c.day}, ${STATUS_LABEL[c.status]}. Abrir el día.`}
                         style={({ pressed }) => [styles.cellFill, pressed && styles.cellPressed]}
                       >
-                        {inner}
+                        {circle}
                       </Pressable>
                     ) : (
-                      inner
+                      circle
                     )}
                   </View>
                 )
               })}
             </View>
-            {onPickDay ? (
-              <Text style={styles.tapHint}>Toca un día para abrirlo en Día.</Text>
-            ) : null}
           </>
         ) : null}
       </View>
-
-      {/* Conteo como caption. Con POCOS días (arranque de mes) NO se muestra el %:
-          un "0%" sobre 1 día no es dato, es culpa el peor día posible. Se gana el
-          derecho a aparecer cuando ya significa algo (≥ 5 días registrados). */}
-      {data.dataDays < 5 ? (
-        <Text style={styles.caption}>
-          <Text style={styles.captionRest}>
-            Llevas {data.dataDays} {data.dataDays === 1 ? 'día registrado' : 'días registrados'}{' '}
-            este mes. Cada día se enciende aquí.
-          </Text>
-        </Text>
-      ) : (
-        <>
-          <Text style={styles.caption}>
-            <Text style={styles.captionNum}>{data.deficitDays}</Text>
-            {/* Denominador EXPLÍCITO: "26" salía de la nada; son tus días con
-                registro, no los del mes. */}
-            <Text style={styles.captionRest}>
-              {' '}
-              de los {data.dataDays} días con registro, en déficit
-            </Text>
-            <Text style={styles.captionDot}> · </Text>
-            <Text style={styles.captionPct}>{pct}%</Text>
-          </Text>
-          <Text style={styles.captionVerdict}>{verdict}</Text>
-        </>
-      )}
-
-      {/* Leyenda: cada chip es una miniatura del tratamiento real. Se gana el
-          derecho a aparecer con ≥5 días (mismo umbral que el %): enseñar la
-          gramática de 4 estados con 1 punto es explicar un texto que aún no
-          existe. */}
-      {data.dataDays >= 5 ? (
-        <>
-          <View style={styles.legend}>
-            <LegendItem kind="deficit" label="Déficit" />
-            <LegendItem kind="surplus" label="Superávit" />
-            <LegendItem kind="none" label="Sin datos" />
-            {data.hasLow ? <LegendItem kind="low" label="Día muy bajo" /> : null}
-          </View>
-          {/* "Muy bajo" sin explicación se lee como regaño en voz bajita ("¿hice
-              algo mal?"). Una línea que lo nombra como cuidado, no como falta. */}
-          {data.hasLow ? (
-            <Text style={styles.lowNote}>
-              Muy bajo: ese día quedó muy poca comida registrada. No es un logro ni una falta; tu
-              cuerpo también necesita energía para sostener el cambio.
-            </Text>
-          ) : null}
-        </>
-      ) : null}
     </View>
   )
 }
 
 function LegendItem({ kind, label }: { kind: CalendarDay['status']; label: string }) {
+  const m = markFor(kind, false)
   return (
     <View style={styles.legendItem}>
-      <View style={styles.legendSwatch}>
-        {kind === 'deficit' ? (
-          <View style={styles.legendGlow}>
-            <View style={styles.legendStar} />
-          </View>
-        ) : kind === 'surplus' ? (
-          <View style={styles.ember} />
-        ) : kind === 'low' ? (
-          <View style={styles.lowRing} />
-        ) : (
-          <View style={styles.dust} />
-        )}
-      </View>
+      <View style={[styles.legendSwatch, m.box]} />
       <Text style={styles.legendLabel}>{label}</Text>
     </View>
   )
 }
 
+const SURPLUS_FILL = 'rgba(188, 150, 128, 0.22)'
+const LOW_RING = 'rgba(150, 158, 172, 0.6)'
+
 const styles = StyleSheet.create({
-  // El encabezado (categoría + mes + pregunta) lo pone MonthSegment; aquí la
-  // rejilla se pega debajo, no flota como otra tarjeta.
   section: {
-    marginTop: 18,
+    marginTop: 10,
   },
-  // ── Calendario full-width ─────────────────────────────────────
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  legendSwatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
   calendar: {
-    marginTop: 22,
+    marginTop: 14,
   },
   weekHead: {
     flexDirection: 'row',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   weekInitial: {
     textAlign: 'center',
@@ -257,192 +188,37 @@ const styles = StyleSheet.create({
   },
   cellPressed: {
     opacity: 0.55,
+    transform: [{ scale: 0.94 }],
   },
-  // El número del día — pequeño y tenue bajo la estrella (identifica el día sin
-  // robarle el protagonismo al mapa estelar).
-  dayNum: {
-    marginTop: 3,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.micro,
-    letterSpacing: 0.2,
-    color: colors.bone,
+  // ── La marca: un círculo con el número adentro ──
+  mark: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markDeficit: {
+    backgroundColor: colors.oroSoft,
+  },
+  markSurplus: {
+    backgroundColor: SURPLUS_FILL,
+  },
+  markLow: {
+    borderWidth: 1.5,
+    borderColor: LOW_RING,
+  },
+  // Hoy: aro claro de orientación, sobre cualquier estado.
+  markToday: {
+    borderWidth: 1.5,
+    borderColor: colors.leche,
+  },
+  num: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
     fontVariant: ['tabular-nums'],
   },
-  dayNumToday: {
-    fontFamily: typography.uiBold,
-    color: colors.leche,
-  },
-  // Pista de tappabilidad — niebla, centrada, como la tira de Semana.
-  tapHint: {
-    marginTop: 12,
-    textAlign: 'center',
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  // Aro de "hoy": orientación temporal, muy tenue.
-  todayRing: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairline,
-  },
-  // ── Día en déficit: estrella encendida (bloom > glow > cuerpo > núcleo) ──
-  bloom: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.oroBloom,
-  },
-  glow: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.oroGlow,
-  },
-  starBody: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.oroLight,
-    // Bloom real en iOS; en Android el stack de Views ya da el halo.
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.oro,
-        shadowOpacity: 0.9,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 0 },
-      },
-      default: {},
-    }),
-  },
-  starCore: {
-    width: 2.5,
-    height: 2.5,
-    borderRadius: 1.25,
-    backgroundColor: colors.oroLeche,
-  },
-  // ── Día sobre meta: brasa NEUTRA tibia que descansa (sin halo). NO el magenta
-  //    de marca: ese color celebra en el resto de la app; usarlo para "te pasaste"
-  //    manda señal cruzada. Un ascua taupe: presente pero apagada, sin premiar. ──
-  ember: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(188, 150, 128, 0.55)',
-  },
-  // ── Muy bajo (comiste muy poco): anillo FRÍO, claramente distinto del oro — no
-  //    debe leerse como "casi déficit / casi bien". Es señal de cuidado, no logro. ─
-  lowRing: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    borderWidth: 1.2,
-    borderColor: 'rgba(150, 158, 172, 0.5)',
-    backgroundColor: 'transparent',
-  },
-  // ── Sin datos: polvo ──────────────────────────────────────────
-  dust: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: DUST,
-    opacity: 0.55,
-  },
-  dustFuture: {
-    opacity: 0.25,
-  },
-  // ── Conteo (caption) ──────────────────────────────────────────
-  caption: {
-    marginTop: 22,
-    paddingLeft: 2,
-    fontVariant: ['tabular-nums'],
-  },
-  captionNum: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.segmentTitle,
-    letterSpacing: -0.4,
-    color: colors.leche,
-  },
-  captionRest: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-  },
-  captionDot: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bruma,
-  },
-  captionPct: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  // El verdicto cálido: voz de coach (serif italic), no un dato más. Responde
-  // "¿voy bien?" sin volverlo calificación.
-  captionVerdict: {
-    marginTop: 8,
-    paddingLeft: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 22,
-    color: colors.bone,
-  },
-  // ── Leyenda ───────────────────────────────────────────────────
-  legend: {
-    marginTop: 22,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 18,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  // Swatch de ancho fijo para alinear las etiquetas pese a tamaños distintos.
-  legendSwatch: {
-    width: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  legendGlow: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.oroGlow,
-  },
-  legendStar: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.oroLight,
-  },
-  legendLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  lowNote: {
-    marginTop: 10,
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.tinyLabel,
-    lineHeight: 16,
-    color: colors.niebla,
-  },
+  numDeficit: { color: colors.bg },
+  numSurplus: { color: colors.bone },
+  numLow: { color: colors.bone },
+  numNone: { color: colors.niebla },
+  numFuture: { color: colors.niebla, opacity: 0.4 },
+  numToday: { fontFamily: typography.uiBold },
 })

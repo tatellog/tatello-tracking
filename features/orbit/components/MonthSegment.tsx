@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
 import { BlurView } from 'expo-blur'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useIsFocused } from '@react-navigation/native'
 
 import { colors, typography } from '@/theme'
@@ -35,6 +36,9 @@ import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
+import { AiCta } from '@/components/AiCta'
+import { useSession } from '@/hooks/useSession'
+import { aiEnabledForEmail } from '@/lib/featureFlags'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
@@ -60,7 +64,32 @@ import {
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
 import { weeklyMovementLever } from '../week-orbit-logic'
+import { comboChatHash, comboId, comboToFinding } from '../combo-chat'
+import {
+  comboDayDetail,
+  comboFacts,
+  comboFocus,
+  comboHabitList,
+  comboOpening,
+  comboGroupLabel,
+  comboHeadline,
+  comboWeek,
+  comboLiftBadge,
+  comboWeekSummary,
+  comboWeekLine,
+  evidenceDots,
+} from '../combo-facts'
+import { useComboTranscript } from '../combo-transcript'
+import { comboKey, combosBornRecently } from '../combo-memory'
+import { useSeenCombos } from '../combo-seen'
+import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
+import { useNotifyOffer } from '@/features/notifications/offer'
+import { earlyReading } from '../early-readings'
+import { dataMaturity } from '../maturity'
+import { useSaveReflection } from '../reflections'
 import { EmptySegmentCard } from './EmptySegmentCard'
+import { ComboChatView } from './ComboChatView'
+import { MonthChatSheet } from './MonthChatSheet'
 import { MonthGlanceCalendar } from './MonthGlanceCalendar'
 import { PatternDiscovery } from './PatternDiscovery'
 import { PatternRevealModal } from './PatternRevealModal'
@@ -230,10 +259,24 @@ function DayStars({ count, total, color }: { count: number; total: number; color
 export function MonthSegment({
   onPickDay,
   onScrollTop,
+  view = 'full',
+  onPickDayFromChat,
+  resumeChat,
+  onChatResumed,
 }: {
   onPickDay?: (date: string) => void
+  /** Un día tocado dentro del chat del patrón: abre el día completo y deja
+   *  volver a la conversación. */
+  onPickDayFromChat?: (date: string) => void
+  /** Reabrir el chat del patrón al volver del día (y avisar que ya se abrió). */
+  resumeChat?: boolean
+  onChatResumed?: () => void
   /** Volver al inicio del scroll de Órbita (botón al final del Mes). */
   onScrollTop?: () => void
+  /** Órbita de un solo scroll (ORBITA_SINGLE_FEED): 'patterns' pinta solo
+   *  "Tus patrones" (el protagonista del feed); 'month' pinta el mes sin sus
+   *  patrones (detrás de "Tu mes de un vistazo ›"). 'full' = el Mes de siempre. */
+  view?: 'full' | 'patterns' | 'month'
 } = {}) {
   const { data: hasAny } = useHasAnySignals()
   const {
@@ -254,6 +297,14 @@ export function MonthSegment({
   const patternDataDays = useMemo(
     () => patternSignals.filter((s) => s.day != null).length,
     [patternSignals],
+  )
+
+  // Madurez de datos (docs/orbita-maturity-spec.md): la sección promete solo
+  // lo que sus días sostienen. Etapa por días CON DATOS, por dimensión.
+  const maturity = useMemo(() => dataMaturity(patternSignals), [patternSignals])
+  const firstSignal = useMemo(
+    () => (maturity.stage >= 1 ? earlyReading(patternSignals, todayInTimezone()) : null),
+    [maturity.stage, patternSignals],
   )
 
   const targets = useMacroTargets().data
@@ -309,10 +360,41 @@ export function MonthSegment({
   // "Tus patrones": el patrón dominante = la combinación de hábitos que más
   // coincidió y mejor terminó en déficit. ACUMULATIVO (ventana larga, no el mes)
   // → un patrón es de tu historia, no se borra el día 1.
-  const combo = useMemo(
-    () => winningCombo(patternSignals, { calorieTarget, proteinTarget, waterGoalGlasses }),
+  // Histéresis (dueña 26 sep 2026): un patrón que ya se mostró sigue vivo con
+  // la vara de permanencia. "Ya mostrado" = nació en las últimas 2 semanas o
+  // quedó guardado en el teléfono cuando se vio.
+  const seenUid = useSession().session?.user?.id ?? null
+  const seenCombos = useSeenCombos(seenUid)
+  const recentCombos = useMemo(
+    () =>
+      combosBornRecently(
+        patternSignals,
+        { calorieTarget, proteinTarget, waterGoalGlasses },
+        todayInTimezone(),
+      ),
     [patternSignals, calorieTarget, proteinTarget, waterGoalGlasses],
   )
+  const seenKeys = seenCombos.keys
+  const keepCombos = useMemo(
+    () => [...new Set([...seenKeys, ...recentCombos])],
+    [seenKeys, recentCombos],
+  )
+  const combo = useMemo(
+    () =>
+      winningCombo(patternSignals, {
+        calorieTarget,
+        proteinTarget,
+        waterGoalGlasses,
+        keep: keepCombos,
+      }),
+    [patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, keepCombos],
+  )
+  // Lo que se muestra queda guardado: mañana sigue con la vara de permanencia.
+  const shownKey = combo ? comboKey(combo.signals.map((x) => x.key)) : null
+  useEffect(() => {
+    if (shownKey) seenCombos.mark(shownKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownKey])
   // Patrones de apoyo: correlaciones demostrables del motor (kind 'pattern'). Se
   // excluye lo que ya dijo el combo (sin redundancia) y se ordena por relevancia
   // (déficit es el norte). Tope: 2 con combo, 3 sin él (el astrónomo no abruma).
@@ -376,6 +458,7 @@ export function MonthSegment({
         : null
     return {
       label: `${HABIT_LABEL[key]} → déficit${proof} · descubierto el ${when}`,
+      when,
       onReplay: () =>
         emitReplayReveal({
           tier: row.tier,
@@ -463,6 +546,76 @@ export function MonthSegment({
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
   const [reveal, setReveal] = useState<ComboReveal | null>(null)
+  // "✦ Quiero entenderlo": la IA explica el patrón dominante que el motor ya
+  // encontró (combo-chat.ts viste el combo como Finding). Solo con IA real.
+  const { session } = useSession()
+  const aiOn = aiEnabledForEmail(session?.user?.email)
+  const [chatOpen, setChatOpen] = useState(false)
+  const comboLever = useMemo(
+    () =>
+      combo
+        ? weeklyComboLever(
+            patternSignals,
+            combo,
+            { calorieTarget, proteinTarget, waterGoalGlasses },
+            today,
+          )
+        : null,
+    [combo, patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, today],
+  )
+  const comboFinding = useMemo(
+    () => (combo ? comboToFinding(combo, comboLever) : null),
+    [combo, comboLever],
+  )
+  const saveReflection = useSaveReflection(today.slice(0, 7))
+  // Segunda y última oferta de avisos: su primer patrón (solo si en la primera
+  // comida dijo "Ahora no"). Espera a que no haya chat ni revelación abiertos.
+  const notifyOffer = useNotifyOffer('pattern', view === 'patterns' && combo != null && !chatOpen)
+  // El chat del patrón con paquete de hechos (combo-facts): apertura, hechos,
+  // foco y semana los calcula el motor; la IA solo redacta preguntas y respuestas.
+  const comboOpts = { calorieTarget, proteinTarget, waterGoalGlasses }
+  const facts = useMemo(
+    () =>
+      combo
+        ? comboFacts(
+            patternSignals,
+            combo,
+            { calorieTarget, proteinTarget, waterGoalGlasses },
+            today,
+          )
+        : [],
+    [combo, patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, today],
+  )
+  const week = useMemo(
+    () =>
+      combo
+        ? comboWeek(
+            patternSignals,
+            combo,
+            { calorieTarget, proteinTarget, waterGoalGlasses },
+            today,
+          )
+        : null,
+    [combo, patternSignals, calorieTarget, proteinTarget, waterGoalGlasses, today],
+  )
+  const weekLine = comboWeekLine(week)
+  // La tarjeta abre el chat ya contestando la pregunta que tocó (o sin pregunta).
+  const [chatAsk, setChatAsk] = useState<string | null>(null)
+  const openChat = (factId: string | null) => {
+    setChatAsk(factId)
+    setChatOpen(true)
+  }
+  const chatHash = combo ? comboChatHash(combo) : null
+  const uid = session?.user?.id ?? null
+  const comboTalk = useComboTranscript(uid, chatHash)
+  // Volver del día a la conversación: se reabre sola.
+  useEffect(() => {
+    if (resumeChat && comboFinding) {
+      setChatAsk(null)
+      setChatOpen(true)
+      onChatResumed?.()
+    }
+  }, [resumeChat, comboFinding, onChatResumed])
   const [revealDetail, setRevealDetail] = useState<RevealDetail | null>(null)
   const openReveal = (item: MonthReveals['revealed'][number], revealed: boolean) =>
     setRevealDetail({
@@ -480,6 +633,8 @@ export function MonthSegment({
 
   // 9.4 · carga y error explícitos (mismo par cálido de Día): sin esto, un
   // fetch fallido dejaba el Mes en blanco sin salida.
+  // En el feed, los patrones cargan en silencio (el feed ya tiene su hero).
+  if (view === 'patterns' && history == null) return null
   if (historyLoading && history == null) {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
@@ -511,7 +666,7 @@ export function MonthSegment({
     )
   }
 
-  if (hasAny === false) {
+  if (hasAny === false && view !== 'patterns') {
     return (
       <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
         <HeroHeader />
@@ -533,177 +688,224 @@ export function MonthSegment({
     )
   }
 
+  // "Tu mes": el calendario completo con navegador de mes. En el feed de
+  // Descubre va DENTRO del scroll, debajo de tus patrones (dueña 26 sep 2026:
+  // no hacía falta una vista aparte); en el Mes completo, arriba.
+  const calendarPanel = (
+    <View style={[styles.beat, styles.glancePanel]}>
+      {/* Una sola fila: el mes (navegable) y su conteo. */}
+      <View style={styles.calHeader}>
+        <View style={styles.monthPagerRow}>
+          <Pressable
+            onPress={() => setMonthOffset((o) => o - 1)}
+            disabled={!canPrevMonth}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Mes anterior"
+          >
+            <Text style={[styles.monthArrow, !canPrevMonth && styles.monthArrowOff]}>‹</Text>
+          </Pressable>
+          <Text style={styles.monthTitle} accessibilityRole="header">
+            {monthLabelOf(selectedMonth, today)}
+          </Text>
+          <Pressable
+            onPress={() => setMonthOffset((o) => o + 1)}
+            disabled={!canNextMonth}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Mes siguiente"
+          >
+            <Text style={[styles.monthArrow, !canNextMonth && styles.monthArrowOff]}>›</Text>
+          </Pressable>
+          {/* El conteo en la misma fila: la respuesta sin párrafo. Con pocos
+              días no hay "de N": solo cuántos llevas. */}
+          {glance ? (
+            <Text style={[styles.monthCount, glance.dataDays < 5 && styles.monthCountQuiet]}>
+              {glance.dataDays < 5
+                ? `${glance.dataDays} ${glance.dataDays === 1 ? 'registrado' : 'registrados'}`
+                : `${glance.deficitDays} de ${glance.dataDays} en déficit`}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {glance ? (
+        <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
+      ) : (
+        <View style={styles.monthEmpty}>
+          <Text style={styles.monthEmptyBody}>
+            {monthOffset === 0
+              ? 'El calendario se irá encendiendo conforme registres tus días.'
+              : 'Aún no hay días con comida en este mes.'}
+          </Text>
+          {monthOffset === 0 && canPrevMonth ? (
+            <Text style={styles.monthEmptyHint}>Usa las flechas para ver meses anteriores.</Text>
+          ) : null}
+        </View>
+      )}
+    </View>
+  )
+
   return (
     <Animated.View entering={FadeIn.duration(320)} style={styles.wrap}>
-      {/* 1 · Hero — la pregunta + la constelación revelada. */}
-      <HeroHeader />
-      {sign ? (
-        <EmblemHero
-          sign={sign}
-          progress={progress}
-          delta={delta}
-          message={withSign(stage.message, signName(sign))}
-          reveals={reveals}
-          deficitTrendUp={deficitTrendUp}
-          onOpenReveal={openReveal}
-        />
-      ) : null}
+      {view !== 'patterns' ? (
+        <>
+          {/* 1 · Hero — la pregunta + la constelación revelada. Solo en el Mes
+              completo: en Descubre el emblema ya vive en Hoy ("Tu {signo}") y
+              aquí repetía la pantalla y contradecía su propio texto. */}
+          {view === 'full' ? <HeroHeader /> : null}
+          {sign && view === 'full' ? (
+            <EmblemHero
+              sign={sign}
+              progress={progress}
+              delta={delta}
+              message={withSign(stage.message, signName(sign))}
+              reveals={reveals}
+              deficitTrendUp={deficitTrendUp}
+              onOpenReveal={openReveal}
+            />
+          ) : null}
 
-      {/* La pantalla se lee como una HISTORIA de 4 tiempos, no un dashboard:
+          {/* La pantalla se lee como una HISTORIA de 4 tiempos, no un dashboard:
           T1 ¿avanzo? (el héroe) → T2 ¿qué lo movió? → T3 ¿qué hago distinto? →
           T4 ¿sigo así? Cada tiempo abre con su pregunta humana. El detalle
           (calendario, patrones, parrilla) baja a "ver más" contextual (slice 2). */}
 
-      {/* ── Tiempo 2 · El calendario de déficit, con navegador de mes (‹ mes ›)
+          {/* ── Tiempo 2 · El calendario de déficit, con navegador de mes (‹ mes ›)
           para ojear meses pasados. Si el mes seleccionado no tiene registro, un
           estado de inicio (con hint para retroceder). */}
-      <View style={[styles.beat, styles.glancePanel]}>
-        {/* Un solo encabezado apilado en el riel izquierdo: categoría → el MES (el
-            título, navegable) → qué muestran los puntos. Igual para lleno y vacío. */}
-        <View style={styles.calHeader}>
-          <Text style={styles.eyebrow}>Tu mes de un vistazo</Text>
-          <View style={styles.monthPagerRow}>
-            <Pressable
-              onPress={() => setMonthOffset((o) => o - 1)}
-              disabled={!canPrevMonth}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Mes anterior"
-            >
-              <Text style={[styles.monthArrow, !canPrevMonth && styles.monthArrowOff]}>‹</Text>
-            </Pressable>
-            <Text style={styles.monthTitle} accessibilityRole="header">
-              {monthLabelOf(selectedMonth, today)}
-            </Text>
-            <Pressable
-              onPress={() => setMonthOffset((o) => o + 1)}
-              disabled={!canNextMonth}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Mes siguiente"
-            >
-              <Text style={[styles.monthArrow, !canNextMonth && styles.monthArrowOff]}>›</Text>
-            </Pressable>
-          </View>
-          {/* "El oro son tus días en déficit" se enseñaba 3 veces (aquí, la
-              leyenda y la silueta de Semana). Relevo: este sub enseña mientras
-              la leyenda aún no aparece (<5 días); con ≥5 la leyenda toma el
-              lugar y el sub se retira. Un solo maestro a la vez. */}
-          {(glance?.dataDays ?? 0) < 5 ? (
-            <Text style={styles.calQuestion}>
-              El oro son tus días en déficit. Lo que el mes fue construyendo.
-            </Text>
-          ) : null}
-        </View>
-
-        {glance ? (
-          <>
-            <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
-            {/* Arranque de mes (pocos días): NO dejar a la usuaria sola frente al
-                conteo bajo — junio, con historia real, a un tap. */}
-            {monthOffset === 0 && glance.dataDays < 5 && canPrevMonth ? (
-              <Text style={styles.monthEmptyHint}>
-                Este mes va empezando. Usa ‹ para ver meses anteriores.
-              </Text>
-            ) : null}
-          </>
-        ) : (
-          <View style={styles.monthEmpty}>
-            <Text style={styles.monthEmptyBody}>
-              {monthOffset === 0
-                ? 'El calendario se irá encendiendo conforme registres tus días.'
-                : 'Aún no hay días con comida en este mes.'}
-            </Text>
-            {monthOffset === 0 && canPrevMonth ? (
-              <Text style={styles.monthEmptyHint}>Usa las flechas para ver meses anteriores.</Text>
-            ) : null}
-          </View>
-        )}
-      </View>
+          {calendarPanel}
+        </>
+      ) : null}
 
       {/* ── Tiempo 3 · Tus patrones — lo que Stelar encontró. La usuaria ya tiene
           datos (el guard de arriba lo asegura), así que la sección SIEMPRE está: con
           patrón probado, lo muestra; sin uno, un estado vacío HONESTO — nunca un
           patrón débil de relleno (Apple/Yazio: jamás fingir). */}
-      <View style={styles.beat}>
-        <View style={styles.section}>
-          <Text style={styles.eyebrow}>Tus patrones</Text>
-          {combo || supportPatterns.length > 0 ? (
-            <>
-              <Text style={styles.sectionLede}>Lo que apareció junto en tus días.</Text>
-              {combo ? (
-                <DominantPatternCard
-                  combo={combo}
-                  provenance={provenance}
-                  onOpen={() => {
-                    const base = comboReveal(combo)
-                    // La palanca de esta semana reemplaza al cierre retrospectivo.
-                    const lever = weeklyComboLever(
-                      patternSignals,
-                      combo,
-                      { calorieTarget, proteinTarget, waterGoalGlasses },
-                      today,
-                    )
-                    setReveal({ ...base, takeaway: lever ?? base.takeaway })
-                  }}
-                />
-              ) : null}
-              {supportPatterns.map((p, i) => (
-                <PatternFindingCard
-                  key={p.id}
-                  pattern={p}
-                  index={i}
-                  leading={!combo && i === 0}
-                  onOpen={() => setEvidence(p)}
-                />
-              ))}
-            </>
-          ) : patternDataDays < 14 ? (
-            /* Semanas 1-2: el diferenciador entero de Stelar aún no puede
-               hablar. Un "no hay nada" sin forma se lee como "esta sección no
-               sirve"; lo bloqueado-pero-visible (siluetas de QUÉ va a
-               descubrir) convierte la ausencia en anticipación. Umbral
-               aproximado, sin countdown (retention-spec · Mecánica C). */
-            <View style={styles.patternsEmpty}>
-              <Text style={styles.patternsEmptyLede}>Tus patrones se están formando.</Text>
-              {/* El marcador de anticipación (Mecánica C): progresa con DÍAS
-                  CON DATOS, nunca con fechas — la usuaria ve que su registro
-                  alimenta algo que se está gestando (Zeigarnik sin countdown). */}
-              <Text style={styles.patternsEmptyBody}>
-                {patternDataDays > 0
-                  ? `Stelar ya leyó ${patternDataDays} ${patternDataDays === 1 ? 'día tuyo' : 'días tuyos'}. Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:`
-                  : 'Con unas dos semanas de registros, tus primeros patrones aparecen aquí. Cosas como:'}
-              </Text>
-              <View style={styles.patternSilhouettes}>
-                {[
-                  'Qué días son distintos en tu rutina',
-                  'Qué acompaña tus mejores días',
-                  'Qué combinación te sostiene en déficit',
-                ].map((t) => (
-                  <View key={t} style={styles.patternSilhouetteRow}>
-                    <View style={styles.patternSilhouetteStar} />
-                    <Text style={styles.patternSilhouetteText}>{t}</Text>
+      {view !== 'month' ? (
+        <View style={styles.beat}>
+          <View style={styles.section}>
+            {combo && view === 'patterns' ? null : <Text style={styles.eyebrow}>Tus patrones</Text>}
+            {combo || supportPatterns.length > 0 ? (
+              <>
+                {combo && view === 'patterns' ? null : (
+                  <Text style={styles.sectionLede}>
+                    {maturity.stage <= 2
+                      ? 'Empieza a asomar. Lo sigo mirando.'
+                      : 'Lo que apareció junto en tus días.'}
+                  </Text>
+                )}
+                {combo && view === 'patterns' ? (
+                  <PatternHero
+                    combo={combo}
+                    discoveredOn={provenance?.when ?? null}
+                    early={maturity.stage <= 2}
+                    weekLine={comboWeekSummary(week, combo)}
+                    talked={comboTalk.transcript != null}
+                    onAsk={aiOn && comboFinding ? () => openChat(null) : undefined}
+                    onReveal={() => {
+                      const base = comboReveal(combo)
+                      setReveal({ ...base, takeaway: comboLever ?? base.takeaway })
+                    }}
+                  />
+                ) : null}
+                {combo && view !== 'patterns' ? (
+                  <DominantPatternCard
+                    combo={combo}
+                    provenance={provenance}
+                    onUnderstand={aiOn && comboFinding ? () => openChat(null) : undefined}
+                    onOpen={() => {
+                      const base = comboReveal(combo)
+                      // La palanca de esta semana reemplaza al cierre retrospectivo.
+                      const lever = weeklyComboLever(
+                        patternSignals,
+                        combo,
+                        { calorieTarget, proteinTarget, waterGoalGlasses },
+                        today,
+                      )
+                      setReveal({ ...base, takeaway: lever ?? base.takeaway })
+                    }}
+                  />
+                ) : null}
+                {view === 'patterns' && combo && supportPatterns.length > 0 ? (
+                  <View style={styles.alsoFound}>
+                    <Text style={styles.alsoFoundEyebrow}>También encontré</Text>
+                    {supportPatterns.map((p) => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => setEvidence(p)}
+                        style={({ pressed }) => [styles.alsoFoundRow, pressed && { opacity: 0.75 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${p.title} Ver la evidencia.`}
+                      >
+                        <Text style={styles.alsoFoundText}>{p.title}</Text>
+                        <Text style={styles.alsoFoundChevron}>›</Text>
+                      </Pressable>
+                    ))}
                   </View>
+                ) : null}
+                {(view === 'patterns' && combo ? [] : supportPatterns).map((p, i) => (
+                  <PatternFindingCard
+                    key={p.id}
+                    pattern={p}
+                    index={i}
+                    leading={!combo && i === 0}
+                    onOpen={() => setEvidence(p)}
+                  />
                 ))}
+              </>
+            ) : maturity.stage < 3 ? (
+              /* Etapas 0 a 2 sin patrón todavía: nunca "nada". En la 0, qué
+               podrá encontrar (siluetas, sin conteo de días); desde la 1, la
+               primera señal DESCRIPTIVA de sus días (early-readings), nunca una
+               correlación. */
+              <View style={styles.patternsEmpty}>
+                {maturity.stage >= 1 && firstSignal ? (
+                  <>
+                    <Text style={styles.firstSignalEyebrow}>Primera señal</Text>
+                    <Text style={styles.firstSignalText}>{firstSignal.text}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.patternsEmptyLede}>Todavía te estoy conociendo.</Text>
+                )}
+                <Text style={styles.patternsEmptyBody}>
+                  Un patrón aparece cuando algo se repite en tus días. Sigue registrando como
+                  siempre y aquí verás lo primero que encuentre. Cosas como:
+                </Text>
+                <View style={styles.patternSilhouettes}>
+                  {[
+                    'Qué días son distintos en tu rutina',
+                    'Qué acompaña tus mejores días',
+                    'Qué combinación te sostiene en déficit',
+                  ].map((t) => (
+                    <View key={t} style={styles.patternSilhouetteRow}>
+                      <View style={styles.patternSilhouetteStar} />
+                      <Text style={styles.patternSilhouetteText}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+                {maturity.deficitBlockedByFood ? (
+                  <Text style={styles.patternsEmptyHorizon}>
+                    Para ver qué mueve tu déficit necesito tus comidas.
+                  </Text>
+                ) : null}
               </View>
-              {/* El horizonte honesto (GAP 5): el umbral concreto que abre la
-                  puerta, sin countdown ni prometer CUÁL patrón llega primero
-                  (eso depende de sus datos, no lo fingimos). */}
-              <Text style={styles.patternsEmptyHorizon}>
-                Un patrón nace cuando algo se repite unas tres veces en tus datos.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.patternsEmpty}>
-              <Text style={styles.patternsEmptyLede}>Aún no emerge un patrón claro.</Text>
-              <Text style={styles.patternsEmptyBody}>
-                Stelar solo te muestra un patrón cuando tus datos lo sostienen. Con más días,
-                aparecerá.
-              </Text>
-            </View>
-          )}
+            ) : (
+              /* Etapa 3 o más sin patrón: honesto, nunca forzado. */
+              <View style={styles.patternsEmpty}>
+                <Text style={styles.patternsEmptyLede}>
+                  Tus días se parecieron entre sí; todavía no encontré algo nuevo.
+                </Text>
+                <Text style={styles.patternsEmptyBody}>
+                  {maturity.deficitBlockedByFood
+                    ? 'Para ver qué mueve tu déficit necesito tus comidas.'
+                    : 'Stelar solo te muestra un patrón cuando tus datos lo sostienen.'}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       {/* ── Tiempo 4 · ¿Sigo así? — el cierre emocional (volver sin culpa). */}
       {/* 9.6 · la coda de presencia se gana su lugar con ≥7 días de datos:
@@ -711,10 +913,14 @@ export function MonthSegment({
           puertas cerradas ("Apenas empieza"); sin historia de regresos que
           contar, la promesa de patrones (con siluetas + horizonte) ya cierra
           el recorrido. */}
-      {presence && patternDataDays >= 7 ? <PresenceFinale presence={presence} /> : null}
+      {view === 'patterns' ? calendarPanel : null}
+
+      {view === 'full' && presence && patternDataDays >= 7 ? (
+        <PresenceFinale presence={presence} />
+      ) : null}
 
       {/* Fin del recorrido: volver al inicio sin tener que hacer scroll a mano. */}
-      {onScrollTop ? (
+      {view === 'full' && onScrollTop ? (
         <Pressable
           style={styles.backTop}
           onPress={onScrollTop}
@@ -727,6 +933,71 @@ export function MonthSegment({
       ) : null}
 
       <EvidenceModal pattern={evidence} onClose={() => setEvidence(null)} />
+      <NotifyOfferSheet
+        visible={notifyOffer.visible && reveal == null}
+        trigger="pattern"
+        onAccept={notifyOffer.accept}
+        onDecline={notifyOffer.decline}
+      />
+      {aiOn && comboFinding && combo ? (
+        <MonthChatSheet
+          finding={chatOpen && !comboTalk.loading ? comboFinding : null}
+          title="Tu patrón dominante"
+          subtitle="Stelar · leyendo tus patrones"
+          closeLabel="Volver a Descubre"
+          sign={sign}
+          periodStart={combo.days[0] ?? today}
+          periodEnd={combo.days[combo.days.length - 1] ?? today}
+          findingsHash={chatHash ?? ''}
+          askMetacognition
+          hasMore={false}
+          onSaveReflection={(questionKey, answer) => saveReflection.mutate({ questionKey, answer })}
+          onNext={() => setChatOpen(false)}
+          onClose={() => setChatOpen(false)}
+          body={
+            <ComboChatView
+              key={chatHash ?? 'combo'}
+              opening={comboOpening(combo)}
+              facts={facts}
+              focus={comboFocus(combo)}
+              weekLine={weekLine}
+              comboDays={combo.days}
+              request={{
+                // El periodo se ancla al último día del patrón: la fila de caché
+                // es estable mientras el patrón no cambie.
+                periodStart: combo.days[0] ?? today,
+                periodEnd: combo.days[combo.days.length - 1] ?? today,
+                chatHash: chatHash ?? '',
+                combo: {
+                  id: comboId(combo),
+                  sentence: comboSentence(combo),
+                  facts: facts.map((f) => ({ id: f.id, text: f.text, question: f.question })),
+                },
+              }}
+              meta={comboFinding.metacognition}
+              reflectionKey={comboFinding.reflectionKey}
+              today={today}
+              transcript={comboTalk.transcript}
+              onSaveTranscript={comboTalk.save}
+              dayDetail={(date) => comboDayDetail(patternSignals, combo, comboOpts, date)}
+              onSaveReflection={(questionKey, answer) =>
+                saveReflection.mutate({ questionKey, answer })
+              }
+              onOpenDay={
+                onPickDayFromChat
+                  ? (date) => {
+                      setChatOpen(false)
+                      onPickDayFromChat(date)
+                    }
+                  : undefined
+              }
+              onFinish={() => setChatOpen(false)}
+              finishLabel="Volver a Descubre"
+              initialFactId={chatAsk}
+            />
+          }
+        />
+      ) : null}
       {/* Modal cinemático del patrón dominante (se monta al abrir → replaya). */}
       {reveal ? (
         <PatternRevealModal
@@ -1174,6 +1445,180 @@ const NODE_COLOR: Record<string, string> = {
   agua: colors.leche,
 }
 
+/* Cómo se nombra cada hábito dentro de la frase del hallazgo. */
+/** "Dormir 7 horas o más y entrenar el mismo día." (vocabulario en combo-facts). */
+function comboSentence(combo: WinningComboData): string {
+  const list = comboHabitList(combo)
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)} el mismo día.`
+}
+
+/* El patrón en el feed (sep 2026 · "la gente no leerá"): se entiende SIN leer
+ * frases. La ecuación (fichas con el color de su estrella) dice de qué es; el
+ * número grande en oro es el gancho; los puntos son la prueba (un día cada uno);
+ * la semana son tres puntos por llenar. Una sola acción: la de Stelar. */
+const CHIP_LABEL: Record<string, string> = {
+  sueno: 'Sueño 7 h',
+  cuerpo: 'Entreno',
+  proteina: 'Proteína',
+  agua: 'Agua',
+}
+
+function PatternHero({
+  combo,
+  discoveredOn,
+  early,
+  weekLine,
+  talked,
+  onAsk,
+  onReveal,
+}: {
+  combo: WinningComboData
+  discoveredOn: string | null
+  /** Muestra chica: el kicker dice "temprano" (sin línea extra). */
+  early: boolean
+  /** La semana dicha con palabras (null = nada que decir). */
+  weekLine: string | null
+  /** Ya hablaron de este patrón. */
+  talked?: boolean
+  onAsk?: () => void
+  onReveal: () => void
+}) {
+  const nodes = [
+    ...combo.signals.map((s) => ({
+      label: NODE_LABEL[s.key] ?? s.label,
+      color: NODE_COLOR[s.key] ?? colors.leche,
+    })),
+    { label: 'Déficit', color: colors.oroSoft },
+  ]
+  const lift = comboLiftBadge(combo)
+  const kicker = `${early ? 'Patrón temprano' : 'Patrón'}${discoveredOn ? ` · ${discoveredOn}` : ''}`
+  return (
+    <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern} accessible={false}>
+      <View style={styles.heroTop}>
+        <Text style={styles.heroKicker}>{kicker}</Text>
+        <View style={styles.heroMini}>
+          <Pressable
+            onPress={onReveal}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Ver la revelación del patrón"
+          >
+            <View pointerEvents="none">
+              <PatternDiscovery nodes={nodes} height={104} showLabels={false} inset={26} />
+            </View>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* La ecuación: qué hábitos, con el color de su estrella. */}
+      <View style={styles.eqRow} accessible accessibilityLabel={comboHeadline(combo)}>
+        {combo.signals.map((sig, i) => (
+          <View key={sig.key} style={styles.eqItem}>
+            {i > 0 ? <Text style={styles.eqPlus}>+</Text> : null}
+            <View style={styles.eqChip}>
+              <View
+                style={[styles.eqDot, { backgroundColor: NODE_COLOR[sig.key] ?? colors.leche }]}
+              />
+              <Text style={styles.eqChipText}>{CHIP_LABEL[sig.key] ?? sig.label}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* El gancho: el número grande. */}
+      <View style={styles.liftBlock}>
+        <Text style={styles.liftNum}>{lift}</Text>
+        <Text style={styles.liftLabel}>
+          {lift === 'mucho más' ? 'días en déficit' : 'más días en déficit'}
+        </Text>
+      </View>
+
+      <View
+        style={styles.heroDots}
+        accessible
+        accessibilityLabel={`Días en déficit: ${combo.deficits} de ${combo.occurrences} con los dos; ${combo.restDeficits} de ${combo.restDays} en tus otros días.`}
+      >
+        {/* Qué es un punto lleno, dicho una vez (la usuaria tenía que volver
+            al número grande para saberlo). */}
+        <Text style={styles.dotsTitle}>Días en déficit</Text>
+        <DotsLine
+          label={comboGroupLabel(combo)}
+          total={combo.occurrences}
+          filled={combo.deficits}
+          strong
+        />
+        <DotsLine label="Otros días" total={combo.restDays} filled={combo.restDeficits} />
+      </View>
+
+      {/* La semana con PALABRAS, separada de la evidencia: con puntos se leía
+          como "días en déficit" (target-user, 26 sep 2026). */}
+      {weekLine ? <Text style={styles.weekSummary}>{weekLine}</Text> : null}
+
+      {onAsk ? (
+        <View style={styles.heroAsk}>
+          <AuroraCta
+            label={talked ? 'Retomar con Stelar' : 'Pregúntale a Stelar'}
+            onPress={onAsk}
+          />
+        </View>
+      ) : null}
+    </Animated.View>
+  )
+}
+
+/* Una fila de evidencia: un punto por día, lleno si cerró en déficit. El conteo
+ * real al final (cuando hay más días que puntos, los puntos se escalan). */
+function DotsLine({
+  label,
+  total,
+  filled,
+  strong,
+}: {
+  label: string
+  total: number
+  filled: number
+  strong?: boolean
+}) {
+  return (
+    <View style={styles.dotLine}>
+      <Text style={[styles.dotLabel, strong && styles.dotLabelStrong]}>{label}</Text>
+      <View style={styles.dotRow}>
+        {evidenceDots(total, filled).map((on, i) => (
+          <View
+            key={i}
+            style={[styles.dot, on ? (strong ? styles.dotOn : styles.dotOnSoft) : null]}
+          />
+        ))}
+      </View>
+      <Text style={[styles.dotCount, strong && styles.dotLabelStrong]}>
+        {`${filled} de ${total}`}
+      </Text>
+    </View>
+  )
+}
+
+/* La acción de IA: píldora con contorno aurora (el degradado del chat), sin
+ * relleno magenta — se lee IA sin competir con Registrar. ✦ solo aquí. */
+function AuroraCta({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      {({ pressed }) => (
+        <LinearGradient
+          colors={[colors.magenta, colors.oroSoft, colors.dimension.mente]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.auroraBorder, pressed && { opacity: 0.8 }]}
+        >
+          <View style={styles.auroraInner}>
+            <Text style={styles.auroraStar}>✦</Text>
+            <Text style={styles.auroraLabel}>{label}</Text>
+          </View>
+        </LinearGradient>
+      )}
+    </Pressable>
+  )
+}
+
 /* El patrón dominante: la combinación de hábitos que más fue de la mano con el
  * déficit. La card es una ESCENA DE DESCUBRIMIENTO (PatternDiscovery): una
  * constelación que Stelar traza sola + el insight. Sigue tappable → modal
@@ -1182,9 +1627,12 @@ function DominantPatternCard({
   combo,
   onOpen,
   provenance,
+  onUnderstand,
 }: {
   combo: WinningComboData
   onOpen: () => void
+  /** "✦ Quiero entenderlo": abre el chat de IA sobre este patrón (solo con IA real). */
+  onUnderstand?: () => void
   /** Procedencia factual: la pieza del combo que ya se reveló y guardó, con su
    *  fecha. Toca → revive la ceremonia real. `null` si ninguna pieza se reveló. */
   provenance?: { label: string; onReplay: () => void } | null
@@ -1235,6 +1683,16 @@ function DominantPatternCard({
         <Text style={styles.discoverCtaText}>Ver la revelación</Text>
         <Animated.Text style={[styles.discoverCtaArrow, ctaStyle]}>→</Animated.Text>
       </View>
+      {/* ✦ Quiero entenderlo — la IA explica el patrón (Pressable anidado: el
+          padre no abre la revelación). El sello ✦ solo aquí, donde abre chat. */}
+      {onUnderstand ? (
+        <AiCta
+          label="Quiero entenderlo"
+          onPress={onUnderstand}
+          accessibilityLabel="Quiero entenderlo: habla con Stelar sobre este patrón"
+          style={styles.understandCta}
+        />
+      ) : null}
       {/* Procedencia: acción SECUNDARIA (Pressable anidado → captura el toque, el
           padre no abre el combo). Revive la ceremonia fechada de esa pieza. */}
       {provenance ? (
@@ -1645,6 +2103,202 @@ function RevealEvidenceModal({
 }
 
 const styles = StyleSheet.create({
+  heroPattern: {
+    marginTop: 4,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  heroKicker: {
+    flex: 1,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+  },
+  heroMini: { width: 164, marginVertical: -26, marginRight: -26 },
+  eqRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 10 },
+  eqItem: { flexDirection: 'row', alignItems: 'center' },
+  eqPlus: {
+    marginHorizontal: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.heading,
+    color: colors.niebla,
+  },
+  eqChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.bgCard,
+  },
+  eqDot: { width: 8, height: 8, borderRadius: 4 },
+  eqChipText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  liftBlock: { marginTop: 18, flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  liftNum: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.displayXl,
+    lineHeight: 44,
+    color: colors.oroLight,
+    letterSpacing: -0.5,
+  },
+  liftLabel: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.title,
+    color: colors.bone,
+  },
+  weekSummary: {
+    marginTop: 20,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    lineHeight: 19,
+    color: colors.bone,
+  },
+  dotsTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  heroDots: {
+    marginTop: 20,
+    gap: 12,
+  },
+  dotLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dotLabel: {
+    width: 92,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  dotLabelStrong: {
+    color: colors.leche,
+  },
+  dotRow: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+  },
+  dotOn: {
+    backgroundColor: colors.oroSoft,
+    borderColor: colors.oroSoft,
+  },
+  // "Otros días" llenos: claros contra los vacíos, sin llegar al oro.
+  dotOnSoft: {
+    backgroundColor: colors.niebla,
+    borderColor: colors.niebla,
+  },
+  // El conteo pegado a sus puntos: se lee como parte de la fila.
+  dotCount: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  heroAsk: {
+    marginTop: 18,
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  auroraBorder: {
+    borderRadius: 999,
+    padding: 1,
+  },
+  auroraInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: colors.bg,
+  },
+  auroraStar: {
+    fontSize: typography.sizes.body,
+    color: colors.oroLight,
+  },
+  auroraLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.leche,
+    letterSpacing: 0.3,
+  },
+  firstSignalEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+    marginBottom: 8,
+  },
+  firstSignalText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.anchor,
+    lineHeight: 24,
+    color: colors.leche,
+    marginBottom: 14,
+  },
+  understandCta: {
+    alignSelf: 'center',
+    marginTop: 14,
+  },
+  alsoFound: {
+    marginTop: 24,
+  },
+  alsoFoundEyebrow: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+    marginBottom: 6,
+  },
+  alsoFoundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 48,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  alsoFoundText: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.ui,
+    lineHeight: 21,
+    color: colors.leche,
+  },
+  alsoFoundChevron: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+  },
   wrap: {
     marginTop: 10,
   },
@@ -1810,26 +2464,7 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
     marginBottom: 16,
   },
-  revealRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    gap: 11,
-    paddingVertical: 7,
-  },
-  revealOnText: {
-    flex: 1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-  },
   // El ancla concreta ("18 días"): números en niebla, tabulares, a la derecha.
-  revealCount: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
-  },
   // ── Módulo consolidado: déficit coronado + contexto + sombra + foco ──
   // El déficit (norte): fila propia, estrella mayor, con su proporción.
   deficitRow: {
@@ -1929,25 +2564,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 5,
   },
-  dayStar: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  dayStarDim: {
-    backgroundColor: 'rgba(244, 236, 222, 0.12)',
-  },
   // La barra de proporción honesta (del módulo de revelados).
-  revBarTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(244, 236, 222, 0.08)',
-    overflow: 'hidden',
-  },
-  revBarFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
   // "Aún en sombra" — lo pendiente, en tono callado (aro hueco, no estrella).
   shadowHeading: {
     marginTop: 2,
@@ -1971,55 +2588,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.niebla,
   },
-  shadowRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    gap: 11,
-    paddingVertical: 6,
-  },
-  hollowStar: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: colors.bruma,
-  },
-  shadowLabel: {
-    flex: 1,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  shadowCount: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
-    color: colors.bruma,
-    fontVariant: ['tabular-nums'],
-  },
   // El FOCO — separado por una regla; el "para qué" del módulo.
-  focusBlock: {
-    alignSelf: 'stretch',
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.oroHairlineSoft,
-  },
-  focusEyebrow: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.oroSoft,
-    marginBottom: 7,
-  },
-  focusText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 23,
-    color: colors.bone,
-  },
   // Aún nada revelado: línea de anticipación cálida (voz observadora), no huecos.
   revealAwait: {
     marginTop: 24,
@@ -2036,49 +2605,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   // La pregunta que abre el tiempo — voz de coach (serif italic), como capítulo.
-  beatQuestion: {
-    marginTop: 34,
-    marginLeft: 2,
-    marginBottom: 2,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.segmentTitle,
-    lineHeight: 28,
-    color: colors.leche,
-  },
   // ── "Ver más" contextual (el detalle vive detrás de un toque) ──────
-  collapse: {
-    alignSelf: 'stretch',
-    marginTop: 12,
-  },
-  collapseToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-  },
-  collapseLabel: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    color: colors.oroSoft,
-    letterSpacing: 0.3,
-  },
-  collapseChevron: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    color: colors.oroSoft,
-  },
-  collapseBody: {
-    marginTop: 4,
-  },
   // La frase-resumen del héroe ("Lo encendieron tu déficit y tu sueño").
-  revealSummary: {
-    marginTop: -4,
-    marginBottom: 4,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-  },
   // ── Secciones ─────────────────────────────────────────────────
   section: {
     marginTop: 30,
@@ -2155,42 +2683,6 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // ── Tu presencia — sistema separado ───────────────────────────
-  presenceCard: {
-    borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-    backgroundColor: colors.bgCard,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-  },
-  presenceLede: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.title,
-    lineHeight: 22,
-    color: colors.bone,
-  },
-  presenceRows: {
-    marginTop: 14,
-    gap: 2,
-  },
-  presenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 9,
-  },
-  presenceLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  presenceValue: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.body,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
   // ── Tus patrones — el patrón dominante (constelación) ────────
   // La tarjeta protagonista: más cuerpo y un borde oro tenue para coronarla sin
   // badge de ranking. La constelación tappable vive dentro.
@@ -2215,30 +2707,7 @@ const styles = StyleSheet.create({
     borderColor: colors.oroSoft,
   },
   // La línea única de conteo (reemplaza chip + count): dato honesto, Hanken.
-  dominantLine: {
-    marginTop: 14,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.niebla,
-    fontVariant: ['tabular-nums'],
-  },
   // El asterismo `*—*—*` de la card (astros conectados + etiquetas).
-  asterism: {
-    marginTop: 20,
-    width: '100%',
-  },
-  asterismLabels: {
-    height: 14,
-    marginTop: 4,
-  },
-  asterismLabel: {
-    position: 'absolute',
-    textAlign: 'center',
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.tinyLabel,
-    color: colors.niebla,
-  },
   // "Volver arriba" al final del recorrido: pill sobrio, centrado, sin peso.
   backTop: {
     marginTop: 36,
@@ -2279,6 +2748,15 @@ const styles = StyleSheet.create({
   calHeader: {
     marginLeft: 2,
   },
+  monthCount: {
+    marginLeft: 'auto',
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.oroSoft,
+    fontVariant: ['tabular-nums'],
+  },
+  // Con pocos días el conteo no es un logro: sin oro.
+  monthCountQuiet: { color: colors.niebla },
   monthPagerRow: {
     marginTop: 2,
     flexDirection: 'row',
@@ -2301,13 +2779,6 @@ const styles = StyleSheet.create({
   },
   monthArrowOff: {
     color: colors.hairline,
-  },
-  calQuestion: {
-    marginTop: 6,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 20,
-    color: colors.niebla,
   },
   // Estado vacío: MISMO frame (el header no cambia); sin título display para que
   // no parezca otra tarjeta, solo una línea cálida bajo la pregunta.
@@ -2376,58 +2847,7 @@ const styles = StyleSheet.create({
     color: colors.niebla,
   },
   // La frase serif es la protagonista: aquí vive el patrón (voz Observadora).
-  dominantPhrase: {
-    marginTop: 12,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.headingLg,
-    lineHeight: 29,
-    color: colors.leche,
-  },
   // Chip de conteo — el dato que ancla el patrón (DATOS, Hanken upright).
-  dominantChip: {
-    marginTop: 18,
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairlineStrong,
-  },
-  dominantChipText: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.bone,
-  },
-  dominantChipNum: {
-    fontFamily: typography.uiBold,
-    color: colors.leche,
-    fontVariant: ['tabular-nums'],
-  },
-  dominantCount: {
-    marginTop: 12,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 22,
-    color: colors.niebla,
-  },
-  dominantCta: {
-    marginTop: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dominantCtaText: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    letterSpacing: 0.6,
-    color: colors.oroSoft,
-  },
-  dominantCtaArrow: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    color: colors.oroSoft,
-  },
   // ── Patrones de apoyo — tarjetas de hallazgo ─────────────────
   // Tarjeta con cuerpo y mucho aire: el patrón respira (Apple + Notion).
   findingCard: {
@@ -2480,77 +2900,8 @@ const styles = StyleSheet.create({
     color: colors.oroSoft,
   },
   // ── Lo que aún no sabemos ─────────────────────────────────────
-  unknownCard: {
-    borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-    backgroundColor: colors.bgCard,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-  },
-  unknownLead: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 21,
-    color: colors.bone,
-  },
-  unknownChips: {
-    marginTop: 14,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  unknownChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingVertical: 7,
-    paddingHorizontal: 13,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairlineStrong,
-  },
   // Anillo vacío (○) — el espacio aún sin llenar, sin culpa.
-  unknownRing: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.4,
-    borderColor: colors.niebla,
-  },
-  unknownChipLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  unknownHint: {
-    marginTop: 16,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.ui,
-    lineHeight: 21,
-    color: colors.bone,
-  },
   // ── Frase final ───────────────────────────────────────────────
-  finalWrap: {
-    marginTop: 40,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  finalRule: {
-    width: 36,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.oroHairline,
-    marginBottom: 18,
-  },
-  finalText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.headingLg,
-    lineHeight: 28,
-    color: colors.bone,
-    textAlign: 'center',
-  },
   // ── Modal de evidencia ────────────────────────────────────────
   modalBackdrop: {
     flex: 1,
@@ -2833,11 +3184,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   // Cuadro del calendario (sin número): encendido = color pleno; el resto, tenue.
-  revCell: {
-    width: 22,
-    height: 20,
-    borderRadius: 5,
-  },
   revCellPast: {
     backgroundColor: 'rgba(244, 236, 222, 0.05)',
   },

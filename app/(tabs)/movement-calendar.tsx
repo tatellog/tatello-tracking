@@ -20,7 +20,7 @@ export default function MovementCalendarScreen() {
       <SafeAreaView style={styles.flex} edges={['top']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <ErrorBoundary screen="movement-calendar">
-            <TabHeader title="Tu constancia" titleEmphasis="Tu" />
+            <TabHeader title="Tu constancia" titleEmphasis="Tu" hideCalendar />
             <MovementCalendarPanel />
             <View style={styles.shareWrap}>
               <TrainingShareCTA historyMode />

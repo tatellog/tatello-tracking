@@ -78,7 +78,8 @@ meditación, horóscopo decorativo, quick-fix de peso.
 
 ```
 app/
-  (tabs)/          · 5 tabs: Hoy, Comidas, Órbita, Progreso, Ajustes
+  (tabs)/          · 5 tabs: Hoy, Comidas, Descubre (ruta orbit, ex
+                     "Órbita"), Progreso, Ajustes
                      (nav de producto = 4: Hoy ¿qué hice? · Comidas ¿qué
                      consumí? · Progreso ¿qué cambió? · Órbita ¿qué
                      significa?. Ajustes no es nav conceptual.)

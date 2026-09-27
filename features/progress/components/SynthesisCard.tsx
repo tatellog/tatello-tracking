@@ -155,10 +155,10 @@ export function SynthesisCard() {
           <Pressable
             onPress={openOrbita}
             accessibilityRole="button"
-            accessibilityLabel="Ver más en Órbita"
+            accessibilityLabel="Ver más en Descubre"
             style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
           >
-            <Text style={styles.ctaText}>Ver más en Órbita</Text>
+            <Text style={styles.ctaText}>Ver más en Descubre</Text>
             <Text style={styles.ctaArrow}>→</Text>
           </Pressable>
         </>

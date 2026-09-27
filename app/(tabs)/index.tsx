@@ -24,6 +24,8 @@ import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
 import type { Profile } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
+import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
+import { useNotifyOffer } from '@/features/notifications/offer'
 import { PatternReveal } from '@/features/patterns'
 import type { PatternType } from '@/features/patterns/logic'
 import { useCycleSealInvite } from '@/features/notifications/hooks'
@@ -434,6 +436,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // hero compacto. % y conteo salen de la MISMA fuente (trained/figureCount)
   // que pinta el hero, así nunca se contradicen.
   const [tuEmblemaOpen, setTuEmblemaOpen] = useState(false)
+  // Avisos en contexto (dueña 26 sep 2026): se ofrecen al guardar la primera
+  // comida, nunca en el onboarding. Espera a que Hoy esté libre de ceremonias.
+  const notifyOffer = useNotifyOffer(
+    'meal',
+    !viewingPast && ctx.meal_count_today >= 1 && !revelation && !tuEmblemaOpen,
+  )
   const heroPct = figureCount > 0 ? Math.round((trainedThisMonth / figureCount) * 100) : 0
   const heroPress = usePressFeedback()
   // Estrellas con nombre ya encendidas + la que sigue — derivadas de la
@@ -822,10 +830,28 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
             {/* ── Nivel 3 · Contexto del día e historia ────────────────────
                 Lo que la usuaria consulta cuando ya hizo lo principal:
-                macros, comidas, y el calendario (historia/editor) al final. */}
+                comidas, macros, y el calendario (historia/editor) al final. */}
 
+            {/* Comidas ANTES que macros (dueña 26 sep 2026): registrar es lo que
+                haces; los anillos son el resultado. Con el día vacío, unos
+                anillos en cero arriba no decían nada. */}
             <Animated.View
               entering={enter(520)}
+              onLayout={(e) => {
+                mealsY.current = e.nativeEvent.layout.y
+              }}
+            >
+              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
+            </Animated.View>
+            <Animated.View entering={enter(560)}>
+              <TodayMealLog
+                date={vctx.date}
+                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
+                onAddMeal={() => router.push({ pathname: '/capture-meal' })}
+              />
+            </Animated.View>
+            <Animated.View
+              entering={enter(600)}
               onLayout={(e) => {
                 macrosY.current = e.nativeEvent.layout.y
               }}
@@ -833,22 +859,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               {/* Los dos anillos, siempre visibles, sin pager: el sueño subió a
                   la pregunta del día y el peso no vive en Hoy. */}
               <MacroRings ctx={vctx} />
-            </Animated.View>
-
-            <Animated.View
-              entering={enter(560)}
-              onLayout={(e) => {
-                mealsY.current = e.nativeEvent.layout.y
-              }}
-            >
-              <SectionHeader label={viewingPast ? 'Comidas del día' : 'Comidas'} />
-            </Animated.View>
-            <Animated.View entering={enter(600)}>
-              <TodayMealLog
-                date={vctx.date}
-                onOpenMeal={(id) => router.push({ pathname: '/scan-meal', params: { editId: id } })}
-                onAddMeal={() => router.push({ pathname: '/capture-meal' })}
-              />
             </Animated.View>
           </ScrollView>
         </SafeAreaView>
@@ -869,6 +879,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           litStars={litStars}
           nextStar={nextStar}
           daysInOrbit={daysInOrbit}
+        />
+        <NotifyOfferSheet
+          visible={notifyOffer.visible}
+          trigger="meal"
+          onAccept={notifyOffer.accept}
+          onDecline={notifyOffer.decline}
         />
         {/* Revelaciones full-screen — el momento core de Stelar, sobre Hoy.
           El orquestador elige UNA (Regreso > Transformación > Patrón); se
@@ -932,7 +948,6 @@ const COACH_PHASE_POOLS: { min: number; lines: CoachCopy[] }[] = [
       { before: 'El cuerpo aprende cuando ', emphasis: 'insistes', after: '.' },
       { before: 'Ya no es esfuerzo. Empieza a ser ', emphasis: 'tuyo', after: '.' },
       { before: 'La constancia se está volviendo ', emphasis: 'gravedad', after: '.' },
-      { before: 'Tu órbita ya tiene ', emphasis: 'forma', after: '.' },
     ],
   },
   {

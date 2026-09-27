@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" fill="none" viewBox="0 0 1024 1024">
+  <!-- Descubre: dos órbitas que se cruzan; en el punto donde coinciden se
+       enciende una luz. Metáfora del patrón ("cuando sueño y entreno
+       coinciden"). La luz va en el CRUCE, no al centro (ahí se leía un ojo).
+       Un corte TRANSPARENTE (máscara) la separa de los aros gruesos: sirve
+       sobre cualquier fondo, incluida la píldora magenta del tab activo. -->
+  <defs>
+    <mask id="descubre-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect x="0" y="0" width="1024" height="1024" fill="#FFFFFF"/>
+      <circle cx="512" cy="461" r="86" fill="#000000"/>
+    </mask>
+  </defs>
+  <g mask="url(#descubre-cut)">
+    <circle cx="366" cy="592" r="196" stroke="currentColor" stroke-width="30" fill="none"/>
+    <circle cx="658" cy="592" r="196" stroke="currentColor" stroke-width="30" fill="none"/>
+  </g>
+  <circle cx="512" cy="461" r="58" fill="currentColor" stroke="none"/>
+  <!-- Destellos de la familia (en "+", nunca la estrella de 4 puntas del sello IA) -->
+  <path d="M760 206 V282 M722 244 H798" stroke="currentColor" stroke-width="24" stroke-linecap="round"/>
+  <path d="M288 250 V290 M268 270 H308" stroke="currentColor" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="858" cy="380" r="16" fill="currentColor" stroke="none"/>
+  <circle cx="150" cy="820" r="15" fill="currentColor" stroke="none"/>
+  <circle cx="880" cy="826" r="15" fill="currentColor" stroke="none"/>
+</svg>

@@ -1,3 +1,4 @@
+import { combosBornRecently } from '../combo-memory'
 import {
   correlationForKind,
   daysInDeficit,
@@ -346,6 +347,17 @@ describe('detectMonthPatterns · patrones accionables (correlaciones)', () => {
     expect(we.title).toMatch(/fin de semana/)
   })
 
+  it('superávit concentrado NO dispara sin comida registrada en ambos lados', () => {
+    // Solo días entre semana con comida (el finde sin registro): "el 100% cae
+    // entre semana" sería un artefacto de la falta de datos, no un patrón.
+    const signals = month(14, (i) => {
+      const wd = monIdxUTC(addDays(BASE, i))
+      return wd < 5 ? { meal_count: 2, calories: 2400 } : { meal_count: 0, calories: null }
+    })
+    const ps = detectMonthPatterns(signals, { calorieTarget: TARGET })
+    expect(ps.some((p) => p.id === 'surplus-concentration')).toBe(false)
+  })
+
   it('sueño ≥7h × déficit cuando el efecto es marcado', () => {
     // 6 días bien dormidos en déficit, 6 mal dormidos en superávit.
     const signals = month(12, (i) => ({
@@ -460,19 +472,46 @@ describe('habitReveal', () => {
 
 describe('winningCombo', () => {
   it('encuentra la fórmula más grande que coincidió y terminó en déficit', () => {
-    // 12 días con sueño≥7h + proteína en meta + entrenó; 9 en déficit, 3 superávit.
-    const signals = month(12, (i) => ({
-      meal_count: 2,
-      calories: i < 9 ? 1400 : 2400,
-      sleep_minutes: 450,
-      protein_g: 140,
-      trained: true,
-    }))
+    // 12 días con sueño≥7h + proteína en meta + entrenó (9 en déficit) y 6 días
+    // sin esos hábitos (3 en déficit): 75% contra 50%, se separa.
+    const signals = month(18, (i) =>
+      i < 12
+        ? {
+            meal_count: 2,
+            calories: i < 9 ? 1400 : 2400,
+            sleep_minutes: 450,
+            protein_g: 140,
+            trained: true,
+          }
+        : { meal_count: 2, calories: i < 15 ? 1400 : 2400, sleep_minutes: 360, protein_g: 60 },
+    )
     const c = winningCombo(signals, { calorieTarget: TARGET, proteinTarget: 130 })!
     expect(c).toBeTruthy()
     expect(c.signals.map((s) => s.key).sort()).toEqual(['cuerpo', 'proteina', 'sueno'])
     expect(c.occurrences).toBe(12)
     expect(c.deficits).toBe(9)
+    expect(c.restDays).toBe(6)
+    expect(c.restDeficits).toBe(3)
+  })
+
+  it('null si la combinación no se separa del resto de sus días (decisión dueña)', () => {
+    // Combo 6/10 en déficit; resto 6/10 también: no es "lo que te sostiene".
+    const signals = month(20, (i) =>
+      i < 10
+        ? { meal_count: 2, calories: i < 6 ? 1400 : 2400, sleep_minutes: 450, trained: true }
+        : { meal_count: 2, calories: i < 16 ? 1400 : 2400, sleep_minutes: 360 },
+    )
+    expect(winningCombo(signals, { calorieTarget: TARGET })).toBeNull()
+  })
+
+  it('null sin días fuera de la combinación (no hay contra qué compararse)', () => {
+    const signals = month(10, () => ({
+      meal_count: 2,
+      calories: 1400,
+      sleep_minutes: 450,
+      trained: true,
+    }))
+    expect(winningCombo(signals, { calorieTarget: TARGET })).toBeNull()
   })
 
   it('null si la combinación no terminó en déficit la mayoría de las veces', () => {
@@ -484,6 +523,49 @@ describe('winningCombo', () => {
       trained: true,
     }))
     expect(winningCombo(signals, { calorieTarget: TARGET })).toBeNull()
+  })
+
+  describe('histéresis: nacer pide 15 puntos, seguir vivo pide 5', () => {
+    // El caso real de la dueña (26 sep 2026): 5/9 con los dos contra 4/9 el
+    // resto = 11 puntos. No alcanza para NACER, pero un patrón ya mostrado sigue.
+    const signals = month(18, (i) =>
+      i < 9
+        ? { meal_count: 2, calories: i < 5 ? 1400 : 2400, sleep_minutes: 450, trained: true }
+        : { meal_count: 2, calories: i < 13 ? 1400 : 2400, sleep_minutes: 360 },
+    )
+
+    it('un patrón nuevo con 11 puntos de ventaja no nace', () => {
+      expect(winningCombo(signals, { calorieTarget: TARGET })).toBeNull()
+    })
+
+    it('el mismo patrón, ya mostrado, sigue vivo con sus números actualizados', () => {
+      const c = winningCombo(signals, { calorieTarget: TARGET, keep: ['sueno+cuerpo'] })!
+      expect(c).toBeTruthy()
+      expect([c.deficits, c.occurrences, c.restDeficits, c.restDays]).toEqual([5, 9, 4, 9])
+    })
+
+    it('el orden de las keys guardadas no importa', () => {
+      expect(winningCombo(signals, { calorieTarget: TARGET, keep: ['cuerpo+sueno'] })).toBeTruthy()
+    })
+
+    it('debajo de 5 puntos se desvanece aunque ya se haya mostrado', () => {
+      // 5/9 contra 5/9: cero ventaja.
+      const flat = month(18, (i) =>
+        i < 9
+          ? { meal_count: 2, calories: i < 5 ? 1400 : 2400, sleep_minutes: 450, trained: true }
+          : { meal_count: 2, calories: i < 14 ? 1400 : 2400, sleep_minutes: 360 },
+      )
+      expect(winningCombo(flat, { calorieTarget: TARGET, keep: ['cuerpo+sueno'] })).toBeNull()
+    })
+
+    it('ya mostrado, pero con menos de la mitad de sus días en déficit, se desvanece', () => {
+      const weak = month(18, (i) =>
+        i < 9
+          ? { meal_count: 2, calories: i < 4 ? 1400 : 2400, sleep_minutes: 450, trained: true }
+          : { meal_count: 2, calories: i < 10 ? 1400 : 2400, sleep_minutes: 360 },
+      )
+      expect(winningCombo(weak, { calorieTarget: TARGET, keep: ['cuerpo+sueno'] })).toBeNull()
+    })
   })
 
   it('null sin meta de calorías', () => {
@@ -756,5 +838,36 @@ describe('finalPhrase', () => {
 
   it('null sin días', () => {
     expect(finalPhrase([])).toBeNull()
+  })
+})
+
+describe('combosBornRecently (memoria de la histéresis)', () => {
+  // Hasta ayer el patrón se separaba (5/8 contra 4/9: 18 puntos); hoy un día
+  // con los dos cerró sobre la meta y quedó 5/9 contra 4/9 (11 puntos), el
+  // caso real del 26 sep 2026.
+  const base = month(17, (i) =>
+    i < 8
+      ? { meal_count: 2, calories: i < 5 ? 1400 : 2400, sleep_minutes: 450, trained: true }
+      : { meal_count: 2, calories: i < 12 ? 1400 : 2400, sleep_minutes: 360 },
+  )
+  const lastDay = base[base.length - 1]!.day!
+  const next = new Date(`${lastDay}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  const today = next.toISOString().slice(0, 10)
+  const withToday = [
+    ...base,
+    { ...base[0]!, day: today, calories: 2400, sleep_minutes: 450, trained: true },
+  ]
+
+  it('recuerda el patrón que nació en los últimos días', () => {
+    expect(combosBornRecently(withToday, { calorieTarget: TARGET }, today)).toEqual([
+      'cuerpo+sueno',
+    ])
+  })
+
+  it('con esa memoria, el patrón sigue vivo hoy', () => {
+    expect(winningCombo(withToday, { calorieTarget: TARGET })).toBeNull()
+    const keep = combosBornRecently(withToday, { calorieTarget: TARGET }, today)
+    expect(winningCombo(withToday, { calorieTarget: TARGET, keep })).toBeTruthy()
   })
 })

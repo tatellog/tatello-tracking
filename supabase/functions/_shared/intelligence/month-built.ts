@@ -58,6 +58,7 @@ import { DEFICIT_FLOOR_RATIO, isDeficitDay } from './deficit.ts'
 import { workoutTypeDeficitSplit, workoutTypeMix, workoutTypeMixPhrase } from './workout-type.ts'
 // Meta de agua diaria: fuente única en _shared/intelligence/water.ts (T2.2).
 import { WATER_GOAL_GLASSES } from './water.ts'
+import { comboWeek } from './combo-facts.ts'
 
 /** Re-export para compatibilidad: la meta de agua vive en _shared (./water). */
 export { WATER_GOAL_GLASSES }
@@ -1216,7 +1217,11 @@ export function detectMonthPatterns(
   if (target != null && target > 0 && !daytypeFired) {
     let wdSurplus = 0
     let weSurplus = 0
+    let wdDays = 0
+    let weDays = 0
     for (const s of food) {
+      if (weekdayMon(s.day!) < 5) wdDays++
+      else weDays++
       const over = s.calories! - target
       if (over <= 0) continue
       if (weekdayMon(s.day!) < 5) wdSurplus += over
@@ -1225,7 +1230,10 @@ export function detectMonthPatterns(
     const total = wdSurplus + weSurplus
     const weekendHeavy = weSurplus >= wdSurplus
     const heavy = weekendHeavy ? weSurplus : wdSurplus
-    if (total >= 1000 && heavy / total >= 0.6) {
+    // Guard: ambos lados con comida registrada (≥ 3 días cada uno). Sin días
+    // de fin de semana registrados, "el 100% cae entre semana" es un artefacto
+    // de la falta de datos, no un patrón.
+    if (wdDays >= 3 && weDays >= 3 && total >= 1000 && heavy / total >= 0.6) {
       const pct = Math.round((heavy / total) * 100)
       out.push({
         id: 'surplus-concentration',
@@ -1595,9 +1603,26 @@ export type WinningCombo = {
   /** Las fechas (ISO) en que la combinación coincidió — el ancla de la evidencia
    *  ("¿de dónde salen las N veces?"). Ordenadas. */
   days: string[]
+  /** El punto de comparación: el resto de sus días con comida (sin la
+   *  combinación) y cuántos de esos cerraron en déficit. */
+  restDays: number
+  restDeficits: number
 }
 
 const COMBO_MIN_OCCUR = 3
+/** El combo tiene que SEPARARSE del resto de sus días (decisión dueña 26 sep
+ *  2026): su tasa de déficit supera la del resto por al menos 15 puntos. Si sus
+ *  días normales ya cierran en déficit casi igual, no es "lo que te sostiene". */
+const COMBO_MIN_ADVANTAGE = 0.15
+/** Histéresis (dueña 26 sep 2026): un patrón que YA se mostró no muere por un
+ *  solo día. Para NACER pide 15 puntos de ventaja; para SEGUIR VIVO, 5 (y la
+ *  mitad de sus días en déficit, como siempre). Si cae debajo, se desvanece. */
+const COMBO_KEEP_ADVANTAGE = 0.05
+
+/** Id estable de una combinación: sus keys ordenadas ("cuerpo+sueno"). */
+function comboKeyOf(keys: readonly string[]): string {
+  return [...keys].sort().join('+')
+}
 
 /* Verbos naturales por hábito para NOMBRAR el combo en la frase (no etiquetas
  * sueltas): "Entrenar e hidratarte fueron de la mano con tu déficit." */
@@ -1683,38 +1708,15 @@ export function weeklyComboLever(
   },
   todayIso: string,
 ): string | null {
-  const target = opts.calorieTarget ?? null
-  if (target == null || target <= 0) return null
-  const matches = comboMatcher(combo, opts)
-  const monday = mondayIso(todayIso)
-  const w = signals.filter(
-    (s) =>
-      s.day != null &&
-      s.day >= monday &&
-      s.day <= todayIso &&
-      s.calories != null &&
-      s.calories > 0 &&
-      matches(s),
-  ).length
-  // typical = días-de-combo por semana en sus semanas fuertes en déficit.
-  const byWeek = new Map<string, { combo: number; food: number; deficit: number }>()
-  for (const s of signals) {
-    if (!s.day || s.calories == null || s.calories <= 0) continue
-    const wk = mondayIso(s.day)
-    const e = byWeek.get(wk) ?? { combo: 0, food: 0, deficit: 0 }
-    e.food += 1
-    if (matches(s)) e.combo += 1
-    if (isDeficitDay(s.calories, target)) e.deficit += 1
-    byWeek.set(wk, e)
-  }
-  const strong = [...byWeek.values()].filter(
-    (e) => e.food >= 3 && e.combo >= 1 && e.deficit / e.food >= 0.5,
-  )
-  if (strong.length < 2) {
+  // Fuente única del estado de la semana: combo-facts.comboWeek (el chat del
+  // patrón usa el mismo cálculo para su cierre).
+  const week = comboWeek(signals, combo, opts, todayIso)
+  if (!week) return null
+  const w = week.done
+  if (week.typical == null) {
     return `Esta semana ya coincidieron ${w} ${w === 1 ? 'día' : 'días'}.`
   }
-  const counts = strong.map((e) => e.combo).sort((a, b) => a - b)
-  const typical = Math.max(1, counts[Math.floor(counts.length / 2)]!)
+  const typical = week.typical
   if (w >= typical) {
     return `Esta semana ya coincidieron ${w} días. Vas en tu mejor forma de déficit.`
   }
@@ -1729,12 +1731,16 @@ export function winningCombo(
     calorieTarget?: number | null
     proteinTarget?: number | null
     waterGoalGlasses?: number | null
+    /** Combinaciones que ya se le mostraron ("cuerpo+sueno"): siguen vivas con
+     *  la vara de permanencia (COMBO_KEEP_ADVANTAGE), no la de nacimiento. */
+    keep?: readonly string[]
   },
 ): WinningCombo | null {
   const target = opts.calorieTarget ?? null
   if (target == null || target <= 0) return null
   const food = foodDays(signals)
   if (food.length < COMBO_MIN_OCCUR) return null
+  const keep = new Set((opts.keep ?? []).map((k) => comboKeyOf(k.split('+'))))
   const pt = opts.proteinTarget ?? null
   const wg = Math.max(1, opts.waterGoalGlasses ?? WATER_GOAL_GLASSES)
 
@@ -1758,8 +1764,14 @@ export function winningCombo(
   ]
 
   const n = candidates.length
-  let best: { combo: typeof candidates; occ: number; deficits: number; days: string[] } | null =
-    null
+  let best: {
+    combo: typeof candidates
+    occ: number
+    deficits: number
+    days: string[]
+    restDays: number
+    restDeficits: number
+  } | null = null
   // Subconjuntos por bitmask (n ≤ 4 → ≤ 16). Solo combinaciones (size ≥ 2).
   for (let mask = 1; mask < 1 << n; mask++) {
     const combo = candidates.filter((_, i) => (mask & (1 << i)) !== 0)
@@ -1768,11 +1780,22 @@ export function winningCombo(
     if (comboDays.length < COMBO_MIN_OCCUR) continue
     const deficits = comboDays.filter((s) => isDeficitDay(s.calories, target)).length
     if (deficits / comboDays.length < 0.5) continue // tiene que HABER funcionado
+    // Punto de comparación: el resto de sus días con comida. Sin ≥ 3 días del
+    // otro lado no hay contra qué separarse.
+    const rest = food.filter((s) => !combo.every((c) => c.has(s)))
+    if (rest.length < COMBO_MIN_OCCUR) continue
+    const restDeficits = rest.filter((s) => isDeficitDay(s.calories, target)).length
+    const minAdvantage = keep.has(comboKeyOf(combo.map((c) => c.key)))
+      ? COMBO_KEEP_ADVANTAGE
+      : COMBO_MIN_ADVANTAGE
+    if (deficits / comboDays.length - restDeficits / rest.length < minAdvantage) continue
     const cand = {
       combo,
       occ: comboDays.length,
       deficits,
       days: comboDays.map((s) => s.day!).sort(),
+      restDays: rest.length,
+      restDeficits,
     }
     // Preferir la fórmula MÁS GRANDE (más rica); desempate por más días en
     // déficit, luego por más apariciones.
@@ -1793,6 +1816,8 @@ export function winningCombo(
     occurrences: best.occ,
     deficits: best.deficits,
     days: best.days,
+    restDays: best.restDays,
+    restDeficits: best.restDeficits,
   }
 }
 

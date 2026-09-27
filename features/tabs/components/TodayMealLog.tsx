@@ -38,8 +38,8 @@ import { colors, typography } from '@/theme'
 const THUMB = 48
 
 // ── Photo-circle pile — the section's hero summary ─────────────────
-const PILE_SIZE = 64
-const PILE_OVERLAP = 20
+const PILE_SIZE = 80
+const PILE_OVERLAP = 24
 const PILE_MAX = 6
 
 // The detail sheet's scroll area caps below the screen height.
@@ -335,7 +335,7 @@ function AddPileCircle({ onPress, overlap }: { onPress: () => void; overlap?: bo
             row (the photo pile opens the sheet; only this looks like a button). */}
         <InteractiveGlow color={colors.magenta} style={styles.addPileGlow} />
         <View style={styles.addPile}>
-          <PlusIcon size={26} color={colors.magenta} />
+          <PlusIcon size={32} color={colors.magenta} />
         </View>
       </View>
     </Pressable>
@@ -389,7 +389,7 @@ export function TodayMealLog({ date, onOpenMeal, onAddMeal }: Props) {
       {!hasMeals ? (
         <>
           <Text style={styles.emptyTitle}>Aún no sumas comida hoy.</Text>
-          <Text style={styles.emptyHint}>Cada comida que sumes aparece aquí, en orden.</Text>
+          <Text style={styles.emptyHint}>Una foto o unas palabras bastan.</Text>
         </>
       ) : null}
 
@@ -646,14 +646,14 @@ const styles = StyleSheet.create({
   // vive a la izquierda en ambos estados, así nunca "salta" al centro).
   emptyTitle: {
     fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.ui,
+    fontSize: typography.sizes.headingLg,
     color: colors.bone,
     letterSpacing: -0.2,
   },
   emptyHint: {
-    marginTop: 4,
+    marginTop: 6,
     fontFamily: typography.ui,
-    fontSize: typography.sizes.label,
+    fontSize: typography.sizes.bodyLarge,
     color: colors.niebla,
   },
   // Fila del pile: justificada a la IZQUIERDA (el grupo pega al borde izq). El
@@ -664,8 +664,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     height: PILE_SIZE,
-    marginTop: 12,
-    marginBottom: 14,
+    marginTop: 16,
+    marginBottom: 16,
   },
   pileTap: {
     flexDirection: 'row',
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
   // Summary line under the pile.
   summary: {
     fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
+    fontSize: typography.sizes.ui,
     color: colors.niebla,
   },
   summaryStrong: {

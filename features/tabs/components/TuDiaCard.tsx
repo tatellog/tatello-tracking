@@ -83,10 +83,10 @@ export function TuDiaCard({
   const gold = model.kind === 'close' && model.verdict.kind === 'deficit'
   const a11y =
     model.kind === 'close'
-      ? `${model.eyebrow}. ${model.title} ${model.line}${model.reading ? ` ${model.reading}` : ''}. Abre tu Órbita.`
+      ? `${model.eyebrow}. ${model.title} ${model.line}${model.reading ? ` ${model.reading}` : ''}. Abre Descubre.`
       : model.kind === 'weekly'
         ? 'Tu lectura semanal está lista. Ábrela.'
-        : `${model.eyebrow}. ${model.title} ${model.line} Abre tu Órbita.`
+        : `${model.eyebrow}. ${model.title} ${model.line} Abre Descubre.`
 
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.card}>
