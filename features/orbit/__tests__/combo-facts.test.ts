@@ -116,7 +116,7 @@ describe('lo fijo del chat', () => {
     expect(comboOpening(combo)).toEqual([
       'Tu patrón más repetido: dormir 7 horas o más y entrenar el mismo día.',
       'Pasó 11 días entre el 3 ago y el 24 sep. En 7 cerraste en déficit.',
-      'Tus otros días: 9 de 30 en déficit.',
+      'Tus días sin los dos: 9 de 30 en déficit.',
     ])
   })
 

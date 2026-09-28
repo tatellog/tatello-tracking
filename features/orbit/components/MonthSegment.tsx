@@ -75,6 +75,7 @@ import {
   comboHeadline,
   comboWeek,
   comboLiftBadge,
+  comboWithoutLabel,
   comboWeekSummary,
   comboWeekLine,
   evidenceDots,
@@ -82,6 +83,7 @@ import {
 import { useComboTranscript } from '../combo-transcript'
 import { comboKey, combosBornRecently } from '../combo-memory'
 import { useSeenCombos } from '../combo-seen'
+import { rankSurprises, type Surprise } from '../surprise'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
 import { earlyReading } from '../early-readings'
@@ -302,6 +304,20 @@ export function MonthSegment({
   // Madurez de datos (docs/orbita-maturity-spec.md): la sección promete solo
   // lo que sus días sostienen. Etapa por días CON DATOS, por dimensión.
   const maturity = useMemo(() => dataMaturity(patternSignals), [patternSignals])
+  // "Lo que no sabías" (etapa 3+): el ranker de sorpresa elige UN protagonista;
+  // lo esperado (el combo sueño + entreno) baja a "Lo que te sostiene".
+  const surpriseTargets = useMacroTargets().data
+  const surprises = useMemo(
+    () =>
+      maturity.stage >= 3
+        ? rankSurprises(patternSignals, {
+            calorieTarget: surpriseTargets?.calories ?? null,
+            proteinTarget: surpriseTargets?.protein_g ?? null,
+          })
+        : { hero: null, others: [] },
+    [maturity.stage, patternSignals, surpriseTargets?.calories, surpriseTargets?.protein_g],
+  )
+  const surprise = view === 'patterns' ? surprises.hero : null
   const firstSignal = useMemo(
     () => (maturity.stage >= 1 ? earlyReading(patternSignals, todayInTimezone()) : null),
     [maturity.stage, patternSignals],
@@ -452,6 +468,8 @@ export function MonthSegment({
     const proof = bar?.total ? ` · ${bar.value}/${bar.total} días` : ''
     const d = row.shown_at.slice(0, 10)
     const when = `${Number(d.slice(8, 10))} ${MONTHS_SHORT[Number(d.slice(5, 7)) - 1]}`
+    // "desde julio": la fecha exacta en otro mes se leía como patrón viejo.
+    const since = (MONTHS_FULL[Number(d.slice(5, 7)) - 1] ?? '').toLowerCase()
     const lever =
       row.kind === 'training_consistent'
         ? weeklyMovementLever(patternSignals, calorieTarget, today)
@@ -459,6 +477,7 @@ export function MonthSegment({
     return {
       label: `${HABIT_LABEL[key]} → déficit${proof} · descubierto el ${when}`,
       when,
+      since,
       onReplay: () =>
         emitReplayReveal({
           tier: row.tier,
@@ -785,10 +804,16 @@ export function MonthSegment({
       {view !== 'month' ? (
         <View style={styles.beat}>
           <View style={styles.section}>
-            {combo && view === 'patterns' ? null : <Text style={styles.eyebrow}>Tus patrones</Text>}
-            {combo || supportPatterns.length > 0 ? (
+            {(combo || surprise) && view === 'patterns' ? null : (
+              <Text style={styles.eyebrow}>Tus patrones</Text>
+            )}
+            {combo || supportPatterns.length > 0 || surprise ? (
               <>
-                {combo && view === 'patterns' ? null : (
+                {surprise ? <SurpriseHero surprise={surprise} /> : null}
+                {surprise && combo ? (
+                  <Text style={[styles.eyebrow, styles.sustainEyebrow]}>Lo que te sostiene</Text>
+                ) : null}
+                {(combo || surprise) && view === 'patterns' ? null : (
                   <Text style={styles.sectionLede}>
                     {maturity.stage <= 2
                       ? 'Empieza a asomar. Lo sigo mirando.'
@@ -798,7 +823,7 @@ export function MonthSegment({
                 {combo && view === 'patterns' ? (
                   <PatternHero
                     combo={combo}
-                    discoveredOn={provenance?.when ?? null}
+                    since={provenance?.since ?? null}
                     early={maturity.stage <= 2}
                     weekLine={comboWeekSummary(week, combo)}
                     talked={comboTalk.transcript != null}
@@ -1452,6 +1477,29 @@ function comboSentence(combo: WinningComboData): string {
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} el mismo día.`
 }
 
+/* "Lo que no sabías" — el protagonista del feed (etapa 3+), elegido por el
+ * ranker de sorpresa: lo que ella NO sabía, no lo que más se repite. La frase
+ * es el hallazgo; debajo, la comparación que lo prueba (dos filas, la fuerte
+ * primero). Sin ✦: el motor lo encontró, no hay chat detrás (regla IA visible). */
+function SurpriseHero({ surprise }: { surprise: Surprise }) {
+  return (
+    <Animated.View entering={FadeIn.duration(420)} style={styles.surprise}>
+      <Text style={styles.surpriseKicker}>Lo que no sabías</Text>
+      <Text style={styles.surpriseHeadline}>{surprise.headline}</Text>
+      <View style={styles.surpriseRows}>
+        {surprise.rows.map((r) => (
+          <View key={r.label} style={styles.surpriseRow}>
+            <Text style={[styles.surpriseLabel, r.strong && styles.surpriseStrong]}>{r.label}</Text>
+            <Text style={[styles.surpriseValue, r.strong && styles.surpriseValueStrong]}>
+              {r.value}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </Animated.View>
+  )
+}
+
 /* El patrón en el feed (sep 2026 · "la gente no leerá"): se entiende SIN leer
  * frases. La ecuación (fichas con el color de su estrella) dice de qué es; el
  * número grande en oro es el gancho; los puntos son la prueba (un día cada uno);
@@ -1465,7 +1513,7 @@ const CHIP_LABEL: Record<string, string> = {
 
 function PatternHero({
   combo,
-  discoveredOn,
+  since,
   early,
   weekLine,
   talked,
@@ -1473,7 +1521,8 @@ function PatternHero({
   onReveal,
 }: {
   combo: WinningComboData
-  discoveredOn: string | null
+  /** Mes en que se descubrió ("julio") → "desde julio". */
+  since: string | null
   /** Muestra chica: el kicker dice "temprano" (sin línea extra). */
   early: boolean
   /** La semana dicha con palabras (null = nada que decir). */
@@ -1491,7 +1540,12 @@ function PatternHero({
     { label: 'Déficit', color: colors.oroSoft },
   ]
   const lift = comboLiftBadge(combo)
-  const kicker = `${early ? 'Patrón temprano' : 'Patrón'}${discoveredOn ? ` · ${discoveredOn}` : ''}`
+  const kicker = `${early ? 'Patrón temprano' : 'Patrón'}${since ? ` · desde ${since}` : ''}`
+  // El número grande solo con muestra suficiente y una diferencia de verdad: con
+  // pocos días, "1,2×" en grande inflaba un solo día (target-user + producto,
+  // 27 sep 2026). Entonces manda la ecuación y los puntos cuentan.
+  const smallRatio = /^\d,\d×$/.test(lift) // "1,4×": diferencia chica, sin palabra
+  const showLift = Math.min(combo.occurrences, combo.restDays) >= 8 && !smallRatio
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern} accessible={false}>
       <View style={styles.heroTop}>
@@ -1525,18 +1579,20 @@ function PatternHero({
         ))}
       </View>
 
-      {/* El gancho: el número grande. */}
-      <View style={styles.liftBlock}>
-        <Text style={styles.liftNum}>{lift}</Text>
-        <Text style={styles.liftLabel}>
-          {lift === 'mucho más' ? 'días en déficit' : 'más días en déficit'}
-        </Text>
-      </View>
+      {/* El gancho: el número grande (solo si la muestra lo sostiene). */}
+      {showLift ? (
+        <View style={styles.liftBlock}>
+          <Text style={styles.liftNum}>{lift}</Text>
+          <Text style={styles.liftLabel}>
+            {lift === 'mucho más' ? 'días en déficit' : 'más días en déficit'}
+          </Text>
+        </View>
+      ) : null}
 
       <View
         style={styles.heroDots}
         accessible
-        accessibilityLabel={`Días en déficit: ${combo.deficits} de ${combo.occurrences} con los dos; ${combo.restDeficits} de ${combo.restDays} en tus otros días.`}
+        accessibilityLabel={`Días en déficit: ${combo.deficits} de ${combo.occurrences} con los dos; ${combo.restDeficits} de ${combo.restDays} ${comboWithoutLabel(combo).toLowerCase()}.`}
       >
         {/* Qué es un punto lleno, dicho una vez (la usuaria tenía que volver
             al número grande para saberlo). */}
@@ -1547,7 +1603,11 @@ function PatternHero({
           filled={combo.deficits}
           strong
         />
-        <DotsLine label="Otros días" total={combo.restDays} filled={combo.restDeficits} />
+        <DotsLine
+          label={comboWithoutLabel(combo)}
+          total={combo.restDays}
+          filled={combo.restDeficits}
+        />
       </View>
 
       {/* La semana con PALABRAS, separada de la evidencia: con puntos se leía
@@ -2105,6 +2165,59 @@ function RevealEvidenceModal({
 const styles = StyleSheet.create({
   heroPattern: {
     marginTop: 4,
+  },
+  surprise: {
+    marginTop: 4,
+    marginBottom: 36,
+  },
+  surpriseKicker: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.oroSoft,
+  },
+  surpriseHeadline: {
+    marginTop: 12,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.segmentTitle,
+    lineHeight: 30,
+    color: colors.leche,
+    letterSpacing: -0.2,
+  },
+  surpriseRows: {
+    marginTop: 18,
+    gap: 10,
+  },
+  surpriseRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  surpriseLabel: {
+    flex: 1,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.niebla,
+  },
+  surpriseStrong: {
+    color: colors.leche,
+  },
+  surpriseValue: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  surpriseValueStrong: {
+    color: colors.oroLight,
+  },
+  sustainEyebrow: {
+    marginBottom: 6,
   },
   heroTop: {
     flexDirection: 'row',

@@ -172,7 +172,9 @@ export function comboOpening(combo: ComboShape): string[] {
     `${span} ${closed}`,
   ]
   if (combo.restDays >= MIN_SIDE) {
-    lines.push(`Tus otros días: ${combo.restDeficits} de ${combo.restDays} en déficit.`)
+    lines.push(
+      `Tus días ${comboWithoutLabel(combo).toLowerCase()}: ${combo.restDeficits} de ${combo.restDays} en déficit.`,
+    )
   }
   return lines
 }
@@ -255,6 +257,12 @@ export function comboGroupLabel(combo: ComboShape): string {
       : n === 4
         ? 'Con los cuatro'
         : 'Con esto'
+}
+
+/** "Sin los dos" / "Sin los tres": la fila de comparación ("Otros días" no
+ *  decía cuáles eran, target-user 27 sep 2026). */
+export function comboWithoutLabel(combo: ComboShape): string {
+  return comboGroupLabel(combo).replace(/^Con /, 'Sin ')
 }
 
 /** Puntos de una fila de evidencia: un punto por día (lleno = déficit). Con más
