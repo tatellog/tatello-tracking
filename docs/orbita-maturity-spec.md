@@ -152,9 +152,12 @@ Regreso), memoria de patrones, `day-quality.ts`, chat guiado con backstops.
 **Falta:**
 
 1. `dataMaturity()` puro: días útiles por dimensión y etapa resultante.
-2. Tres detectores nuevos: noche corta → día siguiente, proteína con y sin
-   entreno, pasos contra déficit.
-3. El ranker de sorpresa con deduplicación y memoria de lo ya mostrado.
+2. ~~Tres detectores nuevos~~ **construidos (28 sep 2026)** en `surprise.ts`:
+   noche corta, proteína con y sin entreno, pasos contra déficit, más el día
+   que se rompe y el rescate.
+3. ~~El ranker de sorpresa~~ **construido** (`rankSurprises`, umbral 0.12,
+   gateado a etapa 3+). Falta: la memoria de lo ya mostrado (el parámetro
+   existe; hoy se pasa vacío).
 4. La superficie por etapa en el feed de Órbita.
 5. ~~El chat con paquete de hechos~~ **construido (26 sep 2026) sobre el patrón
    dominante**: `combo-facts.ts` (hechos, apertura, foco, semana, día tocado),
