@@ -8,6 +8,7 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated'
 
+import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { colors, typography } from '@/theme'
 
 import type { CheckInMode } from '../checkin-turn'
@@ -56,6 +57,13 @@ type Props = {
    *  solo abre el tipo: el dato del dispositivo manda, nunca se des-entrena
    *  contra él. La procedencia la dice la firma de Hoy, no esta fila. */
   wearable?: { minutes: number | null; kcal: number | null } | null
+  /** Algo del día vino del reloj: esta fila lleva el ÚNICO "ajustar" del
+   *  bloque (abre entreno/descanso y horas de sueño a la vez), en vez de un
+   *  encabezado con su link más un "cambiar" por fila. */
+  onAdjust?: () => void
+  /** La frase del coach de descanso se pinta al FINAL del bloque (tras el
+   *  sueño), no aquí: el padre la pone con <RestMessage />. */
+  restMessageOutside?: boolean
 }
 
 // Star = a trained day (the constellation's glyph). Vive SOLO en la fila
@@ -123,6 +131,8 @@ export function DayCheckIn({
   workoutType,
   saveFailed = false,
   wearable = null,
+  onAdjust,
+  restMessageOutside = false,
 }: Props) {
   // El chip recién tocado: sostiene el bloque abierto CHIP_HOLD_MS para que
   // la selección se vea antes del colapso (fill → hold → recogida).
@@ -314,27 +324,39 @@ export function DayCheckIn({
           style={styles.confirmedRow}
         >
           {state === 'trained' ? <StarGlyph color={colors.magenta} /> : null}
-          <Text style={styles.confirmedText}>
-            {state === 'trained'
-              ? isHoy
-                ? 'Entrenaste hoy'
-                : 'Entrenaste este día'
-              : isHoy
-                ? 'Hoy fue descanso'
-                : 'Este día fue descanso'}
-            {state === 'trained' && typeLabel ? (
-              <Text style={styles.confirmedType}>{` · ${typeLabel}`}</Text>
-            ) : null}
-            {/* Lo que el reloj trajo, como contexto (spec wearables §3): la
+          <View style={styles.confirmedLead}>
+            <Text style={styles.confirmedText}>
+              {state === 'trained'
+                ? isHoy
+                  ? 'Entrenaste hoy'
+                  : 'Entrenaste este día'
+                : isHoy
+                  ? 'Hoy fue descanso'
+                  : 'Este día fue descanso'}
+              {state === 'trained' && typeLabel ? (
+                <Text style={styles.confirmedType}>{` · ${typeLabel}`}</Text>
+              ) : null}
+              {/* Lo que el reloj trajo, como contexto (spec wearables §3): la
                 quema nunca infla el presupuesto de comida ni entra al TDEE. */}
-            {sealedByWearable && wearable?.minutes != null ? (
-              <Text style={styles.confirmedType}>{` · ${wearable.minutes} min`}</Text>
-            ) : null}
-            {sealedByWearable && wearable?.kcal != null ? (
-              <Text style={styles.confirmedType}>{` · ~${wearable.kcal} kcal`}</Text>
-            ) : null}
-          </Text>
-          {!locked && !sealedByWearable ? (
+              {sealedByWearable && wearable?.minutes != null ? (
+                <Text style={styles.confirmedType}>{` · ${wearable.minutes} min`}</Text>
+              ) : null}
+              {sealedByWearable && wearable?.kcal != null ? (
+                <Text style={styles.confirmedType}>{` · ~${wearable.kcal} kcal`}</Text>
+              ) : null}
+            </Text>
+            {sealedByWearable ? <WatchMark past={!isHoy} /> : null}
+          </View>
+          {!locked && onAdjust ? (
+            <Pressable
+              onPress={onAdjust}
+              hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Ajustar tu día: entreno o descanso y horas de sueño"
+            >
+              <Text style={styles.changeLink}>ajustar</Text>
+            </Pressable>
+          ) : !locked && !sealedByWearable ? (
             <Pressable
               onPress={onOpen}
               hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
@@ -358,7 +380,7 @@ export function DayCheckIn({
           Esta estrella ya está <Text style={styles.restEm}>encendida</Text>. Lo que enciendes,
           permanece.
         </Animated.Text>
-      ) : state === 'rested' && !showAsk ? (
+      ) : state === 'rested' && !showAsk && !restMessageOutside ? (
         <Animated.Text
           layout={layout}
           entering={fadeInSlow}
@@ -472,8 +494,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginLeft: 2,
   },
-  confirmedText: {
+  // Texto + marca del reloj pegada al dato; el link queda a la derecha.
+  confirmedLead: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  confirmedText: {
+    flexShrink: 1,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,
@@ -543,3 +571,17 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
 })
+
+/** La frase del coach del día de descanso, para pintarla al FINAL del bloque
+ *  de Hoy (tras la fila del sueño): una sola voz, siempre como cierre. */
+export function RestMessage() {
+  const reducedMotion = useReducedMotion()
+  return (
+    <Animated.Text
+      entering={reducedMotion ? undefined : FadeIn.duration(220)}
+      style={styles.restMessage}
+    >
+      Descansar también cuenta. Mañana <Text style={styles.restEm}>sigues</Text>.
+    </Animated.Text>
+  )
+}

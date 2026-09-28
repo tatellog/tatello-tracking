@@ -10,6 +10,7 @@ import Animated, {
 
 import { useSleepLog, useUpsertSleep } from '@/features/sleep/hooks'
 import { formatSleepShort } from '@/features/wearables/recovery'
+import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { colors, typography } from '@/theme'
 
 import type { CheckInMode } from '../checkin-turn'
@@ -153,10 +154,13 @@ export function SleepCheckIn({
         style={styles.confirmedRow}
       >
         <MoonGlyph color={colors.magenta} />
-        <Text style={styles.confirmedText}>
-          {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
-        </Text>
-        {/* Del reloj, la puerta vive en el eyebrow del bloque ("ajustar"). */}
+        <View style={styles.confirmedLead}>
+          <Text style={styles.confirmedText}>
+            {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
+          </Text>
+          {fromWatch ? <WatchMark past={past} /> : null}
+        </View>
+        {/* Del reloj, la puerta es el "ajustar" de la fila del día. */}
         {fromWatch ? null : (
           <Pressable
             onPress={onOpen}
@@ -335,8 +339,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginLeft: 2,
   },
-  confirmedText: {
+  confirmedLead: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  confirmedText: {
+    flexShrink: 1,
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     letterSpacing: 0.3,

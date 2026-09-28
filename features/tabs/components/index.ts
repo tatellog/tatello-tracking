@@ -1,7 +1,13 @@
 export { AppTabBar } from './AppTabBar'
 export { CelebrationOverlay } from './CelebrationOverlay'
 export { CoachLine } from './CoachLine'
-export { DayCheckIn, type DayState, WORKOUT_TYPES, type WorkoutTypeId } from './DayCheckIn'
+export {
+  DayCheckIn,
+  type DayState,
+  RestMessage,
+  WORKOUT_TYPES,
+  type WorkoutTypeId,
+} from './DayCheckIn'
 export { DayMealList } from './DayMealList'
 export { DaySky } from './DaySky'
 export { LunarConstellation } from './LunarConstellation'

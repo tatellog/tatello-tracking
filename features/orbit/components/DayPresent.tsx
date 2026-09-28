@@ -94,9 +94,10 @@ const ABSENT_TONE: Record<string, string> = {
 }
 
 const RING_SIZE = 208
-// Tamaño en pantalla (dirección de arte + ux sep 2026): más compacto, con la
-// leyenda a su lado. El SVG conserva su viewBox de 208 y escala.
-const RING_DISPLAY = 150
+// Tamaño en pantalla: con la leyenda a su lado. 150 se quedaba chico en
+// Descubre (dueña 28 sep 2026); 172 cabe con la leyenda en una línea. El SVG
+// conserva su viewBox de 208 y escala.
+const RING_DISPLAY = 172
 const CENTER = RING_SIZE / 2 // 104
 // El aura respira más allá del borde del anillo (bloom).
 
@@ -1076,7 +1077,7 @@ const styles = StyleSheet.create({
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 22,
+    gap: 18,
     marginTop: 8,
   },
   // La leyenda en filas a la derecha del anillo.

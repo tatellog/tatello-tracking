@@ -15,6 +15,7 @@ import {
   mergeWeightSeries,
   recoveryFact,
   smoothWeightPoints,
+  type Trend,
 } from '@/features/progress/logic'
 import { fourPointStarPath } from '@/features/tabs/components/constellation/geometry/four-point-star-path'
 import { SkyBackground } from '@/features/tabs/components'
@@ -47,20 +48,37 @@ const fmtT = (t: number): string => {
   return `${d.getDate()} ${MESES[d.getMonth()] ?? ''} ${d.getFullYear()}`
 }
 
+/** La reflexión dice las DOS cosas cuando no coinciden: "estable" es el ritmo
+ *  de estas semanas y el −5 kg es del periodo; juntas sin contexto se leían
+ *  como contradicción. Sin juicio en ninguna dirección. */
+function trendReflection(trend: Trend, periodDelta: number, period: Period): string {
+  if (trend.direction === 'flat' && Math.abs(periodDelta) >= 1) {
+    const kg = Math.abs(periodDelta).toFixed(1)
+    const span = period === 'ALL' ? 'en todo tu camino' : `en ${PERIOD_LABEL[period].toLowerCase()}`
+    return periodDelta < 0
+      ? `${kg} kg menos ${span}, y estas semanas tu peso se sostiene.`
+      : `${kg} kg más ${span}, y estas semanas tu peso se sostiene.`
+  }
+  return formatTrendCopy(trend)
+}
+
 export default function WeightTrendScreen() {
   const router = useRouter()
   const measurements = useMeasurements(null)
   const checkins = useBodyCheckins()
   // Báscula (spec wearables §9): rellena los días sin registro propio.
   const scaleWeights = useWearableWeights()
-  // La pantalla abre en "Todo": su pregunta es el camino completo; el tab ya
-  // cubre la ventana corta.
-  const [period, setPeriod] = useState<Period>('ALL')
-
   const fused = useMemo(
     () => mergeWeightSeries(measurements.data ?? [], checkins.data ?? [], scaleWeights.data ?? []),
     [measurements.data, checkins.data, scaleWeights.data],
   )
+  // Abre en 90 días cuando alcanzan los registros (dueña 28 sep 2026: "Todo"
+  // con pocos registros en años dibujaba un zigzag que alarmaba). Con menos de
+  // 4 en esa ventana, "Todo" (si no, no habría línea).
+  const [picked, setPicked] = useState<Period | null>(null)
+  const recent90 = fused.filter((p) => p.t >= Date.now() - 90 * 24 * 60 * 60 * 1000).length
+  const period: Period = picked ?? (recent90 >= 4 ? '90D' : 'ALL')
+  const setPeriod = setPicked
   const points = useMemo(() => {
     const days = PERIOD_DAYS[period]
     if (days == null) return fused
@@ -174,10 +192,9 @@ export default function WeightTrendScreen() {
 
             {/* La protagonista: la gráfica, enorme. */}
             <Animated.View entering={FadeIn.duration(420).delay(120)}>
-              <TrajectoryChart points={smoothed} trend={trend} height={250} />
+              <TrajectoryChart points={smoothed} trend={trend} height={250} variant="area" />
               <Text style={styles.chartCaption}>
-                {points.length} registros · media de 7 días
-                {trend ? ' · la punteada sigue tu ritmo real' : ''}
+                {points.length} {points.length === 1 ? 'registro' : 'registros'} · media de 7 días
               </Text>
             </Animated.View>
 
@@ -225,7 +242,11 @@ export default function WeightTrendScreen() {
             </View>
 
             {/* La interpretación, como reflexión (motor, sin ✦). */}
-            {trend ? <Text style={styles.reflection}>{formatTrendCopy(trend)}</Text> : null}
+            {trend ? (
+              <Text style={styles.reflection}>
+                {trendReflection(trend, delta?.abs ?? 0, period)}
+              </Text>
+            ) : null}
             {cycle && (cycle.phase === 'lutea' || cycle.phase === 'menstrual') ? (
               <Text style={styles.cycleNote}>
                 {cycle.phase === 'lutea'

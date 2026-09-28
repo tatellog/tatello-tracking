@@ -8,9 +8,17 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg'
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  LinearGradient as SvgGradient,
+  Path,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg'
 
-import { colors } from '@/theme'
+import { colors, typography } from '@/theme'
 
 import type { Trend, WeightPoint } from '../logic'
 
@@ -35,16 +43,60 @@ import type { Trend, WeightPoint } from '../logic'
 const STAR_PATH = 'M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z'
 
 const AnimatedPath = Animated.createAnimatedComponent(Path)
+
+/* Curva monótona (Fritsch–Carlson): suaviza sin inventar picos ni valles entre
+ * registros (una Catmull-Rom se pasa de largo y dibuja un peso que nunca hubo). */
+function monotonePath(xs: number[], ys: number[]): string {
+  const n = xs.length
+  if (n === 0) return ''
+  if (n === 1) return `M ${xs[0]} ${ys[0]}`
+  const dx: number[] = []
+  const m: number[] = []
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = xs[i + 1]! - xs[i]!
+    m[i] = dx[i]! === 0 ? 0 : (ys[i + 1]! - ys[i]!) / dx[i]!
+  }
+  const t: number[] = [m[0]!]
+  for (let i = 1; i < n - 1; i++) {
+    t[i] = m[i - 1]! * m[i]! <= 0 ? 0 : (m[i - 1]! + m[i]!) / 2
+  }
+  t[n - 1] = m[n - 2]!
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) {
+      t[i] = 0
+      t[i + 1] = 0
+      continue
+    }
+    const a = t[i]! / m[i]!
+    const b = t[i + 1]! / m[i]!
+    const h = a * a + b * b
+    if (h > 9) {
+      const k = 3 / Math.sqrt(h)
+      t[i] = k * a * m[i]!
+      t[i + 1] = k * b * m[i]!
+    }
+  }
+  let d = `M ${xs[0]} ${ys[0]}`
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i]! / 3
+    d += ` C ${xs[i]! + h} ${ys[i]! + t[i]! * h} ${xs[i + 1]! - h} ${ys[i + 1]! - t[i + 1]! * h} ${xs[i + 1]} ${ys[i + 1]}`
+  }
+  return d
+}
 const AnimatedG = Animated.createAnimatedComponent(G)
 
 export function TrajectoryChart({
   points,
   trend,
   height = 188,
+  variant = 'comet',
 }: {
   points: readonly WeightPoint[]
   trend: Trend | null
   height?: number
+  /** 'area' (pantalla de tendencia): curva suave + área tenue + cada registro
+   *  como punto, y la proyección con su nombre. 'comet' = el tab, idéntico. */
+  variant?: 'comet' | 'area'
 }) {
   const W = 300
   const H = height
@@ -90,7 +142,15 @@ export function TrajectoryChart({
   const sx = (i: number) => xByIndex[i] ?? padX
   const sy = (y: number) => padY + ((maxY - y) / (maxY - minY)) * (H - 2 * padY)
 
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(i)} ${sy(p.weight)}`).join(' ')
+  const isArea = variant === 'area'
+  const linePath = isArea
+    ? monotonePath(
+        points.map((_, i) => sx(i)),
+        points.map((p) => sy(p.weight)),
+      )
+    : points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(i)} ${sy(p.weight)}`).join(' ')
+  const areaPath =
+    isArea && points.length > 1 ? `${linePath} L ${sx(lastIdx)} ${H} L ${sx(0)} ${H} Z` : null
 
   // Total polyline length — drives the stroke draw-in.
   let lineLen = 0
@@ -100,7 +160,7 @@ export function TrajectoryChart({
     if (!a || !b) continue
     lineLen += Math.hypot(sx(i) - sx(i - 1), sy(b.weight) - sy(a.weight))
   }
-  lineLen = lineLen || 1
+  lineLen = (lineLen || 1) * (isArea ? 1.2 : 1)
 
   const draw = useSharedValue(0)
   useEffect(() => {
@@ -129,12 +189,28 @@ export function TrajectoryChart({
           <Stop offset="0" stopColor={colors.magentaDeep} />
           <Stop offset="1" stopColor={colors.magentaHot} />
         </SvgGradient>
+        <SvgGradient id="area-fill" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={colors.magenta} stopOpacity={0.22} />
+          <Stop offset="1" stopColor={colors.magenta} stopOpacity={0} />
+        </SvgGradient>
       </Defs>
+
+      {/* Área tenue bajo la curva (solo 'area'): se lee la tendencia, no el zigzag. */}
+      {areaPath ? (
+        <AnimatedPath d={areaPath} fill="url(#area-fill)" animatedProps={revealProps} />
+      ) : null}
 
       {/* Measurement stars — each logged weight, a point of light (pequeños:
           el protagonista es el punto activo, no el historial). */}
       {points.slice(1, lastIdx).map((p, i) => (
-        <Circle key={`m${i}`} cx={sx(i + 1)} cy={sy(p.weight)} r={2.1} fill={colors.magenta} />
+        <Circle
+          key={`m${i}`}
+          cx={sx(i + 1)}
+          cy={sy(p.weight)}
+          r={isArea ? 3 : 2.1}
+          fill={isArea ? colors.magentaHot : colors.magenta}
+          opacity={isArea ? 0.85 : 1}
+        />
       ))}
 
       {/* Origin — a faint star marking where the trajectory began. */}
@@ -180,6 +256,20 @@ export function TrajectoryChart({
               stroke={colors.magentaDeep}
               strokeWidth={1.6}
             />
+            {/* En 'area' la proyección se NOMBRA (antes una leyenda aparte
+                decía "la punteada sigue tu ritmo real" y no se entendía). */}
+            {isArea ? (
+              <SvgText
+                x={W - padX}
+                y={sy(projectedWeight) - 10}
+                fill={colors.niebla}
+                fontSize={10}
+                fontFamily={typography.uiMedium}
+                textAnchor="end"
+              >
+                hacia dónde vas
+              </SvgText>
+            ) : null}
           </>
         ) : null}
         {/* Punto activo con glow en dos capas: hoy es lo que brilla. */}

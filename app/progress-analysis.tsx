@@ -57,6 +57,9 @@ export default function ProgressAnalysisScreen() {
   const dates = useMemo(() => checkins.map((c) => c.measured_on), [checkins])
 
   const [openPatterns, setOpenPatterns] = useState(false)
+  // Lo demás (lo que no fue a tu favor + sin cambio) va plegado: arriba manda
+  // lo que sí (dueña 28 sep 2026: seis filas iguales pesaban).
+  const [showAll, setShowAll] = useState(false)
 
   // F3: las fechas se ELIGEN aquí (picker A→B); los params solo precargan.
   const [dayA, setDayA] = useState<string | null>(null)
@@ -262,7 +265,7 @@ export default function ProgressAnalysisScreen() {
               <Text style={styles.whoText}>
                 {elapsedDays < 1
                   ? 'Lo que cambió ese día'
-                  : `Lo que cambió en ${elapsedLabel(elapsedDays)}`}
+                  : `Lo que cambió en ${elapsedLabel(elapsedDays)}${isLatest ? ', hasta tu última medición' : ''}`}
               </Text>
 
               {rows.length === 0 ? (
@@ -302,39 +305,65 @@ export default function ProgressAnalysisScreen() {
                       />
                     </Svg>
                   </View>
-                  {/* Header ESTÁTICO (uxui): el acordeón abierto por defecto
-                      solo servía para vaciar la pantalla. */}
-                  <Text style={styles.sectionHead}>¿Qué cambió?</Text>
-                  <Animated.View entering={FadeIn.duration(240)} style={styles.card}>
-                    {gains.map((r) => (
-                      <ChangeRow key={r.key} row={r} favorable />
-                    ))}
-                    {hard.map((r) => (
-                      <ChangeRow key={r.key} row={r} />
-                    ))}
-                    {/* Las sin cambio TAMBIÉN (uxui: una sola card que es
-                          interpretación Y dato completo — la vieja card
-                          "Muéstrame los datos" era esta misma lista sin los
-                          deltas, acordeón de relleno). */}
-                    {rows
-                      .filter((r) => r.delta === 0)
-                      .map((r) => {
-                        const meta = LABEL[r.key]
-                        return (
-                          <View key={r.key} style={styles.changeRow}>
-                            <View style={styles.changeMain}>
-                              <Text style={styles.changeLabel}>{meta.name}</Text>
-                              {/* Atenuadas: "51 → 51" no debe gritar igual
-                                    que "+5.3" (uxui). */}
-                              <Text style={[styles.changeValues, styles.changeValuesMuted]}>
-                                {fmtVal(r.a, meta.unit)} → {fmtVal(r.b, meta.unit)}
-                              </Text>
-                            </View>
-                            <Text style={styles.noChangeTag}>sin cambio</Text>
-                          </View>
-                        )
-                      })}
-                  </Animated.View>
+                  {/* Lo que fue A TU FAVOR, arriba y en oro: es lo que la usuaria
+                      viene a buscar. Lo demás se nombra, plegado, sin rojo. */}
+                  {gains.length > 0 ? (
+                    <>
+                      <Text style={styles.sectionHead}>A tu favor</Text>
+                      <Animated.View entering={FadeIn.duration(240)} style={styles.card}>
+                        {gains.map((r) => (
+                          <ChangeRow key={r.key} row={r} favorable />
+                        ))}
+                      </Animated.View>
+                    </>
+                  ) : (
+                    <Text style={styles.sectionHead}>¿Qué cambió?</Text>
+                  )}
+                  {(() => {
+                    const still = rows.filter((r) => r.delta === 0)
+                    const restCount = hard.length + still.length
+                    if (restCount === 0) return null
+                    // Sin nada a tu favor, la lista se muestra abierta (es todo).
+                    const open = showAll || gains.length === 0
+                    return (
+                      <>
+                        {gains.length > 0 ? (
+                          <Pressable
+                            onPress={() => setShowAll((v) => !v)}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded: open }}
+                            style={styles.moreToggle}
+                          >
+                            <Text style={styles.moreToggleText}>
+                              {open ? 'Ocultar' : `Ver todo lo que cambió (${restCount}) ›`}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                        {open ? (
+                          <Animated.View entering={FadeIn.duration(200)} style={styles.card}>
+                            {hard.map((r) => (
+                              <ChangeRow key={r.key} row={r} />
+                            ))}
+                            {still.map((r) => {
+                              const meta = LABEL[r.key]
+                              return (
+                                <View key={r.key} style={styles.changeRow}>
+                                  <View style={styles.changeMain}>
+                                    <Text style={styles.changeLabel}>{meta.name}</Text>
+                                    <Text style={[styles.changeValues, styles.changeValuesMuted]}>
+                                      {fmtVal(r.a, meta.unit)} → {fmtVal(r.b, meta.unit)}
+                                    </Text>
+                                  </View>
+                                  <Text style={styles.noChangeTag}>sin cambio</Text>
+                                </View>
+                              )
+                            })}
+                          </Animated.View>
+                        ) : null}
+                      </>
+                    )
+                  })()}
 
                   {/* El "muéstrame los datos" DE VERDAD es la tabla cruda. */}
                   <LinkCta
@@ -653,7 +682,13 @@ const styles = StyleSheet.create({
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  changeDeltaFav: { color: colors.oroLight },
+  changeDeltaFav: { color: colors.oroSoft, fontSize: typography.sizes.title },
+  moreToggle: { alignSelf: 'flex-start', marginTop: 12, marginBottom: 2 },
+  moreToggleText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
   noChangeTag: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
