@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
@@ -11,6 +12,7 @@ import {
   useLatestWearableWeight,
   useScaleBadge,
   useScaleConnection,
+  useWearableWeights,
 } from '@/features/wearables/hooks'
 import { colors, radius, typography } from '@/theme'
 
@@ -36,6 +38,7 @@ function ScaleBody() {
   const router = useRouter()
   const { available, enabled, busy, enable, disable } = useScaleConnection()
   const latest = useLatestWearableWeight(enabled === true)
+  const weights = useWearableWeights()
   const { markSeen } = useScaleBadge()
   const [error, setError] = useState<string | null>(null)
 
@@ -115,36 +118,39 @@ function ScaleBody() {
                 >
                   <Text style={styles.primaryBtnText}>Ver tu tendencia</Text>
                 </Pressable>
-                <Pressable
-                  onPress={() => void disable()}
-                  accessibilityRole="button"
-                  accessibilityLabel="Apagar la báscula"
-                  style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-                >
-                  <Text style={styles.secondaryBtnText}>Apagar</Text>
-                </Pressable>
                 <Text style={styles.footnote}>
                   Si un día registras tu peso a mano, ese manda. Al apagar, Stelar deja de leer la
                   báscula; lo ya anotado se queda contigo.
                 </Text>
+                {/* Apagar es una salida, no la acción de la pantalla: link
+                    discreto al pie (antes un botón grande que invitaba a tocarlo). */}
+                <Pressable
+                  onPress={() => void disable()}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Apagar la báscula"
+                  style={styles.offLink}
+                >
+                  <Text style={styles.offLinkText}>Apagar la báscula</Text>
+                </Pressable>
               </>
             ) : (
               <>
                 {/* El priming — qué lee, qué NO hace, reversible (spec §5). */}
                 <View style={styles.point}>
-                  <Text style={styles.pointGlyph}>✦</Text>
+                  <View style={styles.pointDot} />
                   <Text style={styles.pointText}>
                     Lee el peso que tu báscula guarda en Salud y lo suma a tu tendencia.
                   </Text>
                 </View>
                 <View style={styles.point}>
-                  <Text style={styles.pointGlyph}>✦</Text>
+                  <View style={styles.pointDot} />
                   <Text style={styles.pointText}>
                     No te lo muestra en Hoy ni te pide pesarte. Solo te ahorra escribirlo.
                   </Text>
                 </View>
                 <View style={styles.point}>
-                  <Text style={styles.pointGlyph}>✦</Text>
+                  <View style={styles.pointDot} />
                   <Text style={styles.pointText}>Se apaga en un toque, cuando quieras.</Text>
                 </View>
                 <Pressable
@@ -171,9 +177,69 @@ function ScaleBody() {
               </>
             )}
           </View>
+
+          {/* Tus últimas lecturas, de un vistazo: abre la tendencia completa. */}
+          {enabled && (weights.data?.length ?? 0) >= 2 ? (
+            <Pressable
+              onPress={() => router.push('/weight-trend')}
+              accessibilityRole="button"
+              accessibilityLabel="Tus últimas lecturas. Ver tu tendencia"
+              style={({ pressed }) => pressed && styles.pressed}
+            >
+              <View style={styles.sparkCard}>
+                <Text style={styles.readingEyebrow}>
+                  {`Tus últimas ${Math.min(10, weights.data!.length)} lecturas`}
+                </Text>
+                <Sparkline values={weights.data!.slice(-10).map((w) => w.weight_kg)} />
+                <Text style={styles.sparkLink}>Ver tu tendencia ›</Text>
+              </View>
+            </Pressable>
+          ) : null}
+
+          {/* Con qué funciona: cualquier báscula que escriba en Salud. */}
+          <Text style={styles.compat}>
+            Funciona con cualquier báscula que guarde tu peso en Apple Salud: Garmin Index (desde
+            Garmin Connect), Withings, Renpho, Eufy y más.
+          </Text>
         </ScrollView>
       </SafeAreaView>
     </View>
+  )
+}
+
+/** Mini línea de las últimas lecturas: sin ejes ni números (el número vive
+ *  arriba); solo la forma, con la última lectura encendida. */
+function Sparkline({ values }: { values: number[] }) {
+  const W = 300
+  const H = 64
+  const pad = 8
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = Math.max(0.5, max - min)
+  const x = (i: number) => pad + (i / Math.max(1, values.length - 1)) * (W - 2 * pad)
+  const y = (v: number) => pad + ((max - v) / span) * (H - 2 * pad)
+  const d = values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ')
+  const lastI = values.length - 1
+  return (
+    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} style={{ marginTop: 10 }}>
+      <Path
+        d={d}
+        stroke={colors.magenta}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {values.map((v, i) => (
+        <Circle
+          key={i}
+          cx={x(i)}
+          cy={y(v)}
+          r={i === lastI ? 4.5 : 2.5}
+          fill={i === lastI ? colors.magentaHot : colors.magenta}
+        />
+      ))}
+    </Svg>
   )
 }
 
@@ -188,6 +254,43 @@ function readingLabel(iso: string): string {
 }
 
 const styles = StyleSheet.create({
+  offLink: { alignSelf: 'center', marginTop: 16, paddingVertical: 4 },
+  offLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    textDecorationLine: 'underline',
+  },
+  pointDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+    backgroundColor: colors.oroSoft,
+  },
+  sparkCard: {
+    marginTop: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgCard,
+  },
+  sparkLink: {
+    marginTop: 8,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  compat: {
+    marginTop: 18,
+    paddingHorizontal: 4,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.label,
+    lineHeight: 18,
+    color: colors.niebla,
+  },
   screen: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
   header: {
@@ -235,12 +338,6 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   point: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  pointGlyph: {
-    fontFamily: typography.ui,
-    fontSize: typography.sizes.body,
-    color: colors.magenta,
-    marginTop: 1,
-  },
   pointText: {
     flex: 1,
     fontFamily: typography.uiMedium,
@@ -294,20 +391,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.body,
     color: colors.leche,
-    letterSpacing: 0.3,
-  },
-  secondaryBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-  },
-  secondaryBtnText: {
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.body,
-    color: colors.bone,
     letterSpacing: 0.3,
   },
   footnote: {

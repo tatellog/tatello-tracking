@@ -34,7 +34,6 @@ import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/fe
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
-import { WearableSignature } from '@/features/wearables/components/WearableSignature'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
 import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
 import { wearableDayFacts } from '@/features/wearables/recovery'
@@ -60,6 +59,7 @@ import { HERO_ALIVE_ENABLED } from '@/lib/featureFlags'
 import {
   CoachLine,
   DayCheckIn,
+  RestMessage,
   type DayState,
   type WorkoutTypeId,
   LunarConstellation,
@@ -662,24 +662,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 inline se retiró para no duplicar el momento (spec Decisión #3). */}
 
             <Animated.View entering={enter(120)}>
-              {/* La firma del reloj: el eyebrow que agrupa las dos filas. */}
-              {anyFromWearable ? (
-                <WearableSignature
-                  workout={trainedByWearable}
-                  sleep={sleepFromWearable}
-                  past={viewingPast}
-                  adjusting={adjustWorkout || adjustSleep}
-                  onAdjust={() => {
-                    setAdjustWorkout(trainedByWearable)
-                    setAdjustSleep(sleepFromWearable)
-                  }}
-                />
-              ) : null}
               <DayCheckIn
                 // Resetea el hold interno al navegar entre días.
                 key={selectedDate}
                 state={dayState}
-                mode={adjustWorkout && trainedByWearable ? 'ask' : turn.workout}
+                // "ajustar" abre la edición también en día de descanso.
+                mode={adjustWorkout ? 'ask' : turn.workout}
                 onTrain={handleTrain}
                 onRest={handleRest}
                 onOpen={openWorkout}
@@ -699,6 +687,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                     ? { minutes: wearable.workout.minutes, kcal: wearable.workout.kcal }
                     : null
                 }
+                // Con algo del reloj, UN solo "ajustar" en esta fila abre las dos
+                // cosas (entreno/descanso y horas); ya no hay encabezado del
+                // reloj ni un "cambiar" por fila (dueña 28 sep 2026).
+                onAdjust={
+                  anyFromWearable && !(adjustWorkout || adjustSleep)
+                    ? () => {
+                        setAdjustWorkout(true)
+                        setAdjustSleep(sleepFromWearable)
+                      }
+                    : undefined
+                }
+                restMessageOutside
                 saveFailed={
                   toggleToday.isError ||
                   setRest.isError ||
@@ -723,6 +723,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   }}
                 />
               }
+              {/* La voz del coach cierra el bloque, siempre al final. */}
+              {dayState === 'rested' && !adjustWorkout && turn.workout !== 'ask' ? (
+                <RestMessage />
+              ) : null}
               {/* Invitación contextual (spec wearables §5): solo con el día
                   respondido, el sueño ya no preguntando, y el canal disponible
                   pero no conectado. */}
