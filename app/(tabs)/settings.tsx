@@ -18,7 +18,7 @@ import { track } from '@/lib/analytics'
 import { useTransformProgress } from '@/features/emblem'
 import { exportMeasurementsCsv, savePhotosToLibrary } from '@/features/progress/export'
 import { useMacroTargets } from '@/features/macros/hooks'
-import { avatarUrl } from '@/features/profile/api'
+import { useSignedStorageUrl } from '@/lib/storage/signed-url'
 import { useDeleteAccount, useProfile } from '@/features/profile/hooks'
 import { SectionHeader, SkyBackground, TabHeader } from '@/features/tabs/components'
 import { ZODIAC, ZodiacFigure, zodiacFromDate } from '@/features/tabs/zodiac'
@@ -273,7 +273,8 @@ function SettingsBody() {
   const signLabel = zodiacSign ? ZODIAC[zodiacSign].label : null
   const identityLine = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join('  ·  ')
 
-  const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
+  // Enlace firmado: el bucket de avatares ya no es público (auditoría de privacidad).
+  const avatarUri = useSignedStorageUrl('avatars', profile?.avatar_path)
   const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
 
   const nutricion = targetsLoading

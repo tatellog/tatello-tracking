@@ -1,7 +1,7 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
-import { mealPhotoUrl } from '@/features/macros/api'
+import { PrivateImage } from '@/components/PrivateImage'
 import { colors, typography } from '@/theme'
 
 const PHOTO = 40
@@ -57,7 +57,12 @@ export function AllyCard({
   return (
     <View style={[styles.row, divider && styles.divider]}>
       {photoPath ? (
-        <Image source={{ uri: mealPhotoUrl(photoPath) }} style={styles.photo} resizeMode="cover" />
+        <PrivateImage
+          bucket="meal-photos"
+          path={photoPath}
+          style={styles.photo}
+          fallback={<View style={[styles.photo, styles.photoEmpty]} />}
+        />
       ) : (
         <View style={[styles.photo, styles.photoEmpty]}>
           <BowlIcon color={colors.oroSoft} />

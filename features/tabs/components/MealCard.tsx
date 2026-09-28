@@ -1,8 +1,8 @@
 import type { StyleProp, ViewStyle } from 'react-native'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
-import { mealPhotoUrl } from '@/features/macros/api'
+import { PrivateImage } from '@/components/PrivateImage'
 import { colors, typography } from '@/theme'
 
 export type MealCardState = 'idle' | 'confirmed' | 'dimmed'
@@ -121,7 +121,12 @@ export function MealCard({
   const thumb =
     photoPath !== undefined ? (
       photoPath ? (
-        <Image source={{ uri: mealPhotoUrl(photoPath) }} style={styles.thumb} resizeMode="cover" />
+        <PrivateImage
+          bucket="meal-photos"
+          path={photoPath}
+          style={styles.thumb}
+          fallback={<View style={[styles.thumb, styles.thumbEmpty]} />}
+        />
       ) : (
         <View style={[styles.thumb, styles.thumbEmpty]}>
           <BowlIcon color={colors.niebla} />

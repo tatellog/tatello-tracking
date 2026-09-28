@@ -1,6 +1,7 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { mealPhotoUrl, type Meal } from '@/features/macros/api'
+import { type Meal } from '@/features/macros/api'
+import { PrivateImage } from '@/components/PrivateImage'
 import { colors, typography } from '@/theme'
 
 import { BowlIcon } from './AllyCard'
@@ -76,10 +77,11 @@ export function DayMealList({ meals, viewingPast, onOpenMeal }: Props) {
             {/* La foto del plato (misma que en frecuentes); el momento ya lo
                 dice la línea de abajo, así que no se repite el astro. */}
             {meal.photo_storage_path ? (
-              <Image
-                source={{ uri: mealPhotoUrl(meal.photo_storage_path) }}
+              <PrivateImage
+                bucket="meal-photos"
+                path={meal.photo_storage_path}
                 style={styles.photo}
-                resizeMode="cover"
+                fallback={<View style={[styles.photo, styles.photoEmpty]} />}
               />
             ) : (
               <View style={[styles.photo, styles.photoEmpty]}>
