@@ -39,7 +39,7 @@ import { PrimaryCta } from '@/components/PrimaryCta'
 import { StarLoader } from '@/components/StarLoader'
 import {
   mealIngredients,
-  mealPhotoUrl,
+  mealPhotoSignedUrl,
   uploadMealPhoto,
   type MealInput,
   type StoredIngredient,
@@ -795,7 +795,12 @@ export default function ScanMealScreen() {
     // foto), cae a la foto representativa del platillo que llegó por
     // navegación — la misma que muestra la estela.
     const storedPhoto = m.photo_storage_path ?? photoPath
-    if (storedPhoto) setPhotoUri(mealPhotoUrl(storedPhoto))
+    // Enlace firmado (el bucket ya no es público): llega async.
+    if (storedPhoto) {
+      void mealPhotoSignedUrl(storedPhoto).then((u) => {
+        if (u) setPhotoUri(u)
+      })
+    }
   }, [isEdit, editMeal.data, photoPath])
 
   // The reveal auto-dismisses after the star has settled — the user can

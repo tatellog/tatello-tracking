@@ -61,21 +61,21 @@ function TermsBody() {
           <Text style={styles.eyebrow}>Qué NO es Stelar</Text>
           <View style={styles.card}>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 <Text style={styles.accent}>No es un servicio médico ni clínico.</Text> No
                 diagnostica, no ofrece tratamiento médico y no receta dietas ni rutinas.
               </Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 <Text style={styles.accent}>No sustituye a profesionales.</Text> Stelar no reemplaza
                 a tu nutrióloga, médica, psicóloga, terapeuta ni coach.
               </Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 Si tienes una condición de salud, estás embarazada o tienes dudas sobre tu
                 alimentación, consulta a un profesional antes de ajustar lo que comes.
@@ -90,9 +90,7 @@ function TermsBody() {
               calculada desde tus propios registros. Es información, no consejo médico. Las
               decisiones sobre tu cuerpo son tuyas.
             </Text>
-            <Text style={styles.body}>
-              Stelar es para personas adultas. No está pensada para menores de edad.
-            </Text>
+            <Text style={styles.body}>Stelar es para personas de 18 años o más.</Text>
           </View>
 
           <Text style={styles.eyebrow}>Tu cuenta</Text>
@@ -204,10 +202,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
   },
-  pointGlyph: {
-    fontSize: typography.sizes.micro,
-    lineHeight: 20,
-    color: colors.magenta,
+  // Viñeta simple: la ✦ es el sello de la IA, no un adorno de lista.
+  pointDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+    backgroundColor: colors.magenta,
   },
   pointText: {
     flex: 1,

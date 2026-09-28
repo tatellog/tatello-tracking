@@ -20,7 +20,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { StarLoader } from '@/components/StarLoader'
 import { useTransformProgress } from '@/features/emblem'
-import { avatarUrl } from '@/features/profile/api'
+import { useSignedStorageUrl } from '@/lib/storage/signed-url'
 import { FOCUS_LABEL } from '@/features/profile/focus-labels'
 import { useProfile, useUploadAvatar } from '@/features/profile/hooks'
 import { SkyBackground } from '@/features/tabs/components'
@@ -78,7 +78,8 @@ function ProfileBody() {
     : null
   const age = profile?.date_of_birth ? calculateAge(profile.date_of_birth) : null
   const kicker = [signLabel, age != null ? `${age} años` : null].filter(Boolean).join(' · ')
-  const avatarUri = profile?.avatar_path ? avatarUrl(profile.avatar_path) : null
+  // Enlace firmado: el bucket de avatares ya no es público (auditoría de privacidad).
+  const avatarUri = useSignedStorageUrl('avatars', profile?.avatar_path)
   const initial = (profile?.display_name?.trim().charAt(0) || '✦').toUpperCase()
   const SignGlyph = sign ? GLYPH_BY_SIGN[sign] : null
 

@@ -142,11 +142,8 @@ export async function updateProfile(input: ProfileUpdate): Promise<Profile> {
 
 const AVATAR_PX = 512
 
-/* The public URL for an avatar storage path. The `avatars` bucket is
- * public, so this is a stable link with no signing. */
-export function avatarUrl(path: string): string {
-  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
-}
+/* Los avatares ya no se sirven por URL pública (auditoría de privacidad,
+ * 28 sep 2026): se pintan con <PrivateImage bucket="avatars" />. */
 
 /*
  * Resize → JPEG-compress → upload to the `avatars` bucket → point the

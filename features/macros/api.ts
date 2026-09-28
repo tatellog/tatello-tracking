@@ -2,6 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import { z } from 'zod'
 
 import { track } from '@/lib/analytics'
+import { signedStorageUrl } from '@/lib/storage/signed-url'
 import { requireUserId, supabase } from '@/lib/supabase'
 import type { Database, Json } from '@/types/database.types'
 
@@ -302,9 +303,10 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
 
 const MEAL_PHOTO_PX = 720
 
-/** Public URL for a meal photo storage path — the bucket is public. */
-export function mealPhotoUrl(path: string): string {
-  return supabase.storage.from('meal-photos').getPublicUrl(path).data.publicUrl
+/** Enlace firmado (1 h) de una foto de comida: el bucket deja de ser público
+ *  (auditoría de privacidad, 28 sep 2026). Para pintarla, usa <PrivateImage />. */
+export async function mealPhotoSignedUrl(path: string): Promise<string | null> {
+  return signedStorageUrl('meal-photos', path)
 }
 
 /*

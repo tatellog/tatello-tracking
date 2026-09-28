@@ -27,7 +27,8 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
-import { mealPhotoUrl, type Meal } from '@/features/macros/api'
+import { type Meal } from '@/features/macros/api'
+import { useSignedStorageUrl } from '@/lib/storage/signed-url'
 import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { useDeleteMeal, useMealsForDate } from '@/features/macros/hooks'
 import { SAMPLE_MEAL_PHOTOS } from '@/features/macros/sampleMealPhotos'
@@ -72,8 +73,10 @@ function sampleIndex(id: string): number {
  * development, meals without a real photo borrow a bundled sample so
  * the circles preview populated; production shows only real photos.
  * Null → the row falls back to its celestial glyph placeholder. */
-function mealPhoto(meal: Meal): ImageSourcePropType | null {
-  if (meal.photo_storage_path) return { uri: mealPhotoUrl(meal.photo_storage_path) }
+function useMealPhoto(meal: Meal): ImageSourcePropType | null {
+  // Enlace firmado: el bucket de fotos ya no es público (auditoría de privacidad).
+  const signed = useSignedStorageUrl('meal-photos', meal.photo_storage_path)
+  if (meal.photo_storage_path) return signed ? { uri: signed } : null
   if (__DEV__ && SAMPLE_MEAL_PHOTOS.length > 0) {
     return SAMPLE_MEAL_PHOTOS[sampleIndex(meal.id) % SAMPLE_MEAL_PHOTOS.length] ?? null
   }
@@ -251,7 +254,7 @@ function PileCircle({
     transform: [{ scale: 1 + breath.value * 0.05 }],
   }))
 
-  const photo = mealPhoto(meal)
+  const photo = useMealPhoto(meal)
   // A broken / empty photo falls back to the glyph — never a dead circle.
   const [failed, setFailed] = useState(false)
 
@@ -522,6 +525,7 @@ type RowProps = {
  * left a little to rest open with a tappable delete button; swipe it
  * far (past the commit point) and releasing deletes straight away. */
 function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
+  const photo = useMealPhoto(meal)
   const translateX = useSharedValue(0)
   const offsetX = useSharedValue(0) // settled position: 0 (closed) or SWIPE_OPEN
   const press = useSharedValue(0)
@@ -605,7 +609,7 @@ function MealRow({ meal, isRecent, onOpen, onRequestDelete }: RowProps) {
           >
             <View style={styles.mealContent}>
               {/* Thumbnail — the dish photo, or the bowl placeholder. */}
-              <MealThumb photo={mealPhoto(meal)} isRecent={isRecent} />
+              <MealThumb photo={photo} isRecent={isRecent} />
               <View style={styles.mealText}>
                 <Text style={styles.name} numberOfLines={1}>
                   {meal.name}

@@ -56,7 +56,9 @@ const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse)
 // attribution's NebulaWash; here it is re-pivoted to the lower-LEFT.)
 const NEBULA_ART = require('@/assets/orbits-art/orbit-week-art.png')
 
-const MIN_AGE_YEARS = 13
+// 18 (auditoría de privacidad, 28 sep 2026): app de pérdida de peso, no para
+// menores (riesgo de conducta alimentaria); coincide con Términos y Privacidad.
+const MIN_AGE_YEARS = 18
 const MAX_AGE_YEARS = 100
 const DEFAULT_AGE_YEARS = 30
 

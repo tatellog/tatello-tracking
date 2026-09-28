@@ -45,27 +45,36 @@ function PrivacyBody() {
           <Text style={styles.eyebrow}>Qué datos guardamos</Text>
           <View style={styles.card}>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 <Text style={styles.accent}>Tu cuenta:</Text> tu correo y tu nombre.
               </Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 <Text style={styles.accent}>Tu seguimiento:</Text> peso y medidas, comidas y
                 nutrición, sueño, agua, movimiento, ánimo, energía y, si lo activas, tu ciclo.
               </Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
+              <Text style={styles.pointText}>
+                <Text style={styles.accent}>De Apple Salud, si lo conectas:</Text> tu sueño, tus
+                entrenos, tus pasos y tu agua; y, si enciendes tu báscula, tu peso y tu composición
+                corporal. Solo leemos: nunca escribimos en Salud, y esos datos nunca se usan para
+                publicidad.
+              </Text>
+            </View>
+            <View style={styles.point}>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 <Text style={styles.accent}>Tus fotos:</Text> de perfil, de comidas y de progreso,
                 si decides agregarlas.
               </Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 <Text style={styles.accent}>Uso de la app:</Text> eventos básicos para entender qué
                 funciona y corregir errores.
@@ -77,24 +86,24 @@ function PrivacyBody() {
           <View style={styles.card}>
             <Text style={styles.body}>
               Solo para darte Stelar: registrar tu día, encontrar tus patrones y escribir tus
-              lecturas de Tu Órbita. Nada más.
+              lecturas en Descubre. Nada más.
             </Text>
           </View>
 
           <Text style={styles.eyebrow}>Qué NO hacemos</Text>
           <View style={styles.card}>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>No vendemos ni compartimos tus datos con nadie.</Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 No usamos tu información para publicidad de terceros.
               </Text>
             </View>
             <View style={styles.point}>
-              <Text style={styles.pointGlyph}>✦</Text>
+              <View style={styles.pointDot} />
               <Text style={styles.pointText}>
                 Puedes borrar todo cuando quieras desde Eliminar cuenta.
               </Text>
@@ -108,11 +117,21 @@ function PrivacyBody() {
               infraestructura, cifrados y protegidos para que solo tú los veas.
             </Text>
             <Text style={styles.body}>
-              Cuando escaneas una comida con foto, esa foto se envía a{' '}
-              <Text style={styles.accent}>OpenAI</Text> solo para identificar el platillo y estimar
-              sus datos. No se usa para entrenar sus modelos ni queda asociada a ti.
+              Usamos <Text style={styles.accent}>OpenAI</Text> en dos momentos, y en ninguno le
+              enviamos tu nombre ni tu correo:
             </Text>
-            <Text style={styles.body}>Nadie más recibe tu información.</Text>
+            <Text style={styles.body}>
+              Cuando escaneas una comida o una medición con foto, esa foto se envía solo para
+              identificar el platillo o leer los números.
+            </Text>
+            <Text style={styles.body}>
+              Cuando le preguntas a Stelar sobre tus patrones, se envía un resumen de tus días (por
+              ejemplo, cuántos cerraste en déficit y tus hábitos) para redactar la respuesta.
+            </Text>
+            <Text style={styles.body}>OpenAI no usa estos datos para entrenar sus modelos.</Text>
+            <Text style={styles.body}>
+              Nadie más recibe tu información, y tus fotos solo las puedes ver tú.
+            </Text>
           </View>
 
           <Text style={styles.eyebrow}>Cuánto tiempo</Text>
@@ -127,7 +146,7 @@ function PrivacyBody() {
           <View style={styles.card}>
             <Text style={styles.body}>
               Puedes ver y editar tus datos dentro de la app, y borrarlos por completo cuando
-              quieras. Stelar es para personas adultas; no está pensada para menores de edad.
+              quieras. Stelar es para personas de 18 años o más.
             </Text>
           </View>
 
@@ -208,10 +227,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
   },
-  pointGlyph: {
-    fontSize: typography.sizes.micro,
-    lineHeight: 20,
-    color: colors.magenta,
+  // Viñeta simple: la ✦ es el sello de la IA, no un adorno de lista.
+  pointDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+    backgroundColor: colors.magenta,
   },
   pointText: {
     flex: 1,
