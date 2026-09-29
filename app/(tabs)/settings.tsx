@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import FoodVect from '@/assets/icons/food-vect.svg'
 import WaterTint from '@/assets/icons/water-tint.svg'
 import { StelarLogo } from '@/components/brand/StelarLogo'
+import { BetaFeedbackSheet } from '@/components/BetaFeedbackSheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { StarLoader } from '@/components/StarLoader'
 import { ChevronHint, usePressFeedback } from '@/components/ui/interaction'
@@ -58,7 +59,7 @@ const ICON_GOLD = colors.oroVect
  *      escríbenos, términos), sign out, and the destructive delete row.
  *
  * Three remote reads feed this screen: useProfile (the heart — name,
- * zodiac, intención), useMacroTargets, useLatestPhotoSet. Each is read
+ * zodiac, intención), useMacroTargets. Each is read
  * with its loading state so the screen never shows "—" / "Aún sin definir"
  * while a query is still in flight (that reads like the data was wiped).
  * Loading → neutral skeleton; resolved-and-null → the warm empty copy;
@@ -146,6 +147,7 @@ function SettingsBody() {
   }
   const router = useRouter()
   const qc = useQueryClient()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const choose = useConfirm()
 
   // The three remote reads — we keep their loading state, not just data, so
@@ -381,6 +383,15 @@ function SettingsBody() {
                 caption="Cómo funciona, Descubre y preguntas."
                 onPress={() => router.push('/about')}
               />
+              {/* Feedback de la beta: vivía como pastilla flotante sobre la
+                  barra y tapaba contenido en todos los tabs (28 sep 2026). */}
+              {profile?.is_beta ? (
+                <AboutRow
+                  label="Feedback"
+                  caption="Lo que sea, lo leemos."
+                  onPress={() => setFeedbackOpen(true)}
+                />
+              ) : null}
               <AboutRow
                 label="Tus datos"
                 caption={
@@ -395,6 +406,7 @@ function SettingsBody() {
             </View>
           </Animated.View>
 
+          <BetaFeedbackSheet visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
           <Animated.View entering={enter(260)}>
             {/* Destructivas — separadas del resto (hairline + aire), al fondo.
                 Cerrar sesión arriba; Eliminar cuenta en COLOR ERROR, con doble

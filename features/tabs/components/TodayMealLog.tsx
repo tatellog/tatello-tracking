@@ -277,6 +277,8 @@ function PileCircle({
               onError={() => setFailed(true)}
             />
           ) : (
+            // Sin foto, el tazón (decisión dueña 28 sep 2026: se probó el astro
+            // del momento y se revirtió).
             <DishGlyph size={30} color={colors.niebla} />
           )}
         </View>
@@ -410,6 +412,8 @@ export function TodayMealLog({ date, onOpenMeal, onAddMeal }: Props) {
             <MealPhotoCluster meals={list} />
           </Pressable>
         ) : null}
+        {/* El + SIEMPRE, con o sin comidas: es la entrada crucial de registro
+            desde Hoy (dueña 28 sep 2026, revirtió quitarlo). */}
         <AddPileCircle onPress={onAddMeal} overlap={hasMeals} />
       </View>
 

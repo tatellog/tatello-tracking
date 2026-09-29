@@ -71,7 +71,9 @@ export function tuDiaModel(input: {
       verdict,
       title: copy.data,
       line: copy.coach,
-      reading: input.closeReading ?? null,
+      // Solo una observación que hable del mismo tema (comida / déficit): la
+      // del sueño tras un veredicto de comida cambiaba de tema (28 sep 2026).
+      reading: aboutFood(input.closeReading) ? input.closeReading! : null,
     }
   }
 
@@ -84,7 +86,9 @@ export function tuDiaModel(input: {
       eyebrow: 'Tu día',
       status: 'deficit',
       title: 'Vas en déficit.',
-      line: r.line,
+      // Sin segunda línea: "Aún tienes margen" repetía lo que dicen el título
+      // y las macros de abajo (tres veces lo mismo, 28 sep 2026).
+      line: '',
     }
   }
   // Sobre la meta a media tarde: la tarjeta no calla (desaparecer también
@@ -96,4 +100,12 @@ export function tuDiaModel(input: {
     title: 'Tu día sigue abierto.',
     line: 'El cierre llega esta noche.',
   }
+}
+
+/** ¿La observación habla de comida o del déficit? (la del cierre debe). */
+function aboutFood(text: string | null | undefined): boolean {
+  if (!text) return false
+  return /kcal|calor|comid|comist|déficit|deficit|proteín|protein|desayun|cena|snack|plato/i.test(
+    text,
+  )
 }

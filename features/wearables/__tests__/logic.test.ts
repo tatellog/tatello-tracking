@@ -2,10 +2,14 @@ import {
   bodyCompositionToRows,
   bodyMassToRows,
   dayInTimezone,
+  dedupeWorkouts,
   hkActivityToWorkoutType,
   normalizeWorkout,
   sleepSamplesToRows,
   stepsToRows,
+  SYNC_INTERVAL_MS,
+  SYNC_INTERVAL_WAITING_SLEEP_MS,
+  syncIntervalMs,
   waterToRows,
 } from '../logic'
 
@@ -229,5 +233,92 @@ describe('bodyCompositionToRows — snapshot diario de composición', () => {
       'apple_health',
     )
     expect(rows.map((r) => r.day_date)).toEqual(['2026-07-07', '2026-07-09'])
+  })
+})
+
+describe('dedupeWorkouts', () => {
+  const base = {
+    source: 'apple_health' as const,
+    started_at: '2026-09-22T19:56:00.000Z',
+    ended_at: '2026-09-22T20:13:00.000Z',
+    workout_type: 'cardio',
+    duration_min: 17,
+    energy_kcal: 120,
+  }
+
+  it('deja uno cuando Salud guarda el mismo entreno varias veces', () => {
+    const rows = [
+      { ...base, external_id: 'c-uuid' },
+      { ...base, external_id: 'a-uuid' },
+      { ...base, external_id: 'b-uuid' },
+    ]
+    const out = dedupeWorkouts(rows)
+    expect(out).toHaveLength(1)
+    expect(out[0]!.external_id).toBe('a-uuid')
+  })
+
+  it('conserva entrenos distintos (otro inicio, tipo o duración)', () => {
+    const rows = [
+      { ...base, external_id: 'a' },
+      { ...base, external_id: 'b', started_at: '2026-09-22T07:00:00.000Z' },
+      { ...base, external_id: 'c', workout_type: 'strength' },
+      { ...base, external_id: 'd', duration_min: 30 },
+    ]
+    expect(dedupeWorkouts(rows)).toHaveLength(4)
+  })
+})
+
+describe('syncIntervalMs', () => {
+  it('re-consulta seguido en la mañana si el sueño de hoy no llegó', () => {
+    expect(syncIntervalMs({ localHour: 10, today: '2026-09-29', lastSleepDay: '2026-09-28' })).toBe(
+      SYNC_INTERVAL_WAITING_SLEEP_MS,
+    )
+    expect(syncIntervalMs({ localHour: 7, today: '2026-09-29', lastSleepDay: null })).toBe(
+      SYNC_INTERVAL_WAITING_SLEEP_MS,
+    )
+  })
+
+  it('vuelve a 15 min cuando el sueño ya llegó o pasó la mañana', () => {
+    expect(syncIntervalMs({ localHour: 10, today: '2026-09-29', lastSleepDay: '2026-09-29' })).toBe(
+      SYNC_INTERVAL_MS,
+    )
+    expect(syncIntervalMs({ localHour: 15, today: '2026-09-29', lastSleepDay: '2026-09-28' })).toBe(
+      SYNC_INTERVAL_MS,
+    )
+  })
+})
+
+describe('sleepSamplesToRows · etapas', () => {
+  const at = (h: string) => new Date(`2026-09-29T${h}:00Z`)
+  it('separa profundo, ligero, REM y despierta (recortada a la noche)', () => {
+    const [row] = sleepSamplesToRows(
+      [
+        { uuid: 'a', value: 3, start: at('05:00'), end: at('07:00') }, // core 120
+        { uuid: 'b', value: 4, start: at('07:00'), end: at('08:00') }, // deep 60
+        { uuid: 'c', value: 2, start: at('08:00'), end: at('08:15') }, // awake 15
+        { uuid: 'd', value: 5, start: at('08:15'), end: at('09:45') }, // rem 90
+        { uuid: 'e', value: 2, start: at('09:45'), end: at('11:00') }, // awake fuera de la noche
+      ],
+      TZ,
+      'apple_health',
+    )
+    expect(row).toMatchObject({
+      asleep_minutes: 270,
+      core_minutes: 120,
+      deep_minutes: 60,
+      rem_minutes: 90,
+      awake_minutes: 15,
+    })
+  })
+
+  it('sin etapas (solo "dormida") deja las cuatro en null', () => {
+    const [row] = sleepSamplesToRows(
+      [{ uuid: 'a', value: 1, start: at('05:00'), end: at('12:00') }],
+      TZ,
+      'apple_health',
+    )
+    expect(row!.asleep_minutes).toBe(420)
+    expect(row!.deep_minutes).toBeNull()
+    expect(row!.awake_minutes).toBeNull()
   })
 })

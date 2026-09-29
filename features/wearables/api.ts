@@ -36,6 +36,10 @@ const sleepRowSchema = z.object({
   bedtime_at: z.string().datetime().nullable(),
   wake_at: z.string().datetime().nullable(),
   asleep_minutes: z.number().int().min(0).max(1440),
+  deep_minutes: z.number().int().min(0).max(1440).nullable(),
+  core_minutes: z.number().int().min(0).max(1440).nullable(),
+  rem_minutes: z.number().int().min(0).max(1440).nullable(),
+  awake_minutes: z.number().int().min(0).max(1440).nullable(),
 })
 
 const stepsRowSchema = z.object({
@@ -104,6 +108,38 @@ export async function upsertWearableSleep(rows: WearableSleepRow[]): Promise<num
   )
   if (error) throw error
   return parsed.length
+}
+
+/** Una noche del reloj tal como la lee la pantalla de detalle de sueño. */
+const sleepNightSchema = z.object({
+  sleep_date: isoDay,
+  bedtime_at: z.string().nullable(),
+  wake_at: z.string().nullable(),
+  asleep_minutes: z.number().int(),
+  deep_minutes: z.number().int().nullable(),
+  core_minutes: z.number().int().nullable(),
+  rem_minutes: z.number().int().nullable(),
+  awake_minutes: z.number().int().nullable(),
+})
+export type SleepNight = z.infer<typeof sleepNightSchema>
+
+/** Las noches del reloj en [fromDay, toDay] (días en que despertó), asc. */
+export async function getWearableSleepNights(
+  fromDay: string,
+  toDay: string,
+): Promise<SleepNight[]> {
+  const userId = await requireUserId()
+  const { data, error } = await supabase
+    .from('wearable_sleep')
+    .select(
+      'sleep_date, bedtime_at, wake_at, asleep_minutes, deep_minutes, core_minutes, rem_minutes, awake_minutes',
+    )
+    .eq('user_id', userId)
+    .gte('sleep_date', fromDay)
+    .lte('sleep_date', toDay)
+    .order('sleep_date', { ascending: true })
+  if (error) throw error
+  return z.array(sleepNightSchema).parse(data ?? [])
 }
 
 /** Upsert de pasos diarios (ingest-only: el motor los leerá cuando toque). */

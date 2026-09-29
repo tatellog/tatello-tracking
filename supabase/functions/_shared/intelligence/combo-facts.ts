@@ -173,7 +173,7 @@ export function comboOpening(combo: ComboShape): string[] {
   ]
   if (combo.restDays >= MIN_SIDE) {
     lines.push(
-      `Tus días ${comboWithoutLabel(combo).toLowerCase()}: ${combo.restDeficits} de ${combo.restDays} en déficit.`,
+      `${comboWithoutLabel(combo)}: ${combo.restDeficits} de ${combo.restDays} en déficit.`,
     )
   }
   return lines
@@ -241,28 +241,38 @@ export function comboWeekDots(week: ComboWeek | null): boolean[] {
   return Array.from({ length: total }, (_, i) => i < week.done)
 }
 
+/** El hallazgo en una frase llana, SIN multiplicador (dueña 28 sep 2026:
+ *  "casi 2×" obligaba a descifrar dos tasas; las barras de abajo prueban con
+ *  conteos). "Los días que duermes 7 horas y entrenas, cierras en déficit más
+ *  seguido." */
+export function comboPlainHeadline(combo: ComboShape): string {
+  const list = joinList(combo.signals.map((s) => HABIT_PRESENT[s.key] ?? s.label.toLowerCase()))
+  return `Los días que ${list}, cierras en déficit más seguido.`
+}
+
 /** El titular: el hallazgo dicho, no el hábito. */
 export function comboHeadline(combo: ComboShape): string {
   const list = joinList(combo.signals.map((s) => HABIT_PRESENT[s.key] ?? s.label.toLowerCase()))
   return `Cuando ${list}, cierras en déficit ${comboLift(combo)}.`
 }
 
-/** "Con los dos" / "Con los tres": la fila del combo en la evidencia. */
-export function comboGroupLabel(combo: ComboShape): string {
-  const n = combo.signals.length
-  return n === 2
-    ? 'Con los dos'
-    : n === 3
-      ? 'Con los tres'
-      : n === 4
-        ? 'Con los cuatro'
-        : 'Con esto'
+/** Cada hábito en corto, para nombrarlo en las filas y en la semana. */
+const HABIT_SHORT: Record<string, string> = {
+  sueno: 'sueño de 7 h',
+  cuerpo: 'entreno',
+  proteina: 'tu proteína',
+  agua: 'tu agua completa',
 }
 
-/** "Sin los dos" / "Sin los tres": la fila de comparación ("Otros días" no
- *  decía cuáles eran, target-user 27 sep 2026). */
-export function comboWithoutLabel(combo: ComboShape): string {
-  return comboGroupLabel(combo).replace(/^Con /, 'Sin ')
+/** "Con sueño de 7 h y entreno": la fila del combo NOMBRA los hábitos. Una
+ *  usuaria real no entendió "Con los dos" y tuvo que preguntar (28 sep 2026). */
+export function comboGroupLabel(combo: ComboShape): string {
+  return `Con ${joinList(combo.signals.map((s) => HABIT_SHORT[s.key] ?? s.label.toLowerCase()))}`
+}
+
+/** "Tus demás días": el resto, sin acertijo ("Sin los dos" tampoco se leía). */
+export function comboWithoutLabel(_combo: ComboShape): string {
+  return 'Tus demás días'
 }
 
 /** Puntos de una fila de evidencia: un punto por día (lleno = déficit). Con más
@@ -287,6 +297,79 @@ export function comboWeekHook(week: ComboWeek | null): string | null {
   return done === 0
     ? `Esta semana todavía no lo juntas. Tus mejores semanas, ${typical}.`
     : `Esta semana lo juntaste ${done} ${veces(done)}. Tus mejores semanas, ${typical}.`
+}
+
+/* ── El desglose por rubro (las barras de la tarjeta) ─────────────────── */
+
+export type ComboBarGroup = {
+  /** 'both' | 'only:<key>' | 'none' | 'rest' */
+  key: string
+  label: string
+  /** Hábitos presentes en el grupo (para pintar la barra con sus colores). */
+  habits: string[]
+  days: number
+  deficits: number
+}
+
+/** Los días con comida partidos por rubro: con los dos, solo uno, solo el otro,
+ *  ninguno (dueña 28 sep 2026: "gráficas de barra explicando cada rubro").
+ *  Suma exactamente lo mismo que el combo: both = occurrences y el resto = restDays.
+ *  Con 3+ hábitos no hay "solo X" legible: combo contra el resto. Un grupo sin
+ *  días no aparece. */
+export function comboBreakdown(
+  signals: readonly DailySignals[],
+  combo: ComboShape,
+  opts: ComboOpts,
+): ComboBarGroup[] {
+  const target = opts.calorieTarget ?? null
+  if (target == null || target <= 0) return []
+  const food = foodByDay(signals)
+  const inDef = (s: DailySignals) => isDeficitDay(s.calories, target)
+  const keys = combo.signals.map((x) => x.key)
+  const tests = keys.map((k) => habitTest(k, opts))
+  const make = (key: string, label: string, habits: string[], days: DailySignals[]) => ({
+    key,
+    label,
+    habits,
+    days: days.length,
+    deficits: days.filter(inDef).length,
+  })
+  const all = food.filter((s) => tests.every((t) => t(s)))
+  const groups: ComboBarGroup[] = [make('both', comboGroupLabel(combo), keys, all)]
+  if (keys.length === 2) {
+    const [a, b] = keys as [string, string]
+    const [ta, tb] = tests as [(s: DailySignals) => boolean, (s: DailySignals) => boolean]
+    groups.push(
+      make(
+        `only:${a}`,
+        `Solo ${HABIT_SHORT[a] ?? a}`,
+        [a],
+        food.filter((s) => ta(s) && !tb(s)),
+      ),
+      make(
+        `only:${b}`,
+        `Solo ${HABIT_SHORT[b] ?? b}`,
+        [b],
+        food.filter((s) => tb(s) && !ta(s)),
+      ),
+      make(
+        'none',
+        'Sin ninguno',
+        [],
+        food.filter((s) => !ta(s) && !tb(s)),
+      ),
+    )
+  } else {
+    groups.push(
+      make(
+        'rest',
+        comboWithoutLabel(combo),
+        [],
+        food.filter((s) => !tests.every((t) => t(s))),
+      ),
+    )
+  }
+  return groups.filter((g) => g.days > 0)
 }
 
 /* ── El estado de la semana (criterio Apple: meta de TUS datos + lo que falta) ── */

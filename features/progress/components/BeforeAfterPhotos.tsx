@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
@@ -241,13 +242,13 @@ function PhotoColumn({
     <View style={[styles.frame, styles.framePlaceholder]}>
       {photoButNoUrl ? (
         <>
-          <Text style={styles.placeholderStar}>✦</Text>
+          <Feather name="camera-off" size={20} color={colors.bruma} />
           <Text style={styles.placeholderError}>Esta foto no se cargó</Text>
           {onPress ? <Text style={styles.placeholderHint}>Toca para gestionarla</Text> : null}
         </>
       ) : (
         <>
-          <Text style={styles.placeholderStar}>✦</Text>
+          <Feather name="camera" size={20} color={colors.bruma} />
           {onPress ? <Text style={styles.placeholderHint}>Subir foto</Text> : null}
         </>
       )}
@@ -639,7 +640,8 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
           accessibilityRole="button"
           accessibilityLabel="Empieza con una foto frontal"
         >
-          <Text style={styles.emptyStar}>✦</Text>
+          {/* Cámara, no ✦: la ✦ es el sello de la IA (28 sep 2026). */}
+          <Feather name="camera" size={26} color={colors.magenta} style={styles.emptyIcon} />
           <Text style={styles.emptyTitle}>Empieza con una foto frontal</Text>
           <Text style={styles.emptyHint}>Tu próxima marca abre la comparación</Text>
           {busy ? (
@@ -786,9 +788,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     alignItems: 'center',
   },
-  emptyStar: {
-    fontSize: typography.sizes.displayMd,
-    color: colors.magenta,
+  emptyIcon: {
     marginBottom: 12,
   },
   emptyTitle: {
@@ -798,11 +798,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
     textAlign: 'center',
   },
+  // Hanken recta: es una instrucción, no la voz del coach.
   emptyHint: {
     marginTop: 6,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
+    fontFamily: typography.ui,
+    fontSize: typography.sizes.body,
     color: colors.bone,
     textAlign: 'center',
   },
@@ -858,10 +858,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  placeholderStar: {
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.bruma,
   },
   // The tap affordance — quiet magenta so the empty frame reads as an
   // invitation, not just a void.
@@ -946,16 +942,6 @@ const styles = StyleSheet.create({
     color: colors.magentaHot,
   },
   // Fechas bajo el slider (inicial → actual).
-  sliderDates: {
-    marginTop: 12,
-    textAlign: 'center',
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    color: colors.niebla,
-  },
-  sliderArrow: {
-    color: colors.oro,
-  },
   sliderHint: {
     marginTop: 4,
     textAlign: 'center',

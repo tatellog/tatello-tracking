@@ -642,9 +642,10 @@ const styles = StyleSheet.create({
     letterSpacing: -1.6,
     lineHeight: 48,
   },
+  // "/ 159 g" es dato: Hanken recta (la cursiva es solo la voz del coach, y
+  // en Hoy el mismo dato ya va recto).
   reference: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.heading,
     color: colors.bone,
   },

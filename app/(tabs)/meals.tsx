@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 48,
+    paddingBottom: 140,
   },
   // Sits tucked under the "Comidas" title (TabHeader owns its own bottom
   // margin, so we pull the subtitle up to read as one header block).

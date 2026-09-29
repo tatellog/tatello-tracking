@@ -354,7 +354,7 @@ export function DayCheckIn({
               accessibilityRole="button"
               accessibilityLabel="Ajustar tu día: entreno o descanso y horas de sueño"
             >
-              <Text style={styles.changeLink}>ajustar</Text>
+              <Text style={styles.adjustLink}>ajustar</Text>
             </Pressable>
           ) : !locked && !sealedByWearable ? (
             <Pressable
@@ -519,6 +519,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.label,
     letterSpacing: 0.3,
     color: colors.niebla,
+  },
+  // "ajustar" (datos del reloj) en hueso, no niebla: sobre el negro no se
+  // leía como tocable.
+  adjustLink: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
   },
   changeLink: {
     fontFamily: typography.uiMedium,

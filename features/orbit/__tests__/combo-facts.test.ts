@@ -1,4 +1,5 @@
 import {
+  comboBreakdown,
   comboDayDetail,
   comboFacts,
   comboFocus,
@@ -7,6 +8,7 @@ import {
   comboLift,
   comboLiftBadge,
   comboOpening,
+  comboPlainHeadline,
   comboWeek,
   comboWeekDots,
   comboWeekSummary,
@@ -116,7 +118,7 @@ describe('lo fijo del chat', () => {
     expect(comboOpening(combo)).toEqual([
       'Tu patrón más repetido: dormir 7 horas o más y entrenar el mismo día.',
       'Pasó 11 días entre el 3 ago y el 24 sep. En 7 cerraste en déficit.',
-      'Tus días sin los dos: 9 de 30 en déficit.',
+      'Tus demás días: 9 de 30 en déficit.',
     ])
   })
 
@@ -184,7 +186,7 @@ describe('la tarjeta del patrón', () => {
     expect(comboLift({ ...c, deficits: 6 })).toBe('el doble') // 0.75 / 0.33
     expect(comboLift({ ...c, restDeficits: 5 })).toBe('más seguido')
     expect(comboLift({ ...c, restDeficits: 0 })).toBe('mucho más seguido')
-    expect(comboGroupLabel(c)).toBe('Con los dos')
+    expect(comboGroupLabel(c)).toBe('Con sueño de 7 h y entreno')
   })
 
   it('los puntos son un día cada uno; con muchos días se escalan', () => {
@@ -259,13 +261,54 @@ describe('la semana con palabras', () => {
   }
   it('dice qué cuenta y contra qué', () => {
     expect(comboWeekSummary({ done: 1, typical: 3, daysLeft: 3, state: 'onTrack' }, combo)).toBe(
-      'Esta semana: 1 día con los dos · tus mejores semanas, 3',
+      'Esta semana: 1 día con sueño de 7 h y entreno · tus mejores semanas, 3',
     )
     expect(comboWeekSummary({ done: 2, typical: null, daysLeft: 3, state: 'noRef' }, combo)).toBe(
-      'Esta semana: 2 días con los dos',
+      'Esta semana: 2 días con sueño de 7 h y entreno',
     )
     expect(
       comboWeekSummary({ done: 0, typical: null, daysLeft: 3, state: 'noRef' }, combo),
     ).toBeNull()
+  })
+})
+
+describe('comboBreakdown (barras por rubro)', () => {
+  const signals = month()
+  const combo = winningCombo(signals, OPTS)!
+  const g = comboBreakdown(signals, combo, OPTS)
+
+  it('los grupos suman exactamente lo del combo y su resto', () => {
+    const both = g.find((x) => x.key === 'both')!
+    expect([both.days, both.deficits]).toEqual([combo.occurrences, combo.deficits])
+    const rest = g.filter((x) => x.key !== 'both')
+    expect(rest.reduce((a, x) => a + x.days, 0)).toBe(combo.restDays)
+    expect(rest.reduce((a, x) => a + x.deficits, 0)).toBe(combo.restDeficits)
+  })
+
+  it('nombra cada rubro y un grupo sin días no aparece', () => {
+    expect(g.map((x) => x.label)).toEqual([
+      'Con sueño de 7 h y entreno',
+      'Solo entreno',
+      'Sin ninguno',
+    ])
+  })
+})
+
+describe('comboPlainHeadline', () => {
+  it('dice el hallazgo sin multiplicador', () => {
+    const c = {
+      signals: [
+        { key: 'sueno', label: 'Sueño' },
+        { key: 'cuerpo', label: 'Entreno' },
+      ],
+      days: [],
+      occurrences: 8,
+      deficits: 5,
+      restDays: 9,
+      restDeficits: 3,
+    }
+    expect(comboPlainHeadline(c)).toBe(
+      'Los días que duermes 7 horas y entrenas, cierras en déficit más seguido.',
+    )
   })
 })

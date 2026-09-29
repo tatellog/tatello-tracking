@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
@@ -35,7 +35,11 @@ import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
-import { useScaleBadge, useScaleConnection } from '@/features/wearables/hooks'
+import {
+  useAppleHealthSyncNow,
+  useScaleBadge,
+  useScaleConnection,
+} from '@/features/wearables/hooks'
 import { wearableDayFacts } from '@/features/wearables/recovery'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
@@ -398,6 +402,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   }, [firstStarFired, reducedMotion, celebrating])
 
   const trainedThisMonth = month.trainedThisMonth
+  // El día en que se encendió la última estrella de la figura: la fecha del
+  // logro que muestra "Tu {signo}" ("Completaste tu Escorpio el 19 de sep…").
   const MONTHS_ES = [
     'Enero',
     'Febrero',
@@ -496,6 +502,18 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // Báscula (spec §9): ícono en la cabecera solo cuando Salud existe en este
   // build; el punto avisa de una lectura nueva. Nunca muestra el número.
   const scaleConn = useScaleConnection()
+  // Jalar Hoy hacia abajo lee Salud AHORA (sin esperar el intervalo del sync
+  // de fondo): el sueño de anoche llega cuando Garmin Connect sincroniza.
+  const syncHealthNow = useAppleHealthSyncNow()
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = async (): Promise<void> => {
+    setRefreshing(true)
+    try {
+      await syncHealthNow()
+    } finally {
+      setRefreshing(false)
+    }
+  }
   const scaleBadge = useScaleBadge()
 
   // Criterio de éxito V-15 ("cero preguntas por datos que ya llegaron"): se
@@ -543,7 +561,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (!todayHasRegistro || viewingPast || morning) return base
     const tail =
       trainedThisMonth >= figureCount
-        ? 'Mañana sumas luz extra.'
+        ? null // la luz extra ya la dice el contador de la constelación
         : trainedThisMonth + 1 >= figureCount
           ? 'Mañana completas tu figura.'
           : (() => {
@@ -640,6 +658,13 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
             onMomentumScrollBegin={beginScroll}
             onScrollEndDrag={endScroll}
             onMomentumScrollEnd={endScroll}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => void onRefresh()}
+                tintColor={colors.niebla}
+              />
+            }
           >
             <Animated.View entering={enter(40)}>
               <TabHeader
@@ -715,6 +740,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                   mode={adjustSleep && sleepFromWearable ? 'ask' : turn.sleep}
                   wearableMinutes={wearable.sleep?.minutes ?? null}
                   past={viewingPast}
+                  onDetail={() =>
+                    router.push({ pathname: '/sleep', params: { date: selectedDate } })
+                  }
                   onOpen={openSleep}
                   onClose={(touched) => {
                     if (touched) setSleepTouched(true)
@@ -883,6 +911,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           litStars={litStars}
           nextStar={nextStar}
           daysInOrbit={daysInOrbit}
+          completedOn={figureCompletedOn(month.cells, figureCount)}
         />
         <NotifyOfferSheet
           visible={notifyOffer.visible}
@@ -1063,7 +1092,8 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 48,
+    // Aire para la barra flotante: con 48 el último texto quedaba detrás.
+    paddingBottom: 140,
   },
   // Hero: la figura grande (full-bleed, como estaba — la dueña la prefiere
   // así, y en chico las líneas se amontonaban) + la barra de progreso debajo,
@@ -1098,3 +1128,34 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
 })
+
+/** "19 de septiembre": el día en que la cuenta del mes alcanzó la figura. */
+function figureCompletedOn(
+  cells: readonly { date: string; trained: boolean }[],
+  figureCount: number,
+): string | null {
+  if (figureCount <= 0) return null
+  let n = 0
+  for (const c of cells) {
+    if (!c.trained) continue
+    n += 1
+    if (n === figureCount) {
+      const months = [
+        'enero',
+        'febrero',
+        'marzo',
+        'abril',
+        'mayo',
+        'junio',
+        'julio',
+        'agosto',
+        'septiembre',
+        'octubre',
+        'noviembre',
+        'diciembre',
+      ]
+      return `${Number(c.date.slice(8, 10))} de ${months[Number(c.date.slice(5, 7)) - 1] ?? ''}`
+    }
+  }
+  return null
+}

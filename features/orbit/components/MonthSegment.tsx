@@ -35,7 +35,10 @@ import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
-import { todayInTimezone } from '@/lib/time'
+import { todayInTimezone, userTimezone } from '@/lib/time'
+import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
+import { useWearableSleepNights } from '@/features/wearables/hooks'
+import { addDaysIso } from '@/features/wearables/sleep-detail'
 import { AiCta } from '@/components/AiCta'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail } from '@/lib/featureFlags'
@@ -71,18 +74,18 @@ import {
   comboFocus,
   comboHabitList,
   comboOpening,
-  comboGroupLabel,
   comboHeadline,
   comboWeek,
-  comboLiftBadge,
-  comboWithoutLabel,
+  comboPlainHeadline,
+  comboBreakdown,
+  type ComboBarGroup,
   comboWeekSummary,
   comboWeekLine,
-  evidenceDots,
 } from '../combo-facts'
 import { useComboTranscript } from '../combo-transcript'
 import { comboKey, combosBornRecently } from '../combo-memory'
 import { useSeenCombos } from '../combo-seen'
+import { bedtimeOffsetMinutes } from '../bedtime'
 import { rankSurprises, type Surprise } from '../surprise'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
@@ -307,16 +310,29 @@ export function MonthSegment({
   // "Lo que no sabías" (etapa 3+): el ranker de sorpresa elige UN protagonista;
   // lo esperado (el combo sueño + entreno) baja a "Lo que te sostiene".
   const surpriseTargets = useMacroTargets().data
-  const surprises = useMemo(
-    () =>
-      maturity.stage >= 3
-        ? rankSurprises(patternSignals, {
-            calorieTarget: surpriseTargets?.calories ?? null,
-            proteinTarget: surpriseTargets?.protein_g ?? null,
-          })
-        : { hero: null, others: [] },
-    [maturity.stage, patternSignals, surpriseTargets?.calories, surpriseTargets?.protein_g],
-  )
+  // La hora de dormirse solo vive en la tabla del reloj (no en daily_signals):
+  // se lee la misma ventana de 90 días que los patrones.
+  const nightsTo = todayInTimezone()
+  const sleepNights = useWearableSleepNights(addDaysIso(nightsTo, -89), nightsTo).data
+  const surprises = useMemo(() => {
+    if (maturity.stage < 3) return { hero: null, others: [] }
+    const tz = userTimezone()
+    const bedtimes = new Map<string, number>()
+    for (const n of sleepNights ?? []) {
+      if (n.bedtime_at) bedtimes.set(n.sleep_date, bedtimeOffsetMinutes(n.bedtime_at, tz))
+    }
+    return rankSurprises(patternSignals, {
+      calorieTarget: surpriseTargets?.calories ?? null,
+      proteinTarget: surpriseTargets?.protein_g ?? null,
+      bedtimes,
+    })
+  }, [
+    maturity.stage,
+    patternSignals,
+    sleepNights,
+    surpriseTargets?.calories,
+    surpriseTargets?.protein_g,
+  ])
   const surprise = view === 'patterns' ? surprises.hero : null
   const firstSignal = useMemo(
     () => (maturity.stage >= 1 ? earlyReading(patternSignals, todayInTimezone()) : null),
@@ -826,6 +842,11 @@ export function MonthSegment({
                     since={provenance?.since ?? null}
                     early={maturity.stage <= 2}
                     weekLine={comboWeekSummary(week, combo)}
+                    breakdown={comboBreakdown(patternSignals, combo, {
+                      calorieTarget,
+                      proteinTarget,
+                      waterGoalGlasses,
+                    })}
                     talked={comboTalk.transcript != null}
                     onAsk={aiOn && comboFinding ? () => openChat(null) : undefined}
                     onReveal={() => {
@@ -1485,6 +1506,14 @@ function SurpriseHero({ surprise }: { surprise: Surprise }) {
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.surprise}>
       <Text style={styles.surpriseKicker}>Lo que no sabías</Text>
+      {/* Procedencia a la vista: lo que sale del smartwatch lo dice ANTES de
+          la frase, para que nunca parezca que Stelar lo adivinó. */}
+      {surprise.fromWatch ? (
+        <View style={styles.surpriseSource}>
+          <WatchGlyph color={colors.niebla} size={13} />
+          <Text style={styles.surpriseSourceText}>Con datos de tu smartwatch</Text>
+        </View>
+      ) : null}
       <Text style={styles.surpriseHeadline}>{surprise.headline}</Text>
       <View style={styles.surpriseRows}>
         {surprise.rows.map((r) => (
@@ -1516,6 +1545,7 @@ function PatternHero({
   since,
   early,
   weekLine,
+  breakdown,
   talked,
   onAsk,
   onReveal,
@@ -1527,6 +1557,8 @@ function PatternHero({
   early: boolean
   /** La semana dicha con palabras (null = nada que decir). */
   weekLine: string | null
+  /** Los días partidos por rubro (con los dos, solo uno, ninguno). */
+  breakdown: ComboBarGroup[]
   /** Ya hablaron de este patrón. */
   talked?: boolean
   onAsk?: () => void
@@ -1539,13 +1571,7 @@ function PatternHero({
     })),
     { label: 'Déficit', color: colors.oroSoft },
   ]
-  const lift = comboLiftBadge(combo)
   const kicker = `${early ? 'Patrón temprano' : 'Patrón'}${since ? ` · desde ${since}` : ''}`
-  // El número grande solo con muestra suficiente y una diferencia de verdad: con
-  // pocos días, "1,2×" en grande inflaba un solo día (target-user + producto,
-  // 27 sep 2026). Entonces manda la ecuación y los puntos cuentan.
-  const smallRatio = /^\d,\d×$/.test(lift) // "1,4×": diferencia chica, sin palabra
-  const showLift = Math.min(combo.occurrences, combo.restDays) >= 8 && !smallRatio
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern} accessible={false}>
       <View style={styles.heroTop}>
@@ -1579,35 +1605,23 @@ function PatternHero({
         ))}
       </View>
 
-      {/* El gancho: el número grande (solo si la muestra lo sostiene). */}
-      {showLift ? (
-        <View style={styles.liftBlock}>
-          <Text style={styles.liftNum}>{lift}</Text>
-          <Text style={styles.liftLabel}>
-            {lift === 'mucho más' ? 'días en déficit' : 'más días en déficit'}
-          </Text>
-        </View>
-      ) : null}
+      {/* El hallazgo en una frase llana (sin "casi 2×": había que descifrar
+          dos tasas). Las barras de abajo lo prueban con conteos. */}
+      <Text style={styles.heroHeadline}>{comboPlainHeadline(combo)}</Text>
 
+      {/* Barras por rubro (dueña 28 sep 2026): cada hábito con su color (el de
+          su estrella y su chip), así se ve qué aporta cada uno y los dos juntos. */}
       <View
         style={styles.heroDots}
         accessible
-        accessibilityLabel={`Días en déficit: ${combo.deficits} de ${combo.occurrences} con los dos; ${combo.restDeficits} de ${combo.restDays} ${comboWithoutLabel(combo).toLowerCase()}.`}
+        accessibilityLabel={`Días que cerraste en déficit. ${breakdown
+          .map((g) => `${g.label}: ${g.deficits} de ${g.days}`)
+          .join('. ')}.`}
       >
-        {/* Qué es un punto lleno, dicho una vez (la usuaria tenía que volver
-            al número grande para saberlo). */}
-        <Text style={styles.dotsTitle}>Días en déficit</Text>
-        <DotsLine
-          label={comboGroupLabel(combo)}
-          total={combo.occurrences}
-          filled={combo.deficits}
-          strong
-        />
-        <DotsLine
-          label={comboWithoutLabel(combo)}
-          total={combo.restDays}
-          filled={combo.restDeficits}
-        />
+        <Text style={styles.barsTitle}>Días que cerraste en déficit</Text>
+        {breakdown.map((g) => (
+          <HabitBar key={g.key} group={g} strong={g.key === 'both'} />
+        ))}
       </View>
 
       {/* La semana con PALABRAS, separada de la evidencia: con puntos se leía
@@ -1626,33 +1640,43 @@ function PatternHero({
   )
 }
 
-/* Una fila de evidencia: un punto por día, lleno si cerró en déficit. El conteo
- * real al final (cuando hay más días que puntos, los puntos se escalan). */
-function DotsLine({
-  label,
-  total,
-  filled,
-  strong,
-}: {
-  label: string
-  total: number
-  filled: number
-  strong?: boolean
-}) {
+/* Una barra por rubro: la etiqueta con los puntos de color de sus hábitos, el
+ * conteo a la derecha y la barra rellena con la proporción de días en déficit.
+ * Los dos juntos = degradado de sus colores; uno solo = su color; ninguno =
+ * neutro. Colores = identidad del hábito, nunca juicio (sin rojo ni verde). */
+function HabitBar({ group, strong }: { group: ComboBarGroup; strong?: boolean }) {
+  const rate = group.days > 0 ? group.deficits / group.days : 0
+  const colorsFor = group.habits.map((h) => NODE_COLOR[h] ?? colors.leche)
+  const width = `${Math.max(3, Math.round(rate * 100))}%` as const
   return (
-    <View style={styles.dotLine}>
-      <Text style={[styles.dotLabel, strong && styles.dotLabelStrong]}>{label}</Text>
-      <View style={styles.dotRow}>
-        {evidenceDots(total, filled).map((on, i) => (
-          <View
-            key={i}
-            style={[styles.dot, on ? (strong ? styles.dotOn : styles.dotOnSoft) : null]}
-          />
-        ))}
+    <View style={styles.hbRow}>
+      <View style={styles.hbHead}>
+        <View style={styles.hbDots}>
+          {colorsFor.length > 0 ? (
+            colorsFor.map((c, i) => <View key={i} style={[styles.hbDot, { backgroundColor: c }]} />)
+          ) : (
+            <View style={[styles.hbDot, styles.hbDotNone]} />
+          )}
+        </View>
+        <Text style={[styles.hbLabel, strong && styles.hbLabelStrong]} numberOfLines={1}>
+          {group.label}
+        </Text>
+        <Text style={[styles.hbCount, strong && styles.hbLabelStrong]}>
+          {`${group.deficits} de ${group.days} ${group.days === 1 ? 'día' : 'días'}`}
+        </Text>
       </View>
-      <Text style={[styles.dotCount, strong && styles.dotLabelStrong]}>
-        {`${filled} de ${total}`}
-      </Text>
+      <View style={styles.hbTrack}>
+        {colorsFor.length > 1 ? (
+          <LinearGradient
+            colors={colorsFor as [string, string, ...string[]]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={[styles.hbFill, { width }]}
+          />
+        ) : (
+          <View style={[styles.hbFill, { width, backgroundColor: colorsFor[0] ?? colors.bruma }]} />
+        )}
+      </View>
     </View>
   )
 }
@@ -2177,6 +2201,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.oroSoft,
   },
+  surpriseSource: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  surpriseSourceText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
   surpriseHeadline: {
     marginTop: 12,
     fontFamily: typography.uiSemi,
@@ -2259,18 +2294,12 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
   },
-  liftBlock: { marginTop: 18, flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  liftNum: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.displayXl,
-    lineHeight: 44,
-    color: colors.oroLight,
-    letterSpacing: -0.5,
-  },
-  liftLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.title,
-    color: colors.bone,
+  heroHeadline: {
+    marginTop: 16,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 27,
+    color: colors.leche,
   },
   weekSummary: {
     marginTop: 20,
@@ -2279,60 +2308,45 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.bone,
   },
-  dotsTitle: {
+  heroDots: {
+    marginTop: 20,
+    gap: 12,
+  },
+  barsTitle: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.niebla,
+    marginBottom: 2,
   },
-  heroDots: {
-    marginTop: 20,
-    gap: 12,
-  },
-  dotLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  dotLabel: {
-    width: 92,
+  hbRow: { gap: 7 },
+  hbHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hbDots: { flexDirection: 'row', gap: 3, width: 20 },
+  hbDot: { width: 8, height: 8, borderRadius: 4 },
+  hbDotNone: { borderWidth: 1, borderColor: colors.bruma },
+  hbLabel: {
+    flex: 1,
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  dotLabelStrong: {
-    color: colors.leche,
-  },
-  dotRow: {
-    flexShrink: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-  },
-  dotOn: {
-    backgroundColor: colors.oroSoft,
-    borderColor: colors.oroSoft,
-  },
-  // "Otros días" llenos: claros contra los vacíos, sin llegar al oro.
-  dotOnSoft: {
-    backgroundColor: colors.niebla,
-    borderColor: colors.niebla,
-  },
-  // El conteo pegado a sus puntos: se lee como parte de la fila.
-  dotCount: {
+  hbLabelStrong: { color: colors.leche },
+  hbCount: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
+    fontSize: typography.sizes.body,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
+  hbTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.hairline,
+    overflow: 'hidden',
+  },
+  hbFill: { height: '100%', borderRadius: 5 },
+  // "Otros días" llenos: claros contra los vacíos, sin llegar al oro.
+  // El conteo pegado a sus puntos: se lee como parte de la fila.
   heroAsk: {
     marginTop: 18,
     gap: 10,

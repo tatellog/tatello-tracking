@@ -79,14 +79,14 @@ export function HistoryChips() {
     // cosas opuestas por chip (↓ peso bueno, ↓ déficit malo) y "antes/ahora"
     // ya cuenta la dirección.
     const counts: { key: 'workouts' | 'deficit' | 'logging'; label: string; hue: string }[] = [
+      // Mismo color por métrica que en el resto de la app (28 sep 2026: aquí
+      // Entrenos era naranja y en los anillos violeta; "evidencia" verde).
+      // Déficit = magenta (el anillo de calorías), entreno = violeta (el
+      // anillo de entreno), registro = neutro.
       { key: 'deficit', label: 'Días en déficit', hue: colors.magentaHot },
-      // "evidencia", no "registro": registro leía como asistencia escolar
-      // (target-user) y "evidencia" es la palabra del hook del hero.
-      { key: 'logging', label: 'Días con evidencia', hue: colors.dimension.alimento },
-      // signal.entreno, NO dimension.cuerpo: ese alias es el mismo hex que
-      // magentaHot y Entrenos clonaba el color de Días en déficit en el
-      // mismo grid (auditoría: color = identidad).
-      { key: 'workouts', label: 'Entrenos', hue: colors.signal.entreno },
+      // "Días con registro": "evidencia" era jerga (target-user no lo entendía).
+      { key: 'logging', label: 'Días con registro', hue: colors.bone },
+      { key: 'workouts', label: 'Entrenos', hue: colors.dimension.mente },
     ]
     for (const c of counts) {
       const m = byKey.get(c.key)
@@ -142,6 +142,12 @@ export function HistoryChips() {
 
   if (!chips || chips.length === 0) return null
 
+  // Sin datos en la ventana de antes (cuenta nueva): comparar contra cero se
+  // leía como regaño ("antes 0 · antes 0 · antes 0"). Se muestra "Tu primer
+  // mes" con lo tuyo, sin "antes", hasta que exista contra qué compararse.
+  const loggingChip = chips.find((c) => c.key === 'logging')
+  const firstMonth = loggingChip != null && loggingChip.prev === '0'
+
   // Jerarquía (patrón del anillo dominante de Apple, sin su presión): el
   // titular solo se GANA con mejora — en mes flojo no hay héroe y el grid
   // queda plano (pickLeadChip · target-user: "me sirve mi peor dato de
@@ -155,18 +161,22 @@ export function HistoryChips() {
   return (
     <Animated.View entering={FadeIn.duration(360)}>
       <EyebrowLabel tone="magenta" size={10} style={styles.eyebrow}>
-        Tus últimos 30 días
+        {firstMonth ? 'Tu primer mes' : 'Tus últimos 30 días'}
       </EyebrowLabel>
       {/* En Hanken, NO cursiva: la cursiva es registro de coach y el ojo la
           salta buscando números — y esta línea es la llave de la sección
           (target-user: "la explicación estaba donde guardan la poesía"). */}
-      <Text style={styles.sub}>comparado con los 30 días de antes</Text>
+      <Text style={styles.sub}>
+        {firstMonth
+          ? 'La comparación con tu mes anterior llega cuando lo tengas.'
+          : 'comparado con los 30 días de antes'}
+      </Text>
       {lead ? (
         <View style={[styles.chip, styles.leadChip]}>
           <Text style={[styles.chipLabel, { color: lead.hue }]}>{lead.label}</Text>
-          <Text style={styles.prevLine}>antes {lead.prev}</Text>
+          {firstMonth ? null : <Text style={styles.prevLine}>antes {lead.prev}</Text>}
           <View style={styles.currRow}>
-            <Text style={styles.nowWord}>ahora</Text>
+            {firstMonth ? null : <Text style={styles.nowWord}>ahora</Text>}
             <Text style={[styles.curr, styles.leadCurr]}>{lead.curr}</Text>
           </View>
           {lead.spark ? <Sparkline data={lead.spark} hue={lead.hue} width={120} /> : null}
@@ -176,9 +186,9 @@ export function HistoryChips() {
         {rest.map((c) => (
           <View key={c.key} style={styles.chip}>
             <Text style={[styles.chipLabel, { color: c.hue }]}>{c.label}</Text>
-            <Text style={styles.prevLine}>antes {c.prev}</Text>
+            {firstMonth ? null : <Text style={styles.prevLine}>antes {c.prev}</Text>}
             <View style={styles.currRow}>
-              <Text style={styles.nowWord}>ahora</Text>
+              {firstMonth ? null : <Text style={styles.nowWord}>ahora</Text>}
               <Text style={styles.curr}>{c.curr}</Text>
             </View>
           </View>

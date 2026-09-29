@@ -162,19 +162,21 @@ export function SpeedometerRing({
           animatedProps={mainProps}
         />
 
-        {/* Overflow fill — only draws when value > target. Warm
-            amber: informational, never red. */}
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={overColor}
-          strokeWidth={3.5}
-          strokeLinecap="round"
-          strokeDashoffset={-arcLen}
-          animatedProps={overProps}
-        />
+        {/* Overflow fill — SOLO con value > target: con largo cero, la punta
+            redonda pintaba un punto ámbar suelto en el anillo. */}
+        {value > target ? (
+          <AnimatedCircle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={overColor}
+            strokeWidth={3.5}
+            strokeLinecap="round"
+            strokeDashoffset={-arcLen}
+            animatedProps={overProps}
+          />
+        ) : null}
       </Svg>
     </View>
   )

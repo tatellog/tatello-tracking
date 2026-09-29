@@ -145,7 +145,6 @@ export function LunarConstellation({
     fieldStars,
     figureCount,
     figureComplete,
-    extraLit,
     intensity,
   } = useMemo(
     () => deriveProgress(trained, todayIdx, zodiac, target),
@@ -668,22 +667,16 @@ export function LunarConstellation({
           plusOne={plusOne}
           initialCount={trainedCount}
           target={figureCount}
+          signTitle={signTitleOf(sign)}
         />
       ) : null}
 
       {/* The reward — once the asterism is fully lit. Manifesto-safe:
           completing the FIGURE (achievable, rest-friendly), not the
           whole month. Days beyond read as "luz extra", never debt. */}
-      {figureComplete ? (
-        <View style={styles.completionCap}>
-          <Text style={styles.completionLabel}>TU FIGURA BRILLA ENTERA</Text>
-          <Text style={styles.completionPoem}>
-            {extraLit > 0
-              ? `Lo que sigue es luz extra · +${extraLit}`
-              : 'Lo que sigue es luz extra.'}
-          </Text>
-        </View>
-      ) : null}
+      {/* (El cierre "TU FIGURA BRILLA ENTERA · Lo que sigue es luz extra" se
+          retiró el 28 sep 2026: repetía la luz extra que ya dice el contador y
+          la frase del coach. Una sola voz.) */}
     </View>
   )
 }
@@ -746,26 +739,12 @@ const styles = StyleSheet.create({
   // small magenta caps stamp announcing the achievement. Replaces the
   // permanent "ACUARIO" label which duplicated the "TU ACUARIO"
   // section header above.
-  completionCap: {
-    alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 10,
-  },
-  completionLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: 10.5,
-    color: colors.magenta,
-    letterSpacing: 2.8,
-    textTransform: 'uppercase',
-  },
   // Coach voice — Cormorant italic, the poetic register reserved for
   // emotional lines. "Luz extra" reframes the post-figure days as bonus.
-  completionPoem: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-    marginTop: 4,
-    textAlign: 'center',
-  },
 })
+
+/** "ESCORPIO" → "Escorpio" (para la píldora del contador). */
+function signTitleOf(sign: ZodiacSign): string {
+  const l = ZODIAC[sign].label
+  return l.charAt(0).toUpperCase() + l.slice(1).toLowerCase()
+}

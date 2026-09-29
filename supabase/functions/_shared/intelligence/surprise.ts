@@ -18,6 +18,7 @@
  */
 import { isDeficitDay } from './deficit.ts'
 import { dayQuality } from './day-quality.ts'
+import { lateBedtimeEffect } from './bedtime.ts'
 import type { DailySignals } from './types.ts'
 
 export type SurpriseId =
@@ -26,6 +27,7 @@ export type SurpriseId =
   | 'steps-deficit'
   | 'weekday-break'
   | 'rescue'
+  | 'late-bedtime'
 
 export type SurpriseRow = { label: string; value: string; strong?: boolean }
 
@@ -47,11 +49,17 @@ export type Surprise = {
   delayed: boolean
   /** Contradice una creencia común (el día que se rompe NO es finde). */
   contradicts: boolean
+  /** La evidencia sale del smartwatch (hora de dormirse, pasos): la tarjeta
+   *  lo dice, para que nunca parezca que Stelar lo adivinó. */
+  fromWatch?: boolean
 }
 
 export type SurpriseOpts = {
   calorieTarget?: number | null
   proteinTarget?: number | null
+  /** Hora de dormirse por noche (día en que despertó → minutos desde las
+   *  6 pm, ver `bedtimeOffsetMinutes`). Solo existe con reloj. */
+  bedtimes?: ReadonlyMap<string, number>
 }
 
 const MIN_SIDE = 3
@@ -181,6 +189,7 @@ export function stepsDeficit(
     expected: true, // moverse ↔ déficit: ya lo intuye
     delayed: false,
     contradicts: false,
+    fromWatch: true,
   }
 }
 
@@ -297,6 +306,7 @@ export function rankSurprises(
     stepsDeficit(signals, opts),
     weekdayBreak(signals, opts),
     rescueAfterOver(signals, opts),
+    lateBedtimeEffect(signals, opts),
   ].filter((s): s is Surprise => s != null)
   const scored = candidates
     .map((s) => ({ s, score: surpriseScore(s, shownIds) }))

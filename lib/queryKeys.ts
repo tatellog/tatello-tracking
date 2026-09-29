@@ -182,6 +182,9 @@ export const queryKeys = {
     latestWeight: (uid: string) => ['wearables', 'latestWeight', uid] as const,
     // Toda la serie de la báscula (Progreso la fusiona con lo manual).
     weights: (uid: string) => ['wearables', 'weights', uid] as const,
+    // Noches del reloj de un rango (pantalla de detalle de sueño).
+    sleepNights: (uid: string, from: string, to: string) =>
+      ['wearables', 'sleepNights', uid, from, to] as const,
   },
   experiments: {
     all: ['experiments'] as const,

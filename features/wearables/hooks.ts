@@ -9,16 +9,17 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AppState } from 'react-native'
 
 import { useSession } from '@/hooks/useSession'
 import { track } from '@/lib/analytics'
 import { queryKeys } from '@/lib/queryKeys'
-import { userTimezone } from '@/lib/time'
+import { todayInTimezone, userTimezone } from '@/lib/time'
 
 import {
   getLatestWearableWeight,
+  getWearableSleepNights,
   getWearableWeights,
   upsertWearableBodyComposition,
   upsertWearableSleep,
@@ -41,9 +42,11 @@ import {
 import {
   bodyCompositionToRows,
   bodyMassToRows,
+  dedupeWorkouts,
   normalizeWorkout,
   sleepSamplesToRows,
   stepsToRows,
+  syncIntervalMs,
   waterToRows,
 } from './logic'
 
@@ -51,6 +54,8 @@ import {
  * teléfono no heredan la conexión de la otra. */
 const connectedKey = (userId: string) => `stelar.wearables.apple_health.connected:${userId}`
 const lastSyncKey = (userId: string) => `stelar.wearables.apple_health.last_sync:${userId}`
+/* Último día con sueño del reloj (para re-consultar seguido en la mañana). */
+const lastSleepDayKey = (userId: string) => `stelar.wearables.apple_health.sleep_day:${userId}`
 /* Báscula (spec §9): opt-in aparte del canal, con su propio permiso de Salud. */
 const scaleEnabledKey = (userId: string) => `stelar.wearables.scale.enabled:${userId}`
 /* Última lectura de la báscula que la usuaria YA VIO (para el punto del ícono). */
@@ -64,9 +69,6 @@ async function isScaleEnabled(userId: string): Promise<boolean> {
 const SYNC_WINDOW_DAYS = 7
 /** Backfill inicial al conectar: valor inmediato sin pedir historia eterna. */
 const INITIAL_WINDOW_DAYS = 30
-/** No re-sincronizar más seguido que esto (cada foreground no es cada minuto). */
-const MIN_SYNC_INTERVAL_MS = 15 * 60 * 1000
-
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
@@ -84,6 +86,8 @@ export async function syncAppleHealth(
   waterDays: number
   weightDays: number
   bodyDays: number
+  /** Día más reciente con sueño en Salud (YYYY-MM-DD), o null. */
+  lastSleepDay: string | null
 } | null> {
   try {
     if (!(await isHealthKitAvailable())) return null
@@ -103,15 +107,23 @@ export async function syncAppleHealth(
       readBodyComposition(from, to),
     ])
 
+    const sleepRows = sleepSamplesToRows(rawSleep, tz, 'apple_health')
+    const lastSleepDay = sleepRows.reduce<string | null>(
+      (max, r) => (max == null || r.sleep_date > max ? r.sleep_date : max),
+      null,
+    )
+
     const [workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays] = await Promise.all([
-      upsertWearableWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health'))),
-      upsertWearableSleep(sleepSamplesToRows(rawSleep, tz, 'apple_health')),
+      upsertWearableWorkouts(
+        dedupeWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health'))),
+      ),
+      upsertWearableSleep(sleepRows),
       upsertWearableSteps(stepsToRows(rawSteps, tz, 'apple_health')),
       upsertWearableWater(waterToRows(rawWater, tz, 'apple_health')),
       upsertWearableWeight(bodyMassToRows(rawWeight, tz, 'apple_health')),
       upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, 'apple_health')),
     ])
-    return { workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays }
+    return { workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays, lastSleepDay }
   } catch {
     return null
   }
@@ -221,51 +233,104 @@ export function useAppleHealthConnection(): {
   return { available, connected, lastSyncAt, busy, connect, disconnect }
 }
 
+/* Un solo sync a la vez en toda la app (el de fondo y el pull de Hoy). */
+let syncInFlight: Promise<boolean> | null = null
+
+function localHour(tz: string): number {
+  const h = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).format(new Date())
+  return Number(h) % 24
+}
+
+/**
+ * Re-consulta la ventana de 7 días si la usuaria conectó Apple Health. Sin
+ * `force` respeta el intervalo (15 min, o 2 min en la mañana mientras el
+ * sueño de anoche no llega). Devuelve true si corrió un sync.
+ */
+async function runAppleHealthSync(
+  userId: string,
+  qc: ReturnType<typeof useQueryClient>,
+  force: boolean,
+): Promise<boolean> {
+  if (syncInFlight) return syncInFlight
+  syncInFlight = (async () => {
+    const flag = await AsyncStorage.getItem(connectedKey(userId)).catch(() => null)
+    if (flag !== 'true') return false
+    if (!force) {
+      const [last, sleepDay] = await Promise.all([
+        AsyncStorage.getItem(lastSyncKey(userId)).catch(() => null),
+        AsyncStorage.getItem(lastSleepDayKey(userId)).catch(() => null),
+      ])
+      const tz = userTimezone()
+      const interval = syncIntervalMs({
+        localHour: localHour(tz),
+        today: todayInTimezone(tz),
+        lastSleepDay: sleepDay,
+      })
+      if (last && Date.now() - new Date(last).getTime() < interval) return false
+    }
+
+    const counts = await syncAppleHealth(SYNC_WINDOW_DAYS, {
+      scale: await isScaleEnabled(userId),
+    })
+    if (!counts) return false
+    const { lastSleepDay, ...tracked } = counts
+    await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
+    if (lastSleepDay) {
+      await AsyncStorage.setItem(lastSleepDayKey(userId), lastSleepDay).catch(() => {})
+    }
+    track('wearable_sync', { source: 'apple_health', initial: false, forced: force, ...tracked })
+    if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
+      void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
+    }
+    if (counts.weightDays + counts.sleepDays > 0) {
+      void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
+    }
+    if (counts.weightDays > 0) {
+      void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
+    }
+    return true
+  })().finally(() => {
+    syncInFlight = null
+  })
+  return syncInFlight
+}
+
 /**
  * El sync de fondo del canal: al montar y en cada vuelta a foreground, si la
- * usuaria conectó Apple Health, re-consulta la ventana de 7 días (throttled a
- * 15 min). Montar UNA vez en el layout de tabs, junto a los otros syncs.
+ * usuaria conectó Apple Health, re-consulta la ventana de 7 días (throttled,
+ * ver `syncIntervalMs`). Montar UNA vez en el layout de tabs.
  */
 export function useAppleHealthSync(): void {
   const { session } = useSession()
   const userId = session?.user?.id ?? null
   const qc = useQueryClient()
-  const syncing = useRef(false)
-
-  const maybeSync = useCallback(async () => {
-    if (!userId || syncing.current) return
-    syncing.current = true
-    try {
-      const flag = await AsyncStorage.getItem(connectedKey(userId)).catch(() => null)
-      if (flag !== 'true') return
-      const last = await AsyncStorage.getItem(lastSyncKey(userId)).catch(() => null)
-      if (last && Date.now() - new Date(last).getTime() < MIN_SYNC_INTERVAL_MS) return
-
-      const counts = await syncAppleHealth(SYNC_WINDOW_DAYS, {
-        scale: await isScaleEnabled(userId),
-      })
-      if (!counts) return
-      await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
-      track('wearable_sync', { source: 'apple_health', initial: false, ...counts })
-      if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
-        void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
-      }
-      if (counts.weightDays > 0) {
-        void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
-        void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
-      }
-    } finally {
-      syncing.current = false
-    }
-  }, [userId, qc])
 
   useEffect(() => {
-    void maybeSync()
+    if (!userId) return
+    void runAppleHealthSync(userId, qc, false)
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void maybeSync()
+      if (state === 'active') void runAppleHealthSync(userId, qc, false)
     })
     return () => sub.remove()
-  }, [maybeSync])
+  }, [userId, qc])
+}
+
+/**
+ * Sync manual (el pull de Hoy): lee Salud AHORA, sin esperar el intervalo.
+ * No-op si el canal no está conectado.
+ */
+export function useAppleHealthSyncNow(): () => Promise<void> {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? null
+  const qc = useQueryClient()
+  return async () => {
+    if (!userId) return
+    await runAppleHealthSync(userId, qc, true)
+  }
 }
 
 /* ── Invitación contextual (spec §5 · "la que convierte") ─────────────────── */
@@ -490,4 +555,16 @@ export function useWearableLastSync(): string | null {
   }, [userId])
 
   return lastSyncAt
+}
+
+/** Las noches del reloj en [fromDay, toDay] (pantalla de detalle de sueño). */
+export function useWearableSleepNights(fromDay: string, toDay: string) {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? ''
+  return useQuery({
+    queryKey: queryKeys.wearables.sleepNights(userId, fromDay, toDay),
+    queryFn: () => getWearableSleepNights(fromDay, toDay),
+    enabled: userId !== '',
+    staleTime: 60_000,
+  })
 }

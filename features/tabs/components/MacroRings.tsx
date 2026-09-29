@@ -5,8 +5,6 @@ import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-rea
 
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import type { BriefContext } from '@/features/brief/api'
-import { PHASE_LABEL } from '@/features/cycle/phase'
-import { useCyclePhase } from '@/features/cycle/useCyclePhase'
 import { enfoqueLabel, reconstructState } from '@/features/profile/calcMacros'
 import { useMacroInputs } from '@/features/profile/hooks'
 import { colors, typography } from '@/theme'
@@ -22,7 +20,6 @@ import { RingCard } from './RingCard'
  */
 export function MacroRings({ ctx }: { ctx: BriefContext }) {
   const router = useRouter()
-  const cycle = useCyclePhase()
   // Tocar una tarjeta abre el editor de METAS (reusa la pantalla validada que
   // ya usan Comidas/Ajustes). source=settings → vuelve atrás a Hoy al guardar.
   const editTargets = () => router.push('/onboarding/macro-targets?source=settings')
@@ -42,15 +39,9 @@ export function MacroRings({ ctx }: { ctx: BriefContext }) {
         </View>
       )}
 
-      {cycle ? (
-        <Text
-          style={styles.cycleLine}
-          accessibilityLabel={`Tu ciclo: ${PHASE_LABEL[cycle.phase]}, día ${cycle.day} de ${cycle.length}`}
-        >
-          Tu ciclo · {PHASE_LABEL[cycle.phase]}
-          <Text style={styles.cycleDim}>{` · día ${cycle.day} de ${cycle.length}`}</Text>
-        </Text>
-      ) : null}
+      {/* (El renglón "Tu ciclo · fase · día N" se retiró el 28 sep 2026: decía
+          la fase sin decir por qué importa hoy, y el ciclo se registra sin
+          fases. Su contexto útil vive en la tendencia del peso.) */}
     </View>
   )
 }
@@ -79,7 +70,9 @@ function MacroRow({
   const proteinLeft = Math.max(0, Math.round(targets.protein_g - ctx.today_macros.protein_g))
   const proteinRemaining = proteinLeft > 0 ? `Te faltan ${proteinLeft} g` : 'Proteína cerrada'
   const calLeft = Math.max(0, Math.round(caloriesTarget - caloriesConsumed))
-  const calRemaining = calOver > 0 ? null : calLeft > 0 ? `Te quedan ${calLeft} kcal` : 'En tu meta'
+  // Calorías sin cuenta regresiva en Hoy (manifiesto · dueña 28 sep 2026): el
+  // número y la meta ya están en la tarjeta; solo se celebra llegar a la meta.
+  const calRemaining = calOver > 0 || calLeft > 0 ? null : 'En tu meta'
 
   return (
     <View style={styles.row}>
@@ -213,15 +206,4 @@ const styles = StyleSheet.create({
   },
   // Una línea de contexto, en la capa meta (Hanken, niebla): no compite con
   // los anillos ni se lee como card.
-  cycleLine: {
-    marginTop: 14,
-    marginLeft: 2,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    letterSpacing: 0.3,
-    color: colors.bone,
-  },
-  cycleDim: {
-    color: colors.niebla,
-  },
 })
