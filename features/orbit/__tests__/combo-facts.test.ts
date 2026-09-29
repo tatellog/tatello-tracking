@@ -9,7 +9,10 @@ import {
   comboOpening,
   comboWeek,
   comboWeekDots,
+  comboDayCards,
+  comboKcalGap,
   comboToday,
+  fmtKcalDelta,
   comboWeekMeter,
   comboWeekHook,
   comboWeekLine,
@@ -315,11 +318,73 @@ describe('comboToday', () => {
   it('enciende lo que ya pasó hoy, en el orden del combo', () => {
     const sigs = [mkSig(TODAY, { sleep_minutes: 450, trained: false })]
     expect(comboToday(sigs, combo, OPTS, TODAY)).toEqual([
-      { key: 'sueno', on: true },
-      { key: 'cuerpo', on: false },
+      { key: 'sueno', status: 'on', value: '7 h 30', fromWatch: false },
+      { key: 'cuerpo', status: 'open', value: null, fromWatch: false },
+    ])
+  })
+  it('descanso no es ✓ ni pendiente; una noche corta ya registrada queda cerrada', () => {
+    const sigs = [mkSig(TODAY, { sleep_minutes: 370, trained: false, rested: true })]
+    expect(comboToday(sigs, combo, OPTS, TODAY)).toEqual([
+      { key: 'sueno', status: 'closed', value: '6 h 10', fromWatch: false },
+      { key: 'cuerpo', status: 'rest', value: 'Descanso', fromWatch: false },
     ])
   })
   it('sin registro de hoy, todo apagado', () => {
-    expect(comboToday([], combo, OPTS, TODAY).every((h) => !h.on)).toBe(true)
+    expect(comboToday([], combo, OPTS, TODAY).every((h) => h.status === 'open')).toBe(true)
+  })
+})
+
+describe('tu día fuerte', () => {
+  const signals = month()
+  const combo = winningCombo(signals, OPTS)!
+
+  it('el reloj marca lo que encendió', () => {
+    const sigs = [
+      mkSig(TODAY, {
+        sleep_minutes: 450,
+        sleep_source: 'wearable',
+        trained: true,
+        workout_source: 'manual',
+      }),
+    ]
+    expect(comboToday(sigs, combo, OPTS, TODAY).map((h) => [h.key, h.fromWatch])).toEqual(
+      combo.signals.map((s) => [s.key, s.key === 'sueno']),
+    )
+  })
+
+  it('la prueba en kcal: el patrón queda más abajo de la meta que el resto', () => {
+    const gap = comboKcalGap(signals, combo, OPTS)!
+    expect(gap.withAvg).toBeLessThan(gap.restAvg)
+    expect(Math.abs(gap.withAvg % 10)).toBe(0)
+  })
+
+  it('nunca publica una prueba que desmiente el patrón', () => {
+    // Los días sin el patrón quedan MÁS abajo: la comparación no nace.
+    const flipped = signals.map((s) =>
+      comboToday([s], combo, OPTS, s.day!).every((h) => h.status === 'on')
+        ? { ...s, calories: 2400 }
+        : s,
+    )
+    expect(comboKcalGap(flipped, combo, OPTS)).toBeNull()
+  })
+
+  it('sin meta o sin muestra no hay comparación', () => {
+    expect(comboKcalGap(signals, combo, {})).toBeNull()
+    expect(comboKcalGap(signals.slice(0, 6), combo, OPTS)).toBeNull()
+  })
+
+  it('tus días reales, el más reciente primero', () => {
+    const cards = comboDayCards(signals, combo, OPTS, 3)
+    expect(cards).toHaveLength(3)
+    expect(cards[0]!.day > cards[1]!.day).toBe(true)
+    expect(cards[0]!.workout).toBe('Entreno')
+    expect(typeof cards[0]!.deficit).toBe('boolean')
+    expect(cards[0]!.label).toMatch(/^(lun|mar|mié|jue|vie|sáb|dom) \d{1,2}$/)
+  })
+
+  it('formatea el delta con signo tipográfico', () => {
+    expect(fmtKcalDelta(-1310)).toBe('−1,310 kcal')
+    expect(fmtKcalDelta(80)).toBe('+80 kcal')
+    expect(fmtKcalDelta(0)).toBe('0 kcal')
   })
 })

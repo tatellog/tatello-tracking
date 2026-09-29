@@ -37,6 +37,8 @@ export type DailySignals = {
   /** De dónde vino el sueño del día ('wearable' | 'manual'). Opcional: solo
    *  para decir la procedencia en pantalla, nunca para detectar. */
   sleep_source?: string | null
+  /** De dónde vino el entreno del día ('wearable' | 'manual'). Solo procedencia. */
+  workout_source?: string | null
 }
 
 /** Slim meal shape — the night detector only needs the timestamp. */

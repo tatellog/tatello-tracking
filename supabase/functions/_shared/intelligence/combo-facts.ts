@@ -11,6 +11,7 @@
  * También vive aquí lo fijo del chat: la apertura, el foco y el estado de la
  * semana (el cierre ya no lo redacta la IA).
  */
+import { dayQuality } from './day-quality.ts'
 import { isDeficitDay } from './deficit.ts'
 import type { DailySignals } from './types.ts'
 import { WATER_GOAL_GLASSES } from './water.ts'
@@ -281,16 +282,184 @@ export function comboWeekHook(week: ComboWeek | null): string | null {
 
 /* ── Hoy (la fila viva de la tarjeta) ──────────────────────────────── */
 
-/** Qué hábitos del combo ya están encendidos HOY, en el orden del combo. Sin
- *  registro de hoy, todos apagados. Nombra lo encendido, nunca receta lo que falta. */
+/** Estado de un hábito hoy:
+ *  · on     → ya se cumplió
+ *  · open   → todavía se puede (sin registro, o proteína/agua a medio día)
+ *  · rest   → marcó descanso: no hay entreno que pedir (ni ✓ falso)
+ *  · closed → ya quedó registrado sin llegar (dormiste menos de 7 h): no se
+ *             puede cambiar hoy, así que tampoco se pide registrar */
+export type ComboHabitStatus = 'on' | 'open' | 'rest' | 'closed'
+
+export type ComboTodayHabit = {
+  key: string
+  status: ComboHabitStatus
+  /** Lo que pasó, dicho corto ("7 h 30", "Fuerza", "96 g"); null si nada. */
+  value: string | null
+  /** Lo encendió el reloj (la tarjeta lleva su ícono). */
+  fromWatch: boolean
+}
+
+function fmtSleep(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m === 0 ? `${h} h` : `${h} h ${m}`
+}
+
+const WORKOUT_NAME: Record<string, string> = {
+  fuerza: 'Fuerza',
+  cardio: 'Cardio',
+  caminata: 'Caminata',
+}
+
+/** Cómo va cada hábito del combo HOY, en el orden del combo. Nombra lo que
+ *  pasó; nunca receta lo que falta. */
 export function comboToday(
   signals: readonly DailySignals[],
   combo: ComboShape,
   opts: ComboOpts,
   todayIso: string,
-): { key: string; on: boolean }[] {
+): ComboTodayHabit[] {
   const s = signals.find((x) => x.day === todayIso)
-  return combo.signals.map((sig) => ({ key: sig.key, on: s ? habitTest(sig.key, opts)(s) : false }))
+  return combo.signals.map((sig): ComboTodayHabit => {
+    const on = s ? habitTest(sig.key, opts)(s) : false
+    const source =
+      sig.key === 'sueno' ? s?.sleep_source : sig.key === 'cuerpo' ? s?.workout_source : null
+    const fromWatch = on && source === 'wearable'
+    switch (sig.key) {
+      case 'sueno': {
+        const min = s?.sleep_minutes ?? null
+        return {
+          key: sig.key,
+          status: on ? 'on' : min != null && min > 0 ? 'closed' : 'open',
+          value: min != null && min > 0 ? fmtSleep(min) : null,
+          fromWatch,
+        }
+      }
+      case 'cuerpo':
+        return {
+          key: sig.key,
+          status: on ? 'on' : s?.rested ? 'rest' : 'open',
+          value: on
+            ? (WORKOUT_NAME[s?.workout_type ?? ''] ?? 'Hecho')
+            : s?.rested
+              ? 'Descanso'
+              : null,
+          fromWatch,
+        }
+      case 'proteina': {
+        const g = s?.protein_g != null && s.protein_g > 0 ? Math.round(s.protein_g) : null
+        return {
+          key: sig.key,
+          status: on ? 'on' : 'open',
+          value: g != null ? `${g} g` : null,
+          fromWatch,
+        }
+      }
+      case 'agua': {
+        const v = s?.water_glasses ?? 0
+        return {
+          key: sig.key,
+          status: on ? 'on' : 'open',
+          value: v > 0 ? `${v} ${v === 1 ? 'vaso' : 'vasos'}` : null,
+          fromWatch,
+        }
+      }
+      default:
+        return { key: sig.key, status: on ? 'on' : 'open', value: null, fromWatch }
+    }
+  })
+}
+
+/* ── Tu día fuerte (sep 2026): la prueba en kcal y tus días reales ────── */
+
+/** Cuánto quedas contra tu meta de calorías, en promedio: los días con el
+ *  patrón contra tus demás días (negativo = abajo de la meta). La moneda que
+ *  ella siente, en vez de dos proporciones que hay que comparar. Null sin meta
+ *  o con menos de 3 días por lado (una comparación con un lado vacío no nace). */
+export type ComboKcalGap = { withAvg: number; restAvg: number; withDays: number; restDays: number }
+
+export function comboKcalGap(
+  signals: readonly DailySignals[],
+  combo: ComboShape,
+  opts: ComboOpts,
+): ComboKcalGap | null {
+  const target = opts.calorieTarget ?? null
+  if (target == null || target <= 0) return null
+  const matches = comboMatches(combo, opts)
+  // Solo días COMPLETOS: un día a medio registrar (300 kcal anotadas) hundía
+  // el promedio de "otros días" y la prueba desmentía el patrón.
+  const food = foodByDay(signals).filter((s) => dayQuality(s) === 'completo')
+  const withD = food.filter(matches)
+  const rest = food.filter((s) => !matches(s))
+  if (withD.length < MIN_SIDE || rest.length < MIN_SIDE) return null
+  const avgDelta = (xs: DailySignals[]) =>
+    Math.round(xs.reduce((a, s) => a + (s.calories! - target), 0) / xs.length / 10) * 10
+  const withAvg = avgDelta(withD)
+  const restAvg = avgDelta(rest)
+  // La prueba nunca contradice el hallazgo: si en kcal no se nota (o sale al
+  // revés), no se publica y la tarjeta cae al conteo de días en déficit.
+  if (withAvg >= restAvg) return null
+  return { withAvg, restAvg, withDays: withD.length, restDays: rest.length }
+}
+
+/** "−310 kcal" / "+80 kcal" (signo tipográfico, miles con coma). */
+export function fmtKcalDelta(n: number): string {
+  const abs = String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `${n < 0 ? '−' : n > 0 ? '+' : ''}${abs} kcal`
+}
+
+const DOW_SHORT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
+const WORKOUT_SHORT: Record<string, string> = {
+  fuerza: 'Fuerza',
+  cardio: 'Cardio',
+  caminata: 'Caminata',
+}
+
+export type ComboDayCard = {
+  day: string
+  /** "mar 16" */
+  label: string
+  sleepMinutes: number | null
+  /** "Fuerza" / "Entreno" (null si ese día no entrenó). */
+  workout: string | null
+  /** Calorías contra la meta (negativo = abajo); null sin día completo o sin meta. */
+  kcalDelta: number | null
+  /** Cerró en déficit (la misma regla del hallazgo); null sin comida o sin meta. */
+  deficit: boolean | null
+  proteinG: number | null
+}
+
+/** Tus días reales con el patrón, el más reciente primero: la prueba como
+ *  recuerdos ("ah sí, ese jueves") en vez de estadística. Máx. `max`. */
+export function comboDayCards(
+  signals: readonly DailySignals[],
+  combo: ComboShape,
+  opts: ComboOpts,
+  max = 8,
+): ComboDayCard[] {
+  const target = opts.calorieTarget ?? null
+  const byDay = new Map<string, DailySignals>()
+  for (const s of signals) if (s.day) byDay.set(s.day, s)
+  return [...combo.days]
+    .sort((a, b) => (a < b ? 1 : -1))
+    .slice(0, max)
+    .map((day) => {
+      const s = byDay.get(day)
+      // Un día a medio registrar no dice cuánto quedaste: sin número.
+      const kcal = s && dayQuality(s) === 'completo' ? s.calories : null
+      return {
+        day,
+        label: `${DOW_SHORT[weekdayMon(day)]} ${Number(day.slice(8, 10))}`,
+        sleepMinutes: s?.sleep_minutes ?? null,
+        workout: s?.trained ? (WORKOUT_SHORT[s.workout_type ?? ''] ?? 'Entreno') : null,
+        kcalDelta: kcal != null && target != null && target > 0 ? kcal - target : null,
+        deficit:
+          s?.calories != null && s.calories > 0 && target != null && target > 0
+            ? isDeficitDay(s.calories, target)
+            : null,
+        proteinG: s?.protein_g != null && s.protein_g > 0 ? Math.round(s.protein_g) : null,
+      }
+    })
 }
 
 /* ── El estado de la semana (criterio Apple: meta de TUS datos + lo que falta) ── */
