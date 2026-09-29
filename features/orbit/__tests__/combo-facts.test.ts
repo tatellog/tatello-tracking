@@ -1,5 +1,4 @@
 import {
-  comboBreakdown,
   comboDayDetail,
   comboFacts,
   comboFocus,
@@ -8,10 +7,10 @@ import {
   comboLift,
   comboLiftBadge,
   comboOpening,
-  comboPlainHeadline,
   comboWeek,
   comboWeekDots,
-  comboWeekSummary,
+  comboToday,
+  comboWeekMeter,
   comboWeekHook,
   comboWeekLine,
   evidenceDots,
@@ -140,7 +139,7 @@ describe('comboWeek', () => {
 
   it('las líneas de estado no culpan y dicen lo que falta', () => {
     expect(comboWeekLine({ done: 1, typical: 3, daysLeft: 4, state: 'onTrack' })).toBe(
-      'Esta semana van 1 de 3. Quedan 4 días.',
+      'Esta semana van 1 de 3.',
     )
     expect(comboWeekLine({ done: 3, typical: 3, daysLeft: 2, state: 'reached' })).toContain(
       'lo que suelen tener tus mejores semanas',
@@ -152,6 +151,20 @@ describe('comboWeek', () => {
       'Esta semana ya lo juntaste 2 veces.',
     )
     expect(comboWeekLine(null)).toBeNull()
+  })
+
+  it('nunca cuenta los días que quedan', () => {
+    for (const state of ['onTrack', 'short', 'noRef'] as const) {
+      for (const done of [0, 1]) {
+        const line = comboWeekLine({
+          done,
+          typical: state === 'noRef' ? null : 3,
+          daysLeft: 4,
+          state,
+        })
+        expect(line ?? '').not.toMatch(/quedan/i)
+      }
+    }
   })
 })
 
@@ -247,7 +260,47 @@ describe('la tarjeta visual', () => {
   })
 })
 
-describe('la semana con palabras', () => {
+describe('la semana como medidor', () => {
+  it('en camino: estrellas contra tus mejores semanas, sin abrir con 0', () => {
+    expect(comboWeekMeter({ done: 0, typical: 2, daysLeft: 5, state: 'onTrack' })).toEqual({
+      stars: [false, false],
+      count: null,
+      note: 'Tus mejores semanas lo juntan 2 veces.',
+      reached: false,
+    })
+    expect(comboWeekMeter({ done: 1, typical: 2, daysLeft: 5, state: 'onTrack' })).toEqual({
+      stars: [true, false],
+      count: '1 de 2',
+      note: 'Con uno más, igualas tus mejores semanas.',
+      reached: false,
+    })
+  })
+  it('cumplida va en oro y no sube la vara', () => {
+    const m = comboWeekMeter({ done: 3, typical: 2, daysLeft: 2, state: 'reached' })!
+    expect(m.reached).toBe(true)
+    expect(m.stars).toEqual([true, true, true])
+    expect(m.note).toBe('Ya es una de tus mejores semanas.')
+  })
+  it('si ya no alcanza, suma sin culpa', () => {
+    expect(comboWeekMeter({ done: 0, typical: 3, daysLeft: 1, state: 'short' })!.note).toBe(
+      'Cada día que lo juntes suma.',
+    )
+  })
+  it('sin referencia: solo lo encendido, sin meta', () => {
+    expect(comboWeekMeter({ done: 2, typical: null, daysLeft: 3, state: 'noRef' })).toEqual({
+      stars: [true, true],
+      count: null,
+      note: '2 veces esta semana',
+      reached: false,
+    })
+    expect(comboWeekMeter({ done: 0, typical: null, daysLeft: 3, state: 'noRef' })!.stars).toEqual(
+      [],
+    )
+    expect(comboWeekMeter(null)).toBeNull()
+  })
+})
+
+describe('comboToday', () => {
   const combo = {
     signals: [
       { key: 'sueno', label: 'Sueño' },
@@ -259,56 +312,14 @@ describe('la semana con palabras', () => {
     restDays: 9,
     restDeficits: 3,
   }
-  it('dice qué cuenta y contra qué', () => {
-    expect(comboWeekSummary({ done: 1, typical: 3, daysLeft: 3, state: 'onTrack' }, combo)).toBe(
-      'Esta semana: 1 día con sueño de 7 h y entreno · tus mejores semanas, 3',
-    )
-    expect(comboWeekSummary({ done: 2, typical: null, daysLeft: 3, state: 'noRef' }, combo)).toBe(
-      'Esta semana: 2 días con sueño de 7 h y entreno',
-    )
-    expect(
-      comboWeekSummary({ done: 0, typical: null, daysLeft: 3, state: 'noRef' }, combo),
-    ).toBeNull()
-  })
-})
-
-describe('comboBreakdown (barras por rubro)', () => {
-  const signals = month()
-  const combo = winningCombo(signals, OPTS)!
-  const g = comboBreakdown(signals, combo, OPTS)
-
-  it('los grupos suman exactamente lo del combo y su resto', () => {
-    const both = g.find((x) => x.key === 'both')!
-    expect([both.days, both.deficits]).toEqual([combo.occurrences, combo.deficits])
-    const rest = g.filter((x) => x.key !== 'both')
-    expect(rest.reduce((a, x) => a + x.days, 0)).toBe(combo.restDays)
-    expect(rest.reduce((a, x) => a + x.deficits, 0)).toBe(combo.restDeficits)
-  })
-
-  it('nombra cada rubro y un grupo sin días no aparece', () => {
-    expect(g.map((x) => x.label)).toEqual([
-      'Con sueño de 7 h y entreno',
-      'Solo entreno',
-      'Sin ninguno',
+  it('enciende lo que ya pasó hoy, en el orden del combo', () => {
+    const sigs = [mkSig(TODAY, { sleep_minutes: 450, trained: false })]
+    expect(comboToday(sigs, combo, OPTS, TODAY)).toEqual([
+      { key: 'sueno', on: true },
+      { key: 'cuerpo', on: false },
     ])
   })
-})
-
-describe('comboPlainHeadline', () => {
-  it('dice el hallazgo sin multiplicador', () => {
-    const c = {
-      signals: [
-        { key: 'sueno', label: 'Sueño' },
-        { key: 'cuerpo', label: 'Entreno' },
-      ],
-      days: [],
-      occurrences: 8,
-      deficits: 5,
-      restDays: 9,
-      restDeficits: 3,
-    }
-    expect(comboPlainHeadline(c)).toBe(
-      'Los días que duermes 7 horas y entrenas, cierras en déficit más seguido.',
-    )
+  it('sin registro de hoy, todo apagado', () => {
+    expect(comboToday([], combo, OPTS, TODAY).every((h) => !h.on)).toBe(true)
   })
 })

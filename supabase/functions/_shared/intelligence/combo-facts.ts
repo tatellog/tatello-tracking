@@ -222,32 +222,12 @@ export function comboLiftBadge(combo: ComboShape): string {
   return `${(Math.floor(ratio * 10) / 10).toFixed(1).replace('.', ',')}×`
 }
 
-/** La semana dicha con palabras (la usuaria leía los puntos de la semana como
- *  días en déficit): cuántos días lo juntaste y cuántos suelen tener tus
- *  mejores semanas. Sin referencia, solo lo hecho; sin nada, no se dice. */
-export function comboWeekSummary(week: ComboWeek | null, combo: ComboShape): string | null {
-  if (!week) return null
-  const group = comboGroupLabel(combo).toLowerCase()
-  const done = `${week.done} ${dias(week.done)} ${group}`
-  if (week.typical == null) return week.done > 0 ? `Esta semana: ${done}` : null
-  return `Esta semana: ${done} · tus mejores semanas, ${week.typical}`
-}
-
 /** La semana en puntos: llenos = días que ya lo juntaste; el total es lo que
  *  suelen tener tus mejores semanas. Sin referencia, solo lo hecho. Máx. 7. */
 export function comboWeekDots(week: ComboWeek | null): boolean[] {
   if (!week) return []
   const total = Math.min(7, Math.max(week.typical ?? 0, week.done))
   return Array.from({ length: total }, (_, i) => i < week.done)
-}
-
-/** El hallazgo en una frase llana, SIN multiplicador (dueña 28 sep 2026:
- *  "casi 2×" obligaba a descifrar dos tasas; las barras de abajo prueban con
- *  conteos). "Los días que duermes 7 horas y entrenas, cierras en déficit más
- *  seguido." */
-export function comboPlainHeadline(combo: ComboShape): string {
-  const list = joinList(combo.signals.map((s) => HABIT_PRESENT[s.key] ?? s.label.toLowerCase()))
-  return `Los días que ${list}, cierras en déficit más seguido.`
 }
 
 /** El titular: el hallazgo dicho, no el hábito. */
@@ -299,77 +279,18 @@ export function comboWeekHook(week: ComboWeek | null): string | null {
     : `Esta semana lo juntaste ${done} ${veces(done)}. Tus mejores semanas, ${typical}.`
 }
 
-/* ── El desglose por rubro (las barras de la tarjeta) ─────────────────── */
+/* ── Hoy (la fila viva de la tarjeta) ──────────────────────────────── */
 
-export type ComboBarGroup = {
-  /** 'both' | 'only:<key>' | 'none' | 'rest' */
-  key: string
-  label: string
-  /** Hábitos presentes en el grupo (para pintar la barra con sus colores). */
-  habits: string[]
-  days: number
-  deficits: number
-}
-
-/** Los días con comida partidos por rubro: con los dos, solo uno, solo el otro,
- *  ninguno (dueña 28 sep 2026: "gráficas de barra explicando cada rubro").
- *  Suma exactamente lo mismo que el combo: both = occurrences y el resto = restDays.
- *  Con 3+ hábitos no hay "solo X" legible: combo contra el resto. Un grupo sin
- *  días no aparece. */
-export function comboBreakdown(
+/** Qué hábitos del combo ya están encendidos HOY, en el orden del combo. Sin
+ *  registro de hoy, todos apagados. Nombra lo encendido, nunca receta lo que falta. */
+export function comboToday(
   signals: readonly DailySignals[],
   combo: ComboShape,
   opts: ComboOpts,
-): ComboBarGroup[] {
-  const target = opts.calorieTarget ?? null
-  if (target == null || target <= 0) return []
-  const food = foodByDay(signals)
-  const inDef = (s: DailySignals) => isDeficitDay(s.calories, target)
-  const keys = combo.signals.map((x) => x.key)
-  const tests = keys.map((k) => habitTest(k, opts))
-  const make = (key: string, label: string, habits: string[], days: DailySignals[]) => ({
-    key,
-    label,
-    habits,
-    days: days.length,
-    deficits: days.filter(inDef).length,
-  })
-  const all = food.filter((s) => tests.every((t) => t(s)))
-  const groups: ComboBarGroup[] = [make('both', comboGroupLabel(combo), keys, all)]
-  if (keys.length === 2) {
-    const [a, b] = keys as [string, string]
-    const [ta, tb] = tests as [(s: DailySignals) => boolean, (s: DailySignals) => boolean]
-    groups.push(
-      make(
-        `only:${a}`,
-        `Solo ${HABIT_SHORT[a] ?? a}`,
-        [a],
-        food.filter((s) => ta(s) && !tb(s)),
-      ),
-      make(
-        `only:${b}`,
-        `Solo ${HABIT_SHORT[b] ?? b}`,
-        [b],
-        food.filter((s) => tb(s) && !ta(s)),
-      ),
-      make(
-        'none',
-        'Sin ninguno',
-        [],
-        food.filter((s) => !ta(s) && !tb(s)),
-      ),
-    )
-  } else {
-    groups.push(
-      make(
-        'rest',
-        comboWithoutLabel(combo),
-        [],
-        food.filter((s) => !tests.every((t) => t(s))),
-      ),
-    )
-  }
-  return groups.filter((g) => g.days > 0)
+  todayIso: string,
+): { key: string; on: boolean }[] {
+  const s = signals.find((x) => x.day === todayIso)
+  return combo.signals.map((sig) => ({ key: sig.key, on: s ? habitTest(sig.key, opts)(s) : false }))
 }
 
 /* ── El estado de la semana (criterio Apple: meta de TUS datos + lo que falta) ── */
@@ -420,25 +341,71 @@ export function comboWeek(
   return { done, typical, daysLeft, state }
 }
 
-/** La línea de estado bajo el foco. Sin culpa: si ya no alcanza, lo dice y suma igual. */
+/** La línea de estado bajo el foco. Sin culpa ni cuenta regresiva (nada de
+ *  "quedan N días"): si ya no alcanza, lo dice y suma igual. */
 export function comboWeekLine(week: ComboWeek | null): string | null {
   if (!week) return null
-  const { done, typical, daysLeft, state } = week
+  const { done, typical, state } = week
   switch (state) {
     case 'reached':
       return `Esta semana ya lo juntaste ${done} ${veces(done)}, lo que suelen tener tus mejores semanas.`
     case 'onTrack':
       return done === 0
-        ? `Tus mejores semanas lo juntan ${typical} ${veces(typical!)}. Esta semana todavía caben: quedan ${daysLeft} ${dias(daysLeft)}.`
-        : `Esta semana van ${done} de ${typical}. Quedan ${daysLeft} ${dias(daysLeft)}.`
+        ? `Tus mejores semanas lo juntan ${typical} ${veces(typical!)}. Esta semana todavía cabe.`
+        : `Esta semana van ${done} de ${typical}.`
     case 'short':
       return done === 0
         ? 'Esta semana ya no llega a lo de tus mejores semanas. Cada día que lo juntes suma igual.'
         : `Esta semana van ${done}. Ya no llega a ${typical}, y cada día que lo juntes suma igual.`
     case 'noRef':
       return done === 0
-        ? `Esta semana todavía no coincide. Quedan ${daysLeft} ${dias(daysLeft)}.`
+        ? 'Esta semana todavía no coincide.'
         : `Esta semana ya lo juntaste ${done} ${veces(done)}.`
+  }
+}
+
+/** La semana de la tarjeta como MEDIDOR (sep 2026, "no cuadra"): estrellas por
+ *  encender contra tus mejores semanas, tipo anillo. Solo cuenta lo que sí
+ *  pasó: nunca abre con "0", nunca cuenta días que quedan. Sin referencia, solo
+ *  lo encendido y sin meta. */
+export type ComboWeekMeter = {
+  /** Llenas = días que ya lo juntaste; el total, lo de tus mejores semanas. */
+  stars: boolean[]
+  /** "1 de 2" (null cuando no hay nada que contar). */
+  count: string | null
+  note: string | null
+  /** Ya es una de tus mejores semanas (va en oro). */
+  reached: boolean
+}
+
+export function comboWeekMeter(week: ComboWeek | null): ComboWeekMeter | null {
+  if (!week) return null
+  const { done, typical, state } = week
+  const stars = comboWeekDots(week)
+  if (typical == null) {
+    return {
+      stars,
+      count: null,
+      note: done > 0 ? `${done} ${veces(done)} esta semana` : null,
+      reached: false,
+    }
+  }
+  const count = done > 0 ? `${done} de ${typical}` : null
+  switch (state) {
+    case 'reached':
+      return { stars, count: null, note: 'Ya es una de tus mejores semanas.', reached: true }
+    case 'short':
+      return { stars, count, note: 'Cada día que lo juntes suma.', reached: false }
+    default:
+      return {
+        stars,
+        count,
+        note:
+          done > 0 && typical - done === 1
+            ? 'Con uno más, igualas tus mejores semanas.'
+            : `Tus mejores semanas lo juntan ${typical} ${veces(typical)}.`,
+        reached: false,
+      }
   }
 }
 

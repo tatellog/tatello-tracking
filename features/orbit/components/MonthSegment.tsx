@@ -75,12 +75,13 @@ import {
   comboHabitList,
   comboOpening,
   comboHeadline,
+  comboGroupLabel,
+  comboToday,
   comboWeek,
-  comboPlainHeadline,
-  comboBreakdown,
-  type ComboBarGroup,
-  comboWeekSummary,
   comboWeekLine,
+  comboWeekMeter,
+  evidenceDots,
+  type ComboWeekMeter,
 } from '../combo-facts'
 import { useComboTranscript } from '../combo-transcript'
 import { comboKey, combosBornRecently } from '../combo-memory'
@@ -839,14 +840,15 @@ export function MonthSegment({
                 {combo && view === 'patterns' ? (
                   <PatternHero
                     combo={combo}
-                    since={provenance?.since ?? null}
                     early={maturity.stage <= 2}
-                    weekLine={comboWeekSummary(week, combo)}
-                    breakdown={comboBreakdown(patternSignals, combo, {
-                      calorieTarget,
-                      proteinTarget,
-                      waterGoalGlasses,
-                    })}
+                    followUp={shownKey != null && !recentCombos.includes(shownKey)}
+                    meter={comboWeekMeter(week)}
+                    todayHabits={comboToday(
+                      patternSignals,
+                      combo,
+                      { calorieTarget, proteinTarget, waterGoalGlasses },
+                      today,
+                    )}
                     talked={comboTalk.transcript != null}
                     onAsk={aiOn && comboFinding ? () => openChat(null) : undefined}
                     onReveal={() => {
@@ -914,19 +916,63 @@ export function MonthSegment({
                 ) : (
                   <Text style={styles.patternsEmptyLede}>Todavía te estoy conociendo.</Text>
                 )}
+                {/* La ecuación en blanco: la misma forma que tendrá el patrón,
+                    apagada. Y lo que Stelar ya ve de sus días, sin contar. */}
+                <View style={[styles.eqRow, styles.ghostEq]}>
+                  {['?', '?'].map((q, i) => (
+                    <View key={i} style={styles.eqItem}>
+                      {i > 0 ? <Text style={styles.eqPlus}>+</Text> : null}
+                      <View style={[styles.eqChip, styles.ghostChip]}>
+                        <View style={[styles.eqDot, styles.ghostDot]} />
+                        <Text style={[styles.eqChipText, styles.ghostText]}>{q}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <View style={styles.eqItem}>
+                    <Text style={styles.eqPlus}>=</Text>
+                    <View style={[styles.eqChip, styles.ghostChip]}>
+                      <View style={styles.proofDiamond} />
+                      <Text style={[styles.eqChipText, styles.ghostText]}>Déficit</Text>
+                    </View>
+                  </View>
+                </View>
                 <Text style={styles.patternsEmptyBody}>
-                  Un patrón aparece cuando algo se repite en tus días. Sigue registrando como
-                  siempre y aquí verás lo primero que encuentre. Cosas como:
+                  Busco qué combinación te acerca al déficit. Cuando algo se repita en tus días,
+                  aparece aquí.
                 </Text>
-                <View style={styles.patternSilhouettes}>
+                <Text style={styles.seesTitle}>Lo que ya veo</Text>
+                <View
+                  style={styles.todayRow}
+                  accessible
+                  accessibilityLabel={`Lo que ya veo: ${
+                    [
+                      maturity.days.food > 0 && 'comidas',
+                      maturity.days.sleep > 0 && 'sueño',
+                      maturity.days.movement > 0 && 'movimiento',
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || 'todavía nada'
+                  }.`}
+                >
                   {[
-                    'Qué días son distintos en tu rutina',
-                    'Qué acompaña tus mejores días',
-                    'Qué combinación te sostiene en déficit',
-                  ].map((t) => (
-                    <View key={t} style={styles.patternSilhouetteRow}>
-                      <View style={styles.patternSilhouetteStar} />
-                      <Text style={styles.patternSilhouetteText}>{t}</Text>
+                    { label: 'Comidas', on: maturity.days.food > 0, color: colors.leche },
+                    { label: 'Sueño', on: maturity.days.sleep > 0, color: NODE_COLOR.sueno },
+                    {
+                      label: 'Movimiento',
+                      on: maturity.days.movement > 0,
+                      color: NODE_COLOR.cuerpo,
+                    },
+                  ].map((d) => (
+                    <View key={d.label} style={styles.todayItem}>
+                      <View
+                        style={[
+                          styles.todayDot,
+                          d.on
+                            ? { backgroundColor: d.color }
+                            : { borderWidth: 1, borderColor: colors.bruma },
+                        ]}
+                      />
+                      <Text style={[styles.todayText, d.on && styles.todayTextOn]}>{d.label}</Text>
                     </View>
                   ))}
                 </View>
@@ -1529,10 +1575,14 @@ function SurpriseHero({ surprise }: { surprise: Surprise }) {
   )
 }
 
-/* El patrón en el feed (sep 2026 · "la gente no leerá"): se entiende SIN leer
- * frases. La ecuación (fichas con el color de su estrella) dice de qué es; el
- * número grande en oro es el gancho; los puntos son la prueba (un día cada uno);
- * la semana son tres puntos por llenar. Una sola acción: la de Stelar. */
+/* El patrón en el feed (sep 2026 · "no cuadra"): una ecuación, una prueba y tu
+ * semana. La ECUACIÓN es el titular (fichas con el color de su estrella, = ◆
+ * déficit en oro, que también es la leyenda de lo de abajo). La PRUEBA son dos
+ * filas de puntos, un día cada uno: el combo contra tus demás días, la misma
+ * comparación con la que nace el patrón (partirla en 4 barras de 3 días metía
+ * ruido que desmentía el hallazgo; el "¿y si solo…?" vive en el chat). La
+ * SEMANA es un medidor contra tus mejores semanas, más lo encendido hoy.
+ * Recién descubierto manda la prueba; en las visitas siguientes, la semana. */
 const CHIP_LABEL: Record<string, string> = {
   sueno: 'Sueño 7 h',
   cuerpo: 'Entreno',
@@ -1542,23 +1592,23 @@ const CHIP_LABEL: Record<string, string> = {
 
 function PatternHero({
   combo,
-  since,
   early,
-  weekLine,
-  breakdown,
+  followUp,
+  meter,
+  todayHabits,
   talked,
   onAsk,
   onReveal,
 }: {
   combo: WinningComboData
-  /** Mes en que se descubrió ("julio") → "desde julio". */
-  since: string | null
   /** Muestra chica: el kicker dice "temprano" (sin línea extra). */
   early: boolean
-  /** La semana dicha con palabras (null = nada que decir). */
-  weekLine: string | null
-  /** Los días partidos por rubro (con los dos, solo uno, ninguno). */
-  breakdown: ComboBarGroup[]
+  /** Ya no es nuevo (nació hace más de 2 semanas): la semana sube, la prueba baja a una línea. */
+  followUp: boolean
+  /** La semana como medidor (null = sin meta de calorías). */
+  meter: ComboWeekMeter | null
+  /** Los hábitos del combo encendidos hoy. */
+  todayHabits: { key: string; on: boolean }[]
   /** Ya hablaron de este patrón. */
   talked?: boolean
   onAsk?: () => void
@@ -1571,11 +1621,41 @@ function PatternHero({
     })),
     { label: 'Déficit', color: colors.oroSoft },
   ]
-  const kicker = `${early ? 'Patrón temprano' : 'Patrón'}${since ? ` · desde ${since}` : ''}`
+  const hasRest = combo.restDays >= 3
+  const proof = (
+    <View
+      style={styles.proof}
+      accessible
+      accessibilityLabel={`Días que cerraste en déficit. ${comboGroupLabel(combo)}: ${combo.deficits} de ${combo.occurrences}.${
+        hasRest ? ` Tus demás días: ${combo.restDeficits} de ${combo.restDays}.` : ''
+      }`}
+    >
+      <ProofRow
+        label={comboGroupLabel(combo)}
+        total={combo.occurrences}
+        filled={combo.deficits}
+        strong
+      />
+      {hasRest ? (
+        <ProofRow label="Tus demás días" total={combo.restDays} filled={combo.restDeficits} />
+      ) : (
+        <Text style={styles.proofNote}>Aún no tengo con qué compararlo.</Text>
+      )}
+    </View>
+  )
+  const proofLine = (
+    <Text style={styles.proofLine}>
+      <Text style={styles.proofLineGold}>◆ </Text>
+      {`${combo.deficits} de ${combo.occurrences} con el patrón`}
+      {hasRest ? ` · ${combo.restDeficits} de ${combo.restDays} tus demás días` : ''}
+    </Text>
+  )
+  const week = <WeekMeter meter={meter} todayHabits={todayHabits} />
+
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern} accessible={false}>
       <View style={styles.heroTop}>
-        <Text style={styles.heroKicker}>{kicker}</Text>
+        <Text style={styles.heroKicker}>{early ? 'Patrón temprano' : 'Patrón'}</Text>
         <View style={styles.heroMini}>
           <Pressable
             onPress={onReveal}
@@ -1590,7 +1670,7 @@ function PatternHero({
         </View>
       </View>
 
-      {/* La ecuación: qué hábitos, con el color de su estrella. */}
+      {/* La ecuación ES el titular: se entiende sin leer una frase. */}
       <View style={styles.eqRow} accessible accessibilityLabel={comboHeadline(combo)}>
         {combo.signals.map((sig, i) => (
           <View key={sig.key} style={styles.eqItem}>
@@ -1603,35 +1683,31 @@ function PatternHero({
             </View>
           </View>
         ))}
+        <View style={styles.eqItem}>
+          <Text style={styles.eqPlus}>=</Text>
+          <View style={[styles.eqChip, styles.eqChipGold]}>
+            <View style={[styles.proofDiamond, styles.proofDiamondOn]} />
+            <Text style={[styles.eqChipText, styles.eqChipTextGold]}>Déficit</Text>
+          </View>
+        </View>
       </View>
 
-      {/* El hallazgo en una frase llana (sin "casi 2×": había que descifrar
-          dos tasas). Las barras de abajo lo prueban con conteos. */}
-      <Text style={styles.heroHeadline}>{comboPlainHeadline(combo)}</Text>
-
-      {/* Barras por rubro (dueña 28 sep 2026): cada hábito con su color (el de
-          su estrella y su chip), así se ve qué aporta cada uno y los dos juntos. */}
-      <View
-        style={styles.heroDots}
-        accessible
-        accessibilityLabel={`Días que cerraste en déficit. ${breakdown
-          .map((g) => `${g.label}: ${g.deficits} de ${g.days}`)
-          .join('. ')}.`}
-      >
-        <Text style={styles.barsTitle}>Días que cerraste en déficit</Text>
-        {breakdown.map((g) => (
-          <HabitBar key={g.key} group={g} strong={g.key === 'both'} />
-        ))}
-      </View>
-
-      {/* La semana con PALABRAS, separada de la evidencia: con puntos se leía
-          como "días en déficit" (target-user, 26 sep 2026). */}
-      {weekLine ? <Text style={styles.weekSummary}>{weekLine}</Text> : null}
+      {followUp ? (
+        <>
+          {week}
+          {proofLine}
+        </>
+      ) : (
+        <>
+          {proof}
+          {week}
+        </>
+      )}
 
       {onAsk ? (
         <View style={styles.heroAsk}>
           <AuroraCta
-            label={talked ? 'Retomar con Stelar' : 'Pregúntale a Stelar'}
+            label={talked ? 'Retomar con Stelar' : 'Entender este patrón'}
             onPress={onAsk}
           />
         </View>
@@ -1640,42 +1716,103 @@ function PatternHero({
   )
 }
 
-/* Una barra por rubro: la etiqueta con los puntos de color de sus hábitos, el
- * conteo a la derecha y la barra rellena con la proporción de días en déficit.
- * Los dos juntos = degradado de sus colores; uno solo = su color; ninguno =
- * neutro. Colores = identidad del hábito, nunca juicio (sin rojo ni verde). */
-function HabitBar({ group, strong }: { group: ComboBarGroup; strong?: boolean }) {
-  const rate = group.days > 0 ? group.deficits / group.days : 0
-  const colorsFor = group.habits.map((h) => NODE_COLOR[h] ?? colors.leche)
-  const width = `${Math.max(3, Math.round(rate * 100))}%` as const
+/* Una fila de la prueba: la etiqueta y, debajo, un rombo por día (oro = cerró
+ * en déficit, contorno = no). El largo de la fila ES la muestra: 7 rombos no
+ * prometen lo que promete un porcentaje. Con muchos días se escala. */
+function ProofRow({
+  label,
+  total,
+  filled,
+  strong,
+}: {
+  label: string
+  total: number
+  filled: number
+  strong?: boolean
+}) {
   return (
-    <View style={styles.hbRow}>
-      <View style={styles.hbHead}>
-        <View style={styles.hbDots}>
-          {colorsFor.length > 0 ? (
-            colorsFor.map((c, i) => <View key={i} style={[styles.hbDot, { backgroundColor: c }]} />)
-          ) : (
-            <View style={[styles.hbDot, styles.hbDotNone]} />
-          )}
+    <View style={styles.proofRow}>
+      <Text style={[styles.proofLabel, strong && styles.proofLabelStrong]} numberOfLines={1}>
+        {label}
+      </Text>
+      <View style={styles.proofDotsRow}>
+        <View style={styles.proofDots}>
+          {evidenceDots(total, filled).map((on, i) => (
+            <View key={i} style={[styles.proofDiamond, on && styles.proofDiamondOn]} />
+          ))}
         </View>
-        <Text style={[styles.hbLabel, strong && styles.hbLabelStrong]} numberOfLines={1}>
-          {group.label}
-        </Text>
-        <Text style={[styles.hbCount, strong && styles.hbLabelStrong]}>
-          {`${group.deficits} de ${group.days} ${group.days === 1 ? 'día' : 'días'}`}
+        <Text style={[styles.proofCount, strong && styles.proofLabelStrong]}>
+          {`${filled} de ${total}`}
         </Text>
       </View>
-      <View style={styles.hbTrack}>
-        {colorsFor.length > 1 ? (
-          <LinearGradient
-            colors={colorsFor as [string, string, ...string[]]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={[styles.hbFill, { width }]}
-          />
-        ) : (
-          <View style={[styles.hbFill, { width, backgroundColor: colorsFor[0] ?? colors.bruma }]} />
-        )}
+    </View>
+  )
+}
+
+/* La semana como medidor: estrellas por encender contra tus mejores semanas
+ * (oro = logro, contorno = pendiente neutro, nunca magenta ni rojo). Los días
+ * sin el patrón no se dibujan: no hay huecos que se lean como fallo. Debajo,
+ * lo que ya está encendido HOY; nombra, no receta. */
+function WeekMeter({
+  meter,
+  todayHabits,
+}: {
+  meter: ComboWeekMeter | null
+  todayHabits: { key: string; on: boolean }[]
+}) {
+  const showMeter = meter != null && (meter.stars.length > 0 || meter.note != null)
+  return (
+    <View style={styles.week}>
+      <Text style={styles.weekTitle}>Esta semana</Text>
+      {showMeter ? (
+        <View
+          style={styles.weekMeter}
+          accessible
+          accessibilityLabel={[meter.count, meter.note].filter(Boolean).join('. ')}
+        >
+          {meter.stars.length > 0 ? (
+            <View style={styles.weekStars}>
+              {meter.stars.map((on, i) => (
+                <Text key={i} style={[styles.weekStar, on && styles.weekStarOn]}>
+                  {on ? '★' : '☆'}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          <View style={styles.weekText}>
+            {meter.count ? <Text style={styles.weekCount}>{meter.count}</Text> : null}
+            {meter.note ? (
+              <Text style={[styles.weekNote, meter.reached && styles.weekNoteReached]}>
+                {meter.note}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+      <View
+        style={styles.todayRow}
+        accessible
+        accessibilityLabel={`Hoy: ${todayHabits
+          .map((h) => `${CHIP_LABEL[h.key] ?? h.key}, ${h.on ? 'ya está' : 'todavía no'}`)
+          .join('. ')}.`}
+      >
+        <Text style={styles.todayLabel}>Hoy</Text>
+        {todayHabits.map((h) => {
+          const c = NODE_COLOR[h.key] ?? colors.leche
+          return (
+            <View key={h.key} style={styles.todayItem}>
+              <View
+                style={[
+                  styles.todayDot,
+                  h.on ? { backgroundColor: c } : { borderWidth: 1, borderColor: c },
+                ]}
+              />
+              <Text style={[styles.todayText, h.on && styles.todayTextOn]}>
+                {CHIP_LABEL[h.key] ?? h.key}
+              </Text>
+            </View>
+          )
+        })}
       </View>
     </View>
   )
@@ -2187,8 +2324,18 @@ function RevealEvidenceModal({
 }
 
 const styles = StyleSheet.create({
+  // El patrón vive en su propio contenedor (misma familia que el panel del
+  // calendario) con un filo de oro apenas: es EL hallazgo, no texto suelto.
   heroPattern: {
     marginTop: 4,
+    marginBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairline,
+    paddingTop: 18,
+    paddingBottom: 20,
+    paddingHorizontal: 18,
   },
   surprise: {
     marginTop: 4,
@@ -2268,11 +2415,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.oroSoft,
   },
-  heroMini: { width: 164, marginVertical: -26, marginRight: -26 },
+  heroMini: { width: 164, marginVertical: -26, marginRight: -14 },
   eqRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 10 },
   eqItem: { flexDirection: 'row', alignItems: 'center' },
   eqPlus: {
-    marginHorizontal: 10,
+    marginHorizontal: 6,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.heading,
     color: colors.niebla,
@@ -2280,9 +2427,9 @@ const styles = StyleSheet.create({
   eqChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    gap: 7,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
@@ -2291,62 +2438,98 @@ const styles = StyleSheet.create({
   eqDot: { width: 8, height: 8, borderRadius: 4 },
   eqChipText: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-  },
-  heroHeadline: {
-    marginTop: 16,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.headingLg,
-    lineHeight: 27,
-    color: colors.leche,
-  },
-  weekSummary: {
-    marginTop: 20,
-    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.bone,
+    color: colors.leche,
   },
-  heroDots: {
-    marginTop: 20,
-    gap: 12,
+  eqChipGold: { borderColor: colors.oroSoft },
+  eqChipTextGold: { color: colors.oroLight },
+  proof: {
+    marginTop: 22,
+    gap: 14,
   },
-  barsTitle: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-    marginBottom: 2,
-  },
-  hbRow: { gap: 7 },
-  hbHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  hbDots: { flexDirection: 'row', gap: 3, width: 20 },
-  hbDot: { width: 8, height: 8, borderRadius: 4 },
-  hbDotNone: { borderWidth: 1, borderColor: colors.bruma },
-  hbLabel: {
-    flex: 1,
+  proofRow: { gap: 8 },
+  proofLabel: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  hbLabelStrong: { color: colors.leche },
-  hbCount: {
+  proofLabelStrong: { color: colors.leche },
+  proofDotsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  proofDots: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  proofDiamond: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: colors.bruma,
+    transform: [{ rotate: '45deg' }],
+  },
+  proofDiamondOn: { backgroundColor: colors.oroSoft, borderColor: colors.oroSoft },
+  proofCount: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.body,
     color: colors.niebla,
     fontVariant: ['tabular-nums'],
   },
-  hbTrack: {
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.hairline,
-    overflow: 'hidden',
+  proofNote: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
-  hbFill: { height: '100%', borderRadius: 5 },
-  // "Otros días" llenos: claros contra los vacíos, sin llegar al oro.
-  // El conteo pegado a sus puntos: se lee como parte de la fila.
+  proofLine: {
+    marginTop: 16,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+    fontVariant: ['tabular-nums'],
+  },
+  proofLineGold: { color: colors.oroSoft },
+  week: {
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    gap: 12,
+  },
+  weekTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: colors.niebla,
+  },
+  weekMeter: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  weekStars: { flexDirection: 'row', gap: 6 },
+  weekStar: { fontSize: typography.sizes.displaySm, lineHeight: 28, color: colors.bruma },
+  weekStarOn: { color: colors.oroLight },
+  weekText: { flex: 1, gap: 2 },
+  weekCount: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  weekNote: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 18,
+    color: colors.bone,
+  },
+  weekNoteReached: { color: colors.oroLight },
+  todayRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 14 },
+  todayLabel: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  todayItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  todayDot: { width: 8, height: 8, borderRadius: 4 },
+  todayText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
+  },
+  todayTextOn: { color: colors.leche },
   heroAsk: {
     marginTop: 18,
     gap: 10,
@@ -2779,27 +2962,17 @@ const styles = StyleSheet.create({
   },
   // Siluetas de descubrimiento — bloqueado-pero-visible: estrellas tenues
   // sin encender, mismo lenguaje que los días sin datos del calendario.
-  patternSilhouettes: {
-    marginTop: 14,
-    gap: 10,
-  },
-  patternSilhouetteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  patternSilhouetteStar: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    borderWidth: 1,
-    borderColor: colors.bone,
-    opacity: 0.45,
-  },
-  patternSilhouetteText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
+  ghostEq: { marginTop: 16, marginBottom: 14, opacity: 0.55 },
+  ghostChip: { borderStyle: 'dashed', backgroundColor: 'transparent' },
+  ghostDot: { borderWidth: 1, borderColor: colors.bruma },
+  ghostText: { color: colors.niebla },
+  seesTitle: {
+    marginTop: 18,
+    marginBottom: 10,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
     color: colors.niebla,
   },
   patternsEmptyHorizon: {
