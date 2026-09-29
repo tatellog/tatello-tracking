@@ -84,6 +84,44 @@ export async function isHealthKitAvailable(): Promise<boolean> {
   }
 }
 
+/* Background delivery: lo que Hoy muestra y llega tarde (el sueño que Garmin
+ * Connect escribe al sincronizar, los entrenos). Pasos y agua no: cambian a
+ * cada rato y despertarían la app de más; se leen al abrir. */
+const BACKGROUND_TYPES = ['HKCategoryTypeIdentifierSleepAnalysis', 'HKWorkoutTypeIdentifier']
+/** HKUpdateFrequency.immediate (el enum de la lib no se importa en frío). */
+const UPDATE_IMMEDIATE = 1
+
+/**
+ * Pide a iOS que despierte la app cuando Salud reciba sueño o entrenos nuevos.
+ * Los tipos quedan persistidos del lado nativo: en cada arranque (también en
+ * segundo plano) el AppDelegate re-registra los observers solo
+ * (plugins/with-healthkit-background-observers.js). Best-effort: iOS decide
+ * cuándo despierta; el sync al abrir sigue siendo el respaldo.
+ */
+export async function enableHealthBackgroundDelivery(): Promise<boolean> {
+  const mod = await hk()
+  if (!mod) return false
+  try {
+    return await mod.configureBackgroundTypes(
+      BACKGROUND_TYPES,
+      UPDATE_IMMEDIATE as Parameters<HealthKitModule['configureBackgroundTypes']>[1],
+    )
+  } catch {
+    return false
+  }
+}
+
+/** Deja de despertar la app (al desconectar el reloj). */
+export async function disableHealthBackgroundDelivery(): Promise<void> {
+  const mod = await hk()
+  if (!mod) return
+  try {
+    await mod.clearBackgroundTypes()
+  } catch {
+    // Sin módulo o sin configuración previa: nada que apagar.
+  }
+}
+
 /**
  * Dispara el prompt de permisos del OS (solo lectura, solo READ_TYPES).
  * OJO honestidad de iOS: que resuelva true NO significa que concedió — Apple
