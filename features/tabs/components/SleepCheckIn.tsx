@@ -40,6 +40,8 @@ type Props = {
   onClose: (touched: boolean) => void
   /** Modo "ver día": la línea dice "esa noche", no "anoche". */
   past?: boolean
+  /** Tocar la línea respondida abre el detalle de la noche (Tu sueño). */
+  onDetail?: () => void
 }
 
 const LAYOUT = LinearTransition.duration(220)
@@ -55,6 +57,7 @@ export function SleepCheckIn({
   onOpen,
   onClose,
   past = false,
+  onDetail,
 }: Props) {
   const { data: log } = useSleepLog(date)
   const upsert = useUpsertSleep(date)
@@ -153,12 +156,24 @@ export function SleepCheckIn({
         exiting={fadeOut}
         style={styles.confirmedRow}
       >
-        <MoonGlyph color={colors.magenta} />
-        <View style={styles.confirmedLead}>
-          <Text style={styles.confirmedText}>
-            {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
-          </Text>
-          {fromWatch ? <WatchMark past={past} /> : null}
+        <View style={styles.detailWrap}>
+          <Pressable
+            onPress={onDetail}
+            disabled={!onDetail}
+            hitSlop={{ top: 10, bottom: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${sleepAnsweredText(minutes, { manual: !fromWatch, past })}. Ver el detalle de la noche.`}
+            style={({ pressed }) => [styles.detailTap, pressed && styles.detailPressed]}
+          >
+            <MoonGlyph color={colors.magenta} />
+            <View style={styles.confirmedLead}>
+              <Text style={styles.confirmedText}>
+                {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
+              </Text>
+              {fromWatch ? <WatchMark past={past} /> : null}
+              {onDetail ? <Text style={styles.detailChevron}>›</Text> : null}
+            </View>
+          </Pressable>
         </View>
         {/* Del reloj, la puerta es el "ajustar" de la fila del día. */}
         {fromWatch ? null : (
@@ -338,6 +353,16 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
     marginLeft: 2,
+  },
+  // Pressable no toma flex bien en este setup: el ancho vive en el wrapper.
+  detailWrap: { flex: 1 },
+  detailTap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailPressed: { opacity: 0.7 },
+  detailChevron: {
+    marginLeft: 8,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.niebla,
   },
   confirmedLead: {
     flex: 1,

@@ -53,6 +53,7 @@ import {
 import { showActionSheet } from '@/lib/actionSheet'
 import { useDaySignals, useTodaySignals } from '@/features/orbit/hooks'
 import { useActiveLogDate } from '@/features/tabs/active-log-date'
+import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import { wearableDayFacts } from '@/features/wearables/recovery'
 import { emitMealUndo } from '@/features/tabs/undo-meal-bus'
 import { todayInTimezone } from '@/lib/time'
@@ -784,9 +785,12 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       accessibilityLabel={`Agua desde tu reloj, ${glasses} vasos. Toca para ajustar`}
                       style={styles.waterCollapsedRow}
                     >
-                      <Text style={styles.waterCollapsedText}>
-                        {glasses} {glasses === 1 ? 'vaso' : 'vasos'} · desde tu reloj
-                      </Text>
+                      <View style={styles.waterCollapsedSource}>
+                        <WatchGlyph color={colors.niebla} size={13} />
+                        <Text style={styles.waterCollapsedText}>
+                          {glasses} {glasses === 1 ? 'vaso' : 'vasos'} · desde tu reloj
+                        </Text>
+                      </View>
                       <Text style={styles.waterCaptionEdit}>ajustar ›</Text>
                     </Pressable>
                   ) : (
@@ -817,7 +821,10 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                   {/* Procedencia sutil (spec §9): los vasitos llenos vinieron de
                       Salud; se retira en cuanto ella toca uno (manual gana). */}
                   {!editingGoal && waterFromWatch && waterAdjust ? (
-                    <Text style={styles.waterFromWatchNote}>desde tu reloj</Text>
+                    <View style={styles.waterFromWatchRow}>
+                      <WatchGlyph color={colors.niebla} size={11} />
+                      <Text style={styles.waterFromWatchNote}>desde tu reloj</Text>
+                    </View>
                   ) : null}
                   {/* El aporte de comidas: los vasitos rosa de arriba. Esta línea
                       lo nombra (mismo conteo redondeado que los vasitos). */}
@@ -1215,8 +1222,9 @@ const styles = StyleSheet.create({
     color: colors.leche,
   },
   // "desde tu reloj" — capa meta en niebla, junto al dato (spec wearables §5).
+  waterFromWatchRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  waterCollapsedSource: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   waterFromWatchNote: {
-    marginTop: 8,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.micro,
     letterSpacing: 0.3,

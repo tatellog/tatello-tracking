@@ -34,6 +34,11 @@ export type WearableSleepRow = {
   bedtime_at: string | null
   wake_at: string | null
   asleep_minutes: number
+  /** Etapas de la noche; null = la fuente no las dio (solo "dormida"). */
+  deep_minutes: number | null
+  core_minutes: number | null
+  rem_minutes: number | null
+  awake_minutes: number | null
 }
 
 export type WearableStepsRow = {
@@ -158,45 +163,123 @@ export function normalizeWorkout(w: RawWorkout, source: WearableSource): Wearabl
   }
 }
 
+/**
+ * Salud puede guardar el MISMO entreno varias veces con UUIDs distintos (Garmin
+ * Connect lo reescribe al re-sincronizar). Mismo inicio + tipo + duración = el
+ * mismo entreno: se queda uno (el de UUID menor, estable entre syncs) para no
+ * triplicar minutos ni kcal en daily_signals.
+ */
+export function dedupeWorkouts(rows: readonly WearableWorkoutRow[]): WearableWorkoutRow[] {
+  const byKey = new Map<string, WearableWorkoutRow>()
+  for (const r of rows) {
+    const key = `${r.started_at}|${r.workout_type ?? ''}|${r.duration_min ?? ''}`
+    const prev = byKey.get(key)
+    if (!prev || r.external_id < prev.external_id) byKey.set(key, r)
+  }
+  return [...byKey.values()]
+}
+
+/** Intervalo normal entre syncs (cada foreground no es cada minuto). */
+export const SYNC_INTERVAL_MS = 15 * 60 * 1000
+/** En la mañana, mientras el sueño de anoche no llega, se re-consulta seguido. */
+export const SYNC_INTERVAL_WAITING_SLEEP_MS = 2 * 60 * 1000
+/** Hasta qué hora local se espera el sueño de anoche. */
+const SLEEP_WAIT_UNTIL_HOUR = 14
+
+/**
+ * Cuánto esperar entre syncs. Si es de mañana y el sueño de hoy (la noche que
+ * terminó hoy) aún no aterrizó, el reloj suele estar por sincronizar: 2 min.
+ */
+export function syncIntervalMs(opts: {
+  localHour: number
+  today: string
+  lastSleepDay: string | null
+}): number {
+  const waitingSleep = opts.localHour < SLEEP_WAIT_UNTIL_HOUR && opts.lastSleepDay !== opts.today
+  return waitingSleep ? SYNC_INTERVAL_WAITING_SLEEP_MS : SYNC_INTERVAL_MS
+}
+
 /* Etapas que cuentan como DORMIDA: asleepUnspecified(1), core(3), deep(4),
  * REM(5). inBed(0) y awake(2) quedan fuera — el error clásico que infla. */
 const ASLEEP_VALUES = new Set([1, 3, 4, 5])
+const HK_AWAKE = 2
+const HK_CORE = 3
+const HK_DEEP = 4
+const HK_REM = 5
+
+type NightAgg = {
+  minutes: number
+  deep: number
+  core: number
+  rem: number
+  bed: Date
+  wake: Date
+}
 
 /**
  * Muestras de etapas de sueño → una fila por DÍA EN QUE DESPERTÓ (día local
  * del fin de cada etapa). `external_id` es estable por día (`sleep-<fecha>`):
  * cada re-sync upserta la misma fila y la noche se completa sola aunque el
  * dato llegue tarde (backfill solo suma, spec §2).
+ *
+ * Etapas: profundo/ligero/REM salen de las muestras dormidas; "despierta" son
+ * las muestras awake recortadas a la ventana de la noche (dormir → despertar),
+ * para no contar el día. Si la fuente solo dio "dormida" sin etapas, las
+ * cuatro quedan null (la pantalla lo dice en vez de inventar).
  */
 export function sleepSamplesToRows(
   samples: readonly RawSleepSample[],
   tz: string,
   source: WearableSource,
 ): WearableSleepRow[] {
-  const byDay = new Map<string, { minutes: number; bed: Date; wake: Date }>()
+  const byDay = new Map<string, NightAgg>()
   for (const s of samples) {
     if (!ASLEEP_VALUES.has(s.value)) continue
     const ms = s.end.getTime() - s.start.getTime()
     if (ms <= 0) continue
+    const min = ms / 60000
     const day = dayInTimezone(s.end, tz)
-    const prev = byDay.get(day)
-    if (prev) {
-      prev.minutes += ms / 60000
-      if (s.start < prev.bed) prev.bed = s.start
-      if (s.end > prev.wake) prev.wake = s.end
-    } else {
-      byDay.set(day, { minutes: ms / 60000, bed: s.start, wake: s.end })
+    let agg = byDay.get(day)
+    if (!agg) {
+      agg = { minutes: 0, deep: 0, core: 0, rem: 0, bed: s.start, wake: s.end }
+      byDay.set(day, agg)
     }
+    agg.minutes += min
+    if (s.value === HK_DEEP) agg.deep += min
+    else if (s.value === HK_CORE) agg.core += min
+    else if (s.value === HK_REM) agg.rem += min
+    if (s.start < agg.bed) agg.bed = s.start
+    if (s.end > agg.wake) agg.wake = s.end
   }
+
+  const awakeByDay = new Map<string, number>()
+  for (const s of samples) {
+    if (s.value !== HK_AWAKE) continue
+    const day = dayInTimezone(s.end, tz)
+    const agg = byDay.get(day)
+    if (!agg) continue
+    const from = Math.max(s.start.getTime(), agg.bed.getTime())
+    const to = Math.min(s.end.getTime(), agg.wake.getTime())
+    if (to > from) awakeByDay.set(day, (awakeByDay.get(day) ?? 0) + (to - from) / 60000)
+  }
+
+  const mins = (x: number) => clamp(Math.round(x), 0, 1440)
   return [...byDay.entries()]
-    .map(([day, agg]) => ({
-      source,
-      external_id: `sleep-${day}`,
-      sleep_date: day,
-      bedtime_at: agg.bed.toISOString(),
-      wake_at: agg.wake.toISOString(),
-      asleep_minutes: clamp(Math.round(agg.minutes), 0, 1440),
-    }))
+    .map(([day, agg]) => {
+      const staged = agg.deep + agg.core + agg.rem > 0
+      return {
+        source,
+        external_id: `sleep-${day}`,
+        sleep_date: day,
+        bedtime_at: agg.bed.toISOString(),
+        wake_at: agg.wake.toISOString(),
+        asleep_minutes: mins(agg.minutes),
+        deep_minutes: staged ? mins(agg.deep) : null,
+        core_minutes: staged ? mins(agg.core) : null,
+        rem_minutes: staged ? mins(agg.rem) : null,
+        awake_minutes: staged ? mins(awakeByDay.get(day) ?? 0) : null,
+      }
+    })
     .filter((r) => r.asleep_minutes > 0)
     .sort((a, b) => a.sleep_date.localeCompare(b.sleep_date))
 }

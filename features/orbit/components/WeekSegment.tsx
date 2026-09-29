@@ -18,6 +18,7 @@ import { useMacroTargets } from '@/features/macros/hooks'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
 import { colors, typography } from '@/theme'
+import { WatchMark } from '@/features/wearables/components/WatchMark'
 
 import { WEEK_BASELINE_COPY, weekBaselineObservations } from '../baseline'
 import { useIsoWeekSignals, useSignalsHistory } from '../hooks'
@@ -439,9 +440,12 @@ export function WeekSegment({
                     ? `Tus días de más movimiento: ${steps.topDays.join(' y ')}.`
                     : 'Tu movimiento fue parejo esta semana.'}
                 </Text>
-                <Text style={styles.stepsMeta}>
-                  {`Promedio ${steps.avgSteps.toLocaleString('es-MX')} pasos al día · tu reloj`}
-                </Text>
+                <View style={styles.stepsMetaRow}>
+                  <WatchMark inline={false} size={12} />
+                  <Text style={styles.stepsMeta}>
+                    {`Promedio ${steps.avgSteps.toLocaleString('es-MX')} pasos al día · tu reloj`}
+                  </Text>
+                </View>
               </Animated.View>
             </View>
           ) : null}
@@ -1215,12 +1219,12 @@ const styles = StyleSheet.create({
     lineHeight: typography.sizes.bodyLarge * 1.5,
   },
   // El promedio de pasos como evidencia + procedencia, capa meta en niebla.
+  stepsMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 },
   stepsMeta: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
     letterSpacing: 0.3,
     color: colors.niebla,
-    marginTop: -4,
   },
   // La palanca (§8) es recomendación de coach → serif italic, cálida.
   leverText: {

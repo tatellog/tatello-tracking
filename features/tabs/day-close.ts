@@ -57,10 +57,13 @@ export function dayCloseVerdict(input: {
  * sin lenguaje clínico. (Pasa por voice-and-copy.)
  */
 export function dayCloseCopy(v: DayCloseVerdict): { data: string; coach: string } {
-  const data = `Hoy comiste ${v.consumed.toLocaleString('es-MX')} de tus ${v.target.toLocaleString('es-MX')} kcal.`
+  // "1,451 kcal · meta 1,419": se lee de un vistazo. "Hoy comiste 1,451 de tus
+  // 1,419" obligaba a restar y "de tus" sonaba a que aún faltaba (28 sep 2026).
+  const data = `${v.consumed.toLocaleString('es-MX')} kcal · meta ${v.target.toLocaleString('es-MX')}`
   switch (v.kind) {
     case 'deficit':
-      return { data, coach: 'Día en déficit. Uno más dorado para tu cielo.' }
+      // El oro ya dice "déficit": el coach no lo repite.
+      return { data, coach: 'Uno más dorado para tu cielo.' }
     case 'surplus':
       // Nunca "te pasaste": el cuerpo pidió más y mañana sigue el cielo.
       return { data, coach: 'Hoy tu cuerpo pidió más. Mañana el cielo sigue aquí.' }

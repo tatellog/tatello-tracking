@@ -25,11 +25,14 @@ export function CenterNumberOverlay({
   plusOne,
   initialCount,
   target = TARGET_DAYS,
+  signTitle,
 }: {
   displayedCount: SharedValue<number>
   numberPulse: SharedValue<number>
   plusOne: SharedValue<number>
   initialCount: number
+  /** "Escorpio" — para la píldora "Ver tu Escorpio ›". */
+  signTitle?: string
   /** Final-stretch flag — last 3 days before completion. Switches
    *  the chip to a celebratory state (extra microcopy + warmer
    *  tone) so the user sees they're almost there. */
@@ -76,6 +79,24 @@ export function CenterNumberOverlay({
       </View>
     )
   }
+  // Figura completa (dueña 28 sep 2026): "19 de 19 · +9 luz extra" era una
+  // fracción rara. Se dice lo que mide, en días, y una píldora que SÍ se lee
+  // como botón abre "Tu {signo}".
+  if (initialCount >= target && target > 0) {
+    return (
+      <View style={styles.numberOverlay} pointerEvents="none">
+        <Text style={styles.daysLine}>
+          <Text style={styles.daysNum}>{initialCount}</Text>
+          {` días registrados en ${MONTH_NAMES[new Date().getMonth()]}`}
+        </Text>
+        {signTitle ? (
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>{`Ver tu ${signTitle} ›`}</Text>
+          </View>
+        ) : null}
+      </View>
+    )
+  }
   return (
     <View style={styles.numberOverlay} pointerEvents="none">
       <Animated.View style={[styles.numberRow, pulseStyle]}>
@@ -88,8 +109,13 @@ export function CenterNumberOverlay({
         />
         {/* Una sola línea de dato en Hanken; el chevron ES el affordance del
             tap al modal (antes había una pista aparte "toca para ver"). */}
-        <Text style={styles.numberDenominator}>de {target} luces ›</Text>
+        <Text style={styles.numberDenominator}>de {target} estrellas</Text>
       </Animated.View>
+      {signTitle ? (
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>{`Ver tu ${signTitle} ›`}</Text>
+        </View>
+      ) : null}
       <Animated.View style={[styles.plusOne, ghostStyle]} pointerEvents="none">
         <Text style={styles.plusOneText}>+1</Text>
       </Animated.View>
@@ -97,7 +123,48 @@ export function CenterNumberOverlay({
   )
 }
 
+const MONTH_NAMES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+]
+
 const styles = StyleSheet.create({
+  daysLine: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+    textAlign: 'center',
+  },
+  daysNum: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.displaySm,
+    color: colors.leche,
+  },
+  // Píldora con borde: se lee como botón (antes un "›" diminuto).
+  pill: {
+    marginTop: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+  },
+  pillText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+    letterSpacing: 0.3,
+  },
   // Footer container — sits directly below the SVG canvas so the
   // chip lives in its own row, never overlapping the constellation.
   numberOverlay: {

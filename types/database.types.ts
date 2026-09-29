@@ -1167,6 +1167,10 @@ export type Database = {
       }
       wearable_sleep: {
         Row: {
+          awake_minutes: number | null
+          core_minutes: number | null
+          deep_minutes: number | null
+          rem_minutes: number | null
           asleep_minutes: number
           bedtime_at: string | null
           created_at: string
@@ -1179,6 +1183,10 @@ export type Database = {
           wake_at: string | null
         }
         Insert: {
+          awake_minutes?: number | null
+          core_minutes?: number | null
+          deep_minutes?: number | null
+          rem_minutes?: number | null
           asleep_minutes: number
           bedtime_at?: string | null
           created_at?: string
@@ -1191,6 +1199,10 @@ export type Database = {
           wake_at?: string | null
         }
         Update: {
+          awake_minutes?: number | null
+          core_minutes?: number | null
+          deep_minutes?: number | null
+          rem_minutes?: number | null
           asleep_minutes?: number
           bedtime_at?: string | null
           created_at?: string

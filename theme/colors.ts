@@ -113,6 +113,14 @@ export const colors = {
     agua: '#8FBEDB', // azul cielo calmado — menos neón que el cian previo
     entreno: '#FF9E57', // naranja movimiento — antes copiado como hex en Semana/Mes
   },
+  // Etapas de la noche (detalle de sueño): la familia índigo de `sueno`, de
+  // más a menos profunda; "despierta" en hueso tenue (no es error, es la noche).
+  sleepStage: {
+    deep: '#5E6FE0',
+    core: '#9AA8FF',
+    rem: '#C18FFF',
+    awake: 'rgba(201, 184, 165, 0.45)',
+  },
 
   // (Los alias legacy Pearl Mauve se migraron y eliminaron el 5 jul 2026:
   // una paleta cerrada con puerta trasera deprecated no está cerrada.)

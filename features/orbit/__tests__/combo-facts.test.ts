@@ -9,7 +9,11 @@ import {
   comboOpening,
   comboWeek,
   comboWeekDots,
-  comboWeekSummary,
+  comboDayCards,
+  comboKcalGap,
+  comboToday,
+  fmtKcalDelta,
+  comboWeekMeter,
   comboWeekHook,
   comboWeekLine,
   evidenceDots,
@@ -116,7 +120,7 @@ describe('lo fijo del chat', () => {
     expect(comboOpening(combo)).toEqual([
       'Tu patrón más repetido: dormir 7 horas o más y entrenar el mismo día.',
       'Pasó 11 días entre el 3 ago y el 24 sep. En 7 cerraste en déficit.',
-      'Tus días sin los dos: 9 de 30 en déficit.',
+      'Tus demás días: 9 de 30 en déficit.',
     ])
   })
 
@@ -138,7 +142,7 @@ describe('comboWeek', () => {
 
   it('las líneas de estado no culpan y dicen lo que falta', () => {
     expect(comboWeekLine({ done: 1, typical: 3, daysLeft: 4, state: 'onTrack' })).toBe(
-      'Esta semana van 1 de 3. Quedan 4 días.',
+      'Esta semana van 1 de 3.',
     )
     expect(comboWeekLine({ done: 3, typical: 3, daysLeft: 2, state: 'reached' })).toContain(
       'lo que suelen tener tus mejores semanas',
@@ -150,6 +154,20 @@ describe('comboWeek', () => {
       'Esta semana ya lo juntaste 2 veces.',
     )
     expect(comboWeekLine(null)).toBeNull()
+  })
+
+  it('nunca cuenta los días que quedan', () => {
+    for (const state of ['onTrack', 'short', 'noRef'] as const) {
+      for (const done of [0, 1]) {
+        const line = comboWeekLine({
+          done,
+          typical: state === 'noRef' ? null : 3,
+          daysLeft: 4,
+          state,
+        })
+        expect(line ?? '').not.toMatch(/quedan/i)
+      }
+    }
   })
 })
 
@@ -184,7 +202,7 @@ describe('la tarjeta del patrón', () => {
     expect(comboLift({ ...c, deficits: 6 })).toBe('el doble') // 0.75 / 0.33
     expect(comboLift({ ...c, restDeficits: 5 })).toBe('más seguido')
     expect(comboLift({ ...c, restDeficits: 0 })).toBe('mucho más seguido')
-    expect(comboGroupLabel(c)).toBe('Con los dos')
+    expect(comboGroupLabel(c)).toBe('Con sueño de 7 h y entreno')
   })
 
   it('los puntos son un día cada uno; con muchos días se escalan', () => {
@@ -245,7 +263,47 @@ describe('la tarjeta visual', () => {
   })
 })
 
-describe('la semana con palabras', () => {
+describe('la semana como medidor', () => {
+  it('en camino: estrellas contra tus mejores semanas, sin abrir con 0', () => {
+    expect(comboWeekMeter({ done: 0, typical: 2, daysLeft: 5, state: 'onTrack' })).toEqual({
+      stars: [false, false],
+      count: null,
+      note: 'Tus mejores semanas lo juntan 2 veces.',
+      reached: false,
+    })
+    expect(comboWeekMeter({ done: 1, typical: 2, daysLeft: 5, state: 'onTrack' })).toEqual({
+      stars: [true, false],
+      count: '1 de 2',
+      note: 'Con uno más, igualas tus mejores semanas.',
+      reached: false,
+    })
+  })
+  it('cumplida va en oro y no sube la vara', () => {
+    const m = comboWeekMeter({ done: 3, typical: 2, daysLeft: 2, state: 'reached' })!
+    expect(m.reached).toBe(true)
+    expect(m.stars).toEqual([true, true, true])
+    expect(m.note).toBe('Ya es una de tus mejores semanas.')
+  })
+  it('si ya no alcanza, suma sin culpa', () => {
+    expect(comboWeekMeter({ done: 0, typical: 3, daysLeft: 1, state: 'short' })!.note).toBe(
+      'Cada día que lo juntes suma.',
+    )
+  })
+  it('sin referencia: solo lo encendido, sin meta', () => {
+    expect(comboWeekMeter({ done: 2, typical: null, daysLeft: 3, state: 'noRef' })).toEqual({
+      stars: [true, true],
+      count: null,
+      note: '2 veces esta semana',
+      reached: false,
+    })
+    expect(comboWeekMeter({ done: 0, typical: null, daysLeft: 3, state: 'noRef' })!.stars).toEqual(
+      [],
+    )
+    expect(comboWeekMeter(null)).toBeNull()
+  })
+})
+
+describe('comboToday', () => {
   const combo = {
     signals: [
       { key: 'sueno', label: 'Sueño' },
@@ -257,15 +315,76 @@ describe('la semana con palabras', () => {
     restDays: 9,
     restDeficits: 3,
   }
-  it('dice qué cuenta y contra qué', () => {
-    expect(comboWeekSummary({ done: 1, typical: 3, daysLeft: 3, state: 'onTrack' }, combo)).toBe(
-      'Esta semana: 1 día con los dos · tus mejores semanas, 3',
+  it('enciende lo que ya pasó hoy, en el orden del combo', () => {
+    const sigs = [mkSig(TODAY, { sleep_minutes: 450, trained: false })]
+    expect(comboToday(sigs, combo, OPTS, TODAY)).toEqual([
+      { key: 'sueno', status: 'on', value: '7 h 30', fromWatch: false },
+      { key: 'cuerpo', status: 'open', value: null, fromWatch: false },
+    ])
+  })
+  it('descanso no es ✓ ni pendiente; una noche corta ya registrada queda cerrada', () => {
+    const sigs = [mkSig(TODAY, { sleep_minutes: 370, trained: false, rested: true })]
+    expect(comboToday(sigs, combo, OPTS, TODAY)).toEqual([
+      { key: 'sueno', status: 'closed', value: '6 h 10', fromWatch: false },
+      { key: 'cuerpo', status: 'rest', value: 'Descanso', fromWatch: false },
+    ])
+  })
+  it('sin registro de hoy, todo apagado', () => {
+    expect(comboToday([], combo, OPTS, TODAY).every((h) => h.status === 'open')).toBe(true)
+  })
+})
+
+describe('tu día fuerte', () => {
+  const signals = month()
+  const combo = winningCombo(signals, OPTS)!
+
+  it('el reloj marca lo que encendió', () => {
+    const sigs = [
+      mkSig(TODAY, {
+        sleep_minutes: 450,
+        sleep_source: 'wearable',
+        trained: true,
+        workout_source: 'manual',
+      }),
+    ]
+    expect(comboToday(sigs, combo, OPTS, TODAY).map((h) => [h.key, h.fromWatch])).toEqual(
+      combo.signals.map((s) => [s.key, s.key === 'sueno']),
     )
-    expect(comboWeekSummary({ done: 2, typical: null, daysLeft: 3, state: 'noRef' }, combo)).toBe(
-      'Esta semana: 2 días con los dos',
+  })
+
+  it('la prueba en kcal: el patrón queda más abajo de la meta que el resto', () => {
+    const gap = comboKcalGap(signals, combo, OPTS)!
+    expect(gap.withAvg).toBeLessThan(gap.restAvg)
+    expect(Math.abs(gap.withAvg % 10)).toBe(0)
+  })
+
+  it('nunca publica una prueba que desmiente el patrón', () => {
+    // Los días sin el patrón quedan MÁS abajo: la comparación no nace.
+    const flipped = signals.map((s) =>
+      comboToday([s], combo, OPTS, s.day!).every((h) => h.status === 'on')
+        ? { ...s, calories: 2400 }
+        : s,
     )
-    expect(
-      comboWeekSummary({ done: 0, typical: null, daysLeft: 3, state: 'noRef' }, combo),
-    ).toBeNull()
+    expect(comboKcalGap(flipped, combo, OPTS)).toBeNull()
+  })
+
+  it('sin meta o sin muestra no hay comparación', () => {
+    expect(comboKcalGap(signals, combo, {})).toBeNull()
+    expect(comboKcalGap(signals.slice(0, 6), combo, OPTS)).toBeNull()
+  })
+
+  it('tus días reales, el más reciente primero', () => {
+    const cards = comboDayCards(signals, combo, OPTS, 3)
+    expect(cards).toHaveLength(3)
+    expect(cards[0]!.day > cards[1]!.day).toBe(true)
+    expect(cards[0]!.workout).toBe('Entreno')
+    expect(typeof cards[0]!.deficit).toBe('boolean')
+    expect(cards[0]!.label).toMatch(/^(lun|mar|mié|jue|vie|sáb|dom) \d{1,2}$/)
+  })
+
+  it('formatea el delta con signo tipográfico', () => {
+    expect(fmtKcalDelta(-1310)).toBe('−1,310 kcal')
+    expect(fmtKcalDelta(80)).toBe('+80 kcal')
+    expect(fmtKcalDelta(0)).toBe('0 kcal')
   })
 })

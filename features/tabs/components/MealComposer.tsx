@@ -184,7 +184,7 @@ function StarPreview({ progress, valid }: { progress: number; valid: boolean }) 
  * Editar una comida del día vive en la lista del día (DayMealList).
  */
 export function MealComposer() {
-  const { data: foods } = useFrequentMeals(HISTORY_LIMIT)
+  const { data: foods, isLoading: foodsLoading } = useFrequentMeals(HISTORY_LIMIT)
   const createMeal = useCreateMeal()
   const router = useRouter()
   const searchRef = useRef<TextInput>(null)
@@ -208,7 +208,10 @@ export function MealComposer() {
   // prioriza coincidencias por prefijo.
   const history = useMemo(() => {
     const all = [...(foods ?? [])]
-    if (!q) return all.sort((a, b) => b.freq - a.freq)
+    // "Frecuente" = la repetiste al menos 2 veces (28 sep 2026: con una sola
+    // vez, la lista repetía tal cual las comidas de hoy). Al buscar, todo el
+    // historial sigue disponible.
+    if (!q) return all.filter((f) => f.freq >= 2).sort((a, b) => b.freq - a.freq)
     return all
       .filter((f) => f.name.toLowerCase().includes(q))
       .sort((a, b) => {
@@ -652,11 +655,13 @@ export function MealComposer() {
           />
         ))}
 
-        {history.length === 0 ? (
+        {/* Mientras carga no se dice "aparecerá aquí": parpadeaba el estado
+            vacío aunque ya hubiera comidas. */}
+        {history.length === 0 && !foodsLoading ? (
           <Text style={styles.emptyHint}>
             {composing
               ? 'Nada con ese nombre, créala arriba.'
-              : 'La comida que registres aparecerá aquí.'}
+              : 'Lo que repitas seguido aparecerá aquí, para sumarlo en un toque.'}
           </Text>
         ) : null}
       </View>

@@ -277,7 +277,7 @@ function ProgressBody() {
               {/* A · el antojo: Historia delega la evolución completa a Cuerpo
                   (un solo hogar para la tira — nunca duplicarla aquí). */}
               <LinkCta
-                label="Ver tu evolución completa →"
+                label="Ver tu evolución completa ›"
                 onPress={goBody}
                 accessibilityLabel="Ver tu evolución completa"
                 style={styles.bridgeLink}
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 100,
+    paddingBottom: 140,
   },
   hero: {
     paddingTop: 6,

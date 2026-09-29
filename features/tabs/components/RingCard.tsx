@@ -80,7 +80,8 @@ export function RingCard({
         <EyebrowLabel tone="magenta" size={11} tracking={3}>
           {label}
         </EyebrowLabel>
-        {onPress ? <Text style={styles.editHint}>Ajustar ›</Text> : null}
+        {/* Sin "Ajustar ›" por tarjeta: la tarjeta entera abre el editor
+            (tres "ajustar" en Hoy eran ruido). */}
       </View>
       <View style={styles.row}>
         {speedometer ? (
@@ -112,7 +113,18 @@ export function RingCard({
           </Text>
           {/* La meta vive JUNTO al número ("62 / 135 g"), no separada abajo.
               En vacío no se muestra aquí: el prompt va abajo, centrado. */}
-          {isEmpty ? null : <Text style={styles.subtitle}>{unitSuffix}</Text>}
+          {/* Una sola línea: "/ 135 g" se partía en dos ("/ 135" y "g") en
+              tarjetas angostas. Se encoge antes de romperse. */}
+          {isEmpty ? null : (
+            <Text
+              style={styles.subtitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {unitSuffix}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -160,15 +172,10 @@ const styles = StyleSheet.create({
   },
   // Única pista de edición visible (el chip de enfoque ya no es tocable):
   // sube de niebla → bone + medium para que se lea, sin gritar.
-  editHint: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.caption,
-    color: colors.bone,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
     minWidth: 0,
   },
   numberStack: {

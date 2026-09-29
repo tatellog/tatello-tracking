@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dimensions,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -20,8 +21,9 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
 import { BlurView } from 'expo-blur'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useIsFocused } from '@react-navigation/native'
+import * as Haptics from 'expo-haptics'
+import { useRouter } from 'expo-router'
 
 import { colors, typography } from '@/theme'
 
@@ -35,7 +37,11 @@ import { signName, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
-import { todayInTimezone } from '@/lib/time'
+import { todayInTimezone, userTimezone } from '@/lib/time'
+import { WatchMark } from '@/features/wearables/components/WatchMark'
+import { formatSleepShort } from '@/features/wearables/recovery'
+import { useWearableSleepNights } from '@/features/wearables/hooks'
+import { addDaysIso } from '@/features/wearables/sleep-detail'
 import { AiCta } from '@/components/AiCta'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail } from '@/lib/featureFlags'
@@ -71,18 +77,23 @@ import {
   comboFocus,
   comboHabitList,
   comboOpening,
+  comboDayCards,
   comboGroupLabel,
-  comboHeadline,
+  comboKcalGap,
+  comboToday,
   comboWeek,
-  comboLiftBadge,
-  comboWithoutLabel,
-  comboWeekSummary,
   comboWeekLine,
-  evidenceDots,
+  comboWeekMeter,
+  fmtKcalDelta,
+  type ComboDayCard,
+  type ComboKcalGap,
+  type ComboTodayHabit,
+  type ComboWeekMeter,
 } from '../combo-facts'
 import { useComboTranscript } from '../combo-transcript'
 import { comboKey, combosBornRecently } from '../combo-memory'
 import { useSeenCombos } from '../combo-seen'
+import { bedtimeOffsetMinutes } from '../bedtime'
 import { rankSurprises, type Surprise } from '../surprise'
 import { NotifyOfferSheet } from '@/features/notifications/components/NotifyOfferSheet'
 import { useNotifyOffer } from '@/features/notifications/offer'
@@ -307,16 +318,29 @@ export function MonthSegment({
   // "Lo que no sabías" (etapa 3+): el ranker de sorpresa elige UN protagonista;
   // lo esperado (el combo sueño + entreno) baja a "Lo que te sostiene".
   const surpriseTargets = useMacroTargets().data
-  const surprises = useMemo(
-    () =>
-      maturity.stage >= 3
-        ? rankSurprises(patternSignals, {
-            calorieTarget: surpriseTargets?.calories ?? null,
-            proteinTarget: surpriseTargets?.protein_g ?? null,
-          })
-        : { hero: null, others: [] },
-    [maturity.stage, patternSignals, surpriseTargets?.calories, surpriseTargets?.protein_g],
-  )
+  // La hora de dormirse solo vive en la tabla del reloj (no en daily_signals):
+  // se lee la misma ventana de 90 días que los patrones.
+  const nightsTo = todayInTimezone()
+  const sleepNights = useWearableSleepNights(addDaysIso(nightsTo, -89), nightsTo).data
+  const surprises = useMemo(() => {
+    if (maturity.stage < 3) return { hero: null, others: [] }
+    const tz = userTimezone()
+    const bedtimes = new Map<string, number>()
+    for (const n of sleepNights ?? []) {
+      if (n.bedtime_at) bedtimes.set(n.sleep_date, bedtimeOffsetMinutes(n.bedtime_at, tz))
+    }
+    return rankSurprises(patternSignals, {
+      calorieTarget: surpriseTargets?.calories ?? null,
+      proteinTarget: surpriseTargets?.protein_g ?? null,
+      bedtimes,
+    })
+  }, [
+    maturity.stage,
+    patternSignals,
+    sleepNights,
+    surpriseTargets?.calories,
+    surpriseTargets?.protein_g,
+  ])
   const surprise = view === 'patterns' ? surprises.hero : null
   const firstSignal = useMemo(
     () => (maturity.stage >= 1 ? earlyReading(patternSignals, todayInTimezone()) : null),
@@ -333,6 +357,7 @@ export function MonthSegment({
   // CURSO (no de la ventana rodante de 31 días), así sus conteos coinciden
   // exactamente: mismos días-con-comida, mismos días en déficit.
   const today = todayInTimezone()
+  const router = useRouter()
   const monthStr = today.slice(0, 7) // 'YYYY-MM' del mes en curso
 
   // "Tu mes de un vistazo": calendario con NAVEGADOR de mes. 0 = mes en curso;
@@ -821,17 +846,34 @@ export function MonthSegment({
                   </Text>
                 )}
                 {combo && view === 'patterns' ? (
-                  <PatternHero
+                  <StrongDayCard
                     combo={combo}
-                    since={provenance?.since ?? null}
                     early={maturity.stage <= 2}
-                    weekLine={comboWeekSummary(week, combo)}
+                    discovered={shownKey != null && recentCombos.includes(shownKey)}
+                    meter={comboWeekMeter(week)}
+                    todayHabits={comboToday(
+                      patternSignals,
+                      combo,
+                      { calorieTarget, proteinTarget, waterGoalGlasses },
+                      today,
+                    )}
+                    gap={comboKcalGap(patternSignals, combo, {
+                      calorieTarget,
+                      proteinTarget,
+                      waterGoalGlasses,
+                    })}
+                    dayCards={comboDayCards(patternSignals, combo, {
+                      calorieTarget,
+                      proteinTarget,
+                      waterGoalGlasses,
+                    })}
                     talked={comboTalk.transcript != null}
                     onAsk={aiOn && comboFinding ? () => openChat(null) : undefined}
                     onReveal={() => {
                       const base = comboReveal(combo)
                       setReveal({ ...base, takeaway: comboLever ?? base.takeaway })
                     }}
+                    onLog={(key) => router.push(key === 'proteina' ? '/meals' : '/')}
                   />
                 ) : null}
                 {combo && view !== 'patterns' ? (
@@ -893,19 +935,63 @@ export function MonthSegment({
                 ) : (
                   <Text style={styles.patternsEmptyLede}>Todavía te estoy conociendo.</Text>
                 )}
+                {/* La ecuación en blanco: la misma forma que tendrá el patrón,
+                    apagada. Y lo que Stelar ya ve de sus días, sin contar. */}
+                <View style={[styles.eqRow, styles.ghostEq]}>
+                  {['?', '?'].map((q, i) => (
+                    <View key={i} style={styles.eqItem}>
+                      {i > 0 ? <Text style={styles.eqPlus}>+</Text> : null}
+                      <View style={[styles.eqChip, styles.ghostChip]}>
+                        <View style={[styles.eqDot, styles.ghostDot]} />
+                        <Text style={[styles.eqChipText, styles.ghostText]}>{q}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <View style={styles.eqItem}>
+                    <Text style={styles.eqPlus}>=</Text>
+                    <View style={[styles.eqChip, styles.ghostChip]}>
+                      <View style={styles.proofDiamond} />
+                      <Text style={[styles.eqChipText, styles.ghostText]}>Déficit</Text>
+                    </View>
+                  </View>
+                </View>
                 <Text style={styles.patternsEmptyBody}>
-                  Un patrón aparece cuando algo se repite en tus días. Sigue registrando como
-                  siempre y aquí verás lo primero que encuentre. Cosas como:
+                  Busco qué combinación te acerca al déficit. Cuando algo se repita en tus días,
+                  aparece aquí.
                 </Text>
-                <View style={styles.patternSilhouettes}>
+                <Text style={styles.seesTitle}>Lo que ya veo</Text>
+                <View
+                  style={styles.todayRow}
+                  accessible
+                  accessibilityLabel={`Lo que ya veo: ${
+                    [
+                      maturity.days.food > 0 && 'comidas',
+                      maturity.days.sleep > 0 && 'sueño',
+                      maturity.days.movement > 0 && 'movimiento',
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || 'todavía nada'
+                  }.`}
+                >
                   {[
-                    'Qué días son distintos en tu rutina',
-                    'Qué acompaña tus mejores días',
-                    'Qué combinación te sostiene en déficit',
-                  ].map((t) => (
-                    <View key={t} style={styles.patternSilhouetteRow}>
-                      <View style={styles.patternSilhouetteStar} />
-                      <Text style={styles.patternSilhouetteText}>{t}</Text>
+                    { label: 'Comidas', on: maturity.days.food > 0, color: colors.leche },
+                    { label: 'Sueño', on: maturity.days.sleep > 0, color: NODE_COLOR.sueno },
+                    {
+                      label: 'Movimiento',
+                      on: maturity.days.movement > 0,
+                      color: NODE_COLOR.cuerpo,
+                    },
+                  ].map((d) => (
+                    <View key={d.label} style={styles.todayItem}>
+                      <View
+                        style={[
+                          styles.todayDot,
+                          d.on
+                            ? { backgroundColor: d.color }
+                            : { borderWidth: 1, borderColor: colors.bruma },
+                        ]}
+                      />
+                      <Text style={[styles.todayText, d.on && styles.todayTextOn]}>{d.label}</Text>
                     </View>
                   ))}
                 </View>
@@ -1485,6 +1571,14 @@ function SurpriseHero({ surprise }: { surprise: Surprise }) {
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.surprise}>
       <Text style={styles.surpriseKicker}>Lo que no sabías</Text>
+      {/* Procedencia a la vista: lo que sale del smartwatch lo dice ANTES de
+          la frase, para que nunca parezca que Stelar lo adivinó. */}
+      {surprise.fromWatch ? (
+        <View style={styles.surpriseSource}>
+          <WatchMark past inline={false} />
+          <Text style={styles.surpriseSourceText}>Con datos de tu smartwatch</Text>
+        </View>
+      ) : null}
       <Text style={styles.surpriseHeadline}>{surprise.headline}</Text>
       <View style={styles.surpriseRows}>
         {surprise.rows.map((r) => (
@@ -1500,37 +1594,59 @@ function SurpriseHero({ surprise }: { surprise: Surprise }) {
   )
 }
 
-/* El patrón en el feed (sep 2026 · "la gente no leerá"): se entiende SIN leer
- * frases. La ecuación (fichas con el color de su estrella) dice de qué es; el
- * número grande en oro es el gancho; los puntos son la prueba (un día cada uno);
- * la semana son tres puntos por llenar. Una sola acción: la de Stelar. */
-const CHIP_LABEL: Record<string, string> = {
-  sueno: 'Sueño 7 h',
+/* Tu día fuerte (dueña 29 sep 2026, ronda 2: "piensa como usuaria"). El
+ * patrón deja de ser un reporte del pasado y se vuelve el marcador de HOY: tu
+ * receta personal, que vas palomeando. Cambia con lo que ya hiciste (nada / a
+ * la mitad / armado, con oro y un háptico al completarlo). La prueba es UNA
+ * diferencia en kcal contra tu meta (la moneda que ella siente, no dos
+ * proporciones), y detrás, tus días reales como cartitas ("ah sí, ese
+ * jueves"). La semana solo asoma como premio en el día armado. */
+/* Cada hábito como mosaico (no lista con círculos: se leían como radio
+ * buttons). Símbolos de Hoy: ☾ sueño, ✦ entreno. */
+const HABIT_TILE: Record<string, string> = {
+  sueno: 'Sueño',
   cuerpo: 'Entreno',
   proteina: 'Proteína',
   agua: 'Agua',
 }
+const HABIT_CAPTION: Record<string, string> = {
+  sueno: 'de 7 h',
+}
+const HABIT_GLYPH: Record<string, string> = {
+  sueno: '☾',
+  cuerpo: '✦',
+  proteina: '◆',
+  agua: '●',
+}
+const NUM_WORD = ['cero', 'una', 'dos', 'tres', 'cuatro']
 
-function PatternHero({
+function StrongDayCard({
   combo,
-  since,
   early,
-  weekLine,
+  discovered,
+  meter,
+  todayHabits,
+  gap,
+  dayCards,
   talked,
   onAsk,
   onReveal,
+  onLog,
 }: {
   combo: WinningComboData
-  /** Mes en que se descubrió ("julio") → "desde julio". */
-  since: string | null
-  /** Muestra chica: el kicker dice "temprano" (sin línea extra). */
+  /** Muestra chica: el kicker lo dice. */
   early: boolean
-  /** La semana dicha con palabras (null = nada que decir). */
-  weekLine: string | null
-  /** Ya hablaron de este patrón. */
+  /** Recién encontrado: tus días reales abren desplegados (la prueba manda). */
+  discovered: boolean
+  meter: ComboWeekMeter | null
+  todayHabits: ComboTodayHabit[]
+  gap: ComboKcalGap | null
+  dayCards: ComboDayCard[]
   talked?: boolean
   onAsk?: () => void
   onReveal: () => void
+  /** Anotar un hábito que falta (lleva a donde se registra). */
+  onLog: (key: string) => void
 }) {
   const nodes = [
     ...combo.signals.map((s) => ({
@@ -1539,143 +1655,274 @@ function PatternHero({
     })),
     { label: 'Déficit', color: colors.oroSoft },
   ]
-  const lift = comboLiftBadge(combo)
-  const kicker = `${early ? 'Patrón temprano' : 'Patrón'}${since ? ` · desde ${since}` : ''}`
-  // El número grande solo con muestra suficiente y una diferencia de verdad: con
-  // pocos días, "1,2×" en grande inflaba un solo día (target-user + producto,
-  // 27 sep 2026). Entonces manda la ecuación y los puntos cuentan.
-  const smallRatio = /^\d,\d×$/.test(lift) // "1,4×": diferencia chica, sin palabra
-  const showLift = Math.min(combo.occurrences, combo.restDays) >= 8 && !smallRatio
+  const total = todayHabits.length
+  const onCount = todayHabits.filter((h) => h.status === 'on').length
+  const done = total > 0 && onCount === total
+  const rested = todayHabits.some((h) => h.status === 'rest')
+  const closed = todayHabits.some((h) => h.status === 'closed')
+  const [showDays, setShowDays] = useState(discovered)
+
+  // Háptico SOLO al armarlo con la tarjeta abierta (no cada vez que se entra).
+  const wasDone = useRef(done)
+  useEffect(() => {
+    if (done && !wasDone.current) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    }
+    wasDone.current = done
+  }, [done])
+
+  const kicker = done ? '★ Día fuerte armado' : early ? 'Tu día fuerte · temprano' : 'Tu día fuerte'
+  const headline = done
+    ? 'Hoy lo juntaste.'
+    : rested
+      ? 'Hoy descansas. Mañana puede ser día fuerte.'
+      : closed
+        ? 'Hoy no se juntó. Mañana puede ser día fuerte.'
+        : onCount === 0
+          ? `Tus mejores días tienen ${NUM_WORD[total] ?? total} cosas en común.`
+          : total === 2
+            ? 'Vas a la mitad.'
+            : `Llevas ${onCount} de ${total}.`
+  const withLabel = total === 2 ? 'Con los dos' : 'Con el patrón'
+  // Barras de la prueba: cuánto quedas ABAJO de tu meta (arriba = barra mínima).
+  const below = (d: number) => Math.max(0, -d)
+  const barMax = gap ? Math.max(1, below(gap.withAvg), below(gap.restAvg)) : 1
+  const barW = (d: number) => `${Math.max(3, Math.round((below(d) / barMax) * 100))}%` as const
+
   return (
-    <Animated.View entering={FadeIn.duration(420)} style={styles.heroPattern} accessible={false}>
-      <View style={styles.heroTop}>
+    <Animated.View
+      entering={FadeIn.duration(420)}
+      style={[styles.heroPattern, done && styles.heroPatternDone]}
+      accessible={false}
+    >
+      {/* Kicker y constelación en una sola línea: el titular sube. */}
+      <View style={styles.sdTop}>
         <Text style={styles.heroKicker}>{kicker}</Text>
-        <View style={styles.heroMini}>
-          <Pressable
-            onPress={onReveal}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Ver la revelación del patrón"
-          >
-            <View pointerEvents="none">
-              <PatternDiscovery nodes={nodes} height={104} showLabels={false} inset={26} />
-            </View>
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={onReveal}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Ver la revelación del patrón"
+          style={styles.sdMini}
+        >
+          <View pointerEvents="none">
+            <PatternDiscovery nodes={nodes} height={52} showLabels={false} inset={12} />
+          </View>
+        </Pressable>
       </View>
 
-      {/* La ecuación: qué hábitos, con el color de su estrella. */}
-      <View style={styles.eqRow} accessible accessibilityLabel={comboHeadline(combo)}>
-        {combo.signals.map((sig, i) => (
-          <View key={sig.key} style={styles.eqItem}>
-            {i > 0 ? <Text style={styles.eqPlus}>+</Text> : null}
-            <View style={styles.eqChip}>
-              <View
-                style={[styles.eqDot, { backgroundColor: NODE_COLOR[sig.key] ?? colors.leche }]}
-              />
-              <Text style={styles.eqChipText}>{CHIP_LABEL[sig.key] ?? sig.label}</Text>
+      <Text style={styles.sdHeadline}>{headline}</Text>
+
+      {/* La receta de hoy, un mosaico por hábito (estilo Fitness: etiqueta
+          chica, valor grande). Se llena con su color cuando pasó. Pendiente =
+          "Registrar ›"; descanso o noche corta ya registrada = sin acción. */}
+      <View style={styles.sdTiles}>
+        {todayHabits.map((h) => {
+          const c = NODE_COLOR[h.key] ?? colors.leche
+          const isOn = h.status === 'on'
+          const canLog = h.status === 'open'
+          const body = (
+            <>
+              <View style={styles.sdTileHead}>
+                <Text style={[styles.sdTileGlyph, { color: isOn ? c : colors.bone }]}>
+                  {HABIT_GLYPH[h.key] ?? '●'}
+                </Text>
+                {isOn ? (
+                  <View style={[styles.sdTileCheck, { backgroundColor: c }]}>
+                    <Text style={styles.sdTileCheckMark}>✓</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.sdTileLabel}>{HABIT_TILE[h.key] ?? h.key}</Text>
+              {canLog ? (
+                <Text style={styles.sdLog}>Registrar ›</Text>
+              ) : (
+                <View style={styles.sdTileValueRow}>
+                  <Text style={[styles.sdTileValue, !isOn && styles.sdTileValueMuted]}>
+                    {h.value ?? '—'}
+                  </Text>
+                  {h.fromWatch ? <WatchMark inline={false} size={12} /> : null}
+                </View>
+              )}
+              {HABIT_CAPTION[h.key] && h.status !== 'rest' ? (
+                <Text style={styles.sdTileCaption}>{HABIT_CAPTION[h.key]}</Text>
+              ) : null}
+            </>
+          )
+          const tileStyle = [styles.sdTile, isOn && { backgroundColor: `${c}26` }]
+          return canLog ? (
+            <Pressable
+              key={h.key}
+              onPress={() => onLog(h.key)}
+              accessibilityRole="button"
+              accessibilityLabel={`${HABIT_TILE[h.key] ?? h.key}: registrar`}
+              style={({ pressed }) => [...tileStyle, pressed && { opacity: 0.75 }]}
+            >
+              {body}
+            </Pressable>
+          ) : (
+            <View
+              key={h.key}
+              style={tileStyle}
+              accessible
+              accessibilityLabel={`${HABIT_TILE[h.key] ?? h.key}: ${isOn ? 'hecho, ' : ''}${
+                h.value ?? 'sin registro'
+              }`}
+            >
+              {body}
+            </View>
+          )
+        })}
+      </View>
+
+      {/* La prueba: UNA diferencia grande (estilo Highlights de Salud) y dos
+          barras para verla sin hacer cuentas. Armado: el premio y la semana. */}
+      {done ? (
+        <View style={styles.sdPrize}>
+          {gap && gap.withAvg < 0 ? (
+            <Text style={styles.sdPrizeText}>
+              Estos días quedas{' '}
+              <Text style={styles.sdPrizeStrong}>{fmtKcalDelta(-gap.withAvg).slice(1)}</Text> abajo
+              de tu meta, en promedio.
+            </Text>
+          ) : null}
+          {meter && meter.stars.length > 0 ? (
+            <View style={styles.weekMeter}>
+              <View style={styles.weekStars}>
+                {meter.stars.map((on, i) => (
+                  <Text key={i} style={[styles.weekStar, on && styles.weekStarOn]}>
+                    {on ? '★' : '☆'}
+                  </Text>
+                ))}
+              </View>
+              {meter.note ? (
+                <Text
+                  style={[styles.weekNote, meter.reached && styles.weekNoteReached, { flex: 1 }]}
+                >
+                  {meter.note}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : gap ? (
+        <View
+          style={styles.sdGap}
+          accessible
+          accessibilityLabel={`${comboGroupLabel(combo)} quedas ${gap.restAvg - gap.withAvg} kcal más abajo que tus otros días. Contra tu meta, en promedio: ${fmtKcalDelta(gap.withAvg)} con los dos, ${fmtKcalDelta(gap.restAvg)} otros días.`}
+        >
+          <Text style={styles.sdGapLead}>{`${comboGroupLabel(combo)} quedas`}</Text>
+          <Text style={styles.sdGapHero}>
+            {fmtKcalDelta(gap.restAvg - gap.withAvg).slice(1)}
+            <Text style={styles.sdGapHeroUnit}> más abajo</Text>
+          </Text>
+          <Text style={styles.sdGapLead}>que tus otros días.</Text>
+          <View style={styles.sdBars}>
+            <View style={styles.sdBarRow}>
+              <Text style={[styles.sdBarLabel, styles.sdLabelOn]}>{withLabel}</Text>
+              <View style={styles.sdBarTrack}>
+                <View
+                  style={[styles.sdBarFill, styles.sdBarFillGold, { width: barW(gap.withAvg) }]}
+                />
+              </View>
+              <Text style={[styles.sdBarValue, styles.sdLabelOn]}>{fmtKcalDelta(gap.withAvg)}</Text>
+            </View>
+            <View style={styles.sdBarRow}>
+              <Text style={styles.sdBarLabel}>Otros días</Text>
+              <View style={styles.sdBarTrack}>
+                <View style={[styles.sdBarFill, { width: barW(gap.restAvg) }]} />
+              </View>
+              <Text style={styles.sdBarValue}>{fmtKcalDelta(gap.restAvg)}</Text>
             </View>
           </View>
-        ))}
-      </View>
-
-      {/* El gancho: el número grande (solo si la muestra lo sostiene). */}
-      {showLift ? (
-        <View style={styles.liftBlock}>
-          <Text style={styles.liftNum}>{lift}</Text>
-          <Text style={styles.liftLabel}>
-            {lift === 'mucho más' ? 'días en déficit' : 'más días en déficit'}
-          </Text>
+          <Text style={styles.sdGapCaption}>Contra tu meta de calorías, en promedio</Text>
         </View>
+      ) : (
+        <Text style={[styles.sdGapCaption, { marginTop: 18 }]}>
+          {`${combo.deficits} de ${combo.occurrences} días así cerraron en déficit.`}
+        </Text>
+      )}
+
+      {/* Tus días reales: sección con su "Ver todos", como en Salud. */}
+      {dayCards.length > 0 ? (
+        <>
+          <View style={styles.sdDaysHead}>
+            <Text style={styles.sdDaysTitle}>Tus días así</Text>
+            <Pressable
+              onPress={() => setShowDays((v) => !v)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={showDays ? 'Ocultar tus días así' : 'Ver todos tus días así'}
+            >
+              <Text style={styles.sdDaysAction}>{showDays ? 'Ocultar' : 'Ver todos ›'}</Text>
+            </Pressable>
+          </View>
+          {showDays ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.sdCards}
+              style={styles.sdCardsScroll}
+            >
+              {dayCards.map((d) => (
+                <View
+                  key={d.day}
+                  style={styles.sdCard}
+                  accessible
+                  accessibilityLabel={[
+                    d.label,
+                    d.sleepMinutes != null ? `dormiste ${formatSleepShort(d.sleepMinutes)}` : null,
+                    d.workout ? `entreno ${d.workout}` : null,
+                    d.deficit === true
+                      ? 'en déficit'
+                      : d.deficit === false
+                        ? 'sobre tu meta'
+                        : null,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                >
+                  <Text style={styles.sdCardDay}>{d.label}</Text>
+                  {d.sleepMinutes != null ? (
+                    <Text style={styles.sdCardText}>
+                      <Text style={{ color: NODE_COLOR.sueno }}>☾ </Text>
+                      {formatSleepShort(d.sleepMinutes)}
+                    </Text>
+                  ) : null}
+                  {d.workout ? (
+                    <Text style={styles.sdCardText}>
+                      <Text style={{ color: NODE_COLOR.cuerpo }}>✦ </Text>
+                      {d.workout}
+                    </Text>
+                  ) : null}
+                  {d.deficit != null ? (
+                    <Text style={[styles.sdCardBadge, d.deficit && styles.sdCardBadgeGold]}>
+                      {d.deficit ? '◆ En déficit' : '◇ Sobre tu meta'}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
+        </>
       ) : null}
 
-      <View
-        style={styles.heroDots}
-        accessible
-        accessibilityLabel={`Días en déficit: ${combo.deficits} de ${combo.occurrences} con los dos; ${combo.restDeficits} de ${combo.restDays} ${comboWithoutLabel(combo).toLowerCase()}.`}
-      >
-        {/* Qué es un punto lleno, dicho una vez (la usuaria tenía que volver
-            al número grande para saberlo). */}
-        <Text style={styles.dotsTitle}>Días en déficit</Text>
-        <DotsLine
-          label={comboGroupLabel(combo)}
-          total={combo.occurrences}
-          filled={combo.deficits}
-          strong
-        />
-        <DotsLine
-          label={comboWithoutLabel(combo)}
-          total={combo.restDays}
-          filled={combo.restDeficits}
-        />
-      </View>
-
-      {/* La semana con PALABRAS, separada de la evidencia: con puntos se leía
-          como "días en déficit" (target-user, 26 sep 2026). */}
-      {weekLine ? <Text style={styles.weekSummary}>{weekLine}</Text> : null}
-
+      {/* La IA, discreta: una fila, no compite con la acción del día. */}
       {onAsk ? (
-        <View style={styles.heroAsk}>
-          <AuroraCta
-            label={talked ? 'Retomar con Stelar' : 'Pregúntale a Stelar'}
-            onPress={onAsk}
-          />
-        </View>
+        <Pressable
+          onPress={onAsk}
+          hitSlop={8}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.sdAsk, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.sdAskStar}>✦</Text>
+          <Text style={styles.sdAskText}>
+            {talked ? 'Retomar con Stelar' : '¿Por qué me funciona?'}
+          </Text>
+          <Text style={styles.sdAskChevron}>›</Text>
+        </Pressable>
       ) : null}
     </Animated.View>
-  )
-}
-
-/* Una fila de evidencia: un punto por día, lleno si cerró en déficit. El conteo
- * real al final (cuando hay más días que puntos, los puntos se escalan). */
-function DotsLine({
-  label,
-  total,
-  filled,
-  strong,
-}: {
-  label: string
-  total: number
-  filled: number
-  strong?: boolean
-}) {
-  return (
-    <View style={styles.dotLine}>
-      <Text style={[styles.dotLabel, strong && styles.dotLabelStrong]}>{label}</Text>
-      <View style={styles.dotRow}>
-        {evidenceDots(total, filled).map((on, i) => (
-          <View
-            key={i}
-            style={[styles.dot, on ? (strong ? styles.dotOn : styles.dotOnSoft) : null]}
-          />
-        ))}
-      </View>
-      <Text style={[styles.dotCount, strong && styles.dotLabelStrong]}>
-        {`${filled} de ${total}`}
-      </Text>
-    </View>
-  )
-}
-
-/* La acción de IA: píldora con contorno aurora (el degradado del chat), sin
- * relleno magenta — se lee IA sin competir con Registrar. ✦ solo aquí. */
-function AuroraCta({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      {({ pressed }) => (
-        <LinearGradient
-          colors={[colors.magenta, colors.oroSoft, colors.dimension.mente]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.auroraBorder, pressed && { opacity: 0.8 }]}
-        >
-          <View style={styles.auroraInner}>
-            <Text style={styles.auroraStar}>✦</Text>
-            <Text style={styles.auroraLabel}>{label}</Text>
-          </View>
-        </LinearGradient>
-      )}
-    </Pressable>
   )
 }
 
@@ -2163,8 +2410,18 @@ function RevealEvidenceModal({
 }
 
 const styles = StyleSheet.create({
+  // El patrón vive en su propio contenedor (misma familia que el panel del
+  // calendario) con un filo de oro apenas: es EL hallazgo, no texto suelto.
   heroPattern: {
     marginTop: 4,
+    marginBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.oroHairline,
+    paddingTop: 18,
+    paddingBottom: 20,
+    paddingHorizontal: 18,
   },
   surprise: {
     marginTop: 4,
@@ -2176,6 +2433,17 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     color: colors.oroSoft,
+  },
+  surpriseSource: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  surpriseSourceText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.niebla,
   },
   surpriseHeadline: {
     marginTop: 12,
@@ -2219,12 +2487,193 @@ const styles = StyleSheet.create({
   sustainEyebrow: {
     marginBottom: 6,
   },
-  heroTop: {
+  heroPatternDone: { backgroundColor: colors.oroTint, borderColor: colors.oroSoft },
+  sdHeadline: {
+    marginTop: 12,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 26,
+    color: colors.leche,
+  },
+  sdTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: -6,
+    marginBottom: -6,
+  },
+  sdMini: { width: 96, marginRight: -8 },
+  sdTiles: { marginTop: 16, flexDirection: 'row', gap: 10 },
+  sdTile: {
+    flex: 1,
+    padding: 14,
+    gap: 4,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  sdTileHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  sdTileGlyph: { fontSize: typography.sizes.heading, lineHeight: 22 },
+  sdTileCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sdTileCheckMark: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.micro,
+    color: colors.bg,
+  },
+  sdTileLabel: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: colors.bone,
+  },
+  sdLabelOn: { color: colors.leche },
+  sdTileValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sdTileValue: {
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.displaySm,
+    letterSpacing: -0.4,
+    color: colors.leche,
+    fontVariant: ['tabular-nums'],
+  },
+  sdTileValueMuted: { color: colors.bone },
+  sdTileCaption: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  sdLog: {
+    marginTop: 4,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    color: colors.magenta,
+  },
+  sdGap: { marginTop: 22 },
+  sdGapLead: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.bone,
+  },
+  sdGapHero: {
+    marginVertical: 2,
+    fontFamily: typography.displaySemi,
+    fontSize: typography.sizes.displayLg,
+    letterSpacing: -0.8,
+    color: colors.oroLight,
+    fontVariant: ['tabular-nums'],
+  },
+  sdGapHeroUnit: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.title,
+    letterSpacing: 0,
+    color: colors.oroLight,
+  },
+  sdBars: { marginTop: 14, gap: 10 },
+  sdBarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sdBarLabel: {
+    width: 86,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  sdBarTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.hairline },
+  sdBarFill: { height: '100%', borderRadius: 4, backgroundColor: colors.bone },
+  sdBarFillGold: { backgroundColor: colors.oroSoft },
+  sdBarValue: {
+    width: 76,
+    textAlign: 'right',
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  sdGapCaption: {
+    marginTop: 10,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  sdPrize: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.oroHairline,
     gap: 12,
   },
+  sdPrizeText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 20,
+    color: colors.bone,
+  },
+  sdPrizeStrong: { fontFamily: typography.uiSemi, color: colors.oroLight },
+  sdDaysHead: {
+    marginTop: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sdDaysTitle: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+  },
+  sdDaysAction: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
+  },
+  sdCardsScroll: { marginTop: 10, marginHorizontal: -18 },
+  sdCards: { paddingHorizontal: 18, gap: 8 },
+  sdCard: {
+    width: 104,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 4,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  sdCardDay: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.leche,
+  },
+  sdCardText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  sdCardBadge: {
+    marginTop: 2,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  sdCardBadgeGold: { color: colors.oroLight },
+  sdAsk: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  sdAskStar: { fontSize: typography.sizes.body, color: colors.oroLight },
+  sdAskText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  sdAskChevron: { fontSize: typography.sizes.heading, color: colors.bone },
   heroKicker: {
     flex: 1,
     fontFamily: typography.uiBold,
@@ -2233,11 +2682,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.oroSoft,
   },
-  heroMini: { width: 164, marginVertical: -26, marginRight: -26 },
   eqRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 10 },
   eqItem: { flexDirection: 'row', alignItems: 'center' },
   eqPlus: {
-    marginHorizontal: 10,
+    marginHorizontal: 6,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.heading,
     color: colors.niebla,
@@ -2245,9 +2693,9 @@ const styles = StyleSheet.create({
   eqChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    gap: 7,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.hairlineStrong,
@@ -2256,111 +2704,43 @@ const styles = StyleSheet.create({
   eqDot: { width: 8, height: 8, borderRadius: 4 },
   eqChipText: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
-  },
-  liftBlock: { marginTop: 18, flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  liftNum: {
-    fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.displayXl,
-    lineHeight: 44,
-    color: colors.oroLight,
-    letterSpacing: -0.5,
-  },
-  liftLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.title,
-    color: colors.bone,
-  },
-  weekSummary: {
-    marginTop: 20,
-    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.bone,
-  },
-  dotsTitle: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.tinyLabel,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.niebla,
-  },
-  heroDots: {
-    marginTop: 20,
-    gap: 12,
-  },
-  dotLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  dotLabel: {
-    width: 92,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  dotLabelStrong: {
     color: colors.leche,
   },
-  dotRow: {
-    flexShrink: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  dot: {
+  proofDiamond: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: 2,
     borderWidth: 1,
     borderColor: colors.bruma,
+    transform: [{ rotate: '45deg' }],
   },
-  dotOn: {
-    backgroundColor: colors.oroSoft,
-    borderColor: colors.oroSoft,
+  proofDiamondOn: { backgroundColor: colors.oroSoft, borderColor: colors.oroSoft },
+  weekMeter: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  weekStars: { flexDirection: 'row', gap: 6 },
+  weekStar: { fontSize: typography.sizes.displaySm, lineHeight: 28, color: colors.bruma },
+  weekStarOn: { color: colors.oroLight },
+  weekNote: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    lineHeight: 18,
+    color: colors.bone,
   },
-  // "Otros días" llenos: claros contra los vacíos, sin llegar al oro.
-  dotOnSoft: {
-    backgroundColor: colors.niebla,
-    borderColor: colors.niebla,
-  },
-  // El conteo pegado a sus puntos: se lee como parte de la fila.
-  dotCount: {
+  weekNoteReached: { color: colors.oroLight },
+  todayRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 14 },
+  todayLabel: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.label,
     color: colors.niebla,
-    fontVariant: ['tabular-nums'],
   },
-  heroAsk: {
-    marginTop: 18,
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  auroraBorder: {
-    borderRadius: 999,
-    padding: 1,
-  },
-  auroraInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 40,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: colors.bg,
-  },
-  auroraStar: {
-    fontSize: typography.sizes.body,
-    color: colors.oroLight,
-  },
-  auroraLabel: {
-    fontFamily: typography.uiSemi,
+  todayItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  todayDot: { width: 8, height: 8, borderRadius: 4 },
+  todayText: {
+    fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    color: colors.leche,
-    letterSpacing: 0.3,
+    color: colors.niebla,
   },
+  todayTextOn: { color: colors.leche },
   firstSignalEyebrow: {
     fontFamily: typography.uiBold,
     fontSize: typography.sizes.tinyLabel,
@@ -2765,27 +3145,17 @@ const styles = StyleSheet.create({
   },
   // Siluetas de descubrimiento — bloqueado-pero-visible: estrellas tenues
   // sin encender, mismo lenguaje que los días sin datos del calendario.
-  patternSilhouettes: {
-    marginTop: 14,
-    gap: 10,
-  },
-  patternSilhouetteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  patternSilhouetteStar: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    borderWidth: 1,
-    borderColor: colors.bone,
-    opacity: 0.45,
-  },
-  patternSilhouetteText: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
+  ghostEq: { marginTop: 16, marginBottom: 14, opacity: 0.55 },
+  ghostChip: { borderStyle: 'dashed', backgroundColor: 'transparent' },
+  ghostDot: { borderWidth: 1, borderColor: colors.bruma },
+  ghostText: { color: colors.niebla },
+  seesTitle: {
+    marginTop: 18,
+    marginBottom: 10,
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
     color: colors.niebla,
   },
   patternsEmptyHorizon: {

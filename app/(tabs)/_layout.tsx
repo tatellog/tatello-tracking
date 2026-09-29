@@ -7,7 +7,6 @@ import FoodVect from '@/assets/icons/food-vect.svg'
 import Descubre from '@/assets/icons/descubre.svg'
 import Progress from '@/assets/icons/progress.svg'
 import Sunset from '@/assets/icons/sunset.svg'
-import { BetaFeedbackButton } from '@/components/BetaFeedbackButton'
 import { ScanFeedbackToast } from '@/features/meal-scan/components/ScanFeedbackToast'
 import {
   useDayCloseInvite,
@@ -161,7 +160,6 @@ export default function TabsLayout() {
       {/* Celebración full-screen ("Entrené") — DESPUÉS de <Tabs> para que el
           flash dorado cubra toda la pantalla, incluyendo la barra de tabs. */}
       <CelebrationOverlay />
-      <BetaFeedbackButton />
       {/* Deshacer del re-log de 1 tap — global: sobrevive al cierre del sheet. */}
       <UndoMealToast />
       {/* "¿Le atiné?" del scan (M1) — global: recibe a la usuaria al volver. */}

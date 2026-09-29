@@ -86,7 +86,7 @@ export function TuDiaCard({
       ? `${model.eyebrow}. ${model.title} ${model.line}${model.reading ? ` ${model.reading}` : ''}. Abre Descubre.`
       : model.kind === 'weekly'
         ? 'Tu lectura semanal está lista. Ábrela.'
-        : `${model.eyebrow}. ${model.title} ${model.line} Abre Descubre.`
+        : `${model.eyebrow}. ${model.title}${model.line ? ` ${model.line}` : ''} Abre Descubre.`
 
   return (
     <Animated.View entering={FadeIn.duration(420)} style={styles.card}>
@@ -100,20 +100,19 @@ export function TuDiaCard({
           <View style={styles.headLeft}>
             {/* La marca del cierre: estrella oro si el día quedó dorado,
                 brasa neutra si no (mismo lenguaje que el calendario del mes). */}
-            {model.kind === 'close' ? (
-              gold ? (
-                <View style={styles.starGlow}>
-                  <View style={styles.starBody} />
-                </View>
-              ) : (
-                <View style={styles.ember} />
-              )
+            {/* Solo el día dorado lleva marca (oro = logro). La brasa gris de
+                "sobre la meta" no decía nada y parecía una notificación. */}
+            {model.kind === 'close' && gold ? (
+              <View style={styles.starGlow}>
+                <View style={styles.starBody} />
+              </View>
             ) : null}
             <EyebrowLabel tone={gold ? 'bone' : 'niebla'} size={10}>
               {model.eyebrow}
             </EyebrowLabel>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          {/* Dice a dónde lleva (antes un "›" suelto). */}
+          <Text style={styles.chevron}>{model.kind === 'weekly' ? 'Leer ›' : 'Descubre ›'}</Text>
         </View>
 
         {model.kind === 'weekly' ? (
@@ -121,18 +120,20 @@ export function TuDiaCard({
           // card de Órbita Semana — es el mismo objeto asomado en dos lugares.
           <Text style={styles.weeklyTitle}>{model.title}</Text>
         ) : (
-          <Text style={styles.data}>{model.title}</Text>
+          <Text style={[styles.data, gold && styles.dataGold]}>{model.title}</Text>
         )}
 
-        <Text
-          style={[
-            styles.line,
-            model.kind === 'close' && styles.lineCoach,
-            model.kind === 'close' && gold && styles.lineGold,
-          ]}
-        >
-          {model.line}
-        </Text>
+        {model.line ? (
+          <Text
+            style={[
+              styles.line,
+              model.kind === 'close' && styles.lineCoach,
+              model.kind === 'close' && gold && styles.lineGold,
+            ]}
+          >
+            {model.line}
+          </Text>
+        ) : null}
 
         {model.kind === 'close' && model.reading ? (
           <Text style={styles.reading}>{model.reading}</Text>
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.label,
     color: colors.niebla,
   },
   // Estrella dorada (día en déficit) — miniatura del tratamiento del
@@ -186,19 +187,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.oroLight,
   },
   // Brasa neutra (superávit / muy bajo) — descansa, no alarma.
-  ember: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: colors.bone,
-    opacity: 0.55,
-  },
   // El titular: de día una frase, de noche los números literales.
   data: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
+  },
+  dataGold: {
+    color: colors.oroLight,
   },
   weeklyTitle: {
     fontFamily: typography.serifSemi,
@@ -212,10 +209,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     color: colors.niebla,
   },
-  // La línea del cierre es la voz del coach (serif italic).
+  // La línea del cierre es la voz del coach (serif italic), más grande y en
+  // hueso: en niebla y al mismo tamaño que el Hanken quedaba casi ilegible.
   lineCoach: {
     fontFamily: typography.serif,
     fontStyle: 'italic',
+    fontSize: typography.sizes.title,
+    lineHeight: 22,
+    color: colors.bone,
   },
   lineGold: {
     color: colors.oroLight,
