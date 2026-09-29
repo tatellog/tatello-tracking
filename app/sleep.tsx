@@ -8,7 +8,7 @@ import { useBriefContext } from '@/features/brief/hooks'
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { sleepDeficitLink } from '@/features/orbit/sleep-link'
 import { SkyBackground } from '@/features/tabs/components'
-import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
+import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { useWearableSleepNights } from '@/features/wearables/hooks'
 import { formatSleepShort } from '@/features/wearables/recovery'
 import {
@@ -121,7 +121,7 @@ function SleepBody() {
             </Text>
             {watchDescribes ? (
               <View style={styles.source}>
-                <WatchGlyph color={colors.niebla} size={12} />
+                <WatchMark past={!isToday} size={12} inline={false} />
                 <Text style={styles.sourceText}>de tu smartwatch</Text>
               </View>
             ) : null}

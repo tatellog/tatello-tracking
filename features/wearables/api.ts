@@ -223,3 +223,68 @@ export async function upsertWearableBodyComposition(
   if (error) throw error
   return parsed.length
 }
+
+/* ── Lo que trajo Salud en un rango (pantalla "Tu smartwatch") ─────────── */
+
+const summaryWorkoutSchema = z.object({
+  started_at: z.string(),
+  ended_at: z.string(),
+  workout_type: z.string().nullable(),
+  duration_min: z.number().nullable(),
+  energy_kcal: z.number().nullable(),
+})
+const summaryStepsSchema = z.object({ day_date: isoDay, steps: z.number() })
+const summaryWaterSchema = z.object({ day_date: isoDay, water_ml: z.number() })
+
+export type HealthWorkout = z.infer<typeof summaryWorkoutSchema>
+export type HealthSummary = {
+  /** Cada sesión, asc por inicio (el check-in de Hoy solo muestra el total). */
+  workouts: HealthWorkout[]
+  steps: z.infer<typeof summaryStepsSchema>[]
+  water: z.infer<typeof summaryWaterSchema>[]
+}
+
+/** Entrenos, pasos y agua de Salud en [fromDay, toDay] (días locales). Los
+ *  entrenos se traen con un día de colchón por lado (instantes UTC); la
+ *  lógica pura los asigna a su día local con la zona de la usuaria. */
+export async function getHealthSummary(fromDay: string, toDay: string): Promise<HealthSummary> {
+  const userId = await requireUserId()
+  const pad = (iso: string, n: number) => {
+    const d = new Date(`${iso}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + n)
+    return d.toISOString()
+  }
+  const fromStartUtc = pad(fromDay, -1)
+  const toEndUtc = pad(toDay, 2)
+  const [w, st, wa] = await Promise.all([
+    supabase
+      .from('wearable_workouts')
+      .select('started_at, ended_at, workout_type, duration_min, energy_kcal')
+      .eq('user_id', userId)
+      .gte('started_at', fromStartUtc)
+      .lt('started_at', toEndUtc)
+      .order('started_at', { ascending: true }),
+    supabase
+      .from('wearable_steps')
+      .select('day_date, steps')
+      .eq('user_id', userId)
+      .gte('day_date', fromDay)
+      .lte('day_date', toDay)
+      .order('day_date', { ascending: true }),
+    supabase
+      .from('wearable_water')
+      .select('day_date, water_ml')
+      .eq('user_id', userId)
+      .gte('day_date', fromDay)
+      .lte('day_date', toDay)
+      .order('day_date', { ascending: true }),
+  ])
+  if (w.error) throw w.error
+  if (st.error) throw st.error
+  if (wa.error) throw wa.error
+  return {
+    workouts: z.array(summaryWorkoutSchema).parse(w.data ?? []),
+    steps: z.array(summaryStepsSchema).parse(st.data ?? []),
+    water: z.array(summaryWaterSchema).parse(wa.data ?? []),
+  }
+}

@@ -185,6 +185,9 @@ export const queryKeys = {
     // Noches del reloj de un rango (pantalla de detalle de sueño).
     sleepNights: (uid: string, from: string, to: string) =>
       ['wearables', 'sleepNights', uid, from, to] as const,
+    // Entrenos, pasos y agua de un rango (pantalla "Tu smartwatch").
+    summary: (uid: string, from: string, to: string) =>
+      ['wearables', 'summary', uid, from, to] as const,
   },
   experiments: {
     all: ['experiments'] as const,

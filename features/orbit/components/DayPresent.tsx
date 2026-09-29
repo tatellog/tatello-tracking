@@ -18,7 +18,7 @@ import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'r
 import { useMacroTargets } from '@/features/macros/hooks'
 import { useLocalHour } from '@/features/tabs/use-local-hour'
 import { MoonGlyph, StarGlyph } from '@/features/tabs/components/check-in-glyphs'
-import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
+import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone } from '@/lib/time'
 
@@ -467,7 +467,7 @@ function LegendStat({
       <Text style={[styles.legendValue, dim && styles.legendValueDim]}>{value}</Text>
       {caption ? (
         <View style={styles.legendCaptionRow}>
-          <WatchGlyph color={colors.niebla} size={11} />
+          <WatchMark past={false} size={11} inline={false} />
           <Text style={styles.legendCaption}>{caption}</Text>
         </View>
       ) : null}
@@ -894,7 +894,7 @@ export function DayPresent({
             <View style={styles.watchGroup}>
               <View style={styles.watchEyebrow} accessibilityRole="text">
                 <View style={styles.evidenceStar}>
-                  <WatchGlyph color={colors.niebla} size={13} />
+                  <WatchMark past={isPast} inline={false} />
                 </View>
                 <Text style={styles.watchEyebrowText}>Desde tu smartwatch</Text>
               </View>

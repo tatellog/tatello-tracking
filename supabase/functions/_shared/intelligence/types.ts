@@ -34,6 +34,9 @@ export type DailySignals = {
   on_period: boolean | null
   /** Pasos del reloj (view ≥ 20260925). Opcional: fixtures viejas no lo traen. */
   steps?: number | null
+  /** De dónde vino el sueño del día ('wearable' | 'manual'). Opcional: solo
+   *  para decir la procedencia en pantalla, nunca para detectar. */
+  sleep_source?: string | null
 }
 
 /** Slim meal shape — the night detector only needs the timestamp. */

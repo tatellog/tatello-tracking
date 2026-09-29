@@ -36,7 +36,7 @@ import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { useMacroTargets } from '@/features/macros/hooks'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone, userTimezone } from '@/lib/time'
-import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
+import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { useWearableSleepNights } from '@/features/wearables/hooks'
 import { addDaysIso } from '@/features/wearables/sleep-detail'
 import { AiCta } from '@/components/AiCta'
@@ -1556,7 +1556,7 @@ function SurpriseHero({ surprise }: { surprise: Surprise }) {
           la frase, para que nunca parezca que Stelar lo adivinó. */}
       {surprise.fromWatch ? (
         <View style={styles.surpriseSource}>
-          <WatchGlyph color={colors.niebla} size={13} />
+          <WatchMark past inline={false} />
           <Text style={styles.surpriseSourceText}>Con datos de tu smartwatch</Text>
         </View>
       ) : null}

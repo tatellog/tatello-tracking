@@ -99,6 +99,12 @@ const complete = (s: DailySignals) => dayQuality(s) === 'completo'
 
 /* ── Detectores ─────────────────────────────────────────────────────── */
 
+/** ¿La mayoría de estos días trae el sueño del reloj? */
+function fromWatchMostly(days: readonly DailySignals[]): boolean {
+  if (days.length === 0) return false
+  return days.filter((s) => s.sleep_source === 'wearable').length * 2 > days.length
+}
+
 /** Noche corta (< 6 h) → las calorías de ESE día, contra noches de 7 h o más. */
 export function shortNightEffect(signals: readonly DailySignals[]): Surprise | null {
   const days = byDay(signals).filter(complete)
@@ -122,6 +128,8 @@ export function shortNightEffect(signals: readonly DailySignals[]): Surprise | n
     expected: false,
     delayed: true,
     contradicts: false,
+    // La mayoría de esas noches las contó el reloj: la tarjeta lo dice.
+    fromWatch: fromWatchMostly([...short, ...good]),
   }
 }
 

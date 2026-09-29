@@ -34,6 +34,7 @@ import { EmblemFramePreloader, TuEmblemaModal, useTransformProgress } from '@/fe
 import { useRecentWorkoutDates } from '@/features/progress/hooks'
 import { useRestToday, useSetRestForDate, useSetRestToday } from '@/features/rest/hooks'
 import { useSleepLog } from '@/features/sleep/hooks'
+import { SmartwatchRow } from '@/features/wearables/components/SmartwatchRow'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
 import {
   useAppleHealthSyncNow,
@@ -764,6 +765,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               turn.sleep !== 'ask' ? (
                 <WearableInviteLine />
               ) : null}
+              {/* Con el reloj conectado, la entrada fija a "Tu smartwatch". */}
+              {!viewingPast ? <SmartwatchRow /> : null}
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre

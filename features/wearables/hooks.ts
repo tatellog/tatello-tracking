@@ -19,6 +19,7 @@ import { todayInTimezone, userTimezone } from '@/lib/time'
 
 import {
   getLatestWearableWeight,
+  getHealthSummary,
   getWearableSleepNights,
   getWearableWeights,
   upsertWearableBodyComposition,
@@ -564,6 +565,18 @@ export function useWearableSleepNights(fromDay: string, toDay: string) {
   return useQuery({
     queryKey: queryKeys.wearables.sleepNights(userId, fromDay, toDay),
     queryFn: () => getWearableSleepNights(fromDay, toDay),
+    enabled: userId !== '',
+    staleTime: 60_000,
+  })
+}
+
+/** Entrenos, pasos y agua de Salud en [fromDay, toDay] (pantalla "Tu smartwatch"). */
+export function useHealthSummary(fromDay: string, toDay: string) {
+  const { session } = useSession()
+  const userId = session?.user?.id ?? ''
+  return useQuery({
+    queryKey: queryKeys.wearables.summary(userId, fromDay, toDay),
+    queryFn: () => getHealthSummary(fromDay, toDay),
     enabled: userId !== '',
     staleTime: 60_000,
   })
