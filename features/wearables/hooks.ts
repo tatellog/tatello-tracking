@@ -29,6 +29,8 @@ import {
   upsertWearableWorkouts,
 } from './api'
 import {
+  disableHealthBackgroundDelivery,
+  enableHealthBackgroundDelivery,
   isHealthKitAvailable,
   readBodyComposition,
   readBodyMass,
@@ -56,6 +58,9 @@ const connectedKey = (userId: string) => `stelar.wearables.apple_health.connecte
 const lastSyncKey = (userId: string) => `stelar.wearables.apple_health.last_sync:${userId}`
 /* Último día con sueño del reloj (para re-consultar seguido en la mañana). */
 const lastSleepDayKey = (userId: string) => `stelar.wearables.apple_health.sleep_day:${userId}`
+/* Background delivery ya configurado en este teléfono (se configura una vez;
+ * el lado nativo lo persiste y lo re-registra en cada arranque). */
+const BACKGROUND_KEY = 'stelar.wearables.apple_health.background:v1'
 /* Báscula (spec §9): opt-in aparte del canal, con su propio permiso de Salud. */
 const scaleEnabledKey = (userId: string) => `stelar.wearables.scale.enabled:${userId}`
 /* Última lectura de la báscula que la usuaria YA VIO (para el punto del ícono). */
@@ -200,6 +205,7 @@ export function useAppleHealthConnection(): {
       await AsyncStorage.setItem(connectedKey(userId), 'true').catch(() => {})
       setConnected(true)
       track('wearable_connected', { source: 'apple_health' })
+      void ensureBackgroundDelivery()
 
       const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS, {
         scale: await isScaleEnabled(userId),
@@ -228,9 +234,20 @@ export function useAppleHealthConnection(): {
     await AsyncStorage.setItem(connectedKey(userId), 'false').catch(() => {})
     setConnected(false)
     track('wearable_disconnected', { source: 'apple_health' })
+    await AsyncStorage.removeItem(BACKGROUND_KEY).catch(() => {})
+    void disableHealthBackgroundDelivery()
   }, [userId])
 
   return { available, connected, lastSyncAt, busy, connect, disconnect }
+}
+
+/** Enciende el background delivery una vez por teléfono (idempotente). */
+async function ensureBackgroundDelivery(): Promise<void> {
+  const done = await AsyncStorage.getItem(BACKGROUND_KEY).catch(() => null)
+  if (done === 'true') return
+  if (await enableHealthBackgroundDelivery()) {
+    await AsyncStorage.setItem(BACKGROUND_KEY, 'true').catch(() => {})
+  }
 }
 
 /* Un solo sync a la vez en toda la app (el de fondo y el pull de Hoy). */
@@ -311,7 +328,16 @@ export function useAppleHealthSync(): void {
 
   useEffect(() => {
     if (!userId) return
-    void runAppleHealthSync(userId, qc, false)
+    // iOS despertó la app en segundo plano porque Salud recibió sueño o un
+    // entreno (background delivery): hay dato nuevo seguro, se lee sin
+    // esperar el intervalo. En un arranque normal, el throttle de siempre.
+    const wokenByHealth = AppState.currentState === 'background'
+    void (async () => {
+      const connected = await AsyncStorage.getItem(connectedKey(userId)).catch(() => null)
+      if (connected === 'true') await ensureBackgroundDelivery()
+      await runAppleHealthSync(userId, qc, wokenByHealth)
+      if (wokenByHealth) track('wearable_background_wake', { source: 'apple_health' })
+    })()
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void runAppleHealthSync(userId, qc, false)
     })
@@ -434,6 +460,7 @@ export function useScaleConnection(): {
       await AsyncStorage.setItem(scaleEnabledKey(userId), 'true').catch(() => {})
       // El canal queda conectado también (la báscula vive dentro de Salud).
       await AsyncStorage.setItem(connectedKey(userId), 'true').catch(() => {})
+      void ensureBackgroundDelivery()
       setEnabled(true)
       track('scale_enabled', { source: 'apple_health' })
       const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS, { scale: true })
