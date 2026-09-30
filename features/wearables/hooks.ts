@@ -33,6 +33,7 @@ import {
   disableHealthBackgroundDelivery,
   enableHealthBackgroundDelivery,
   isHealthKitAvailable,
+  subscribeHealthChanges,
   readBodyComposition,
   readBodyMass,
   readDailySteps,
@@ -304,7 +305,10 @@ async function runAppleHealthSync(
     if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
       void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     }
-    if (counts.weightDays + counts.sleepDays > 0) {
+    if (
+      counts.workouts + counts.weightDays + counts.sleepDays + counts.stepDays + counts.waterDays >
+      0
+    ) {
       void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
     }
     if (counts.weightDays > 0) {
@@ -342,7 +346,31 @@ export function useAppleHealthSync(): void {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void runAppleHealthSync(userId, qc, false)
     })
-    return () => sub.remove()
+    // Con la app abierta, Salud avisa en cuanto llega sueño o un entreno
+    // (Garmin Connect suele escribir minutos después del sync de apertura):
+    // se lee en ese momento, sin esperar el intervalo. Debounce: Garmin
+    // escribe en ráfaga (entreno + energía + sueño) y basta un sync.
+    let debounce: ReturnType<typeof setTimeout> | null = null
+    let stop: (() => void) | null = null
+    let alive = true
+    void subscribeHealthChanges(() => {
+      if (debounce) clearTimeout(debounce)
+      debounce = setTimeout(() => {
+        debounce = null
+        void runAppleHealthSync(userId, qc, true).then((ran) => {
+          if (ran) track('wearable_live_sync', { source: 'apple_health' })
+        })
+      }, 4_000)
+    }).then((unsub) => {
+      if (alive) stop = unsub
+      else unsub()
+    })
+    return () => {
+      alive = false
+      sub.remove()
+      if (debounce) clearTimeout(debounce)
+      stop?.()
+    }
   }, [userId, qc])
 }
 

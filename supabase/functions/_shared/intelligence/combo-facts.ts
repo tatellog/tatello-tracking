@@ -370,6 +370,40 @@ export function comboToday(
   })
 }
 
+/* ── El "Highlight" de Tu smartwatch ───────────────────────────────── */
+
+const HABIT_NOUN_DAY: Record<string, string> = {
+  sueno: '7 h de sueño',
+  cuerpo: 'el entreno',
+  proteina: 'tu proteína',
+  agua: 'tu agua',
+}
+
+/** La frase de arriba en "Tu smartwatch" (determinista, sin IA): conecta lo que
+ *  trajo el reloj con SU día fuerte, lo que Salud no puede decirle. Nombra lo
+ *  que pasó y, si todavía cabe, qué lo completaría (oportunidad, nunca falta).
+ *  Nunca kcal ni peso. Null si hoy no pasó nada que contar. */
+export function comboTodayHighlight(habits: readonly ComboTodayHabit[]): string | null {
+  if (habits.length === 0) return null
+  const told: string[] = []
+  for (const h of habits) {
+    if (h.key === 'sueno' && h.value && h.status !== 'open') told.push(`dormiste ${h.value}`)
+    else if (h.key === 'cuerpo' && h.status === 'on') told.push('entrenaste')
+    else if (h.key === 'cuerpo' && h.status === 'rest') told.push('hoy descansas')
+    else if (h.status === 'on') told.push(`llegaste a ${HABIT_NOUN_DAY[h.key] ?? h.key}`)
+  }
+  if (told.length === 0) return null
+  const first = joinList(told)
+  const lead = `${first.charAt(0).toUpperCase()}${first.slice(1)}.`
+  if (habits.every((h) => h.status === 'on')) return `${lead} Hoy ya es día fuerte.`
+  if (habits.some((h) => h.status === 'rest')) return `${lead} Mañana puede ser día fuerte.`
+  if (habits.some((h) => h.key === 'sueno' && h.status === 'closed')) {
+    return `${lead} Tus días fuertes empiezan con 7 h de sueño.`
+  }
+  const open = habits.filter((h) => h.status === 'open').map((h) => HABIT_NOUN_DAY[h.key] ?? h.key)
+  return `${lead} Con ${joinList(open)}, hoy sería día fuerte.`
+}
+
 /* ── Tu día fuerte (sep 2026): la prueba en kcal y tus días reales ────── */
 
 /** Cuánto quedas contra tu meta de calorías, en promedio: los días con el

@@ -111,6 +111,40 @@ export async function enableHealthBackgroundDelivery(): Promise<boolean> {
   }
 }
 
+/**
+ * Con la app ABIERTA, avisa cuando Salud recibe sueño o entrenos nuevos (el
+ * caso real: Garmin Connect escribe el entreno un minuto después de que Stelar
+ * sincronizó, y el intervalo de 15 min lo dejaba fuera). HKObserverQuery avisa
+ * una vez al registrarse; ese primer aviso se ignora (ya hay sync al abrir).
+ * Devuelve la función para dejar de escuchar. Best-effort: sin módulo, no-op.
+ */
+export async function subscribeHealthChanges(onChange: () => void): Promise<() => void> {
+  const mod = await hk()
+  if (!mod) return () => {}
+  const armedAt = Date.now() + 3_000
+  const subs: { remove: () => unknown }[] = []
+  for (const id of BACKGROUND_TYPES) {
+    try {
+      subs.push(
+        mod.subscribeToChanges(id as Parameters<HealthKitModule['subscribeToChanges']>[0], () => {
+          if (Date.now() >= armedAt) onChange()
+        }),
+      )
+    } catch {
+      // Tipo sin permiso o módulo viejo: se sigue con los demás.
+    }
+  }
+  return () => {
+    for (const sub of subs) {
+      try {
+        sub.remove()
+      } catch {
+        // Ya estaba cerrada.
+      }
+    }
+  }
+}
+
 /** Deja de despertar la app (al desconectar el reloj). */
 export async function disableHealthBackgroundDelivery(): Promise<void> {
   const mod = await hk()
