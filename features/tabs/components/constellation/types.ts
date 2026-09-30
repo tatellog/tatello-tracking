@@ -65,6 +65,10 @@ export type Props = {
    *  padre vía `useHeroReaction`). null = en reposo. Se ignora sin foco y
    *  bajo reduce-motion. */
   reaction?: HeroReaction | null
+  /** Dónde está la estrella alfa (el corazón de la figura) en px, relativo al
+   *  lienzo cuadrado de la constelación, y el lado del lienzo. La celebración
+   *  full-screen de Hoy la usa para que el oro caiga justo en esa estrella. */
+  onHeartLayout?: (p: { x: number; y: number; canvas: number }) => void
 }
 
 export type AmbientStar = { x: number; y: number; r: number; baseOp: number; sparkle: boolean }

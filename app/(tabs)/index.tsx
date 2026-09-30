@@ -1,9 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useIsFocused } from '@react-navigation/native'
 import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
-import LottieView from 'lottie-react-native'
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -15,10 +16,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { emitCelebrate } from '@/features/tabs/celebrate-bus'
+import { signName } from '@/features/tabs/zodiac/name'
+import { useSession } from '@/hooks/useSession'
 import { usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
 import { HomeError } from '@/features/home/components'
-import { emitCelebrate } from '@/features/tabs/celebrate-bus'
 import { useDayRollover } from '@/features/home/useDayRollover'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useHomeCadence, type Cadence } from '@/features/home/useHomeCadence'
@@ -97,6 +100,12 @@ import { colors } from '@/theme'
  * Owned here (the action handlers) rather than in DayCheckIn or the
  * constellation, so the body's reward fires with the user's choice.
  */
+/** El anillo dorado del arte del emblema, como fracción del lado del lienzo. */
+const RING_CY = 0.505
+const RING_R = 0.405
+/** Espera a que el check-in termine de colapsarse antes de medir el emblema. */
+const CELEBRATE_SETTLE_MS = 380
+
 function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
   if (kind === 'rested') {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
@@ -204,7 +213,6 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   useEffect(() => subscribeReturnToToday(() => setSelectedDate(ctx.date)), [ctx.date])
 
   const reducedMotion = useReducedMotion()
-  const [celebrateKey, setCelebrateKey] = useState(0)
   // True for the duration of the reward animation. Pauses the constellation's
   // AMBIENT loops (twinkle/drift/breath) so the UI thread is free for the
   // star ignition + the fireworks Lottie + the Skia flash that all fire at
@@ -220,9 +228,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     return () => clearTimeout(id)
   }, [celebrating])
 
-  // El flash dorado full-screen ahora vive GLOBAL en el (tabs) layout
-  // (CelebrationOverlay) para cubrir también la barra de tabs; Hoy solo lo
-  // dispara por el bus (emitCelebrate) al marcar "Entrené".
+  // La celebración de "Entrené" vive DENTRO de la constelación (SparkVortex,
+  // oct 2026): reemplazó a los fuegos Lottie y al flash dorado full-screen.
 
   // Pause the constellation's animation loops while the page is actively
   // scrolling so the UI thread isn't split between scroll frames and the
@@ -396,10 +403,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (!firstStarFired || firstStarPlayed.current) return
     firstStarPlayed.current = true
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    if (!reducedMotion && !celebrating) {
-      setCelebrating(true)
-      setCelebrateKey((k) => k + 1)
-    }
+    if (!celebrating) fireCelebration('Tu primera estrella', `Aquí empieza tu ${signProper}.`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstStarFired, reducedMotion, celebrating])
 
   const trainedThisMonth = month.trainedThisMonth
@@ -424,6 +429,39 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
 
   const sign = useMemo(() => zodiacFromDate(profile?.date_of_birth), [profile?.date_of_birth])
   const signLabel = ZODIAC[sign].label
+  const signProper = signName(sign)
+
+  // La celebración full-screen (RingCelebration, en el layout de tabs): nace
+  // del anillo dorado del emblema (centrado en su lienzo cuadrado, radio 40.5 %
+  // del ancho) y el oro regresa a la estrella del corazón, que reporta la
+  // constelación (onHeartLayout). Se mide DESPUÉS de que el check-in se colapsa
+  // al responder: medir en el tap dejaba la corona ~30 pt abajo del emblema,
+  // que sube cuando los botones pasan a una sola línea.
+  const constellationRef = useRef<View>(null)
+  const heartRef = useRef<{ x: number; y: number; canvas: number } | null>(null)
+  const fireCelebration = (title: string, subtitle?: string) => {
+    if (reducedMotion) return
+    setCelebrating(true)
+    setTimeout(() => {
+      constellationRef.current?.measureInWindow((x, y, w) => {
+        if (!w) return
+        const heart = heartRef.current
+        const side = heart?.canvas ?? w
+        const ox = x + (w - side) / 2
+        const cx = ox + side / 2
+        const cy = y + side * RING_CY
+        emitCelebrate({
+          cx,
+          cy,
+          r: side * RING_R,
+          tx: heart ? ox + heart.x : cx,
+          ty: heart ? y + heart.y : cy,
+          title,
+          subtitle,
+        })
+      })
+    }, CELEBRATE_SETTLE_MS)
+  }
 
   // Orquestador de Revelaciones — única fuente de momentos full-screen en Hoy
   // (Regreso > Transformación > Patrón). Reemplaza al usePatternDetection
@@ -479,6 +517,42 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // Entreno sellado por el reloj: sin registro manual, sin descanso marcado.
   const trainedByWearable =
     !vctx.today_workout_completed && !restedToday && wearable.workout != null
+
+  // El entreno llegó DEL RELOJ con Hoy abierto (sync de apertura o en vivo):
+  // misma celebración que tocar "Entrené" (dueña 30 sep 2026). Una vez por día
+  // y por usuaria (persistido: reabrir la app no la repite). Si llega con Hoy
+  // tapado, espera a que vuelva al frente. Solo la TRANSICIÓN celebra: si al
+  // montar ya venía del reloj, no hay nada nuevo que festejar.
+  const watchTrainedToday = !viewingPast && trainedByWearable
+  const prevWatchTrained = useRef(watchTrainedToday)
+  const pendingWatchCelebration = useRef(false)
+  const hoyFocused = useIsFocused()
+  const uidForCelebration = useSession().session?.user?.id ?? 'anon'
+  const celebrateWatchWorkout = () => {
+    playCommitHaptic('trained')
+    fireCelebration('Tu reloj trajo tu entreno', `Una luz más en tu ${signProper}.`)
+    track('workout_celebrated', { source: 'wearable' })
+  }
+  useEffect(() => {
+    const was = prevWatchTrained.current
+    prevWatchTrained.current = watchTrainedToday
+    if (!watchTrainedToday || was) return
+    const key = `stelar.watch-workout-celebrated:${uidForCelebration}:${todayIsoLocal}`
+    void (async () => {
+      const done = await AsyncStorage.getItem(key).catch(() => null)
+      if (done) return
+      await AsyncStorage.setItem(key, '1').catch(() => {})
+      if (hoyFocused) celebrateWatchWorkout()
+      else pendingWatchCelebration.current = true
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchTrainedToday])
+  useEffect(() => {
+    if (!hoyFocused || !pendingWatchCelebration.current) return
+    pendingWatchCelebration.current = false
+    celebrateWatchWorkout()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoyFocused])
 
   // Modo confirmación (spec §9): lo que el reloj ya trajo NO se pregunta. Las
   // filas de entreno y sueño nacen respondidas, con la misma gramática del
@@ -612,13 +686,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     if (alreadyTrained) return
     const wasFirstDay = isFirstDay
     playCommitHaptic('trained')
-    // Only gate on the reward when it actually plays (reduced motion shows
-    // no Lottie → onAnimationFinish would never fire → stuck paused).
-    if (!reducedMotion) setCelebrating(true)
-    setCelebrateKey((k) => k + 1)
-    // Flash dorado full-screen (global, cubre la tab bar). El celebrateKey
-    // local sigue manejando el Lottie de fuegos sobre la constelación.
-    if (!reducedMotion) emitCelebrate()
+    // La corona de chispas del anillo, a pantalla completa (RingCelebration).
+    fireCelebration('Entrenaste hoy', `Una luz más en tu ${signProper}.`)
     if (wasFirstDay) {
       qc.invalidateQueries({ queryKey: queryKeys.profile.all })
     }
@@ -800,7 +869,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 accessibilityLabel={`Tu ${signLabel}. ${heroPct} por ciento de tu figura, ${trainedThisMonth} de ${figureCount}. Ver tus estrellas`}
               >
                 <Animated.View style={[styles.heroInner, heroPress.animatedStyle]}>
-                  <View style={styles.constellationBox}>
+                  <View ref={constellationRef} collapsable={false} style={styles.constellationBox}>
                     {/* El progreso lo lleva el contador NATIVO de la
                         constelación ("10 / 19 luces", animado con el commit).
                         Ya no hay barra/conteo duplicado aquí abajo; tocar la
@@ -814,22 +883,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                       suppressBurst
                       pausedSV={constellationPaused}
                       reaction={heroReaction}
+                      onHeartLayout={(p) => {
+                        heartRef.current = p
+                      }}
                     />
-
-                    {!reducedMotion && celebrateKey > 0 ? (
-                      <View pointerEvents="none" style={styles.celebration}>
-                        <LottieView
-                          key={celebrateKey}
-                          source={require('../../assets/lottie/gold-fireworks.json')}
-                          autoPlay
-                          loop={false}
-                          speed={0.6}
-                          resizeMode="contain"
-                          style={styles.celebrationLottie}
-                          onAnimationFinish={() => setCelebrating(false)}
-                        />
-                      </View>
-                    ) : null}
                   </View>
                 </Animated.View>
               </Pressable>
@@ -1116,15 +1173,6 @@ const styles = StyleSheet.create({
     // forzar aspectRatio en el wrapper medía mal la altura y los elementos de
     // abajo (progreso, coach) se metían DENTRO de la figura.
     marginHorizontal: -20,
-  },
-  celebration: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  celebrationLottie: {
-    width: '100%',
-    height: '100%',
   },
   coachLineWrap: {
     marginTop: 12,
