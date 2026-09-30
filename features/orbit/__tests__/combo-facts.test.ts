@@ -12,6 +12,7 @@ import {
   comboDayCards,
   comboKcalGap,
   comboToday,
+  comboTodayHighlight,
   fmtKcalDelta,
   comboWeekMeter,
   comboWeekHook,
@@ -386,5 +387,42 @@ describe('tu día fuerte', () => {
     expect(fmtKcalDelta(-1310)).toBe('−1,310 kcal')
     expect(fmtKcalDelta(80)).toBe('+80 kcal')
     expect(fmtKcalDelta(0)).toBe('0 kcal')
+  })
+})
+
+describe('la frase de Tu smartwatch', () => {
+  const h = (
+    key: string,
+    status: 'on' | 'open' | 'rest' | 'closed',
+    value: string | null = null,
+  ) => ({
+    key,
+    status,
+    value,
+    fromWatch: false,
+  })
+  it('noche corta + entreno: nombra lo que pasó y la receta, sin culpa', () => {
+    expect(comboTodayHighlight([h('sueno', 'closed', '6 h 18'), h('cuerpo', 'on', 'Fuerza')])).toBe(
+      'Dormiste 6 h 18 y entrenaste. Tus días fuertes empiezan con 7 h de sueño.',
+    )
+  })
+  it('todo cumplido', () => {
+    expect(comboTodayHighlight([h('sueno', 'on', '7 h 30'), h('cuerpo', 'on', 'Fuerza')])).toBe(
+      'Dormiste 7 h 30 y entrenaste. Hoy ya es día fuerte.',
+    )
+  })
+  it('a la mitad: qué lo completaría', () => {
+    expect(comboTodayHighlight([h('sueno', 'on', '7 h 30'), h('cuerpo', 'open')])).toBe(
+      'Dormiste 7 h 30. Con el entreno, hoy sería día fuerte.',
+    )
+  })
+  it('descanso', () => {
+    expect(comboTodayHighlight([h('sueno', 'on', '7 h 30'), h('cuerpo', 'rest', 'Descanso')])).toBe(
+      'Dormiste 7 h 30 y hoy descansas. Mañana puede ser día fuerte.',
+    )
+  })
+  it('sin nada que contar, sin frase', () => {
+    expect(comboTodayHighlight([h('sueno', 'open'), h('cuerpo', 'open')])).toBeNull()
+    expect(comboTodayHighlight([])).toBeNull()
   })
 })

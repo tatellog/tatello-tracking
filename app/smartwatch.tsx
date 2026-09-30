@@ -1,9 +1,12 @@
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import type { ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { comboTodayHighlight } from '@/features/orbit/combo-facts'
+import { useStrongDay } from '@/features/orbit/strong-day'
 import { SkyBackground } from '@/features/tabs/components'
 import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import {
@@ -12,7 +15,6 @@ import {
   lastSevenSteps,
   stepsOfDay,
   waterOfDay,
-  workoutLineText,
   workoutsOfDay,
 } from '@/features/wearables/health-summary'
 import {
@@ -28,12 +30,18 @@ import { todayInTimezone, userTimezone } from '@/lib/time'
 import { colors, radius, typography } from '@/theme'
 
 /*
- * Tu smartwatch · todo lo que trajo el reloj y la báscula en un solo lugar
- * (dueña 29 sep 2026: "todo lo que venga del reloj lleva el ícono y hay una
- * sección que abre el detalle"). La abre la fila de Hoy y cualquier ícono del
- * reloj de la app. Muestra lo de hoy (sueño, entrenos por sesión, pasos, agua),
- * los pasos de la semana y la última lectura de la báscula. Es procedencia, no
- * metas: sin calificar la noche, sin meta de pasos, lo manual siempre gana.
+ * Tu smartwatch · lo que trajo el reloj que le importa a tu proceso (dueña
+ * 30 sep 2026: "me gusta más cómo lo presenta Apple, solo lo importante").
+ *
+ * Anatomía de tarjeta tomada de Salud (categoría con ícono y color arriba a la
+ * izquierda, hora del dato arriba a la derecha, valor grande con unidad chica,
+ * mini barras a la derecha), con la paleta tenue de Stelar. Solo los tres datos
+ * que alimentan "Tu día fuerte": sueño, entreno y pasos. Arriba, la frase del
+ * motor (no IA, sin ✦) que conecta el dato con SU día fuerte y lleva a
+ * Descubre. Lo que no llegó se dice en una línea al pie, sin tarjetas vacías.
+ * Las kcal del entreno van chicas: procedencia, nunca "comida ganada" (spec
+ * wearables: sin eat-back). El peso no se muestra aquí: la báscula es una fila
+ * que abre su pantalla.
  */
 export default function SmartwatchScreen() {
   return (
@@ -43,9 +51,8 @@ export default function SmartwatchScreen() {
   )
 }
 
-const BAR_MAX = 64
-
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const MINI_MAX = 30
 
 function shortDate(iso: string): string {
   const [, m, d] = iso.split('-').map(Number)
@@ -63,16 +70,28 @@ function SmartwatchBody() {
   const summary = useHealthSummary(from, today)
   const nights = useWearableSleepNights(today, today)
   const weight = useLatestWearableWeight(scale.enabled === true)
+  const strong = useStrongDay()
 
   const sync = relativeSyncLabel(conn.lastSyncAt, new Date())
   const night = nights.data?.find((n) => n.sleep_date === today) ?? null
   const data = summary.data ?? { workouts: [], steps: [], water: [] }
   const workouts = workoutsOfDay(data.workouts, today, tz)
-  const waterMl = waterOfDay(data, today)
+  const totalMin = workouts.reduce((a, w) => a + (w.minutes ?? 0), 0)
+  const kcal = workouts.reduce((a, w) => a + (w.kcal ?? 0), 0)
+  const lastWorkout = workouts[workouts.length - 1] ?? null
   const steps = stepsOfDay(data, today)
+  const waterMl = waterOfDay(data, today)
   const bars = lastSevenSteps(data, today)
   const avg = averageSteps(bars)
   const barScale = Math.max(1, ...bars.map((b) => b.steps ?? 0))
+  const highlight = strong.combo ? comboTodayHighlight(strong.today) : null
+
+  // Lo que no llegó, en una línea (sin tarjetas vacías).
+  const missing = [
+    night ? null : 'sueño de anoche',
+    workouts.length > 0 ? null : 'entrenos',
+    steps != null ? null : 'pasos',
+  ].filter((x): x is string => x != null)
 
   return (
     <View style={styles.screen}>
@@ -94,11 +113,11 @@ function SmartwatchBody() {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.source}>
-            <WatchGlyph color={colors.niebla} size={13} />
+            <WatchGlyph color={colors.bone} size={13} />
             <Text style={styles.sourceText}>
               {conn.connected === false
                 ? 'Tu reloj no está conectado'
-                : `Tu reloj y tu báscula${sync ? ` · sincronizado ${sync}` : ''}`}
+                : `Reloj y báscula${sync ? ` · sincronizado ${sync}` : ''}`}
             </Text>
           </View>
 
@@ -108,155 +127,176 @@ function SmartwatchBody() {
               accessibilityRole="button"
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             >
-              <Text style={styles.cardTitle}>Conecta tu reloj</Text>
-              <Text style={styles.muted}>
-                Anota tu entreno, tu sueño, tus pasos y tu agua por ti. Nada sale de tu cuenta.
+              <Text style={styles.highlightText}>
+                Conecta tu reloj y anota tu entreno, tu sueño y tus pasos por ti.
               </Text>
-              <Text style={styles.cta}>Conectar ›</Text>
+              <Text style={styles.highlightLink}>Conectar ›</Text>
             </Pressable>
           ) : (
             <>
-              <Text style={styles.kicker}>HOY</Text>
+              {/* La frase del motor: tu dato conectado con tu día fuerte. */}
+              {highlight ? (
+                <Pressable
+                  onPress={() => router.push('/orbit')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${highlight} Ver tu día fuerte.`}
+                  style={({ pressed }) => [
+                    styles.card,
+                    styles.highlight,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.highlightText}>{highlight}</Text>
+                  <Text style={styles.highlightLink}>Ver tu día fuerte ›</Text>
+                </Pressable>
+              ) : null}
 
-              {/* Sueño: abre su detalle con etapas. */}
-              <Pressable
-                onPress={() => router.push('/sleep')}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  night
-                    ? `Dormiste ${formatSleepShort(night.asleep_minutes)}. Ver tu sueño.`
-                    : 'Ver tu sueño'
-                }
-                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-              >
-                <View style={styles.rowHead}>
-                  <Text style={styles.cardTitle}>Sueño</Text>
-                  <Text style={styles.chevron}>›</Text>
-                </View>
-                {night ? (
+              {night ? (
+                <HealthCard
+                  glyph="☾"
+                  label="Sueño"
+                  tint={colors.dimension.sueno}
+                  when="anoche"
+                  onPress={() => router.push('/sleep')}
+                >
+                  <Text style={styles.value}>{formatSleepShort(night.asleep_minutes)}</Text>
+                </HealthCard>
+              ) : null}
+
+              {lastWorkout ? (
+                <HealthCard
+                  glyph="✦"
+                  label="Entreno"
+                  tint={colors.signal.entreno}
+                  when={lastWorkout.time}
+                >
                   <Text style={styles.value}>
-                    {formatSleepShort(night.asleep_minutes)}
-                    <Text style={styles.valueUnit}> anoche</Text>
+                    {totalMin > 0 ? totalMin : workouts.length}
+                    <Text style={styles.unit}>
+                      {totalMin > 0 ? ' min' : workouts.length === 1 ? ' sesión' : ' sesiones'}
+                      {'  '}
+                      {workouts.map((w) => w.label.toLowerCase()).join(' + ')}
+                    </Text>
                   </Text>
-                ) : (
-                  <Text style={styles.muted}>Todavía no llega el sueño de anoche.</Text>
-                )}
-              </Pressable>
-
-              {/* Entrenos: cada sesión (en Hoy solo se ve el total). */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Entrenos</Text>
-                {workouts.length > 0 ? (
-                  <View style={styles.list}>
-                    {workouts.map((w) => (
-                      <Text key={w.key} style={styles.listItem}>
-                        {workoutLineText(w)}
-                      </Text>
-                    ))}
+                  <View style={styles.provenance}>
+                    <WatchGlyph color={colors.bone} size={11} />
+                    <Text style={styles.provenanceText}>
+                      {`desde tu reloj${kcal > 0 ? ` · ~${formatCount(kcal)} kcal` : ''}`}
+                    </Text>
                   </View>
-                ) : (
-                  <Text style={styles.muted}>Hoy no llegó ningún entreno.</Text>
-                )}
-              </View>
+                </HealthCard>
+              ) : null}
 
-              {/* Pasos: el de hoy (dueña 29 sep 2026 lo pidió aquí, en el
-                  detalle; en Hoy sigue sin contador) y la semana. Sin meta. */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Pasos</Text>
-                {steps != null ? (
-                  <Text style={styles.value}>
-                    {formatCount(steps)}
-                    <Text style={styles.valueUnit}> hoy</Text>
-                  </Text>
-                ) : (
-                  <Text style={styles.muted}>Todavía no llegan los pasos de hoy.</Text>
-                )}
-                {bars.some((b) => b.steps != null) ? (
-                  <>
-                    <View style={styles.bars}>
+              {steps != null ? (
+                <HealthCard glyph="•" label="Pasos" tint={colors.leche} when="hoy">
+                  <View style={styles.valueRow}>
+                    <Text style={styles.value}>
+                      {formatCount(steps)}
+                      <Text style={styles.unit}> pasos</Text>
+                    </Text>
+                    <View style={styles.mini} accessible={false}>
                       {bars.map((b) => (
-                        <View key={b.day} style={styles.barCol}>
-                          <View style={styles.barTrack}>
-                            {b.steps != null && b.steps > 0 ? (
-                              <View
-                                style={[
-                                  styles.bar,
-                                  { height: Math.max(6, (b.steps / barScale) * BAR_MAX) },
-                                  b.selected && styles.barOn,
-                                ]}
-                              />
-                            ) : (
-                              <View style={styles.barEmpty} />
-                            )}
-                          </View>
-                          <Text style={[styles.barDay, b.selected && styles.barDayOn]}>
-                            {b.initial}
-                          </Text>
-                        </View>
+                        <View
+                          key={b.day}
+                          style={[
+                            styles.miniBar,
+                            {
+                              height: Math.max(3, ((b.steps ?? 0) / barScale) * MINI_MAX),
+                            },
+                            b.selected && styles.miniBarToday,
+                          ]}
+                        />
                       ))}
                     </View>
-                    {avg != null ? (
-                      <Text style={styles.foot}>
-                        Promedio de la semana:{' '}
-                        <Text style={styles.footStrong}>{formatCount(avg)} pasos</Text>
-                      </Text>
-                    ) : null}
-                  </>
-                ) : null}
-              </View>
+                  </View>
+                  {avg != null ? (
+                    <Text style={styles.caption}>{`Tu semana: ${formatCount(avg)} al día`}</Text>
+                  ) : null}
+                </HealthCard>
+              ) : null}
 
-              {/* Agua: lo que otras apps o el reloj escriben en Salud. */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Agua</Text>
-                {waterMl != null ? (
-                  <Text style={styles.value}>
-                    {formatCount(waterMl)}
-                    <Text style={styles.valueUnit}> mL hoy</Text>
-                  </Text>
-                ) : (
-                  <Text style={styles.muted}>Hoy no llegó agua desde Salud.</Text>
-                )}
-              </View>
+              {waterMl != null ? (
+                <Text
+                  style={styles.line}
+                >{`Agua desde Salud: ${formatCount(waterMl)} mL hoy`}</Text>
+              ) : null}
             </>
           )}
 
-          {/* La báscula vive en Salud también: su última lectura y su pantalla. */}
-          <Text style={styles.kicker}>TU BÁSCULA</Text>
+          {/* La báscula: una fila que abre su pantalla; el número vive allá. */}
           <Pressable
             onPress={() => router.push('/scale')}
+            hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Abrir tu báscula"
-            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.rowLink, pressed && styles.pressed]}
           >
-            <View style={styles.rowHead}>
-              <Text style={styles.cardTitle}>Peso</Text>
-              <Text style={styles.chevron}>›</Text>
-            </View>
-            {scale.enabled && weight.data ? (
-              <Text style={styles.value}>
-                {weight.data.weight_kg.toFixed(1).replace('.', ',')}
-                <Text style={styles.valueUnit}> kg · {shortDate(weight.data.day_date)}</Text>
-              </Text>
-            ) : (
-              <Text style={styles.muted}>
-                {scale.enabled ? 'Todavía no llega ninguna lectura.' : 'Conecta tu báscula.'}
-              </Text>
-            )}
+            <Text style={styles.rowLinkText}>
+              {scale.enabled && weight.data
+                ? `Báscula · última lectura ${shortDate(weight.data.day_date)}`
+                : 'Báscula · conectar'}
+            </Text>
+            <Text style={styles.rowLinkChevron}>›</Text>
           </Pressable>
 
-          <Text style={styles.note}>
-            Lo que anotas a mano siempre gana sobre lo de tu smartwatch.
-          </Text>
-          <Pressable
-            onPress={() => router.push('/connections')}
-            hitSlop={8}
-            accessibilityRole="button"
-            style={styles.manage}
-          >
-            <Text style={styles.manageText}>Administrar conexión ›</Text>
-          </Pressable>
+          <View style={styles.foot}>
+            {conn.connected !== false && missing.length > 0 ? (
+              <Text style={styles.footText}>{`Todavía no llega: ${missing.join(', ')}.`}</Text>
+            ) : null}
+            <Text style={styles.footText}>Lo que anotas a mano siempre gana.</Text>
+            <Pressable
+              onPress={() => router.push('/connections')}
+              hitSlop={8}
+              accessibilityRole="button"
+              style={styles.manage}
+            >
+              <Text style={styles.manageText}>Administrar conexión ›</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </SafeAreaView>
+    </View>
+  )
+}
+
+/* La tarjeta al estilo Salud: categoría con ícono y color arriba a la
+ * izquierda, cuándo llegó el dato arriba a la derecha, el valor debajo. */
+function HealthCard({
+  glyph,
+  label,
+  tint,
+  when,
+  onPress,
+  children,
+}: {
+  glyph: string
+  label: string
+  tint: string
+  when: string
+  onPress?: () => void
+  children: ReactNode
+}) {
+  const head = (
+    <View style={styles.cardHead}>
+      <Text style={[styles.cardLabel, { color: tint }]}>{`${glyph}  ${label}`}</Text>
+      <Text style={styles.cardWhen}>
+        {when}
+        {onPress ? '  ›' : ''}
+      </Text>
+    </View>
+  )
+  return onPress ? (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+    >
+      {head}
+      {children}
+    </Pressable>
+  ) : (
+    <View style={styles.card}>
+      {head}
+      {children}
     </View>
   )
 }
@@ -279,104 +319,115 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   content: { paddingHorizontal: 20, paddingBottom: 48 },
-  source: { marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  source: { marginTop: 4, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
   sourceText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  kicker: {
-    marginTop: 26,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.label,
-    letterSpacing: 1.2,
-    color: colors.niebla,
+    color: colors.bone,
   },
   card: {
     marginTop: 12,
-    padding: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     borderRadius: radius.cardLg,
-    borderWidth: 1,
-    borderColor: colors.hairline,
     backgroundColor: colors.bgCard,
   },
   pressed: { opacity: 0.8 },
-  rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: {
+  highlight: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.oroHairline },
+  highlightText: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.ui,
+    fontSize: typography.sizes.title,
+    lineHeight: 23,
     color: colors.leche,
   },
-  chevron: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.heading,
-    color: colors.niebla,
+  highlightLink: {
+    marginTop: 10,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.body,
+    color: colors.magenta,
   },
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  cardLabel: { fontFamily: typography.uiSemi, fontSize: typography.sizes.bodyLarge },
+  cardWhen: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
+  },
+  valueRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   value: {
-    marginTop: 8,
     fontFamily: typography.displaySemi,
-    fontSize: typography.sizes.displayMd,
-    letterSpacing: -0.6,
+    fontSize: typography.sizes.displayLg,
+    letterSpacing: -0.8,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  valueUnit: {
+  unit: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.bodyLarge,
     letterSpacing: 0,
     color: colors.bone,
   },
-  muted: {
-    marginTop: 8,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
-  },
-  cta: {
-    marginTop: 12,
-    fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.magenta,
-  },
-  list: { marginTop: 10, gap: 8 },
-  listItem: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-    fontVariant: ['tabular-nums'],
-  },
-  bars: { marginTop: 16, flexDirection: 'row', justifyContent: 'space-between' },
-  barCol: { flex: 1, alignItems: 'center' },
-  barTrack: { height: BAR_MAX, justifyContent: 'flex-end' },
-  bar: { width: 18, borderRadius: 5, backgroundColor: colors.bruma },
-  barOn: { backgroundColor: colors.signal.entreno },
-  barEmpty: { width: 18, height: 3, borderRadius: 2, backgroundColor: colors.hairline },
-  barDay: {
-    marginTop: 6,
+  provenance: { marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  provenanceText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    color: colors.niebla,
+    color: colors.bone,
   },
-  barDayOn: { color: colors.leche, fontFamily: typography.uiSemi },
-  foot: {
-    marginTop: 12,
+  mini: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    height: MINI_MAX,
+    marginBottom: 8,
+  },
+  miniBar: { width: 6, borderRadius: 2, backgroundColor: colors.bruma },
+  miniBarToday: { backgroundColor: colors.leche },
+  caption: {
+    marginTop: 6,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     color: colors.bone,
   },
-  footStrong: { fontFamily: typography.uiSemi, color: colors.leche },
-  note: {
-    marginTop: 24,
+  line: {
+    marginTop: 14,
+    marginLeft: 2,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  rowLink: {
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: radius.cardLg,
+    backgroundColor: colors.bgCard,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowLinkText: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
+  },
+  rowLinkChevron: { fontSize: typography.sizes.heading, color: colors.bone },
+  foot: { marginTop: 22, gap: 6 },
+  footText: {
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.body,
     lineHeight: 19,
-    color: colors.niebla,
+    color: colors.bone,
   },
-  manage: { marginTop: 10, alignSelf: 'flex-start' },
+  manage: { marginTop: 8, alignSelf: 'flex-start' },
   manageText: {
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
+    color: colors.leche,
   },
 })

@@ -1,37 +1,33 @@
 import { useEffect, useState } from 'react'
 import { useReducedMotion } from 'react-native-reanimated'
 
-import { CelebrateShockwave } from '@/features/home/components'
-
-import { subscribeCelebrate } from '../celebrate-bus'
+import { subscribeCelebrate, type CelebratePayload } from '../celebrate-bus'
+import { RingCelebration } from './RingCelebration'
 
 /*
- * Celebración full-screen GLOBAL — el flash dorado de "Entrené".
+ * Celebración full-screen GLOBAL de "Entrené" (RingCelebration: la corona de
+ * chispas del anillo del emblema).
  *
  * Vive en el (tabs) layout, DESPUÉS de <Tabs>, así su absoluteFill cubre toda
- * la pantalla incluyendo la barra de tabs (antes se montaba dentro de Hoy y se
- * cortaba justo arriba de la tab bar — la parte de abajo quedaba sin cubrir).
- *
- * Calienta el Canvas Skia en idle (~1.2 s) para que el primer flash no llegue
- * tarde, igual que antes. Se omite por completo con reduce-motion.
+ * la pantalla incluyendo la barra de tabs. Solo se monta mientras corre (≈3 s)
+ * y se desmonta sola; tocar la pantalla la cierra. Se omite con reduce-motion.
  */
 export function CelebrationOverlay() {
   const reducedMotion = useReducedMotion()
-  const [celebrateKey, setCelebrateKey] = useState(0)
-  // Warmup diferido: monta el Canvas en idle para compilar antes del 1er flash.
-  const [ready, setReady] = useState(false)
+  const [active, setActive] = useState<{ key: number; payload: CelebratePayload } | null>(null)
 
-  useEffect(() => {
-    const id = setTimeout(() => setReady(true), 1200)
-    return () => clearTimeout(id)
-  }, [])
+  useEffect(
+    () => subscribeCelebrate((payload) => setActive((a) => ({ key: (a?.key ?? 0) + 1, payload }))),
+    [],
+  )
 
-  useEffect(() => subscribeCelebrate(() => setCelebrateKey((k) => k + 1)), [])
-
-  // Reduce-motion: sin flash. Antes del warmup y sin celebración aún: nada.
-  if (reducedMotion || (!ready && celebrateKey === 0)) return null
-
-  // CelebrateShockwave ya es absoluteFill + pointerEvents="none"; aquí cubre el
-  // root View del layout = pantalla completa con tab bar incluida.
-  return <CelebrateShockwave celebrateKey={celebrateKey} />
+  if (reducedMotion || !active) return null
+  return (
+    <RingCelebration
+      key={active.key}
+      payload={active.payload}
+      playKey={active.key}
+      onDone={() => setActive(null)}
+    />
+  )
 }

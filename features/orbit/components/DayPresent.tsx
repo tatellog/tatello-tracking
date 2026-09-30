@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -95,19 +96,19 @@ const ABSENT_TONE: Record<string, string> = {
 
 const RING_SIZE = 208
 // Tamaño en pantalla: con la leyenda a su lado. 150 se quedaba chico en
-// Descubre (dueña 28 sep 2026); 172 cabe con la leyenda en una línea. El SVG
-// conserva su viewBox de 208 y escala.
-const RING_DISPLAY = 172
+// Descubre (dueña 28 sep 2026) y 172 también (30 sep 2026: "más grandes"). El
+// SVG conserva su viewBox de 208 y escala.
+const RING_DISPLAY = 212
 const CENTER = RING_SIZE / 2 // 104
 // El aura respira más allá del borde del anillo (bloom).
 
 // Tres anillos concéntricos (radios de la línea media). Exterior = calorías (el
 // norte de la app), medio = proteína, interior = entreno (binario). sw 8, ~9px
 // de aire entre bordes → premium, sin apretar.
-const RING_SW = 8
-const RING_OUTER_R = 91 // calorías / déficit
-const RING_MID_R = 74 // proteína
-const RING_INNER_R = 57 // entreno
+const RING_SW = 10
+const RING_OUTER_R = 90 // calorías / déficit
+const RING_MID_R = 75 // proteína
+const RING_INNER_R = 60 // entreno
 const C_OUTER = 2 * Math.PI * RING_OUTER_R
 const C_MID = 2 * Math.PI * RING_MID_R
 const C_INNER = 2 * Math.PI * RING_INNER_R
@@ -164,8 +165,21 @@ type RingSpec = {
  *  propio fill al entrar (one-shot, respeta reduce-motion). Cada anillo lleva su
  *  color de dimensión. Devuelve un fragmento de elementos SVG → vive dentro del
  *  <Svg> rotado -90 del padre (arranca arriba, la punta viaja con él). */
-function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
+function RingArc({
+  spec,
+  reduce,
+  playKey,
+}: {
+  spec: RingSpec
+  reduce: boolean
+  /** Cada valor nuevo redibuja el anillo desde cero (al volver a Descubre). */
+  playKey: number
+}) {
   const { r, c } = spec
+  // Anillo cerrado (lleno): al terminar de dibujarse, un destello recorre la
+  // vuelta una vez y el anillo brilla un momento. Premia sin hacer ruido.
+  const closed = spec.show && spec.fill >= 1
+  const sweep = useSharedValue(0)
 
   const progress = useSharedValue(reduce ? spec.fill : 0)
   const overflow = useSharedValue(reduce ? (spec.overflow ?? 0) : 0)
@@ -175,6 +189,15 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
       overflow.value = spec.overflow ?? 0
       return
     }
+    progress.value = 0
+    overflow.value = 0
+    sweep.value = 0
+    if (closed) {
+      sweep.value = withDelay(
+        spec.delay + 1150,
+        withTiming(1, { duration: 950, easing: Easing.inOut(Easing.cubic) }),
+      )
+    }
     progress.value = withDelay(
       spec.delay,
       withTiming(spec.fill, { duration: 1300, easing: Easing.bezier(0.2, 0.7, 0.2, 1) }),
@@ -183,7 +206,7 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
       1100,
       withTiming(spec.overflow ?? 0, { duration: 700, easing: Easing.out(Easing.quad) }),
     )
-  }, [progress, overflow, spec.fill, spec.overflow, spec.delay, reduce])
+  }, [progress, overflow, sweep, closed, spec.fill, spec.overflow, spec.delay, reduce, playKey])
 
   const arcProps = useAnimatedProps(() => ({ strokeDasharray: [c * progress.value, c] }))
   const overflowProps = useAnimatedProps(() => ({ strokeDasharray: [c * overflow.value, c] }))
@@ -199,7 +222,13 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
   // se dibuja una vez al entrar y queda quieto.
   const bloomProps = useAnimatedProps(() => ({
     strokeDasharray: [c * progress.value, c],
-    opacity: spec.bloomOpacity,
+    opacity: spec.bloomOpacity + 0.5 * Math.sin(sweep.value * Math.PI),
+  }))
+  // El destello del cierre: un tramo corto y brillante que da la vuelta.
+  const sweepProps = useAnimatedProps(() => ({
+    strokeDasharray: [c * 0.16, c],
+    strokeDashoffset: -c * sweep.value,
+    opacity: Math.sin(sweep.value * Math.PI),
   }))
 
   return (
@@ -240,6 +269,18 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
             strokeLinecap="round"
             animatedProps={arcProps}
           />
+          {closed ? (
+            <AnimatedCircle
+              cx={CENTER}
+              cy={CENTER}
+              r={r}
+              fill="none"
+              stroke={colors.oroLeche}
+              strokeWidth={spec.sw * 0.55}
+              strokeLinecap="round"
+              animatedProps={sweepProps}
+            />
+          ) : null}
           {/* Sobre-objetivo (solo exterior) — la segunda vuelta en magenta claro,
               como Apple: se ve cuánto pasó sin rojo ni alarma (ni oro: no es logro). */}
           {spec.overflow != null ? (
@@ -282,6 +323,13 @@ function RingArc({ spec, reduce }: { spec: RingSpec; reduce: boolean }) {
  *  Evidencia del día, no un reto: incompleto y "sin entreno" descansan en calma. */
 function GoalRing({ hero }: { hero: GoalHero }) {
   const reduce = useReducedMotion() ?? false
+  // Como Apple Fitness: los anillos se vuelven a dibujar cada vez que entras a
+  // la pestaña (la pestaña queda montada, así que sin esto solo animaban una vez).
+  const focused = useIsFocused()
+  const [playKey, setPlayKey] = useState(0)
+  useEffect(() => {
+    if (focused) setPlayKey((k) => k + 1)
+  }, [focused])
   const outerColor = STATUS_COLOR[hero.status]
   const isIncomplete = hero.status === 'incomplete'
   const isOver = hero.status === 'over'
@@ -375,9 +423,9 @@ function GoalRing({ hero }: { hero: GoalHero }) {
         <Circle cx={CENTER} cy={CENTER} r={RING_INNER_R - 6} fill="url(#ring-well)" />
 
         {/* De adentro hacia afuera: exterior encima (el norte manda visualmente). */}
-        <RingArc spec={inner} reduce={reduce} />
-        <RingArc spec={mid} reduce={reduce} />
-        <RingArc spec={outer} reduce={reduce} />
+        <RingArc spec={inner} reduce={reduce} playKey={playKey} />
+        <RingArc spec={mid} reduce={reduce} playKey={playKey} />
+        <RingArc spec={outer} reduce={reduce} playKey={playKey} />
       </Svg>
 
       {/* Centro — campo de estrellas (achicado para caber en el anillo interior). */}
@@ -1077,7 +1125,7 @@ const styles = StyleSheet.create({
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 14,
     marginTop: 8,
   },
   // La leyenda en filas a la derecha del anillo.

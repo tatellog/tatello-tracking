@@ -123,6 +123,7 @@ export function LunarConstellation({
   transformProgressOverride,
   showStarLabels = false,
   reaction = null,
+  onHeartLayout,
 }: Props) {
   const zodiac = ZODIAC[sign]
   const cx = W / 2
@@ -321,6 +322,14 @@ export function LunarConstellation({
     return toScreen(s.x, s.y)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ignitingKey, stars, k, transform.tx, transform.ty, transform.sx, transform.sy])
+
+  // La estrella alfa en px del lienzo, para la celebración de Hoy.
+  useEffect(() => {
+    if (!onHeartLayout || k <= 0) return
+    const p = toScreen(alphaPos.x, alphaPos.y)
+    onHeartLayout({ x: p.x, y: p.y, canvas: canvasPx })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [k, canvasPx, alphaPos.x, alphaPos.y, transform.tx, transform.ty, transform.sx, transform.sy])
 
   // Con la atmósfera + figura + viñeta ya en Skia, el <Svg> solo aloja los
   // overlays raros (StarBurst, AnticipationCrown, CompletionRings). Lo
