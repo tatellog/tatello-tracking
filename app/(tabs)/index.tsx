@@ -17,6 +17,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { LoadingView } from '@/components/LoadingView'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { emitCelebrate } from '@/features/tabs/celebrate-bus'
+import {
+  consumeWatchCelebration,
+  subscribeWatchCelebration,
+} from '@/features/tabs/pending-watch-celebration'
 import { signName } from '@/features/tabs/zodiac/name'
 import { useSession } from '@/hooks/useSession'
 import { usePressFeedback } from '@/components/ui/interaction'
@@ -442,9 +446,19 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const fireCelebration = (title: string, subtitle?: string) => {
     if (reducedMotion) return
     setCelebrating(true)
-    setTimeout(() => {
-      constellationRef.current?.measureInWindow((x, y, w) => {
-        if (!w) return
+    // Reintenta mientras Hoy termina de pintar (cold start desde la
+    // notificación: la constelación aún no existe en el primer intento).
+    const attempt = (left: number) => {
+      const node = constellationRef.current
+      if (!node) {
+        if (left > 0) setTimeout(() => attempt(left - 1), 400)
+        return
+      }
+      node.measureInWindow((x, y, w) => {
+        if (!w) {
+          if (left > 0) setTimeout(() => attempt(left - 1), 400)
+          return
+        }
         const heart = heartRef.current
         const side = heart?.canvas ?? w
         const ox = x + (w - side) / 2
@@ -460,7 +474,8 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
           subtitle,
         })
       })
-    }, CELEBRATE_SETTLE_MS)
+    }
+    setTimeout(() => attempt(8), CELEBRATE_SETTLE_MS)
   }
 
   // Orquestador de Revelaciones — única fuente de momentos full-screen en Hoy
@@ -533,20 +548,41 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
     fireCelebration('Tu reloj trajo tu entreno', `Una luz más en tu ${signProper}.`)
     track('workout_celebrated', { source: 'wearable' })
   }
+  // Una sola celebración del reloj por día: la llegada en vivo (transición) y
+  // el tap de "Entreno registrado" pueden coincidir al abrir la app. El tap es
+  // intención explícita: celebra aunque otra sesión ya lo haya hecho hoy;
+  // nunca dos veces en la misma sesión.
+  const celebratedDayRef = useRef<string | null>(null)
+  const celebrateWatchOnce = async (fromTap: boolean) => {
+    if (celebratedDayRef.current === todayIsoLocal) return
+    const key = `stelar.watch-workout-celebrated:${uidForCelebration}:${todayIsoLocal}`
+    if (!fromTap) {
+      const done = await AsyncStorage.getItem(key).catch(() => null)
+      if (done) return
+    }
+    celebratedDayRef.current = todayIsoLocal
+    await AsyncStorage.setItem(key, '1').catch(() => {})
+    if (hoyFocused) celebrateWatchWorkout()
+    else pendingWatchCelebration.current = true
+  }
   useEffect(() => {
     const was = prevWatchTrained.current
     prevWatchTrained.current = watchTrainedToday
     if (!watchTrainedToday || was) return
-    const key = `stelar.watch-workout-celebrated:${uidForCelebration}:${todayIsoLocal}`
-    void (async () => {
-      const done = await AsyncStorage.getItem(key).catch(() => null)
-      if (done) return
-      await AsyncStorage.setItem(key, '1').catch(() => {})
-      if (hoyFocused) celebrateWatchWorkout()
-      else pendingWatchCelebration.current = true
-    })()
+    void celebrateWatchOnce(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchTrainedToday])
+  // El tap de la notificación "Entreno registrado" (buzón: puede llegar antes
+  // de que Hoy exista, en un cold start desde la notificación).
+  useEffect(() => {
+    const handle = (date: string) => {
+      if (date === todayIsoLocal) void celebrateWatchOnce(true)
+    }
+    const pending = consumeWatchCelebration()
+    if (pending) handle(pending)
+    return subscribeWatchCelebration(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayIsoLocal])
   useEffect(() => {
     if (!hoyFocused || !pendingWatchCelebration.current) return
     pendingWatchCelebration.current = false

@@ -56,6 +56,9 @@ jest.mock('@/features/emblem', () => {
 // control so snapshots capture the post-reveal state (the live SVG,
 // not the skeleton) deterministically.
 jest.useFakeTimers()
+// Fecha fija: el contador dice "días registrados en <mes>" con el mes REAL;
+// sin esto los snapshots se rompían cada cambio de mes.
+jest.setSystemTime(new Date('2026-09-15T12:00:00Z'))
 
 describe('LunarConstellation · refactor-safety snapshots', () => {
   it.each(LUNAR_CONSTELLATION_STATES.map((s) => [s.id, s] as const))('%s', (_id, state) => {
