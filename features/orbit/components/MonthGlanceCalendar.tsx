@@ -18,10 +18,16 @@ import type { CalendarDay, MonthCalendar } from '../month-built'
  *   sin registro  → el número tenue, sin marca
  *   futuro        → el número aún más tenue
  * Lógica en `monthCalendar`.
+ *
+ * Entreno (dueña 30 sep 2026, "debo reconocer días de entreno, de déficit y
+ * de ambos"): un ARO violeta alrededor del círculo = ese día entrenaste (el
+ * color del aro de entreno del multiring), como los anillos de Apple. El
+ * relleno dice cómo comiste, el aro si te moviste: déficit + entreno = oro con
+ * aro violeta. Tocar el día abre su detalle completo, con "Tu entreno".
  */
 
 const WD_INITIALS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
-const MARK_MAX = 34
+const MARK_MAX = 32
 
 type Mark = { box: object | null; text: object }
 
@@ -42,10 +48,13 @@ const STATUS_LABEL: Record<CalendarDay['status'], string> = {
 export function MonthGlanceCalendar({
   data,
   onPickDay,
+  trainedDays,
 }: {
   data: MonthCalendar
   /** Tocar un día (no futuro) lo abre en el día completo. */
   onPickDay?: (date: string) => void
+  /** Días (YYYY-MM-DD) en que entrenó: llevan la estrella de entreno. */
+  trainedDays?: ReadonlySet<string>
 }) {
   const [w, setW] = useState(0)
   const onLayout = (e: LayoutChangeEvent): void => {
@@ -53,7 +62,8 @@ export function MonthGlanceCalendar({
     setW((p) => (Math.abs(p - next) < 1 ? p : next))
   }
   const cell = w > 0 ? w / 7 : 0
-  const mark = Math.min(MARK_MAX, Math.max(0, cell - 10))
+  // Deja aire para el aro de entreno (+7) dentro de la celda.
+  const mark = Math.min(MARK_MAX, Math.max(0, cell - 14))
   const cells: (CalendarDay | null)[] = [...Array(data.leadOffset).fill(null), ...data.days]
 
   return (
@@ -63,6 +73,20 @@ export function MonthGlanceCalendar({
         <LegendItem kind="deficit" label="déficit" />
         <LegendItem kind="surplus" label="sobre tu meta" />
         {data.hasLow ? <LegendItem kind="low" label="poco" /> : null}
+        {data.days.some((d) => trainedDays?.has(d.date)) ? (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, styles.legendTrained]} />
+            <Text style={styles.legendLabel}>entrenaste</Text>
+          </View>
+        ) : null}
+        {data.days.some((d) => d.status === 'deficit' && trainedDays?.has(d.date)) ? (
+          <View style={styles.legendItem}>
+            <View style={styles.legendBothRing}>
+              <View style={[styles.legendBothFill, styles.markDeficit]} />
+            </View>
+            <Text style={styles.legendLabel}>los dos</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.calendar} onLayout={onLayout}>
@@ -81,6 +105,7 @@ export function MonthGlanceCalendar({
                 if (!c) return <View key={i} style={{ width: cell, height: cell }} />
                 const m = markFor(c.status, c.future)
                 const tappable = !c.future && onPickDay != null
+                const trained = trainedDays?.has(c.date) ?? false
                 const circle = (
                   <View
                     style={[
@@ -93,6 +118,20 @@ export function MonthGlanceCalendar({
                     <Text style={[styles.num, m.text, c.isToday && styles.numToday]}>{c.day}</Text>
                   </View>
                 )
+                // El aro de entreno envuelve la marca (no la reemplaza).
+                const ring = mark + 7
+                const marked = trained ? (
+                  <View
+                    style={[
+                      styles.trainedRing,
+                      { width: ring, height: ring, borderRadius: ring / 2 },
+                    ]}
+                  >
+                    {circle}
+                  </View>
+                ) : (
+                  circle
+                )
                 return (
                   <View key={i} style={[styles.cellBox, { width: cell, height: cell }]}>
                     {tappable ? (
@@ -100,13 +139,13 @@ export function MonthGlanceCalendar({
                         onPress={() => onPickDay!(c.date)}
                         hitSlop={2}
                         accessibilityRole="button"
-                        accessibilityLabel={`Día ${c.day}, ${STATUS_LABEL[c.status]}. Abrir el día.`}
+                        accessibilityLabel={`Día ${c.day}, ${STATUS_LABEL[c.status]}${trained ? ', entrenaste' : ''}. Abrir el día.`}
                         style={({ pressed }) => [styles.cellFill, pressed && styles.cellPressed]}
                       >
-                        {circle}
+                        {marked}
                       </Pressable>
                     ) : (
-                      circle
+                      marked
                     )}
                   </View>
                 )
@@ -221,4 +260,22 @@ const styles = StyleSheet.create({
   numNone: { color: colors.niebla },
   numFuture: { color: colors.niebla, opacity: 0.4 },
   numToday: { fontFamily: typography.uiBold },
+  // El aro de entreno alrededor de la marca del día.
+  trainedRing: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.dimension.mente,
+  },
+  legendTrained: { borderWidth: 2, borderColor: colors.dimension.mente },
+  legendBothRing: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: colors.dimension.mente,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legendBothFill: { width: 6, height: 6, borderRadius: 3 },
 })
