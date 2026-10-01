@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { AppState } from 'react-native'
 
 import { useSession } from '@/hooks/useSession'
+import { notifyWorkoutArrived } from '@/features/notifications/workout-arrived'
+import { freshWorkouts, localDayOf } from './health-summary'
 import { track } from '@/lib/analytics'
 import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone, userTimezone } from '@/lib/time'
@@ -95,6 +97,8 @@ export async function syncAppleHealth(
   bodyDays: number
   /** Día más reciente con sueño en Salud (YYYY-MM-DD), o null. */
   lastSleepDay: string | null
+  /** Los entrenos de HOY que trajo Salud (para el aviso "Entreno registrado"). */
+  todayWorkouts: { id: string; type: string | null; minutes: number | null }[]
 } | null> {
   try {
     if (!(await isHealthKitAvailable())) return null
@@ -115,22 +119,34 @@ export async function syncAppleHealth(
     ])
 
     const sleepRows = sleepSamplesToRows(rawSleep, tz, 'apple_health')
+    const workoutRows = dedupeWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health')))
+    const today = todayInTimezone(tz)
+    const todayWorkouts = workoutRows
+      .filter((w) => localDayOf(w.started_at, tz) === today)
+      .map((w) => ({ id: w.external_id, type: w.workout_type, minutes: w.duration_min }))
     const lastSleepDay = sleepRows.reduce<string | null>(
       (max, r) => (max == null || r.sleep_date > max ? r.sleep_date : max),
       null,
     )
 
     const [workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays] = await Promise.all([
-      upsertWearableWorkouts(
-        dedupeWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health'))),
-      ),
+      upsertWearableWorkouts(workoutRows),
       upsertWearableSleep(sleepRows),
       upsertWearableSteps(stepsToRows(rawSteps, tz, 'apple_health')),
       upsertWearableWater(waterToRows(rawWater, tz, 'apple_health')),
       upsertWearableWeight(bodyMassToRows(rawWeight, tz, 'apple_health')),
       upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, 'apple_health')),
     ])
-    return { workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays, lastSleepDay }
+    return {
+      workouts,
+      sleepDays,
+      stepDays,
+      waterDays,
+      weightDays,
+      bodyDays,
+      lastSleepDay,
+      todayWorkouts,
+    }
   } catch {
     return null
   }
@@ -252,6 +268,37 @@ async function ensureBackgroundDelivery(): Promise<void> {
   }
 }
 
+/* Entrenos de Salud ya vistos/avisados (ids), por usuaria. */
+const seenWorkoutsKey = (userId: string) => `stelar.wearables.apple_health.seen_workouts:${userId}`
+
+async function announceArrivedWorkouts(
+  userId: string,
+  todays: { id: string; type: string | null; minutes: number | null }[],
+  background: boolean,
+): Promise<void> {
+  if (todays.length === 0) return
+  const raw = await AsyncStorage.getItem(seenWorkoutsKey(userId)).catch(() => null)
+  let seen: string[] = []
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    if (Array.isArray(parsed)) seen = parsed.filter((x): x is string => typeof x === 'string')
+  } catch {
+    seen = []
+  }
+  const fresh = freshWorkouts(todays, seen)
+  if (fresh.length === 0) return
+  const next = [...seen, ...fresh.map((w) => w.id)].slice(-60)
+  await AsyncStorage.setItem(seenWorkoutsKey(userId), JSON.stringify(next)).catch(() => {})
+  if (!background) return
+  // Un aviso por tanda: el entreno más largo de los nuevos.
+  const main = fresh.reduce((a, b) => ((b.minutes ?? 0) > (a.minutes ?? 0) ? b : a))
+  await notifyWorkoutArrived({
+    type: main.type,
+    minutes: main.minutes,
+    date: todayInTimezone(userTimezone()),
+  })
+}
+
 /* Un solo sync a la vez en toda la app (el de fondo y el pull de Hoy). */
 let syncInFlight: Promise<boolean> | null = null
 
@@ -296,7 +343,12 @@ async function runAppleHealthSync(
       scale: await isScaleEnabled(userId),
     })
     if (!counts) return false
-    const { lastSleepDay, ...tracked } = counts
+    const { lastSleepDay, todayWorkouts, ...tracked } = counts
+    // "Entreno registrado": si Salud trajo un entreno de hoy NUEVO mientras la
+    // app NO está a la vista (iOS la despertó en segundo plano), se avisa con
+    // una notificación; con la app abierta celebra Hoy directo, sin avisar.
+    // Todo entreno visto queda anotado para no avisarlo dos veces.
+    await announceArrivedWorkouts(userId, todayWorkouts, AppState.currentState !== 'active')
     await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
     if (lastSleepDay) {
       await AsyncStorage.setItem(lastSleepDayKey(userId), lastSleepDay).catch(() => {})

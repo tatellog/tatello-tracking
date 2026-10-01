@@ -80,3 +80,12 @@ describe('health-summary', () => {
     expect(formatCount(950)).toBe('950')
   })
 })
+
+describe('freshWorkouts', () => {
+  it('solo los entrenos de hoy que no se habían visto', () => {
+    const { freshWorkouts } = jest.requireActual('../health-summary')
+    const todays = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    expect(freshWorkouts(todays, ['a', 'z'])).toEqual([{ id: 'b' }, { id: 'c' }])
+    expect(freshWorkouts(todays, ['a', 'b', 'c'])).toEqual([])
+  })
+})

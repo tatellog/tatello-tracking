@@ -92,3 +92,13 @@ export function averageSteps(bars: readonly StepsBar[]): number | null {
 export function formatCount(n: number): string {
   return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
+
+/** Los entrenos de hoy que todavía no se avisaron (ids de Salud). Puro: el
+ *  caller guarda `seen` y decide si notificar (solo en segundo plano). */
+export function freshWorkouts<T extends { id: string }>(
+  todays: readonly T[],
+  seen: readonly string[],
+): T[] {
+  const set = new Set(seen)
+  return todays.filter((w) => !set.has(w.id))
+}

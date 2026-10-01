@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
 
 import { requestOrbitSegment } from '@/features/orbit/pending-segment'
+import { requestWatchCelebration } from '@/features/tabs/pending-watch-celebration'
 import { track } from '@/lib/analytics'
 
 import type { NotificationTarget } from './scheduler'
@@ -36,6 +37,12 @@ function landFactory(router: ReturnType<typeof useRouter>) {
       requestOrbitSegment('mes')
       router.navigate('/(tabs)/orbit')
     } else if (target === 'hoy') {
+      router.navigate('/(tabs)')
+    } else if (target === 'hoy-workout') {
+      // "Entreno registrado": abre Hoy y celebra el entreno del reloj (el
+      // emblema). El día viaja en la notificación: un tap de ayer no celebra hoy.
+      const date = (data as { date?: unknown } | null)?.date
+      if (typeof date === 'string') requestWatchCelebration(date)
       router.navigate('/(tabs)')
     } else if (target === 'weekly-reading') {
       // N8 promete la lectura → aterriza EN /weekly-reading (la pantalla

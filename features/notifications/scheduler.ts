@@ -25,7 +25,13 @@ import {
 /** Dónde aterriza el TAP de cada notificación (leído por el response
  *  router en features/notifications/response.ts). Sin destino, el tap
  *  aterrizaba frío en Hoy aunque el copy prometiera el sello de Órbita. */
-export type NotificationTarget = 'hoy' | 'orbit-semana' | 'orbit-mes' | 'weekly-reading'
+/** 'hoy-workout' = "Entreno registrado" (workout-arrived.ts): abre Hoy y celebra. */
+export type NotificationTarget =
+  | 'hoy'
+  | 'hoy-workout'
+  | 'orbit-semana'
+  | 'orbit-mes'
+  | 'weekly-reading'
 
 /*
  * El scheduler de la invitación — el lado imperativo (expo-notifications).
