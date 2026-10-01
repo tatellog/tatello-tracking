@@ -22,6 +22,7 @@ import Animated, {
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
 import { BlurView } from 'expo-blur'
 import { useIsFocused } from '@react-navigation/native'
+import { LinearGradient } from 'expo-linear-gradient'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 
@@ -1912,20 +1913,15 @@ function StrongDayCard({
         </>
       ) : null}
 
-      {/* La IA, discreta: una fila, no compite con la acción del día. */}
+      {/* La IA: la píldora con borde aurora (el degradado del chat), sin
+          relleno magenta. La dueña la prefirió sobre la fila discreta. */}
       {onAsk ? (
-        <Pressable
-          onPress={onAsk}
-          hitSlop={8}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.sdAsk, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.sdAskStar}>✦</Text>
-          <Text style={styles.sdAskText}>
-            {talked ? 'Retomar con Stelar' : '¿Por qué me funciona?'}
-          </Text>
-          <Text style={styles.sdAskChevron}>›</Text>
-        </Pressable>
+        <View style={styles.sdAsk}>
+          <AuroraCta
+            label={talked ? 'Retomar con Stelar' : 'Pregúntale a Stelar'}
+            onPress={onAsk}
+          />
+        </View>
       ) : null}
     </Animated.View>
   )
@@ -2414,6 +2410,28 @@ function RevealEvidenceModal({
   )
 }
 
+/* La acción de IA: píldora con contorno aurora (el degradado del chat), sin
+ * relleno magenta — se lee IA sin competir con Registrar. ✦ solo aquí. */
+function AuroraCta({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      {({ pressed }) => (
+        <LinearGradient
+          colors={[colors.magenta, colors.oroSoft, colors.dimension.mente]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.auroraBorder, pressed && { opacity: 0.8 }]}
+        >
+          <View style={styles.auroraInner}>
+            <Text style={styles.auroraStar}>✦</Text>
+            <Text style={styles.auroraLabel}>{label}</Text>
+          </View>
+        </LinearGradient>
+      )}
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
   // El patrón vive en su propio contenedor (misma familia que el panel del
   // calendario) con un filo de oro apenas: es EL hallazgo, no texto suelto.
@@ -2665,20 +2683,24 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   sdCardBadgeGold: { color: colors.oroLight },
-  sdAsk: {
-    marginTop: 20,
+  sdAsk: { marginTop: 20, alignItems: 'flex-start' },
+  auroraBorder: { borderRadius: 999, padding: 1 },
+  auroraInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    alignSelf: 'flex-start',
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: colors.bg,
   },
-  sdAskStar: { fontSize: typography.sizes.body, color: colors.oroLight },
-  sdAskText: {
+  auroraStar: { fontSize: typography.sizes.body, color: colors.oroLight },
+  auroraLabel: {
     fontFamily: typography.uiSemi,
-    fontSize: typography.sizes.bodyLarge,
+    fontSize: typography.sizes.label,
     color: colors.leche,
+    letterSpacing: 0.3,
   },
-  sdAskChevron: { fontSize: typography.sizes.heading, color: colors.bone },
   heroKicker: {
     flex: 1,
     fontFamily: typography.uiBold,
