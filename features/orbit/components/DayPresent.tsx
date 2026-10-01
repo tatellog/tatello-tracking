@@ -22,6 +22,7 @@ import { MoonGlyph, StarGlyph } from '@/features/tabs/components/check-in-glyphs
 import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
 import { todayInTimezone, userTimezone } from '@/lib/time'
+import { requestCalendarDay } from '@/features/tabs/pending-calendar-day'
 import { WorkoutSessionCard } from '@/features/wearables/components/WorkoutHero'
 import { useHealthSummary } from '@/features/wearables/hooks'
 import { formatSleepShort } from '@/features/wearables/recovery'
@@ -853,6 +854,24 @@ export function DayPresent({
           ) : null}
         </View>
       ) : null}
+
+      {/* Corregir un día pasado sin salir de Descubre: abre Hoy en esa fecha,
+          donde se marca entrené o descansé (el mismo bus que usa "Tu
+          constancia"). Un solo lugar para editar un dato. */}
+      {!compact && isPast ? (
+        <Pressable
+          onPress={() => {
+            requestCalendarDay(targetDay)
+            router.navigate('/(tabs)')
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Editar este día en Hoy"
+          style={styles.editDay}
+        >
+          <Text style={styles.editDayText}>Editar este día ›</Text>
+        </Pressable>
+      ) : null}
     </>
   )
 
@@ -1183,6 +1202,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   workoutBlock: { marginTop: 22, gap: 10 },
+  editDay: { marginTop: 20, alignSelf: 'flex-start' },
+  editDayText: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.magenta,
+  },
   workoutCard: {
     borderRadius: 22,
     padding: 18,
