@@ -1,6 +1,7 @@
 /*
  * Buzón + bus para "abrir Hoy en una fecha y mostrar su detalle" — hoy, desde
- * el CTA "Ver día →" del bottom sheet de Historia (Tab Progreso). Progreso
+ * el CTA "Ver día →" del bottom sheet de Historia (Tab Progreso) y desde
+ * "Editar este día ›" del detalle de un día pasado en Descubre. Progreso
  * OBSERVA; cuando la usuaria quiere editar, este bus la lleva a Hoy (que OPERA)
  * con la fecha ya seleccionada y scrolleada al DayDetailPanel.
  *
