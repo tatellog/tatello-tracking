@@ -651,12 +651,19 @@ describe('monthCalendar', () => {
     expect(cal.days[20]!.status).toBe('none')
   })
 
-  it('null sin meta de calorías o sin un solo día con comida', () => {
+  it('null sin meta de calorías o sin ningún día con comida ni entreno', () => {
     const signals = [at(1, { meal_count: 2, calories: 1400 })]
     expect(monthCalendar(signals, { today: TODAY })).toBeNull()
     expect(
-      monthCalendar([at(1, { trained: true })], { today: TODAY, calorieTarget: 1800 }),
+      monthCalendar([at(1, { sleep_minutes: 420 })], { today: TODAY, calorieTarget: 1800 }),
     ).toBeNull()
+  })
+
+  it('un mes con entrenos pero sin comidas igual se dibuja (sus estrellas)', () => {
+    const cal = monthCalendar([at(1, { trained: true })], { today: TODAY, calorieTarget: 1800 })!
+    expect(cal).not.toBeNull()
+    expect(cal.dataDays).toBe(0)
+    expect(cal.days.every((d) => d.status === 'none')).toBe(true)
   })
 })
 

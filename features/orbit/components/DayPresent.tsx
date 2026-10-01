@@ -21,7 +21,13 @@ import { useLocalHour } from '@/features/tabs/use-local-hour'
 import { MoonGlyph, StarGlyph } from '@/features/tabs/components/check-in-glyphs'
 import { WatchMark } from '@/features/wearables/components/WatchMark'
 import { GLASS_ML, useWaterGoal } from '@/features/water/useWaterGoal'
-import { todayInTimezone } from '@/lib/time'
+import { todayInTimezone, userTimezone } from '@/lib/time'
+import { WorkoutSessionCard } from '@/features/wearables/components/WorkoutHero'
+import { useHealthSummary } from '@/features/wearables/hooks'
+import { formatSleepShort } from '@/features/wearables/recovery'
+import { addDaysIso } from '@/features/wearables/sleep-detail'
+import { WORKOUT_NAME, workoutOfDay } from '@/features/wearables/workout-insights'
+import { LinearGradient as GradientView } from 'expo-linear-gradient'
 
 import { DayLogModal, type DayLogKey } from './log/DayLogModal'
 import { colors, typography } from '@/theme'
@@ -630,6 +636,14 @@ export function DayPresent({
   const { data, isLoading, isError, refetch } = isPast ? pastQ : todayQ
   const signals = data ?? null
   const targets = useMacroTargets()
+  // "Tu entreno" (dueña 30 sep 2026): el detalle del ejercicio de ESE día, con
+  // tu promedio y tu marca hasta esa fecha. Solo en el día completo (no en el
+  // feed compacto de Descubre, donde hoy ya lo dice el anillo).
+  const tz = userTimezone()
+  const health = useHealthSummary(addDaysIso(targetDay, -89), targetDay)
+  const dayWorkout =
+    !compact && health.data ? workoutOfDay(health.data.workouts, targetDay, tz) : null
+  const manualWorkout = !compact && !dayWorkout && signals?.trained === true
   const { goalMl } = useWaterGoal()
 
   const ctx = {
@@ -807,6 +821,38 @@ export function DayPresent({
           </Pressable>
         ) : null}
       </View>
+
+      {/* Tu entreno de ese día: la misma tarjeta que el hero de Tu smartwatch
+          (un entreno se ve igual sea de hoy o del 16 sep). Manual: solo el
+          tipo, sin inventar duración. Debajo, el sueño de la noche antes. */}
+      {dayWorkout || manualWorkout ? (
+        <View style={styles.workoutBlock}>
+          <GradientView
+            colors={[`${TRAIN_COLOR}26`, `${TRAIN_COLOR}08`, colors.bgCard]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={styles.workoutCard}
+          >
+            {dayWorkout ? (
+              <WorkoutSessionCard workout={dayWorkout} tz={tz} />
+            ) : (
+              <View style={styles.manualRow}>
+                <StarGlyph color={TRAIN_COLOR} size={14} />
+                <Text style={styles.manualType}>
+                  {(WORKOUT_NAME[signals?.workout_type ?? ''] ?? 'Entreno').toUpperCase()}
+                </Text>
+                <Text style={styles.manualNote}>lo anotaste tú</Text>
+              </View>
+            )}
+          </GradientView>
+          {signals?.sleep_minutes != null && signals.sleep_minutes > 0 ? (
+            <Text style={styles.sleepBefore}>
+              {`Dormiste ${formatSleepShort(signals.sleep_minutes)} la noche antes.`}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </>
   )
 
@@ -1135,6 +1181,32 @@ const styles = StyleSheet.create({
   },
   verdictBlock: {
     marginTop: 24,
+  },
+  workoutBlock: { marginTop: 22, gap: 10 },
+  workoutCard: {
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: `${TRAIN_COLOR}40`,
+  },
+  manualRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  manualType: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    letterSpacing: 1.6,
+    color: TRAIN_COLOR,
+  },
+  manualNote: {
+    marginLeft: 'auto',
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+  },
+  sleepBefore: {
+    marginLeft: 2,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
   },
   verdictRow: {
     flexDirection: 'row',

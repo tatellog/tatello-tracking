@@ -381,7 +381,10 @@ export function monthCalendar(
     }
     days.push({ day: d, date, status, future, isToday: d === todayDay })
   }
-  if (dataDays === 0) return null
+  // Sin comidas pero con entrenos, el mes igual se dibuja (números tenues): la
+  // estrella de entreno del calendario necesita su día (dueña 30 sep 2026).
+  const trainedInMonth = days.some((d) => !d.future && byDay.get(d.date)?.trained === true)
+  if (dataDays === 0 && !trainedInMonth) return null
   return { leadOffset, days, deficitDays, dataDays, hasLow }
 }
 

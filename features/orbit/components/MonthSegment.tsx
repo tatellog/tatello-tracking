@@ -382,6 +382,11 @@ export function MonthSegment({
     }
     return min
   }, [patternSignals])
+  // Días con entreno (a mano o del reloj): la estrella del calendario.
+  const trainedDays = useMemo(
+    () => new Set(calendarSignals.filter((s) => s.trained && s.day).map((s) => s.day!)),
+    [calendarSignals],
+  )
   const glance = useMemo(
     () => monthCalendar(calendarSignals, { today: calendarToday, calorieTarget, firstDataDay }),
     [calendarSignals, calendarToday, calorieTarget, firstDataDay],
@@ -763,7 +768,7 @@ export function MonthSegment({
           </Pressable>
           {/* El conteo en la misma fila: la respuesta sin párrafo. Con pocos
               días no hay "de N": solo cuántos llevas. */}
-          {glance ? (
+          {glance && glance.dataDays > 0 ? (
             <Text style={[styles.monthCount, glance.dataDays < 5 && styles.monthCountQuiet]}>
               {glance.dataDays < 5
                 ? `${glance.dataDays} ${glance.dataDays === 1 ? 'registrado' : 'registrados'}`
@@ -774,7 +779,7 @@ export function MonthSegment({
       </View>
 
       {glance ? (
-        <MonthGlanceCalendar data={glance} onPickDay={onPickDay} />
+        <MonthGlanceCalendar data={glance} onPickDay={onPickDay} trainedDays={trainedDays} />
       ) : (
         <View style={styles.monthEmpty}>
           <Text style={styles.monthEmptyBody}>
