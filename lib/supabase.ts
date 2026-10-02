@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, processLock } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
 import { AppState, Platform } from 'react-native'
 
@@ -48,9 +48,27 @@ if (!url || !key) {
   )
 }
 
+/* Ninguna petición puede colgarse para siempre (dueña 2 oct 2026: en Android
+ * "Guardar" se quedaba en "Guardando…" y nada llegaba a la base). Una conexión
+ * vieja de OkHttp tras volver de segundo plano puede no responder nunca; con
+ * tope de 20 s la petición falla, la pantalla lo dice y se puede reintentar. */
+const REQUEST_TIMEOUT_MS = 20_000
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  // Respeta un abort del que llama (React Query cancela al desmontar).
+  init?.signal?.addEventListener('abort', () => controller.abort())
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 export const supabase = createClient<Database>(url, key, {
+  global: { fetch: fetchWithTimeout },
   auth: {
     storage,
+    // Receta oficial de Supabase para React Native: un candado de proceso para
+    // que el refresh del token y las lecturas de sesión no se pisen (sin él,
+    // al volver de segundo plano una petición puede quedar esperando).
+    lock: processLock,
     autoRefreshToken: true,
     persistSession: true,
     // On native we parse the deep link manually in
@@ -86,8 +104,12 @@ if (Platform.OS !== 'web') {
  * supabase-js null-dereference further down.
  */
 export async function requireUserId(): Promise<string> {
-  const { data, error } = await supabase.auth.getUser()
+  // La sesión local basta para saber QUIÉN es: no hace un viaje a la red (antes
+  // getUser() pedía /auth/v1/user en cada escritura). La seguridad la sigue
+  // poniendo RLS en el servidor con el token.
+  const { data, error } = await supabase.auth.getSession()
   if (error) throw error
-  if (!data.user) throw new Error('not authenticated')
-  return data.user.id
+  const id = data.session?.user?.id
+  if (!id) throw new Error('not authenticated')
+  return id
 }
