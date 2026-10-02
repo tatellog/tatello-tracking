@@ -283,12 +283,23 @@ export async function backgroundHealthSync(userId: string): Promise<void> {
   if (flag !== 'true') return
   const counts = await syncAppleHealth(SYNC_WINDOW_DAYS, { scale: await isScaleEnabled(userId) })
   if (!counts) return
+  if (lockedRead(counts)) {
+    track('wearable_sync_locked', { source: HEALTH_SOURCE, task: true })
+    return
+  }
   await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
   if (counts.lastSleepDay) {
     await AsyncStorage.setItem(lastSleepDayKey(userId), counts.lastSleepDay).catch(() => {})
   }
   await announceArrivedWorkouts(userId, counts.todayWorkouts, true)
   track('wearable_background_task', { source: HEALTH_SOURCE, workouts: counts.workouts })
+}
+
+/** Una ventana de 7 días sin un solo paso, sueño ni entreno = Salud no dejó
+ *  leer (iPhone bloqueado: los datos de Salud están cifrados) o la app aún no
+ *  tiene datos. En los dos casos no se cuenta como sync. */
+function lockedRead(c: { workouts: number; sleepDays: number; stepDays: number }): boolean {
+  return c.workouts + c.sleepDays + c.stepDays === 0
 }
 
 /* Entrenos de Salud ya vistos/avisados (ids), por usuaria. */
@@ -366,6 +377,12 @@ async function runAppleHealthSync(
       scale: await isScaleEnabled(userId),
     })
     if (!counts) return false
+    // Teléfono bloqueado: Salud está cifrada y la lectura sale vacía. No cuenta
+    // como sync (así el siguiente intento no espera el intervalo).
+    if (lockedRead(counts)) {
+      track('wearable_sync_locked', { source: HEALTH_SOURCE })
+      return false
+    }
     const { lastSleepDay, todayWorkouts, ...tracked } = counts
     // "Entreno registrado": si Salud trajo un entreno de hoy NUEVO mientras la
     // app NO está a la vista (iOS la despertó en segundo plano), se avisa con
