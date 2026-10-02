@@ -84,6 +84,15 @@ function useMealPhoto(meal: Meal): ImageSourcePropType | null {
   return null
 }
 
+/* "Esta foto falló" recordado por su URI: si llega otro enlace (el firmado se
+ * renueva cada hora), la marca se borra sola y se vuelve a intentar. */
+function useFailedPhoto(photo: ImageSourcePropType | null): [boolean, (v: boolean) => void] {
+  const uri =
+    photo && typeof photo === 'object' && 'uri' in photo ? ((photo.uri as string) ?? null) : null
+  const [failedUri, setFailedUri] = useState<string | null>(null)
+  return [uri != null && failedUri === uri, (v: boolean) => setFailedUri(v ? uri : null)]
+}
+
 /* Warm 12-hour time — "8:15 am", "1:30 pm". */
 function formatTime(iso: string): string {
   const d = new Date(iso)
@@ -193,7 +202,9 @@ function MealThumb({ photo, isRecent }: { photo: ImageSourcePropType | null; isR
   }))
 
   // A broken / empty photo falls back to the glyph — never a dead circle.
-  const [failed, setFailed] = useState(false)
+  // La marca de "rota" es POR enlace: un enlace firmado caducado que falló no
+  // condena a la foto cuando llega el enlace nuevo (antes quedaba el tazón).
+  const [failed, setFailed] = useFailedPhoto(photo)
 
   return (
     <Animated.View style={[styles.thumbWrap, breathStyle]}>
@@ -257,7 +268,9 @@ function PileCircle({
 
   const photo = useMealPhoto(meal)
   // A broken / empty photo falls back to the glyph — never a dead circle.
-  const [failed, setFailed] = useState(false)
+  // La marca de "rota" es POR enlace: un enlace firmado caducado que falló no
+  // condena a la foto cuando llega el enlace nuevo (antes quedaba el tazón).
+  const [failed, setFailed] = useFailedPhoto(photo)
 
   return (
     // Outer view carries the cascade entrance + the overlap margin;

@@ -15,6 +15,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/hanken-grotesk'
 import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native'
+import { defaultShouldDehydrateQuery } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Stack, useGlobalSearchParams, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
@@ -182,6 +183,13 @@ export default function RootLayout() {
             // persistida con el formato anterior (incl. la que quedó contaminada
             // bajo el mismo id durante el dev). Súbelo si hace falta re-flushar.
             buster: `v2:${session?.user?.id ?? 'anon'}`,
+            // Los enlaces firmados de fotos caducan en 1 h: guardarlos en disco
+            // hacía que al abrir la app las fotos de comidas fallaran con un
+            // enlace viejo y quedaran como tazón. Se piden frescos siempre.
+            dehydrateOptions: {
+              shouldDehydrateQuery: (q) =>
+                q.queryKey[0] !== 'storage' && defaultShouldDehydrateQuery(q),
+            },
           }}
         >
           <SafeAreaProvider>
