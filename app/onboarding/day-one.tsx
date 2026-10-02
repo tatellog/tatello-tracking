@@ -263,7 +263,7 @@ export default function DayOneScreen() {
           accessibilityRole="button"
           accessibilityLabel="Primero quiero ver mi cielo"
         >
-          <Text style={styles.ctaSecondaryLabel}>Primero quiero ver mi cielo</Text>
+          <Text style={styles.ctaSecondaryLabel}>Primero quiero ver mi cielo ›</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -465,15 +465,21 @@ const styles = StyleSheet.create({
   },
   // Quiet escape under the CTA — a text link, deliberately not a second
   // button, so the meal CTA keeps all the visual weight.
+  // Acción secundaria con forma de botón (dueña 2 oct 2026: en itálica serif
+  // no se leía como algo tocable). Contorno sin relleno: no compite con el
+  // magenta de la principal. Hanken, no serif: es UI, no voz del coach.
   ctaSecondary: {
     marginTop: 12,
     alignItems: 'center',
-    paddingVertical: 4,
+    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
   },
   ctaSecondaryLabel: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.bone,
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
   },
 })
