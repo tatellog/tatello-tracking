@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { HEALTH_APP_FULL } from '../health-platform'
 import Animated from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
@@ -34,7 +35,7 @@ export function ConnectionsCard({ onPress }: { onPress: () => void }) {
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       accessibilityRole="button"
-      accessibilityLabel="Conexiones. Tu reloj y Apple Health."
+      accessibilityLabel={`Conexiones. Tu reloj y ${HEALTH_APP_FULL}.`}
       accessibilityHint="Abre la pantalla de conexiones"
     >
       <Animated.View style={[styles.card, press.animatedStyle]}>

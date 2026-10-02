@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import { HEALTH_APP_NAME } from '@/features/wearables/health-platform'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
@@ -281,7 +282,7 @@ function SmartwatchBody() {
               {waterMl != null ? (
                 <Text
                   style={styles.water}
-                >{`Agua desde Salud: ${formatCount(waterMl)} mL hoy`}</Text>
+                >{`Agua desde ${HEALTH_APP_NAME}: ${formatCount(waterMl)} mL hoy`}</Text>
               ) : null}
             </>
           )}

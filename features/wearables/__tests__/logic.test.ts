@@ -322,3 +322,68 @@ describe('sleepSamplesToRows · etapas', () => {
     expect(row!.awake_minutes).toBeNull()
   })
 })
+
+describe('Health Connect · traducción al vocabulario de Stelar', () => {
+  const { hcExerciseToWorkoutType, hcSleepStageToHk, normalizeWorkout, sleepSamplesToRows } =
+    jest.requireActual('../logic')
+
+  it('tipos de entreno de Health Connect → fuerza / cardio / caminata / otro', () => {
+    expect(hcExerciseToWorkoutType(70)).toBe('fuerza') // strength training
+    expect(hcExerciseToWorkoutType(81)).toBe('fuerza') // weightlifting
+    expect(hcExerciseToWorkoutType(56)).toBe('cardio') // running
+    expect(hcExerciseToWorkoutType(79)).toBe('caminata') // walking
+    expect(hcExerciseToWorkoutType(5)).toBe('otro') // basketball: no se inventa
+  })
+
+  it('el tipo ya resuelto por la fuente gana sobre el enum de HealthKit', () => {
+    const row = normalizeWorkout(
+      {
+        uuid: 'hc-1',
+        activityType: -1,
+        workoutType: 'fuerza',
+        start: new Date('2026-10-01T18:00:00Z'),
+        end: new Date('2026-10-01T19:00:00Z'),
+        durationSec: 3600,
+        energyKcal: null,
+      },
+      'health_connect',
+    )
+    expect(row).toMatchObject({
+      source: 'health_connect',
+      workout_type: 'fuerza',
+      duration_min: 60,
+    })
+  })
+
+  it('etapas de sueño de Health Connect caen en las mismas de la noche', () => {
+    expect(hcSleepStageToHk(5)).toBe(4) // profundo
+    expect(hcSleepStageToHk(6)).toBe(5) // REM
+    expect(hcSleepStageToHk(4)).toBe(3) // ligero
+    expect(hcSleepStageToHk(1)).toBe(2) // despierta
+    expect(hcSleepStageToHk(3)).toBeNull() // fuera de la cama
+    const rows = sleepSamplesToRows(
+      [
+        {
+          uuid: 'a',
+          value: hcSleepStageToHk(4),
+          start: new Date('2026-10-01T05:00:00Z'),
+          end: new Date('2026-10-01T08:00:00Z'),
+        },
+        {
+          uuid: 'b',
+          value: hcSleepStageToHk(5),
+          start: new Date('2026-10-01T08:00:00Z'),
+          end: new Date('2026-10-01T09:30:00Z'),
+        },
+      ],
+      'America/Mexico_City',
+      'health_connect',
+    )
+    expect(rows[0]).toMatchObject({
+      source: 'health_connect',
+      asleep_minutes: 270,
+      deep_minutes: 90,
+      core_minutes: 180,
+    })
+  })
+})

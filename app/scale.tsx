@@ -1,7 +1,12 @@
 import { Feather } from '@expo/vector-icons'
+import {
+  HEALTH_APP_FULL,
+  HEALTH_APP_NAME,
+  HEALTH_PERMISSION_PATH,
+} from '@/features/wearables/health-platform'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Circle, Path } from 'react-native-svg'
 
@@ -80,8 +85,9 @@ function ScaleBody() {
           <View style={styles.card}>
             {available === false ? (
               <Text style={styles.body}>
-                Disponible en iPhone con Apple Salud. Cuando abras Stelar desde uno, aquí podrás
-                encender tu báscula.
+                {Platform.OS === 'android'
+                  ? 'Instala Health Connect desde Google Play para encender tu báscula.'
+                  : 'Disponible en iPhone con Apple Salud. Cuando abras Stelar desde uno, aquí podrás encender tu báscula.'}
               </Text>
             ) : enabled ? (
               <>
@@ -105,8 +111,7 @@ function ScaleBody() {
                   </View>
                 ) : (
                   <Text style={styles.metaLine}>
-                    Aún no encontramos lecturas. Si tu báscula ya guarda tu peso en Salud, dale un
-                    vistazo al permiso en Salud → Stelar.
+                    {`Aún no encontramos lecturas. Si tu báscula ya guarda tu peso en ${HEALTH_APP_NAME}, dale un vistazo al permiso en ${HEALTH_PERMISSION_PATH}.`}
                   </Text>
                 )}
 
@@ -140,7 +145,7 @@ function ScaleBody() {
                 <View style={styles.point}>
                   <View style={styles.pointDot} />
                   <Text style={styles.pointText}>
-                    Lee el peso que tu báscula guarda en Salud y lo suma a tu tendencia.
+                    {`Lee el peso que tu báscula guarda en ${HEALTH_APP_NAME} y lo suma a tu tendencia.`}
                   </Text>
                 </View>
                 <View style={styles.point}>
@@ -198,8 +203,7 @@ function ScaleBody() {
 
           {/* Con qué funciona: cualquier báscula que escriba en Salud. */}
           <Text style={styles.compat}>
-            Funciona con cualquier báscula que guarde tu peso en Apple Salud: Garmin Index (desde
-            Garmin Connect), Withings, Renpho, Eufy y más.
+            {`Funciona con cualquier báscula que guarde tu peso en ${HEALTH_APP_FULL === 'Apple Health' ? 'Apple Salud' : HEALTH_APP_FULL}: Garmin Index (desde Garmin Connect), Withings, Renpho, Eufy y más.`}
           </Text>
         </ScrollView>
       </SafeAreaView>

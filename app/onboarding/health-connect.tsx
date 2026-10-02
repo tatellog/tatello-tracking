@@ -1,4 +1,5 @@
 import Constants from 'expo-constants'
+import { HEALTH_APP_FULL } from '@/features/wearables/health-platform'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -70,7 +71,7 @@ export default function HealthConnectScreen() {
       canContinue
       loading={busy}
       onContinue={() => void handleContinue()}
-      continueLabel={canConnect ? 'Conectar Apple Health' : 'Continuar'}
+      continueLabel={canConnect ? `Conectar ${HEALTH_APP_FULL}` : 'Continuar'}
       ctaVariant="soft"
       ctaTransform="none"
       atmosphere={<AtmosphericSky glow={{ cx: '50%', cy: '38%', r: '70%' }} />}
