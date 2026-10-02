@@ -13,7 +13,7 @@ import { comboTodayHighlight } from '@/features/orbit/combo-facts'
 import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useStrongDay } from '@/features/orbit/strong-day'
 import { SkyBackground } from '@/features/tabs/components'
-import { MoonGlyph } from '@/features/tabs/components/check-in-glyphs'
+import { MoonGlyph, StepsGlyph } from '@/features/tabs/components/check-in-glyphs'
 import { WatchGlyph } from '@/features/wearables/components/WatchGlyph'
 import { WorkoutHero } from '@/features/wearables/components/WorkoutHero'
 import {
@@ -251,7 +251,7 @@ function SmartwatchBody() {
                 </Tile>
                 <Tile tint={colors.leche}>
                   <View style={styles.tileHead}>
-                    <View style={styles.stepsDot} />
+                    <StepsGlyph color={colors.leche} size={14} />
                     <Text style={[styles.tileLabel, { color: colors.leche }]}>Pasos</Text>
                   </View>
                   <Text style={styles.tileValue}>{steps != null ? formatCount(steps) : '—'}</Text>
@@ -451,7 +451,6 @@ const styles = StyleSheet.create({
     color: colors.bone,
   },
   stageBar: { height: 8, borderRadius: 4, overflow: 'hidden', flexDirection: 'row', gap: 2 },
-  stepsDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.leche },
   mini: {
     height: MINI_MAX,
     flexDirection: 'row',

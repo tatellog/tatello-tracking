@@ -92,3 +92,63 @@ export function clockTime(iso: string, tz: string): string {
 export function barLabel(minutes: number): string {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`
 }
+
+/* ── Hora de dormir (la "highlight" del detalle de sueño) ─────────────── */
+
+/** Minutos desde el MEDIODÍA local de la hora de dormir (12:00 → 0, 1:15 am →
+ *  795): así una noche que cruza la medianoche promedia bien con las demás. */
+export function bedtimeMinutes(iso: string, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0) % 24
+  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? 0)
+  return (h * 60 + m - 12 * 60 + 1440) % 1440
+}
+
+/** "12:49 am" desde minutos-después-del-mediodía. */
+export function bedtimeLabel(minutesAfterNoon: number): string {
+  const total = (Math.round(minutesAfterNoon) + 12 * 60) % 1440
+  const h24 = Math.floor(total / 60)
+  const m = total % 60
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return `${h12}:${String(m).padStart(2, '0')} ${h24 < 12 ? 'am' : 'pm'}`
+}
+
+export type BedtimeBar = { day: string; minutes: number | null; selected: boolean }
+
+export type BedtimeRead = {
+  bars: BedtimeBar[]
+  /** Promedio de tus noches ANTERIORES (sin la vista); null con menos de 3. */
+  average: number | null
+  last: number | null
+  /** Positivo = más tarde que tu promedio (minutos, redondeado). */
+  diff: number | null
+}
+
+/** Las últimas `n` noches que terminan en `day`, con su hora de dormir. */
+export function bedtimeRead(
+  nights: readonly { sleep_date: string; bedtime_at: string | null }[],
+  day: string,
+  tz: string,
+  n = 14,
+): BedtimeRead {
+  const byDay = new Map(nights.map((x) => [x.sleep_date, x.bedtime_at]))
+  const bars: BedtimeBar[] = Array.from({ length: n }, (_, i) => {
+    const d = addDaysIso(day, i - (n - 1))
+    const at = byDay.get(d)
+    return { day: d, minutes: at ? bedtimeMinutes(at, tz) : null, selected: d === day }
+  })
+  const prior = bars.filter((b) => !b.selected && b.minutes != null).map((b) => b.minutes!)
+  const average = prior.length >= 3 ? prior.reduce((a, x) => a + x, 0) / prior.length : null
+  const last = bars[bars.length - 1]?.minutes ?? null
+  return {
+    bars,
+    average,
+    last,
+    diff: average != null && last != null ? Math.round(last - average) : null,
+  }
+}
