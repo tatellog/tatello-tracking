@@ -11,8 +11,8 @@ import {
   type SkPath,
 } from '@shopify/react-native-skia'
 import * as Haptics from 'expo-haptics'
-import { memo, useEffect, useMemo } from 'react'
-import { Pressable, StyleSheet, Text, useWindowDimensions } from 'react-native'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated, {
   Easing,
   runOnJS,
@@ -48,12 +48,15 @@ import type { CelebratePayload } from '../celebrate-bus'
  */
 
 const DURATION_MS = 3400
-const N = 1800
+// Android pinta las estelas con blur más pesadas que iOS (dueña 1 oct 2026:
+// "arregla el estilo solo en Android"): menos chispas y halos más finos ahí.
+const ANDROID = Platform.OS === 'android'
+const N = ANDROID ? 1100 : 1800
 /** Fracción de la duración en la que el anillo sigue soltando chispas. */
 const EMIT_UNTIL = 0.72
 const GRAVITY = 520 // px/s²
 const TAIL_S = 0.04
-const HOMING = 220
+const HOMING = ANDROID ? 150 : 220
 
 const CORE = colors.oroLeche
 
@@ -183,7 +186,7 @@ function drawHoming(path: SkPath, u: number, tone: number, h: Homing, g: Geo): v
 
 /* ── Las estrellas (lo nuestro): destellos de cuatro puntas ─────────── */
 
-const STARS = 72
+const STARS = ANDROID ? 48 : 72
 
 type Stars = { ang: number[]; dist: number[]; born: number[]; life: number[]; size: number[] }
 
@@ -237,15 +240,29 @@ export const RingCelebration = memo(function RingCelebration({
   const { width, height } = useWindowDimensions()
   const t = useSharedValue(0)
   const sparks = useMemo(() => buildSparks(playKey * 7919 + 31), [playKey])
-  const g: Geo = { cx: payload.cx, cy: payload.cy, r: payload.r, tx: payload.tx, ty: payload.ty }
+  // El emblema se midió en coordenadas de VENTANA; esta capa puede no empezar
+  // en (0,0) (Android de borde a borde corre la barra de estado). Se mide el
+  // propio origen y se resta: la corona cae justo sobre el anillo en ambas.
+  const rootRef = useRef<View>(null)
+  const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null)
+  const ox = origin?.x ?? 0
+  const oy = origin?.y ?? 0
+  const g: Geo = {
+    cx: payload.cx - ox,
+    cy: payload.cy - oy,
+    r: payload.r,
+    tx: payload.tx - ox,
+    ty: payload.ty - oy,
+  }
 
   useEffect(() => {
+    if (!origin) return
     t.value = 0
     t.value = withTiming(1, { duration: DURATION_MS, easing: Easing.linear }, (done) => {
       if (done) runOnJS(onDone)()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playKey])
+  }, [playKey, origin != null])
 
   // El segundo golpe: cuando el oro llega a la estrella del corazón (el primero
   // ya sonó al tocar "Entrené"), como Apple al cerrar el anillo.
@@ -336,198 +353,205 @@ export const RingCelebration = memo(function RingCelebration({
   const far = Math.hypot(Math.max(g.cx, width - g.cx), Math.max(g.cy, height - g.cy))
 
   return (
-    <Pressable
+    <View
+      ref={rootRef}
       style={StyleSheet.absoluteFill}
-      onPress={onDone}
-      accessibilityRole="button"
-      accessibilityLabel={`${payload.title}. ${payload.subtitle ?? ''} Toca para cerrar.`}
+      collapsable={false}
+      onLayout={() => rootRef.current?.measureInWindow((x, y) => setOrigin({ x, y }))}
     >
-      <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-        {/* Telón con hueco: el emblema sigue visible dentro de su anillo. */}
-        <Group opacity={scrim}>
-          <Rect x={0} y={0} width={width} height={height}>
-            <RadialGradient
-              c={vec(g.cx, g.cy)}
-              r={far}
-              colors={['rgba(5,2,4,0)', 'rgba(5,2,4,0)', 'rgba(5,2,4,0.9)', 'rgba(5,2,4,0.94)']}
-              positions={[0, hole / far, edge / far, 1]}
-            />
-          </Rect>
-        </Group>
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={onDone}
+        accessibilityRole="button"
+        accessibilityLabel={`${payload.title}. ${payload.subtitle ?? ''} Toca para cerrar.`}
+      >
+        <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+          {/* Telón con hueco: el emblema sigue visible dentro de su anillo. */}
+          <Group opacity={scrim}>
+            <Rect x={0} y={0} width={width} height={height}>
+              <RadialGradient
+                c={vec(g.cx, g.cy)}
+                r={far}
+                colors={['rgba(5,2,4,0)', 'rgba(5,2,4,0)', 'rgba(5,2,4,0.9)', 'rgba(5,2,4,0.94)']}
+                positions={[0, hole / far, edge / far, 1]}
+              />
+            </Rect>
+          </Group>
 
-        {/* La corona del anillo: una BANDA de luz de dos tonos (dueña: "más
+          {/* La corona del anillo: una BANDA de luz de dos tonos (dueña: "más
             grueso, dorados y magenta"). Halo magenta ancho afuera, banda
             magenta hacia fuera y banda de oro hacia dentro que se funden en el
             borde, y un núcleo crema que la hace arder. Colores estáticos. */}
-        <Group opacity={crown}>
-          <Circle
-            cx={g.cx}
-            cy={g.cy}
-            r={g.r + 6}
-            color={colors.magenta}
-            style="stroke"
-            strokeWidth={46}
-            opacity={0.4}
-          >
-            <BlurMask blur={34} style="normal" />
-          </Circle>
-          <Circle
-            cx={g.cx}
-            cy={g.cy}
-            r={g.r + 4}
-            color={colors.magenta}
-            style="stroke"
-            strokeWidth={14}
-            opacity={0.85}
-          >
-            <BlurMask blur={11} style="normal" />
-          </Circle>
-          <Circle
-            cx={g.cx}
-            cy={g.cy}
-            r={g.r - 4}
-            color={colors.oroSoft}
-            style="stroke"
-            strokeWidth={11}
-            opacity={0.7}
-          >
-            <BlurMask blur={9} style="normal" />
-          </Circle>
-          <Circle
-            cx={g.cx}
-            cy={g.cy}
-            r={g.r}
-            color={CORE}
-            style="stroke"
-            strokeWidth={3}
-            opacity={0.75}
-          >
-            <BlurMask blur={3.5} style="normal" />
-          </Circle>
-        </Group>
+          <Group opacity={crown}>
+            <Circle
+              cx={g.cx}
+              cy={g.cy}
+              r={g.r + 6}
+              color={colors.magenta}
+              style="stroke"
+              strokeWidth={ANDROID ? 26 : 46}
+              opacity={ANDROID ? 0.28 : 0.4}
+            >
+              <BlurMask blur={ANDROID ? 22 : 34} style="normal" />
+            </Circle>
+            <Circle
+              cx={g.cx}
+              cy={g.cy}
+              r={g.r + 4}
+              color={colors.magenta}
+              style="stroke"
+              strokeWidth={14}
+              opacity={0.85}
+            >
+              <BlurMask blur={11} style="normal" />
+            </Circle>
+            <Circle
+              cx={g.cx}
+              cy={g.cy}
+              r={g.r - 4}
+              color={colors.oroSoft}
+              style="stroke"
+              strokeWidth={11}
+              opacity={0.7}
+            >
+              <BlurMask blur={9} style="normal" />
+            </Circle>
+            <Circle
+              cx={g.cx}
+              cy={g.cy}
+              r={g.r}
+              color={CORE}
+              style="stroke"
+              strokeWidth={3}
+              opacity={0.75}
+            >
+              <BlurMask blur={3.5} style="normal" />
+            </Circle>
+          </Group>
 
-        {/* Las chispas: finas, con estela; las viejas más tenues. Las
+          {/* Las chispas: finas, con estela; las viejas más tenues. Las
             magenta se dibujan dos veces sobre el MISMO camino: un halo
             difuso detrás de una línea nítida, así destellan sin costo extra. */}
-        <Group opacity={sparkOp} blendMode="plus">
-          <Path
-            path={pink0}
-            style="stroke"
-            strokeWidth={4}
-            strokeCap="round"
-            color={colors.magenta}
-            opacity={0.55}
-          >
-            <BlurMask blur={5} style="normal" />
-          </Path>
-          <Path
-            path={pink0}
-            style="stroke"
-            strokeWidth={1.4}
-            strokeCap="round"
-            color={colors.magenta}
-          />
-          <Path
-            path={pink1}
-            style="stroke"
-            strokeWidth={3}
-            strokeCap="round"
-            color={colors.magenta}
-            opacity={0.3}
-          >
-            <BlurMask blur={4} style="normal" />
-          </Path>
-          <Path
-            path={pink1}
-            style="stroke"
-            strokeWidth={1.1}
-            strokeCap="round"
-            color={colors.magenta}
-            opacity={0.6}
-          />
-          <Path path={white0} style="stroke" strokeWidth={1.1} strokeCap="round" color={CORE} />
-          <Path
-            path={white1}
-            style="stroke"
-            strokeWidth={0.9}
-            strokeCap="round"
-            color={CORE}
-            opacity={0.4}
-          />
-          <Path
-            path={gold0}
-            style="stroke"
-            strokeWidth={1.1}
-            strokeCap="round"
-            color={colors.oroLight}
-          />
-          <Path
-            path={gold1}
-            style="stroke"
-            strokeWidth={0.9}
-            strokeCap="round"
-            color={colors.oroLight}
-            opacity={0.4}
-          />
-        </Group>
+          <Group opacity={sparkOp} blendMode="plus">
+            <Path
+              path={pink0}
+              style="stroke"
+              strokeWidth={ANDROID ? 2.4 : 4}
+              strokeCap="round"
+              color={colors.magenta}
+              opacity={ANDROID ? 0.4 : 0.55}
+            >
+              <BlurMask blur={5} style="normal" />
+            </Path>
+            <Path
+              path={pink0}
+              style="stroke"
+              strokeWidth={1.4}
+              strokeCap="round"
+              color={colors.magenta}
+            />
+            <Path
+              path={pink1}
+              style="stroke"
+              strokeWidth={3}
+              strokeCap="round"
+              color={colors.magenta}
+              opacity={0.3}
+            >
+              <BlurMask blur={4} style="normal" />
+            </Path>
+            <Path
+              path={pink1}
+              style="stroke"
+              strokeWidth={1.1}
+              strokeCap="round"
+              color={colors.magenta}
+              opacity={0.6}
+            />
+            <Path path={white0} style="stroke" strokeWidth={1.1} strokeCap="round" color={CORE} />
+            <Path
+              path={white1}
+              style="stroke"
+              strokeWidth={0.9}
+              strokeCap="round"
+              color={CORE}
+              opacity={0.4}
+            />
+            <Path
+              path={gold0}
+              style="stroke"
+              strokeWidth={1.1}
+              strokeCap="round"
+              color={colors.oroLight}
+            />
+            <Path
+              path={gold1}
+              style="stroke"
+              strokeWidth={0.9}
+              strokeCap="round"
+              color={colors.oroLight}
+              opacity={0.4}
+            />
+          </Group>
 
-        {/* Nuestro toque: el enjambre regresa a la estrella del corazón (magenta
+          {/* Nuestro toque: el enjambre regresa a la estrella del corazón (magenta
             con oro, pizca de crema) y ahí destella. */}
-        <Group blendMode="plus">
-          <Path
-            path={homingPink}
-            style="stroke"
-            strokeWidth={4}
-            strokeCap="round"
-            color={colors.magenta}
-            opacity={0.5}
-          >
-            <BlurMask blur={5} style="normal" />
-          </Path>
-          <Path
-            path={homingPink}
-            style="stroke"
-            strokeWidth={1.3}
-            strokeCap="round"
-            color={colors.magenta}
-          />
-          <Path
-            path={homingGold}
-            style="stroke"
-            strokeWidth={1.1}
-            strokeCap="round"
-            color={colors.oroLight}
-          >
-            <BlurMask blur={1.5} style="solid" />
-          </Path>
-          <Path
-            path={homingCream}
-            style="stroke"
-            strokeWidth={0.9}
-            strokeCap="round"
-            color={CORE}
-          />
-        </Group>
-        {/* Destellos de estrella entre las chispas: halo magenta + centro crema. */}
-        <Group blendMode="plus">
-          <Path path={starPath} color={colors.magenta} opacity={0.8}>
-            <BlurMask blur={6} style="normal" />
-          </Path>
-          <Path path={starPath} color={CORE} />
-        </Group>
-        <Group opacity={heart}>
-          <Circle cx={g.tx} cy={g.ty} r={heartR} color={colors.oroLight} opacity={0.35}>
-            <BlurMask blur={16} style="normal" />
-          </Circle>
-          <Circle cx={g.tx} cy={g.ty} r={4} color={CORE} />
-        </Group>
-      </Canvas>
+          <Group blendMode="plus">
+            <Path
+              path={homingPink}
+              style="stroke"
+              strokeWidth={ANDROID ? 2.4 : 4}
+              strokeCap="round"
+              color={colors.magenta}
+              opacity={ANDROID ? 0.38 : 0.5}
+            >
+              <BlurMask blur={5} style="normal" />
+            </Path>
+            <Path
+              path={homingPink}
+              style="stroke"
+              strokeWidth={1.3}
+              strokeCap="round"
+              color={colors.magenta}
+            />
+            <Path
+              path={homingGold}
+              style="stroke"
+              strokeWidth={1.1}
+              strokeCap="round"
+              color={colors.oroLight}
+            >
+              <BlurMask blur={1.5} style="solid" />
+            </Path>
+            <Path
+              path={homingCream}
+              style="stroke"
+              strokeWidth={0.9}
+              strokeCap="round"
+              color={CORE}
+            />
+          </Group>
+          {/* Destellos de estrella entre las chispas: halo magenta + centro crema. */}
+          <Group blendMode="plus">
+            <Path path={starPath} color={colors.magenta} opacity={0.8}>
+              <BlurMask blur={6} style="normal" />
+            </Path>
+            <Path path={starPath} color={CORE} />
+          </Group>
+          <Group opacity={heart}>
+            <Circle cx={g.tx} cy={g.ty} r={heartR} color={colors.oroLight} opacity={0.35}>
+              <BlurMask blur={16} style="normal" />
+            </Circle>
+            <Circle cx={g.tx} cy={g.ty} r={4} color={CORE} />
+          </Group>
+        </Canvas>
 
-      <Animated.View style={[styles.caption, textStyle]} pointerEvents="none">
-        <Text style={styles.title}>{payload.title}</Text>
-        {payload.subtitle ? <Text style={styles.subtitle}>{payload.subtitle}</Text> : null}
-      </Animated.View>
-    </Pressable>
+        <Animated.View style={[styles.caption, textStyle]} pointerEvents="none">
+          <Text style={styles.title}>{payload.title}</Text>
+          {payload.subtitle ? <Text style={styles.subtitle}>{payload.subtitle}</Text> : null}
+        </Animated.View>
+      </Pressable>
+    </View>
   )
 })
 
