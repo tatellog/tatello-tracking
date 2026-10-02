@@ -18,7 +18,8 @@ const AI_MASTER_ENABLED = true
  * la beta ve lo de siempre; solo estas cuentas viven el rediseño y gastan
  * OpenAI. Agregar un email aquí lo enciende sin más cambios.
  */
-const AI_ENABLED_EMAILS = ['dev@local.test']
+// La dueña también (1 oct 2026: "Pregúntale a Stelar" en su cuenta real).
+const AI_ENABLED_EMAILS = ['dev@local.test', 'tatellog@gmail.com']
 
 /** ¿Este usuario tiene las features de IA encendidas? (Órbita Mes IA + Voz.) */
 export function aiEnabledForEmail(email: string | null | undefined): boolean {
