@@ -107,8 +107,8 @@ import { colors } from '@/theme'
 /** El anillo dorado del arte del emblema, como fracción del lado del lienzo. */
 const RING_CY = 0.505
 const RING_R = 0.405
-/** Espera a que el check-in termine de colapsarse antes de medir el emblema. */
-const CELEBRATE_SETTLE_MS = 380
+/** Primera medición del emblema; luego se re-mide hasta que quede quieto. */
+const CELEBRATE_SETTLE_MS = 200
 
 function playCommitHaptic(kind: 'trained' | 'backfill' | 'rested') {
   if (kind === 'rested') {
@@ -446,19 +446,26 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const fireCelebration = (title: string, subtitle?: string) => {
     if (reducedMotion) return
     setCelebrating(true)
-    // Reintenta mientras Hoy termina de pintar (cold start desde la
-    // notificación: la constelación aún no existe en el primer intento).
+    // Mide hasta que el emblema quede QUIETO: al tocar "Entrené" el check-in se
+    // colapsa con animación y el emblema sube un rato; medir a tiempo fijo
+    // dejaba la corona desfasada (iPhone). Dos lecturas iguales seguidas =
+    // quieto. También cubre el cold start desde la notificación (la
+    // constelación aún no existe en los primeros intentos).
+    let last: number | null = null
     const attempt = (left: number) => {
       const node = constellationRef.current
       if (!node) {
-        if (left > 0) setTimeout(() => attempt(left - 1), 400)
+        if (left > 0) setTimeout(() => attempt(left - 1), 120)
         return
       }
       node.measureInWindow((x, y, w) => {
-        if (!w) {
-          if (left > 0) setTimeout(() => attempt(left - 1), 400)
+        const stable = w > 0 && last != null && Math.abs(last - y) < 0.5
+        if (!stable && left > 0) {
+          if (w > 0) last = y
+          setTimeout(() => attempt(left - 1), 120)
           return
         }
+        if (!w) return
         const heart = heartRef.current
         const side = heart?.canvas ?? w
         const ox = x + (w - side) / 2
@@ -475,7 +482,7 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
         })
       })
     }
-    setTimeout(() => attempt(8), CELEBRATE_SETTLE_MS)
+    setTimeout(() => attempt(25), CELEBRATE_SETTLE_MS)
   }
 
   // Orquestador de Revelaciones — única fuente de momentos full-screen en Hoy
