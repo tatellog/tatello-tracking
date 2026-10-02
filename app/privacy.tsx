@@ -60,10 +60,12 @@ function PrivacyBody() {
             <View style={styles.point}>
               <View style={styles.pointDot} />
               <Text style={styles.pointText}>
-                <Text style={styles.accent}>De Apple Salud, si lo conectas:</Text> tu sueño, tus
-                entrenos, tus pasos y tu agua; y, si enciendes tu báscula, tu peso y tu composición
-                corporal. Solo leemos: nunca escribimos en Salud, y esos datos nunca se usan para
-                publicidad.
+                <Text style={styles.accent}>
+                  De Apple Salud (iPhone) o Health Connect (Android), si lo conectas:
+                </Text>{' '}
+                tu sueño, tus entrenos, tus pasos y tu agua; y, si enciendes tu báscula, tu peso y
+                tu composición corporal. Solo leemos: nunca escribimos en ellos, y esos datos nunca
+                se usan para publicidad.
               </Text>
             </View>
             <View style={styles.point}>

@@ -15,7 +15,7 @@
  *     que el insert truene).
  */
 
-export type WearableSource = 'apple_health' | 'garmin'
+export type WearableSource = 'apple_health' | 'health_connect' | 'garmin'
 
 export type WearableWorkoutRow = {
   source: WearableSource
@@ -80,6 +80,9 @@ export type RawWorkout = {
   durationSec: number | null
   /** kcal del entreno (totalEnergyBurned del propio workout); null si no vino. */
   energyKcal: number | null
+  /** Tipo canónico ya resuelto por la fuente (Health Connect usa otro enum que
+   *  HealthKit); si viene, gana sobre `activityType`. */
+  workoutType?: string
 }
 
 /** Muestra cruda de sueño (una etapa). `value` = CategoryValueSleepAnalysis. */
@@ -142,6 +145,46 @@ export function hkActivityToWorkoutType(activityType: number): string {
   return 'otro'
 }
 
+/**
+ * Health Connect ExerciseType → el mismo vocabulario canónico. Otro enum que
+ * HealthKit (constantes de react-native-health-connect), misma regla: lo que no
+ * mapea limpio cae a 'otro'.
+ */
+const HC_FUERZA = new Set([13, 70, 81]) // calisthenics, strength training, weightlifting
+const HC_CARDIO = new Set([8, 9, 10, 16, 25, 36, 48, 53, 54, 56, 57, 68, 69, 73, 74])
+const HC_CAMINATA = new Set([37, 79]) // hiking, walking
+
+export function hcExerciseToWorkoutType(exerciseType: number): string {
+  if (HC_FUERZA.has(exerciseType)) return 'fuerza'
+  if (HC_CARDIO.has(exerciseType)) return 'cardio'
+  if (HC_CAMINATA.has(exerciseType)) return 'caminata'
+  return 'otro'
+}
+
+/**
+ * Etapa de sueño de Health Connect → el valor de HealthKit que entiende
+ * `sleepSamplesToRows` (así la agregación de la noche es UNA sola). Fuera de
+ * la cama no cuenta (null).
+ *   HC: 1 despierta · 2 dormida · 3 fuera de la cama · 4 ligero · 5 profundo · 6 REM
+ *   HK: 2 despierta · 1 dormida sin etapa · 3 core · 4 profundo · 5 REM
+ */
+export function hcSleepStageToHk(stage: number): number | null {
+  switch (stage) {
+    case 1:
+      return 2
+    case 2:
+      return 1
+    case 4:
+      return 3
+    case 5:
+      return 4
+    case 6:
+      return 5
+    default:
+      return null
+  }
+}
+
 const clamp = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n))
 
 /** Un workout crudo → fila de wearable_workouts (sin user_id; lo pone api). */
@@ -157,7 +200,7 @@ export function normalizeWorkout(w: RawWorkout, source: WearableSource): Wearabl
     external_id: w.uuid,
     started_at: w.start.toISOString(),
     ended_at: w.end.toISOString(),
-    workout_type: hkActivityToWorkoutType(w.activityType),
+    workout_type: w.workoutType ?? hkActivityToWorkoutType(w.activityType),
     duration_min: durationMin,
     energy_kcal: energyKcal,
   }

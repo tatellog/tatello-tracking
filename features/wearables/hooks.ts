@@ -14,6 +14,7 @@ import { AppState } from 'react-native'
 
 import { useSession } from '@/hooks/useSession'
 import { notifyWorkoutArrived } from '@/features/notifications/workout-arrived'
+import { registerHealthBackgroundSync, unregisterHealthBackgroundSync } from './background-sync'
 import { freshWorkouts, localDayOf } from './health-summary'
 import { track } from '@/lib/analytics'
 import { queryKeys } from '@/lib/queryKeys'
@@ -44,7 +45,8 @@ import {
   readWorkouts,
   requestHealthKitAuthorization,
   requestScaleAuthorization,
-} from './healthkit'
+  HEALTH_SOURCE,
+} from './health-platform'
 import {
   bodyCompositionToRows,
   bodyMassToRows,
@@ -118,8 +120,8 @@ export async function syncAppleHealth(
       readBodyComposition(from, to),
     ])
 
-    const sleepRows = sleepSamplesToRows(rawSleep, tz, 'apple_health')
-    const workoutRows = dedupeWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, 'apple_health')))
+    const sleepRows = sleepSamplesToRows(rawSleep, tz, HEALTH_SOURCE)
+    const workoutRows = dedupeWorkouts(rawWorkouts.map((w) => normalizeWorkout(w, HEALTH_SOURCE)))
     const today = todayInTimezone(tz)
     const todayWorkouts = workoutRows
       .filter((w) => localDayOf(w.started_at, tz) === today)
@@ -132,10 +134,10 @@ export async function syncAppleHealth(
     const [workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays] = await Promise.all([
       upsertWearableWorkouts(workoutRows),
       upsertWearableSleep(sleepRows),
-      upsertWearableSteps(stepsToRows(rawSteps, tz, 'apple_health')),
-      upsertWearableWater(waterToRows(rawWater, tz, 'apple_health')),
-      upsertWearableWeight(bodyMassToRows(rawWeight, tz, 'apple_health')),
-      upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, 'apple_health')),
+      upsertWearableSteps(stepsToRows(rawSteps, tz, HEALTH_SOURCE)),
+      upsertWearableWater(waterToRows(rawWater, tz, HEALTH_SOURCE)),
+      upsertWearableWeight(bodyMassToRows(rawWeight, tz, HEALTH_SOURCE)),
+      upsertWearableBodyComposition(bodyCompositionToRows(rawBody, tz, HEALTH_SOURCE)),
     ])
     return {
       workouts,
@@ -217,12 +219,12 @@ export function useAppleHealthConnection(): {
       // iOS no revela "denegado" en lectura: granted=false solo pasa si el
       // flujo tronó. Conectamos igual y el vacío honesto vive en la UI.
       if (!granted) {
-        track('wearable_connect_failed', { source: 'apple_health' })
+        track('wearable_connect_failed', { source: HEALTH_SOURCE })
         return false
       }
       await AsyncStorage.setItem(connectedKey(userId), 'true').catch(() => {})
       setConnected(true)
-      track('wearable_connected', { source: 'apple_health' })
+      track('wearable_connected', { source: HEALTH_SOURCE })
       void ensureBackgroundDelivery()
 
       const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS, {
@@ -232,7 +234,7 @@ export function useAppleHealthConnection(): {
         const now = new Date().toISOString()
         await AsyncStorage.setItem(lastSyncKey(userId), now).catch(() => {})
         setLastSyncAt(now)
-        track('wearable_sync', { source: 'apple_health', initial: true, ...counts })
+        track('wearable_sync', { source: HEALTH_SOURCE, initial: true, ...counts })
         if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
           void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
         }
@@ -251,9 +253,10 @@ export function useAppleHealthConnection(): {
     if (!userId) return
     await AsyncStorage.setItem(connectedKey(userId), 'false').catch(() => {})
     setConnected(false)
-    track('wearable_disconnected', { source: 'apple_health' })
+    track('wearable_disconnected', { source: HEALTH_SOURCE })
     await AsyncStorage.removeItem(BACKGROUND_KEY).catch(() => {})
     void disableHealthBackgroundDelivery()
+    void unregisterHealthBackgroundSync()
   }, [userId])
 
   return { available, connected, lastSyncAt, busy, connect, disconnect }
@@ -261,11 +264,31 @@ export function useAppleHealthConnection(): {
 
 /** Enciende el background delivery una vez por teléfono (idempotente). */
 async function ensureBackgroundDelivery(): Promise<void> {
+  // Android: la tarea periódica (no hay background delivery). Idempotente.
+  void registerHealthBackgroundSync()
   const done = await AsyncStorage.getItem(BACKGROUND_KEY).catch(() => null)
   if (done === 'true') return
   if (await enableHealthBackgroundDelivery()) {
     await AsyncStorage.setItem(BACKGROUND_KEY, 'true').catch(() => {})
   }
+}
+
+/**
+ * El sync de la tarea en segundo plano de Android (background-sync.ts): sin
+ * React ni QueryClient. Lee Health Connect, guarda y avisa si llegó un entreno
+ * de hoy nuevo (la app no está a la vista, así que siempre "en segundo plano").
+ */
+export async function backgroundHealthSync(userId: string): Promise<void> {
+  const flag = await AsyncStorage.getItem(connectedKey(userId)).catch(() => null)
+  if (flag !== 'true') return
+  const counts = await syncAppleHealth(SYNC_WINDOW_DAYS, { scale: await isScaleEnabled(userId) })
+  if (!counts) return
+  await AsyncStorage.setItem(lastSyncKey(userId), new Date().toISOString()).catch(() => {})
+  if (counts.lastSleepDay) {
+    await AsyncStorage.setItem(lastSleepDayKey(userId), counts.lastSleepDay).catch(() => {})
+  }
+  await announceArrivedWorkouts(userId, counts.todayWorkouts, true)
+  track('wearable_background_task', { source: HEALTH_SOURCE, workouts: counts.workouts })
 }
 
 /* Entrenos de Salud ya vistos/avisados (ids), por usuaria. */
@@ -353,7 +376,7 @@ async function runAppleHealthSync(
     if (lastSleepDay) {
       await AsyncStorage.setItem(lastSleepDayKey(userId), lastSleepDay).catch(() => {})
     }
-    track('wearable_sync', { source: 'apple_health', initial: false, forced: force, ...tracked })
+    track('wearable_sync', { source: HEALTH_SOURCE, initial: false, forced: force, ...tracked })
     if (counts.workouts + counts.sleepDays + counts.waterDays + counts.weightDays > 0) {
       void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
     }
@@ -393,7 +416,7 @@ export function useAppleHealthSync(): void {
       const connected = await AsyncStorage.getItem(connectedKey(userId)).catch(() => null)
       if (connected === 'true') await ensureBackgroundDelivery()
       await runAppleHealthSync(userId, qc, wokenByHealth)
-      if (wokenByHealth) track('wearable_background_wake', { source: 'apple_health' })
+      if (wokenByHealth) track('wearable_background_wake', { source: HEALTH_SOURCE })
     })()
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void runAppleHealthSync(userId, qc, false)
@@ -410,7 +433,7 @@ export function useAppleHealthSync(): void {
       debounce = setTimeout(() => {
         debounce = null
         void runAppleHealthSync(userId, qc, true).then((ran) => {
-          if (ran) track('wearable_live_sync', { source: 'apple_health' })
+          if (ran) track('wearable_live_sync', { source: HEALTH_SOURCE })
         })
       }, 4_000)
     }).then((unsub) => {
@@ -478,7 +501,7 @@ export function useWearableInvite(): {
     if (!userId) return
     setDismissed(true)
     void AsyncStorage.setItem(inviteDismissedKey(userId), 'true').catch(() => {})
-    track('wearable_invite_dismissed', { source: 'apple_health' })
+    track('wearable_invite_dismissed', { source: HEALTH_SOURCE })
   }, [userId])
 
   return {
@@ -535,7 +558,7 @@ export function useScaleConnection(): {
     try {
       const granted = await requestScaleAuthorization()
       if (!granted) {
-        track('scale_enable_failed', { source: 'apple_health' })
+        track('scale_enable_failed', { source: HEALTH_SOURCE })
         return false
       }
       await AsyncStorage.setItem(scaleEnabledKey(userId), 'true').catch(() => {})
@@ -543,10 +566,10 @@ export function useScaleConnection(): {
       await AsyncStorage.setItem(connectedKey(userId), 'true').catch(() => {})
       void ensureBackgroundDelivery()
       setEnabled(true)
-      track('scale_enabled', { source: 'apple_health' })
+      track('scale_enabled', { source: HEALTH_SOURCE })
       const counts = await syncAppleHealth(INITIAL_WINDOW_DAYS, { scale: true })
       if (counts) {
-        track('wearable_sync', { source: 'apple_health', initial: true, ...counts })
+        track('wearable_sync', { source: HEALTH_SOURCE, initial: true, ...counts })
         void qc.invalidateQueries({ queryKey: queryKeys.wearables.all })
         void qc.invalidateQueries({ queryKey: queryKeys.progress.all })
         void qc.invalidateQueries({ queryKey: queryKeys.orbit.all })
@@ -561,7 +584,7 @@ export function useScaleConnection(): {
     if (!userId) return
     await AsyncStorage.setItem(scaleEnabledKey(userId), 'false').catch(() => {})
     setEnabled(false)
-    track('scale_disabled', { source: 'apple_health' })
+    track('scale_disabled', { source: HEALTH_SOURCE })
   }, [userId])
 
   return { available, enabled, busy, enable, disable }

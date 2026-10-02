@@ -11,6 +11,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import { AMBIENT_MOTION } from '@/lib/motion'
 import Svg, { Circle } from 'react-native-svg'
 
 import { MealGlyph } from '@/features/macros/components/meal-glyphs'
@@ -63,7 +64,7 @@ function CurrentGlow() {
   const reduce = useReducedMotion() ?? false
   const t = useSharedValue(0)
   useEffect(() => {
-    if (reduce) {
+    if (reduce || !AMBIENT_MOTION) {
       t.value = 0.5
       return
     }

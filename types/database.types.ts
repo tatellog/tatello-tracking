@@ -1030,6 +1030,24 @@ export type Database = {
         }
         Relationships: []
       }
+      seen_combos: {
+        Row: {
+          combo_key: string
+          first_seen_at: string
+          user_id: string
+        }
+        Insert: {
+          combo_key: string
+          first_seen_at?: string
+          user_id: string
+        }
+        Update: {
+          combo_key?: string
+          first_seen_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sleep_logs: {
         Row: {
           bedtime: string
@@ -1167,15 +1185,15 @@ export type Database = {
       }
       wearable_sleep: {
         Row: {
-          awake_minutes: number | null
-          core_minutes: number | null
-          deep_minutes: number | null
-          rem_minutes: number | null
           asleep_minutes: number
+          awake_minutes: number | null
           bedtime_at: string | null
+          core_minutes: number | null
           created_at: string
+          deep_minutes: number | null
           external_id: string
           id: string
+          rem_minutes: number | null
           sleep_date: string
           source: string
           updated_at: string
@@ -1183,15 +1201,15 @@ export type Database = {
           wake_at: string | null
         }
         Insert: {
-          awake_minutes?: number | null
-          core_minutes?: number | null
-          deep_minutes?: number | null
-          rem_minutes?: number | null
           asleep_minutes: number
+          awake_minutes?: number | null
           bedtime_at?: string | null
+          core_minutes?: number | null
           created_at?: string
+          deep_minutes?: number | null
           external_id: string
           id?: string
+          rem_minutes?: number | null
           sleep_date: string
           source: string
           updated_at?: string
@@ -1199,15 +1217,15 @@ export type Database = {
           wake_at?: string | null
         }
         Update: {
-          awake_minutes?: number | null
-          core_minutes?: number | null
-          deep_minutes?: number | null
-          rem_minutes?: number | null
           asleep_minutes?: number
+          awake_minutes?: number | null
           bedtime_at?: string | null
+          core_minutes?: number | null
           created_at?: string
+          deep_minutes?: number | null
           external_id?: string
           id?: string
+          rem_minutes?: number | null
           sleep_date?: string
           source?: string
           updated_at?: string

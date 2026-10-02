@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import { HEALTH_APP_FULL, HEALTH_PERMISSION_PATH } from '@/features/wearables/health-platform'
 import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -73,8 +74,8 @@ function ConnectionsBody() {
             Tu reloj anota por ti. <Text style={styles.promiseStrong}>Nada sale de tu cuenta.</Text>
           </Text>
 
-          {/* ── Apple Health ── */}
-          <Text style={styles.eyebrow}>Apple Health</Text>
+          {/* ── Apple Health / Health Connect ── */}
+          <Text style={styles.eyebrow}>{HEALTH_APP_FULL}</Text>
           <View style={styles.card}>
             {available === false ? (
               <Text style={styles.body}>
@@ -82,7 +83,9 @@ function ConnectionsBody() {
                   ? // Solo lo ve la dueña en desarrollo: Expo Go no incluye el
                     // módulo de Salud; el prompt real vive en el dev build.
                     'Expo Go no incluye Salud. En el build de desarrollo, este botón abre la hoja de permisos.'
-                  : 'Disponible en iPhone. Cuando abras Stelar desde uno, aquí podrás conectar tu reloj.'}
+                  : Platform.OS === 'android'
+                    ? 'Instala Health Connect desde Google Play para conectar tu reloj.'
+                    : 'Disponible en iPhone. Cuando abras Stelar desde uno, aquí podrás conectar tu reloj.'}
               </Text>
             ) : connected ? (
               <>
@@ -94,14 +97,13 @@ function ConnectionsBody() {
                   <Text style={styles.metaLine}>Última lectura: {syncLabel(lastSyncAt)}</Text>
                 ) : (
                   <Text style={styles.metaLine}>
-                    Aún no encontramos registros tuyos. Si tu reloj ya guarda entrenos o sueño, dale
-                    un vistazo al permiso en Salud → Stelar.
+                    {`Aún no encontramos registros tuyos. Si tu reloj ya guarda entrenos o sueño, dale un vistazo al permiso en ${HEALTH_PERMISSION_PATH}.`}
                   </Text>
                 )}
                 <Pressable
                   onPress={() => void disconnect()}
                   accessibilityRole="button"
-                  accessibilityLabel="Desconectar Apple Health"
+                  accessibilityLabel={`Desconectar ${HEALTH_APP_FULL}`}
                   style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
                 >
                   <Text style={styles.secondaryBtnText}>Desconectar</Text>
@@ -131,7 +133,7 @@ function ConnectionsBody() {
                   onPress={() => void handleConnect()}
                   disabled={busy || available !== true}
                   accessibilityRole="button"
-                  accessibilityLabel="Conectar Apple Health"
+                  accessibilityLabel={`Conectar ${HEALTH_APP_FULL}`}
                   style={({ pressed }) => [
                     styles.primaryBtn,
                     (busy || available !== true) && styles.disabled,
@@ -141,7 +143,7 @@ function ConnectionsBody() {
                   {busy ? (
                     <StarLoader size={16} color={colors.leche} />
                   ) : (
-                    <Text style={styles.primaryBtnText}>Conectar Apple Health</Text>
+                    <Text style={styles.primaryBtnText}>{`Conectar ${HEALTH_APP_FULL}`}</Text>
                   )}
                 </Pressable>
                 <Text style={styles.footnote}>
@@ -157,8 +159,7 @@ function ConnectionsBody() {
           <Text style={styles.eyebrow}>Garmin</Text>
           <View style={styles.card}>
             <Text style={styles.body}>
-              ¿Usas Garmin? Activa Apple Health en tu app Garmin Connect y tus entrenos y tu sueño
-              llegan a Stelar. La conexión directa con Garmin llega después.
+              {`¿Usas Garmin? Activa ${HEALTH_APP_FULL} en tu app Garmin Connect y tus entrenos y tu sueño llegan a Stelar. La conexión directa con Garmin llega después.`}
             </Text>
           </View>
         </ScrollView>

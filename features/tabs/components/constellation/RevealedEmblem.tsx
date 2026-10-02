@@ -17,6 +17,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import { AMBIENT_MOTION } from '@/lib/motion'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -313,7 +314,7 @@ export function RevealedEmblem({
   // conocido). El emblema "inhala". Los hooks van ANTES del early-return.
   const breath = useSharedValue(0)
   useEffect(() => {
-    if (!breathe) return
+    if (!breathe || !AMBIENT_MOTION) return
     breath.value = withRepeat(
       withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.ease) }),
       -1,

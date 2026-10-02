@@ -20,7 +20,7 @@ import type {
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 const workoutRowSchema = z.object({
-  source: z.enum(['apple_health', 'garmin']),
+  source: z.enum(['apple_health', 'health_connect', 'garmin']),
   external_id: z.string().min(1).max(256),
   started_at: z.string().datetime(),
   ended_at: z.string().datetime(),
@@ -30,7 +30,7 @@ const workoutRowSchema = z.object({
 })
 
 const sleepRowSchema = z.object({
-  source: z.enum(['apple_health', 'garmin']),
+  source: z.enum(['apple_health', 'health_connect', 'garmin']),
   external_id: z.string().min(1).max(256),
   sleep_date: isoDay,
   bedtime_at: z.string().datetime().nullable(),
@@ -43,19 +43,19 @@ const sleepRowSchema = z.object({
 })
 
 const stepsRowSchema = z.object({
-  source: z.enum(['apple_health', 'garmin']),
+  source: z.enum(['apple_health', 'health_connect', 'garmin']),
   day_date: isoDay,
   steps: z.number().int().min(0).max(200000),
 })
 
 const waterRowSchema = z.object({
-  source: z.enum(['apple_health', 'garmin']),
+  source: z.enum(['apple_health', 'health_connect', 'garmin']),
   day_date: isoDay,
   water_ml: z.number().int().min(0).max(10000),
 })
 
 const weightRowSchema = z.object({
-  source: z.enum(['apple_health', 'garmin']),
+  source: z.enum(['apple_health', 'health_connect', 'garmin']),
   day_date: isoDay,
   measured_at: z.string().datetime(),
   weight_kg: z.number().min(20).max(400),
@@ -73,7 +73,7 @@ export type WearableWeightPoint = LatestWearableWeight
 
 const bodyCompositionRowSchema = z
   .object({
-    source: z.enum(['apple_health', 'garmin']),
+    source: z.enum(['apple_health', 'health_connect', 'garmin']),
     day_date: isoDay,
     body_fat_pct: z.number().min(0).max(100).nullable(),
     lean_body_mass_kg: z.number().min(0).max(300).nullable(),

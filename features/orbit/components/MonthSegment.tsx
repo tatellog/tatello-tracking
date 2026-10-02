@@ -441,7 +441,7 @@ export function MonthSegment({
   useEffect(() => {
     if (shownKey) seenCombos.mark(shownKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shownKey])
+  }, [shownKey, seenCombos.ready])
   // Patrones de apoyo: correlaciones demostrables del motor (kind 'pattern'). Se
   // excluye lo que ya dijo el combo (sin redundancia) y se ordena por relevancia
   // (déficit es el norte). Tope: 2 con combo, 3 sin él (el astrónomo no abruma).

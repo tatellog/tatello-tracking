@@ -11,6 +11,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import { AMBIENT_MOTION } from '@/lib/motion'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 
@@ -50,7 +51,7 @@ function QuickLogFab({ onPress }: { onPress: () => void }) {
   const press = useSharedValue(0)
 
   useEffect(() => {
-    if (reduceMotion) return
+    if (reduceMotion || !AMBIENT_MOTION) return
     breath.value = withRepeat(
       withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
       -1,

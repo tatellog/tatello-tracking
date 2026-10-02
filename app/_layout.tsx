@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+// Android: define la tarea periódica de Health Connect al cargar el bundle
+// (WorkManager puede arrancar SOLO la tarea, sin UI).
+import '@/features/wearables/background-sync'
 import {
   CormorantGaramond_500Medium_Italic,
   CormorantGaramond_600SemiBold_Italic,
