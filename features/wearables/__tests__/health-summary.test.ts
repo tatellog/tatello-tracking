@@ -18,6 +18,8 @@ describe('health-summary', () => {
     const lines = workoutsOfDay(
       [
         {
+          external_id: 'x',
+          activity: null,
           started_at: '2026-09-30T01:30:00Z',
           ended_at: '2026-09-30T02:15:00Z',
           workout_type: 'fuerza',
@@ -25,6 +27,8 @@ describe('health-summary', () => {
           energy_kcal: 320,
         },
         {
+          external_id: 'x',
+          activity: null,
           started_at: '2026-09-28T14:00:00Z',
           ended_at: '2026-09-28T14:30:00Z',
           workout_type: 'cardio',
@@ -43,6 +47,8 @@ describe('health-summary', () => {
     const [l] = workoutsOfDay(
       [
         {
+          external_id: 'x',
+          activity: null,
           started_at: '2026-09-29T15:00:00Z',
           ended_at: '2026-09-29T15:20:00Z',
           workout_type: 'otro',

@@ -27,6 +27,7 @@ const workoutRowSchema = z.object({
   workout_type: z.string().max(64).nullable(),
   duration_min: z.number().int().min(0).max(1440).nullable(),
   energy_kcal: z.number().int().min(0).max(5000).nullable(),
+  activity: z.string().min(1).max(40).nullable(),
 })
 
 const sleepRowSchema = z.object({
@@ -142,6 +143,33 @@ export async function getWearableSleepNights(
   return z.array(sleepNightSchema).parse(data ?? [])
 }
 
+/**
+ * Borra los entrenos de la fuente en [fromIso, toIso] que Salud YA NO tiene.
+ * Garmin Connect reescribe el mismo entreno con un UUID nuevo en cada sync:
+ * sin esto, cada versión quedaba como un entreno aparte (dueña 2 oct 2026: 3
+ * actividades salían como 9, "174 min, 19 entrenos esta semana"). Salud es la
+ * fuente de verdad de su ventana. RLS: solo filas propias.
+ */
+export async function pruneWearableWorkouts(
+  source: WearableWorkoutRow['source'],
+  fromIso: string,
+  toIso: string,
+  keepIds: readonly string[],
+): Promise<void> {
+  if (keepIds.length === 0) return
+  const userId = await requireUserId()
+  const list = keepIds.map((id) => `"${id.replace(/"/g, '')}"`).join(',')
+  const { error } = await supabase
+    .from('wearable_workouts')
+    .delete()
+    .eq('user_id', userId)
+    .eq('source', source)
+    .gte('started_at', fromIso)
+    .lte('started_at', toIso)
+    .not('external_id', 'in', `(${list})`)
+  if (error) throw error
+}
+
 /** Upsert de pasos diarios (ingest-only: el motor los leerá cuando toque). */
 export async function upsertWearableSteps(rows: WearableStepsRow[]): Promise<number> {
   if (rows.length === 0) return 0
@@ -227,6 +255,8 @@ export async function upsertWearableBodyComposition(
 /* ── Lo que trajo Salud en un rango (pantalla "Tu smartwatch") ─────────── */
 
 const summaryWorkoutSchema = z.object({
+  external_id: z.string(),
+  activity: z.string().nullable(),
   started_at: z.string(),
   ended_at: z.string(),
   workout_type: z.string().nullable(),
@@ -259,7 +289,9 @@ export async function getHealthSummary(fromDay: string, toDay: string): Promise<
   const [w, st, wa] = await Promise.all([
     supabase
       .from('wearable_workouts')
-      .select('started_at, ended_at, workout_type, duration_min, energy_kcal')
+      .select(
+        'external_id, activity, started_at, ended_at, workout_type, duration_min, energy_kcal',
+      )
       .eq('user_id', userId)
       .gte('started_at', fromStartUtc)
       .lt('started_at', toEndUtc)

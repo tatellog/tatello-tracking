@@ -31,6 +31,7 @@ import {
   upsertWearableWater,
   upsertWearableWeight,
   upsertWearableWorkouts,
+  pruneWearableWorkouts,
 } from './api'
 import {
   disableHealthBackgroundDelivery,
@@ -131,6 +132,15 @@ export async function syncAppleHealth(
       null,
     )
 
+    // Salud es la verdad de su ventana: lo que ya no está (las versiones
+    // viejas que Garmin reescribe con otro UUID) se borra antes de guardar.
+    // Solo con lectura real: una ventana vacía (iPhone bloqueado) no borra nada.
+    await pruneWearableWorkouts(
+      HEALTH_SOURCE,
+      from.toISOString(),
+      to.toISOString(),
+      workoutRows.map((w) => w.external_id),
+    ).catch(() => {})
     const [workouts, sleepDays, stepDays, waterDays, weightDays, bodyDays] = await Promise.all([
       upsertWearableWorkouts(workoutRows),
       upsertWearableSleep(sleepRows),

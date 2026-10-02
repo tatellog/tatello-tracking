@@ -244,6 +244,7 @@ describe('dedupeWorkouts', () => {
     workout_type: 'cardio',
     duration_min: 17,
     energy_kcal: 120,
+    activity: null,
   }
 
   it('deja uno cuando Salud guarda el mismo entreno varias veces', () => {
@@ -385,5 +386,26 @@ describe('Health Connect · traducción al vocabulario de Stelar', () => {
       deep_minutes: 90,
       core_minutes: 180,
     })
+  })
+})
+
+describe('nombre de la actividad', () => {
+  const { hkActivityName, hcActivityName, normalizeWorkout } = jest.requireActual('../logic')
+  it('la bici se llama bici, no cardio', () => {
+    expect(hkActivityName(13)).toBe('Bici')
+    expect(hcActivityName(8)).toBe('Bici')
+    expect(hkActivityName(9999)).toBeNull()
+    const row = normalizeWorkout(
+      {
+        uuid: 'u',
+        activityType: 13,
+        start: new Date('2026-10-02T18:18:50Z'),
+        end: new Date('2026-10-02T18:30:47Z'),
+        durationSec: 717,
+        energyKcal: 73,
+      },
+      'apple_health',
+    )
+    expect(row).toMatchObject({ workout_type: 'cardio', activity: 'Bici' })
   })
 })

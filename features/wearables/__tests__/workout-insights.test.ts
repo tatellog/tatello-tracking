@@ -11,6 +11,8 @@ const TODAY = '2026-09-30' // miércoles
 
 // Sesión a las 12:00 locales (18:00 UTC) del día dado.
 const w = (day: string, type: string, min: number, kcal = 200) => ({
+  external_id: `${day}-${type}-${min}`,
+  activity: null,
   started_at: `${day}T18:00:00Z`,
   ended_at: `${day}T19:00:00Z`,
   workout_type: type,
@@ -129,5 +131,18 @@ describe('formatMinutes', () => {
     expect(formatMinutes(45)).toBe('45 min')
     expect(formatMinutes(160)).toBe('2 h 40')
     expect(formatMinutes(120)).toBe('2 h')
+  })
+})
+
+describe('sin duplicados', () => {
+  it('el mismo entreno con IDs distintos (Garmin lo reescribe) cuenta una vez', () => {
+    const dup = (id: string) => ({ ...w(TODAY, 'fuerza', 54, 270), external_id: id })
+    const t = todayWorkout([dup('a'), dup('b'), dup('c'), w(TODAY, 'cardio', 21, 172)], TODAY, TZ)!
+    expect(t.list).toHaveLength(2)
+    expect(t.totalMinutes).toBe(75)
+    expect(t.kcal).toBe(442)
+    const week = movementWeek([dup('a'), dup('b'), dup('c')], TODAY, TZ)
+    expect(week.sessions).toBe(1)
+    expect(week.totalMinutes).toBe(54)
   })
 })

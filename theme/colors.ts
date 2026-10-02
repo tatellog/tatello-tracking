@@ -121,6 +121,19 @@ export const colors = {
     rem: '#C18FFF',
     awake: 'rgba(201, 184, 165, 0.45)',
   },
+  // Íconos de actividad: un color propio y VIBRANTE por actividad (dueña 2 oct
+  // 2026: "no pastel"), tonos joya saturados como los anillos de Apple que
+  // combinan con el violeta del entreno. Ningún azul índigo: ese es sueño.
+  activity: {
+    strength: '#B266FF', // violeta eléctrico (el del entreno)
+    bike: '#2DD4BF', // turquesa
+    run: '#FF5C8A', // rosa intenso
+    walk: '#84E065', // lima
+    swim: '#22B8F0', // cian
+    hiit: '#FF8A3D', // naranja
+    yoga: '#E05CFF', // orquídea
+    other: '#9B8CFF', // pervinca
+  },
 
   // (Los alias legacy Pearl Mauve se migraron y eliminaron el 5 jul 2026:
   // una paleta cerrada con puerta trasera deprecated no está cerrada.)
