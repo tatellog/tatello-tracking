@@ -21,6 +21,7 @@ import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
 import {
+  hcActivityName,
   hcExerciseToWorkoutType,
   hcSleepStageToHk,
   type RawBodyComposition,
@@ -136,6 +137,7 @@ export async function readHcWorkouts(from: Date, to: Date): Promise<RawWorkout[]
         uuid: r.metadata?.id ?? `${r.startTime}-${r.exerciseType}`,
         activityType: -1,
         workoutType: hcExerciseToWorkoutType(r.exerciseType),
+        activityName: hcActivityName(r.exerciseType),
         start,
         end,
         durationSec: Math.max(0, (end.getTime() - start.getTime()) / 1000),

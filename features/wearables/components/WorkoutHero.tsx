@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
   FadeInDown,
+  ZoomIn,
   useAnimatedProps,
   useReducedMotion,
   useSharedValue,
@@ -17,6 +18,7 @@ import { colors, typography } from '@/theme'
 
 import { clockTime } from '../sleep-detail'
 import { formatMinutes, type MovementWeek, type TodayWorkout } from '../workout-insights'
+import { ActivityIcon } from './ActivityIcon'
 import { WatchGlyph } from './WatchGlyph'
 
 /*
@@ -115,15 +117,28 @@ export function WorkoutSessionCard({
   /** "hoy · " en el hero; vacío en un día pasado. */
   whenPrefix?: string
 }) {
+  const multi = workout.list.length > 1
+  const first = workout.list[0]
+  const last = workout.list[workout.list.length - 1]
   return (
     <>
       <View style={styles.head}>
         <View style={styles.headLeft}>
-          <StarGlyph color={ENTRENO} size={14} />
-          <Text style={styles.kicker}>{workout.name.toUpperCase()}</Text>
+          {multi || !first ? (
+            <StarGlyph color={ENTRENO} size={14} />
+          ) : (
+            <ActivityIcon name={first.name} type={first.type} size={24} />
+          )}
+          <Text style={styles.kicker}>
+            {multi
+              ? `${workout.list.length} ENTRENOS`
+              : (first?.name ?? workout.name).toUpperCase()}
+          </Text>
         </View>
         <Text style={styles.when}>
-          {`${whenPrefix}${clockTime(workout.startedAt, tz)} – ${clockTime(workout.endedAt, tz)}`}
+          {multi && first && last
+            ? `${whenPrefix}${clockTime(first.startedAt, tz)} – ${clockTime(last.endedAt, tz)}`
+            : `${whenPrefix}${clockTime(workout.startedAt, tz)} – ${clockTime(workout.endedAt, tz)}`}
         </Text>
       </View>
       <View style={styles.today}>
@@ -141,9 +156,6 @@ export function WorkoutSessionCard({
           ) : (
             <Text style={styles.vsAvg}>Tu reloj lo anotó por ti.</Text>
           )}
-          {workout.sessions > 1 ? (
-            <Text style={styles.meta}>{`${workout.sessions} sesiones ese día`}</Text>
-          ) : null}
           <View style={styles.provenance}>
             <WatchGlyph color={colors.bone} size={11} />
             <Text style={styles.meta}>
@@ -152,6 +164,38 @@ export function WorkoutSessionCard({
           </View>
         </View>
       </View>
+
+      {/* Qué hiciste, sesión por sesión (como la lista de Garmin): el anillo
+          suma el día; aquí se ve cada ejercicio con su hora y sus minutos. */}
+      {multi ? (
+        <View style={styles.sessionList}>
+          {workout.list.map((x, i) => (
+            // Cascada: cada fila entra un poco después de la anterior y su
+            // ícono aparece con un pequeño rebote (one-shot, sin bucles).
+            <Animated.View
+              key={x.key}
+              entering={FadeInDown.duration(320).delay(380 + i * 70)}
+              style={styles.sessionRow}
+            >
+              <Animated.View
+                entering={ZoomIn.springify()
+                  .damping(12)
+                  .delay(430 + i * 70)}
+              >
+                <ActivityIcon name={x.name} type={x.type} size={36} />
+              </Animated.View>
+              <View style={styles.sessionText}>
+                <Text style={styles.sessionName} numberOfLines={1}>
+                  {x.name}
+                </Text>
+                <Text style={styles.sessionMeta}>
+                  {`${x.minutes} min · ${clockTime(x.startedAt, tz)}${x.kcal > 0 ? ` · ~${x.kcal} kcal` : ''}`}
+                </Text>
+              </View>
+            </Animated.View>
+          ))}
+        </View>
+      ) : null}
     </>
   )
 }
@@ -288,6 +332,23 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     fontSize: typography.sizes.bodyLarge,
     color: colors.leche,
+  },
+  sessionList: {
+    marginTop: 16,
+    gap: 12,
+  },
+  sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sessionText: { flex: 1, gap: 2 },
+  sessionName: {
+    fontFamily: typography.uiSemi,
+    fontSize: typography.sizes.bodyLarge,
+    color: colors.leche,
+  },
+  sessionMeta: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.body,
+    color: colors.bone,
+    fontVariant: ['tabular-nums'],
   },
   monthLink: { marginTop: 12, alignSelf: 'flex-start' },
   monthLinkText: {

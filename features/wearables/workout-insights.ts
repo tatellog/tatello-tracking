@@ -35,16 +35,32 @@ type Session = {
   kcal: number
   startedAt: string
   endedAt: string
+  activity: string | null
+}
+
+/** Segunda red contra duplicados (la primera es el sync, que borra lo que
+ *  Salud ya no tiene): el mismo inicio + tipo + duración = el mismo entreno.
+ *  Garmin reescribe cada entreno con un ID nuevo y una base vieja podía tener
+ *  varias copias; aquí cuentan UNA vez. */
+function uniqueWorkouts(workouts: readonly HealthWorkout[]): HealthWorkout[] {
+  const seen = new Set<string>()
+  return workouts.filter((w) => {
+    const key = `${w.started_at.slice(0, 16)}|${w.workout_type ?? ''}|${w.duration_min ?? ''}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function sessions(workouts: readonly HealthWorkout[], tz: string): Session[] {
-  return workouts.map((w) => ({
+  return uniqueWorkouts(workouts).map((w) => ({
     day: localDayOf(w.started_at, tz),
     type: w.workout_type ?? 'otro',
     minutes: Math.max(0, w.duration_min ?? 0),
     kcal: Math.max(0, w.energy_kcal ?? 0),
     startedAt: w.started_at,
     endedAt: w.ended_at,
+    activity: w.activity,
   }))
 }
 
@@ -68,6 +84,20 @@ export type TodayWorkout = {
   average: number | null
   /** "Tu sesión de fuerza más larga en 6 semanas" (null si no es marca). */
   record: string | null
+  /** Cada sesión del día, en orden: qué hiciste, a qué hora, cuánto. */
+  list: SessionLine[]
+}
+
+/** Una sesión para la lista del día ("Bici · 12:18 pm · 12 min · ~73 kcal"). */
+export type SessionLine = {
+  key: string
+  /** "Bici", "Fuerza"…: la actividad real; si no se sabe, el tipo canónico. */
+  name: string
+  type: string
+  startedAt: string
+  endedAt: string
+  minutes: number
+  kcal: number
 }
 
 export function todayWorkout(
@@ -91,6 +121,17 @@ export function todayWorkout(
     startedAt: main.startedAt,
     endedAt: main.endedAt,
     sessions: mine.length,
+    list: [...mine]
+      .sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1))
+      .map((x) => ({
+        key: x.startedAt,
+        name: x.activity ?? WORKOUT_NAME[x.type] ?? 'Entreno',
+        type: x.type,
+        startedAt: x.startedAt,
+        endedAt: x.endedAt,
+        minutes: x.minutes,
+        kcal: Math.round(x.kcal),
+      })),
     average,
     record: sessionRecord(prior, main, today),
   }

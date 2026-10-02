@@ -1329,6 +1329,7 @@ export type Database = {
       }
       wearable_workouts: {
         Row: {
+          activity: string | null
           created_at: string
           duration_min: number | null
           ended_at: string
@@ -1342,6 +1343,7 @@ export type Database = {
           workout_type: string | null
         }
         Insert: {
+          activity?: string | null
           created_at?: string
           duration_min?: number | null
           ended_at: string
@@ -1355,6 +1357,7 @@ export type Database = {
           workout_type?: string | null
         }
         Update: {
+          activity?: string | null
           created_at?: string
           duration_min?: number | null
           ended_at?: string

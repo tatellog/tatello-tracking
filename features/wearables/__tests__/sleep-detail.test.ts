@@ -54,3 +54,37 @@ describe('formatos', () => {
     expect(clockTime('2026-09-29T05:48:00Z', 'America/Mexico_City')).toBe('11:48 pm')
   })
 })
+
+describe('hora de dormir', () => {
+  const { bedtimeMinutes, bedtimeLabel, bedtimeRead } = jest.requireActual('../sleep-detail')
+  const TZ = 'America/Mexico_City'
+  it('cuenta desde el mediodía para que cruzar la medianoche promedie bien', () => {
+    expect(bedtimeMinutes('2026-10-02T07:15:00Z', TZ)).toBe(795) // 1:15 am
+    expect(bedtimeMinutes('2026-10-02T04:30:00Z', TZ)).toBe(630) // 10:30 pm
+    expect(bedtimeLabel(795)).toBe('1:15 am')
+    expect(bedtimeLabel(630)).toBe('10:30 pm')
+    expect(bedtimeLabel(720)).toBe('12:00 am')
+  })
+  it('compara anoche contra tu promedio de noches anteriores', () => {
+    const nights = [
+      { sleep_date: '2026-09-29', bedtime_at: '2026-09-29T06:40:00Z' }, // 12:40 am
+      { sleep_date: '2026-09-30', bedtime_at: '2026-09-30T06:50:00Z' }, // 12:50 am
+      { sleep_date: '2026-10-01', bedtime_at: '2026-10-01T06:57:00Z' }, // 12:57 am
+      { sleep_date: '2026-10-02', bedtime_at: '2026-10-02T07:15:00Z' }, // 1:15 am
+    ]
+    const r = bedtimeRead(nights, '2026-10-02', TZ)
+    expect(r.bars).toHaveLength(14)
+    expect(r.bars[13]).toMatchObject({ selected: true, minutes: 795 })
+    expect(bedtimeLabel(r.average)).toBe('12:49 am')
+    expect(r.diff).toBe(26)
+  })
+  it('con pocas noches no hay promedio', () => {
+    const r = bedtimeRead(
+      [{ sleep_date: '2026-10-02', bedtime_at: '2026-10-02T07:15:00Z' }],
+      '2026-10-02',
+      TZ,
+    )
+    expect(r.average).toBeNull()
+    expect(r.diff).toBeNull()
+  })
+})

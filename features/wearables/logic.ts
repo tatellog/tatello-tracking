@@ -25,6 +25,8 @@ export type WearableWorkoutRow = {
   workout_type: string | null
   duration_min: number | null
   energy_kcal: number | null
+  /** Nombre a mostrar ("Bici", "Correr"); null si la fuente no lo dice. */
+  activity: string | null
 }
 
 export type WearableSleepRow = {
@@ -83,6 +85,8 @@ export type RawWorkout = {
   /** Tipo canónico ya resuelto por la fuente (Health Connect usa otro enum que
    *  HealthKit); si viene, gana sobre `activityType`. */
   workoutType?: string
+  /** Nombre ya resuelto por la fuente (Health Connect); si no, de HealthKit. */
+  activityName?: string | null
 }
 
 /** Muestra cruda de sueño (una etapa). `value` = CategoryValueSleepAnalysis. */
@@ -185,6 +189,66 @@ export function hcSleepStageToHk(stage: number): number | null {
   }
 }
 
+/*
+ * El nombre de la actividad que se MUESTRA ("Bici", "Correr", "Yoga"…), aparte
+ * del tipo canónico del motor. Dueña 2 oct 2026: "quiero saber qué tipo de
+ * ejercicio hice" (la bici salía como "cardio"). Sin nombre conocido → null y
+ * la UI usa el tipo canónico.
+ */
+const HK_ACTIVITY: Record<number, string> = {
+  13: 'Bici',
+  74: 'Bici',
+  37: 'Correr',
+  52: 'Caminata',
+  24: 'Senderismo',
+  50: 'Fuerza',
+  20: 'Fuerza funcional',
+  59: 'Core',
+  63: 'HIIT',
+  73: 'Cardio mixto',
+  16: 'Elíptica',
+  35: 'Remo',
+  46: 'Natación',
+  44: 'Escaleras',
+  77: 'Baile',
+  57: 'Yoga',
+  66: 'Pilates',
+  11: 'Cross training',
+  65: 'Kickboxing',
+  64: 'Step',
+  78: 'Baile',
+}
+const HC_ACTIVITY: Record<number, string> = {
+  8: 'Bici',
+  9: 'Bici fija',
+  56: 'Correr',
+  57: 'Caminadora',
+  79: 'Caminata',
+  37: 'Senderismo',
+  70: 'Fuerza',
+  81: 'Pesas',
+  13: 'Calistenia',
+  36: 'HIIT',
+  25: 'Elíptica',
+  53: 'Remo',
+  54: 'Remo',
+  73: 'Natación',
+  74: 'Natación',
+  83: 'Yoga',
+  48: 'Pilates',
+  10: 'Bootcamp',
+  16: 'Baile',
+  68: 'Escaleras',
+  69: 'Escaleras',
+}
+
+export function hkActivityName(activityType: number): string | null {
+  return HK_ACTIVITY[activityType] ?? null
+}
+export function hcActivityName(exerciseType: number): string | null {
+  return HC_ACTIVITY[exerciseType] ?? null
+}
+
 const clamp = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n))
 
 /** Un workout crudo → fila de wearable_workouts (sin user_id; lo pone api). */
@@ -201,6 +265,7 @@ export function normalizeWorkout(w: RawWorkout, source: WearableSource): Wearabl
     started_at: w.start.toISOString(),
     ended_at: w.end.toISOString(),
     workout_type: w.workoutType ?? hkActivityToWorkoutType(w.activityType),
+    activity: w.activityName !== undefined ? w.activityName : hkActivityName(w.activityType),
     duration_min: durationMin,
     energy_kcal: energyKcal,
   }
