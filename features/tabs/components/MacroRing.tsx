@@ -11,6 +11,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import { AMBIENT_MOTION } from '@/lib/motion'
 import Svg, { Circle } from 'react-native-svg'
 
 import { useScreenActive } from '@/features/orbit/useScreenActive'
@@ -59,7 +60,7 @@ export function MacroRing({
   const screenActive = useScreenActive()
   useEffect(() => {
     if (reduce) return
-    if (!screenActive) {
+    if (!screenActive || !AMBIENT_MOTION) {
       cancelAnimation(glow)
       glow.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
       return

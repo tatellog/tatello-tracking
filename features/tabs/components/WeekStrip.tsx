@@ -12,6 +12,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import { AMBIENT_MOTION } from '@/lib/motion'
 import Svg, { Path } from 'react-native-svg'
 
 import type { CalendarDay, DayStatus } from '@/features/tabs/components/calendar/logic'
@@ -82,7 +83,7 @@ function DayGlyph({
       breath.value = 0
       return
     }
-    if (!active) {
+    if (!active || !AMBIENT_MOTION) {
       cancelAnimation(breath)
       breath.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
       return

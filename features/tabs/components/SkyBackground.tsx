@@ -10,6 +10,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated'
+import { AMBIENT_MOTION } from '@/lib/motion'
 import Svg, { Circle } from 'react-native-svg'
 
 import { useScreenActive } from '@/features/orbit/useScreenActive'
@@ -88,7 +89,7 @@ function TwinkleDot({ star, active }: { star: Star; active: boolean }) {
   // non-blinking brightness rather than its trough.
   const tw = useSharedValue(0.5)
   useEffect(() => {
-    if (!active) {
+    if (!active || !AMBIENT_MOTION) {
       cancelAnimation(tw)
       tw.value = withTiming(0.5, { duration: 300, easing: Easing.out(Easing.quad) })
       return
