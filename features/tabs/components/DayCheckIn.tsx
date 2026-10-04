@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -57,6 +58,11 @@ type Props = {
    *  solo abre el tipo: el dato del dispositivo manda, nunca se des-entrena
    *  contra él. La procedencia la dice la firma de Hoy, no esta fila. */
   wearable?: { minutes: number | null; kcal: number | null } | null
+  /** Cada sesión que trajo el reloj ese día ("Bici 12 min"). Con más de una,
+   *  se listan bajo la fila: el total solo no dice qué hiciste. */
+  sessions?: readonly { key: string; name: string; minutes: number }[] | null
+  /** Abre el detalle del entreno del día (solo la fila que vino del reloj). */
+  onDetail?: () => void
   /** Algo del día vino del reloj: esta fila lleva el ÚNICO "ajustar" del
    *  bloque (abre entreno/descanso y horas de sueño a la vez), en vez de un
    *  encabezado con su link más un "cambiar" por fila. */
@@ -131,6 +137,8 @@ export function DayCheckIn({
   workoutType,
   saveFailed = false,
   wearable = null,
+  sessions = null,
+  onDetail,
   onAdjust,
   restMessageOutside = false,
 }: Props) {
@@ -323,30 +331,60 @@ export function DayCheckIn({
           exiting={fadeOut}
           style={styles.confirmedRow}
         >
-          {state === 'trained' ? <StarGlyph color={colors.magenta} /> : null}
-          <View style={styles.confirmedLead}>
-            <Text style={styles.confirmedText}>
-              {state === 'trained'
-                ? isHoy
-                  ? 'Entrenaste hoy'
-                  : 'Entrenaste este día'
-                : isHoy
-                  ? 'Hoy fue descanso'
-                  : 'Este día fue descanso'}
-              {state === 'trained' && typeLabel ? (
-                <Text style={styles.confirmedType}>{` · ${typeLabel}`}</Text>
-              ) : null}
-              {/* Lo que el reloj trajo, como contexto (spec wearables §3): la
-                quema nunca infla el presupuesto de comida ni entra al TDEE. */}
-              {sealedByWearable && wearable?.minutes != null ? (
-                <Text style={styles.confirmedType}>{` · ${wearable.minutes} min`}</Text>
-              ) : null}
-              {sealedByWearable && wearable?.kcal != null ? (
-                <Text style={styles.confirmedType}>{` · ~${wearable.kcal} kcal`}</Text>
-              ) : null}
-            </Text>
-            {sealedByWearable ? <WatchMark past={!isHoy} /> : null}
-          </View>
+          {(() => {
+            const lead = (
+              <>
+                {state === 'trained' ? <StarGlyph color={colors.magenta} /> : null}
+                <View style={styles.confirmedLead}>
+                  <Text style={styles.confirmedText}>
+                    {state === 'trained'
+                      ? isHoy
+                        ? 'Entrenaste hoy'
+                        : 'Entrenaste este día'
+                      : isHoy
+                        ? 'Hoy fue descanso'
+                        : 'Este día fue descanso'}
+                    {state === 'trained' && typeLabel ? (
+                      <Text style={styles.confirmedType}>{` · ${typeLabel}`}</Text>
+                    ) : null}
+                    {/* Lo que el reloj trajo, como contexto (spec wearables §3): la
+                      quema nunca infla el presupuesto de comida ni entra al TDEE. */}
+                    {sealedByWearable && wearable?.minutes != null ? (
+                      <Text style={styles.confirmedType}>{` · ${wearable.minutes} min`}</Text>
+                    ) : null}
+                    {sealedByWearable && wearable?.kcal != null ? (
+                      <Text style={styles.confirmedType}>{` · ~${wearable.kcal} kcal`}</Text>
+                    ) : null}
+                  </Text>
+                  {sealedByWearable ? <WatchMark past={!isHoy} /> : null}
+                </View>
+              </>
+            )
+            // Del reloj, la fila es una tarjeta tocable (abre el detalle del
+            // día, sesión por sesión); a mano sigue siendo una línea.
+            if (!sealedByWearable || !onDetail) return lead
+            return (
+              // Pressable no toma flex bien en este setup: el ancho en el wrapper.
+              <View style={styles.detailWrap}>
+                <Pressable
+                  onPress={onDetail}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver tu entreno de este día, sesión por sesión"
+                  style={({ pressed }) => [styles.detailCard, pressed && styles.detailPressed]}
+                >
+                  <View style={styles.detailHead}>
+                    {lead}
+                    <Feather name="chevron-right" size={18} color={colors.bone} />
+                  </View>
+                  {sessions && sessions.length > 1 ? (
+                    <Text style={styles.sessionsLine}>
+                      {sessions.map((s) => `${s.name} ${s.minutes} min`).join(' · ')}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              </View>
+            )
+          })()}
           {!locked && onAdjust ? (
             <Pressable
               onPress={onAdjust}
@@ -369,18 +407,8 @@ export function DayCheckIn({
         </Animated.View>
       )}
 
-      {/* Sellado — un entreno pasado ya encendió su estrella y no retrocede. */}
-      {locked ? (
-        <Animated.Text
-          layout={layout}
-          entering={fadeInSlow}
-          exiting={fadeOut}
-          style={styles.sealedMessage}
-        >
-          Esta estrella ya está <Text style={styles.restEm}>encendida</Text>. Lo que enciendes,
-          permanece.
-        </Animated.Text>
-      ) : state === 'rested' && !showAsk && !restMessageOutside ? (
+      {/* Un entreno pasado sellado no lleva frase: la fila ya lo dice. */}
+      {!locked && state === 'rested' && !showAsk && !restMessageOutside ? (
         <Animated.Text
           layout={layout}
           entering={fadeInSlow}
@@ -512,6 +540,27 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiSemi,
     color: colors.bone,
   },
+  // La fila del reloj como tarjeta tocable: superficie + filo + chevron.
+  detailWrap: { flex: 1 },
+  detailCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: colors.bgCard2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+  },
+  detailPressed: { opacity: 0.7 },
+  detailHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Alineada con el texto de la fila (estrella 16 + gap 8).
+  sessionsLine: {
+    marginTop: 6,
+    marginLeft: 24,
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.label,
+    letterSpacing: 0.3,
+    color: colors.bone,
+  },
   hint: {
     marginTop: 8,
     marginLeft: 2,
@@ -552,15 +601,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.bodyLarge,
     lineHeight: 20,
     color: colors.bone,
-    marginTop: 10,
-    marginLeft: 2,
-  },
-  sealedMessage: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    lineHeight: 19,
-    color: colors.niebla,
     marginTop: 10,
     marginLeft: 2,
   },
