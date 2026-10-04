@@ -46,6 +46,9 @@ export type GoalHero = {
   proteinG: number | null
   /** Anillo de entreno (binario): entrenó hoy o no. */
   trained: boolean
+  /** Día de descanso marcado (y sin entreno): el anillo interior se llena con
+   *  el índigo del descanso. Descansar también cuenta, no es un anillo vacío. */
+  rested: boolean
   /** kcal del entreno detectadas por el wearable (suma del día). null si el
    *  entreno fue manual o no hubo — nunca 0 como deuda. SOLO display: jamás
    *  toca el target de calorías ni el TDEE (spec wearables §3). */
@@ -212,6 +215,7 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
       : null
   const proteinG = s.protein_g != null ? Math.round(s.protein_g) : null
   const trained = s.trained === true
+  const rested = !trained && s.rested === true
   // La kcal del reloj solo acompaña a un día ENTRENADO; si el dato quedó
   // huérfano (kcal sin trained, imposible por la view pero defensivo), se
   // descarta para que la leyenda nunca hable de un entreno que no existe.
@@ -228,6 +232,7 @@ function buildHero(s: DailySignals, ctx: DayGoalCtx, past: boolean): GoalHero {
     proteinFill,
     proteinG,
     trained,
+    rested,
     workoutKcal,
     workoutSource,
     stateLabel: reading.stateLabel,
@@ -363,6 +368,7 @@ export const REST_HERO: GoalHero = {
   proteinFill: null,
   proteinG: null,
   trained: false,
+  rested: false,
   workoutKcal: null,
   workoutSource: null,
   stateLabel: '',
