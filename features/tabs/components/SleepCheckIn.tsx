@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -163,7 +164,11 @@ export function SleepCheckIn({
             hitSlop={{ top: 10, bottom: 10 }}
             accessibilityRole="button"
             accessibilityLabel={`${sleepAnsweredText(minutes, { manual: !fromWatch, past })}. Ver el detalle de la noche.`}
-            style={({ pressed }) => [styles.detailTap, pressed && styles.detailPressed]}
+            style={({ pressed }) => [
+              styles.detailTap,
+              onDetail && styles.detailCard,
+              pressed && styles.detailPressed,
+            ]}
           >
             <MoonGlyph color={colors.magenta} />
             <View style={styles.confirmedLead}>
@@ -171,7 +176,7 @@ export function SleepCheckIn({
                 {sleepAnsweredText(minutes, { manual: !fromWatch, past })}
               </Text>
               {fromWatch ? <WatchMark past={past} /> : null}
-              {onDetail ? <Text style={styles.detailChevron}>›</Text> : null}
+              {onDetail ? <Feather name="chevron-right" size={18} color={colors.bone} /> : null}
             </View>
           </Pressable>
         </View>
@@ -358,11 +363,14 @@ const styles = StyleSheet.create({
   detailWrap: { flex: 1 },
   detailTap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailPressed: { opacity: 0.7 },
-  detailChevron: {
-    marginLeft: 8,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.niebla,
+  // Misma tarjeta tocable que la fila de entreno del reloj (DayCheckIn).
+  detailCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: colors.bgCard2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
   },
   confirmedLead: {
     flex: 1,

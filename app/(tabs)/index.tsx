@@ -45,10 +45,12 @@ import { SmartwatchRow } from '@/features/wearables/components/SmartwatchRow'
 import { WearableInviteLine } from '@/features/wearables/components/WearableInviteLine'
 import {
   useAppleHealthSyncNow,
+  useHealthSummary,
   useScaleBadge,
   useScaleConnection,
 } from '@/features/wearables/hooks'
 import { wearableDayFacts } from '@/features/wearables/recovery'
+import { workoutOfDay } from '@/features/wearables/workout-insights'
 import { earlyReading } from '@/features/orbit/early-readings'
 import { useSignalsHistory, useTodaySignals, useTotalSignalDays } from '@/features/orbit/hooks'
 import { useFirstStarCeremony } from '@/features/tabs/first-star'
@@ -91,6 +93,7 @@ import { namedStarProgress } from '@/features/tabs/components/constellation/data
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { queryKeys } from '@/lib/queryKeys'
+import { userTimezone } from '@/lib/time'
 import { colors } from '@/theme'
 
 /*
@@ -539,6 +542,12 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   // Entreno sellado por el reloj: sin registro manual, sin descanso marcado.
   const trainedByWearable =
     !vctx.today_workout_completed && !restedToday && wearable.workout != null
+  // daily_signals solo trae el TOTAL del día; las sesiones (Bici, Fuerza…)
+  // salen de wearable_workouts para que la fila diga qué hiciste.
+  const dayHealth = useHealthSummary(selectedDate, selectedDate)
+  const daySessions = dayHealth.data
+    ? workoutOfDay(dayHealth.data.workouts, selectedDate, userTimezone())
+    : null
 
   // El entreno llegó DEL RELOJ con Hoy abierto (sync de apertura o en vivo):
   // misma celebración que tocar "Entrené" (dueña 30 sep 2026). Una vez por día
@@ -817,13 +826,22 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
                 question={viewingPast ? '¿Entrenaste este día?' : '¿Entrenaste hoy?'}
                 locked={viewingPast && (vctx.today_workout_completed || trainedByWearable)}
                 // Sin fila manual, el tipo viene del reloj (fuerza/cardio/caminata/otro).
+                // Un día pasado sin fila manual también dice su tipo (el del reloj).
                 workoutType={
-                  viewingPast ? undefined : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
+                  viewingPast
+                    ? trainedByWearable
+                      ? (wearable.workout?.type ?? null)
+                      : undefined
+                    : (workoutTypeQ.data ?? wearable.workout?.type ?? null)
                 }
                 wearable={
                   trainedByWearable && wearable.workout
                     ? { minutes: wearable.workout.minutes, kcal: wearable.workout.kcal }
                     : null
+                }
+                sessions={trainedByWearable ? (daySessions?.list ?? null) : null}
+                onDetail={() =>
+                  router.push({ pathname: '/workout-day', params: { date: selectedDate } })
                 }
                 // Con algo del reloj, UN solo "ajustar" en esta fila abre las dos
                 // cosas (entreno/descanso y horas); ya no hay encabezado del

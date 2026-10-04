@@ -38,7 +38,7 @@ import {
   movementWeek,
   todayWorkout,
   trainingDeficitBridge,
-  WORKOUT_NAME,
+  workoutOfDay,
 } from '@/features/wearables/workout-insights'
 import { todayInTimezone, userTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
@@ -103,11 +103,19 @@ function SmartwatchBody() {
   const last = [...data.workouts]
     .filter((w) => localDayOf(w.started_at, tz) < today)
     .sort((a, b) => (a.started_at < b.started_at ? 1 : -1))[0]
-  const lastWorkout = last
-    ? `${DOW[new Date(`${localDayOf(last.started_at, tz)}T12:00:00Z`).getUTCDay()]}, ${(
-        WORKOUT_NAME[last.workout_type ?? ''] ?? 'entreno'
-      ).toLowerCase()} ${formatMinutes(last.duration_min ?? 0)}`
-    : null
+  // El último DÍA con entreno, con todas sus sesiones ("viernes, bici 12 min,
+  // fuerza 54 min y cardio mixto 21 min"), no solo la última sesión.
+  const lastDay = last ? localDayOf(last.started_at, tz) : null
+  const lastSessions = lastDay ? (workoutOfDay(data.workouts, lastDay, tz)?.list ?? []) : []
+  const lastParts = lastSessions.map((s) => `${s.name.toLowerCase()} ${formatMinutes(s.minutes)}`)
+  const lastWorkout =
+    lastDay && lastParts.length > 0
+      ? `${DOW[new Date(`${lastDay}T12:00:00Z`).getUTCDay()]}, ${
+          lastParts.length === 1
+            ? lastParts[0]
+            : `${lastParts.slice(0, -1).join(', ')} y ${lastParts[lastParts.length - 1]}`
+        }`
+      : null
 
   const steps = stepsOfDay(data, today)
   const waterMl = waterOfDay(data, today)
