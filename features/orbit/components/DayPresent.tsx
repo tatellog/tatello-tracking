@@ -151,6 +151,12 @@ const TRAIN_STOPS: [string, string, string] = ['#8E5FC7', '#C18FFF', '#DABBFF']
 const TRAIN_TRACK = 'rgba(193, 143, 255, 0.12)'
 const TRAIN_SOFT = 'rgba(193, 143, 255, 0.55)'
 
+// Descanso — el mismo anillo interior, lleno con el ÍNDIGO del sueño (el tono
+// que ya lleva "Día de descanso" en la evidencia): descansar también cuenta.
+const REST_COLOR = colors.dimension.sueno // #7C8FFF
+const REST_TRACK = 'rgba(124, 143, 255, 0.12)'
+const REST_SOFT = 'rgba(124, 143, 255, 0.55)'
+
 type RingSpec = {
   r: number
   c: number
@@ -344,6 +350,7 @@ function GoalRing({ hero }: { hero: GoalHero }) {
 
   const hasProtein = hero.proteinFill != null
   const trained = hero.trained
+  const rested = hero.rested
 
   // Especificaciones de los tres anillos. Retrasos escalonados = el exterior lidera.
   const outer: RingSpec = {
@@ -379,17 +386,18 @@ function GoalRing({ hero }: { hero: GoalHero }) {
     r: RING_INNER_R,
     c: C_INNER,
     sw: RING_SW,
-    fill: trained ? 1 : 0,
-    // Binario (entrenó o no): va plano y más callado que calorías y proteína.
-    // Lleno al 100% con gradiente era lo que más brillaba siendo lo que menos
-    // dice del objetivo (producto + ux coinciden).
-    color: TRAIN_SOFT,
+    fill: trained || rested ? 1 : 0,
+    // Binario (entrenó, descansó o nada): va plano y más callado que calorías y
+    // proteína. Lleno al 100% con gradiente era lo que más brillaba siendo lo
+    // que menos dice del objetivo (producto + ux coinciden).
+    color: rested ? REST_SOFT : TRAIN_SOFT,
     gradId: null,
-    trackColor: trained ? TRAIN_TRACK : colors.hairline, // no entrenó = track en reposo
+    // Sin respuesta = track en reposo.
+    trackColor: trained ? TRAIN_TRACK : rested ? REST_TRACK : colors.hairline,
     bloomWidth: 13,
     bloomOpacity: 0,
     comet: 'none', // binario: sin cometa
-    show: trained,
+    show: trained || rested,
     delay: 480,
   }
 
@@ -783,13 +791,13 @@ export function DayPresent({
             />
           ) : null}
           <LegendStat
-            color={TRAIN_COLOR}
+            color={hero.rested ? REST_COLOR : TRAIN_COLOR}
             label="Entreno"
-            value={hero.trained ? 'Sí' : isPast ? 'No' : 'Aún no'}
+            value={hero.trained ? 'Sí' : hero.rested ? 'Descanso' : isPast ? 'No' : 'Aún no'}
             caption={
               hero.trained && hero.workoutSource === 'wearable' ? 'tu smartwatch' : undefined
             }
-            dim={!hero.trained}
+            dim={!hero.trained && !hero.rested}
           />
         </View>
       </View>
