@@ -91,3 +91,68 @@ export function monthLabelFromIso(iso: string): string {
   const month = MONTHS_ES[Number(iso.slice(5, 7)) - 1] ?? ''
   return `${month} ${iso.slice(0, 4)}`.trim()
 }
+
+/* ── Tarjetas nuevas (rediseño dueña 5 oct 2026) ─────────────────────── */
+
+/**
+ * El tiempo del proceso como héroe de la tarjeta de cambio visual: "23
+ * meses", "3 semanas", "12 días", "2 años". El valor y la unidad por
+ * separado (el número va gigante y la unidad en serif).
+ */
+export function processDuration(fromIso: string, toIso: string): { value: string; unit: string } {
+  const [fy, fm, fd] = fromIso.slice(0, 10).split('-').map(Number) as [number, number, number]
+  const [ty, tm, td] = toIso.slice(0, 10).split('-').map(Number) as [number, number, number]
+  const days = Math.max(
+    0,
+    Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000),
+  )
+  if (days < 14) return { value: String(days), unit: days === 1 ? 'día' : 'días' }
+  let months = (ty - fy) * 12 + (tm - fm) - (td < fd ? 1 : 0)
+  if (months < 2) {
+    const weeks = Math.floor(days / 7)
+    return { value: String(weeks), unit: 'semanas' }
+  }
+  if (months >= 24 && months % 12 === 0) {
+    const years = months / 12
+    return { value: String(years), unit: 'años' }
+  }
+  months = Math.max(2, months)
+  return { value: String(months), unit: 'meses' }
+}
+
+/** Entrenos por mes (YYYY-MM) de `fromIso` a `toIso`, inclusive, en orden.
+ *  Los meses sin entreno van en 0 (la barra baja también es historia). */
+export function trainedByMonth(
+  trainedDates: readonly string[],
+  fromIso: string,
+  toIso: string,
+): { month: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const d of trainedDates) {
+    if (d < fromIso.slice(0, 10) || d > toIso.slice(0, 10)) continue
+    const k = d.slice(0, 7)
+    counts.set(k, (counts.get(k) ?? 0) + 1)
+  }
+  const out: { month: string; count: number }[] = []
+  let [y, m] = fromIso.split('-').map(Number) as [number, number]
+  const end = toIso.slice(0, 7)
+  for (let guard = 0; guard < 600; guard++) {
+    const k = `${y}-${String(m).padStart(2, '0')}`
+    out.push({ month: k, count: counts.get(k) ?? 0 })
+    if (k >= end) break
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+  return out
+}
+
+/** Celda de un día del mes en la rejilla L-D: columna (0..6) y fila (0..5). */
+export function monthCellPosition(monthIso: string, day: number): { col: number; row: number } {
+  const [y, m] = monthIso.split('-').map(Number) as [number, number]
+  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7
+  const idx = lead + day - 1
+  return { col: idx % 7, row: Math.floor(idx / 7) }
+}

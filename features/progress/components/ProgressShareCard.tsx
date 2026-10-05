@@ -1,14 +1,11 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useEffect, useRef } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
-import type { ZodiacSign } from '@/features/tabs/zodiac/types'
 import { colors, typography } from '@/theme'
 
-import StelarIcon from '@/assets/stelar-icon.png'
-import { StelarLogo } from '@/components/brand/StelarLogo'
 import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
+import { AuroraBed, ShareSignature, ShareTopRow, shortMonthYear } from './share-aurora'
 
 // Fixed 9:16 — rendered at this exact size so the capture is
 // consistent and fits the share-sheet stage on any phone.
@@ -17,613 +14,444 @@ export const CARD_H = Math.round((CARD_W * 16) / 9)
 
 export type VisualShareVariant = 'retrato' | 'transformacion' | 'cambio'
 
-// A seeded starfield with three brightness tiers — the celestial bed.
-const CARD_STARS: { x: number; y: number; r: number; o: number }[] = (() => {
-  const arr = []
-  let s = 99173
-  const rand = () => {
-    s = (s * 1664525 + 1013904223) % 4294967296
-    return s / 4294967296
-  }
-  for (let i = 0; i < 56; i += 1) {
-    const b = rand()
-    const bright = b > 0.9
-    const mid = !bright && b > 0.62
-    arr.push({
-      x: rand() * CARD_W,
-      y: rand() * CARD_H,
-      r: bright ? 1.5 + rand() * 0.8 : mid ? 1 + rand() * 0.6 : 0.5 + rand() * 0.6,
-      o: bright ? 0.36 + rand() * 0.16 : mid ? 0.2 + rand() * 0.13 : 0.06 + rand() * 0.12,
-    })
-  }
-  return arr
-})()
-
-// Capa de grano para dithering — muchos puntos diminutos de opacidad muy baja
-// repartidos por toda la tarjeta. Rompen los escalones de 8-bit del degradado
-// (la causa de la "línea") sin leerse como estrellas.
-const CARD_GRAIN: { x: number; y: number; r: number; o: number }[] = (() => {
-  const arr: { x: number; y: number; r: number; o: number }[] = []
-  let s = 24681
-  const rand = () => {
-    s = (s * 1664525 + 1013904223) % 4294967296
-    return s / 4294967296
-  }
-  for (let i = 0; i < 520; i += 1) {
-    arr.push({
-      x: rand() * CARD_W,
-      y: rand() * CARD_H,
-      r: 0.4 + rand() * 0.55,
-      o: 0.014 + rand() * 0.045,
-    })
-  }
-  return arr
-})()
+/*
+ * Las tarjetas de "Tu cambio visual" para historias (rediseño dueña 5 oct
+ * 2026). El héroe es el TIEMPO del proceso ("22 meses de constancia"), no la
+ * báscula: lo que se admira de un antes y después es haberlo sostenido.
+ *   transformacion — las dos fotos a sangre (ANTES / AHORA) y el tiempo.
+ *   retrato        — la foto de ahora a pantalla completa y el antes como
+ *                    polaroid inclinada.
+ *   cambio         — "Tu camino", sin fotos: entrenos por mes en barras.
+ * El peso solo aparece si la usuaria prende "Incluir peso" en la hoja, y en
+ * neutro ("67.4 → 75 kg"), sin juicio ni ritmo.
+ */
 
 type Props = {
   variant: VisualShareVariant
   beforeUrl: string
   afterUrl: string
+  /** 'YYYY-MM-DD' de cada foto (el tiempo del proceso sale de aquí). */
+  beforeIso: string
+  afterIso: string
+  /** "15 ago 2024" — la fecha legible sobre cada foto. */
   beforeDate: string
   afterDate: string
-  /** Peso inicial / actual — null oculta la fila (sin datos falsos). */
+  /** "22" + "meses" — el tiempo del proceso, ya formateado. */
+  duration: { value: string; unit: string }
+  /** Entrenos (a mano o del reloj) entre las dos fotos; null = sin dato. */
+  workoutsTotal: number | null
+  /** Entrenos por mes entre las fotos (Tu camino). */
+  monthly: readonly { month: string; count: number }[]
+  /** Peso inicial / actual — null oculta el chip (sin datos falsos). */
   weightFrom: number | null
   weightTo: number | null
-  /** Delta con signo, p. ej. "−0.3". */
-  deltaText: string | null
-  /** Entrenos del ciclo → "0 → N". */
-  workoutsCount: number
-  /** Constelación → "0% → N%". */
-  revealedPct: number
-  /** Signo + días encendidos — para la constelación firma / héroe. */
-  sign: ZodiacSign
-  litCount: number
-  /** "ESCORPIO" — para "0% → 62% Escorpio". */
-  signLabel: string
-  coachCopy: string | null
-  /** Fondo elegido en la fila "ESTILO". */
+  /** "Incluir peso" de la hoja (apagado por defecto). */
+  includeWeight: boolean
   cardStyle?: ShareCardStyle
-  /** Fires once both photos have settled — gates the capture. */
+  /** Fires once the photos have settled — gates the capture. */
   onReady: () => void
 }
 
-function PhotoFrame({
-  url,
-  now,
-  accent,
-  onSettled,
-}: {
-  url: string
-  now: boolean
-  accent: string
-  onSettled: () => void
-}) {
-  return (
-    // La foto "Ahora" se ilumina como una estrella encendida: un aura
-    // suave del acento detrás del marco. "Antes" descansa, sin halo.
-    <View style={now ? styles.nowHalo : undefined}>
-      <View style={[styles.frame, now && { borderColor: accent }]}>
-        <Image
-          source={{ uri: url }}
-          style={styles.img}
-          resizeMode="cover"
-          onLoad={onSettled}
-          onError={onSettled}
-        />
-        <View style={[styles.chip, now ? { backgroundColor: accent } : styles.chipBefore]}>
-          <Text style={[styles.chipText, now ? styles.chipTextNow : styles.chipTextBefore]}>
-            {now ? 'Ahora' : 'Antes'}
-          </Text>
-        </View>
-      </View>
-    </View>
-  )
-}
+const MONTHS_SHORT = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]
 
-// Title-case del label en mayúsculas: "ESCORPIO" → "Escorpio".
-function titleCase(label: string): string {
-  return label.charAt(0) + label.slice(1).toLowerCase()
-}
-
-/* La firma de pie — la voz del coach y, opcionalmente, el emblema del
- * signo (arte zodiac-art con su halo dorado) como sello de marca. Llena
- * el tercio inferior con cielo en vez de aire muerto. */
-function CardFooter({
-  coachCopy,
-  sign,
-  showEmblem,
-}: {
-  coachCopy: string | null
-  sign: ZodiacSign
-  showEmblem: boolean
-}) {
-  return (
-    <View style={styles.footer}>
-      {coachCopy ? <Text style={styles.coach}>{coachCopy}</Text> : null}
-      {showEmblem ? (
-        <View style={styles.footerEmblem}>
-          <ZodiacArt sign={sign} size={108} halo="soft" />
-        </View>
-      ) : null}
-    </View>
-  )
-}
-
-/*
- * La tarjeta compartible del cambio visual — una imagen 9:16 para Stories.
- * Tres franjas verticales (marca arriba · héroe al medio · firma abajo)
- * llenan el alto con intención. Tres formatos comparten la cama celeste:
- *   retrato        — las dos fotos, ANTES/AHORA y el cambio de peso.
- *   transformacion — el resumen: fotos + tres métricas (peso, entrenos,
- *                    constelación).
- *   cambio         — la constancia como héroe sobre la constelación.
- */
 export function ProgressShareCard({
   variant,
   beforeUrl,
   afterUrl,
+  beforeIso,
+  afterIso,
   beforeDate,
   afterDate,
+  duration,
+  workoutsTotal,
+  monthly,
   weightFrom,
   weightTo,
-  deltaText,
-  workoutsCount,
-  revealedPct,
-  sign,
-  litCount,
-  signLabel,
-  coachCopy,
+  includeWeight,
   cardStyle = DEFAULT_SHARE_STYLE,
   onReady,
 }: Props) {
   const settled = useRef(0)
+  const done = useRef(false)
   const handleSettled = () => {
     settled.current += 1
-    if (settled.current >= 2) onReady()
+    if (settled.current >= 2 && !done.current) {
+      done.current = true
+      onReady()
+    }
   }
-
-  // Cambio no muestra fotos (el emblema es el héroe): nada async que
-  // esperar, así que habilita la captura al montar.
+  // Tu camino no lleva fotos: nada async que esperar.
   useEffect(() => {
-    if (variant === 'cambio') onReady()
+    if (variant === 'cambio' && !done.current) {
+      done.current = true
+      onReady()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant])
 
-  // El acento sigue el estilo: magenta por defecto, pero en Oro/Índigo
-  // toma el glow del estilo para no chocar con el fondo cálido/frío.
-  const accent =
-    cardStyle.id === 'oro' || cardStyle.id === 'indigo' ? cardStyle.glow : colors.magenta
+  const [accent, , gold] = cardStyle.aurora
+  const weight =
+    includeWeight && weightFrom != null && weightTo != null
+      ? `${weightFrom} → ${weightTo} kg`
+      : null
+  // Mismo lenguaje que la Constelación (dueña 5 oct 2026): kicker en serif
+  // dorada + título gigante, stickers DERECHOS y la firma con el dato.
+  const title = `${duration.value} ${duration.unit.toUpperCase()}`
+  const workoutsLabel =
+    workoutsTotal != null && workoutsTotal > 0
+      ? `${workoutsTotal} ${workoutsTotal === 1 ? 'ENTRENO' : 'ENTRENOS'}`
+      : null
 
-  const before = (
-    <PhotoFrame url={beforeUrl} now={false} accent={accent} onSettled={handleSettled} />
-  )
-  const after = <PhotoFrame url={afterUrl} now accent={accent} onSettled={handleSettled} />
-
-  const hasWeight = weightFrom != null && weightTo != null
-
-  return (
-    <View style={[styles.card, { backgroundColor: cardStyle.bg }]}>
-      {/* Nebulosa como GLOW RADIAL (no degradado lineal): el radial difumina
-          en curvas y evita el banding de 8-bit que dejaba líneas horizontales
-          en los estilos de color. Misma técnica que la cama celeste del entreno. */}
-      <Svg style={StyleSheet.absoluteFill} width={CARD_W} height={CARD_H}>
-        <Defs>
-          {/* Caída suave de 2 stops + radio amplio = sin filo de disco. */}
-          <RadialGradient id="psc-nebula" cx="50%" cy="-6%" r="118%">
-            <Stop
-              offset="0"
-              stopColor={cardStyle.nebulaColor}
-              stopOpacity={cardStyle.nebulaAlpha}
-            />
-            <Stop offset="1" stopColor={cardStyle.nebulaColor} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width={CARD_W} height={CARD_H} fill="url(#psc-nebula)" />
-        {/* Grano sutil: dithering que rompe cualquier escalón de 8-bit del
-            degradado para que no se lea como una línea. */}
-        {CARD_GRAIN.map((g, i) => (
-          <Circle key={`g-${i}`} cx={g.x} cy={g.y} r={g.r} fill={colors.leche} opacity={g.o} />
-        ))}
-        {CARD_STARS.map((st, i) => (
-          <Circle key={i} cx={st.x} cy={st.y} r={st.r} fill={colors.leche} opacity={st.o} />
-        ))}
-      </Svg>
-
-      <View style={styles.brand}>
-        <Image source={StelarIcon} style={styles.brandIcon} resizeMode="contain" />
-        {/* Wordmark como brand asset (PNG), no como fuente. Más grande + blanco
-            puro para que resalte junto al S9. */}
-        <StelarLogo variant="wordmark" size={20} color="#FFFFFF" />
+  if (variant === 'transformacion') {
+    return (
+      <View style={styles.card}>
+        <AuroraBed width={CARD_W} height={CARD_H} cardStyle={cardStyle} />
+        <View style={styles.split}>
+          <Photo url={beforeUrl} onSettled={handleSettled} />
+          <Photo url={afterUrl} onSettled={handleSettled} ring={accent} />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']}
+            style={styles.topShade}
+            pointerEvents="none"
+          />
+          <View style={styles.overlayTop}>
+            <ShareTopRow right={shortMonthYear(afterIso)} accent={accent} />
+          </View>
+          <Text style={[styles.tag, styles.tagBefore, { left: 10 }]}>ANTES</Text>
+          <Text
+            style={[
+              styles.tag,
+              { left: CARD_W / 2 + 10, backgroundColor: accent, color: cardStyle.onAccent },
+            ]}
+          >
+            AHORA
+          </Text>
+          <Text style={[styles.photoDate, { left: 12 }]}>{beforeDate}</Text>
+          <Text style={[styles.photoDate, { left: CARD_W / 2 + 12 }]}>{afterDate}</Text>
+        </View>
+        {weight ? (
+          <Sticker light style={{ top: SPLIT_H - 18, alignSelf: 'center' }}>
+            {weight}
+          </Sticker>
+        ) : null}
+        <View style={styles.titleBlock}>
+          <Text style={[styles.titleKicker, { color: gold }]}>mi transformación</Text>
+          <Text style={styles.titleBig} numberOfLines={1} adjustsFontSizeToFit>
+            {title}
+          </Text>
+        </View>
+        <View style={styles.footer}>
+          <ShareSignature label={workoutsLabel ?? 'STELAR'} />
+        </View>
       </View>
+    )
+  }
 
-      {variant === 'retrato' ? (
-        <>
-          <View style={styles.hero}>
-            <View style={styles.diptychWide}>
-              <View style={styles.col}>
-                {before}
-                <Text style={styles.date}>{beforeDate}</Text>
-              </View>
-              <View style={styles.col}>
-                {after}
-                <Text style={styles.date}>{afterDate}</Text>
-              </View>
+  if (variant === 'retrato') {
+    return (
+      <View style={styles.card}>
+        <Image
+          source={{ uri: afterUrl }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onLoad={handleSettled}
+          onError={handleSettled}
+        />
+        <LinearGradient
+          colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', cardStyle.bg]}
+          locations={[0, 0.2, 0.45, 0.86]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.retratoTop}>
+          <ShareTopRow right={shortMonthYear(afterIso)} accent={accent} />
+        </View>
+        <View style={styles.polaroid}>
+          <Image
+            source={{ uri: beforeUrl }}
+            style={styles.polaroidImg}
+            resizeMode="cover"
+            onLoad={handleSettled}
+            onError={handleSettled}
+          />
+          <Text style={styles.polaroidCaption}>{shortDate(beforeIso)}</Text>
+        </View>
+        {weight ? (
+          <Sticker light style={{ top: 96, left: 14 }}>
+            {weight}
+          </Sticker>
+        ) : null}
+        <View style={styles.retratoText}>
+          <Text style={[styles.titleKicker, styles.left, { color: gold }]}>mi proceso</Text>
+          <Text style={[styles.titleBig, styles.left]} numberOfLines={1} adjustsFontSizeToFit>
+            {title}
+          </Text>
+        </View>
+        <View style={[styles.footer, styles.footerAbs]}>
+          <ShareSignature label={workoutsLabel ?? 'STELAR'} />
+        </View>
+      </View>
+    )
+  }
+
+  // Tu camino (sin fotos). La gráfica empieza en el primer mes con entreno:
+  // meses vacíos antes de que existiera el dato no son historia.
+  const firstActive = monthly.findIndex((m) => m.count > 0)
+  const bars = firstActive > 0 ? monthly.slice(firstActive) : monthly
+  const max = Math.max(1, ...bars.map((m) => m.count))
+  const best = monthly.reduce((a, m) => (m.count > a ? m.count : a), 0)
+  const first = bars[0]?.month
+  const last = bars[bars.length - 1]?.month
+  return (
+    <View style={styles.card}>
+      <AuroraBed width={CARD_W} height={CARD_H} cardStyle={cardStyle} />
+      {/* El número del tiempo gigante, de fondo y de lado (como el signo en
+          la Constelación). */}
+      <Text style={styles.ghost} numberOfLines={1}>
+        {duration.value}
+      </Text>
+      <View style={styles.pathPad}>
+        <ShareTopRow right={shortMonthYear(afterIso)} accent={accent} />
+        <Text style={[styles.titleKicker, styles.left, styles.pathKickerGap, { color: gold }]}>
+          mi camino
+        </Text>
+        <Text style={[styles.titleBig, styles.left]} numberOfLines={1} adjustsFontSizeToFit>
+          {title}
+        </Text>
+        {bars.length > 1 && best > 0 ? (
+          <>
+            <View style={styles.chart}>
+              {bars.map((m) => (
+                <View
+                  key={m.month}
+                  style={[
+                    styles.bar,
+                    {
+                      height: `${Math.max(4, Math.round((m.count / max) * 100))}%`,
+                      backgroundColor: accent,
+                      opacity: m.count > 0 ? 0.95 : 0.25,
+                    },
+                  ]}
+                />
+              ))}
             </View>
-            {hasWeight ? (
-              <View
-                style={[styles.deltaTag, { borderColor: accent, backgroundColor: tint(accent) }]}
-              >
-                <Text style={[styles.deltaTagText, { color: accent }]}>
-                  {weightFrom} → {weightTo} kg
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <CardFooter coachCopy={coachCopy} sign={sign} showEmblem />
-        </>
-      ) : variant === 'transformacion' ? (
-        <>
-          <View style={styles.hero}>
-            <Text style={styles.transformTitle}>MI TRANSFORMACIÓN</Text>
-            <View style={styles.diptych}>
-              <View style={styles.col}>
-                {before}
-                <Text style={styles.date}>{beforeDate}</Text>
-              </View>
-              <View style={styles.col}>
-                {after}
-                <Text style={styles.date}>{afterDate}</Text>
-              </View>
+            <View style={styles.axis}>
+              <Text style={styles.axisText}>{first ? monthTag(first) : ''}</Text>
+              <Text style={styles.axisText}>{last ? monthTag(last) : ''}</Text>
             </View>
-            <View style={styles.metricBox}>
-              {hasWeight ? (
-                <>
-                  <MetricColumn
-                    icon={<PesoIcon />}
-                    label="PESO"
-                    before={`${weightFrom} kg`}
-                    after={`${weightTo} kg`}
-                    accent={accent}
-                  />
-                  <View style={styles.metricDivider} />
-                </>
-              ) : null}
-              <MetricColumn
-                icon={<EntrenosIcon />}
-                label="ENTRENOS"
-                before="0"
-                after={`${workoutsCount}`}
-                accent={accent}
-              />
-              <View style={styles.metricDivider} />
-              <MetricColumn
-                icon={<ConstelacionMetricIcon />}
-                label="CONSTELACIÓN"
-                before="0%"
-                after={`${revealedPct}%`}
-                sub={titleCase(signLabel)}
-                accent={accent}
-              />
-            </View>
-          </View>
-          <CardFooter coachCopy={coachCopy} sign={sign} showEmblem={false} />
-        </>
-      ) : (
-        <>
-          {/* El emblema del signo es el héroe — grande y nítido. La
-              constancia se sella debajo, sin fotos: una sola idea limpia. */}
-          <View style={styles.cambioHero}>
-            <View style={styles.cambioEmblemBox}>
-              <ZodiacArt sign={sign} size={210} halo="soft" />
-            </View>
-            <View style={styles.cambioSeal}>
-              <Text style={[styles.cambioSealStar, { color: accent }]}>✦</Text>
-              <Text style={[styles.cambioSealNum, { color: accent }]}>{litCount}</Text>
-              <Text style={styles.cambioSealDias}>días</Text>
-            </View>
-            <Text style={styles.cambioSealLabel}>DE CONSTANCIA</Text>
-          </View>
-          <View style={styles.cambioFooter}>
-            {coachCopy ? <Text style={styles.coach}>{coachCopy}</Text> : null}
-          </View>
-        </>
-      )}
+          </>
+        ) : null}
+        <View style={styles.stickersRow}>
+          {workoutsLabel ? (
+            <Sticker accent={accent} onAccent={cardStyle.onAccent} inline>
+              {`${workoutsTotal} ${workoutsTotal === 1 ? 'entreno' : 'entrenos'}`}
+            </Sticker>
+          ) : null}
+          {best > 0 ? (
+            <Sticker light inline>
+              {`mejor mes: ${best}`}
+            </Sticker>
+          ) : null}
+          {weight ? (
+            <Sticker light inline>
+              {weight}
+            </Sticker>
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.footer}>
+        <ShareSignature label={`DESDE ${shortMonthYear(beforeIso)}`} />
+      </View>
     </View>
   )
 }
 
-// Un tinte translúcido del acento para el fondo del pill de retrato.
-function tint(hex: string): string {
-  return `${hex}22`
-}
-
-/* Iconos dorados de cada métrica — un trazo, delicados, a tono observatorio. */
-function PesoIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Path d="M7 8 H17 L19 19 H5 Z" stroke={colors.oro} strokeWidth={1.4} strokeLinejoin="round" />
-      <Path d="M9.5 8 A2.5 2.5 0 0 1 14.5 8" stroke={colors.oro} strokeWidth={1.4} />
-    </Svg>
-  )
-}
-
-function EntrenosIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Path d="M9 12 H15" stroke={colors.oro} strokeWidth={1.4} strokeLinecap="round" />
-      <Rect x={4} y={9} width={3} height={6} rx={1} stroke={colors.oro} strokeWidth={1.4} />
-      <Rect x={17} y={9} width={3} height={6} rx={1} stroke={colors.oro} strokeWidth={1.4} />
-    </Svg>
-  )
-}
-
-function ConstelacionMetricIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3 L13.4 10.6 L21 12 L13.4 13.4 L12 21 L10.6 13.4 L3 12 L10.6 10.6 Z"
-        fill={colors.oro}
-      />
-    </Svg>
-  )
-}
-
-function MetricColumn({
-  icon,
-  label,
-  before,
-  after,
-  sub,
+/** Sticker derecho (nunca inclinado): claro o del color del acento. */
+function Sticker({
+  children,
+  light = false,
   accent,
+  onAccent,
+  inline = false,
+  style,
 }: {
-  icon: ReactNode
-  label: string
-  before: string
-  after: string
-  sub?: string
-  accent: string
+  children: React.ReactNode
+  light?: boolean
+  accent?: string
+  onAccent?: string
+  inline?: boolean
+  style?: object
 }) {
   return (
-    <View style={styles.metricCol}>
-      {icon}
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricBefore}>{before}</Text>
-      <Text style={[styles.metricArrow, { color: accent }]}>↓</Text>
-      <Text style={[styles.metricAfter, { color: accent }]}>{after}</Text>
-      {sub ? <Text style={styles.metricSub}>{sub}</Text> : null}
+    <View
+      style={[
+        styles.sticker,
+        !inline && styles.stickerAbs,
+        { backgroundColor: light ? colors.leche : (accent ?? colors.magenta) },
+        style,
+      ]}
+    >
+      <Text style={[styles.stickerText, { color: light ? '#1A0A10' : (onAccent ?? '#FFFFFF') }]}>
+        {children}
+      </Text>
     </View>
   )
 }
 
+function Photo({ url, onSettled, ring }: { url: string; onSettled: () => void; ring?: string }) {
+  return (
+    <View style={[styles.splitCell, ring ? { borderColor: ring, borderWidth: 2 } : null]}>
+      <Image
+        source={{ uri: url }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        onLoad={onSettled}
+        onError={onSettled}
+      />
+    </View>
+  )
+}
+
+/** '2024-08-15' → "ago 2024". */
+function shortDate(iso: string): string {
+  const [y, m] = iso.split('-').map(Number) as [number, number]
+  return `${MONTHS_SHORT[m - 1]} ${y}`
+}
+
+/** '2024-08' → "AGO 24". */
+function monthTag(month: string): string {
+  const [y, m] = month.split('-').map(Number) as [number, number]
+  return `${(MONTHS_SHORT[m - 1] ?? '').toUpperCase()} ${String(y).slice(2)}`
+}
+
+const SPLIT_H = Math.round(CARD_H * 0.6)
+
 const styles = StyleSheet.create({
-  card: {
-    width: CARD_W,
-    height: CARD_H,
-    backgroundColor: colors.bg,
-    paddingHorizontal: 22,
-    paddingTop: 38,
-    paddingBottom: 30,
-    // Tres franjas: marca arriba · héroe al medio · firma abajo.
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  brand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // El S9 ya trae margen transparente propio; gap 0 (el margen del PNG ya
-    // deja aire) para que el wordmark quede junto al ícono.
-    gap: 0,
-  },
-  brandIcon: {
-    width: 26,
-    height: 26,
-  },
-  hero: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  // ── shared photo frame ─────────────────────────────────────────────
-  nowHalo: {
-    borderRadius: 18,
-    shadowColor: colors.magenta,
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 6,
-  },
-  frame: {
-    width: '100%',
-    aspectRatio: 3 / 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.bruma,
-    backgroundColor: colors.bgCard2,
-    overflow: 'hidden',
-  },
-  img: {
-    width: '100%',
-    height: '100%',
-  },
-  chip: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 7,
-  },
-  chipBefore: {
-    backgroundColor: 'rgba(8, 5, 7, 0.78)',
-  },
-  chipText: {
-    fontFamily: typography.uiBold,
-    fontSize: 9.5,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  chipTextBefore: {
-    color: colors.leche,
-  },
-  chipTextNow: {
-    color: colors.leche,
-  },
-  col: {
-    flex: 1,
-  },
-  date: {
-    marginTop: 8,
+  card: { width: CARD_W, height: CARD_H, overflow: 'hidden', backgroundColor: colors.bg },
+  footer: { marginTop: 'auto', paddingBottom: 28 },
+  footerAbs: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  left: { textAlign: 'left', alignSelf: 'flex-start' },
+  titleBlock: { marginTop: 22, alignItems: 'center', paddingHorizontal: 20 },
+  titleKicker: {
+    fontFamily: typography.serifSemi,
+    fontSize: typography.sizes.displaySm,
     textAlign: 'center',
-    fontFamily: typography.uiMedium,
-    fontSize: 11,
-    color: colors.niebla,
   },
-  // ── retrato ────────────────────────────────────────────────────────
-  diptychWide: {
-    flexDirection: 'row',
-    gap: 10,
-    marginHorizontal: -6,
+  titleBig: {
+    fontFamily: typography.display,
+    fontSize: 46,
+    letterSpacing: -1.5,
+    color: colors.leche,
+    textAlign: 'center',
   },
-  deltaTag: {
-    marginTop: 18,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderRadius: 100,
-    paddingHorizontal: 18,
+  topShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 110 },
+  overlayTop: { position: 'absolute', top: 34, left: 22, right: 22 },
+  sticker: {
+    alignSelf: 'flex-start',
     paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
-  deltaTagText: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.title,
-    letterSpacing: -0.5,
+  stickerAbs: { position: 'absolute', zIndex: 4 },
+  stickerText: { fontFamily: typography.uiBold, fontSize: typography.sizes.body },
+  stickersRow: { marginTop: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  ghost: {
+    position: 'absolute',
+    top: CARD_H / 2 - 110,
+    right: -40,
+    fontFamily: typography.display,
+    fontSize: 260,
+    letterSpacing: -12,
+    color: 'rgba(244, 236, 222, 0.04)',
+    transform: [{ rotate: '-90deg' }],
   },
-  // ── transformacion ─────────────────────────────────────────────────
-  transformTitle: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.title,
-    letterSpacing: 2.4,
-    color: colors.leche,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  diptych: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  metricBox: {
-    marginTop: 22,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    paddingVertical: 16,
-  },
-  metricDivider: {
-    width: 0.5,
-    backgroundColor: colors.hairline,
-    marginVertical: 4,
-  },
-  metricCol: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 6,
-  },
-  metricLabel: {
-    marginTop: 2,
+  pathKickerGap: { marginTop: 44 },
+  // ── Transformación ─────────────────────────────────────────────
+  split: { flexDirection: 'row', height: SPLIT_H, gap: 3 },
+  splitCell: { flex: 1, overflow: 'hidden', backgroundColor: colors.bgCard2 },
+  tag: {
+    position: 'absolute',
+    top: 72,
+    overflow: 'hidden',
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 7,
     fontFamily: typography.uiBold,
-    fontSize: 9,
-    letterSpacing: 1.2,
-    color: colors.niebla,
-    textTransform: 'uppercase',
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 2,
   },
-  metricBefore: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-  },
-  metricArrow: {
+  tagBefore: { backgroundColor: 'rgba(10, 6, 8, 0.72)', color: colors.leche },
+  photoDate: {
+    position: 'absolute',
+    bottom: 10,
     fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    marginVertical: -2,
-  },
-  metricAfter: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.title,
-  },
-  metricSub: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
     fontSize: typography.sizes.micro,
-    color: colors.oro,
-  },
-  // ── cambio (emblema héroe + sello de constancia) ───────────────────
-  cambioHero: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  cambioEmblemBox: {
-    width: 210,
-    height: 210,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
-    marginBottom: 8,
-  },
-  cambioSeal: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  cambioSealStar: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.heading,
-  },
-  cambioSealNum: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 44,
-    letterSpacing: -1,
-  },
-  cambioSealDias: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.segmentTitle,
-    color: colors.bone,
-  },
-  cambioSealLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    letterSpacing: 2.6,
     color: colors.leche,
-    textTransform: 'uppercase',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowRadius: 6,
   },
-  cambioFooter: {
-    alignItems: 'center',
-    gap: 16,
+  // ── Retrato ────────────────────────────────────────────────────
+  retratoTop: { paddingTop: 34, paddingHorizontal: 22 },
+  polaroid: {
+    position: 'absolute',
+    top: 84,
+    right: 18,
+    width: 104,
+    padding: 6,
+    paddingBottom: 22,
+    borderRadius: 6,
+    backgroundColor: colors.leche,
+    transform: [{ rotate: '7deg' }],
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
   },
-  // ── firma de pie ───────────────────────────────────────────────────
-  footer: {
-    alignItems: 'center',
-    gap: 14,
-  },
-  footerEmblem: {
-    width: 108,
-    height: 108,
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
-  },
-  coach: {
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 21,
-    color: colors.bone,
+  polaroidImg: { width: 92, height: 120, borderRadius: 3, backgroundColor: colors.bgCard2 },
+  polaroidCaption: {
+    position: 'absolute',
+    bottom: 3,
+    left: 0,
+    right: 0,
     textAlign: 'center',
-    paddingHorizontal: 8,
+    fontFamily: typography.serifSemi,
+    fontSize: typography.sizes.body,
+    color: '#2A1418',
+  },
+  retratoText: { position: 'absolute', left: 22, right: 22, bottom: 66 },
+  // ── Tu camino ──────────────────────────────────────────────────
+  pathPad: { paddingTop: 34, paddingHorizontal: 22 },
+  chart: {
+    marginTop: 28,
+    height: 140,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  // Con pocos meses las barras no se vuelven bloques: ancho tope.
+  bar: { flex: 1, maxWidth: 22, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
+  axis: { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
+  axisText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.tinyLabel,
+    letterSpacing: 1.5,
+    color: colors.niebla,
   },
 })

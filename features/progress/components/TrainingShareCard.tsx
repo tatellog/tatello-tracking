@@ -4,14 +4,12 @@ import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { GLYPH_BY_SIGN } from '@/features/tabs/zodiac/glyphs'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
-import type { MonthCell } from '@/features/tabs/components/constellation/data/month-grid'
 import { colors, typography } from '@/theme'
-
-import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
 
 import StelarIcon from '@/assets/stelar-icon.png'
 import { StelarLogo } from '@/components/brand/StelarLogo'
 import { DEFAULT_SHARE_STYLE, type ShareCardStyle } from '../share-styles'
+import { ConstellationCard, MyMonthCard, SkyCalendarCard } from './ConstanciaShareCards'
 
 // Same 9:16 frame as ProgressShareCard so the captured PNG lives in
 // the same visual language across the share-sheet tabs.
@@ -85,19 +83,16 @@ type Props = {
   nextStarDay: number | null
   /** "Junio 2026". */
   monthLabel: string
-  /** Entrenos del mes civil. */
-  workoutsThisMonth: number
-  /** Calendario: las celdas del mes en curso (día, entrenó, hoy). */
-  monthCells?: MonthCell[]
-  /** Calendario: día de la semana (0=domingo) del 1° del mes, para el offset. */
-  monthFirstWeekday?: number
-  /** Días activos del ciclo (= dayCount). */
-  activeDays: number
-  /** Peso inicial / actual — null oculta la fila (sin datos falsos). */
-  weightFrom: number | null
-  weightTo: number | null
-  /** Una línea corta en voz de coach (serif italic). */
+  /** Una línea corta en voz de coach (serif italic). Solo la usa Momento. */
   coachCopy: string
+  /** 'YYYY-MM-DD' de hoy: el mes de las tarjetas y su fecha corta. */
+  todayIso?: string
+  /** Días del mes en que entrenaste (a mano o del reloj). */
+  trainedDates?: readonly string[]
+  /** Minutos de entreno del mes (los trae el reloj); null = sin dato. */
+  moveMinutes?: number | null
+  /** Días en déficit del mes (mismo conteo que el calendario); null = sin meta. */
+  deficitDays?: number | null
   /** Fondo elegido en la fila "ESTILO". */
   cardStyle?: ShareCardStyle
   /** Fires once the card has settled — gates the capture. */
@@ -216,13 +211,11 @@ export function TrainingShareCard({
   revealedPct,
   nextStarDay,
   monthLabel,
-  workoutsThisMonth,
-  monthCells,
-  monthFirstWeekday,
-  activeDays,
-  weightFrom,
-  weightTo,
   coachCopy,
+  todayIso,
+  trainedDates = [],
+  moveMinutes = null,
+  deficitDays = null,
   cardStyle = DEFAULT_SHARE_STYLE,
   onReady,
 }: Props) {
@@ -241,134 +234,79 @@ export function TrainingShareCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant, hasPhoto])
 
-  const hasConstellation = dayCount > 0
-
   // El acento sigue el estilo: magenta por defecto, glow del estilo en
   // Oro/Índigo para no chocar con el fondo.
   const accent =
     cardStyle.id === 'oro' || cardStyle.id === 'indigo' ? cardStyle.glow : colors.magenta
+
+  const today = todayIso ?? new Date().toISOString().slice(0, 10)
+
+  // Rediseño (dueña 5 oct 2026): Constelación limpia, Calendario-constelación
+  // y "Mi mes" tipo Wrapped. Momento conserva su composición de foto.
+  if (variant === 'constelacion') {
+    return (
+      <ConstellationCard
+        sign={sign}
+        signLabel={signLabel}
+        monthLabel={monthLabel}
+        revealedPct={revealedPct}
+        nextStarDay={nextStarDay}
+        trainedCount={trainedDates.length}
+        cardStyle={cardStyle}
+      />
+    )
+  }
+  if (variant === 'calendario') {
+    return <SkyCalendarCard today={today} trainedDates={trainedDates} cardStyle={cardStyle} />
+  }
+  if (variant === 'progreso') {
+    return (
+      <MyMonthCard
+        today={today}
+        trained={trainedDates.length}
+        minutes={moveMinutes}
+        deficitDays={deficitDays}
+        cardStyle={cardStyle}
+      />
+    )
+  }
 
   return (
     <View style={[styles.card, { backgroundColor: cardStyle.bg }]}>
       <CelestialBed cardStyle={cardStyle} />
       <Brand />
 
-      {variant === 'constelacion' ? (
-        <View style={styles.middle}>
-          <Text style={styles.signTitle}>{signLabel}</Text>
-          {hasConstellation ? (
-            <Text style={[styles.revealLine, { color: accent }]}>{revealedPct}% REVELADO</Text>
-          ) : null}
-
-          <View style={styles.constellationWrap}>
-            <View style={styles.emblemBox}>
-              <ZodiacArt sign={sign} size={184} halo="soft" />
+      {/* Solo Momento llega aquí: las otras tres tienen su tarjeta propia. */}
+      <View style={styles.middle}>
+        {hasPhoto ? (
+          <>
+            <View style={styles.momentoPhoto}>
+              <PhotoFrame uri={photoUri!} halo accent={accent} onSettled={handleSettled} />
             </View>
-          </View>
-          {!hasConstellation ? (
-            <Text style={styles.emptyConstellation}>
-              Tu constelación empieza con tu próximo entrenamiento.
-            </Text>
-          ) : null}
-
-          {hasConstellation && nextStarDay != null ? (
-            <View style={styles.nextStar}>
-              <Text style={styles.eyebrowGold}>Próxima estrella</Text>
-              <Text style={styles.nextStarDay}>DÍA {nextStarDay}</Text>
+            <View style={styles.meta}>
+              <SignGlyph sign={sign} size={28} />
+              <Text style={styles.eyebrowGold}>DÍA {dayCount}</Text>
+              <Text style={styles.signMd}>{signLabel}</Text>
+              {revealedPct > 0 ? (
+                <Text style={[styles.revealSmall, { color: accent }]}>{revealedPct}% REVELADO</Text>
+              ) : null}
             </View>
-          ) : null}
-
-          <Text style={styles.coach}>{coachCopy}</Text>
-        </View>
-      ) : variant === 'calendario' ? (
-        <View style={styles.middle}>
-          <Text style={styles.calMonth}>{monthLabel}</Text>
-          <Text style={styles.calCount}>
-            {(monthCells ?? []).filter((c) => c.trained).length} días entrenados
-          </Text>
-          <View style={styles.calGrid}>
-            {Array.from({ length: monthFirstWeekday ?? 0 }).map((_, i) => (
-              <View key={`empty-${i}`} style={styles.calCell} />
-            ))}
-            {(monthCells ?? []).map((c) => (
-              <View key={c.date} style={styles.calCell}>
-                <View
-                  style={[
-                    styles.calDot,
-                    c.trained
-                      ? [styles.calDotOn, { backgroundColor: accent, shadowColor: accent }]
-                      : c.isToday
-                        ? styles.calDotToday
-                        : styles.calDotOff,
-                  ]}
-                />
-              </View>
-            ))}
-          </View>
-          <Text style={styles.coach}>{coachCopy}</Text>
-        </View>
-      ) : variant === 'momento' ? (
-        <View style={styles.middle}>
-          {hasPhoto ? (
-            <>
-              <View style={styles.momentoPhoto}>
-                <PhotoFrame uri={photoUri!} halo accent={accent} onSettled={handleSettled} />
-              </View>
-              <View style={styles.meta}>
-                <SignGlyph sign={sign} size={28} />
-                <Text style={styles.eyebrowGold}>DÍA {dayCount}</Text>
-                <Text style={styles.signMd}>{signLabel}</Text>
-                {revealedPct > 0 ? (
-                  <Text style={[styles.revealSmall, { color: accent }]}>
-                    {revealedPct}% REVELADO
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.coach}>{coachCopy}</Text>
-            </>
-          ) : (
-            <TouchableOpacity
-              style={styles.photoEmpty}
-              activeOpacity={0.8}
-              onPress={onAddPhoto}
-              accessibilityRole="button"
-              accessibilityLabel="Agregar una foto"
-            >
-              <Text style={styles.photoEmptyStar}>✦</Text>
-              <Text style={styles.photoEmptyText}>Agrega una foto para compartir tu momento.</Text>
-              {onAddPhoto ? <Text style={styles.photoEmptyCta}>Agregar foto</Text> : null}
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <View style={styles.middle}>
-          <View style={styles.progressHero}>
-            <Text style={[styles.heroNum, { color: accent }]}>{activeDays}</Text>
-            <Text style={styles.heroLabel}>DÍAS DE MOVIMIENTO</Text>
-          </View>
-
-          <Text style={styles.monthLine}>{monthLabel}</Text>
-
-          <View style={styles.statList}>
-            <StatRow label="Entrenos este mes" value={`${workoutsThisMonth}`} />
-            <StatRow label="Días activos" value={`+${activeDays}`} />
-            {weightFrom != null && weightTo != null ? (
-              <StatRow label="Peso" value={`${weightFrom} → ${weightTo} kg`} />
-            ) : null}
-          </View>
-
-          <Text style={styles.coach}>{coachCopy}</Text>
-        </View>
-      )}
-    </View>
-  )
-}
-
-function StatRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statRow}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
+            <Text style={styles.coach}>{coachCopy}</Text>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={styles.photoEmpty}
+            activeOpacity={0.8}
+            onPress={onAddPhoto}
+            accessibilityRole="button"
+            accessibilityLabel="Agregar una foto"
+          >
+            <Text style={styles.photoEmptyStar}>✦</Text>
+            <Text style={styles.photoEmptyText}>Agrega una foto para compartir tu momento.</Text>
+            {onAddPhoto ? <Text style={styles.photoEmptyCta}>Agregar foto</Text> : null}
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   )
 }
@@ -401,99 +339,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // ── calendario ─────────────────────────────────────────────────────
-  calMonth: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.heading,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.leche,
-  },
-  calCount: {
-    marginTop: 4,
-    marginBottom: 18,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.body,
-    color: colors.bone,
-  },
-  calGrid: {
-    width: 245,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-  },
-  calCell: {
-    width: 35,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  calDotOn: {
-    shadowOpacity: 0.9,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  calDotToday: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.leche,
-  },
-  calDotOff: {
-    backgroundColor: 'rgba(244, 236, 222, 0.12)',
-  },
-  // ── constelacion ───────────────────────────────────────────────────
-  signTitle: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.segmentTitle,
-    letterSpacing: 4,
-    color: colors.leche,
-    textAlign: 'center',
-  },
-  revealLine: {
-    marginTop: 6,
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    letterSpacing: 2.2,
-    color: colors.magenta,
-  },
-  constellationWrap: {
-    marginVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emblemBox: {
-    width: 184,
-    height: 184,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
-  },
-  emptyConstellation: {
-    marginVertical: 40,
-    paddingHorizontal: 18,
-    fontFamily: typography.serif,
-    fontStyle: 'italic',
-    fontSize: typography.sizes.bodyLarge,
-    lineHeight: 22,
-    color: colors.niebla,
-    textAlign: 'center',
-  },
-  nextStar: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  nextStarDay: {
-    fontFamily: typography.displayHeavy,
-    fontSize: typography.sizes.title,
-    letterSpacing: 2,
-    color: colors.leche,
   },
   // ── momento ────────────────────────────────────────────────────────
   momentoPhoto: {
@@ -548,56 +393,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     letterSpacing: 0.4,
     color: colors.magenta,
-  },
-  // ── progreso ───────────────────────────────────────────────────────
-  progressHero: {
-    alignItems: 'center',
-  },
-  heroNum: {
-    fontFamily: typography.displayHeavy,
-    fontSize: 96,
-    paddingTop: 10,
-    paddingBottom: 4,
-    color: colors.magenta,
-    textAlign: 'center',
-  },
-  heroLabel: {
-    fontFamily: typography.uiBold,
-    fontSize: typography.sizes.label,
-    letterSpacing: 2.4,
-    color: colors.leche,
-  },
-  monthLine: {
-    marginTop: 18,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    letterSpacing: 1,
-    color: colors.niebla,
-    textTransform: 'uppercase',
-  },
-  statList: {
-    marginTop: 18,
-    width: '100%',
-    paddingHorizontal: 8,
-    gap: 12,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.hairline,
-    paddingBottom: 10,
-  },
-  statLabel: {
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.bone,
-  },
-  statValue: {
-    fontFamily: typography.displayMedium,
-    fontSize: typography.sizes.bodyLarge,
-    color: colors.leche,
   },
   // ── frame compartido ───────────────────────────────────────────────
   frame: {
