@@ -70,6 +70,7 @@ import {
   type WinningCombo as WinningComboData,
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
+import { evidenceChip, evidenceLook } from '../evidence-highlight'
 import { weeklyMovementLever } from '../week-orbit-logic'
 import { comboChatHash, comboId, comboToFinding } from '../combo-chat'
 import {
@@ -101,6 +102,7 @@ import { useNotifyOffer } from '@/features/notifications/offer'
 import { earlyReading } from '../early-readings'
 import { dataMaturity } from '../maturity'
 import { useSaveReflection } from '../reflections'
+import { EvidenceChip, EvidenceComparison, EvidenceHeader } from './EvidenceHighlight'
 import { EmptySegmentCard } from './EmptySegmentCard'
 import { ComboChatView } from './ComboChatView'
 import { MonthChatSheet } from './MonthChatSheet'
@@ -113,6 +115,8 @@ import { DiscoveryStar } from './month-glyphs'
 /* El detalle de un patrón (modal de evidencia) acepta tanto los patrones del
  * motor (`MonthPattern`) como la combinación ganadora, adaptada a esta forma. */
 type EvidenceItem = {
+  /** Id del patrón (month-built): elige íconos, categoría y chip del modal. */
+  id?: string
   title: string
   evidence: { bars: EvidenceBar[]; caption: string; unit: string }
   /** Las fechas concretas que anclan el conteo ("¿de dónde salen las N?"). */
@@ -445,6 +449,10 @@ export function MonthSegment({
   // Patrones de apoyo: correlaciones demostrables del motor (kind 'pattern'). Se
   // excluye lo que ya dijo el combo (sin redundancia) y se ordena por relevancia
   // (déficit es el norte). Tope: 2 con combo, 3 sin él (el astrónomo no abruma).
+  const allPatterns = useMemo(
+    () => detectMonthPatterns(patternSignals, { calorieTarget, proteinTarget }),
+    [patternSignals, calorieTarget, proteinTarget],
+  )
   const supportPatterns = useMemo(() => {
     const comboKeys = new Set(combo?.signals.map((s) => s.key) ?? [])
     const coveredByCombo = (id: string): boolean => {
@@ -463,11 +471,11 @@ export function MonthSegment({
       'sleep-deficit': 3,
       'training-protein': 4,
     }
-    return detectMonthPatterns(patternSignals, { calorieTarget, proteinTarget })
+    return allPatterns
       .filter((p) => p.kind === 'pattern' && !coveredByCombo(p.id))
       .sort((a, b) => (PRIORITY[a.id] ?? 9) - (PRIORITY[b.id] ?? 9))
       .slice(0, combo ? 2 : 3)
-  }, [patternSignals, calorieTarget, proteinTarget, combo])
+  }, [allPatterns, combo])
   // Puente con la ceremonia fechada: si una PIEZA del combo dominante ya se
   // reveló y guardó (tabla `revelations`), mostramos su procedencia factual
   // ("Entreno → déficit · 18/22 días · descubierto el 30 jun") que revive la
@@ -2106,13 +2114,15 @@ function EvidenceModal({
   // hueco/falla): bajan a una nota al pie. La evidencia muestra lo que SÍ pasó.
   const shown = ev ? ev.bars.filter((b) => b.value > 0) : []
   const zeros = ev ? ev.bars.filter((b) => b.value === 0) : []
-  const max = Math.max(1, ...shown.map((b) => b.value))
   const titleColor = ev
     ? (() => {
         const hi = ev.bars.find((b) => b.highlight) ?? ev.bars[0]
         return hi?.colorKey ? (BAR_COLOR[hi.colorKey] ?? colors.oro) : colors.oro
       })()
     : colors.oro
+  // Estilo Destacados de Apple Salud: íconos + categoría + chip por patrón.
+  const look = evidenceLook(pattern?.id, titleColor)
+  const chip = ev ? evidenceChip(pattern?.id, shown, ev.unit) : null
   return (
     <Modal visible={pattern != null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
@@ -2124,91 +2134,42 @@ function EvidenceModal({
         <View style={[StyleSheet.absoluteFill, styles.modalScrim]} pointerEvents="none" />
         <Pressable style={styles.modalCard} onPress={() => {}}>
           {pattern && ev ? (
-            <>
-              <Text style={styles.modalEyebrow}>La evidencia</Text>
-              <View style={styles.modalTitleRow}>
-                <View style={[styles.modalTitleDot, { backgroundColor: titleColor }]} />
-                <Text style={styles.modalTitle}>{pattern.title}</Text>
-              </View>
+            <View style={styles.evStack}>
+              <EvidenceHeader look={look} />
+              <Text style={styles.evTitle}>{pattern.title}</Text>
               {pattern.weekdayShape ? (
                 // Forma por día de semana: la usuaria VE sus picos y valles + el
                 // dato traducido en plano ("de cada 10 días entre semana sostienes 5").
                 <>
                   <WeekdayShapeChart shape={pattern.weekdayShape} />
-                  {pattern.why ? <Text style={styles.modalWhy}>{pattern.why}</Text> : null}
+                  {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
                 </>
               ) : (
                 <>
-                  <View style={styles.bars}>
-                    {shown.map((b, i) => {
-                      const barColor = b.colorKey
-                        ? (BAR_COLOR[b.colorKey] ?? colors.oro)
-                        : colors.oro
-                      // Con denominador, la barra dibuja la TASA (value/total), no el
-                      // conteo crudo — si no, "11 de 22" (50%) se vería más largo que
-                      // "7 de 8" (87%) y diría lo contrario a la verdad.
-                      const rate = b.total != null ? b.value / b.total : null
-                      const frac = rate != null ? rate : b.value / max
-                      return (
-                        <View key={`${b.label}-${i}`} style={styles.barRow}>
-                          <Text style={styles.barLabel} numberOfLines={1}>
-                            {b.label}
-                          </Text>
-                          <View style={styles.barTrack}>
-                            <View
-                              style={[
-                                styles.barFill,
-                                {
-                                  width: `${Math.round(frac * 100)}%`,
-                                  backgroundColor: barColor,
-                                  opacity: b.highlight ? 1 : 0.32,
-                                },
-                              ]}
-                            />
-                          </View>
-                          {rate != null ? (
-                            // % protagonista (el número que golpea) + conteo como ancla.
-                            <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
-                              {Math.round(rate * 100)}%
-                              <Text style={styles.barValueTotal}>
-                                {'  '}
-                                {b.value}/{b.total}
-                              </Text>
-                            </Text>
-                          ) : (
-                            <Text style={[styles.barValue, b.highlight ? styles.barValueHi : null]}>
-                              {b.value}
-                            </Text>
-                          )}
-                        </View>
-                      )
-                    })}
-                  </View>
-                  <Text style={styles.modalCaption}>{ev.caption}</Text>
-                  {/* Las fechas concretas — anclan el conteo ("¿de dónde salen?"). */}
+                  <EvidenceComparison bars={shown} unit={ev.unit} accent={look.accent} />
+                  {chip ? <EvidenceChip text={chip} color={look.accent} /> : null}
+                  {/* "Por qué importa" — el lever que la usuaria puede mover. */}
+                  {pattern.why ? <Text style={styles.evWhy}>{pattern.why}</Text> : null}
+                  {/* Qué se midió + las fechas concretas que anclan el conteo. */}
+                  <Text style={styles.evMeta}>{ev.caption}</Text>
                   {pattern.dates && pattern.dates.length > 0 ? (
                     <Text style={styles.modalDates}>{formatDates(pattern.dates)}</Text>
                   ) : null}
                   {zeros.length > 0 ? (
-                    <Text style={styles.modalZeroNote}>
+                    <Text style={styles.evMeta}>
                       {zeros.map((z) => z.label).join(' · ')}: aún sin registro este mes.
                     </Text>
                   ) : null}
-                  {/* "Por qué importa" — el lever que la usuaria puede mover (voz
-                      Observadora: describe lo que pasó, no aconseja). Solo en los
-                      patrones del motor; el combo no lo trae. */}
-                  {pattern.why ? <Text style={styles.modalWhy}>{pattern.why}</Text> : null}
                 </>
               )}
               <Pressable
                 onPress={onClose}
-                hitSlop={10}
                 accessibilityRole="button"
-                style={styles.modalCloseBtn}
+                style={({ pressed }) => [styles.evDone, pressed && { opacity: 0.7 }]}
               >
-                <Text style={styles.modalClose}>Cerrar</Text>
+                <Text style={styles.evDoneText}>Listo</Text>
               </Pressable>
-            </>
+            </View>
           ) : null}
         </Pressable>
       </Pressable>
@@ -3468,49 +3429,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: colors.leche,
   },
-  bars: {
-    marginTop: 18,
-    gap: 10,
-  },
-  barRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  barLabel: {
-    width: 86,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.bone,
-  },
-  barTrack: {
-    flex: 1,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(244, 236, 222, 0.06)',
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 5,
-    backgroundColor: colors.oroHairline,
-  },
-  barValue: {
-    width: 68,
-    textAlign: 'right',
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    color: colors.niebla,
-  },
-  barValueHi: {
-    fontFamily: typography.uiBold,
-    color: colors.leche,
-  },
-  // El denominador va atenuado para que el número grande pese.
-  barValueTotal: {
-    fontFamily: typography.ui,
-    color: colors.niebla,
-  },
   // ── Forma de tu semana (7 columnas) ──────────────────────────
   shapeWrap: {
     marginTop: 20,
@@ -3552,13 +3470,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.uiBold,
     color: colors.bone,
   },
-  modalCaption: {
-    marginTop: 16,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.label,
-    lineHeight: 18,
-    color: colors.bone,
-  },
   // Las fechas concretas que anclan el conteo (la prueba, en tabulares).
   modalDates: {
     marginTop: 8,
@@ -3568,23 +3479,39 @@ const styles = StyleSheet.create({
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
-  // Nota al pie de las señales sin registro — neutra, sin culpa.
-  modalZeroNote: {
-    marginTop: 8,
+  // ── "La evidencia" estilo Destacados de Apple Salud ──────────
+  evStack: { gap: 14 },
+  evTitle: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.headingLg,
+    lineHeight: 25,
+    letterSpacing: -0.3,
+    color: colors.leche,
+  },
+  evWhy: {
+    fontFamily: typography.uiMedium,
+    fontSize: typography.sizes.bodyLarge,
+    lineHeight: 20,
+    color: colors.bone,
+  },
+  evMeta: {
+    marginTop: -6,
     fontFamily: typography.uiMedium,
     fontSize: typography.sizes.label,
-    lineHeight: 18,
+    lineHeight: 17,
     color: colors.niebla,
   },
-  // "Por qué importa" — serif (voz Observadora) cerrando el detalle del patrón.
-  // "Por qué importa" — reflexión funcional (el rol/lever), no la frase-conclusión
-  // de coach → Hanken (regla estricta: solo la conclusión va en serif).
-  modalWhy: {
-    marginTop: 16,
-    fontFamily: typography.uiMedium,
-    fontSize: typography.sizes.body,
-    lineHeight: 21,
-    color: colors.bone,
+  evDone: {
+    marginTop: 4,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+  },
+  evDoneText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.ui,
+    color: colors.leche,
   },
   modalCloseBtn: {
     marginTop: 20,
