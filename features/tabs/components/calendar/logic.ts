@@ -71,6 +71,8 @@ export type DayValues = {
   energy: number | null
   weightKg: number | null
   onPeriod: boolean
+  /** Tipo del entreno del día (manual o del reloj): fuerza/cardio/… */
+  workoutType: string | null
 }
 
 export type CalendarDay = {
@@ -94,6 +96,9 @@ export type CalendarDay = {
 
 /** Subconjunto de daily_signals que el calendario necesita por día. */
 export type DaySignal = {
+  /** La view une entrenos manuales y del reloj: true si hubo cualquiera. */
+  trained?: boolean | null
+  workout_type?: string | null
   rested?: boolean | null
   meal_count?: number | null
   protein_g?: number | null
@@ -176,6 +181,7 @@ function valuesFor(sig: DaySignal | undefined): DayValues {
     energy: sig?.energy ?? null,
     weightKg: sig?.weight_kg ?? null,
     onPeriod: sig?.on_period === true,
+    workoutType: sig?.workout_type ?? null,
   }
 }
 
@@ -208,7 +214,9 @@ export function buildCalendarDays(args: BuildCalendarDaysArgs): CalendarDay[] {
 
   return cells.map((cell) => {
     const sig = signalsByDay[cell.date]
-    const trained = cell.trained || (cell.isToday && todayWorkoutCompleted)
+    // El reloj también entrena: daily_signals.trained cubre manual + wearable
+    // (antes solo contaba la tabla workouts y el entreno del reloj no se veía).
+    const trained = cell.trained || sig?.trained === true || (cell.isToday && todayWorkoutCompleted)
 
     // Precedencia: override local > trained > rested > empty.
     let status: DayStatus

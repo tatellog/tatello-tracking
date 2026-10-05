@@ -59,6 +59,14 @@ describe('buildCalendarDays · status', () => {
     expect(dayOf(days, '2026-06-12').status).toBe('trained')
   })
 
+  test('entreno del reloj (daily_signals.trained sin fila en workouts) → trained', () => {
+    const days = buildCalendarDays(
+      base({ signalsByDay: { '2026-06-12': { trained: true, workout_type: 'fuerza' } } }),
+    )
+    expect(dayOf(days, '2026-06-12').status).toBe('trained')
+    expect(dayOf(days, '2026-06-12').values.workoutType).toBe('fuerza')
+  })
+
   test('hoy se fuerza a trained si todayWorkoutCompleted aunque no esté en workouts', () => {
     const days = buildCalendarDays(base({ todayWorkoutCompleted: true }))
     expect(dayOf(days, TODAY).status).toBe('trained')
@@ -184,6 +192,7 @@ describe('buildCalendarDays · values (Historia)', () => {
       energy: 4,
       weightKg: 68.5,
       onPeriod: true,
+      workoutType: null,
     })
   })
 
@@ -198,6 +207,7 @@ describe('buildCalendarDays · values (Historia)', () => {
       energy: null,
       weightKg: null,
       onPeriod: false,
+      workoutType: null,
     })
   })
 })
