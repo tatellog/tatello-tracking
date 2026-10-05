@@ -19,3 +19,20 @@ export function consumeOrbitSegment(): OrbitSegment | null {
   pending = null
   return p
 }
+
+/*
+ * Mismo buzón one-shot, para abrir "La evidencia" de un patrón (el tap del
+ * push N9 "Nuevo patrón encontrado"). Mes lo consume cuando ya tiene sus
+ * patrones calculados.
+ */
+let pendingEvidence: string | null = null
+
+export function requestOrbitEvidence(patternId: string): void {
+  pendingEvidence = patternId
+}
+
+export function consumeOrbitEvidence(): string | null {
+  const p = pendingEvidence
+  pendingEvidence = null
+  return p
+}

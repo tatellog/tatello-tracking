@@ -10,6 +10,7 @@ import Sunset from '@/assets/icons/sunset.svg'
 import { ScanFeedbackToast } from '@/features/meal-scan/components/ScanFeedbackToast'
 import {
   useDayCloseInvite,
+  useFindingInvite,
   useNextStarInvite,
   useOrbitPatternInvite,
   useWeeklyReadingInvite,
@@ -84,6 +85,9 @@ export default function TabsLayout() {
   // N7 · patrón de Órbita: cuando el motor encuentra una señal nueva, un push la
   // trae de vuelta a Órbita Mes (self-healing, 1/14d por el reposo del writer).
   useOrbitPatternInvite()
+  // N9 · hallazgo importante de Mes: un push con el hallazgo mismo que abre su
+  // evidencia (1 cada 14 días por patrón). Gated a dev hasta validarlo.
+  useFindingInvite()
   // N8 · Lectura Semanal: el lunes que la lectura existe (garantizada por los
   // días con comida de la semana en curso), un push la anuncia con destino
   // directo a /weekly-reading. Gated a dev junto con toda la Lectura Semanal.

@@ -2,7 +2,7 @@ import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useEffect } from 'react'
 
-import { requestOrbitSegment } from '@/features/orbit/pending-segment'
+import { requestOrbitEvidence, requestOrbitSegment } from '@/features/orbit/pending-segment'
 import { requestWatchCelebration } from '@/features/tabs/pending-watch-celebration'
 import { track } from '@/lib/analytics'
 
@@ -34,6 +34,12 @@ function landFactory(router: ReturnType<typeof useRouter>) {
       requestOrbitSegment('semana')
       router.navigate('/(tabs)/orbit')
     } else if (target === 'orbit-mes') {
+      requestOrbitSegment('mes')
+      router.navigate('/(tabs)/orbit')
+    } else if (target === 'orbit-evidence') {
+      // N9 "Nuevo patrón encontrado": Mes abre "La evidencia" de ese patrón.
+      const patternId = (data as { patternId?: unknown } | null)?.patternId
+      if (typeof patternId === 'string') requestOrbitEvidence(patternId)
       requestOrbitSegment('mes')
       router.navigate('/(tabs)/orbit')
     } else if (target === 'hoy') {

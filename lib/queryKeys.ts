@@ -176,6 +176,11 @@ export const queryKeys = {
     priorFindings: (uid: string, before: string) =>
       ['orbit', 'priorFindings', uid, before] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    /** Registro de 14 días del push N9 (hallazgos avisados o vistos). */
+    findingLedger: (uid: string | null) => ['notifications', 'findingLedger', uid] as const,
+  },
   wearables: {
     all: ['wearables'] as const,
     // La lectura más reciente de la báscula (ícono de Hoy + pantalla Tu báscula).
