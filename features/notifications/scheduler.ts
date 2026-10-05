@@ -31,6 +31,8 @@ export type NotificationTarget =
   | 'hoy-workout'
   | 'orbit-semana'
   | 'orbit-mes'
+  /** N9: abre Descubre › Mes con "La evidencia" del patrón (data.patternId). */
+  | 'orbit-evidence'
   | 'weekly-reading'
 
 /*
@@ -95,6 +97,9 @@ export const PATTERN_ID = 'stelar-pattern-found'
 /** El slot N7 · "Stelar encontró una señal" (patrón de Órbita) — aterriza en
  *  Órbita Mes, a diferencia de N3 (que aterriza en Hoy). */
 export const ORBIT_PATTERN_ID = 'stelar-orbit-pattern'
+/** El slot N9 · "Nuevo patrón encontrado" (hallazgo de Mes con su texto) —
+ *  aterriza en "La evidencia" de ese patrón. */
+export const FINDING_ID = 'stelar-finding'
 /** El slot N5 · el sello del ciclo mensual — idempotente como los demás. */
 export const CYCLE_ID = 'stelar-cycle-seal'
 /** El slot N8 · la Lectura Semanal lista — el tap aterriza directo en
@@ -143,7 +148,9 @@ export async function syncNextStarInvite(
     // hoy es fin de mes), ese push hace el trabajo de la invitación con
     // mejor contenido — la invitación cede este re-armado.
     const inviteDate = nextInviteDate(new Date(), window)
-    const patternPending = (await scheduledFireAt(Notifications, PATTERN_ID)) != null
+    const patternPending =
+      (await scheduledFireAt(Notifications, PATTERN_ID)) != null ||
+      (await scheduledFireAt(Notifications, FINDING_ID)) != null
     const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
     const cycleTomorrow = cycleFireAt != null && sameLocalDay(cycleFireAt, inviteDate)
     if (!patternPending && !cycleTomorrow) {
@@ -225,6 +232,9 @@ export async function syncWeekSealInvite(
     // señal-órbita > sello: idem, el sello cede a un patrón de Órbita.
     const orbitPatternFireAt = await scheduledFireAt(Notifications, ORBIT_PATTERN_ID)
     if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, sealDate)) return
+    // hallazgo (N9) > sello/cierre/lectura: un solo anuncio ese día.
+    const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
+    if (findingFireAt && sameLocalDay(findingFireAt, sealDate)) return
     const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
     if (cycleFireAt && sameLocalDay(cycleFireAt, sealDate)) return
     // lectura > sello: si N8 ya anuncia la lectura ese lunes, el sello cede
@@ -292,6 +302,9 @@ export async function syncDayCloseInvite(
     // señal-órbita > cierre: el cierre diario cede a un patrón de Órbita.
     const orbitPatternFireAt = await scheduledFireAt(Notifications, ORBIT_PATTERN_ID)
     if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, date)) return
+    // hallazgo (N9) > sello/cierre/lectura: un solo anuncio ese día.
+    const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
+    if (findingFireAt && sameLocalDay(findingFireAt, date)) return
 
     const perm = await Notifications.getPermissionsAsync()
     if (perm.status !== 'granted') return
@@ -423,6 +436,9 @@ export async function syncOrbitPatternInvite(
     // día · la ceremonia de Hoy tiene más contenido, así que esta cede.
     const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
     if (patternFireAt && sameLocalDay(patternFireAt, date)) return
+    // hallazgo (N9) > señal-órbita: el hallazgo dice QUÉ encontró; esta cede.
+    const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
+    if (findingFireAt && sameLocalDay(findingFireAt, date)) return
     // señal-órbita > invitación: mismo minuto de mañana — la invitación cede.
     await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
     // señal-órbita > sello/lectura: si mañana es lunes, ambos ceden (se
@@ -450,6 +466,88 @@ export async function syncOrbitPatternInvite(
     trackScheduled(ORBIT_PATTERN_ID, 'orbit-mes', date)
   } catch {
     // Nunca romper la app por una notificación.
+  }
+}
+
+/**
+ * N9 · "Nuevo patrón encontrado": anuncia un hallazgo importante del motor de
+ * Mes (finding-push.ts decide cuál) CON su texto, y el tap abre "La
+ * evidencia" de ese patrón. Suena en la ventana elegida del día siguiente.
+ *
+ * `finding=null` cancela. Si ya está agendado el mismo patrón, se conserva
+ * (re-abrir la app no lo mueve). Devuelve la fecha agendada (o null) para que
+ * el registro de 14 días la guarde.
+ *
+ * Arbitraje 1/día: ciclo > patrón de Hoy (N3) > hallazgo > señal-órbita (N7)
+ * > lectura/sello > cierre; absorbe la invitación.
+ */
+export async function syncFindingInvite(
+  window: NotificationWindow | null | undefined,
+  finding: { id: string; title: string; body: string } | null,
+): Promise<Date | null> {
+  if (isExpoGo) return null
+  try {
+    const Notifications = await import('expo-notifications')
+
+    const all = await Notifications.getAllScheduledNotificationsAsync().catch(() => [])
+    const current = all.find((r) => r.identifier === FINDING_ID)
+    const currentData = current?.content.data as { patternId?: unknown; fireAt?: unknown } | null
+    if (
+      finding &&
+      window != null &&
+      window !== 'not_yet' &&
+      currentData?.patternId === finding.id &&
+      typeof currentData.fireAt === 'string'
+    ) {
+      return new Date(currentData.fireAt)
+    }
+
+    await Notifications.cancelScheduledNotificationAsync(FINDING_ID).catch(() => {})
+    if (window == null || window === 'not_yet' || !finding) return null
+
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status !== 'granted') return null
+
+    await ensureChannels(Notifications)
+
+    const date = nextInviteDate(new Date(), window)
+    // ciclo > hallazgo: si el sello del ciclo suena ese mismo día, cede.
+    const cycleFireAt = await scheduledFireAt(Notifications, CYCLE_ID)
+    if (cycleFireAt && sameLocalDay(cycleFireAt, date)) return null
+    // N3 (ceremonia de Hoy) > hallazgo: no dos "encontré" el mismo día.
+    const patternFireAt = await scheduledFireAt(Notifications, PATTERN_ID)
+    if (patternFireAt && sameLocalDay(patternFireAt, date)) return null
+    // hallazgo > invitación / señal-órbita: mismo minuto de mañana, ceden.
+    await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
+    await Notifications.cancelScheduledNotificationAsync(ORBIT_PATTERN_ID).catch(() => {})
+    // hallazgo > sello/lectura: si mañana es lunes, ambos ceden.
+    if (date.getDay() === 1) {
+      await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
+      await Notifications.cancelScheduledNotificationAsync(READING_ID).catch(() => {})
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: FINDING_ID,
+      content: {
+        title: finding.title,
+        body: finding.body,
+        data: {
+          target: 'orbit-evidence' satisfies NotificationTarget,
+          patternId: finding.id,
+          fireAt: date.toISOString(),
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+        channelId: CHANNEL_ANNOUNCEMENTS,
+      },
+    })
+    trackScheduled(FINDING_ID, 'orbit-evidence', date)
+    return date
+  } catch {
+    // Nunca romper la app por una notificación.
+    return null
   }
 }
 
@@ -498,6 +596,7 @@ export async function syncCycleSealInvite(
     if (sameLocalDay(date, nextInviteDate(new Date(), window))) {
       await Notifications.cancelScheduledNotificationAsync(INVITE_ID).catch(() => {})
       await Notifications.cancelScheduledNotificationAsync(PATTERN_ID).catch(() => {})
+      await Notifications.cancelScheduledNotificationAsync(FINDING_ID).catch(() => {})
     }
     // ciclo > sello semanal/lectura: si el día 1 es lunes, ambos ceden (se
     // re-arman en la próxima apertura para el lunes siguiente).
@@ -568,6 +667,9 @@ export async function syncWeeklyReadingInvite(
     if (patternFireAt && sameLocalDay(patternFireAt, date)) return
     const orbitPatternFireAt = await scheduledFireAt(Notifications, ORBIT_PATTERN_ID)
     if (orbitPatternFireAt && sameLocalDay(orbitPatternFireAt, date)) return
+    // hallazgo (N9) > sello/cierre/lectura: un solo anuncio ese día.
+    const findingFireAt = await scheduledFireAt(Notifications, FINDING_ID)
+    if (findingFireAt && sameLocalDay(findingFireAt, date)) return
     // lectura > sello: mismo lunes, el sello genérico cede al contenido.
     await Notifications.cancelScheduledNotificationAsync(SEAL_ID).catch(() => {})
 

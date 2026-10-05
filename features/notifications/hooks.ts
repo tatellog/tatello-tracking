@@ -1,18 +1,29 @@
 import { useEffect } from 'react'
 
-import { useMealsForDate } from '@/features/macros/hooks'
-import { useHasAnySignals, useIsoWeekSignals } from '@/features/orbit/hooks'
+import { useQuery } from '@tanstack/react-query'
+
+import { useMacroTargets, useMealsForDate } from '@/features/macros/hooks'
+import { useHasAnySignals, useIsoWeekSignals, useSignalsHistory } from '@/features/orbit/hooks'
+import { detectMonthPatterns } from '@/features/orbit/month-built'
 import { useRecentOrbitPattern } from '@/features/orbit/pattern-memory'
 import type { NotificationWindow } from '@/features/profile/api'
 import { useProfile } from '@/features/profile/hooks'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail, WEEKLY_READING_ENABLED } from '@/lib/featureFlags'
+import { queryKeys } from '@/lib/queryKeys'
 import { todayInTimezone } from '@/lib/time'
 
+import {
+  findingPushCopy,
+  pickFindingToAnnounce,
+  readFindingLedger,
+  writeFindingLedgerEntry,
+} from './finding-push'
 import { weeklyReadingGuaranteed } from './invite'
 import {
   syncCycleSealInvite,
   syncDayCloseInvite,
+  syncFindingInvite,
   syncNextStarInvite,
   syncOrbitPatternInvite,
   syncWeeklyReadingInvite,
@@ -103,6 +114,50 @@ export function useOrbitPatternInvite(): void {
     if (window === undefined || fresh === undefined) return
     void syncOrbitPatternInvite(window, devOnly && fresh === true)
   }, [window, fresh, devOnly])
+}
+
+/*
+ * N9 · "Nuevo patrón encontrado": corre el motor de Mes (misma ventana de 90
+ * días que Descubre, query cacheada) y agenda el hallazgo importante que toca
+ * (finding-push.ts). Guarda la fecha en el registro de 14 días. Gateado a DEV
+ * como N7 hasta validarlo en un build: fuera del gate cancela y no agenda.
+ */
+export function useFindingInvite(): void {
+  const { session } = useSession()
+  const uid = session?.user?.id ?? null
+  const devOnly = aiEnabledForEmail(session?.user?.email)
+  const { data: profile } = useProfile()
+  const window = (profile ? (profile.notification_window ?? null) : undefined) as
+    | NotificationWindow
+    | null
+    | undefined
+  const { data: signals } = useSignalsHistory(90)
+  const targets = useMacroTargets().data
+  const ledger = useQuery({
+    queryKey: queryKeys.notifications.findingLedger(uid),
+    queryFn: () => readFindingLedger(uid!),
+    enabled: uid != null,
+  })
+
+  useEffect(() => {
+    if (window === undefined || signals === undefined || ledger.data === undefined || !uid) return
+    const patterns = devOnly
+      ? detectMonthPatterns(signals, {
+          calorieTarget: targets?.calories ?? null,
+          proteinTarget: targets?.protein_g ?? null,
+        })
+      : []
+    const pick = pickFindingToAnnounce(patterns, ledger.data, new Date())
+    void (async () => {
+      const at = await syncFindingInvite(
+        window,
+        pick ? { id: pick.id, ...findingPushCopy(pick) } : null,
+      )
+      if (pick && at && ledger.data[pick.id] !== at.toISOString()) {
+        await writeFindingLedgerEntry(uid, pick.id, at.toISOString())
+      }
+    })()
+  }, [window, signals, ledger.data, uid, devOnly, targets?.calories, targets?.protein_g])
 }
 
 /*

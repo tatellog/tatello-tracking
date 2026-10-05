@@ -25,6 +25,7 @@ import { useIsFocused } from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { colors, typography } from '@/theme'
 
@@ -46,6 +47,8 @@ import { addDaysIso } from '@/features/wearables/sleep-detail'
 import { AiCta } from '@/components/AiCta'
 import { useSession } from '@/hooks/useSession'
 import { aiEnabledForEmail } from '@/lib/featureFlags'
+import { queryKeys } from '@/lib/queryKeys'
+import { writeFindingLedgerEntry } from '@/features/notifications/finding-push'
 
 import { useHasAnySignals, useSignalsHistory } from '../hooks'
 import {
@@ -71,6 +74,7 @@ import {
 } from '../month-built'
 import { isDeficitDay } from '../deficit'
 import { evidenceChip, evidenceLook } from '../evidence-highlight'
+import { consumeOrbitEvidence } from '../pending-segment'
 import { weeklyMovementLever } from '../week-orbit-logic'
 import { comboChatHash, comboId, comboToFinding } from '../combo-chat'
 import {
@@ -602,6 +606,28 @@ export function MonthSegment({
   }, [signals, today, calorieTarget, proteinTarget, waterGoalGlasses])
 
   const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
+  // Abrir una evidencia cuenta como visto para el push N9: ese hallazgo no se
+  // avisa en 14 días (no se manda lo que ya leíste).
+  const qc = useQueryClient()
+  const openEvidence = (p: EvidenceItem) => {
+    setEvidence(p)
+    if (seenUid && p.id) {
+      void writeFindingLedgerEntry(seenUid, p.id, new Date().toISOString()).then(() =>
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.findingLedger(seenUid) }),
+      )
+    }
+  }
+  // El tap del push N9 pide abrir "La evidencia" de un patrón: se consume
+  // cuando Mes está a la vista y ya tiene sus patrones (90 días cargados).
+  const evidenceFocused = useIsFocused()
+  useEffect(() => {
+    if (!evidenceFocused || longHistory === undefined) return
+    const id = consumeOrbitEvidence()
+    if (!id) return
+    const p = allPatterns.find((x) => x.id === id)
+    if (p) openEvidence(p)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evidenceFocused, longHistory, allPatterns])
   // El patrón dominante abre el modal cinemático a pantalla completa (no el panel).
   const [reveal, setReveal] = useState<ComboReveal | null>(null)
   // "✦ Quiero entenderlo": la IA explica el patrón dominante que el motor ya
@@ -914,7 +940,7 @@ export function MonthSegment({
                     {supportPatterns.map((p) => (
                       <Pressable
                         key={p.id}
-                        onPress={() => setEvidence(p)}
+                        onPress={() => openEvidence(p)}
                         style={({ pressed }) => [styles.alsoFoundRow, pressed && { opacity: 0.75 }]}
                         accessibilityRole="button"
                         accessibilityLabel={`${p.title} Ver la evidencia.`}
@@ -931,7 +957,7 @@ export function MonthSegment({
                     pattern={p}
                     index={i}
                     leading={!combo && i === 0}
-                    onOpen={() => setEvidence(p)}
+                    onOpen={() => openEvidence(p)}
                   />
                 ))}
               </>
