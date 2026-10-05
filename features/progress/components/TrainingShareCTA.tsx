@@ -7,21 +7,18 @@ import Svg, { Path } from 'react-native-svg'
 import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useProfile } from '@/features/profile/hooks'
-import {
-  useMeasurements,
-  useMonthWorkoutDates,
-  useTotalTrainedDays,
-} from '@/features/progress/hooks'
+import { useMacroTargets } from '@/features/macros/hooks'
+import { useSignalsHistory } from '@/features/orbit/hooks'
+import { monthCalendar } from '@/features/orbit/month-built'
+import { useTotalTrainedDays } from '@/features/progress/hooks'
 import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { showActionSheet } from '@/lib/actionSheet'
 import { todayInTimezone } from '@/lib/time'
 import { colors, typography } from '@/theme'
 
-import { buildMonthGrid } from '@/features/tabs/components/constellation/data/month-grid'
-
 import { ProgressShareSheet, type ShareTab } from './ProgressShareSheet'
 import { CalendarioIcon, ConstelacionIcon, ProgresoIcon } from './share-icons'
-import { constellationReveal, monthLabelFromIso, weightSpan } from '../share-logic'
+import { constellationReveal, monthLabelFromIso } from '../share-logic'
 import { useWorkoutSharedToday } from '../shared-flag'
 import type { ShareCardStyle } from '../share-styles'
 import { TrainingShareCard } from './TrainingShareCard'
@@ -99,8 +96,10 @@ function coachLineForDay(dayCount: number): string {
 export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolean } = {}) {
   const brief = useHomeBrief()
   const profile = useProfile()
-  const measurements = useMeasurements(null)
-  const monthWorkouts = useMonthWorkoutDates()
+  // Las mismas señales que Descubre y el calendario (90 días, cacheadas):
+  // entrenos a mano Y del reloj, minutos y déficit del mes.
+  const history = useSignalsHistory(90)
+  const calorieTarget = useMacroTargets().data?.calories ?? null
   const totalTrained = useTotalTrainedDays()
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -127,21 +126,31 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
   )
 
   const reveal = useMemo(() => constellationReveal(sign, dayCount), [sign, dayCount])
-  const weight = useMemo(() => weightSpan(measurements.data), [measurements.data])
   const todayIso = brief.data?.date ?? todayInTimezone()
   const monthLabel = monthLabelFromIso(todayIso)
-  const workoutsThisMonth = monthWorkouts.data?.length ?? 0
   const coachCopy = coachLineForDay(dayCount)
-  // Grilla del mes en curso para la tarjeta "Calendario" (días entrenados).
-  const monthGrid = useMemo(
-    () => buildMonthGrid(`${todayIso.slice(0, 7)}-01`, monthWorkouts.data ?? [], todayIso),
-    [todayIso, monthWorkouts.data],
-  )
-  const monthFirstWeekday = useMemo(() => {
-    const [y, m] = todayIso.split('-').map(Number) as [number, number]
-    // Lunes-primero, como todos los calendarios de la app.
-    return (new Date(y, m - 1, 1).getDay() + 6) % 7
-  }, [todayIso])
+  // El mes de las tarjetas: entrenos (a mano o del reloj), minutos de entreno
+  // del reloj y días en déficit con el MISMO cálculo que el calendario.
+  const monthStats = useMemo(() => {
+    const rows = history.data ?? []
+    const month = todayIso.slice(0, 7)
+    const inMonth = rows.filter(
+      (r) => r.day != null && r.day.startsWith(month) && r.day <= todayIso,
+    )
+    const trainedDates = inMonth.filter((r) => r.trained === true).map((r) => r.day!)
+    const minutes = inMonth.reduce((a, r) => a + (r.workout_minutes ?? 0), 0)
+    let firstDataDay: string | null = null
+    for (const r of rows) {
+      if (r.day == null || ((r.meal_count ?? 0) <= 0 && (r.calories ?? 0) <= 0)) continue
+      if (firstDataDay == null || r.day < firstDataDay) firstDataDay = r.day
+    }
+    const cal = monthCalendar(inMonth, { today: todayIso, calorieTarget, firstDataDay })
+    return {
+      trainedDates,
+      minutes: minutes > 0 ? Math.round(minutes) : null,
+      deficitDays: cal ? cal.deficitDays : null,
+    }
+  }, [history.data, todayIso, calorieTarget])
   // "Compartiste tu entreno de hoy" — persiste por día (solo la acción, no la
   // imagen). Se resetea al cambiar de día. Sin racha ni culpa: su ausencia es
   // neutra (manifiesto).
@@ -205,12 +214,10 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
         revealedPct={reveal.revealedPct}
         nextStarDay={reveal.nextStarDay}
         monthLabel={monthLabel}
-        workoutsThisMonth={workoutsThisMonth}
-        monthCells={monthGrid.cells}
-        monthFirstWeekday={monthFirstWeekday}
-        activeDays={dayCount}
-        weightFrom={weight?.from ?? null}
-        weightTo={weight?.to ?? null}
+        todayIso={todayIso}
+        trainedDates={monthStats.trainedDates}
+        moveMinutes={monthStats.minutes}
+        deficitDays={monthStats.deficitDays}
         coachCopy={coachCopy}
         cardStyle={cardStyle}
         onReady={onReady}
@@ -237,7 +244,7 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
       },
       {
         id: 'progreso',
-        label: 'Progreso',
+        label: 'Mi mes',
         icon: (active: boolean) => <ProgresoIcon active={active} />,
         render: (onReady: () => void, cardStyle: ShareCardStyle) =>
           cardFor('progreso', onReady, cardStyle),
@@ -251,10 +258,8 @@ export function TrainingShareCTA({ historyMode = false }: { historyMode?: boolea
     dayCount,
     reveal,
     monthLabel,
-    workoutsThisMonth,
-    monthGrid,
-    monthFirstWeekday,
-    weight,
+    monthStats,
+    todayIso,
     coachCopy,
     historyMode,
   ])

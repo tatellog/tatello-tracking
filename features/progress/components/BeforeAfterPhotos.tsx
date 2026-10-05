@@ -16,22 +16,19 @@ import Svg, { Path } from 'react-native-svg'
 import Toast from 'react-native-toast-message'
 
 import { EyebrowLabel, type EyebrowTone } from '@/components/EyebrowLabel'
-import { useHomeBrief } from '@/features/home/useHomeBrief'
 import { useTakePhoto } from '@/features/onboarding/photos/hooks/useTakePhoto'
-import { useProfile } from '@/features/profile/hooks'
 import type { ProgressPhoto } from '@/features/progress/api'
 import { trySaveUriToLibrary } from '@/features/progress/export'
+import { useSignalsHistory } from '@/features/orbit/hooks'
 import { useBeforeAfterPhotos, useDeletePhoto, useMeasurements } from '@/features/progress/hooks'
-import { computeTrend, formatTrendCopy, toWeightPoints } from '@/features/progress/logic'
-import { ZODIAC, zodiacFromDate } from '@/features/tabs/zodiac'
 import { showActionSheet } from '@/lib/actionSheet'
 import { colors, typography } from '@/theme'
 
 import { BeforeAfterSlider } from './BeforeAfterSlider'
 import { ProgressShareCard } from './ProgressShareCard'
-import { ProgressShareSheet, type ShareTab } from './ProgressShareSheet'
+import { ProgressShareSheet, type ShareOptions, type ShareTab } from './ProgressShareSheet'
 import { CambioIcon, RetratoIcon, TransformacionIcon } from './share-icons'
-import { constellationReveal, weightSpan } from '../share-logic'
+import { processDuration, trainedByMonth, weightSpan } from '../share-logic'
 import type { ShareCardStyle } from '../share-styles'
 
 // Persistencia del slot sostenido (ID de la foto que vive en "Ahora").
@@ -328,8 +325,6 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
 
   const { data } = useBeforeAfterPhotos(chapterReady ? chapterStart : undefined)
   const measurements = useMeasurements(null)
-  const brief = useHomeBrief()
-  const profile = useProfile()
   const takePhoto = useTakePhoto()
   const deletePhoto = useDeletePhoto()
   const [shareOpen, setShareOpen] = useState(false)
@@ -362,53 +357,67 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
     else AsyncStorage.removeItem(SOLO_AFTER_KEY).catch(() => {})
   }
 
-  // Datos de las métricas que viven en las tarjetas (entrenos del ciclo +
-  // constelación revelada). El signo sale del perfil; el conteo, del brief.
-  const sign = useMemo(
-    () => zodiacFromDate(profile.data?.date_of_birth),
-    [profile.data?.date_of_birth],
-  )
-  const dayCount = useMemo(
-    () => brief.data?.grid_28_days.filter((c) => c.completed).length ?? 0,
-    [brief.data?.grid_28_days],
-  )
+  // Datos de las tarjetas (rediseño dueña 5 oct 2026): el tiempo entre las
+  // fotos, los entrenos (a mano o del reloj) en ese lapso y por mes. Las
+  // señales cubren desde la foto del "antes" (tope ~2.5 años, una lectura).
+  const beforeIso = data?.before?.taken_at?.slice(0, 10) ?? null
+  const historyDays = beforeIso
+    ? Math.min(
+        900,
+        Math.max(
+          90,
+          Math.ceil((Date.now() - new Date(`${beforeIso}T00:00:00`).getTime()) / 86_400_000) + 2,
+        ),
+      )
+    : 90
+  const history = useSignalsHistory(historyDays)
 
   // Build the tab-config used to feed the generic share sheet. Lives
   // here (not in the sheet) because the data — photo URLs, dates,
-  // métricas, coach line — is specific to the antes/después flow.
+  // métricas — is specific to the antes/después flow.
   const tabs: readonly ShareTab[] = useMemo(() => {
     const before = data?.before
     const after = data?.after
     const beforeUrl = before?.signed_url
     const afterUrl = after?.signed_url
     if (!before || !after || !beforeUrl || !afterUrl) return []
-    const trend = computeTrend(toWeightPoints(measurements.data ?? []))
-    const coachCopy = trend ? formatTrendCopy(trend) : null
     const weight = weightSpan(measurements.data)
-    const reveal = constellationReveal(sign, dayCount)
-    const beforeDate = formatDateForCard(before.taken_at)
-    const afterDate = formatDateForCard(after.taken_at)
+    const bIso = before.taken_at.slice(0, 10)
+    const aIso = after.taken_at.slice(0, 10)
+    const trainedDates = (history.data ?? [])
+      .filter((r) => r.trained === true && r.day != null)
+      .map((r) => r.day!)
+    const inRange = trainedDates.filter((d) => d >= bIso && d <= aIso)
+    // Sin historia que llegue a la foto del antes, no se inventa el total.
+    const covered = (history.data ?? []).some((r) => r.day != null && r.day <= bIso)
+    const workoutsTotal = history.data
+      ? covered || inRange.length > 0
+        ? inRange.length
+        : null
+      : null
+    const monthly = trainedByMonth(trainedDates, bIso, aIso)
+    const duration = processDuration(bIso, aIso)
 
     const cardFor = (
       variant: 'retrato' | 'transformacion' | 'cambio',
       onReady: () => void,
       cardStyle: ShareCardStyle,
+      opts: ShareOptions,
     ) => (
       <ProgressShareCard
         variant={variant}
         beforeUrl={beforeUrl}
         afterUrl={afterUrl}
-        beforeDate={beforeDate}
-        afterDate={afterDate}
+        beforeIso={bIso}
+        afterIso={aIso}
+        beforeDate={formatDateForCard(before.taken_at)}
+        afterDate={formatDateForCard(after.taken_at)}
+        duration={duration}
+        workoutsTotal={workoutsTotal}
+        monthly={monthly}
         weightFrom={weight?.from ?? null}
         weightTo={weight?.to ?? null}
-        deltaText={weight?.deltaText ?? null}
-        workoutsCount={dayCount}
-        revealedPct={reveal.revealedPct}
-        sign={sign}
-        litCount={dayCount}
-        signLabel={ZODIAC[sign].label}
-        coachCopy={coachCopy}
+        includeWeight={opts.includeWeight}
         cardStyle={cardStyle}
         onReady={onReady}
       />
@@ -419,26 +428,24 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
         id: 'retrato',
         label: 'Retrato',
         icon: (active: boolean) => <RetratoIcon active={active} />,
-        render: (onReady: () => void, cardStyle: ShareCardStyle) =>
-          cardFor('retrato', onReady, cardStyle),
+        render: (onReady, cardStyle, opts) => cardFor('retrato', onReady, cardStyle, opts),
       },
       {
         id: 'transformacion',
         label: 'Transformación',
         icon: (active: boolean) => <TransformacionIcon active={active} />,
         recommended: true,
-        render: (onReady: () => void, cardStyle: ShareCardStyle) =>
-          cardFor('transformacion', onReady, cardStyle),
+        render: (onReady, cardStyle, opts) => cardFor('transformacion', onReady, cardStyle, opts),
       },
       {
         id: 'cambio',
-        label: 'Cambio',
+        label: 'Tu camino',
         icon: (active: boolean) => <CambioIcon active={active} />,
-        render: (onReady: () => void, cardStyle: ShareCardStyle) =>
-          cardFor('cambio', onReady, cardStyle),
+        render: (onReady, cardStyle, opts) => cardFor('cambio', onReady, cardStyle, opts),
       },
     ]
-  }, [data?.before, data?.after, measurements.data, sign, dayCount])
+  }, [data?.before, data?.after, measurements.data, history.data])
+  const hasWeight = weightSpan(measurements.data) != null
 
   if (!chapterReady || !data) return null
 
@@ -763,6 +770,7 @@ export function BeforeAfterPhotos({ hideEyebrow }: { hideEyebrow?: boolean }) {
           shareType="visual_change"
           defaultTabId="transformacion"
           tabs={tabs}
+          weightToggle={hasWeight}
         />
       ) : null}
     </Animated.View>

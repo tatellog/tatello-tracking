@@ -172,9 +172,16 @@ export type ShareTab = {
   icon: (active: boolean) => ReactNode
   /** Marca el formato recomendado (etiqueta "Más compartido"). */
   recommended?: boolean
-  /** Renderiza la tarjeta. Recibe `onReady` (gate de captura) y el estilo
-   *  de fondo elegido en la fila "ESTILO". */
-  render: (onReady: () => void, cardStyle: ShareCardStyle) => ReactNode
+  /** Renderiza la tarjeta. Recibe `onReady` (gate de captura), el estilo
+   *  de fondo elegido en la fila "ESTILO" y las opciones de la hoja. */
+  render: (onReady: () => void, cardStyle: ShareCardStyle, opts: ShareOptions) => ReactNode
+}
+
+/** Opciones que la usuaria elige en la hoja antes de compartir. */
+export type ShareOptions = {
+  /** "Incluir peso" (cambio visual): apagado por defecto, nadie comparte su
+   *  peso sin querer (dueña 5 oct 2026). */
+  includeWeight: boolean
 }
 
 type Props = {
@@ -195,6 +202,8 @@ type Props = {
   onShared?: (result: { uri: string; action: ActionId; template: string }) => void
   /** Copy mientras los tabs aún no existen (cargando). */
   loadingLabel?: string
+  /** Muestra el interruptor "Incluir peso" (solo si hay peso que mostrar). */
+  weightToggle?: boolean
 }
 
 type Busy = 'instagram' | 'save' | 'more' | null
@@ -255,6 +264,7 @@ export function ProgressShareSheet({
   shareType,
   onShared,
   loadingLabel,
+  weightToggle = false,
 }: Props) {
   const cardRefs = useRef<(View | null)[]>([])
   // Índice del tab por defecto: el explícito, el recomendado, o el primero.
@@ -276,6 +286,7 @@ export function ProgressShareSheet({
   const [saved, setSaved] = useState(false)
   const [stage, setStage] = useState({ w: 0, h: 0 })
   const [styleId, setStyleId] = useState(DEFAULT_SHARE_STYLE.id)
+  const [includeWeight, setIncludeWeight] = useState(false)
 
   // El preview se agranda para llenar el escenario PERO con aire alrededor:
   // un margen generoso (no toca los bordes) y un tope para que no se sienta
@@ -291,6 +302,7 @@ export function ProgressShareSheet({
     if (!visible) return
     setActive(initialIndex)
     setStyleId(DEFAULT_SHARE_STYLE.id)
+    setIncludeWeight(false)
     const opened = tabs[initialIndex]
     if (opened) {
       track('share_template_opened', { share_type: shareType, template: opened.id })
@@ -499,7 +511,7 @@ export function ProgressShareSheet({
                     cardRefs.current[i] = el
                   }}
                 >
-                  {t.render(() => onCardReady(t.id), cardStyle)}
+                  {t.render(() => onCardReady(t.id), cardStyle, { includeWeight })}
                 </StageCard>
               ))}
             </View>
@@ -529,6 +541,24 @@ export function ProgressShareSheet({
                 })}
               </View>
             </View>
+            {weightToggle ? (
+              <Pressable
+                onPress={() => {
+                  const next = !includeWeight
+                  setIncludeWeight(next)
+                  track('share_weight_toggled', { on: next, share_type: shareType })
+                }}
+                style={[styles.weightToggle, includeWeight && styles.weightToggleOn]}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: includeWeight }}
+                accessibilityLabel="Incluir peso en la tarjeta"
+              >
+                <View style={[styles.weightKnob, includeWeight && styles.weightKnobOn]} />
+                <Text style={[styles.weightText, includeWeight && styles.weightTextOn]}>
+                  Incluir peso
+                </Text>
+              </Pressable>
+            ) : null}
           </>
         ) : (
           <View style={styles.loading}>
@@ -733,6 +763,34 @@ const styles = StyleSheet.create({
   swatchFill: {
     flex: 1,
   },
+  // "Incluir peso": píldora fantasma; encendida, borde y texto magenta.
+  weightToggle: {
+    alignSelf: 'center',
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+  },
+  weightToggleOn: { borderColor: colors.magenta },
+  weightKnob: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: colors.niebla,
+  },
+  weightKnobOn: { borderColor: colors.magenta, backgroundColor: colors.magenta },
+  weightText: {
+    fontFamily: typography.uiBold,
+    fontSize: typography.sizes.label,
+    color: colors.bone,
+  },
+  weightTextOn: { color: colors.magenta },
   // ── barra de acciones (fija abajo) ─────────────────────────────────
   actionsCaption: {
     textAlign: 'center',
