@@ -16,6 +16,9 @@ import {
   fetchClosedExperiments,
   fetchHypotheses,
   fetchLatestExperiment,
+  fetchPlanCheckins,
+  savePlanCheckin,
+  type PlanCheckinAnswer,
 } from './api'
 
 type Period = 'day' | 'week' | 'month' | 'last30'
@@ -122,5 +125,49 @@ export function useCancelExperiment(uid: string | null) {
   return useMutation({
     mutationFn: (experimentId: string) => callLifecycle({ action: 'cancel', experimentId }),
     onSuccess: invalidate,
+  })
+}
+
+/** Arranca un PLAN de un día ("si es viernes, haré X"): el mismo ciclo de vida
+ *  de un experimento, con día, texto y hora del recordatorio. */
+export function useStartWeekdayPlan(uid: string | null) {
+  const invalidate = useLifecycleInvalidation(uid)
+  return useMutation({
+    mutationFn: (input: {
+      hypothesisId: string
+      weekday: number
+      planText: string
+      reminderMinutes: number | null
+    }) =>
+      callLifecycle({
+        action: 'start',
+        hypothesisId: input.hypothesisId,
+        today: todayInTimezone(),
+        weekday: input.weekday,
+        planText: input.planText,
+        ...(input.reminderMinutes != null ? { reminderMinutes: input.reminderMinutes } : {}),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Las respuestas "¿lo cumpliste?" de un plan (fechas → sí / en parte / no). */
+export function usePlanCheckins(planId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.experiments.planCheckins(planId ?? 'none'),
+    queryFn: () => fetchPlanCheckins(planId as string),
+    enabled: planId != null,
+    staleTime: 60_000,
+  })
+}
+
+export function useAnswerPlanCheckin(planId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { date: string; answer: PlanCheckinAnswer }) =>
+      savePlanCheckin(planId as string, input.date, input.answer),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.experiments.planCheckins(planId ?? 'none') })
+    },
   })
 }

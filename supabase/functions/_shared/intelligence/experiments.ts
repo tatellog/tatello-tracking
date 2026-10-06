@@ -53,14 +53,24 @@ export type ExperimentPlan = {
   metric: ExperimentMetric
   /** Dirección buscada (siempre reversible: sostener el foco unos días). */
   direction: ExperimentDirection
-  /** Duración en días. SIEMPRE ≤14 (≤2 semanas · regla del PRD). */
+  /** Duración en días. ≤14 (≤2 semanas · regla del PRD); un plan de un día
+   *  de la semana llega a 28 (dueña 6 oct 2026: con 2 viernes no se mide). */
   durationDays: number
+  /** Plan de UN día de la semana (0 = domingo … 6 = sábado, como getUTCDay):
+   *  la ventana y la línea base miden solo ese día ("tus viernes"). */
+  weekday?: number
+  /** El plan en palabras de ella ("Entrenar ese día"), elegido o escrito. */
+  planText?: string
+  /** Hora del recordatorio ese día, en minutos desde medianoche (780 = 13:00). */
+  reminderMinutes?: number
 }
 
 /** Duración por defecto (2 semanas · el máximo permitido). */
 export const DEFAULT_DURATION_DAYS = 14
 /** Tope duro del PRD: nunca más de 2 semanas. */
 export const MAX_DURATION_DAYS = 14
+/** Plan de un día de la semana: 4 semanas = 4 ocurrencias de ese día. */
+export const WEEKDAY_PLAN_DAYS = 28
 
 /** Cada dimensión medible → su métrica por-día. Todas se buscan `increase`
  *  (sostener más días el foco); `alimentacion` no mapea a un experimento
@@ -83,28 +93,68 @@ const METRIC_BY_DIMENSION: Partial<Record<FindingCategory, ExperimentMetric>> = 
 export function buildExperimentScaffold(
   hypothesis: Pick<Hypothesis, 'id' | 'sourceFindingId'>,
   sourceFinding: Pick<Finding, 'id' | 'category'>,
-  opts: { durationDays?: number } = {},
+  opts: {
+    durationDays?: number
+    weekday?: number
+    planText?: string
+    reminderMinutes?: number
+  } = {},
 ): ExperimentPlan | null {
   // La hipótesis debe venir del Finding que se pasa (integridad del par).
   if (hypothesis.sourceFindingId && hypothesis.sourceFindingId !== sourceFinding.id) return null
   const metric = METRIC_BY_DIMENSION[sourceFinding.category]
   if (!metric) return null
 
-  const durationDays = clampDuration(opts.durationDays ?? DEFAULT_DURATION_DAYS)
+  const weekdayPlan = opts.weekday != null
+  if (weekdayPlan && !isWeekday(opts.weekday)) return null
+  const durationDays = weekdayPlan
+    ? clampDuration(opts.durationDays ?? WEEKDAY_PLAN_DAYS, WEEKDAY_PLAN_DAYS)
+    : clampDuration(opts.durationDays ?? DEFAULT_DURATION_DAYS)
   if (durationDays < 1) return null
 
-  return {
+  const plan: ExperimentPlan = {
     dimension: sourceFinding.category,
     metric,
     direction: 'increase',
     durationDays,
   }
+  if (weekdayPlan) {
+    plan.weekday = opts.weekday
+    const text = opts.planText?.trim().slice(0, PLAN_TEXT_MAX)
+    if (text) plan.planText = text
+    if (isReminderMinutes(opts.reminderMinutes)) plan.reminderMinutes = opts.reminderMinutes
+  }
+  return plan
 }
 
-/** Acota la duración al rango [1, MAX_DURATION_DAYS]. Enteriza (días completos). */
-export function clampDuration(days: number): number {
+/** Largo máximo del plan escrito por ella (cabe en una notificación). */
+export const PLAN_TEXT_MAX = 80
+
+function isWeekday(n: unknown): n is number {
+  return Number.isInteger(n) && (n as number) >= 0 && (n as number) <= 6
+}
+
+function isReminderMinutes(n: unknown): n is number {
+  return Number.isInteger(n) && (n as number) >= 0 && (n as number) < 24 * 60
+}
+
+/** Día de la semana de un 'YYYY-MM-DD' (0 = domingo), sin zona horaria. */
+export function weekdayOf(day: string): number {
+  return new Date(`${day}T00:00:00Z`).getUTCDay()
+}
+
+/** Solo los días de ese día de la semana (la ventana o la base de un plan). */
+export function onlyWeekday<T extends { day: string | null }>(
+  rows: readonly T[],
+  weekday: number,
+): T[] {
+  return rows.filter((r) => r.day != null && weekdayOf(r.day) === weekday)
+}
+
+/** Acota la duración al rango [1, max] (por defecto 2 semanas). Enteriza. */
+export function clampDuration(days: number, max: number = MAX_DURATION_DAYS): number {
   if (!Number.isFinite(days)) return 0
-  return Math.max(1, Math.min(MAX_DURATION_DAYS, Math.floor(days)))
+  return Math.max(1, Math.min(max, Math.floor(days)))
 }
 
 /** ¿El experimento ya terminó (tiene resultado)? */
@@ -146,6 +196,11 @@ export const RESULT_MARGIN = 0.1
  *  hablar de "mejora" (comparar contra 0 días haría pasar "no había datos" por
  *  "mejoró"). Bajo esto → inconclusa. */
 export const MIN_BASELINE_DAYS = 4
+/** Plan de un día de la semana: muestra mínima en la ventana (3 de sus 4
+ *  viernes) y en la base (3 viernes previos). Con menos, inconclusa. */
+export const MIN_WEEKDAY_SAMPLES = 3
+/** Línea base de un plan de día: ese día en las 8 semanas previas. */
+export const WEEKDAY_BASELINE_DAYS = 56
 /** ¿Es un día registrado (hubo presencia)? Para métricas donde cada día es una
  *  oportunidad (entreno), no solo los días con ese valor puntual. */
 function isLoggedDay(s: DailySignals): boolean {
@@ -230,25 +285,27 @@ function minMeasured(durationDays: number): number {
  * `maintain` confirma si se sostuvo dentro del margen. Determinístico, sin IA.
  */
 export function measureExperiment(
-  plan: Pick<ExperimentPlan, 'metric' | 'direction' | 'durationDays'>,
+  plan: Pick<ExperimentPlan, 'metric' | 'direction' | 'durationDays' | 'weekday'>,
   windowSignals: readonly DailySignals[],
   opts: { baselineRate: number; baselineDaysMeasured?: number } & MetricCtx,
 ): ExperimentMeasurement {
-  const {
-    hitDays,
-    daysMeasured,
-    rate: windowRate,
-  } = computeMetricRate(plan.metric, windowSignals, opts)
+  // Plan de un día: solo cuentan ESOS días de la ventana (los demás días no
+  // eran parte del plan).
+  const weekdayPlan = plan.weekday != null
+  const scoped = weekdayPlan ? onlyWeekday(windowSignals, plan.weekday!) : windowSignals
+  const { hitDays, daysMeasured, rate: windowRate } = computeMetricRate(plan.metric, scoped, opts)
   const baselineRate = opts.baselineRate
   const base = { hitDays, daysMeasured, windowRate, baselineRate }
 
   // Sin muestra en la ventana → inconclusa (no se juzga con 2 días).
-  if (daysMeasured < minMeasured(plan.durationDays)) {
+  const minWindow = weekdayPlan ? MIN_WEEKDAY_SAMPLES : minMeasured(plan.durationDays)
+  if (daysMeasured < minWindow) {
     return { ...base, status: 'inconclusive' }
   }
   // Sin línea base suficiente → inconclusa: comparar contra una base vacía haría
   // pasar "no había datos antes" por "mejoró" (bug #1).
-  if (opts.baselineDaysMeasured != null && opts.baselineDaysMeasured < MIN_BASELINE_DAYS) {
+  const minBase = weekdayPlan ? MIN_WEEKDAY_SAMPLES : MIN_BASELINE_DAYS
+  if (opts.baselineDaysMeasured != null && opts.baselineDaysMeasured < minBase) {
     return { ...base, status: 'inconclusive' }
   }
 
@@ -264,4 +321,71 @@ export function measureExperiment(
         ? 'discarded'
         : 'inconclusive'
   return { ...base, status }
+}
+
+/* ── Plan de un día de la semana · las opciones salen de SUS días buenos ────
+ *
+ * Un plan "si es viernes, haré X" (Gollwitzer & Sheeran 2006). Stelar no
+ * receta: muestra lo que estuvo presente en SUS viernes que sí quedaron en
+ * déficit y no en los otros. Solo hábitos que el motor ya mide; nada de comida.
+ */
+
+export type PlanOptionKey = 'trained' | 'sleep' | 'protein' | 'water'
+
+export type PlanOption = {
+  key: PlanOptionKey
+  /** El plan en su voz, listo para guardarse como planText. */
+  text: string
+  /** La evidencia: "En 3 de tus 4 viernes en déficit". */
+  evidence: string
+  /** Días buenos con el hábito / días buenos (para ordenar). */
+  goodShare: number
+}
+
+const PLAN_OPTION_TEXT: Record<PlanOptionKey, string> = {
+  trained: 'Entrenar ese día',
+  sleep: 'Dormir 7 h la noche antes',
+  protein: 'Llegar a mi proteína',
+  water: 'Completar mi agua',
+}
+
+const PLAN_HABIT: Record<PlanOptionKey, (s: DailySignals, c: MetricCtx) => boolean> = {
+  trained: (s) => s.trained === true,
+  sleep: (s) => (s.sleep_minutes ?? 0) >= SLEEP_7H_MIN,
+  protein: (s, c) => c.proteinTarget != null && (s.protein_g ?? 0) >= c.proteinTarget,
+  water: (s) => (s.water_glasses ?? 0) >= WATER_GOAL_GLASSES,
+}
+
+/**
+ * Las opciones de plan para un día de la semana, desde sus propios datos: un
+ * hábito entra si estuvo en al menos la mitad de sus días buenos (en déficit) de
+ * ese día Y más seguido que en los malos. Ordenadas por presencia en los buenos.
+ * Sin al menos 2 días buenos de ese día, no hay evidencia: devuelve [].
+ */
+export function planOptionsForWeekday(
+  signals: readonly DailySignals[],
+  weekday: number,
+  ctx: MetricCtx,
+  weekdayLabel: string,
+): PlanOption[] {
+  if (ctx.calorieTarget == null) return []
+  const days = onlyWeekday(signals, weekday).filter((s) => s.calories != null && s.calories > 0)
+  const good = days.filter((s) => isDeficitDay(s.calories, ctx.calorieTarget))
+  const bad = days.filter((s) => !isDeficitDay(s.calories, ctx.calorieTarget))
+  if (good.length < 2) return []
+  const out: PlanOption[] = []
+  for (const key of Object.keys(PLAN_HABIT) as PlanOptionKey[]) {
+    const has = PLAN_HABIT[key]
+    const g = good.filter((s) => has(s, ctx)).length
+    const goodShare = g / good.length
+    const badShare = bad.length > 0 ? bad.filter((s) => has(s, ctx)).length / bad.length : 0
+    if (goodShare < 0.5 || goodShare <= badShare) continue
+    out.push({
+      key,
+      text: PLAN_OPTION_TEXT[key],
+      evidence: `En ${g} de tus ${good.length} ${weekdayLabel} en déficit`,
+      goodShare,
+    })
+  }
+  return out.sort((a, b) => b.goodShare - a.goodShare)
 }

@@ -40,7 +40,7 @@ export function UndoMealToast() {
   if (!payload) return null
 
   const undo = () => {
-    deleteMeal.mutate(payload.id)
+    for (const id of payload.ids ?? [payload.id]) deleteMeal.mutate(id)
     if (timer.current) clearTimeout(timer.current)
     setPayload(null)
   }
@@ -54,7 +54,9 @@ export function UndoMealToast() {
     >
       <View style={styles.toast}>
         <Text style={styles.text} numberOfLines={1}>
-          <Text style={styles.name}>{payload.name}</Text> sumada a {payload.mealTypeLabel}
+          <Text style={styles.name}>{payload.name}</Text>
+          {(payload.ids?.length ?? 1) > 1 ? ' sumadas a ' : ' sumada a '}
+          {payload.mealTypeLabel}
         </Text>
         <Pressable
           onPress={undo}

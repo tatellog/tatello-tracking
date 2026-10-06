@@ -129,3 +129,14 @@ export const HERO_ALIVE_ENABLED = true
  * beta (month-built), sin tocar backend. false = la Órbita de tres segmentos.
  */
 export const ORBITA_SINGLE_FEED = true
+
+/*
+ * Plan de un día ("si es viernes, haré X") · dueña 6 oct 2026: "solo tu cuenta
+ * primero". Determinístico (sin IA), pero se valida en la cuenta de la dueña
+ * antes de abrirlo a la beta: agregar emails aquí lo enciende.
+ */
+const WEEKDAY_PLAN_EMAILS = ['dev@local.test', 'tatellog@gmail.com']
+
+export function weekdayPlanEnabledForEmail(email: string | null | undefined): boolean {
+  return email != null && WEEKDAY_PLAN_EMAILS.includes(email.toLowerCase())
+}

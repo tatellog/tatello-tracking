@@ -201,6 +201,8 @@ export const queryKeys = {
     // El experimento MÁS RECIENTE (cualquier status) — para mostrar el resultado
     // recién cerrado leyéndolo de la DB (sobrevive a remounts del cliente).
     latest: (uid: string) => ['experiments', 'latest', uid] as const,
+    // Las respuestas "¿lo cumpliste?" de un plan de un día.
+    planCheckins: (planId: string) => ['experiments', 'plan-checkins', planId] as const,
     // Los experimentos ya cerrados (confirmado/no/inconcluso) — el historial
     // "Hilos que ya seguiste" en Órbita Mes, para que no desaparezcan al cerrar.
     closed: (uid: string) => ['experiments', 'closed', uid] as const,

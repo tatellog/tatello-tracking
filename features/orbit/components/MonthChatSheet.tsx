@@ -18,7 +18,7 @@ import { aiEnabledForEmail } from '@/lib/featureFlags'
 import { colors, radius, typography } from '@/theme'
 
 import type { Finding } from '../findings'
-import { FindingChatView } from './FindingChatView'
+import { FindingChatView, type FindingTrial } from './FindingChatView'
 import { FindingView } from './FindingView'
 import { StelarStar } from './MonthChatView'
 
@@ -60,10 +60,7 @@ type Props = {
   /** El hallazgo abierto ya es un foco guardado este mes. */
   kept?: boolean
   /** La prueba (V-12) del hallazgo abierto — se pasa tal cual al chat. */
-  trial?:
-    | { state: 'offer'; onStart: () => void; busy?: boolean }
-    | { state: 'running'; day: number; days: number; onLeave: () => void; busy?: boolean }
-    | null
+  trial?: FindingTrial
   onNext: () => void
   onClose: () => void
   onPickDay?: (date: string) => void

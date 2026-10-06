@@ -55,14 +55,21 @@ type Props = {
    *  El experimento nace y se deja DESDE la conversación (jamás un dashboard);
    *  el estado vive en el arco de la card. null = no aplica (sin hipótesis
    *  viva, dimensión no medible, u otra prueba ya corre). */
-  trial?:
-    | { state: 'offer'; onStart: () => void; busy?: boolean }
-    | { state: 'running'; day: number; days: number; onLeave: () => void; busy?: boolean }
-    | null
+  trial?: FindingTrial
   onNext: () => void
   onFinish: () => void
   onPickDay?: (date: string) => void
 }
+
+/** Lo que el cierre del chat ofrece: probar, armar un plan de día, o su estado. */
+export type FindingTrial =
+  | { state: 'offer'; onStart: () => void; busy?: boolean }
+  | { state: 'running'; day: number; days: number; onLeave: () => void; busy?: boolean }
+  /** Hallazgo de UN día ("los viernes"): en vez de probar, arma un plan. */
+  | { state: 'plan'; label: string; onPlan: () => void }
+  /** Su plan de ese día ya corre: lo recuerda y se puede dejar. */
+  | { state: 'planRunning'; text: string; onLeave: () => void; busy?: boolean }
+  | null
 
 type Entry = { who: 'stelar'; text: string; voice?: boolean } | { who: 'user'; label: string }
 
@@ -428,7 +435,24 @@ export function FindingChatView({
               El seguimiento vive en el arco de la card, no en esta hoja. */}
           {trial ? (
             <View style={styles.trialBlock}>
-              {trial.state === 'offer' ? (
+              {trial.state === 'plan' ? (
+                <>
+                  <Text style={styles.trialNote}>
+                    Si quieres, armamos un plan para ese día: tú eliges qué harás distinto y te lo
+                    recuerdo. Dejarlo también está bien.
+                  </Text>
+                  <ChoiceChip label={trial.label} tint={tint} onPress={trial.onPlan} />
+                </>
+              ) : trial.state === 'planRunning' ? (
+                <>
+                  <Text style={styles.trialNote}>{`Tu plan: ${trial.text}.`}</Text>
+                  <ChoiceChip
+                    label={trial.busy ? 'Cerrando…' : 'Dejar el plan'}
+                    tint={tint}
+                    onPress={trial.busy ? () => {} : trial.onLeave}
+                  />
+                </>
+              ) : trial.state === 'offer' ? (
                 <>
                   <Text style={styles.trialNote}>
                     Si quieres, lo miramos de cerca unos días. Se mide sola, con tu registro.

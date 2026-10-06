@@ -91,6 +91,9 @@ export type Finding = {
    *  receta. undefined si el hallazgo no da una palanca clara (observaciones,
    *  muestras chicas). La IA solo la VISTE; nunca la inventa. */
   lever?: string
+  /** Día de la semana estructurado (0 = domingo) cuando el hallazgo es de UN
+   *  día ("los viernes"): con él se arma un plan de ese día. */
+  weekday?: number
   /** Métrica de esquina ("18 de 21 entrenamientos"). */
   metric: { value: string; label: string }
   /** Las fechas reales relevantes del hallazgo (para "Ver esos días"). */

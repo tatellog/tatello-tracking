@@ -28,7 +28,7 @@ import Animated, {
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import { isCycleActive } from '@/features/cycle/phase'
-import type { FrequentMeal, MealInput } from '@/features/macros/api'
+import { mealIngredients, type FrequentMeal, type MealInput } from '@/features/macros/api'
 import { MealGlyph } from '@/features/macros/components/meal-glyphs'
 import { useCreateMeal, useFrequentMeals, useMealsForDate } from '@/features/macros/hooks'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
@@ -497,6 +497,7 @@ export function QuickLogSheet({ visible, onClose }: Props) {
         consumed_at: logConsumedAt(),
         meal_type: mealType,
         photo_storage_path: comoAyer.photo_storage_path,
+        ingredients: mealIngredients(comoAyer) ?? undefined,
       },
       {
         onSuccess: (meal) => {
@@ -509,6 +510,55 @@ export function QuickLogSheet({ visible, onClose }: Props) {
       },
     )
     setConfirmingName(comoAyer.name)
+    fireBurst(SCREEN_W / 2, SCREEN_H * 0.62, colors.magentaHot)
+    setTimeout(onClose, CONFIRM_HOLD_MS)
+  }
+
+  // "Repetir mi día de ayer" — para quien come casi igual entre semana: todo
+  // lo de ayer en un tap, cada comida en su momento, con deshacer de todas.
+  // Solo se ofrece si el día que se registra aún está vacío (sin duplicar).
+  const dayMeals = useMealsForDate(visible ? logDate : null)
+  const yesterAll = yesterMeals.data ?? []
+  const repeatDay =
+    yesterAll.length >= 2 && dayMeals.data != null && dayMeals.data.length === 0
+      ? {
+          count: yesterAll.length,
+          kcal: Math.round(yesterAll.reduce((a, m) => a + m.calories, 0)),
+          protein: Math.round(yesterAll.reduce((a, m) => a + m.protein_g, 0)),
+        }
+      : null
+  const REPEAT_DAY_KEY = '__repeat_day__'
+
+  const handleRepeatDay = () => {
+    if (!repeatDay || confirmingName) return
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    const at = logConsumedAt()
+    Promise.all(
+      yesterAll.map((m) =>
+        createMeal.mutateAsync({
+          name: m.name,
+          protein_g: m.protein_g,
+          calories: m.calories,
+          consumed_at: at,
+          // Cada comida en su momento de ayer (si viniera uno raro, el elegido).
+          meal_type: MEAL_TYPES.some((t) => t.value === m.meal_type)
+            ? (m.meal_type as MealType)
+            : mealType,
+          photo_storage_path: m.photo_storage_path,
+          ingredients: mealIngredients(m) ?? undefined,
+        }),
+      ),
+    )
+      .then((created) => {
+        emitMealUndo({
+          id: created[0]!.id,
+          ids: created.map((c) => c.id),
+          name: `${created.length} comidas de ayer`,
+          mealTypeLabel: isTodayLog ? 'hoy' : backfillLabel,
+        })
+      })
+      .catch(() => {})
+    setConfirmingName(REPEAT_DAY_KEY)
     fireBurst(SCREEN_W / 2, SCREEN_H * 0.62, colors.magentaHot)
     setTimeout(onClose, CONFIRM_HOLD_MS)
   }
@@ -847,7 +897,9 @@ export function QuickLogSheet({ visible, onClose }: Props) {
               <Text style={styles.newMealLabel}>Una comida nueva</Text>
               {methodsBlock}
 
-              {items.length === 0 ? (
+              {/* Sin frecuentes pero con comida de ayer: "Como ayer" igual se
+                  ofrece (una usuaria nueva también repite lo de ayer). */}
+              {items.length === 0 && !comoAyer && !repeatDay ? (
                 <Text style={styles.empty}>
                   Toca ✦ Con texto y escribe lo que comiste, tal cual: “dos huevos con pan”.
                   Aparecerá aquí para sumarlo en un toque.
@@ -874,6 +926,34 @@ export function QuickLogSheet({ visible, onClose }: Props) {
                       )
                     })}
                   </View>
+
+                  {repeatDay ? (
+                    <Pressable
+                      onPress={handleRepeatDay}
+                      disabled={confirmingName != null}
+                      style={[
+                        styles.comoAyer,
+                        confirmingName != null &&
+                          confirmingName !== REPEAT_DAY_KEY &&
+                          styles.methodDimmed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Repetir tu día de ayer: ${repeatDay.count} comidas`}
+                    >
+                      <View style={styles.comoAyerText}>
+                        <Text style={styles.comoAyerLabel}>
+                          {confirmingName === REPEAT_DAY_KEY
+                            ? '✦ Registrado'
+                            : 'Repetir tu día de ayer'}
+                        </Text>
+                        <Text style={styles.comoAyerName} numberOfLines={1}>
+                          {repeatDay.count} comidas · {repeatDay.protein} g prot · {repeatDay.kcal}{' '}
+                          kcal
+                        </Text>
+                      </View>
+                      <Text style={styles.comoAyerChevron}>›</Text>
+                    </Pressable>
+                  ) : null}
 
                   {/* "Como ayer" — el camino más corto primero: repetir lo de
                       ayer en este momento es un tap. */}
@@ -905,9 +985,11 @@ export function QuickLogSheet({ visible, onClose }: Props) {
 
                   {/* "Lo de siempre" se gana con repetición: con puras comidas
                       de 1 vez la app exageraría lo que sabe de ti. */}
-                  <Text style={styles.frequentLabel}>
-                    {items.some((it) => it.freq >= 2) ? 'Lo de siempre' : 'Tus recientes'}
-                  </Text>
+                  {items.length > 0 ? (
+                    <Text style={styles.frequentLabel}>
+                      {items.some((it) => it.freq >= 2) ? 'Lo de siempre' : 'Tus recientes'}
+                    </Text>
+                  ) : null}
 
                   {items.slice(0, FREQUENT_PREVIEW).map((item) => {
                     const confirming = confirmingName === item.name

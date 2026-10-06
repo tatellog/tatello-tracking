@@ -25,6 +25,7 @@ import {
   subscribeWatchCelebration,
 } from '@/features/tabs/pending-watch-celebration'
 import { signName } from '@/features/tabs/zodiac/name'
+import { PlanTodayCard } from '@/features/experiments/components/PlanTodayCard'
 import { useSession } from '@/hooks/useSession'
 import { usePressFeedback } from '@/components/ui/interaction'
 import type { BriefContext } from '@/features/brief/api'
@@ -83,7 +84,7 @@ import {
   useWorkoutTypeToday,
 } from '@/features/streak/hooks'
 import { track } from '@/lib/analytics'
-import { HERO_ALIVE_ENABLED } from '@/lib/featureFlags'
+import { HERO_ALIVE_ENABLED, weekdayPlanEnabledForEmail } from '@/lib/featureFlags'
 import {
   CoachLine,
   DayCheckIn,
@@ -749,6 +750,9 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
   const discoverySignals = useSignalsHistory(90)
   const discovery = discoverySignals.data ? discoveryProgress(discoverySignals.data) : null
   const stardustUid = useSession().session?.user?.id ?? 'anon'
+  // Plan de un día (dueña 6 oct 2026): solo en las cuentas del flag por ahora.
+  const planSession = useSession().session
+  const planEnabled = weekdayPlanEnabledForEmail(planSession?.user?.email)
   const mealCardRef = useRef<View>(null)
   const lastStardustSeed = useRef<number | null>(null)
   const fireStardust = () => {
@@ -996,6 +1000,10 @@ function TodayContent({ ctx, cadence, profile }: ContentProps) {
               ) : null}
               {/* Con el reloj conectado, la entrada fija a "Tu smartwatch". */}
               {!viewingPast ? <SmartwatchRow /> : null}
+              {/* Su plan de un día: ese día lo recuerda, al siguiente pregunta. */}
+              {planEnabled && !viewingPast ? (
+                <PlanTodayCard uid={planSession?.user?.id ?? null} today={todayIsoLocal} />
+              ) : null}
             </Animated.View>
 
             {/* La constelación va DIRECTO tras el toggle — nada de texto entre
