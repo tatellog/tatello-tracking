@@ -15,6 +15,9 @@ export type MealUndoPayload = {
   name: string
   /** "Desayuno" / "Cena"... — el momento al que se sumó. */
   mealTypeLabel: string
+  /** Varias comidas de un tap ("Repetir mi día de ayer"): el deshacer las
+   *  borra todas. Si viene, `id` es la primera. */
+  ids?: string[]
 }
 
 type Listener = (payload: MealUndoPayload) => void

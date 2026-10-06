@@ -17,7 +17,13 @@ import { EyebrowLabel } from '@/components/EyebrowLabel'
 import { PrimaryCta } from '@/components/PrimaryCta'
 import { usePressFeedback } from '@/components/ui/interaction'
 import { track } from '@/lib/analytics'
-import { uploadMealPhoto, type FrequentMeal, type MealInput } from '@/features/macros/api'
+import {
+  mealIngredients,
+  uploadMealPhoto,
+  type FrequentMeal,
+  type MealInput,
+  type StoredIngredient,
+} from '@/features/macros/api'
 import { useCreateMeal, useFrequentMeals, useMealsForDate } from '@/features/macros/hooks'
 import { emitMealLogged } from '@/features/macros/meal-logged-bus'
 import { mealMomentByHour } from '@/features/macros/meal-moment'
@@ -255,13 +261,21 @@ export function MealComposer() {
   // a la comida de AYER en este mismo momento (desayuno/comida/cena). Solo
   // consulta con el registro abierto; sin comida de ayer en el momento, la
   // fila simplemente no existe.
+  // "Ayer" es relativo al día que se registra (viendo un día pasado, es el
+  // anterior a ESE día), igual que en Registrar.
+  const activeLogDate = useActiveLogDate()
   const yesterdayIso = useMemo(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 1)
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    return `${d.getFullYear()}-${mm}-${dd}`
-  }, [])
+    const base = activeLogDate
+      ? (() => {
+          const [y, m, d] = activeLogDate.split('-').map(Number) as [number, number, number]
+          return new Date(y, m - 1, d, 12)
+        })()
+      : new Date()
+    base.setDate(base.getDate() - 1)
+    const mm = String(base.getMonth() + 1).padStart(2, '0')
+    const dd = String(base.getDate()).padStart(2, '0')
+    return `${base.getFullYear()}-${mm}-${dd}`
+  }, [activeLogDate])
   const yesterMeals = useMealsForDate(registroOpen ? yesterdayIso : null)
   const activeMoment = forcedType ?? currentMealType()
   const comoAyer = useMemo(
@@ -276,6 +290,7 @@ export function MealComposer() {
       protein_g: comoAyer.protein_g,
       calories: comoAyer.calories,
       photo_storage_path: comoAyer.photo_storage_path,
+      ingredients: mealIngredients(comoAyer),
     })
     setConfirmed(comoAyer.name)
     setTimeout(() => setConfirmed((c) => (c === comoAyer.name ? null : c)), CONFIRM_MS)
@@ -309,7 +324,6 @@ export function MealComposer() {
   // Viendo un día pasado ("modo ver día"), todo lo que se registra desde aquí
   // se ancla a ESE día (mediodía local), igual que scan-meal. Antes Repetir y
   // "Como ayer" escribían en HOY mientras la pantalla mostraba otro día.
-  const activeLogDate = useActiveLogDate()
   const consumedAtNow = () => {
     if (!activeLogDate) return new Date()
     const [y, m, d] = activeLogDate.split('-').map(Number) as [number, number, number]
@@ -324,6 +338,7 @@ export function MealComposer() {
     protein_g: number
     calories: number
     photo_storage_path?: string | null
+    ingredients?: StoredIngredient[] | null
   }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     const mealType = forcedType ?? currentMealType()
@@ -335,6 +350,8 @@ export function MealComposer() {
         consumed_at: consumedAtNow(),
         meal_type: mealType,
         photo_storage_path: meal.photo_storage_path ?? undefined,
+        // Repetir conserva el desglose (antes se perdía; Registrar sí lo guardaba).
+        ingredients: meal.ingredients ?? undefined,
       },
       {
         onSuccess: (created) => {
@@ -360,41 +377,22 @@ export function MealComposer() {
       protein_g: item.protein_g,
       calories: item.calories,
       photo_storage_path: item.photo_storage_path,
+      ingredients: item.ingredients,
     })
     setConfirmed(item.name)
     setTimeout(() => setConfirmed((c) => (c === item.name ? null : c)), CONFIRM_MS)
   }
 
   // ── Registro con foto / texto — hand off al flujo /scan-meal ──
-  const openScanPhoto = async (source: 'camera' | 'library') => {
-    if (source === 'camera') {
-      const perm = await ImagePicker.requestCameraPermissionsAsync()
-      if (!perm.granted) {
-        Alert.alert('Cámara', 'Necesitamos permiso a la cámara para tomar la foto.')
-        return
-      }
-    }
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
-    if (result.canceled || !result.assets[0]) return
-    router.push({ pathname: '/scan-meal', params: { uri: result.assets[0].uri } })
-  }
-
+  // Foto: directo a la cámara in-app (/capture-meal), como el "+" de Hoy y
+  // Registrar. Trae galería y Platillo/Etiqueta adentro; el action sheet
+  // intermedio cobraba un tap y saltaba la foto de etiqueta.
   const handleScanPhoto = () => {
     track('quick_add_pressed', { method: 'photo' })
-    showActionSheet(
-      {
-        title: 'Registrar comida con foto',
-        options: ['Tomar foto', 'Elegir de la galería', 'Cancelar'],
-        cancelButtonIndex: 2,
-      },
-      (i) => {
-        if (i === 0) void openScanPhoto('camera')
-        else if (i === 1) void openScanPhoto('library')
-      },
-    )
+    router.push({
+      pathname: '/capture-meal',
+      params: { mealType: forcedType ?? currentMealType() },
+    })
   }
 
   const handleScanText = () => {
