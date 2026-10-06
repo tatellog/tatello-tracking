@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native'
-import Svg, { Circle, Path, Polyline } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 
 import { ZodiacArt } from '@/features/tabs/components/constellation/ZodiacArt'
 import type { ZodiacSign } from '@/features/tabs/zodiac/types'
@@ -14,7 +14,7 @@ import { AuroraBed, ShareSignature, ShareTopRow, shortMonthYear } from './share-
  *   · Constelación — limpia y centrada: el arte del signo con su anillo de
  *     avance, el nombre, el % y dos chips. (La que la dueña eligió.)
  *   · Calendario — un número gigante y el mes donde cada día entrenado es una
- *     estrella, unidas por una línea: el mes dibuja su propia constelación.
+ *     estrella (sin línea que las una: no se entendía, dueña 5 oct 2026).
  *   · Mi mes — bandas de color inclinadas tipo Wrapped: entrenos, minutos y
  *     días en déficit. Una banda sin dato no se pinta (nunca un cero).
  * 9:16 fijo, todo dentro de la zona segura de historias.
@@ -201,23 +201,8 @@ export function SkyCalendarCard({
         ))}
       </View>
       <View style={{ width: GRID_W, height: rows * ROW_H }}>
-        {/* Las estrellas y la línea que las une (debajo de los números). */}
+        {/* Una estrella por día entrenado (debajo de los números). */}
         <Svg width={GRID_W} height={rows * ROW_H} style={StyleSheet.absoluteFill}>
-          {litSorted.length > 1 ? (
-            <Polyline
-              points={litSorted
-                .map((d) => {
-                  const p = center(d)
-                  return `${p.x},${p.y}`
-                })
-                .join(' ')}
-              fill="none"
-              stroke={accent}
-              strokeOpacity={0.7}
-              strokeWidth={1.3}
-              strokeDasharray="3 4"
-            />
-          ) : null}
           {litSorted.map((d) => {
             const p = center(d)
             return (
@@ -392,12 +377,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // lineHeight MAYOR que el tamaño: con uno menor iOS recorta el número
+  // (pasaba con el "3"). El espaciado negativo se queda leve por lo mismo.
   bigNum: {
-    marginTop: 18,
+    marginTop: 8,
+    paddingLeft: 2,
     fontFamily: typography.display,
     fontSize: 132,
-    lineHeight: 128,
-    letterSpacing: -7,
+    lineHeight: 156,
+    letterSpacing: -3,
     color: colors.leche,
     fontVariant: ['tabular-nums'],
   },
