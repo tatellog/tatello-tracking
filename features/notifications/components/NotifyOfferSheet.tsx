@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, radius, typography } from '@/theme'
 
 import type { OfferTrigger } from '../offer-logic'
+import { SHEET_GRABBER, SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 /*
  * La oferta de avisos en contexto: una hoja chica, una pregunta, un toque.
@@ -73,24 +74,16 @@ export function NotifyOfferSheet({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.55)' },
+  root: { flex: 1, justifyContent: 'flex-end', backgroundColor: SHEET_SCRIM },
   sheet: {
     paddingTop: 12,
     paddingHorizontal: 24,
     gap: 12,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    backgroundColor: colors.bgCard,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.oroHairlineSoft,
+    ...SHEET_SURFACE,
   },
   grabber: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.oroHairline,
     marginBottom: 10,
+    ...SHEET_GRABBER,
   },
   title: {
     fontFamily: typography.uiSemi,

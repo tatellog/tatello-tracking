@@ -13,6 +13,7 @@ import {
   type DetectedLiquid,
   type LiquidDetection,
 } from '../liquid-detection'
+import { SHEET_GRABBER, SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 /*
  * El momento "Stelar entendió lo que tomé": al guardar una comida con
@@ -232,16 +233,13 @@ export function LiquidDetectionSheet({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: SHEET_SCRIM,
   },
   anchor: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.bgCard,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 34,
@@ -250,14 +248,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 12,
+    ...SHEET_SURFACE,
   },
   grabber: {
-    alignSelf: 'center',
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.bruma,
     marginBottom: 16,
+    ...SHEET_GRABBER,
   },
   headerRow: {
     flexDirection: 'row',

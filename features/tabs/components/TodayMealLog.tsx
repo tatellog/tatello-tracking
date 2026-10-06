@@ -36,6 +36,7 @@ import { SAMPLE_MEAL_PHOTOS } from '@/features/macros/sampleMealPhotos'
 import { useScreenActive } from '@/features/orbit/useScreenActive'
 import { InteractiveGlow } from '@/components/ui/interaction'
 import { colors, typography } from '@/theme'
+import { SHEET_GRABBER, SHEET_SCRIM, SHEET_SURFACE } from '@/components/ui/StelarModal'
 
 const THUMB = 48
 
@@ -809,29 +810,21 @@ const styles = StyleSheet.create({
   },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.scrim,
+    backgroundColor: SHEET_SCRIM,
   },
   sheetAnchor: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.bgCard,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderTopWidth: 1,
-    borderColor: colors.bruma,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 34,
+    ...SHEET_SURFACE,
   },
   grabber: {
-    alignSelf: 'center',
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.bruma,
     marginBottom: 14,
+    ...SHEET_GRABBER,
   },
   sheetHeader: {
     flexDirection: 'row',
